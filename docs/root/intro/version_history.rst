@@ -4,6 +4,8 @@ Version history
 1.12.0 (pending)
 ================
 * http: added the ability to reject HTTP/1.1 requests with invalid HTTP header values, using the runtime feature `envoy.reloadable_features.strict_header_validation`.
+* tls: IP address SAN fields in certificates are now verified against configured SANs in the
+  certificate validation context.
 
 1.11.0 (July 11, 2019)
 ======================

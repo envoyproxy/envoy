@@ -520,7 +520,7 @@ bool ContextImpl::verifySubjectAltName(X509* cert,
       if (san->d.ip->length == 4) {
         auto& sin = reinterpret_cast<sockaddr_in&>(ss);
         sin.sin_family = AF_INET;
-        memcpy(&sin.sin_addr, san->d.ip->data, 4);
+        memcpy(&sin.sin_addr, san->d.ip->data, sizeof(sin.sin_addr));
         Network::Address::Ipv4Instance addr(&sin);
         for (auto& config_san : subject_alt_names) {
           if (config_san == addr.ip()->addressAsString()) {
@@ -530,7 +530,7 @@ bool ContextImpl::verifySubjectAltName(X509* cert,
       } else if (san->d.ip->length == 16) {
         auto& sin6 = reinterpret_cast<sockaddr_in6&>(ss);
         sin6.sin6_family = AF_INET6;
-        memcpy(&sin6.sin6_addr, san->d.ip->data, 16);
+        memcpy(&sin6.sin6_addr, san->d.ip->data, sizeof(sin6.sin6_addr));
         Network::Address::Ipv6Instance addr(sin6);
         for (auto& config_san : subject_alt_names) {
           if (config_san == addr.ip()->addressAsString()) {

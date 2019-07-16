@@ -102,7 +102,7 @@ public:
    * @return pointer to the Instance, or nullptr if unable to parse the address.
    */
   static Address::InstanceConstSharedPtr
-  parseInternetAddress(const std::string& ip_address, uint16_t port = 0, bool v6only = true);
+  parseInternetAddress(absl::string_view ip_address, uint16_t port = 0, bool v6only = true);
 
   /**
    * Parse an internet host address (IPv4 or IPv6) AND port, and create an Instance from it. Throws
