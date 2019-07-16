@@ -48,13 +48,21 @@ using testing::Throw;
 namespace Envoy {
 namespace Server {
 
-class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
+MATCHER_P(containsServerName, name, "") {
+  const auto& names = arg.filter_chain_match().server_names();
+  return std::find(names.begin(), names.end(), name) != std::end(names);
+}
 
-  std::unique_ptr<Network::FilterChain>
-  buildFilterChain(const ::envoy::api::v2::listener::FilterChain&) const override {
-    // Won't dereference but requires not nullptr.
-    return std::make_unique<Network::MockFilterChain>();
+class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
+public:
+  MockFilterChainFactoryBuilder() {
+    EXPECT_CALL(*this, buildFilterChain(_)).WillRepeatedly(Invoke([](auto) {
+      return std::make_unique<Network::MockFilterChain>();
+    }));
   }
+
+  MOCK_CONST_METHOD1(buildFilterChain, std::unique_ptr<Network::FilterChain>(
+                                           const ::envoy::api::v2::listener::FilterChain&));
 };
 
 class FilterChainManagerImplTest : public testing::Test {
@@ -168,16 +176,32 @@ TEST_F(FilterChainManagerImplTest, EmptyDstAddressAndCatchAllAddress) {
   TestUtility::loadFromYaml(
       TestEnvironment::substitute(filter_chain_yaml1, Network::Address::IpVersion::v4),
       filter_chain_1);
+  std::vector<Network::FilterFactoryCb> ref0, ref1;
+
+  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(containsServerName("*.foo.com")))
+      .WillRepeatedly(Invoke([&ref0](auto) {
+        auto res = std::make_unique<Network::MockFilterChain>();
+        EXPECT_CALL(*res, networkFilterFactories()).Times(1).WillRepeatedly(ReturnRef(ref0));
+        return res;
+      }));
+  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(containsServerName("*.bar.com")))
+      .WillRepeatedly(Invoke([&ref1](auto) {
+        auto res = std::make_unique<Network::MockFilterChain>();
+        EXPECT_CALL(*res, networkFilterFactories()).Times(1).WillRepeatedly(ReturnRef(ref1));
+        return res;
+      }));
   filter_chain_manager_.addFilterChain(
       std::vector<const envoy::api::v2::listener::FilterChain*>{&filter_chain_0, &filter_chain_1},
       filter_chain_factory_builder_);
 
   auto* filter_chain =
-      findFilterChainHelper(443, "127.0.0.1", "www.bar.com", "tls", {}, "8.8.8.8", 111);
+      findFilterChainHelper(443, "127.0.0.1", "www.foo.com", "tls", {}, "8.8.8.8", 111);
   EXPECT_NE(filter_chain, nullptr);
+  EXPECT_EQ(&ref0, &filter_chain->networkFilterFactories());
 
-  filter_chain = findFilterChainHelper(443, "127.0.0.1", "www.foo.com", "tls", {}, "8.8.8.8", 111);
+  filter_chain = findFilterChainHelper(443, "127.0.0.1", "www.bar.com", "tls", {}, "8.8.8.8", 111);
   EXPECT_NE(filter_chain, nullptr);
+  EXPECT_EQ(&ref1, &filter_chain->networkFilterFactories());
 }
 
 TEST_F(FilterChainManagerImplTest, EmptyDstAddressIsSuperSetOfCatchAllAddress) {
