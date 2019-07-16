@@ -6,6 +6,7 @@
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
+#include "common/common/macros.h"
 #include "common/http/headers.h"
 
 #include "extensions/transport_sockets/well_known_names.h"
@@ -147,19 +148,18 @@ void Filter::done(bool success) {
 }
 
 const absl::flat_hash_set<std::string>& Filter::httpMethods() const {
-  static const absl::flat_hash_set<std::string>* methods = new absl::flat_hash_set<std::string>(
+  CONSTRUCT_ON_FIRST_USE(
+      absl::flat_hash_set<std::string>,
       {Http::Headers::get().MethodValues.Connect, Http::Headers::get().MethodValues.Delete,
        Http::Headers::get().MethodValues.Get, Http::Headers::get().MethodValues.Head,
        Http::Headers::get().MethodValues.Post, Http::Headers::get().MethodValues.Put,
        Http::Headers::get().MethodValues.Options, Http::Headers::get().MethodValues.Trace});
-  return *methods;
 }
 
 const absl::flat_hash_set<std::string>& Filter::httpProtocols() const {
-  static const absl::flat_hash_set<std::string>* protocols =
-      new absl::flat_hash_set<std::string>({Http::Headers::get().ProtocolStrings.Http10String,
-                                            Http::Headers::get().ProtocolStrings.Http11String});
-  return *protocols;
+  CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>,
+                         {Http::Headers::get().ProtocolStrings.Http10String,
+                          Http::Headers::get().ProtocolStrings.Http11String});
 }
 
 } // namespace HttpInspector

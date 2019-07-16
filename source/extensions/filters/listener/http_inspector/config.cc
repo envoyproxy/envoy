@@ -18,7 +18,7 @@ public:
   Network::ListenerFilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&,
                                Server::Configuration::ListenerFactoryContext& context) override {
-    ConfigSharedPtr config(new Config(context.scope()));
+    ConfigSharedPtr config(std::make_shared<Config>(context.scope()));
     return [config](Network::ListenerFilterManager& filter_manager) -> void {
       filter_manager.addAcceptFilter(std::make_unique<Filter>(config));
     };
