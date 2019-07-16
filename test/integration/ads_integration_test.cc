@@ -958,19 +958,42 @@ TEST_P(AdsIntegrationTest, XdsBatching) {
 TEST_P(AdsIntegrationTest, ListenerDrainBeforeServerStart) {
   initialize();
 
+  // Initial request for cluster, response for cluster_0.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}));
   sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
                                                  {buildCluster("cluster_0")},
                                                  {buildCluster("cluster_0")}, {}, "1");
+
+  // Initial request for load assignment for cluster_0, respond with version 1
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",
+                                      {"cluster_0"}, {"cluster_0"}, {}));
   sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
       Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")},
       {buildClusterLoadAssignment("cluster_0")}, {}, "1");
+  // Request for updates to cluster_0 version 1, no response
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}, {}, {}));
 
+  // Initial request for any listener, respond with listener_0 version 1
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}, {}, {}));
   sendDiscoveryResponse<envoy::api::v2::Listener>(
       Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")},
       {buildListener("listener_0", "route_config_0")}, {}, "1");
+
+  // Request for updates to load assignment version 1, no response
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
+                                      {"cluster_0"}, {}, {}));
+
+  // Initial request for route_config_0 (referenced by listener_0), respond with version 1
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "",
+                                      {"route_config_0"}, {"route_config_0"}, {}));
+
   test_server_->waitForGaugeGe("listener_manager.total_listeners_active", 1);
+  // Before server is started, even though listeners are added to active list
+  // we mark them as "warming" in config dump since they're not initialized yet.
+  EXPECT_EQ(getListenersConfigDump().dynamic_warming_listeners().size(), 1);
 
   // Remove listener.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "1", {}, {}, {}));
   sendDiscoveryResponse<envoy::api::v2::Listener>(Config::TypeUrl::get().Listener, {}, {}, {}, "1");
   test_server_->waitForGaugeEq("listener_manager.total_listeners_active", 0);
 }

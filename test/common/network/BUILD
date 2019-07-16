@@ -185,6 +185,7 @@ envoy_cc_test(
         "//source/common/event:dispatcher_lib",
         "//source/common/network:address_lib",
         "//source/common/network:listener_lib",
+        "//source/common/network:socket_option_lib",
         "//source/common/network:utility_lib",
         "//source/common/stats:stats_lib",
         "//test/common/network:listener_impl_test_base_lib",

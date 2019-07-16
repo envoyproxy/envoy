@@ -172,6 +172,7 @@ public:
   MOCK_METHOD2(addDecodedData, void(Buffer::Instance& data, bool streaming));
   MOCK_METHOD2(injectDecodedDataToFilterChain, void(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD0(addDecodedTrailers, HeaderMap&());
+  MOCK_METHOD0(addDecodedMetadata, MetadataMapVector&());
   MOCK_METHOD0(decodingBuffer, const Buffer::Instance*());
   MOCK_METHOD1(modifyDecodingBuffer, void(std::function<void(Buffer::Instance&)>));
   MOCK_METHOD1(encode100ContinueHeaders_, void(HeaderMap& headers));
@@ -241,6 +242,7 @@ public:
   MOCK_METHOD2(decodeHeaders, FilterHeadersStatus(HeaderMap& headers, bool end_stream));
   MOCK_METHOD2(decodeData, FilterDataStatus(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD1(decodeTrailers, FilterTrailersStatus(HeaderMap& trailers));
+  MOCK_METHOD1(decodeMetadata, FilterMetadataStatus(Http::MetadataMap& metadata_map));
   MOCK_METHOD1(setDecoderFilterCallbacks, void(StreamDecoderFilterCallbacks& callbacks));
   MOCK_METHOD0(decodeComplete, void());
 
@@ -279,6 +281,7 @@ public:
   MOCK_METHOD2(decodeHeaders, FilterHeadersStatus(HeaderMap& headers, bool end_stream));
   MOCK_METHOD2(decodeData, FilterDataStatus(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD1(decodeTrailers, FilterTrailersStatus(HeaderMap& trailers));
+  MOCK_METHOD1(decodeMetadata, FilterMetadataStatus(Http::MetadataMap& metadata_map));
   MOCK_METHOD1(setDecoderFilterCallbacks, void(StreamDecoderFilterCallbacks& callbacks));
 
   // Http::MockStreamEncoderFilter

@@ -766,6 +766,7 @@ filter_chains: {}
 version_info: version1
 static_listeners:
 dynamic_active_listeners:
+dynamic_warming_listeners:
   version_info: "version1"
   listener:
     name: "foo"
@@ -777,7 +778,6 @@ dynamic_active_listeners:
   last_updated:
     seconds: 1001001001
     nanos: 1000000
-dynamic_warming_listeners:
 dynamic_draining_listeners:
 )EOF");
 
@@ -808,6 +808,7 @@ per_connection_buffer_limit_bytes: 10
 version_info: version2
 static_listeners:
 dynamic_active_listeners:
+dynamic_warming_listeners:
   version_info: "version2"
   listener:
     name: "foo"
@@ -820,7 +821,6 @@ dynamic_active_listeners:
   last_updated:
     seconds: 2002002002
     nanos: 2000000
-dynamic_warming_listeners:
 dynamic_draining_listeners:
 )EOF");
 

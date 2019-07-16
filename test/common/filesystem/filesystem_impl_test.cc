@@ -131,6 +131,8 @@ TEST_F(FileSystemImplTest, IllegalPath) {
 #else
   EXPECT_TRUE(file_system_.illegalPath("/dev"));
   EXPECT_TRUE(file_system_.illegalPath("/dev/"));
+  // Exception to allow opening from file descriptors. See #7258.
+  EXPECT_FALSE(file_system_.illegalPath("/dev/fd/0"));
   EXPECT_TRUE(file_system_.illegalPath("/proc"));
   EXPECT_TRUE(file_system_.illegalPath("/proc/"));
   EXPECT_TRUE(file_system_.illegalPath("/sys"));
