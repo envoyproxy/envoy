@@ -8,6 +8,7 @@ _ENVOY_BUILD_IMAGE_JAVA_HOME = "/usr/lib/jvm/java-8-openjdk-amd64"
 _CONFIGS_OUTPUT_BASE = "bazel/toolchains/configs"
 
 _CLANG_ENV = {
+    "BAZEL_COMPILER": "clang",
     "BAZEL_LINKLIBS": "-l%:libstdc++.a",
     "BAZEL_LINKOPTS": "-lm:-static-libgcc",
     "CC": "clang",
@@ -16,6 +17,7 @@ _CLANG_ENV = {
 }
 
 _GCC_ENV = {
+    "BAZEL_COMPILER": "gcc",
     "BAZEL_LINKLIBS": "-l%:libstdc++.a",
     "BAZEL_LINKOPTS": "-lm:-static-libgcc",
     "CC": "gcc",

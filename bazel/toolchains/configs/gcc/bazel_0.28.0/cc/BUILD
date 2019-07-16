@@ -46,7 +46,7 @@ filegroup(
 cc_toolchain_suite(
     name = "toolchain",
     toolchains = {
-        "k8|compiler": ":cc-compiler-k8",
+        "k8|gcc": ":cc-compiler-k8",
         "k8": ":cc-compiler-k8",
         "armeabi-v7a|compiler": ":cc-compiler-armeabi-v7a",
         "armeabi-v7a": ":cc-compiler-armeabi-v7a",
@@ -71,7 +71,7 @@ cc_toolchain(
 cc_toolchain_config(
     name = "local",
     cpu = "k8",
-    compiler = "compiler",
+    compiler = "gcc",
     toolchain_identifier = "local",
     host_system_name = "local",
     target_system_name = "local",
