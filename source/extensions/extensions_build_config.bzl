@@ -67,7 +67,6 @@ EXTENSIONS = {
     "envoy.filters.listener.proxy_protocol":            "//source/extensions/filters/listener/proxy_protocol:config",
     "envoy.filters.listener.tls_inspector":             "//source/extensions/filters/listener/tls_inspector:config",
 
-
     #
     # Network filters
     #
