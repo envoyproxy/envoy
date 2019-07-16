@@ -38,13 +38,6 @@ bool Heap::stopProfiler() {
   return true;
 }
 
-void Heap::forceLink() {
-  // Currently this is here to force the inclusion of the heap profiler during static linking.
-  // Without this call the heap profiler will not be included and cannot be started via env
-  // variable. In the future we can add admin support.
-  HeapProfilerDump("");
-}
-
 } // namespace Profiler
 } // namespace Envoy
 

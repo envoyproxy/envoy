@@ -13,6 +13,7 @@
 #include "common/common/stack_array.h"
 #include "common/common/utility.h"
 #include "common/http/exception.h"
+#include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 
@@ -319,11 +320,20 @@ const ToLowerTable& ConnectionImpl::toLowerTable() {
   return *table;
 }
 
+// TODO(alyssawilk) The overloaded constructors here and on {Client,Server}ConnectionImpl
+// can be cleaned up once "strict_header_validation" becomes the default behavior, rather
+// than a runtime-guarded one. The overloads were a workaround for the fact that Runtime
+// doesn't work from integration test call sites in scenarios where the required
+// thread-local storage is not available.
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, http_parser_type type,
                                uint32_t max_headers_kb)
+    : ConnectionImpl::ConnectionImpl(connection, type, max_headers_kb, false) {}
+
+ConnectionImpl::ConnectionImpl(Network::Connection& connection, http_parser_type type,
+                               uint32_t max_headers_kb, bool strict_header_validation)
     : connection_(connection), output_buffer_([&]() -> void { this->onBelowLowWatermark(); },
                                               [&]() -> void { this->onAboveHighWatermark(); }),
-      max_headers_kb_(max_headers_kb) {
+      max_headers_kb_(max_headers_kb), strict_header_validation_(strict_header_validation) {
   output_buffer_.setWatermarks(connection.bufferLimit());
   http_parser_init(&parser_, type);
   parser_.data = this;
@@ -421,11 +431,21 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
     // Ignore trailers.
     return;
   }
-  // http-parser should filter for this
-  // (https://tools.ietf.org/html/rfc7230#section-3.2.6), but it doesn't today. HeaderStrings
-  // have an invariant that they must not contain embedded zero characters
-  // (NUL, ASCII 0x0).
-  if (absl::string_view(data, length).find('\0') != absl::string_view::npos) {
+
+  const absl::string_view header_value = absl::string_view(data, length);
+
+  if (strict_header_validation_) {
+    if (!Http::HeaderUtility::headerIsValid(header_value)) {
+      ENVOY_CONN_LOG(debug, "invalid header value: {}", connection_, header_value);
+      error_code_ = Http::Code::BadRequest;
+      sendProtocolError();
+      throw CodecProtocolException("http/1.1 protocol error: header value contains invalid chars");
+    }
+  } else if (header_value.find('\0') != absl::string_view::npos) {
+    // http-parser should filter for this
+    // (https://tools.ietf.org/html/rfc7230#section-3.2.6), but it doesn't today. HeaderStrings
+    // have an invariant that they must not contain embedded zero characters
+    // (NUL, ASCII 0x0).
     throw CodecProtocolException("http/1.1 protocol error: header value contains NUL");
   }
 
@@ -496,8 +516,15 @@ void ConnectionImpl::onResetStreamBase(StreamResetReason reason) {
 ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection,
                                            ServerConnectionCallbacks& callbacks,
                                            Http1Settings settings, uint32_t max_request_headers_kb)
-    : ConnectionImpl(connection, HTTP_REQUEST, max_request_headers_kb), callbacks_(callbacks),
-      codec_settings_(settings) {}
+    : ServerConnectionImpl::ServerConnectionImpl(connection, callbacks, settings,
+                                                 max_request_headers_kb, false) {}
+
+ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection,
+                                           ServerConnectionCallbacks& callbacks,
+                                           Http1Settings settings, uint32_t max_request_headers_kb,
+                                           bool strict_header_validation)
+    : ConnectionImpl(connection, HTTP_REQUEST, max_request_headers_kb, strict_header_validation),
+      callbacks_(callbacks), codec_settings_(settings) {}
 
 void ServerConnectionImpl::onEncodeComplete() {
   ASSERT(active_request_);
@@ -668,8 +695,14 @@ void ServerConnectionImpl::onBelowLowWatermark() {
   }
 }
 
-ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks&)
-    : ConnectionImpl(connection, HTTP_RESPONSE, MAX_RESPONSE_HEADERS_KB) {}
+ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection,
+                                           ConnectionCallbacks& callbacks)
+    : ClientConnectionImpl::ClientConnectionImpl(connection, callbacks, false) {}
+
+ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks&,
+                                           bool strict_header_validation)
+    : ConnectionImpl(connection, HTTP_RESPONSE, MAX_RESPONSE_HEADERS_KB, strict_header_validation) {
+}
 
 bool ClientConnectionImpl::cannotHaveBody() {
   if ((!pending_responses_.empty() && pending_responses_.front().head_request_) ||

@@ -62,42 +62,47 @@ private:
 
   void addFilterChainForDestinationPorts(
       DestinationPortsMap& destination_ports_map, uint16_t destination_port,
-      const std::vector<std::string>& destination_ips, const std::vector<std::string>& server_names,
-      const std::string& transport_protocol, const std::vector<std::string>& application_protocols,
+      const std::vector<std::string>& destination_ips,
+      const absl::Span<const std::string* const> server_names,
+      const std::string& transport_protocol,
+      const absl::Span<const std::string* const> application_protocols,
       const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
       const std::vector<std::string>& source_ips,
-      const Protobuf::RepeatedField<Protobuf::uint32>& source_ports,
+      const absl::Span<const Protobuf::uint32> source_ports,
       const Network::FilterChainSharedPtr& filter_chain);
   void addFilterChainForDestinationIPs(
       DestinationIPsMap& destination_ips_map, const std::vector<std::string>& destination_ips,
-      const std::vector<std::string>& server_names, const std::string& transport_protocol,
-      const std::vector<std::string>& application_protocols,
+      const absl::Span<const std::string* const> server_names,
+      const std::string& transport_protocol,
+      const absl::Span<const std::string* const> application_protocols,
       const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
       const std::vector<std::string>& source_ips,
-      const Protobuf::RepeatedField<Protobuf::uint32>& source_ports,
+      const absl::Span<const Protobuf::uint32> source_ports,
       const Network::FilterChainSharedPtr& filter_chain);
   void addFilterChainForServerNames(
-      ServerNamesMapSharedPtr& server_names_map_ptr, const std::vector<std::string>& server_names,
-      const std::string& transport_protocol, const std::vector<std::string>& application_protocols,
+      ServerNamesMapSharedPtr& server_names_map_ptr,
+      const absl::Span<const std::string* const> server_names,
+      const std::string& transport_protocol,
+      const absl::Span<const std::string* const> application_protocols,
       const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
       const std::vector<std::string>& source_ips,
-      const Protobuf::RepeatedField<Protobuf::uint32>& source_ports,
+      const absl::Span<const Protobuf::uint32> source_ports,
       const Network::FilterChainSharedPtr& filter_chain);
   void addFilterChainForApplicationProtocols(
       ApplicationProtocolsMap& application_protocol_map,
-      const std::vector<std::string>& application_protocols,
+      const absl::Span<const std::string* const> application_protocols,
       const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
       const std::vector<std::string>& source_ips,
-      const Protobuf::RepeatedField<Protobuf::uint32>& source_ports,
+      const absl::Span<const Protobuf::uint32> source_ports,
       const Network::FilterChainSharedPtr& filter_chain);
   void addFilterChainForSourceTypes(
       SourceTypesArray& source_types_array,
       const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
       const std::vector<std::string>& source_ips,
-      const Protobuf::RepeatedField<Protobuf::uint32>& source_ports,
+      const absl::Span<const Protobuf::uint32> source_ports,
       const Network::FilterChainSharedPtr& filter_chain);
   void addFilterChainForSourceIPs(SourceIPsMap& source_ips_map, const std::string& source_ip,
-                                  const Protobuf::RepeatedField<Protobuf::uint32>& source_ports,
+                                  const absl::Span<const Protobuf::uint32> source_ports,
                                   const Network::FilterChainSharedPtr& filter_chain);
   void addFilterChainForSourcePorts(SourcePortsMapSharedPtr& source_ports_map_ptr,
                                     uint32_t source_port,

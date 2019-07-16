@@ -40,21 +40,6 @@ then
 fi
 export ENVOY_FILTER_EXAMPLE_SRCDIR="${BUILD_DIR}/envoy-filter-example"
 
-# Make sure that /source doesn't contain /build on the underlying host
-# filesystem, including via hard links or symlinks. We can get into weird
-# loops with Bazel symlinking and gcovr's path traversal if this is true, so
-# best to keep /source and /build in distinct directories on the host
-# filesystem.
-SENTINEL="${BUILD_DIR}"/bazel.sentinel
-touch "${SENTINEL}"
-if [[ -n "$(find -L "${ENVOY_SRCDIR}" -name "$(basename "${SENTINEL}")")" ]]
-then
-  rm -f "${SENTINEL}"
-  echo "/source mount must not contain /build mount"
-  exit 1
-fi
-rm -f "${SENTINEL}"
-
 # Environment setup.
 export USER=bazel
 export TEST_TMPDIR=${BUILD_DIR}/tmp

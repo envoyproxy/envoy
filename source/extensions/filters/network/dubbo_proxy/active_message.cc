@@ -8,94 +8,134 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
 
-// class ResponseDecoder
-ResponseDecoder::ResponseDecoder(Buffer::Instance& buffer, DubboFilterStats& stats,
-                                 Network::Connection& connection, Deserializer& deserializer,
-                                 Protocol& protocol)
-    : response_buffer_(buffer), stats_(stats), response_connection_(connection),
-      decoder_(std::make_unique<Decoder>(protocol, deserializer, *this)), complete_(false) {}
+// class ActiveResponseDecoder
+ActiveResponseDecoder::ActiveResponseDecoder(ActiveMessage& parent, DubboFilterStats& stats,
+                                             Network::Connection& connection,
+                                             ProtocolPtr&& protocol)
+    : parent_(parent), stats_(stats), response_connection_(connection),
+      protocol_(std::move(protocol)),
+      decoder_(std::make_unique<ResponseDecoder>(*protocol_, *this)), complete_(false),
+      response_status_(DubboFilters::UpstreamResponseStatus::MoreData) {}
 
-bool ResponseDecoder::onData(Buffer::Instance& data) {
+DubboFilters::UpstreamResponseStatus ActiveResponseDecoder::onData(Buffer::Instance& data) {
   ENVOY_LOG(debug, "dubbo response: the received reply data length is {}", data.length());
 
   bool underflow = false;
   decoder_->onData(data, underflow);
   ASSERT(complete_ || underflow);
-  return complete_;
+
+  return response_status_;
 }
 
-Network::FilterStatus ResponseDecoder::transportBegin() {
-  stats_.response_.inc();
-  response_buffer_.drain(response_buffer_.length());
-  ProtocolDataPassthroughConverter::initProtocolConverter(response_buffer_);
+void ActiveResponseDecoder::onStreamDecoded(MessageMetadataSharedPtr metadata,
+                                            ContextSharedPtr ctx) {
+  ASSERT(metadata->message_type() == MessageType::Response ||
+         metadata->message_type() == MessageType::Exception);
+  ASSERT(metadata->hasResponseStatus());
 
-  return Network::FilterStatus::Continue;
-}
+  if (applyMessageEncodedFilters(metadata, ctx) != FilterStatus::Continue) {
+    return;
+  }
 
-Network::FilterStatus ResponseDecoder::transportEnd() {
   if (response_connection_.state() != Network::Connection::State::Open) {
     throw DownstreamConnectionCloseException("Downstream has closed or closing");
   }
 
-  response_connection_.write(response_buffer_, false);
+  response_connection_.write(ctx->message_origin_data(), false);
   ENVOY_LOG(debug,
             "dubbo response: the upstream response message has been forwarded to the downstream");
-  return Network::FilterStatus::Continue;
-}
 
-Network::FilterStatus ResponseDecoder::messageBegin(MessageType, int64_t, SerializationType) {
-  return Network::FilterStatus::Continue;
-}
-
-Network::FilterStatus ResponseDecoder::messageEnd(MessageMetadataSharedPtr metadata) {
-  ASSERT(metadata->message_type() == MessageType::Response ||
-         metadata->message_type() == MessageType::Exception);
-  ASSERT(metadata->response_status().has_value());
-
+  stats_.response_.inc();
   stats_.response_decoding_success_.inc();
   if (metadata->message_type() == MessageType::Exception) {
     stats_.response_business_exception_.inc();
   }
 
   metadata_ = metadata;
-  switch (metadata->response_status().value()) {
+  switch (metadata->response_status()) {
   case ResponseStatus::Ok:
     stats_.response_success_.inc();
     break;
   default:
     stats_.response_error_.inc();
     ENVOY_LOG(error, "dubbo response status: {}",
-              static_cast<uint8_t>(metadata->response_status().value()));
+              static_cast<uint8_t>(metadata->response_status()));
     break;
   }
 
   complete_ = true;
+  response_status_ = DubboFilters::UpstreamResponseStatus::Complete;
+
   ENVOY_LOG(debug, "dubbo response: complete processing of upstream response messages, id is {}",
             metadata->request_id());
-
-  return Network::FilterStatus::Continue;
 }
 
-DecoderEventHandler* ResponseDecoder::newDecoderEventHandler() { return this; }
+FilterStatus ActiveResponseDecoder::applyMessageEncodedFilters(MessageMetadataSharedPtr metadata,
+                                                               ContextSharedPtr ctx) {
+  parent_.encoder_filter_action_ = [metadata,
+                                    ctx](DubboFilters::EncoderFilter* filter) -> FilterStatus {
+    return filter->onMessageEncoded(metadata, ctx);
+  };
 
-// class ActiveMessageDecoderFilter
-ActiveMessageDecoderFilter::ActiveMessageDecoderFilter(ActiveMessage& parent,
-                                                       DubboFilters::DecoderFilterSharedPtr filter)
-    : parent_(parent), handle_(filter) {}
+  auto status = parent_.applyEncoderFilters(
+      nullptr, ActiveMessage::FilterIterationStartState::CanStartFromCurrent);
+  switch (status) {
+  case FilterStatus::StopIteration:
+    break;
+  case FilterStatus::Retry:
+    response_status_ = DubboFilters::UpstreamResponseStatus::Retry;
+    decoder_->reset();
+    break;
+  default:
+    ASSERT(FilterStatus::Continue == status);
+    break;
+  }
 
-uint64_t ActiveMessageDecoderFilter::requestId() const { return parent_.requestId(); }
+  return status;
+}
 
-uint64_t ActiveMessageDecoderFilter::streamId() const { return parent_.streamId(); }
+// class ActiveMessageFilterBase
+uint64_t ActiveMessageFilterBase::requestId() const { return parent_.requestId(); }
 
-const Network::Connection* ActiveMessageDecoderFilter::connection() const {
+uint64_t ActiveMessageFilterBase::streamId() const { return parent_.streamId(); }
+
+const Network::Connection* ActiveMessageFilterBase::connection() const {
   return parent_.connection();
 }
 
+Router::RouteConstSharedPtr ActiveMessageFilterBase::route() { return parent_.route(); }
+
+SerializationType ActiveMessageFilterBase::serializationType() const {
+  return parent_.serializationType();
+}
+
+ProtocolType ActiveMessageFilterBase::protocolType() const { return parent_.protocolType(); }
+
+Event::Dispatcher& ActiveMessageFilterBase::dispatcher() { return parent_.dispatcher(); }
+
+void ActiveMessageFilterBase::resetStream() { parent_.resetStream(); }
+
+StreamInfo::StreamInfo& ActiveMessageFilterBase::streamInfo() { return parent_.streamInfo(); }
+
+// class ActiveMessageDecoderFilter
+ActiveMessageDecoderFilter::ActiveMessageDecoderFilter(ActiveMessage& parent,
+                                                       DubboFilters::DecoderFilterSharedPtr filter,
+                                                       bool dual_filter)
+    : ActiveMessageFilterBase(parent, dual_filter), handle_(filter) {}
+
 void ActiveMessageDecoderFilter::continueDecoding() {
-  const Network::FilterStatus status = parent_.applyDecoderFilters(this);
-  if (status == Network::FilterStatus::Continue) {
+  ASSERT(parent_.context());
+  auto state = ActiveMessage::FilterIterationStartState::AlwaysStartFromNext;
+  if (0 != parent_.context()->message_origin_data().length()) {
+    state = ActiveMessage::FilterIterationStartState::CanStartFromCurrent;
+    ENVOY_LOG(warn, "The original message data is not consumed, triggering the decoder filter from "
+                    "the current location");
+  }
+  const FilterStatus status = parent_.applyDecoderFilters(this, state);
+  if (status == FilterStatus::Continue) {
+    ENVOY_LOG(debug, "dubbo response: start upstream");
     // All filters have been executed for the current decoder state.
-    if (parent_.pending_transport_end()) {
+    if (parent_.pending_stream_decoded()) {
       // If the filter stack was paused during messageEnd, handle end-of-request details.
       parent_.finalizeRequest();
     }
@@ -103,25 +143,12 @@ void ActiveMessageDecoderFilter::continueDecoding() {
   }
 }
 
-Router::RouteConstSharedPtr ActiveMessageDecoderFilter::route() { return parent_.route(); }
-
-SerializationType ActiveMessageDecoderFilter::downstreamSerializationType() const {
-  return parent_.downstreamSerializationType();
-}
-
-ProtocolType ActiveMessageDecoderFilter::downstreamProtocolType() const {
-  return parent_.downstreamProtocolType();
-}
-
 void ActiveMessageDecoderFilter::sendLocalReply(const DubboFilters::DirectResponse& response,
                                                 bool end_stream) {
   parent_.sendLocalReply(response, end_stream);
 }
 
-void ActiveMessageDecoderFilter::startUpstreamResponse(Deserializer& deserializer,
-                                                       Protocol& protocol) {
-  parent_.startUpstreamResponse(deserializer, protocol);
-}
+void ActiveMessageDecoderFilter::startUpstreamResponse() { parent_.startUpstreamResponse(); }
 
 DubboFilters::UpstreamResponseStatus
 ActiveMessageDecoderFilter::upstreamData(Buffer::Instance& buffer) {
@@ -132,16 +159,32 @@ void ActiveMessageDecoderFilter::resetDownstreamConnection() {
   parent_.resetDownstreamConnection();
 }
 
-void ActiveMessageDecoderFilter::resetStream() { parent_.resetStream(); }
+// class ActiveMessageEncoderFilter
+ActiveMessageEncoderFilter::ActiveMessageEncoderFilter(ActiveMessage& parent,
+                                                       DubboFilters::EncoderFilterSharedPtr filter,
+                                                       bool dual_filter)
+    : ActiveMessageFilterBase(parent, dual_filter), handle_(filter) {}
 
-StreamInfo::StreamInfo& ActiveMessageDecoderFilter::streamInfo() { return parent_.streamInfo(); }
+void ActiveMessageEncoderFilter::continueEncoding() {
+  ASSERT(parent_.context());
+  auto state = ActiveMessage::FilterIterationStartState::AlwaysStartFromNext;
+  if (0 != parent_.context()->message_origin_data().length()) {
+    state = ActiveMessage::FilterIterationStartState::CanStartFromCurrent;
+    ENVOY_LOG(warn, "The original message data is not consumed, triggering the encoder filter from "
+                    "the current location");
+  }
+  const FilterStatus status = parent_.applyEncoderFilters(this, state);
+  if (FilterStatus::Continue == status) {
+    ENVOY_LOG(debug, "All encoding filters have been executed");
+  }
+}
 
 // class ActiveMessage
 ActiveMessage::ActiveMessage(ConnectionManager& parent)
     : parent_(parent), request_timer_(std::make_unique<Stats::Timespan>(
                            parent_.stats().request_time_ms_, parent.time_system())),
       request_id_(-1), stream_id_(parent.random_generator().random()),
-      stream_info_(parent.time_system()), pending_transport_end_(false),
+      stream_info_(parent.time_system()), pending_stream_decoded_(false),
       local_response_sent_(false) {
   parent_.stats().request_active_.inc();
   stream_info_.setDownstreamLocalAddress(parent_.connection().localAddress());
@@ -157,95 +200,64 @@ ActiveMessage::~ActiveMessage() {
   ENVOY_LOG(debug, "ActiveMessage::~ActiveMessage()");
 }
 
-Network::FilterStatus ActiveMessage::transportBegin() {
-  filter_action_ = [](DubboFilters::DecoderFilter* filter) -> Network::FilterStatus {
-    return filter->transportBegin();
-  };
+std::list<ActiveMessageEncoderFilterPtr>::iterator
+ActiveMessage::commonEncodePrefix(ActiveMessageEncoderFilter* filter,
+                                  FilterIterationStartState state) {
+  // Only do base state setting on the initial call. Subsequent calls for filtering do not touch
+  // the base state.
+  if (filter == nullptr) {
+    // ASSERT(!state_.local_complete_);
+    // state_.local_complete_ = end_stream;
+    return encoder_filters_.begin();
+  }
 
-  return this->applyDecoderFilters(nullptr);
+  if (state == FilterIterationStartState::CanStartFromCurrent) {
+    // The filter iteration has been stopped for all frame types, and now the iteration continues.
+    // The current filter's encoding callback has not be called. Call it now.
+    return filter->entry();
+  }
+  return std::next(filter->entry());
 }
 
-Network::FilterStatus ActiveMessage::transportEnd() {
-  filter_action_ = [](DubboFilters::DecoderFilter* filter) -> Network::FilterStatus {
-    return filter->transportEnd();
+std::list<ActiveMessageDecoderFilterPtr>::iterator
+ActiveMessage::commonDecodePrefix(ActiveMessageDecoderFilter* filter,
+                                  FilterIterationStartState state) {
+  if (!filter) {
+    return decoder_filters_.begin();
+  }
+  if (state == FilterIterationStartState::CanStartFromCurrent) {
+    // The filter iteration has been stopped for all frame types, and now the iteration continues.
+    // The current filter's callback function has not been called. Call it now.
+    return filter->entry();
+  }
+  return std::next(filter->entry());
+}
+
+void ActiveMessage::onStreamDecoded(MessageMetadataSharedPtr metadata, ContextSharedPtr ctx) {
+  parent_.stats().request_decoding_success_.inc();
+
+  metadata_ = metadata;
+  context_ = ctx;
+  filter_action_ = [metadata, ctx](DubboFilters::DecoderFilter* filter) -> FilterStatus {
+    return filter->onMessageDecoded(metadata, ctx);
   };
 
-  Network::FilterStatus status = applyDecoderFilters(nullptr);
-  if (status == Network::FilterStatus::StopIteration) {
-    pending_transport_end_ = true;
-    return status;
+  auto status = applyDecoderFilters(nullptr, FilterIterationStartState::CanStartFromCurrent);
+  if (status == FilterStatus::StopIteration) {
+    ENVOY_LOG(debug, "dubbo request: stop calling decoder filter, id is {}",
+              metadata->request_id());
+    pending_stream_decoded_ = true;
+    return;
   }
 
   finalizeRequest();
 
   ENVOY_LOG(debug, "dubbo request: complete processing of downstream request messages, id is {}",
-            request_id_);
-
-  return status;
-}
-
-Network::FilterStatus ActiveMessage::messageBegin(MessageType type, int64_t message_id,
-                                                  SerializationType serialization_type) {
-  request_id_ = message_id;
-  filter_action_ = [type, message_id, serialization_type](
-                       DubboFilters::DecoderFilter* filter) -> Network::FilterStatus {
-    return filter->messageBegin(type, message_id, serialization_type);
-  };
-
-  return applyDecoderFilters(nullptr);
-}
-
-Network::FilterStatus ActiveMessage::messageEnd(MessageMetadataSharedPtr metadata) {
-  ASSERT(metadata->message_type() == MessageType::Request ||
-         metadata->message_type() == MessageType::Oneway);
-
-  // Currently only hessian serialization is implemented.
-  ASSERT(metadata->serialization_type() == SerializationType::Hessian);
-
-  ENVOY_LOG(debug, "dubbo request: start processing downstream request messages, id is {}",
             metadata->request_id());
-
-  parent_.stats().request_decoding_success_.inc();
-
-  metadata_ = metadata;
-  filter_action_ = [metadata](DubboFilters::DecoderFilter* filter) -> Network::FilterStatus {
-    return filter->messageEnd(metadata);
-  };
-
-  return applyDecoderFilters(nullptr);
-}
-
-Network::FilterStatus ActiveMessage::transferHeaderTo(Buffer::Instance& header_buf, size_t size) {
-  filter_action_ = [&header_buf,
-                    size](DubboFilters::DecoderFilter* filter) -> Network::FilterStatus {
-    return filter->transferHeaderTo(header_buf, size);
-  };
-
-  // If a local reply is generated, the filter callback is skipped and
-  // the buffer data needs to be actively released.
-  if (local_response_sent_) {
-    header_buf.drain(size);
-  }
-
-  return applyDecoderFilters(nullptr);
-}
-
-Network::FilterStatus ActiveMessage::transferBodyTo(Buffer::Instance& body_buf, size_t size) {
-  filter_action_ = [&body_buf, size](DubboFilters::DecoderFilter* filter) -> Network::FilterStatus {
-    return filter->transferBodyTo(body_buf, size);
-  };
-
-  // If a local reply is generated, the filter callback is skipped and
-  // the buffer data needs to be actively released.
-  if (local_response_sent_) {
-    body_buf.drain(size);
-  }
-
-  return applyDecoderFilters(nullptr);
 }
 
 void ActiveMessage::finalizeRequest() {
-  pending_transport_end_ = false;
+  pending_stream_decoded_ = false;
   parent_.stats().request_.inc();
   bool is_one_way = false;
   switch (metadata_->message_type()) {
@@ -284,24 +296,17 @@ DubboProxy::Router::RouteConstSharedPtr ActiveMessage::route() {
   return nullptr;
 }
 
-Network::FilterStatus ActiveMessage::applyDecoderFilters(ActiveMessageDecoderFilter* filter) {
+FilterStatus ActiveMessage::applyDecoderFilters(ActiveMessageDecoderFilter* filter,
+                                                FilterIterationStartState state) {
   ASSERT(filter_action_ != nullptr);
-
   if (!local_response_sent_) {
-    std::list<ActiveMessageDecoderFilterPtr>::iterator entry;
-    if (!filter) {
-      entry = decoder_filters_.begin();
-    } else {
-      entry = std::next(filter->entry());
-    }
-
-    for (; entry != decoder_filters_.end(); entry++) {
-      const Network::FilterStatus status = filter_action_((*entry)->handler().get());
+    for (auto entry = commonDecodePrefix(filter, state); entry != decoder_filters_.end(); entry++) {
+      const FilterStatus status = filter_action_((*entry)->handler().get());
       if (local_response_sent_) {
         break;
       }
 
-      if (status != Network::FilterStatus::Continue) {
+      if (status != FilterStatus::Continue) {
         return status;
       }
     }
@@ -309,7 +314,29 @@ Network::FilterStatus ActiveMessage::applyDecoderFilters(ActiveMessageDecoderFil
 
   filter_action_ = nullptr;
 
-  return Network::FilterStatus::Continue;
+  return FilterStatus::Continue;
+}
+
+FilterStatus ActiveMessage::applyEncoderFilters(ActiveMessageEncoderFilter* filter,
+                                                FilterIterationStartState state) {
+  ASSERT(encoder_filter_action_ != nullptr);
+
+  if (!local_response_sent_) {
+    for (auto entry = commonEncodePrefix(filter, state); entry != encoder_filters_.end(); entry++) {
+      const FilterStatus status = encoder_filter_action_((*entry)->handler().get());
+      if (local_response_sent_) {
+        break;
+      }
+
+      if (status != FilterStatus::Continue) {
+        return status;
+      }
+    }
+  }
+
+  encoder_filter_action_ = nullptr;
+
+  return FilterStatus::Continue;
 }
 
 void ActiveMessage::sendLocalReply(const DubboFilters::DirectResponse& response, bool end_stream) {
@@ -328,21 +355,25 @@ void ActiveMessage::sendLocalReply(const DubboFilters::DirectResponse& response,
   local_response_sent_ = true;
 }
 
-void ActiveMessage::startUpstreamResponse(Deserializer& deserializer, Protocol& protocol) {
+void ActiveMessage::startUpstreamResponse() {
   ENVOY_LOG(debug, "dubbo response: start upstream");
 
   ASSERT(response_decoder_ == nullptr);
 
+  auto protocol =
+      NamedProtocolConfigFactory::getFactory(protocolType()).createProtocol(serializationType());
+
   // Create a response message decoder.
-  response_decoder_ = std::make_unique<ResponseDecoder>(
-      response_buffer_, parent_.stats(), parent_.connection(), deserializer, protocol);
+  response_decoder_ = std::make_unique<ActiveResponseDecoder>(
+      *this, parent_.stats(), parent_.connection(), std::move(protocol));
 }
 
 DubboFilters::UpstreamResponseStatus ActiveMessage::upstreamData(Buffer::Instance& buffer) {
   ASSERT(response_decoder_ != nullptr);
 
   try {
-    if (response_decoder_->onData(buffer)) {
+    auto status = response_decoder_->onData(buffer);
+    if (status == DubboFilters::UpstreamResponseStatus::Complete) {
       if (requestId() != response_decoder_->requestId()) {
         throw EnvoyException(fmt::format("dubbo response: request ID is not equal, {}:{}",
                                          requestId(), response_decoder_->requestId()));
@@ -350,9 +381,11 @@ DubboFilters::UpstreamResponseStatus ActiveMessage::upstreamData(Buffer::Instanc
 
       // Completed upstream response.
       parent_.deferredMessage(*this);
-      return DubboFilters::UpstreamResponseStatus::Complete;
+    } else if (status == DubboFilters::UpstreamResponseStatus::Retry) {
+      response_decoder_.reset();
     }
-    return DubboFilters::UpstreamResponseStatus::MoreData;
+
+    return status;
   } catch (const DownstreamConnectionCloseException& ex) {
     ENVOY_CONN_LOG(error, "dubbo response: exception ({})", parent_.connection(), ex.what());
     onReset();
@@ -381,23 +414,44 @@ uint64_t ActiveMessage::streamId() const { return stream_id_; }
 
 void ActiveMessage::continueDecoding() { parent_.continueDecoding(); }
 
-SerializationType ActiveMessage::downstreamSerializationType() const {
+SerializationType ActiveMessage::serializationType() const {
   return parent_.downstreamSerializationType();
 }
 
-ProtocolType ActiveMessage::downstreamProtocolType() const {
-  return parent_.downstreamProtocolType();
-}
+ProtocolType ActiveMessage::protocolType() const { return parent_.downstreamProtocolType(); }
 
 StreamInfo::StreamInfo& ActiveMessage::streamInfo() { return stream_info_; }
+
+Event::Dispatcher& ActiveMessage::dispatcher() { return parent_.connection().dispatcher(); }
 
 const Network::Connection* ActiveMessage::connection() const { return &parent_.connection(); }
 
 void ActiveMessage::addDecoderFilter(DubboFilters::DecoderFilterSharedPtr filter) {
+  addDecoderFilterWorker(filter, false);
+}
+
+void ActiveMessage::addEncoderFilter(DubboFilters::EncoderFilterSharedPtr filter) {
+  addEncoderFilterWorker(filter, false);
+}
+
+void ActiveMessage::addFilter(DubboFilters::CodecFilterSharedPtr filter) {
+  addDecoderFilterWorker(filter, true);
+  addEncoderFilterWorker(filter, true);
+}
+
+void ActiveMessage::addDecoderFilterWorker(DubboFilters::DecoderFilterSharedPtr filter,
+                                           bool dual_filter) {
   ActiveMessageDecoderFilterPtr wrapper =
-      std::make_unique<ActiveMessageDecoderFilter>(*this, filter);
+      std::make_unique<ActiveMessageDecoderFilter>(*this, filter, dual_filter);
   filter->setDecoderFilterCallbacks(*wrapper);
   wrapper->moveIntoListBack(std::move(wrapper), decoder_filters_);
+}
+void ActiveMessage::addEncoderFilterWorker(DubboFilters::EncoderFilterSharedPtr filter,
+                                           bool dual_filter) {
+  ActiveMessageEncoderFilterPtr wrapper =
+      std::make_unique<ActiveMessageEncoderFilter>(*this, filter, dual_filter);
+  filter->setEncoderFilterCallbacks(*wrapper);
+  wrapper->moveIntoListBack(std::move(wrapper), encoder_filters_);
 }
 
 void ActiveMessage::onReset() { parent_.deferredMessage(*this); }
