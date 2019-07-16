@@ -3,6 +3,9 @@
 Generally follow guidance at https://cloud.google.com/apis/design/, in
 particular for proto3 as described at:
 
+
+
+
 * https://cloud.google.com/apis/design/proto3
 * https://cloud.google.com/apis/design/naming_convention
 * https://developers.google.com/protocol-buffers/docs/style
