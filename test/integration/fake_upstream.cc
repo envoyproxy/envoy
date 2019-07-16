@@ -397,7 +397,8 @@ FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket
       api_(Api::createApiForTest(stats_store_)), time_system_(time_system),
       dispatcher_(api_->allocateDispatcher()),
       handler_(new Server::ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
-      allow_unexpected_disconnects_(false), enable_half_close_(enable_half_close), listener_(*this),
+      allow_unexpected_disconnects_(false), read_disable_on_new_connection_(true),
+      enable_half_close_(enable_half_close), listener_(*this),
       filter_chain_(Network::Test::createEmptyFilterChain(std::move(transport_socket_factory))) {
   thread_ = api_->threadFactory().createThread([this]() -> void { threadRoutine(); });
   server_initialized_.waitReady();
@@ -416,7 +417,9 @@ void FakeUpstream::cleanUp() {
 bool FakeUpstream::createNetworkFilterChain(Network::Connection& connection,
                                             const std::vector<Network::FilterFactoryCb>&) {
   Thread::LockGuard lock(lock_);
-  connection.readDisable(true);
+  if (read_disable_on_new_connection_) {
+    connection.readDisable(true);
+  }
   auto connection_wrapper =
       std::make_unique<QueuedConnectionWrapper>(connection, allow_unexpected_disconnects_);
   connection_wrapper->moveIntoListBack(std::move(connection_wrapper), new_connections_);

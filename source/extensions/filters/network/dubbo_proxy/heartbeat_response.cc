@@ -6,14 +6,12 @@ namespace NetworkFilters {
 namespace DubboProxy {
 
 DubboFilters::DirectResponse::ResponseType
-HeartbeatResponse::encode(MessageMetadata& metadata, DubboProxy::Protocol& protocol, Deserializer&,
+HeartbeatResponse::encode(MessageMetadata& metadata, DubboProxy::Protocol& protocol,
                           Buffer::Instance& buffer) const {
-  ASSERT(metadata.response_status().value() == ResponseStatus::Ok);
-  ASSERT(metadata.message_type() == MessageType::Response);
-  ASSERT(metadata.is_event());
+  ASSERT(metadata.response_status() == ResponseStatus::Ok);
+  ASSERT(metadata.message_type() == MessageType::HeartbeatResponse);
 
-  const size_t serialized_body_size = 0;
-  if (!protocol.encode(buffer, serialized_body_size, metadata)) {
+  if (!protocol.encode(buffer, metadata, "")) {
     throw EnvoyException("failed to encode heartbeat message");
   }
 
