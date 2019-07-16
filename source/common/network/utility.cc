@@ -117,7 +117,7 @@ uint32_t Utility::portFromUdpUrl(const std::string& url) {
   return portFromUrl(url, UDP_SCHEME, "UDP");
 }
 
-Address::InstanceConstSharedPtr Utility::parseInternetAddress(absl::string_view ip_address,
+Address::InstanceConstSharedPtr Utility::parseInternetAddress(const std::string& ip_address,
                                                               uint16_t port, bool v6only) {
   sockaddr_in sa4;
   if (inet_pton(AF_INET, ip_address.c_str(), &sa4.sin_addr) == 1) {

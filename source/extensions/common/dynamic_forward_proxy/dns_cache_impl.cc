@@ -104,6 +104,10 @@ void DnsCacheImpl::startCacheLoad(const std::string& host, uint16_t default_port
   bool is_ip_address = false;
   try {
     absl::string_view potential_ip_address = host_to_resolve;
+    // TODO(mattklein123): Optimally we would support bracket parsing in parseInternetAddress(),
+    // but we still need to trim the brackets to send the IPv6 address into the DNS resolver. For
+    // now, just do all the trimming here, but in the future we should consider whether we can
+    // have unified [] handling as low as possible in the stack.
     if (potential_ip_address.front() == '[' && potential_ip_address.back() == ']') {
       potential_ip_address.remove_prefix(1);
       potential_ip_address.remove_suffix(1);

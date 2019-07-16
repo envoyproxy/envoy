@@ -5,7 +5,7 @@ Version history
 ================
 * config: async data access for local and remote data source.
 * http: added the ability to reject HTTP/1.1 requests with invalid HTTP header values, using the runtime feature `envoy.reloadable_features.strict_header_validation`.
-* tls: IP address SAN fields in certificates are now verified against configured SANs in the
+* tls: added verification of IP address SAN fields in certificates against configured SANs in the
   certificate validation context.
 
 1.11.0 (July 11, 2019)
