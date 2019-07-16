@@ -22,6 +22,7 @@ const uint32_t RetryPolicy::RETRY_ON_GATEWAY_ERROR;
 const uint32_t RetryPolicy::RETRY_ON_CONNECT_FAILURE;
 const uint32_t RetryPolicy::RETRY_ON_RETRIABLE_4XX;
 const uint32_t RetryPolicy::RETRY_ON_RETRIABLE_STATUS_CODES;
+const uint32_t RetryPolicy::RETRY_ON_RESET;
 const uint32_t RetryPolicy::RETRY_ON_GRPC_CANCELLED;
 const uint32_t RetryPolicy::RETRY_ON_GRPC_DEADLINE_EXCEEDED;
 const uint32_t RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED;
@@ -130,6 +131,8 @@ std::pair<uint32_t, bool> RetryStateImpl::parseRetryOn(absl::string_view config)
       ret |= RetryPolicy::RETRY_ON_REFUSED_STREAM;
     } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.RetriableStatusCodes) {
       ret |= RetryPolicy::RETRY_ON_RETRIABLE_STATUS_CODES;
+    } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.Reset) {
+      ret |= RetryPolicy::RETRY_ON_RESET;
     } else {
       all_fields_valid = false;
     }
@@ -293,10 +296,13 @@ bool RetryStateImpl::wouldRetryFromReset(const Http::StreamResetReason reset_rea
     return false;
   }
 
+  if (retry_on_ & RetryPolicy::RETRY_ON_RESET) {
+    return true;
+  }
+
   if (retry_on_ & (RetryPolicy::RETRY_ON_5XX | RetryPolicy::RETRY_ON_GATEWAY_ERROR)) {
     // Currently we count an upstream reset as a "5xx" (since it will result in
-    // one). We may eventually split this out into its own type. I.e.,
-    // RETRY_ON_RESET.
+    // one). With RETRY_ON_RESET we may eventually remove these policies.
     return true;
   }
 
