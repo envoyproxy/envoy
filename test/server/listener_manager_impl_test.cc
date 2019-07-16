@@ -1031,11 +1031,11 @@ dynamic_draining_listeners:
     )EOF";
 
   ListenerHandle* listener_baz_update1 = expectListenerCreate(true);
+  EXPECT_CALL(listener_baz_update1->target_, initialize());
   EXPECT_CALL(*listener_baz, onDestroy()).WillOnce(Invoke([listener_baz]() -> void {
     // Call the initialize callback during destruction like RDS will.
     listener_baz->target_.ready();
   }));
-  EXPECT_CALL(listener_baz_update1->target_, initialize());
   EXPECT_TRUE(
       manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_baz_update1_yaml), "", true));
   EXPECT_EQ(2UL, manager_->listeners().size());
