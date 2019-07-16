@@ -23,13 +23,13 @@ fi
 
 # Make sure //test/coverage:coverage_tests is up-to-date.
 SCRIPT_DIR="$(realpath "$(dirname "$0")")"
-NO_GCOV=1 "${SCRIPT_DIR}"/coverage/gen_build.sh ${COVERAGE_TARGETS}
+"${SCRIPT_DIR}"/coverage/gen_build.sh ${COVERAGE_TARGETS}
 
 BAZEL_USE_LLVM_NATIVE_COVERAGE=1 GCOV=llvm-profdata bazel coverage ${BAZEL_BUILD_OPTIONS} \
     -c fastbuild --copt=-DNDEBUG --instrumentation_filter=//source/...,//include/... \
     --test_timeout=2000 --cxxopt="-DENVOY_CONFIG_COVERAGE=1" --test_output=streamed \
     --test_arg="--log-path /dev/null" --test_arg="-l trace" --test_env=HEAPCHECK= \
-    --test_filter='-QuicPlatformTest.QuicStackTraceTest' //test/coverage:coverage_tests
+    //test/coverage:coverage_tests
 
 COVERAGE_DIR="${SRCDIR}"/generated/coverage
 mkdir -p "${COVERAGE_DIR}"
