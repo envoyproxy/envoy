@@ -431,6 +431,7 @@ config:
         request_handle:headers():add("signature_verification", "rejected")
         return
       end
+
       local hash = request_handle:headers():get("hash")
       local sig = request_handle:headers():get("signature")
       local rawsig = sig:fromhex()
