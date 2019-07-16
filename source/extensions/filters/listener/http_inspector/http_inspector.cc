@@ -32,7 +32,7 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   Network::ConnectionSocket& socket = cb.socket();
 
   absl::string_view transport_protocol = socket.detectedTransportProtocol();
-  if (transport_protocol != "" &&
+  if (!transport_protocol.empty() &&
       transport_protocol != TransportSockets::TransportSocketNames::get().RawBuffer) {
     ENVOY_LOG(debug, "http inspector: cannot inspect http protocol with transport socket {}",
               transport_protocol);
