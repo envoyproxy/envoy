@@ -1167,7 +1167,7 @@ AdminImpl::NullRouteConfigProvider::NullRouteConfigProvider(TimeSource& time_sou
 void AdminImpl::startHttpListener(const std::string& access_log_path,
                                   const std::string& address_out_path,
                                   Network::Address::InstanceConstSharedPtr address,
-                                  const Network::Socket::OptionsSharedPtr& socketOptions,
+                                  const Network::Socket::OptionsSharedPtr& socket_options,
                                   Stats::ScopePtr&& listener_scope) {
   // TODO(mattklein123): Allow admin to use normal access logger extension loading and avoid the
   // hard dependency here.
