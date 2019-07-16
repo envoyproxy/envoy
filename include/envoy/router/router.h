@@ -163,6 +163,7 @@ public:
   static const uint32_t RETRY_ON_GRPC_UNAVAILABLE        = 0x100;
   static const uint32_t RETRY_ON_GRPC_INTERNAL           = 0x200;
   static const uint32_t RETRY_ON_RETRIABLE_STATUS_CODES  = 0x400;
+  static const uint32_t RETRY_ON_RESET                   = 0x800;
   // clang-format on
 
   virtual ~RetryPolicy() = default;

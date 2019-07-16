@@ -976,7 +976,8 @@ TEST_P(RedisProxyWithMirrorsIntegrationTest, ExcludeReadCommands) {
 
   // command is not mirrored to cluster 1
   FakeRawConnectionPtr cluster_1_connection;
-  EXPECT_FALSE(fake_upstreams_[2]->waitForRawConnection(cluster_1_connection));
+  EXPECT_FALSE(fake_upstreams_[2]->waitForRawConnection(cluster_1_connection,
+                                                        std::chrono::milliseconds(500)));
 
   redis_client->waitForData(get_response);
   EXPECT_EQ(get_response, redis_client->data());

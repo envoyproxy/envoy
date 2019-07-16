@@ -132,12 +132,12 @@ void DnsCacheImpl::onReResolve(const std::string& host) {
 
 void DnsCacheImpl::startResolve(const std::string& host, PrimaryHostInfo& host_info) {
   ENVOY_LOG(debug, "starting main thread resolve for host='{}' dns='{}' port='{}'", host,
-            host_info.host_to_resolve_, host_info.port_);
+            host_info.host_info_->resolved_host_, host_info.port_);
   ASSERT(host_info.active_query_ == nullptr);
 
   stats_.dns_query_attempt_.inc();
   host_info.active_query_ =
-      resolver_->resolve(host_info.host_to_resolve_, dns_lookup_family_,
+      resolver_->resolve(host_info.host_info_->resolved_host_, dns_lookup_family_,
                          [this, host](std::list<Network::DnsResponse>&& response) {
                            finishResolve(host, std::move(response));
                          });
@@ -151,11 +151,8 @@ void DnsCacheImpl::finishResolve(const std::string& host,
 
   auto& primary_host_info = *primary_host_it->second;
   primary_host_info.active_query_ = nullptr;
-  const bool first_resolve = primary_host_info.host_info_ == nullptr;
-  if (primary_host_info.host_info_ == nullptr) {
-    primary_host_info.host_info_ =
-        std::make_shared<DnsHostInfoImpl>(main_thread_dispatcher_.timeSource());
-  }
+  const bool first_resolve = !primary_host_info.host_info_->first_resolve_complete_;
+  primary_host_info.host_info_->first_resolve_complete_ = true;
 
   const auto new_address = !response.empty()
                                ? Network::Utility::getAddressWithPort(*(response.front().address_),
@@ -211,9 +208,8 @@ void DnsCacheImpl::runRemoveCallbacks(const std::string& host) {
 void DnsCacheImpl::updateTlsHostsMap() {
   TlsHostMapSharedPtr new_host_map = std::make_shared<TlsHostMap>();
   for (const auto& primary_host : primary_hosts_) {
-    // Do not include hosts without host info. This only happens before we get the first
-    // resolution.
-    if (primary_host.second->host_info_ != nullptr) {
+    // Do not include hosts that have not resolved at least once.
+    if (primary_host.second->host_info_->first_resolve_complete_) {
       new_host_map->emplace(primary_host.first, primary_host.second->host_info_);
     }
   }
@@ -249,8 +245,10 @@ void DnsCacheImpl::ThreadLocalHostInfo::updateHostMap(const TlsHostMapSharedPtr&
 DnsCacheImpl::PrimaryHostInfo::PrimaryHostInfo(DnsCacheImpl& parent,
                                                absl::string_view host_to_resolve, uint16_t port,
                                                const Event::TimerCb& timer_cb)
-    : parent_(parent), host_to_resolve_(host_to_resolve), port_(port),
-      refresh_timer_(parent.main_thread_dispatcher_.createTimer(timer_cb)) {
+    : parent_(parent), port_(port),
+      refresh_timer_(parent.main_thread_dispatcher_.createTimer(timer_cb)),
+      host_info_(std::make_shared<DnsHostInfoImpl>(parent.main_thread_dispatcher_.timeSource(),
+                                                   host_to_resolve)) {
   parent_.stats_.host_added_.inc();
   parent_.stats_.num_hosts_.inc();
 }
