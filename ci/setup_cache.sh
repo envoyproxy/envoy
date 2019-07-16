@@ -17,13 +17,6 @@ if [[ ! -z "${GCP_SERVICE_ACCOUNT_KEY}" ]]; then
   echo "${GCP_SERVICE_ACCOUNT_KEY}" | base64 --decode > "${GCP_SERVICE_ACCOUNT_KEY_FILE}"
 fi
 
-if [[ -n "${BAZEL_REMOTE_CACHE}" ]]; then
-  export BAZEL_BUILD_EXTRA_OPTIONS="${BAZEL_BUILD_EXTRA_OPTIONS} \
-    --experimental_inmemory_dotd_files \
-    --experimental_inmemory_jdeps_files \
-    --experimental_remote_download_outputs=toplevel"
-fi
-
 if [[ "${BAZEL_REMOTE_CACHE}" =~ ^http ]]; then
   if [[ ! -z "${GCP_SERVICE_ACCOUNT_KEY}" ]]; then
     export BAZEL_BUILD_EXTRA_OPTIONS="${BAZEL_BUILD_EXTRA_OPTIONS} \
