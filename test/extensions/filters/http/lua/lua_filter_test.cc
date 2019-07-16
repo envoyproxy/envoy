@@ -250,6 +250,8 @@ TEST_F(LuaHttpFilterTest, ScriptBodyChunksRequestBody) {
   Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("/")));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
 
   Buffer::OwnedImpl data("hello");
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("5")));
@@ -1257,7 +1259,14 @@ TEST_F(LuaHttpFilterTest, ImmediateResponse) {
   config_->runtimeGC();
   const uint64_t mem_use_at_start = config_->runtimeBytesUsed();
 
-  for (uint64_t i = 0; i < 2000; i++) {
+  uint64_t num_loops = 2000;
+#if defined(__has_feature) && (__has_feature(thread_sanitizer))
+  // per https://github.com/envoyproxy/envoy/issues/7374 this test is causing
+  // problems on tsan
+  num_loops = 200;
+#endif
+
+  for (uint64_t i = 0; i < num_loops; i++) {
     Http::TestHeaderMapImpl request_headers{{":path", "/"}};
     Http::TestHeaderMapImpl expected_headers{{":status", "503"}, {"content-length", "4"}};
     EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), false));

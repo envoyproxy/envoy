@@ -387,7 +387,7 @@ std::vector<uint8_t> ContextImpl::parseAlpnProtocols(const std::string& alpn_pro
   return out;
 }
 
-bssl::UniquePtr<SSL> ContextImpl::newSsl(absl::optional<std::string>) {
+bssl::UniquePtr<SSL> ContextImpl::newSsl(const Network::TransportSocketOptions*) {
   // We use the first certificate for a new SSL object, later in the
   // SSL_CTX_set_select_certificate_cb() callback following ClientHello, we replace with the
   // selected certificate via SSL_set_SSL_CTX().
@@ -419,12 +419,18 @@ int ContextImpl::verifyCallback(X509_STORE_CTX* store_ctx, void* arg) {
   SSL* ssl = reinterpret_cast<SSL*>(
       X509_STORE_CTX_get_ex_data(store_ctx, SSL_get_ex_data_X509_STORE_CTX_idx()));
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
-  return impl->verifyCertificate(cert.get());
+
+  const Network::TransportSocketOptions* transport_socket_options =
+      static_cast<const Network::TransportSocketOptions*>(SSL_get_app_data(ssl));
+  return impl->verifyCertificate(
+      cert.get(), transport_socket_options &&
+                          !transport_socket_options->verifySubjectAltNameListOverride().empty()
+                      ? transport_socket_options->verifySubjectAltNameListOverride()
+                      : impl->verify_subject_alt_name_list_);
 }
 
-int ContextImpl::verifyCertificate(X509* cert) {
-  if (!verify_subject_alt_name_list_.empty() &&
-      !verifySubjectAltName(cert, verify_subject_alt_name_list_)) {
+int ContextImpl::verifyCertificate(X509* cert, const std::vector<std::string>& verify_san_list) {
+  if (!verify_san_list.empty() && !verifySubjectAltName(cert, verify_san_list)) {
     stats_.fail_verify_san_.inc();
     return 0;
   }
@@ -664,15 +670,21 @@ ClientContextImpl::ClientContextImpl(Stats::Scope& scope,
   }
 }
 
-bssl::UniquePtr<SSL> ClientContextImpl::newSsl(absl::optional<std::string> override_server_name) {
-  bssl::UniquePtr<SSL> ssl_con(ContextImpl::newSsl(absl::nullopt));
+bssl::UniquePtr<SSL> ClientContextImpl::newSsl(const Network::TransportSocketOptions* options) {
+  bssl::UniquePtr<SSL> ssl_con(ContextImpl::newSsl(options));
 
-  std::string server_name_indication =
-      override_server_name.has_value() ? override_server_name.value() : server_name_indication_;
+  const std::string server_name_indication = options && options->serverNameOverride().has_value()
+                                                 ? options->serverNameOverride().value()
+                                                 : server_name_indication_;
 
   if (!server_name_indication.empty()) {
     int rc = SSL_set_tlsext_host_name(ssl_con.get(), server_name_indication.c_str());
     RELEASE_ASSERT(rc, "");
+  }
+
+  if (options && !options->verifySubjectAltNameListOverride().empty()) {
+    SSL_set_app_data(ssl_con.get(), options);
+    SSL_set_verify(ssl_con.get(), SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, nullptr);
   }
 
   if (allow_renegotiation_) {

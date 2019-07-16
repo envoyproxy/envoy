@@ -15,6 +15,7 @@
 #include "envoy/server/tracer_config.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/stats/timespan.h"
 #include "envoy/tracing/http_tracer.h"
 
 #include "common/access_log/access_log_manager_impl.h"
@@ -47,7 +48,7 @@ namespace Server {
 /**
  * All server wide stats. @see stats_macros.h
  */
-#define ALL_SERVER_STATS(COUNTER, GAUGE)                                                           \
+#define ALL_SERVER_STATS(COUNTER, GAUGE, HISTOGRAM)                                                \
   COUNTER(debug_assertion_failures)                                                                \
   GAUGE(concurrency, NeverImport)                                                                  \
   GAUGE(days_until_first_cert_expiring, Accumulate)                                                \
@@ -59,10 +60,11 @@ namespace Server {
   GAUGE(state, NeverImport)                                                                        \
   GAUGE(total_connections, Accumulate)                                                             \
   GAUGE(uptime, Accumulate)                                                                        \
-  GAUGE(version, NeverImport)
+  GAUGE(version, NeverImport)                                                                      \
+  HISTOGRAM(initialization_time_ms)
 
 struct ServerStats {
-  ALL_SERVER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
+  ALL_SERVER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
 };
 
 /**
@@ -275,6 +277,9 @@ private:
   std::unique_ptr<ProcessContext> process_context_;
   std::unique_ptr<Memory::HeapShrinker> heap_shrinker_;
   const std::thread::id main_thread_id_;
+  // initialization_time is a histogram for tracking the initialization time across hot restarts
+  // whenever we have support for histogram merge across hot restarts.
+  Stats::TimespanPtr initialization_timer_;
 
   using LifecycleNotifierCallbacks = std::list<StageCallback>;
   using LifecycleNotifierCompletionCallbacks = std::list<StageCallbackWithCompletion>;

@@ -86,11 +86,9 @@ public:
 protected:
   HeapStatDataAllocator& alloc_;
 
-  // Holds backing store for both CounterImpl and GaugeImpl. This provides a level
-  // of indirection needed to enable stats created with the same name from
-  // different scopes to share the same value.
+  // Holds backing store shared by both CounterImpl and GaugeImpl. CounterImpl
+  // adds another field, pending_increment_, that is not used in Gauge.
   std::atomic<uint64_t> value_{0};
-  std::atomic<uint64_t> pending_increment_{0};
   std::atomic<uint16_t> flags_{0};
   std::atomic<uint16_t> ref_count_{0};
 };
@@ -113,8 +111,10 @@ public:
   void inc() override { add(1); }
   uint64_t latch() override { return pending_increment_.exchange(0); }
   void reset() override { value_ = 0; }
-  bool used() const override { return flags_ & Flags::Used; }
   uint64_t value() const override { return value_; }
+
+private:
+  std::atomic<uint64_t> pending_increment_{0};
 };
 
 class GaugeImpl : public StatsSharedImpl<Gauge> {

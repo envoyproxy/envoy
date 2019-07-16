@@ -341,6 +341,28 @@ QUICHE_FLAG(
 QUICHE_FLAG(bool, quic_reloadable_flag_quic_version_negotiation_grease, false,
             "When true, QUIC Version Negotiation packets will randomly include fake versions.")
 
+QUICHE_FLAG(
+    bool, quic_reloadable_flag_quic_fix_get_packet_header_size, false,
+    "Fixes quic::GetPacketHeaderSize and callsites when QuicVersionHasLongHeaderLengths is false.")
+
+QUICHE_FLAG(
+    bool, quic_reloadable_flag_quic_change_default_lumpy_pacing_size_to_two, false,
+    "If true and --quic_lumpy_pacing_size is 1, QUIC will use a lumpy size of two for pacing.")
+
+QUICHE_FLAG(bool, quic_reloadable_flag_quic_no_window_update_on_read_only_stream, false,
+            "If true, QuicConnection will be closed if a WindowUpdate frame is received on a "
+            "READ_UNIDIRECTIONAL stream.")
+
+QUICHE_FLAG(bool, quic_reloadable_flag_quic_clear_queued_packets_on_connection_close, false,
+            "Calls ClearQueuedPackets after sending a connection close packet")
+
+QUICHE_FLAG(bool, quic_reloadable_flag_quic_enable_version_48, false,
+            "If true, enable QUIC version 48.")
+
+QUICHE_FLAG(bool, quic_reloadable_flag_quic_avoid_empty_frame_after_empty_headers, false,
+            "If enabled, do not call OnStreamFrame() with empty frame after receiving empty or too "
+            "large headers with FIN.")
+
 QUICHE_FLAG(bool, quic_restart_flag_quic_allow_loas_multipacket_chlo, false,
             "If true, inspects QUIC CHLOs for kLOAS and early creates sessions "
             "to allow multi-packet CHLOs")

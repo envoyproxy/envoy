@@ -34,7 +34,15 @@ fi
 # This is where we are going to copy the .gcno files into.
 GCNO_ROOT=bazel-out/k8-dbg/bin/test/coverage/coverage_tests.runfiles/"${WORKSPACE}"
 echo "    GCNO_ROOT=${GCNO_ROOT}"
-rm -rf ${GCNO_ROOT}
+
+echo "Cleaning .gcno from previous coverage runs..."
+NUM_PREVIOUS_GCNO_FILES=0
+for f in $(find -L "${GCNO_ROOT}" -name "*.gcno")
+do
+  rm -f "${f}"
+  let NUM_PREVIOUS_GCNO_FILES=NUM_PREVIOUS_GCNO_FILES+1
+done
+echo "Cleanup completed. ${NUM_PREVIOUS_GCNO_FILES} files deleted."
 
 # Make sure //test/coverage:coverage_tests is up-to-date.
 SCRIPT_DIR="$(realpath "$(dirname "$0")")"
@@ -69,7 +77,7 @@ BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} -c dbg --copt=-DNDEBUG"
 # stats. The #foo# pattern is because gcov produces files such as
 # bazel-out#local-fastbuild#bin#external#spdlog_git#_virtual_includes#spdlog#spdlog#details#pattern_formatter_impl.h.gcov.
 # To find these while modifying this regex, perform a gcov run with -k set.
-[[ -z "${GCOVR_EXCLUDE_REGEX}" ]] && GCOVR_EXCLUDE_REGEX=".*pb.h.gcov|.*#k8-dbg#bin#.*|test#.*|external#.*|.*#external#.*|.*#prebuilt#.*|.*#config_validation#.*|.*#chromium_url#.*"
+[[ -z "${GCOVR_EXCLUDE_REGEX}" ]] && GCOVR_EXCLUDE_REGEX=".*pb\\..*|test#.*|.*#test#.*|external#.*|.*#external#.*|.*#prebuilt#.*|.*#config_validation#.*|.*#chromium_url#.*"
 [[ -z "${GCOVR_EXCLUDE_DIR}" ]] && GCOVR_EXCLUDE_DIR=".*/external/.*"
 
 COVERAGE_DIR="${SRCDIR}"/generated/coverage

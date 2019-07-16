@@ -52,6 +52,8 @@ TEST_F(GrpcHttp1BridgeFilterTest, NoRoute) {
                                           {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, true));
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.decodeMetadata(metadata_map));
 
   Http::TestHeaderMapImpl response_headers{{":status", "404"}};
 }

@@ -209,6 +209,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithStats) {
   // 2019/06/17  7243     49412       49700   macros for exact/upper-bound memory checks
   // 2019/06/29  7364     45685       46000   combine 2 levels of stat ref-counting into 1
   // 2019/06/30  7428     42742       43000   remove stats multiple inheritance, inline HeapStatData
+  // 2019/07/06  7477     42742       43000   fork gauge representation to drop pending_increment_
   // 2019/07/03  4980     35393       35500   use real symbol tables
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
@@ -219,7 +220,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithStats) {
   // On a local clang8/libstdc++/linux flow, the memory usage was observed in
   // June 2019 to be 64 bytes higher than it is in CI/release. Your mileage may
   // vary.
-  EXPECT_MEMORY_EQ(m_per_cluster, 35393);
+  EXPECT_MEMORY_EQ(m_per_cluster, 35393); // 104 bytes higher than a debug build.
   EXPECT_MEMORY_LE(m_per_cluster, 35500);
 }
 

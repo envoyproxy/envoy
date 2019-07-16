@@ -17,7 +17,7 @@
 #include "server/server.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
-#include "exe/signal_action.h"
+#include "common/signal/signal_action.h"
 #include "exe/terminate_handler.h"
 #endif
 
