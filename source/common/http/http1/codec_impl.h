@@ -174,8 +174,6 @@ public:
 protected:
   ConnectionImpl(Network::Connection& connection, http_parser_type type,
                  uint32_t max_request_headers_kb);
-  ConnectionImpl(Network::Connection& connection, http_parser_type type,
-                 uint32_t max_request_headers_kb, bool strict_header_validation);
 
   bool resetStreamCalled() { return reset_stream_called_; }
 
@@ -296,10 +294,6 @@ public:
   ServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks,
                        Http1Settings settings, uint32_t max_request_headers_kb);
 
-  ServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks,
-                       Http1Settings settings, uint32_t max_request_headers_kb,
-                       bool strict_header_validation);
-
   virtual bool supports_http_10() override { return codec_settings_.accept_http_10_; }
 
 private:
@@ -349,9 +343,6 @@ private:
 class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
   ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks& callbacks);
-
-  ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks& callbacks,
-                       bool strict_header_validation);
 
   // Http::ClientConnection
   StreamEncoder& newStream(StreamDecoder& response_decoder) override;
