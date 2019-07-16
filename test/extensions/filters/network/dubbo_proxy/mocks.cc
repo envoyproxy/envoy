@@ -17,52 +17,41 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
 
-MockDecoderEventHandler::MockDecoderEventHandler() {
-  ON_CALL(*this, transportBegin()).WillByDefault(Return(Network::FilterStatus::Continue));
-  ON_CALL(*this, transportEnd()).WillByDefault(Return(Network::FilterStatus::Continue));
-  ON_CALL(*this, messageBegin(_, _, _)).WillByDefault(Return(Network::FilterStatus::Continue));
-  ON_CALL(*this, messageEnd(_)).WillByDefault(Return(Network::FilterStatus::Continue));
-  ON_CALL(*this, transferHeaderTo(_, _)).WillByDefault(Return(Network::FilterStatus::Continue));
-  ON_CALL(*this, transferBodyTo(_, _)).WillByDefault(Return(Network::FilterStatus::Continue));
+MockStreamDecoder::MockStreamDecoder() {
+  ON_CALL(*this, onMessageDecoded(_, _)).WillByDefault(Return(FilterStatus::Continue));
 }
 
-MockDecoderCallbacks::MockDecoderCallbacks() {
-  ON_CALL(*this, newDecoderEventHandler()).WillByDefault(Return(&handler_));
+MockStreamEncoder::MockStreamEncoder() {
+  ON_CALL(*this, onMessageEncoded(_, _)).WillByDefault(Return(FilterStatus::Continue));
+}
+
+MockRequestDecoderCallbacks::MockRequestDecoderCallbacks() {
+  ON_CALL(*this, newStream()).WillByDefault(ReturnRef(handler_));
+}
+
+MockResponseDecoderCallbacks::MockResponseDecoderCallbacks() {
+  ON_CALL(*this, newStream()).WillByDefault(ReturnRef(handler_));
 }
 
 MockProtocol::MockProtocol() {
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
   ON_CALL(*this, type()).WillByDefault(Return(type_));
+  ON_CALL(*this, serializer()).WillByDefault(Return(&serializer_));
 }
 MockProtocol::~MockProtocol() = default;
 
-MockDeserializer::MockDeserializer() {
+MockSerializer::MockSerializer() {
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
   ON_CALL(*this, type()).WillByDefault(Return(type_));
 }
-MockDeserializer::~MockDeserializer() = default;
+MockSerializer::~MockSerializer() = default;
 
 namespace DubboFilters {
 
 MockFilterChainFactoryCallbacks::MockFilterChainFactoryCallbacks() = default;
 MockFilterChainFactoryCallbacks::~MockFilterChainFactoryCallbacks() = default;
 
-MockDecoderFilter::MockDecoderFilter() {
-  ON_CALL(*this, transportBegin()).WillByDefault(Return(Network::FilterStatus::Continue));
-  ON_CALL(*this, transportEnd()).WillByDefault(Return(Network::FilterStatus::Continue));
-  ON_CALL(*this, messageBegin(_, _, _)).WillByDefault(Return(Network::FilterStatus::Continue));
-  ON_CALL(*this, messageEnd(_)).WillByDefault(Return(Network::FilterStatus::Continue));
-  ON_CALL(*this, transferHeaderTo(_, _))
-      .WillByDefault(Invoke([&](Buffer::Instance& buf, size_t size) -> Network::FilterStatus {
-        buf.drain(size);
-        return Network::FilterStatus::Continue;
-      }));
-  ON_CALL(*this, transferBodyTo(_, _))
-      .WillByDefault(Invoke([&](Buffer::Instance& buf, size_t size) -> Network::FilterStatus {
-        buf.drain(size);
-        return Network::FilterStatus::Continue;
-      }));
-}
+MockDecoderFilter::MockDecoderFilter() = default;
 MockDecoderFilter::~MockDecoderFilter() = default;
 
 MockDecoderFilterCallbacks::MockDecoderFilterCallbacks() {
@@ -72,11 +61,26 @@ MockDecoderFilterCallbacks::MockDecoderFilterCallbacks() {
   ON_CALL(*this, connection()).WillByDefault(Return(&connection_));
   ON_CALL(*this, route()).WillByDefault(Return(route_));
   ON_CALL(*this, streamInfo()).WillByDefault(ReturnRef(stream_info_));
+  ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
 }
 MockDecoderFilterCallbacks::~MockDecoderFilterCallbacks() = default;
 
-MockDirectResponse::MockDirectResponse() = default;
-MockDirectResponse::~MockDirectResponse() = default;
+MockEncoderFilter::MockEncoderFilter() {}
+MockEncoderFilter::~MockEncoderFilter() {}
+
+MockEncoderFilterCallbacks::MockEncoderFilterCallbacks() {
+  route_.reset(new NiceMock<Router::MockRoute>());
+
+  ON_CALL(*this, streamId()).WillByDefault(Return(stream_id_));
+  ON_CALL(*this, connection()).WillByDefault(Return(&connection_));
+  ON_CALL(*this, route()).WillByDefault(Return(route_));
+  ON_CALL(*this, streamInfo()).WillByDefault(ReturnRef(stream_info_));
+  ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
+}
+MockEncoderFilterCallbacks::~MockEncoderFilterCallbacks() {}
+
+MockCodecFilter::MockCodecFilter() {}
+MockCodecFilter::~MockCodecFilter() {}
 
 MockFilterConfigFactory::MockFilterConfigFactory()
     : MockFactoryBase("envoy.filters.dubbo.mock_filter"),
