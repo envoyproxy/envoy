@@ -3,6 +3,7 @@ Version history
 
 1.12.0 (pending)
 ================
+* config: async data access for local and remote data source.
 * http: added the ability to reject HTTP/1.1 requests with invalid HTTP header values, using the runtime feature `envoy.reloadable_features.strict_header_validation`.
 
 1.11.0 (July 11, 2019)
