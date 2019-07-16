@@ -5,6 +5,7 @@ Version history
 ================
 * config: async data access for local and remote data source.
 * http: added the ability to reject HTTP/1.1 requests with invalid HTTP header values, using the runtime feature `envoy.reloadable_features.strict_header_validation`.
+* upstream: added network filter chains to upstream connections, see :ref:`filters<envoy_api_field_Cluster.filters>`.
 
 1.11.0 (July 11, 2019)
 ======================
