@@ -3,6 +3,14 @@ REPOSITORY_LOCATIONS = dict(
         sha256 = "3c681998538231a2d24d0c07ed5a7658cb72bfb5fd4bf9911157c0e9ac6a2687",
         urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/0.17.0/bazel-gazelle-0.17.0.tar.gz"],
     ),
+    bazel_toolchains = dict(
+        sha256 = "68e7678473090542e679ce7e6aa8a3ba5669577dede2b404f9865d556bd99f10",
+        strip_prefix = "bazel-toolchains-0.28.0",
+        urls = [
+            "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/0.28.0.tar.gz",
+            "https://github.com/bazelbuild/bazel-toolchains/archive/0.28.0.tar.gz",
+        ],
+    ),
     boringssl = dict(
         # Use commits from branch "chromium-stable-with-bazel"
         sha256 = "448773376d063b1e9a19e4fd41002d1a31a968a13be20b3b66ecd4aab9cf14a8",
