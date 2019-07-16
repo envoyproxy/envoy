@@ -1073,7 +1073,9 @@ filter_chains:
       new Network::Address::Ipv4Instance("127.0.0.1", 1234));
   ON_CALL(*listener_factory_.socket_, localAddress()).WillByDefault(ReturnRef(local_address));
 
-  ListenerHandle* listener_foo = expectListenerCreateWithSocket(false, true);
+  ListenerHandle* listener_foo = expectListenerCreate(false);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
+
   EXPECT_CALL(*worker_, addListener(_, _));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
   worker_->callAddCompletion(true);
@@ -1277,7 +1279,8 @@ filter_chains:
 - filters: []
   )EOF";
 
-  ListenerHandle* listener_foo = expectListenerCreateWithSocket(false, true);
+  ListenerHandle* listener_foo = expectListenerCreate(false);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
   EXPECT_CALL(*worker_, addListener(_, _));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
 
@@ -1329,8 +1332,9 @@ filter_chains:
 - filters: []
   )EOF";
 
-  ListenerHandle* listener_foo = expectListenerCreateWithSocket(true, false);
+  ListenerHandle* listener_foo = expectListenerCreate(true);
   EXPECT_CALL(listener_foo->target_, initialize());
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, false));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
 
   // Add bar with same non-binding address. Should fail.
@@ -1350,6 +1354,7 @@ filter_chains:
     auto listener_bar = std::make_unique<ListenerHandle>();
     EXPECT_CALL(listener_factory_, createDrainManager_(envoy::api::v2::Listener_DrainType_DEFAULT))
         .WillOnce(Return(listener_bar->drain_manager_));
+    EXPECT_CALL(listener_factory_, createNetworkFilterFactoryList(_, _)).Times(1);
     EXPECT_CALL(*listener_bar, onDestroy());
 
     EXPECT_THROW_WITH_MESSAGE(
@@ -1357,6 +1362,7 @@ filter_chains:
         EnvoyException,
         "error adding listener: 'bar' has duplicate address '0.0.0.0:1234' as existing listener");
   }
+
   // Move foo to active and then try to add again. This should still fail.
   EXPECT_CALL(*worker_, addListener(_, _));
   listener_foo->target_.ready();
@@ -1366,12 +1372,15 @@ filter_chains:
     auto listener_bar = std::make_unique<ListenerHandle>();
     EXPECT_CALL(listener_factory_, createDrainManager_(envoy::api::v2::Listener_DrainType_DEFAULT))
         .WillOnce(Return(listener_bar->drain_manager_));
+    EXPECT_CALL(listener_factory_, createNetworkFilterFactoryList(_, _)).Times(1);
     EXPECT_CALL(*listener_bar, onDestroy());
+
     EXPECT_THROW_WITH_MESSAGE(
         manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_bar_yaml), "", true),
         EnvoyException,
         "error adding listener: 'bar' has duplicate address '0.0.0.0:1234' as existing listener");
   }
+
   EXPECT_CALL(*listener_foo, onDestroy());
 }
 

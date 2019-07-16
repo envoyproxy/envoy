@@ -44,8 +44,6 @@ void FilterChainManagerImpl::addFilterChain(
 void FilterChainManagerImpl::addFilterChainInternalForFcds(
     absl::Span<const ::envoy::api::v2::listener::FilterChain* const> filter_chain_span,
     std::unique_ptr<FilterChainFactoryBuilder> filter_chain_factory_builder) {
-
-  // TODO(silentdai): replacing the old warming one is safe.
   warming_lookup_ = createFilterChainLookup();
   filter_chain_factory_builder->setInitManager(warming_lookup_->getInitManager());
   // mark builder as rvalue ref in func declaration
@@ -118,10 +116,9 @@ void FilterChainManagerImpl::addFilterChainInternalForFcds(
         filter_chain_match.server_names(), filter_chain_match.transport_protocol(),
         filter_chain_match.application_protocols(), filter_chain_match.source_type(), source_ips,
         filter_chain_match.source_ports(), existing_chain_impl);
-    ENVOY_LOG(trace, "Added a filter chain");
+    ENVOY_LOG(trace, "Added a filter chain to {}", address_->asString());
   }
   convertIPsToTries(warming_lookup_->destination_ports_map_);
-  // TODO(silentdai) : trigger fcds api
   ENVOY_LOG(debug, "initializing filter chain lookup of listener {}", address_->asString());
   warming_lookup_->initialize();
 }
@@ -514,14 +511,14 @@ void FilterChainManagerImpl::convertIPsToTries(DestinationPortsMap& destination_
 }
 
 void FilterChainManagerImpl::lookupWarmed(FilterChainLookup* warming_lookup) {
-  ENVOY_LOG(info, "initial lookup active {} warming {} : mark {} as active immediately.",
+  ENVOY_LOG(debug, "initial lookup active {} warming {} : mark {} as active immediately.",
             static_cast<void*>(active_lookup_.get()), static_cast<void*>(warming_lookup_.get()),
             static_cast<void*>(this));
   if (warming_lookup != warming_lookup_.get()) {
     ENVOY_LOG(error, "transforming warmed up lookup {} but is replaced by newer warming one {}. ",
               static_cast<void*>(warming_lookup), static_cast<void*>(warming_lookup_.get()));
   } else {
-    ENVOY_LOG(info, "updating to warmed up lookup {}", static_cast<void*>(warming_lookup));
+    ENVOY_LOG(debug, "updating to warmed up lookup {}", static_cast<void*>(warming_lookup));
     std::swap(warming_lookup_, active_lookup_);
   }
 }
@@ -545,7 +542,10 @@ FilterChainManagerImpl::createFilterChainLookup() {
           ENVOY_LOG(debug, "filter chain manager {} warmed up a new lookup {}",
                     address_->asString(), static_cast<void*>(lookup));
         }
+        // Try notify the target.
         init_target_.ready();
+        // The target may be initialized yet. Set the flag so that target callback can discover that
+        // target itself is ready.
         target_ready_ = true;
       });
   return res;

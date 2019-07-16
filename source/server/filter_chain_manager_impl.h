@@ -19,10 +19,23 @@ namespace Server {
 
 class FilterChainImpl;
 
+/**
+ * Interface representing the context of envoy needed by filter chain.
+ */
 class FilterChainFactoryBuilder {
 public:
   virtual ~FilterChainFactoryBuilder() = default;
+  /**
+   * Set the Init Manager object.
+   *
+   * @param init_manager The reference to the init_manager.
+   */
   virtual void setInitManager(Init::Manager& init_manager) PURE;
+  /**
+   * Build the filter chain from proto.
+   *
+   * @param filter_chain The proto config of the filter chain
+   */
   virtual std::unique_ptr<Network::FilterChain>
   buildFilterChain(const ::envoy::api::v2::listener::FilterChain& filter_chain) PURE;
 };
@@ -152,11 +165,12 @@ private:
 
     std::unique_ptr<FilterChainFactoryBuilder> filter_chain_builder_;
 
+    // The proto and the generated filter chain.
     std::unordered_map<::envoy::api::v2::listener::FilterChain,
                        std::shared_ptr<Network::FilterChain>, MessageUtil, MessageUtil>
         existing_active_filter_chains_;
 
-    // Used during warm up, notified by dependencies, and notify parent that the index is ready.
+    // Owned init manager to coordinates initialization of the filter chains.
     Init::ManagerImpl dynamic_init_manager_{"lookup_init_manager"};
 
     // `has_active_lookup_` is tricky here. It seems the condition is mutable. However, if we
@@ -165,18 +179,28 @@ private:
     // `active_lookup_` Access `has_active_lookup_` at the beginning of `FilterChainLookup`. The
     // value is stale soon after. Consider the case
     //   another FCDS update request comes and new warming lookup is created.
-    // Access `has_active_lookup_` from main thread.
     bool has_active_lookup_{false};
 
+    // Listen the complete event of the initialization.
     std::unique_ptr<Init::Watcher> init_watcher_;
 
     Init::Manager& getInitManager() { return dynamic_init_manager_; }
     void initialize();
   };
 
+  /**
+   * A factory method to create and FilterChainLookup object.
+   *
+   * @return std::unique_ptr<FilterChainLookup>
+   */
   std::unique_ptr<FilterChainLookup> createFilterChainLookup();
 
-  void lookupWarmed(FilterChainLookup* warming_lookup);
+  /**
+   * The callback for the lookup object so that filter chain manager can activate the new lookup.
+   *
+   * @param warming_lookup
+   */
+  void lookupWarmed(FilterChainLookup* warmed_lookup);
 
   // The invariant:
   // Once the active one is ready, there is always an active one until shutdown.
@@ -188,6 +212,9 @@ private:
   std::shared_ptr<FilterChainLookup> active_lookup_;
   std::shared_ptr<FilterChainLookup> warming_lookup_;
 
+  /**
+   * The below init components are suppose to block and notify the parent object.
+   */
   Init::Manager& init_manager_;
   bool target_ready_{false};
   Init::TargetImpl init_target_{"filter_chain_manager", [this]() {
