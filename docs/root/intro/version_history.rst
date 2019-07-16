@@ -3,7 +3,7 @@ Version history
 
 1.12.0 (pending)
 ================
-* config: changed the default value of :ref:`initial_fetch_timeout <envoy_api_field_core.ConfigSource.initial_fetch_timeout>` from 0s to 15s. This is a change in behaviour in the sense that Envoy initialization always completes within 15s by default. Refer to :ref:`initialization process <arch_overview_initialization>` for more details.
+* config: changed the default value of :ref:`initial_fetch_timeout <envoy_api_field_core.ConfigSource.initial_fetch_timeout>` from 0s to 15s. This is a change in behaviour in the sense that Envoy will move to the next initialization phase, even if the first config is not delivered in 15s. Refer to :ref:`initialization process <arch_overview_initialization>` for more details.
 
 1.11.0 (July 11, 2019)
 ======================

@@ -118,6 +118,6 @@ message ConfigSource {
   // initialization phase, even if the first config is not delivered yet. The timer is activated
   // when the xDS API subscription starts, and is disarmed on first config update or on error. 0
   // means no timeout - Envoy will wait indefinitely for the first xDS config (unless another
-  // timeout applies). If not specified the default is 15000ms (15 seconds).
+  // timeout applies). The default is 15s.
   google.protobuf.Duration initial_fetch_timeout = 4;
 }
