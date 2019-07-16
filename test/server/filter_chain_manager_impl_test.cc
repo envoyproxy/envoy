@@ -48,9 +48,7 @@ using testing::Throw;
 
 namespace Envoy {
 namespace Server {
-
 class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
-
   std::unique_ptr<Network::FilterChain>
   buildFilterChain(const ::envoy::api::v2::listener::FilterChain& filter_chain) override {
     UNREFERENCED_PARAMETER(filter_chain);
@@ -61,6 +59,22 @@ class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
   void setInitManager(Init::Manager& init_manager) override {
     UNREFERENCED_PARAMETER(init_manager);
   }
+};
+
+class DependentFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
+public:
+  std::unique_ptr<Network::FilterChain>
+  buildFilterChain(const ::envoy::api::v2::listener::FilterChain& filter_chain) override {
+    UNREFERENCED_PARAMETER(filter_chain);
+    targets_.push_back(std::make_shared<Init::TargetImpl>("mock_builder_target", []() {}));
+    init_manager_->add(*targets_.back());
+    // Won't dereference but requires not nullptr.
+    return std::make_unique<Network::MockFilterChain>();
+  }
+  // Not yet used by the this test
+  void setInitManager(Init::Manager& init_manager) override { init_manager_ = &init_manager; }
+  Init::Manager* init_manager_;
+  std::vector<std::shared_ptr<Init::TargetImpl>> targets_;
 };
 
 class FilterChainManagerImplTest : public testing::Test {
@@ -123,6 +137,16 @@ public:
         std::make_unique<MockFilterChainFactoryBuilder>());
   }
 
+  // Use the returned ptr with caution. It is controlled by unique_ptr.
+  DependentFilterChainFactoryBuilder* addDependentSingleFilterChainAndReturnBuilder(
+      const envoy::api::v2::listener::FilterChain& filter_chain) {
+    auto ptr = std::make_unique<DependentFilterChainFactoryBuilder>();
+    DependentFilterChainFactoryBuilder* res = ptr.get();
+    filter_chain_manager_->addFilterChain(
+        std::vector<const envoy::api::v2::listener::FilterChain*>{&filter_chain}, std::move(ptr));
+    return res;
+  }
+
   // Intermedia states.
   Network::Address::InstanceConstSharedPtr local_address_;
   Network::Address::InstanceConstSharedPtr remote_address_;
@@ -157,6 +181,7 @@ public:
   envoy::api::v2::listener::FilterChain filter_chain_template_peer_;
   std::unique_ptr<Init::Manager> init_manager_;
   std::unique_ptr<Init::Watcher> init_watcher_;
+
   // Test target
   std::unique_ptr<FilterChainManagerImpl> filter_chain_manager_;
 };
@@ -191,5 +216,54 @@ TEST_F(FilterChainManagerImplTest, OverrideSingleFilterChain) {
   EXPECT_NE(filter_chain_10001, nullptr);
   EXPECT_EQ(filter_chain_10000, nullptr);
 }
+
+TEST_F(FilterChainManagerImplTest, FilterChainNotAvailableWhenBeforeInitialization) {
+  addDependentSingleFilterChainAndReturnBuilder(filter_chain_template_);
+  auto* filter_chain_10000 =
+      findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  EXPECT_EQ(filter_chain_10000, nullptr);
+}
+
+TEST_F(FilterChainManagerImplTest, FilterChainIsAvailableWhenAfterInitialization) {
+  auto builder = addDependentSingleFilterChainAndReturnBuilder(filter_chain_template_);
+  auto* filter_chain_10000 =
+      findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  EXPECT_EQ(filter_chain_10000, nullptr);
+  EXPECT_FALSE(builder->targets_.empty());
+  for (const auto& target_ptr : builder->targets_) {
+    target_ptr->ready();
+  }
+  filter_chain_10000 = findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  EXPECT_NE(filter_chain_10000, nullptr);
+}
+
+TEST_F(FilterChainManagerImplTest, FilterChainOverrideDuringInitialization) {
+  auto builder = addDependentSingleFilterChainAndReturnBuilder(filter_chain_template_);
+  auto* filter_chain_10000 =
+      findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  auto* filter_chain_10001 =
+      findFilterChainHelper(10001, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  // Neither can be addressed before initialization.
+  EXPECT_FALSE(builder->targets_.empty());
+  EXPECT_EQ(filter_chain_10000, nullptr);
+  EXPECT_EQ(filter_chain_10001, nullptr);
+
+  auto builder_peer = addDependentSingleFilterChainAndReturnBuilder(filter_chain_template_peer_);
+  filter_chain_10000 = findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  filter_chain_10001 = findFilterChainHelper(10001, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  EXPECT_FALSE(builder_peer->targets_.empty());
+  EXPECT_EQ(filter_chain_10000, nullptr);
+  EXPECT_EQ(filter_chain_10001, nullptr);
+
+  // Mark filter chain as ready and redo find.
+  for (const auto& target_ptr : builder_peer->targets_) {
+    target_ptr->ready();
+  }
+  filter_chain_10000 = findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  filter_chain_10001 = findFilterChainHelper(10001, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  EXPECT_EQ(filter_chain_10000, nullptr);
+  EXPECT_NE(filter_chain_10001, nullptr);
+}
+
 } // namespace Server
 } // namespace Envoy
