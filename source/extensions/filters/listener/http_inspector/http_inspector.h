@@ -9,7 +9,6 @@
 #include "common/common/logger.h"
 
 #include "absl/container/flat_hash_set.h"
-#include "http_protocol_header.h"
 
 namespace Envoy {
 namespace Extensions {

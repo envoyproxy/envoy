@@ -6,10 +6,12 @@
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
+#include "common/http/headers.h"
 
 #include "extensions/transport_sockets/well_known_names.h"
 
 #include "absl/strings/match.h"
+#include "nghttp2/nghttp2.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -75,7 +77,7 @@ void Filter::onRead() {
 }
 
 void Filter::parseHttpHeader(absl::string_view data) {
-  if (absl::StartsWith(data, HTTP2_CONNECTION_PREFACE)) {
+  if (absl::StartsWith(data, NGHTTP2_CLIENT_MAGIC)) {
     ENVOY_LOG(trace, "http inspector: http2 connection preface found");
     protocol_ = "HTTP/2";
     config_->stats().http2_found_.inc();
