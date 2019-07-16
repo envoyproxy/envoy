@@ -492,6 +492,7 @@ TEST_F(DeprecatedFieldsTest, NoErrorWhenDeprecatedFieldsUnused) {
   EXPECT_EQ(0, runtime_deprecated_feature_use_.value());
 }
 
+#ifndef DISABLE_DEPRECATED_FEATURES
 TEST_F(DeprecatedFieldsTest, IndividualFieldDeprecated) {
   envoy::test::deprecation_test::Base base;
   base.set_is_deprecated("foo");
@@ -617,6 +618,7 @@ TEST_F(DeprecatedFieldsTest, RepeatedMessageDeprecated) {
                       "'envoy.test.deprecation_test.Base.deprecated_repeated_message'",
                       MessageUtil::checkForDeprecation(base));
 }
+#endif
 
 class TimestampUtilTest : public testing::Test, public ::testing::WithParamInterface<int64_t> {};
 

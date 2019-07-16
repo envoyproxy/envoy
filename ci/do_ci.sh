@@ -133,7 +133,7 @@ elif [[ "$CI_TARGET" == "bazel.debug" ]]; then
   echo "bazel debug build with tests..."
   bazel_binary_build debug
   echo "Testing ${TEST_TARGETS}"
-  bazel test ${BAZEL_BUILD_OPTIONS} -c dbg ${TEST_TARGETS}
+  bazel test ${BAZEL_BUILD_OPTIONS} --define deprecated_features=disabled -c dbg ${TEST_TARGETS}
   exit 0
 elif [[ "$CI_TARGET" == "bazel.debug.server_only" ]]; then
   setup_clang_toolchain
