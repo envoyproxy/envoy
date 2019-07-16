@@ -2,7 +2,7 @@
 
 #include <vector>
 
-#include "envoy/stats/stat_data_allocator.h"
+#include "envoy/stats/allocator.h"
 #include "envoy/stats/stats.h"
 #include "envoy/stats/symbol_table.h"
 
