@@ -1,10 +1,7 @@
 licenses(["notice"])  # Apache 2
 
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_package")
 load("//bazel:aar_with_jni.bzl", "aar_with_jni")
 load("@io_bazel_rules_kotlin//kotlin:kotlin.bzl", "kt_android_library", "kt_jvm_library")
-
-envoy_package()
 
 aar_with_jni(
     name = "android_aar",
@@ -39,4 +36,5 @@ kt_jvm_library(
         "RequestMethod.kt",
         "RetryPolicy.kt",
     ],
+    visibility = ["//visibility:public"],
 )
