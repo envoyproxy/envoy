@@ -1,9 +1,6 @@
 licenses(["notice"])  # Apache 2
 
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_package")
 load("@io_bazel_rules_kotlin//kotlin:kotlin.bzl", "kt_android_library")
-
-envoy_package()
 
 kt_android_library(
     name = "hello_envoy_shared_lib",
@@ -19,6 +16,7 @@ kt_android_library(
         "res/values/colors.xml",
         "res/values/strings.xml",
     ]),
+    visibility = ["//visibility:public"],
     deps = [
         "@androidsdk//com.android.support:recyclerview-v7-25.0.0",
     ],

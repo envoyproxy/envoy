@@ -1,10 +1,7 @@
 licenses(["notice"])  # Apache 2
 
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_package")
 load("@build_bazel_rules_apple//apple:ios.bzl", "ios_application", "ios_framework", "ios_static_framework")
 load("@io_bazel_rules_kotlin//kotlin/internal:toolchains.bzl", "define_kt_toolchain")
-
-envoy_package()
 
 alias(
     name = "ios_framework",

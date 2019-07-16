@@ -1,9 +1,5 @@
 licenses(["notice"])  # Apache 2
 
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_package")
-
-envoy_package()
-
 load("//bazel:swift_static_framework.bzl", "swift_static_framework")
 
 swift_static_framework(

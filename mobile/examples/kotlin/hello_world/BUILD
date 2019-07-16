@@ -1,9 +1,6 @@
 licenses(["notice"])  # Apache 2
 
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_package")
 load("@io_bazel_rules_kotlin//kotlin:kotlin.bzl", "kt_android_library")
-
-envoy_package()
 
 android_binary(
     name = "hello_envoy_kt",
