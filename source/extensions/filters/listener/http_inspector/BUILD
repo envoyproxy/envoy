@@ -14,7 +14,6 @@ envoy_cc_library(
     name = "http_inspector_lib",
     srcs = ["http_inspector.cc"],
     hdrs = ["http_inspector.h"],
-    external_deps = ["nghttp2"],
     deps = [
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",

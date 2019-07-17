@@ -12,7 +12,6 @@
 #include "extensions/transport_sockets/well_known_names.h"
 
 #include "absl/strings/match.h"
-#include "nghttp2/nghttp2.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -22,6 +21,7 @@ namespace HttpInspector {
 Config::Config(Stats::Scope& scope)
     : stats_{ALL_HTTP_INSPECTOR_STATS(POOL_COUNTER_PREFIX(scope, "http_inspector."))} {}
 
+const absl::string_view Filter::HTTP2_CONNECTION_PREFACE = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
 thread_local uint8_t Filter::buf_[Config::MAX_INSPECT_SIZE];
 
 Filter::Filter(const ConfigSharedPtr config) : config_(config) {}
@@ -34,7 +34,7 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   absl::string_view transport_protocol = socket.detectedTransportProtocol();
   if (!transport_protocol.empty() &&
       transport_protocol != TransportSockets::TransportSocketNames::get().RawBuffer) {
-    ENVOY_LOG(debug, "http inspector: cannot inspect http protocol with transport socket {}",
+    ENVOY_LOG(trace, "http inspector: cannot inspect http protocol with transport socket {}",
               transport_protocol);
     return Network::FilterStatus::Continue;
   }
@@ -78,14 +78,18 @@ void Filter::onRead() {
 }
 
 void Filter::parseHttpHeader(absl::string_view data) {
-  if (absl::StartsWith(data, NGHTTP2_CLIENT_MAGIC)) {
+  if (absl::StartsWith(data, HTTP2_CONNECTION_PREFACE)) {
     ENVOY_LOG(trace, "http inspector: http2 connection preface found");
     protocol_ = "HTTP/2";
-    config_->stats().http2_found_.inc();
     done(true);
   } else {
-    unsigned int id = 0, sid = 0, spaces[2];
-    while (id + 1 < data.length() && (data[id] != '\r' || data[id + 1] != '\n')) {
+    unsigned int id, sid = 0, spaces[2];
+    for (id = 0; id + 1 < data.length(); ++id) {
+      // The end of the request line.
+      if (data[id] == '\r' && data[id + 1] == '\n') {
+        break;
+      }
+
       if (data[id] == ' ') {
         if (sid < 2) {
           spaces[sid++] = id;
@@ -94,7 +98,6 @@ void Filter::parseHttpHeader(absl::string_view data) {
           break;
         }
       }
-      id++;
     }
 
     if (sid != 2 || id + 1 == data.length()) {
@@ -119,7 +122,6 @@ void Filter::parseHttpHeader(absl::string_view data) {
               request_uri, http_version);
 
     protocol_ = http_version;
-    config_->stats().http1x_found_.inc();
     done(true);
   }
 }
@@ -129,11 +131,15 @@ void Filter::done(bool success) {
 
   if (success) {
     absl::string_view protocol;
-    if (protocol_ == "HTTP/1.0") {
+    if (protocol_ == Http::Headers::get().ProtocolStrings.Http10String) {
+      config_->stats().http10_found_.inc();
       protocol = "http/1.0";
-    } else if (protocol_ == "HTTP/1.1") {
+    } else if (protocol_ == Http::Headers::get().ProtocolStrings.Http11String) {
+      config_->stats().http11_found_.inc();
       protocol = "http/1.1";
     } else {
+      ASSERT(protocol_ == "HTTP/2");
+      config_->stats().http2_found_.inc();
       protocol = "h2";
     }
 

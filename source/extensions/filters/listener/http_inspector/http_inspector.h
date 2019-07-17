@@ -20,7 +20,8 @@ namespace HttpInspector {
  */
 #define ALL_HTTP_INSPECTOR_STATS(COUNTER)                                                          \
   COUNTER(read_error)                                                                              \
-  COUNTER(http1x_found)                                                                            \
+  COUNTER(http10_found)                                                                            \
+  COUNTER(http11_found)                                                                            \
   COUNTER(http2_found)                                                                             \
   COUNTER(http_not_found)
 
@@ -71,6 +72,8 @@ private:
   Event::FileEventPtr file_event_;
   uint64_t read_{0};
   absl::string_view protocol_;
+
+  const static absl::string_view HTTP2_CONNECTION_PREFACE;
 
   static thread_local uint8_t buf_[Config::MAX_INSPECT_SIZE];
 };

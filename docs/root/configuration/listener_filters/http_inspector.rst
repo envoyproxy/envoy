@@ -32,6 +32,7 @@ This filter has a statistics tree rooted at *http_inspector* with the following 
   :widths: 1, 1, 2
 
   read_error, Counter, Total read errors
-  http1x_found, Counter, Total number of times HTTP/1.x was found
-  http2_found, Counter, Total number of times HTTP/1.x was found
+  http10_found, Counter, Total number of times HTTP/1.0 was found
+  http11_found, Counter, Total number of times HTTP/1.1 was found
+  http2_found, Counter, Total number of times HTTP/2 was found
   http_not_found, Counter, Total number of times HTTP protocol was not found

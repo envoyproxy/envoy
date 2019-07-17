@@ -70,6 +70,29 @@ TEST_F(HttpInspectorTest, SkipHttpInspectForTLS) {
   EXPECT_EQ(filter_->onAccept(cb_), Network::FilterStatus::Continue);
 }
 
+TEST_F(HttpInspectorTest, InspectHttp10) {
+  init();
+  absl::string_view header =
+      "GET /anything HTTP/1.0\r\nhost: google.com\r\nuser-agent: curl/7.64.0\r\naccept: "
+      "*/*\r\nx-forwarded-proto: http\r\nx-request-id: "
+      "a52df4a0-ed00-4a19-86a7-80e5049c6c84\r\nx-envoy-expected-rq-timeout-ms: "
+      "15000\r\ncontent-length: 0\r\n\r\n";
+
+  EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+      .WillOnce(Invoke([&header](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+        ASSERT(length >= header.size());
+        memcpy(buffer, header.data(), header.size());
+        return Api::SysCallSizeResult{ssize_t(header.size()), 0};
+      }));
+
+  const std::vector<absl::string_view> alpn_protos{absl::string_view("http/1.1")};
+
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
+  EXPECT_CALL(cb_, continueFilterChain(true));
+  file_event_callback_(Event::FileReadyType::Read);
+  EXPECT_EQ(1, cfg_->stats().http10_found_.value());
+}
+
 TEST_F(HttpInspectorTest, InspectHttp11) {
   init();
   absl::string_view header =
@@ -90,7 +113,7 @@ TEST_F(HttpInspectorTest, InspectHttp11) {
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
   EXPECT_CALL(cb_, continueFilterChain(true));
   file_event_callback_(Event::FileReadyType::Read);
-  EXPECT_EQ(1, cfg_->stats().http1x_found_.value());
+  EXPECT_EQ(1, cfg_->stats().http11_found_.value());
 }
 
 TEST_F(HttpInspectorTest, InvalidHttpMethod) {
