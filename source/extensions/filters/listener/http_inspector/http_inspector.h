@@ -73,8 +73,7 @@ private:
   uint64_t read_{0};
   absl::string_view protocol_;
 
-  const static absl::string_view HTTP2_CONNECTION_PREFACE;
-
+  static const absl::string_view HTTP2_CONNECTION_PREFACE;
   static thread_local uint8_t buf_[Config::MAX_INSPECT_SIZE];
 };
 

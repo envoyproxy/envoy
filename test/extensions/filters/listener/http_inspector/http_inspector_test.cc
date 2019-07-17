@@ -85,7 +85,7 @@ TEST_F(HttpInspectorTest, InspectHttp10) {
         return Api::SysCallSizeResult{ssize_t(header.size()), 0};
       }));
 
-  const std::vector<absl::string_view> alpn_protos{absl::string_view("http/1.1")};
+  const std::vector<absl::string_view> alpn_protos{absl::string_view("http/1.0")};
 
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
   EXPECT_CALL(cb_, continueFilterChain(true));

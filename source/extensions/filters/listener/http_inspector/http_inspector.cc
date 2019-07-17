@@ -164,8 +164,8 @@ const absl::flat_hash_set<std::string>& Filter::httpMethods() const {
 
 const absl::flat_hash_set<std::string>& Filter::httpProtocols() const {
   CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>,
-                         {Http::Headers::get().ProtocolStrings.Http10String,
-                          Http::Headers::get().ProtocolStrings.Http11String});
+                         Http::Headers::get().ProtocolStrings.Http10String,
+                         Http::Headers::get().ProtocolStrings.Http11String);
 }
 
 } // namespace HttpInspector
