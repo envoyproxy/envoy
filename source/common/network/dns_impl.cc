@@ -254,19 +254,18 @@ void DnsResolverImpl::PendingSrvResolution::onAresSrvStartCallback(int status, i
     status = ares_parse_srv_reply(buf, len, &srv_reply);
 
     if (status == ARES_SUCCESS) {
-      std::list<Address::SrvInstanceConstSharedPtr> srv_records;
+      std::list<DnsSrvResponse> srv_records;
       size_t total = 0, finished = 0;
       for (ares_srv_reply* current_reply = srv_reply; current_reply != NULL;
            current_reply = current_reply->next, ++total) {
         resolver_->resolve(
             current_reply->host, this->dns_lookup_family_,
-            [=, &finished,
-             &srv_records](const std::list<Address::InstanceConstSharedPtr>&& address_list) {
-              for (auto instance = address_list.begin(); instance != address_list.end();
-                   ++instance) {
+            [=, &finished, &srv_records](const std::list<DnsResponse>&& response) {
+              for (auto instance = response.begin(); instance != response.end(); ++instance) {
                 Address::InstanceConstSharedPtr inst_with_port(
-                    Utility::getAddressWithPort(*instance->get(), current_reply->port));
-                srv_records.emplace_back(new Address::SrvInstanceImpl(inst_with_port));
+                    Utility::getAddressWithPort(*instance->address_, current_reply->port));
+                srv_records.emplace_back(DnsSrvResponse(
+                    std::make_shared<Address::SrvInstanceImpl>(inst_with_port), instance->ttl_));
               }
               if (++finished == total) {
                 this->onAresSrvFinishCallback(std::move(srv_records));
@@ -289,7 +288,7 @@ void DnsResolverImpl::PendingSrvResolution::onAresSrvStartCallback(int status, i
 }
 
 void DnsResolverImpl::PendingSrvResolution::onAresSrvFinishCallback(
-    std::list<Address::SrvInstanceConstSharedPtr>&& srv_records) {
+    std::list<DnsSrvResponse>&& srv_records) {
   if (!srv_records.empty()) {
     completed_ = true;
   }

@@ -36,6 +36,17 @@ struct DnsResponse {
   const std::chrono::seconds ttl_;
 };
 
+/**
+ * DNS SRV response.
+ */
+struct DnsSrvResponse {
+  DnsSrvResponse(const Address::SrvInstanceConstSharedPtr& address, const std::chrono::seconds ttl)
+      : address_(address), ttl_(ttl) {}
+
+  const Address::SrvInstanceConstSharedPtr address_;
+  const std::chrono::seconds ttl_;
+};
+
 enum class DnsLookupFamily { V4Only, V6Only, Auto };
 
 /**
@@ -48,7 +59,7 @@ public:
   /**
    * Called when a resolution attempt is complete.
    * @param response supplies the list of resolved IP addresses and TTLs. The list will be empty if
-   *                     the resolution failed.
+   *        the resolution failed.
    */
   using ResolveCb = std::function<void(std::list<DnsResponse>&& response)>;
 
@@ -65,11 +76,10 @@ public:
 
   /**
    * Called when a resolution attempt for an SRV record is complete.
-   * @param srv_records supplies the list of resolved SRV records. The list will be empty if the
-   *        resolution failed.
+   * @param response supplies the list of resolved SRV records and TTLs. The list will be empty if
+   *        the resolution failed.
    */
-  using ResolveSrvCb =
-      std::function<void(std::list<Address::SrvInstanceConstSharedPtr>&& srv_records)>;
+  using ResolveSrvCb = std::function<void(std::list<DnsSrvResponse>&& response)>;
 
   /**
    * Initiate an async DNS resolution for an SRV record.

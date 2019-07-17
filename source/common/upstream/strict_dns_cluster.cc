@@ -92,24 +92,24 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
   if (srv_) {
     active_query_ = parent_.dns_resolver_->resolveSrv(
         dns_address_, parent_.dns_lookup_family_,
-        [this](std::list<Network::DnsResponse>&& response) -> void {
+        [this](std::list<Network::DnsSrvResponse>&& response) -> void {
           updateHosts(std::move(response),
                       static_cast<std::function<Network::Address::InstanceConstSharedPtr(
-                          const Network::Address::SrvInstanceConstSharedPtr&)>>(
-                          [](const Network::Address::SrvInstanceConstSharedPtr& srv) {
-                            return srv->address();
+                          const Network::DnsSrvResponse&)>>(
+                          [](const Network::DnsSrvResponse& dns_srv_response) {
+                            return dns_srv_response.address_->address();
                           }));
         });
   } else {
     active_query_ = parent_.dns_resolver_->resolve(
         dns_address_, parent_.dns_lookup_family_,
-        [this](std::list<Network::Address::InstanceConstSharedPtr>&& address_list) -> void {
-          updateHosts(std::move(address_list),
-                      static_cast<std::function<Network::Address::InstanceConstSharedPtr(
-                          const Network::Address::InstanceConstSharedPtr&)>>(
-                          [this](const Network::Address::InstanceConstSharedPtr& address) {
-                            return Network::Utility::getAddressWithPort(*address, port_);
-                          }));
+        [this](std::list<Network::DnsResponse>&& response) -> void {
+          updateHosts(
+              std::move(response),
+              static_cast<std::function<Network::Address::InstanceConstSharedPtr(
+                  const Network::DnsResponse&)>>([this](const Network::DnsResponse& dns_response) {
+                return Network::Utility::getAddressWithPort(*dns_response.address_, port_);
+              }));
         });
   }
 }

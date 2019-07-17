@@ -28,10 +28,10 @@ private:
                   const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint);
     ~ResolveTarget();
 
-    template <typename AddressInstance>
+    template <typename DnsResponseType>
     void updateHosts(
-        const std::list<DnsResponse>&& response,
-        std::function<Network::Address::InstanceConstSharedPtr(const AddressInstance&)> translate) {
+        const std::list<DnsResponseType>&& response,
+        std::function<Network::Address::InstanceConstSharedPtr(const DnsResponseType&)> translate) {
       active_query_ = nullptr;
       ENVOY_LOG(trace, "async DNS resolution complete for {}", dns_address_);
       parent_.info_->stats().update_success_.inc();
@@ -42,7 +42,7 @@ private:
       for (const auto& resp : response) {
         ASSERT(resp.address_ != nullptr);
         new_hosts.emplace_back(new HostImpl(
-            parent_.info_, dns_address_, translate(resp.address_), lb_endpoint_.metadata(),
+            parent_.info_, dns_address_, translate(resp), lb_endpoint_.metadata(),
             lb_endpoint_.load_balancing_weight().value(), locality_lb_endpoint_.locality(),
             lb_endpoint_.endpoint().health_check_config(), locality_lb_endpoint_.priority(),
             lb_endpoint_.health_status()));

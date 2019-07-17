@@ -51,13 +51,13 @@ private:
       cancelled_ = true;
     }
 
-    template <typename AddressInstance>
-    bool fireCallback(std::function<void(std::list<AddressInstance>&&)> callback,
-                      std::list<AddressInstance>&& address_list) {
+    template <typename DnsResponseType>
+    bool fireCallback(std::function<void(std::list<DnsResponseType>&&)> callback,
+                      std::list<DnsResponseType>&& response) {
       if (completed_) {
         if (!cancelled_) {
           try {
-            callback(std::move(address_list));
+            callback(std::move(response));
           } catch (const EnvoyException& e) {
             ENVOY_LOG(critical, "EnvoyException in c-ares callback");
             dispatcher_.post([s = std::string(e.what())] { throw EnvoyException(s); });
@@ -135,7 +135,7 @@ private:
      * c-ares ares_query() query callback for completion.
      * @param srv_records a list of SRV records.
      */
-    void onAresSrvFinishCallback(std::list<Address::SrvInstanceConstSharedPtr>&& srv_records);
+    void onAresSrvFinishCallback(std::list<DnsSrvResponse>&& srv_records);
 
     // wrapper function of call to ares_query().
     void getSrvByName();

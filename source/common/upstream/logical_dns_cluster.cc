@@ -73,26 +73,25 @@ void LogicalDnsCluster::startResolve() {
   if (srv_) {
     active_dns_query_ = dns_resolver_->resolveSrv(
         dns_address, dns_lookup_family_,
-        [this, dns_address](std::list<Network::DnsResponse>&& response) -> void {
+        [this, dns_address](std::list<Network::DnsSrvResponse>&& response) -> void {
           updateHosts(dns_address, std::move(response),
                       static_cast<std::function<Network::Address::InstanceConstSharedPtr(
-                          const Network::Address::SrvInstanceConstSharedPtr&)>>(
-                          [](const Network::Address::SrvInstanceConstSharedPtr& srv) {
-                            return srv->address();
+                          const Network::DnsSrvResponse&)>>(
+                          [](const Network::DnsSrvResponse& dns_srv_response) {
+                            return dns_srv_response.address_->address();
                           }));
         });
   } else {
     active_dns_query_ = dns_resolver_->resolve(
         dns_address, dns_lookup_family_,
-        [this, dns_address](
-            const std::list<Network::Address::InstanceConstSharedPtr>&& address_list) -> void {
-          updateHosts(dns_address, std::move(address_list),
-                      static_cast<std::function<Network::Address::InstanceConstSharedPtr(
-                          const Network::Address::InstanceConstSharedPtr&)>>(
-                          [this](const Network::Address::InstanceConstSharedPtr& address) {
-                            return Network::Utility::getAddressWithPort(
-                                *address, Network::Utility::portFromTcpUrl(dns_url_));
-                          }));
+        [this, dns_address](std::list<Network::DnsResponse>&& response) -> void {
+          updateHosts(
+              dns_address, std::move(response),
+              static_cast<std::function<Network::Address::InstanceConstSharedPtr(
+                  const Network::DnsResponse&)>>([this](const Network::DnsResponse& dns_response) {
+                return Network::Utility::getAddressWithPort(
+                    *dns_response.address_, Network::Utility::portFromTcpUrl(dns_url_));
+              }));
         });
   }
 }
