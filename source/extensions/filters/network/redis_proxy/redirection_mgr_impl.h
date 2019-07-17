@@ -132,7 +132,7 @@ public:
                 uint32_t redirects_per_minute_threshold, RedirectCB cb, TimeSource& time_source)
         : tracker_(std::make_unique<EventsPerMinuteTracker>(time_source)),
           min_time_between_triggering_(min_time_between_triggering),
-          redirects_per_minute_threshold_(redirects_per_minute_threshold), cb_(cb) {}
+          redirects_per_minute_threshold_(redirects_per_minute_threshold), cb_(std::move(cb)) {}
     EventsPerMinuteTrackerPtr tracker_;
     std::atomic<uint64_t> last_callback_time_ms_{};
     std::chrono::milliseconds min_time_between_triggering_;
@@ -147,7 +147,7 @@ public:
     HandleImpl(const std::string& cluster_name, RedirectionManagerImpl* mgr)
         : manager_(mgr->shared_from_this()), cluster_name_(cluster_name) {}
 
-    virtual ~HandleImpl() {
+    ~HandleImpl() override {
       std::shared_ptr<RedirectionManagerImpl> strong_manager = manager_.lock();
       if (strong_manager) {
         strong_manager->unregisterCluster(cluster_name_);

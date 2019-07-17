@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 
@@ -12,7 +13,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
 
-typedef std::function<void()> RedirectCB;
+using RedirectCB = std::function<void()>;
 
 /**
  * A manager for tracking redirection errors on a per cluster basis, and calling registered

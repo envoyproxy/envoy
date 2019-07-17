@@ -37,7 +37,7 @@ public:
     map_.emplace("fake_cluster", mock_cluster_);
     ON_CALL(cm_, clusters()).WillByDefault(Return(map_));
   }
-  virtual ~RedirectionMgrTest() = default;
+  ~RedirectionMgrTest() override = default;
 
   void advanceTime(MonotonicTime&& end_time, uint32_t nthreads = 0,
                    std::chrono::milliseconds&& increment = std::chrono::milliseconds(1000)) {

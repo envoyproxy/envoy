@@ -30,7 +30,7 @@ InstanceImpl::InstanceImpl(
       tls_(tls.allocateSlot()), config_(config), api_(api),
       stats_scope_(std::move(stats_scope)), redis_cluster_stats_{REDIS_CLUSTER_STATS(
                                                 POOL_COUNTER(*stats_scope_))},
-      redirection_manager_(redirection_manager) {
+      redirection_manager_(std::move(redirection_manager)) {
   tls_->set([this, cluster_name](
                 Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<ThreadLocalPool>(*this, dispatcher, cluster_name);

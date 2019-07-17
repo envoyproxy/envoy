@@ -22,8 +22,8 @@ namespace RedisProxy {
 
 class MockRouter : public Router {
 public:
-  MockRouter();
-  ~MockRouter();
+  MockRouter() = default;
+  ~MockRouter() = default;
 
   MOCK_METHOD1(upstreamPool, RouteSharedPtr(std::string& key));
 };
@@ -31,7 +31,7 @@ public:
 class MockRoute : public Route {
 public:
   MockRoute(ConnPool::InstanceSharedPtr);
-  ~MockRoute();
+  ~MockRoute() = default;
 
   MOCK_CONST_METHOD0(upstream, ConnPool::InstanceSharedPtr());
   MOCK_CONST_METHOD0(mirrorPolicies, const MirrorPolicies&());
@@ -43,8 +43,8 @@ private:
 
 class MockRedirectionManager : public RedirectionManager {
 public:
-  MockRedirectionManager();
-  ~MockRedirectionManager();
+  MockRedirectionManager() = default;
+  ~MockRedirectionManager() = default;
 
   MOCK_METHOD1(onRedirection, bool(const std::string& cluster_name));
   MOCK_METHOD4(registerCluster,
@@ -58,8 +58,8 @@ namespace ConnPool {
 
 class MockInstance : public Instance {
 public:
-  MockInstance();
-  ~MockInstance();
+  MockInstance() = default;
+  ~MockInstance() = default;
 
   MOCK_METHOD3(makeRequest,
                Common::Redis::Client::PoolRequest*(
@@ -78,16 +78,16 @@ namespace CommandSplitter {
 
 class MockSplitRequest : public SplitRequest {
 public:
-  MockSplitRequest();
-  ~MockSplitRequest();
+  MockSplitRequest() = default;
+  ~MockSplitRequest() = default;
 
   MOCK_METHOD0(cancel, void());
 };
 
 class MockSplitCallbacks : public SplitCallbacks {
 public:
-  MockSplitCallbacks();
-  ~MockSplitCallbacks();
+  MockSplitCallbacks() = default;
+  ~MockSplitCallbacks() = default;
 
   MOCK_METHOD0(connectionAllowed, bool());
   MOCK_METHOD1(onAuth, void(const std::string& password));
@@ -99,8 +99,8 @@ public:
 
 class MockInstance : public Instance {
 public:
-  MockInstance();
-  ~MockInstance();
+  MockInstance() = default;
+  ~MockInstance() = default;
 
   SplitRequestPtr makeRequest(Common::Redis::RespValuePtr&& request,
                               SplitCallbacks& callbacks) override {
