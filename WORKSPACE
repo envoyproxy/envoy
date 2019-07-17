@@ -23,8 +23,8 @@ load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_languag
 switched_rules_by_language(
     name = "com_google_googleapis_imports",
     cc = True,
-    grpc = True,
     go = True,
+    grpc = True,
     rules_override = {
         "py_proto_library": "@envoy_api//bazel:api_build_system.bzl",
     },
