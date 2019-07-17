@@ -106,10 +106,10 @@ void Filter::parseHttpHeader(absl::string_view data) {
       return;
     }
 
-    absl::string_view method(data.data(), spaces[0]);
+    absl::string_view method = data.substr(0, spaces[0]);
     // TODO(crazyxy): check request URI
-    absl::string_view request_uri(data.data() + spaces[0] + 1, spaces[1] - spaces[0] - 1);
-    absl::string_view http_version(data.data() + spaces[1] + 1, id - spaces[1] - 1);
+    absl::string_view request_uri = data.substr(spaces[0] + 1, spaces[1] - spaces[0] - 1);
+    absl::string_view http_version = data.substr(spaces[1] + 1, id - spaces[1] - 1);
 
     if (httpMethods().count(method) == 0 || httpProtocols().count(http_version) == 0) {
       ENVOY_LOG(trace, "http inspector: method: {} or protocol: {} not found", method,
@@ -149,7 +149,7 @@ void Filter::done(bool success) {
   }
 
   file_event_.reset();
-  // Do not skip other listener filters.
+  // Do not skip following listener filters.
   cb_->continueFilterChain(true);
 }
 
