@@ -10,6 +10,12 @@ jobs:
     vmImage: 'Ubuntu 16.04'
   container: envoy-build
   steps:
+  - bash: |
+      echo "disk space at begining of build:"
+      df -h
+    condition: always()
+
+
   - script: ci/do_ci.sh bazel.release
     env:
       ENVOY_SRCDIR: $(Build.SourcesDirectory)
@@ -19,6 +25,11 @@ jobs:
       BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
       BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
       GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+
+  - bash: |
+      echo "disk space at end of build:"
+      df -h
+    condition: always()
 
   - task: PublishBuildArtifacts@1
     inputs:
