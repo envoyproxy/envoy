@@ -21,6 +21,7 @@ namespace HttpInspector {
 Config::Config(Stats::Scope& scope)
     : stats_{ALL_HTTP_INSPECTOR_STATS(POOL_COUNTER_PREFIX(scope, "http_inspector."))} {}
 
+const absl::string_view Filter::HTTP2_CONNECTION_PREFACE = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
 thread_local uint8_t Filter::buf_[Config::MAX_INSPECT_SIZE];
 
 Filter::Filter(const ConfigSharedPtr config) : config_(config) {}
@@ -40,13 +41,13 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
 
   ASSERT(file_event_ == nullptr);
 
-  file_event_ = cb.dispatcher().createFileEvent(
-      socket.ioHandle().fd(),
-      [this](uint32_t events) {
-        ASSERT(events == Event::FileReadyType::Read);
-        onRead();
-      },
-      Event::FileTriggerType::Edge, Event::FileReadyType::Read);
+  file_event_ =
+      cb.dispatcher().createFileEvent(socket.ioHandle().fd(),
+                                      [this](uint32_t events) {
+                                        ASSERT(events == Event::FileReadyType::Read);
+                                        onRead();
+                                      },
+                                      Event::FileTriggerType::Edge, Event::FileReadyType::Read);
 
   cb_ = &cb;
   return Network::FilterStatus::StopIteration;
@@ -77,7 +78,7 @@ void Filter::onRead() {
 }
 
 void Filter::parseHttpHeader(absl::string_view data) {
-  if (absl::StartsWith(data, HTTP2_CONNECTION_PREFACE)) {
+  if (absl::StartsWith(data, Filter::HTTP2_CONNECTION_PREFACE)) {
     ENVOY_LOG(trace, "http inspector: http2 connection preface found");
     protocol_ = "HTTP/2";
     done(true);

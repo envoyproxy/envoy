@@ -59,6 +59,8 @@ public:
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
 
+  static const absl::string_view HTTP2_CONNECTION_PREFACE;
+
 private:
   void onRead();
   void done(bool success);
@@ -72,8 +74,6 @@ private:
   Event::FileEventPtr file_event_;
   uint64_t read_{0};
   absl::string_view protocol_;
-
-  static constexpr absl::string_view HTTP2_CONNECTION_PREFACE = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
 
   // Use static thread_local to avoid allocating buffer over and over again.
   static thread_local uint8_t buf_[Config::MAX_INSPECT_SIZE];
