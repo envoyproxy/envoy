@@ -8,7 +8,6 @@ load(
     "envoy_external_dep_path",
     "envoy_linkstatic",
     "envoy_select_force_libcpp",
-    "envoy_static_link_libstdcpp_linkopts",
     "tcmalloc_external_dep",
 )
 
@@ -60,7 +59,7 @@ def _envoy_test_linkopts():
         # TODO(mattklein123): It's not great that we universally link against the following libs.
         # In particular, -latomic and -lrt are not needed on all platforms. Make this more granular.
         "//conditions:default": ["-pthread", "-lrt", "-ldl"],
-    }) + envoy_select_force_libcpp(["-lc++fs"], ["-lstdc++fs", "-latomic"])
+    }) + envoy_select_force_libcpp([], ["-lstdc++fs", "-latomic"])
 
 # Envoy C++ fuzz test targets. These are not included in coverage runs.
 def envoy_cc_fuzz_test(name, corpus, deps = [], tags = [], **kwargs):
@@ -205,7 +204,7 @@ def envoy_cc_test_binary(
     envoy_cc_binary(
         name,
         testonly = 1,
-        linkopts = _envoy_test_linkopts() + envoy_static_link_libstdcpp_linkopts(),
+        linkopts = _envoy_test_linkopts(),
         **kargs
     )
 

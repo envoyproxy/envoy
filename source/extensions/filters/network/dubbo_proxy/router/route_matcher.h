@@ -13,6 +13,7 @@
 #include "common/protobuf/protobuf.h"
 
 #include "extensions/filters/network/dubbo_proxy/metadata.h"
+#include "extensions/filters/network/dubbo_proxy/router/route.h"
 #include "extensions/filters/network/dubbo_proxy/router/router.h"
 
 #include "absl/types/optional.h"
@@ -126,12 +127,12 @@ private:
   std::shared_ptr<ParameterRouteEntryImpl> parameter_route_;
 };
 
-class RouteMatcher : public Logger::Loggable<Logger::Id::dubbo> {
+class SignleRouteMatcherImpl : public RouteMatcher, public Logger::Loggable<Logger::Id::dubbo> {
 public:
   using RouteConfig = envoy::config::filter::network::dubbo_proxy::v2alpha1::RouteConfiguration;
-  RouteMatcher(const RouteConfig& config);
+  SignleRouteMatcherImpl(const RouteConfig& config, Server::Configuration::FactoryContext& context);
 
-  RouteConstSharedPtr route(const MessageMetadata& metadata, uint64_t random_value) const;
+  RouteConstSharedPtr route(const MessageMetadata& metadata, uint64_t random_value) const override;
 
 private:
   std::vector<RouteEntryImplBaseConstSharedPtr> routes_;
@@ -140,16 +141,14 @@ private:
   const absl::optional<std::string> version_;
 };
 
-using RouteMatcherConstSharedPtr = std::shared_ptr<const RouteMatcher>;
-using RouteMatcherPtr = std::unique_ptr<RouteMatcher>;
-
-class MultiRouteMatcher : public Logger::Loggable<Logger::Id::dubbo> {
+class MultiRouteMatcher : public RouteMatcher, public Logger::Loggable<Logger::Id::dubbo> {
 public:
   using RouteConfigList = Envoy::Protobuf::RepeatedPtrField<
       ::envoy::config::filter::network::dubbo_proxy::v2alpha1::RouteConfiguration>;
-  MultiRouteMatcher(const RouteConfigList& route_config_list);
+  MultiRouteMatcher(const RouteConfigList& route_config_list,
+                    Server::Configuration::FactoryContext& context);
 
-  RouteConstSharedPtr route(const MessageMetadata& metadata, uint64_t random_value) const;
+  RouteConstSharedPtr route(const MessageMetadata& metadata, uint64_t random_value) const override;
 
 private:
   std::vector<RouteMatcherPtr> route_matcher_list_;

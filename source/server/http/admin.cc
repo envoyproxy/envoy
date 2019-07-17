@@ -1104,35 +1104,6 @@ Http::Code AdminImpl::handlerRuntime(absl::string_view url, Http::HeaderMap& res
   return Http::Code::OK;
 }
 
-std::string AdminImpl::runtimeAsJson(
-    const std::vector<std::pair<std::string, Runtime::Snapshot::Entry>>& entries) {
-  rapidjson::Document document;
-  document.SetObject();
-  rapidjson::Value entries_array(rapidjson::kArrayType);
-  rapidjson::Document::AllocatorType& allocator = document.GetAllocator();
-  for (const auto& entry : entries) {
-    Value entry_obj;
-    entry_obj.SetObject();
-
-    entry_obj.AddMember("name", {entry.first.c_str(), allocator}, allocator);
-
-    Value entry_value;
-    if (entry.second.uint_value_) {
-      entry_value.SetUint64(entry.second.uint_value_.value());
-    } else {
-      entry_value.SetString(entry.second.raw_string_value_.c_str(), allocator);
-    }
-    entry_obj.AddMember("value", entry_value, allocator);
-
-    entries_array.PushBack(entry_obj, allocator);
-  }
-  document.AddMember("runtime", entries_array, allocator);
-  rapidjson::StringBuffer strbuf;
-  rapidjson::PrettyWriter<StringBuffer> writer(strbuf);
-  document.Accept(writer);
-  return strbuf.GetString();
-}
-
 bool AdminImpl::isFormUrlEncoded(const Http::HeaderEntry* content_type) const {
   if (content_type == nullptr) {
     return false;
@@ -1270,10 +1241,11 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
 
 Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection,
                                                  const Buffer::Instance& data,
-                                                 Http::ServerConnectionCallbacks& callbacks) {
+                                                 Http::ServerConnectionCallbacks& callbacks,
+                                                 const bool strict_header_validation) {
   return Http::ConnectionManagerUtility::autoCreateCodec(
       connection, data, callbacks, server_.stats(), Http::Http1Settings(), Http::Http2Settings(),
-      maxRequestHeadersKb());
+      maxRequestHeadersKb(), strict_header_validation);
 }
 
 bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,

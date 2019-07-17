@@ -62,6 +62,7 @@ public:
   const Http::HeaderMap& headers() { return *headers_; }
   void setAddServedByHeader(bool add_header) { add_served_by_header_ = add_header; }
   const Http::HeaderMapPtr& trailers() { return trailers_; }
+  bool receivedData() { return received_data_; }
 
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
@@ -150,7 +151,7 @@ public:
   void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
   void decodeData(Buffer::Instance& data, bool end_stream) override;
   void decodeTrailers(Http::HeaderMapPtr&& trailers) override;
-  void decodeMetadata(Http::MetadataMapPtr&&) override {}
+  void decodeMetadata(Http::MetadataMapPtr&& metadata_map_ptr) override;
 
   // Http::StreamCallbacks
   void onResetStream(Http::StreamResetReason reason,
@@ -161,6 +162,11 @@ public:
   virtual void setEndStream(bool end) { end_stream_ = end; }
 
   Event::TestTimeSystem& timeSystem() { return time_system_; }
+
+  Http::MetadataMap& metadata_map() { return metadata_map_; }
+  std::unordered_map<std::string, uint64_t>& duplicated_metadata_key_count() {
+    return duplicated_metadata_key_count_;
+  }
 
 protected:
   Http::HeaderMapPtr headers_;
@@ -178,6 +184,9 @@ private:
   std::vector<Grpc::Frame> decoded_grpc_frames_;
   bool add_served_by_header_{};
   Event::TestTimeSystem& time_system_;
+  Http::MetadataMap metadata_map_;
+  std::unordered_map<std::string, uint64_t> duplicated_metadata_key_count_;
+  bool received_data_{false};
 };
 
 using FakeStreamPtr = std::unique_ptr<FakeStream>;
@@ -559,8 +568,9 @@ public:
   bool createListenerFilterChain(Network::ListenerFilterManager& listener) override;
   bool createUdpListenerFilterChain(Network::UdpListenerFilterManager& udp_listener,
                                     Network::UdpReadFilterCallbacks& callbacks) override;
-  void set_allow_unexpected_disconnects(bool value) { allow_unexpected_disconnects_ = value; }
 
+  void set_allow_unexpected_disconnects(bool value) { allow_unexpected_disconnects_ = value; }
+  void setReadDisableOnNewConnection(bool value) { read_disable_on_new_connection_ = value; }
   Event::TestTimeSystem& timeSystem() { return time_system_; }
 
   // Stops the dispatcher loop and joins the listening thread.
@@ -619,6 +629,7 @@ private:
   // deleted) on the same thread that allocated the connection.
   std::list<QueuedConnectionWrapperPtr> consumed_connections_ GUARDED_BY(lock_);
   bool allow_unexpected_disconnects_;
+  bool read_disable_on_new_connection_;
   const bool enable_half_close_;
   FakeListener listener_;
   const Network::FilterChainSharedPtr filter_chain_;

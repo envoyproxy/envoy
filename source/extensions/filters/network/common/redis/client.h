@@ -77,6 +77,12 @@ public:
   virtual void addConnectionCallbacks(Network::ConnectionCallbacks& callbacks) PURE;
 
   /**
+   * Called to determine if the client has pending requests.
+   * @return bool true if the client is processing requests or false if it is currently idle.
+   */
+  virtual bool active() PURE;
+
+  /**
    * Closes the underlying network connection.
    */
   virtual void close() PURE;
@@ -134,6 +140,23 @@ public:
    * @return timeout for batching commands for a single upstream host.
    */
   virtual std::chrono::milliseconds bufferFlushTimeoutInMs() const PURE;
+
+  /**
+   * @return the maximum number of upstream connections to unknown hosts when enableRedirection() is
+   * true.
+   *
+   * This value acts as an upper bound on the number of servers in a cluster if only a subset
+   * of the cluster's servers are known via configuration (cluster size - number of servers in
+   * cluster known to cluster manager <= maxUpstreamUnknownConnections() for proper operation).
+   * Redirection errors are processed if enableRedirection() is true, and a new upstream connection
+   * to a previously unknown server will be made as a result of redirection if the number of unknown
+   * server connections is currently less than maxUpstreamUnknownConnections(). If a connection
+   * cannot be made, then the original redirection error will be passed though unchanged to the
+   * downstream client. If a cluster is using the Redis cluster protocol (RedisCluster), then the
+   * cluster logic will periodically discover all of the servers in the cluster; this should
+   * minimize the need for a large maxUpstreamUnknownConnections() value.
+   */
+  virtual uint32_t maxUpstreamUnknownConnections() const PURE;
 };
 
 /**
