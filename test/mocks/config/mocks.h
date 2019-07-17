@@ -82,6 +82,8 @@ public:
                             GrpcMuxCallbacks& callbacks) override;
   MOCK_METHOD1(pause, void(const std::string& type_url));
   MOCK_METHOD1(resume, void(const std::string& type_url));
+  MOCK_CONST_METHOD1(paused, bool(const std::string& type_url));
+
   MOCK_METHOD5(addSubscription,
                void(const std::set<std::string>& resources, const std::string& type_url,
                     SubscriptionCallbacks& callbacks, SubscriptionStats& stats,
@@ -90,10 +92,10 @@ public:
                void(const std::set<std::string>& resources, const std::string& type_url));
 
   MOCK_METHOD5(addOrUpdateWatch,
-               void(const std::string& type_url, WatchPtr& watch,
-                    const std::set<std::string>& resources, SubscriptionCallbacks& callbacks,
-                    std::chrono::milliseconds init_fetch_timeout));
-  MOCK_CONST_METHOD1(paused, bool(const std::string& type_url));
+               Watch*(const std::string& type_url, Watch* watch,
+                      const std::set<std::string>& resources, SubscriptionCallbacks& callbacks,
+                      std::chrono::milliseconds init_fetch_timeout));
+  MOCK_METHOD2(removeWatch, void(const std::string& type_url, Watch* watch));
 };
 
 class MockGrpcMuxCallbacks : public GrpcMuxCallbacks {

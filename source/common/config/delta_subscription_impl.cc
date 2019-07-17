@@ -11,14 +11,8 @@ DeltaSubscriptionImpl::DeltaSubscriptionImpl(
 
 DeltaSubscriptionImpl::~DeltaSubscriptionImpl() {
   if (watch_) {
-    // The Watch destruction process assumes all resource interest has already been removed. Doing
-    // that cleanly needs the context's involvement. So, do that now, just before destroying the
-    // watch.
-    context_->addOrUpdateWatch(type_url_, watch_, {}, *this, init_fetch_timeout_);
-    // A Watch must not outlive its owning WatchMap. Since DeltaSubscriptionImpl holds a shared_ptr
-    // to the context, which owns the WatchMap, the watch must be destroyed first in case this
-    // subscription holds the last shared_ptr.
-    watch_.reset();
+    context_->removeWatch(type_url_, watch_);
+    watch_ = nullptr;
   }
 }
 
@@ -33,13 +27,14 @@ void DeltaSubscriptionImpl::start(const std::set<std::string>& resources) {
   if (!is_aggregated_) {
     context_->start();
   }
-  context_->addOrUpdateWatch(type_url_, watch_, resources, *this, init_fetch_timeout_);
+  watch_ = context_->addOrUpdateWatch(type_url_, watch_, resources, *this, init_fetch_timeout_);
   stats_.update_attempt_.inc();
 }
 
 void DeltaSubscriptionImpl::updateResourceInterest(
     const std::set<std::string>& update_to_these_names) {
-  context_->addOrUpdateWatch(type_url_, watch_, update_to_these_names, *this, init_fetch_timeout_);
+  watch_ = context_->addOrUpdateWatch(type_url_, watch_, update_to_these_names, *this,
+                                      init_fetch_timeout_);
   stats_.update_attempt_.inc();
 }
 

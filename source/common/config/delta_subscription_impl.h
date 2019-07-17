@@ -64,7 +64,7 @@ private:
   // NOTE: if another subscription of the same type_url has already been started, this value will be
   // ignored in favor of the other subscription's.
   std::chrono::milliseconds init_fetch_timeout_;
-  WatchPtr watch_{};
+  Watch* watch_{};
   const bool is_aggregated_;
 };
 

@@ -19,15 +19,26 @@ NewGrpcMuxImpl::NewGrpcMuxImpl(Grpc::RawAsyncClientPtr async_client, Event::Disp
       grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings) {}
 
-void NewGrpcMuxImpl::addOrUpdateWatch(const std::string& type_url, WatchPtr& watch,
-                                      const std::set<std::string>& resources,
-                                      SubscriptionCallbacks& callbacks,
-                                      std::chrono::milliseconds init_fetch_timeout) {
-  if (watch.get() == nullptr) {
-    watch = addWatch(type_url, resources, callbacks, init_fetch_timeout);
+Watch* NewGrpcMuxImpl::addOrUpdateWatch(const std::string& type_url, Watch* watch,
+                                        const std::set<std::string>& resources,
+                                        SubscriptionCallbacks& callbacks,
+                                        std::chrono::milliseconds init_fetch_timeout) {
+  if (watch == nullptr) {
+    return addWatch(type_url, resources, callbacks, init_fetch_timeout);
   } else {
-    updateWatch(type_url, watch.get(), resources);
+    updateWatch(type_url, watch, resources);
+    return watch;
   }
+}
+
+void NewGrpcMuxImpl::removeWatch(const std::string& type_url, Watch* watch) {
+  updateWatch(type_url, watch, {});
+  auto entry = subscriptions_.find(type_url);
+  if (entry == subscriptions_.end()) {
+    ENVOY_LOG(error, "removeWatch() called for non-existent subscription {}.", type_url);
+    return;
+  }
+  entry->second->watch_map_.removeWatch(watch);
 }
 
 void NewGrpcMuxImpl::pause(const std::string& type_url) { pausable_ack_queue_.pause(type_url); }
@@ -97,10 +108,9 @@ GrpcMuxWatchPtr NewGrpcMuxImpl::subscribe(const std::string&, const std::set<std
 }
 void NewGrpcMuxImpl::start() { grpc_stream_.establishNewStream(); }
 
-WatchPtr NewGrpcMuxImpl::addWatch(const std::string& type_url,
-                                  const std::set<std::string>& resources,
-                                  SubscriptionCallbacks& callbacks,
-                                  std::chrono::milliseconds init_fetch_timeout) {
+Watch* NewGrpcMuxImpl::addWatch(const std::string& type_url, const std::set<std::string>& resources,
+                                SubscriptionCallbacks& callbacks,
+                                std::chrono::milliseconds init_fetch_timeout) {
   auto entry = subscriptions_.find(type_url);
   if (entry == subscriptions_.end()) {
     // We don't yet have a subscription for type_url! Make one!
@@ -108,9 +118,9 @@ WatchPtr NewGrpcMuxImpl::addWatch(const std::string& type_url,
     return addWatch(type_url, resources, callbacks, init_fetch_timeout);
   }
 
-  WatchPtr watch = entry->second->watch_map_.addWatch(callbacks);
+  Watch* watch = entry->second->watch_map_.addWatch(callbacks);
   // updateWatch() queues a discovery request if any of 'resources' are not yet subscribed.
-  updateWatch(type_url, watch.get(), resources);
+  updateWatch(type_url, watch, resources);
   return watch;
 }
 

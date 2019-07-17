@@ -65,6 +65,8 @@ public:
 
 using GrpcMuxWatchPtr = std::unique_ptr<GrpcMuxWatch>;
 
+struct Watch;
+
 /**
  * Manage one or more gRPC subscriptions on a single stream to management server. This can be used
  * for a single xDS API, e.g. EDS, or to combined multiple xDS APIs for ADS.
@@ -110,10 +112,11 @@ public:
   virtual void resume(const std::string& type_url) PURE;
 
   // For delta
-  virtual void addOrUpdateWatch(const std::string& type_url, WatchPtr& watch,
-                                const std::set<std::string>& resources,
-                                SubscriptionCallbacks& callbacks,
-                                std::chrono::milliseconds init_fetch_timeout) PURE;
+  virtual Watch* addOrUpdateWatch(const std::string& type_url, Watch* watch,
+                                  const std::set<std::string>& resources,
+                                  SubscriptionCallbacks& callbacks,
+                                  std::chrono::milliseconds init_fetch_timeout) PURE;
+  virtual void removeWatch(const std::string& type_url, Watch* watch) PURE;
 
   /**
    * Retrieves the current pause state as set by pause()/resume().

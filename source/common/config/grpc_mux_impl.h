@@ -40,10 +40,11 @@ public:
   void resume(const std::string& type_url) override;
   bool paused(const std::string& type_url) const override;
 
-  void addOrUpdateWatch(const std::string&, WatchPtr&, const std::set<std::string>&,
-                        SubscriptionCallbacks&, std::chrono::milliseconds) override {
+  Watch* addOrUpdateWatch(const std::string&, Watch*, const std::set<std::string>&,
+                          SubscriptionCallbacks&, std::chrono::milliseconds) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
+  void removeWatch(const std::string&, Watch*) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
   void handleDiscoveryResponse(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message);
 
@@ -134,8 +135,11 @@ public:
   void resume(const std::string&) override {}
   bool paused(const std::string&) const override { NOT_REACHED_GCOVR_EXCL_LINE; }
 
-  void addOrUpdateWatch(const std::string&, WatchPtr&, const std::set<std::string>&,
-                        SubscriptionCallbacks&, std::chrono::milliseconds) override {
+  Watch* addOrUpdateWatch(const std::string&, Watch*, const std::set<std::string>&,
+                          SubscriptionCallbacks&, std::chrono::milliseconds) override {
+    throw EnvoyException("ADS must be configured to support an ADS config source");
+  }
+  void removeWatch(const std::string&, Watch*) override {
     throw EnvoyException("ADS must be configured to support an ADS config source");
   }
 

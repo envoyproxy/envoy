@@ -29,9 +29,10 @@ public:
                  Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
                  const LocalInfo::LocalInfo& local_info);
 
-  void addOrUpdateWatch(const std::string& type_url, WatchPtr& watch,
-                        const std::set<std::string>& resources, SubscriptionCallbacks& callbacks,
-                        std::chrono::milliseconds init_fetch_timeout) override;
+  Watch* addOrUpdateWatch(const std::string& type_url, Watch* watch,
+                          const std::set<std::string>& resources, SubscriptionCallbacks& callbacks,
+                          std::chrono::milliseconds init_fetch_timeout) override;
+  void removeWatch(const std::string& type_url, Watch* watch) override;
 
   void pause(const std::string& type_url) override;
   void resume(const std::string& type_url) override;
@@ -53,8 +54,8 @@ public:
   void start() override;
 
 private:
-  WatchPtr addWatch(const std::string& type_url, const std::set<std::string>& resources,
-                    SubscriptionCallbacks& callbacks, std::chrono::milliseconds init_fetch_timeout);
+  Watch* addWatch(const std::string& type_url, const std::set<std::string>& resources,
+                  SubscriptionCallbacks& callbacks, std::chrono::milliseconds init_fetch_timeout);
 
   // Updates the list of resource names watched by the given watch. If an added name is new across
   // the whole subscription, or if a removed name has no other watch interested in it, then the
@@ -92,11 +93,10 @@ private:
         : sub_state_(type_url, watch_map_, local_info, init_fetch_timeout, dispatcher),
           init_fetch_timeout_(init_fetch_timeout) {}
 
-    WatchMapImpl watch_map_;
+    WatchMap watch_map_;
     DeltaSubscriptionState sub_state_;
     const std::chrono::milliseconds init_fetch_timeout_;
 
-  private:
     SubscriptionStuff(const SubscriptionStuff&) = delete;
     SubscriptionStuff& operator=(const SubscriptionStuff&) = delete;
   };
