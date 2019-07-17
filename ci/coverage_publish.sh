@@ -8,18 +8,20 @@ if [ "${CIRCLECI}" != "true" ]; then
   exit 0
 fi
 
+[[ -z "${ENVOY_BUILD_DIR}" ]] && ENVOY_BUILD_DIR=/build
+COVERAGE_FILE="${ENVOY_BUILD_DIR}/envoy/generated/coverage/index.html"
+
+if [ ! -f "${COVERAGE_FILE}" ]; then
+    echo "ERROR: Coverage file not found."
+    exit 1
+fi
+
+echo "Found coverage report: ${COVERAGE_FILE}"
+
 # available for master builds
 if [ -z "$CIRCLE_PR_NUMBER" ]
 then
   echo "Uploading coverage report..."
-
-  [[ -z "${ENVOY_BUILD_DIR}" ]] && ENVOY_BUILD_DIR=/build
-  COVERAGE_FILE="${ENVOY_BUILD_DIR}/envoy/generated/coverage/coverage.html"
-
-  if [ ! -f "${COVERAGE_FILE}" ]; then
-    echo "ERROR: Coverage file not found."
-    exit 1
-  fi
 
   BRANCH_NAME="${CIRCLE_BRANCH}"
   COVERAGE_DIR="$(dirname "${COVERAGE_FILE}")"
