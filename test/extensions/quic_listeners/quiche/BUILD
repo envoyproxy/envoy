@@ -26,6 +26,17 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "envoy_quic_writer_test",
+    srcs = ["envoy_quic_writer_test.cc"],
+    external_deps = ["quiche_quic_platform"],
+    deps = [
+        "//source/common/network:io_socket_error_lib",
+        "//source/extensions/quic_listeners/quiche:envoy_quic_packet_writer_lib",
+        "//test/mocks/network:network_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "envoy_quic_proof_source_test",
     srcs = ["envoy_quic_proof_source_test.cc"],
     external_deps = ["quiche_quic_platform"],

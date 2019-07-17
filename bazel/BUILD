@@ -86,6 +86,20 @@ config_setting(
 )
 
 config_setting(
+    name = "clang_build",
+    flag_values = {
+        "@bazel_tools//tools/cpp:compiler": "clang",
+    },
+)
+
+config_setting(
+    name = "gcc_build",
+    flag_values = {
+        "@bazel_tools//tools/cpp:compiler": "gcc",
+    },
+)
+
+config_setting(
     name = "disable_tcmalloc",
     values = {"define": "tcmalloc=disabled"},
 )
@@ -98,6 +112,11 @@ config_setting(
 config_setting(
     name = "disable_signal_trace",
     values = {"define": "signal_trace=disabled"},
+)
+
+config_setting(
+    name = "disable_object_dump_on_signal_trace",
+    values = {"define": "object_dump_on_signal_trace=disabled"},
 )
 
 config_setting(
@@ -156,6 +175,11 @@ config_setting(
         "@bazel_tools//platforms:x86_64",
     ],
     values = {"define": "boringssl=fips"},
+)
+
+config_setting(
+    name = "boringssl_disabled",
+    values = {"define": "boringssl=disabled"},
 )
 
 config_setting(

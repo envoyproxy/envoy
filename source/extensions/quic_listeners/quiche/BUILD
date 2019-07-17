@@ -47,6 +47,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "envoy_quic_packet_writer_lib",
+    srcs = ["envoy_quic_packet_writer.cc"],
+    hdrs = ["envoy_quic_packet_writer.h"],
+    external_deps = ["quiche_quic_platform"],
+    deps = [
+        ":envoy_quic_utils_lib",
+        "@com_googlesource_quiche//:quic_core_packet_writer_interface_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "envoy_quic_proof_source_lib",
     hdrs = ["envoy_quic_fake_proof_source.h"],
     external_deps = ["quiche_quic_platform"],
@@ -140,4 +151,11 @@ envoy_cc_library(
         "//include/envoy/network:connection_interface",
         "@com_googlesource_quiche//:quic_core_connection_lib",
     ],
+)
+
+envoy_cc_library(
+    name = "envoy_quic_utils_lib",
+    hdrs = ["envoy_quic_utils.h"],
+    external_deps = ["quiche_quic_platform"],
+    deps = ["//source/common/network:address_lib"],
 )

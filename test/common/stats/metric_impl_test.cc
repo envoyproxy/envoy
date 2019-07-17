@@ -1,7 +1,7 @@
 #include <string>
 
+#include "common/stats/allocator_impl.h"
 #include "common/stats/fake_symbol_table_impl.h"
-#include "common/stats/heap_stat_data.h"
 #include "common/stats/utility.h"
 
 #include "test/test_common/logging.h"
@@ -25,7 +25,7 @@ protected:
   }
 
   FakeSymbolTableImpl symbol_table_;
-  HeapStatDataAllocator alloc_;
+  AllocatorImpl alloc_;
   StatNamePool pool_;
 };
 
@@ -42,6 +42,7 @@ TEST_F(MetricImplTest, OneTag) {
   ASSERT_EQ(1, tags.size());
   EXPECT_EQ("name", tags[0].name_);
   EXPECT_EQ("value", tags[0].value_);
+  EXPECT_EQ("counter.name.value", counter->name());
   EXPECT_EQ("counter", counter->tagExtractedName());
   EXPECT_EQ(makeStat("counter"), counter->tagExtractedStatName());
 }

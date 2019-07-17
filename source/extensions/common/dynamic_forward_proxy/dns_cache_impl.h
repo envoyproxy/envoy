@@ -71,13 +71,19 @@ private:
   };
 
   struct DnsHostInfoImpl : public DnsHostInfo {
-    DnsHostInfoImpl(TimeSource& time_source) : time_source_(time_source) { touch(); }
+    DnsHostInfoImpl(TimeSource& time_source, absl::string_view resolved_host)
+        : time_source_(time_source), resolved_host_(resolved_host) {
+      touch();
+    }
 
     // DnsHostInfo
     Network::Address::InstanceConstSharedPtr address() override { return address_; }
+    const std::string& resolvedHost() override { return resolved_host_; }
     void touch() override { last_used_time_ = time_source_.monotonicTime().time_since_epoch(); }
 
     TimeSource& time_source_;
+    const std::string resolved_host_;
+    bool first_resolve_complete_{};
     Network::Address::InstanceConstSharedPtr address_;
     // Using std::chrono::steady_clock::duration is required for compilation within an atomic vs.
     // using MonotonicTime.
@@ -93,10 +99,9 @@ private:
     ~PrimaryHostInfo();
 
     DnsCacheImpl& parent_;
-    const std::string host_to_resolve_;
     const uint16_t port_;
     const Event::TimerPtr refresh_timer_;
-    DnsHostInfoImplSharedPtr host_info_;
+    const DnsHostInfoImplSharedPtr host_info_;
     Network::ActiveDnsQuery* active_query_{};
   };
 
@@ -113,8 +118,7 @@ private:
 
   void startCacheLoad(const std::string& host, uint16_t default_port);
   void startResolve(const std::string& host, PrimaryHostInfo& host_info);
-  void finishResolve(const std::string& host,
-                     const std::list<Network::Address::InstanceConstSharedPtr>& address_list);
+  void finishResolve(const std::string& host, std::list<Network::DnsResponse>&& response);
   void runAddUpdateCallbacks(const std::string& host, const DnsHostInfoSharedPtr& host_info);
   void runRemoveCallbacks(const std::string& host);
   void updateTlsHostsMap();

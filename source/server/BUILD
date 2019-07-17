@@ -41,6 +41,7 @@ envoy_cc_library(
         "//source/common/config:runtime_utility_lib",
         "//source/common/config:utility_lib",
         "//source/common/network:resolver_lib",
+        "//source/common/network:socket_option_factory_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/tracing:http_tracer_lib",
@@ -167,7 +168,7 @@ envoy_cc_library(
         "//include/envoy/server:options_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
-        "//source/common/stats:heap_stat_data_lib",
+        "//source/common/stats:allocator_lib",
     ],
 )
 
@@ -176,7 +177,7 @@ envoy_cc_library(
     hdrs = ["hot_restart_nop_impl.h"],
     deps = [
         "//include/envoy/server:hot_restart_interface",
-        "//source/common/stats:heap_stat_data_lib",
+        "//source/common/stats:allocator_lib",
     ],
 )
 
@@ -270,8 +271,6 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/listener:well_known_names",
         "//source/extensions/transport_sockets:well_known_names",
-        "//source/extensions/transport_sockets/tls:context_config_lib",
-        "//source/extensions/transport_sockets/tls:context_lib",
         "@envoy_api//envoy/admin/v2alpha:config_dump_cc",
         "@envoy_api//envoy/api/v2:lds_cc",
     ],
@@ -340,6 +339,7 @@ envoy_cc_library(
         ":guarddog_lib",
         ":listener_hooks_lib",
         ":listener_manager_lib",
+        ":ssl_context_manager_lib",
         ":worker_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:signal_interface",
@@ -381,6 +381,16 @@ envoy_cc_library(
         "//source/server:overload_manager_lib",
         "//source/server/http:admin_lib",
         "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "ssl_context_manager_lib",
+    srcs = ["ssl_context_manager.cc"],
+    hdrs = ["ssl_context_manager.h"],
+    deps = [
+        "//include/envoy/registry",
+        "//include/envoy/ssl:context_manager_interface",
     ],
 )
 

@@ -108,7 +108,7 @@ of times the host has been ejected).
 .. code-block:: json
 
   {
-     "retry_on": "cancelled,connect-failure,gateway-error,refused-stream,resource-exhausted,unavailable",
+     "retry_on": "cancelled,connect-failure,gateway-error,refused-stream,reset,resource-exhausted,unavailable",
      "num_retries": 1,
      "retry_host_predicate": [
      {

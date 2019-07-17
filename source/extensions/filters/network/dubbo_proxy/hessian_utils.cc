@@ -458,7 +458,6 @@ void HessianUtils::readNull(Buffer::Instance& buffer) {
   size_t size;
   peekNull(buffer, &size);
   buffer.drain(size);
-  return;
 }
 
 std::chrono::milliseconds HessianUtils::peekDate(Buffer::Instance& buffer, size_t* size,

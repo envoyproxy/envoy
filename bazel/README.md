@@ -350,6 +350,7 @@ The following optional features can be disabled on the Bazel build command-line:
 * Hot restart with `--define hot_restart=disabled`
 * Google C++ gRPC client with `--define google_grpc=disabled`
 * Backtracing on signals with `--define signal_trace=disabled`
+* Active stream state dump on signals with `--define signal_trace=disabled` or `--define disable_object_dump_on_signal_trace=disabled`
 * tcmalloc with `--define tcmalloc=disabled`
 
 ## Enabling optional features
@@ -434,10 +435,8 @@ https://github.com/bazelbuild/bazel/issues/2805.
 
 # Coverage builds
 
-To generate coverage results, make sure you have
-[`gcovr`](https://github.com/gcovr/gcovr) 3.3 in your `PATH` (or set `GCOVR` to
-point at it) and are using a GCC toolchain (clang does not work currently, see
-https://github.com/envoyproxy/envoy/issues/1000). Then run:
+To generate coverage results, make sure you are using a clang toolchain and have `llvm-cov` and
+`llvm-profdata` in your `PATH`. Then run:
 
 ```
 test/run_envoy_bazel_coverage.sh

@@ -22,6 +22,7 @@ envoy_cc_library(
         ":dispatcher_includes",
         ":libevent_scheduler_lib",
         ":real_time_system_lib",
+        "//include/envoy/common:scope_tracker_interface",
         "//include/envoy/common:time_interface",
         "//include/envoy/event:signal_interface",
         "//include/envoy/network:listen_socket_interface",
@@ -74,7 +75,13 @@ envoy_cc_library(
         "//include/envoy/network:connection_handler_interface",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:thread_lib",
-    ],
+        "//source/common/signal:fatal_error_handler_lib",
+    ] + select({
+        "//bazel:disable_signal_trace": [],
+        "//conditions:default": [
+            "//source/common/signal:sigaction_lib",
+        ],
+    }),
 )
 
 envoy_cc_library(

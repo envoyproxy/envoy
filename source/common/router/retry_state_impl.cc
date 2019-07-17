@@ -22,6 +22,7 @@ const uint32_t RetryPolicy::RETRY_ON_GATEWAY_ERROR;
 const uint32_t RetryPolicy::RETRY_ON_CONNECT_FAILURE;
 const uint32_t RetryPolicy::RETRY_ON_RETRIABLE_4XX;
 const uint32_t RetryPolicy::RETRY_ON_RETRIABLE_STATUS_CODES;
+const uint32_t RetryPolicy::RETRY_ON_RESET;
 const uint32_t RetryPolicy::RETRY_ON_GRPC_CANCELLED;
 const uint32_t RetryPolicy::RETRY_ON_GRPC_DEADLINE_EXCEEDED;
 const uint32_t RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED;
@@ -79,10 +80,11 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
 
   // Merge in the headers.
   if (request_headers.EnvoyRetryOn()) {
-    retry_on_ |= parseRetryOn(request_headers.EnvoyRetryOn()->value().getStringView());
+    retry_on_ |= parseRetryOn(request_headers.EnvoyRetryOn()->value().getStringView()).first;
   }
   if (request_headers.EnvoyRetryGrpcOn()) {
-    retry_on_ |= parseRetryGrpcOn(request_headers.EnvoyRetryGrpcOn()->value().getStringView());
+    retry_on_ |=
+        parseRetryGrpcOn(request_headers.EnvoyRetryGrpcOn()->value().getStringView()).first;
   }
   if (retry_on_ != 0 && request_headers.EnvoyMaxRetries()) {
     uint64_t temp;
@@ -113,8 +115,9 @@ void RetryStateImpl::enableBackoffTimer() {
   retry_timer_->enableTimer(std::chrono::milliseconds(backoff_strategy_->nextBackOffMs()));
 }
 
-uint32_t RetryStateImpl::parseRetryOn(absl::string_view config) {
+std::pair<uint32_t, bool> RetryStateImpl::parseRetryOn(absl::string_view config) {
   uint32_t ret = 0;
+  bool all_fields_valid = true;
   for (const auto retry_on : StringUtil::splitToken(config, ",")) {
     if (retry_on == Http::Headers::get().EnvoyRetryOnValues._5xx) {
       ret |= RetryPolicy::RETRY_ON_5XX;
@@ -128,14 +131,19 @@ uint32_t RetryStateImpl::parseRetryOn(absl::string_view config) {
       ret |= RetryPolicy::RETRY_ON_REFUSED_STREAM;
     } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.RetriableStatusCodes) {
       ret |= RetryPolicy::RETRY_ON_RETRIABLE_STATUS_CODES;
+    } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.Reset) {
+      ret |= RetryPolicy::RETRY_ON_RESET;
+    } else {
+      all_fields_valid = false;
     }
   }
 
-  return ret;
+  return {ret, all_fields_valid};
 }
 
-uint32_t RetryStateImpl::parseRetryGrpcOn(absl::string_view retry_grpc_on_header) {
+std::pair<uint32_t, bool> RetryStateImpl::parseRetryGrpcOn(absl::string_view retry_grpc_on_header) {
   uint32_t ret = 0;
+  bool all_fields_valid = true;
   for (const auto retry_on : StringUtil::splitToken(retry_grpc_on_header, ",")) {
     if (retry_on == Http::Headers::get().EnvoyRetryOnGrpcValues.Cancelled) {
       ret |= RetryPolicy::RETRY_ON_GRPC_CANCELLED;
@@ -147,10 +155,12 @@ uint32_t RetryStateImpl::parseRetryGrpcOn(absl::string_view retry_grpc_on_header
       ret |= RetryPolicy::RETRY_ON_GRPC_UNAVAILABLE;
     } else if (retry_on == Http::Headers::get().EnvoyRetryOnGrpcValues.Internal) {
       ret |= RetryPolicy::RETRY_ON_GRPC_INTERNAL;
+    } else {
+      all_fields_valid = false;
     }
   }
 
-  return ret;
+  return {ret, all_fields_valid};
 }
 
 void RetryStateImpl::resetRetry() {
@@ -286,10 +296,13 @@ bool RetryStateImpl::wouldRetryFromReset(const Http::StreamResetReason reset_rea
     return false;
   }
 
+  if (retry_on_ & RetryPolicy::RETRY_ON_RESET) {
+    return true;
+  }
+
   if (retry_on_ & (RetryPolicy::RETRY_ON_5XX | RetryPolicy::RETRY_ON_GATEWAY_ERROR)) {
     // Currently we count an upstream reset as a "5xx" (since it will result in
-    // one). We may eventually split this out into its own type. I.e.,
-    // RETRY_ON_RESET.
+    // one). With RETRY_ON_RESET we may eventually remove these policies.
     return true;
   }
 

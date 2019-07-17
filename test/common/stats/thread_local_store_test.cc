@@ -43,7 +43,7 @@ public:
     store_->addSink(sink_);
   }
 
-  void resetStoreWithAlloc(StatDataAllocator& alloc) {
+  void resetStoreWithAlloc(Allocator& alloc) {
     store_ = std::make_unique<ThreadLocalStoreImpl>(alloc);
     store_->addSink(sink_);
   }
@@ -51,7 +51,7 @@ public:
   Stats::FakeSymbolTableImpl symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  HeapStatDataAllocator alloc_;
+  AllocatorImpl alloc_;
   MockSink sink_;
   std::unique_ptr<ThreadLocalStoreImpl> store_;
 };
@@ -169,7 +169,7 @@ public:
   FakeSymbolTableImpl symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  HeapStatDataAllocator alloc_;
+  AllocatorImpl alloc_;
   MockSink sink_;
   std::unique_ptr<ThreadLocalStoreImpl> store_;
   InSequence s;
@@ -461,7 +461,7 @@ public:
   StatName makeStatName(absl::string_view name) { return pool_.add(name); }
 
   Stats::FakeSymbolTableImpl symbol_table_;
-  HeapStatDataAllocator alloc_;
+  AllocatorImpl alloc_;
   ThreadLocalStoreImpl store_;
   StatNamePool pool_;
 };
@@ -758,13 +758,13 @@ public:
   Stats::FakeSymbolTableImpl symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  HeapStatDataAllocator heap_alloc_;
+  AllocatorImpl heap_alloc_;
   ThreadLocalStoreImpl store_;
   ScopePtr scope_;
 };
 
-INSTANTIATE_TEST_CASE_P(RememberStatsMatcherTest, RememberStatsMatcherTest,
-                        testing::ValuesIn({false, true}));
+INSTANTIATE_TEST_SUITE_P(RememberStatsMatcherTest, RememberStatsMatcherTest,
+                         testing::ValuesIn({false, true}));
 
 // Tests that the logic for remembering rejected stats works properly, both
 // with and without threading.
@@ -849,7 +849,7 @@ TEST_F(StatsThreadLocalStoreTest, NonHotRestartNoTruncation) {
 TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTls) {
   MockSink sink;
   Stats::FakeSymbolTableImpl symbol_table;
-  HeapStatDataAllocator alloc(symbol_table);
+  AllocatorImpl alloc(symbol_table);
   ThreadLocalStoreImpl store(alloc);
   store.addSink(sink);
 
@@ -861,13 +861,13 @@ TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTls) {
   TestUtil::forEachSampleStat(
       1000, [&store](absl::string_view name) { store.counter(std::string(name)); });
   const size_t million = 1000 * 1000;
-  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 17432336); // June 29, 2019
-  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 18 * million);
+  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 15268336); // June 30, 2019
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 16 * million);
 }
 
 TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithTls) {
   Stats::FakeSymbolTableImpl symbol_table;
-  HeapStatDataAllocator alloc(symbol_table);
+  AllocatorImpl alloc(symbol_table);
   NiceMock<Event::MockDispatcher> main_thread_dispatcher;
   NiceMock<ThreadLocal::MockInstance> tls;
   ThreadLocalStoreImpl store(alloc);
@@ -881,8 +881,8 @@ TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithTls) {
   TestUtil::forEachSampleStat(
       1000, [&store](absl::string_view name) { store.counter(std::string(name)); });
   const size_t million = 1000 * 1000;
-  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 19660848); // June 29, 2019
-  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 20 * million);
+  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 17496848); // June 30, 2019
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 18 * million);
   store.shutdownThreading();
   tls.shutdownThread();
 }
@@ -933,7 +933,7 @@ TEST(ThreadLocalStoreThreadTest, ConstructDestruct) {
   Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherPtr dispatcher = api->allocateDispatcher();
   NiceMock<ThreadLocal::MockInstance> tls;
-  HeapStatDataAllocator alloc(symbol_table);
+  AllocatorImpl alloc(symbol_table);
   ThreadLocalStoreImpl store(alloc);
 
   store.initializeThreading(*dispatcher, tls);

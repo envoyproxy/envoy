@@ -27,6 +27,8 @@ follows:
 * A special load balancer will select the right host to use based on the HTTP host/authority header
   during forwarding.
 * Hosts that have not been used for a period of time are subject to a TTL that will purge them.
+* When the upstream cluster has been configured with a TLS context, Envoy will automatically perform
+  SAN verification for the resolved host name as well as specify the host name via SNI.
 
 The above implementation details mean that at steady state Envoy can forward a large volume of
 HTTP proxy traffic while all DNS resolution happens asynchronously in the background. Additionally,

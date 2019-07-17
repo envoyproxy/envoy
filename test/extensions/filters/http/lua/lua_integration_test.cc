@@ -445,7 +445,7 @@ config:
         request_handle:headers():add("signature_verification", "rejected")
       end
 
-      request_handle:releasePublicKey(pubkey)
+      request_handle:headers():add("verification", "done")
     end
 )EOF";
 
@@ -472,6 +472,11 @@ config:
                             .get(Http::LowerCaseString("signature_verification"))
                             ->value()
                             .getStringView());
+
+  EXPECT_EQ("done", upstream_request_->headers()
+                        .get(Http::LowerCaseString("verification"))
+                        ->value()
+                        .getStringView());
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
   response->waitForEndStream();

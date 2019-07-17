@@ -9,7 +9,7 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/hash.h"
-#include "common/stats/heap_stat_data.h"
+#include "common/stats/allocator_impl.h"
 #include "common/stats/histogram_impl.h"
 #include "common/stats/null_counter.h"
 #include "common/stats/null_gauge.h"
@@ -28,9 +28,9 @@ namespace Stats {
  * histograms, one to collect the values and other as backup that is used for merge process. The
  * swap happens during the merge process.
  */
-class ThreadLocalHistogramImpl : public Histogram, public MetricImpl {
+class ThreadLocalHistogramImpl : public HistogramImplHelper {
 public:
-  ThreadLocalHistogramImpl(StatName name, absl::string_view tag_extracted_name,
+  ThreadLocalHistogramImpl(StatName name, const std::string& tag_extracted_name,
                            const std::vector<Tag>& tags, SymbolTable& symbol_table);
   ~ThreadLocalHistogramImpl() override;
 
@@ -51,7 +51,6 @@ public:
   bool used() const override { return used_; }
 
   // Stats::Metric
-  StatName statName() const override { return name_.statName(); }
   SymbolTable& symbolTable() override { return symbol_table_; }
 
 private:
@@ -60,7 +59,6 @@ private:
   histogram_t* histograms_[2];
   std::atomic<bool> used_;
   std::thread::id created_thread_id_;
-  StatNameStorage name_;
   SymbolTable& symbol_table_;
 };
 
@@ -71,14 +69,13 @@ class TlsScope;
 /**
  * Log Linear Histogram implementation that is stored in the main thread.
  */
-class ParentHistogramImpl : public ParentHistogram, public MetricImpl {
+class ParentHistogramImpl : public MetricImpl<ParentHistogram> {
 public:
   ParentHistogramImpl(StatName name, Store& parent, TlsScope& tlsScope,
                       absl::string_view tag_extracted_name, const std::vector<Tag>& tags);
   ~ParentHistogramImpl() override;
 
   void addTlsHistogram(const TlsHistogramSharedPtr& hist_ptr);
-  bool used() const override;
   void recordValue(uint64_t value) override;
 
   /**
@@ -97,8 +94,13 @@ public:
   const std::string bucketSummary() const override;
 
   // Stats::Metric
-  StatName statName() const override { return name_.statName(); }
   SymbolTable& symbolTable() override { return parent_.symbolTable(); }
+  bool used() const override;
+
+  // RefcountInterface
+  void incRefCount() override { refcount_helper_.incRefCount(); }
+  bool decRefCount() override { return refcount_helper_.decRefCount(); }
+  uint32_t use_count() const override { return refcount_helper_.use_count(); }
 
 private:
   bool usedLockHeld() const EXCLUSIVE_LOCKS_REQUIRED(merge_lock_);
@@ -112,7 +114,7 @@ private:
   mutable Thread::MutexBasicLockable merge_lock_;
   std::list<TlsHistogramSharedPtr> tls_histograms_ GUARDED_BY(merge_lock_);
   bool merged_;
-  StatNameStorage name_;
+  RefcountHelper refcount_helper_;
 };
 
 using ParentHistogramImplSharedPtr = RefcountPtr<ParentHistogramImpl>;
@@ -138,7 +140,7 @@ public:
  */
 class ThreadLocalStoreImpl : Logger::Loggable<Logger::Id::stats>, public StoreRoot {
 public:
-  ThreadLocalStoreImpl(StatDataAllocator& alloc);
+  ThreadLocalStoreImpl(Allocator& alloc);
   ~ThreadLocalStoreImpl() override;
 
   // Stats::Scope
@@ -278,7 +280,7 @@ private:
     findHistogram(StatName name) const override;
 
     template <class StatType>
-    using MakeStatFn = std::function<RefcountPtr<StatType>(StatDataAllocator&, StatName name,
+    using MakeStatFn = std::function<RefcountPtr<StatType>(Allocator&, StatName name,
                                                            absl::string_view tag_extracted_name,
                                                            const std::vector<Tag>& tags)>;
 
@@ -347,7 +349,7 @@ private:
   bool checkAndRememberRejection(StatName name, StatNameStorageSet& central_rejected_stats,
                                  StatNameHashSet* tls_rejected_stats);
 
-  StatDataAllocator& alloc_;
+  Allocator& alloc_;
   Event::Dispatcher* main_thread_dispatcher_{};
   ThreadLocal::SlotPtr tls_;
   mutable Thread::MutexBasicLockable lock_;
@@ -359,7 +361,7 @@ private:
   std::atomic<bool> threading_ever_initialized_{};
   std::atomic<bool> shutting_down_{};
   std::atomic<bool> merge_in_progress_{};
-  HeapStatDataAllocator heap_allocator_;
+  AllocatorImpl heap_allocator_;
 
   NullCounterImpl null_counter_;
   NullGaugeImpl null_gauge_;

@@ -13,6 +13,7 @@ echo "ENVOY_SRCDIR=${ENVOY_SRCDIR}"
 function setup_gcc_toolchain() {
   export CC=gcc
   export CXX=g++
+  export BAZEL_COMPILER=gcc
   echo "$CC/$CXX toolchain configured"
 }
 
@@ -20,6 +21,7 @@ function setup_clang_toolchain() {
   export PATH=/usr/lib/llvm-8/bin:$PATH
   export CC=clang
   export CXX=clang++
+  export BAZEL_COMPILER=clang
   export ASAN_SYMBOLIZER_PATH=/usr/lib/llvm-8/bin/llvm-symbolizer
   echo "$CC/$CXX toolchain configured"
 }
@@ -39,21 +41,6 @@ then
   mkdir -p "${BUILD_DIR}"
 fi
 export ENVOY_FILTER_EXAMPLE_SRCDIR="${BUILD_DIR}/envoy-filter-example"
-
-# Make sure that /source doesn't contain /build on the underlying host
-# filesystem, including via hard links or symlinks. We can get into weird
-# loops with Bazel symlinking and gcovr's path traversal if this is true, so
-# best to keep /source and /build in distinct directories on the host
-# filesystem.
-SENTINEL="${BUILD_DIR}"/bazel.sentinel
-touch "${SENTINEL}"
-if [[ -n "$(find -L "${ENVOY_SRCDIR}" -name "$(basename "${SENTINEL}")")" ]]
-then
-  rm -f "${SENTINEL}"
-  echo "/source mount must not contain /build mount"
-  exit 1
-fi
-rm -f "${SENTINEL}"
 
 # Environment setup.
 export USER=bazel
@@ -85,7 +72,7 @@ if [ "$1" != "-nofetch" ]; then
   fi
 
   # This is the hash on https://github.com/envoyproxy/envoy-filter-example.git we pin to.
-  (cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git fetch origin && git checkout -f 6c0625cb4cc9a21df97cef2a1d065463f2ae81ae)
+  (cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git fetch origin && git checkout -f dcd3374baa9365ab7ab505018232994d6c8a8d81)
   cp -f "${ENVOY_SRCDIR}"/ci/WORKSPACE.filter.example "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/WORKSPACE
 fi
 

@@ -4,6 +4,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
+    "envoy_cc_test_binary",
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_select_hot_restart",
@@ -253,6 +254,7 @@ envoy_cc_test(
         ":invalid_runtime_bootstrap.yaml",
         ":node_bootstrap.yaml",
         ":node_bootstrap_no_admin_port.yaml",
+        ":node_bootstrap_with_admin_socket_options.yaml",
         ":node_bootstrap_without_access_log.yaml",
         ":runtime_bootstrap.yaml",
         ":runtime_test_data",
@@ -283,6 +285,18 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "ssl_context_manager_test",
+    srcs = ["ssl_context_manager_test.cc"],
+    deps = [
+        "//source/server:ssl_context_manager_lib",
+        "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
 envoy_cc_test_library(
     name = "utility_lib",
     hdrs = ["utility.h"],
@@ -304,5 +318,21 @@ envoy_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test_binary(
+    name = "filter_chain_benchmark_test",
+    srcs = ["filter_chain_benchmark_test.cc"],
+    external_deps = [
+        "benchmark",
+        "googletest",
+    ],
+    deps = [
+        "//source/server:filter_chain_manager_lib",
+        "//test/test_common:environment_lib",
+        "//test/mocks/network:network_mocks",
+        # tranport socket config registration
+        "//source/extensions/transport_sockets/tls:config",
     ],
 )
