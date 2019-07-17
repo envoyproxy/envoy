@@ -38,6 +38,7 @@ api_proto_library_internal(
         ":friends",
     ],
     deps = [
+        ":http_uri",
         "//envoy/type:percent",
     ],
 )
@@ -45,7 +46,10 @@ api_proto_library_internal(
 api_go_proto_library(
     name = "base",
     proto = ":base",
-    deps = ["//envoy/type:percent_go_proto"],
+    deps = [
+        ":http_uri_go_proto",
+        "//envoy/type:percent_go_proto",
+    ],
 )
 
 api_proto_library_internal(

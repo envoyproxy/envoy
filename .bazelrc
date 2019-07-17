@@ -8,8 +8,12 @@ startup --host_jvm_args=-Xmx512m
 build --workspace_status_command=bazel/get_workspace_status
 build --experimental_remap_main_repo
 build --host_force_python=PY2
+build --action_env=BAZEL_LINKLIBS=-l%:libstdc++.a
+build --action_env=BAZEL_LINKOPTS=-lm:-static-libgcc
 
 # Basic ASAN/UBSAN that works for gcc
+build:asan --action_env=BAZEL_LINKLIBS=
+build:asan --action_env=BAZEL_LINKOPTS=-lstdc++:-lm
 build:asan --define ENVOY_CONFIG_ASAN=1
 build:asan --copt -fsanitize=address,undefined
 build:asan --linkopt -fsanitize=address,undefined
@@ -60,6 +64,8 @@ build:clang-msan --copt -fsanitize-memory-track-origins=2
 build:libc++ --action_env=CC
 build:libc++ --action_env=CXX
 build:libc++ --action_env=CXXFLAGS=-stdlib=libc++
+build:libc++ --action_env=BAZEL_CXXOPTS=-stdlib=libc++
+build:libc++ --action_env=BAZEL_LINKLIBS=-l%:libc++.a:-l%:libc++abi.a:-lm
 build:libc++ --action_env=PATH
 build:libc++ --host_linkopt=-fuse-ld=lld
 build:libc++ --define force_libcpp=enabled
