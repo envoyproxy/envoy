@@ -292,7 +292,7 @@ stages:
             submodules: true
           - script: ./ci/mac_ci_setup.sh
             displayName: 'Install dependencies'
-          - script: ./bazelw test --test_output=all --build_tests_only //library/swift/test/...
+          - script: ./bazelw test --test_output=all --build_tests_only --config=ios //library/swift/test/...
             displayName: 'Run Swift library tests'
       #- job: mac_objc_helloworld
       #  dependsOn: mac_dist
