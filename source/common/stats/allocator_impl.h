@@ -67,5 +67,6 @@ private:
   Thread::MutexBasicLockable mutex_;
 };
 
+
 } // namespace Stats
 } // namespace Envoy
