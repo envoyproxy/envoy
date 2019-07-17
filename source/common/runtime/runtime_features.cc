@@ -38,15 +38,16 @@ constexpr const char* runtime_features[] = {
 //
 // The release cycle after a feature has been marked disallowed, it is officially removable, and
 // the maintainer team will run a script creating a tracking issue for proto and code clean up.
-//
-// TODO(alyssawilk) handle deprecation of reloadable_features and update the above comment. Ideally
-// runtime override of a deprecated feature will log(warn) on runtime-load if not deprecated
-// and hard-fail once it has been deprecated.
-
 constexpr const char* disallowed_features[] = {
     // Acts as both a test entry for deprecated.proto and a marker for the Envoy
     // deprecation scripts.
     "envoy.deprecated_features.deprecated.proto:is_deprecated_fatal",
+    "envoy.deprecated_features.bootstrap.proto:runtime",
+    "envoy.deprecated_features.redis_proxy.proto:catch_all_cluster",
+    "envoy.deprecated_features.lds.proto:use_original_dst",
+    "envoy.deprecated_features.server_info.proto:max_stats",
+    "envoy.deprecated_features.redis_proxy.proto:cluster",
+    "envoy.deprecated_features.server_info.proto:max_obj_name_len",
     "envoy.deprecated_features.config_source.proto:UNSUPPORTED_REST_LEGACY",
     "envoy.deprecated_features.ext_authz.proto:use_alpha",
     "envoy.deprecated_features.route.proto:enabled",

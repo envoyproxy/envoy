@@ -70,6 +70,7 @@ ECONNREFUSED
 EDESTRUCTION
 EDF
 EDS
+EINVAL
 EIP
 ELB
 ENOTSUP
@@ -609,6 +610,7 @@ optimizations
 ostream
 outlier
 outliers
+offsetof
 overridable
 param
 parameterizable
@@ -647,6 +649,7 @@ pthreads
 pton
 ptr
 ptrs
+pts
 pwd
 py
 qps
@@ -734,6 +737,7 @@ structs
 subexpr
 subdirs
 symlink
+symlinks
 symlinked
 sync
 sys

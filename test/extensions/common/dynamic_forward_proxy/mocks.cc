@@ -3,6 +3,7 @@
 using testing::_;
 using testing::Return;
 using testing::ReturnPointee;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -22,6 +23,7 @@ MockDnsCacheManager::~MockDnsCacheManager() = default;
 
 MockDnsHostInfo::MockDnsHostInfo() {
   ON_CALL(*this, address()).WillByDefault(ReturnPointee(&address_));
+  ON_CALL(*this, resolvedHost()).WillByDefault(ReturnRef(resolved_host_));
 }
 MockDnsHostInfo::~MockDnsHostInfo() = default;
 

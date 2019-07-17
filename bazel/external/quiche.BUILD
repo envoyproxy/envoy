@@ -55,6 +55,7 @@ genrule(
 quiche_copt = [
     # Remove these after upstream fix.
     "-Wno-unused-parameter",
+    "-Wno-type-limits",
     # quic_inlined_frame.h uses offsetof() to optimize memory usage in frames.
     "-Wno-invalid-offsetof",
 ]
@@ -2194,6 +2195,7 @@ envoy_cc_library(
     copts = quiche_copt,
     repository = "@envoy",
     tags = ["nofips"],
+    visibility = ["//visibility:public"],
     deps = [
         ":quic_core_packets_lib",
         ":quic_core_types_lib",
@@ -2682,6 +2684,7 @@ envoy_cc_library(
     deps = [
         ":quic_platform_base",
         ":quic_platform_socket_address",
+        ":spdy_core_priority_write_scheduler_lib",
     ],
 )
 
