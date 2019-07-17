@@ -207,13 +207,13 @@ public:
   MOCK_METHOD0(version, std::string());
   MOCK_METHOD0(logLock, Thread::BasicLockable&());
   MOCK_METHOD0(accessLogLock, Thread::BasicLockable&());
-  MOCK_METHOD0(statsAllocator, Stats::StatDataAllocator&());
+  MOCK_METHOD0(statsAllocator, Stats::Allocator&());
 
 private:
   Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
   Thread::MutexBasicLockable log_lock_;
   Thread::MutexBasicLockable access_log_lock_;
-  Stats::HeapStatDataAllocator stats_allocator_;
+  Stats::AllocatorImpl stats_allocator_;
 };
 
 class MockListenerComponentFactory : public ListenerComponentFactory {

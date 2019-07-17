@@ -168,7 +168,7 @@ envoy_cc_library(
         "//include/envoy/server:options_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
-        "//source/common/stats:heap_stat_data_lib",
+        "//source/common/stats:allocator_lib",
     ],
 )
 
@@ -177,7 +177,7 @@ envoy_cc_library(
     hdrs = ["hot_restart_nop_impl.h"],
     deps = [
         "//include/envoy/server:hot_restart_interface",
-        "//source/common/stats:heap_stat_data_lib",
+        "//source/common/stats:allocator_lib",
     ],
 )
 

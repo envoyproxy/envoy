@@ -183,7 +183,7 @@ TEST_F(StatMergerTest, gaugeMergeImportMode) {
 class StatMergerThreadLocalTest : public testing::Test {
 protected:
   FakeSymbolTableImpl symbol_table_;
-  HeapStatDataAllocator alloc_{symbol_table_};
+  AllocatorImpl alloc_{symbol_table_};
   ThreadLocalStoreImpl store_{alloc_};
 };
 
