@@ -322,6 +322,7 @@ void InstanceImpl::initialize(const Options& options,
     ENVOY_LOG(info, "admin address: {}", initial_config.admin().address()->asString());
     admin_->startHttpListener(initial_config.admin().accessLogPath(), options.adminAddressPath(),
                               initial_config.admin().address(),
+                              initial_config.admin().socketOptions(),
                               stats_store_.createScope("listener.admin."));
   } else {
     ENVOY_LOG(warn, "No admin address given, so no admin HTTP server started.");
