@@ -29,5 +29,7 @@ else
   TEST_TARGETS=//test/...
 fi
 
-bazel build ${BAZEL_BUILD_OPTIONS} //source/exe:envoy-static
+if [[ "$TEST_TARGETS" == "//test/..." ]]; then
+  bazel build ${BAZEL_BUILD_OPTIONS} //source/exe:envoy-static
+fi
 bazel test ${BAZEL_BUILD_OPTIONS} ${TEST_TARGETS}

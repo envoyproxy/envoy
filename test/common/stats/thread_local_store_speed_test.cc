@@ -4,8 +4,8 @@
 #include "common/common/logger.h"
 #include "common/common/thread.h"
 #include "common/event/dispatcher_impl.h"
+#include "common/stats/allocator_impl.h"
 #include "common/stats/fake_symbol_table_impl.h"
-#include "common/stats/heap_stat_data.h"
 #include "common/stats/tag_producer_impl.h"
 #include "common/stats/thread_local_store.h"
 #include "common/thread_local/thread_local_impl.h"
@@ -56,7 +56,7 @@ public:
 private:
   Stats::FakeSymbolTableImpl symbol_table_;
   Event::SimulatedTimeSystem time_system_;
-  Stats::HeapStatDataAllocator heap_alloc_;
+  Stats::AllocatorImpl heap_alloc_;
   Stats::ThreadLocalStoreImpl store_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
