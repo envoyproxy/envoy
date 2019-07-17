@@ -119,7 +119,7 @@ void Filter::parseHttpHeader(absl::string_view data) {
     }
 
     if (httpMethods().count(method) == 0) {
-      ENVOY_LOG(trace, "http inspector: detect unknown method: {}", method);
+      ENVOY_LOG(debug, "http inspector: detect unknown method: {}", method);
     }
 
     ENVOY_LOG(trace, "http inspector: method: {}, request uri: {}, protocol: {}", method,
