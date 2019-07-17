@@ -59,9 +59,9 @@ public:
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
 
+private:
   static const absl::string_view HTTP2_CONNECTION_PREFACE;
 
-private:
   void onRead();
   void done(bool success);
   void parseHttpHeader(absl::string_view data);
