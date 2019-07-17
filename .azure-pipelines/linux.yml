@@ -13,8 +13,6 @@ jobs:
   - bash: |
       echo "disk space at begining of build:"
       df -h
-    condition: always()
-
 
   - script: ci/do_ci.sh bazel.release
     env:
