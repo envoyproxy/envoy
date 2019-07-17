@@ -392,10 +392,14 @@ void ConnectionManagerUtility::mutateResponseHeaders(HeaderMap& response_headers
 bool ConnectionManagerUtility::maybeNormalizePath(HeaderMap& request_headers,
                                                   const ConnectionManagerConfig& config) {
   ASSERT(request_headers.Path());
+  bool is_valid_path = true;
   if (config.shouldNormalizePath()) {
-    return PathUtil::canonicalPath(*request_headers.Path());
+    is_valid_path = PathUtil::canonicalPath(*request_headers.Path());
   }
-  return true;
+  if (config.shouldMergeSlashes()) {
+    PathUtil::mergeSlashes(*request_headers.Path());
+  }
+  return is_valid_path;
 }
 
 } // namespace Http

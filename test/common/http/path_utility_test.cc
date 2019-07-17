@@ -85,5 +85,24 @@ TEST_F(PathUtilityTest, NormalizeCasePath) {
 // "/../c\r\n\"  '\n' '\r' should be excluded by http parser
 // "/a/\0c",     '\0' should be excluded by http parser
 
+// Paths that are valid get normalized.
+TEST_F(PathUtilityTest, MergeSlashes) {
+  const std::vector<std::pair<std::string, std::string>> non_normal_pairs{
+      {"", ""},                        // empty
+      {"/a", "/a"},                    // no-op
+      {"//a/b/c", "/a/b/c"},           // double / start
+      {"/a//b/c", "/a/b/c"},           // double / in the middle
+      {"/a//b?a=///c", "/a/b?a=///c"}, // slashes in the query are ignored
+      {"/a//b?", "/a/b?"},             // empty query
+  };
+
+  for (const auto& path_pair : non_normal_pairs) {
+    auto& path_header = pathHeaderEntry(path_pair.first);
+    PathUtil::mergeSlashes(path_header);
+    EXPECT_EQ(path_header.value().getStringView(), path_pair.second)
+        << "original path: " << path_pair.first;
+  }
+}
+
 } // namespace Http
 } // namespace Envoy
