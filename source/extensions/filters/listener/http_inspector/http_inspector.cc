@@ -21,7 +21,6 @@ namespace HttpInspector {
 Config::Config(Stats::Scope& scope)
     : stats_{ALL_HTTP_INSPECTOR_STATS(POOL_COUNTER_PREFIX(scope, "http_inspector."))} {}
 
-const absl::string_view Filter::HTTP2_CONNECTION_PREFACE = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
 thread_local uint8_t Filter::buf_[Config::MAX_INSPECT_SIZE];
 
 Filter::Filter(const ConfigSharedPtr config) : config_(config) {}
