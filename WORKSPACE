@@ -25,4 +25,7 @@ switched_rules_by_language(
     cc = True,
     grpc = True,
     go = True,
+    rules_override = {
+        "py_proto_library": "@envoy_api//bazel:api_build_system.bzl",
+    },
 )

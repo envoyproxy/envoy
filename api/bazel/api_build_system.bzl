@@ -1,4 +1,4 @@
-load("@com_google_protobuf//:protobuf.bzl", "py_proto_library")
+load("@com_google_protobuf//:protobuf.bzl", _py_proto_library = "py_proto_library")
 load("@com_envoyproxy_protoc_gen_validate//bazel:pgv_proto_library.bzl", "pgv_cc_proto_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_grpc_library", "go_proto_library")
 load("@io_bazel_rules_go//go:def.bzl", "go_test")
@@ -24,17 +24,36 @@ def _LibrarySuffix(library_name, suffix):
 # https://github.com/bazelbuild/bazel/issues/3935 and/or
 # https://github.com/bazelbuild/bazel/issues/2626 are resolved.
 def api_py_proto_library(name, srcs = [], deps = [], has_services = 0):
-    py_proto_library(
+    _py_proto_library(
         name = _Suffix(name, _PY_SUFFIX),
         srcs = srcs,
         default_runtime = "@com_google_protobuf//:protobuf_python",
         protoc = "@com_google_protobuf//:protoc",
         deps = [_LibrarySuffix(d, _PY_SUFFIX) for d in deps] + [
             "@com_envoyproxy_protoc_gen_validate//validate:validate_py",
-        #    "@com_google_googleapis//:api_httpbody_protos_py",
-        #    "@com_google_googleapis//:http_api_protos_py",
+            "@com_google_googleapis//google/rpc:status_py_proto",
+            "@com_google_googleapis//google/api:annotations_py_proto",
+            "@com_google_googleapis//google/api:http_py_proto",
+            "@com_google_googleapis//google/api:httpbody_py_proto",
             "@com_github_gogo_protobuf//:gogo_proto_py",
         ],
+        visibility = ["//visibility:public"],
+    )
+
+# This replaces googleapis rules.
+def py_proto_library(name, deps = []):
+    srcs = [dep[:-6] + ".proto" if dep.endswith("_proto") else dep for dep in deps]
+    proto_deps = []
+
+    # Ignoring the proto_library has an unfortunate side-effect of losing proto dependencies...
+    if name == "annotations_py_proto":
+        proto_deps = proto_deps + [":http_py_proto"]
+    _py_proto_library(
+        name = name,
+        srcs = srcs,
+        default_runtime = "@com_google_protobuf//:protobuf_python",
+        protoc = "@com_google_protobuf//:protoc",
+        deps = proto_deps + ["@com_google_protobuf//:protobuf_python"],
         visibility = ["//visibility:public"],
     )
 
@@ -69,7 +88,6 @@ def api_go_grpc_library(name, proto, deps = []):
             "@io_bazel_rules_go//proto/wkt:struct_go_proto",
             "@io_bazel_rules_go//proto/wkt:wrappers_go_proto",
             "@com_envoyproxy_protoc_gen_validate//validate:go_default_library",
-            "@com_google_googleapis//google/api:http_go_proto",
             "@com_google_googleapis//google/api:annotations_go_proto",
         ],
     )

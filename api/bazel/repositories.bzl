@@ -14,7 +14,6 @@ def api_dependencies():
     envoy_http_archive(
         name = "com_google_googleapis",
         locations = REPOSITORY_LOCATIONS,
-        build_file_content = GOOGLEAPIS_BUILD_CONTENT,
     )
     envoy_http_archive(
         name = "com_github_gogo_protobuf",
@@ -35,19 +34,6 @@ def api_dependencies():
         locations = REPOSITORY_LOCATIONS,
         build_file_content = KAFKASOURCE_BUILD_CONTENT,
     )
-
-GOOGLEAPIS_BUILD_CONTENT = """
-load("@com_google_protobuf//:protobuf.bzl", "py_proto_library")
-
-py_proto_library(
-    name = "status_proto_py",
-    srcs = ["//google/rpc/status.proto"],
-    default_runtime = "@com_google_protobuf//:protobuf_python",
-    protoc = "@com_google_protobuf//:protoc",
-    include = "google/rpc",
-    visibility = ["//visibility:public"],
-)
-"""
 
 GOGOPROTO_BUILD_CONTENT = """
 load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library", "py_proto_library")
