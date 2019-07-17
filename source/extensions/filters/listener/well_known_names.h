@@ -14,6 +14,8 @@ namespace ListenerFilters {
  */
 class ListenerFilterNameValues {
 public:
+  // HTTP Inspector listener filter
+  const std::string HttpInspector = "envoy.listener.http_inspector";
   // Original destination listener filter
   const std::string OriginalDst = "envoy.listener.original_dst";
   // Original source listener filter
@@ -22,8 +24,6 @@ public:
   const std::string ProxyProtocol = "envoy.listener.proxy_protocol";
   // TLS Inspector listener filter
   const std::string TlsInspector = "envoy.listener.tls_inspector";
-  // HTTP Inspector listener filter
-  const std::string HttpInspector = "envoy.listener.http_inspector";
 };
 
 using ListenerFilterNames = ConstSingleton<ListenerFilterNameValues>;
