@@ -13,6 +13,7 @@ echo "ENVOY_SRCDIR=${ENVOY_SRCDIR}"
 function setup_gcc_toolchain() {
   export CC=gcc
   export CXX=g++
+  export BAZEL_COMPILER=gcc
   echo "$CC/$CXX toolchain configured"
 }
 
@@ -20,6 +21,7 @@ function setup_clang_toolchain() {
   export PATH=/usr/lib/llvm-8/bin:$PATH
   export CC=clang
   export CXX=clang++
+  export BAZEL_COMPILER=clang
   export ASAN_SYMBOLIZER_PATH=/usr/lib/llvm-8/bin/llvm-symbolizer
   echo "$CC/$CXX toolchain configured"
 }

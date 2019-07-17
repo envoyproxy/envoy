@@ -15,7 +15,7 @@
 namespace Envoy {
 namespace Stats {
 
-class StatDataAllocator;
+class Allocator;
 struct Tag;
 
 /**

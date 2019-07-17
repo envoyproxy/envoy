@@ -2,12 +2,6 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load(":genrule_repository.bzl", "genrule_repository")
 load("@envoy_api//bazel:envoy_http_archive.bzl", "envoy_http_archive")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS")
-load(
-    "@bazel_tools//tools/cpp:windows_cc_configure.bzl",
-    "find_vc_path",
-    "setup_vc_env_vars",
-)
-load("@bazel_tools//tools/cpp:lib_cc_configure.bzl", "get_env_var")
 load("@envoy_api//bazel:repositories.bzl", "api_dependencies")
 
 # dict of {build recipe name: longform extension name,}

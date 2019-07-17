@@ -3,7 +3,6 @@
 #include <unordered_map>
 #include <vector>
 
-#include "envoy/access_log/access_log.h"
 #include "envoy/config/accesslog/v2/als.pb.h"
 #include "envoy/config/filter/accesslog/v2/accesslog.pb.h"
 #include "envoy/grpc/async_client.h"
@@ -14,6 +13,8 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/grpc/typed_async_client.h"
+
+#include "extensions/access_loggers/common/access_log_base.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -115,7 +116,7 @@ private:
 /**
  * Access log Instance that streams HTTP logs over gRPC.
  */
-class HttpGrpcAccessLog : public AccessLog::Instance {
+class HttpGrpcAccessLog : public Common::ImplBase {
 public:
   HttpGrpcAccessLog(AccessLog::FilterPtr&& filter,
                     const envoy::config::accesslog::v2::HttpGrpcAccessLogConfig& config,
@@ -125,13 +126,12 @@ public:
       envoy::data::accesslog::v2::AccessLogCommon& common_access_log,
       const StreamInfo::StreamInfo& stream_info);
 
-  // AccessLog::Instance
-  void log(const Http::HeaderMap* request_headers, const Http::HeaderMap* response_headers,
-           const Http::HeaderMap* response_trailers,
-           const StreamInfo::StreamInfo& stream_info) override;
-
 private:
-  AccessLog::FilterPtr filter_;
+  // Common::ImplBase
+  void emitLog(const Http::HeaderMap& request_headers, const Http::HeaderMap& response_headers,
+               const Http::HeaderMap& response_trailers,
+               const StreamInfo::StreamInfo& stream_info) override;
+
   const envoy::config::accesslog::v2::HttpGrpcAccessLogConfig config_;
   GrpcAccessLogStreamerSharedPtr grpc_access_log_streamer_;
   std::vector<Http::LowerCaseString> request_headers_to_log_;
