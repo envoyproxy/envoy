@@ -606,6 +606,13 @@ Http::FilterTrailersStatus Filter::decodeTrailers(Http::HeaderMap& trailers) {
   return Http::FilterTrailersStatus::StopIteration;
 }
 
+Http::FilterMetadataStatus Filter::decodeMetadata(Http::MetadataMap& metadata_map) {
+  Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
+  ASSERT(upstream_requests_.size() == 1);
+  upstream_requests_.front()->encodeMetadata(std::move(metadata_map_ptr));
+  return Http::FilterMetadataStatus::Continue;
+}
+
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   callbacks_ = &callbacks;
   // As the decoder filter only pushes back via watermarks once data has reached
@@ -1052,7 +1059,10 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& head
   // chance to return before returning a response downstream.
   if (could_not_retry && (numRequestsAwaitingHeaders() > 0 || pending_retries_ > 0)) {
     upstream_request.upstream_host_->stats().rq_error_.inc();
-    upstream_request.removeFromList(upstream_requests_);
+
+    // Reset the stream because there are other in-flight requests that we'll
+    // wait around for and we're not interested in consuming any body/trailers.
+    upstream_request.removeFromList(upstream_requests_)->resetStream();
     return;
   }
 
@@ -1400,6 +1410,8 @@ void Filter::UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream
 
     buffered_request_body_->move(data);
   } else {
+    ASSERT(downstream_metadata_map_vector_.empty());
+
     ENVOY_STREAM_LOG(trace, "proxying {} bytes", *parent_.callbacks_, data.length());
     stream_info_.addBytesSent(data.length());
     request_encoder_->encodeData(data, end_stream);
@@ -1417,9 +1429,24 @@ void Filter::UpstreamRequest::encodeTrailers(const Http::HeaderMap& trailers) {
   if (!request_encoder_) {
     ENVOY_STREAM_LOG(trace, "buffering trailers", *parent_.callbacks_);
   } else {
+    ASSERT(downstream_metadata_map_vector_.empty());
+
     ENVOY_STREAM_LOG(trace, "proxying trailers", *parent_.callbacks_);
     request_encoder_->encodeTrailers(trailers);
     upstream_timing_.onLastUpstreamTxByteSent(parent_.callbacks_->dispatcher().timeSource());
+  }
+}
+
+void Filter::UpstreamRequest::encodeMetadata(Http::MetadataMapPtr&& metadata_map_ptr) {
+  if (!request_encoder_) {
+    ENVOY_STREAM_LOG(trace, "request_encoder_ not ready. Store metadata_map to encode later: {}",
+                     *parent_.callbacks_, *metadata_map_ptr);
+    downstream_metadata_map_vector_.emplace_back(std::move(metadata_map_ptr));
+  } else {
+    ENVOY_STREAM_LOG(trace, "Encode metadata: {}", *parent_.callbacks_, *metadata_map_ptr);
+    Http::MetadataMapVector metadata_map_vector;
+    metadata_map_vector.emplace_back(std::move(metadata_map_ptr));
+    request_encoder_->encodeMetadata(metadata_map_vector);
   }
 }
 
@@ -1526,8 +1553,13 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
   }
 
   upstream_timing_.onFirstUpstreamTxByteSent(parent_.callbacks_->dispatcher().timeSource());
+
+  const bool end_stream = !buffered_request_body_ && encode_complete_ && !encode_trailers_;
+  // If end_stream is set in headers, and there are metadata to send, delays end_stream. The case
+  // only happens when decoding headers filters return ContinueAndEndStream.
+  const bool delay_headers_end_stream = end_stream && !downstream_metadata_map_vector_.empty();
   request_encoder.encodeHeaders(*parent_.downstream_headers_,
-                                !buffered_request_body_ && encode_complete_ && !encode_trailers_);
+                                end_stream && !delay_headers_end_stream);
   calling_encode_headers_ = false;
 
   // It is possible to get reset in the middle of an encodeHeaders() call. This happens for example
@@ -1538,6 +1570,18 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
   if (deferred_reset_reason_) {
     onResetStream(deferred_reset_reason_.value(), absl::string_view());
   } else {
+    // Encode metadata after headers and before any other frame type.
+    if (!downstream_metadata_map_vector_.empty()) {
+      ENVOY_STREAM_LOG(debug, "Send metadata onPoolReady. {}", *parent_.callbacks_,
+                       downstream_metadata_map_vector_);
+      request_encoder.encodeMetadata(downstream_metadata_map_vector_);
+      downstream_metadata_map_vector_.clear();
+      if (delay_headers_end_stream) {
+        Buffer::OwnedImpl empty_data("");
+        request_encoder.encodeData(empty_data, true);
+      }
+    }
+
     if (buffered_request_body_) {
       stream_info_.addBytesSent(buffered_request_body_->length());
       request_encoder.encodeData(*buffered_request_body_, encode_complete_ && !encode_trailers_);

@@ -21,8 +21,7 @@ DubboFilters::FilterFactoryCb RouterFilterConfig::createFilterFactoryFromProtoTy
 /**
  * Static registration for the router filter. @see RegisterFactory.
  */
-static Registry::RegisterFactory<RouterFilterConfig, DubboFilters::NamedDubboFilterConfigFactory>
-    register_;
+REGISTER_FACTORY(RouterFilterConfig, DubboFilters::NamedDubboFilterConfigFactory);
 
 } // namespace Router
 } // namespace DubboProxy

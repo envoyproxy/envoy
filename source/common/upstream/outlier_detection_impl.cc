@@ -710,7 +710,7 @@ SuccessRateAccumulatorBucket* SuccessRateAccumulator::updateCurrentWriter() {
 absl::optional<double>
 SuccessRateAccumulator::getSuccessRate(uint64_t success_rate_request_volume) {
   if (backup_success_rate_bucket_->total_request_counter_ < success_rate_request_volume) {
-    return absl::optional<double>();
+    return {};
   }
 
   return {backup_success_rate_bucket_->success_request_counter_ * 100.0 /

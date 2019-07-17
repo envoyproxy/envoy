@@ -270,6 +270,13 @@ void InstanceImpl::initialize(const Options& options,
   InstanceUtil::loadBootstrapConfig(bootstrap_, options, messageValidationVisitor(), *api_);
   bootstrap_config_update_time_ = time_source_.systemTime();
 
+  // Immediate after the bootstrap has been loaded, override the header prefix, if configured to
+  // do so. This must be set before any other code block references the HeaderValues ConstSingleton.
+  if (!bootstrap_.header_prefix().empty()) {
+    // setPrefix has a release assert verifying that setPrefix() is not called after prefix()
+    ThreadSafeSingleton<Http::PrefixValue>::get().setPrefix(bootstrap_.header_prefix().c_str());
+  }
+
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
   // stats.
   stats_store_.setTagProducer(Config::Utility::createTagProducer(bootstrap_));
@@ -278,8 +285,11 @@ void InstanceImpl::initialize(const Options& options,
   const std::string server_stats_prefix = "server.";
   server_stats_ = std::make_unique<ServerStats>(
       ServerStats{ALL_SERVER_STATS(POOL_COUNTER_PREFIX(stats_store_, server_stats_prefix),
-                                   POOL_GAUGE_PREFIX(stats_store_, server_stats_prefix))});
+                                   POOL_GAUGE_PREFIX(stats_store_, server_stats_prefix),
+                                   POOL_HISTOGRAM_PREFIX(stats_store_, server_stats_prefix))});
 
+  initialization_timer_ =
+      std::make_unique<Stats::Timespan>(server_stats_->initialization_time_ms_, timeSource());
   server_stats_->concurrency_.set(options_.concurrency());
   server_stats_->hot_restart_epoch_.set(options_.restartEpoch());
 
@@ -410,7 +420,7 @@ void InstanceImpl::initialize(const Options& options,
 
 void InstanceImpl::startWorkers() {
   listener_manager_->startWorkers(*guard_dog_);
-
+  initialization_timer_->complete();
   // At this point we are ready to take traffic and all listening ports are up. Notify our parent
   // if applicable that they can stop listening and drain.
   restarter_.drainParentListeners();

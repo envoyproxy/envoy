@@ -34,12 +34,15 @@ public:
   void sendData(Http::StreamEncoder& encoder, uint64_t size, bool end_stream);
   void sendTrailers(Http::StreamEncoder& encoder, const Http::HeaderMap& trailers);
   void sendReset(Http::StreamEncoder& encoder);
+  // Intentionally makes a copy of metadata_map.
+  void sendMetadata(Http::StreamEncoder& encoder, Http::MetadataMap metadata_map);
   std::pair<Http::StreamEncoder&, IntegrationStreamDecoderPtr>
   startRequest(const Http::HeaderMap& headers);
   bool waitForDisconnect(std::chrono::milliseconds time_to_wait = std::chrono::milliseconds(0));
   Network::ClientConnection* connection() const { return connection_.get(); }
   Network::ConnectionEvent last_connection_event() const { return last_connection_event_; }
   Network::Connection& rawConnection() { return *connection_; }
+  bool disconnected() { return disconnected_; }
 
 private:
   struct ConnectionCallbacks : public Network::ConnectionCallbacks {
@@ -134,9 +137,6 @@ protected:
 
   // Close |codec_client_| and |fake_upstream_connection_| cleanly.
   void cleanupUpstreamAndDownstream();
-
-  // Utility function to add filters.
-  void addFilters(std::vector<std::string> filters);
 
   // Check for completion of upstream_request_, and a simple "200" response.
   void checkSimpleRequestSuccess(uint64_t expected_request_size, uint64_t expected_response_size,

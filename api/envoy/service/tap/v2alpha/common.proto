@@ -3,7 +3,6 @@ syntax = "proto3";
 import "envoy/api/v2/route/route.proto";
 import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/core/grpc_service.proto";
-import "envoy/type/matcher/string.proto";
 
 import "google/protobuf/wrappers.proto";
 

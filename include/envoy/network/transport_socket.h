@@ -166,6 +166,12 @@ public:
   virtual const absl::optional<std::string>& serverNameOverride() const PURE;
 
   /**
+   * @return the optional overridden SAN names to verify, if the transport socket supports SAN
+   *         verification.
+   */
+  virtual const std::vector<std::string>& verifySubjectAltNameListOverride() const PURE;
+
+  /**
    * @param vector of bytes to which the option should append hash key data that will be used
    *        to separate connections based on the option. Any data already in the key vector must
    *        not be modified.
@@ -173,7 +179,8 @@ public:
   virtual void hashKey(std::vector<uint8_t>& key) const PURE;
 };
 
-using TransportSocketOptionsSharedPtr = std::shared_ptr<TransportSocketOptions>;
+// TODO(mattklein123): Rename to TransportSocketOptionsConstSharedPtr in a dedicated follow up.
+using TransportSocketOptionsSharedPtr = std::shared_ptr<const TransportSocketOptions>;
 
 /**
  * A factory for creating transport socket. It will be associated to filter chains and clusters.

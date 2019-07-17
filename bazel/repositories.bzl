@@ -2,12 +2,6 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load(":genrule_repository.bzl", "genrule_repository")
 load("@envoy_api//bazel:envoy_http_archive.bzl", "envoy_http_archive")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS")
-load(
-    "@bazel_tools//tools/cpp:windows_cc_configure.bzl",
-    "find_vc_path",
-    "setup_vc_env_vars",
-)
-load("@bazel_tools//tools/cpp:lib_cc_configure.bzl", "get_env_var")
 load("@envoy_api//bazel:repositories.bzl", "api_dependencies")
 
 # dict of {build recipe name: longform extension name,}
@@ -140,7 +134,6 @@ def envoy_dependencies(skip_targets = []):
     _com_github_envoyproxy_sqlparser()
     _com_github_fmtlib_fmt()
     _com_github_gabime_spdlog()
-    _com_github_gcovr_gcovr()
     _com_github_google_benchmark()
     _com_github_google_jwt_verify()
     _com_github_google_libprotobuf_mutator()
@@ -163,9 +156,6 @@ def envoy_dependencies(skip_targets = []):
     _com_lightstep_tracer_cpp()
     _io_opentracing_cpp()
     _net_zlib()
-
-    # Used for bundling gcovr into a relocatable .par file.
-    _repository_impl("subpar")
 
     _python_deps()
     _cc_deps()
@@ -255,16 +245,6 @@ def _com_github_gabime_spdlog():
     native.bind(
         name = "spdlog",
         actual = "@com_github_gabime_spdlog//:spdlog",
-    )
-
-def _com_github_gcovr_gcovr():
-    _repository_impl(
-        name = "com_github_gcovr_gcovr",
-        build_file = "@envoy//bazel/external:gcovr.BUILD",
-    )
-    native.bind(
-        name = "gcovr",
-        actual = "@com_github_gcovr_gcovr//:gcovr",
     )
 
 def _com_github_google_benchmark():
@@ -486,9 +466,10 @@ def _com_google_absl():
 def _com_google_protobuf():
     _repository_impl(
         "com_google_protobuf",
-        # The patch is only needed until
-        # https://github.com/protocolbuffers/protobuf/pull/5901 is available.
-        # TODO(htuch): remove this when > protobuf 3.7.1 is released.
+        # The patch includes
+        # https://github.com/protocolbuffers/protobuf/pull/6333 and also uses
+        # foreign_cc build for zlib as its dependency.
+        # TODO(asraa): remove this when > protobuf 3.8.0 is released.
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:protobuf.patch"],
     )
@@ -499,9 +480,10 @@ def _com_google_protobuf():
     _repository_impl(
         "com_google_protobuf_cc",
         repository_key = "com_google_protobuf",
-        # The patch is only needed until
-        # https://github.com/protocolbuffers/protobuf/pull/5901 is available.
-        # TODO(htuch): remove this when > protobuf 3.7.1 is released.
+        # The patch includes
+        # https://github.com/protocolbuffers/protobuf/pull/6333 and also uses
+        # foreign_cc build for zlib as its dependency.
+        # TODO(asraa): remove this when > protobuf 3.8.0 is released.
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:protobuf.patch"],
     )

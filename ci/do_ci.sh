@@ -241,22 +241,11 @@ elif [[ "$CI_TARGET" == "bazel.api" ]]; then
     @envoy_api//tools:tap2pcap_test
   exit 0
 elif [[ "$CI_TARGET" == "bazel.coverage" ]]; then
-  setup_gcc_toolchain
+  setup_clang_toolchain
   echo "bazel coverage build with tests ${TEST_TARGETS}"
 
-  # gcovr is a pain to run with `bazel run`, so package it up into a
-  # relocatable and hermetic-ish .par file.
-  bazel build --python_version=PY2 @com_github_gcovr_gcovr//:gcovr.par
-  export GCOVR="/tmp/gcovr.par"
-  cp -f "${ENVOY_SRCDIR}/bazel-bin/external/com_github_gcovr_gcovr/gcovr.par" ${GCOVR}
-
-  # Reduce the amount of memory and number of cores Bazel tries to use to
-  # prevent it from launching too many subprocesses. This should prevent the
-  # system from running out of memory and killing tasks. See discussion on
-  # https://github.com/envoyproxy/envoy/pull/5611.
-  # TODO(akonradi): use --local_cpu_resources flag once Bazel has a release
-  # after 0.21.
-  [ -z "$CIRCLECI" ] || export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --local_resources=12288,4,1"
+  # LLVM coverage is a memory hog too.
+  [ -z "$CIRCLECI" ] || export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --local_cpu_resources=6"
 
   test/run_envoy_bazel_coverage.sh ${TEST_TARGETS}
   collect_build_profile coverage

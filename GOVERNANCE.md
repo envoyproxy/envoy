@@ -101,9 +101,9 @@ or you can subscribe to the iCal feed [here](https://app.opsgenie.com/webcal/get
   the same time, also add a new empty "pending" section to the [release
   notes](docs/root/intro/version_history.rst) and to [deprecated log](docs/root/intro/deprecated.rst) for the
   following version. E.g., "1.7.0 (pending)".
-* Run the deprecate_versions.py script (e.g. `sh tools/deprecate_version/deprecate_version.sh 1.8.0 1.10.0`)
+* Run the deprecate_versions.py script (e.g. `sh tools/deprecate_version/deprecate_version.sh`)
   to file tracking issues for code which can be removed.
-* Run the deprecate_features.py script (e.g. `sh tools/deprecate_version/deprecate_features.sh`)
+* Run the deprecate_features.py script (e.g. `sh tools/deprecate_features/deprecate_features.sh`)
   to make the last release's deprecated features fatal-by-default. Submit the resultant PR and send
   an email to envoy-announce.
 

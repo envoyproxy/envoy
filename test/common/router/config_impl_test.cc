@@ -2319,7 +2319,7 @@ virtual_hosts:
       retry_policy:
         per_try_timeout: 1s
         num_retries: 3
-        retry_on: 5xx,gateway-error,connect-failure
+        retry_on: 5xx,gateway-error,connect-failure,reset
   )EOF";
 
   TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
@@ -2363,7 +2363,7 @@ virtual_hosts:
                     ->retryPolicy()
                     .numRetries());
   EXPECT_EQ(RetryPolicy::RETRY_ON_CONNECT_FAILURE | RetryPolicy::RETRY_ON_5XX |
-                RetryPolicy::RETRY_ON_GATEWAY_ERROR,
+                RetryPolicy::RETRY_ON_GATEWAY_ERROR | RetryPolicy::RETRY_ON_RESET,
             config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
                 ->routeEntry()
                 ->retryPolicy()
@@ -2376,7 +2376,7 @@ name: RetryVirtualHostLevel
 virtual_hosts:
 - domains: [www.lyft.com]
   name: www
-  retry_policy: {num_retries: 3, per_try_timeout: 1s, retry_on: '5xx,gateway-error,connect-failure'}
+  retry_policy: {num_retries: 3, per_try_timeout: 1s, retry_on: '5xx,gateway-error,connect-failure,reset'}
   routes:
   - match: {prefix: /foo}
     route:
@@ -2417,7 +2417,7 @@ virtual_hosts:
                     ->retryPolicy()
                     .numRetries());
   EXPECT_EQ(RetryPolicy::RETRY_ON_CONNECT_FAILURE | RetryPolicy::RETRY_ON_5XX |
-                RetryPolicy::RETRY_ON_GATEWAY_ERROR,
+                RetryPolicy::RETRY_ON_GATEWAY_ERROR | RetryPolicy::RETRY_ON_RESET,
             config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
                 ->routeEntry()
                 ->retryPolicy()
@@ -2432,7 +2432,7 @@ virtual_hosts:
                     ->retryPolicy()
                     .numRetries());
   EXPECT_EQ(RetryPolicy::RETRY_ON_CONNECT_FAILURE | RetryPolicy::RETRY_ON_5XX |
-                RetryPolicy::RETRY_ON_GATEWAY_ERROR,
+                RetryPolicy::RETRY_ON_GATEWAY_ERROR | RetryPolicy::RETRY_ON_RESET,
             config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
                 ->routeEntry()
                 ->retryPolicy()

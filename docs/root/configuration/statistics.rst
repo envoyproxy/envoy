@@ -23,6 +23,7 @@ Server related statistics are rooted at *server.* with following statistics:
   version, Gauge, Integer represented version number based on SCM revision
   days_until_first_cert_expiring, Gauge, Number of days until the next certificate being managed will expire
   hot_restart_epoch, Gauge, Current hot restart epoch
+  initialization_time_ms, Histogram, Total time taken for Envoy initialization in milliseconds. This is the time from server start-up until the worker threads are ready to accept new connections
   debug_assertion_failures, Counter, Number of debug assertion failures detected in a release build if compiled with `--define log_debug_assert_in_release=enabled` or zero otherwise
 
 File system
