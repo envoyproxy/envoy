@@ -19,7 +19,8 @@ jobs:
       ENVOY_SRCDIR: $(Build.SourcesDirectory)
       BUILD_DIR: $(Build.StagingDirectory)
       BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-clang --config=remote-ci --jobs=100 --curses=no"
-      BAZEL_EXTRA_TEST_OPTIONS: "--test_env=ENVOY_IP_TEST_VERSIONS=v4only"
+      # AddRemoveListener is marked exclusive so it will be ran locally, no IPv6 locally in container.
+      BAZEL_EXTRA_TEST_OPTIONS: "--test_filter=-IpVersions/EchoIntegrationTest.AddRemoveListener/IPv6"
       BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
       BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
       GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
@@ -32,12 +33,4 @@ jobs:
   - task: PublishBuildArtifacts@1
     inputs:
       pathtoPublish: "$(Build.StagingDirectory)/envoy"
-
-  - task: PublishTestResults@2
-    inputs:
-      testResultsFiles: '**/testlogs/**/test.xml'
-      testRunTitle: 'bazel.release'
-      searchFolder: $(Build.StagingDirectory)
-      mergeTestResults: true
-      publishRunAttachments: true
-    condition: always()
+      artifactName: 'envoy'
