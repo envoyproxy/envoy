@@ -260,7 +260,8 @@ void DnsResolverImpl::PendingSrvResolution::onAresSrvStartCallback(int status, i
            current_reply = current_reply->next, ++total) {
         resolver_->resolve(
             current_reply->host, this->dns_lookup_family_,
-            [=, &finished, &srv_records](const std::list<DnsResponse>&& response) {
+            [this, &current_reply, &finished, &total,
+             &srv_records](const std::list<DnsResponse>&& response) {
               for (auto instance = response.begin(); instance != response.end(); ++instance) {
                 Address::InstanceConstSharedPtr inst_with_port(
                     Utility::getAddressWithPort(*instance->address_, current_reply->port));
@@ -268,7 +269,7 @@ void DnsResolverImpl::PendingSrvResolution::onAresSrvStartCallback(int status, i
                     std::make_shared<Address::SrvInstanceImpl>(inst_with_port), instance->ttl_));
               }
               if (++finished == total) {
-                this->onAresSrvFinishCallback(std::move(srv_records));
+                onAresSrvFinishCallback(std::move(srv_records));
               }
             });
       }
