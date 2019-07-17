@@ -260,6 +260,12 @@ void Filter::readDisableDownstream(bool disable) {
   }
 }
 
+void Filter::DownstreamCallbacks::onAboveWriteBufferOverflowWatermark() {
+  // TODO(mergeconflict): Do we want this to appear as a local or remote close?
+  // Also, we probably want to log when this happens.
+  onEvent(Network::ConnectionEvent::RemoteClose);
+}
+
 void Filter::DownstreamCallbacks::onAboveWriteBufferHighWatermark() {
   ASSERT(!on_high_watermark_called_);
   on_high_watermark_called_ = true;
@@ -280,6 +286,11 @@ void Filter::UpstreamCallbacks::onEvent(Network::ConnectionEvent event) {
   } else {
     drainer_->onEvent(event);
   }
+}
+
+void Filter::UpstreamCallbacks::onAboveWriteBufferOverflowWatermark() {
+  // TODO(mergeconflict): Same as above in DownstreamCallbacks.
+  onEvent(Network::ConnectionEvent::RemoteClose);
 }
 
 void Filter::UpstreamCallbacks::onAboveWriteBufferHighWatermark() {

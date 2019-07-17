@@ -333,6 +333,7 @@ private:
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeTrailers(HeaderMapPtr&& trailers) override;
   void encodeMetadata(MetadataMapPtr&&) override {}
+  void onDecoderFilterAboveWriteBufferOverflowWatermark() override {}
   void onDecoderFilterAboveWriteBufferHighWatermark() override {}
   void onDecoderFilterBelowWriteBufferLowWatermark() override {}
   void addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}

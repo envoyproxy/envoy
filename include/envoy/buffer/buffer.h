@@ -372,10 +372,13 @@ public:
    *   low watermark.
    * @param above_high_watermark supplies a function to call if the buffer goes over a configured
    *   high watermark.
+   * @param above_overflow_watermark supplies a function to call if the buffer goes over a
+   *   configured "overflow" watermark.
    * @return a newly created InstancePtr.
    */
   virtual InstancePtr create(std::function<void()> below_low_watermark,
-                             std::function<void()> above_high_watermark) PURE;
+                             std::function<void()> above_high_watermark,
+                             std::function<void()> above_overflow_watermark) PURE;
 };
 
 using WatermarkFactoryPtr = std::unique_ptr<WatermarkFactory>;

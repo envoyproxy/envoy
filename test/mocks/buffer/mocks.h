@@ -17,7 +17,8 @@ namespace Envoy {
 template <class BaseClass> class MockBufferBase : public BaseClass {
 public:
   MockBufferBase();
-  MockBufferBase(std::function<void()> below_low, std::function<void()> above_high);
+  MockBufferBase(std::function<void()> below_low, std::function<void()> above_high,
+                 std::function<void()> above_overflow);
 
   MOCK_METHOD1(write, Api::IoCallUint64Result(Network::IoHandle& io_handle));
   MOCK_METHOD1(move, void(Buffer::Instance& rhs));
@@ -57,12 +58,14 @@ private:
 
 template <>
 MockBufferBase<Buffer::WatermarkBuffer>::MockBufferBase(std::function<void()> below_low,
-                                                        std::function<void()> above_high);
+                                                        std::function<void()> above_high,
+                                                        std::function<void()> above_overflow);
 template <> MockBufferBase<Buffer::WatermarkBuffer>::MockBufferBase();
 
 template <>
 MockBufferBase<Buffer::OwnedImpl>::MockBufferBase(std::function<void()> below_low,
-                                                  std::function<void()> above_high);
+                                                  std::function<void()> above_high,
+                                                  std::function<void()> above_overflow);
 template <> MockBufferBase<Buffer::OwnedImpl>::MockBufferBase();
 
 class MockBuffer : public MockBufferBase<Buffer::OwnedImpl> {
@@ -78,8 +81,9 @@ class MockWatermarkBuffer : public MockBufferBase<Buffer::WatermarkBuffer> {
 public:
   using BaseClass = MockBufferBase<Buffer::WatermarkBuffer>;
 
-  MockWatermarkBuffer(std::function<void()> below_low, std::function<void()> above_high)
-      : BaseClass(below_low, above_high) {
+  MockWatermarkBuffer(std::function<void()> below_low, std::function<void()> above_high,
+                      std::function<void()> above_overflow)
+      : BaseClass(below_low, above_high, above_overflow) {
     ON_CALL(*this, write(testing::_))
         .WillByDefault(testing::Invoke(this, &MockWatermarkBuffer::trackWrites));
     ON_CALL(*this, move(testing::_))
@@ -92,13 +96,14 @@ public:
   MockBufferFactory();
   ~MockBufferFactory();
 
-  Buffer::InstancePtr create(std::function<void()> below_low,
-                             std::function<void()> above_high) override {
-    return Buffer::InstancePtr{create_(below_low, above_high)};
+  Buffer::InstancePtr create(std::function<void()> below_low, std::function<void()> above_high,
+                             std::function<void()> above_overflow) override {
+    return Buffer::InstancePtr{create_(below_low, above_high, above_overflow)};
   }
 
-  MOCK_METHOD2(create_, Buffer::Instance*(std::function<void()> below_low,
-                                          std::function<void()> above_high));
+  MOCK_METHOD3(create_,
+               Buffer::Instance*(std::function<void()> below_low, std::function<void()> above_high,
+                                 std::function<void()> above_overflow));
 };
 
 MATCHER_P(BufferEqual, rhs, testing::PrintToString(*rhs)) {

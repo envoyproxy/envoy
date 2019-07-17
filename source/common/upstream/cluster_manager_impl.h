@@ -280,6 +280,7 @@ private:
           parent_.removeTcpConn(host_, connection_);
         }
       }
+      void onAboveWriteBufferOverflowWatermark() override {}
       void onAboveWriteBufferHighWatermark() override {}
       void onBelowWriteBufferLowWatermark() override {}
 

@@ -48,9 +48,10 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
                                TransportSocketPtr&& transport_socket, bool connected)
     : transport_socket_(std::move(transport_socket)), socket_(std::move(socket)),
       filter_manager_(*this), stream_info_(dispatcher.timeSource()),
-      write_buffer_(
-          dispatcher.getWatermarkFactory().create([this]() -> void { this->onLowWatermark(); },
-                                                  [this]() -> void { this->onHighWatermark(); })),
+      write_buffer_(dispatcher.getWatermarkFactory().create(
+          [this]() -> void { this->onLowWatermark(); },
+          [this]() -> void { this->onHighWatermark(); },
+          [this]() -> void { this->onOverflowWatermark(); })),
       dispatcher_(dispatcher), id_(next_global_id_++) {
   // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
   // condition and just crash.
@@ -449,6 +450,13 @@ void ConnectionImpl::onHighWatermark() {
   above_high_watermark_ = true;
   for (ConnectionCallbacks* callback : callbacks_) {
     callback->onAboveWriteBufferHighWatermark();
+  }
+}
+
+void ConnectionImpl::onOverflowWatermark() {
+  ENVOY_CONN_LOG(debug, "onAboveWriteBufferOverflowWatermark", *this);
+  for (ConnectionCallbacks* callback : callbacks_) {
+    callback->onAboveWriteBufferOverflowWatermark();
   }
 }
 

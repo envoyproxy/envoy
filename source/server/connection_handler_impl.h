@@ -170,6 +170,7 @@ private:
         listener_.removeConnection(*this);
       }
     }
+    void onAboveWriteBufferOverflowWatermark() override {}
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 

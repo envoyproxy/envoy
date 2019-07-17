@@ -18,13 +18,15 @@ class WatermarkBufferTest : public BufferImplementationParamTest {
 public:
   WatermarkBufferTest() {
     verifyImplementation(buffer_);
-    buffer_.setWatermarks(5, 10);
+    buffer_.setWatermarks(5, 10, 20);
   }
 
   Buffer::WatermarkBuffer buffer_{[&]() -> void { ++times_low_watermark_called_; },
-                                  [&]() -> void { ++times_high_watermark_called_; }};
+                                  [&]() -> void { ++times_high_watermark_called_; },
+                                  [&]() -> void { ++times_overflow_watermark_called_; }};
   uint32_t times_low_watermark_called_{0};
   uint32_t times_high_watermark_called_{0};
+  uint32_t times_overflow_watermark_called_{0};
 };
 
 INSTANTIATE_TEST_SUITE_P(WatermarkBufferTest, WatermarkBufferTest,
@@ -51,6 +53,13 @@ TEST_P(WatermarkBufferTest, AddChar) {
   buffer_.add("a", 1);
   EXPECT_EQ(1, times_high_watermark_called_);
   EXPECT_EQ(11, buffer_.length());
+
+  buffer_.add("bcdefghij");
+  EXPECT_EQ(0, times_overflow_watermark_called_);
+  EXPECT_EQ(20, buffer_.length());
+  buffer_.add("k", 1);
+  EXPECT_EQ(1, times_overflow_watermark_called_);
+  EXPECT_EQ(21, buffer_.length());
 }
 
 TEST_P(WatermarkBufferTest, AddString) {
@@ -59,6 +68,10 @@ TEST_P(WatermarkBufferTest, AddString) {
   buffer_.add(std::string("a"));
   EXPECT_EQ(1, times_high_watermark_called_);
   EXPECT_EQ(11, buffer_.length());
+
+  buffer_.add(std::string(TEN_BYTES));
+  EXPECT_EQ(1, times_overflow_watermark_called_);
+  EXPECT_EQ(21, buffer_.length());
 }
 
 TEST_P(WatermarkBufferTest, AddBuffer) {
@@ -69,6 +82,11 @@ TEST_P(WatermarkBufferTest, AddBuffer) {
   buffer_.add(second);
   EXPECT_EQ(1, times_high_watermark_called_);
   EXPECT_EQ(11, buffer_.length());
+
+  OwnedImpl third(TEN_BYTES);
+  buffer_.add(third);
+  EXPECT_EQ(1, times_overflow_watermark_called_);
+  EXPECT_EQ(21, buffer_.length());
 }
 
 TEST_P(WatermarkBufferTest, Prepend) {
@@ -79,6 +97,9 @@ TEST_P(WatermarkBufferTest, Prepend) {
   buffer_.prepend(prefix);
   EXPECT_EQ(1, times_high_watermark_called_);
   EXPECT_EQ(suffix.size() + prefix.size(), buffer_.length());
+
+  buffer_.prepend(TEN_BYTES);
+  EXPECT_EQ(1, times_overflow_watermark_called_);
 }
 
 TEST_P(WatermarkBufferTest, PrependToEmptyBuffer) {
@@ -103,8 +124,9 @@ TEST_P(WatermarkBufferTest, PrependBuffer) {
   uint32_t prefix_buffer_low_watermark_hits{0};
   uint32_t prefix_buffer_high_watermark_hits{0};
   WatermarkBuffer prefixBuffer{[&]() -> void { ++prefix_buffer_low_watermark_hits; },
-                               [&]() -> void { ++prefix_buffer_high_watermark_hits; }};
-  prefixBuffer.setWatermarks(5, 10);
+                               [&]() -> void { ++prefix_buffer_high_watermark_hits; },
+                               [&]() -> void {}};
+  prefixBuffer.setWatermarks(5, 10, 20);
   prefixBuffer.add(prefix);
   prefixBuffer.add(suffix);
 
@@ -121,13 +143,22 @@ TEST_P(WatermarkBufferTest, PrependBuffer) {
 TEST_P(WatermarkBufferTest, Commit) {
   buffer_.add(TEN_BYTES, 10);
   EXPECT_EQ(0, times_high_watermark_called_);
-  RawSlice out;
-  buffer_.reserve(10, &out, 1);
-  memcpy(out.mem_, &TEN_BYTES[0], 10);
-  out.len_ = 10;
-  buffer_.commit(&out, 1);
+
+  const auto commit_ten_bytes = [this]() {
+    RawSlice out;
+    buffer_.reserve(10, &out, 1);
+    memcpy(out.mem_, &TEN_BYTES[0], 10);
+    out.len_ = 10;
+    buffer_.commit(&out, 1);
+  };
+
+  commit_ten_bytes();
   EXPECT_EQ(1, times_high_watermark_called_);
   EXPECT_EQ(20, buffer_.length());
+
+  commit_ten_bytes();
+  EXPECT_EQ(1, times_overflow_watermark_called_);
+  EXPECT_EQ(30, buffer_.length());
 }
 
 TEST_P(WatermarkBufferTest, Drain) {
@@ -151,6 +182,14 @@ TEST_P(WatermarkBufferTest, Drain) {
   // Going back above should trigger the high again
   buffer_.add(TEN_BYTES, 10);
   EXPECT_EQ(2, times_high_watermark_called_);
+
+  // Draining doesn't reset the overflow bit, so overflow should only be called once.
+  buffer_.add(TEN_BYTES, 10);
+  EXPECT_EQ(1, times_overflow_watermark_called_);
+  buffer_.drain(20);
+  buffer_.add(TEN_BYTES, 10);
+  buffer_.add(TEN_BYTES, 10);
+  EXPECT_EQ(1, times_overflow_watermark_called_);
 }
 
 TEST_P(WatermarkBufferTest, MoveFullBuffer) {
@@ -161,6 +200,11 @@ TEST_P(WatermarkBufferTest, MoveFullBuffer) {
   buffer_.move(data);
   EXPECT_EQ(1, times_high_watermark_called_);
   EXPECT_EQ(11, buffer_.length());
+
+  OwnedImpl overflow_data(TEN_BYTES);
+  buffer_.move(overflow_data);
+  EXPECT_EQ(1, times_overflow_watermark_called_);
+  EXPECT_EQ(21, buffer_.length());
 }
 
 TEST_P(WatermarkBufferTest, MoveOneByte) {
@@ -174,6 +218,12 @@ TEST_P(WatermarkBufferTest, MoveOneByte) {
   buffer_.move(data, 1);
   EXPECT_EQ(1, times_high_watermark_called_);
   EXPECT_EQ(11, buffer_.length());
+
+  buffer_.add(TEN_BYTES, 9);
+  OwnedImpl overflow_data("ab");
+  buffer_.move(overflow_data, 1);
+  EXPECT_EQ(1, times_overflow_watermark_called_);
+  EXPECT_EQ(21, buffer_.length());
 }
 
 TEST_P(WatermarkBufferTest, WatermarkFdFunctions) {
@@ -212,25 +262,32 @@ TEST_P(WatermarkBufferTest, WatermarkFdFunctions) {
 TEST_P(WatermarkBufferTest, MoveWatermarks) {
   buffer_.add(TEN_BYTES, 9);
   EXPECT_EQ(0, times_high_watermark_called_);
-  buffer_.setWatermarks(1, 9);
+  EXPECT_EQ(0, times_overflow_watermark_called_);
+  buffer_.setWatermarks(1, 9, 18);
   EXPECT_EQ(0, times_high_watermark_called_);
-  buffer_.setWatermarks(1, 8);
+  EXPECT_EQ(0, times_overflow_watermark_called_);
+  buffer_.setWatermarks(1, 8, 16);
   EXPECT_EQ(1, times_high_watermark_called_);
+  EXPECT_EQ(0, times_overflow_watermark_called_);
 
-  buffer_.setWatermarks(9, 20);
+  buffer_.setWatermarks(9, 20, 40);
   EXPECT_EQ(0, times_low_watermark_called_);
-  buffer_.setWatermarks(10, 20);
+  buffer_.setWatermarks(10, 20, 40);
   EXPECT_EQ(1, times_low_watermark_called_);
-  buffer_.setWatermarks(8, 20);
-  buffer_.setWatermarks(10, 20);
+  buffer_.setWatermarks(8, 20, 40);
+  buffer_.setWatermarks(10, 20, 40);
   EXPECT_EQ(1, times_low_watermark_called_);
 
   EXPECT_EQ(1, times_high_watermark_called_);
-  buffer_.setWatermarks(2);
+  buffer_.setWatermarks(5);
   EXPECT_EQ(2, times_high_watermark_called_);
   EXPECT_EQ(1, times_low_watermark_called_);
   buffer_.setWatermarks(0);
   EXPECT_EQ(2, times_low_watermark_called_);
+
+  buffer_.setWatermarks(4);
+  EXPECT_EQ(1, times_overflow_watermark_called_);
+  EXPECT_EQ(2, times_high_watermark_called_);
 }
 
 TEST_P(WatermarkBufferTest, GetRawSlices) {
@@ -257,8 +314,8 @@ TEST_P(WatermarkBufferTest, MoveBackWithWatermarks) {
   int high_watermark_buffer1 = 0;
   int low_watermark_buffer1 = 0;
   Buffer::WatermarkBuffer buffer1{[&]() -> void { ++low_watermark_buffer1; },
-                                  [&]() -> void { ++high_watermark_buffer1; }};
-  buffer1.setWatermarks(5, 10);
+                                  [&]() -> void { ++high_watermark_buffer1; }, [&]() -> void {}};
+  buffer1.setWatermarks(5, 10, 20);
 
   // Stick 20 bytes in buffer_ and expect the high watermark is hit.
   buffer_.add(TEN_BYTES, 10);

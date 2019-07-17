@@ -35,6 +35,12 @@ void MockConnectionBase::raiseBytesSentCallbacks(uint64_t num_bytes) {
   }
 }
 
+void MockConnectionBase::runOverflowWatermarkCallbacks() {
+  for (auto* callback : callbacks_) {
+    callback->onAboveWriteBufferOverflowWatermark();
+  }
+}
+
 void MockConnectionBase::runHighWatermarkCallbacks() {
   for (auto* callback : callbacks_) {
     callback->onAboveWriteBufferHighWatermark();

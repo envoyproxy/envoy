@@ -16,8 +16,10 @@ namespace Buffer {
 class WatermarkBuffer : public OwnedImpl {
 public:
   WatermarkBuffer(std::function<void()> below_low_watermark,
-                  std::function<void()> above_high_watermark)
-      : below_low_watermark_(below_low_watermark), above_high_watermark_(above_high_watermark) {}
+                  std::function<void()> above_high_watermark,
+                  std::function<void()> above_overflow_watermark)
+      : below_low_watermark_(below_low_watermark), above_high_watermark_(above_high_watermark),
+        above_overflow_watermark_(above_overflow_watermark) {}
 
   // Override all functions from Instance which can result in changing the size
   // of the underlying buffer.
@@ -35,25 +37,29 @@ public:
   Api::IoCallUint64Result write(Network::IoHandle& io_handle) override;
   void postProcess() override { checkLowWatermark(); }
 
-  void setWatermarks(uint32_t watermark) { setWatermarks(watermark / 2, watermark); }
-  void setWatermarks(uint32_t low_watermark, uint32_t high_watermark);
+  void setWatermarks(uint32_t watermark) { setWatermarks(watermark / 2, watermark, watermark * 2); }
+  void setWatermarks(uint32_t low_watermark, uint32_t high_watermark, uint32_t overflow_watermark);
   uint32_t highWatermark() const { return high_watermark_; }
 
 private:
-  void checkHighWatermark();
+  void checkHighAndOverflowWatermarks();
   void checkLowWatermark();
 
   std::function<void()> below_low_watermark_;
   std::function<void()> above_high_watermark_;
+  std::function<void()> above_overflow_watermark_;
 
   // Used for enforcing buffer limits (off by default). If these are set to non-zero by a call to
   // setWatermarks() the watermark callbacks will be called as described above.
+  uint32_t overflow_watermark_{0};
   uint32_t high_watermark_{0};
   uint32_t low_watermark_{0};
-  // Tracks the latest state of watermark callbacks.
-  // True between the time above_high_watermark_ has been called until above_high_watermark_ has
-  // been called.
+  // Set to true after above_high_watermark_ has been called, and reset to false after
+  // below_low_watermark_ has been called.
   bool above_high_watermark_called_{false};
+  // Set to true after above_overflow_watermark_ has been called. Never reset, because we assume
+  // the stream will be forcibly closed in response.
+  bool above_overflow_watermark_called_{false};
 };
 
 using WatermarkBufferPtr = std::unique_ptr<WatermarkBuffer>;
@@ -62,8 +68,10 @@ class WatermarkBufferFactory : public WatermarkFactory {
 public:
   // Buffer::WatermarkFactory
   InstancePtr create(std::function<void()> below_low_watermark,
-                     std::function<void()> above_high_watermark) override {
-    return InstancePtr{new WatermarkBuffer(below_low_watermark, above_high_watermark)};
+                     std::function<void()> above_high_watermark,
+                     std::function<void()> above_overflow_watermark) override {
+    return InstancePtr{
+        new WatermarkBuffer(below_low_watermark, above_high_watermark, above_overflow_watermark)};
   }
 };
 

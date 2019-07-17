@@ -81,6 +81,9 @@ public:
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override;
   // Pass connection watermark events on to all the streams associated with that connection.
+  void onAboveWriteBufferOverflowWatermark() override {
+    codec_->onUnderlyingConnectionAboveWriteBufferOverflowWatermark();
+  }
   void onAboveWriteBufferHighWatermark() override {
     codec_->onUnderlyingConnectionAboveWriteBufferHighWatermark();
   }
@@ -274,6 +277,7 @@ private:
     void encodeData(Buffer::Instance& data, bool end_stream) override;
     void encodeTrailers(HeaderMapPtr&& trailers) override;
     void encodeMetadata(MetadataMapPtr&& metadata_map_ptr) override;
+    void onDecoderFilterAboveWriteBufferOverflowWatermark() override;
     void onDecoderFilterAboveWriteBufferHighWatermark() override;
     void onDecoderFilterBelowWriteBufferLowWatermark() override;
     void
@@ -358,6 +362,7 @@ private:
     void addEncodedData(Buffer::Instance& data, bool streaming) override;
     void injectEncodedDataToFilterChain(Buffer::Instance& data, bool end_stream) override;
     HeaderMap& addEncodedTrailers() override;
+    void onEncoderFilterAboveWriteBufferOverflowWatermark() override;
     void onEncoderFilterAboveWriteBufferHighWatermark() override;
     void onEncoderFilterBelowWriteBufferLowWatermark() override;
     void setEncoderBufferLimit(uint32_t limit) override { parent_.setBufferLimit(limit); }
@@ -448,6 +453,7 @@ private:
     // Http::StreamCallbacks
     void onResetStream(StreamResetReason reason,
                        absl::string_view transport_failure_reason) override;
+    void onAboveWriteBufferOverflowWatermark() override;
     void onAboveWriteBufferHighWatermark() override;
     void onBelowWriteBufferLowWatermark() override;
 
@@ -496,6 +502,7 @@ private:
 
     // Pass on watermark callbacks to watermark subscribers. This boils down to passing watermark
     // events for this stream and the downstream connection to the router filter.
+    void callOverflowWatermarkCallbacks();
     void callHighWatermarkCallbacks();
     void callLowWatermarkCallbacks();
 

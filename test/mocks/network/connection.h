@@ -21,6 +21,7 @@ public:
 
   // Network::ConnectionCallbacks
   MOCK_METHOD1(onEvent, void(Network::ConnectionEvent event));
+  MOCK_METHOD0(onAboveWriteBufferOverflowWatermark, void());
   MOCK_METHOD0(onAboveWriteBufferHighWatermark, void());
   MOCK_METHOD0(onBelowWriteBufferLowWatermark, void());
 };
@@ -29,6 +30,7 @@ class MockConnectionBase {
 public:
   void raiseEvent(Network::ConnectionEvent event);
   void raiseBytesSentCallbacks(uint64_t num_bytes);
+  void runOverflowWatermarkCallbacks();
   void runHighWatermarkCallbacks();
   void runLowWatermarkCallbacks();
 

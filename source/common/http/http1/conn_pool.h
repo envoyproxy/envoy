@@ -69,6 +69,7 @@ protected:
     void onResetStream(StreamResetReason, absl::string_view) override {
       parent_.parent_.onDownstreamReset(parent_);
     }
+    void onAboveWriteBufferOverflowWatermark() override {}
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 
@@ -92,6 +93,7 @@ protected:
     void onEvent(Network::ConnectionEvent event) override {
       parent_.onConnectionEvent(*this, event);
     }
+    void onAboveWriteBufferOverflowWatermark() override {}
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 

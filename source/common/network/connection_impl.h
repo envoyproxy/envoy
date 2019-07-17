@@ -137,6 +137,7 @@ protected:
 
   void onLowWatermark();
   void onHighWatermark();
+  void onOverflowWatermark();
 
   TransportSocketPtr transport_socket_;
   ConnectionSocketPtr socket_;

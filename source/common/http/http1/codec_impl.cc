@@ -332,7 +332,8 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, http_parser_type
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, http_parser_type type,
                                uint32_t max_headers_kb, bool strict_header_validation)
     : connection_(connection), output_buffer_([&]() -> void { this->onBelowLowWatermark(); },
-                                              [&]() -> void { this->onAboveHighWatermark(); }),
+                                              [&]() -> void { this->onAboveHighWatermark(); },
+                                              [&]() -> void { this->onAboveOverflowWatermark(); }),
       max_headers_kb_(max_headers_kb), strict_header_validation_(strict_header_validation) {
   output_buffer_.setWatermarks(connection.bufferLimit());
   http_parser_init(&parser_, type);
@@ -684,6 +685,11 @@ void ServerConnectionImpl::sendProtocolError() {
   }
 }
 
+void ServerConnectionImpl::onAboveOverflowWatermark() {
+  if (active_request_) {
+    active_request_->response_encoder_.runOverflowWatermarkCallbacks();
+  }
+}
 void ServerConnectionImpl::onAboveHighWatermark() {
   if (active_request_) {
     active_request_->response_encoder_.runHighWatermarkCallbacks();
@@ -808,6 +814,12 @@ void ClientConnectionImpl::onResetStream(StreamResetReason reason) {
     pending_responses_.clear();
     request_encoder_->runResetCallbacks(reason);
   }
+}
+
+void ClientConnectionImpl::onAboveOverflowWatermark() {
+  // This should never happen without an active stream/request.
+  ASSERT(!pending_responses_.empty());
+  request_encoder_->runOverflowWatermarkCallbacks();
 }
 
 void ClientConnectionImpl::onAboveHighWatermark() {

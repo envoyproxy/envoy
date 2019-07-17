@@ -55,7 +55,7 @@ ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_l
       pending_receive_buffer_high_watermark_called_(false),
       pending_send_buffer_high_watermark_called_(false), reset_due_to_messaging_error_(false) {
   if (buffer_limit > 0) {
-    setWriteBufferWatermarks(buffer_limit / 2, buffer_limit);
+    setWriteBufferWatermarks(buffer_limit / 2, buffer_limit, buffer_limit * 2);
   }
 }
 
@@ -169,6 +169,11 @@ void ConnectionImpl::StreamImpl::readDisable(bool disable) {
   }
 }
 
+void ConnectionImpl::StreamImpl::pendingRecvBufferOverflowWatermark() {
+  ENVOY_CONN_LOG(warn, "recv buffer overflow ", parent_.connection_);
+  resetStream(StreamResetReason::Overflow);
+}
+
 void ConnectionImpl::StreamImpl::pendingRecvBufferHighWatermark() {
   ENVOY_CONN_LOG(debug, "recv buffer over limit ", parent_.connection_);
   ASSERT(!pending_receive_buffer_high_watermark_called_);
@@ -186,6 +191,11 @@ void ConnectionImpl::StreamImpl::pendingRecvBufferLowWatermark() {
 void ConnectionImpl::StreamImpl::decodeHeaders() {
   maybeTransformUpgradeFromH2ToH1();
   decoder_->decodeHeaders(std::move(headers_), remote_end_stream_);
+}
+
+void ConnectionImpl::StreamImpl::pendingSendBufferOverflowWatermark() {
+  ENVOY_CONN_LOG(warn, "send buffer overflow ", parent_.connection_);
+  resetStream(StreamResetReason::Overflow);
 }
 
 void ConnectionImpl::StreamImpl::pendingSendBufferHighWatermark() {

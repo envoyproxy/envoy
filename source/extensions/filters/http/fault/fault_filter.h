@@ -111,7 +111,10 @@ public:
   /**
    * @param max_kbps maximum rate in KiB/s.
    * @param max_buffered_data maximum data to buffer before invoking the pause callback.
-   * @param pause_data_cb callback invoked when the limiter has buffered too much data.
+   * @param overflow_cb callback invoked when the limiter has buffered too much data despite
+   *                    previous backpressure.
+   * @param pause_data_cb callback invoked when the limiter has buffered enough data to necessitate
+   *                      backpressure.
    * @param resume_data_cb callback invoked when the limiter has gone under the buffer limit.
    * @param write_data_cb callback invoked to write data to the stream.
    * @param continue_cb callback invoked to continue the stream. This is only used to continue
@@ -120,7 +123,8 @@ public:
    * @param dispatcher the stream's dispatcher to use for creating timers.
    */
   StreamRateLimiter(uint64_t max_kbps, uint64_t max_buffered_data,
-                    std::function<void()> pause_data_cb, std::function<void()> resume_data_cb,
+                    std::function<void()> overflow_cb, std::function<void()> pause_data_cb,
+                    std::function<void()> resume_data_cb,
                     std::function<void(Buffer::Instance&, bool)> write_data_cb,
                     std::function<void()> continue_cb, TimeSource& time_source,
                     Event::Dispatcher& dispatcher);

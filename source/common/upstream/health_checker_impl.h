@@ -94,6 +94,7 @@ private:
     // Http::StreamCallbacks
     void onResetStream(Http::StreamResetReason reason,
                        absl::string_view transport_failure_reason) override;
+    void onAboveWriteBufferOverflowWatermark() override {}
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 
@@ -104,6 +105,7 @@ private:
       ConnectionCallbackImpl(HttpActiveHealthCheckSession& parent) : parent_(parent) {}
       // Network::ConnectionCallbacks
       void onEvent(Network::ConnectionEvent event) override { parent_.onEvent(event); }
+      void onAboveWriteBufferOverflowWatermark() override {}
       void onAboveWriteBufferHighWatermark() override {}
       void onBelowWriteBufferLowWatermark() override {}
 
@@ -226,6 +228,7 @@ private:
 
     // Network::ConnectionCallbacks
     void onEvent(Network::ConnectionEvent event) override { parent_.onEvent(event); }
+    void onAboveWriteBufferOverflowWatermark() override {}
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 
@@ -311,6 +314,7 @@ private:
     // Http::StreamCallbacks
     void onResetStream(Http::StreamResetReason reason,
                        absl::string_view transport_failure_reason) override;
+    void onAboveWriteBufferOverflowWatermark() override {}
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 
@@ -322,6 +326,7 @@ private:
       ConnectionCallbackImpl(GrpcActiveHealthCheckSession& parent) : parent_(parent) {}
       // Network::ConnectionCallbacks
       void onEvent(Network::ConnectionEvent event) override { parent_.onEvent(event); }
+      void onAboveWriteBufferOverflowWatermark() override {}
       void onAboveWriteBufferHighWatermark() override {}
       void onBelowWriteBufferLowWatermark() override {}
 

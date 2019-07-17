@@ -1649,6 +1649,11 @@ void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason, absl:
   connection_manager_.doDeferredStreamDestroy(*this);
 }
 
+void ConnectionManagerImpl::ActiveStream::onAboveWriteBufferOverflowWatermark() {
+  ENVOY_STREAM_LOG(debug, "Closing upstream stream due to downstream stream overflow.", *this);
+  callOverflowWatermarkCallbacks();
+}
+
 void ConnectionManagerImpl::ActiveStream::onAboveWriteBufferHighWatermark() {
   ENVOY_STREAM_LOG(debug, "Disabling upstream stream due to downstream stream watermark.", *this);
   callHighWatermarkCallbacks();
@@ -1670,6 +1675,12 @@ ConnectionManagerImpl::ActiveStream::requestHeadersForTags() const {
 
 bool ConnectionManagerImpl::ActiveStream::verbose() const {
   return connection_manager_.config_.tracingConfig()->verbose_;
+}
+
+void ConnectionManagerImpl::ActiveStream::callOverflowWatermarkCallbacks() {
+  for (auto watermark_callbacks : watermark_callbacks_) {
+    watermark_callbacks->onAboveWriteBufferOverflowWatermark();
+  }
 }
 
 void ConnectionManagerImpl::ActiveStream::callHighWatermarkCallbacks() {
@@ -1939,9 +1950,9 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::clearRouteCache() {
 }
 
 Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamDecoderFilter::createBuffer() {
-  auto buffer =
-      std::make_unique<Buffer::WatermarkBuffer>([this]() -> void { this->requestDataDrained(); },
-                                                [this]() -> void { this->requestDataTooLarge(); });
+  auto buffer = std::make_unique<Buffer::WatermarkBuffer>(
+      [this]() -> void { this->requestDataDrained(); },
+      [this]() -> void { this->requestDataTooLarge(); }, [this]() -> void { this->resetStream(); });
   buffer->setWatermarks(parent_.buffer_limit_);
   return buffer;
 }
@@ -2011,6 +2022,13 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::encodeTrailers(HeaderMapP
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::encodeMetadata(
     MetadataMapPtr&& metadata_map_ptr) {
   parent_.encodeMetadata(nullptr, std::move(metadata_map_ptr));
+}
+
+void ConnectionManagerImpl::ActiveStreamDecoderFilter::
+    onDecoderFilterAboveWriteBufferOverflowWatermark() {
+  ENVOY_STREAM_LOG(debug, "Closing downstream stream due to filter callbacks.", parent_);
+  // TODO(mergeconflict): Add a new flow control stat.
+  resetStream();
 }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::
@@ -2086,7 +2104,8 @@ bool ConnectionManagerImpl::ActiveStreamDecoderFilter::recreateStream() {
 
 Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamEncoderFilter::createBuffer() {
   auto buffer = new Buffer::WatermarkBuffer([this]() -> void { this->responseDataDrained(); },
-                                            [this]() -> void { this->responseDataTooLarge(); });
+                                            [this]() -> void { this->responseDataTooLarge(); },
+                                            [this]() -> void { this->resetStream(); });
   buffer->setWatermarks(parent_.buffer_limit_);
   return Buffer::WatermarkBufferPtr{buffer};
 }
@@ -2104,6 +2123,12 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::injectEncodedDataToFilter
 
 HeaderMap& ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedTrailers() {
   return parent_.addEncodedTrailers();
+}
+
+void ConnectionManagerImpl::ActiveStreamEncoderFilter::
+    onEncoderFilterAboveWriteBufferOverflowWatermark() {
+  ENVOY_STREAM_LOG(debug, "Closing upstream stream due to filter callbacks.", parent_);
+  parent_.callOverflowWatermarkCallbacks();
 }
 
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::

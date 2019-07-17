@@ -1404,7 +1404,8 @@ void Filter::UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream
     if (!buffered_request_body_) {
       buffered_request_body_ = std::make_unique<Buffer::WatermarkBuffer>(
           [this]() -> void { this->enableDataFromDownstream(); },
-          [this]() -> void { this->disableDataFromDownstream(); });
+          [this]() -> void { this->disableDataFromDownstream(); },
+          [this]() -> void { this->resetStream(); });
       buffered_request_body_->setWatermarks(parent_.buffer_limit_);
     }
 
@@ -1620,6 +1621,11 @@ void Filter::UpstreamRequest::clearRequestEncoder() {
     parent_.callbacks_->removeDownstreamWatermarkCallbacks(downstream_watermark_manager_);
   }
   request_encoder_ = nullptr;
+}
+
+void Filter::UpstreamRequest::DownstreamWatermarkManager::onAboveWriteBufferOverflowWatermark() {
+  // TODO(mergeconflict): Stats and logging?
+  parent_.resetStream();
 }
 
 void Filter::UpstreamRequest::DownstreamWatermarkManager::onAboveWriteBufferHighWatermark() {

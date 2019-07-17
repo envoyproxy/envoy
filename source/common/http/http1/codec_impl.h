@@ -162,6 +162,9 @@ public:
   Protocol protocol() override { return protocol_; }
   void shutdownNotice() override {} // Called during connection manager drain flow
   bool wantsToWrite() override { return false; }
+  void onUnderlyingConnectionAboveWriteBufferOverflowWatermark() override {
+    onAboveOverflowWatermark();
+  }
   void onUnderlyingConnectionAboveWriteBufferHighWatermark() override { onAboveHighWatermark(); }
   void onUnderlyingConnectionBelowWriteBufferLowWatermark() override { onBelowLowWatermark(); }
 
@@ -260,6 +263,11 @@ private:
   virtual void sendProtocolError() PURE;
 
   /**
+   * Called when output_buffer_ or the underlying connection exceed the "overflow" watermark.
+   */
+  virtual void onAboveOverflowWatermark() PURE;
+
+  /**
    * Called when output_buffer_ or the underlying connection go from below a low watermark to over
    * a high watermark.
    */
@@ -335,6 +343,7 @@ private:
   void onMessageComplete() override;
   void onResetStream(StreamResetReason reason) override;
   void sendProtocolError() override;
+  void onAboveOverflowWatermark() override;
   void onAboveHighWatermark() override;
   void onBelowLowWatermark() override;
 
@@ -376,6 +385,7 @@ private:
   void onMessageComplete() override;
   void onResetStream(StreamResetReason reason) override;
   void sendProtocolError() override {}
+  void onAboveOverflowWatermark() override;
   void onAboveHighWatermark() override;
   void onBelowLowWatermark() override;
 
