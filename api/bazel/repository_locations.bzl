@@ -10,8 +10,8 @@ OPENCENSUS_PROTO_SHA256 = "a4e87a1da21d1b3a16674332c3ee6e2689d52f3532e2ff8cb4a62
 PGV_GIT_SHA = "26db5cb7c01a67c6a2e21a832106406185530b2f"
 PGV_SHA256 = "6510cbcf69d99059c652ae2376f6240bc761d0b019cd962225f4f609be361e26"
 
-GOOGLEAPIS_GIT_SHA = "d642131a6e6582fc226caf9893cb7fe7885b3411"  # May 23, 2018
-GOOGLEAPIS_SHA = "16f5b2e8bf1e747a32f9a62e211f8f33c94645492e9bbd72458061d9a9de1f63"
+GOOGLEAPIS_GIT_SHA = "96d5a05171e99b6a2378eb0a3423f765351878b7"   # Jul 16, 2019
+GOOGLEAPIS_SHA = "a3b2f198e43969b9ec3d96fe4bc7a74191ab0c055f9c5cab716c0ed512d9cd49"
 
 PROMETHEUS_GIT_SHA = "99fa1f4be8e564e8a6b613da7fa6f46c9edafc6c"  # Nov 17, 2017
 PROMETHEUS_SHA = "783bdaf8ee0464b35ec0c8704871e1e72afa0005c3f3587f65d9d6694bf3911b"
@@ -28,7 +28,7 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "protoc-gen-validate-" + PGV_GIT_SHA,
         urls = ["https://github.com/envoyproxy/protoc-gen-validate/archive/" + PGV_GIT_SHA + ".tar.gz"],
     ),
-    googleapis = dict(
+    com_google_googleapis = dict(
         # TODO(dio): Consider writing a Skylark macro for importing Google API proto.
         sha256 = GOOGLEAPIS_SHA,
         strip_prefix = "googleapis-" + GOOGLEAPIS_GIT_SHA,

@@ -160,6 +160,7 @@ def envoy_dependencies(skip_targets = []):
     _python_deps()
     _cc_deps()
     _go_deps(skip_targets)
+
     api_dependencies()
 
 def _boringssl():
@@ -515,8 +516,6 @@ def _io_opencensus_cpp():
     location = REPOSITORY_LOCATIONS["io_opencensus_cpp"]
     http_archive(
         name = "io_opencensus_cpp",
-        patch_args = ["-p0"],
-        patches = ["@envoy//bazel/foreign_cc:io_opencensus_cpp.patch"],
         **location
     )
     native.bind(
