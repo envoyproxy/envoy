@@ -21,7 +21,11 @@ envoy_cc_test(
         "//source/common/http/http1:codec_lib",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/http:http_mocks",
+        "//test/mocks/init:init_mocks",
+        "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/protobuf:protobuf_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:upstream_mocks",
     ],
 )

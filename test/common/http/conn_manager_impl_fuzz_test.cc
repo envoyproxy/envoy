@@ -72,7 +72,7 @@ public:
   // Http::ConnectionManagerConfig
   const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
   ServerConnectionPtr createCodec(Network::Connection&, const Buffer::Instance&,
-                                  ServerConnectionCallbacks&) override {
+                                  ServerConnectionCallbacks&, const bool) override {
     return ServerConnectionPtr{codec_};
   }
   DateProvider& dateProvider() override { return date_provider_; }

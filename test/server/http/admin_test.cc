@@ -586,7 +586,7 @@ public:
         admin_(cpu_profile_path_, server_), request_headers_{{":path", "/"}},
         admin_filter_(admin_) {
     admin_.startHttpListener("/dev/null", address_out_path_,
-                             Network::Test::getCanonicalLoopbackAddress(GetParam()),
+                             Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
                              listener_scope_.createScope("listener.admin."));
     EXPECT_EQ(std::chrono::milliseconds(100), admin_.drainTimeout());
     admin_.tracingStats().random_sampling_.inc();
@@ -727,7 +727,7 @@ TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
   EXPECT_LOG_CONTAINS(
       "critical", "cannot open admin address output file " + bad_path + " for writing.",
       admin_bad_address_out_path.startHttpListener(
-          "/dev/null", bad_path, Network::Test::getCanonicalLoopbackAddress(GetParam()),
+          "/dev/null", bad_path, Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
           listener_scope_.createScope("listener.admin.")));
   EXPECT_FALSE(std::ifstream(bad_path));
 }

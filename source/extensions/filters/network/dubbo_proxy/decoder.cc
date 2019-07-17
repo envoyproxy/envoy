@@ -25,14 +25,14 @@ DecoderStateMachine::onDecodeStreamHeader(Buffer::Instance& buffer) {
     ENVOY_LOG(debug, "dubbo decoder: this is the {} heartbeat message", protocol_.name());
     buffer.drain(context->header_size());
     delegate_.onHeartbeat(metadata);
-    return DecoderStatus(ProtocolState::Done);
+    return {ProtocolState::Done};
   }
 
   active_stream_ = delegate_.newStream(metadata, context);
   ASSERT(active_stream_);
   context->message_origin_data().move(buffer, context->header_size());
 
-  return DecoderStatus(ProtocolState::OnDecodeStreamData);
+  return {ProtocolState::OnDecodeStreamData};
 }
 
 DecoderStateMachine::DecoderStatus
@@ -42,7 +42,7 @@ DecoderStateMachine::onDecodeStreamData(Buffer::Instance& buffer) {
   if (!protocol_.decodeData(buffer, active_stream_->context_, active_stream_->metadata_)) {
     ENVOY_LOG(debug, "dubbo decoder: need more data for {} serialization, current size {}",
               protocol_.serializer()->name(), buffer.length());
-    return DecoderStatus(ProtocolState::WaitForData);
+    return {ProtocolState::WaitForData};
   }
 
   active_stream_->context_->message_origin_data().move(buffer,
@@ -51,7 +51,7 @@ DecoderStateMachine::onDecodeStreamData(Buffer::Instance& buffer) {
   active_stream_ = nullptr;
 
   ENVOY_LOG(debug, "dubbo decoder: ends the deserialization of the message");
-  return DecoderStatus(ProtocolState::Done);
+  return {ProtocolState::Done};
 }
 
 DecoderStateMachine::DecoderStatus DecoderStateMachine::handleState(Buffer::Instance& buffer) {
