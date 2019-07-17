@@ -359,7 +359,7 @@ public:
   virtual bool shouldNormalizePath() const PURE;
 
   /**
-   * @return if the HttpConnectionManager should merge two or more adjucent slashes in the path into
+   * @return if the HttpConnectionManager should merge two or more adjacent slashes in the path into
    * one.
    */
   virtual bool shouldMergeSlashes() const PURE;
