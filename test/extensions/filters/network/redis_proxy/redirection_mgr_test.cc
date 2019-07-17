@@ -47,17 +47,20 @@ public:
     } else {
       MonotonicTime current_time = time_system_.monotonicTime();
       while (current_time < end_time) {
-        // Wait for all waiting threads to arrive. Wait on a separate condition variable that is
-        // signaled by each waiting thread.
-        while (nthreads_waiting_ < nthreads) {
+        {
           Thread::LockGuard lg(time_mutex_);
-          if (nthreads_waiting_ < nthreads) {
+          // Wait for all waiting threads to arrive. Wait on a separate condition variable that is
+          // signaled by each waiting thread.
+          while (nthreads_waiting_ < nthreads) {
             setter_wait_cv_.wait(time_mutex_);
           }
+          current_time += increment;
+          if (current_time > end_time) {
+            current_time = end_time;
+          }
+          time_system_.setMonotonicTime(current_time);
+          wait_cv_.notifyAll();
         }
-        time_system_.setMonotonicTime(current_time + increment);
-        current_time += increment;
-        wait_cv_.notifyAll();
         // Wait for the waiting threads to all reach this "exit" gate. This ensures that all threads
         // properly enter and exit the time-advancing loop without getting ahead or behind.
         while (nthreads_going_ < nthreads) {
@@ -79,9 +82,7 @@ public:
         // the notification.
         nthreads_waiting_++;
         setter_wait_cv_.notifyOne();
-        if (time_system_.monotonicTime() < end_time) {
-          wait_cv_.wait(time_mutex_);
-        }
+        wait_cv_.wait(time_mutex_);
         nthreads_waiting_--;
       }
       nthreads_going_++;
