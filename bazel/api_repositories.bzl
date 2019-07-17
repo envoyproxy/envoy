@@ -27,9 +27,9 @@ def envoy_api_dependencies():
 
     native.bind(
         name = "api_httpbody_protos",
-        actual = "@googleapis//:api_httpbody_protos",
+        actual = "@com_google_googleapis//google/api:httpbody_cc_proto",
     )
     native.bind(
         name = "http_api_protos",
-        actual = "@googleapis//:http_api_protos",
+        actual = "@com_google_googleapis//google/api:annotations_cc_proto",
     )
