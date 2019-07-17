@@ -57,8 +57,8 @@ InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_syste
                            ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
                            Filesystem::Instance& file_system,
                            std::unique_ptr<ProcessContext> process_context)
-    : secret_manager_(std::make_unique<Secret::SecretManagerImpl>()), shutdown_(false),
-      options_(options), time_source_(time_system), restarter_(restarter),
+    : secret_manager_(std::make_unique<Secret::SecretManagerImpl>()), workers_started_(false),
+      shutdown_(false), options_(options), time_source_(time_system), restarter_(restarter),
       start_time_(time(nullptr)), original_start_time_(start_time_), stats_store_(store),
       thread_local_(tls), api_(new Api::Impl(thread_factory, store, time_system, file_system)),
       dispatcher_(api_->allocateDispatcher()),
@@ -422,6 +422,7 @@ void InstanceImpl::initialize(const Options& options,
 void InstanceImpl::startWorkers() {
   listener_manager_->startWorkers(*guard_dog_);
   initialization_timer_->complete();
+  workers_started_ = true;
   // At this point we are ready to take traffic and all listening ports are up. Notify our parent
   // if applicable that they can stop listening and drain.
   restarter_.drainParentListeners();
@@ -614,11 +615,17 @@ void InstanceImpl::notifyCallbacksForStage(Stage stage, Event::PostCb completion
                                             delete cb;
                                           });
 
-  auto it2 = stage_completable_callbacks_.find(stage);
-  if (it2 != stage_completable_callbacks_.end()) {
-    ENVOY_LOG(info, "Notifying {} callback(s) with completion.", it2->second.size());
-    for (const StageCallbackWithCompletion& callback : it2->second) {
-      callback([cb_guard] { (*cb_guard)(); });
+  // Registrations which take a completion callback are typically implemented by executing a
+  // callback on all worker threads using Slot::runOnAllThreads which will hang indefinitely if
+  // worker threads have not been started so we need to skip notifications if envoy is shutdown
+  // early before workers have started.
+  if (workers_started_) {
+    auto it2 = stage_completable_callbacks_.find(stage);
+    if (it2 != stage_completable_callbacks_.end()) {
+      ENVOY_LOG(info, "Notifying {} callback(s) with completion.", it2->second.size());
+      for (const StageCallbackWithCompletion& callback : it2->second) {
+        callback([cb_guard] { (*cb_guard)(); });
+      }
     }
   }
 }
