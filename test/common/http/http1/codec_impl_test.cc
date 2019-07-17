@@ -49,9 +49,8 @@ public:
   }
 
   void initialize() {
-    codec_ =
-        std::make_unique<ServerConnectionImpl>(connection_, callbacks_, codec_settings_,
-                                               max_request_headers_kb_);
+    codec_ = std::make_unique<ServerConnectionImpl>(connection_, callbacks_, codec_settings_,
+                                                    max_request_headers_kb_);
   }
 
   NiceMock<Network::MockConnection> connection_;
@@ -85,9 +84,8 @@ void Http1ServerConnectionImplTest::expect400(Protocol p, bool allow_absolute_ur
 
   if (allow_absolute_url) {
     codec_settings_.allow_absolute_url_ = allow_absolute_url;
-    codec_ =
-        std::make_unique<ServerConnectionImpl>(connection_, callbacks_, codec_settings_,
-                                               max_request_headers_kb_);
+    codec_ = std::make_unique<ServerConnectionImpl>(connection_, callbacks_, codec_settings_,
+                                                    max_request_headers_kb_);
   }
 
   Http::MockStreamDecoder decoder;
@@ -106,9 +104,8 @@ void Http1ServerConnectionImplTest::expectHeadersTest(Protocol p, bool allow_abs
   // Make a new 'codec' with the right settings
   if (allow_absolute_url) {
     codec_settings_.allow_absolute_url_ = allow_absolute_url;
-    codec_ =
-        std::make_unique<ServerConnectionImpl>(connection_, callbacks_, codec_settings_,
-                                               max_request_headers_kb_);
+    codec_ = std::make_unique<ServerConnectionImpl>(connection_, callbacks_, codec_settings_,
+                                                    max_request_headers_kb_);
   }
 
   Http::MockStreamDecoder decoder;
@@ -861,10 +858,7 @@ public:
                                 generator_, validation_visitor_, *api_)});
   }
 
-  void initialize() {
-    codec_ =
-        std::make_unique<ClientConnectionImpl>(connection_, callbacks_);
-  }
+  void initialize() { codec_ = std::make_unique<ClientConnectionImpl>(connection_, callbacks_); }
 
   NiceMock<Network::MockConnection> connection_;
   NiceMock<Http::MockConnectionCallbacks> callbacks_;

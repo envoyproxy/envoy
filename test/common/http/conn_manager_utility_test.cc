@@ -44,8 +44,7 @@ public:
   // Http::ConnectionManagerConfig
   ServerConnectionPtr createCodec(Network::Connection& connection, const Buffer::Instance& instance,
                                   ServerConnectionCallbacks& callbacks) override {
-    return ServerConnectionPtr{
-        createCodec_(connection, instance, callbacks)};
+    return ServerConnectionPtr{createCodec_(connection, instance, callbacks)};
   }
 
   MOCK_METHOD0(accessLogs, const std::list<AccessLog::InstanceSharedPtr>&());
