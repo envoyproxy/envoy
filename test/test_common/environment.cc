@@ -234,6 +234,14 @@ std::string TestEnvironment::substitute(const std::string& str,
     break;
   }
 
+  // Substitute socket options arguments.
+  const std::regex sol_socket_regex(R"(\{\{ sol_socket \}\})");
+  out_json_string =
+      std::regex_replace(out_json_string, sol_socket_regex, std::to_string(SOL_SOCKET));
+  const std::regex so_reuseport_regex(R"(\{\{ so_reuseport \}\})");
+  out_json_string =
+      std::regex_replace(out_json_string, so_reuseport_regex, std::to_string(SO_REUSEPORT));
+
   return out_json_string;
 }
 

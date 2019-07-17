@@ -23,11 +23,10 @@ namespace Stats {
  * be created utilizing a single fixed-size block suitable for
  * shared-memory, or in the heap, allowing for pointers and sharing of
  * substrings, with an opportunity for reduced memory consumption.
- * TODO(fredlas) this interface can be deleted now that the shared memory version is gone.
  */
-class StatDataAllocator {
+class Allocator {
 public:
-  virtual ~StatDataAllocator() = default;
+  virtual ~Allocator() = default;
 
   /**
    * @param name the full name of the stat.

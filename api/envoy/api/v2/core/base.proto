@@ -7,6 +7,8 @@ option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.api.v2.core";
 option go_package = "core";
 
+import "envoy/api/v2/core/http_uri.proto";
+
 import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
@@ -184,6 +186,28 @@ message DataSource {
 
     // String inlined in the configuration.
     string inline_string = 3 [(validate.rules).string.min_bytes = 1];
+  }
+}
+
+// The message specifies how to fetch data from remote and how to verify it.
+message RemoteDataSource {
+  // The HTTP URI to fetch the remote data.
+  HttpUri http_uri = 1 [(validate.rules).message.required = true];
+
+  // SHA256 string for verifying data.
+  string sha256 = 2 [(validate.rules).string.min_bytes = 1];
+}
+
+// Async data source which support async data fetch.
+message AsyncDataSource {
+  oneof specifier {
+    option (validate.required) = true;
+
+    // Local async data source.
+    DataSource local = 1;
+
+    // Remote async data source.
+    RemoteDataSource remote = 2;
   }
 }
 

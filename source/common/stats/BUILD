@@ -9,9 +9,9 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "heap_stat_data_lib",
-    srcs = ["heap_stat_data.cc"],
-    hdrs = ["heap_stat_data.h"],
+    name = "allocator_lib",
+    srcs = ["allocator_impl.cc"],
+    hdrs = ["allocator_impl.h"],
     deps = [
         ":metric_impl_lib",
         ":stat_merger_lib",
@@ -51,7 +51,7 @@ envoy_cc_library(
         ":stats_lib",
         ":store_impl_lib",
         "//include/envoy/stats:stats_macros",
-        "//source/common/stats:heap_stat_data_lib",
+        "//source/common/stats:allocator_lib",
     ],
 )
 
@@ -202,7 +202,7 @@ envoy_cc_library(
     srcs = ["thread_local_store.cc"],
     hdrs = ["thread_local_store.h"],
     deps = [
-        ":heap_stat_data_lib",
+        ":allocator_lib",
         ":null_counter_lib",
         ":null_gauge_lib",
         ":scope_prefixer_lib",
