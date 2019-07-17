@@ -8,5 +8,8 @@
 .ijwb
 *.pyc
 tags
+/tmp
+*.tulsiconf-user
+tulsi-workspace
 .vscode
-/tmp/
+*.xcodeproj

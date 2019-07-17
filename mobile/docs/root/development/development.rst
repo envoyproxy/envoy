@@ -10,3 +10,4 @@ developing Envoy Mobile.
   :maxdepth: 2
 
   performance/performance
+  tools/tools
