@@ -1,0 +1,234 @@
+static_resources {   listeners {     name: "                                   "     address {       socket_address {         address: "       "         port_value: 2048         resolver_name: " "         ipv4_compat: true       }     }     filter_chains {       filter_chain_match {         transport_protocol: "         "         server_names: " "         server_names: " "       }     }     filter_chains {       filter_chain_match {         transport_protocol: " "         server_names: " "         server_names: " "         server_names: " "         server_names: " "         server_names: " "         server_names: " "         server_names: " "         server_names: " "         server_names: " "         server_names: " "         server_names: ""         server_names: " "         server_names: " "         server_names: " "       }     }     filter_chains {       filter_chain_match {         transport_protocol: " "         server_names: " "         server_names: " "         server_names: " "         server_names: " "         server_names: " "         server_names: " "         server_names: " "         server_names: " "         server_names: " "         server_names: ")"
+        server_names: ""
+        server_names: "l"
+        server_names: "?"
+        server_names: "l"
+      }
+    }
+    filter_chains {
+    }
+  }
+  clusters {
+    name: "%"
+    connect_timeout {
+      seconds: 2304
+    }
+    per_connection_buffer_limit_bytes {
+      value: 16
+    }
+    lb_policy: RING_HASH
+    hosts {
+      pipe {
+        path: "zz"
+      }
+    }
+    hosts {
+      pipe {
+        path: "1"
+      }
+    }
+    hosts {
+      pipe {
+        path: "p  t\000\000"
+      }
+    }
+    hosts {
+      pipe {
+        path: "&"
+      }
+    }
+    hosts {
+      pipe {
+        path: "("
+      }
+    }
+    hosts {
+      pipe {
+        path: "5"
+      }
+    }
+    hosts {
+      pipe {
+        path: "?"
+      }
+    }
+    hosts {
+      pipe {
+        path: "P"
+      }
+    }
+    hosts {
+      pipe {
+        path: "p"
+      }
+    }
+    hosts {
+      pipe {
+        path: "d"
+      }
+    }
+    hosts {
+      pipe {
+        path: "#"
+      }
+    }
+    hosts {
+      pipe {
+        path: "]"
+      }
+    }
+    hosts {
+      pipe {
+        path: "/"
+      }
+    }
+    hosts {
+      pipe {
+        path: "1"
+      }
+    }
+    hosts {
+      pipe {
+        path: " "
+      }
+    }
+    hosts {
+      pipe {
+        path: "z"
+      }
+    }
+    hosts {
+      pipe {
+        path: "#"
+      }
+    }
+    hosts {
+      pipe {
+        path: " "
+      }
+    }
+    hosts {
+      pipe {
+        path: "5"
+      }
+    }
+    hosts {
+      pipe {
+        path: "1"
+      }
+    }
+    hosts {
+      pipe {
+        path: "p"
+      }
+    }
+    hosts {
+      pipe {
+        path: "9"
+      }
+    }
+    hosts {
+      pipe {
+        path: "z"
+      }
+    }
+    hosts {
+      pipe {
+        path: ")"
+      }
+    }
+    hosts {
+      pipe {
+        path: ";"
+      }
+    }
+    hosts {
+      pipe {
+        path: "#"
+      }
+    }
+    hosts {
+      pipe {
+        path: "log_\000\000\000202"
+      }
+    }
+    hosts {
+      pipe {
+        path: "("
+      }
+    }
+    hosts {
+      pipe {
+        path: "#"
+      }
+    }
+    hosts {
+      pipe {
+        path: "v"
+      }
+    }
+    hosts {
+      pipe {
+        path: "#"
+      }
+    }
+    hosts {
+      pipe {
+        path: "2"
+      }
+    }
+    hosts {
+      pipe {
+        path: "1"
+      }
+    }
+    hosts {
+      pipe {
+        path: "("
+      }
+    }
+    hosts {
+      pipe {
+        path: "("
+      }
+    }
+    tls_context {
+      sni: "mane"
+      allow_renegotiation: true
+    }
+    dns_lookup_family: V4_ONLY
+    outlier_detection {
+    }
+    metadata {
+      filter_metadata {
+        key: ""
+        value {
+        }
+      }
+    }
+    upstream_connection_options {
+    }
+  }
+}
+cluster_manager {
+  load_stats_config {
+    api_type: GRPC
+    grpc_services {
+      envoy_grpc {
+        cluster_name: "%"
+      }
+      initial_metadata {
+        key: "routu_c"
+      }
+    }
+  }
+}
+admin {
+  access_log_path: "1"
+  profile_path: "2"
+  address {
+    pipe {
+      path: ";"
+    }
+  }
+}

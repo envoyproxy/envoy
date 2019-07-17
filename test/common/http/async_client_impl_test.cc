@@ -908,6 +908,18 @@ TEST_F(AsyncClientImplTest, RdsGettersTest) {
   EXPECT_CALL(stream_callbacks_, onReset());
 }
 
+// Test oss-fuzz issue #11036, where a crash happened in sendHeaders() if local address wasn't set
+// and XFF was used.
+TEST_F(AsyncClientImplTest, XffTest) {
+  TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  AsyncClient::Stream* stream =
+      client_.start(stream_callbacks_, AsyncClient::StreamOptions().setSendXff(true));
+  ON_CALL(local_info_, address()).WillByDefault(Return(nullptr));
+  stream->sendHeaders(headers, true);
+  EXPECT_CALL(stream_callbacks_, onReset());
+}
+
 } // namespace
 
 // Must not be in anonymous namespace for friend to work.
