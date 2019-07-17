@@ -127,10 +127,12 @@ TEST_F(HttpInspectorTest, InvalidHttpMethod) {
         return Api::SysCallSizeResult{ssize_t(header.size()), 0};
       }));
 
-  EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
+  const std::vector<absl::string_view> alpn_protos{absl::string_view("http/1.1")};
+
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
   EXPECT_CALL(cb_, continueFilterChain(true));
   file_event_callback_(Event::FileReadyType::Read);
-  EXPECT_EQ(1, cfg_->stats().http_not_found_.value());
+  EXPECT_EQ(1, cfg_->stats().http11_found_.value());
 }
 
 TEST_F(HttpInspectorTest, UnsupportedHttpProtocol) {

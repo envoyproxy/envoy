@@ -111,11 +111,15 @@ void Filter::parseHttpHeader(absl::string_view data) {
     absl::string_view request_uri = data.substr(spaces[0] + 1, spaces[1] - spaces[0] - 1);
     absl::string_view http_version = data.substr(spaces[1] + 1, id - spaces[1] - 1);
 
-    if (httpMethods().count(method) == 0 || httpProtocols().count(http_version) == 0) {
-      ENVOY_LOG(trace, "http inspector: method: {} or protocol: {} not found", method,
-                http_version);
+    if (httpProtocols().count(http_version) == 0 || method.empty()) {
+      ENVOY_LOG(trace, "http inspector: protocol: {} or method: {} not valid", http_version,
+                method);
       done(false);
       return;
+    }
+
+    if (httpMethods().count(method) == 0) {
+      ENVOY_LOG(trace, "http inspector: detect unknown method: {}", method);
     }
 
     ENVOY_LOG(trace, "http inspector: method: {}, request uri: {}, protocol: {}", method,
