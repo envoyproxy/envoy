@@ -11,7 +11,7 @@ jobs:
   container: envoy-build
   steps:
   - bash: |
-      echo "disk space at begining of build:"
+      echo "disk space at beginning of build:"
       df -h
 
   - script: ci/do_ci.sh bazel.release
