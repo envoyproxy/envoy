@@ -200,9 +200,8 @@ void DynamoFilter::chargeUnProcessedKeysStats(const Json::Object& json_body) {
   // complete apart of the batch operation. Only the table names will be logged for errors.
   std::vector<std::string> unprocessed_tables = RequestParser::parseBatchUnProcessedKeys(json_body);
   for (const std::string& unprocessed_table : unprocessed_tables) {
-    Stats::StatNameManagedStorage unprocessed_table_name(unprocessed_table, stats_->symbolTable());
     stats_
-        ->counter({stats_->error_, unprocessed_table_name.statName(),
+        ->counter({stats_->error_, stats_->getStatName(unprocessed_table),
                    stats_->batch_failure_unprocessed_keys_})
         .inc();
   }

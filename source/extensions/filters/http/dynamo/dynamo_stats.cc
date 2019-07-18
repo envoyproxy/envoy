@@ -1,11 +1,14 @@
 #include "extensions/filters/http/dynamo/dynamo_stats.h"
 
+#include <iostream>
 #include <memory>
 #include <string>
 
 #include "envoy/stats/scope.h"
 
 #include "common/stats/symbol_table_impl.h"
+
+#include "extensions/filters/http/dynamo/dynamo_request_parser.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -28,6 +31,16 @@ DynamoStats::DynamoStats(Stats::Scope& scope, const std::string& prefix)
     upstream_rq_total_groups_[i] = pool_.add(fmt::format("upstream_rq_total_{}xx", i));
     upstream_rq_time_groups_[i] = pool_.add(fmt::format("upstream_rq_time_{}xx", i));
   }
+  RequestParser::forEachStatString([this](const std::string& str) {
+    // Thread annotation does not realize this function is only called from the
+    // constructor, so we need to lock the mutex. It's easier to just do that
+    // and it's no real penalty.
+    absl::MutexLock lock(&mutex_);
+    builtin_stat_names_[str] = pool_.add(str);
+  });
+  builtin_stat_names_[""] = Stats::StatName();
+
+  // TODO(jmarantz): should we also learn some 'time' and 'total' stat-names for 200, 404, 503 etc?
 }
 
 Stats::SymbolTable::StoragePtr DynamoStats::addPrefix(const std::vector<Stats::StatName>& names) {
@@ -70,20 +83,29 @@ Stats::Counter& DynamoStats::buildPartitionStatCounter(const std::string& table_
 
 size_t DynamoStats::groupIndex(uint64_t status) {
   size_t index = status / 100;
-  if (index > 5) {
+  if (index >= NumGroupEntries) {
     index = 0; // status-code 600 or higher is unknown.
   }
   return index;
 }
 
 Stats::StatName DynamoStats::getStatName(const std::string& str) {
+  // We have been presented with a string to when composing a stat. The Dynamo
+  // system has a few well-known names that we have saved during construction,
+  // and we can access StatNames for those without a lock.
   auto iter = builtin_stat_names_.find(str);
   if (iter != builtin_stat_names_.end()) {
     return iter->second;
   }
+
+  // However, some of the names come from json data in requests, so we need
+  // to learn these, and we'll need to take a lock in this structure to see
+  // if we already have allocated a StatName for such names. If we haven't,
+  // then we'll have to take the more-likely-contented symbol-table lock to
+  // allocate one, which we'll then remember in dynamic_stat_names_.
   absl::MutexLock lock(&mutex_);
   Stats::StatName& stat_name = dynamic_stat_names_[str];
-  if (stat_name.empty()) {
+  if (stat_name.empty()) { // Note that builtin_stat_names_ already has one for "".
     stat_name = pool_.add(str);
   }
   return stat_name;

@@ -65,8 +65,11 @@ public:
   const Stats::StatName upstream_rq_time_;
   const Stats::StatName upstream_rq_total_;
   const Stats::StatName upstream_rq_unknown_;
-  Stats::StatName upstream_rq_total_groups_[6];
-  Stats::StatName upstream_rq_time_groups_[6];
+
+  // Keep group codes for HTTP status codes through the 500s.
+  static constexpr size_t NumGroupEntries = 6;
+  Stats::StatName upstream_rq_total_groups_[NumGroupEntries];
+  Stats::StatName upstream_rq_time_groups_[NumGroupEntries];
 };
 using DynamoStatsSharedPtr = std::shared_ptr<DynamoStats>;
 
