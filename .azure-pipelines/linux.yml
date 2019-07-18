@@ -48,7 +48,8 @@ jobs:
   - task: PublishBuildArtifacts@1
     inputs:
       pathtoPublish: "$(Build.StagingDirectory)/envoy"
-      artifactName: 'envoy'
+      artifactName: $(CI_TARGET)
+
 - job: format
   dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
   pool:
