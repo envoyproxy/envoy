@@ -12,11 +12,11 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Dynamo {
 
-struct DynamoStats {
+class DynamoStats {
+public:
   DynamoStats(Stats::Scope& scope, const std::string& prefix);
   Stats::SymbolTable& symbolTable() { return scope_.symbolTable(); }
 
-  Stats::SymbolTable::StoragePtr addPrefix(const std::vector<Stats::StatName>& names);
   Stats::Counter& counter(const std::vector<Stats::StatName>& names);
   Stats::Histogram& histogram(const std::vector<Stats::StatName>& names);
 
@@ -35,17 +35,22 @@ struct DynamoStats {
                                             const std::string& operation,
                                             const std::string& partition_id);
 
-  static size_t groupIndex(uint64_t status) {
-    size_t index = status / 100;
-    if (index > 5) {
-      index = 0;  // status-code 600 or higher is unknown.
-    }
-    return index;
-  }
+  static size_t groupIndex(uint64_t status);
+
+  Stats::StatName getStatName(const std::string& str);
+
+private:
+  Stats::SymbolTable::StoragePtr addPrefix(const std::vector<Stats::StatName>& names);
 
   Stats::Scope& scope_;
-  Stats::StatNamePool pool_;
+  Stats::StatNamePool pool_ GUARDED_BY(mutex_);
   const Stats::StatName prefix_;
+  absl::Mutex mutex_;
+  using StringStatNameMap = absl::flat_hash_map<std::string, Stats::StatName>;
+  StringStatNameMap builtin_stat_names_;
+  StringStatNameMap dynamic_stat_names_ GUARDED_BY(mutex_);
+
+public:
   const Stats::StatName batch_failure_unprocessed_keys_;
   const Stats::StatName capacity_;
   const Stats::StatName empty_response_body_;

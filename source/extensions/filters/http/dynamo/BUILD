@@ -55,6 +55,7 @@ envoy_cc_library(
     srcs = ["dynamo_stats.cc"],
     hdrs = ["dynamo_stats.h"],
     deps = [
+        ":dynamo_request_parser_lib",
         "//include/envoy/stats:stats_interface",
         "//source/common/stats:symbol_table_lib",
     ],

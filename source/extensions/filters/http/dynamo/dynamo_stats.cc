@@ -1,10 +1,11 @@
+#include "extensions/filters/http/dynamo/dynamo_stats.h"
+
 #include <memory>
 #include <string>
 
 #include "envoy/stats/scope.h"
 
 #include "common/stats/symbol_table_impl.h"
-#include "extensions/filters/http/dynamo/dynamo_stats.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -12,21 +13,14 @@ namespace HttpFilters {
 namespace Dynamo {
 
 DynamoStats::DynamoStats(Stats::Scope& scope, const std::string& prefix)
-    : scope_(scope),
-      pool_(scope.symbolTable()),
-      prefix_(pool_.add(prefix + "dynamodb")),
+    : scope_(scope), pool_(scope.symbolTable()), prefix_(pool_.add(prefix + "dynamodb")),
       batch_failure_unprocessed_keys_(pool_.add("BatchFailureUnprocessedKeys")),
-      capacity_(pool_.add("capacity")),
-      empty_response_body_(pool_.add("empty_response_body")),
-      error_(pool_.add("error")),
-      invalid_req_body_(pool_.add("invalid_req_body")),
+      capacity_(pool_.add("capacity")), empty_response_body_(pool_.add("empty_response_body")),
+      error_(pool_.add("error")), invalid_req_body_(pool_.add("invalid_req_body")),
       invalid_resp_body_(pool_.add("invalid_resp_body")),
-      multiple_tables_(pool_.add("multiple_tables")),
-      no_table_(pool_.add("no_table")),
-      operation_missing_(pool_.add("operation_missing")),
-      table_(pool_.add("table")),
-      table_missing_(pool_.add("table_missing")),
-      upstream_rq_time_(pool_.add("upstream_rq_time")),
+      multiple_tables_(pool_.add("multiple_tables")), no_table_(pool_.add("no_table")),
+      operation_missing_(pool_.add("operation_missing")), table_(pool_.add("table")),
+      table_missing_(pool_.add("table_missing")), upstream_rq_time_(pool_.add("upstream_rq_time")),
       upstream_rq_total_(pool_.add("upstream_rq_total")) {
   upstream_rq_total_groups_[0] = pool_.add("upstream_rq_total_unknown");
   upstream_rq_time_groups_[0] = pool_.add("upstream_rq_time_unknown");
@@ -63,18 +57,37 @@ Stats::Histogram& DynamoStats::histogram(const std::vector<Stats::StatName>& nam
  * truncate the table name to
  * fit the size requirements.
  */
-Stats::Counter& DynamoStats::buildPartitionStatCounter(
-    const std::string& table_name, const std::string& operation, const std::string& partition_id) {
+Stats::Counter& DynamoStats::buildPartitionStatCounter(const std::string& table_name,
+                                                       const std::string& operation,
+                                                       const std::string& partition_id) {
   // Use the last 7 characters of the partition id.
   absl::string_view id_last_7 = absl::string_view(partition_id).substr(partition_id.size() - 7);
-  Stats::StatNamePool pool(symbolTable());
-  const Stats::SymbolTable::StoragePtr stat_name_storage = addPrefix({
-      table_, pool_.add(table_name), capacity_, pool.add(operation),
-      pool.add(absl::StrCat("__partition_id=", id_last_7))
-    });
+  const Stats::SymbolTable::StoragePtr stat_name_storage =
+      addPrefix({table_, getStatName(table_name), capacity_, getStatName(operation),
+                 getStatName(absl::StrCat("__partition_id=", id_last_7))});
   return scope_.counterFromStatName(Stats::StatName(stat_name_storage.get()));
 }
 
+size_t DynamoStats::groupIndex(uint64_t status) {
+  size_t index = status / 100;
+  if (index > 5) {
+    index = 0; // status-code 600 or higher is unknown.
+  }
+  return index;
+}
+
+Stats::StatName DynamoStats::getStatName(const std::string& str) {
+  auto iter = builtin_stat_names_.find(str);
+  if (iter != builtin_stat_names_.end()) {
+    return iter->second;
+  }
+  absl::MutexLock lock(&mutex_);
+  Stats::StatName& stat_name = dynamic_stat_names_[str];
+  if (stat_name.empty()) {
+    stat_name = pool_.add(str);
+  }
+  return stat_name;
+}
 
 } // namespace Dynamo
 } // namespace HttpFilters

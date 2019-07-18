@@ -177,10 +177,11 @@ void DynamoFilter::chargeStatsPerEntity(const std::string& entity, const std::st
 
   size_t group_index = DynamoStats::groupIndex(status);
   Stats::StatNamePool pool(stats_->symbolTable());
-  const Stats::StatName entity_type_name = pool.add(entity_type);
-  const Stats::StatName entity_name = pool.add(entity);
-  const Stats::StatName total_name = pool.add(fmt::format("upstream_rq_total_{}", status));
-  const Stats::StatName time_name = pool.add(fmt::format("upstream_rq_time_{}", status));
+  const Stats::StatName entity_type_name = stats_->getStatName(entity_type);
+  const Stats::StatName entity_name = stats_->getStatName(entity);
+  const Stats::StatName total_name =
+      stats_->getStatName(absl::StrCat("upstream_rq_total_", status));
+  const Stats::StatName time_name = stats_->getStatName(absl::StrCat("upstream_rq_time_", status));
 
   stats_->counter({entity_type_name, entity_name, stats_->upstream_rq_total_}).inc();
   const Stats::StatName total_group = stats_->upstream_rq_total_groups_[group_index];
@@ -188,7 +189,7 @@ void DynamoFilter::chargeStatsPerEntity(const std::string& entity, const std::st
   stats_->counter({entity_type_name, entity_name, total_name}).inc();
 
   stats_->histogram({entity_type_name, entity_name, stats_->upstream_rq_time_})
-          .recordValue(latency.count());
+      .recordValue(latency.count());
   const Stats::StatName time_group = stats_->upstream_rq_time_groups_[group_index];
   stats_->histogram({entity_type_name, entity_name, time_group}).recordValue(latency.count());
   stats_->histogram({entity_type_name, entity_name, time_name}).recordValue(latency.count());
@@ -200,8 +201,10 @@ void DynamoFilter::chargeUnProcessedKeysStats(const Json::Object& json_body) {
   std::vector<std::string> unprocessed_tables = RequestParser::parseBatchUnProcessedKeys(json_body);
   for (const std::string& unprocessed_table : unprocessed_tables) {
     Stats::StatNameManagedStorage unprocessed_table_name(unprocessed_table, stats_->symbolTable());
-    stats_->counter({stats_->error_, unprocessed_table_name.statName(),
-                     stats_->batch_failure_unprocessed_keys_}).inc();
+    stats_
+        ->counter({stats_->error_, unprocessed_table_name.statName(),
+                   stats_->batch_failure_unprocessed_keys_})
+        .inc();
   }
 }
 
@@ -209,13 +212,13 @@ void DynamoFilter::chargeFailureSpecificStats(const Json::Object& json_body) {
   std::string error_type = RequestParser::parseErrorType(json_body);
 
   if (!error_type.empty()) {
-    Stats::StatNamePool pool(stats_->symbolTable());
     if (table_descriptor_.table_name.empty()) {
-      stats_->counter({stats_->error_, stats_->no_table_, pool.add(error_type)}).inc();
+      stats_->counter({stats_->error_, stats_->no_table_, stats_->getStatName(error_type)}).inc();
     } else {
-      stats_->counter({stats_->error_,
-                       pool.add(table_descriptor_.table_name),
-                       pool.add(error_type)}).inc();
+      stats_
+          ->counter({stats_->error_, stats_->getStatName(table_descriptor_.table_name),
+                     stats_->getStatName(error_type)})
+          .inc();
     }
   } else {
     stats_->counter({stats_->empty_response_body_}).inc();
@@ -230,8 +233,10 @@ void DynamoFilter::chargeTablePartitionIdStats(const Json::Object& json_body) {
   std::vector<RequestParser::PartitionDescriptor> partitions =
       RequestParser::parsePartitions(json_body);
   for (const RequestParser::PartitionDescriptor& partition : partitions) {
-    stats_->buildPartitionStatCounter(
-        table_descriptor_.table_name, operation_, partition.partition_id_).add(partition.capacity_);
+    stats_
+        ->buildPartitionStatCounter(table_descriptor_.table_name, operation_,
+                                    partition.partition_id_)
+        .add(partition.capacity_);
   }
 }
 

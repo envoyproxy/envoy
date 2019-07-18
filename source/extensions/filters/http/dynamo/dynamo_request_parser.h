@@ -97,6 +97,13 @@ public:
    */
   static std::vector<PartitionDescriptor> parsePartitions(const Json::Object& json_data);
 
+  using StringFn = std::function<void(const std::string)>;
+
+  /**
+   * Calls a function for every string that may be included as a token in a stat.
+   */
+  static void forEachStatString(const StringFn& fn);
+
 private:
   static const Http::LowerCaseString X_AMZ_TARGET;
   static const std::vector<std::string> SINGLE_TABLE_OPERATIONS;
