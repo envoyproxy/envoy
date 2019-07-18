@@ -11,6 +11,8 @@ _CLANG_ENV = {
     "BAZEL_COMPILER": "clang",
     "BAZEL_LINKLIBS": "-l%:libstdc++.a",
     "BAZEL_LINKOPTS": "-lm:-static-libgcc",
+    "BAZEL_USE_LLVM_NATIVE_COVERAGE": "1",
+    "GCOV": "llvm-profdata",
     "CC": "clang",
     "CXX": "clang++",
     "PATH": "/usr/sbin:/usr/bin:/sbin:/bin:/usr/lib/llvm-8/bin",

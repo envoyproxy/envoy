@@ -91,7 +91,7 @@ cc_toolchain_config(
         "cpp": "/usr/bin/cpp",
         "gcc": "/usr/lib/llvm-8/bin/clang",
         "dwp": "/usr/bin/dwp",
-        "gcov": "/usr/bin/gcov",
+        "gcov": "/usr/lib/llvm-8/bin/llvm-profdata",
         "nm": "/usr/bin/nm",
         "objcopy": "/usr/bin/objcopy",
         "objdump": "/usr/bin/objdump",
@@ -124,8 +124,8 @@ cc_toolchain_config(
     "-D__DATE__=\"redacted\"",
     "-D__TIMESTAMP__=\"redacted\"",
     "-D__TIME__=\"redacted\""],
-    coverage_compile_flags = ["--coverage"],
-    coverage_link_flags = ["--coverage"],
+    coverage_compile_flags = ["-fprofile-instr-generate",  "-fcoverage-mapping"],
+    coverage_link_flags = ["-fprofile-instr-generate"],
     supports_start_end_lib = True,
 )
 
