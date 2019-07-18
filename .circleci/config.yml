@@ -98,6 +98,31 @@ jobs:
              ci/do_circle_ci.sh bazel.clang_tidy
            no_output_timeout: 60m
 
+   build_image:
+     docker:
+       - image: circleci/python:3.7
+         environment:
+           # See comment in do_circle_ci.sh for why we do this.
+           NUM_CPUS: 8
+     resource_class: xlarge
+     steps:
+       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
+       - checkout
+       - setup_remote_docker
+       - run: ci/build_container/docker_push.sh
+   docs:
+     executor: ubuntu-build
+     steps:
+       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
+       - checkout
+       - run: ci/do_circle_ci.sh docs
+       - add_ssh_keys:
+           fingerprints:
+             - "44:c7:a1:9e:f4:9e:a5:33:11:f1:0e:79:e1:55:c9:04"
+       - run: docs/publish.sh
+       - store_artifacts:
+           path: generated/docs
+
 workflows:
   version: 2
   all:
@@ -115,6 +140,7 @@ workflows:
       - api
       - filter_example_mirror
       - coverage
+      - format
       - clang_tidy
       - build_image
       - docs:
