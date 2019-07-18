@@ -124,6 +124,7 @@ public:
   virtual void startHttpListener(const std::string& access_log_path_,
                                  const std::string& address_out_path,
                                  Network::Address::InstanceConstSharedPtr address,
+                                 const Network::Socket::OptionsSharedPtr& socket_options,
                                  Stats::ScopePtr&& listener_scope) PURE;
 
   /**

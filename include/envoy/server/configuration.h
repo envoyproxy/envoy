@@ -92,6 +92,11 @@ public:
    * @return Network::Address::InstanceConstSharedPtr the server address.
    */
   virtual Network::Address::InstanceConstSharedPtr address() PURE;
+
+  /**
+   * @return Network::Address::OptionsSharedPtr the list of listener socket options.
+   */
+  virtual Network::Socket::OptionsSharedPtr socketOptions() PURE;
 };
 
 /**
