@@ -328,7 +328,7 @@ private:
 
   class AdminFilterChain : public Network::FilterChain {
   public:
-    // We can't use the default constructor because transport_socket_factory_ diesn't have a
+    // We can't use the default constructor because transport_socket_factory_ doesn't have a
     // default constructor.
     AdminFilterChain() {} // NOLINT(modernize-use-equals-default)
 
