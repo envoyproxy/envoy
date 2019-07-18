@@ -5,7 +5,7 @@
 namespace Envoy {
 namespace Upstream {
 namespace Utility {
-    
+
 const std::string lbPolicyToString(const envoy::api::v2::Cluster::LbPolicy& lb_policy) {
   switch (lb_policy) {
   case envoy::api::v2::Cluster::ROUND_ROBIN:
