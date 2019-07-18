@@ -18,6 +18,7 @@ jobs:
       df -h
 
   - bash: |
+      sudo mkdir -p /etc/docker
       echo '{
         "ipv6": true,
         "fixed-cidr-v6": "2001:db8:1::/64"
