@@ -17,7 +17,7 @@ MockApi::MockApi() {
   ON_CALL(*this, rootScope()).WillByDefault(ReturnRef(stats_store_));
 }
 
-MockApi::~MockApi() {}
+MockApi::~MockApi() = default;
 
 Event::DispatcherPtr MockApi::allocateDispatcher() {
   return Event::DispatcherPtr{allocateDispatcher_(time_system_)};
@@ -26,9 +26,9 @@ Event::DispatcherPtr MockApi::allocateDispatcher(Buffer::WatermarkFactoryPtr&& w
   return Event::DispatcherPtr{allocateDispatcher_(std::move(watermark_factory), time_system_)};
 }
 
-MockOsSysCalls::MockOsSysCalls() {}
+MockOsSysCalls::MockOsSysCalls() = default;
 
-MockOsSysCalls::~MockOsSysCalls() {}
+MockOsSysCalls::~MockOsSysCalls() = default;
 
 SysCallIntResult MockOsSysCalls::setsockopt(int sockfd, int level, int optname, const void* optval,
                                             socklen_t optlen) {
