@@ -45,3 +45,17 @@ public final class RetryPolicy: NSObject {
     self.perRetryTimeoutMS = perRetryTimeoutMS
   }
 }
+
+// MARK: - Equatable overrides
+
+extension RetryPolicy {
+  public override func isEqual(_ object: Any?) -> Bool {
+    guard let other = object as? RetryPolicy else {
+      return false
+    }
+
+    return self.maxRetryCount == other.maxRetryCount
+      && self.retryOn == other.retryOn
+      && self.perRetryTimeoutMS == other.perRetryTimeoutMS
+  }
+}
