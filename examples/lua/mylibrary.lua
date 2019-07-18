@@ -1,6 +1,6 @@
 M = {}
 
-local function M.foobar()
+function M.foobar()
     return "bar"
 end
 
