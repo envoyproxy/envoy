@@ -315,6 +315,7 @@ envoy_cc_library(
         "//source/common/common:hex_lib",
         "//source/common/crypto:utility_lib",
         "//source/common/http:utility_lib",
+        "//source/extensions/common/crypto:utility_lib",
         "@envoy_api//envoy/api/v2/core:http_uri_cc",
     ],
 )

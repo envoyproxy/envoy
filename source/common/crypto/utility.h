@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <iostream>
 #include <vector>
 
 #include "envoy/buffer/buffer.h"
@@ -10,6 +11,13 @@
 namespace Envoy {
 namespace Common {
 namespace Crypto {
+
+class CryptoWrapper {
+public:
+  virtual ~CryptoWrapper() = default;
+  virtual void* get() PURE;
+  virtual void set(void* o) PURE;
+};
 
 struct VerificationOutput {
   /**
@@ -59,7 +67,7 @@ const VerificationOutput verifySignature(absl::string_view hash, void* key,
  * @param key key string
  * @return pointer to EVP_PKEY public key
  */
-void* importPublicKey(const std::vector<uint8_t>& key);
+std::unique_ptr<CryptoWrapper> importPublicKey(const std::vector<uint8_t>& key);
 
 } // namespace Utility
 } // namespace Crypto

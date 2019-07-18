@@ -14,8 +14,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Lua {
 
-using PublicKeyPtr = bssl::UniquePtr<EVP_PKEY>;
-
 class HeaderMapWrapper;
 
 /**
@@ -212,7 +210,8 @@ private:
  */
 class PublicKeyWrapper : public Filters::Common::Lua::BaseLuaObject<PublicKeyWrapper> {
 public:
-  PublicKeyWrapper(EVP_PKEY* key) : public_key_(std::move(key)) {}
+  PublicKeyWrapper(std::unique_ptr<Envoy::Common::Crypto::CryptoWrapper>* key)
+      : public_key_(std::move(*key)) {}
   static ExportedFunctions exportedFunctions() { return {{"get", static_luaGet}}; }
 
 private:
@@ -222,7 +221,8 @@ private:
    */
   DECLARE_LUA_FUNCTION(PublicKeyWrapper, luaGet);
 
-  PublicKeyPtr public_key_;
+  // PublicKeyPtr public_key_;
+  std::unique_ptr<Envoy::Common::Crypto::CryptoWrapper> public_key_;
 };
 
 } // namespace Lua

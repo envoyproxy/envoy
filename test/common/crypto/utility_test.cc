@@ -60,14 +60,16 @@ TEST(UtilityTest, TestImportPublicKey) {
              "d5af8136a9630a6cc0cde157dc8e00f39540628d5f335b2c36c54c7c8bc3738a6b21acff815405afa28e5"
              "183f550dac19abcf1145a7f9ced987db680e4a229cac75dee347ec9ebce1fc3dbbbb0203010001";
 
-  EVP_PKEY* pub_key = reinterpret_cast<EVP_PKEY*>(Utility::importPublicKey(Hex::decode(key)));
+  std::unique_ptr<CryptoWrapper> cryptoPtr = Utility::importPublicKey(Hex::decode(key));
+  CryptoWrapper* crypto = cryptoPtr.get();
+  EVP_PKEY* pub_key = reinterpret_cast<EVP_PKEY*>(crypto->get());
   EXPECT_NE(nullptr, pub_key);
-  EVP_PKEY_free(pub_key);
 
   key = "badkey";
-  pub_key = reinterpret_cast<EVP_PKEY*>(Utility::importPublicKey(Hex::decode(key)));
+  cryptoPtr = Utility::importPublicKey(Hex::decode(key));
+  crypto = cryptoPtr.get();
+  pub_key = reinterpret_cast<EVP_PKEY*>(crypto->get());
   EXPECT_EQ(nullptr, pub_key);
-  EVP_PKEY_free(pub_key);
 }
 
 TEST(UtilityTest, TestVerifySignature) {
@@ -88,7 +90,9 @@ TEST(UtilityTest, TestVerifySignature) {
       "295234f7c14fa46303b7e977d2c89ba8a39a46a35f33eb07a332";
   auto data = "hello";
 
-  EVP_PKEY* pub_key = reinterpret_cast<EVP_PKEY*>(Utility::importPublicKey(Hex::decode(key)));
+  std::unique_ptr<CryptoWrapper> cryptoPtr = Utility::importPublicKey(Hex::decode(key));
+  CryptoWrapper* crypto = cryptoPtr.get();
+  EVP_PKEY* pub_key = reinterpret_cast<EVP_PKEY*>(crypto->get());
 
   std::vector<uint8_t> text(data, data + strlen(data));
 
@@ -117,8 +121,6 @@ TEST(UtilityTest, TestVerifySignature) {
   result = Utility::verifySignature(hash_func, pub_key, Hex::decode("000000"), text);
   EXPECT_EQ(false, result.result_);
   EXPECT_EQ("Failed to verify digest. Error code: 0", result.error_message_);
-
-  EVP_PKEY_free(pub_key);
 }
 
 } // namespace

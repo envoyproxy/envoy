@@ -1,5 +1,7 @@
 #include "common/crypto/utility.h"
 
+#include <iostream>
+
 #include "common/common/assert.h"
 #include "common/common/stack_array.h"
 
@@ -13,6 +15,17 @@
 namespace Envoy {
 namespace Common {
 namespace Crypto {
+
+class PublicKeyWrapper : public virtual CryptoWrapper {
+private:
+  bssl::UniquePtr<EVP_PKEY> pkey_;
+
+public:
+  void* get() override { return pkey_.get(); }
+
+  void set(void* object) override { pkey_.reset(reinterpret_cast<EVP_PKEY*>(object)); }
+};
+
 namespace Utility {
 
 const EVP_MD* getHashFunction(absl::string_view name);
@@ -75,10 +88,18 @@ const VerificationOutput verifySignature(absl::string_view hash, void* pubKey,
   return {false, absl::StrCat("Failed to verify digest. Error code: ", ok)};
 }
 
-void* importPublicKey(const std::vector<uint8_t>& key) {
+std::unique_ptr<CryptoWrapper> importPublicKey(const std::vector<uint8_t>& key) {
   CBS cbs({key.data(), key.size()});
+
   EVP_PKEY* pkey(EVP_parse_public_key(&cbs));
-  return pkey;
+
+  auto publicKeyWrapper = new PublicKeyWrapper();
+  publicKeyWrapper->set(pkey);
+
+  std::unique_ptr<CryptoWrapper> publicKeyPtr = std::make_unique<PublicKeyWrapper>();
+  publicKeyPtr.reset(publicKeyWrapper);
+
+  return publicKeyPtr;
 }
 
 const EVP_MD* getHashFunction(absl::string_view name) {
