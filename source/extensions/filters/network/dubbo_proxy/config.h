@@ -55,7 +55,6 @@ public:
   DubboFilters::FilterChainFactory& filterFactory() override { return *this; }
   Router::Config& routerConfig() override { return *this; }
   ProtocolPtr createProtocol() override;
-  DeserializerPtr createDeserializer() override;
 
 private:
   void registerFilter(const DubboFilterConfig& proto_config);
@@ -65,7 +64,7 @@ private:
   DubboFilterStats stats_;
   const SerializationType serialization_type_;
   const ProtocolType protocol_type_;
-  std::unique_ptr<Router::MultiRouteMatcher> route_matcher_;
+  Router::RouteMatcherPtr route_matcher_;
 
   std::list<DubboFilters::FilterFactoryCb> filter_factories_;
 };
