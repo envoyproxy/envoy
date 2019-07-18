@@ -17,3 +17,7 @@ load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_depe
 go_rules_dependencies()
 
 go_register_toolchains(go_version = GO_VERSION)
+
+load("@envoy//bazel/toolchains:rbe_toolchains_config.bzl", "rbe_toolchains_config")
+
+rbe_toolchains_config()
