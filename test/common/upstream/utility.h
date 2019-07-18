@@ -3,7 +3,6 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/utility.h"
-#include "common/config/cds_json.h"
 #include "common/json/json_loader.h"
 #include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"

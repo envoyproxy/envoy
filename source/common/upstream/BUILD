@@ -48,7 +48,6 @@ envoy_cc_library(
         "//source/common/common:cleanup_lib",
         "//source/common/common:enum_to_int",
         "//source/common/common:utility_lib",
-        "//source/common/config:cds_json_lib",
         "//source/common/config:grpc_mux_lib",
         "//source/common/config:subscription_factory_lib",
         "//source/common/config:utility_lib",

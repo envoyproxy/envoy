@@ -166,7 +166,7 @@ TEST_P(StrictDnsParamTest, ImmediateResolve) {
         cb(TestUtility::makeDnsResponse(std::get<2>(GetParam())));
         return nullptr;
       }));
-  envoy::api::v2::Cluster cluster_config = parseClusterFromJson(json);
+  envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(json);
   Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
@@ -259,7 +259,7 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
   }
   )EOF";
 
-  envoy::api::v2::Cluster cluster_config = parseClusterFromJson(json);
+  envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(json);
   Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
@@ -1061,7 +1061,7 @@ TEST_F(StaticClusterImplTest, EmptyHostname) {
   }
   )EOF";
 
-  envoy::api::v2::Cluster cluster_config = parseClusterFromJson(json);
+  envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(json);
   Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
@@ -1288,7 +1288,7 @@ TEST_F(StaticClusterImplTest, RingHash) {
   }
   )EOF";
 
-  envoy::api::v2::Cluster cluster_config = parseClusterFromJson(json);
+  envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(json);
   Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
@@ -1315,7 +1315,7 @@ TEST_F(StaticClusterImplTest, OutlierDetector) {
   }
   )EOF";
 
-  envoy::api::v2::Cluster cluster_config = parseClusterFromJson(json);
+  envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(json);
   Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
@@ -1364,7 +1364,7 @@ TEST_F(StaticClusterImplTest, HealthyStat) {
   }
   )EOF";
 
-  envoy::api::v2::Cluster cluster_config = parseClusterFromJson(json);
+  envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(json);
   Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
@@ -1496,7 +1496,7 @@ TEST_F(StaticClusterImplTest, UrlConfig) {
   }
   )EOF";
 
-  envoy::api::v2::Cluster cluster_config = parseClusterFromJson(json);
+  envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(json);
   Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
@@ -1543,7 +1543,7 @@ TEST_F(StaticClusterImplTest, UnsupportedLBType) {
 
   EXPECT_THROW_WITH_MESSAGE(
       {
-        envoy::api::v2::Cluster cluster_config = parseClusterFromJson(json);
+        envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(json);
         Envoy::Stats::ScopePtr scope =
             stats_.createScope(fmt::format("cluster.{}.", cluster_config.alt_stat_name().empty()
                                                               ? cluster_config.name()
