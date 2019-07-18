@@ -305,14 +305,6 @@ public:
           std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
     }
   }
-  void addListenSocketOption(const Network::Socket::OptionConstSharedPtr& option) override {
-    ensureSocketOptions();
-    listen_socket_options_->emplace_back(std::move(option));
-  }
-  void addListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) override {
-    ensureSocketOptions();
-    Network::Socket::appendOptions(listen_socket_options_, options);
-  }
   const Network::ListenerConfig& listenerConfig() const override { return *this; }
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
     return parent_.server_.messageValidationVisitor();
@@ -336,6 +328,15 @@ public:
   SystemTime last_updated_;
 
 private:
+  void addListenSocketOption(const Network::Socket::OptionConstSharedPtr& option) {
+    ensureSocketOptions();
+    listen_socket_options_->emplace_back(std::move(option));
+  }
+  void addListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) {
+    ensureSocketOptions();
+    Network::Socket::appendOptions(listen_socket_options_, options);
+  }
+
   ListenerManagerImpl& parent_;
   Network::Address::InstanceConstSharedPtr address_;
   FilterChainManagerImpl filter_chain_manager_;

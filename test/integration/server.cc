@@ -180,7 +180,7 @@ void IntegrationTestServerImpl::createAndRunEnvoyServer(
     Stats::FakeSymbolTableImpl symbol_table;
     Server::HotRestartNopImpl restarter;
     ThreadLocal::InstanceImpl tls;
-    Stats::HeapStatDataAllocator stats_allocator(symbol_table);
+    Stats::AllocatorImpl stats_allocator(symbol_table);
     Stats::ThreadLocalStoreImpl stat_store(stats_allocator);
     std::unique_ptr<ProcessContext> process_context;
     if (process_object.has_value()) {
