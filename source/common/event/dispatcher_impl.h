@@ -93,7 +93,7 @@ private:
   // Validate that an operation is thread safe, i.e. it's invoked on the same thread that the
   // dispatcher run loop is executing on. We allow run_tid_ to be empty for tests where we don't
   // invoke run().
-  bool isThreadSafe() const {
+  bool isThreadSafe() const override {
     return run_tid_.isEmpty() || run_tid_ == api_.threadFactory().currentThreadId();
   }
 
