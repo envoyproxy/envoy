@@ -1,11 +1,11 @@
 #include "extensions/filters/listener/proxy_protocol/proxy_protocol.h"
 
-#include <string.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
 
 #include <algorithm>
 #include <cstdint>
+#include <cstring>
 #include <memory>
 #include <string>
 
