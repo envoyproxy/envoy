@@ -147,12 +147,9 @@ workflows:
           filters:
             tags:
               only: /^v.*/
-      - asan
-      - tsan
       - compile_time_options
       - api
       - filter_example_mirror
-      - ipv6_tests
       - coverage
       - format
       - clang_tidy
