@@ -12,6 +12,7 @@
 #include "extensions/transport_sockets/well_known_names.h"
 
 #include "absl/strings/match.h"
+#include "absl/strings/str_split.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -83,49 +84,36 @@ void Filter::parseHttpHeader(absl::string_view data) {
     protocol_ = "HTTP/2";
     done(true);
   } else {
-    unsigned int id, sid = 0, spaces[2];
-    for (id = 0; id + 1 < data.length(); ++id) {
-      // The end of the request line.
-      if (data[id] == '\r' && data[id + 1] == '\n') {
-        break;
-      }
+    size_t pos = data.find_first_of("\r\n");
 
-      if (data[id] == ' ') {
-        if (sid < 2) {
-          spaces[sid++] = id;
-        } else {
-          sid = 0;
-          break;
-        }
-      }
+    // Cannot find \r or \n
+    if (pos == absl::string_view::npos) {
+      ENVOY_LOG(trace, "http inspector: no request line detected");
+      return done(false);
     }
 
-    if (sid != 2 || id + 1 == data.length()) {
+    absl::string_view request_line = data.substr(0, pos);
+    std::vector<std::string> fields = absl::StrSplit(request_line, ' ');
+
+    // Method SP Request-URI SP HTTP-Version
+    if (fields.size() != 3) {
       ENVOY_LOG(trace, "http inspector: invalid http1x request line");
-      done(false);
-      return;
+      return done(false);
     }
 
-    absl::string_view method = data.substr(0, spaces[0]);
-    // TODO(crazyxy): check request URI
-    absl::string_view request_uri = data.substr(spaces[0] + 1, spaces[1] - spaces[0] - 1);
-    absl::string_view http_version = data.substr(spaces[1] + 1, id - spaces[1] - 1);
-
-    if (httpProtocols().count(http_version) == 0 || method.empty()) {
-      ENVOY_LOG(trace, "http inspector: protocol: {} or method: {} not valid", http_version,
-                method);
-      done(false);
-      return;
+    if (httpProtocols().count(fields[2]) == 0) {
+      ENVOY_LOG(trace, "http inspector: protocol: {} not valid", fields[2]);
+      return done(false);
     }
 
-    if (httpMethods().count(method) == 0) {
-      ENVOY_LOG(debug, "http inspector: detect unknown method: {}", method);
+    if (httpMethods().count(fields[0]) == 0) {
+      ENVOY_LOG(debug, "http inspector: detect unknown method: {}", fields[0]);
     }
 
-    ENVOY_LOG(trace, "http inspector: method: {}, request uri: {}, protocol: {}", method,
-              request_uri, http_version);
+    ENVOY_LOG(trace, "http inspector: method: {}, request uri: {}, protocol: {}", fields[0],
+              fields[1], fields[2]);
 
-    protocol_ = http_version;
+    protocol_ = fields[2];
     done(true);
   }
 }
