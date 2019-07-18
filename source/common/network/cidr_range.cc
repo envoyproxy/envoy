@@ -34,7 +34,7 @@ CidrRange::CidrRange(InstanceConstSharedPtr address, int length)
   }
 }
 
-CidrRange::CidrRange(const CidrRange& other)  = default;
+CidrRange::CidrRange(const CidrRange& other) = default;
 
 CidrRange& CidrRange::operator=(const CidrRange& other) = default;
 
