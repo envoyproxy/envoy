@@ -1,5 +1,5 @@
 jobs:
-- job: ci
+- job: bazel
   strategy:
     matrix:
       release:
@@ -30,13 +30,12 @@ jobs:
   - script: ci/run_envoy_docker.sh 'ci/do_ci.sh $(CI_TARGET)'
     workingDirectory: $(Build.SourcesDirectory)
     env:
-      ENVOY_SRCDIR: $(Build.SourcesDirectory)
       ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
       BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-clang --config=remote-ci --jobs=100 --curses=no"
       BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
       BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
       GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
-    displayName: "CI"
+    displayName: "Run CI script"
 
   - bash: |
       echo "disk space at end of build:"
@@ -48,3 +47,21 @@ jobs:
     inputs:
       pathtoPublish: "$(Build.StagingDirectory)/envoy"
       artifactName: 'envoy'
+- job: format
+  dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
+  pool:
+    vmImage: 'Ubuntu 16.04'
+  steps:
+  - script: |
+      ci/run_envoy_docker.sh '
+        pip install -r tools/requirements.txt
+        ci/do_ci.sh check_format
+        ci/do_ci.sh check_repositories
+        ci/do_ci.sh check_spelling
+        ci/do_ci.sh check_spelling_pedantic
+      '
+    workingDirectory: $(Build.SourcesDirectory)
+    env:
+      ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+    displayName: "Run CI script"
+
