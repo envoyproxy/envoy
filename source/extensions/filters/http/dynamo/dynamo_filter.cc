@@ -15,7 +15,7 @@
 #include "common/json/json_loader.h"
 
 #include "extensions/filters/http/dynamo/dynamo_request_parser.h"
-#include "extensions/filters/http/dynamo/dynamo_utility.h"
+#include "extensions/filters/http/dynamo/dynamo_stats.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -175,20 +175,23 @@ void DynamoFilter::chargeStatsPerEntity(const std::string& entity, const std::st
   std::chrono::milliseconds latency = std::chrono::duration_cast<std::chrono::milliseconds>(
       time_source_.monotonicTime() - start_decode_);
 
-  const Stats::StatName group = stats_->upstreamRqGroup(status);
+  size_t group_index = DynamoStats::groupIndex(status);
   Stats::StatNamePool pool(stats_->symbolTable());
   const Stats::StatName entity_type_name = pool.add(entity_type);
   const Stats::StatName entity_name = pool.add(entity);
-  const Stats::StatName status_name = pool.add(std::to_string(status));
+  const Stats::StatName total_name = pool.add(fmt::format("upstream_rq_total_{}", status));
+  const Stats::StatName time_name = pool.add(fmt::format("upstream_rq_time_{}", status));
 
   stats_->counter({entity_type_name, entity_name, stats_->upstream_rq_total_}).inc();
-  stats_->counter({entity_type_name, entity_name, group}).inc();
-  stats_->counter({entity_type_name, entity_name, status_name}).inc();
+  const Stats::StatName total_group = stats_->upstream_rq_total_groups_[group_index];
+  stats_->counter({entity_type_name, entity_name, total_group}).inc();
+  stats_->counter({entity_type_name, entity_name, total_name}).inc();
 
-  stats_->histogram({entity_type_name, entity_name, stats_->upstream_rq_total_})
+  stats_->histogram({entity_type_name, entity_name, stats_->upstream_rq_time_})
           .recordValue(latency.count());
-  stats_->histogram({entity_type_name, entity_name, group}).recordValue(latency.count());
-  stats_->histogram({entity_type_name, entity_name, status_name}).recordValue(latency.count());
+  const Stats::StatName time_group = stats_->upstream_rq_time_groups_[group_index];
+  stats_->histogram({entity_type_name, entity_name, time_group}).recordValue(latency.count());
+  stats_->histogram({entity_type_name, entity_name, time_name}).recordValue(latency.count());
 }
 
 void DynamoFilter::chargeUnProcessedKeysStats(const Json::Object& json_body) {

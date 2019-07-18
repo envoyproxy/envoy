@@ -18,7 +18,6 @@ envoy_cc_library(
     deps = [
         ":dynamo_request_parser_lib",
         ":dynamo_stats_lib",
-        ":dynamo_utility_lib",
         "//include/envoy/http:filter_interface",
         "//include/envoy/runtime:runtime_interface",
         "//source/common/buffer:buffer_lib",
@@ -39,16 +38,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "dynamo_utility_lib",
-    srcs = ["dynamo_utility.cc"],
-    hdrs = ["dynamo_utility.h"],
-    deps = [
-        "//include/envoy/stats:stats_interface",
-        "//source/common/stats:stats_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
@@ -63,6 +52,7 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "dynamo_stats_lib",
+    srcs = ["dynamo_stats.cc"],
     hdrs = ["dynamo_stats.h"],
     deps = [
         "//include/envoy/stats:stats_interface",
