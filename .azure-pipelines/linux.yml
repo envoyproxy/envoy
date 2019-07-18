@@ -1,26 +1,29 @@
-resources:
-  containers:
-  - container: envoy-build
-    image: envoyproxy/envoy-build:8246167b9d238797cbc6c03dccc9e3921c37617d
-
 jobs:
-- job: EnvoyFullTest
+- job: BuildAndTest
+  strategy:
+    matrix:
+      Release:
+        CI_TARGET: 'bazel.release'
+      ASAN:
+        CI_TARGET: 'bazel.asan'
+      TSAN:
+        CI_TARGET: 'bazel.tsan'
+  dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
   timeoutInMinutes: 360
   pool:
     vmImage: 'Ubuntu 16.04'
-  container: envoy-build
   steps:
   - bash: |
       echo "disk space at beginning of build:"
       df -h
 
-  - script: ci/do_ci.sh bazel.release
+  - bash: |
+      cd $(Build.SourcesDirectory)
+      ci/run_envoy_docker.sh 'ci/do_ci.sh $(CI_TARGET)'
     env:
       ENVOY_SRCDIR: $(Build.SourcesDirectory)
-      BUILD_DIR: $(Build.StagingDirectory)
+      ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
       BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-clang --config=remote-ci --jobs=100 --curses=no"
-      # //test/integration:echo_integration_test is marked exclusive so it will be run locally, no IPv6 locally in container.
-      BAZEL_EXTRA_TEST_OPTIONS: "--test_filter=-IpVersions/EchoIntegrationTest.*/IPv6"
       BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
       BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
       GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
