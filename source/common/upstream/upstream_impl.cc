@@ -35,6 +35,7 @@
 #include "common/upstream/health_checker_impl.h"
 #include "common/upstream/logical_dns_cluster.h"
 #include "common/upstream/original_dst_cluster.h"
+#include "common/upstream/utility.h"
 
 #include "server/transport_socket_config_impl.h"
 
@@ -594,8 +595,11 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
     break;
   case envoy::api::v2::Cluster::ORIGINAL_DST_LB:
     if (config.type() != envoy::api::v2::Cluster::ORIGINAL_DST) {
-      throw EnvoyException(fmt::format(
-          "cluster: LB type 'original_dst_lb' may only be used with cluster type 'original_dst'"));
+      throw EnvoyException(
+          fmt::format("cluster: LB type {} is not valid for Cluster type {}. Only "
+                      "'original_dst_lb' is allowed with cluster type 'original_dst'",
+                      Utility::lbPolicyToString(config.lb_policy()),
+                      Utility::discoveryTypeToString(config.type())));
     }
     lb_type_ = LoadBalancerType::OriginalDst;
     break;
