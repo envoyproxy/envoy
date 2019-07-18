@@ -161,6 +161,10 @@ message Admin {
   // The TCP address that the administration server will listen on.
   // If not specified, Envoy will not start an administration server.
   envoy.api.v2.core.Address address = 3;
+
+  // Additional socket options that may not be present in Envoy source code or
+  // precompiled binaries.
+  repeated envoy.api.v2.core.SocketOption socket_options = 4;
 }
 
 // Cluster manager :ref:`architecture overview <arch_overview_cluster_manager>`.
