@@ -1,12 +1,12 @@
 jobs:
-- job: BuildAndTest
+- job: ci
   strategy:
     matrix:
-      Release:
+      release:
         CI_TARGET: 'bazel.release'
-      ASAN:
+      asan:
         CI_TARGET: 'bazel.asan'
-      TSAN:
+      tsan:
         CI_TARGET: 'bazel.tsan'
   dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
   timeoutInMinutes: 360
@@ -16,6 +16,7 @@ jobs:
   - bash: |
       echo "disk space at beginning of build:"
       df -h
+    displayName: "Check disk space at beginning"
 
   - bash: |
       sudo mkdir -p /etc/docker
@@ -24,11 +25,10 @@ jobs:
         "fixed-cidr-v6": "2001:db8:1::/64"
       }' | sudo tee /etc/docker/daemon.json
       sudo service docker restart
+    displayName: "Enable IPv6"
 
-  - bash: |
-      cd $(Build.SourcesDirectory)
-      ci/run_envoy_docker.sh 'ci/do_ci.sh $(CI_TARGET)'
-    failOnStderr: true
+  - script: ci/run_envoy_docker.sh 'ci/do_ci.sh $(CI_TARGET)'
+    workingDirectory: $(Build.SourcesDirectory)
     env:
       ENVOY_SRCDIR: $(Build.SourcesDirectory)
       ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
@@ -36,10 +36,12 @@ jobs:
       BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
       BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
       GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+    displayName: "CI"
 
   - bash: |
       echo "disk space at end of build:"
       df -h
+    displayName: "Check disk space at end"
     condition: always()
 
   - task: PublishBuildArtifacts@1
