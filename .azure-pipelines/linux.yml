@@ -8,6 +8,8 @@ jobs:
         CI_TARGET: 'bazel.asan'
       tsan:
         CI_TARGET: 'bazel.tsan'
+      coverage:
+        CI_TARGET: 'bazel.coverage'
   dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
   timeoutInMinutes: 360
   pool:

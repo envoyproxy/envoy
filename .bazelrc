@@ -113,3 +113,4 @@ build:docker-clang --config=rbe-toolchain
 # CI configurations
 build:remote-ci --remote_cache=grpcs://remotebuildexecution.googleapis.com
 build:remote-ci --remote_executor=grpcs://remotebuildexecution.googleapis.com
+coverage:remote-ci --strategy=TestRunner=sandboxed,local
