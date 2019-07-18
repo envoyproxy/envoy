@@ -67,10 +67,12 @@ EOF
   done
   cat << EOF
     ],
-    tags = ["manual"],
+    # no-remote due to https://github.com/bazelbuild/bazel/issues/4685
+    tags = ["manual", "no-remote"],
     coverage = False,
-    # Needed when invoking external shell tests etc.
-    local = True,
+    # Using the maximum sharding to allow Bazel to schedule them across CPUs.
+    # Sharding can be disabled by --test_sharding_strategy=disabled.
+    shard_count = 50,
 )
 EOF
 
