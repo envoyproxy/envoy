@@ -17,5 +17,10 @@ CertificateValidationContextConfigProviderImpl::CertificateValidationContextConf
           std::make_unique<envoy::api::v2::auth::CertificateValidationContext>(
               certificate_validation_context)) {}
 
+TlsSessionTicketKeysConfigProviderImpl::TlsSessionTicketKeysConfigProviderImpl(
+    const envoy::api::v2::auth::TlsSessionTicketKeys& tls_session_ticket_keys)
+    : tls_session_ticket_keys_(
+          std::make_unique<envoy::api::v2::auth::TlsSessionTicketKeys>(tls_session_ticket_keys)) {}
+
 } // namespace Secret
 } // namespace Envoy

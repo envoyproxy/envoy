@@ -34,6 +34,17 @@ void SecretManagerImpl::addStaticSecret(const envoy::api::v2::auth::Secret& secr
     }
     break;
   }
+  case envoy::api::v2::auth::Secret::TypeCase::kSessionTicketKeys: {
+    auto secret_provider =
+        std::make_shared<TlsSessionTicketKeysConfigProviderImpl>(secret.session_ticket_keys());
+    if (!static_session_ticket_keys_providers_
+             .insert(std::make_pair(secret.name(), secret_provider))
+             .second) {
+      throw EnvoyException(
+          fmt::format("Duplicate static TlsSessionTicketKeys secret name {}", secret.name()));
+    }
+    break;
+  }
   default:
     throw EnvoyException("Secret type not implemented");
   }
@@ -52,6 +63,12 @@ SecretManagerImpl::findStaticCertificateValidationContextProvider(const std::str
                                                                             : nullptr;
 }
 
+TlsSessionTicketKeysConfigProviderSharedPtr
+SecretManagerImpl::findStaticTlsSessionTicketKeysContextProvider(const std::string& name) const {
+  auto secret = static_session_ticket_keys_providers_.find(name);
+  return (secret != static_session_ticket_keys_providers_.end()) ? secret->second : nullptr;
+}
+
 TlsCertificateConfigProviderSharedPtr SecretManagerImpl::createInlineTlsCertificateProvider(
     const envoy::api::v2::auth::TlsCertificate& tls_certificate) {
   return std::make_shared<TlsCertificateConfigProviderImpl>(tls_certificate);
@@ -62,6 +79,12 @@ SecretManagerImpl::createInlineCertificateValidationContextProvider(
     const envoy::api::v2::auth::CertificateValidationContext& certificate_validation_context) {
   return std::make_shared<CertificateValidationContextConfigProviderImpl>(
       certificate_validation_context);
+}
+
+TlsSessionTicketKeysConfigProviderSharedPtr
+SecretManagerImpl::createInlineTlsSessionTicketKeysProvider(
+    const envoy::api::v2::auth::TlsSessionTicketKeys& tls_session_ticket_keys) {
+  return std::make_shared<TlsSessionTicketKeysConfigProviderImpl>(tls_session_ticket_keys);
 }
 
 TlsCertificateConfigProviderSharedPtr SecretManagerImpl::findOrCreateTlsCertificateProvider(
@@ -77,6 +100,14 @@ SecretManagerImpl::findOrCreateCertificateValidationContextProvider(
     Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
   return validation_context_providers_.findOrCreate(sds_config_source, config_name,
                                                     secret_provider_context);
+}
+
+TlsSessionTicketKeysConfigProviderSharedPtr
+SecretManagerImpl::findOrCreateTlsSessionTicketKeysContextProvider(
+    const envoy::api::v2::core::ConfigSource& sds_config_source, const std::string& config_name,
+    Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
+  return session_ticket_keys_providers_.findOrCreate(sds_config_source, config_name,
+                                                     secret_provider_context);
 }
 
 } // namespace Secret
