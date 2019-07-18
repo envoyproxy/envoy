@@ -77,7 +77,7 @@ void PathUtil::mergeSlashes(HeaderEntry& path_header) {
   std::string simplified_path;
   simplified_path.reserve(original_path.size());
   for (size_t i = 0; i < original_path.size(); ++i) {
-    if (original_path[i] == '/' && original_path[i - 1] == '/') {
+    if (i > 0 && original_path[i] == '/' && original_path[i - 1] == '/') {
       continue;
     }
     // Only operate on path component in URL.
