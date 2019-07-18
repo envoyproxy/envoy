@@ -5,9 +5,9 @@ use("github.com/repokitteh/modules/circleci.star", secret_token=get_secret('circ
 
 use(
   "github.com/repokitteh/modules/owners.star#owners",
-  paths={
-    'envoyproxy/api-shepherds': 'api/',
-  },
+  paths=[
+    ('envoyproxy/api-shepherds', 'api/'),
+  ],
 )
 
 alias('retest', 'retry-circle')
