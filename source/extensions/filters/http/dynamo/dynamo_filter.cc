@@ -62,7 +62,7 @@ void DynamoFilter::onDecodeComplete(const Buffer::Instance& data) {
       table_descriptor_ = RequestParser::parseTable(operation_, *json_body);
     } catch (const Json::Exception& jsonEx) {
       // Body parsing failed. This should not happen, just put a stat for that.
-      scope_.counter(fmt::format("{}invalid_req_body", stat_prefix_)).inc();
+      stats_->counter({stats_->invalid_req_body_}).inc();
     }
   }
 }
@@ -89,7 +89,7 @@ void DynamoFilter::onEncodeComplete(const Buffer::Instance& data) {
       }
     } catch (const Json::Exception&) {
       // Body parsing failed. This should not happen, just put a stat for that.
-      scope_.counter(fmt::format("{}invalid_resp_body", stat_prefix_)).inc();
+      stats_->counter({stats_->invalid_resp_body_}).inc();
     }
   }
 }
@@ -158,15 +158,15 @@ void DynamoFilter::chargeBasicStats(uint64_t status) {
   if (!operation_.empty()) {
     chargeStatsPerEntity(operation_, "operation", status);
   } else {
-    scope_.counter(fmt::format("{}operation_missing", stat_prefix_)).inc();
+    stats_->counter({stats_->operation_missing_}).inc();
   }
 
   if (!table_descriptor_.table_name.empty()) {
     chargeStatsPerEntity(table_descriptor_.table_name, "table", status);
   } else if (table_descriptor_.is_single_table) {
-    scope_.counter(fmt::format("{}table_missing", stat_prefix_)).inc();
+    stats_->counter({stats_->table_missing_}).inc();
   } else {
-    scope_.counter(fmt::format("{}multiple_tables", stat_prefix_)).inc();
+    stats_->counter({stats_->multiple_tables_}).inc();
   }
 }
 
@@ -175,29 +175,20 @@ void DynamoFilter::chargeStatsPerEntity(const std::string& entity, const std::st
   std::chrono::milliseconds latency = std::chrono::duration_cast<std::chrono::milliseconds>(
       time_source_.monotonicTime() - start_decode_);
 
-  std::string group_string =
-      Http::CodeUtility::groupStringForResponseCode(static_cast<Http::Code>(status));
+  const Stats::StatName group = stats_->upstreamRqGroup(status);
+  Stats::StatNamePool pool(stats_->symbolTable());
+  const Stats::StatName entity_type_name = pool.add(entity_type);
+  const Stats::StatName entity_name = pool.add(entity);
+  const Stats::StatName status_name = pool.add(std::to_string(status));
 
-  scope_.counter(fmt::format("{}{}.{}.upstream_rq_total", stat_prefix_, entity_type, entity)).inc();
-  scope_
-      .counter(fmt::format("{}{}.{}.upstream_rq_total_{}", stat_prefix_, entity_type, entity,
-                           group_string))
-      .inc();
-  scope_
-      .counter(fmt::format("{}{}.{}.upstream_rq_total_{}", stat_prefix_, entity_type, entity,
-                           std::to_string(status)))
-      .inc();
+  stats_->counter({entity_type_name, entity_name, stats_->upstream_rq_total_}).inc();
+  stats_->counter({entity_type_name, entity_name, group}).inc();
+  stats_->counter({entity_type_name, entity_name, status_name}).inc();
 
-  scope_.histogram(fmt::format("{}{}.{}.upstream_rq_time", stat_prefix_, entity_type, entity))
-      .recordValue(latency.count());
-  scope_
-      .histogram(fmt::format("{}{}.{}.upstream_rq_time_{}", stat_prefix_, entity_type, entity,
-                             group_string))
-      .recordValue(latency.count());
-  scope_
-      .histogram(fmt::format("{}{}.{}.upstream_rq_time_{}", stat_prefix_, entity_type, entity,
-                             std::to_string(status)))
-      .recordValue(latency.count());
+  stats_->histogram({entity_type_name, entity_name, stats_->upstream_rq_total_})
+          .recordValue(latency.count());
+  stats_->histogram({entity_type_name, entity_name, group}).recordValue(latency.count());
+  stats_->histogram({entity_type_name, entity_name, status_name}).recordValue(latency.count());
 }
 
 void DynamoFilter::chargeUnProcessedKeysStats(const Json::Object& json_body) {
@@ -205,10 +196,9 @@ void DynamoFilter::chargeUnProcessedKeysStats(const Json::Object& json_body) {
   // complete apart of the batch operation. Only the table names will be logged for errors.
   std::vector<std::string> unprocessed_tables = RequestParser::parseBatchUnProcessedKeys(json_body);
   for (const std::string& unprocessed_table : unprocessed_tables) {
-    scope_
-        .counter(
-            fmt::format("{}error.{}.BatchFailureUnprocessedKeys", stat_prefix_, unprocessed_table))
-        .inc();
+    Stats::StatNameManagedStorage unprocessed_table_name(unprocessed_table, stats_->symbolTable());
+    stats_->counter({stats_->error_, unprocessed_table_name.statName(),
+                     stats_->batch_failure_unprocessed_keys_}).inc();
   }
 }
 
@@ -216,16 +206,16 @@ void DynamoFilter::chargeFailureSpecificStats(const Json::Object& json_body) {
   std::string error_type = RequestParser::parseErrorType(json_body);
 
   if (!error_type.empty()) {
+    Stats::StatNamePool pool(stats_->symbolTable());
     if (table_descriptor_.table_name.empty()) {
-      scope_.counter(fmt::format("{}error.no_table.{}", stat_prefix_, error_type)).inc();
+      stats_->counter({stats_->error_, stats_->no_table_, pool.add(error_type)}).inc();
     } else {
-      scope_
-          .counter(
-              fmt::format("{}error.{}.{}", stat_prefix_, table_descriptor_.table_name, error_type))
-          .inc();
+      stats_->counter({stats_->error_,
+                       pool.add(table_descriptor_.table_name),
+                       pool.add(error_type)}).inc();
     }
   } else {
-    scope_.counter(fmt::format("{}empty_response_body", stat_prefix_)).inc();
+    stats_->counter({stats_->empty_response_body_}).inc();
   }
 }
 
@@ -237,9 +227,8 @@ void DynamoFilter::chargeTablePartitionIdStats(const Json::Object& json_body) {
   std::vector<RequestParser::PartitionDescriptor> partitions =
       RequestParser::parsePartitions(json_body);
   for (const RequestParser::PartitionDescriptor& partition : partitions) {
-    std::string scope_string = Utility::buildPartitionStatString(
-        stat_prefix_, table_descriptor_.table_name, operation_, partition.partition_id_);
-    scope_.counter(scope_string).add(partition.capacity_);
+    stats_->buildPartitionStatCounter(
+        table_descriptor_.table_name, operation_, partition.partition_id_).add(partition.capacity_);
   }
 }
 
