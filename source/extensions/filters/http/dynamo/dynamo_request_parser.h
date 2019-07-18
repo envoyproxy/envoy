@@ -100,7 +100,11 @@ public:
   using StringFn = std::function<void(const std::string)>;
 
   /**
-   * Calls a function for every string that may be included as a token in a stat.
+   * Calls a function for every string that is likely to be included as a token
+   * in a stat. This is not functionally necessary, but can reduce potentially
+   * contented access to create entries in the symbol table in the hot path.
+   *
+   * @param fn the function to call for every potential stat name.
    */
   static void forEachStatString(const StringFn& fn);
 
