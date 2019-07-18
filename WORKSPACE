@@ -18,6 +18,10 @@ go_rules_dependencies()
 
 go_register_toolchains(go_version = GO_VERSION)
 
+load("@envoy//bazel/toolchains:rbe_toolchains_config.bzl", "rbe_toolchains_config")
+
+rbe_toolchains_config()
+
 load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_language")
 
 switched_rules_by_language(

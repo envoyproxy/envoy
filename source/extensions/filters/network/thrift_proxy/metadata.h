@@ -1,8 +1,7 @@
 #pragma once
 
-#include <string.h>
-
 #include <algorithm>
+#include <cstring>
 #include <list>
 #include <memory>
 #include <string>

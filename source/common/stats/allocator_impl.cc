@@ -1,4 +1,4 @@
-#include "common/stats/heap_stat_data.h"
+#include "common/stats/allocator_impl.h"
 
 #include <cstdint>
 
@@ -20,25 +20,25 @@
 namespace Envoy {
 namespace Stats {
 
-HeapStatDataAllocator::~HeapStatDataAllocator() {
+AllocatorImpl::~AllocatorImpl() {
   ASSERT(counters_.empty());
   ASSERT(gauges_.empty());
 }
 
-void HeapStatDataAllocator::removeCounterFromSet(Counter* counter) {
+void AllocatorImpl::removeCounterFromSet(Counter* counter) {
   Thread::LockGuard lock(mutex_);
   const size_t count = counters_.erase(counter->statName());
   ASSERT(count == 1);
 }
 
-void HeapStatDataAllocator::removeGaugeFromSet(Gauge* gauge) {
+void AllocatorImpl::removeGaugeFromSet(Gauge* gauge) {
   Thread::LockGuard lock(mutex_);
   const size_t count = gauges_.erase(gauge->statName());
   ASSERT(count == 1);
 }
 
 #ifndef ENVOY_CONFIG_COVERAGE
-void HeapStatDataAllocator::debugPrint() {
+void AllocatorImpl::debugPrint() {
   Thread::LockGuard lock(mutex_);
   for (Counter* counter : counters_) {
     ENVOY_LOG_MISC(info, "counter: {}", symbolTable().toString(counter->statName()));
@@ -59,7 +59,7 @@ void HeapStatDataAllocator::debugPrint() {
 // wasted in the alignment padding next to flags_.
 template <class BaseClass> class StatsSharedImpl : public MetricImpl<BaseClass> {
 public:
-  StatsSharedImpl(StatName name, HeapStatDataAllocator& alloc, absl::string_view tag_extracted_name,
+  StatsSharedImpl(StatName name, AllocatorImpl& alloc, absl::string_view tag_extracted_name,
                   const std::vector<Tag>& tags)
       : MetricImpl<BaseClass>(name, tag_extracted_name, tags, alloc.symbolTable()), alloc_(alloc) {}
 
@@ -84,7 +84,7 @@ public:
   uint32_t use_count() const override { return ref_count_; }
 
 protected:
-  HeapStatDataAllocator& alloc_;
+  AllocatorImpl& alloc_;
 
   // Holds backing store shared by both CounterImpl and GaugeImpl. CounterImpl
   // adds another field, pending_increment_, that is not used in Gauge.
@@ -95,7 +95,7 @@ protected:
 
 class CounterImpl : public StatsSharedImpl<Counter> {
 public:
-  CounterImpl(StatName name, HeapStatDataAllocator& alloc, absl::string_view tag_extracted_name,
+  CounterImpl(StatName name, AllocatorImpl& alloc, absl::string_view tag_extracted_name,
               const std::vector<Tag>& tags)
       : StatsSharedImpl(name, alloc, tag_extracted_name, tags) {}
   ~CounterImpl() override { alloc_.removeCounterFromSet(this); }
@@ -119,7 +119,7 @@ private:
 
 class GaugeImpl : public StatsSharedImpl<Gauge> {
 public:
-  GaugeImpl(StatName name, HeapStatDataAllocator& alloc, absl::string_view tag_extracted_name,
+  GaugeImpl(StatName name, AllocatorImpl& alloc, absl::string_view tag_extracted_name,
             const std::vector<Tag>& tags, ImportMode import_mode)
       : StatsSharedImpl(name, alloc, tag_extracted_name, tags) {
     switch (import_mode) {
@@ -194,9 +194,8 @@ public:
   }
 };
 
-CounterSharedPtr HeapStatDataAllocator::makeCounter(StatName name,
-                                                    absl::string_view tag_extracted_name,
-                                                    const std::vector<Tag>& tags) {
+CounterSharedPtr AllocatorImpl::makeCounter(StatName name, absl::string_view tag_extracted_name,
+                                            const std::vector<Tag>& tags) {
   Thread::LockGuard lock(mutex_);
   ASSERT(gauges_.find(name) == gauges_.end());
   auto iter = counters_.find(name);
@@ -208,9 +207,9 @@ CounterSharedPtr HeapStatDataAllocator::makeCounter(StatName name,
   return counter;
 }
 
-GaugeSharedPtr HeapStatDataAllocator::makeGauge(StatName name, absl::string_view tag_extracted_name,
-                                                const std::vector<Tag>& tags,
-                                                Gauge::ImportMode import_mode) {
+GaugeSharedPtr AllocatorImpl::makeGauge(StatName name, absl::string_view tag_extracted_name,
+                                        const std::vector<Tag>& tags,
+                                        Gauge::ImportMode import_mode) {
   Thread::LockGuard lock(mutex_);
   ASSERT(counters_.find(name) == counters_.end());
   auto iter = gauges_.find(name);

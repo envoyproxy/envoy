@@ -156,6 +156,7 @@ def envoy_dependencies(skip_targets = []):
     _com_lightstep_tracer_cpp()
     _io_opentracing_cpp()
     _net_zlib()
+    _repository_impl("bazel_toolchains")
 
     _python_deps()
     _cc_deps()
