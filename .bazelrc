@@ -1,12 +1,7 @@
 # Envoy specific Bazel build/test options.
-
-# Bazel doesn't need more than 200MB of memory based on memory profiling:
-# https://docs.bazel.build/versions/master/skylark/performance.html#memory-profiling
-# Limiting JVM heapsize here to let it do GC more when approaching the limit to
-# leave room for compiler/linker.
-startup --host_jvm_args=-Xmx512m
 build --workspace_status_command=bazel/get_workspace_status
 build --experimental_remap_main_repo
+build --experimental_local_memory_estimate
 build --host_force_python=PY2
 build --action_env=BAZEL_LINKLIBS=-l%:libstdc++.a
 build --action_env=BAZEL_LINKOPTS=-lm:-static-libgcc

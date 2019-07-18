@@ -1,6 +1,6 @@
 #include "extensions/filters/network/dubbo_proxy/conn_manager.h"
 
-#include <stdint.h>
+#include <cstdint>
 
 #include "envoy/common/exception.h"
 

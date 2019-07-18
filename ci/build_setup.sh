@@ -58,7 +58,7 @@ fi
 export BAZEL_QUERY_OPTIONS="${BAZEL_OPTIONS}"
 export BAZEL_BUILD_OPTIONS="--strategy=Genrule=standalone --spawn_strategy=standalone \
   --verbose_failures ${BAZEL_OPTIONS} --action_env=HOME --action_env=PYTHONUSERBASE \
-  --jobs=${NUM_CPUS} --show_task_finish --experimental_generate_json_trace_profile \
+  --local_cpu_resources=${NUM_CPUS} --show_task_finish --experimental_generate_json_trace_profile \
   --test_env=HOME --test_env=PYTHONUSERBASE --cache_test_results=no --test_output=all \
   ${BAZEL_BUILD_EXTRA_OPTIONS} ${BAZEL_EXTRA_TEST_OPTIONS}"
 
