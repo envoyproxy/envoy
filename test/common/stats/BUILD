@@ -11,11 +11,11 @@ load(
 envoy_package()
 
 envoy_cc_test(
-    name = "heap_allocator_test",
-    srcs = ["heap_allocator_test.cc"],
+    name = "allocator_impl_test",
+    srcs = ["allocator_impl_test.cc"],
     deps = [
+        "//source/common/stats:allocator_lib",
         "//source/common/stats:fake_symbol_table_lib",
-        "//source/common/stats:heap_stat_data_lib",
         "//test/test_common:logging_lib",
     ],
 )
@@ -32,8 +32,8 @@ envoy_cc_test(
     name = "metric_impl_test",
     srcs = ["metric_impl_test.cc"],
     deps = [
+        "//source/common/stats:allocator_lib",
         "//source/common/stats:fake_symbol_table_lib",
-        "//source/common/stats:heap_stat_data_lib",
         "//source/common/stats:utility_lib",
         "//test/test_common:logging_lib",
     ],
