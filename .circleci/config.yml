@@ -140,7 +140,6 @@ workflows:
       - api
       - filter_example_mirror
       - coverage
-      - format
       - clang_tidy
       - build_image
       - docs:
