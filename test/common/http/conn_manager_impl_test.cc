@@ -2767,6 +2767,72 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyInTrailersCallback) {
       HeaderMapPtr{new TestHeaderMapImpl{{"some", "trailer"}}});
 }
 
+// Verifies that calling addEncodedData during a encodeData callback or addDecodedData during
+// decodeData results in data being added to the subsequent filters without having to stop
+// iteration.
+TEST_F(HttpConnectionManagerImplTest, FilterAddBodyDuringEncodeDataWithoutStopping) {
+  InSequence s;
+  setup(false, "");
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+    HeaderMapPtr headers{
+        new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+    decoder->decodeHeaders(std::move(headers), false);
+
+    Buffer::OwnedImpl data("world");
+    decoder->decodeData(data, true);
+  }));
+
+  setupFilterChain(2, 1);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[0], decodeData(_, true))
+      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterDataStatus {
+        Buffer::OwnedImpl b("hello");
+        decoder_filters_[0]->callbacks_->addDecodedData(b, true);
+        EXPECT_EQ(decoder_filters_[0]->callbacks_->decodingBuffer()->toString(), "hello");
+        return FilterDataStatus::Continue;
+      }));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+  EXPECT_CALL(*decoder_filters_[1], decodeData(_, true))
+      .WillOnce(Invoke([&](Buffer::Instance& data, bool) -> FilterDataStatus {
+        EXPECT_EQ(data.toString(), "helloworld");
+        return FilterDataStatus::Continue;
+      }));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
+
+  // Kick off the incoming data.
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
+  EXPECT_CALL(*encoder_filters_[0], encodeData(_, true))
+      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterDataStatus {
+        Buffer::OwnedImpl b("good");
+        encoder_filters_[0]->callbacks_->addEncodedData(b, true);
+        EXPECT_EQ(encoder_filters_[0]->callbacks_->encodingBuffer()->toString(), "good");
+        return FilterDataStatus::Continue;
+      }));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
+  EXPECT_CALL(response_encoder_, encodeData(_, true))
+      .WillOnce(
+          // Verify that the response encode sees both the data added with addEncodedData as well as
+          // the original data passed to the filter.
+          Invoke([&](Buffer::Instance& data, bool) { EXPECT_EQ(data.toString(), "goodbye"); }));
+  expectOnDestroy();
+
+  decoder_filters_[0]->callbacks_->encodeHeaders(
+      HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, false);
+  Buffer::OwnedImpl data("bye");
+  decoder_filters_[0]->callbacks_->encodeData(data, true);
+}
+
 // Add*Data during the *Data callbacks.
 TEST_F(HttpConnectionManagerImplTest, FilterAddBodyDuringDecodeData) {
   InSequence s;

@@ -987,6 +987,7 @@ void ConnectionManagerImpl::ActiveStream::decodeData(
     recordLatestDataFilter(entry, state_.latest_data_decoding_filter_, decoder_filters_);
 
     state_.filter_call_state_ |= FilterCallState::DecodeData;
+    (*entry)->inline_buffered_data_ = false;
     (*entry)->end_stream_ = end_stream && !request_trailers_;
     FilterDataStatus status = (*entry)->handle_->decodeData(data, (*entry)->end_stream_);
     if ((*entry)->end_stream_) {
@@ -1046,6 +1047,7 @@ void ConnectionManagerImpl::ActiveStream::addDecodedData(ActiveStreamDecoderFilt
     state_.decoder_filters_streaming_ = streaming;
     // If no call is happening or we are in the decode headers/data callback, buffer the data.
     // Inline processing happens in the decodeHeaders() callback if necessary.
+    filter.inline_buffered_data_ = true;
     filter.commonHandleBufferData(data);
   } else if (state_.filter_call_state_ & FilterCallState::DecodeTrailers) {
     // In this case we need to inline dispatch the data to further filters. If those filters
@@ -1480,6 +1482,7 @@ void ConnectionManagerImpl::ActiveStream::addEncodedData(ActiveStreamEncoderFilt
     state_.encoder_filters_streaming_ = streaming;
     // If no call is happening or we are in the decode headers/data callback, buffer the data.
     // Inline processing happens in the decodeHeaders() callback if necessary.
+    filter.inline_buffered_data_ = true;
     filter.commonHandleBufferData(data);
   } else if (state_.filter_call_state_ & FilterCallState::EncodeTrailers) {
     // In this case we need to inline dispatch the data to further filters. If those filters
@@ -1741,7 +1744,6 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {
 
   ENVOY_STREAM_LOG(trace, "continuing filter chain: filter={}", parent_,
                    static_cast<const void*>(this));
-  ASSERT(!canIterate());
   // If iteration has stopped for all frame types, set iterate_from_current_filter_ to true so the
   // filter iteration starts with the current filter instead of the next one.
   if (stoppedAll()) {
@@ -1856,7 +1858,7 @@ bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfterDataCallbac
     FilterDataStatus status, Buffer::Instance& provided_data, bool& buffer_was_streaming) {
 
   if (status == FilterDataStatus::Continue) {
-    if (iteration_state_ == IterationState::StopSingleIteration) {
+    if (iteration_state_ == IterationState::StopSingleIteration || inline_buffered_data_) {
       commonHandleBufferData(provided_data);
       commonContinue();
       return false;

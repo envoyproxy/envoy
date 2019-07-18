@@ -100,8 +100,8 @@ private:
     ActiveStreamFilterBase(ActiveStream& parent, bool dual_filter)
         : parent_(parent), iteration_state_(IterationState::Continue),
           iterate_from_current_filter_(false), headers_continued_(false),
-          continue_headers_continued_(false), end_stream_(false), dual_filter_(dual_filter),
-          decode_headers_called_(false) {}
+          continue_headers_continued_(false), inline_buffered_data_(false), end_stream_(false),
+          dual_filter_(dual_filter), decode_headers_called_(false) {}
 
     // Functions in the following block are called after the filter finishes processing
     // corresponding data. Those functions handle state updates and data storage (if needed)
@@ -151,10 +151,7 @@ private:
       return iteration_state_ == IterationState::StopAllBuffer ||
              iteration_state_ == IterationState::StopAllWatermark;
     }
-    void allowIteration() {
-      ASSERT(iteration_state_ != IterationState::Continue);
-      iteration_state_ = IterationState::Continue;
-    }
+    void allowIteration() { iteration_state_ = IterationState::Continue; }
     MetadataMapVector* getSavedRequestMetadata() {
       if (saved_request_metadata_ == nullptr) {
         saved_request_metadata_ = std::make_unique<MetadataMapVector>();
@@ -192,6 +189,7 @@ private:
     bool iterate_from_current_filter_ : 1;
     bool headers_continued_ : 1;
     bool continue_headers_continued_ : 1;
+    bool inline_buffered_data_ : 1;
     // If true, end_stream is called for this filter.
     bool end_stream_ : 1;
     const bool dual_filter_ : 1;
