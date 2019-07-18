@@ -1,7 +1,6 @@
 #pragma once
 
-#include <inttypes.h>
-
+#include <cinttypes>
 #include <regex>
 #include <string>
 #include <vector>
