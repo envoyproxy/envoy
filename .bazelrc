@@ -93,6 +93,8 @@ build:remote --experimental_inmemory_jdeps_files
 build:remote --experimental_inmemory_dotd_files
 build:remote --experimental_remote_download_outputs=toplevel
 test:remote --experimental_remote_download_outputs=minimal
+coverage:remote --experimental_remote_download_outputs=toplevel
+
 
 build:remote-clang --config=remote
 build:remote-clang --config=rbe-toolchain
