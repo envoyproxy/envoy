@@ -1,5 +1,6 @@
-#include <signal.h>
 #include <sys/mman.h>
+
+#include <csignal>
 
 #include "common/signal/signal_action.h"
 
