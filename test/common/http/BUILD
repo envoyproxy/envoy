@@ -252,6 +252,7 @@ envoy_cc_test(
     srcs = ["header_map_impl_test.cc"],
     deps = [
         "//source/common/http:header_map_lib",
+        "//source/common/http:header_utility_lib",
         "//test/test_common:utility_lib",
     ],
 )
