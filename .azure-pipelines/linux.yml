@@ -20,6 +20,7 @@ jobs:
   - bash: |
       cd $(Build.SourcesDirectory)
       ci/run_envoy_docker.sh 'ci/do_ci.sh $(CI_TARGET)'
+    failOnStderr: true
     env:
       ENVOY_SRCDIR: $(Build.SourcesDirectory)
       ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
