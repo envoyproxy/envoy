@@ -48,6 +48,7 @@ envoy_cc_test(
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
     ],
+    shard_count = 4,
 )
 
 envoy_cc_test(
