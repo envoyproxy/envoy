@@ -66,11 +66,9 @@ FaultSettings::FaultSettings(const envoy::config::filter::http::fault::v2::HTTPF
 
 FaultFilterConfig::FaultFilterConfig(const envoy::config::filter::http::fault::v2::HTTPFault& fault,
                                      Runtime::Loader& runtime, const std::string& stats_prefix,
-                                     Stats::Scope& scope, TimeSource& time_source,
-                                     std::string listener_filter_name)
+                                     Stats::Scope& scope, TimeSource& time_source)
     : settings_(fault), runtime_(runtime), stats_(generateStats(stats_prefix, scope)),
-      stats_prefix_(stats_prefix), scope_(scope), time_source_(time_source),
-      listener_filter_name_(listener_filter_name) {}
+      stats_prefix_(stats_prefix), scope_(scope), time_source_(time_source) {}
 
 FaultFilter::FaultFilter(FaultFilterConfigSharedPtr config) : config_(config) {}
 
@@ -120,23 +118,14 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::HeaderMap& headers, b
     downstream_cluster_ =
         std::string(headers.EnvoyDownstreamServiceCluster()->value().getStringView());
 
-    cluster_delay_percent_key_ =
+    downstream_cluster_delay_percent_key_ =
         fmt::format("fault.http.{}.delay.fixed_delay_percent", downstream_cluster_);
-    cluster_abort_percent_key_ =
+    downstream_cluster_abort_percent_key_ =
         fmt::format("fault.http.{}.abort.abort_percent", downstream_cluster_);
-    cluster_delay_duration_key_ =
+    downstream_cluster_delay_duration_key_ =
         fmt::format("fault.http.{}.delay.fixed_duration_ms", downstream_cluster_);
-    cluster_abort_http_status_key_ =
+    downstream_cluster_abort_http_status_key_ =
         fmt::format("fault.http.{}.abort.http_status", downstream_cluster_);
-  } else if (!config_->listener_filter_name().empty()) {
-    cluster_delay_percent_key_ = fmt::format("fault.http.listener.{}.delay.fixed_delay_percent",
-                                             config_->listener_filter_name());
-    cluster_abort_percent_key_ =
-        fmt::format("fault.http.listener.{}.abort.abort_percent", config_->listener_filter_name());
-    cluster_delay_duration_key_ = fmt::format("fault.http.listener.{}.delay.fixed_duration_ms",
-                                              config_->listener_filter_name());
-    cluster_abort_http_status_key_ =
-        fmt::format("fault.http.listener.{}.abort.http_status", config_->listener_filter_name());
   }
 
   maybeSetupResponseRateLimit(headers);
@@ -215,9 +204,9 @@ bool FaultFilter::isDelayEnabled() {
 
   bool enabled = config_->runtime().snapshot().featureEnabled(
       RuntimeKeys::get().DelayPercentKey, fault_settings_->requestDelay()->percentage());
-  if (!cluster_delay_percent_key_.empty()) {
+  if (!downstream_cluster_delay_percent_key_.empty()) {
     enabled |= config_->runtime().snapshot().featureEnabled(
-        cluster_delay_percent_key_, fault_settings_->requestDelay()->percentage());
+        downstream_cluster_delay_percent_key_, fault_settings_->requestDelay()->percentage());
   }
   return enabled;
 }
@@ -225,8 +214,8 @@ bool FaultFilter::isDelayEnabled() {
 bool FaultFilter::isAbortEnabled() {
   bool enabled = config_->runtime().snapshot().featureEnabled(RuntimeKeys::get().AbortPercentKey,
                                                               fault_settings_->abortPercentage());
-  if (!cluster_abort_percent_key_.empty()) {
-    enabled |= config_->runtime().snapshot().featureEnabled(cluster_abort_percent_key_,
+  if (!downstream_cluster_abort_percent_key_.empty()) {
+    enabled |= config_->runtime().snapshot().featureEnabled(downstream_cluster_abort_percent_key_,
                                                             fault_settings_->abortPercentage());
   }
   return enabled;
@@ -251,9 +240,9 @@ FaultFilter::delayDuration(const Http::HeaderMap& request_headers) {
   std::chrono::milliseconds duration =
       std::chrono::milliseconds(config_->runtime().snapshot().getInteger(
           RuntimeKeys::get().DelayDurationKey, config_duration.value().count()));
-  if (!cluster_delay_duration_key_.empty()) {
-    duration = std::chrono::milliseconds(
-        config_->runtime().snapshot().getInteger(cluster_delay_duration_key_, duration.count()));
+  if (!downstream_cluster_delay_duration_key_.empty()) {
+    duration = std::chrono::milliseconds(config_->runtime().snapshot().getInteger(
+        downstream_cluster_delay_duration_key_, duration.count()));
   }
 
   // Delay only if the duration is >0ms
@@ -269,9 +258,9 @@ uint64_t FaultFilter::abortHttpStatus() {
   uint64_t http_status = config_->runtime().snapshot().getInteger(
       RuntimeKeys::get().AbortHttpStatusKey, fault_settings_->abortCode());
 
-  if (!cluster_abort_http_status_key_.empty()) {
-    http_status =
-        config_->runtime().snapshot().getInteger(cluster_abort_http_status_key_, http_status);
+  if (!downstream_cluster_abort_http_status_key_.empty()) {
+    http_status = config_->runtime().snapshot().getInteger(
+        downstream_cluster_abort_http_status_key_, http_status);
   }
 
   return http_status;
