@@ -41,3 +41,20 @@ public final class Request: NSObject {
     self.retryPolicy = retryPolicy
   }
 }
+
+// MARK: - Equatable overrides
+
+extension Request {
+  public override func isEqual(_ object: Any?) -> Bool {
+    guard let other = object as? Request else {
+      return false
+    }
+
+    return self.method == other.method
+      && self.url == other.url
+      && self.headers == other.headers
+      && self.trailers == other.trailers
+      && self.body == other.body
+      && self.retryPolicy == other.retryPolicy
+  }
+}
