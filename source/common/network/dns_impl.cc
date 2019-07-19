@@ -219,8 +219,9 @@ ActiveDnsQuery* DnsResolverImpl::preparePendingResolution(
 
 ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
                                          DnsLookupFamily dns_lookup_family, ResolveCb callback) {
-  // TODO(hennna): Add DNS caching which will allow testing the edge case of a failed initial call
-  // to getHostByName followed by a synchronous IPv4 resolution.
+  // TODO(hennna): Add DNS caching which will allow testing the edge case of a
+  // failed initial call to getHostByName followed by a synchronous IPv4
+  // resolution.
   std::unique_ptr<PendingResolution> pending_resolution(
       new PendingResolution(callback, dispatcher_, channel_, dns_name));
   if (dns_lookup_family == DnsLookupFamily::Auto) {
@@ -277,21 +278,31 @@ void DnsResolverImpl::PendingSrvResolution::onAresSrvStartCallback(int status, i
     status = ares_parse_srv_reply(buf, len, &srv_reply);
 
     if (status == ARES_SUCCESS) {
-      std::list<DnsResponse> srv_records;
-      size_t total = 0, finished = 0;
+      size_t total = 0;
       for (ares_srv_reply* current_reply = srv_reply; current_reply != NULL;
-           current_reply = current_reply->next, ++total) {
+           current_reply = current_reply->next) {
+        total++;
+      }
+
+      std::shared_ptr<std::atomic<ssize_t>> finished = std::make_shared<std::atomic<ssize_t>>(0);
+      std::shared_ptr<std::list<DnsResponse>> srv_records =
+          std::make_shared<std::list<DnsResponse>>();
+      std::shared_ptr<std::mutex> mutex = std::make_shared<std::mutex>();
+      for (ares_srv_reply* current_reply = srv_reply; current_reply != NULL;
+           current_reply = current_reply->next) {
         resolver_->resolve(
             current_reply->host, this->dns_lookup_family_,
-            [this, &current_reply, &finished, &total,
-             &srv_records](const std::list<DnsResponse>&& response) {
+            [this, total, finished, srv_records, mutex,
+             current_reply](const std::list<DnsResponse>&& response) {
               for (auto instance = response.begin(); instance != response.end(); ++instance) {
                 Address::InstanceConstSharedPtr inst_with_port(
                     Utility::getAddressWithPort(*instance->address_, current_reply->port));
-                srv_records.emplace_back(DnsResponse(inst_with_port, instance->ttl_));
+                mutex->lock();
+                srv_records->emplace_back(DnsResponse(inst_with_port, instance->ttl_));
+                mutex->unlock();
               }
-              if (++finished == total) {
-                onAresSrvFinishCallback(std::move(srv_records));
+              if (static_cast<unsigned>(++(*finished)) == total) {
+                onAresSrvFinishCallback(std::move(*srv_records));
               }
             });
       }
