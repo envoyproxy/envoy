@@ -243,23 +243,12 @@ envoy_cc_library(
     deps = [
         ":cluster_factory_lib",
         ":upstream_includes",
-        ":utility_lib",
         "//include/envoy/secret:secret_manager_interface",
         "//include/envoy/upstream:cluster_factory_interface",
         "//source/common/common:empty_string",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//source/extensions/clusters:well_known_names",
-    ],
-)
-
-envoy_cc_library(
-    name = "utility_lib",
-    srcs = ["utility.cc"],
-    hdrs = ["utility.h"],
-    deps = [
-        "//source/common/common:assert_lib",
-        "@envoy_api//envoy/api/v2:cds_cc",
     ],
 )
 
@@ -383,7 +372,6 @@ envoy_cc_library(
         ":static_cluster_lib",
         ":strict_dns_cluster_lib",
         ":upstream_includes",
-        ":utility_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",
         "//include/envoy/network:dns_interface",

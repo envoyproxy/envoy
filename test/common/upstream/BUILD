@@ -129,14 +129,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "utility_test",
-    srcs = ["utility_test.cc"],
-    deps = [
-        ":utility_lib",
-    ],
-)
-
-envoy_cc_test(
     name = "load_balancer_impl_test",
     srcs = ["load_balancer_impl_test.cc"],
     deps = [
