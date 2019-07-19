@@ -84,7 +84,7 @@ Envoy can also be built with the Docker image used for CI, by installing Docker 
 See also the [documentation](https://github.com/envoyproxy/envoy/tree/master/ci) for developer use of the
 CI Docker image.
 
-## Buidling Envoy with Remote Execution
+## Building Envoy with Remote Execution
 
 Envoy can also be built with Bazel [Remote Executioon](https://docs.bazel.build/versions/master/remote-execution.html),
 part of the CI is running with the hosted [GCP RBE](https://blog.bazel.build/2018/10/05/remote-build-execution.html) service.
