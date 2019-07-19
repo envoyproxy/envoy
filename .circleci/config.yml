@@ -110,6 +110,18 @@ jobs:
        - checkout
        - setup_remote_docker
        - run: ci/build_container/docker_push.sh
+   docs:
+     executor: ubuntu-build
+     steps:
+       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
+       - checkout
+       - run: ci/do_circle_ci.sh docs
+       - add_ssh_keys:
+           fingerprints:
+             - "44:c7:a1:9e:f4:9e:a5:33:11:f1:0e:79:e1:55:c9:04"
+       - run: docs/publish.sh
+       - store_artifacts:
+           path: generated/docs
 
 workflows:
   version: 2
