@@ -41,6 +41,7 @@ envoy_cc_library(
         "//source/common/config:runtime_utility_lib",
         "//source/common/config:utility_lib",
         "//source/common/network:resolver_lib",
+        "//source/common/network:socket_option_factory_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/tracing:http_tracer_lib",
@@ -167,7 +168,7 @@ envoy_cc_library(
         "//include/envoy/server:options_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
-        "//source/common/stats:heap_stat_data_lib",
+        "//source/common/stats:allocator_lib",
     ],
 )
 
@@ -176,7 +177,7 @@ envoy_cc_library(
     hdrs = ["hot_restart_nop_impl.h"],
     deps = [
         "//include/envoy/server:hot_restart_interface",
-        "//source/common/stats:heap_stat_data_lib",
+        "//source/common/stats:allocator_lib",
     ],
 )
 

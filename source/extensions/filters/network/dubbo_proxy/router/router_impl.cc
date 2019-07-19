@@ -167,7 +167,7 @@ Router::UpstreamRequest::UpstreamRequest(Router& parent, Tcp::ConnectionPool::In
       request_complete_(false), response_started_(false), response_complete_(false),
       stream_reset_(false) {}
 
-Router::UpstreamRequest::~UpstreamRequest() {}
+Router::UpstreamRequest::~UpstreamRequest() = default;
 
 FilterStatus Router::UpstreamRequest::start() {
   Tcp::ConnectionPool::Cancellable* handle = conn_pool_.newConnection(*this);

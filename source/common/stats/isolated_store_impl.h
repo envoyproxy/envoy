@@ -1,15 +1,14 @@
 #pragma once
 
-#include <string.h>
-
 #include <algorithm>
+#include <cstring>
 #include <string>
 
 #include "envoy/stats/stats.h"
 #include "envoy/stats/store.h"
 
 #include "common/common/utility.h"
-#include "common/stats/heap_stat_data.h"
+#include "common/stats/allocator_impl.h"
 #include "common/stats/null_counter.h"
 #include "common/stats/null_gauge.h"
 #include "common/stats/store_impl.h"
@@ -142,7 +141,7 @@ private:
   IsolatedStoreImpl(std::unique_ptr<SymbolTable>&& symbol_table);
 
   std::unique_ptr<SymbolTable> symbol_table_storage_;
-  HeapStatDataAllocator alloc_;
+  AllocatorImpl alloc_;
   IsolatedStatsCache<Counter> counters_;
   IsolatedStatsCache<Gauge> gauges_;
   IsolatedStatsCache<Histogram> histograms_;
