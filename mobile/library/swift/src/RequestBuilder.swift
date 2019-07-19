@@ -67,13 +67,13 @@ public final class RequestBuilder: NSObject {
   }
 
   @discardableResult
-  public func removeTrailer(name: String) -> RequestBuilder {
+  public func removeTrailers(name: String) -> RequestBuilder {
     self.trailers.removeValue(forKey: name)
     return self
   }
 
   @discardableResult
-  public func removeTrailers(named name: String, value: String) -> RequestBuilder {
+  public func removeTrailer(name: String, value: String) -> RequestBuilder {
     self.trailers[name]?.removeAll(where: { $0 == value })
     if self.trailers[name]?.isEmpty == true {
       self.trailers.removeValue(forKey: name)
