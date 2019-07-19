@@ -425,10 +425,10 @@ message HttpConnectionManager {
   // `case normalization <https://tools.ietf.org/html/rfc3986#section-6.2.2.1>`
   google.protobuf.BoolValue normalize_path = 30;
 
-  // Should adjacent slashes in the path be merged into one before any processing of requests by
-  // HTTP filters or routing? This affects the upstream *:path* header as well. Without setting this
-  // option incoming requests with path `//dir/file` will not match against route with `prefix`
-  // match set to `/dir`. Defaults to `false`.
+  // Determines if adjacent slashes in the path are merged into one before any processing of
+  // requests by HTTP filters or routing. This affects the upstream *:path* header as well. Without
+  // setting this option incoming requests with path `//dir/file` will not match against route with
+  // `prefix` match set to `/dir`. Defaults to `false`.
   google.protobuf.BoolValue merge_slashes = 33;
 }
 
