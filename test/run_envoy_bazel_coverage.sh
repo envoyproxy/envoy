@@ -27,7 +27,7 @@ SCRIPT_DIR="$(realpath "$(dirname "$0")")"
 
 BAZEL_USE_LLVM_NATIVE_COVERAGE=1 GCOV=llvm-profdata bazel coverage ${BAZEL_BUILD_OPTIONS} \
     -c fastbuild --copt=-DNDEBUG --instrumentation_filter=//source/...,//include/... \
-    --test_timeout=2000 --cxxopt="-DENVOY_CONFIG_COVERAGE=1" --test_output=streamed \
+    --test_timeout=2000 --cxxopt="-DENVOY_CONFIG_COVERAGE=1" --test_output=errors \
     --test_arg="--log-path /dev/null" --test_arg="-l trace" --test_env=HEAPCHECK= \
     //test/coverage:coverage_tests
 
@@ -36,7 +36,10 @@ mkdir -p "${COVERAGE_DIR}"
 
 COVERAGE_IGNORE_REGEX="(/external/|pb\.(validate\.)?(h|cc)|/chromium_url/|/test/|/tmp)"
 COVERAGE_BINARY="bazel-bin/test/coverage/coverage_tests"
-COVERAGE_DATA="bazel-out/k8-fastbuild/testlogs/test/coverage/coverage_tests/coverage.dat"
+COVERAGE_DATA="${COVERAGE_DIR}/coverage.dat"
+
+echo "Merging coverage data..."
+llvm-profdata merge -sparse -o ${COVERAGE_DATA} $(find -L bazel-out/k8-fastbuild/testlogs/test/coverage/coverage_tests/ -name coverage.dat)
 
 echo "Generating report..."
 llvm-cov show "${COVERAGE_BINARY}" -instr-profile="${COVERAGE_DATA}" -Xdemangler=c++filt \
