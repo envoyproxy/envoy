@@ -543,7 +543,8 @@ static_resources:
 
   EXPECT_THROW_WITH_MESSAGE(
       create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
-      "cluster: cluster type 'original_dst' may only be used with LB type 'original_dst_lb'");
+      "cluster: LB policy ROUND_ROBIN is not valid for Cluster type ORIGINAL_DST. Only "
+      "'original_dst_lb' is allowed with cluster type 'original_dst'");
 }
 
 TEST_F(ClusterManagerImplTest, OriginalDstLbRestriction2) {
@@ -566,7 +567,8 @@ static_resources:
 
   EXPECT_THROW_WITH_MESSAGE(
       create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
-      "cluster: LB type 'original_dst_lb' may only be used with cluster type 'original_dst'");
+      "cluster: LB policy ORIGINAL_DST_LB is not valid for Cluster type STATIC. Only "
+      "'original_dst_lb' is allowed with cluster type 'original_dst'");
 }
 
 TEST_F(ClusterManagerImplTest, SubsetLoadBalancerInitialization) {
