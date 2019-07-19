@@ -82,10 +82,9 @@ jobs:
     workingDirectory: $(Build.SourcesDirectory)
     env:
       ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-      DOCS_OUTPUT_DIR: $(Build.StagingDirectory)/docs
     displayName: "Run CI script"
 
   - task: PublishBuildArtifacts@1
     inputs:
-      pathtoPublish: "$(Build.StagingDirectory)/docs"
+      pathtoPublish: "$(Build.SourcesDirectory)/generated/docs"
       artifactName: docs
