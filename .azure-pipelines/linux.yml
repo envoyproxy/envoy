@@ -68,3 +68,24 @@ jobs:
     env:
       ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
     displayName: "Run CI script"
+
+- job: docs
+  dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
+  pool:
+    vmImage: 'Ubuntu 16.04'
+  steps:
+  - script: |
+      ci/run_envoy_docker.sh '
+        set -e
+        ci/do_ci.sh docs
+      '
+    workingDirectory: $(Build.SourcesDirectory)
+    env:
+      ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+      DOCS_OUTPUT_DIR: $(Build.StagingDirectory)/docs
+    displayName: "Run CI script"
+
+  - task: PublishBuildArtifacts@1
+    inputs:
+      pathtoPublish: "$(Build.StagingDirectory)/docs"
+      artifactName: docs
