@@ -362,7 +362,7 @@ public:
   CustomInstance(const std::string& address, uint32_t port) : instance_(address, port) {
     antagonistic_name_ = fmt::format("{}:borked_port_{}", address, port);
   }
-  ~CustomInstance() override {}
+  ~CustomInstance() override = default;
 
   // Address::Instance
   bool operator==(const Address::Instance& rhs) const override {

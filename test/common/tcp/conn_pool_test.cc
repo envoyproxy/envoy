@@ -180,7 +180,7 @@ public:
                                     Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000"),
                                     Upstream::ResourcePriority::Default, nullptr, nullptr)} {}
 
-  ~TcpConnPoolImplDestructorTest() {}
+  ~TcpConnPoolImplDestructorTest() = default;
 
   void prepareConn() {
     connection_ = new NiceMock<Network::MockClientConnection>();

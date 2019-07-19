@@ -29,7 +29,7 @@ public:
 
 class MockMetadataFetcher {
 public:
-  virtual ~MockMetadataFetcher(){};
+  virtual ~MockMetadataFetcher() = default;
 
   MOCK_CONST_METHOD3(fetch, absl::optional<std::string>(const std::string&, const std::string&,
                                                         const absl::optional<std::string>&));

@@ -1,8 +1,7 @@
 #include "server/server.h"
 
-#include <signal.h>
-
 #include <atomic>
+#include <csignal>
 #include <cstdint>
 #include <functional>
 #include <memory>

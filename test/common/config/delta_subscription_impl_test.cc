@@ -8,18 +8,12 @@ namespace {
 
 class DeltaSubscriptionImplTest : public DeltaSubscriptionTestHarness, public testing::Test {
 protected:
-  DeltaSubscriptionImplTest() {}
+  DeltaSubscriptionImplTest() = default;
 
   // We need to destroy the subscription before the test's destruction, because the subscription's
   // destructor removes its watch from the NewGrpcMuxImpl, and that removal process involves
   // some things held by the test fixture.
-  void TearDown() override {
-    //  if (subscription_started_) {
-    //  EXPECT_CALL(async_stream_, sendMessage(_,_));
-    //     subscription_.reset();
-    // }
-    doSubscriptionTearDown();
-  }
+  void TearDown() override { doSubscriptionTearDown(); }
 };
 
 TEST_F(DeltaSubscriptionImplTest, UpdateResourcesCausesRequest) {
