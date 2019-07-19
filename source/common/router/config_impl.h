@@ -228,7 +228,7 @@ class RetryPolicyImpl : public RetryPolicy {
 public:
   RetryPolicyImpl(const envoy::api::v2::route::RetryPolicy& retry_policy,
                   ProtobufMessage::ValidationVisitor& validation_visitor);
-  RetryPolicyImpl() {}
+  RetryPolicyImpl() = default;
 
   // Router::RetryPolicy
   std::chrono::milliseconds perTryTimeout() const override { return per_try_timeout_; }

@@ -153,8 +153,8 @@ elif [[ "$CI_TARGET" == "bazel.asan" ]]; then
   rm -rf "${TAP_TMP}"
   mkdir -p "${TAP_TMP}"
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-asan \
-    //test/extensions/transport_sockets/tls/integration:ssl_integration_test \
-    --test_env=TAP_PATH="${TAP_TMP}/tap"
+    --strategy=TestRunner=local --test_env=TAP_PATH="${TAP_TMP}/tap" \
+    //test/extensions/transport_sockets/tls/integration:ssl_integration_test
   # Verify that some pb_text files have been created. We can't check for pcap,
   # since tcpdump is not available in general due to CircleCI lack of support
   # for privileged Docker executors.
@@ -238,8 +238,10 @@ elif [[ "$CI_TARGET" == "bazel.coverage" ]]; then
   setup_clang_toolchain
   echo "bazel coverage build with tests ${TEST_TARGETS}"
 
-  # LLVM coverage is a memory hog too.
-  [ -z "$CIRCLECI" ] || export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --local_cpu_resources=6"
+  # Reduce the amount of memory Bazel tries to use to prevent it from launching too many subprocesses.
+  # This should prevent the system from running out of memory and killing tasks. See discussion on
+  # https://github.com/envoyproxy/envoy/pull/5611.
+  [ -z "$CIRCLECI" ] || export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --local_ram_resources=12288"
 
   test/run_envoy_bazel_coverage.sh ${TEST_TARGETS}
   collect_build_profile coverage

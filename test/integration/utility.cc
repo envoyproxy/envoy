@@ -129,7 +129,7 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& initia
   client_->connect();
 }
 
-RawConnectionDriver::~RawConnectionDriver() {}
+RawConnectionDriver::~RawConnectionDriver() = default;
 
 void RawConnectionDriver::run(Event::Dispatcher::RunType run_type) { dispatcher_->run(run_type); }
 
