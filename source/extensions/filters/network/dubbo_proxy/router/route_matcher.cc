@@ -64,7 +64,7 @@ ParameterRouteEntryImpl::ParameterRouteEntryImpl(
   }
 }
 
-ParameterRouteEntryImpl::~ParameterRouteEntryImpl() {}
+ParameterRouteEntryImpl::~ParameterRouteEntryImpl() = default;
 
 bool ParameterRouteEntryImpl::matchParameter(absl::string_view request_data,
                                              const ParameterData& config_data) const {
@@ -138,7 +138,7 @@ MethodRouteEntryImpl::MethodRouteEntryImpl(
   }
 }
 
-MethodRouteEntryImpl::~MethodRouteEntryImpl() {}
+MethodRouteEntryImpl::~MethodRouteEntryImpl() = default;
 
 RouteConstSharedPtr MethodRouteEntryImpl::matches(const MessageMetadata& metadata,
                                                   uint64_t random_value) const {

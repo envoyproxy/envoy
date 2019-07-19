@@ -3,9 +3,9 @@
 namespace Envoy {
 namespace ProtobufMessage {
 
-MockValidationVisitor::MockValidationVisitor() {}
+MockValidationVisitor::MockValidationVisitor() = default;
 
-MockValidationVisitor::~MockValidationVisitor() {}
+MockValidationVisitor::~MockValidationVisitor() = default;
 
 } // namespace ProtobufMessage
 } // namespace Envoy

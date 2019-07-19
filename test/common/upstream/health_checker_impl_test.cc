@@ -2831,7 +2831,7 @@ public:
 class GrpcHealthCheckerImplTestBase {
 public:
   struct TestSession {
-    TestSession() {}
+    TestSession() = default;
 
     Event::MockTimer* interval_timer_{};
     Event::MockTimer* timeout_timer_{};

@@ -216,7 +216,7 @@ public:
 class MockListenSocket : public Socket {
 public:
   MockListenSocket();
-  ~MockListenSocket() override {}
+  ~MockListenSocket() override = default;
 
   void addOption(const Socket::OptionConstSharedPtr& option) override { addOption_(option); }
   void addOptions(const Socket::OptionsSharedPtr& options) override { addOptions_(options); }
@@ -252,7 +252,7 @@ public:
 class MockConnectionSocket : public ConnectionSocket {
 public:
   MockConnectionSocket();
-  ~MockConnectionSocket() override {}
+  ~MockConnectionSocket() override = default;
 
   void addOption(const Socket::OptionConstSharedPtr& option) override { addOption_(option); }
   void addOptions(const Socket::OptionsSharedPtr& options) override { addOptions_(options); }
