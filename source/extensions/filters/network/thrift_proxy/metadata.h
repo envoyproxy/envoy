@@ -29,7 +29,7 @@ namespace ThriftProxy {
  */
 class MessageMetadata {
 public:
-  MessageMetadata() {}
+  MessageMetadata() = default;
 
   bool hasFrameSize() const { return frame_size_.has_value(); }
   uint32_t frameSize() const { return frame_size_.value(); }

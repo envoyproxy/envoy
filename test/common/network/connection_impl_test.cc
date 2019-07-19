@@ -1335,7 +1335,7 @@ TEST_P(ConnectionImplTest, DelayedCloseTimeoutNullStats) {
 
 class FakeReadFilter : public Network::ReadFilter {
 public:
-  FakeReadFilter() {}
+  FakeReadFilter() = default;
   ~FakeReadFilter() {
     EXPECT_TRUE(callbacks_ != nullptr);
     // The purpose is to verify that when FilterManger is destructed, ConnectionSocketImpl is not
