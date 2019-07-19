@@ -39,6 +39,8 @@ public:
   }
   ~RedirectionMgrTest() override = default;
 
+  // Advance simulation time by increment milliseconds, waiting on nthreads other threads at each
+  // point, before continuing. This must be called only by a single thread.
   void advanceTime(MonotonicTime&& end_time, uint32_t nthreads = 0,
                    std::chrono::milliseconds&& increment = std::chrono::milliseconds(1000)) {
     if (nthreads == 0) {
@@ -56,6 +58,7 @@ public:
           }
           current_time += increment;
           if (current_time > end_time) {
+            // Ensure that end_time is not overshot.
             current_time = end_time;
           }
           time_system_.setMonotonicTime(current_time);
@@ -72,6 +75,7 @@ public:
     }
   }
 
+  // Wait until simulation time reaches end_time.
   void waitForTime(MonotonicTime&& end_time) {
     while (time_system_.monotonicTime() < end_time) {
       {
