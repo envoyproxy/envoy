@@ -50,7 +50,6 @@ constexpr const char* disallowed_features[] = {
     "envoy.deprecated_features.route.proto:runtime_key",
     // 1.11.0
     "envoy.deprecated_features.bootstrap.proto:runtime",
-    "envoy.deprecated_features.lds.proto:use_original_dst",
     "envoy.deprecated_features.redis_proxy.proto:catch_all_cluster",
     "envoy.deprecated_features.redis_proxy.proto:cluster",
     "envoy.deprecated_features.server_info.proto:max_obj_name_len",

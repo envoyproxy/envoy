@@ -153,8 +153,8 @@ elif [[ "$CI_TARGET" == "bazel.asan" ]]; then
   rm -rf "${TAP_TMP}"
   mkdir -p "${TAP_TMP}"
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-asan \
-    //test/extensions/transport_sockets/tls/integration:ssl_integration_test \
-    --test_env=TAP_PATH="${TAP_TMP}/tap"
+    --strategy=TestRunner=local --test_env=TAP_PATH="${TAP_TMP}/tap" \
+    //test/extensions/transport_sockets/tls/integration:ssl_integration_test
   # Verify that some pb_text files have been created. We can't check for pcap,
   # since tcpdump is not available in general due to CircleCI lack of support
   # for privileged Docker executors.
