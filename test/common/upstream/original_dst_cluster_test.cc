@@ -104,22 +104,6 @@ public:
   Api::ApiPtr api_;
 };
 
-TEST(OriginalDstClusterConfigTest, BadConfig) {
-  const std::string yaml = R"EOF(
-    name: name
-    connect_timeout: 0.25s
-    type: original_dst
-    lb_policy: original_dst_lb
-    hosts:
-    - socket_address:
-        address: foo.bar.com
-        port_value: 443
-  )EOF"; // Help Emacs balance quotation marks: "
-
-  EXPECT_THROW_WITH_MESSAGE(parseClusterFromV2Yaml(yaml), EnvoyException,
-                            "original_dst clusters must have no hosts configured");
-}
-
 TEST(OriginalDstClusterConfigTest, GoodConfig) {
   const std::string yaml = R"EOF(
     name: name

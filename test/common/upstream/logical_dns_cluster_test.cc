@@ -198,31 +198,31 @@ using LogicalDnsConfigTuple =
 std::vector<LogicalDnsConfigTuple> generateLogicalDnsParams() {
   std::vector<LogicalDnsConfigTuple> dns_config;
   {
-    std::string family_json("");
+    std::string family_yaml("");
     Network::DnsLookupFamily family(Network::DnsLookupFamily::Auto);
     std::list<std::string> dns_response{"127.0.0.1", "127.0.0.2"};
-    dns_config.push_back(std::make_tuple(family_json, family, dns_response));
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response));
   }
   {
-    std::string family_json(R"EOF(dns_lookup_family: v4_only
+    std::string family_yaml(R"EOF(dns_lookup_family: v4_only
                             )EOF");
     Network::DnsLookupFamily family(Network::DnsLookupFamily::V4Only);
     std::list<std::string> dns_response{"127.0.0.1", "127.0.0.2"};
-    dns_config.push_back(std::make_tuple(family_json, family, dns_response));
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response));
   }
   {
-    std::string family_json(R"EOF(dns_lookup_family: v6_only
+    std::string family_yaml(R"EOF(dns_lookup_family: v6_only
                             )EOF");
     Network::DnsLookupFamily family(Network::DnsLookupFamily::V6Only);
     std::list<std::string> dns_response{"::1", "::2"};
-    dns_config.push_back(std::make_tuple(family_json, family, dns_response));
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response));
   }
   {
-    std::string family_json(R"EOF(dns_lookup_family: auto
+    std::string family_yaml(R"EOF(dns_lookup_family: auto
                             )EOF");
     Network::DnsLookupFamily family(Network::DnsLookupFamily::Auto);
     std::list<std::string> dns_response{"::1"};
-    dns_config.push_back(std::make_tuple(family_json, family, dns_response));
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response));
   }
   return dns_config;
 }
@@ -242,7 +242,8 @@ TEST_P(LogicalDnsParamTest, ImmediateResolve) {
   connect_timeout: 0.25s
   type: logical_dns
   lb_policy: round_robin
-  )EOF" + std::get<0>(GetParam()) + R"EOF(
+  )EOF" + std::get<0>(GetParam()) +
+                           R"EOF(
   hosts:
   - socket_address:
       address: foo.bar.com
