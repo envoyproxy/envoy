@@ -206,10 +206,9 @@ SplitRequestPtr EvalRequest::create(Router& router, Common::Redis::RespValuePtr&
           // A prefix router modified the first key, and its logic will now be applied to the
           // other keys. eval and evalsha have the same offsets for num_keys and the keys
           // themselves.
-          for (uint32_t key_index = 4; key_index <= (3 + num_keys); key_index++) {
-            bool prefix_found = (incoming_request->asArray()[key_index].asString().find(
-                                     prefix_route->prefix()) == 0);
-            if (prefix_found) {
+          for (uint64_t key_index = 4; key_index <= (3 + num_keys); key_index++) {
+            if (absl::StartsWith(incoming_request->asArray()[key_index].asString(),
+                                 prefix_route->prefix())) {
               // The prefix has been found as part of this key; remove it. This logic assumes that
               // the prefix route that matches the first key either applies to the other keys or NO
               // prefix does. Other prefixes from other routes are not checked against these other
