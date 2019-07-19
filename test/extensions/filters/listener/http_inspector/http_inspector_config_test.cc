@@ -21,7 +21,7 @@ TEST(HttpInspectorConfigFactoryTest, TestCreateFactory) {
 
   EXPECT_EQ(factory->name(), ListenerFilters::ListenerFilterNames::get().HttpInspector);
 
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
       {}
 )EOF";
 
