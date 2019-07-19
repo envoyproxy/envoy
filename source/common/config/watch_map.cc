@@ -154,10 +154,8 @@ WatchMap::findRemovals(const std::vector<std::string>& newly_removed_from_watch,
   std::set<std::string> newly_removed_from_subscription;
   for (const auto& name : newly_removed_from_watch) {
     auto entry = watch_interest_.find(name);
-    if (entry == watch_interest_.end()) {
-      ENVOY_LOG(warn, "WatchMap: tried to remove a watch from untracked resource {}", name);
-      continue;
-    }
+    ASSERT(entry != watch_interest_.end(),
+           fmt::format("WatchMap: tried to remove a watch from untracked resource {}", name));
 
     entry->second.erase(watch);
     if (entry->second.empty()) {
