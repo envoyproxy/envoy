@@ -41,7 +41,7 @@ public:
 
   const HttpInspectorStats& stats() const { return stats_; }
 
-  static constexpr uint32_t MAX_INSPECT_SIZE = 1024;
+  static constexpr uint32_t MAX_INSPECT_SIZE = 8192;
 
 private:
   HttpInspectorStats stats_;
@@ -66,7 +66,6 @@ private:
   void done(bool success);
   void parseHttpHeader(absl::string_view data);
 
-  const absl::flat_hash_set<std::string>& httpMethods() const;
   const absl::flat_hash_set<std::string>& httpProtocols() const;
 
   ConfigSharedPtr config_;

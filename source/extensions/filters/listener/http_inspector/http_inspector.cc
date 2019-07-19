@@ -93,7 +93,7 @@ void Filter::parseHttpHeader(absl::string_view data) {
     }
 
     absl::string_view request_line = data.substr(0, pos);
-    std::vector<std::string> fields = absl::StrSplit(request_line, ' ');
+    std::vector<absl::string_view> fields = absl::StrSplit(request_line, ' ');
 
     // Method SP Request-URI SP HTTP-Version
     if (fields.size() != 3) {
@@ -104,10 +104,6 @@ void Filter::parseHttpHeader(absl::string_view data) {
     if (httpProtocols().count(fields[2]) == 0) {
       ENVOY_LOG(trace, "http inspector: protocol: {} not valid", fields[2]);
       return done(false);
-    }
-
-    if (httpMethods().count(fields[0]) == 0) {
-      ENVOY_LOG(debug, "http inspector: detect unknown method: {}", fields[0]);
     }
 
     ENVOY_LOG(trace, "http inspector: method: {}, request uri: {}, protocol: {}", fields[0],
@@ -143,15 +139,6 @@ void Filter::done(bool success) {
   file_event_.reset();
   // Do not skip following listener filters.
   cb_->continueFilterChain(true);
-}
-
-const absl::flat_hash_set<std::string>& Filter::httpMethods() const {
-  CONSTRUCT_ON_FIRST_USE(
-      absl::flat_hash_set<std::string>,
-      {Http::Headers::get().MethodValues.Connect, Http::Headers::get().MethodValues.Delete,
-       Http::Headers::get().MethodValues.Get, Http::Headers::get().MethodValues.Head,
-       Http::Headers::get().MethodValues.Post, Http::Headers::get().MethodValues.Put,
-       Http::Headers::get().MethodValues.Options, Http::Headers::get().MethodValues.Trace});
 }
 
 const absl::flat_hash_set<std::string>& Filter::httpProtocols() const {
