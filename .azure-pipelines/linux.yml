@@ -58,7 +58,6 @@ jobs:
   - script: |
       ci/run_envoy_docker.sh '
         set -e
-        pip install -r tools/requirements.txt
         ci/do_ci.sh check_format
         ci/do_ci.sh check_repositories
         ci/do_ci.sh check_spelling
