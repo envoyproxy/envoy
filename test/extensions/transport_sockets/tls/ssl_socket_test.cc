@@ -879,6 +879,30 @@ TEST_P(SslSocketTest, GetUriWithUriSan) {
                .setExpectedSerialNumber(TEST_SAN_URI_CERT_SERIAL));
 }
 
+TEST_P(SslSocketTest, IpSan) {
+  const std::string client_ctx_yaml =
+      fmt::format(R"EOF(
+  common_tls_context:
+    validation_context:
+      trusted_ca:
+        filename: "{{{{ test_rundir }}}}/test/config/integration/certs/upstreamcacert.pem"
+      verify_subject_alt_name: {}
+)EOF",
+                  Network::Test::getLoopbackAddressString(GetParam()));
+
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/config/integration/certs/upstreamlocalhostcert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/config/integration/certs/upstreamlocalhostkey.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
+  testUtil(test_options);
+}
+
 TEST_P(SslSocketTest, GetNoUriWithDnsSan) {
   const std::string client_ctx_yaml = R"EOF(
   common_tls_context:

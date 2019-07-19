@@ -17,6 +17,7 @@ envoy_cc_test(
     ],
     data = [
         "gen_unittest_certs.sh",
+        "//test/config/integration/certs",
         "//test/extensions/transport_sockets/tls/test_data:certs",
     ],
     external_deps = ["ssl"],
