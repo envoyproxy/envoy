@@ -97,7 +97,7 @@ if [[ "$CI_TARGET" == "bazel.release" ]]; then
   # toolchain is kept consistent. This ifdef is checked in
   # test/common/stats/stat_test_utility.cc when computing
   # Stats::TestUtil::MemoryTest::mode().
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --cxxopt=-DMEMORY_TEST_EXACT=1"
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_env=ENVOY_MEMORY_TEST_EXACT=true"
 
   setup_clang_toolchain
   echo "bazel release build with tests..."
@@ -238,8 +238,10 @@ elif [[ "$CI_TARGET" == "bazel.coverage" ]]; then
   setup_clang_toolchain
   echo "bazel coverage build with tests ${TEST_TARGETS}"
 
-  # LLVM coverage is a memory hog too.
-  [ -z "$CIRCLECI" ] || export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --local_cpu_resources=6"
+  # Reduce the amount of memory Bazel tries to use to prevent it from launching too many subprocesses.
+  # This should prevent the system from running out of memory and killing tasks. See discussion on
+  # https://github.com/envoyproxy/envoy/pull/5611.
+  [ -z "$CIRCLECI" ] || export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --local_ram_resources=12288"
 
   test/run_envoy_bazel_coverage.sh ${TEST_TARGETS}
   collect_build_profile coverage

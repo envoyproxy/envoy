@@ -57,6 +57,7 @@ jobs:
   steps:
   - script: |
       ci/run_envoy_docker.sh '
+        set -e
         pip install -r tools/requirements.txt
         ci/do_ci.sh check_format
         ci/do_ci.sh check_repositories
@@ -67,4 +68,3 @@ jobs:
     env:
       ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
     displayName: "Run CI script"
-

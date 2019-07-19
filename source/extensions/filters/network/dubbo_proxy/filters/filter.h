@@ -175,7 +175,7 @@ public:
  */
 class FilterBase {
 public:
-  virtual ~FilterBase() {}
+  virtual ~FilterBase() = default;
 
   /**
    * This routine is called prior to a filter being destroyed. This may happen after normal stream

@@ -196,7 +196,10 @@ OriginalDstClusterFactory::createClusterImpl(
     Stats::ScopePtr&& stats_scope) {
   if (cluster.lb_policy() != envoy::api::v2::Cluster::ORIGINAL_DST_LB) {
     throw EnvoyException(fmt::format(
-        "cluster: cluster type 'original_dst' may only be used with LB type 'original_dst_lb'"));
+        "cluster: LB policy {} is not valid for Cluster type {}. Only 'original_dst_lb' "
+        "is allowed with cluster type 'original_dst'",
+        envoy::api::v2::Cluster_LbPolicy_Name(cluster.lb_policy()),
+        envoy::api::v2::Cluster_DiscoveryType_Name(cluster.type())));
   }
   if (cluster.has_lb_subset_config() && cluster.lb_subset_config().subset_selectors_size() != 0) {
     throw EnvoyException(

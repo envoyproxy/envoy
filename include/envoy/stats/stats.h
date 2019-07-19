@@ -10,7 +10,6 @@
 #include "envoy/stats/symbol_table.h"
 
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Stats {
