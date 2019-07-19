@@ -182,7 +182,7 @@ protected:
       LocalityDegradedHosts,
     };
 
-    HostsSource() {}
+    HostsSource() = default;
 
     HostsSource(uint32_t priority, SourceType source_type)
         : priority_(priority), source_type_(source_type) {

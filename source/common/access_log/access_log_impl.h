@@ -121,7 +121,7 @@ public:
  */
 class NotHealthCheckFilter : public Filter {
 public:
-  NotHealthCheckFilter() {}
+  NotHealthCheckFilter() = default;
 
   // AccessLog::Filter
   bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
