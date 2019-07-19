@@ -12,6 +12,7 @@
 #include "common/protobuf/utility.h"
 #include "common/singleton/const_singleton.h"
 #include "common/upstream/load_balancer_impl.h"
+#include "common/upstream/upstream_impl.h"
 
 #include "extensions/filters/network/common/redis/client.h"
 
@@ -45,6 +46,9 @@ public:
   std::chrono::milliseconds bufferFlushTimeoutInMs() const override {
     return buffer_flush_timeout_;
   }
+  uint32_t maxUpstreamUnknownConnections() const override {
+    return max_upstream_unknown_connections_;
+  }
 
 private:
   const std::chrono::milliseconds op_timeout_;
@@ -52,6 +56,7 @@ private:
   const bool enable_redirection_;
   const uint32_t max_buffer_size_before_flush_;
   const std::chrono::milliseconds buffer_flush_timeout_;
+  const uint32_t max_upstream_unknown_connections_;
 };
 
 class ClientImpl : public Client, public DecoderCallbacks, public Network::ConnectionCallbacks {
@@ -68,6 +73,7 @@ public:
   }
   void close() override;
   PoolRequest* makeRequest(const RespValue& request, PoolCallbacks& callbacks) override;
+  bool active() override { return !pending_requests_.empty(); }
   void flushBufferAndResetTimer();
 
 private:

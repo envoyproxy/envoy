@@ -1104,35 +1104,6 @@ Http::Code AdminImpl::handlerRuntime(absl::string_view url, Http::HeaderMap& res
   return Http::Code::OK;
 }
 
-std::string AdminImpl::runtimeAsJson(
-    const std::vector<std::pair<std::string, Runtime::Snapshot::Entry>>& entries) {
-  rapidjson::Document document;
-  document.SetObject();
-  rapidjson::Value entries_array(rapidjson::kArrayType);
-  rapidjson::Document::AllocatorType& allocator = document.GetAllocator();
-  for (const auto& entry : entries) {
-    Value entry_obj;
-    entry_obj.SetObject();
-
-    entry_obj.AddMember("name", {entry.first.c_str(), allocator}, allocator);
-
-    Value entry_value;
-    if (entry.second.uint_value_) {
-      entry_value.SetUint64(entry.second.uint_value_.value());
-    } else {
-      entry_value.SetString(entry.second.raw_string_value_.c_str(), allocator);
-    }
-    entry_obj.AddMember("value", entry_value, allocator);
-
-    entries_array.PushBack(entry_obj, allocator);
-  }
-  document.AddMember("runtime", entries_array, allocator);
-  rapidjson::StringBuffer strbuf;
-  rapidjson::PrettyWriter<StringBuffer> writer(strbuf);
-  document.Accept(writer);
-  return strbuf.GetString();
-}
-
 bool AdminImpl::isFormUrlEncoded(const Http::HeaderEntry* content_type) const {
   if (content_type == nullptr) {
     return false;
@@ -1196,13 +1167,14 @@ AdminImpl::NullRouteConfigProvider::NullRouteConfigProvider(TimeSource& time_sou
 void AdminImpl::startHttpListener(const std::string& access_log_path,
                                   const std::string& address_out_path,
                                   Network::Address::InstanceConstSharedPtr address,
+                                  const Network::Socket::OptionsSharedPtr& socket_options,
                                   Stats::ScopePtr&& listener_scope) {
   // TODO(mattklein123): Allow admin to use normal access logger extension loading and avoid the
   // hard dependency here.
   access_logs_.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
       access_log_path, {}, AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter(),
       server_.accessLogManager()));
-  socket_ = std::make_unique<Network::TcpListenSocket>(address, nullptr, true);
+  socket_ = std::make_unique<Network::TcpListenSocket>(address, socket_options, true);
   listener_ = std::make_unique<AdminListener>(*this, std::move(listener_scope));
   if (!address_out_path.empty()) {
     std::ofstream address_out_file(address_out_path);
@@ -1270,10 +1242,11 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
 
 Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection,
                                                  const Buffer::Instance& data,
-                                                 Http::ServerConnectionCallbacks& callbacks) {
+                                                 Http::ServerConnectionCallbacks& callbacks,
+                                                 const bool strict_header_validation) {
   return Http::ConnectionManagerUtility::autoCreateCodec(
       connection, data, callbacks, server_.stats(), Http::Http1Settings(), Http::Http2Settings(),
-      maxRequestHeadersKb());
+      maxRequestHeadersKb(), strict_header_validation);
 }
 
 bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,

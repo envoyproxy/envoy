@@ -3,7 +3,6 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
 #include "envoy/config/subscription.h"
-#include "envoy/config/watch_map.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "common/protobuf/protobuf.h"

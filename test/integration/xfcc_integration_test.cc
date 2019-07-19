@@ -70,16 +70,16 @@ Network::TransportSocketFactoryPtr XfccIntegrationTest::createClientSslContext(b
 }
 
 Network::TransportSocketFactoryPtr XfccIntegrationTest::createUpstreamSslContext() {
-  std::string json = R"EOF(
-{
-  "cert_chain_file": "{{ test_rundir }}/test/config/integration/certs/upstreamcert.pem",
-  "private_key_file": "{{ test_rundir }}/test/config/integration/certs/upstreamkey.pem"
-}
-)EOF";
+  envoy::api::v2::auth::DownstreamTlsContext tls_context;
+  auto* common_tls_context = tls_context.mutable_common_tls_context();
+  auto* tls_cert = common_tls_context->add_tls_certificates();
+  tls_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"));
+  tls_cert->mutable_private_key()->set_filename(
+      TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
 
-  Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
   auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
-      *loader, factory_context_);
+      tls_context, factory_context_);
   static Stats::Scope* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
   return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
       std::move(cfg), *context_manager_, *upstream_stats_store, std::vector<std::string>{});

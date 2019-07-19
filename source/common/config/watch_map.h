@@ -4,7 +4,7 @@
 #include <string>
 #include <utility>
 
-#include "envoy/config/watch_map.h"
+#include "envoy/config/subscription.h"
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"
