@@ -55,51 +55,10 @@ private:
     return localityLbEndpoint().lb_endpoints()[0];
   }
 
-  template <typename DnsResponseType>
-  void updateHosts(
-      std::string dns_address, const std::list<DnsResponseType>&& response,
-      std::function<Network::Address::InstanceConstSharedPtr(const DnsResponseType&)> translate) {
-    active_dns_query_ = nullptr;
-    ENVOY_LOG(debug, "async DNS resolution complete for {}", dns_address);
-    info_->stats().update_success_.inc();
-
-    std::chrono::milliseconds refresh_rate = dns_refresh_rate_ms_;
-    if (!response.empty()) {
-      // TODO(mattklein123): Move port handling into the DNS interface.
-      ASSERT(response.front().address_ != nullptr);
-      Network::Address::InstanceConstSharedPtr new_address = translate(response.front());
-
-      if (respect_dns_ttl_ && response.front().ttl_ != std::chrono::seconds(0)) {
-        refresh_rate = response.front().ttl_;
-      }
-
-      if (!logical_host_) {
-        logical_host_.reset(new LogicalHost(info_, hostname_, new_address, localityLbEndpoint(),
-                                            lbEndpoint(), nullptr));
-
-        const auto& locality_lb_endpoint = localityLbEndpoint();
-        PriorityStateManager priority_state_manager(*this, local_info_, nullptr);
-        priority_state_manager.initializePriorityFor(locality_lb_endpoint);
-        priority_state_manager.registerHostForPriority(logical_host_, locality_lb_endpoint);
-
-        const uint32_t priority = locality_lb_endpoint.priority();
-        priority_state_manager.updateClusterPrioritySet(
-            priority, std::move(priority_state_manager.priorityState()[priority].first),
-            absl::nullopt, absl::nullopt, absl::nullopt);
-      }
-
-      if (!current_resolved_address_ || !(*new_address == *current_resolved_address_)) {
-        current_resolved_address_ = new_address;
-
-        // Make sure that we have an updated address for admin display, health
-        // checking, and creating real host connections.
-        logical_host_->setNewAddress(new_address, lbEndpoint());
-      }
-    }
-
-    onPreInitComplete();
-    resolve_timer_->enableTimer(refresh_rate);
-  }
+  void
+  updateHosts(std::string dns_address, const std::list<Network::DnsResponse>&& response,
+              std::function<Network::Address::InstanceConstSharedPtr(const Network::DnsResponse&)>
+                  translate);
 
   void startResolve();
 

@@ -165,31 +165,6 @@ public:
 
 using InstanceConstSharedPtr = std::shared_ptr<const Instance>;
 
-/**
- * Interface for SRV records.
- */
-class SrvInstance {
-public:
-  virtual ~SrvInstance() {}
-
-  virtual bool operator==(const SrvInstance& rhs) const PURE;
-  bool operator!=(const SrvInstance& rhs) const { return !operator==(rhs); }
-
-  // TODO(venilnoronha): leverage priority and weight information from SRV records.
-
-  /**
-   * @return the address instance for the SRV record.
-   */
-  virtual InstanceConstSharedPtr address() const PURE;
-
-  /**
-   * @return a human readable string for the SRV record.
-   */
-  virtual const std::string& asString() const PURE;
-};
-
-using SrvInstanceConstSharedPtr = std::shared_ptr<const SrvInstance>;
-
 } // namespace Address
 } // namespace Network
 } // namespace Envoy

@@ -68,6 +68,30 @@ void DnsResolverImpl::initializeChannel(ares_options* options, int optmask) {
   ares_init_options(&channel_, options, optmask | ARES_OPT_SOCK_STATE_CB);
 }
 
+bool DnsResolverImpl::PendingResolutionBase::fireCallback(std::list<DnsResponse>&& response) {
+  if (completed_) {
+    if (!cancelled_) {
+      try {
+        callback_(std::move(response));
+      } catch (const EnvoyException& e) {
+        ENVOY_LOG(critical, "EnvoyException in c-ares callback");
+        dispatcher_.post([s = std::string(e.what())] { throw EnvoyException(s); });
+      } catch (const std::exception& e) {
+        ENVOY_LOG(critical, "std::exception in c-ares callback");
+        dispatcher_.post([s = std::string(e.what())] { throw EnvoyException(s); });
+      } catch (...) {
+        ENVOY_LOG(critical, "Unknown exception in c-ares callback");
+        dispatcher_.post([] { throw EnvoyException("unknown"); });
+      }
+    }
+    if (owned_) {
+      delete this;
+      return true;
+    }
+  }
+  return false;
+}
+
 void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, int timeouts,
                                                                    ares_addrinfo* addrinfo) {
   // We receive ARES_EDESTRUCTION when destructing with pending queries.
@@ -121,7 +145,7 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
     ENVOY_LOG(debug, "DNS request timed out {} times", timeouts);
   }
 
-  if (fireCallback(callback_, std::move(address_list))) {
+  if (fireCallback(std::move(address_list))) {
     return;
   }
 
@@ -176,8 +200,8 @@ void DnsResolverImpl::onAresSocketStateChange(int fd, int read, int write) {
                           (write ? Event::FileReadyType::Write : 0));
 }
 
-ActiveDnsQuery*
-DnsResolverImpl::markForDestruction(std::unique_ptr<PendingResolutionBase> pending_resolution) {
+ActiveDnsQuery* DnsResolverImpl::preparePendingResolution(
+    std::unique_ptr<PendingResolutionBase> pending_resolution) {
   if (pending_resolution->completed_) {
     // Resolution does not need asynchronous behavior or network events. For
     // example, localhost lookup.
@@ -209,7 +233,7 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
     pending_resolution->getAddrInfo(AF_INET6);
   }
 
-  return markForDestruction(std::move(pending_resolution));
+  return preparePendingResolution(std::move(pending_resolution));
 }
 
 void DnsResolverImpl::PendingResolution::getAddrInfo(int family) {
@@ -231,12 +255,11 @@ void DnsResolverImpl::PendingResolution::getAddrInfo(int family) {
 }
 
 ActiveDnsQuery* DnsResolverImpl::resolveSrv(const std::string& dns_name,
-                                            DnsLookupFamily dns_lookup_family,
-                                            ResolveSrvCb callback) {
+                                            DnsLookupFamily dns_lookup_family, ResolveCb callback) {
   std::unique_ptr<PendingSrvResolution> pending_srv_res(
       new PendingSrvResolution(callback, dispatcher_, channel_, dns_name, dns_lookup_family, this));
   pending_srv_res->getSrvByName();
-  return markForDestruction(std::move(pending_srv_res));
+  return preparePendingResolution(std::move(pending_srv_res));
 }
 
 void DnsResolverImpl::PendingSrvResolution::onAresSrvStartCallback(int status, int timeouts,
@@ -254,7 +277,7 @@ void DnsResolverImpl::PendingSrvResolution::onAresSrvStartCallback(int status, i
     status = ares_parse_srv_reply(buf, len, &srv_reply);
 
     if (status == ARES_SUCCESS) {
-      std::list<DnsSrvResponse> srv_records;
+      std::list<DnsResponse> srv_records;
       size_t total = 0, finished = 0;
       for (ares_srv_reply* current_reply = srv_reply; current_reply != NULL;
            current_reply = current_reply->next, ++total) {
@@ -265,8 +288,7 @@ void DnsResolverImpl::PendingSrvResolution::onAresSrvStartCallback(int status, i
               for (auto instance = response.begin(); instance != response.end(); ++instance) {
                 Address::InstanceConstSharedPtr inst_with_port(
                     Utility::getAddressWithPort(*instance->address_, current_reply->port));
-                srv_records.emplace_back(DnsSrvResponse(
-                    std::make_shared<Address::SrvInstanceImpl>(inst_with_port), instance->ttl_));
+                srv_records.emplace_back(DnsResponse(inst_with_port, instance->ttl_));
               }
               if (++finished == total) {
                 onAresSrvFinishCallback(std::move(srv_records));
@@ -289,12 +311,12 @@ void DnsResolverImpl::PendingSrvResolution::onAresSrvStartCallback(int status, i
 }
 
 void DnsResolverImpl::PendingSrvResolution::onAresSrvFinishCallback(
-    std::list<DnsSrvResponse>&& srv_records) {
+    std::list<DnsResponse>&& srv_records) {
   if (!srv_records.empty()) {
     completed_ = true;
   }
 
-  fireCallback(callback_, std::move(srv_records));
+  fireCallback(std::move(srv_records));
 }
 
 void DnsResolverImpl::PendingSrvResolution::getSrvByName() {

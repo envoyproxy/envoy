@@ -259,25 +259,6 @@ private:
   uint32_t address_length_{0};
 };
 
-/**
- * Implementation for an SrvInstance.
- */
-class SrvInstanceImpl : public SrvInstance {
-public:
-  /**
-   * Construct from an InstanceConstSharedPtr.
-   */
-  explicit SrvInstanceImpl(InstanceConstSharedPtr instance);
-
-  // Network::Address::SrvInstance
-  bool operator==(const SrvInstance& rhs) const override;
-  InstanceConstSharedPtr address() const override { return instance_; }
-  const std::string& asString() const override { return instance_->asString(); }
-
-private:
-  InstanceConstSharedPtr instance_;
-};
-
 } // namespace Address
 } // namespace Network
 } // namespace Envoy

@@ -386,12 +386,6 @@ Api::SysCallIntResult PipeInstance::connect(int fd) const {
 
 IoHandlePtr PipeInstance::socket(SocketType type) const { return socketFromSocketType(type); }
 
-SrvInstanceImpl::SrvInstanceImpl(InstanceConstSharedPtr instance) : instance_(instance) {}
-
-bool SrvInstanceImpl::operator==(const SrvInstance& rhs) const {
-  return instance_.get() == rhs.address().get();
-}
-
 } // namespace Address
 } // namespace Network
 } // namespace Envoy

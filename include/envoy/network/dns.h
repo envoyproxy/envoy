@@ -36,17 +36,6 @@ struct DnsResponse {
   const std::chrono::seconds ttl_;
 };
 
-/**
- * DNS SRV response.
- */
-struct DnsSrvResponse {
-  DnsSrvResponse(const Address::SrvInstanceConstSharedPtr& address, const std::chrono::seconds ttl)
-      : address_(address), ttl_(ttl) {}
-
-  const Address::SrvInstanceConstSharedPtr address_;
-  const std::chrono::seconds ttl_;
-};
-
 enum class DnsLookupFamily { V4Only, V6Only, Auto };
 
 /**
@@ -75,13 +64,6 @@ public:
                                   ResolveCb callback) PURE;
 
   /**
-   * Called when a resolution attempt for an SRV record is complete.
-   * @param response supplies the list of resolved SRV records and TTLs. The list will be empty if
-   *        the resolution failed.
-   */
-  using ResolveSrvCb = std::function<void(std::list<DnsSrvResponse>&& response)>;
-
-  /**
    * Initiate an async DNS resolution for an SRV record.
    * @param dns_name supplies the DNS name to lookup.
    * @param dns_lookup_family the DNS IP version lookup policy.
@@ -90,7 +72,7 @@ public:
    *         This is only valid until the invocation of callback or ~DnsResolver().
    */
   virtual ActiveDnsQuery* resolveSrv(const std::string& dns_name, DnsLookupFamily dns_lookup_family,
-                                     ResolveSrvCb callback) PURE;
+                                     ResolveCb callback) PURE;
 };
 
 using DnsResolverSharedPtr = std::shared_ptr<DnsResolver>;

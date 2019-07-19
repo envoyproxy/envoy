@@ -35,15 +35,15 @@ public:
   ActiveDnsQuery* resolve(const std::string& dns_name, DnsLookupFamily dns_lookup_family,
                           ResolveCb callback) override;
   ActiveDnsQuery* resolveSrv(const std::string& dns_name, DnsLookupFamily dns_lookup_family,
-                             ResolveSrvCb callback) override;
+                             ResolveCb callback) override;
 
 private:
   friend class DnsResolverImplPeer;
   struct PendingResolutionBase : public ActiveDnsQuery {
     // Network::ActiveDnsQuery
-    PendingResolutionBase(Event::Dispatcher& dispatcher, ares_channel channel,
+    PendingResolutionBase(ResolveCb callback, Event::Dispatcher& dispatcher, ares_channel channel,
                           const std::string& dns_name)
-        : dispatcher_(dispatcher), channel_(channel), dns_name_(dns_name) {}
+        : callback_(callback), dispatcher_(dispatcher), channel_(channel), dns_name_(dns_name) {}
 
     void cancel() override {
       // c-ares only supports channel-wide cancellation, so we just allow the
@@ -51,32 +51,10 @@ private:
       cancelled_ = true;
     }
 
-    template <typename DnsResponseType>
-    bool fireCallback(std::function<void(std::list<DnsResponseType>&&)> callback,
-                      std::list<DnsResponseType>&& response) {
-      if (completed_) {
-        if (!cancelled_) {
-          try {
-            callback(std::move(response));
-          } catch (const EnvoyException& e) {
-            ENVOY_LOG(critical, "EnvoyException in c-ares callback");
-            dispatcher_.post([s = std::string(e.what())] { throw EnvoyException(s); });
-          } catch (const std::exception& e) {
-            ENVOY_LOG(critical, "std::exception in c-ares callback");
-            dispatcher_.post([s = std::string(e.what())] { throw EnvoyException(s); });
-          } catch (...) {
-            ENVOY_LOG(critical, "Unknown exception in c-ares callback");
-            dispatcher_.post([] { throw EnvoyException("unknown"); });
-          }
-        }
-        if (owned_) {
-          delete this;
-          return true;
-        }
-      }
-      return false;
-    }
+    bool fireCallback(std::list<DnsResponse>&& response);
 
+    // Caller supplied callback to invoke on query completion or error.
+    const ResolveCb callback_;
     // Dispatcher to post any callback_ exceptions to.
     Event::Dispatcher& dispatcher_;
     // Does the object own itself? Resource reclamation occurs via self-deleting
@@ -93,7 +71,7 @@ private:
   struct PendingResolution : public PendingResolutionBase {
     PendingResolution(ResolveCb callback, Event::Dispatcher& dispatcher, ares_channel channel,
                       const std::string& dns_name)
-        : PendingResolutionBase(dispatcher, channel, dns_name), callback_(callback) {}
+        : PendingResolutionBase(callback, dispatcher, channel, dns_name) {}
 
     /**
      * ares_getaddrinfo query callback.
@@ -109,17 +87,15 @@ private:
      */
     void getAddrInfo(int family);
 
-    // Caller supplied callback to invoke on query completion or error.
-    const ResolveCb callback_;
     // If dns_lookup_family is "fallback", fallback to v4 address if v6 resolution failed.
     bool fallback_if_failed_ = false;
   };
 
   struct PendingSrvResolution : public PendingResolutionBase {
-    PendingSrvResolution(ResolveSrvCb callback, Event::Dispatcher& dispatcher, ares_channel channel,
+    PendingSrvResolution(ResolveCb callback, Event::Dispatcher& dispatcher, ares_channel channel,
                          const std::string& dns_name, DnsLookupFamily dns_lookup_family,
                          DnsResolverImpl* resolver)
-        : PendingResolutionBase(dispatcher, channel, dns_name), callback_(callback),
+        : PendingResolutionBase(callback, dispatcher, channel, dns_name),
           dns_lookup_family_(dns_lookup_family), resolver_(resolver) {}
 
     /**
@@ -135,13 +111,11 @@ private:
      * c-ares ares_query() query callback for completion.
      * @param srv_records a list of SRV records.
      */
-    void onAresSrvFinishCallback(std::list<DnsSrvResponse>&& srv_records);
+    void onAresSrvFinishCallback(std::list<DnsResponse>&& srv_records);
 
     // wrapper function of call to ares_query().
     void getSrvByName();
 
-    // Caller supplied callback to invoke on query completion or error.
-    const ResolveSrvCb callback_;
     // The DnsLookupFamily for the SRV record.
     const DnsLookupFamily dns_lookup_family_;
     // The resolver instance.
@@ -158,10 +132,12 @@ private:
   // Update timer for c-ares timeouts.
   void updateAresTimer();
   /**
-   * Marks a PendingResolutionBase object for destruction if owned.
+   * Prepares a PendingResolutionBase object for destruction if owned and when
+   * the resolution is completed.
    * @param a pointer to the PendingResolutionBase instance.
    */
-  ActiveDnsQuery* markForDestruction(std::unique_ptr<PendingResolutionBase> pending_resolution);
+  ActiveDnsQuery*
+  preparePendingResolution(std::unique_ptr<PendingResolutionBase> pending_resolution);
 
   Event::Dispatcher& dispatcher_;
   Event::TimerPtr timer_;

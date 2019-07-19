@@ -18,7 +18,7 @@ public:
   ActiveDnsQuery* resolve(const std::string& dns_name, DnsLookupFamily dns_lookup_family,
                           ResolveCb callback) override;
   ActiveDnsQuery* resolveSrv(const std::string& dns_name, DnsLookupFamily dns_lookup_family,
-                             ResolveSrvCb callback) override;
+                             ResolveCb callback) override;
 };
 
 } // namespace Network

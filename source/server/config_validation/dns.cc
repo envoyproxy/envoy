@@ -10,7 +10,7 @@ ActiveDnsQuery* ValidationDnsResolver::resolve(const std::string&, DnsLookupFami
 }
 
 ActiveDnsQuery* ValidationDnsResolver::resolveSrv(const std::string&, DnsLookupFamily,
-                                                  ResolveSrvCb callback) {
+                                                  ResolveCb callback) {
   callback({});
   return nullptr;
 }

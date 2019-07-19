@@ -70,9 +70,8 @@ InstanceConstSharedPtr SrvResolver::resolve(std::string socket_address) {
 
   Network::ActiveDnsQuery* active_query = dns_resolver_->resolveSrv(
       socket_address, DnsLookupFamily::Auto,
-      [&address, &timed_out,
-       &latch](const std::list<Network::DnsSrvResponse>&& srv_records) -> void {
-        address = srv_records.front().address_->address();
+      [&address, &timed_out, &latch](const std::list<Network::DnsResponse>&& srv_records) -> void {
+        address = srv_records.front().address_;
         timed_out = false;
         latch.DecrementCount();
       });

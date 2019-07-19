@@ -307,18 +307,6 @@ TEST(PipeInstanceTest, Basic) {
   EXPECT_EQ(nullptr, address.ip());
 }
 
-TEST(SrvInstanceTest, IPv4) {
-  InstanceConstSharedPtr inst = Utility::getCanonicalIpv4LoopbackAddress();
-  SrvInstanceConstSharedPtr srv = std::make_shared<SrvInstanceImpl>(inst);
-  EXPECT_EQ("127.0.0.1:0", srv->asString());
-}
-
-TEST(SrvInstanceTest, IPv6) {
-  InstanceConstSharedPtr inst = Utility::getIpv6LoopbackAddress();
-  SrvInstanceConstSharedPtr srv = std::make_shared<SrvInstanceImpl>(inst);
-  EXPECT_EQ("[::1]:0", srv->asString());
-}
-
 TEST(PipeInstanceTest, AbstractNamespace) {
 #if defined(__linux__)
   PipeInstance address("@/foo");

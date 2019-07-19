@@ -85,6 +85,59 @@ StrictDnsClusterImpl::ResolveTarget::~ResolveTarget() {
   }
 }
 
+void StrictDnsClusterImpl::ResolveTarget::updateHosts(
+    const std::list<Network::DnsResponse>&& response,
+    std::function<Network::Address::InstanceConstSharedPtr(const Network::DnsResponse&)>
+        translate) {
+  active_query_ = nullptr;
+  ENVOY_LOG(trace, "async DNS resolution complete for {}", dns_address_);
+  parent_.info_->stats().update_success_.inc();
+
+  std::unordered_map<std::string, HostSharedPtr> updated_hosts;
+  HostVector new_hosts;
+  std::chrono::seconds ttl_refresh_rate = std::chrono::seconds::max();
+  for (const auto& resp : response) {
+    ASSERT(resp.address_ != nullptr);
+    new_hosts.emplace_back(
+        new HostImpl(parent_.info_, dns_address_, translate(resp), lb_endpoint_.metadata(),
+                     lb_endpoint_.load_balancing_weight().value(), locality_lb_endpoint_.locality(),
+                     lb_endpoint_.endpoint().health_check_config(),
+                     locality_lb_endpoint_.priority(), lb_endpoint_.health_status()));
+    ttl_refresh_rate = min(ttl_refresh_rate, resp.ttl_);
+  }
+
+  HostVector hosts_added;
+  HostVector hosts_removed;
+  if (parent_.updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed, updated_hosts,
+                                    all_hosts_)) {
+    ENVOY_LOG(debug, "DNS hosts have changed for {}", dns_address_);
+    ASSERT(std::all_of(hosts_.begin(), hosts_.end(), [&](const auto& host) {
+      return host->priority() == locality_lb_endpoint_.priority();
+    }));
+    parent_.updateAllHosts(hosts_added, hosts_removed, locality_lb_endpoint_.priority());
+  } else {
+    parent_.info_->stats().update_no_rebuild_.inc();
+  }
+
+  all_hosts_ = std::move(updated_hosts);
+
+  // If there is an initialize callback, fire it now. Note that if the cluster refers to
+  // multiple DNS names, this will return initialized after a single DNS resolution
+  // completes. This is not perfect but is easier to code and unclear if the extra
+  // complexity is needed so will start with this.
+  parent_.onPreInitComplete();
+
+  std::chrono::milliseconds final_refresh_rate = parent_.dns_refresh_rate_ms_;
+
+  if (parent_.respect_dns_ttl_ && ttl_refresh_rate != std::chrono::seconds(0)) {
+    final_refresh_rate = ttl_refresh_rate;
+    ENVOY_LOG(debug, "DNS refresh rate reset for {}, refresh rate {} ms", dns_address_,
+              final_refresh_rate.count());
+  }
+
+  resolve_timer_->enableTimer(final_refresh_rate);
+}
+
 void StrictDnsClusterImpl::ResolveTarget::startResolve() {
   ENVOY_LOG(trace, "starting async DNS resolution for {}", dns_address_);
   parent_.info_->stats().update_attempt_.inc();
@@ -92,24 +145,18 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
   if (srv_) {
     active_query_ = parent_.dns_resolver_->resolveSrv(
         dns_address_, parent_.dns_lookup_family_,
-        [this](std::list<Network::DnsSrvResponse>&& response) -> void {
-          updateHosts(std::move(response),
-                      static_cast<std::function<Network::Address::InstanceConstSharedPtr(
-                          const Network::DnsSrvResponse&)>>(
-                          [](const Network::DnsSrvResponse& dns_srv_response) {
-                            return dns_srv_response.address_->address();
-                          }));
+        [this](std::list<Network::DnsResponse>&& response) -> void {
+          updateHosts(std::move(response), [](const Network::DnsResponse& dns_response) {
+            return dns_response.address_;
+          });
         });
   } else {
     active_query_ = parent_.dns_resolver_->resolve(
         dns_address_, parent_.dns_lookup_family_,
         [this](std::list<Network::DnsResponse>&& response) -> void {
-          updateHosts(
-              std::move(response),
-              static_cast<std::function<Network::Address::InstanceConstSharedPtr(
-                  const Network::DnsResponse&)>>([this](const Network::DnsResponse& dns_response) {
-                return Network::Utility::getAddressWithPort(*dns_response.address_, port_);
-              }));
+          updateHosts(std::move(response), [this](const Network::DnsResponse& dns_response) {
+            return Network::Utility::getAddressWithPort(*dns_response.address_, port_);
+          });
         });
   }
 }
