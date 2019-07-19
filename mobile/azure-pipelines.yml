@@ -353,14 +353,18 @@ stages:
           # First start the iOS simulator.
           # Interestingly bazel run does not start the simulator in CI.
           # https://github.com/lyft/envoy-mobile/issues/201 for further investigation.
-          - script: npm install -g ios-sim && ios-sim start --devicetypeid "iPhone-X, 12.2"
-            displayName: 'Start the iOS simulator'
-          # Run the app in the background and redirect logs.
-          - script: ./bazelw run --config=ios //examples/swift/hello_world:app &> /tmp/envoy.log &
-            displayName: 'Run swift app'
-          # Wait for the app to start and get some requests/responses.
-          - script: sleep 60
-            displayName: 'Sleep'
-          # Check for the sentinel value that shows the app is alive and well.
-          - script: cat /tmp/envoy.log | grep 'Hello, world!'
-            displayName: 'Check liveliness'
+          #
+          # Temporarily disabled due to flakiness. Tracking in this issue:
+          # https://github.com/lyft/envoy-mobile/issues/271
+          #
+          # - script: npm install -g ios-sim && ios-sim start --devicetypeid "iPhone-X, 12.2"
+          #   displayName: 'Start the iOS simulator'
+          # # Run the app in the background and redirect logs.
+          # - script: ./bazelw run --config=ios //examples/swift/hello_world:app &> /tmp/envoy.log &
+          #   displayName: 'Run swift app'
+          # # Wait for the app to start and get some requests/responses.
+          # - script: sleep 60
+          #   displayName: 'Sleep'
+          # # Check for the sentinel value that shows the app is alive and well.
+          # - script: cat /tmp/envoy.log | grep 'Hello, world!'
+          #   displayName: 'Check liveliness'
