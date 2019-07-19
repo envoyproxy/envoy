@@ -510,8 +510,9 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
 void InstanceImpl::run() {
   // RunHelper exists primarily to facilitate testing of how we respond to early shutdown during
   // startup (see RunHelperTest in server_test.cc).
-  auto run_helper = RunHelper(*this, options_, *dispatcher_, clusterManager(), access_log_manager_,
-                              init_manager_, overloadManager(), [this] { startWorkers(); });
+  const auto run_helper =
+      RunHelper(*this, options_, *dispatcher_, clusterManager(), access_log_manager_, init_manager_,
+                overloadManager(), [this] { startWorkers(); });
 
   // Run the main dispatch loop waiting to exit.
   ENVOY_LOG(info, "starting main dispatch loop");
@@ -598,7 +599,7 @@ InstanceImpl::registerCallback(Stage stage, StageCallbackWithCompletion callback
 
 void InstanceImpl::notifyCallbacksForStage(Stage stage, Event::PostCb completion_cb) {
   ASSERT(std::this_thread::get_id() == main_thread_id_);
-  auto it = stage_callbacks_.find(stage);
+  const auto it = stage_callbacks_.find(stage);
   if (it != stage_callbacks_.end()) {
     for (const StageCallback& callback : it->second) {
       callback();
@@ -619,7 +620,7 @@ void InstanceImpl::notifyCallbacksForStage(Stage stage, Event::PostCb completion
   // worker threads have not been started so we need to skip notifications if envoy is shutdown
   // early before workers have started.
   if (workers_started_) {
-    auto it2 = stage_completable_callbacks_.find(stage);
+    const auto it2 = stage_completable_callbacks_.find(stage);
     if (it2 != stage_completable_callbacks_.end()) {
       ENVOY_LOG(info, "Notifying {} callback(s) with completion.", it2->second.size());
       for (const StageCallbackWithCompletion& callback : it2->second) {

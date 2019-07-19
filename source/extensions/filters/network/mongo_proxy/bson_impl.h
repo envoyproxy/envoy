@@ -268,7 +268,7 @@ public:
   const std::list<FieldPtr>& values() const override { return fields_; }
 
 private:
-  DocumentImpl() {}
+  DocumentImpl() = default;
 
   void fromBuffer(Buffer::Instance& data);
 
