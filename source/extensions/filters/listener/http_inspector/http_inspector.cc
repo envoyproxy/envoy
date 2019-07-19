@@ -59,7 +59,6 @@ void Filter::onRead() {
   const Api::SysCallSizeResult result =
       os_syscalls.recv(cb_->socket().ioHandle().fd(), buf_, Config::MAX_INSPECT_SIZE, MSG_PEEK);
   ENVOY_LOG(trace, "http inspector: recv: {}", result.rc_);
-
   if (result.rc_ == -1 && result.errno_ == EAGAIN) {
     return;
   } else if (result.rc_ < 0) {
@@ -68,14 +67,7 @@ void Filter::onRead() {
     return;
   }
 
-  if (static_cast<uint64_t>(result.rc_) > read_) {
-    const uint8_t* data = buf_ + read_;
-    const size_t len = result.rc_ - read_;
-    read_ = result.rc_;
-    parseHttpHeader(absl::string_view(reinterpret_cast<const char*>(data), len));
-  } else {
-    done(false);
-  }
+  parseHttpHeader(absl::string_view(reinterpret_cast<const char*>(buf_), result.rc_));
 }
 
 void Filter::parseHttpHeader(absl::string_view data) {
@@ -93,7 +85,7 @@ void Filter::parseHttpHeader(absl::string_view data) {
     }
 
     absl::string_view request_line = data.substr(0, pos);
-    std::vector<absl::string_view> fields = absl::StrSplit(request_line, ' ');
+    std::vector<absl::string_view> fields = absl::StrSplit(request_line, absl::MaxSplits(' ', 4));
 
     // Method SP Request-URI SP HTTP-Version
     if (fields.size() != 3) {

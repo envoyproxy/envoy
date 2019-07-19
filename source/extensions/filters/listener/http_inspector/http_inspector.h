@@ -69,9 +69,8 @@ private:
   const absl::flat_hash_set<std::string>& httpProtocols() const;
 
   ConfigSharedPtr config_;
-  Network::ListenerFilterCallbacks* cb_;
+  Network::ListenerFilterCallbacks* cb_{nullptr};
   Event::FileEventPtr file_event_;
-  uint64_t read_{0};
   absl::string_view protocol_;
 
   // Use static thread_local to avoid allocating buffer over and over again.
