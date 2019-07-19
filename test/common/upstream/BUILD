@@ -129,6 +129,14 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "utility_test",
+    srcs = ["utility_test.cc"],
+    deps = [
+        ":utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "load_balancer_impl_test",
     srcs = ["load_balancer_impl_test.cc"],
     deps = [
@@ -138,6 +146,19 @@ envoy_cc_test(
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+    ],
+)
+
+envoy_cc_test(
+    name = "host_utility_test",
+    srcs = ["host_utility_test.cc"],
+    deps = [
+        ":utility_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/upstream:host_utility_lib",
+        "//source/common/upstream:upstream_includes",
+        "//source/common/upstream:upstream_lib",
         "//test/mocks/upstream:upstream_mocks",
     ],
 )
