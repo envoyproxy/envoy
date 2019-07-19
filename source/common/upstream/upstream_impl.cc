@@ -595,7 +595,10 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
   case envoy::api::v2::Cluster::ORIGINAL_DST_LB:
     if (config.type() != envoy::api::v2::Cluster::ORIGINAL_DST) {
       throw EnvoyException(fmt::format(
-          "cluster: LB type 'original_dst_lb' may only be used with cluster type 'original_dst'"));
+          "cluster: LB policy {} is not valid for Cluster type {}. Only 'original_dst_lb' "
+          "is allowed with cluster type 'original_dst'",
+          envoy::api::v2::Cluster_LbPolicy_Name(config.lb_policy()),
+          envoy::api::v2::Cluster_DiscoveryType_Name(config.type())));
     }
     lb_type_ = LoadBalancerType::OriginalDst;
     break;
