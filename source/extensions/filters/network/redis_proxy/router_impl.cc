@@ -65,7 +65,8 @@ PrefixRoutes::PrefixRoutes(
   }
 }
 
-RouteSharedPtr PrefixRoutes::upstreamPool(std::string& key) {
+RouteSharedPtr PrefixRoutes::upstreamPool(std::string& key, bool& key_modified) {
+  key_modified = false;
   PrefixSharedPtr value = nullptr;
   if (case_insensitive_) {
     std::string copy(key);
@@ -78,6 +79,7 @@ RouteSharedPtr PrefixRoutes::upstreamPool(std::string& key) {
   if (value != nullptr) {
     if (value->removePrefix()) {
       key.erase(0, value->prefix().length());
+      key_modified = true;
     }
     return value;
   }

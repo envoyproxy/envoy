@@ -69,7 +69,12 @@ public:
                    prefix_routes,
                Upstreams&& upstreams, Runtime::Loader& runtime);
 
-  RouteSharedPtr upstreamPool(std::string& key) override;
+  RouteSharedPtr upstreamPool(std::string& key, bool& key_modified) override;
+
+  RouteSharedPtr upstreamPool(std::string& key) override {
+    bool key_modified;
+    return upstreamPool(key, key_modified);
+  }
 
 private:
   TrieLookupTable<PrefixSharedPtr> prefix_lookup_table_;

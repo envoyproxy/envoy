@@ -192,8 +192,35 @@ SplitRequestPtr EvalRequest::create(Router& router, Common::Redis::RespValuePtr&
   std::unique_ptr<EvalRequest> request_ptr{
       new EvalRequest(callbacks, command_stats, time_source, latency_in_micros)};
 
-  const auto route = router.upstreamPool(incoming_request->asArray()[3].asString());
+  bool key_modified = false;
+  const auto route = router.upstreamPool(incoming_request->asArray()[3].asString(), key_modified);
   if (route) {
+    if (key_modified) {
+      // The first key was modified by the router. Other keys might need modification.
+      uint64_t num_keys = 0;
+      StringUtil::strtoull(incoming_request->asArray()[2].asString().c_str(), num_keys);
+      if ((num_keys > 1) && (num_keys <= (incoming_request->asArray().size() - 4))) {
+        // There are additional keys that might need modification.
+        Prefix* prefix_route = dynamic_cast<Prefix*>(route.get());
+        if (prefix_route && prefix_route->removePrefix()) {
+          // A prefix router modified the first key, and its logic will now be applied to the
+          // other keys. eval and evalsha have the same offsets for num_keys and the keys
+          // themselves.
+          for (uint32_t key_index = 4; key_index <= (3 + num_keys); key_index++) {
+            bool prefix_found = (incoming_request->asArray()[key_index].asString().find(
+                                     prefix_route->prefix()) == 0);
+            if (prefix_found) {
+              // The prefix has been found as part of this key; remove it. This logic assumes that
+              // the prefix route that matches the first key either applies to the other keys or NO
+              // prefix does. Other prefixes from other routes are not checked against these other
+              // keys.
+              incoming_request->asArray()[key_index].asString().erase(
+                  0, prefix_route->prefix().length());
+            }
+          }
+        }
+      }
+    }
     request_ptr->conn_pool_ = route->upstream();
     request_ptr->handle_ =
         makeRequest(route, incoming_request->asArray()[0].asString(),

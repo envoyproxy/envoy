@@ -17,7 +17,7 @@
 #include "extensions/filters/network/common/redis/client_impl.h"
 #include "extensions/filters/network/redis_proxy/command_splitter.h"
 #include "extensions/filters/network/redis_proxy/conn_pool.h"
-#include "extensions/filters/network/redis_proxy/router.h"
+#include "extensions/filters/network/redis_proxy/router_impl.h"
 
 namespace Envoy {
 namespace Extensions {

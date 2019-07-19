@@ -64,6 +64,16 @@ public:
    * Returns a connection pool that matches a given route. When no match is found, the catch all
    * pool is used. When remove prefix is set to true, the prefix will be removed from the key.
    * @param key mutable reference to the key of the current command.
+   * @param key_modified mutable reference to boolean that is true if the key is modified, false
+   * otherwise.
+   * @return a handle to the connection pool.
+   */
+  virtual RouteSharedPtr upstreamPool(std::string& key, bool& key_modified) PURE;
+
+  /**
+   * Returns a connection pool that matches a given route. When no match is found, the catch all
+   * pool is used. When remove prefix is set to true, the prefix will be removed from the key.
+   * @param key mutable reference to the key of the current command.
    * @return a handle to the connection pool.
    */
   virtual RouteSharedPtr upstreamPool(std::string& key) PURE;

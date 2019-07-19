@@ -24,6 +24,7 @@ public:
   MockRouter();
   ~MockRouter();
 
+  MOCK_METHOD2(upstreamPool, RouteSharedPtr(std::string& key, bool& key_modified));
   MOCK_METHOD1(upstreamPool, RouteSharedPtr(std::string& key));
 };
 
