@@ -236,6 +236,7 @@ public:
    * @param config supplies the custom configuration for this filter type.
    * @param runtime supplies the runtime loader.
    * @param random supplies the random generator.
+   * @return an instance of extension filter implementation from a config proto.
    */
   virtual FilterPtr
   createFilter(const envoy::config::filter::accesslog::v2::ExtensionFilter& config,
