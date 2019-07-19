@@ -30,9 +30,9 @@ envoy_cc_library(
     name = "config",
     srcs = ["config.cc"],
     deps = [
+        ":http_inspector_lib",
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
         "//source/extensions/filters/listener:well_known_names",
-        "//source/extensions/filters/listener/http_inspector:http_inspector_lib",
     ],
 )

@@ -2,36 +2,22 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_binary",
-    "envoy_cc_library",
     "envoy_cc_test",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_test",
 )
 
 envoy_package()
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "http_inspector_test",
     srcs = ["http_inspector_test.cc"],
+    extension_name = "envoy.filters.listener.http_inspector",
     deps = [
         "//source/common/common:hex_lib",
-        "//source/extensions/filters/listener/http_inspector:http_inspector_lib",
-        "//test/mocks/api:api_mocks",
-        "//test/mocks/network:network_mocks",
-        "//test/mocks/stats:stats_mocks",
-        "//test/test_common:threadsafe_singleton_injector_lib",
-    ],
-)
-
-envoy_cc_binary(
-    name = "http_inspector_benchmark",
-    testonly = 1,
-    srcs = ["http_inspector_benchmark.cc"],
-    external_deps = [
-        "benchmark",
-    ],
-    deps = [
-        "//source/common/network:listen_socket_lib",
         "//source/extensions/filters/listener/http_inspector:http_inspector_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/network:network_mocks",
