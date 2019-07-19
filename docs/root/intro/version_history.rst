@@ -5,6 +5,7 @@ Version history
 ================
 * admin: added ability to configure listener :ref:`socket options <envoy_api_field_config.bootstrap.v2.Admin.socket_options>`.
 * config: async data access for local and remote data source.
+* listeners: added :ref:`HTTP inspector listener filter <config_listener_filters_http_inspector>`.
 * http: added the ability to reject HTTP/1.1 requests with invalid HTTP header values, using the runtime feature `envoy.reloadable_features.strict_header_validation`.
 
 1.11.0 (July 11, 2019)
