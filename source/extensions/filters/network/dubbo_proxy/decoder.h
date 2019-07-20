@@ -128,7 +128,7 @@ class DecoderBase : public DecoderStateMachine::Delegate,
                     public Logger::Loggable<Logger::Id::dubbo> {
 public:
   DecoderBase(Protocol& protocol);
-  virtual ~DecoderBase();
+  ~DecoderBase() override;
 
   /**
    * Drains data from the given buffer

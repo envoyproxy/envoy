@@ -57,7 +57,7 @@ public:
   StaticRouteConfigProviderImpl(const envoy::api::v2::RouteConfiguration& config,
                                 Server::Configuration::FactoryContext& factory_context,
                                 RouteConfigProviderManagerImpl& route_config_provider_manager);
-  ~StaticRouteConfigProviderImpl();
+  ~StaticRouteConfigProviderImpl() override;
 
   // Router::RouteConfigProvider
   Router::ConfigConstSharedPtr config() override { return config_; }

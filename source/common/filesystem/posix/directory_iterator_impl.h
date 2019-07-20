@@ -15,7 +15,7 @@ public:
   DirectoryIteratorImpl()
       : directory_path_(""), dir_(nullptr), os_sys_calls_(Api::OsSysCallsSingleton::get()) {}
 
-  ~DirectoryIteratorImpl();
+  ~DirectoryIteratorImpl() override;
 
   DirectoryIteratorImpl& operator++() override;
 

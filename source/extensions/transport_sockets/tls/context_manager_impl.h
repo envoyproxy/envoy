@@ -22,7 +22,7 @@ namespace Tls {
 class ContextManagerImpl final : public Envoy::Ssl::ContextManager {
 public:
   ContextManagerImpl(TimeSource& time_source) : time_source_(time_source) {}
-  ~ContextManagerImpl();
+  ~ContextManagerImpl() override;
 
   // Ssl::ContextManager
   Ssl::ClientContextSharedPtr

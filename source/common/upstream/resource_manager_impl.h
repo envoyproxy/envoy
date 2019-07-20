@@ -55,7 +55,7 @@ private:
           remaining_(remaining) {
       remaining_.set(max);
     }
-    ~ResourceImpl() { ASSERT(current_ == 0); }
+    ~ResourceImpl() override { ASSERT(current_ == 0); }
 
     // Upstream::Resource
     bool canCreate() override { return current_ < max(); }

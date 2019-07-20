@@ -66,7 +66,7 @@ class GoogleAsyncClientThreadLocal : public ThreadLocal::ThreadLocalObject,
                                      Logger::Loggable<Logger::Id::grpc> {
 public:
   GoogleAsyncClientThreadLocal(Api::Api& api);
-  ~GoogleAsyncClientThreadLocal();
+  ~GoogleAsyncClientThreadLocal() override;
 
   grpc::CompletionQueue& completionQueue() { return cq_; }
 
@@ -199,7 +199,7 @@ public:
   GoogleAsyncStreamImpl(GoogleAsyncClientImpl& parent, absl::string_view service_full_name,
                         absl::string_view method_name, RawAsyncStreamCallbacks& callbacks,
                         const absl::optional<std::chrono::milliseconds>& timeout);
-  ~GoogleAsyncStreamImpl();
+  ~GoogleAsyncStreamImpl() override;
 
   virtual void initialize(bool buffer_body_for_retry);
 

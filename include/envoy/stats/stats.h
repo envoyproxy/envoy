@@ -22,7 +22,7 @@ struct Tag;
  */
 class Metric : public RefcountInterface {
 public:
-  virtual ~Metric() = default;
+  ~Metric() override = default;
   /**
    * Returns the full name of the Metric. This is intended for most uses, such
    * as streaming out the name to a stats sink or admin request, or comparing
