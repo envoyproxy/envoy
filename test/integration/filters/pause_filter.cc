@@ -63,7 +63,8 @@ class TestPauseFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpF
 public:
   TestPauseFilterConfig() : EmptyHttpFilterConfig("pause-filter") {}
 
-  Http::FilterFactoryCb createFilter(const std::string&, Server::Configuration::FactoryContext&) {
+  Http::FilterFactoryCb createFilter(const std::string&,
+                                     Server::Configuration::FactoryContext&) override {
     return [&](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       // GUARDED_BY insists the lock be held when the guarded variables are passed by reference.
       absl::WriterMutexLock m(&encode_lock_);

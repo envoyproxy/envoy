@@ -84,7 +84,7 @@ private:
   struct ThreadLocalPool : public ThreadLocal::ThreadLocalObject,
                            public Upstream::ClusterUpdateCallbacks {
     ThreadLocalPool(InstanceImpl& parent, Event::Dispatcher& dispatcher, std::string cluster_name);
-    ~ThreadLocalPool();
+    ~ThreadLocalPool() override;
     ThreadLocalActiveClientPtr& threadLocalActiveClient(Upstream::HostConstSharedPtr host);
     Common::Redis::Client::PoolRequest*
     makeRequest(const std::string& key, const Common::Redis::RespValue& request,

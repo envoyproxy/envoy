@@ -40,7 +40,7 @@ public:
   OptionalHistogram findHistogram(StatName name) const override;
 
   const SymbolTable& constSymbolTable() const override { return scope_.constSymbolTable(); }
-  virtual SymbolTable& symbolTable() override { return scope_.symbolTable(); }
+  SymbolTable& symbolTable() override { return scope_.symbolTable(); }
 
   NullGaugeImpl& nullGauge(const std::string& str) override { return scope_.nullGauge(str); }
 

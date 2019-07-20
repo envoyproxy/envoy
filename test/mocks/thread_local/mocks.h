@@ -15,7 +15,7 @@ namespace ThreadLocal {
 class MockInstance : public Instance {
 public:
   MockInstance();
-  ~MockInstance();
+  ~MockInstance() override;
 
   MOCK_METHOD1(runOnAllThreads, void(Event::PostCb cb));
   MOCK_METHOD2(runOnAllThreads, void(Event::PostCb cb, Event::PostCb main_callback));
@@ -48,7 +48,7 @@ public:
       parent_.data_.resize(index_ + 1);
     }
 
-    ~SlotImpl() {
+    ~SlotImpl() override {
       // Do not actually clear slot data during shutdown. This mimics the production code.
       if (!parent_.shutdown_) {
         EXPECT_LT(index_, parent_.data_.size());
