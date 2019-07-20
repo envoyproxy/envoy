@@ -10,6 +10,8 @@ jobs:
         CI_TARGET: 'bazel.tsan'
       coverage:
         CI_TARGET: 'bazel.coverage'
+      api:
+        CI_TARGET: 'bazel.api'
   dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
   timeoutInMinutes: 360
   pool:
@@ -29,11 +31,11 @@ jobs:
       sudo service docker restart
     displayName: "Enable IPv6"
 
-  - script: ci/run_envoy_docker.sh 'ci/do_ci.sh $(CI_TARGET)'
+  - script: ci/run_envoy_docker.sh 'ci/do_rbe_ci.sh $(CI_TARGET)'
     workingDirectory: $(Build.SourcesDirectory)
     env:
       ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-      BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-clang --config=remote-ci --jobs=100 --curses=no"
+      BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=100 --curses=no"
       BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
       BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
       GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
@@ -49,6 +51,7 @@ jobs:
     inputs:
       pathtoPublish: "$(Build.StagingDirectory)/envoy"
       artifactName: $(CI_TARGET)
+      parallel: true
 
 - job: format
   dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
@@ -87,3 +90,4 @@ jobs:
     inputs:
       pathtoPublish: "$(Build.SourcesDirectory)/generated/docs"
       artifactName: docs
+      parallel: true

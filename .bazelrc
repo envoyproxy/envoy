@@ -104,6 +104,13 @@ build:rbe-toolchain-libc++ --action_env=CC=clang --action_env=CXX=clang++ --acti
 build:rbe-toolchain-libc++ --action_env=CXXFLAGS=-stdlib=libc++
 build:rbe-toolchain-libc++ --define force_libcpp=enabled
 
+build:rbe-toolchain-gcc --config=rbe-toolchain-base
+build:rbe-toolchain-gcc --host_javabase=@rbe_ubuntu_gcc//java:jdk
+build:rbe-toolchain-gcc --javabase=@rbe_ubuntu_gcc//java:jdk
+build:rbe-toolchain-gcc --crosstool_top=@rbe_ubuntu_gcc//cc:toolchain
+build:rbe-toolchain-gcc --extra_toolchains=@rbe_ubuntu_gcc//config:cc-toolchain
+build:rbe-toolchain-gcc --action_env=CC=gcc --action_env=CXX=g++ --action_env=PATH=/usr/sbin:/usr/bin:/sbin:/bin
+
 build:remote --spawn_strategy=remote,sandboxed,local
 build:remote --strategy=Javac=remote,sandboxed,local
 build:remote --strategy=Closure=remote,sandboxed,local
@@ -121,6 +128,9 @@ build:remote-clang --config=rbe-toolchain
 
 build:remote-libc++ --config=remote
 build:remote-libc++ --config=rbe-toolchain-libc++
+
+build:remote-gcc --config=remote
+build:remote-gcc --config=rbe-toolchain-gcc
 
 # Docker sandbox
 build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build:cfc514546bc0284536893cca5fa43d7128edcd35
