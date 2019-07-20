@@ -156,7 +156,13 @@ def envoy_dependencies(skip_targets = []):
     _com_lightstep_tracer_cpp()
     _io_opentracing_cpp()
     _net_zlib()
-    _repository_impl("bazel_toolchains")
+    _repository_impl(
+        "bazel_toolchains",
+        # TODO(lizan): remove this once new bazel_toolchains is released.
+        # context: https://github.com/bazelbuild/bazel-toolchains/pull/644
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:bazel_toolchains.patch"],
+    )
 
     _python_deps()
     _cc_deps()

@@ -82,17 +82,27 @@ build:sizeopt -c opt --copt -Os
 build --test_env=HEAPCHECK=normal --test_env=PPROF_PATH
 
 # Remote execution: https://docs.bazel.build/versions/master/remote-execution.html
+build:rbe-toolchain-base --host_java_toolchain=@bazel_tools//tools/jdk:toolchain_hostjdk8
+build:rbe-toolchain-base --java_toolchain=@bazel_tools//tools/jdk:toolchain_hostjdk8
+build:rbe-toolchain-base --host_platform=@envoy//bazel/toolchains:rbe_ubuntu_clang_platform
+build:rbe-toolchain-base --platforms=@envoy//bazel/toolchains:rbe_ubuntu_clang_platform
+build:rbe-toolchain-base --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
+
+build:rbe-toolchain --config=rbe-toolchain-base
 build:rbe-toolchain --host_javabase=@rbe_ubuntu_clang//java:jdk
 build:rbe-toolchain --javabase=@rbe_ubuntu_clang//java:jdk
-build:rbe-toolchain --host_java_toolchain=@bazel_tools//tools/jdk:toolchain_hostjdk8
-build:rbe-toolchain --java_toolchain=@bazel_tools//tools/jdk:toolchain_hostjdk8
-build:rbe-toolchain --host_platform=@envoy//bazel/toolchains:rbe_ubuntu_clang_platform
-build:rbe-toolchain --platforms=@envoy//bazel/toolchains:rbe_ubuntu_clang_platform
-build:rbe-toolchain --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
 build:rbe-toolchain --crosstool_top=@rbe_ubuntu_clang//cc:toolchain
 build:rbe-toolchain --extra_toolchains=@rbe_ubuntu_clang//config:cc-toolchain
-build:rbe-toolchain --linkopt=-fuse-ld=lld
 build:rbe-toolchain --action_env=CC=clang --action_env=CXX=clang++ --action_env=PATH=/usr/sbin:/usr/bin:/sbin:/bin:/usr/lib/llvm-8/bin
+
+build:rbe-toolchain-libc++ --config=rbe-toolchain-base
+build:rbe-toolchain-libc++ --host_javabase=@rbe_ubuntu_clang_libcxx//java:jdk
+build:rbe-toolchain-libc++ --javabase=@rbe_ubuntu_clang_libcxx//java:jdk
+build:rbe-toolchain-libc++ --crosstool_top=@rbe_ubuntu_clang_libcxx//cc:toolchain
+build:rbe-toolchain-libc++ --extra_toolchains=@rbe_ubuntu_clang_libcxx//config:cc-toolchain
+build:rbe-toolchain-libc++ --action_env=CC=clang --action_env=CXX=clang++ --action_env=PATH=/usr/sbin:/usr/bin:/sbin:/bin:/usr/lib/llvm-8/bin
+build:rbe-toolchain-libc++ --action_env=CXXFLAGS=-stdlib=libc++
+build:rbe-toolchain-libc++ --define force_libcpp=enabled
 
 build:remote --spawn_strategy=remote,sandboxed,local
 build:remote --strategy=Javac=remote,sandboxed,local
@@ -108,6 +118,9 @@ coverage:remote --experimental_remote_download_outputs=toplevel
 
 build:remote-clang --config=remote
 build:remote-clang --config=rbe-toolchain
+
+build:remote-libc++ --config=remote
+build:remote-libc++ --config=rbe-toolchain-libc++
 
 # Docker sandbox
 build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build:cfc514546bc0284536893cca5fa43d7128edcd35
