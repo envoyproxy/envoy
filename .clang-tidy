@@ -1,6 +1,8 @@
 Checks:          'abseil-*,
                   bugprone-*,
                   clang-analyzer-*,
+                  -clang-analyzer-optin.osx.*,
+                  -clang-analyzer-osx.*,
                   clang-diagnostic-*,
                   modernize-*,
                   performance-*,
