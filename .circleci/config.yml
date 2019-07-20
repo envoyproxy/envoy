@@ -177,6 +177,11 @@ jobs:
        - store_artifacts:
            path: generated/docs
 
+parameters:
+  asan:
+    type: boolean
+    default: false
+    
 workflows:
   version: 2
   all:
@@ -191,6 +196,7 @@ workflows:
             tags:
               only: /^v.*/
       - asan
+          when: << pipeline.parameters.asan >>
       - tsan
       - compile_time_options
       - api
