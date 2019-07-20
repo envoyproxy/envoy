@@ -332,7 +332,6 @@ bool FaultFilter::isOverriddenAbortRuntime() {
     return true;
   }
   return false;
-  ;
 }
 
 bool FaultFilter::isOverriddenDelayRuntime() {
@@ -341,7 +340,6 @@ bool FaultFilter::isOverriddenDelayRuntime() {
     return true;
   }
   return false;
-  ;
 }
 
 Http::FilterDataStatus FaultFilter::decodeData(Buffer::Instance&, bool) {
