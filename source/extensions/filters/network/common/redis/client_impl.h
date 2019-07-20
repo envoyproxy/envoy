@@ -65,7 +65,7 @@ public:
                           EncoderPtr&& encoder, DecoderFactory& decoder_factory,
                           const Config& config);
 
-  ~ClientImpl();
+  ~ClientImpl() override;
 
   // Client
   void addConnectionCallbacks(Network::ConnectionCallbacks& callbacks) override {
@@ -93,7 +93,7 @@ private:
 
   struct PendingRequest : public PoolRequest {
     PendingRequest(ClientImpl& parent, PoolCallbacks& callbacks);
-    ~PendingRequest();
+    ~PendingRequest() override;
 
     // PoolRequest
     void cancel() override;

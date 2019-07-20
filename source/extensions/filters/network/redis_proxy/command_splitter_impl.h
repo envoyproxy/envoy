@@ -100,7 +100,7 @@ protected:
  */
 class SingleServerRequest : public SplitRequestBase, public Common::Redis::Client::PoolCallbacks {
 public:
-  ~SingleServerRequest();
+  ~SingleServerRequest() override;
 
   // Common::Redis::Client::PoolCallbacks
   void onResponse(Common::Redis::RespValuePtr&& response) override;
@@ -158,7 +158,7 @@ private:
  */
 class FragmentedRequest : public SplitRequestBase {
 public:
-  ~FragmentedRequest();
+  ~FragmentedRequest() override;
 
   // RedisProxy::CommandSplitter::SplitRequest
   void cancel() override;
@@ -277,7 +277,7 @@ public:
   CommandHandlerFactory(Router& router) : CommandHandlerBase(router) {}
   SplitRequestPtr startRequest(Common::Redis::RespValuePtr&& request, SplitCallbacks& callbacks,
                                CommandStats& command_stats, TimeSource& time_source,
-                               bool latency_in_micros) {
+                               bool latency_in_micros) override {
     return RequestClass::create(router_, std::move(request), callbacks, command_stats, time_source,
                                 latency_in_micros);
   }

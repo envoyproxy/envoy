@@ -28,7 +28,7 @@ namespace {
 class TestDeferredDeletable : public DeferredDeletable {
 public:
   TestDeferredDeletable(std::function<void()> on_destroy) : on_destroy_(on_destroy) {}
-  ~TestDeferredDeletable() { on_destroy_(); }
+  ~TestDeferredDeletable() override { on_destroy_(); }
 
 private:
   std::function<void()> on_destroy_;

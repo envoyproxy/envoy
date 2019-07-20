@@ -43,7 +43,7 @@ public:
     return Common::Redis::DecoderPtr{decoder_};
   }
 
-  ~RedisClientImplTest() {
+  ~RedisClientImplTest() override {
     client_.reset();
 
     EXPECT_TRUE(TestUtility::gaugesZeroed(host_->cluster_.stats_store_.gauges()));

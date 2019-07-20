@@ -226,7 +226,7 @@ public:
   ListenerImpl(const envoy::api::v2::Listener& config, const std::string& version_info,
                ListenerManagerImpl& parent, const std::string& name, bool modifiable,
                bool workers_started, uint64_t hash);
-  ~ListenerImpl();
+  ~ListenerImpl() override;
 
   /**
    * Helper functions to determine whether a listener is blocked for update or remove.

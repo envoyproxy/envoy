@@ -97,7 +97,7 @@ if [[ "$CI_TARGET" == "bazel.release" ]]; then
   # toolchain is kept consistent. This ifdef is checked in
   # test/common/stats/stat_test_utility.cc when computing
   # Stats::TestUtil::MemoryTest::mode().
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --cxxopt=-DMEMORY_TEST_EXACT=1"
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_env=ENVOY_MEMORY_TEST_EXACT=true"
 
   setup_clang_toolchain
   echo "bazel release build with tests..."

@@ -36,7 +36,7 @@ TEST(SignalsDeathTest, InvalidAddressDeathTest) {
 }
 
 class TestFatalErrorHandler : public FatalErrorHandlerInterface {
-  virtual void onFatalError() const override { std::cerr << "HERE!"; }
+  void onFatalError() const override { std::cerr << "HERE!"; }
 };
 
 TEST(SignalsDeathTest, RegisteredHandlerTest) {
