@@ -120,7 +120,7 @@ TEST(ZipkinCoreTypesAnnotationTest, defaultConstructor) {
   // Test the move-semantics flavor of setEndpoint
   addr = Network::Utility::parseInternetAddressAndPort("192.168.1.1:5555");
   Endpoint ep2(std::string("my_service_2"), addr);
-  ann.setEndpoint(std::move(ep2));
+  ann.setEndpoint(ep2);
   EXPECT_TRUE(ann.isSetEndpoint());
   EXPECT_EQ("my_service_2", ann.endpoint().serviceName());
   EXPECT_EQ(R"({"ipv4":"192.168.1.1","port":5555,"serviceName":"my_service_2"})",
@@ -241,7 +241,7 @@ TEST(ZipkinCoreTypesBinaryAnnotationTest, defaultConstructor) {
   // Test the move-semantics flavor of setEndpoint
   addr = Network::Utility::parseInternetAddressAndPort("192.168.1.1:5555");
   Endpoint ep2(std::string("my_service_2"), addr);
-  ann.setEndpoint(std::move(ep2));
+  ann.setEndpoint(ep2);
   EXPECT_TRUE(ann.isSetEndpoint());
   EXPECT_EQ("my_service_2", ann.endpoint().serviceName());
   EXPECT_EQ(R"({"ipv4":"192.168.1.1","port":5555,"serviceName":"my_service_2"})",

@@ -110,7 +110,7 @@ WatchDogSharedPtr GuardDogImpl::createWatchDog(Thread::ThreadId thread_id) {
   // state).
   auto wd_interval = loop_interval_ / 2;
   WatchDogSharedPtr new_watchdog =
-      std::make_shared<WatchDogImpl>(std::move(thread_id), time_source_, wd_interval);
+      std::make_shared<WatchDogImpl>(thread_id, time_source_, wd_interval);
   WatchedDog watched_dog;
   watched_dog.dog_ = new_watchdog;
   {

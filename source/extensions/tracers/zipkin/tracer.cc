@@ -20,7 +20,7 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
 
   // Build the CS annotation
   Annotation cs;
-  cs.setEndpoint(std::move(ep));
+  cs.setEndpoint(ep);
   if (config.operationName() == Tracing::OperationName::Egress) {
     cs.setValue(ZipkinCoreConstants::get().CLIENT_SEND);
   } else {
@@ -100,7 +100,7 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
   Endpoint ep(service_name_, address_);
 
   // Add the newly-created annotation to the span
-  annotation.setEndpoint(std::move(ep));
+  annotation.setEndpoint(ep);
   annotation.setTimestamp(timestamp_micro);
   span_ptr->addAnnotation(std::move(annotation));
 
@@ -125,7 +125,7 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
 
 void Tracer::reportSpan(Span&& span) {
   if (reporter_ && span.sampled()) {
-    reporter_->reportSpan(std::move(span));
+    reporter_->reportSpan(span);
   }
 }
 

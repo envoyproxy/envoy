@@ -20,7 +20,7 @@ buildOriginalSrcOptions(Network::Address::InstanceConstSharedPtr source, uint32_
   auto options_to_add = std::make_shared<Network::Socket::Options>();
   options_to_add->emplace_back(
       std::make_shared<Filters::Common::OriginalSrc::OriginalSrcSocketOption>(
-          std::move(address_without_port)));
+          address_without_port));
 
   if (mark != 0) {
     const auto mark_options = Network::SocketOptionFactory::buildSocketMarkOptions(mark);

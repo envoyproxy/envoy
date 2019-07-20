@@ -64,7 +64,7 @@ grpc::ByteBuffer GoogleGrpcUtils::makeByteBuffer(Buffer::InstancePtr&& buffer_in
 
 class GrpcSliceBufferFragmentImpl : public Buffer::BufferFragment {
 public:
-  explicit GrpcSliceBufferFragmentImpl(grpc::Slice&& slice) : slice_(std::move(slice)) {}
+  explicit GrpcSliceBufferFragmentImpl(grpc::Slice&& slice) : slice_(slice) {}
 
   // Buffer::BufferFragment
   const void* data() const override { return slice_.begin(); }

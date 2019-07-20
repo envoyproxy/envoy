@@ -828,8 +828,7 @@ std::unique_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFi
                                         filter_chain.filter_chain_match().server_names().end());
 
   return std::make_unique<FilterChainImpl>(
-      config_factory.createTransportSocketFactory(*message, factory_context_,
-                                                  std::move(server_names)),
+      config_factory.createTransportSocketFactory(*message, factory_context_, server_names),
       parent_.parent_.factory_.createNetworkFilterFactoryList(filter_chain.filters(), parent_));
 }
 

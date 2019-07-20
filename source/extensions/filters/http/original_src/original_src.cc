@@ -26,8 +26,8 @@ Http::FilterHeadersStatus OriginalSrcFilter::decodeHeaders(Http::HeaderMap&, boo
             "Got a new connection in the original_src filter for address {}. Marking with {}",
             downstream_address->asString(), config_.mark());
 
-  const auto options_to_add = Filters::Common::OriginalSrc::buildOriginalSrcOptions(
-      std::move(downstream_address), config_.mark());
+  const auto options_to_add =
+      Filters::Common::OriginalSrc::buildOriginalSrcOptions(downstream_address, config_.mark());
   callbacks_->addUpstreamSocketOptions(options_to_add);
   return Http::FilterHeadersStatus::Continue;
 }

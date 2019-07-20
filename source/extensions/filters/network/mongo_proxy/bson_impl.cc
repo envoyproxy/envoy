@@ -441,7 +441,7 @@ void DocumentImpl::fromBuffer(Buffer::Instance& data) {
     case Field::Type::OBJECT_ID: {
       Field::ObjectId value;
       BufferHelper::removeBytes(data, &value[0], value.size());
-      addObjectId(key, std::move(value));
+      addObjectId(key, value);
       break;
     }
 

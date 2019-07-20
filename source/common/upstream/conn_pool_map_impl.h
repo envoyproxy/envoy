@@ -80,7 +80,7 @@ void ConnPoolMap<KEY_TYPE, POOL_TYPE>::addDrainedCallback(const DrainedCb& cb) {
     pool_pair.second->addDrainedCallback(cb);
   }
 
-  cached_callbacks_.emplace_back(std::move(cb));
+  cached_callbacks_.emplace_back(cb);
 }
 
 template <typename KEY_TYPE, typename POOL_TYPE>

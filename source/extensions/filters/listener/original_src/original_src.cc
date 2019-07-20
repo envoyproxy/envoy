@@ -29,7 +29,7 @@ Network::FilterStatus OriginalSrcFilter::onAccept(Network::ListenerFilterCallbac
   }
   auto options_to_add =
       Filters::Common::OriginalSrc::buildOriginalSrcOptions(std::move(address), config_.mark());
-  socket.addOptions(std::move(options_to_add));
+  socket.addOptions(options_to_add);
   return Network::FilterStatus::Continue;
 }
 

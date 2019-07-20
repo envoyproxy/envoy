@@ -38,7 +38,7 @@ public:
   }
   void addOption(const OptionConstSharedPtr& option) override {
     ensureOptions();
-    options_->emplace_back(std::move(option));
+    options_->emplace_back(option);
   }
   void addOptions(const OptionsSharedPtr& options) override {
     ensureOptions();

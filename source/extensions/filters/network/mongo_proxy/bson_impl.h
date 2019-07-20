@@ -56,7 +56,7 @@ public:
   }
 
   explicit FieldImpl(const std::string& key, ObjectId&& value) : type_(Type::OBJECT_ID), key_(key) {
-    value_.object_id_value_ = std::move(value);
+    value_.object_id_value_ = value;
   }
 
   explicit FieldImpl(const std::string& key, bool value) : type_(Type::BOOLEAN), key_(key) {
@@ -220,7 +220,7 @@ public:
   }
 
   DocumentSharedPtr addObjectId(const std::string& key, Field::ObjectId&& value) override {
-    fields_.emplace_back(new FieldImpl(key, std::move(value)));
+    fields_.emplace_back(new FieldImpl(key, value));
     return shared_from_this();
   }
 
