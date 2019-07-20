@@ -56,8 +56,9 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
 
 void Filter::onRead() {
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
+  const Network::ConnectionSocket& socket = cb_->socket();
   const Api::SysCallSizeResult result =
-      os_syscalls.recv(cb_->socket().ioHandle().fd(), buf_, Config::MAX_INSPECT_SIZE, MSG_PEEK);
+      os_syscalls.recv(socket.ioHandle().fd(), buf_, Config::MAX_INSPECT_SIZE, MSG_PEEK);
   ENVOY_LOG(trace, "http inspector: recv: {}", result.rc_);
   if (result.rc_ == -1 && result.errno_ == EAGAIN) {
     return;
