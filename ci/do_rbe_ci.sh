@@ -11,7 +11,6 @@ if [[ "$CI_TARGET" == "bazel.gcc" ]]; then
   export BAZEL_BUILD_EXTRA_OPTIONS="${BAZEL_BUILD_EXTRA_OPTIONS} --config=remote-gcc"
   CI_TARGET="bazel.release"
 elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
-  # TODO(lizan): combine this with ci/do_ci.sh target
   export BAZEL_BUILD_EXTRA_OPTIONS="${BAZEL_BUILD_EXTRA_OPTIONS} --config=remote-libc++"
 else
   export BAZEL_BUILD_EXTRA_OPTIONS="${BAZEL_BUILD_EXTRA_OPTIONS} --config=remote-clang"
