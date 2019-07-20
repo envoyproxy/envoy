@@ -10,6 +10,10 @@ executors:
     working_directory: /source
 
 jobs:
+   specialjob:
+     executor: ubuntu-build
+     steps:
+       - run: echo
    release:
      executor: ubuntu-build
      environment:
@@ -178,12 +182,16 @@ jobs:
            path: generated/docs
 
 parameters:
-  asan:
+  special:
     type: boolean
     default: false
     
 workflows:
   version: 2
+  special:
+    when: << pipeline.parameters.special >>
+    jobs:
+      - specialjob
   all:
     jobs:
       - release:
@@ -196,7 +204,6 @@ workflows:
             tags:
               only: /^v.*/
       - asan
-          when: << pipeline.parameters.asan >>
       - tsan
       - compile_time_options
       - api
