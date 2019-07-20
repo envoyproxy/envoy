@@ -12,6 +12,10 @@ jobs:
         CI_TARGET: 'bazel.coverage'
       api:
         CI_TARGET: 'bazel.api'
+      gcc:
+        CI_TARGET: 'bazel.gcc'
+      compile_time_options:
+        CI_TARGET: 'bazel.compile_time_options'
   dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
   timeoutInMinutes: 360
   pool:
