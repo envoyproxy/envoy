@@ -47,11 +47,13 @@ export USER=bazel
 export TEST_TMPDIR=${BUILD_DIR}/tmp
 export BAZEL="bazel"
 
-if [[ -f "/etc/redhat-release" ]]
-then
-  export BAZEL_BUILD_EXTRA_OPTIONS="--copt=-DENVOY_IGNORE_GLIBCXX_USE_CXX11_ABI_ERROR=1 --action_env=PATH ${BAZEL_BUILD_EXTRA_OPTIONS}"
-else
-  export BAZEL_BUILD_EXTRA_OPTIONS="--action_env=PATH=/bin:/usr/bin:/usr/lib/llvm-8/bin --linkopt=-fuse-ld=lld ${BAZEL_BUILD_EXTRA_OPTIONS}"
+if [[ -z "${ENVOY_RBE}" ]]
+  if [[ -f "/etc/redhat-release" ]]
+  then
+    export BAZEL_BUILD_EXTRA_OPTIONS="--copt=-DENVOY_IGNORE_GLIBCXX_USE_CXX11_ABI_ERROR=1 --action_env=PATH ${BAZEL_BUILD_EXTRA_OPTIONS}"
+  else
+    export BAZEL_BUILD_EXTRA_OPTIONS="--action_env=PATH=/bin:/usr/bin:/usr/lib/llvm-8/bin --linkopt=-fuse-ld=lld ${BAZEL_BUILD_EXTRA_OPTIONS}"
+  fi
 fi
 
 # Not sandboxing, since non-privileged Docker can't do nested namespaces.

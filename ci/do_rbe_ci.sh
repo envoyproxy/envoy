@@ -5,21 +5,14 @@ set -e
 CI_TARGET=$1
 shift
 
+export ENVOY_RBE=1
+
 if [[ "$CI_TARGET" == "bazel.gcc" ]]; then
-  export BAZEL_BUILD_EXTRA_OPTIONS="${BAZEL_BUILD_EXTRA_OPTIONS} --config=remote-gcc --linkopt=-fuse-ld=gold"
+  export BAZEL_BUILD_EXTRA_OPTIONS="${BAZEL_BUILD_EXTRA_OPTIONS} --config=remote-gcc"
   CI_TARGET="bazel.release"
 elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   # TODO(lizan): combine this with ci/do_ci.sh target
-  export BAZEL_BUILD_EXTRA_OPTIONS="${BAZEL_BUILD_EXTRA_OPTIONS} --config=remote-libc++ \
-    --define signal_trace=disabled \
-    --define hot_restart=disabled \
-    --define google_grpc=disabled \
-    --define boringssl=fips \
-    --define log_debug_assert_in_release=enabled \
-    --define quiche=enabled \
-    --define path_normalization_by_default=true \
-  "
-  CI_TARGET="bazel.release"
+  export BAZEL_BUILD_EXTRA_OPTIONS="${BAZEL_BUILD_EXTRA_OPTIONS} --config=remote-libc++"
 else
   export BAZEL_BUILD_EXTRA_OPTIONS="${BAZEL_BUILD_EXTRA_OPTIONS} --config=remote-clang"
 fi

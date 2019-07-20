@@ -185,7 +185,6 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   # changes, this build type may need to be broken up.
   # TODO(mpwarres): remove quiche=enabled once QUICHE is built by default.
   COMPILE_TIME_OPTIONS="\
-    --config libc++ \
     --define signal_trace=disabled \
     --define hot_restart=disabled \
     --define google_grpc=disabled \
@@ -194,6 +193,9 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
     --define quiche=enabled \
     --define path_normalization_by_default=true \
   "
+  if [[ -z "${ENVOY_RBE}" ]]
+    COMPILE_TIME_OPTIONS="--config libc++ ${COMPILE_TIME_OPTIONS}"
+  fi
   setup_clang_toolchain
   # This doesn't go into CI but is available for developer convenience.
   echo "bazel with different compiletime options build with tests..."
