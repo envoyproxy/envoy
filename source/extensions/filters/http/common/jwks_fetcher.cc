@@ -28,7 +28,8 @@ public:
     reset();
   }
 
-  void fetch(const ::envoy::api::v2::core::HttpUri& uri, JwksFetcher::JwksReceiver& receiver) override {
+  void fetch(const ::envoy::api::v2::core::HttpUri& uri,
+             JwksFetcher::JwksReceiver& receiver) override {
     ENVOY_LOG(trace, "{}", __func__);
     ASSERT(!receiver_);
     complete_ = false;

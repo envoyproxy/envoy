@@ -127,9 +127,7 @@ public:
    */
   const std::vector<Message>& getCapturedMessages() const { return captured_messages_; }
 
-  void onFailedParse(Failure failure_data) override {
-    parse_failures_.push_back(failure_data);
-  }
+  void onFailedParse(Failure failure_data) override { parse_failures_.push_back(failure_data); }
 
   const std::vector<Failure>& getParseFailures() const { return parse_failures_; }
 

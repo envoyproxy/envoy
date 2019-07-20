@@ -16,7 +16,7 @@ template <class ConfigProto> class FactoryBase : public Server::Configuration::T
 public:
   // Server::Configuration::TracerFactory
   Tracing::HttpTracerPtr createHttpTracer(const Protobuf::Message& config,
-                                                  Server::Instance& server) override {
+                                          Server::Instance& server) override {
     return createHttpTracerTyped(MessageUtil::downcastAndValidate<const ConfigProto&>(config),
                                  server);
   }

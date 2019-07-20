@@ -276,7 +276,9 @@ public:
         std::make_unique<RouteConfigProviderManagerImpl>(factory_context_.admin_);
   }
 
-  ~RouteConfigProviderManagerImplTest() override { factory_context_.thread_local_.shutdownThread(); }
+  ~RouteConfigProviderManagerImplTest() override {
+    factory_context_.thread_local_.shutdownThread();
+  }
 
   envoy::config::filter::network::http_connection_manager::v2::Rds rds_;
   std::unique_ptr<RouteConfigProviderManagerImpl> route_config_provider_manager_;

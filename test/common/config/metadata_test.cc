@@ -63,7 +63,8 @@ public:
   public:
     const std::string name() const override { return "foo"; }
     // Throws EnvoyException (conversion failure) if d is empty.
-    std::unique_ptr<const TypedMetadata::Object> parse(const ProtobufWkt::Struct& d) const override {
+    std::unique_ptr<const TypedMetadata::Object>
+    parse(const ProtobufWkt::Struct& d) const override {
       if (d.fields().find("name") != d.fields().end()) {
         return std::make_unique<Foo>(d.fields().at("name").string_value());
       }

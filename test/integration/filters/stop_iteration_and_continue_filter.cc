@@ -33,7 +33,8 @@ public:
   StopIterationAndContinueFilterConfig()
       : EmptyHttpFilterConfig("stop-iteration-and-continue-filter") {}
 
-  Http::FilterFactoryCb createFilter(const std::string&, Server::Configuration::FactoryContext&) override {
+  Http::FilterFactoryCb createFilter(const std::string&,
+                                     Server::Configuration::FactoryContext&) override {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamFilter(std::make_shared<::Envoy::StopIterationAndContinueFilter>());
     };

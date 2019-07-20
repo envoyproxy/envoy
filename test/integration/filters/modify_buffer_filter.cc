@@ -46,7 +46,8 @@ class ModifyBuffferFilterConfig : public Extensions::HttpFilters::Common::EmptyH
 public:
   ModifyBuffferFilterConfig() : EmptyHttpFilterConfig("modify-buffer-filter") {}
 
-  Http::FilterFactoryCb createFilter(const std::string&, Server::Configuration::FactoryContext&) override {
+  Http::FilterFactoryCb createFilter(const std::string&,
+                                     Server::Configuration::FactoryContext&) override {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamFilter(std::make_shared<::Envoy::ModifyBufferStreamFilter>());
     };

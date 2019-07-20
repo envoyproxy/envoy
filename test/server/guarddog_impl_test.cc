@@ -35,8 +35,8 @@ public:
     impl_.notifyAll();
   }
 
-  void waitFromTest(Thread::MutexBasicLockable& mutex, MonotonicTime time)
-      override EXCLUSIVE_LOCKS_REQUIRED(mutex) {
+  void waitFromTest(Thread::MutexBasicLockable& mutex, MonotonicTime time) override
+      EXCLUSIVE_LOCKS_REQUIRED(mutex) {
     while (impl_reached_ < time) {
       impl_.wait(mutex);
     }

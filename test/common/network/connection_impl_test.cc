@@ -1350,7 +1350,9 @@ public:
 
   Network::FilterStatus onNewConnection() override { return Network::FilterStatus::Continue; }
 
-  void initializeReadFilterCallbacks(ReadFilterCallbacks& callbacks) override { callbacks_ = &callbacks; }
+  void initializeReadFilterCallbacks(ReadFilterCallbacks& callbacks) override {
+    callbacks_ = &callbacks;
+  }
 
 private:
   ReadFilterCallbacks* callbacks_{nullptr};

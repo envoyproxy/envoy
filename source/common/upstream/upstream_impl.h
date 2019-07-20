@@ -485,11 +485,10 @@ private:
     }
     ~BatchUpdateScope() override { parent_.batch_update_ = false; }
 
-    void updateHosts(uint32_t priority,
-                             PrioritySet::UpdateHostsParams&& update_hosts_params,
-                             LocalityWeightsConstSharedPtr locality_weights,
-                             const HostVector& hosts_added, const HostVector& hosts_removed,
-                             absl::optional<uint32_t> overprovisioning_factor) override;
+    void updateHosts(uint32_t priority, PrioritySet::UpdateHostsParams&& update_hosts_params,
+                     LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
+                     const HostVector& hosts_removed,
+                     absl::optional<uint32_t> overprovisioning_factor) override;
 
     std::unordered_set<HostSharedPtr> all_hosts_added_;
     std::unordered_set<HostSharedPtr> all_hosts_removed_;

@@ -17,11 +17,11 @@ public:
   std::pair<RpcInvocationSharedPtr, bool>
   deserializeRpcInvocation(Buffer::Instance& buffer, ContextSharedPtr context) override;
 
-  std::pair<RpcResultSharedPtr, bool>
-  deserializeRpcResult(Buffer::Instance& buffer, ContextSharedPtr context) override;
+  std::pair<RpcResultSharedPtr, bool> deserializeRpcResult(Buffer::Instance& buffer,
+                                                           ContextSharedPtr context) override;
 
   size_t serializeRpcResult(Buffer::Instance& output_buffer, const std::string& content,
-                                    RpcResponseType type) override;
+                            RpcResponseType type) override;
 };
 
 } // namespace DubboProxy
