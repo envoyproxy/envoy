@@ -104,16 +104,33 @@ public:
   Api::ApiPtr api_;
 };
 
-TEST(OriginalDstClusterConfigTest, GoodConfig) {
-  const std::string yaml = R"EOF(
-    name: name
-    connect_timeout: 0.25s
-    type: original_dst
-    lb_policy: original_dst_lb
-    cleanup_interval: 1s
+TEST(OriginalDstClusterConfigTest, BadConfig) {
+  std::string json = R"EOF(
+  {
+    "name": "name",
+    "connect_timeout_ms": 250,
+    "type": "original_dst",
+    "lb_type": "original_dst_lb",
+    "hosts": [{"url": "tcp://foo.bar.com:443"}]
+  }
   )EOF"; // Help Emacs balance quotation marks: "
 
-  EXPECT_TRUE(parseClusterFromV2Yaml(yaml).has_cleanup_interval());
+  EXPECT_THROW_WITH_MESSAGE(parseClusterFromJson(json), EnvoyException,
+                            "original_dst clusters must have no hosts configured");
+}
+
+TEST(OriginalDstClusterConfigTest, GoodConfig) {
+  std::string json = R"EOF(
+  {
+    "name": "name",
+    "connect_timeout_ms": 250,
+    "type": "original_dst",
+    "lb_type": "original_dst_lb",
+    "cleanup_interval_ms": 1000
+  }
+  )EOF"; // Help Emacs balance quotation marks: "
+
+  EXPECT_TRUE(parseClusterFromJson(json).has_cleanup_interval());
 }
 
 TEST_F(OriginalDstClusterTest, BadConfigWithLoadAssignment) {
