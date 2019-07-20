@@ -7,7 +7,7 @@ use(
   paths=[
     ("htuch", "api/"),
     ("itayd", "api/"),
-    ("envoyproxy/testers!", "/doc"),
+    ("envoyproxy/testers!", "docs/"),
   ],
 )
 
