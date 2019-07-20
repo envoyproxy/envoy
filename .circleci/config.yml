@@ -195,8 +195,10 @@ workflows:
           filters:
             tags:
               only: /^v.*/
-      - asan
-          when: << pipeline.parameters.asan >>
+      - when:
+          condition: << pipeline.parameters.asan >>
+          steps:
+            - asan
       - tsan
       - compile_time_options
       - api
