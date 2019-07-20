@@ -229,7 +229,9 @@ private:
   bool matchesTargetUpstreamCluster();
   bool matchesDownstreamNodes(const Http::HeaderMap& headers);
   bool isAbortEnabled();
+  bool isOverriddenAbortRuntime();
   bool isDelayEnabled();
+  bool isOverriddenDelayRuntime();
   absl::optional<std::chrono::milliseconds> delayDuration(const Http::HeaderMap& request_headers);
   uint64_t abortHttpStatus();
   void maybeIncActiveFaults();
