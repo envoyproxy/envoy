@@ -39,13 +39,13 @@ void XfccIntegrationTest::TearDown() {
 }
 
 Network::TransportSocketFactoryPtr XfccIntegrationTest::createClientSslContext(bool mtls) {
-  std::string json_tls = R"EOF(
+  const std::string yaml_tls = R"EOF(
 {
   "ca_cert_file": "{{ test_rundir }}/test/config/integration/certs/cacert.pem",
   "verify_subject_alt_name": [ "spiffe://lyft.com/backend-team", "lyft.com", "www.lyft.com" ]
 }
 )EOF";
-  std::string json_mtls = R"EOF(
+  const std::string yaml_mtls = R"EOF(
 {
   "ca_cert_file": "{{ test_rundir }}/test/config/integration/certs/cacert.pem",
   "cert_chain_file": "{{ test_rundir }}/test/config/integration/certs/clientcert.pem",
@@ -56,13 +56,14 @@ Network::TransportSocketFactoryPtr XfccIntegrationTest::createClientSslContext(b
 
   std::string target;
   if (mtls) {
-    target = json_mtls;
+    target = yaml_mtls;
   } else {
-    target = json_tls;
+    target = yaml_tls;
   }
-  Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(target);
+  envoy::api::v2::auth::UpstreamTlsContext config;
+  TestUtility::loadFromYaml(target, config);
   auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
-      *loader, factory_context_);
+      config, factory_context_);
   static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
   return Network::TransportSocketFactoryPtr{
       new Extensions::TransportSockets::Tls::ClientSslSocketFactory(
