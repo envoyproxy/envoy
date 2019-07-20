@@ -257,4 +257,3 @@ TEST(TimerImplTest, TimerValueConversion) {
 } // namespace
 } // namespace Event
 } // namespace Envoy
-
