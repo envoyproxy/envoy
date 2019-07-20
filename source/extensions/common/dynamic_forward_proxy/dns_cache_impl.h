@@ -39,7 +39,7 @@ public:
   DnsCacheImpl(Event::Dispatcher& main_thread_dispatcher, ThreadLocal::SlotAllocator& tls,
                Stats::Scope& root_scope,
                const envoy::config::common::dynamic_forward_proxy::v2alpha::DnsCacheConfig& config);
-  ~DnsCacheImpl();
+  ~DnsCacheImpl() override;
 
   // DnsCache
   LoadDnsCacheEntryResult loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
@@ -63,7 +63,7 @@ private:
 
   // Per-thread DNS cache info including the currently known hosts as well as any pending callbacks.
   struct ThreadLocalHostInfo : public ThreadLocal::ThreadLocalObject {
-    ~ThreadLocalHostInfo();
+    ~ThreadLocalHostInfo() override;
     void updateHostMap(const TlsHostMapSharedPtr& new_host_map);
 
     TlsHostMapSharedPtr host_map_;

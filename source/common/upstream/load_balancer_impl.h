@@ -162,7 +162,7 @@ protected:
                             ClusterStats& stats, Runtime::Loader& runtime,
                             Runtime::RandomGenerator& random,
                             const envoy::api::v2::Cluster::CommonLbConfig& common_config);
-  ~ZoneAwareLoadBalancerBase();
+  ~ZoneAwareLoadBalancerBase() override;
 
   // When deciding which hosts to use on an LB decision, we need to know how to index into the
   // priority_set. This priority_set cursor is used by ZoneAwareLoadBalancerBase subclasses, e.g.

@@ -33,7 +33,7 @@ public:
   DispatcherImpl(Api::Api& api, Event::TimeSystem& time_system);
   DispatcherImpl(Buffer::WatermarkFactoryPtr&& factory, Api::Api& api,
                  Event::TimeSystem& time_system);
-  ~DispatcherImpl();
+  ~DispatcherImpl() override;
 
   /**
    * @return event_base& the libevent base.

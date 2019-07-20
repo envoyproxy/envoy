@@ -25,7 +25,7 @@ namespace {
 class MockBuffer : public Envoy::MockBuffer {
 public:
   MockBuffer() = default;
-  ~MockBuffer() = default;
+  ~MockBuffer() override = default;
 
   MOCK_CONST_METHOD0(length, uint64_t());
 };
