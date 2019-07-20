@@ -6,7 +6,7 @@ use(
   "github.com/repokitteh/modules/ownerscheck.star",
   paths=[
     ('htuch!', 'api/'),
-    ('itayd', 'api/'),
+    ('envoy/testers', 'api/'),
   ],
 )
 
