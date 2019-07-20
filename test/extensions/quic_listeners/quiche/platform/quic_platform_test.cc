@@ -726,7 +726,7 @@ TEST_F(QuicPlatformTest, TestQuicOptional) {
 
 class QuicMemSliceTest : public Envoy::Buffer::BufferImplementationParamTest {
 public:
-  ~QuicMemSliceTest() override {}
+  ~QuicMemSliceTest() override = default;
 };
 
 INSTANTIATE_TEST_SUITE_P(QuicMemSliceTests, QuicMemSliceTest,

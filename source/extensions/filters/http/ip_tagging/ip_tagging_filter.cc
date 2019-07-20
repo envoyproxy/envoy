@@ -12,7 +12,7 @@ namespace IpTagging {
 
 IpTaggingFilter::IpTaggingFilter(IpTaggingFilterConfigSharedPtr config) : config_(config) {}
 
-IpTaggingFilter::~IpTaggingFilter() {}
+IpTaggingFilter::~IpTaggingFilter() = default;
 
 void IpTaggingFilter::onDestroy() {}
 
