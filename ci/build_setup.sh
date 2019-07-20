@@ -48,6 +48,7 @@ export TEST_TMPDIR=${BUILD_DIR}/tmp
 export BAZEL="bazel"
 
 if [[ -z "${ENVOY_RBE}" ]]
+then
   if [[ -f "/etc/redhat-release" ]]
   then
     export BAZEL_BUILD_EXTRA_OPTIONS="--copt=-DENVOY_IGNORE_GLIBCXX_USE_CXX11_ABI_ERROR=1 --action_env=PATH ${BAZEL_BUILD_EXTRA_OPTIONS}"
