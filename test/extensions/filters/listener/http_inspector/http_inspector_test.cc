@@ -41,7 +41,7 @@ public:
     EXPECT_CALL(cb_, socket()).WillRepeatedly(ReturnRef(socket_));
     EXPECT_CALL(socket_, detectedTransportProtocol()).WillRepeatedly(Return("raw_buffer"));
     EXPECT_CALL(cb_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
-    EXPECT_CALL(socket_, ioHandle()).WillRepeatedly(ReturnRef(*io_handle_));
+    EXPECT_CALL(testing::Const(socket_), ioHandle()).WillRepeatedly(ReturnRef(*io_handle_));
 
     EXPECT_CALL(dispatcher_,
                 createFileEvent_(_, _, Event::FileTriggerType::Edge, Event::FileReadyType::Read))
@@ -72,7 +72,7 @@ TEST_F(HttpInspectorTest, SkipHttpInspectForTLS) {
 
 TEST_F(HttpInspectorTest, InspectHttp10) {
   init();
-  absl::string_view header =
+  const absl::string_view header =
       "GET /anything HTTP/1.0\r\nhost: google.com\r\nuser-agent: curl/7.64.0\r\naccept: "
       "*/*\r\nx-forwarded-proto: http\r\nx-request-id: "
       "a52df4a0-ed00-4a19-86a7-80e5049c6c84\r\nx-envoy-expected-rq-timeout-ms: "
@@ -95,7 +95,7 @@ TEST_F(HttpInspectorTest, InspectHttp10) {
 
 TEST_F(HttpInspectorTest, InspectHttp11) {
   init();
-  absl::string_view header =
+  const absl::string_view header =
       "GET /anything HTTP/1.1\r\nhost: google.com\r\nuser-agent: curl/7.64.0\r\naccept: "
       "*/*\r\nx-forwarded-proto: http\r\nx-request-id: "
       "a52df4a0-ed00-4a19-86a7-80e5049c6c84\r\nx-envoy-expected-rq-timeout-ms: "
@@ -118,7 +118,7 @@ TEST_F(HttpInspectorTest, InspectHttp11) {
 
 TEST_F(HttpInspectorTest, InvalidHttpMethod) {
   init();
-  absl::string_view header = "BAD /anything HTTP/1.1\r\n";
+  const absl::string_view header = "BAD /anything HTTP/1.1\r\n";
 
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(Invoke([&header](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
@@ -137,7 +137,7 @@ TEST_F(HttpInspectorTest, InvalidHttpMethod) {
 
 TEST_F(HttpInspectorTest, InvalidHttpRequestLine) {
   init();
-  absl::string_view header = "BAD /anything HTTP/1.1";
+  const absl::string_view header = "BAD /anything HTTP/1.1";
 
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(Invoke([&header](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
@@ -154,7 +154,7 @@ TEST_F(HttpInspectorTest, InvalidHttpRequestLine) {
 
 TEST_F(HttpInspectorTest, UnsupportedHttpProtocol) {
   init();
-  absl::string_view header = "GET /anything HTTP/0.9\r\n";
+  const absl::string_view header = "GET /anything HTTP/0.9\r\n";
 
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(Invoke([&header](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
@@ -171,7 +171,7 @@ TEST_F(HttpInspectorTest, UnsupportedHttpProtocol) {
 
 TEST_F(HttpInspectorTest, InvalidRequestLine) {
   init();
-  absl::string_view header = "GET /anything HTTP/1.1 BadRequestLine\r\n";
+  const absl::string_view header = "GET /anything HTTP/1.1 BadRequestLine\r\n";
 
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(Invoke([&header](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
@@ -189,7 +189,7 @@ TEST_F(HttpInspectorTest, InvalidRequestLine) {
 TEST_F(HttpInspectorTest, InspectHttp2) {
   init();
 
-  std::string header =
+  const std::string header =
       "505249202a20485454502f322e300d0a0d0a534d0d0a0d0a00000c04000000000000041000000000020000000000"
       "00040800000000000fff000100007d010500000001418aa0e41d139d09b8f0000f048860757a4ce6aa660582867a"
       "8825b650c3abb8d2e053032a2f2a408df2b4a7b3c0ec90b22d5d8749ff839d29af4089f2b585ed6950958d279a18"
@@ -215,8 +215,8 @@ TEST_F(HttpInspectorTest, InspectHttp2) {
 TEST_F(HttpInspectorTest, InvalidConnectionPreface) {
   init();
 
-  std::string header = "505249202a20485454502f322e300d0a";
-  std::vector<uint8_t> data = Hex::decode(header);
+  const std::string header = "505249202a20485454502f322e300d0a";
+  const std::vector<uint8_t> data = Hex::decode(header);
 
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(Invoke([&data](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {

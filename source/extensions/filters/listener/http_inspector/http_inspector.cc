@@ -30,9 +30,9 @@ Filter::Filter(const ConfigSharedPtr config) : config_(config) {}
 Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   ENVOY_LOG(debug, "http inspector: new connection accepted");
 
-  Network::ConnectionSocket& socket = cb.socket();
+  const Network::ConnectionSocket& socket = cb.socket();
 
-  absl::string_view transport_protocol = socket.detectedTransportProtocol();
+  const absl::string_view transport_protocol = socket.detectedTransportProtocol();
   if (!transport_protocol.empty() &&
       transport_protocol != TransportSockets::TransportSocketNames::get().RawBuffer) {
     ENVOY_LOG(trace, "http inspector: cannot inspect http protocol with transport socket {}",
@@ -56,8 +56,9 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
 
 void Filter::onRead() {
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
+  const Network::ConnectionSocket& socket = cb_->socket();
   const Api::SysCallSizeResult result =
-      os_syscalls.recv(cb_->socket().ioHandle().fd(), buf_, Config::MAX_INSPECT_SIZE, MSG_PEEK);
+      os_syscalls.recv(socket.ioHandle().fd(), buf_, Config::MAX_INSPECT_SIZE, MSG_PEEK);
   ENVOY_LOG(trace, "http inspector: recv: {}", result.rc_);
   if (result.rc_ == -1 && result.errno_ == EAGAIN) {
     return;
@@ -76,7 +77,7 @@ void Filter::parseHttpHeader(absl::string_view data) {
     protocol_ = "HTTP/2";
     done(true);
   } else {
-    size_t pos = data.find_first_of("\r\n");
+    const size_t pos = data.find_first_of("\r\n");
 
     // Cannot find \r or \n
     if (pos == absl::string_view::npos) {
@@ -84,7 +85,7 @@ void Filter::parseHttpHeader(absl::string_view data) {
       return done(false);
     }
 
-    absl::string_view request_line = data.substr(0, pos);
+    const absl::string_view request_line = data.substr(0, pos);
     std::vector<absl::string_view> fields = absl::StrSplit(request_line, absl::MaxSplits(' ', 4));
 
     // Method SP Request-URI SP HTTP-Version
