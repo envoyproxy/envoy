@@ -193,9 +193,7 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
     --define quiche=enabled \
     --define path_normalization_by_default=true \
   "
-  if [[ -z "${ENVOY_RBE}" ]]
-    COMPILE_TIME_OPTIONS="--config libc++ ${COMPILE_TIME_OPTIONS}"
-  fi
+  [[ -z "${ENVOY_RBE}" ]] && COMPILE_TIME_OPTIONS="--config libc++ ${COMPILE_TIME_OPTIONS}"
   setup_clang_toolchain
   # This doesn't go into CI but is available for developer convenience.
   echo "bazel with different compiletime options build with tests..."
