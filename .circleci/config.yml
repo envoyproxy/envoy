@@ -178,12 +178,16 @@ jobs:
            path: generated/docs
 
 parameters:
-  asan:
+  special:
     type: boolean
     default: false
     
 workflows:
   version: 2
+  special:
+    when: << pipeline.parameters.special >>
+    jobs:
+      - asan
   all:
     jobs:
       - release:
@@ -195,10 +199,6 @@ workflows:
           filters:
             tags:
               only: /^v.*/
-      - when:
-          condition: << pipeline.parameters.asan >>
-          steps:
-            - asan
       - tsan
       - compile_time_options
       - api
