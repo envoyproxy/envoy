@@ -7,7 +7,7 @@ use(
   paths=[
     ('htuch', 'api/'),
     ('envoyproxy/testers!', 'api/'),
-    ('rktest2', 'api/'),
+    ('rktest2!', 'api/'),
   ],
 )
 
