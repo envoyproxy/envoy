@@ -17,7 +17,7 @@ public:
 
   // DnsCacheManager
   DnsCacheSharedPtr
-  getCache(const envoy::config::common::dynamic_forward_proxy::v2alpha::DnsCacheConfig& config);
+  getCache(const envoy::config::common::dynamic_forward_proxy::v2alpha::DnsCacheConfig& config) override;
 
 private:
   struct ActiveCache {

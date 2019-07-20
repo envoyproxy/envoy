@@ -30,13 +30,13 @@ namespace {
 class DebugTestInterlock : public GuardDogImpl::TestInterlockHook {
 public:
   // GuardDogImpl::TestInterlockHook
-  virtual void signalFromImpl(MonotonicTime time) {
+  void signalFromImpl(MonotonicTime time) override {
     impl_reached_ = time;
     impl_.notifyAll();
   }
 
-  virtual void waitFromTest(Thread::MutexBasicLockable& mutex, MonotonicTime time)
-      EXCLUSIVE_LOCKS_REQUIRED(mutex) {
+  void waitFromTest(Thread::MutexBasicLockable& mutex, MonotonicTime time)
+      override EXCLUSIVE_LOCKS_REQUIRED(mutex) {
     while (impl_reached_ < time) {
       impl_.wait(mutex);
     }

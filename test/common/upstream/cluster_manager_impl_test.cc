@@ -2130,14 +2130,14 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
 
 class MockConnPoolWithDestroy : public Http::ConnectionPool::MockInstance {
 public:
-  ~MockConnPoolWithDestroy() { onDestroy(); }
+  ~MockConnPoolWithDestroy() override { onDestroy(); }
 
   MOCK_METHOD0(onDestroy, void());
 };
 
 class MockTcpConnPoolWithDestroy : public Tcp::ConnectionPool::MockInstance {
 public:
-  ~MockTcpConnPoolWithDestroy() { onDestroy(); }
+  ~MockTcpConnPoolWithDestroy() override { onDestroy(); }
 
   MOCK_METHOD0(onDestroy, void());
 };

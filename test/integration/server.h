@@ -236,7 +236,7 @@ public:
          absl::optional<std::reference_wrapper<ProcessObject>> process_object = absl::nullopt);
   // Note that the derived class is responsible for tearing down the server in its
   // destructor.
-  ~IntegrationTestServer();
+  ~IntegrationTestServer() override;
 
   void waitUntilListenersReady();
 

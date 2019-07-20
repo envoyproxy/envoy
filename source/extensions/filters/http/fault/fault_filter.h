@@ -168,7 +168,7 @@ private:
 class FaultFilter : public Http::StreamFilter, Logger::Loggable<Logger::Id::filter> {
 public:
   FaultFilter(FaultFilterConfigSharedPtr config);
-  ~FaultFilter();
+  ~FaultFilter() override;
 
   // Http::StreamFilterBase
   void onDestroy() override;
