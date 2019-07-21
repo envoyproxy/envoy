@@ -1020,6 +1020,28 @@ name: encode-headers-return-stop-all-filter
   EXPECT_EQ(count_ * size_ + added_decoded_data_size_, response->body().size());
 }
 
+// Per https://github.com/envoyproxy/envoy/issues/7488 make sure we don't
+// combine set-cookie headers
+TEST_P(ProtocolIntegrationTest, MultipleSetCookies) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestHeaderMapImpl response_headers{
+      {":status", "200"}, {"set-cookie", "foo"}, {"set-cookie", "bar"}};
+
+  auto response = sendRequestAndWaitForResponse(default_request_headers_, 0, response_headers, 0);
+
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+
+  std::vector<absl::string_view> out;
+  Http::HeaderUtility::getAllOfHeader(response->headers(), "set-cookie", out);
+  ASSERT_EQ(out.size(), 2);
+  ASSERT_EQ(out[0], "foo");
+  ASSERT_EQ(out[1], "bar");
+}
+
 // For tests which focus on downstream-to-Envoy behavior, and don't need to be
 // run with both HTTP/1 and HTTP/2 upstreams.
 INSTANTIATE_TEST_SUITE_P(Protocols, DownstreamProtocolIntegrationTest,

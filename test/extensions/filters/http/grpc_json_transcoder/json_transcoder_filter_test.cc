@@ -740,7 +740,7 @@ protected:
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
-  ~GrpcJsonTranscoderFilterPrintTest() {
+  ~GrpcJsonTranscoderFilterPrintTest() override {
     delete filter_;
     delete config_;
   }

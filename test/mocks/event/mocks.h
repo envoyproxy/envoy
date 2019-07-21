@@ -28,7 +28,7 @@ namespace Event {
 class MockDispatcher : public Dispatcher {
 public:
   MockDispatcher();
-  ~MockDispatcher();
+  ~MockDispatcher() override;
 
   // Dispatcher
   TimeSource& timeSource() override { return time_system_; }
@@ -125,7 +125,7 @@ class MockTimer : public Timer {
 public:
   MockTimer();
   MockTimer(MockDispatcher* dispatcher);
-  ~MockTimer();
+  ~MockTimer() override;
 
   void invokeCallback() {
     EXPECT_TRUE(enabled_);
@@ -147,7 +147,7 @@ public:
 class MockSignalEvent : public SignalEvent {
 public:
   MockSignalEvent(MockDispatcher* dispatcher);
-  ~MockSignalEvent();
+  ~MockSignalEvent() override;
 
   SignalCb callback_;
 };
@@ -155,7 +155,7 @@ public:
 class MockFileEvent : public FileEvent {
 public:
   MockFileEvent();
-  ~MockFileEvent();
+  ~MockFileEvent() override;
 
   MOCK_METHOD1(activate, void(uint32_t events));
   MOCK_METHOD1(setEnabled, void(uint32_t events));

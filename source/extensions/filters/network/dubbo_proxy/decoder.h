@@ -99,7 +99,7 @@ public:
 private:
   struct DecoderStatus {
     DecoderStatus() = default;
-    DecoderStatus(ProtocolState next_state) : next_state_(next_state), filter_status_{} {};
+    DecoderStatus(ProtocolState next_state) : next_state_(next_state){};
     DecoderStatus(ProtocolState next_state, FilterStatus filter_status)
         : next_state_(next_state), filter_status_(filter_status){};
 
@@ -128,7 +128,7 @@ class DecoderBase : public DecoderStateMachine::Delegate,
                     public Logger::Loggable<Logger::Id::dubbo> {
 public:
   DecoderBase(Protocol& protocol);
-  virtual ~DecoderBase();
+  ~DecoderBase() override;
 
   /**
    * Drains data from the given buffer

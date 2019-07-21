@@ -2,14 +2,13 @@ workspace(name = "envoy_filter_example")
 
 local_repository(
     name = "envoy",
-    path = "/source",
+    path = "{ENVOY_SRCDIR}",
 )
 
 load("@envoy//bazel:api_repositories.bzl", "envoy_api_dependencies")
 envoy_api_dependencies()
 
 load("@envoy//bazel:repositories.bzl", "envoy_dependencies", "GO_VERSION")
-load("@envoy//bazel:cc_configure.bzl", "cc_configure")
 
 envoy_dependencies()
 
@@ -17,8 +16,10 @@ envoy_dependencies()
 load("@rules_foreign_cc//:workspace_definitions.bzl", "rules_foreign_cc_dependencies")
 rules_foreign_cc_dependencies()
 
-cc_configure()
-
 load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
 go_rules_dependencies()
 go_register_toolchains(go_version = GO_VERSION)
+
+load("@envoy//bazel/toolchains:rbe_toolchains_config.bzl", "rbe_toolchains_config")
+
+rbe_toolchains_config()

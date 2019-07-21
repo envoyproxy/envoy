@@ -5,6 +5,7 @@ package(default_visibility = ["//visibility:public"])
 exports_files([
     "gen_sh_test_runner.sh",
     "sh_test_wrapper.sh",
+    "cc_wrapper.py",
 ])
 
 genrule(
@@ -83,6 +84,20 @@ config_setting(
 config_setting(
     name = "coverage_build",
     values = {"define": "ENVOY_CONFIG_COVERAGE=1"},
+)
+
+config_setting(
+    name = "clang_build",
+    flag_values = {
+        "@bazel_tools//tools/cpp:compiler": "clang",
+    },
+)
+
+config_setting(
+    name = "gcc_build",
+    flag_values = {
+        "@bazel_tools//tools/cpp:compiler": "gcc",
+    },
 )
 
 config_setting(

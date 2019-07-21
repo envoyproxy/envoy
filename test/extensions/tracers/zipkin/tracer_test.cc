@@ -28,7 +28,7 @@ namespace {
 class TestReporterImpl : public Reporter {
 public:
   TestReporterImpl(int value) : value_(value) {}
-  void reportSpan(const Span& span) { reported_spans_.push_back(span); }
+  void reportSpan(const Span& span) override { reported_spans_.push_back(span); }
   int getValue() { return value_; }
   std::vector<Span>& reportedSpans() { return reported_spans_; }
 

@@ -85,7 +85,7 @@ protected:
     GetLogger().set_level(ERROR);
   }
 
-  ~QuicPlatformTest() {
+  ~QuicPlatformTest() override {
     SetVerbosityLogThreshold(verbosity_log_threshold_);
     GetLogger().set_level(log_level_);
   }
@@ -726,7 +726,7 @@ TEST_F(QuicPlatformTest, TestQuicOptional) {
 
 class QuicMemSliceTest : public Envoy::Buffer::BufferImplementationParamTest {
 public:
-  ~QuicMemSliceTest() override {}
+  ~QuicMemSliceTest() override = default;
 };
 
 INSTANTIATE_TEST_SUITE_P(QuicMemSliceTests, QuicMemSliceTest,

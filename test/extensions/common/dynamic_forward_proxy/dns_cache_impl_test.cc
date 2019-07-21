@@ -28,7 +28,7 @@ public:
     update_callbacks_handle_ = dns_cache_->addUpdateCallbacks(update_callbacks_);
   }
 
-  ~DnsCacheImplTest() {
+  ~DnsCacheImplTest() override {
     dns_cache_.reset();
     EXPECT_EQ(0, TestUtility::findGauge(store_, "dns_cache.foo.num_hosts")->value());
   }

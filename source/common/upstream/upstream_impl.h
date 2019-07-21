@@ -105,7 +105,7 @@ public:
     absl::ReaderMutexLock lock(&metadata_mutex_);
     return metadata_;
   }
-  virtual void metadata(const envoy::api::v2::core::Metadata& new_metadata) override {
+  void metadata(const envoy::api::v2::core::Metadata& new_metadata) override {
     absl::WriterMutexLock lock(&metadata_mutex_);
     metadata_ = std::make_shared<envoy::api::v2::core::Metadata>(new_metadata);
   }
@@ -483,13 +483,12 @@ private:
       ASSERT(!parent_.batch_update_);
       parent_.batch_update_ = true;
     }
-    ~BatchUpdateScope() { parent_.batch_update_ = false; }
+    ~BatchUpdateScope() override { parent_.batch_update_ = false; }
 
-    virtual void updateHosts(uint32_t priority,
-                             PrioritySet::UpdateHostsParams&& update_hosts_params,
-                             LocalityWeightsConstSharedPtr locality_weights,
-                             const HostVector& hosts_added, const HostVector& hosts_removed,
-                             absl::optional<uint32_t> overprovisioning_factor) override;
+    void updateHosts(uint32_t priority, PrioritySet::UpdateHostsParams&& update_hosts_params,
+                     LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
+                     const HostVector& hosts_removed,
+                     absl::optional<uint32_t> overprovisioning_factor) override;
 
     std::unordered_set<HostSharedPtr> all_hosts_added_;
     std::unordered_set<HostSharedPtr> all_hosts_removed_;

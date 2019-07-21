@@ -28,7 +28,7 @@ public:
                               SetPayloadCallback set_payload_cb, AuthenticatorCallback callback));
 
   void verify(Http::HeaderMap& headers, std::vector<JwtLocationConstPtr>&& tokens,
-              SetPayloadCallback set_payload_cb, AuthenticatorCallback callback) {
+              SetPayloadCallback set_payload_cb, AuthenticatorCallback callback) override {
     doVerify(headers, &tokens, std::move(set_payload_cb), std::move(callback));
   }
 

@@ -33,7 +33,7 @@ public:
   DispatcherImpl(Api::Api& api, Event::TimeSystem& time_system);
   DispatcherImpl(Buffer::WatermarkFactoryPtr&& factory, Api::Api& api,
                  Event::TimeSystem& time_system);
-  ~DispatcherImpl();
+  ~DispatcherImpl() override;
 
   /**
    * @return event_base& the libevent base.
@@ -91,7 +91,7 @@ private:
   void runPostCallbacks();
 
   // Validate that an operation is thread safe, i.e. it's invoked on the same thread that the
-  // dispatcher run loop is executing on. We allow run_tid_ == nullptr for tests where we don't
+  // dispatcher run loop is executing on. We allow run_tid_ to be empty for tests where we don't
   // invoke run().
   bool isThreadSafe() const {
     return run_tid_.isEmpty() || run_tid_ == api_.threadFactory().currentThreadId();

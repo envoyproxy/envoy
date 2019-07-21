@@ -89,7 +89,7 @@ public:
     EXPECT_CALL(response_encoder_, getStream()).Times(AtLeast(0));
   }
 
-  ~HttpConnectionManagerImplTest() {
+  ~HttpConnectionManagerImplTest() override {
     filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   }
 
@@ -241,7 +241,7 @@ public:
   // Http::ConnectionManagerConfig
   const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
   ServerConnectionPtr createCodec(Network::Connection&, const Buffer::Instance&,
-                                  ServerConnectionCallbacks&) override {
+                                  ServerConnectionCallbacks&, const bool) override {
     return ServerConnectionPtr{codec_};
   }
   DateProvider& dateProvider() override { return date_provider_; }

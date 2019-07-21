@@ -17,7 +17,7 @@ public:
    * Constructor that creates an empty buffer. Space needs to be allocated by invoking
    * the method allocateBuffer(size).
    */
-  SpanBuffer() {}
+  SpanBuffer() = default;
 
   /**
    * Constructor that initializes a buffer with the given size.

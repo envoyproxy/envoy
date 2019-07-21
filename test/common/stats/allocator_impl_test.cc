@@ -1,7 +1,7 @@
 #include <string>
 
+#include "common/stats/allocator_impl.h"
 #include "common/stats/fake_symbol_table_impl.h"
-#include "common/stats/heap_stat_data.h"
 
 #include "test/test_common/logging.h"
 
@@ -11,10 +11,10 @@ namespace Envoy {
 namespace Stats {
 namespace {
 
-class HeapAllocatorTest : public testing::Test {
+class AllocatorImplTest : public testing::Test {
 protected:
-  HeapAllocatorTest() : alloc_(symbol_table_), pool_(symbol_table_) {}
-  ~HeapAllocatorTest() { clearStorage(); }
+  AllocatorImplTest() : alloc_(symbol_table_), pool_(symbol_table_) {}
+  ~AllocatorImplTest() override { clearStorage(); }
 
   StatNameStorage makeStatStorage(absl::string_view name) {
     return StatNameStorage(name, symbol_table_);
@@ -28,12 +28,12 @@ protected:
   }
 
   FakeSymbolTableImpl symbol_table_;
-  HeapStatDataAllocator alloc_;
+  AllocatorImpl alloc_;
   StatNamePool pool_;
 };
 
 // Allocate 2 counters of the same name, and you'll get the same object.
-TEST_F(HeapAllocatorTest, CountersWithSameName) {
+TEST_F(AllocatorImplTest, CountersWithSameName) {
   StatName counter_name = makeStat("counter.name");
   CounterSharedPtr c1 = alloc_.makeCounter(counter_name, "", std::vector<Tag>());
   EXPECT_EQ(1, c1->use_count());
@@ -51,7 +51,7 @@ TEST_F(HeapAllocatorTest, CountersWithSameName) {
   EXPECT_EQ(2, c2->value());
 }
 
-TEST_F(HeapAllocatorTest, GaugesWithSameName) {
+TEST_F(AllocatorImplTest, GaugesWithSameName) {
   StatName gauge_name = makeStat("gauges.name");
   GaugeSharedPtr g1 =
       alloc_.makeGauge(gauge_name, "", std::vector<Tag>(), Gauge::ImportMode::Accumulate);
