@@ -411,7 +411,9 @@ TEST_P(IntegrationAdminTest, Admin) {
   config_dump.configs(4).UnpackTo(&route_config_dump);
   EXPECT_EQ("route_config_0", route_config_dump.static_route_configs(0).route_config().name());
 
-  // TODO(incfly) do we need to add parsing and data input for the sds?
+  envoy::admin::v2alpha::SecretsConfigDump secret_config_dump;
+  config_dump.configs(5).UnpackTo(&secret_config_dump);
+  EXPECT_EQ("secret_static_0", secret_config_dump.static_secrets(0).name());
 }
 
 TEST_P(IntegrationAdminTest, AdminOnDestroyCallbacks) {
