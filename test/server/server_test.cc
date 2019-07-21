@@ -575,7 +575,7 @@ void bindAndListenTcpSocket(const Network::Address::InstanceConstSharedPtr& addr
   // Some kernels erroneously allow `bind` without SO_REUSEPORT for addresses
   // with some other socket already listening on it, see #7636.
   if (::listen(socket->ioHandle().fd(), 1) != 0) {
-    // Mimick bind exception for the test simplicity.
+    // Mimic bind exception for the test simplicity.
     throw Network::SocketBindException(fmt::format("cannot listen: {}", strerror(errno)), errno);
   }
 }
