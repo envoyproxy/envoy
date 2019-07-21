@@ -575,6 +575,7 @@ void ServerConnectionImpl::handlePath(HeaderMapImpl& headers, unsigned int metho
   // forward the received Host field-value.
   headers.insertHost().value(std::string(absolute_url.host_and_port()));
 
+  headers.insertScheme().value(std::string(absolute_url.scheme()));
   headers.insertPath().value(std::string(absolute_url.path_and_query_params()));
   active_request_->request_url_.clear();
 }
