@@ -1,8 +1,8 @@
 ---
 tasks:
-  ubuntu_1804:
-    platform: ubuntu1804
+  release:
+    platform: ubuntu1604
     build_targets:
-      - "//source/..."
+      - "//source/exe:envoy-static"
     test_targets:
       - "//test/..."

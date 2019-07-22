@@ -29,7 +29,7 @@ AsyncRequest* sendUntyped(RawAsyncClient* client, const Protobuf::MethodDescript
  */
 template <typename Request> class AsyncStream /* : public RawAsyncStream */ {
 public:
-  AsyncStream() {}
+  AsyncStream() = default;
   AsyncStream(RawAsyncStream* stream) : stream_(stream) {}
   AsyncStream(const AsyncStream& other) = default;
   void sendMessage(const Request& request, bool end_stream) {
@@ -93,7 +93,7 @@ private:
 
 template <typename Request, typename Response> class AsyncClient /* : public RawAsyncClient )*/ {
 public:
-  AsyncClient() {}
+  AsyncClient() = default;
   AsyncClient(RawAsyncClientPtr&& client) : client_(std::move(client)) {}
   virtual ~AsyncClient() = default;
 

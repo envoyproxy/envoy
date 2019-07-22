@@ -43,7 +43,7 @@ public:
 class MockTimeSystem : public Event::TestTimeSystem {
 public:
   MockTimeSystem();
-  ~MockTimeSystem();
+  ~MockTimeSystem() override;
 
   // TODO(#4160): Eliminate all uses of MockTimeSystem, replacing with SimulatedTimeSystem,
   // where timer callbacks are triggered by the advancement of time. This implementation

@@ -49,7 +49,8 @@ class RandomPauseFilterConfig : public Extensions::HttpFilters::Common::EmptyHtt
 public:
   RandomPauseFilterConfig() : EmptyHttpFilterConfig("random-pause-filter") {}
 
-  Http::FilterFactoryCb createFilter(const std::string&, Server::Configuration::FactoryContext&) {
+  Http::FilterFactoryCb createFilter(const std::string&,
+                                     Server::Configuration::FactoryContext&) override {
     return [&](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       absl::WriterMutexLock m(&rand_lock_);
       if (rng_ == nullptr) {

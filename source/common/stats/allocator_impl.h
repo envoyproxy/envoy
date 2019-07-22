@@ -1,10 +1,8 @@
-// TODO(jmarantz): rename this file and class to heap_allocator.h.
-
 #pragma once
 
 #include <vector>
 
-#include "envoy/stats/stat_data_allocator.h"
+#include "envoy/stats/allocator.h"
 #include "envoy/stats/stats.h"
 #include "envoy/stats/symbol_table.h"
 
@@ -16,15 +14,15 @@
 namespace Envoy {
 namespace Stats {
 
-class HeapStatDataAllocator : public StatDataAllocator {
+class AllocatorImpl : public Allocator {
 public:
-  HeapStatDataAllocator(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
-  ~HeapStatDataAllocator() override;
+  AllocatorImpl(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
+  ~AllocatorImpl() override;
 
   void removeCounterFromSet(Counter* counter);
   void removeGaugeFromSet(Gauge* gauge);
 
-  // StatDataAllocator
+  // Allocator
   CounterSharedPtr makeCounter(StatName name, absl::string_view tag_extracted_name,
                                const std::vector<Tag>& tags) override;
   GaugeSharedPtr makeGauge(StatName name, absl::string_view tag_extracted_name,
