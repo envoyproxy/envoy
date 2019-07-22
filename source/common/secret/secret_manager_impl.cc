@@ -111,7 +111,7 @@ ProtobufTypes::MessagePtr SecretManagerImpl::dumpSecretConfigs() {
     ASSERT(tls_cert != nullptr);
     auto dump_secret = static_secret->mutable_secret();
     dump_secret->set_name(cert_iter.first);
-    dump_secret->mutable_tls_certificate()->MergeFrom(*tls_cert.get()->secret());
+    dump_secret->mutable_tls_certificate()->MergeFrom(*tls_cert->secret());
     redactSecret(dump_secret);
   }
 
@@ -123,7 +123,7 @@ ProtobufTypes::MessagePtr SecretManagerImpl::dumpSecretConfigs() {
     ASSERT(validation_context != nullptr);
     auto dump_secret = static_secret->mutable_secret();
     dump_secret->set_name(context_iter.first);
-    dump_secret->mutable_validation_context()->MergeFrom(*validation_context.get()->secret());
+    dump_secret->mutable_validation_context()->MergeFrom(*validation_context->secret());
   }
 
   // Handle dynamic tls_certificate providers.
