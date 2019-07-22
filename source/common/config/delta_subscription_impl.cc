@@ -12,7 +12,6 @@ DeltaSubscriptionImpl::DeltaSubscriptionImpl(
 DeltaSubscriptionImpl::~DeltaSubscriptionImpl() {
   if (watch_) {
     context_->removeWatch(type_url_, watch_);
-    watch_ = nullptr;
   }
 }
 

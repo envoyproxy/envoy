@@ -28,6 +28,10 @@ struct Watch {
   std::set<std::string> resource_names_; // must be sorted set, for set_difference.
 };
 
+// NOTE: Users are responsible for eventually calling removeWatch() on the Watch* returned
+//       by addWatch(). We don't expect there to be new users of this class beyond
+//       NewGrpcMuxImpl and DeltaSubscriptionImpl (to be renamed).
+//
 // Manages "watches" of xDS resources. Several xDS callers might ask for a subscription to the same
 // resource name "X". The xDS machinery must return to each their very own subscription to X.
 // The xDS machinery's "watch" concept accomplishes that, while avoiding parallel redundant xDS
