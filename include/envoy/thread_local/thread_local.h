@@ -29,10 +29,10 @@ public:
   virtual ~Slot() = default;
 
   /**
-   * Returns if there is a slot for this thread
+   * Returns if there is thread local data for this thread.
    *
-   * This should return true for Envoy worker threads and false for threads which do not have a TLS
-   * slot allocateed.
+   * This should return true for Envoy worker threads and false for threads which do not have thead
+   * local storage allocated.
    *
    * @return true if registerThread has been called for this thread, false otherwise.
    */

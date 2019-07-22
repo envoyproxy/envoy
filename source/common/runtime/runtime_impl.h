@@ -246,14 +246,11 @@ public:
   const Snapshot& snapshot() override;
   void mergeValues(const std::unordered_map<std::string, std::string>& values) override;
 
-protected:
-  ThreadLocal::SlotPtr& tls() { return tls_; }
-  virtual std::unique_ptr<SnapshotImpl> createNewSnapshot();
-
 private:
   friend RtdsSubscription;
 
   // Create a new Snapshot
+  virtual std::unique_ptr<SnapshotImpl> createNewSnapshot();
   // Load a new Snapshot into TLS
   void loadNewSnapshot();
   RuntimeStats generateStats(Stats::Store& store);
@@ -269,12 +266,17 @@ private:
   std::vector<RtdsSubscriptionPtr> subscriptions_;
   Upstream::ClusterManager* cm_{};
 
+  // State of the snapshot for non-worker threads.
   struct SnapshotState {
+    // If SnapshotState exists, this should be a pointer to a snapshot.
     std::unique_ptr<Runtime::SnapshotImpl> snapshot_;
+    // This is set false during mergeValues, and indicates that next time a
+    // given thread calls snapshot() that snapshot_ should be replaced.
     bool valid_;
   };
-  absl::Mutex mutex_;
-  absl::flat_hash_map<std::thread::id, std::unique_ptr<SnapshotState>> snapshots_;
+  absl::Mutex snapshot_mutex_;
+  absl::flat_hash_map<std::thread::id, std::unique_ptr<SnapshotState>>
+      snapshots_ GUARDED_BY(snapshot_mutex_);
 };
 
 } // namespace Runtime
