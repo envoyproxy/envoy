@@ -108,21 +108,6 @@ void Filter::parseHttpHeader(absl::string_view data) {
   }
 }
 
-bool Filter::checkPrefix(const absl::string_view prefix,
-                         const absl::flat_hash_set<std::string>& hash_set) {
-  for (const auto& value : hash_set) {
-    if (value.length() < prefix.length()) {
-      continue;
-    }
-
-    if (value.substr(0, prefix.length()) == prefix) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
 void Filter::done(bool success) {
   ENVOY_LOG(trace, "http inspector: done: {}", success);
 
