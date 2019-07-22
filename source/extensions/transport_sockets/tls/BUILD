@@ -97,6 +97,7 @@ envoy_cc_library(
         "//source/common/common:base64_lib",
         "//source/common/common:hex_lib",
         "//source/common/common:utility_lib",
+        "//source/common/network:address_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/admin/v2alpha:certs_cc",
     ],
