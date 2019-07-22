@@ -384,6 +384,76 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp1BadMethod) {
   EXPECT_EQ(1, cfg_->stats().http_not_found_.value());
 }
 
+TEST_F(HttpInspectorTest, MultipleReadsHttp1IncompleteHeader) {
+
+  init();
+
+  const absl::string_view data = "GE";
+  bool end_stream = false;
+
+  {
+    InSequence s;
+
+    EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce(InvokeWithoutArgs([]() {
+      return Api::SysCallSizeResult{ssize_t(-1), EAGAIN};
+    }));
+
+    for (size_t i = 1; i <= data.length(); i++) {
+      EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+          .WillOnce(Invoke([&data, &end_stream, i](int, void* buffer, size_t length,
+                                                   int) -> Api::SysCallSizeResult {
+            ASSERT(length >= data.size());
+            memcpy(buffer, data.data(), data.size());
+            if (i == data.length()) {
+              end_stream = true;
+            }
+
+            return Api::SysCallSizeResult{ssize_t(i), 0};
+          }));
+    }
+  }
+
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
+  EXPECT_EQ(0, cfg_->stats().http_not_found_.value());
+  while (!end_stream) {
+    file_event_callback_(Event::FileReadyType::Read);
+  }
+}
+
+TEST_F(HttpInspectorTest, MultipleReadsNonHttp) {
+
+  init();
+
+  const absl::string_view data = "E";
+  {
+    InSequence s;
+
+    EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce(InvokeWithoutArgs([]() {
+      return Api::SysCallSizeResult{ssize_t(-1), EAGAIN};
+    }));
+
+    for (size_t i = 1; i <= data.length(); i++) {
+      EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+          .WillOnce(
+              Invoke([&data, i](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+                ASSERT(length >= data.size());
+                memcpy(buffer, data.data(), data.size());
+                return Api::SysCallSizeResult{ssize_t(i), 0};
+              }));
+    }
+  }
+
+  bool got_continue = false;
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
+  EXPECT_CALL(cb_, continueFilterChain(true)).WillOnce(InvokeWithoutArgs([&got_continue]() {
+    got_continue = true;
+  }));
+  while (!got_continue) {
+    file_event_callback_(Event::FileReadyType::Read);
+  }
+  EXPECT_EQ(1, cfg_->stats().http_not_found_.value());
+}
+
 TEST_F(HttpInspectorTest, MultipleReadsHttp1BadProtocol) {
 
   init();
