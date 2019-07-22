@@ -54,11 +54,12 @@ void FilterChainManagerImpl::addFilterChain(
       destination_ips.push_back(cidr_range.asString());
     }
     if (destination_ips.empty()) {
-      if (Network::Address::ipFamilySupported(AF_INET)) {
-        destination_ips.push_back(Network::Utility::getIpv4CidrCatchAllAddress());
-      }
       if (Network::Address::ipFamilySupported(AF_INET6)) {
         destination_ips.push_back(Network::Utility::getIpv6CidrCatchAllAddress());
+      }
+      // Insert a 0.0.0.0 to avoid empty entry to match UDS address.
+      if (destination_ips.empty() || Network::Address::ipFamilySupported(AF_INET)) {
+        destination_ips.push_back(Network::Utility::getIpv4CidrCatchAllAddress());
       }
     }
     std::vector<std::string> source_ips;
@@ -68,11 +69,12 @@ void FilterChainManagerImpl::addFilterChain(
       source_ips.push_back(cidr_range.asString());
     }
     if (source_ips.empty()) {
-      if (Network::Address::ipFamilySupported(AF_INET)) {
-        source_ips.push_back(Network::Utility::getIpv4CidrCatchAllAddress());
-      }
       if (Network::Address::ipFamilySupported(AF_INET6)) {
         source_ips.push_back(Network::Utility::getIpv6CidrCatchAllAddress());
+      }
+      // Insert a 0.0.0.0 to avoid empty entry to match UDS address.
+      if (source_ips.empty() || Network::Address::ipFamilySupported(AF_INET)) {
+        source_ips.push_back(Network::Utility::getIpv4CidrCatchAllAddress());
       }
     }
 
@@ -243,20 +245,8 @@ namespace {
 template <class T>
 std::pair<T, std::vector<Network::Address::CidrRange>> makeCidrListEntry(const std::string& cidr,
                                                                          const T& data) {
-  std::vector<Network::Address::CidrRange> subnets;
-  if (cidr == EMPTY_STRING) {
-    // This branch should never hit unless OS doesn't support ip family.
-    if (Network::Address::ipFamilySupported(AF_INET)) {
-      subnets.push_back(
-          Network::Address::CidrRange::create(Network::Utility::getIpv4CidrCatchAllAddress()));
-    }
-    if (Network::Address::ipFamilySupported(AF_INET6)) {
-      subnets.push_back(
-          Network::Address::CidrRange::create(Network::Utility::getIpv6CidrCatchAllAddress()));
-    }
-  } else {
-    subnets.push_back(Network::Address::CidrRange::create(cidr));
-  }
+  ASSERT(!cidr.empty());
+  std::vector<Network::Address::CidrRange> subnets{Network::Address::CidrRange::create(cidr)};
   return std::make_pair<T, std::vector<Network::Address::CidrRange>>(T(data), std::move(subnets));
 }
 
