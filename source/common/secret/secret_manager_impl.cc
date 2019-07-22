@@ -90,10 +90,12 @@ SecretManagerImpl::findOrCreateCertificateValidationContextProvider(
 void redactSecret(::envoy::api::v2::auth::Secret* secret) {
   if (secret && secret->type_case() == envoy::api::v2::auth::Secret::TypeCase::kTlsCertificate) {
     auto tls_certificate = secret->mutable_tls_certificate();
-    if (tls_certificate->has_private_key()) {
+    if (tls_certificate->has_private_key() && tls_certificate->private_key().specifier_case() !=
+                                                  envoy::api::v2::core::DataSource::kFilename) {
       tls_certificate->mutable_private_key()->set_inline_string("[redacted]");
     }
-    if (tls_certificate->has_password()) {
+    if (tls_certificate->has_password() && tls_certificate->password().specifier_case() !=
+                                               envoy::api::v2::core::DataSource::kFilename) {
       tls_certificate->mutable_password()->set_inline_string("[redacted]");
     }
   }
@@ -106,9 +108,7 @@ ProtobufTypes::MessagePtr SecretManagerImpl::dumpSecretConfigs() {
     const auto& tls_cert = cert_iter.second;
     auto static_secret = config_dump->mutable_static_secrets()->Add();
     static_secret->set_name(cert_iter.first);
-    if (!tls_cert.get()) {
-      continue;
-    }
+    ASSERT(tls_cert != nullptr);
     auto dump_secret = static_secret->mutable_secret();
     dump_secret->set_name(cert_iter.first);
     dump_secret->mutable_tls_certificate()->MergeFrom(*tls_cert.get()->secret());
@@ -120,34 +120,32 @@ ProtobufTypes::MessagePtr SecretManagerImpl::dumpSecretConfigs() {
     const auto& validation_context = context_iter.second;
     auto static_secret = config_dump->mutable_static_secrets()->Add();
     static_secret->set_name(context_iter.first);
-    if (!validation_context.get()) {
-      continue;
-    }
+    ASSERT(validation_context != nullptr);
     auto dump_secret = static_secret->mutable_secret();
     dump_secret->set_name(context_iter.first);
     dump_secret->mutable_validation_context()->MergeFrom(*validation_context.get()->secret());
   }
 
   // Handle dynamic tls_certificate providers.
-  auto providers = certificate_providers_.allSecretProviders();
+  const auto providers = certificate_providers_.allSecretProviders();
   for (const auto& cert_secrets : providers) {
     const auto& secret_data = cert_secrets->secretData();
     const auto& tls_cert = cert_secrets->secret();
     ::envoy::admin::v2alpha::SecretsConfigDump_DynamicSecret* dump_secret;
-    bool secret_ready = tls_cert != nullptr;
+    const bool secret_ready = tls_cert != nullptr;
     if (secret_ready) {
       dump_secret = config_dump->mutable_dynamic_active_secrets()->Add();
     } else {
       dump_secret = config_dump->mutable_dynamic_warming_secrets()->Add();
     }
-    dump_secret->set_name(secret_data.resource_name);
+    dump_secret->set_name(secret_data.resource_name_);
     auto secret = dump_secret->mutable_secret();
-    secret->set_name(secret_data.resource_name);
+    secret->set_name(secret_data.resource_name_);
     ProtobufWkt::Timestamp last_updated_ts;
     TimestampUtil::systemClockToTimestamp(secret_data.last_updated_, last_updated_ts);
     dump_secret->set_version_info(secret_data.version_info_);
     *dump_secret->mutable_last_updated() = last_updated_ts;
-    secret->set_name(secret_data.resource_name);
+    secret->set_name(secret_data.resource_name_);
     if (secret_ready) {
       secret->mutable_tls_certificate()->MergeFrom(*tls_cert);
     }
@@ -155,20 +153,20 @@ ProtobufTypes::MessagePtr SecretManagerImpl::dumpSecretConfigs() {
   }
 
   // Handling dynamic cert validation context providers.
-  auto context_secret_provider = validation_context_providers_.allSecretProviders();
+  const auto context_secret_provider = validation_context_providers_.allSecretProviders();
   for (const auto& validation_context_secret : context_secret_provider) {
     const auto& secret_data = validation_context_secret->secretData();
     const auto& validation_context = validation_context_secret->secret();
     ::envoy::admin::v2alpha::SecretsConfigDump_DynamicSecret* dump_secret;
-    bool secret_ready = validation_context != nullptr;
+    const bool secret_ready = validation_context != nullptr;
     if (secret_ready) {
       dump_secret = config_dump->mutable_dynamic_active_secrets()->Add();
     } else {
       dump_secret = config_dump->mutable_dynamic_warming_secrets()->Add();
     }
-    dump_secret->set_name(secret_data.resource_name);
+    dump_secret->set_name(secret_data.resource_name_);
     auto secret = dump_secret->mutable_secret();
-    secret->set_name(secret_data.resource_name);
+    secret->set_name(secret_data.resource_name_);
     ProtobufWkt::Timestamp last_updated_ts;
     TimestampUtil::systemClockToTimestamp(secret_data.last_updated_, last_updated_ts);
     dump_secret->set_version_info(secret_data.version_info_);

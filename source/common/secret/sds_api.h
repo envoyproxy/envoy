@@ -33,7 +33,7 @@ namespace Secret {
 class SdsApi : public Config::SubscriptionCallbacks {
 public:
   struct SecretData {
-    const std::string resource_name;
+    const std::string resource_name_;
     std::string version_info_;
     SystemTime last_updated_;
   };
