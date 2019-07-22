@@ -5,7 +5,12 @@ local_repository(
     path = "{ENVOY_SRCDIR}",
 )
 
-load("@envoy//bazel:api_repositories.bzl", "envoy_api_dependencies")
+load("//bazel:api_binding.bzl", "envoy_api_binding")
+
+envoy_api_binding()
+
+load("//bazel:api_repositories.bzl", "envoy_api_dependencies")
+
 envoy_api_dependencies()
 
 load("@envoy//bazel:repositories.bzl", "envoy_dependencies", "GO_VERSION")
@@ -23,15 +28,3 @@ go_register_toolchains(go_version = GO_VERSION)
 load("@envoy//bazel/toolchains:rbe_toolchains_config.bzl", "rbe_toolchains_config")
 
 rbe_toolchains_config()
-
-load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_language")
-
-switched_rules_by_language(
-    name = "com_google_googleapis_imports",
-    cc = True,
-    go = True,
-    grpc = True,
-    rules_override = {
-        "py_proto_library": "@envoy_api//bazel:api_build_system.bzl",
-    },
-)

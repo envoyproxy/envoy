@@ -2,7 +2,7 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load(":genrule_repository.bzl", "genrule_repository")
 load("@envoy_api//bazel:envoy_http_archive.bzl", "envoy_http_archive")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS")
-load("@envoy_api//bazel:repositories.bzl", "api_dependencies")
+load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_language")
 
 # dict of {build recipe name: longform extension name,}
 PPC_SKIP_TARGETS = {"luajit": "envoy.filters.http.lua"}
@@ -162,7 +162,15 @@ def envoy_dependencies(skip_targets = []):
     _cc_deps()
     _go_deps(skip_targets)
 
-    api_dependencies()
+    switched_rules_by_language(
+        name = "com_google_googleapis_imports",
+        cc = True,
+        go = True,
+        grpc = True,
+        rules_override = {
+            "py_proto_library": "@envoy_api//bazel:api_build_system.bzl",
+        },
+    )
 
 def _boringssl():
     _repository_impl("boringssl")
