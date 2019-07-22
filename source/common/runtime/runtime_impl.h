@@ -268,6 +268,13 @@ private:
   Api::Api& api_;
   std::vector<RtdsSubscriptionPtr> subscriptions_;
   Upstream::ClusterManager* cm_{};
+
+  struct SnapshotState {
+    std::unique_ptr<Runtime::SnapshotImpl> snapshot_;
+    bool valid_;
+  };
+  absl::Mutex mutex_;
+  absl::flat_hash_map<std::thread::id, std::unique_ptr<SnapshotState>> snapshots_;
 };
 
 } // namespace Runtime

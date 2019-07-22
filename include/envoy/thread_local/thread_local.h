@@ -29,12 +29,14 @@ public:
   virtual ~Slot() = default;
 
   /**
-   * This is a helper, mainly used for test code, to determine if a given thread
-   * has a valid slot (i.e. if it is a worker thread) or not.
+   * Returns if there is a slot for this thread
    *
-   * @return true if this is a valid slot (called from a worker thread).
+   * This should return true for Envoy worker threads and false for threads which do not have a TLS
+   * slot allocateed.
+   *
+   * @return true if registerThread has been called for this thread, false otherwise.
    */
-  virtual bool valid() PURE;
+  virtual bool currentThreadRegistered() PURE;
 
   /**
    * @return ThreadLocalObjectSharedPtr a thread local object stored in the slot.

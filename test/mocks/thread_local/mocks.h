@@ -58,7 +58,7 @@ public:
 
     // ThreadLocal::Slot
     ThreadLocalObjectSharedPtr get() override { return parent_.data_[index_]; }
-    bool valid() override { return true; }
+    bool currentThreadRegistered() override { return parent_.registered_; }
     void runOnAllThreads(Event::PostCb cb) override { parent_.runOnAllThreads(cb); }
     void runOnAllThreads(Event::PostCb cb, Event::PostCb main_callback) override {
       parent_.runOnAllThreads(cb, main_callback);
@@ -73,6 +73,7 @@ public:
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   std::vector<ThreadLocalObjectSharedPtr> data_;
   bool shutdown_{};
+  bool registered_{true};
 };
 
 } // namespace ThreadLocal
