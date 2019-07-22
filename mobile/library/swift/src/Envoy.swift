@@ -2,7 +2,7 @@ import Foundation
 
 @objcMembers
 public final class Envoy: NSObject {
-  private let runner: EnvoyRunner
+  private let runner: RunnerThread
 
   /// Indicates whether this Envoy instance is currently active and running.
   public var isRunning: Bool {
@@ -19,11 +19,11 @@ public final class Envoy: NSObject {
   /// - parameter config:   Configuration file that is recognizable by Envoy (YAML).
   /// - parameter logLevel: Log level to use for this instance.
   public init(config: String, logLevel: LogLevel = .info) {
-    self.runner = EnvoyRunner(config: config, logLevel: logLevel)
+    self.runner = RunnerThread(config: config, logLevel: logLevel)
     self.runner.start()
   }
 
-  private final class EnvoyRunner: Thread {
+  private final class RunnerThread: Thread {
     private let config: String
     private let logLevel: LogLevel
 
