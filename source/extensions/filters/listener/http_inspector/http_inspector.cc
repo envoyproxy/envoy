@@ -72,7 +72,7 @@ void Filter::onRead() {
 }
 
 void Filter::parseHttpHeader(absl::string_view data) {
-  size_t len = std::min(data.length(), Filter::HTTP2_CONNECTION_PREFACE.length());
+  const size_t len = std::min(data.length(), Filter::HTTP2_CONNECTION_PREFACE.length());
   if (Filter::HTTP2_CONNECTION_PREFACE.compare(0, len, data, 0, len) == 0) {
     if (data.length() < Filter::HTTP2_CONNECTION_PREFACE.length()) {
       return;
@@ -84,7 +84,8 @@ void Filter::parseHttpHeader(absl::string_view data) {
     const size_t pos = data.find_first_of("\r\n");
     if (pos != absl::string_view::npos) {
       const absl::string_view request_line = data.substr(0, pos);
-      std::vector<absl::string_view> fields = absl::StrSplit(request_line, absl::MaxSplits(' ', 4));
+      const std::vector<absl::string_view> fields =
+          absl::StrSplit(request_line, absl::MaxSplits(' ', 4));
 
       // Method SP Request-URI SP HTTP-Version
       if (fields.size() != 3) {
@@ -107,7 +108,7 @@ void Filter::parseHttpHeader(absl::string_view data) {
 
     // Cannot find \r or \n
     ENVOY_LOG(trace, "http inspector: no request line detected");
-    std::vector<absl::string_view> fields = absl::StrSplit(data, absl::MaxSplits(' ', 4));
+    const std::vector<absl::string_view> fields = absl::StrSplit(data, absl::MaxSplits(' ', 4));
 
     // Check if inspect partial of HTTP 1.x packet.
     switch (fields.size()) {
@@ -144,7 +145,7 @@ void Filter::parseHttpHeader(absl::string_view data) {
   }
 }
 
-bool Filter::checkPrefix(absl::string_view prefix,
+bool Filter::checkPrefix(const absl::string_view prefix,
                          const absl::flat_hash_set<std::string>& hash_set) {
   for (const auto& value : hash_set) {
     if (value.length() < prefix.length()) {
