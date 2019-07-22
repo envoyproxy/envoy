@@ -1,7 +1,7 @@
 import Envoy
 import UIKit
 
-private enum ConfigLoadError: Error {
+private enum ConfigLoadError: Swift.Error {
   case noFileAtPath
 }
 

@@ -5,12 +5,16 @@ load("//bazel:swift_static_framework.bzl", "swift_static_framework")
 swift_static_framework(
     name = "ios_framework",
     srcs = [
+        "Client.swift",
         "Envoy.swift",
+        "Error.swift",
         "LogLevel.swift",
         "Request.swift",
         "RequestBuilder.swift",
         "RequestMethod.swift",
+        "ResponseHandler.swift",
         "RetryPolicy.swift",
+        "StreamEmitter.swift",
     ],
     module_name = "Envoy",
     objc_includes = ["//library/objective-c:EnvoyEngine.h"],
