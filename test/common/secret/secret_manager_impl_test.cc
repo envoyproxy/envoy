@@ -264,6 +264,7 @@ tls_certificate:
   Ssl::TlsCertificateConfigImpl tls_config(*secret_provider->secret(), *api_);
   EXPECT_EQ("DUMMY_INLINE_BYTES_FOR_CERT_CHAIN", tls_config.certificateChain());
   EXPECT_EQ("DUMMY_INLINE_BYTES_FOR_PRIVATE_KEY", tls_config.privateKey());
+  EXPECT_EQ("DUMMY_PASSWORD", tls_config.password());
 
   // Private key and password are removed.
   const std::string expected_secrets_config_dump = R"EOF(
@@ -433,8 +434,25 @@ tls_certificate:
   envoy::api::v2::auth::Secret tls_cert_secret;
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_certificate), tls_cert_secret);
   secret_manager->addStaticSecret(tls_cert_secret);
+  TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
+name: "abc.com.nopassword"
+tls_certificate:
+  certificate_chain:
+    inline_string: "DUMMY_INLINE_BYTES_FOR_CERT_CHAIN"
+  private_key:
+    inline_string: "DUMMY_INLINE_BYTES_FOR_PRIVATE_KEY"
+)EOF"), tls_cert_secret);
+  secret_manager->addStaticSecret(tls_cert_secret);
   const std::string expected_config_dump = R"EOF(
 static_secrets:
+- name: "abc.com.nopassword"
+  secret:
+    name: "abc.com.nopassword"
+    tls_certificate:
+      certificate_chain:
+        inline_string: "DUMMY_INLINE_BYTES_FOR_CERT_CHAIN"
+      private_key:
+        inline_string: "[redacted]"
 - name: "abc.com" 
   secret:
     name: "abc.com"
