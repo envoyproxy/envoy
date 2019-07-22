@@ -137,9 +137,9 @@ class RequestBuilder(
   }
 
   /**
-   * Creates the {@link io.envoyproxy.envoymobile.Request} object using the data set in the builder
+   * Creates the {@link io.envoyproxy.envoymobile.Request} object using the data set in the builder.
    *
-   * @return the {@link io.envoyproxy.envoymobile.Request} object
+   * @return the {@link io.envoyproxy.envoymobile.Request} object.
    */
   fun build(): Request {
     return Request(
