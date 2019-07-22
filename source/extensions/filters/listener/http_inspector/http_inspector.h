@@ -68,7 +68,7 @@ private:
   bool checkPrefix(absl::string_view prefix, const absl::flat_hash_set<std::string>& hash_set);
 
   const absl::flat_hash_set<std::string>& httpProtocols() const;
-  const absl::flat_hash_set<std::string>& httpMethods() const;
+  const absl::flat_hash_set<std::string>& http1xMethods() const;
 
   ConfigSharedPtr config_;
   Network::ListenerFilterCallbacks* cb_{nullptr};

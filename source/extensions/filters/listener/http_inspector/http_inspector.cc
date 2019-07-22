@@ -93,7 +93,7 @@ void Filter::parseHttpHeader(absl::string_view data) {
         return done(false);
       }
 
-      if (httpMethods().count(fields[0]) == 0 || httpProtocols().count(fields[2]) == 0) {
+      if (http1xMethods().count(fields[0]) == 0 || httpProtocols().count(fields[2]) == 0) {
         ENVOY_LOG(trace, "http inspector: method: {} or protocol: {} not valid", fields[0],
                   fields[2]);
         return done(false);
@@ -104,43 +104,6 @@ void Filter::parseHttpHeader(absl::string_view data) {
 
       protocol_ = fields[2];
       return done(true);
-    }
-
-    // Cannot find \r or \n
-    ENVOY_LOG(trace, "http inspector: no request line detected");
-    const std::vector<absl::string_view> fields = absl::StrSplit(data, absl::MaxSplits(' ', 4));
-
-    // Check if inspect partial of HTTP 1.x packet.
-    switch (fields.size()) {
-    case 0:
-      break;
-    case 1:
-      // Check if partial of HTTP method is received.
-      if (!checkPrefix(fields[0], httpMethods())) {
-        return done(false);
-      }
-      break;
-    case 2:
-      /**
-       * e.g. GET /index -> waiting for following bytes
-       *      BAD /index -> exit inspector
-       */
-      if (httpMethods().count(fields[0]) == 0) {
-        return done(false);
-      }
-      break;
-    case 3:
-      /**
-       * e.g. GET /index HTTP -> waiting for following bytes
-       *      GET /index BAD -> exit inspector
-       *      BAD /index HTTP/1.1 -> exit inspector
-       */
-      if (httpMethods().count(fields[0]) == 0 || !checkPrefix(fields[2], httpProtocols())) {
-        return done(false);
-      }
-      break;
-    default:
-      return done(false);
     }
   }
 }
@@ -193,7 +156,7 @@ const absl::flat_hash_set<std::string>& Filter::httpProtocols() const {
                          Http::Headers::get().ProtocolStrings.Http11String);
 }
 
-const absl::flat_hash_set<std::string>& Filter::httpMethods() const {
+const absl::flat_hash_set<std::string>& Filter::http1xMethods() const {
   CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>,
                          {HttpInspector::ExtendedHeader::get().MethodValues.Acl,
                           HttpInspector::ExtendedHeader::get().MethodValues.Baseline_Control,
@@ -219,7 +182,6 @@ const absl::flat_hash_set<std::string>& Filter::httpMethods() const {
                           HttpInspector::ExtendedHeader::get().MethodValues.Orderpatch,
                           HttpInspector::ExtendedHeader::get().MethodValues.Patch,
                           HttpInspector::ExtendedHeader::get().MethodValues.Post,
-                          HttpInspector::ExtendedHeader::get().MethodValues.Pri,
                           HttpInspector::ExtendedHeader::get().MethodValues.Proppatch,
                           HttpInspector::ExtendedHeader::get().MethodValues.Purge,
                           HttpInspector::ExtendedHeader::get().MethodValues.Put,
