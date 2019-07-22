@@ -1484,6 +1484,42 @@ TEST_F(HttpHealthCheckerImplTest, Timeout) {
             Host::ActiveHealthFailureType::TIMEOUT);
 }
 
+// Make sure that a timeout during a partial response works correctly.
+TEST_F(HttpHealthCheckerImplTest, TimeoutThenSuccess) {
+  setupNoServiceValidationHC();
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+  health_checker_->start();
+
+  // Do a response that is not complete but includes headers.
+  std::unique_ptr<Http::TestHeaderMapImpl> response_headers(
+      new Http::TestHeaderMapImpl{{":status", "200"}});
+  test_sessions_[0]->stream_response_callbacks_->decodeHeaders(std::move(response_headers), false);
+
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::ChangePending));
+  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, true));
+  EXPECT_CALL(*test_sessions_[0]->client_connection_, close(_));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  test_sessions_[0]->timeout_timer_->callback_();
+  EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+
+  expectClientCreate(0);
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+  test_sessions_[0]->interval_timer_->callback_();
+
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respond(0, "200", false, false, true);
+  EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+}
+
 TEST_F(HttpHealthCheckerImplTest, TimeoutThenRemoteClose) {
   setupNoServiceValidationHC();
   EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, true));
