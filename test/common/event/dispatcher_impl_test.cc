@@ -206,17 +206,18 @@ TEST_F(DispatcherImplTest, IsThreadSafe) {
   EXPECT_FALSE(dispatcher_->isThreadSafe());
 }
 
-class NotRanDispatcherImplTest : public testing::Test {
+class NotStartedDispatcherImplTest : public testing::Test {
 protected:
-  NotRanDispatcherImplTest()
+  NotStartedDispatcherImplTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()) {}
 
   Api::ApiPtr api_;
   DispatcherPtr dispatcher_;
 };
 
-TEST_F(NotRanDispatcherImplTest, IsThreadSafe) {
-  // Thread safe because the dispatcher has not ran. Therefore, no thread id has been assigned.
+TEST_F(NotStartedDispatcherImplTest, IsThreadSafe) {
+  // Thread safe because the dispatcher has not started.
+  // Therefore, no thread id has been assigned.
   EXPECT_TRUE(dispatcher_->isThreadSafe());
 }
 
