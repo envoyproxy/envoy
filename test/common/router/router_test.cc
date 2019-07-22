@@ -100,6 +100,7 @@ public:
     // Make the "system time" non-zero, because 0 is considered invalid by DateUtil.
     test_time_.setMonotonicTime(std::chrono::milliseconds(50));
 
+    // Allow any number of setTrackedObject calls for the dispatcher strict mock.
     EXPECT_CALL(callbacks_.dispatcher_, setTrackedObject(_)).Times(AnyNumber());
   }
 
