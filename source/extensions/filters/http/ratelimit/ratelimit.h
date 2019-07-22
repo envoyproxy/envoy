@@ -47,8 +47,7 @@ public:
             config.rate_limited_as_resource_exhausted()
                 ? absl::make_optional(Grpc::Status::GrpcStatus::ResourceExhausted)
                 : absl::nullopt),
-        http_context_(http_context), stat_name_pool_(scope.symbolTable()),
-        stat_names_(stat_name_pool_) {}
+        http_context_(http_context), stat_names_(scope.symbolTable()) {}
   const std::string& domain() const { return domain_; }
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   uint64_t stage() const { return stage_; }
@@ -83,7 +82,6 @@ private:
   const bool failure_mode_deny_;
   const absl::optional<Grpc::Status::GrpcStatus> rate_limited_grpc_status_;
   Http::Context& http_context_;
-  Stats::StatNamePool stat_name_pool_;
   Filters::Common::RateLimit::StatNames stat_names_;
 };
 
