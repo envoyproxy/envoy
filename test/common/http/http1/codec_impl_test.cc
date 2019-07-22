@@ -241,6 +241,8 @@ TEST_F(Http1ServerConnectionImplTest, Http11AbsolutePath2) {
 }
 
 TEST_F(Http1ServerConnectionImplTest, Http11AbsolutePathWithPort) {
+  initialize();
+
   TestHeaderMapImpl expected_headers{
       {":authority", "www.somewhere.com:4532"}, {":path", "/foo/bar"}, {":method", "GET"}};
   Buffer::OwnedImpl buffer(

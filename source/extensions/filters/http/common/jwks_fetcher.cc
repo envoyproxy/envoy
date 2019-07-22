@@ -18,9 +18,9 @@ class JwksFetcherImpl : public JwksFetcher,
 public:
   JwksFetcherImpl(Upstream::ClusterManager& cm) : cm_(cm) { ENVOY_LOG(trace, "{}", __func__); }
 
-  ~JwksFetcherImpl() { cancel(); }
+  ~JwksFetcherImpl() override { cancel(); }
 
-  void cancel() {
+  void cancel() override {
     if (request_ && !complete_) {
       request_->cancel();
       ENVOY_LOG(debug, "fetch pubkey [uri = {}]: canceled", uri_->uri());
@@ -28,7 +28,8 @@ public:
     reset();
   }
 
-  void fetch(const ::envoy::api::v2::core::HttpUri& uri, JwksFetcher::JwksReceiver& receiver) {
+  void fetch(const ::envoy::api::v2::core::HttpUri& uri,
+             JwksFetcher::JwksReceiver& receiver) override {
     ENVOY_LOG(trace, "{}", __func__);
     ASSERT(!receiver_);
     complete_ = false;
@@ -44,7 +45,7 @@ public:
   }
 
   // HTTP async receive methods
-  void onSuccess(Http::MessagePtr&& response) {
+  void onSuccess(Http::MessagePtr&& response) override {
     ENVOY_LOG(trace, "{}", __func__);
     complete_ = true;
     const uint64_t status_code = Http::Utility::getResponseStatus(response->headers());
@@ -74,7 +75,7 @@ public:
     reset();
   }
 
-  void onFailure(Http::AsyncClient::FailureReason reason) {
+  void onFailure(Http::AsyncClient::FailureReason reason) override {
     ENVOY_LOG(debug, "{}: fetch pubkey [uri = {}]: network error {}", __func__, uri_->uri(),
               enumToInt(reason));
     complete_ = true;

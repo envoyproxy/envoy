@@ -107,7 +107,7 @@ private:
   // http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Programming.Errors.html
   static const std::vector<std::string> SUPPORTED_ERROR_TYPES;
 
-  RequestParser() {}
+  RequestParser() = default;
 };
 
 } // namespace Dynamo

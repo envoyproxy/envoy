@@ -47,7 +47,7 @@ public:
 
   RoleBasedAccessControlFilterTest() : config_(setupConfig()), filter_(config_) {}
 
-  void SetUp() {
+  void SetUp() override {
     EXPECT_CALL(callbacks_, connection()).WillRepeatedly(Return(&connection_));
     EXPECT_CALL(callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
     filter_.setDecoderFilterCallbacks(callbacks_);

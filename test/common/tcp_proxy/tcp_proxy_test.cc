@@ -357,7 +357,7 @@ public:
         .WillByDefault(SaveArg<0>(&access_log_data_));
   }
 
-  ~TcpProxyTest() {
+  ~TcpProxyTest() override {
     if (filter_ != nullptr) {
       filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
     }

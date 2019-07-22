@@ -24,7 +24,7 @@ MockDispatcher::MockDispatcher() {
   ON_CALL(*this, post(_)).WillByDefault(Invoke([](PostCb cb) -> void { cb(); }));
 }
 
-MockDispatcher::~MockDispatcher() {}
+MockDispatcher::~MockDispatcher() = default;
 
 MockTimer::MockTimer() {
   ON_CALL(*this, enableTimer(_)).WillByDefault(Assign(&enabled_, true));
@@ -41,7 +41,7 @@ MockTimer::MockTimer(MockDispatcher* dispatcher) : MockTimer() {
       .RetiresOnSaturation();
 }
 
-MockTimer::~MockTimer() {}
+MockTimer::~MockTimer() = default;
 
 MockSignalEvent::MockSignalEvent(MockDispatcher* dispatcher) {
   EXPECT_CALL(*dispatcher, listenForSignal_(_, _))
@@ -49,10 +49,10 @@ MockSignalEvent::MockSignalEvent(MockDispatcher* dispatcher) {
       .RetiresOnSaturation();
 }
 
-MockSignalEvent::~MockSignalEvent() {}
+MockSignalEvent::~MockSignalEvent() = default;
 
-MockFileEvent::MockFileEvent() {}
-MockFileEvent::~MockFileEvent() {}
+MockFileEvent::MockFileEvent() = default;
+MockFileEvent::~MockFileEvent() = default;
 
 } // namespace Event
 } // namespace Envoy
