@@ -1,16 +1,10 @@
 licenses(["notice"])  # Apache 2
 
-# These source files must be re-exported to the kotlin custom library rule to ensure their
-# inclusion.
-filegroup(
-    name = "envoy_engine_srcs",
-    srcs = ["EnvoyEngine.java"],
-    visibility = ["//visibility:public"],
-)
+load("//bazel:kotlin_lib.bzl", "envoy_mobile_android_library")
 
-android_library(
+envoy_mobile_android_library(
     name = "envoy_engine_lib",
-    srcs = [":envoy_engine_srcs"],
+    srcs = ["EnvoyEngine.java"],
     custom_package = "io.envoyproxy.envoymobile.engine",
     manifest = "EnvoyEngineManifest.xml",
     visibility = ["//visibility:public"],
