@@ -220,11 +220,11 @@ public:
   virtual void initialize(Upstream::ClusterManager& cm) PURE;
 
   /**
-   * @return Snapshot& the current snapshot. This reference is safe to use for the duration of
+   * @return const Snapshot& the current snapshot. This reference is safe to use for the duration of
    *         the calling routine, but may be overwritten on a future event loop cycle so should be
    *         fetched again when needed.
    */
-  virtual Snapshot& snapshot() PURE;
+  virtual const Snapshot& snapshot() PURE;
 
   /**
    * Merge the given map of key-value pairs into the runtime's state. To remove a previous merge for

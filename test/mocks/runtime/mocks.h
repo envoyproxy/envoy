@@ -63,7 +63,7 @@ public:
   ~MockLoader() override;
 
   MOCK_METHOD1(initialize, void(Upstream::ClusterManager& cm));
-  MOCK_METHOD0(snapshot, Snapshot&());
+  MOCK_METHOD0(snapshot, const Snapshot&());
   MOCK_METHOD1(mergeValues, void(const std::unordered_map<std::string, std::string>&));
 
   testing::NiceMock<MockSnapshot> snapshot_;
