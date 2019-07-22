@@ -441,7 +441,8 @@ tls_certificate:
     inline_string: "DUMMY_INLINE_BYTES_FOR_CERT_CHAIN"
   private_key:
     inline_string: "DUMMY_INLINE_BYTES_FOR_PRIVATE_KEY"
-)EOF"), tls_cert_secret);
+)EOF"),
+                            tls_cert_secret);
   secret_manager->addStaticSecret(tls_cert_secret);
   const std::string expected_config_dump = R"EOF(
 static_secrets:
