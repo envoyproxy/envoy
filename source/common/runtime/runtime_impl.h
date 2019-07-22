@@ -243,7 +243,7 @@ public:
 
   // Runtime::Loader
   void initialize(Upstream::ClusterManager& cm) override;
-  Snapshot& snapshot() override;
+  const Snapshot& snapshot() override;
   void mergeValues(const std::unordered_map<std::string, std::string>& values) override;
 
 private:

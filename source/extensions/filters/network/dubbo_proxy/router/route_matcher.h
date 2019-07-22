@@ -30,7 +30,7 @@ class RouteEntryImplBase : public RouteEntry,
                            public Logger::Loggable<Logger::Id::dubbo> {
 public:
   RouteEntryImplBase(const envoy::config::filter::network::dubbo_proxy::v2alpha1::Route& route);
-  virtual ~RouteEntryImplBase() = default;
+  ~RouteEntryImplBase() override = default;
 
   // Router::RouteEntry
   const std::string& clusterName() const override;

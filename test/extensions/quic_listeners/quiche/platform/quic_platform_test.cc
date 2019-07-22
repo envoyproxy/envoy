@@ -85,7 +85,7 @@ protected:
     GetLogger().set_level(ERROR);
   }
 
-  ~QuicPlatformTest() {
+  ~QuicPlatformTest() override {
     SetVerbosityLogThreshold(verbosity_log_threshold_);
     GetLogger().set_level(log_level_);
   }

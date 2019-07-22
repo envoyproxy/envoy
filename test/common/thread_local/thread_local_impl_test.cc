@@ -18,7 +18,7 @@ namespace {
 
 class TestThreadLocalObject : public ThreadLocalObject {
 public:
-  ~TestThreadLocalObject() { onDestroy(); }
+  ~TestThreadLocalObject() override { onDestroy(); }
 
   MOCK_METHOD0(onDestroy, void());
 };

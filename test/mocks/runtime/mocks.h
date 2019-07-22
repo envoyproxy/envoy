@@ -15,7 +15,7 @@ namespace Runtime {
 class MockRandomGenerator : public RandomGenerator {
 public:
   MockRandomGenerator();
-  ~MockRandomGenerator();
+  ~MockRandomGenerator() override;
 
   MOCK_METHOD0(random, uint64_t());
   MOCK_METHOD0(uuid, std::string());
@@ -60,10 +60,10 @@ public:
 class MockLoader : public Loader {
 public:
   MockLoader();
-  ~MockLoader();
+  ~MockLoader() override;
 
   MOCK_METHOD1(initialize, void(Upstream::ClusterManager& cm));
-  MOCK_METHOD0(snapshot, Snapshot&());
+  MOCK_METHOD0(snapshot, const Snapshot&());
   MOCK_METHOD1(mergeValues, void(const std::unordered_map<std::string, std::string>&));
 
   testing::NiceMock<MockSnapshot> snapshot_;
@@ -72,7 +72,7 @@ public:
 class MockOverrideLayer : public Snapshot::OverrideLayer {
 public:
   MockOverrideLayer();
-  ~MockOverrideLayer();
+  ~MockOverrideLayer() override;
 
   MOCK_CONST_METHOD0(name, const std::string&());
   MOCK_CONST_METHOD0(values, const Snapshot::EntryMap&());

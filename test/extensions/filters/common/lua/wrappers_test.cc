@@ -18,7 +18,7 @@ class LuaBufferWrapperTest : public LuaWrappersTestBase<BufferWrapper> {};
 
 class LuaMetadataMapWrapperTest : public LuaWrappersTestBase<MetadataMapWrapper> {
 public:
-  virtual void setup(const std::string& script) {
+  void setup(const std::string& script) override {
     LuaWrappersTestBase<MetadataMapWrapper>::setup(script);
     state_->registerType<MetadataMapIterator>();
   }
@@ -32,7 +32,7 @@ public:
 
 class LuaConnectionWrapperTest : public LuaWrappersTestBase<ConnectionWrapper> {
 public:
-  virtual void setup(const std::string& script) {
+  void setup(const std::string& script) override {
     LuaWrappersTestBase<ConnectionWrapper>::setup(script);
     state_->registerType<SslConnectionWrapper>();
   }
