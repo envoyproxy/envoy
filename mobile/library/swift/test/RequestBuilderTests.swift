@@ -2,8 +2,6 @@ import Envoy
 import Foundation
 import XCTest
 
-// swiftlint:disable:next force_unwrapping
-private let kURL = URL(string: "http://0.0.0.0:9001/api.lyft.com/demo.txt")!
 private let kBodyData = Data([1, 2, 3, 4])
 private let kRetryPolicy = RetryPolicy(maxRetryCount: 123,
                                        retryOn: [.connectFailure, .fiveXX],
@@ -13,7 +11,8 @@ final class RequestBuilderTests: XCTestCase {
   // MARK: - Method
 
   func testHasMatchingMethodPresentInRequest() {
-    let request = RequestBuilder(method: .post, url: kURL)
+    let request = RequestBuilder(method: .post, scheme: "https",
+                                 authority: "api.foo.com", path: "/foo")
       .build()
     XCTAssertEqual(.post, request.method)
   }
@@ -21,22 +20,27 @@ final class RequestBuilderTests: XCTestCase {
   // MARK: - URL
 
   func testHasMatchingURLPresentInRequest() {
-    let request = RequestBuilder(method: .post, url: kURL)
+    let request = RequestBuilder(method: .post, scheme: "https",
+                                 authority: "api.foo.com", path: "/foo")
       .build()
-    XCTAssertEqual(kURL.absoluteString, request.url.absoluteString)
+    XCTAssertEqual("https", request.scheme)
+    XCTAssertEqual("api.foo.com", request.authority)
+    XCTAssertEqual("/foo", request.path)
   }
 
   // MARK: - Body data
 
   func testAddingRequestDataHasBodyPresentInRequest() {
-    let request = RequestBuilder(method: .post, url: kURL)
+    let request = RequestBuilder(method: .post, scheme: "https",
+                                 authority: "api.foo.com", path: "/foo")
       .addBody(kBodyData)
       .build()
     XCTAssertEqual(kBodyData, request.body)
   }
 
   func testNotAddingRequestDataHasNilBodyInRequest() {
-    let request = RequestBuilder(method: .post, url: kURL)
+    let request = RequestBuilder(method: .post, scheme: "https",
+                                 authority: "api.foo.com", path: "/foo")
       .build()
     XCTAssertNil(request.body)
   }
@@ -44,14 +48,16 @@ final class RequestBuilderTests: XCTestCase {
   // MARK: - Retry policy
 
   func testAddingRetryPolicyHasRetryPolicyInRequest() {
-    let request = RequestBuilder(method: .post, url: kURL)
+    let request = RequestBuilder(method: .post, scheme: "https",
+                                 authority: "api.foo.com", path: "/foo")
       .addRetryPolicy(kRetryPolicy)
       .build()
     XCTAssertEqual(kRetryPolicy, request.retryPolicy)
   }
 
   func testNotAddingRetryPolicyHasNilRetryPolicyInRequest() {
-    let request = RequestBuilder(method: .post, url: kURL)
+    let request = RequestBuilder(method: .post, scheme: "https",
+                                 authority: "api.foo.com", path: "/foo")
       .build()
     XCTAssertNil(request.retryPolicy)
   }
@@ -59,14 +65,16 @@ final class RequestBuilderTests: XCTestCase {
   // MARK: - Headers
 
   func testAddingNewHeaderAddsToListOfHeaderKeys() {
-    let request = RequestBuilder(method: .post, url: kURL)
+    let request = RequestBuilder(method: .post, scheme: "https",
+                                 authority: "api.foo.com", path: "/foo")
       .addHeader(name: "foo", value: "bar")
       .build()
     XCTAssertEqual(["bar"], request.headers["foo"])
   }
 
   func testRemovingSpecificHeaderKeyRemovesAllOfItsValuesFromRequest() {
-    let request = RequestBuilder(method: .post, url: kURL)
+    let request = RequestBuilder(method: .post, scheme: "https",
+                                 authority: "api.foo.com", path: "/foo")
       .addHeader(name: "foo", value: "1")
       .addHeader(name: "foo", value: "2")
       .removeHeaders(name: "foo")
@@ -75,7 +83,8 @@ final class RequestBuilderTests: XCTestCase {
   }
 
   func testRemovingSpecificHeaderKeyDoesNotRemoveOtherKeysFromRequest() {
-    let request = RequestBuilder(method: .post, url: kURL)
+    let request = RequestBuilder(method: .post, scheme: "https",
+                                 authority: "api.foo.com", path: "/foo")
       .addHeader(name: "foo", value: "1")
       .addHeader(name: "bar", value: "2")
       .removeHeaders(name: "foo")
@@ -84,7 +93,8 @@ final class RequestBuilderTests: XCTestCase {
   }
 
   func testRemovingSpecificHeaderValueRemovesItFromRequest() {
-    let request = RequestBuilder(method: .post, url: kURL)
+    let request = RequestBuilder(method: .post, scheme: "https",
+                                 authority: "api.foo.com", path: "/foo")
       .addHeader(name: "foo", value: "1")
       .addHeader(name: "foo", value: "2")
       .addHeader(name: "foo", value: "3")
@@ -94,7 +104,8 @@ final class RequestBuilderTests: XCTestCase {
   }
 
   func testRemovingAllHeaderValuesRemovesKeyFromRequest() {
-    let request = RequestBuilder(method: .post, url: kURL)
+    let request = RequestBuilder(method: .post, scheme: "https",
+                                 authority: "api.foo.com", path: "/foo")
       .addHeader(name: "foo", value: "1")
       .addHeader(name: "foo", value: "2")
       .removeHeader(name: "foo", value: "1")
@@ -106,14 +117,16 @@ final class RequestBuilderTests: XCTestCase {
   // MARK: - Trailers
 
   func testAddingNewTrailerAppendsToListOfTrailerKeys() {
-    let request = RequestBuilder(method: .post, url: kURL)
+    let request = RequestBuilder(method: .post, scheme: "https",
+                                 authority: "api.foo.com", path: "/foo")
       .addTrailer(name: "foo", value: "bar")
       .build()
     XCTAssertEqual(["bar"], request.trailers["foo"])
   }
 
   func testRemovingSpecificTrailerKeyRemovesAllOfItsValuesFromRequest() {
-    let request = RequestBuilder(method: .post, url: kURL)
+    let request = RequestBuilder(method: .post, scheme: "https",
+                                 authority: "api.foo.com", path: "/foo")
       .addTrailer(name: "foo", value: "1")
       .addTrailer(name: "foo", value: "2")
       .removeTrailers(name: "foo")
@@ -122,7 +135,8 @@ final class RequestBuilderTests: XCTestCase {
   }
 
   func testRemovingSpecificTrailerKeyDoesNotRemoveOtherKeysFromRequest() {
-    let request = RequestBuilder(method: .post, url: kURL)
+    let request = RequestBuilder(method: .post, scheme: "https",
+                                 authority: "api.foo.com", path: "/foo")
       .addTrailer(name: "foo", value: "1")
       .addTrailer(name: "bar", value: "2")
       .removeTrailers(name: "foo")
@@ -131,7 +145,8 @@ final class RequestBuilderTests: XCTestCase {
   }
 
   func testRemovingSpecificTrailerValueRemovesItFromRequest() {
-    let request = RequestBuilder(method: .post, url: kURL)
+    let request = RequestBuilder(method: .post, scheme: "https",
+                                 authority: "api.foo.com", path: "/foo")
       .addTrailer(name: "foo", value: "1")
       .addTrailer(name: "foo", value: "2")
       .addTrailer(name: "foo", value: "3")
@@ -141,7 +156,8 @@ final class RequestBuilderTests: XCTestCase {
   }
 
   func testRemovingAllTrailerValuesRemovesKeyFromRequest() {
-    let request = RequestBuilder(method: .post, url: kURL)
+    let request = RequestBuilder(method: .post, scheme: "https",
+                                 authority: "api.foo.com", path: "/foo")
       .addTrailer(name: "foo", value: "1")
       .addTrailer(name: "foo", value: "2")
       .removeTrailer(name: "foo", value: "1")
@@ -173,7 +189,7 @@ final class RequestBuilderTests: XCTestCase {
   // MARK: - Private
 
   private func newRequestBuilder() -> RequestBuilder {
-    return RequestBuilder(method: .post, url: kURL)
+    return RequestBuilder(method: .post, scheme: "https", authority: "api.foo.com", path: "/foo")
       .addBody(kBodyData)
       .addRetryPolicy(kRetryPolicy)
       .addHeader(name: "foo", value: "1")
