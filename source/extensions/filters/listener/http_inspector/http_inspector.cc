@@ -9,6 +9,7 @@
 #include "common/common/macros.h"
 #include "common/http/headers.h"
 
+#include "extensions/filters/listener/http_inspector/http_protocol_header.h"
 #include "extensions/transport_sockets/well_known_names.h"
 
 #include "absl/strings/match.h"
@@ -64,8 +65,7 @@ void Filter::onRead() {
     return;
   } else if (result.rc_ < 0) {
     config_->stats().read_error_.inc();
-    done(false);
-    return;
+    return done(false);
   }
 
   parseHttpHeader(absl::string_view(reinterpret_cast<const char*>(buf_), result.rc_));
@@ -77,34 +77,89 @@ void Filter::parseHttpHeader(absl::string_view data) {
     protocol_ = "HTTP/2";
     done(true);
   } else {
+    if (data.length() < Filter::HTTP2_CONNECTION_PREFACE.length()) {
+      // Inspect partial HTTP2 connection preface
+      if (Filter::HTTP2_CONNECTION_PREFACE.substr(0, data.length()) == data) {
+        return;
+      }
+    }
+
     const size_t pos = data.find_first_of("\r\n");
+    if (pos != absl::string_view::npos) {
+      const absl::string_view request_line = data.substr(0, pos);
+      std::vector<absl::string_view> fields = absl::StrSplit(request_line, absl::MaxSplits(' ', 4));
+
+      // Method SP Request-URI SP HTTP-Version
+      if (fields.size() != 3) {
+        ENVOY_LOG(trace, "http inspector: invalid http1x request line");
+        return done(false);
+      }
+
+      if (httpMethods().count(fields[0]) == 0 || httpProtocols().count(fields[2]) == 0) {
+        ENVOY_LOG(trace, "http inspector: method: {} or protocol: {} not valid", fields[0],
+                  fields[2]);
+        return done(false);
+      }
+
+      ENVOY_LOG(trace, "http inspector: method: {}, request uri: {}, protocol: {}", fields[0],
+                fields[1], fields[2]);
+
+      protocol_ = fields[2];
+      return done(true);
+    }
 
     // Cannot find \r or \n
-    if (pos == absl::string_view::npos) {
-      ENVOY_LOG(trace, "http inspector: no request line detected");
+    ENVOY_LOG(trace, "http inspector: no request line detected");
+    std::vector<absl::string_view> fields = absl::StrSplit(data, absl::MaxSplits(' ', 4));
+
+    // Check if inspect partial of HTTP 1.x packet.
+    switch (fields.size()) {
+    case 0:
+      break;
+    case 1:
+      // Check if partial of HTTP method is received.
+      if (!checkPrefix(fields[0], httpMethods())) {
+        return done(false);
+      }
+      break;
+    case 2:
+      /**
+       * e.g. GET /index -> waiting for following bytes
+       *      BAD /index -> exit inspector
+       */
+      if (httpMethods().count(fields[0]) == 0) {
+        return done(false);
+      }
+      break;
+    case 3:
+      /**
+       * e.g. GET /index HTTP -> waiting for following bytes
+       *      GET /index BAD -> exit inspector
+       *      BAD /index HTTP/1.1 -> exit inspector
+       */
+      if (httpMethods().count(fields[0]) == 0 || !checkPrefix(fields[2], httpProtocols())) {
+        return done(false);
+      }
+      break;
+    default:
       return done(false);
     }
-
-    const absl::string_view request_line = data.substr(0, pos);
-    std::vector<absl::string_view> fields = absl::StrSplit(request_line, absl::MaxSplits(' ', 4));
-
-    // Method SP Request-URI SP HTTP-Version
-    if (fields.size() != 3) {
-      ENVOY_LOG(trace, "http inspector: invalid http1x request line");
-      return done(false);
-    }
-
-    if (httpProtocols().count(fields[2]) == 0) {
-      ENVOY_LOG(trace, "http inspector: protocol: {} not valid", fields[2]);
-      return done(false);
-    }
-
-    ENVOY_LOG(trace, "http inspector: method: {}, request uri: {}, protocol: {}", fields[0],
-              fields[1], fields[2]);
-
-    protocol_ = fields[2];
-    done(true);
   }
+}
+
+bool Filter::checkPrefix(absl::string_view prefix,
+                         const absl::flat_hash_set<std::string>& hash_set) {
+  for (const auto& value : hash_set) {
+    if (value.length() < prefix.length()) {
+      continue;
+    }
+
+    if (value.substr(0, prefix.length()) == prefix) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 void Filter::done(bool success) {
@@ -138,6 +193,16 @@ const absl::flat_hash_set<std::string>& Filter::httpProtocols() const {
   CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>,
                          Http::Headers::get().ProtocolStrings.Http10String,
                          Http::Headers::get().ProtocolStrings.Http11String);
+}
+
+const absl::flat_hash_set<std::string>& Filter::httpMethods() const {
+  CONSTRUCT_ON_FIRST_USE(
+      absl::flat_hash_set<std::string>,
+      {Http::Headers::get().MethodValues.Connect, Http::Headers::get().MethodValues.Delete,
+       Http::Headers::get().MethodValues.Get, Http::Headers::get().MethodValues.Head,
+       Http::Headers::get().MethodValues.Post, Http::Headers::get().MethodValues.Put,
+       Http::Headers::get().MethodValues.Options, Http::Headers::get().MethodValues.Trace,
+       HttpInspector::ExtendedHeader::get().MethodValues.Patch});
 }
 
 } // namespace HttpInspector
