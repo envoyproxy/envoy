@@ -224,7 +224,6 @@ message ScopedRoutesConfigDump {
 // Envoys SDS implementation fills this message with all secrets fetched dynamically via SDS.
 message SecretsConfigDump {
   // DynamicSecret contains secret information fetched via SDS.
-  // The security sensitive information will trimmed, for example, private key.
   message DynamicSecret {
     // The name assigned to the secret.
     string name = 1;
@@ -235,20 +234,23 @@ message SecretsConfigDump {
     // The timestamp when the secret was last updated.
     google.protobuf.Timestamp last_updated = 3;
 
-    // The actual secret information. Security sensitive information is stripped.
-    // For example, private key in a TLS cert.
+    // The actual secret information.
+    // Security sensitive information is redacted (replaced with "[redacted]") for
+    // private keys and passwords in TLS certificates.
     envoy.api.v2.auth.Secret secret = 4;
   }
 
-  // StaticSecret specifies statically loaded secret.
+  // StaticSecret specifies statically loaded secret in bootstrap.
   message StaticSecret {
     // The name assigned to the secret.
     string name = 1;
 
-    // The timestamp when the Listener was last updated.
+    // The timestamp when the secret was last updated.
     google.protobuf.Timestamp last_updated = 2;
 
-    // The secret config.
+    // The actual secret information.
+    // Security sensitive information is redacted (replaced with "[redacted]") for
+    // private keys and passwords in TLS certificates.
     envoy.api.v2.auth.Secret secret = 3;
   }
 
