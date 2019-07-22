@@ -9,6 +9,8 @@ Version history
 * listeners: added :ref:`HTTP inspector listener filter <config_listener_filters_http_inspector>`.
 * http: added the ability to reject HTTP/1.1 requests with invalid HTTP header values, using the runtime feature `envoy.reloadable_features.strict_header_validation`.
 * http: added :scheme header to downstream HTTP1 requests.
+* tls: added verification of IP address SAN fields in certificates against configured SANs in the
+  certificate validation context.
 
 1.11.0 (July 11, 2019)
 ======================
