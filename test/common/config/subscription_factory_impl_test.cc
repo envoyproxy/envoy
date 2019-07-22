@@ -226,7 +226,7 @@ TEST_F(SubscriptionFactoryTest, HttpSubscriptionCustomRequestTimeout) {
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cluster, info()).Times(2);
   EXPECT_CALL(*cluster.info_, addedViaApi());
-  EXPECT_CALL(dispatcher_, createTimer_(_));
+  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(2);
   EXPECT_CALL(cm_, httpAsyncClientForCluster("static_cluster"));
   EXPECT_CALL(
       cm_.async_client_,
@@ -246,7 +246,7 @@ TEST_F(SubscriptionFactoryTest, HttpSubscription) {
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cluster, info()).Times(2);
   EXPECT_CALL(*cluster.info_, addedViaApi());
-  EXPECT_CALL(dispatcher_, createTimer_(_));
+  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(2);
   EXPECT_CALL(cm_, httpAsyncClientForCluster("static_cluster"));
   EXPECT_CALL(cm_.async_client_, send_(_, _, _))
       .WillOnce(Invoke([this](Http::MessagePtr& request, Http::AsyncClient::Callbacks&,
@@ -301,7 +301,7 @@ TEST_F(SubscriptionFactoryTest, GrpcSubscription) {
         return async_client_factory;
       }));
   EXPECT_CALL(random_, random());
-  EXPECT_CALL(dispatcher_, createTimer_(_));
+  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(2);
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
   subscriptionFromConfigSource(config)->start({"static_cluster"});
 }

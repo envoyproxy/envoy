@@ -55,7 +55,7 @@ TEST(UtilityTest, ApiConfigSourceRequestTimeout) {
 
 TEST(UtilityTest, ConfigSourceDefaultInitFetchTimeout) {
   envoy::api::v2::core::ConfigSource config_source;
-  EXPECT_EQ(0, Utility::configSourceInitialFetchTimeout(config_source).count());
+  EXPECT_EQ(15000, Utility::configSourceInitialFetchTimeout(config_source).count());
 }
 
 TEST(UtilityTest, ConfigSourceInitFetchTimeout) {

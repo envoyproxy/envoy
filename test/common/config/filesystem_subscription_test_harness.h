@@ -32,7 +32,7 @@ public:
         api_(Api::createApiForTest(stats_store_)), dispatcher_(api_->allocateDispatcher()),
         subscription_(*dispatcher_, path_, callbacks_, stats_, validation_visitor_, *api_) {}
 
-  ~FilesystemSubscriptionTestHarness() {
+  ~FilesystemSubscriptionTestHarness() override {
     if (::access(path_.c_str(), F_OK) != -1) {
       EXPECT_EQ(0, ::unlink(path_.c_str()));
     }

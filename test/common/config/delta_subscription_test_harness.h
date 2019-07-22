@@ -50,7 +50,7 @@ public:
     }
   }
 
-  ~DeltaSubscriptionTestHarness() {
+  ~DeltaSubscriptionTestHarness() override {
     while (!nonce_acks_required_.empty()) {
       if (nonce_acks_sent_.empty()) {
         // It's not enough to EXPECT_FALSE(nonce_acks_sent_.empty()), we need to skip the following

@@ -300,7 +300,7 @@ public:
                        Http1Settings settings, uint32_t max_request_headers_kb,
                        bool strict_header_validation);
 
-  virtual bool supports_http_10() override { return codec_settings_.accept_http_10_; }
+  bool supports_http_10() override { return codec_settings_.accept_http_10_; }
 
 private:
   /**

@@ -29,7 +29,7 @@ public:
               Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
               Runtime::RandomGenerator& random, Stats::Scope& scope,
               const RateLimitSettings& rate_limit_settings);
-  ~GrpcMuxImpl();
+  ~GrpcMuxImpl() override;
 
   void start() override;
   GrpcMuxWatchPtr subscribe(const std::string& type_url, const std::set<std::string>& resources,

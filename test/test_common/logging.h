@@ -49,7 +49,7 @@ private:
 class LogRecordingSink : public Logger::SinkDelegate {
 public:
   explicit LogRecordingSink(Logger::DelegatingLogSinkPtr log_sink);
-  virtual ~LogRecordingSink();
+  ~LogRecordingSink() override;
 
   // Logger::SinkDelegate
   void log(absl::string_view msg) override;

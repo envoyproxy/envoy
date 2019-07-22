@@ -210,7 +210,7 @@ protected:
     main_common_->dispatcherForTest().post([this, &done] {
       struct Sacrifice : Event::DeferredDeletable {
         Sacrifice(absl::Notification& notify) : notify_(notify) {}
-        ~Sacrifice() { notify_.Notify(); }
+        ~Sacrifice() override { notify_.Notify(); }
         absl::Notification& notify_;
       };
       auto sacrifice = std::make_unique<Sacrifice>(done);
