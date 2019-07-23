@@ -1623,11 +1623,6 @@ void Filter::UpstreamRequest::clearRequestEncoder() {
   request_encoder_ = nullptr;
 }
 
-void Filter::UpstreamRequest::DownstreamWatermarkManager::onAboveWriteBufferOverflowWatermark() {
-  // TODO(mergeconflict): Stats and logging?
-  parent_.resetStream();
-}
-
 void Filter::UpstreamRequest::DownstreamWatermarkManager::onAboveWriteBufferHighWatermark() {
   ASSERT(parent_.request_encoder_);
 

@@ -455,9 +455,8 @@ void ConnectionImpl::onHighWatermark() {
 
 void ConnectionImpl::onOverflowWatermark() {
   ENVOY_CONN_LOG(debug, "onAboveWriteBufferOverflowWatermark", *this);
-  for (ConnectionCallbacks* callback : callbacks_) {
-    callback->onAboveWriteBufferOverflowWatermark();
-  }
+  // TODO(mergeconflict): increment a counter
+  close(ConnectionCloseType::NoFlush);
 }
 
 void ConnectionImpl::onFileEvent(uint32_t events) {

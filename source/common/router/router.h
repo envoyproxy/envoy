@@ -388,10 +388,6 @@ private:
     // Http::StreamCallbacks
     void onResetStream(Http::StreamResetReason reason,
                        absl::string_view transport_failure_reason) override;
-    void onAboveWriteBufferOverflowWatermark() override {
-      // TODO(mergeconflict): Does it make sense to log or stat this?
-      resetStream();
-    }
     void onAboveWriteBufferHighWatermark() override { disableDataFromDownstream(); }
     void onBelowWriteBufferLowWatermark() override { enableDataFromDownstream(); }
 
@@ -441,7 +437,6 @@ private:
       // Http::DownstreamWatermarkCallbacks
       void onBelowWriteBufferLowWatermark() override;
       void onAboveWriteBufferHighWatermark() override;
-      void onAboveWriteBufferOverflowWatermark() override;
 
       UpstreamRequest& parent_;
     };

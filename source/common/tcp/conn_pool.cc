@@ -430,12 +430,6 @@ void ConnPoolImpl::ActiveConn::onEvent(Network::ConnectionEvent event) {
   }
 }
 
-void ConnPoolImpl::ActiveConn::onAboveWriteBufferOverflowWatermark() {
-  if (wrapper_ != nullptr && wrapper_->callbacks_ != nullptr) {
-    wrapper_->callbacks_->onAboveWriteBufferOverflowWatermark();
-  }
-}
-
 void ConnPoolImpl::ActiveConn::onAboveWriteBufferHighWatermark() {
   if (wrapper_ != nullptr && wrapper_->callbacks_ != nullptr) {
     wrapper_->callbacks_->onAboveWriteBufferHighWatermark();

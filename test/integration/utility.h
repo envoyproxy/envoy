@@ -40,7 +40,6 @@ public:
   // Http::StreamCallbacks
   void onResetStream(Http::StreamResetReason reason,
                      absl::string_view transport_failure_reason) override;
-  void onAboveWriteBufferOverflowWatermark() override {}
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 
@@ -94,7 +93,6 @@ private:
       last_connection_event_ = event;
       connecting_ = false;
     }
-    void onAboveWriteBufferOverflowWatermark() override {}
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 
@@ -163,7 +161,6 @@ public:
                 event == Network::ConnectionEvent::LocalClose);
     connected_ |= (event == Network::ConnectionEvent::Connected);
   }
-  void onAboveWriteBufferOverflowWatermark() override {}
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 

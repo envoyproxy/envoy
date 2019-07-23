@@ -1649,11 +1649,6 @@ void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason, absl:
   connection_manager_.doDeferredStreamDestroy(*this);
 }
 
-void ConnectionManagerImpl::ActiveStream::onAboveWriteBufferOverflowWatermark() {
-  ENVOY_STREAM_LOG(debug, "Closing upstream stream due to downstream stream overflow.", *this);
-  callOverflowWatermarkCallbacks();
-}
-
 void ConnectionManagerImpl::ActiveStream::onAboveWriteBufferHighWatermark() {
   ENVOY_STREAM_LOG(debug, "Disabling upstream stream due to downstream stream watermark.", *this);
   callHighWatermarkCallbacks();
@@ -1675,12 +1670,6 @@ ConnectionManagerImpl::ActiveStream::requestHeadersForTags() const {
 
 bool ConnectionManagerImpl::ActiveStream::verbose() const {
   return connection_manager_.config_.tracingConfig()->verbose_;
-}
-
-void ConnectionManagerImpl::ActiveStream::callOverflowWatermarkCallbacks() {
-  for (auto watermark_callbacks : watermark_callbacks_) {
-    watermark_callbacks->onAboveWriteBufferOverflowWatermark();
-  }
 }
 
 void ConnectionManagerImpl::ActiveStream::callHighWatermarkCallbacks() {
@@ -2025,13 +2014,6 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::encodeMetadata(
 }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::
-    onDecoderFilterAboveWriteBufferOverflowWatermark() {
-  ENVOY_STREAM_LOG(debug, "Closing downstream stream due to filter callbacks.", parent_);
-  // TODO(mergeconflict): Add a new flow control stat.
-  resetStream();
-}
-
-void ConnectionManagerImpl::ActiveStreamDecoderFilter::
     onDecoderFilterAboveWriteBufferHighWatermark() {
   ENVOY_STREAM_LOG(debug, "Read-disabling downstream stream due to filter callbacks.", parent_);
   parent_.response_encoder_->getStream().readDisable(true);
@@ -2123,12 +2105,6 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::injectEncodedDataToFilter
 
 HeaderMap& ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedTrailers() {
   return parent_.addEncodedTrailers();
-}
-
-void ConnectionManagerImpl::ActiveStreamEncoderFilter::
-    onEncoderFilterAboveWriteBufferOverflowWatermark() {
-  ENVOY_STREAM_LOG(debug, "Closing upstream stream due to filter callbacks.", parent_);
-  parent_.callOverflowWatermarkCallbacks();
 }
 
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::

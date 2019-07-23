@@ -65,7 +65,6 @@ public:
 
   // Http::StreamCallbacks
   MOCK_METHOD2(onResetStream, void(StreamResetReason reason, absl::string_view));
-  MOCK_METHOD0(onAboveWriteBufferOverflowWatermark, void());
   MOCK_METHOD0(onAboveWriteBufferHighWatermark, void());
   MOCK_METHOD0(onBelowWriteBufferLowWatermark, void());
 };
@@ -81,7 +80,6 @@ public:
   MOCK_METHOD0(protocol, Protocol());
   MOCK_METHOD0(shutdownNotice, void());
   MOCK_METHOD0(wantsToWrite, bool());
-  MOCK_METHOD0(onUnderlyingConnectionAboveWriteBufferOverflowWatermark, void());
   MOCK_METHOD0(onUnderlyingConnectionAboveWriteBufferHighWatermark, void());
   MOCK_METHOD0(onUnderlyingConnectionBelowWriteBufferLowWatermark, void());
 
@@ -99,7 +97,6 @@ public:
   MOCK_METHOD0(protocol, Protocol());
   MOCK_METHOD0(shutdownNotice, void());
   MOCK_METHOD0(wantsToWrite, bool());
-  MOCK_METHOD0(onUnderlyingConnectionAboveWriteBufferOverflowWatermark, void());
   MOCK_METHOD0(onUnderlyingConnectionAboveWriteBufferHighWatermark, void());
   MOCK_METHOD0(onUnderlyingConnectionBelowWriteBufferLowWatermark, void());
 
@@ -144,7 +141,6 @@ public:
   MOCK_METHOD0(streamInfo, StreamInfo::StreamInfo&());
   MOCK_METHOD0(activeSpan, Tracing::Span&());
   MOCK_METHOD0(tracingConfig, Tracing::Config&());
-  MOCK_METHOD0(onDecoderFilterAboveWriteBufferOverflowWatermark, void());
   MOCK_METHOD0(onDecoderFilterAboveWriteBufferHighWatermark, void());
   MOCK_METHOD0(onDecoderFilterBelowWriteBufferLowWatermark, void());
   MOCK_METHOD1(addDownstreamWatermarkCallbacks, void(DownstreamWatermarkCallbacks&));
@@ -216,7 +212,6 @@ public:
   MOCK_METHOD0(streamInfo, StreamInfo::StreamInfo&());
   MOCK_METHOD0(activeSpan, Tracing::Span&());
   MOCK_METHOD0(tracingConfig, Tracing::Config&());
-  MOCK_METHOD0(onEncoderFilterAboveWriteBufferOverflowWatermark, void());
   MOCK_METHOD0(onEncoderFilterAboveWriteBufferHighWatermark, void());
   MOCK_METHOD0(onEncoderFilterBelowWriteBufferLowWatermark, void());
   MOCK_METHOD1(setEncoderBufferLimit, void(uint32_t));
@@ -385,7 +380,6 @@ public:
 
 class MockDownstreamWatermarkCallbacks : public DownstreamWatermarkCallbacks {
 public:
-  MOCK_METHOD0(onAboveWriteBufferOverflowWatermark, void());
   MOCK_METHOD0(onAboveWriteBufferHighWatermark, void());
   MOCK_METHOD0(onBelowWriteBufferLowWatermark, void());
 };

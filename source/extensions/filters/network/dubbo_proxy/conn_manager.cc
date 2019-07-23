@@ -68,11 +68,6 @@ void ConnectionManager::onEvent(Network::ConnectionEvent event) {
   resetAllMessages(event == Network::ConnectionEvent::LocalClose);
 }
 
-void ConnectionManager::onAboveWriteBufferOverflowWatermark() {
-  ENVOY_CONN_LOG(debug, "onAboveWriteBufferOverflowWatermark", read_callbacks_->connection());
-  read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
-}
-
 void ConnectionManager::onAboveWriteBufferHighWatermark() {
   ENVOY_CONN_LOG(debug, "onAboveWriteBufferHighWatermark", read_callbacks_->connection());
   read_callbacks_->connection().readDisable(true);

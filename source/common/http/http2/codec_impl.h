@@ -89,11 +89,6 @@ public:
   void shutdownNotice() override;
   bool wantsToWrite() override { return nghttp2_session_want_write(session_); }
   // Propagate network connection watermark events to each stream on the connection.
-  void onUnderlyingConnectionAboveWriteBufferOverflowWatermark() override {
-    for (auto& stream : active_streams_) {
-      stream->runOverflowWatermarkCallbacks();
-    }
-  }
   void onUnderlyingConnectionAboveWriteBufferHighWatermark() override {
     for (auto& stream : active_streams_) {
       stream->runHighWatermarkCallbacks();
@@ -188,8 +183,9 @@ protected:
     void pendingRecvBufferHighWatermark();
     void pendingRecvBufferLowWatermark();
 
-    // If the send buffer encounters watermark callbacks, propagate this information to the streams.
-    // The router and connection manager will propagate them on as appropriate.
+    // If the send buffer encounters high/low watermark callbacks, propagate this information to the
+    // streams. The router and connection manager will propagate them on as appropriate. If it
+    // encounters an overflow watermark callback, close the stream.
     void pendingSendBufferOverflowWatermark();
     void pendingSendBufferHighWatermark();
     void pendingSendBufferLowWatermark();

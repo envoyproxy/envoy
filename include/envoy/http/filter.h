@@ -355,13 +355,6 @@ public:
 
   /**
    * Called when the buffer for a decoder filter, or any buffers the filter sends data to, go over
-   * their "overflow" watermark. Implementations should close/reset any streams that overflow their
-   * write buffers.
-   */
-  virtual void onDecoderFilterAboveWriteBufferOverflowWatermark() PURE;
-
-  /**
-   * Called when the buffer for a decoder filter, or any buffers the filter sends data to, go over
    * their high watermark.
    *
    * In the case of a filter such as the router filter, which spills into multiple buffers (codec,
@@ -609,12 +602,6 @@ public:
    * @return a reference to the newly created trailers map.
    */
   virtual HeaderMap& addEncodedTrailers() PURE;
-
-  /**
-   * Called when an encoder filter goes over its "overflow" watermark. The stream should be closed
-   * in response to overflows.
-   */
-  virtual void onEncoderFilterAboveWriteBufferOverflowWatermark() PURE;
 
   /**
    * Called when an encoder filter goes over its high watermark.

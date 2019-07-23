@@ -166,7 +166,6 @@ public:
   // Tcp::ConnectionPool::UpstreamCallbacks
   void onUpstreamData(Buffer::Instance& data, bool end_stream) override;
   void onEvent(Network::ConnectionEvent event) override;
-  void onAboveWriteBufferOverflowWatermark() override {}
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 

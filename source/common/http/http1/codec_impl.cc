@@ -218,6 +218,11 @@ void ConnectionImpl::reserveBuffer(uint64_t size) {
   reserved_current_ = static_cast<char*>(reserved_iovec_.mem_);
 }
 
+void ConnectionImpl::onAboveOverflowWatermark() {
+  // TODO(mergeconflict): log and increment counter
+  connection_.close(Network::ConnectionCloseType::NoFlush);
+}
+
 void StreamEncoderImpl::resetStream(StreamResetReason reason) {
   connection_.onResetStreamBase(reason);
 }
@@ -685,11 +690,6 @@ void ServerConnectionImpl::sendProtocolError() {
   }
 }
 
-void ServerConnectionImpl::onAboveOverflowWatermark() {
-  if (active_request_) {
-    active_request_->response_encoder_.runOverflowWatermarkCallbacks();
-  }
-}
 void ServerConnectionImpl::onAboveHighWatermark() {
   if (active_request_) {
     active_request_->response_encoder_.runHighWatermarkCallbacks();
@@ -814,12 +814,6 @@ void ClientConnectionImpl::onResetStream(StreamResetReason reason) {
     pending_responses_.clear();
     request_encoder_->runResetCallbacks(reason);
   }
-}
-
-void ClientConnectionImpl::onAboveOverflowWatermark() {
-  // This should never happen without an active stream/request.
-  ASSERT(!pending_responses_.empty());
-  request_encoder_->runOverflowWatermarkCallbacks();
 }
 
 void ClientConnectionImpl::onAboveHighWatermark() {

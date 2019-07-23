@@ -48,12 +48,6 @@ public:
   virtual void onEvent(ConnectionEvent event) PURE;
 
   /**
-   * Called when the write buffer for a connection goes over its "overflow"
-   * watermark.
-   */
-  virtual void onAboveWriteBufferOverflowWatermark() PURE;
-
-  /**
    * Called when the write buffer for a connection goes over its high watermark.
    */
   virtual void onAboveWriteBufferHighWatermark() PURE;

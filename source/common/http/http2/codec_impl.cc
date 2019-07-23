@@ -171,6 +171,7 @@ void ConnectionImpl::StreamImpl::readDisable(bool disable) {
 
 void ConnectionImpl::StreamImpl::pendingRecvBufferOverflowWatermark() {
   ENVOY_CONN_LOG(warn, "recv buffer overflow ", parent_.connection_);
+  // TODO(mergeconflict): increment a counter
   resetStream(StreamResetReason::Overflow);
 }
 
@@ -195,6 +196,7 @@ void ConnectionImpl::StreamImpl::decodeHeaders() {
 
 void ConnectionImpl::StreamImpl::pendingSendBufferOverflowWatermark() {
   ENVOY_CONN_LOG(warn, "send buffer overflow ", parent_.connection_);
+  // TODO(mergeconflict): increment a counter
   resetStream(StreamResetReason::Overflow);
 }
 

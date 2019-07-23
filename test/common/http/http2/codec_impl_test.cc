@@ -485,7 +485,7 @@ TEST_P(Http2CodecImplDeferredResetTest, DeferredResetClient) {
   TestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   request_encoder_->encodeHeaders(request_headers, false);
-  Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
+  Buffer::OwnedImpl body(std::string(65536, 'a'));
   EXPECT_CALL(client_stream_callbacks, onAboveWriteBufferHighWatermark()).Times(AnyNumber());
   request_encoder_->encodeData(body, true);
   EXPECT_CALL(client_stream_callbacks, onResetStream(StreamResetReason::LocalReset, _));
@@ -523,7 +523,7 @@ TEST_P(Http2CodecImplDeferredResetTest, DeferredResetServer) {
           Invoke([&](Buffer::Instance& data, bool) -> void { client_wrapper_.buffer_.add(data); }));
   TestHeaderMapImpl response_headers{{":status", "200"}};
   response_encoder_->encodeHeaders(response_headers, false);
-  Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
+  Buffer::OwnedImpl body(std::string(65536, 'a'));
   EXPECT_CALL(server_stream_callbacks_, onAboveWriteBufferHighWatermark()).Times(AnyNumber());
   response_encoder_->encodeData(body, true);
   EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalReset, _));
@@ -537,6 +537,8 @@ TEST_P(Http2CodecImplDeferredResetTest, DeferredResetServer) {
   setupDefaultConnectionMocks();
   client_wrapper_.dispatch(Buffer::OwnedImpl(), *client_);
 }
+
+// TODO(mergeconflict): implement similar tests that reset the stream even quicker on overflow.
 
 class Http2CodecImplFlowControlTest : public Http2CodecImplTest {};
 
