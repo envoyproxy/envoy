@@ -589,12 +589,8 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithSocketOptions) {
 
   // First attempt to bind and listen socket should fail due to the lack of SO_REUSEPORT socket
   // options.
-  try {
-    bindAndListenTcpSocket(address, nullptr);
-    ADD_FAILURE() << "expected bind or listen to fail, but got success instead.";
-  } catch (Network::SocketBindException& exc) {
-    EXPECT_EQ(exc.errorNumber(), EADDRINUSE) << "unexpected exception: " << exc.what();
-  }
+  EXPECT_THAT_THROWS_MESSAGE(bindAndListenTcpSocket(address, nullptr), EnvoyException,
+                             HasSubstr(strerror(EADDRINUSE)));
 
   // Second attempt should succeed as kernel allows multiple sockets to listen the same address iff
   // both of them use SO_REUSEPORT socket option.
