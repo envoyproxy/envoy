@@ -31,7 +31,7 @@ public:
   /**
    * Returns if there is thread local data for this thread.
    *
-   * This should return true for Envoy worker threads and false for threads which do not have thead
+   * This should return true for Envoy worker threads and false for threads which do not have thread
    * local storage allocated.
    *
    * @return true if registerThread has been called for this thread, false otherwise.

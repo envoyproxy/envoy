@@ -555,7 +555,6 @@ void LoaderImpl::loadNewSnapshot() {
   tls_->set([ptr = std::move(ptr)](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return ptr;
   });
-
   // Invalidate all locally tracked snapshots. These can not be deleted as the owning threads may
   // be accessing them. Instead mark them invalid and clean up during the next in-thread call to
   // snapshot()
@@ -574,7 +573,7 @@ const Snapshot& LoaderImpl::snapshot() {
 
   // Make sure that if a runtime snapshot is requested from outside of a worker thread, this does
   // not crash Envoy. Instead, track thread to snapshot maps locally. In the common case, a
-  // snapshot will exist and will be vadlid, so snag a reader lock and check.
+  // snapshot will exist and will be valid, so snag a reader lock and check.
   {
     absl::ReaderMutexLock lock(&snapshot_mutex_);
     auto snapshot_it = snapshots_.find(std::this_thread::get_id());

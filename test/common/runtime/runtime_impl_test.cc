@@ -621,7 +621,7 @@ TEST_F(StaticLoaderImplTest, RuntimeFromNonWorkerThreads) {
 
   // Now set up a test thread which verifies foo -> bar
   //
-  // Then change foo -> eep and make sure the test thread picks up the change.
+  // Then change foo and make sure the test thread picks up the change.
   Thread::MutexBasicLockable mutex;
   Thread::CondVar foo_read;
   Thread::CondVar foo_changed;
