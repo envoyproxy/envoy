@@ -187,6 +187,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onEvent(Network::Conne
     // For the raw disconnect event, we are either between intervals in which case we already have
     // a timer setup, or we did the close or got a reset, in which case we already setup a new
     // timer. There is nothing to do here other than blow away the client.
+    response_headers_.reset();
     parent_.dispatcher_.deferredDelete(std::move(client_));
   }
 }
