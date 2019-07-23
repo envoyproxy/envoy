@@ -49,7 +49,6 @@ REAL_TIME_WHITELIST = ("./source/common/common/utility.h",
 #
 # TODO(#4196): Eliminate this list completely and then merge #4980.
 STAT_FROM_STRING_WHITELIST = ("./source/common/memory/heap_shrinker.cc",
-                              "./source/extensions/filters/http/dynamo/dynamo_filter.cc",
                               "./source/extensions/filters/http/ext_authz/ext_authz.cc",
                               "./source/extensions/filters/http/fault/fault_filter.cc",
                               "./source/extensions/filters/http/ip_tagging/ip_tagging_filter.cc",
