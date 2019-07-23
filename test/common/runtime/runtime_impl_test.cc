@@ -617,7 +617,8 @@ TEST_F(StaticLoaderImplTest, RuntimeFromNonWorkerThreads) {
 
   // Set up foo -> bar
   loader_->mergeValues({{"foo", "bar"}});
-  EXPECT_EQ("bar", loader_->snapshot().get("foo"));
+  EXPECT_EQ("bar", loader_->threadsafeSnapshot()->get("foo"));
+  Snapshot* original_snapshot_pointer = loader_->threadsafeSnapshot().get();
 
   // Now set up a test thread which verifies foo -> bar
   //
@@ -625,14 +626,16 @@ TEST_F(StaticLoaderImplTest, RuntimeFromNonWorkerThreads) {
   Thread::MutexBasicLockable mutex;
   Thread::CondVar foo_read;
   Thread::CondVar foo_changed;
+  Snapshot* original_thread_snapshot_pointer = nullptr;
   auto thread = Thread::threadFactoryForTest().createThread([&]() {
     Thread::LockGuard lock(mutex);
-    EXPECT_EQ("bar", loader_->snapshot().get("foo"));
-    EXPECT_EQ(&loader_->snapshot(), &loader_->snapshot());
+    EXPECT_EQ("bar", loader_->threadsafeSnapshot()->get("foo"));
+    original_thread_snapshot_pointer = loader_->threadsafeSnapshot().get();
+    EXPECT_EQ(original_thread_snapshot_pointer, loader_->threadsafeSnapshot().get());
     foo_read.notifyOne();
 
     foo_changed.wait(mutex);
-    EXPECT_EQ("eep", loader_->snapshot().get("foo"));
+    EXPECT_EQ("eep", loader_->threadsafeSnapshot()->get("foo"));
   });
 
   {
@@ -640,10 +643,11 @@ TEST_F(StaticLoaderImplTest, RuntimeFromNonWorkerThreads) {
     foo_read.wait(mutex);
     loader_->mergeValues({{"foo", "eep"}});
     foo_changed.notifyOne();
-    EXPECT_EQ("eep", loader_->snapshot().get("foo"));
+    EXPECT_EQ("eep", loader_->threadsafeSnapshot()->get("foo"));
   }
 
   thread->join();
+  EXPECT_EQ(original_thread_snapshot_pointer, original_snapshot_pointer);
 }
 
 class DiskLayerTest : public testing::Test {

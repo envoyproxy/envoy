@@ -27,7 +27,8 @@ namespace Runtime {
 bool runtimeFeatureEnabled(absl::string_view feature) {
   ASSERT(absl::StartsWith(feature, "envoy.reloadable_features"));
   if (Runtime::LoaderSingleton::getExisting()) {
-    return Runtime::LoaderSingleton::getExisting()->snapshot().runtimeFeatureEnabled(feature);
+    return Runtime::LoaderSingleton::getExisting()->threadsafeSnapshot()->runtimeFeatureEnabled(
+        feature);
   }
   ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::runtime), warn,
                       "Unable to use runtime singleton for feature {}", feature);
@@ -552,45 +553,27 @@ void RtdsSubscription::validateUpdateSize(uint32_t num_resources) {
 
 void LoaderImpl::loadNewSnapshot() {
   ThreadLocal::ThreadLocalObjectSharedPtr ptr = createNewSnapshot();
-  tls_->set([ptr = std::move(ptr)](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    return ptr;
-  });
-  // Invalidate all locally tracked snapshots. These can not be deleted as the owning threads may
-  // be accessing them. Instead mark them invalid and clean up during the next in-thread call to
-  // snapshot()
+  tls_->set([ptr](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr { return ptr; });
+
   {
-    absl::ReaderMutexLock lock(&snapshot_mutex_);
-    for (auto& it : snapshots_) {
-      it.second->valid_ = false;
-    }
+    absl::MutexLock lock(&snapshot_mutex_);
+    thread_safe_snapshot_ = std::dynamic_pointer_cast<Snapshot>(ptr);
   }
 }
 
 const Snapshot& LoaderImpl::snapshot() {
+  ASSERT(tls_->currentThreadRegistered(), "snapshot can only be called from a worker thread");
+  return tls_->getTyped<Snapshot>();
+}
+
+const std::shared_ptr<Snapshot> LoaderImpl::threadsafeSnapshot() {
   if (tls_->currentThreadRegistered()) {
-    return tls_->getTyped<Snapshot>();
+    return std::dynamic_pointer_cast<Snapshot>(tls_->get());
   }
 
-  // Make sure that if a runtime snapshot is requested from outside of a worker thread, this does
-  // not crash Envoy. Instead, track thread to snapshot maps locally. In the common case, a
-  // snapshot will exist and will be valid, so snag a reader lock and check.
   {
     absl::ReaderMutexLock lock(&snapshot_mutex_);
-    auto snapshot_it = snapshots_.find(std::this_thread::get_id());
-    if (snapshot_it != snapshots_.end() && snapshot_it->second->valid_) {
-      return *snapshot_it->second->snapshot_;
-    }
-  }
-
-  // If this is the thread's first call to snapshot() or mergeFrom() has been called since the last
-  // call to snapshot() create a new snapshot.
-  {
-    absl::MutexLock lock(&snapshot_mutex_);
-    snapshots_.erase(std::this_thread::get_id());
-    auto snapshot_it =
-        snapshots_.emplace(std::this_thread::get_id(), new SnapshotState{createNewSnapshot(), true})
-            .first;
-    return *snapshot_it->second->snapshot_;
+    return thread_safe_snapshot_;
   }
 }
 

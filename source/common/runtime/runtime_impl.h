@@ -244,6 +244,7 @@ public:
   // Runtime::Loader
   void initialize(Upstream::ClusterManager& cm) override;
   const Snapshot& snapshot() override;
+  const std::shared_ptr<Snapshot> threadsafeSnapshot() override;
   void mergeValues(const std::unordered_map<std::string, std::string>& values) override;
 
 private:
@@ -266,17 +267,8 @@ private:
   std::vector<RtdsSubscriptionPtr> subscriptions_;
   Upstream::ClusterManager* cm_{};
 
-  // State of the snapshot for non-worker threads.
-  struct SnapshotState {
-    // If SnapshotState exists, this should be a pointer to a snapshot.
-    std::unique_ptr<Runtime::SnapshotImpl> snapshot_;
-    // This is set false during mergeValues, and indicates that next time a
-    // given thread calls snapshot() that snapshot_ should be replaced.
-    bool valid_;
-  };
   absl::Mutex snapshot_mutex_;
-  absl::flat_hash_map<std::thread::id, std::unique_ptr<SnapshotState>>
-      snapshots_ GUARDED_BY(snapshot_mutex_);
+  std::shared_ptr<Snapshot> thread_safe_snapshot_ GUARDED_BY(snapshot_mutex_);
 };
 
 } // namespace Runtime
