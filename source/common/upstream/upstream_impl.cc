@@ -713,8 +713,10 @@ ClusterInfoImpl::ClusterInfoImpl(
     auto& factory =
         Config::Utility::getAndCheckFactory<Server::Configuration::NamedNetworkFilterConfigFactory>(
             string_name);
-    auto message =
-        Config::Utility::translateToFactoryConfig(proto_config, validation_visitor, factory);
+    auto message = factory.createEmptyConfigProto().get();
+    if (!proto_config.typed_config().value().empty()) {
+      proto_config.typed_config().UnpackTo(message);
+    }
     Network::FilterFactoryCb callback =
         factory.createFilterFactoryFromProto(*message, *factory_context_);
     filter_factories_.push_back(callback);
