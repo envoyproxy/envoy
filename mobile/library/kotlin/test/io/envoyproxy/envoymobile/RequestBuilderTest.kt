@@ -2,7 +2,6 @@ package io.envoyproxy.envoymobile
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
-import java.net.URL
 
 class RequestBuilderTest {
 
@@ -10,7 +9,7 @@ class RequestBuilderTest {
   fun `adding request data should have body present in request`() {
     val body = "data".toByteArray()
 
-    val request = RequestBuilder(URL("http://0.0.0.0:9001/api.lyft.com/demo.txt"), RequestMethod.GET)
+    val request = RequestBuilder(method = RequestMethod.POST, scheme = "https", authority = "api.foo.com", path = "foo")
         .addBody(body)
         .build()
     assertThat(request.body).isEqualTo(body)
@@ -18,7 +17,7 @@ class RequestBuilderTest {
 
   @Test
   fun `not adding request data should have null body in request`() {
-    val request = RequestBuilder(URL("http://0.0.0.0:9001/api.lyft.com/demo.txt"), RequestMethod.GET)
+    val request = RequestBuilder(method = RequestMethod.POST, scheme = "https", authority = "api.foo.com", path = "foo")
         .build()
 
     assertThat(request.body).isNull()
@@ -28,7 +27,7 @@ class RequestBuilderTest {
   fun `adding retry policy should have policy present in request`() {
 
     val retryPolicy = RetryPolicy(23, listOf(RetryRule.FIVE_XX, RetryRule.CONNECT_FAILURE), 1234)
-    val request = RequestBuilder(URL("http://0.0.0.0:9001/api.lyft.com/demo.txt"), RequestMethod.GET)
+    val request = RequestBuilder(method = RequestMethod.POST, scheme = "https", authority = "api.foo.com", path = "foo")
         .addRetryPolicy(retryPolicy)
         .build()
 
@@ -37,7 +36,7 @@ class RequestBuilderTest {
 
   @Test
   fun `not adding retry policy should have null body in request`() {
-    val request = RequestBuilder(URL("http://0.0.0.0:9001/api.lyft.com/demo.txt"), RequestMethod.GET)
+    val request = RequestBuilder(method = RequestMethod.POST, scheme = "https", authority = "api.foo.com", path = "foo")
         .build()
 
     assertThat(request.retryPolicy).isNull()
@@ -45,7 +44,7 @@ class RequestBuilderTest {
 
   @Test
   fun `adding new headers should append to the list of header keys`() {
-    val request = RequestBuilder(URL("http://0.0.0.0:9001/api.lyft.com/demo.txt"), RequestMethod.GET)
+    val request = RequestBuilder(method = RequestMethod.POST, scheme = "https", authority = "api.foo.com", path = "foo")
         .addHeader("header_a", "value_a1")
         .build()
 
@@ -54,7 +53,7 @@ class RequestBuilderTest {
 
   @Test
   fun `adding new trailers should append to the list of trailers keys`() {
-    val request = RequestBuilder(URL("http://0.0.0.0:9001/api.lyft.com/demo.txt"), RequestMethod.GET)
+    val request = RequestBuilder(method = RequestMethod.POST, scheme = "https", authority = "api.foo.com", path = "foo")
         .addTrailer("trailer_a", "value_a1")
         .build()
 
@@ -63,7 +62,7 @@ class RequestBuilderTest {
 
   @Test
   fun `removing headers should clear headers in request`() {
-    val request = RequestBuilder(URL("http://0.0.0.0:9001/api.lyft.com/demo.txt"), RequestMethod.GET)
+    val request = RequestBuilder(method = RequestMethod.POST, scheme = "https", authority = "api.foo.com", path = "foo")
         .addHeader("header_a", "value_a1")
         .removeHeaders("header_a")
         .build()
@@ -73,7 +72,7 @@ class RequestBuilderTest {
 
   @Test
   fun `removing a specific header value should not be in request`() {
-    val request = RequestBuilder(URL("http://0.0.0.0:9001/api.lyft.com/demo.txt"), RequestMethod.GET)
+    val request = RequestBuilder(method = RequestMethod.POST, scheme = "https", authority = "api.foo.com", path = "foo")
         .addHeader("header_a", "value_a1")
         .addHeader("header_a", "value_a2")
         .removeHeader("header_a", "value_a1")
@@ -84,7 +83,7 @@ class RequestBuilderTest {
 
   @Test
   fun `removing a specific header value should keep the other header values in request`() {
-    val request = RequestBuilder(URL("http://0.0.0.0:9001/api.lyft.com/demo.txt"), RequestMethod.GET)
+    val request = RequestBuilder(method = RequestMethod.POST, scheme = "https", authority = "api.foo.com", path = "foo")
         .addHeader("header_a", "value_a1")
         .addHeader("header_a", "value_a2")
         .removeHeader("header_a", "value_a1")
@@ -95,7 +94,7 @@ class RequestBuilderTest {
 
   @Test
   fun `adding a specific header value should keep the other header values in request`() {
-    val request = RequestBuilder(URL("http://0.0.0.0:9001/api.lyft.com/demo.txt"), RequestMethod.GET)
+    val request = RequestBuilder(method = RequestMethod.POST, scheme = "https", authority = "api.foo.com", path = "foo")
         .addHeader("header_a", "value_a1")
         .addHeader("header_a", "value_a2")
         .build()
@@ -105,7 +104,7 @@ class RequestBuilderTest {
 
   @Test
   fun `removing all header values should remove header list in request`() {
-    val request = RequestBuilder(URL("http://0.0.0.0:9001/api.lyft.com/demo.txt"), RequestMethod.GET)
+    val request = RequestBuilder(method = RequestMethod.POST, scheme = "https", authority = "api.foo.com", path = "foo")
         .addHeader("header_a", "value_a1")
         .removeHeader("header_a", "value_a1")
         .build()
@@ -115,7 +114,7 @@ class RequestBuilderTest {
 
   @Test
   fun `removing trailers should clear trailers in request`() {
-    val request = RequestBuilder(URL("http://0.0.0.0:9001/api.lyft.com/demo.txt"), RequestMethod.GET)
+    val request = RequestBuilder(method = RequestMethod.POST, scheme = "https", authority = "api.foo.com", path = "foo")
         .addTrailer("trailer_a", "value_a1")
         .removeTrailers("trailer_a")
         .build()
@@ -125,7 +124,7 @@ class RequestBuilderTest {
 
   @Test
   fun `removing a specific trailer value should not be in request`() {
-    val request = RequestBuilder(URL("http://0.0.0.0:9001/api.lyft.com/demo.txt"), RequestMethod.GET)
+    val request = RequestBuilder(method = RequestMethod.POST, scheme = "https", authority = "api.foo.com", path = "foo")
         .addTrailer("trailer_a", "value_a1")
         .addTrailer("trailer_a", "value_a2")
         .removeTrailer("trailer_a", "value_a1")
@@ -136,7 +135,7 @@ class RequestBuilderTest {
 
   @Test
   fun `removing a specific trailer value should keep the other trailer values in request`() {
-    val request = RequestBuilder(URL("http://0.0.0.0:9001/api.lyft.com/demo.txt"), RequestMethod.GET)
+    val request = RequestBuilder(method = RequestMethod.POST, scheme = "https", authority = "api.foo.com", path = "foo")
         .addTrailer("trailer_a", "value_a1")
         .addTrailer("trailer_a", "value_a2")
         .removeTrailer("trailer_a", "value_a1")
@@ -147,7 +146,7 @@ class RequestBuilderTest {
 
   @Test
   fun `adding a specific trailer value should keep the other trailer values in request`() {
-    val request = RequestBuilder(URL("http://0.0.0.0:9001/api.lyft.com/demo.txt"), RequestMethod.GET)
+    val request = RequestBuilder(method = RequestMethod.POST, scheme = "https", authority = "api.foo.com", path = "foo")
         .addTrailer("trailer_a", "value_a1")
         .addTrailer("trailer_a", "value_a2")
         .build()
@@ -157,7 +156,7 @@ class RequestBuilderTest {
 
   @Test
   fun `removing all trailer values should remove trailer list in request`() {
-    val request = RequestBuilder(URL("http://0.0.0.0:9001/api.lyft.com/demo.txt"), RequestMethod.GET)
+    val request = RequestBuilder(method = RequestMethod.POST, scheme = "https", authority = "api.foo.com", path = "foo")
         .addTrailer("trailer_a", "value_a1")
         .removeTrailer("trailer_a", "value_a1")
         .build()

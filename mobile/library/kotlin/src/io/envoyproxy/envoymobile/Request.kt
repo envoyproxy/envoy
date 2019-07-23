@@ -1,10 +1,18 @@
 package io.envoyproxy.envoymobile
 
-import java.net.URL
-
+/**
+ * Represents an Envoy HTTP request. Use `RequestBuilder` to construct new instances.
+ *
+ * @param method Method for the request.
+ * @param scheme The URL scheme for the request (i.e., "https").
+ * @param authority The URL authority for the request (i.e., "api.foo.com").
+ * @param path The URL path for the request (i.e., "/foo").
+ */
 class Request internal constructor(
     val method: RequestMethod,
-    val url: URL,
+    val scheme: String,
+    val authority: String,
+    val path: String,
     val headers: Map<String, List<String>>,
     val trailers: Map<String, List<String>>,
     val body: ByteArray?,
@@ -18,7 +26,7 @@ class Request internal constructor(
    * @return the builder.
    */
   fun toBuilder(): RequestBuilder {
-    return RequestBuilder(url, method)
+    return RequestBuilder(method, scheme, authority, path)
         .setHeaders(headers)
         .setTrailers(trailers)
         .addBody(body)
@@ -32,7 +40,9 @@ class Request internal constructor(
     other as Request
 
     if (method != other.method) return false
-    if (url != other.url) return false
+    if (scheme != other.scheme) return false
+    if (authority != other.authority) return false
+    if (path != other.path) return false
     if (headers != other.headers) return false
     if (trailers != other.trailers) return false
     if (body != null) {
@@ -46,7 +56,9 @@ class Request internal constructor(
 
   override fun hashCode(): Int {
     var result = method.hashCode()
-    result = 31 * result + url.hashCode()
+    result = 31 * result + scheme.hashCode()
+    result = 31 * result + authority.hashCode()
+    result = 31 * result + path.hashCode()
     result = 31 * result + headers.hashCode()
     result = 31 * result + trailers.hashCode()
     result = 31 * result + (body?.contentHashCode() ?: 0)
