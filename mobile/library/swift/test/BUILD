@@ -15,3 +15,10 @@ envoy_mobile_swift_test(
         "RetryPolicyTests.swift",
     ],
 )
+
+envoy_mobile_swift_test(
+    name = "retry_policy_mapper_tests",
+    srcs = [
+        "RetryPolicyMapperTests.swift",
+    ],
+)

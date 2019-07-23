@@ -4,7 +4,7 @@ import XCTest
 
 private let kBodyData = Data([1, 2, 3, 4])
 private let kRetryPolicy = RetryPolicy(maxRetryCount: 123,
-                                       retryOn: [.connectFailure, .fiveXX],
+                                       retryOn: [.connectFailure, .status5xx],
                                        perRetryTimeoutMS: 9000)
 
 final class RequestBuilderTests: XCTestCase {
