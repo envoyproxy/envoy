@@ -49,6 +49,77 @@ TEST_F(HttpConnectionManagerConfigTest, ValidateFail) {
       ProtoValidationException);
 }
 
+// Verify that the v1 JSON config path still works. This will be deleted when v1 is fully removed.
+TEST_F(HttpConnectionManagerConfigTest, V1Config) {
+  const std::string yaml_string = R"EOF(
+drain_timeout_ms: 5000
+route_config:
+  virtual_hosts:
+  - require_ssl: all
+    routes:
+    - cluster: cluster_1
+      prefix: "/"
+    domains:
+    - www.redirect.com
+    name: redirect
+  - routes:
+    - prefix: "/"
+      cluster: cluster_1
+      runtime:
+        key: some_key
+        default: 0
+    - prefix: "/test/long/url"
+      rate_limits:
+      - actions:
+        - type: destination_cluster
+      cluster: cluster_1
+    - prefix: "/test/"
+      cluster: cluster_2
+    - prefix: "/websocket/test"
+      prefix_rewrite: "/websocket"
+      cluster: cluster_1
+    domains:
+    - "*"
+    name: integration
+codec_type: http1
+stat_prefix: router
+filters:
+- name: health_check
+  config:
+    endpoint: "/healthcheck"
+    pass_through_mode: false
+- name: rate_limit
+  config:
+    domain: foo
+- name: router
+  config: {}
+access_log:
+- format: '[%START_TIME%] "%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%
+    %PROTOCOL%" %RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT%
+    %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% "%REQ(X-FORWARDED-FOR)%"
+    "%REQ(USER-AGENT)%" "%REQ(X-REQUEST-ID)%" "%REQ(:AUTHORITY)%" "%UPSTREAM_HOST%"
+    "%REQUEST_DURATION%" "%RESPONSE_DURATION%"'
+  path: "/dev/null"
+  filter:
+    filters:
+    - type: status_code
+      op: ">="
+      value: 500
+    - type: duration
+      op: ">="
+      value: 1000000
+    type: logical_or
+- path: "/dev/null"
+  )EOF";
+
+  ON_CALL(context_.runtime_loader_.snapshot_,
+          deprecatedFeatureEnabled("envoy.deprecated_features.v1_filter_json_config"))
+      .WillByDefault(Return(true));
+
+  HttpConnectionManagerFilterConfigFactory().createFilterFactory(
+      *Json::Factory::loadFromYamlString(yaml_string), context_);
+}
+
 TEST_F(HttpConnectionManagerConfigTest, InvalidFilterName) {
   const std::string yaml_string = R"EOF(
 codec_type: http1

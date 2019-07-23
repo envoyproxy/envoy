@@ -12,7 +12,7 @@ namespace Envoy {
 // A test filter that does StopIterationNoBuffer then continues after a 0ms alarm.
 class StopIterationAndContinueFilter : public Http::PassThroughFilter {
 public:
-  Http::FilterDataStatus decodeData(Buffer::Instance&, bool end_stream) {
+  Http::FilterDataStatus decodeData(Buffer::Instance&, bool end_stream) override {
     RELEASE_ASSERT(!end_stream_seen_, "end stream seen twice");
     if (end_stream) {
       end_stream_seen_ = true;
@@ -33,7 +33,8 @@ public:
   StopIterationAndContinueFilterConfig()
       : EmptyHttpFilterConfig("stop-iteration-and-continue-filter") {}
 
-  Http::FilterFactoryCb createFilter(const std::string&, Server::Configuration::FactoryContext&) {
+  Http::FilterFactoryCb createFilter(const std::string&,
+                                     Server::Configuration::FactoryContext&) override {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamFilter(std::make_shared<::Envoy::StopIterationAndContinueFilter>());
     };

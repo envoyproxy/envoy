@@ -902,8 +902,8 @@ TEST_P(AdminInstanceTest, ContextThatReturnsNullCertDetails) {
 
   // Setup a context that returns null cert details.
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
-  Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString("{}");
-  Extensions::TransportSockets::Tls::ClientContextConfigImpl cfg(*loader, factory_context);
+  envoy::api::v2::auth::UpstreamTlsContext config;
+  Extensions::TransportSockets::Tls::ClientContextConfigImpl cfg(config, factory_context);
   Stats::IsolatedStoreImpl store;
   Envoy::Ssl::ClientContextSharedPtr client_ctx(
       server_.sslContextManager().createSslClientContext(store, cfg));
