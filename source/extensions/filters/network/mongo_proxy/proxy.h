@@ -111,7 +111,7 @@ public:
               const Filters::Common::Fault::FaultDelayConfigSharedPtr& fault_config,
               const Network::DrainDecision& drain_decision, TimeSource& time_system,
               bool emit_dynamic_metadata);
-  ~ProxyFilter();
+  ~ProxyFilter() override;
 
   virtual DecoderPtr createDecoder(DecoderCallbacks& callbacks) PURE;
 

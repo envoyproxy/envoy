@@ -28,7 +28,7 @@ namespace ThriftProxy {
 class MockConfig : public Config {
 public:
   MockConfig();
-  ~MockConfig();
+  ~MockConfig() override;
 
   // ThriftProxy::Config
   MOCK_METHOD0(filterFactory, ThriftFilters::FilterChainFactory&());
@@ -40,7 +40,7 @@ public:
 class MockTransport : public Transport {
 public:
   MockTransport();
-  ~MockTransport();
+  ~MockTransport() override;
 
   // ThriftProxy::Transport
   MOCK_CONST_METHOD0(name, const std::string&());
@@ -56,7 +56,7 @@ public:
 class MockProtocol : public Protocol {
 public:
   MockProtocol();
-  ~MockProtocol();
+  ~MockProtocol() override;
 
   // ThriftProxy::Protocol
   MOCK_CONST_METHOD0(name, const std::string&());
@@ -121,7 +121,7 @@ public:
 class MockDecoderCallbacks : public DecoderCallbacks {
 public:
   MockDecoderCallbacks();
-  ~MockDecoderCallbacks();
+  ~MockDecoderCallbacks() override;
 
   // ThriftProxy::DecoderCallbacks
   MOCK_METHOD0(newDecoderEventHandler, DecoderEventHandler&());
@@ -130,7 +130,7 @@ public:
 class MockDecoderEventHandler : public DecoderEventHandler {
 public:
   MockDecoderEventHandler();
-  ~MockDecoderEventHandler();
+  ~MockDecoderEventHandler() override;
 
   // ThriftProxy::DecoderEventHandler
   MOCK_METHOD1(transportBegin, FilterStatus(MessageMetadataSharedPtr metadata));
@@ -160,7 +160,7 @@ public:
 class MockDirectResponse : public DirectResponse {
 public:
   MockDirectResponse();
-  ~MockDirectResponse();
+  ~MockDirectResponse() override;
 
   // ThriftProxy::DirectResponse
   MOCK_CONST_METHOD3(encode,
@@ -170,7 +170,7 @@ public:
 class MockThriftObject : public ThriftObject {
 public:
   MockThriftObject();
-  ~MockThriftObject();
+  ~MockThriftObject() override;
 
   MOCK_CONST_METHOD0(fields, ThriftFieldPtrList&());
   MOCK_METHOD1(onData, bool(Buffer::Instance&));
@@ -185,7 +185,7 @@ namespace ThriftFilters {
 class MockFilterChainFactoryCallbacks : public FilterChainFactoryCallbacks {
 public:
   MockFilterChainFactoryCallbacks();
-  ~MockFilterChainFactoryCallbacks();
+  ~MockFilterChainFactoryCallbacks() override;
 
   MOCK_METHOD1(addDecoderFilter, void(DecoderFilterSharedPtr));
 };
@@ -193,7 +193,7 @@ public:
 class MockDecoderFilter : public DecoderFilter {
 public:
   MockDecoderFilter();
-  ~MockDecoderFilter();
+  ~MockDecoderFilter() override;
 
   // ThriftProxy::ThriftFilters::DecoderFilter
   MOCK_METHOD0(onDestroy, void());
@@ -228,7 +228,7 @@ public:
 class MockDecoderFilterCallbacks : public DecoderFilterCallbacks {
 public:
   MockDecoderFilterCallbacks();
-  ~MockDecoderFilterCallbacks();
+  ~MockDecoderFilterCallbacks() override;
 
   // ThriftProxy::ThriftFilters::DecoderFilterCallbacks
   MOCK_CONST_METHOD0(streamId, uint64_t());
@@ -252,7 +252,7 @@ public:
 class MockFilterConfigFactory : public ThriftFilters::FactoryBase<ProtobufWkt::Struct> {
 public:
   MockFilterConfigFactory();
-  ~MockFilterConfigFactory();
+  ~MockFilterConfigFactory() override;
 
   ThriftFilters::FilterFactoryCb
   createFilterFactoryFromProtoTyped(const ProtobufWkt::Struct& proto_config,
@@ -271,7 +271,7 @@ namespace Router {
 class MockRateLimitPolicyEntry : public RateLimitPolicyEntry {
 public:
   MockRateLimitPolicyEntry();
-  ~MockRateLimitPolicyEntry();
+  ~MockRateLimitPolicyEntry() override;
 
   MOCK_CONST_METHOD0(stage, uint32_t());
   MOCK_CONST_METHOD0(disableKey, const std::string&());
@@ -286,7 +286,7 @@ public:
 class MockRateLimitPolicy : public RateLimitPolicy {
 public:
   MockRateLimitPolicy();
-  ~MockRateLimitPolicy();
+  ~MockRateLimitPolicy() override;
 
   MOCK_CONST_METHOD0(empty, bool());
   MOCK_CONST_METHOD1(
@@ -299,7 +299,7 @@ public:
 class MockRouteEntry : public RouteEntry {
 public:
   MockRouteEntry();
-  ~MockRouteEntry();
+  ~MockRouteEntry() override;
 
   // ThriftProxy::Router::RouteEntry
   MOCK_CONST_METHOD0(clusterName, const std::string&());
@@ -313,7 +313,7 @@ public:
 class MockRoute : public Route {
 public:
   MockRoute();
-  ~MockRoute();
+  ~MockRoute() override;
 
   // ThriftProxy::Router::Route
   MOCK_CONST_METHOD0(routeEntry, const RouteEntry*());

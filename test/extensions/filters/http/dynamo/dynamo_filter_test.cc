@@ -42,7 +42,7 @@ public:
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
-  ~DynamoFilterTest() { filter_->onDestroy(); }
+  ~DynamoFilterTest() override { filter_->onDestroy(); }
 
   NiceMock<Stats::MockStore> stats_;
   std::unique_ptr<DynamoFilter> filter_;

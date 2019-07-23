@@ -116,7 +116,7 @@ protected:
 
 class EdsWithHealthCheckUpdateTest : public EdsTest {
 protected:
-  EdsWithHealthCheckUpdateTest() {}
+  EdsWithHealthCheckUpdateTest() = default;
 
   // Build the initial cluster with some endpoints.
   void initializeCluster(const std::vector<uint32_t> endpoint_ports,

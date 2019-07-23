@@ -60,7 +60,7 @@ class DubboDecoderStateMachineTest : public DecoderStateMachineTestBase, public 
 class DubboDecoderTest : public testing::Test {
 public:
   DubboDecoderTest() = default;
-  virtual ~DubboDecoderTest() override = default;
+  ~DubboDecoderTest() override = default;
 
   NiceMock<MockProtocol> protocol_;
   NiceMock<MockStreamHandler> handler_;

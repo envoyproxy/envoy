@@ -1,5 +1,7 @@
 #include "extensions/transport_sockets/tls/context_impl.h"
 
+#include <netinet/in.h>
+
 #include <algorithm>
 #include <memory>
 #include <string>
@@ -13,6 +15,7 @@
 #include "common/common/fmt.h"
 #include "common/common/hex.h"
 #include "common/common/utility.h"
+#include "common/network/address_impl.h"
 #include "common/protobuf/utility.h"
 
 #include "extensions/transport_sockets/tls/utility.h"
@@ -491,7 +494,8 @@ bool ContextImpl::verifySubjectAltName(X509* cert,
     return false;
   }
   for (const GENERAL_NAME* san : san_names.get()) {
-    if (san->type == GEN_DNS) {
+    switch (san->type) {
+    case GEN_DNS: {
       ASN1_STRING* str = san->d.dNSName;
       const char* dns_name = reinterpret_cast<const char*>(ASN1_STRING_data(str));
       for (auto& config_san : subject_alt_names) {
@@ -499,7 +503,9 @@ bool ContextImpl::verifySubjectAltName(X509* cert,
           return true;
         }
       }
-    } else if (san->type == GEN_URI) {
+      break;
+    }
+    case GEN_URI: {
       ASN1_STRING* str = san->d.uniformResourceIdentifier;
       const char* uri = reinterpret_cast<const char*>(ASN1_STRING_data(str));
       for (auto& config_san : subject_alt_names) {
@@ -507,6 +513,32 @@ bool ContextImpl::verifySubjectAltName(X509* cert,
           return true;
         }
       }
+      break;
+    }
+    case GEN_IPADD: {
+      if (san->d.ip->length == 4) {
+        sockaddr_in sin;
+        sin.sin_family = AF_INET;
+        memcpy(&sin.sin_addr, san->d.ip->data, sizeof(sin.sin_addr));
+        Network::Address::Ipv4Instance addr(&sin);
+        for (auto& config_san : subject_alt_names) {
+          if (config_san == addr.ip()->addressAsString()) {
+            return true;
+          }
+        }
+      } else if (san->d.ip->length == 16) {
+        sockaddr_in6 sin6;
+        sin6.sin6_family = AF_INET6;
+        memcpy(&sin6.sin6_addr, san->d.ip->data, sizeof(sin6.sin6_addr));
+        Network::Address::Ipv6Instance addr(sin6);
+        for (auto& config_san : subject_alt_names) {
+          if (config_san == addr.ip()->addressAsString()) {
+            return true;
+          }
+        }
+      }
+      break;
+    }
     }
   }
   return false;
