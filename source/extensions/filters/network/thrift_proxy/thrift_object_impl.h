@@ -18,7 +18,7 @@ namespace ThriftProxy {
 class ThriftBase : public DecoderEventHandler {
 public:
   ThriftBase(ThriftBase* parent);
-  ~ThriftBase() {}
+  ~ThriftBase() override = default;
 
   // DecoderEventHandler
   FilterStatus transportBegin(MessageMetadataSharedPtr) override { return FilterStatus::Continue; }
@@ -61,7 +61,7 @@ class ThriftValueBase : public ThriftValue, public ThriftBase {
 public:
   ThriftValueBase(ThriftBase* parent, FieldType value_type)
       : ThriftBase(parent), value_type_(value_type) {}
-  ~ThriftValueBase() {}
+  ~ThriftValueBase() override = default;
 
   // ThriftValue
   FieldType type() const override { return value_type_; }

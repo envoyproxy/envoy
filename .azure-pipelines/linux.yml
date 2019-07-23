@@ -1,29 +1,45 @@
-resources:
-  containers:
-  - container: envoy-build
-    image: envoyproxy/envoy-build:8246167b9d238797cbc6c03dccc9e3921c37617d
-
 jobs:
-- job: EnvoyFullTest
+- job: bazel
+  strategy:
+    matrix:
+      release:
+        CI_TARGET: 'bazel.release'
+  dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
   timeoutInMinutes: 360
   pool:
     vmImage: 'Ubuntu 16.04'
-  container: envoy-build
   steps:
-  # bazel.dev isn't for CI purpose but we use it here to experiment with Azure Pipeline
-  # as it builds faster, before Azure can provision larger VM or we can use RBE.
-  - script: ci/do_ci.sh bazel.dev
+  - bash: |
+      echo "disk space at beginning of build:"
+      df -h
+    displayName: "Check disk space at beginning"
+
+  - bash: |
+      sudo mkdir -p /etc/docker
+      echo '{
+        "ipv6": true,
+        "fixed-cidr-v6": "2001:db8:1::/64"
+      }' | sudo tee /etc/docker/daemon.json
+      sudo service docker restart
+    displayName: "Enable IPv6"
+
+  - script: ci/run_envoy_docker.sh 'ci/do_ci.sh $(CI_TARGET)'
+    workingDirectory: $(Build.SourcesDirectory)
     env:
-      ENVOY_SRCDIR: $(Build.SourcesDirectory)
-      BUILD_DIR: $(Build.StagingDirectory)
-      BAZEL_EXTRA_TEST_OPTIONS: "--test_env=ENVOY_IP_TEST_VERSIONS=v4only"
-      BAZEL_REMOTE_CACHE: remotebuildexecution.googleapis.com
+      ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+      BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-clang --config=remote-ci --jobs=100 --curses=no"
+      BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
       BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
       GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+    displayName: "Run CI script"
 
-  - task: PublishTestResults@2
-    inputs:
-      testResultsFiles: '**/testlogs/**/test.xml'
-      testRunTitle: 'bazel.dev'
-      searchFolder: $(Build.StagingDirectory)
+  - bash: |
+      echo "disk space at end of build:"
+      df -h
+    displayName: "Check disk space at end"
     condition: always()
+
+  - task: PublishBuildArtifacts@1
+    inputs:
+      pathtoPublish: "$(Build.StagingDirectory)/envoy"
+      artifactName: $(CI_TARGET)

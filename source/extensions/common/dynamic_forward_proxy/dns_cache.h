@@ -30,6 +30,11 @@ public:
   virtual const std::string& resolvedHost() PURE;
 
   /**
+   * Returns whether the original host is an IP address.
+   */
+  virtual bool isIpAddress() PURE;
+
+  /**
    * Indicates that the host has been used and should not be purged depending on any configured
    * TTL policy
    */
