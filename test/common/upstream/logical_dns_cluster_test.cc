@@ -269,6 +269,24 @@ TEST_P(LogicalDnsParamTest, ImmediateResolve) {
 }
 
 TEST_F(LogicalDnsClusterTest, BadConfig) {
+  const std::string multiple_hosts_yaml = R"EOF(
+  name: name
+  type: LOGICAL_DNS
+  dns_refresh_rate: 4s
+  connect_timeout: 0.25s
+  lb_policy: ROUND_ROBIN
+  hosts:
+  - socket_address:
+      address: foo.bar.com
+      port_value: 443
+  - socket_address:
+      address: foo2.bar.com
+      port_value: 443
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(setupFromV2Yaml(multiple_hosts_yaml), EnvoyException,
+                            "LOGICAL_DNS clusters must have a single host");
+
   const std::string multiple_lb_endpoints_yaml = R"EOF(
   name: name
   type: LOGICAL_DNS
