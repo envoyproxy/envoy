@@ -557,7 +557,7 @@ void LoaderImpl::loadNewSnapshot() {
   });
 }
 
-Snapshot& LoaderImpl::snapshot() { return tls_->getTyped<Snapshot>(); }
+const Snapshot& LoaderImpl::snapshot() { return tls_->getTyped<Snapshot>(); }
 
 void LoaderImpl::mergeValues(const std::unordered_map<std::string, std::string>& values) {
   if (admin_layer_ == nullptr) {
