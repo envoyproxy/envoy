@@ -26,12 +26,14 @@ envoy_cc_library(
         "//bazel:linux_x86_64": ["os_sys_calls_impl_linux.cc"],
         "//bazel:linux_aarch64": ["os_sys_calls_impl_linux.cc"],
         "//bazel:linux_ppc": ["os_sys_calls_impl_linux.cc"],
+        "//bazel:linux_mips64": ["os_sys_calls_impl_linux.cc"],
         "//conditions:default": [],
     }) + envoy_select_hot_restart(["os_sys_calls_impl_hot_restart.cc"]),
     hdrs = ["os_sys_calls_impl.h"] + select({
         "//bazel:linux_x86_64": ["os_sys_calls_impl_linux.h"],
         "//bazel:linux_aarch64": ["os_sys_calls_impl_linux.h"],
         "//bazel:linux_ppc": ["os_sys_calls_impl_linux.h"],
+        "//bazel:linux_mips64": ["os_sys_calls_impl_linux.h"],
         "//conditions:default": [],
     }) + envoy_select_hot_restart(["os_sys_calls_impl_hot_restart.h"]),
     deps = [
