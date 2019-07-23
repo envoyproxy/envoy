@@ -10,6 +10,10 @@ resources:
 trigger:
 - master
 
+variables:
+  CC: clang
+  CXX: clang++
+
 stages:
   - stage: format
     dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
@@ -72,7 +76,8 @@ stages:
             submodules: true
           - script: ./ci/linux_ci_setup.sh
             displayName: 'Install dependencies'
-          - script: ./bazelw build //test/performance:test_binary_size --config=sizeopt
+          - script: |
+              ./bazelw build -s //test/performance:test_binary_size --config=sizeopt
             displayName: 'Build test binary'
           - task: PublishPipelineArtifact@0
             displayName: 'Publish current test binary'
@@ -140,11 +145,6 @@ stages:
           - script: ./ci/linux_ci_setup.sh
             displayName: 'Install dependencies'
           - script: |
-              export PATH=/usr/lib/llvm-8/bin:$PATH
-              export CC=clang
-              export CXX=clang++
-            displayName: 'Set up clang toolchain'
-          - script: |
               ./bazelw build --fat_apk_cpu=x86 //:android_dist
             displayName: 'Build envoy.aar distributable'
           - task: PublishPipelineArtifact@0
@@ -163,11 +163,6 @@ stages:
             submodules: true
           - script: ./ci/linux_ci_setup.sh
             displayName: 'Install dependencies'
-          - script: |
-              export PATH=/usr/lib/llvm-8/bin:$PATH
-              export CC=clang
-              export CXX=clang++
-            displayName: 'Set up clang toolchain'
           - script: ./bazelw test --test_output=all --build_tests_only //library/kotlin/test/...
             displayName: 'Run Kotlin library tests'
       - job: linux_java_helloworld
