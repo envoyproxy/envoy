@@ -610,6 +610,42 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
   EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
 }
 
+TEST_F(StaticLoaderImplTest, RuntimeFromNonWorkerThreads) {
+  // Force the thread to be considered a non-worker thread.
+  tls_.registered_ = false;
+  setup();
+
+  // Set up foo -> bar
+  loader_->mergeValues({{"foo", "bar"}});
+  EXPECT_EQ("bar", loader_->snapshot().get("foo"));
+
+  // Now set up a test thread which verifies foo -> bar
+  //
+  // Then change foo -> eep and make sure the test thread picks up the change.
+  Thread::MutexBasicLockable mutex;
+  Thread::CondVar foo_read;
+  Thread::CondVar foo_changed;
+  auto thread = Thread::threadFactoryForTest().createThread([&]() {
+    Thread::LockGuard lock(mutex);
+    EXPECT_EQ("bar", loader_->snapshot().get("foo"));
+    EXPECT_EQ(&loader_->snapshot(), &loader_->snapshot());
+    foo_read.notifyOne();
+
+    foo_changed.wait(mutex);
+    EXPECT_EQ("eep", loader_->snapshot().get("foo"));
+  });
+
+  {
+    Thread::LockGuard lock(mutex);
+    foo_read.wait(mutex);
+    loader_->mergeValues({{"foo", "eep"}});
+    foo_changed.notifyOne();
+    EXPECT_EQ("eep", loader_->snapshot().get("foo"));
+  }
+
+  thread->join();
+}
+
 class DiskLayerTest : public testing::Test {
 protected:
   DiskLayerTest() : api_(Api::createApiForTest()) {}
