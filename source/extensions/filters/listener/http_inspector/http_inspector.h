@@ -67,6 +67,7 @@ private:
   void parseHttpHeader(absl::string_view data);
 
   const absl::flat_hash_set<std::string>& httpProtocols() const;
+  const absl::flat_hash_set<std::string>& http1xMethods() const;
 
   ConfigSharedPtr config_;
   Network::ListenerFilterCallbacks* cb_{nullptr};

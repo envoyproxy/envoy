@@ -127,12 +127,10 @@ TEST_F(HttpInspectorTest, InvalidHttpMethod) {
         return Api::SysCallSizeResult{ssize_t(header.size()), 0};
       }));
 
-  const std::vector<absl::string_view> alpn_protos{absl::string_view("http/1.1")};
-
-  EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
   EXPECT_CALL(cb_, continueFilterChain(true));
   file_event_callback_(Event::FileReadyType::Read);
-  EXPECT_EQ(1, cfg_->stats().http11_found_.value());
+  EXPECT_EQ(0, cfg_->stats().http11_found_.value());
 }
 
 TEST_F(HttpInspectorTest, InvalidHttpRequestLine) {
@@ -147,9 +145,8 @@ TEST_F(HttpInspectorTest, InvalidHttpRequestLine) {
       }));
 
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
-  EXPECT_CALL(cb_, continueFilterChain(true));
+  EXPECT_CALL(cb_, continueFilterChain(_)).Times(0);
   file_event_callback_(Event::FileReadyType::Read);
-  EXPECT_EQ(1, cfg_->stats().http_not_found_.value());
 }
 
 TEST_F(HttpInspectorTest, UnsupportedHttpProtocol) {
@@ -226,9 +223,9 @@ TEST_F(HttpInspectorTest, InvalidConnectionPreface) {
       }));
 
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
-  EXPECT_CALL(cb_, continueFilterChain(true));
+  EXPECT_CALL(cb_, continueFilterChain(true)).Times(0);
   file_event_callback_(Event::FileReadyType::Read);
-  EXPECT_EQ(1, cfg_->stats().http_not_found_.value());
+  EXPECT_EQ(0, cfg_->stats().http_not_found_.value());
 }
 
 TEST_F(HttpInspectorTest, ReadError) {
@@ -242,7 +239,7 @@ TEST_F(HttpInspectorTest, ReadError) {
   EXPECT_EQ(1, cfg_->stats().read_error_.value());
 }
 
-TEST_F(HttpInspectorTest, MultipleReads) {
+TEST_F(HttpInspectorTest, MultipleReadsHttp2) {
 
   init();
   const std::vector<absl::string_view> alpn_protos = {absl::string_view("h2")};
@@ -260,12 +257,16 @@ TEST_F(HttpInspectorTest, MultipleReads) {
     EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce(InvokeWithoutArgs([]() {
       return Api::SysCallSizeResult{ssize_t(-1), EAGAIN};
     }));
-    EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-        .WillOnce(Invoke([&data](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-          ASSERT(length >= data.size());
-          memcpy(buffer, data.data(), data.size());
-          return Api::SysCallSizeResult{ssize_t(data.size()), 0};
-        }));
+
+    for (size_t i = 1; i <= 24; i++) {
+      EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+          .WillOnce(
+              Invoke([&data, i](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+                ASSERT(length >= data.size());
+                memcpy(buffer, data.data(), data.size());
+                return Api::SysCallSizeResult{ssize_t(i), 0};
+              }));
+    }
   }
 
   bool got_continue = false;
@@ -277,6 +278,144 @@ TEST_F(HttpInspectorTest, MultipleReads) {
     file_event_callback_(Event::FileReadyType::Read);
   }
   EXPECT_EQ(1, cfg_->stats().http2_found_.value());
+}
+
+TEST_F(HttpInspectorTest, MultipleReadsHttp2BadPreface) {
+
+  init();
+  const std::string header = "505249202a20485454502f322e300d0a0d0c";
+  const std::vector<uint8_t> data = Hex::decode(header);
+  {
+    InSequence s;
+
+    EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce(InvokeWithoutArgs([]() {
+      return Api::SysCallSizeResult{ssize_t(-1), EAGAIN};
+    }));
+
+    for (size_t i = 1; i <= data.size(); i++) {
+      EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+          .WillOnce(
+              Invoke([&data, i](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+                ASSERT(length >= data.size());
+                memcpy(buffer, data.data(), data.size());
+                return Api::SysCallSizeResult{ssize_t(i), 0};
+              }));
+    }
+  }
+
+  bool got_continue = false;
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
+  EXPECT_CALL(cb_, continueFilterChain(true)).WillOnce(InvokeWithoutArgs([&got_continue]() {
+    got_continue = true;
+  }));
+  while (!got_continue) {
+    file_event_callback_(Event::FileReadyType::Read);
+  }
+  EXPECT_EQ(1, cfg_->stats().http_not_found_.value());
+}
+
+TEST_F(HttpInspectorTest, MultipleReadsHttp1) {
+
+  init();
+
+  const absl::string_view data = "GET /anything HTTP/1.0\r";
+  {
+    InSequence s;
+
+    EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce(InvokeWithoutArgs([]() {
+      return Api::SysCallSizeResult{ssize_t(-1), EAGAIN};
+    }));
+
+    for (size_t i = 1; i <= data.length(); i++) {
+      EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+          .WillOnce(
+              Invoke([&data, i](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+                ASSERT(length >= data.size());
+                memcpy(buffer, data.data(), data.size());
+                return Api::SysCallSizeResult{ssize_t(i), 0};
+              }));
+    }
+  }
+
+  bool got_continue = false;
+  const std::vector<absl::string_view> alpn_protos = {absl::string_view("http/1.0")};
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
+  EXPECT_CALL(cb_, continueFilterChain(true)).WillOnce(InvokeWithoutArgs([&got_continue]() {
+    got_continue = true;
+  }));
+  while (!got_continue) {
+    file_event_callback_(Event::FileReadyType::Read);
+  }
+  EXPECT_EQ(1, cfg_->stats().http10_found_.value());
+}
+
+TEST_F(HttpInspectorTest, MultipleReadsHttp1IncompleteHeader) {
+
+  init();
+
+  const absl::string_view data = "GE";
+  bool end_stream = false;
+
+  {
+    InSequence s;
+
+    EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce(InvokeWithoutArgs([]() {
+      return Api::SysCallSizeResult{ssize_t(-1), EAGAIN};
+    }));
+
+    for (size_t i = 1; i <= data.length(); i++) {
+      EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+          .WillOnce(Invoke([&data, &end_stream, i](int, void* buffer, size_t length,
+                                                   int) -> Api::SysCallSizeResult {
+            ASSERT(length >= data.size());
+            memcpy(buffer, data.data(), data.size());
+            if (i == data.length()) {
+              end_stream = true;
+            }
+
+            return Api::SysCallSizeResult{ssize_t(i), 0};
+          }));
+    }
+  }
+
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
+  EXPECT_EQ(0, cfg_->stats().http_not_found_.value());
+  while (!end_stream) {
+    file_event_callback_(Event::FileReadyType::Read);
+  }
+}
+TEST_F(HttpInspectorTest, MultipleReadsHttp1BadProtocol) {
+
+  init();
+
+  const absl::string_view data = "GET /index HTT\r";
+  {
+    InSequence s;
+
+    EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce(InvokeWithoutArgs([]() {
+      return Api::SysCallSizeResult{ssize_t(-1), EAGAIN};
+    }));
+
+    for (size_t i = 1; i <= data.length(); i++) {
+      EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+          .WillOnce(
+              Invoke([&data, i](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+                ASSERT(length >= data.size());
+                memcpy(buffer, data.data(), data.size());
+                return Api::SysCallSizeResult{ssize_t(i), 0};
+              }));
+    }
+  }
+
+  bool got_continue = false;
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
+  EXPECT_CALL(cb_, continueFilterChain(true)).WillOnce(InvokeWithoutArgs([&got_continue]() {
+    got_continue = true;
+  }));
+  while (!got_continue) {
+    file_event_callback_(Event::FileReadyType::Read);
+  }
+  EXPECT_EQ(1, cfg_->stats().http_not_found_.value());
 }
 
 } // namespace
