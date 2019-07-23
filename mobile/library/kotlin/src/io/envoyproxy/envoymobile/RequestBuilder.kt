@@ -1,17 +1,19 @@
 package io.envoyproxy.envoymobile
 
-import java.net.URL
-
 
 /**
  * Builder used for constructing instances of `Request` types.
  *
- * @param url URL for the request.
  * @param method Method for the request.
+ * @param scheme The URL scheme for the request (i.e., "https").
+ * @param authority The URL authority for the request (i.e., "api.foo.com").
+ * @param path The URL path for the request (i.e., "/foo").
  */
 class RequestBuilder(
-    val url: URL,
-    val method: RequestMethod
+    val method: RequestMethod,
+    val scheme: String,
+    val authority: String,
+    val path: String
 ) {
   // Headers to send with the request.
   // Multiple values for a given name are valid, and will be sent as comma-separated values.
@@ -144,7 +146,9 @@ class RequestBuilder(
   fun build(): Request {
     return Request(
         method,
-        url,
+        scheme,
+        authority,
+        path,
         headers,
         trailers,
         body,
