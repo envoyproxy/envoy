@@ -6,9 +6,9 @@
 #include <memory>
 #include <string>
 
+#include "envoy/stats/allocator.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/sink.h"
-#include "envoy/stats/stat_data_allocator.h"
 #include "envoy/stats/stats.h"
 
 #include "common/common/lock_guard.h"
@@ -20,7 +20,7 @@
 namespace Envoy {
 namespace Stats {
 
-ThreadLocalStoreImpl::ThreadLocalStoreImpl(StatDataAllocator& alloc)
+ThreadLocalStoreImpl::ThreadLocalStoreImpl(Allocator& alloc)
     : alloc_(alloc), default_scope_(createScope("")),
       tag_producer_(std::make_unique<TagProducerImpl>()),
       stats_matcher_(std::make_unique<StatsMatcherImpl>()), heap_allocator_(alloc.symbolTable()),
@@ -400,7 +400,7 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatName(StatName name) {
 
   return safeMakeStat<Counter>(
       final_stat_name, central_cache_.counters_, central_cache_.rejected_stats_,
-      [](StatDataAllocator& allocator, StatName name, absl::string_view tag_extracted_name,
+      [](Allocator& allocator, StatName name, absl::string_view tag_extracted_name,
          const std::vector<Tag>& tags) -> CounterSharedPtr {
         return allocator.makeCounter(name, tag_extracted_name, tags);
       },
@@ -450,8 +450,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatName(StatName name,
 
   Gauge& gauge = safeMakeStat<Gauge>(
       final_stat_name, central_cache_.gauges_, central_cache_.rejected_stats_,
-      [import_mode](StatDataAllocator& allocator, StatName name,
-                    absl::string_view tag_extracted_name,
+      [import_mode](Allocator& allocator, StatName name, absl::string_view tag_extracted_name,
                     const std::vector<Tag>& tags) -> GaugeSharedPtr {
         return allocator.makeGauge(name, tag_extracted_name, tags, import_mode);
       },
@@ -514,18 +513,15 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(StatName name)
   return **central_ref;
 }
 
-absl::optional<std::reference_wrapper<const Counter>>
-ThreadLocalStoreImpl::ScopeImpl::findCounter(StatName name) const {
+OptionalCounter ThreadLocalStoreImpl::ScopeImpl::findCounter(StatName name) const {
   return findStatLockHeld<Counter>(name, central_cache_.counters_);
 }
 
-absl::optional<std::reference_wrapper<const Gauge>>
-ThreadLocalStoreImpl::ScopeImpl::findGauge(StatName name) const {
+OptionalGauge ThreadLocalStoreImpl::ScopeImpl::findGauge(StatName name) const {
   return findStatLockHeld<Gauge>(name, central_cache_.gauges_);
 }
 
-absl::optional<std::reference_wrapper<const Histogram>>
-ThreadLocalStoreImpl::ScopeImpl::findHistogram(StatName name) const {
+OptionalHistogram ThreadLocalStoreImpl::ScopeImpl::findHistogram(StatName name) const {
   auto iter = central_cache_.histograms_.find(name);
   if (iter == central_cache_.histograms_.end()) {
     return absl::nullopt;

@@ -213,9 +213,10 @@ public:
   virtual const ScopeTrackedObject* setTrackedObject(const ScopeTrackedObject* object) PURE;
 
   /**
-   * @return the current thread id.
+   * Validates that an operation is thread-safe with respect to this dispatcher; i.e. that the
+   * current thread of execution is on the same thread upon which the dispatcher loop is running.
    */
-  virtual Thread::ThreadId getCurrentThreadId() PURE;
+  virtual bool isThreadSafe() const PURE;
 };
 
 using DispatcherPtr = std::unique_ptr<Dispatcher>;

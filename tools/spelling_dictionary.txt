@@ -300,6 +300,7 @@ XDS
 decRefCount
 getaddrinfo
 sendto
+ssize
 upcasts
 vip
 xDSes

@@ -129,7 +129,7 @@ SquashFilter::SquashFilter(SquashFilterConfigSharedPtr config, Upstream::Cluster
                                  std::bind(&SquashFilter::onGetAttachmentFailure, this, _1)),
       cm_(cm), decoder_callbacks_(nullptr) {}
 
-SquashFilter::~SquashFilter() {}
+SquashFilter::~SquashFilter() = default;
 
 void SquashFilter::onDestroy() { cleanup(); }
 

@@ -240,8 +240,8 @@ public:
 
 class MockCvcValidationCallback : public CvcValidationCallback {
 public:
-  MockCvcValidationCallback() {}
-  ~MockCvcValidationCallback() {}
+  MockCvcValidationCallback() = default;
+  ~MockCvcValidationCallback() override = default;
   MOCK_METHOD1(validateCvc, void(const envoy::api::v2::auth::CertificateValidationContext&));
 };
 

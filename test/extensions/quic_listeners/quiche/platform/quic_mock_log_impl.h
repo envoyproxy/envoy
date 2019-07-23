@@ -21,7 +21,7 @@ class QuicEnvoyMockLog : public QuicLogSink {
 public:
   QuicEnvoyMockLog() : is_capturing_(false) {}
 
-  virtual ~QuicEnvoyMockLog() {
+  ~QuicEnvoyMockLog() override {
     if (is_capturing_) {
       StopCapturingLogs();
     }

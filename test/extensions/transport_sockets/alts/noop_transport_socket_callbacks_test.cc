@@ -19,7 +19,7 @@ public:
   explicit TestTransportSocketCallbacks(Network::Connection& connection)
       : io_handle_(std::make_unique<Network::IoSocketHandleImpl>()), connection_(connection) {}
 
-  ~TestTransportSocketCallbacks() override {}
+  ~TestTransportSocketCallbacks() override = default;
   Network::IoHandle& ioHandle() override { return *io_handle_; }
   const Network::IoHandle& ioHandle() const override { return *io_handle_; }
   Network::Connection& connection() override { return connection_; }

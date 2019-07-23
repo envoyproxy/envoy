@@ -63,11 +63,6 @@ void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& c
   // private key methods).
   for (auto const& provider : ctx_->getPrivateKeyMethodProviders()) {
     provider->registerPrivateKeyMethod(ssl_.get(), *this, callbacks_->connection().dispatcher());
-    if (run_tid_.isEmpty()) {
-      // Store the dispatcher thread ID. We will check that the caller is the same when the private
-      // key method callback is received.
-      run_tid_ = callbacks_->connection().dispatcher().getCurrentThreadId();
-    }
   }
 
   BIO* bio = BIO_new_socket(callbacks_->ioHandle().fd(), 0);

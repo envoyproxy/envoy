@@ -46,7 +46,7 @@ public:
    * Expectations and assertions should be made on onJwksSuccessImpl in place
    * of onJwksSuccess.
    */
-  void onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) {
+  void onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) override {
     ASSERT(jwks);
     onJwksSuccessImpl(*jwks.get());
   }

@@ -3,6 +3,8 @@
 #include "common/common/assert.h"
 #include "common/common/version.h"
 #include "common/network/address_impl.h"
+#include "common/network/listen_socket_impl.h"
+#include "common/network/socket_option_impl.h"
 #include "common/thread_local/thread_local_impl.h"
 
 #include "server/process_context_impl.h"
@@ -373,6 +375,46 @@ TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
   server_thread->join();
 }
 
+// A test target which never signals that it is ready.
+class NeverReadyTarget : public Init::TargetImpl {
+public:
+  NeverReadyTarget(absl::Notification& initialized)
+      : Init::TargetImpl("test", [this] { initialize(); }), initialized_(initialized) {}
+
+private:
+  void initialize() { initialized_.Notify(); }
+
+  absl::Notification& initialized_;
+};
+
+TEST_P(ServerInstanceImplTest, NoLifecycleNotificationOnEarlyShutdown) {
+  absl::Notification initialized;
+
+  auto server_thread = Thread::threadFactoryForTest().createThread([&] {
+    initialize("test/server/node_bootstrap.yaml");
+
+    // This shutdown notification should never be called because we will shutdown
+    // early before the init manager finishes initializing and therefore before
+    // the server starts worker threads.
+    auto shutdown_handle = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
+                                                     [&](Event::PostCb) { FAIL(); });
+    NeverReadyTarget target(initialized);
+    server_->initManager().add(target);
+    server_->run();
+
+    shutdown_handle = nullptr;
+    server_ = nullptr;
+    thread_local_ = nullptr;
+  });
+
+  // Wait until the init manager starts initializing targets...
+  initialized.WaitForNotification();
+
+  // Now shutdown the main dispatcher and trigger server lifecycle notifications.
+  server_->dispatcher().post([&] { server_->shutdown(); });
+  server_thread->join();
+}
+
 TEST_P(ServerInstanceImplTest, V2ConfigOnly) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
@@ -524,6 +566,19 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithoutAccessLog) {
   EXPECT_THROW_WITH_MESSAGE(initialize("test/server/node_bootstrap_without_access_log.yaml"),
                             EnvoyException,
                             "An admin access log path is required for a listening server.");
+}
+
+// Test that `socket_options` field in an Admin proto is honored.
+TEST_P(ServerInstanceImplTest, BootstrapNodeWithSocketOptions) {
+  ASSERT_NO_THROW(initialize("test/server/node_bootstrap_with_admin_socket_options.yaml"));
+  const auto address = server_->admin().socket().localAddress();
+  EXPECT_THAT_THROWS_MESSAGE(std::make_unique<Network::TcpListenSocket>(address, nullptr, true),
+                             EnvoyException, HasSubstr("Address already in use"));
+  auto options = std::make_shared<Network::Socket::Options>();
+  options->emplace_back(std::make_shared<Network::SocketOptionImpl>(
+      envoy::api::v2::core::SocketOption::STATE_PREBIND,
+      ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_REUSEPORT), 1));
+  EXPECT_NO_THROW(std::make_unique<Network::TcpListenSocket>(address, options, true));
 }
 
 // Empty bootstrap succeeds.

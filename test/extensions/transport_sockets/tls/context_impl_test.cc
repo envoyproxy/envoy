@@ -287,8 +287,8 @@ TEST_F(SslContextImplTest, TestGetCertInformationWithExpiration) {
 }
 
 TEST_F(SslContextImplTest, TestNoCert) {
-  Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString("{}");
-  ClientContextConfigImpl cfg(*loader, factory_context_);
+  envoy::api::v2::auth::UpstreamTlsContext config;
+  ClientContextConfigImpl cfg(config, factory_context_);
   Envoy::Ssl::ClientContextSharedPtr context(manager_.createSslClientContext(store_, cfg));
   EXPECT_EQ(nullptr, context->getCaCertInformation());
   EXPECT_TRUE(context->getCertChainInformation().empty());

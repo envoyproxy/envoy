@@ -76,7 +76,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
       type,
       dispatcher->createClientConnection(addr, Network::Address::InstanceConstSharedPtr(),
                                          Network::Test::createRawBufferSocket(), nullptr),
-      host_description, *dispatcher);
+      host_description, *dispatcher, false);
   BufferingStreamDecoderPtr response(new BufferingStreamDecoder([&]() -> void {
     client.close();
     dispatcher->exit();
@@ -129,7 +129,7 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& initia
   client_->connect();
 }
 
-RawConnectionDriver::~RawConnectionDriver() {}
+RawConnectionDriver::~RawConnectionDriver() = default;
 
 void RawConnectionDriver::run(Event::Dispatcher::RunType run_type) { dispatcher_->run(run_type); }
 

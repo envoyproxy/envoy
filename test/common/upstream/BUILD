@@ -109,7 +109,6 @@ envoy_cc_test(
     deps = [
         ":utility_lib",
         "//source/common/buffer:buffer_lib",
-        "//source/common/config:cds_json_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/http:headers_lib",
         "//source/common/json:json_loader_lib",
@@ -396,7 +395,6 @@ envoy_cc_test_library(
     hdrs = ["utility.h"],
     deps = [
         "//include/envoy/stats:stats_interface",
-        "//source/common/config:cds_json_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
         "//source/common/stats:stats_lib",
