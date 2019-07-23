@@ -11,6 +11,7 @@ swift_static_framework(
         "LogLevel.swift",
         "Request.swift",
         "RequestBuilder.swift",
+        "RequestMapper.swift",
         "RequestMethod.swift",
         "ResponseHandler.swift",
         "RetryPolicy.swift",

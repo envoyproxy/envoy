@@ -2,7 +2,7 @@ extension RetryPolicy {
   /// Converts the retry policy to a set of headers recognized by Envoy.
   ///
   /// - returns: The header representation of the retry policy.
-  func toHeaders() -> [String: String] {
+  func outboundHeaders() -> [String: String] {
     var headers = [
       "x-envoy-max-retries": "\(self.maxRetryCount)",
       "x-envoy-retry-on": self.retryOn
