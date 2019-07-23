@@ -3,23 +3,23 @@ import Foundation
 /// Rules that may be used with `RetryPolicy`.
 /// See the `x-envoy-retry-on` Envoy header for documentation.
 @objc
-public enum RetryRule: Int {
-  case fiveXX
+public enum RetryRule: Int, CaseIterable {
+  case status5xx
   case gatewayError
   case connectFailure
-  case retriableFourXX
+  case retriable4xx
   case refusedUpstream
 
   /// String representation of this rule.
   var stringValue: String {
     switch self {
-    case .fiveXX:
+    case .status5xx:
       return "5xx"
     case .gatewayError:
       return "gateway-error"
     case .connectFailure:
       return "connect-failure"
-    case .retriableFourXX:
+    case .retriable4xx:
       return "retriable-4xx"
     case .refusedUpstream:
       return "refused-upstream"

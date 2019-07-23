@@ -14,6 +14,7 @@ swift_static_framework(
         "RequestMethod.swift",
         "ResponseHandler.swift",
         "RetryPolicy.swift",
+        "RetryPolicyMapper.swift",
         "StreamEmitter.swift",
     ],
     module_name = "Envoy",
