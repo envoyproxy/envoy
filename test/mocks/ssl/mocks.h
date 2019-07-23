@@ -112,7 +112,7 @@ public:
 class MockPrivateKeyMethodManager : public PrivateKeyMethodManager {
 public:
   MockPrivateKeyMethodManager();
-  ~MockPrivateKeyMethodManager();
+  ~MockPrivateKeyMethodManager() override;
 
   MOCK_METHOD2(
       createPrivateKeyMethodProvider,
@@ -124,7 +124,7 @@ public:
 class MockPrivateKeyMethodProvider : public PrivateKeyMethodProvider {
 public:
   MockPrivateKeyMethodProvider();
-  ~MockPrivateKeyMethodProvider();
+  ~MockPrivateKeyMethodProvider() override;
 
   MOCK_METHOD3(registerPrivateKeyMethod,
                void(SSL* ssl, PrivateKeyConnectionCallbacks& cb, Event::Dispatcher& dispatcher));
