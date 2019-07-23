@@ -10,6 +10,13 @@ envoy_mobile_swift_test(
 )
 
 envoy_mobile_swift_test(
+    name = "request_mapper_tests",
+    srcs = [
+        "RequestMapperTests.swift",
+    ],
+)
+
+envoy_mobile_swift_test(
     name = "retry_policy_tests",
     srcs = [
         "RetryPolicyTests.swift",
