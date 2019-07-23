@@ -113,28 +113,31 @@ using StrictDnsConfigTuple =
 std::vector<StrictDnsConfigTuple> generateStrictDnsParams() {
   std::vector<StrictDnsConfigTuple> dns_config;
   {
-    std::string family_json("");
-    Network::DnsLookupFamily family(Network::DnsLookupFamily::V4Only);
-    std::list<std::string> dns_response{"127.0.0.1", "127.0.0.2"};
-    dns_config.push_back(std::make_tuple(family_json, family, dns_response));
-  }
-  {
-    std::string family_json(R"EOF("dns_lookup_family": "v4_only",)EOF");
-    Network::DnsLookupFamily family(Network::DnsLookupFamily::V4Only);
-    std::list<std::string> dns_response{"127.0.0.1", "127.0.0.2"};
-    dns_config.push_back(std::make_tuple(family_json, family, dns_response));
-  }
-  {
-    std::string family_json(R"EOF("dns_lookup_family": "v6_only",)EOF");
-    Network::DnsLookupFamily family(Network::DnsLookupFamily::V6Only);
-    std::list<std::string> dns_response{"::1", "::2"};
-    dns_config.push_back(std::make_tuple(family_json, family, dns_response));
-  }
-  {
-    std::string family_json(R"EOF("dns_lookup_family": "auto",)EOF");
+    std::string family_yaml("");
     Network::DnsLookupFamily family(Network::DnsLookupFamily::Auto);
     std::list<std::string> dns_response{"127.0.0.1", "127.0.0.2"};
-    dns_config.push_back(std::make_tuple(family_json, family, dns_response));
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response));
+  }
+  {
+    std::string family_yaml(R"EOF(dns_lookup_family: v4_only
+                            )EOF");
+    Network::DnsLookupFamily family(Network::DnsLookupFamily::V4Only);
+    std::list<std::string> dns_response{"127.0.0.1", "127.0.0.2"};
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response));
+  }
+  {
+    std::string family_yaml(R"EOF(dns_lookup_family: v6_only
+                            )EOF");
+    Network::DnsLookupFamily family(Network::DnsLookupFamily::V6Only);
+    std::list<std::string> dns_response{"::1", "::2"};
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response));
+  }
+  {
+    std::string family_yaml(R"EOF(dns_lookup_family: auto
+                            )EOF");
+    Network::DnsLookupFamily family(Network::DnsLookupFamily::Auto);
+    std::list<std::string> dns_response{"127.0.0.1", "127.0.0.2"};
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response));
   }
   return dns_config;
 }
@@ -148,16 +151,17 @@ INSTANTIATE_TEST_SUITE_P(DnsParam, StrictDnsParamTest,
 TEST_P(StrictDnsParamTest, ImmediateResolve) {
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
   ReadyWatcher initialized;
-  const std::string json = R"EOF(
-  {
-    "name": "name",
-    "connect_timeout_ms": 250,
-    "type": "strict_dns",
-  )EOF" + std::get<0>(GetParam()) +
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: strict_dns
+    )EOF" + std::get<0>(GetParam()) +
                            R"EOF(
-    "lb_type": "round_robin",
-    "hosts": [{"url": "tcp://foo.bar.com:443"}]
-  }
+    lb_policy: round_robin
+    hosts:
+    - socket_address:
+        address: foo.bar.com
+        port_value: 443
   )EOF";
   EXPECT_CALL(initialized, ready());
   EXPECT_CALL(*dns_resolver, resolve("foo.bar.com", std::get<1>(GetParam()), _))
@@ -166,7 +170,7 @@ TEST_P(StrictDnsParamTest, ImmediateResolve) {
         cb(TestUtility::makeDnsResponse(std::get<2>(GetParam())));
         return nullptr;
       }));
-  envoy::api::v2::Cluster cluster_config = parseClusterFromJson(json);
+  envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
   Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
@@ -228,38 +232,33 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
   ResolverData resolver2(*dns_resolver_, dispatcher_);
   ResolverData resolver1(*dns_resolver_, dispatcher_);
 
-  const std::string json = R"EOF(
-  {
-    "name": "name",
-    "connect_timeout_ms": 250,
-    "type": "strict_dns",
-    "dns_refresh_rate_ms": 4000,
-    "lb_type": "round_robin",
-    "circuit_breakers": {
-      "default": {
-        "max_connections": 43,
-        "max_pending_requests": 57,
-        "max_requests": 50,
-        "max_retries": 10
-      },
-      "high": {
-        "max_connections": 1,
-        "max_pending_requests": 2,
-        "max_requests": 3,
-        "max_retries": 4
-      }
-    },
-    "max_requests_per_connection": 3,
-    "http2_settings": {
-       "hpack_table_size": 0
-     },
-    "hosts": [{"url": "tcp://localhost1:11001"},
-              {"url": "tcp://localhost2:11002"}]
-
-  }
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: strict_dns
+    dns_refresh_rate: 4s
+    lb_policy: round_robin
+    circuit_breakers:
+      thresholds:
+      - priority: DEFAULT
+        max_connections: 43
+        max_pending_requests: 57
+        max_requests: 50
+        max_retries: 10
+      - priority: HIGH
+        max_connections: 1
+        max_pending_requests: 2
+        max_requests: 3
+        max_retries: 4
+    max_requests_per_connection: 3
+    http2_protocol_options:
+      hpack_table_size: 0
+    hosts:
+    - { socket_address: { address: localhost1, port_value: 11001 }}
+    - { socket_address: { address: localhost2, port_value: 11002 }}
   )EOF";
 
-  envoy::api::v2::Cluster cluster_config = parseClusterFromJson(json);
+  envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
   Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
@@ -1050,32 +1049,6 @@ TEST_F(StaticClusterImplTest, InitialHosts) {
   EXPECT_FALSE(cluster.info()->addedViaApi());
 }
 
-TEST_F(StaticClusterImplTest, EmptyHostname) {
-  const std::string json = R"EOF(
-  {
-    "name": "staticcluster",
-    "connect_timeout_ms": 250,
-    "type": "static",
-    "lb_type": "random",
-    "hosts": [{"url": "tcp://10.0.0.1:11001"}]
-  }
-  )EOF";
-
-  envoy::api::v2::Cluster cluster_config = parseClusterFromJson(json);
-  Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
-      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
-                                                            : cluster_config.alt_stat_name()));
-  Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-      admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_,
-      singleton_manager_, tls_, validation_visitor_, *api_);
-  StaticClusterImpl cluster(cluster_config, runtime_, factory_context, std::move(scope), false);
-  cluster.initialize([] {});
-
-  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ("", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
-  EXPECT_FALSE(cluster.info()->addedViaApi());
-}
-
 TEST_F(StaticClusterImplTest, LoadAssignmentEmptyHostname) {
   const std::string yaml = R"EOF(
     name: staticcluster
@@ -1278,17 +1251,15 @@ TEST_F(StaticClusterImplTest, AltStatName) {
 }
 
 TEST_F(StaticClusterImplTest, RingHash) {
-  const std::string json = R"EOF(
-  {
-    "name": "staticcluster",
-    "connect_timeout_ms": 250,
-    "type": "static",
-    "lb_type": "ring_hash",
-    "hosts": [{"url": "tcp://10.0.0.1:11001"}]
-  }
+  const std::string yaml = R"EOF(
+    name: staticcluster
+    connect_timeout: 0.25s
+    type: static
+    lb_policy: ring_hash
+    hosts: [{ socket_address: { address: 10.0.0.1, port_value: 11001 }}]
   )EOF";
 
-  envoy::api::v2::Cluster cluster_config = parseClusterFromJson(json);
+  envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
   Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
@@ -1304,18 +1275,17 @@ TEST_F(StaticClusterImplTest, RingHash) {
 }
 
 TEST_F(StaticClusterImplTest, OutlierDetector) {
-  const std::string json = R"EOF(
-  {
-    "name": "addressportconfig",
-    "connect_timeout_ms": 250,
-    "type": "static",
-    "lb_type": "random",
-    "hosts": [{"url": "tcp://10.0.0.1:11001"},
-              {"url": "tcp://10.0.0.2:11002"}]
-  }
+  const std::string yaml = R"EOF(
+    name: addressportconfig
+    connect_timeout: 0.25s
+    type: static
+    lb_policy: random
+    hosts:
+    - { socket_address: { address: 10.0.0.1, port_value: 11001 }}
+    - { socket_address: { address: 10.0.0.1, port_value: 11002 }}
   )EOF";
 
-  envoy::api::v2::Cluster cluster_config = parseClusterFromJson(json);
+  envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
   Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
@@ -1353,18 +1323,17 @@ TEST_F(StaticClusterImplTest, OutlierDetector) {
 }
 
 TEST_F(StaticClusterImplTest, HealthyStat) {
-  const std::string json = R"EOF(
-  {
-    "name": "addressportconfig",
-    "connect_timeout_ms": 250,
-    "type": "static",
-    "lb_type": "random",
-    "hosts": [{"url": "tcp://10.0.0.1:11001"},
-              {"url": "tcp://10.0.0.2:11002"}]
-  }
+  const std::string yaml = R"EOF(
+    name: addressportconfig
+    connect_timeout: 0.25s
+    type: static
+    lb_policy: random
+    hosts:
+    - { socket_address: { address: 10.0.0.1, port_value: 11001 }}
+    - { socket_address: { address: 10.0.0.1, port_value: 11002 }}
   )EOF";
 
-  envoy::api::v2::Cluster cluster_config = parseClusterFromJson(json);
+  envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
   Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
@@ -1485,18 +1454,17 @@ TEST_F(StaticClusterImplTest, HealthyStat) {
 }
 
 TEST_F(StaticClusterImplTest, UrlConfig) {
-  const std::string json = R"EOF(
-  {
-    "name": "addressportconfig",
-    "connect_timeout_ms": 250,
-    "type": "static",
-    "lb_type": "random",
-    "hosts": [{"url": "tcp://10.0.0.1:11001"},
-              {"url": "tcp://10.0.0.2:11002"}]
-  }
+  const std::string yaml = R"EOF(
+    name: addressportconfig
+    connect_timeout: 0.25s
+    type: static
+    lb_policy: random
+    hosts:
+    - { socket_address: { address: 10.0.0.1, port_value: 11001 }}
+    - { socket_address: { address: 10.0.0.2, port_value: 11002 }}
   )EOF";
 
-  envoy::api::v2::Cluster cluster_config = parseClusterFromJson(json);
+  envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
   Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
@@ -1530,20 +1498,19 @@ TEST_F(StaticClusterImplTest, UrlConfig) {
 }
 
 TEST_F(StaticClusterImplTest, UnsupportedLBType) {
-  const std::string json = R"EOF(
-  {
-    "name": "addressportconfig",
-    "connect_timeout_ms": 250,
-    "type": "static",
-    "lb_type": "fakelbtype",
-    "hosts": [{"url": "tcp://192.168.1.1:22"},
-              {"url": "tcp://192.168.1.2:44"}]
-  }
+  const std::string yaml = R"EOF(
+    name: addressportconfig
+    connect_timeout: 0.25s
+    type: static
+    lb_policy: fakelbtype
+    hosts:
+    - { socket_address: { address: 192.168.1.1, port_value: 22 }}
+    - { socket_address: { address: 192.168.1.2, port_value: 44 }}
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
       {
-        envoy::api::v2::Cluster cluster_config = parseClusterFromJson(json);
+        envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
         Envoy::Stats::ScopePtr scope =
             stats_.createScope(fmt::format("cluster.{}.", cluster_config.alt_stat_name().empty()
                                                               ? cluster_config.name()
@@ -1555,10 +1522,8 @@ TEST_F(StaticClusterImplTest, UnsupportedLBType) {
                                   false);
       },
       EnvoyException,
-      "JSON at lines 2-9 does not conform to schema.\n"
-      " Invalid schema: #/properties/lb_type\n"
-      " Schema violation: enum\n"
-      " Offending document key: #/lb_type");
+      "Protobuf message (type envoy.api.v2.Cluster reason INVALID_ARGUMENT:(lb_policy): invalid "
+      "value \"fakelbtype\" for type TYPE_ENUM) has unknown fields");
 }
 
 TEST_F(StaticClusterImplTest, MalformedHostIP) {

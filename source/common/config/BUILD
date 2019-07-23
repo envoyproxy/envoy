@@ -32,27 +32,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "cds_json_lib",
-    srcs = ["cds_json.cc"],
-    hdrs = ["cds_json.h"],
-    external_deps = ["abseil_optional"],
-    deps = [
-        ":address_json_lib",
-        ":json_utility_lib",
-        ":protocol_json_lib",
-        ":tls_context_json_lib",
-        ":utility_lib",
-        "//include/envoy/json:json_object_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
-        "//source/common/common:assert_lib",
-        "//source/common/json:config_schemas_lib",
-        "//source/common/network:utility_lib",
-        "@envoy_api//envoy/api/v2:cds_cc",
-        "@envoy_api//envoy/api/v2/cluster:circuit_breaker_cc",
-    ],
-)
-
-envoy_cc_library(
     name = "filesystem_subscription_lib",
     srcs = ["filesystem_subscription_impl.cc"],
     hdrs = ["filesystem_subscription_impl.h"],
@@ -333,18 +312,6 @@ envoy_cc_library(
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/protobuf",
         "@envoy_api//envoy/api/v2/core:base_cc",
-    ],
-)
-
-envoy_cc_library(
-    name = "tls_context_json_lib",
-    srcs = ["tls_context_json.cc"],
-    hdrs = ["tls_context_json.h"],
-    deps = [
-        ":json_utility_lib",
-        "//include/envoy/json:json_object_interface",
-        "//source/common/common:utility_lib",
-        "@envoy_api//envoy/api/v2/auth:cert_cc",
     ],
 )
 

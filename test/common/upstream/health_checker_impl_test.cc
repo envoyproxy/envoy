@@ -7,7 +7,6 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/zero_copy_input_stream_impl.h"
-#include "common/config/cds_json.h"
 #include "common/grpc/common.h"
 #include "common/http/headers.h"
 #include "common/json/json_loader.h"
