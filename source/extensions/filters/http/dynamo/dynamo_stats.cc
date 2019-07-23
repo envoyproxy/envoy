@@ -27,7 +27,7 @@ DynamoStats::DynamoStats(Stats::Scope& scope, const std::string& prefix)
       upstream_rq_total_(pool_.add("upstream_rq_total")) {
   upstream_rq_total_groups_[0] = pool_.add("upstream_rq_total_unknown");
   upstream_rq_time_groups_[0] = pool_.add("upstream_rq_time_unknown");
-  for (int i = 1; i < 6; ++i) {
+  for (size_t i = 1; i < DynamoStats::NumGroupEntries; ++i) {
     upstream_rq_total_groups_[i] = pool_.add(fmt::format("upstream_rq_total_{}xx", i));
     upstream_rq_time_groups_[i] = pool_.add(fmt::format("upstream_rq_time_{}xx", i));
   }
@@ -39,12 +39,11 @@ DynamoStats::DynamoStats(Stats::Scope& scope, const std::string& prefix)
     builtin_stat_names_[str] = pool_.add(str);
   });
   builtin_stat_names_[""] = Stats::StatName();
-
-  // TODO(jmarantz): should we also learn some 'time' and 'total' stat-names for 200, 404, 503 etc?
 }
 
 Stats::SymbolTable::StoragePtr DynamoStats::addPrefix(const std::vector<Stats::StatName>& names) {
   std::vector<Stats::StatName> names_with_prefix{prefix_};
+  names_with_prefix.reserve(names.end() - names.begin());
   names_with_prefix.insert(names_with_prefix.end(), names.begin(), names.end());
   return symbolTable().join(names_with_prefix);
 }
@@ -59,17 +58,6 @@ Stats::Histogram& DynamoStats::histogram(const std::vector<Stats::StatName>& nam
   return scope_.histogramFromStatName(Stats::StatName(stat_name_storage.get()));
 }
 
-/**
- * Creates the partition id stats string.
- * The stats format is
- * "<stat_prefix>table.<table_name>.capacity.<operation>.__partition_id=<partition_id>".
- * Partition ids and dynamodb table names can be long. To satisfy the string length,
- * we truncate in two ways:
- * 1. We only take the last 7 characters of the partition id.
- * 2. If the stats string with <table_name> is longer than the stats MAX_NAME_SIZE, we will
- * truncate the table name to
- * fit the size requirements.
- */
 Stats::Counter& DynamoStats::buildPartitionStatCounter(const std::string& table_name,
                                                        const std::string& operation,
                                                        const std::string& partition_id) {
@@ -89,24 +77,28 @@ size_t DynamoStats::groupIndex(uint64_t status) {
   return index;
 }
 
-Stats::StatName DynamoStats::getStatName(const std::string& str) {
-  // We have been presented with a string to when composing a stat. The Dynamo
-  // system has a few well-known names that we have saved during construction,
-  // and we can access StatNames for those without a lock.
-  auto iter = builtin_stat_names_.find(str);
+Stats::StatName DynamoStats::getStatName(const std::string& token) {
+  // The Dynamo system has a few well-known tokens that we have stored during
+  // construction, and we can access StatNames for those without a lock. Note
+  // that we only mutate builtin_stat_names_ during construction.
+  auto iter = builtin_stat_names_.find(token);
   if (iter != builtin_stat_names_.end()) {
     return iter->second;
   }
 
-  // However, some of the names come from json data in requests, so we need
-  // to learn these, and we'll need to take a lock in this structure to see
-  // if we already have allocated a StatName for such names. If we haven't,
-  // then we'll have to take the more-likely-contented symbol-table lock to
-  // allocate one, which we'll then remember in dynamic_stat_names_.
+  // However, some of the tokens come from json data received during requests,
+  // so we need to store these in a mutex-protected map. Once we hold the mutex,
+  // we can check dynamic_stat_names_. If it's missing we'll have to add it
+  // to the symbol table, whose mutex is more likely to be contended, and then
+  // store it in dynamic_stat_names.
+  //
+  // TODO(jmarantz): Potential perf issue here with contention, both on this
+  // mutex and also the SymbolTable mutex which must be taken during
+  // StatNamePool::add().
   absl::MutexLock lock(&mutex_);
-  Stats::StatName& stat_name = dynamic_stat_names_[str];
+  Stats::StatName& stat_name = dynamic_stat_names_[token];
   if (stat_name.empty()) { // Note that builtin_stat_names_ already has one for "".
-    stat_name = pool_.add(str);
+    stat_name = pool_.add(token);
   }
   return stat_name;
 }

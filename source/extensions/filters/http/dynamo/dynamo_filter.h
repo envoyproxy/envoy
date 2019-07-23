@@ -67,7 +67,7 @@ private:
   void chargeTablePartitionIdStats(const Json::Object& json_body);
 
   Runtime::Loader& runtime_;
-  DynamoStatsSharedPtr stats_;
+  const DynamoStatsSharedPtr stats_;
 
   bool enabled_{};
   std::string operation_{};

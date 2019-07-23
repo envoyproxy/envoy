@@ -97,7 +97,7 @@ public:
    */
   static std::vector<PartitionDescriptor> parsePartitions(const Json::Object& json_data);
 
-  using StringFn = std::function<void(const std::string)>;
+  using StringFn = std::function<void(const std::string&)>;
 
   /**
    * Calls a function for every string that is likely to be included as a token
