@@ -468,13 +468,62 @@ static_secrets:
   checkConfigDump(expected_config_dump);
 }
 
+TEST_F(SecretManagerImplTest, ConfigDumpNotRedactFilenamePrivateKey) {
+  Server::MockInstance server;
+  auto secret_manager = std::make_unique<SecretManagerImpl>(config_tracker_);
+  time_system_.setSystemTime(std::chrono::milliseconds(1234567891234));
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
+  envoy::api::v2::core::ConfigSource config_source;
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Runtime::MockRandomGenerator> random;
+  Stats::IsolatedStoreImpl stats;
+  NiceMock<Init::MockManager> init_manager;
+  NiceMock<Init::ExpectableWatcherImpl> init_watcher;
+  Init::TargetHandlePtr init_target_handle;
+  EXPECT_CALL(init_manager, add(_))
+      .WillRepeatedly(Invoke([&init_target_handle](const Init::Target& target) {
+        init_target_handle = target.createHandle("test");
+      }));
+  EXPECT_CALL(secret_context, stats()).WillRepeatedly(ReturnRef(stats));
+  EXPECT_CALL(secret_context, initManager()).WillRepeatedly(Return(&init_manager));
+  EXPECT_CALL(secret_context, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
+  EXPECT_CALL(secret_context, localInfo()).WillRepeatedly(ReturnRef(local_info));
+
+  const std::string tls_certificate = R"EOF(
+name: "abc.com"
+tls_certificate:
+  certificate_chain:
+    inline_string: "DUMMY_INLINE_BYTES_FOR_CERT_CHAIN"
+  private_key:
+    inline_string: "DUMMY_INLINE_BYTES_FOR_PRIVATE_KEY"
+  password:
+    filename: "/etc/certs/password"
+)EOF";
+  envoy::api::v2::auth::Secret tls_cert_secret;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(tls_certificate), tls_cert_secret);
+  secret_manager->addStaticSecret(tls_cert_secret);
+  const std::string expected_config_dump = R"EOF(
+static_secrets:
+- name: "abc.com" 
+  secret:
+    name: "abc.com"
+    tls_certificate:
+      certificate_chain:
+        inline_string: "DUMMY_INLINE_BYTES_FOR_CERT_CHAIN"
+      private_key:
+        inline_string: "[redacted]"
+      password:
+        filename: "/etc/certs/password"
+)EOF";
+  checkConfigDump(expected_config_dump);
+}
+
 TEST_F(SecretManagerImplTest, ConfigDumpHandlerStaticValidationContext) {
   Server::MockInstance server;
   auto secret_manager = std::make_unique<SecretManagerImpl>(config_tracker_);
   time_system_.setSystemTime(std::chrono::milliseconds(1234567891234));
-
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
-
   envoy::api::v2::core::ConfigSource config_source;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Event::MockDispatcher> dispatcher;
