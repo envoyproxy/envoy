@@ -172,10 +172,7 @@ protected:
   void initialize(const std::string& bootstrap_path) { initialize(bootstrap_path, false); }
 
   void initialize(const std::string& bootstrap_path, const bool use_intializing_instance) {
-    if (bootstrap_path.empty() && options_.config_path_.empty()) {
-      options_.config_path_ = TestEnvironment::temporaryFileSubstitute(
-          "test/config/integration/server.json", {{"upstream_0", 0}, {"upstream_1", 0}}, version_);
-    } else if (options_.config_path_.empty()) {
+    if (options_.config_path_.empty()) {
       options_.config_path_ = TestEnvironment::temporaryFileSubstitute(
           bootstrap_path, {{"upstream_0", 0}, {"upstream_1", 0}}, version_);
     }
