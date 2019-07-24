@@ -40,12 +40,15 @@ def api_py_proto_library(name, srcs = [], deps = [], has_services = 0):
         visibility = ["//visibility:public"],
     )
 
-# This replaces googleapis rules.
+# This defines googleapis py_proto_library. The repository does not provide its definition and requires
+# overriding it in the consuming project (see https://github.com/grpc/grpc/issues/19255 for more details).
 def py_proto_library(name, deps = []):
     srcs = [dep[:-6] + ".proto" if dep.endswith("_proto") else dep for dep in deps]
     proto_deps = []
 
-    # Ignoring the proto_library has an unfortunate side-effect of losing proto dependencies...
+    # py_proto_library in googleapis specifies *_proto rules in dependencies.
+    # By rewriting *_proto to *.proto above, the dependencies in *_proto rules are not preserved.
+    # As a workaround, manually specify the proto dependencies for the imported python rules.
     if name == "annotations_py_proto":
         proto_deps = proto_deps + [":http_py_proto"]
     _py_proto_library(
