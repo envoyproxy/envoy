@@ -175,6 +175,7 @@ envoy_cc_library(
     hdrs = ["scoped_rds.h"],
     deps = [
         ":scoped_config_lib",
+        "//include/envoy/config:config_provider_interface",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
