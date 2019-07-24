@@ -76,9 +76,7 @@ public:
   domain: foo
   )EOF";
 
-  FilterConfigSharedPtr config_;
   Filters::Common::RateLimit::MockClient* client_;
-  std::unique_ptr<Filter> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks_;
   Filters::Common::RateLimit::RequestCallbacks* request_callbacks_{};
   Http::TestHeaderMapImpl request_headers_;
@@ -86,6 +84,8 @@ public:
   Buffer::OwnedImpl data_;
   Buffer::OwnedImpl response_data_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
+  FilterConfigSharedPtr config_;
+  std::unique_ptr<Filter> filter_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Router::MockRateLimitPolicyEntry> route_rate_limit_;
   NiceMock<Router::MockRateLimitPolicyEntry> vh_rate_limit_;

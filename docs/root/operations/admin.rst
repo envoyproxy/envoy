@@ -179,8 +179,15 @@ modify different aspects of the server:
 
 .. http:post:: /logging
 
-  Enable/disable different logging levels on different subcomponents. Generally only used during
-  development.
+  Enable/disable different logging levels on a particular logger or all loggers.
+
+  - To change the logging level across all loggers, set the query parameter as level=<desired_level>.
+  - To change a particular logger's level, set the query parameter like so, <logger_name>=<desired_level>.
+  - To list the loggers, send a POST request to the /logging endpoint without a query parameter.
+
+  .. note::
+
+    Generally only used during development.
 
 .. http:post:: /memory
 

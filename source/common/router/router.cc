@@ -16,6 +16,7 @@
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
+#include "common/common/scope_tracker.h"
 #include "common/common/utility.h"
 #include "common/grpc/common.h"
 #include "common/http/codes.h"
@@ -1216,6 +1217,7 @@ bool Filter::setupRetry() {
   // this filter which will make this a non-issue. The implementation of supporting retry in cases
   // where the request is not complete is more complicated so we will start with this for now.
   if (!downstream_end_stream_) {
+    config_.stats_.rq_retry_skipped_request_not_complete_.inc();
     return false;
   }
   pending_retries_++;
@@ -1339,11 +1341,15 @@ Filter::UpstreamRequest::~UpstreamRequest() {
 }
 
 void Filter::UpstreamRequest::decode100ContinueHeaders(Http::HeaderMapPtr&& headers) {
+  ScopeTrackerScopeState scope(&parent_.callbacks_->scope(), parent_.callbacks_->dispatcher());
+
   ASSERT(100 == Http::Utility::getResponseStatus(*headers));
   parent_.onUpstream100ContinueHeaders(std::move(headers), *this);
 }
 
 void Filter::UpstreamRequest::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
+  ScopeTrackerScopeState scope(&parent_.callbacks_->scope(), parent_.callbacks_->dispatcher());
+
   // TODO(rodaine): This is actually measuring after the headers are parsed and not the first byte.
   upstream_timing_.onFirstUpstreamRxByteReceived(parent_.callbacks_->dispatcher().timeSource());
   maybeEndDecode(end_stream);
@@ -1358,12 +1364,16 @@ void Filter::UpstreamRequest::decodeHeaders(Http::HeaderMapPtr&& headers, bool e
 }
 
 void Filter::UpstreamRequest::decodeData(Buffer::Instance& data, bool end_stream) {
+  ScopeTrackerScopeState scope(&parent_.callbacks_->scope(), parent_.callbacks_->dispatcher());
+
   maybeEndDecode(end_stream);
   stream_info_.addBytesReceived(data.length());
   parent_.onUpstreamData(data, *this, end_stream);
 }
 
 void Filter::UpstreamRequest::decodeTrailers(Http::HeaderMapPtr&& trailers) {
+  ScopeTrackerScopeState scope(&parent_.callbacks_->scope(), parent_.callbacks_->dispatcher());
+
   maybeEndDecode(true);
   if (!parent_.config_.upstream_logs_.empty()) {
     upstream_trailers_ = std::make_unique<Http::HeaderMapImpl>(*trailers);
@@ -1452,6 +1462,8 @@ void Filter::UpstreamRequest::encodeMetadata(Http::MetadataMapPtr&& metadata_map
 
 void Filter::UpstreamRequest::onResetStream(Http::StreamResetReason reason,
                                             absl::string_view transport_failure_reason) {
+  ScopeTrackerScopeState scope(&parent_.callbacks_->scope(), parent_.callbacks_->dispatcher());
+
   clearRequestEncoder();
   awaiting_headers_ = false;
   if (!calling_encode_headers_) {

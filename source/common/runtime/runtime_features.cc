@@ -42,16 +42,19 @@ constexpr const char* disallowed_features[] = {
     // Acts as both a test entry for deprecated.proto and a marker for the Envoy
     // deprecation scripts.
     "envoy.deprecated_features.deprecated.proto:is_deprecated_fatal",
-    "envoy.deprecated_features.bootstrap.proto:runtime",
-    "envoy.deprecated_features.redis_proxy.proto:catch_all_cluster",
-    "envoy.deprecated_features.server_info.proto:max_stats",
-    "envoy.deprecated_features.redis_proxy.proto:cluster",
-    "envoy.deprecated_features.server_info.proto:max_obj_name_len",
+    // 1.10.0
     "envoy.deprecated_features.config_source.proto:UNSUPPORTED_REST_LEGACY",
     "envoy.deprecated_features.ext_authz.proto:use_alpha",
-    "envoy.deprecated_features.route.proto:enabled",
     "envoy.deprecated_features.fault.proto:type",
+    "envoy.deprecated_features.route.proto:enabled",
     "envoy.deprecated_features.route.proto:runtime_key",
+    // 1.11.0
+    "envoy.deprecated_features.bootstrap.proto:runtime",
+    "envoy.deprecated_features.redis_proxy.proto:catch_all_cluster",
+    "envoy.deprecated_features.redis_proxy.proto:cluster",
+    "envoy.deprecated_features.server_info.proto:max_obj_name_len",
+    "envoy.deprecated_features.server_info.proto:max_stats",
+    "envoy.deprecated_features.v1_filter_json_config",
 };
 
 RuntimeFeatures::RuntimeFeatures() {

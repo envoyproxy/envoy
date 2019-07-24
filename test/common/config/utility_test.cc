@@ -2,8 +2,6 @@
 #include "envoy/common/exception.h"
 
 #include "common/common/fmt.h"
-#include "common/config/cds_json.h"
-#include "common/config/rds_json.h"
 #include "common/config/utility.h"
 #include "common/config/well_known_names.h"
 #include "common/protobuf/protobuf.h"
@@ -100,35 +98,6 @@ TEST(UtilityTest, createTagProducer) {
   auto extracted_name = producer->produceTags("http.config_test.rq_total", tags);
   ASSERT_EQ(extracted_name, "http.rq_total");
   ASSERT_EQ(tags.size(), 1);
-}
-
-TEST(UtilityTest, UnixClusterDns) {
-
-  std::string cluster_type;
-  cluster_type = "strict_dns";
-  std::string json =
-      R"EOF({ "name": "test", "type": ")EOF" + cluster_type +
-      R"EOF(", "lb_type": "random", "connect_timeout_ms" : 1, "hosts": [{"url": "unix:///test.sock"}]})EOF";
-  auto json_object_ptr = Json::Factory::loadFromString(json);
-  envoy::api::v2::Cluster cluster;
-  envoy::api::v2::core::ConfigSource eds_config;
-  EXPECT_THROW_WITH_MESSAGE(
-      Config::CdsJson::translateCluster(*json_object_ptr, eds_config, cluster), EnvoyException,
-      "unresolved URL must be TCP scheme, got: unix:///test.sock");
-}
-
-TEST(UtilityTest, UnixClusterStatic) {
-
-  std::string cluster_type;
-  cluster_type = "static";
-  std::string json =
-      R"EOF({ "name": "test", "type": ")EOF" + cluster_type +
-      R"EOF(", "lb_type": "random", "connect_timeout_ms" : 1, "hosts": [{"url": "unix:///test.sock"}]})EOF";
-  auto json_object_ptr = Json::Factory::loadFromString(json);
-  envoy::api::v2::Cluster cluster;
-  envoy::api::v2::core::ConfigSource eds_config;
-  Config::CdsJson::translateCluster(*json_object_ptr, eds_config, cluster);
-  EXPECT_EQ("/test.sock", cluster.hosts(0).pipe().path());
 }
 
 TEST(UtilityTest, CheckFilesystemSubscriptionBackingPath) {
