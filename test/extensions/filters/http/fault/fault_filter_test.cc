@@ -632,19 +632,13 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDownstreamOverride) {
                              Matcher<const envoy::type::FractionalPercent&>(Percent(100))))
       .WillOnce(Return(false));
   EXPECT_CALL(runtime_.snapshot_,
-              featureEnabled("fault.http.cluster.delay.fixed_delay_percent",
-                             Matcher<const envoy::type::FractionalPercent&>(Percent(100))))
-      .WillOnce(Return(false));
-  EXPECT_CALL(runtime_.snapshot_,
               featureEnabled("fault.http.custom.delay.fixed_delay_percent",
                              Matcher<const envoy::type::FractionalPercent&>(Percent(100))))
       .WillOnce(Return(true));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", 5000))
       .WillOnce(Return(125UL));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.cluster.delay.fixed_duration_ms", 125UL))
-      .WillOnce(Return(250UL));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.custom.delay.fixed_duration_ms", 250UL))
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.custom.delay.fixed_duration_ms", 125UL))
       .WillOnce(Return(500UL));
   expectDelayTimer(500UL);
 
@@ -662,19 +656,13 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDownstreamOverride) {
                              Matcher<const envoy::type::FractionalPercent&>(Percent(100))))
       .WillOnce(Return(false));
   EXPECT_CALL(runtime_.snapshot_,
-              featureEnabled("fault.http.cluster.abort.abort_percent",
-                             Matcher<const envoy::type::FractionalPercent&>(Percent(100))))
-      .WillOnce(Return(false));
-  EXPECT_CALL(runtime_.snapshot_,
               featureEnabled("fault.http.custom.abort.abort_percent",
                              Matcher<const envoy::type::FractionalPercent&>(Percent(100))))
       .WillOnce(Return(true));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", 503))
       .WillOnce(Return(503));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.cluster.abort.http_status", 503))
-      .WillOnce(Return(400));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.custom.abort.http_status", 400))
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.custom.abort.http_status", 503))
       .WillOnce(Return(500));
 
   Http::TestHeaderMapImpl response_headers{
