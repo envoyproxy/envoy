@@ -62,25 +62,11 @@ public:
   const Filters::Common::Fault::FaultRateLimitConfig* responseRateLimit() const {
     return response_rate_limit_.get();
   }
-  const std::string abortPercentKey(std::string& cluster) const {
-    return fmt::format(abort_percent_key_, cluster);
-  }
-  const std::string delayPercentKey(std::string& cluster) const {
-    return fmt::format(delay_percent_key_, cluster);
-  }
-  const std::string abortHttpStatusKey(std::string& cluster) const {
-    return fmt::format(abort_http_status_key_, cluster);
-  }
-  const std::string delayDurationKey(std::string& cluster) const {
-    return fmt::format(delay_duration_key_, cluster);
-  }
+  const std::string& abortPercentKey() const { return abort_percent_key_; }
+  const std::string& delayPercentKey() const { return delay_percent_key_; }
+  const std::string& abortHttpStatusKey() const { return abort_http_status_key_; }
+  const std::string& delayDurationKey() const { return delay_duration_key_; }
   const std::string& downstreamCluster() const { return downstream_cluster_; }
-  bool isDelayOverridden() const {
-    return is_delay_overridden_ && (!downstream_cluster_.empty() || !upstream_cluster_.empty());
-  };
-  bool isAbortOverridden() const {
-    return is_abort_overridden_ && (!downstream_cluster_.empty() || !upstream_cluster_.empty());
-  };
 
 private:
   envoy::type::FractionalPercent abort_percentage_;
@@ -96,8 +82,6 @@ private:
   std::string abort_http_status_key_;
   std::string delay_duration_key_;
   std::string downstream_cluster_;
-  bool is_abort_overridden_;
-  bool is_delay_overridden_;
 };
 
 /**
@@ -245,13 +229,13 @@ private:
   bool matchesTargetUpstreamCluster();
   bool matchesDownstreamNodes(const Http::HeaderMap& headers);
   bool isAbortEnabled();
+  bool isOverriddenAbortRuntime();
   bool isDelayEnabled();
+  bool isOverriddenDelayRuntime();
   absl::optional<std::chrono::milliseconds> delayDuration(const Http::HeaderMap& request_headers);
   uint64_t abortHttpStatus();
   void maybeIncActiveFaults();
   void maybeSetupResponseRateLimit(const Http::HeaderMap& request_headers);
-  bool isReadyToAbortFault();
-  bool isReadyToDelayFault();
 
   FaultFilterConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
@@ -262,6 +246,10 @@ private:
   const FaultSettings* fault_settings_;
   bool fault_active_{};
   std::unique_ptr<StreamRateLimiter> response_limiter_;
+  std::string downstream_cluster_delay_percent_key_{};
+  std::string downstream_cluster_abort_percent_key_{};
+  std::string downstream_cluster_delay_duration_key_{};
+  std::string downstream_cluster_abort_http_status_key_{};
 };
 
 } // namespace Fault
