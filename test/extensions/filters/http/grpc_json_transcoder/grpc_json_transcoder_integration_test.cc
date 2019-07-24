@@ -377,7 +377,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, DeepStruct) {
           {":status", "200"}, {"content-type", "application/json"}, {"grpc-status", "0"}},
       R"({"content":)" + deepJson + R"(})");
 
-  // The valid deep struct is parsed sucessfully.
+  // The valid deep struct is parsed successfully.
   // Since we didn't set the response, it return 503.
   testTranscoding<bookstore::EchoStructReqResp, bookstore::EchoStructReqResp>(
       Http::TestHeaderMapImpl{
