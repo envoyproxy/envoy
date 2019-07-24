@@ -361,6 +361,12 @@ TEST_F(QuicPlatformTest, QuicLog) {
 #define VALUE_BY_COMPILE_MODE(debug_mode_value, release_mode_value) debug_mode_value
 #endif
 
+TEST_F(QuicPlatformTest, LogEndOfLine) {
+  GetLogger().set_level(ERROR);
+  QUIC_DLOG(ERROR) << "aaaa" << std::endl;
+  QUIC_LOG(ERROR) << "aaaa" << std::endl;
+}
+
 TEST_F(QuicPlatformTest, QuicDLog) {
   int i = 0;
 
