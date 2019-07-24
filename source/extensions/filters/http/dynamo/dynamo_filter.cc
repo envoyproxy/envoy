@@ -176,7 +176,6 @@ void DynamoFilter::chargeStatsPerEntity(const std::string& entity, const std::st
       time_source_.monotonicTime() - start_decode_);
 
   size_t group_index = DynamoStats::groupIndex(status);
-  Stats::StatNamePool pool(stats_->symbolTable());
   const Stats::StatName entity_type_name = stats_->getStatName(entity_type);
   const Stats::StatName entity_name = stats_->getStatName(entity);
   const Stats::StatName total_name =

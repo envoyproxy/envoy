@@ -15,7 +15,6 @@ namespace Dynamo {
 class DynamoStats {
 public:
   DynamoStats(Stats::Scope& scope, const std::string& prefix);
-  Stats::SymbolTable& symbolTable() { return scope_.symbolTable(); }
 
   Stats::Counter& counter(const std::vector<Stats::StatName>& names);
   Stats::Histogram& histogram(const std::vector<Stats::StatName>& names);

@@ -45,7 +45,7 @@ Stats::SymbolTable::StoragePtr DynamoStats::addPrefix(const std::vector<Stats::S
   std::vector<Stats::StatName> names_with_prefix{prefix_};
   names_with_prefix.reserve(names.end() - names.begin());
   names_with_prefix.insert(names_with_prefix.end(), names.begin(), names.end());
-  return symbolTable().join(names_with_prefix);
+  return scope_.symbolTable().join(names_with_prefix);
 }
 
 Stats::Counter& DynamoStats::counter(const std::vector<Stats::StatName>& names) {
