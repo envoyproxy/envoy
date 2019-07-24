@@ -1,0 +1,65 @@
+---
+node:
+  id: default
+  cluster: front-envoy
+static_resources:
+  listeners:
+  - name: listener
+    address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 7500
+        protocol: TCP
+    filter_chains:
+    - filters:
+      - name: envoy.http_connection_manager
+        config:
+          http_filters:
+          - name: envoy.router
+          stat_prefix: ingress_http
+          codec_type: AUTO
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: local_service
+              domains:
+              - "*"
+              routes:
+              - route:
+                  cluster: sidecar_envoy
+                match:
+                  prefix: "/"
+  clusters:
+  - name: sidecar_envoy
+    type: STATIC
+    connect_timeout:
+      seconds: '5'
+    lb_policy: ROUND_ROBIN
+    health_checks:
+    - event_log_path: active_healthcheck_events.log
+      healthy_threshold: 1
+      http_health_check:
+        path: /healthcheck
+        service_name: test-service
+      interval: 5.0s
+      interval_jitter: 5.0s
+      timeout: 2s
+      unhealthy_threshold: 1
+    load_assignment:
+      cluster_name: sidecar_envoy
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            health_check_config:
+              port_value: 7502
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 7502
+admin:
+  access_log_path: "/dev/stdout"
+  address:
+    socket_address:
+      protocol: TCP
+      address: 0.0.0.0
+      port_value: 7501

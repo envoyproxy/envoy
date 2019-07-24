@@ -150,6 +150,8 @@ additionally compares the value of the *x-envoy-upstream-healthchecked-cluster* 
 check filter appends *x-envoy-upstream-healthchecked-cluster* to the response headers. The appended
 value is determined by the :option:`--service-cluster` command line option.
 
+A simple example for this configuration can be found [here](https://github.com/envoyproxy/envoy/blob/master/examples/healthchecks).
+
 .. _arch_overview_health_checking_degraded:
 
 Degraded health
@@ -157,5 +159,3 @@ Degraded health
 When using the HTTP health checker, an upstream host can return ``x-envoy-degraded`` to inform the
 health checker that the host is degraded. See :ref:`here <arch_overview_load_balancing_degraded>` for
 how this affects load balancing.
-
-
