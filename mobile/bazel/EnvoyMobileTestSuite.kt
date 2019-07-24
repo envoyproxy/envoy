@@ -19,6 +19,7 @@ import java.util.zip.ZipFile
  */
 @RunWith(org.junit.runners.AllTests::class)
 object EnvoyMobileTestSuite {
+  private const val TEST_SUFFIX = "Test"
   private const val CLASS_SUFFIX = ".class"
   private const val ENVOY_MOBILE_PACKAGE = "io.envoyproxy.envoymobile"
 
@@ -57,7 +58,7 @@ object EnvoyMobileTestSuite {
         if (entryName.endsWith(CLASS_SUFFIX)) {
           val classNameEnd = entryName.length - CLASS_SUFFIX.length
           val resolvedClass = entryName.substring(0, classNameEnd).replace('/', '.')
-          if (resolvedClass.contains(ENVOY_MOBILE_PACKAGE)) {
+          if (resolvedClass.contains(ENVOY_MOBILE_PACKAGE) && resolvedClass.endsWith(TEST_SUFFIX)) {
             classNames.add(resolvedClass)
           }
         }

@@ -21,3 +21,13 @@ envoy_mobile_kt_test(
         "//library/kotlin/src/io/envoyproxy/envoymobile:envoy_interfaces_lib",
     ],
 )
+
+envoy_mobile_kt_test(
+    name = "retry_policy_mapper_test",
+    srcs = [
+        "RetryPolicyMapperTest.kt",
+    ],
+    deps = [
+        "//library/kotlin/src/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+    ],
+)

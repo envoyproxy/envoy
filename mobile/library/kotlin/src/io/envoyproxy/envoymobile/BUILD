@@ -31,6 +31,7 @@ envoy_mobile_kt_library(
         "RequestMethod.kt",
         "ResponseHandler.kt",
         "RetryPolicy.kt",
+        "RetryPolicyMapper.kt",
         "StreamEmitter.kt",
     ],
     visibility = ["//visibility:public"],

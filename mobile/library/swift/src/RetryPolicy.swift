@@ -39,7 +39,7 @@ public final class RetryPolicy: NSObject {
   public let perRetryTimeoutMS: UInt?
 
   /// Public initializer.
-  public init(maxRetryCount: UInt, retryOn: [RetryRule], perRetryTimeoutMS: UInt?) {
+  public init(maxRetryCount: UInt, retryOn: [RetryRule], perRetryTimeoutMS: UInt? = nil) {
     self.maxRetryCount = maxRetryCount
     self.retryOn = retryOn
     self.perRetryTimeoutMS = perRetryTimeoutMS

@@ -17,8 +17,7 @@ final class RetryPolicyMapperTests: XCTestCase {
 
   func testConvertingToHeadersWithoutRetryTimeoutExcludesPerRetryTimeoutHeader() {
     let policy = RetryPolicy(maxRetryCount: 123,
-                             retryOn: RetryRule.allCases,
-                             perRetryTimeoutMS: nil)
+                             retryOn: RetryRule.allCases)
     let expectedHeaders = [
       "x-envoy-max-retries": "123",
       "x-envoy-retry-on": "5xx,gateway-error,connect-failure,retriable-4xx,refused-upstream",

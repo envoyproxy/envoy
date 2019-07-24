@@ -8,9 +8,9 @@ package io.envoyproxy.envoymobile
  * @param perRetryTimeoutMs Timeout (in milliseconds) to apply to each retry.
  */
 data class RetryPolicy(
-    val maxRetryCount: Int,
-    val retryOn: List<RetryRule>,
-    val perRetryTimeoutMs: Long?
+  val maxRetryCount: Int,
+  val retryOn: List<RetryRule>,
+  val perRetryTimeoutMs: Long? = null
 )
 
 /**
@@ -18,9 +18,9 @@ data class RetryPolicy(
  * @see <a href="https://www.envoyproxy.io/docs/envoy/latest/configuration/http_filters/router_filter#x-envoy-retry-on">x-envoy-retry-on</a>
  */
 enum class RetryRule {
-  FIVE_XX,
+  STATUS_5XX,
   GATEWAY_ERROR,
   CONNECT_FAILURE,
-  RETRIABLE_FOUR_XX,
+  RETRIABLE_4XX,
   REFUSED_UPSTREAM,
 }
