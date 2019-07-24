@@ -2909,27 +2909,6 @@ envoy_cc_library(
 )
 
 envoy_cc_test_library(
-    name = "quic_test_tools_mock_clock_lib",
-    srcs = ["quiche/quic/test_tools/mock_clock.cc"],
-    hdrs = ["quiche/quic/test_tools/mock_clock.h"],
-    copts = quiche_copt,
-    repository = "@envoy",
-    deps = [
-        ":quic_core_time_lib",
-        ":quic_platform",
-    ],
-)
-
-envoy_cc_test_library(
-    name = "quic_test_tools_mock_random_lib",
-    srcs = ["quiche/quic/test_tools/mock_random.cc"],
-    hdrs = ["quiche/quic/test_tools/mock_random.h"],
-    copts = quiche_copt,
-    repository = "@envoy",
-    deps = [":quic_core_crypto_random_lib"],
-)
-
-envoy_cc_test_library(
     name = "quic_test_tools_config_peer_lib",
     srcs = ["quiche/quic/test_tools/quic_config_peer.cc"],
     hdrs = ["quiche/quic/test_tools/quic_config_peer.h"],
@@ -2956,6 +2935,26 @@ envoy_cc_test_library(
     ],
 )
 
+envoy_cc_test_library(
+    name = "quic_test_tools_mock_clock_lib",
+    srcs = ["quiche/quic/test_tools/mock_clock.cc"],
+    hdrs = ["quiche/quic/test_tools/mock_clock.h"],
+    copts = quiche_copt,
+    repository = "@envoy",
+    deps = [
+        ":quic_core_time_lib",
+        ":quic_platform",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "quic_test_tools_mock_random_lib",
+    srcs = ["quiche/quic/test_tools/mock_random.cc"],
+    hdrs = ["quiche/quic/test_tools/mock_random.h"],
+    copts = quiche_copt,
+    repository = "@envoy",
+    deps = [":quic_core_crypto_random_lib"],
+)
 envoy_cc_test_library(
     name = "quic_test_tools_packet_generator_peer_lib",
     srcs = ["quiche/quic/test_tools/quic_packet_generator_peer.cc"],
