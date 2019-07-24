@@ -28,6 +28,7 @@ envoy_mobile_kt_library(
         "EnvoyException.kt",
         "Request.kt",
         "RequestBuilder.kt",
+        "RequestMapper.kt",
         "RequestMethod.kt",
         "ResponseHandler.kt",
         "RetryPolicy.kt",

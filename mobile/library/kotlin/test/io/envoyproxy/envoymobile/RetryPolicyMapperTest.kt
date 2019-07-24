@@ -2,7 +2,7 @@ package library.kotlin.test.io.envoyproxy.envoymobile
 
 import io.envoyproxy.envoymobile.RetryPolicy
 import io.envoyproxy.envoymobile.RetryRule
-import io.envoyproxy.envoymobile.headers
+import io.envoyproxy.envoymobile.outboundHeaders
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
 
@@ -20,7 +20,7 @@ class RetryPolicyMapperTest {
             RetryRule.REFUSED_UPSTREAM),
         perRetryTimeoutMs = 9001)
 
-    assertThat(retryPolicy.headers()).isEqualTo(mapOf(
+    assertThat(retryPolicy.outboundHeaders()).isEqualTo(mapOf(
         "x-envoy-max-retries" to "123",
         "x-envoy-retry-on" to "5xx,gateway-error,connect-failure,retriable-4xx,refused-upstream",
         "x-envoy-upstream-rq-per-try-timeout-ms" to "9001"
@@ -38,6 +38,6 @@ class RetryPolicyMapperTest {
             RetryRule.RETRIABLE_4XX,
             RetryRule.REFUSED_UPSTREAM))
 
-    assertThat(retryPolicy.headers()).doesNotContainKey("x-envoy-upstream-rq-per-try-timeout-ms")
+    assertThat(retryPolicy.outboundHeaders()).doesNotContainKey("x-envoy-upstream-rq-per-try-timeout-ms")
   }
 }
