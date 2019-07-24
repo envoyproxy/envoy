@@ -31,3 +31,13 @@ envoy_mobile_kt_test(
         "//library/kotlin/src/io/envoyproxy/envoymobile:envoy_interfaces_lib",
     ],
 )
+
+envoy_mobile_kt_test(
+    name = "request_mapper_test",
+    srcs = [
+        "RequestMapperTest.kt",
+    ],
+    deps = [
+        "//library/kotlin/src/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+    ],
+)

@@ -5,7 +5,7 @@ package io.envoyproxy.envoymobile
  *
  * @return The header representation of the retry policy.
  */
-internal fun RetryPolicy.headers(): Map<String, String> {
+internal fun RetryPolicy.outboundHeaders(): Map<String, String> {
 
   val headers = mutableMapOf(
       "x-envoy-max-retries" to "$maxRetryCount",
