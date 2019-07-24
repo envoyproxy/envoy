@@ -179,7 +179,7 @@ ShadowPolicyImpl::ShadowPolicyImpl(const envoy::api::v2::route::RouteAction& con
 
 class HashMethodImplBase : public HashPolicyImpl::HashMethod {
 public:
-  HashMethodImplBase(bool terminal) : terminal_(terminal) {}
+  explicit HashMethodImplBase(bool terminal) : terminal_(terminal) {}
 
   bool terminal() const override { return terminal_; }
 
