@@ -63,24 +63,18 @@ FaultSettings::FaultSettings(const envoy::config::filter::http::fault::v2::HTTPF
         std::make_unique<Filters::Common::Fault::FaultRateLimitConfig>(fault.response_rate_limit());
   }
 
-  delay_percent_runtime_ = fault.delay_percent_runtime().empty()
-                               ? RuntimeKeys::get().DelayPercentKey
-                               : fault.delay_percent_runtime();
-  abort_percent_runtime_ = fault.abort_percent_runtime().empty()
-                               ? RuntimeKeys::get().AbortPercentKey
-                               : fault.abort_percent_runtime();
-  delay_duration_runtime_ = fault.delay_duration_runtime().empty()
-                                ? RuntimeKeys::get().DelayDurationKey
-                                : fault.delay_duration_runtime();
-  abort_http_status_runtime_ = fault.abort_http_status_runtime().empty()
-                                   ? RuntimeKeys::get().AbortHttpStatusKey
-                                   : fault.abort_http_status_runtime();
-  max_active_faults_runtime_ = fault.max_active_faults_runtime().empty()
-                                   ? RuntimeKeys::get().MaxActiveFaultsKey
-                                   : fault.max_active_faults_runtime();
-  response_rate_limit_percent_runtime_ = fault.response_rate_limit_percent_runtime().empty()
-                                             ? RuntimeKeys::get().ResponseRateLimitPercentKey
-                                             : fault.response_rate_limit_percent_runtime();
+  delay_percent_runtime_ = PROTOBUF_GET_STRING_OR_DEFAULT(fault, delay_percent_runtime,
+                                                          RuntimeKeys::get().DelayPercentKey);
+  abort_percent_runtime_ = PROTOBUF_GET_STRING_OR_DEFAULT(fault, abort_percent_runtime,
+                                                          RuntimeKeys::get().AbortPercentKey);
+  delay_duration_runtime_ = PROTOBUF_GET_STRING_OR_DEFAULT(fault, delay_duration_runtime,
+                                                           RuntimeKeys::get().DelayDurationKey);
+  abort_http_status_runtime_ = PROTOBUF_GET_STRING_OR_DEFAULT(
+      fault, abort_http_status_runtime, RuntimeKeys::get().AbortHttpStatusKey);
+  max_active_faults_runtime_ = PROTOBUF_GET_STRING_OR_DEFAULT(
+      fault, max_active_faults_runtime, RuntimeKeys::get().MaxActiveFaultsKey);
+  response_rate_limit_percent_runtime_ = PROTOBUF_GET_STRING_OR_DEFAULT(
+      fault, response_rate_limit_percent_runtime, RuntimeKeys::get().ResponseRateLimitPercentKey);
 }
 
 FaultFilterConfig::FaultFilterConfig(const envoy::config::filter::http::fault::v2::HTTPFault& fault,
