@@ -18,7 +18,7 @@ public protocol StreamEmitter {
   /// - returns: The stream emitter, for chaining syntax.
   func sendData(_ data: Data) throws -> StreamEmitter
 
-  /// Sent metadata over the associated stream.
+  /// Send metadata over the associated stream.
   ///
   /// - parameter metadata: Metadata to send over the stream.
   ///
