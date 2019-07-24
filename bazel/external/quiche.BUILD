@@ -55,6 +55,7 @@ genrule(
 quiche_copt = [
     # Remove these after upstream fix.
     "-Wno-unused-parameter",
+    "-Wno-unused-function",
     "-Wno-type-limits",
     # quic_inlined_frame.h uses offsetof() to optimize memory usage in frames.
     "-Wno-invalid-offsetof",
