@@ -100,14 +100,40 @@ public:
         "abort_percent" : 100,
         "http_status" : 503
       },
-      "delay_runtime" : {
-        "delay_percent" : "fault.http.custom.delay.fixed_delay_percent",
-        "delay_duration" : "fault.http.custom.delay.fixed_duration_ms"
+      "abort_percent_key": "fault.http.custom.abort.abort_percent"
+    }
+    )EOF";
+
+  const std::string fixed_delay_and_abort_json_incorrect_override_2 = R"EOF(
+    {
+      "delay" : {
+        "type" : "fixed",
+        "fixed_delay_percent" : 100,
+        "fixed_duration_ms" : 5000
       },
-      "abort_runtime" : {
-        "abort_percent": "fault.http.custom.abort.abort_percent",
-        "abort_http_status": "fault.http.custom.abort.http_status"
-      }
+      "abort" : {
+        "abort_percent" : 100,
+        "http_status" : 503
+      },
+      "delay_percent_key": "fault.http.custom.delay.fixed_delay_percent"
+    }
+    )EOF";
+
+  const std::string fixed_delay_and_abort_json_incorrect_override_3 = R"EOF(
+    {
+      "delay" : {
+        "type" : "fixed",
+        "fixed_delay_percent" : 100,
+        "fixed_duration_ms" : 5000
+      },
+      "abort" : {
+        "abort_percent" : 100,
+        "http_status" : 503
+      },
+      "abort_percent_key": "fault.http.custom.abort.abort_percent",
+      "abort_http_status_key": "fault.http.custom.abort.http_status",
+      "delay_percent_key": "fault.http.custom.delay.fixed_delay_percent",
+      "delay_duration_key": "fault.http.custom.delay.fixed_duration_ms"
     }
     )EOF";
 
@@ -122,14 +148,10 @@ public:
         "abort_percent" : 100,
         "http_status" : 503
       },
-      "delay_runtime" : {
-        "delay_percent" : "fault.http.custom.delay.fixed_delay_percent",
-        "delay_duration" : "fault.http.custom.delay.fixed_duration_ms"
-      },
-      "abort_runtime" : {
-        "abort_percent": "fault.http.custom.abort.abort_percent",
-        "abort_http_status": "fault.http.custom.abort.http_status"
-      },
+      "abort_percent_key": "fault.http.custom.abort.abort_percent",
+      "abort_http_status_key": "fault.http.custom.abort.http_status",
+      "delay_percent_key": "fault.http.custom.delay.fixed_delay_percent",
+      "delay_duration_key": "fault.http.custom.delay.fixed_duration_ms",
       "downstream_cluster": "cluster"
     }
     )EOF";
@@ -171,10 +193,8 @@ public:
         "fixed_duration_ms" : 5000
       },
       "upstream_cluster" : "www1",
-      "delay_runtime" : {
-        "delay_percent" : "fault.http.custom.delay.fixed_delay_percent",
-        "delay_duration" : "fault.http.custom.delay.fixed_duration_ms"
-      }
+      "delay_percent_key": "fault.http.custom.delay.fixed_delay_percent",
+      "delay_duration_key": "fault.http.custom.delay.fixed_duration_ms"
     }
     )EOF";
 
@@ -613,6 +633,18 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDownstream) {
 
 TEST_F(FaultFilterTest, FixedDelayAndAbortDownstreamIncorrectOverride) {
   SetUpTest(fixed_delay_and_abort_json_incorrect_override);
+
+  VerifyFallBackRuntime();
+}
+
+TEST_F(FaultFilterTest, FixedDelayAndAbortDownstreamIncorrectOverride_2) {
+  SetUpTest(fixed_delay_and_abort_json_incorrect_override_2);
+
+  VerifyFallBackRuntime();
+}
+
+TEST_F(FaultFilterTest, FixedDelayAndAbortDownstreamIncorrectOverride_3) {
+  SetUpTest(fixed_delay_and_abort_json_incorrect_override_3);
 
   VerifyFallBackRuntime();
 }

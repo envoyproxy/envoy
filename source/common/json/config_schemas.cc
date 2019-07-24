@@ -1043,25 +1043,11 @@ const std::string Json::Schema::FAULT_HTTP_FILTER_SCHEMA(R"EOF(
           "type" : "object"
         }
       },
-      "downstream_cluster" : {"type" : "string"},
-      "abort_runtime" : {
-        "type" : "object",
-        "properties" : {
-          "abort_percent" : { "type" : "string", "minLength" : 1 },
-          "abort_http_status" : { "type" : "string", "minLength" : 1 }
-        },
-        "required" : ["abort_percent", "abort_http_status"],
-        "additionalProperties" : false
-      },
-      "delay_runtime" : {
-        "type" : "object",
-        "properties" : {
-          "delay_percent" : { "type" : "string", "minLength" : 1 },
-          "delay_duration" : { "type" : "string", "minLength" : 1 }
-        },
-        "required" : ["delay_percent", "delay_duration"],
-        "additionalProperties" : false
-      }
+      "abort_percent_key" : {"type" : "string"},
+      "abort_http_status_key" : {"type" : "string"},
+      "delay_percent_key" : {"type" : "string"},
+      "delay_duration_key" : {"type" : "string"},
+      "downstream_cluster" : {"type" : "string"}
     },
     "additionalProperties" : false
   }
