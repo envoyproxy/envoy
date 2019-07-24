@@ -1,8 +1,8 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_server_stream.h"
-#include "/usr/local/google/home/danzh/.cache/bazel/_bazel_danzh/3af5f831530d3ae92cc2833051a9b35d/execroot/envoy/bazel-out/k8-fastbuild/bin/external/com_googlesource_quiche/quiche/quic/core/crypto/quic_crypto_server_config.h"
-#include "/usr/local/google/home/danzh/.cache/bazel/_bazel_danzh/3af5f831530d3ae92cc2833051a9b35d/execroot/envoy/bazel-out/k8-fastbuild/bin/include/envoy/http/_virtual_includes/codec_interface/envoy/http/codec.h"
-#include <cstddef>
+
 #include <openssl/evp.h>
+
+#include <cstddef>
 
 #pragma GCC diagnostic push
 // QUICHE allows unused parameters.
@@ -79,21 +79,21 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
   // Currently read out all the data.
   uint64_t bytes_to_read = ReadableBytes();
   if (bytes_to_read > 0) {
-  constexpr uint64_t MaxSlices = 2;
-  Buffer::RawSlice slices[MaxSlices];
-  const uint64_t num_slices = buffer->reserve(bytes_to_read, slices, MaxSlices);
-  STACK_ARRAY(iov, iovec, num_slices);
-  uint64_t max_len = 0;
-  for (uint64_t i = 0; i < num_slices; ++i) {
-    Buffer::RawSlice& slice = slices[i];
-    iov[i].iov_base = slice.mem_;
-    iov[i].iov_len = slice.len_;
-    max_len += slice.len_;
-  }
-  ASSERT(max_len >= bytes_to_read);
-  size_t bytes_read = Readv(iov.begin(), num_slices);
-  ASSERT(bytes_read == bytes_to_read);
-  buffer->commit(slices, num_slices);
+    constexpr uint64_t MaxSlices = 2;
+    Buffer::RawSlice slices[MaxSlices];
+    const uint64_t num_slices = buffer->reserve(bytes_to_read, slices, MaxSlices);
+    STACK_ARRAY(iov, iovec, num_slices);
+    uint64_t max_len = 0;
+    for (uint64_t i = 0; i < num_slices; ++i) {
+      Buffer::RawSlice& slice = slices[i];
+      iov[i].iov_base = slice.mem_;
+      iov[i].iov_len = slice.len_;
+      max_len += slice.len_;
+    }
+    ASSERT(max_len >= bytes_to_read);
+    size_t bytes_read = Readv(iov.begin(), num_slices);
+    ASSERT(bytes_read == bytes_to_read);
+    buffer->commit(slices, num_slices);
   }
   // True if no trailer and FIN read.
   bool finished_reading = IsDoneReading();
@@ -111,7 +111,8 @@ void EnvoyQuicServerStream::OnTrailingHeadersComplete(bool fin, size_t frame_len
                                                       const quic::QuicHeaderList& header_list) {
   quic::QuicSpdyServerStreamBase::OnTrailingHeadersComplete(fin, frame_len, header_list);
   if (!FinishedReadingHeaders()) {
-    // Before QPack trailers can arrive before body. Only decode trailers after finishing decoding body.
+    // Before QPack trailers can arrive before body. Only decode trailers after finishing decoding
+    // body.
     ASSERT(decoder() != nullptr);
     decoder()->decodeTrailers(spdyHeaderBlockToEnvoyHeaders(received_trailers()));
     MarkTrailersConsumed();
@@ -119,15 +120,15 @@ void EnvoyQuicServerStream::OnTrailingHeadersComplete(bool fin, size_t frame_len
 }
 
 Http::StreamResetReason quicRstErrorToEnvoyResetReason(quic::QuicRstStreamErrorCode quic_rst) {
-  switch(quic_rst) {
-    case quic::QUIC_REFUSED_STREAM:
-      return  Http::StreamResetReason::RemoteRefusedStreamReset;
-    case quic::QUIC_STREAM_NO_ERROR:
-      return Http::StreamResetReason:: ConnectionTermination;
-    case quic::QUIC_STREAM_CONNECTION_ERROR:
-      return Http::StreamResetReason::ConnectionFailure;
-    default:
-      return Http::StreamResetReason::RemoteReset;
+  switch (quic_rst) {
+  case quic::QUIC_REFUSED_STREAM:
+    return Http::StreamResetReason::RemoteRefusedStreamReset;
+  case quic::QUIC_STREAM_NO_ERROR:
+    return Http::StreamResetReason::ConnectionTermination;
+  case quic::QUIC_STREAM_CONNECTION_ERROR:
+    return Http::StreamResetReason::ConnectionFailure;
+  default:
+    return Http::StreamResetReason::RemoteReset;
   }
 }
 
@@ -137,7 +138,8 @@ void EnvoyQuicServerStream::OnStreamReset(const quic::QuicRstStreamFrame& frame)
   runResetCallbacks(reason);
 }
 
-void EnvoyQuicServerStream::OnConnectionClosed(quic::QuicErrorCode error, quic::ConnectionCloseSource source) {
+void EnvoyQuicServerStream::OnConnectionClosed(quic::QuicErrorCode error,
+                                               quic::ConnectionCloseSource source) {
   quic::QuicSpdyServerStreamBase::OnConnectionClosed(error, source);
   Http::StreamResetReason reason = quicRstErrorToEnvoyResetReason(stream_error());
   runResetCallbacks(reason);

@@ -17,12 +17,12 @@ EnvoyQuicServerSession::EnvoyQuicServerSession(
     const quic::QuicConfig& config, const quic::ParsedQuicVersionVector& supported_versions,
     quic::QuicConnection* connection, quic::QuicSession::Visitor* visitor,
     quic::QuicCryptoServerStream::Helper* helper, const quic::QuicCryptoServerConfig* crypto_config,
-    quic::QuicCompressedCertsCache* compressed_certs_cache,
-    Event::Dispatcher& dispatcher)
+    quic::QuicCompressedCertsCache* compressed_certs_cache, Event::Dispatcher& dispatcher)
     : quic::QuicServerSessionBase(config, supported_versions, connection, visitor, helper,
                                   crypto_config, compressed_certs_cache),
-      filter_manager_(*this), dispatcher_(dispatcher), stream_info_(dispatcher.timeSource()) {
-      }
+      filter_manager_(*this), dispatcher_(dispatcher), stream_info_(dispatcher.timeSource()) {}
+
+EnvoyQuicServerSession::~EnvoyQuicServerSession() { delete connection(); }
 
 quic::QuicCryptoServerStreamBase* EnvoyQuicServerSession::CreateQuicCryptoServerStream(
     const quic::QuicCryptoServerConfig* crypto_config,
@@ -65,23 +65,28 @@ void EnvoyQuicServerSession::setUpRequestDecoder(EnvoyQuicStream& stream) {
 
 void EnvoyQuicServerSession::OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
                                                 quic::ConnectionCloseSource source) {
-  std::cerr << "HasActiveStreams " << HasActiveRequestStreams() << "\n";
   quic::QuicServerSessionBase::OnConnectionClosed(frame, source);
-   std::cerr << "HasActiveStreams " << HasActiveRequestStreams() << "\n";
-
   for (auto callback : network_connection_callbacks_) {
     callback->onEvent(source == quic::ConnectionCloseSource::FROM_PEER
-                                            ? Network::ConnectionEvent::RemoteClose
-                                            : Network::ConnectionEvent::LocalClose);
+                          ? Network::ConnectionEvent::RemoteClose
+                          : Network::ConnectionEvent::LocalClose);
   }
-  transport_failure_reason_ = absl::StrCat(quic::QuicErrorCodeToString(frame.quic_error_code), " with details: ", frame.error_details);
+  transport_failure_reason_ = absl::StrCat(quic::QuicErrorCodeToString(frame.quic_error_code),
+                                           " with details: ", frame.error_details);
+}
+
+void EnvoyQuicServerSession::Initialize() {
+  quic::QuicServerSessionBase::Initialize();
+  reinterpret_cast<EnvoyQuicConnection*>(connection())->setEnvoyConnection(*this);
 }
 
 void EnvoyQuicServerSession::addWriteFilter(Network::WriteFilterSharedPtr filter) {
   filter_manager_.addWriteFilter(filter);
 }
 
-void EnvoyQuicServerSession::addFilter(Network::FilterSharedPtr filter) { filter_manager_.addFilter(filter); }
+void EnvoyQuicServerSession::addFilter(Network::FilterSharedPtr filter) {
+  filter_manager_.addFilter(filter);
+}
 
 void EnvoyQuicServerSession::addReadFilter(Network::ReadFilterSharedPtr filter) {
   filter_manager_.addReadFilter(filter);
@@ -98,7 +103,8 @@ void EnvoyQuicServerSession::addConnectionCallbacks(Network::ConnectionCallbacks
 void EnvoyQuicServerSession::close(Network::ConnectionCloseType type) {
   // TODO(danzh): Implement FlushWrite and FlushWriteAndDelay mode.
   ASSERT(type == Network::ConnectionCloseType::NoFlush);
-  connection()->CloseConnection(quic::QUIC_NO_ERROR, "Closed by application", quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
+  connection()->CloseConnection(quic::QUIC_NO_ERROR, "Closed by application",
+                                quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
 }
 void EnvoyQuicServerSession::setDelayedCloseTimeout(std::chrono::milliseconds /*timeout*/) {
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
@@ -112,24 +118,23 @@ absl::string_view EnvoyQuicServerSession::requestedServerName() const {
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 
- const Network::Address::InstanceConstSharedPtr& EnvoyQuicServerSession::remoteAddress() const {
-   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
- }
+const Network::Address::InstanceConstSharedPtr& EnvoyQuicServerSession::remoteAddress() const {
+  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+}
 
-  const Network::Address::InstanceConstSharedPtr& EnvoyQuicServerSession::localAddress() const {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
+const Network::Address::InstanceConstSharedPtr& EnvoyQuicServerSession::localAddress() const {
+  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+}
 
- const Ssl::ConnectionInfo* EnvoyQuicServerSession::ssl() const {
-   // TODO(danzh): construct Ssl::ConnectionInfo from crypto stream
-   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
- }
+const Ssl::ConnectionInfo* EnvoyQuicServerSession::ssl() const {
+  // TODO(danzh): construct Ssl::ConnectionInfo from crypto stream
+  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+}
 
 void EnvoyQuicServerSession::rawWrite(Buffer::Instance& /*data*/, bool /*end_stream*/) {
   // TODO(danzh): maybe send via MessageFrame?
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
-
 
 } // namespace Quic
 } // namespace Envoy

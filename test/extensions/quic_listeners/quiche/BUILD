@@ -22,6 +22,7 @@ envoy_cc_test(
         "//source/extensions/quic_listeners/quiche:envoy_quic_alarm_lib",
         "//source/extensions/quic_listeners/quiche/platform:envoy_quic_clock_lib",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -60,7 +61,7 @@ envoy_cc_test(
         "//source/extensions/quic_listeners/quiche:envoy_quic_connection_lib",
         "//source/extensions/quic_listeners/quiche:envoy_quic_server_stream_lib",
         "//test/mocks/http:stream_decoder_mock",
-        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
         "@com_googlesource_quiche//:quic_core_http_spdy_session_lib",
     ],
 )
@@ -75,14 +76,31 @@ envoy_cc_test(
         "//source/extensions/quic_listeners/quiche:codec_impl_lib",
         "//source/extensions/quic_listeners/quiche:envoy_quic_alarm_factory_lib",
         "//source/extensions/quic_listeners/quiche:envoy_quic_connection_helper_lib",
+        "//source/extensions/quic_listeners/quiche:envoy_quic_proof_source_lib",
         "//source/extensions/quic_listeners/quiche:envoy_quic_server_session_lib",
+        "//source/server:configuration_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/http:stream_decoder_mock",
-        "//test/mocks/network:connection_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:global_lib",
+        "//test/test_common:simulated_time_system_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "active_quic_listener_test",
+    srcs = ["active_quic_listener_test.cc"],
+    tags = ["nofips"],
+    deps = [
+        ":quic_test_utils_for_envoy_lib",
+        "//source/extensions/quic_listeners/quiche:active_quic_listener_lib",
+        "//source/extensions/quic_listeners/quiche:envoy_quic_utils_lib",
+        "//source/server:configuration_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:network_utility_lib",
         "//test/test_common:simulated_time_system_lib",
     ],
 )

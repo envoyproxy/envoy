@@ -1,3 +1,8 @@
+// NOLINT(namespace-envoy)
+
+// This file defines platform dependent test utility functions which is declared
+// in quiche/quic/test_tools/crypto_test_utils.h.
+
 #pragma GCC diagnostic push
 // QUICHE allows unused parameters.
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -29,6 +34,6 @@ std::unique_ptr<ProofVerifyContext> ProofVerifyContextForTesting() {
   return nullptr;
 }
 
-}  // namespace crypto_test_utils
-}  // namespace test
-}  // namespace quic
+} // namespace crypto_test_utils
+} // namespace test
+} // namespace quic

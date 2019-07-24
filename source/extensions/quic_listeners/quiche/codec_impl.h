@@ -1,5 +1,7 @@
-#include "common/common/assert.h"
 #include "envoy/http/codec.h"
+
+#include "common/common/assert.h"
+
 #include "extensions/quic_listeners/quiche/envoy_quic_server_session.h"
 
 namespace Envoy {
@@ -38,12 +40,14 @@ private:
 class QuicHttpServerConnectionImpl : public QuicHttpConnectionImplBase,
                                      public Http::ServerConnection {
 public:
-  QuicHttpServerConnectionImpl(EnvoyQuicServerSession& quic_session, Http::ServerConnectionCallbacks& callbacks) : QuicHttpConnectionImplBase(quic_session) {
+  QuicHttpServerConnectionImpl(EnvoyQuicServerSession& quic_session,
+                               Http::ServerConnectionCallbacks& callbacks)
+      : QuicHttpConnectionImplBase(quic_session) {
     quic_session.setHttpConnectionCallbacks(callbacks);
   }
 
   // Http::Connection
-    void shutdownNotice() override {
+  void shutdownNotice() override {
     // TODO(danzh): Add double-GOAWAY support in QUIC.
   }
 };

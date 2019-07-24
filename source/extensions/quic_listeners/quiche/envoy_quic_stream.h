@@ -17,7 +17,8 @@ public:
   // Http::Stream
   void addCallbacks(Http::StreamCallbacks& callbacks) override {
     ASSERT(!local_end_stream_);
-    addCallbacks_(callbacks); }
+    addCallbacks_(callbacks);
+  }
   void removeCallbacks(Http::StreamCallbacks& callbacks) override { removeCallbacks_(callbacks); }
   uint32_t bufferLimit() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 

@@ -19,8 +19,7 @@ class EnvoyQuicServerStream : public quic::QuicSpdyServerStreamBase, public Envo
 public:
   EnvoyQuicServerStream(quic::QuicStreamId id, quic::QuicSpdySession* session,
                         quic::StreamType type)
-      : quic::QuicSpdyServerStreamBase(id, session, type), EnvoyQuicStream() {
-      }
+      : quic::QuicSpdyServerStreamBase(id, session, type), EnvoyQuicStream() {}
   EnvoyQuicServerStream(quic::PendingStream* pending, quic::QuicSpdySession* session,
                         quic::StreamType type)
       : quic::QuicSpdyServerStreamBase(pending, session, type), EnvoyQuicStream(*this) {}
@@ -47,9 +46,7 @@ protected:
                                 const quic::QuicHeaderList& header_list) override;
   void OnTrailingHeadersComplete(bool fin, size_t frame_len,
                                  const quic::QuicHeaderList& header_list) override;
-  void CloseWriteSide() override {
-    quic::QuicSpdyServerStreamBase::CloseWriteSide();
-  }
+  void CloseWriteSide() override { quic::QuicSpdyServerStreamBase::CloseWriteSide(); }
 };
 
 } // namespace Quic

@@ -85,7 +85,6 @@ public:
       }
     }
   }
-  Scheduler& scheduler() override { return *Scheduler_; }
 
 private:
   TimerPtr createTimerInternal(TimerCb cb);

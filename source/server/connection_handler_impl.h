@@ -22,6 +22,12 @@
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
+
+namespace Quic {
+class ActiveQuicListener;
+class EnvoyQuicDispatcher;
+} // namespace Quic
+
 namespace Server {
 
 #define ALL_LISTENER_STATS(COUNTER, GAUGE, HISTOGRAM)                                              \
@@ -46,36 +52,6 @@ struct ListenerStats {
  */
 class ConnectionHandlerImpl : public Network::ConnectionHandler, NonCopyable {
 public:
-  ConnectionHandlerImpl(spdlog::logger& logger, Event::Dispatcher& dispatcher);
-
-  // Network::ConnectionHandler
-  uint64_t numConnections() override { return num_connections_; }
-  void addListener(Network::ListenerConfig& config) override;
-  void removeListeners(uint64_t listener_tag) override;
-  void stopListeners(uint64_t listener_tag) override;
-  void stopListeners() override;
-  void disableListeners() override;
-  void enableListeners() override;
-
-  Network::Listener* findListenerByAddress(const Network::Address::Instance& address) override;
-
-private:
-  struct ActiveListenerBase;
-  using ActiveListenerBasePtr = std::unique_ptr<ActiveListenerBase>;
-
-  struct ActiveTcpListener;
-  using ActiveTcpListenerPtr = std::unique_ptr<ActiveTcpListener>;
-
-  struct ActiveUdpListener;
-  using ActiveUdpListenerPtr = std::unique_ptr<ActiveUdpListener>;
-
-  ActiveListenerBase* findActiveListenerByAddress(const Network::Address::Instance& address);
-
-  struct ActiveConnection;
-  using ActiveConnectionPtr = std::unique_ptr<ActiveConnection>;
-  struct ActiveSocket;
-  using ActiveSocketPtr = std::unique_ptr<ActiveSocket>;
-
   /**
    * Wrapper for an active listener owned by this handler.
    */
@@ -120,6 +96,35 @@ private:
     Network::UdpListener* udp_listener_;
     Network::UdpListenerReadFilterPtr read_filter_;
   };
+
+  ConnectionHandlerImpl(spdlog::logger& logger, Event::Dispatcher& dispatcher);
+
+  // Network::ConnectionHandler
+  uint64_t numConnections() override { return num_connections_; }
+  void addListener(Network::ListenerConfig& config) override;
+  void removeListeners(uint64_t listener_tag) override;
+  void stopListeners(uint64_t listener_tag) override;
+  void stopListeners() override;
+  void disableListeners() override;
+  void enableListeners() override;
+
+  Network::Listener* findListenerByAddress(const Network::Address::Instance& address) override;
+
+private:
+  using ActiveListenerBasePtr = std::unique_ptr<ActiveListenerBase>;
+  using ActiveUdpListenerPtr = std::unique_ptr<ActiveUdpListener>;
+  struct ActiveTcpListener;
+  using ActiveTcpListenerPtr = std::unique_ptr<ActiveTcpListener>;
+
+  friend class Quic::ActiveQuicListener;
+  friend class Quic::EnvoyQuicDispatcher;
+
+  ActiveListenerBase* findActiveListenerByAddress(const Network::Address::Instance& address);
+
+  struct ActiveConnection;
+  using ActiveConnectionPtr = std::unique_ptr<ActiveConnection>;
+  struct ActiveSocket;
+  using ActiveSocketPtr = std::unique_ptr<ActiveSocket>;
 
   /**
    * Wrapper for an active tcp listener owned by this handler.

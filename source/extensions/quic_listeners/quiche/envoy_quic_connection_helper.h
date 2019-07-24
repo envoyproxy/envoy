@@ -15,13 +15,13 @@
 
 #include "extensions/quic_listeners/quiche/platform/envoy_quic_clock.h"
 
-namespace Envoy  {
+namespace Envoy {
 namespace Quic {
 
 class EnvoyQuicConnectionHelper : public quic::QuicConnectionHelperInterface {
 public:
-  EnvoyQuicConnectionHelper(Event::TimeSystem& time_system)
-      : clock_(time_system), random_generator_(quic::QuicRandom::GetInstance()) {}
+  EnvoyQuicConnectionHelper(Event::Dispatcher& dispatcher)
+      : clock_(dispatcher), random_generator_(quic::QuicRandom::GetInstance()) {}
 
   ~EnvoyQuicConnectionHelper() override {}
 

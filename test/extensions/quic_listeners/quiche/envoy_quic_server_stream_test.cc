@@ -1,5 +1,7 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_server_stream.h"
 
+#include "/usr/local/google/home/danzh/.cache/bazel/_bazel_danzh/3af5f831530d3ae92cc2833051a9b35d/execroot/envoy/bazel-out/k8-fastbuild/bin/include/envoy/event/_virtual_includes/dispatcher_interface/envoy/event/dispatcher.h"
+
 #pragma GCC diagnostic push
 // QUICHE allows unused parameters.
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -16,7 +18,7 @@
 
 #include "common/event/libevent_scheduler.h"
 #include "common/http/headers.h"
-#include "test/test_common/simulated_time_system.h"
+#include "test/test_common/utility.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_alarm_factory.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_connection.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_connection_helper.h"
@@ -56,11 +58,12 @@ public:
 class EnvoyQuicServerStreamTest : public ::testing::Test {
 public:
   EnvoyQuicServerStreamTest()
-      : connection_helper_(time_system_),
-        scheduler_(time_system_.createScheduler(base_scheduler_)),
-        alarm_factory_(*scheduler_, *connection_helper_.GetClock()),
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()),
+        connection_helper_(*dispatcher_),
+        alarm_factory_(*dispatcher_, *connection_helper_.GetClock()),
         quic_version_(quic::CurrentSupportedVersions()[0]),
-        quic_connection_(quic::test::TestConnectionId(), quic::QuicSocketAddress(quic::QuicIpAddress::Any6(), 12345),
+        quic_connection_(quic::test::TestConnectionId(),
+                         quic::QuicSocketAddress(quic::QuicIpAddress::Any6(), 12345),
                          &connection_helper_, &alarm_factory_, &writer_,
                          /*owns_writer=*/false, quic::Perspective::IS_SERVER, {quic_version_}),
         quic_session_(quic_config_, {quic_version_}, &quic_connection_, /*visitor=*/nullptr,
@@ -84,19 +87,18 @@ public:
     trailers_.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0, /*compressed_header_bytes=*/0);
   }
 
- protected:
-  Event::SimulatedTimeSystemHelper time_system_;
+protected:
+  Api::ApiPtr api_;
+  Event::DispatcherPtr dispatcher_;
   EnvoyQuicConnectionHelper connection_helper_;
-  Event::LibeventScheduler base_scheduler_;
-  Event::SchedulerPtr scheduler_;
   EnvoyQuicAlarmFactory alarm_factory_;
   testing::NiceMock<quic::test::MockPacketWriter> writer_;
   quic::ParsedQuicVersion quic_version_;
   quic::QuicConfig quic_config_;
   EnvoyQuicConnection quic_connection_;
   MockQuicServerSession quic_session_;
-  EnvoyQuicServerStream quic_stream_;
   quic::QuicStreamId stream_id_{5};
+  EnvoyQuicServerStream quic_stream_;
   Http::MockStreamDecoder stream_decoder_;
   quic::QuicHeaderList headers_;
   quic::QuicHeaderList trailers_;
@@ -109,14 +111,15 @@ TEST_F(EnvoyQuicServerStreamTest, DecodeHeadersAndBody) {
       .WillOnce(Invoke([this](const Http::HeaderMapPtr& headers, bool) {
         EXPECT_EQ(host_, headers->Host()->value().getStringView());
         EXPECT_EQ("/", headers->Path()->value().getStringView());
-        EXPECT_EQ(Http::Headers::get().MethodValues.Get, headers->Method()->value().getStringView());
+        EXPECT_EQ(Http::Headers::get().MethodValues.Get,
+                  headers->Method()->value().getStringView());
       }));
   quic_stream_.OnStreamHeaderList(/*fin=*/false, headers_.uncompressed_header_bytes(), headers_);
   EXPECT_TRUE(quic_stream_.FinishedReadingHeaders());
 
   quic::QuicStreamFrame frame(stream_id_, true, 0, request_body_);
   EXPECT_CALL(stream_decoder_, decodeData(_, _))
-      .WillOnce(Invoke([this](Buffer::Instance& buffer, bool finished_reading){
+      .WillOnce(Invoke([this](Buffer::Instance& buffer, bool finished_reading) {
         EXPECT_EQ(request_body_, buffer.toString());
         EXPECT_TRUE(finished_reading);
       }));
@@ -128,27 +131,29 @@ TEST_F(EnvoyQuicServerStreamTest, DecodeHeadersBodyAndTrailers) {
       .WillOnce(Invoke([this](const Http::HeaderMapPtr& headers, bool) {
         EXPECT_EQ(host_, headers->Host()->value().getStringView());
         EXPECT_EQ("/", headers->Path()->value().getStringView());
-        EXPECT_EQ(Http::Headers::get().MethodValues.Get, headers->Method()->value().getStringView());
+        EXPECT_EQ(Http::Headers::get().MethodValues.Get,
+                  headers->Method()->value().getStringView());
       }));
   quic_stream_.OnStreamHeaderList(/*fin=*/false, headers_.uncompressed_header_bytes(), headers_);
   EXPECT_TRUE(quic_stream_.FinishedReadingHeaders());
 
   quic::QuicStreamFrame frame(stream_id_, false, 0, request_body_);
-  EXPECT_CALL(stream_decoder_, decodeData(_, _)).Times(testing::AtMost(2))
-      .WillOnce(Invoke([this](Buffer::Instance& buffer, bool finished_reading){
+  EXPECT_CALL(stream_decoder_, decodeData(_, _))
+      .Times(testing::AtMost(2))
+      .WillOnce(Invoke([this](Buffer::Instance& buffer, bool finished_reading) {
         EXPECT_EQ(request_body_, buffer.toString());
         EXPECT_FALSE(finished_reading);
       }))
-  // Depends on QUIC version, there may be an empty STREAM_FRAME with FIN. But
-  // since there is trailers, finished_reading should always be false.
-  .WillOnce(Invoke([this](Buffer::Instance& buffer, bool finished_reading){
+      // Depends on QUIC version, there may be an empty STREAM_FRAME with FIN. But
+      // since there is trailers, finished_reading should always be false.
+      .WillOnce(Invoke([this](Buffer::Instance& buffer, bool finished_reading) {
         EXPECT_FALSE(finished_reading);
         EXPECT_EQ(0, buffer.length());
       }));
   quic_stream_.OnStreamFrame(frame);
 
   EXPECT_CALL(stream_decoder_, decodeTrailers_(_))
-      .WillOnce(Invoke([this](const Http::HeaderMapPtr& headers){
+      .WillOnce(Invoke([this](const Http::HeaderMapPtr& headers) {
         Http::LowerCaseString key1("key1");
         Http::LowerCaseString key2(":final-offset");
         EXPECT_EQ("value1", headers->get(key1)->value().getStringView());
@@ -157,5 +162,5 @@ TEST_F(EnvoyQuicServerStreamTest, DecodeHeadersBodyAndTrailers) {
   quic_stream_.OnStreamHeaderList(/*fin=*/true, trailers_.uncompressed_header_bytes(), trailers_);
 }
 
-}  // namespace Quic
-}  // namespace Envoy
+} // namespace Quic
+} // namespace Envoy

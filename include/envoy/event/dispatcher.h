@@ -211,8 +211,6 @@ public:
    * @return The previously tracked object or nullptr if there was none.
    */
   virtual const ScopeTrackedObject* setTrackedObject(const ScopeTrackedObject* object) PURE;
-
-  virtual Scheduler& scheduler() PURE;
 };
 
 using DispatcherPtr = std::unique_ptr<Dispatcher>;

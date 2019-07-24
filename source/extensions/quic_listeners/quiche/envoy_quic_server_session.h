@@ -13,6 +13,7 @@
 
 #include <memory>
 
+#include "common/common/logger.h"
 #include "common/common/empty_string.h"
 #include "common/network/filter_manager_impl.h"
 #include "common/stream_info/stream_info_impl.h"
@@ -27,6 +28,7 @@ namespace Quic {
 class EnvoyQuicServerSession : public quic::QuicServerSessionBase,
                                public Network::FilterManagerConnection {
 public:
+  // Ownes connection.
   EnvoyQuicServerSession(const quic::QuicConfig& config,
                          const quic::ParsedQuicVersionVector& supported_versions,
                          quic::QuicConnection* connection, quic::QuicSession::Visitor* visitor,
@@ -34,6 +36,9 @@ public:
                          const quic::QuicCryptoServerConfig* crypto_config,
                          quic::QuicCompressedCertsCache* compressed_certs_cache,
                          Event::Dispatcher& dispatcher);
+
+  // Overridden to delete connection object.
+  ~EnvoyQuicServerSession() override;
 
   // Network::FilterManager
   void addWriteFilter(Network::WriteFilterSharedPtr filter) override;
@@ -63,41 +68,37 @@ public:
     // No-op. TCP_NODELAY doesn't apply to UDP.
   }
   void setDelayedCloseTimeout(std::chrono::milliseconds timeout) override;
-  std::chrono::milliseconds delayedCloseTimeout() const;
+  std::chrono::milliseconds delayedCloseTimeout() const override;
   void readDisable(bool /*disable*/) override {
     // Quic connection should be able to read through out its life time.
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
-  void detectEarlyCloseWhenReadDisabled(bool /*value*/) override {
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
-  bool readEnabled() const override {
-    return true;
-  }
+  void detectEarlyCloseWhenReadDisabled(bool /*value*/) override { NOT_REACHED_GCOVR_EXCL_LINE; }
+  bool readEnabled() const override { return true; }
   const Network::Address::InstanceConstSharedPtr& remoteAddress() const override;
   const Network::Address::InstanceConstSharedPtr& localAddress() const override;
-  absl::optional<Network::Connection::UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const override {
+  absl::optional<Network::Connection::UnixDomainSocketPeerCredentials>
+  unixSocketPeerCredentials() const override {
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
   void setConnectionStats(const Network::Connection::ConnectionStats& stats) override {
-     stats_ = std::make_unique<Network::Connection::ConnectionStats>(stats);
-     reinterpret_cast<EnvoyQuicConnection*>(connection())->setConnectionStats(stats);
+    stats_ = std::make_unique<Network::Connection::ConnectionStats>(stats);
+    reinterpret_cast<EnvoyQuicConnection*>(connection())->setConnectionStats(stats);
   }
   const Ssl::ConnectionInfo* ssl() const override;
   Network::Connection::State state() const override {
-    return connection()->connected() ? Network::Connection::State::Open : Network::Connection::State::Closed;
+    return connection()->connected() ? Network::Connection::State::Open
+                                     : Network::Connection::State::Closed;
   }
   void write(Buffer::Instance& /*data*/, bool /*end_stream*/) override {
     // All writes should be handled by Quic internally.
-        NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
   void setBufferLimits(uint32_t /*limit*/) override {
     // QUIC manages its own buffer.
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
-  uint32_t bufferLimit() const override {
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
+  uint32_t bufferLimit() const override { NOT_REACHED_GCOVR_EXCL_LINE; }
   bool localAddressRestored() const override {
     // SO_ORIGINAL_DST not supported by QUIC.
     return false;
@@ -113,22 +114,16 @@ public:
   absl::string_view requestedServerName() const override;
   StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
   const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
-  absl::string_view transportFailureReason() const override {
-    return transport_failure_reason_;
-  }
+  absl::string_view transportFailureReason() const override { return transport_failure_reason_; }
   bool isQuic() const override { return true; }
 
   // Network::FilterManagerConnection
   void rawWrite(Buffer::Instance& data, bool end_stream) override;
 
   // Network::ReadBufferSource
-  Network::StreamBuffer getReadBuffer() override {
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
+  Network::StreamBuffer getReadBuffer() override { NOT_REACHED_GCOVR_EXCL_LINE; }
   // Network::WriteBufferSource
-  Network::StreamBuffer getWriteBuffer() override {
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
+  Network::StreamBuffer getWriteBuffer() override { NOT_REACHED_GCOVR_EXCL_LINE; }
 
   // Must be called before creating data streams.
   void setHttpConnectionCallbacks(Http::ServerConnectionCallbacks& callbacks) {
@@ -138,11 +133,14 @@ public:
   // quic::QuicSession
   void OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
                           quic::ConnectionCloseSource source) override;
+  void Initialize() override;
+
 protected:
   // quic::QuicServerSessionBase
   quic::QuicCryptoServerStreamBase*
   CreateQuicCryptoServerStream(const quic::QuicCryptoServerConfig* crypto_config,
                                quic::QuicCompressedCertsCache* compressed_certs_cache) override;
+
   // quic::QuicSession
   quic::QuicSpdyStream* CreateIncomingStream(quic::QuicStreamId id) override;
   quic::QuicSpdyStream* CreateIncomingStream(quic::PendingStream* pending) override;

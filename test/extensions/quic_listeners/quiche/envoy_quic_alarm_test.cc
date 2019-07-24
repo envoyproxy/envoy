@@ -1,10 +1,9 @@
-#include "common/event/libevent_scheduler.h"
-
 #include "extensions/quic_listeners/quiche/envoy_quic_alarm.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_alarm_factory.h"
 #include "extensions/quic_listeners/quiche/platform/envoy_quic_clock.h"
 
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -32,19 +31,19 @@ private:
 class EnvoyQuicAlarmTest : public ::testing::Test {
 public:
   EnvoyQuicAlarmTest()
-      : clock_(time_system_), scheduler_(time_system_.createScheduler(base_scheduler_)),
-        alarm_factory_(*scheduler_, clock_) {}
+      : api_(Api::createApiForTest(time_system_)), dispatcher_(api_->allocateDispatcher()),
+        clock_(*dispatcher_), alarm_factory_(*dispatcher_, clock_) {}
 
   void advanceMsAndLoop(int64_t delay_ms) {
     time_system_.sleep(std::chrono::milliseconds(delay_ms));
-    base_scheduler_.run(Dispatcher::RunType::NonBlock);
+    dispatcher_->run(Dispatcher::RunType::NonBlock);
   }
 
 protected:
   Event::SimulatedTimeSystemHelper time_system_;
+  Api::ApiPtr api_;
+  Event::DispatcherPtr dispatcher_;
   EnvoyQuicClock clock_;
-  Event::LibeventScheduler base_scheduler_;
-  Event::SchedulerPtr scheduler_;
   EnvoyQuicAlarmFactory alarm_factory_;
   quic::QuicConnectionArena arena_;
 };
@@ -157,7 +156,7 @@ TEST_F(EnvoyQuicAlarmTest, SetAlarmToPastTime) {
   // alarm becomes active upon Set().
   alarm->Set(clock_.Now() - QuicTime::Delta::FromMilliseconds(10));
   EXPECT_FALSE(unowned_delegate->fired());
-  base_scheduler_.run(Dispatcher::RunType::NonBlock);
+  dispatcher_->run(Dispatcher::RunType::NonBlock);
   EXPECT_TRUE(unowned_delegate->fired());
 }
 
@@ -170,7 +169,7 @@ TEST_F(EnvoyQuicAlarmTest, UpdateAlarmWithPastDeadline) {
   EXPECT_FALSE(unowned_delegate->fired());
   // alarm becomes active upon Update().
   alarm->Update(clock_.Now() - QuicTime::Delta::FromMilliseconds(1), quic::QuicTime::Delta::Zero());
-  base_scheduler_.run(Dispatcher::RunType::NonBlock);
+  dispatcher_->run(Dispatcher::RunType::NonBlock);
   EXPECT_TRUE(unowned_delegate->fired());
   unowned_delegate->set_fired(false);
   advanceMsAndLoop(1);
@@ -186,7 +185,7 @@ TEST_F(EnvoyQuicAlarmTest, CancelActiveAlarm) {
   // alarm becomes active upon Set().
   alarm->Set(clock_.Now() - QuicTime::Delta::FromMilliseconds(10));
   alarm->Cancel();
-  base_scheduler_.run(Dispatcher::RunType::NonBlock);
+  dispatcher_->run(Dispatcher::RunType::NonBlock);
   EXPECT_FALSE(unowned_delegate->fired());
 }
 
