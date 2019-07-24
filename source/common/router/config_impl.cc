@@ -428,8 +428,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     const std::string& runtime_key_prefix = route.route().weighted_clusters().runtime_key_prefix();
 
     for (const auto& cluster : route.route().weighted_clusters().clusters()) {
-      std::unique_ptr<WeightedClusterEntry> cluster_entry(new WeightedClusterEntry(
-          this, runtime_key_prefix + "." + cluster.name(), factory_context, cluster));
+      auto cluster_entry = std::make_unique<WeightedClusterEntry>(
+          this, runtime_key_prefix + "." + cluster.name(), factory_context, cluster);
       weighted_clusters_.emplace_back(std::move(cluster_entry));
       total_weight += weighted_clusters_.back()->clusterWeight();
     }
