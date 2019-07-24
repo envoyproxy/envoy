@@ -88,14 +88,4 @@ message HTTPFault {
   //  This is a per-stream limit versus a connection level limit. This means that concurrent streams
   //  will each get an independent limit.
   filter.fault.v2.FaultRateLimit response_rate_limit = 7;
-
-  string abort_percent_key = 8;
-
-  string abort_http_status_key = 9;
-
-  string delay_percent_key = 10;
-
-  string delay_duration_key = 11;
-
-  string downstream_cluster = 12;
 }

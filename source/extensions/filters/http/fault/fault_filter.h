@@ -62,11 +62,6 @@ public:
   const Filters::Common::Fault::FaultRateLimitConfig* responseRateLimit() const {
     return response_rate_limit_.get();
   }
-  const std::string& abort_percent_key() const { return abort_percent_key_; }
-  const std::string& delay_percent_key() const { return delay_percent_key_; }
-  const std::string& abort_http_status_key() const { return abort_http_status_key_; }
-  const std::string& delay_duration_key() const { return delay_duration_key_; }
-  const std::string& downstream_cluster() const { return downstream_cluster_; }
 
 private:
   envoy::type::FractionalPercent abort_percentage_;
@@ -77,11 +72,6 @@ private:
   absl::flat_hash_set<std::string> downstream_nodes_{}; // Inject failures for specific downstream
   absl::optional<uint64_t> max_active_faults_;
   Filters::Common::Fault::FaultRateLimitConfigPtr response_rate_limit_;
-  std::string abort_percent_key_;
-  std::string delay_percent_key_;
-  std::string abort_http_status_key_;
-  std::string delay_duration_key_;
-  std::string downstream_cluster_;
 };
 
 /**
@@ -240,7 +230,6 @@ private:
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   Event::TimerPtr delay_timer_;
   std::string downstream_cluster_{};
-  std::string upstream_cluster_{};
   const FaultSettings* fault_settings_;
   bool fault_active_{};
   std::unique_ptr<StreamRateLimiter> response_limiter_;

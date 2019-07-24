@@ -62,16 +62,6 @@ FaultSettings::FaultSettings(const envoy::config::filter::http::fault::v2::HTTPF
     response_rate_limit_ =
         std::make_unique<Filters::Common::Fault::FaultRateLimitConfig>(fault.response_rate_limit());
   }
-
-  abort_percent_key_ = fault.abort_percent_key();
-
-  delay_percent_key_ = fault.delay_percent_key();
-
-  abort_http_status_key_ = fault.abort_http_status_key();
-
-  delay_duration_key_ = fault.delay_duration_key();
-
-  downstream_cluster_ = fault.downstream_cluster();
 }
 
 FaultFilterConfig::FaultFilterConfig(const envoy::config::filter::http::fault::v2::HTTPFault& fault,
@@ -218,14 +208,6 @@ bool FaultFilter::isDelayEnabled() {
     enabled |= config_->runtime().snapshot().featureEnabled(
         downstream_cluster_delay_percent_key_, fault_settings_->requestDelay()->percentage());
   }
-
-  if (!config_->runtime().snapshot().get(fault_settings_->delay_percent_key()).empty()
-    && !config_->runtime().snapshot().get(fault_settings_->delay_duration_key()).empty()
-    && (fault_settings_->downstream_cluster() == downstream_cluster_
-      || fault_settings_->upstreamCluster() == upstream_cluster_)) {
-    enabled |= config_->runtime().snapshot().featureEnabled(fault_settings_->delay_percent_key(),
-                                                            fault_settings_->requestDelay()->percentage());
-  }
   return enabled;
 }
 
@@ -234,14 +216,6 @@ bool FaultFilter::isAbortEnabled() {
                                                               fault_settings_->abortPercentage());
   if (!downstream_cluster_abort_percent_key_.empty()) {
     enabled |= config_->runtime().snapshot().featureEnabled(downstream_cluster_abort_percent_key_,
-                                                            fault_settings_->abortPercentage());
-  }
-
-  if (!config_->runtime().snapshot().get(fault_settings_->abort_percent_key()).empty()
-    && !config_->runtime().snapshot().get(fault_settings_->abort_http_status_key()).empty()
-    && (fault_settings_->downstream_cluster() == downstream_cluster_
-      || fault_settings_->upstreamCluster() == upstream_cluster_)) {
-    enabled |= config_->runtime().snapshot().featureEnabled(fault_settings_->abort_percent_key(),
                                                             fault_settings_->abortPercentage());
   }
   return enabled;
@@ -271,12 +245,6 @@ FaultFilter::delayDuration(const Http::HeaderMap& request_headers) {
         downstream_cluster_delay_duration_key_, duration.count()));
   }
 
-  if (!config_->runtime().snapshot().get(fault_settings_->delay_percent_key()).empty()
-    && !config_->runtime().snapshot().get(fault_settings_->delay_duration_key()).empty()) {
-    duration = std::chrono::milliseconds(config_->runtime().snapshot().getInteger(
-        fault_settings_->delay_duration_key(), duration.count()));
-  }
-
   // Delay only if the duration is >0ms
   if (duration.count() > 0) {
     ret = duration;
@@ -293,12 +261,6 @@ uint64_t FaultFilter::abortHttpStatus() {
   if (!downstream_cluster_abort_http_status_key_.empty()) {
     http_status = config_->runtime().snapshot().getInteger(
         downstream_cluster_abort_http_status_key_, http_status);
-  }
-
-  if (!config_->runtime().snapshot().get(fault_settings_->abort_percent_key()).empty()
-    && !config_->runtime().snapshot().get(fault_settings_->abort_http_status_key()).empty()) {
-    http_status = config_->runtime().snapshot().getInteger(
-      fault_settings_->abort_http_status_key(), http_status);
   }
 
   return http_status;
@@ -397,10 +359,8 @@ bool FaultFilter::matchesTargetUpstreamCluster() {
 
   if (!fault_settings_->upstreamCluster().empty()) {
     Router::RouteConstSharedPtr route = decoder_callbacks_->route();
-    if (route && route->routeEntry()) {
-      upstream_cluster_ = route->routeEntry()->clusterName();
-    }
-    matches = upstream_cluster_ == fault_settings_->upstreamCluster();
+    matches = route && route->routeEntry() &&
+              (route->routeEntry()->clusterName() == fault_settings_->upstreamCluster());
   }
 
   return matches;
