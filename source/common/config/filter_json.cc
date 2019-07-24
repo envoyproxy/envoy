@@ -290,6 +290,11 @@ void FilterJson::translateFaultFilter(
   }
 
   JSON_UTIL_SET_STRING(json_config, proto_config, upstream_cluster);
+  JSON_UTIL_SET_STRING(json_config, proto_config, downstream_cluster);
+  JSON_UTIL_SET_STRING(json_config, proto_config, abort_percent_key);
+  JSON_UTIL_SET_STRING(json_config, proto_config, abort_http_status_key);
+  JSON_UTIL_SET_STRING(json_config, proto_config, delay_percent_key);
+  JSON_UTIL_SET_STRING(json_config, proto_config, delay_duration_key);
 
   for (const auto& json_downstream_node : json_config.getStringArray("downstream_nodes", true)) {
     auto* downstream_node = proto_config.mutable_downstream_nodes()->Add();
