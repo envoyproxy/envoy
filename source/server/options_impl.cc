@@ -180,6 +180,7 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   }
 
   config_path_ = config_path.getValue();
+  config_proto_ = config_proto.getValue();
   config_yaml_ = config_yaml.getValue();
   allow_unknown_fields_ = allow_unknown_fields.getValue();
   admin_address_path_ = admin_address_path.getValue();
@@ -280,7 +281,8 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
 
 OptionsImpl::OptionsImpl(const std::string& service_cluster, const std::string& service_node,
                          const std::string& service_zone, spdlog::level::level_enum log_level)
-    : base_id_(0u), concurrency_(1u), config_path_(""), config_yaml_(""),
+    : base_id_(0u), concurrency_(1u), config_path_(""),
+      config_proto_(envoy::config::bootstrap::v2::Bootstrap()), config_yaml_(""),
       local_address_ip_version_(Network::Address::IpVersion::v4), log_level_(log_level),
       log_format_(Logger::Logger::DEFAULT_LOG_FORMAT), restart_epoch_(0u),
       service_cluster_(service_cluster), service_node_(service_node), service_zone_(service_zone),

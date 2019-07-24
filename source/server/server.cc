@@ -210,9 +210,10 @@ InstanceUtil::BootstrapVersion InstanceUtil::loadBootstrapConfig(
     ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api) {
   const std::string& config_path = options.configPath();
   const std::string& config_yaml = options.configYaml();
+  const envoy::config::bootstrap::v2::Bootstrap& config_proto = options.configProto();
 
   // Exactly one of config_path and config_yaml should be specified.
-  if (config_path.empty() && config_yaml.empty()) {
+  if (config_path.empty() && config_yaml.empty() && config_proto.ByteSize() == 0) {
     const std::string message =
         "At least one of --config-path and --config-yaml should be non-empty";
     throw EnvoyException(message);
@@ -225,6 +226,9 @@ InstanceUtil::BootstrapVersion InstanceUtil::loadBootstrapConfig(
     envoy::config::bootstrap::v2::Bootstrap bootstrap_override;
     MessageUtil::loadFromYaml(config_yaml, bootstrap_override, validation_visitor);
     bootstrap.MergeFrom(bootstrap_override);
+  }
+  if (!config_proto.ByteSize() != 0) {
+    bootstrap.MergeFrom(config_proto);
   }
   MessageUtil::validate(bootstrap);
   return BootstrapVersion::V2;
