@@ -279,30 +279,22 @@ uint64_t FaultFilter::abortHttpStatus() {
   return http_status;
 }
 
-// Fault is possible in following 2 conditions:
-// 1. The settings have either the abort or delay runtime override blocks.
-//    In such a case, the downstream or upstream cluster name is not implicit and hence has to be
-//    specifically mentioned.
-// 2. The settings don't have the override settings and the downstream cluster name is available
-//    in the headers.
 bool FaultFilter::isReadyToAbortFault() {
-  if (fault_settings_->isAbortOverridden() &&
-      (fault_settings_->downstreamCluster().compare(downstream_cluster_) == 0 ||
-       (!upstream_cluster_.empty() &&
-        fault_settings_->upstreamCluster().compare(upstream_cluster_) == 0))) {
-    return true;
-  }
-  return !fault_settings_->isAbortOverridden() && !downstream_cluster_.empty();
+  bool isImplicitFaultPossible = !fault_settings_->isAbortOverridden() && !downstream_cluster_.empty();
+  bool isOverridePossible = fault_settings_->isAbortOverridden() &&
+         (fault_settings_->downstreamCluster().compare(downstream_cluster_) == 0 ||
+          (!upstream_cluster_.empty() &&
+           fault_settings_->upstreamCluster().compare(upstream_cluster_) == 0));
+  return isImplicitFaultPossible || isOverridePossible;
 }
 
 bool FaultFilter::isReadyToDelayFault() {
-  if (fault_settings_->isDelayOverridden() &&
-      (fault_settings_->downstreamCluster().compare(downstream_cluster_) == 0 ||
-       (!upstream_cluster_.empty() &&
-        fault_settings_->upstreamCluster().compare(upstream_cluster_) == 0))) {
-    return true;
-  }
-  return !fault_settings_->isDelayOverridden() && !downstream_cluster_.empty();
+  bool isImplicitFaultPossible = !fault_settings_->isDelayOverridden() && !downstream_cluster_.empty();
+  bool isOverridePossible = fault_settings_->isDelayOverridden() &&
+         (fault_settings_->downstreamCluster().compare(downstream_cluster_) == 0 ||
+          (!upstream_cluster_.empty() &&
+           fault_settings_->upstreamCluster().compare(upstream_cluster_) == 0));
+  return isImplicitFaultPossible || isOverridePossible; 
 }
 
 void FaultFilter::recordDelaysInjectedStats() {

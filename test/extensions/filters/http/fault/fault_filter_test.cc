@@ -134,25 +134,6 @@ public:
     }
     )EOF";
 
-  const std::string fixed_delay_and_abort_json_partial_override = R"EOF(
-    {
-      "delay" : {
-        "type" : "fixed",
-        "fixed_delay_percent" : 100,
-        "fixed_duration_ms" : 5000
-      },
-      "abort" : {
-        "abort_percent" : 100,
-        "http_status" : 503
-      },
-      "abort_runtime" : {
-        "abort_percent": "fault.http.custom.abort.abort_percent",
-        "abort_http_status": "fault.http.custom.abort.http_status"
-      },
-      "downstream_cluster": "cluster"
-    }
-    )EOF";
-
   const std::string fixed_delay_and_abort_match_headers_json = R"EOF(
     {
       "delay" : {
@@ -658,78 +639,6 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDownstreamOverride) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", 5000))
       .WillOnce(Return(125UL));
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.custom.delay.fixed_duration_ms", 125UL))
-      .WillOnce(Return(500UL));
-  expectDelayTimer(500UL);
-
-  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::DelayInjected));
-
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
-            filter_->decodeHeaders(request_headers_, false));
-
-  EXPECT_EQ(1UL, config_->stats().active_faults_.value());
-
-  // Abort related calls
-  EXPECT_CALL(runtime_.snapshot_,
-              featureEnabled("fault.http.abort.abort_percent",
-                             Matcher<const envoy::type::FractionalPercent&>(Percent(100))))
-      .WillOnce(Return(false));
-  EXPECT_CALL(runtime_.snapshot_,
-              featureEnabled("fault.http.custom.abort.abort_percent",
-                             Matcher<const envoy::type::FractionalPercent&>(Percent(100))))
-      .WillOnce(Return(true));
-
-  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", 503))
-      .WillOnce(Return(503));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.custom.abort.http_status", 503))
-      .WillOnce(Return(500));
-
-  Http::TestHeaderMapImpl response_headers{
-      {":status", "500"}, {"content-length", "18"}, {"content-type", "text/plain"}};
-  EXPECT_CALL(decoder_filter_callbacks_,
-              encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
-  EXPECT_CALL(decoder_filter_callbacks_, encodeData(_, true));
-
-  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::FaultInjected));
-
-  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
-  timer_->invokeCallback();
-
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
-  EXPECT_EQ(1UL, config_->stats().active_faults_.value());
-  filter_->onDestroy();
-
-  EXPECT_EQ(1UL, config_->stats().delays_injected_.value());
-  EXPECT_EQ(1UL, config_->stats().aborts_injected_.value());
-  EXPECT_EQ(1UL, stats_.counter("prefix.fault.cluster.delays_injected").value());
-  EXPECT_EQ(1UL, stats_.counter("prefix.fault.cluster.aborts_injected").value());
-  EXPECT_EQ(0UL, config_->stats().active_faults_.value());
-}
-
-TEST_F(FaultFilterTest, FixedDelayAndAbortDownstreamPartialOverride) {
-  SetUpTest(fixed_delay_and_abort_json_partial_override);
-
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
-      .WillOnce(Return(std::numeric_limits<uint64_t>::max()));
-
-  request_headers_.addCopy("x-envoy-downstream-service-cluster", "cluster");
-
-  // Delay related calls.
-  EXPECT_CALL(runtime_.snapshot_,
-              featureEnabled("fault.http.delay.fixed_delay_percent",
-                             Matcher<const envoy::type::FractionalPercent&>(Percent(100))))
-      .WillOnce(Return(false));
-  EXPECT_CALL(runtime_.snapshot_,
-              featureEnabled("fault.http.cluster.delay.fixed_delay_percent",
-                             Matcher<const envoy::type::FractionalPercent&>(Percent(100))))
-      .WillOnce(Return(true));
-
-  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", 5000))
-      .WillOnce(Return(125UL));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.cluster.delay.fixed_duration_ms", 125UL))
       .WillOnce(Return(500UL));
   expectDelayTimer(500UL);
 

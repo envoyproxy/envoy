@@ -98,8 +98,10 @@ message HTTPFault {
 
 message FaultAbortRuntime {
   string abort_percent = 1 [(validate.rules).string.min_bytes = 1];
+  ;
 
   string abort_http_status = 2 [(validate.rules).string.min_bytes = 1];
+  ;
 }
 
 message FaultDelayRuntime {
