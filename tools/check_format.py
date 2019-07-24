@@ -48,9 +48,7 @@ REAL_TIME_WHITELIST = ("./source/common/common/utility.h",
 # https://github.com/envoyproxy/envoy/pull/7573 and others.
 #
 # TODO(#4196): Eliminate this list completely and then merge #4980.
-STAT_FROM_STRING_WHITELIST = ("./source/common/memory/heap_shrinker.cc",
-                              "./source/extensions/filters/http/dynamo/dynamo_filter.cc",
-                              "./source/extensions/filters/http/ext_authz/ext_authz.cc",
+STAT_FROM_STRING_WHITELIST = ("./source/extensions/filters/http/ext_authz/ext_authz.cc",
                               "./source/extensions/filters/http/fault/fault_filter.cc",
                               "./source/extensions/filters/http/ip_tagging/ip_tagging_filter.cc",
                               "./source/extensions/filters/network/mongo_proxy/proxy.cc",
@@ -584,7 +582,7 @@ def checkSourceLine(line, file_path, reportError):
   if isInSubdir(file_path, 'source') and file_path.endswith('.cc') and \
      not whitelistedForStatFromString(file_path) and \
      ('.counter(' in line or '.gauge(' in line or '.histogram(' in line):
-    reportError("Don't lookup stats by name at runtime; used StatName saved during construction")
+    reportError("Don't lookup stats by name at runtime; use StatName saved during construction")
 
 
 def checkBuildLine(line, file_path, reportError):
