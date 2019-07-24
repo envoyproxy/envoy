@@ -146,21 +146,19 @@ Upstream::RetryPrioritySharedPtr RetryPolicyImpl::retryPriority() const {
 
 CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config,
                                Runtime::Loader& loader)
-    : config_(config), loader_(loader) {
+    : config_(config), loader_(loader), allow_methods_(config.allow_methods()),
+      allow_headers_(config.allow_headers()), expose_headers_(config.expose_headers()),
+      max_age_(config.max_age()),
+      legacy_enabled_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enabled, true)) {
   for (const auto& origin : config.allow_origin()) {
     allow_origin_.push_back(origin);
   }
   for (const auto& regex : config.allow_origin_regex()) {
     allow_origin_regex_.push_back(RegexUtil::parseRegex(regex));
   }
-  allow_methods_ = config.allow_methods();
-  allow_headers_ = config.allow_headers();
-  expose_headers_ = config.expose_headers();
-  max_age_ = config.max_age();
   if (config.has_allow_credentials()) {
     allow_credentials_ = PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_credentials);
   }
-  legacy_enabled_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enabled, true);
 }
 
 ShadowPolicyImpl::ShadowPolicyImpl(const envoy::api::v2::route::RouteAction& config) {
