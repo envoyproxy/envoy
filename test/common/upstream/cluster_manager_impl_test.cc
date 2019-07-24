@@ -33,6 +33,7 @@
 #include "test/mocks/tcp/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
@@ -2689,8 +2690,35 @@ TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsNullIsOkay) {
   EXPECT_NE(nullptr, cp);
 }
 
+class TestUpstreamNetworkFilter : public Network::WriteFilter {
+public:
+  Network::FilterStatus onWrite(Buffer::Instance&, bool) override {
+    return Network::FilterStatus::Continue;
+  }
+};
+
+class TestUpstreamNetworkFilterConfigFactory
+    : public Server::Configuration::NamedUpstreamNetworkFilterConfigFactory {
+public:
+  TestUpstreamNetworkFilterConfigFactory() {}
+  Network::FilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message&,
+                               Server::Configuration::CommonFactoryContext&) override {
+    return [](Network::FilterManager& filter_manager) -> void {
+      filter_manager.addWriteFilter(std::make_shared<TestUpstreamNetworkFilter>());
+    };
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
+  }
+  std::string name() override { CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.filter"); }
+};
+
 // Verify that configured upstream filters are added to client connections.
 TEST_F(ClusterManagerImplTest, AddUpstreamFilters) {
+  TestUpstreamNetworkFilterConfigFactory factory;
+  Registry::InjectFactory<Server::Configuration::NamedUpstreamNetworkFilterConfigFactory> registry(
+      factory);
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
@@ -2703,13 +2731,13 @@ TEST_F(ClusterManagerImplTest, AddUpstreamFilters) {
           address: "127.0.0.1"
           port_value: 11001
       filters:
-      - name: envoy.echo
+      - name: envoy.test.filter
   )EOF";
 
   create(parseBootstrapFromV2Yaml(yaml));
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
-  EXPECT_CALL(*connection, addReadFilter(_)).Times(1); // echo is a read filter.
-  EXPECT_CALL(*connection, addWriteFilter(_)).Times(0);
+  EXPECT_CALL(*connection, addReadFilter(_)).Times(0);
+  EXPECT_CALL(*connection, addWriteFilter(_)).Times(1);
   EXPECT_CALL(*connection, addFilter(_)).Times(0);
   EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
       .WillOnce(Return(connection));
