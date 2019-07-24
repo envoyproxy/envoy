@@ -33,7 +33,7 @@ elif [[ ! -z "${BAZEL_REMOTE_CACHE}" ]]; then
     --remote_cache=${BAZEL_REMOTE_CACHE} \
     --remote_instance_name=${BAZEL_REMOTE_INSTANCE} \
     --google_credentials=${GCP_SERVICE_ACCOUNT_KEY_FILE} \
-    --tls_enabled=true --auth_enabled=true"
+    --auth_enabled=true"
   echo "Set up bazel remote read/write cache at ${BAZEL_REMOTE_CACHE} instance: ${BAZEL_REMOTE_INSTANCE}."
 else
   echo "No remote cache bucket is set, skipping setup remote cache."

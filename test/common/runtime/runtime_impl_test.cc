@@ -155,7 +155,7 @@ TEST_F(DiskLoaderImplTest, All) {
   EXPECT_EQ(123UL, loader_->snapshot().getInteger("file4", 1));
 
   bool value;
-  SnapshotImpl* snapshot = reinterpret_cast<SnapshotImpl*>(&loader_->snapshot());
+  const SnapshotImpl* snapshot = reinterpret_cast<const SnapshotImpl*>(&loader_->snapshot());
 
   // Validate that the layer name is set properly for static layers.
   EXPECT_EQ("base", snapshot->getLayers()[0]->name());
@@ -538,7 +538,7 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
 
   // Boolean getting.
   bool value;
-  SnapshotImpl* snapshot = reinterpret_cast<SnapshotImpl*>(&loader_->snapshot());
+  const SnapshotImpl* snapshot = reinterpret_cast<const SnapshotImpl*>(&loader_->snapshot());
 
   EXPECT_EQ(true, snapshot->getBoolean("file11", value));
   EXPECT_EQ(true, value);

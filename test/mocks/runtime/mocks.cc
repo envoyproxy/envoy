@@ -12,19 +12,19 @@ namespace Runtime {
 
 MockRandomGenerator::MockRandomGenerator() { ON_CALL(*this, uuid()).WillByDefault(Return(uuid_)); }
 
-MockRandomGenerator::~MockRandomGenerator() {}
+MockRandomGenerator::~MockRandomGenerator() = default;
 
 MockSnapshot::MockSnapshot() { ON_CALL(*this, getInteger(_, _)).WillByDefault(ReturnArg<1>()); }
 
-MockSnapshot::~MockSnapshot() {}
+MockSnapshot::~MockSnapshot() = default;
 
 MockLoader::MockLoader() { ON_CALL(*this, snapshot()).WillByDefault(ReturnRef(snapshot_)); }
 
-MockLoader::~MockLoader() {}
+MockLoader::~MockLoader() = default;
 
-MockOverrideLayer::MockOverrideLayer() {}
+MockOverrideLayer::MockOverrideLayer() = default;
 
-MockOverrideLayer::~MockOverrideLayer() {}
+MockOverrideLayer::~MockOverrideLayer() = default;
 
 } // namespace Runtime
 } // namespace Envoy

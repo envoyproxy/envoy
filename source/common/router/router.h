@@ -234,7 +234,7 @@ public:
         downstream_end_stream_(false), do_shadowing_(false), is_retry_(false),
         attempting_internal_redirect_with_complete_stream_(false) {}
 
-  ~Filter();
+  ~Filter() override;
 
   // Http::StreamFilterBase
   void onDestroy() override;
@@ -357,7 +357,7 @@ private:
                            public Http::ConnectionPool::Callbacks,
                            public LinkedObject<UpstreamRequest> {
     UpstreamRequest(Filter& parent, Http::ConnectionPool::Instance& pool);
-    ~UpstreamRequest();
+    ~UpstreamRequest() override;
 
     void encodeHeaders(bool end_stream);
     void encodeData(Buffer::Instance& data, bool end_stream);

@@ -9,7 +9,7 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/hash.h"
-#include "common/stats/heap_stat_data.h"
+#include "common/stats/allocator_impl.h"
 #include "common/stats/histogram_impl.h"
 #include "common/stats/null_counter.h"
 #include "common/stats/null_gauge.h"
@@ -140,7 +140,7 @@ public:
  */
 class ThreadLocalStoreImpl : Logger::Loggable<Logger::Id::stats>, public StoreRoot {
 public:
-  ThreadLocalStoreImpl(StatDataAllocator& alloc);
+  ThreadLocalStoreImpl(Allocator& alloc);
   ~ThreadLocalStoreImpl() override;
 
   // Stats::Scope
@@ -166,8 +166,8 @@ public:
   const SymbolTable& constSymbolTable() const override { return alloc_.constSymbolTable(); }
   SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
   const TagProducer& tagProducer() const { return *tag_producer_; }
-  absl::optional<std::reference_wrapper<const Counter>> findCounter(StatName name) const override {
-    absl::optional<std::reference_wrapper<const Counter>> found_counter;
+  OptionalCounter findCounter(StatName name) const override {
+    OptionalCounter found_counter;
     Thread::LockGuard lock(lock_);
     for (ScopeImpl* scope : scopes_) {
       found_counter = scope->findCounter(name);
@@ -177,8 +177,8 @@ public:
     }
     return absl::nullopt;
   }
-  absl::optional<std::reference_wrapper<const Gauge>> findGauge(StatName name) const override {
-    absl::optional<std::reference_wrapper<const Gauge>> found_gauge;
+  OptionalGauge findGauge(StatName name) const override {
+    OptionalGauge found_gauge;
     Thread::LockGuard lock(lock_);
     for (ScopeImpl* scope : scopes_) {
       found_gauge = scope->findGauge(name);
@@ -188,9 +188,8 @@ public:
     }
     return absl::nullopt;
   }
-  absl::optional<std::reference_wrapper<const Histogram>>
-  findHistogram(StatName name) const override {
-    absl::optional<std::reference_wrapper<const Histogram>> found_histogram;
+  OptionalHistogram findHistogram(StatName name) const override {
+    OptionalHistogram found_histogram;
     Thread::LockGuard lock(lock_);
     for (ScopeImpl* scope : scopes_) {
       found_histogram = scope->findHistogram(name);
@@ -274,13 +273,12 @@ private:
 
     // NOTE: The find methods assume that `name` is fully-qualified.
     // Implementations will not add the scope prefix.
-    absl::optional<std::reference_wrapper<const Counter>> findCounter(StatName name) const override;
-    absl::optional<std::reference_wrapper<const Gauge>> findGauge(StatName name) const override;
-    absl::optional<std::reference_wrapper<const Histogram>>
-    findHistogram(StatName name) const override;
+    OptionalCounter findCounter(StatName name) const override;
+    OptionalGauge findGauge(StatName name) const override;
+    OptionalHistogram findHistogram(StatName name) const override;
 
     template <class StatType>
-    using MakeStatFn = std::function<RefcountPtr<StatType>(StatDataAllocator&, StatName name,
+    using MakeStatFn = std::function<RefcountPtr<StatType>(Allocator&, StatName name,
                                                            absl::string_view tag_extracted_name,
                                                            const std::vector<Tag>& tags)>;
 
@@ -349,7 +347,7 @@ private:
   bool checkAndRememberRejection(StatName name, StatNameStorageSet& central_rejected_stats,
                                  StatNameHashSet* tls_rejected_stats);
 
-  StatDataAllocator& alloc_;
+  Allocator& alloc_;
   Event::Dispatcher* main_thread_dispatcher_{};
   ThreadLocal::SlotPtr tls_;
   mutable Thread::MutexBasicLockable lock_;
@@ -361,7 +359,7 @@ private:
   std::atomic<bool> threading_ever_initialized_{};
   std::atomic<bool> shutting_down_{};
   std::atomic<bool> merge_in_progress_{};
-  HeapStatDataAllocator heap_allocator_;
+  AllocatorImpl heap_allocator_;
 
   NullCounterImpl null_counter_;
   NullGaugeImpl null_gauge_;

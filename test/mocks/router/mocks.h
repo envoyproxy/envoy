@@ -34,7 +34,7 @@ namespace Router {
 class MockDirectResponseEntry : public DirectResponseEntry {
 public:
   MockDirectResponseEntry();
-  ~MockDirectResponseEntry();
+  ~MockDirectResponseEntry() override;
 
   // DirectResponseEntry
   MOCK_CONST_METHOD2(finalizeResponseHeaders,
@@ -112,7 +112,7 @@ public:
 class MockRetryState : public RetryState {
 public:
   MockRetryState();
-  ~MockRetryState();
+  ~MockRetryState() override;
 
   void expectHeadersRetry();
   void expectHedgedPerTryTimeoutRetry();
@@ -138,7 +138,7 @@ public:
 class MockRateLimitPolicyEntry : public RateLimitPolicyEntry {
 public:
   MockRateLimitPolicyEntry();
-  ~MockRateLimitPolicyEntry();
+  ~MockRateLimitPolicyEntry() override;
 
   // Router::RateLimitPolicyEntry
   MOCK_CONST_METHOD0(stage, uint64_t());
@@ -156,7 +156,7 @@ public:
 class MockRateLimitPolicy : public RateLimitPolicy {
 public:
   MockRateLimitPolicy();
-  ~MockRateLimitPolicy();
+  ~MockRateLimitPolicy() override;
 
   // Router::RateLimitPolicy
   MOCK_CONST_METHOD1(
@@ -182,7 +182,7 @@ public:
 class MockShadowWriter : public ShadowWriter {
 public:
   MockShadowWriter();
-  ~MockShadowWriter();
+  ~MockShadowWriter() override;
 
   // Router::ShadowWriter
   void shadow(const std::string& cluster, Http::MessagePtr&& request,
@@ -206,7 +206,7 @@ public:
 class MockVirtualHost : public VirtualHost {
 public:
   MockVirtualHost();
-  ~MockVirtualHost();
+  ~MockVirtualHost() override;
 
   // Router::VirtualHost
   MOCK_CONST_METHOD0(name, const std::string&());
@@ -233,7 +233,7 @@ public:
 class MockHashPolicy : public HashPolicy {
 public:
   MockHashPolicy();
-  ~MockHashPolicy();
+  ~MockHashPolicy() override;
 
   // Router::HashPolicy
   MOCK_CONST_METHOD3(generateHash,
@@ -245,7 +245,7 @@ public:
 class MockMetadataMatchCriteria : public MetadataMatchCriteria {
 public:
   MockMetadataMatchCriteria();
-  ~MockMetadataMatchCriteria();
+  ~MockMetadataMatchCriteria() override;
 
   // Router::MetadataMatchCriteria
   MOCK_CONST_METHOD0(metadataMatchCriteria,
@@ -256,7 +256,7 @@ public:
 class MockPathMatchCriterion : public PathMatchCriterion {
 public:
   MockPathMatchCriterion();
-  ~MockPathMatchCriterion();
+  ~MockPathMatchCriterion() override;
 
   // Router::PathMatchCriterion
   MOCK_CONST_METHOD0(matchType, PathMatchType());
@@ -269,7 +269,7 @@ public:
 class MockRouteEntry : public RouteEntry {
 public:
   MockRouteEntry();
-  ~MockRouteEntry();
+  ~MockRouteEntry() override;
 
   // Router::Config
   MOCK_CONST_METHOD0(clusterName, const std::string&());
@@ -326,7 +326,7 @@ public:
 class MockDecorator : public Decorator {
 public:
   MockDecorator();
-  ~MockDecorator();
+  ~MockDecorator() override;
 
   // Router::Decorator
   MOCK_CONST_METHOD0(getOperation, const std::string&());
@@ -338,7 +338,7 @@ public:
 class MockRouteTracing : public RouteTracing {
 public:
   MockRouteTracing();
-  ~MockRouteTracing();
+  ~MockRouteTracing() override;
 
   // Router::RouteTracing
   MOCK_CONST_METHOD0(getClientSampling, const envoy::type::FractionalPercent&());
@@ -349,7 +349,7 @@ public:
 class MockRoute : public Route {
 public:
   MockRoute();
-  ~MockRoute();
+  ~MockRoute() override;
 
   // Router::Route
   MOCK_CONST_METHOD0(directResponseEntry, const DirectResponseEntry*());
@@ -366,7 +366,7 @@ public:
 class MockConfig : public Config {
 public:
   MockConfig();
-  ~MockConfig();
+  ~MockConfig() override;
 
   // Router::Config
   MOCK_CONST_METHOD2(route, RouteConstSharedPtr(const Http::HeaderMap&, uint64_t random_value));
@@ -382,7 +382,7 @@ public:
 class MockRouteConfigProviderManager : public RouteConfigProviderManager {
 public:
   MockRouteConfigProviderManager();
-  ~MockRouteConfigProviderManager();
+  ~MockRouteConfigProviderManager() override;
 
   MOCK_METHOD3(createRdsRouteConfigProvider,
                RouteConfigProviderPtr(
@@ -397,7 +397,7 @@ public:
 class MockScopedConfig : public ScopedConfig {
 public:
   MockScopedConfig();
-  ~MockScopedConfig();
+  ~MockScopedConfig() override;
 
   MOCK_CONST_METHOD1(getRouteConfig, ConfigConstSharedPtr(const Http::HeaderMap& headers));
 };

@@ -3521,10 +3521,10 @@ struct Baz : public Envoy::Config::TypedMetadata::Object {
 };
 class BazFactory : public HttpRouteTypedMetadataFactory {
 public:
-  const std::string name() const { return "baz"; }
+  const std::string name() const override { return "baz"; }
   // Returns nullptr (conversion failure) if d is empty.
   std::unique_ptr<const Envoy::Config::TypedMetadata::Object>
-  parse(const ProtobufWkt::Struct& d) const {
+  parse(const ProtobufWkt::Struct& d) const override {
     if (d.fields().find("name") != d.fields().end()) {
       return std::make_unique<Baz>(d.fields().at("name").string_value());
     }

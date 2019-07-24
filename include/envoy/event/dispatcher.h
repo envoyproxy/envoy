@@ -211,6 +211,12 @@ public:
    * @return The previously tracked object or nullptr if there was none.
    */
   virtual const ScopeTrackedObject* setTrackedObject(const ScopeTrackedObject* object) PURE;
+
+  /**
+   * Validates that an operation is thread-safe with respect to this dispatcher; i.e. that the
+   * current thread of execution is on the same thread upon which the dispatcher loop is running.
+   */
+  virtual bool isThreadSafe() const PURE;
 };
 
 using DispatcherPtr = std::unique_ptr<Dispatcher>;

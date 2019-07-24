@@ -47,7 +47,7 @@ private:
     UpstreamRequest(Router& parent, Tcp::ConnectionPool::Instance& pool,
                     MessageMetadataSharedPtr& metadata, SerializationType serialization_type,
                     ProtocolType protocol_type);
-    ~UpstreamRequest();
+    ~UpstreamRequest() override;
 
     FilterStatus start();
     void resetStream();

@@ -207,13 +207,13 @@ public:
   MOCK_METHOD0(version, std::string());
   MOCK_METHOD0(logLock, Thread::BasicLockable&());
   MOCK_METHOD0(accessLogLock, Thread::BasicLockable&());
-  MOCK_METHOD0(statsAllocator, Stats::StatDataAllocator&());
+  MOCK_METHOD0(statsAllocator, Stats::Allocator&());
 
 private:
   Test::Global<Stats::SymbolTableImpl> symbol_table_;
   Thread::MutexBasicLockable log_lock_;
   Thread::MutexBasicLockable access_log_lock_;
-  Stats::HeapStatDataAllocator stats_allocator_;
+  Stats::AllocatorImpl stats_allocator_;
 };
 
 class MockListenerComponentFactory : public ListenerComponentFactory {
@@ -517,14 +517,6 @@ public:
   MockListenerFactoryContext();
   ~MockListenerFactoryContext() override;
 
-  void addListenSocketOption(const Network::Socket::OptionConstSharedPtr& option) override {
-    addListenSocketOption_(option);
-  }
-  MOCK_METHOD1(addListenSocketOption_, void(const Network::Socket::OptionConstSharedPtr&));
-  void addListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) override {
-    addListenSocketOptions_(options);
-  }
-  MOCK_METHOD1(addListenSocketOptions_, void(const Network::Socket::OptionsSharedPtr&));
   const Network::ListenerConfig& listenerConfig() const override { return _listenerConfig_; }
   MOCK_CONST_METHOD0(listenerConfig_, const Network::ListenerConfig&());
 

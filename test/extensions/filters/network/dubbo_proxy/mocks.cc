@@ -65,8 +65,8 @@ MockDecoderFilterCallbacks::MockDecoderFilterCallbacks() {
 }
 MockDecoderFilterCallbacks::~MockDecoderFilterCallbacks() = default;
 
-MockEncoderFilter::MockEncoderFilter() {}
-MockEncoderFilter::~MockEncoderFilter() {}
+MockEncoderFilter::MockEncoderFilter() = default;
+MockEncoderFilter::~MockEncoderFilter() = default;
 
 MockEncoderFilterCallbacks::MockEncoderFilterCallbacks() {
   route_.reset(new NiceMock<Router::MockRoute>());
@@ -77,10 +77,10 @@ MockEncoderFilterCallbacks::MockEncoderFilterCallbacks() {
   ON_CALL(*this, streamInfo()).WillByDefault(ReturnRef(stream_info_));
   ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
 }
-MockEncoderFilterCallbacks::~MockEncoderFilterCallbacks() {}
+MockEncoderFilterCallbacks::~MockEncoderFilterCallbacks() = default;
 
-MockCodecFilter::MockCodecFilter() {}
-MockCodecFilter::~MockCodecFilter() {}
+MockCodecFilter::MockCodecFilter() = default;
+MockCodecFilter::~MockCodecFilter() = default;
 
 MockFilterConfigFactory::MockFilterConfigFactory()
     : MockFactoryBase("envoy.filters.dubbo.mock_filter"),

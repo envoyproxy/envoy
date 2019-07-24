@@ -26,7 +26,7 @@ def FixBuild(path):
         if line != '\n':
           outlines.append('\n')
         first = False
-      if path.startswith('./bazel/external/'):
+      if path.startswith('./bazel/external/') or path.startswith('./bazel/toolchains/'):
         outlines.append(line)
         continue
       if line.startswith('package(') and not path.endswith('bazel/BUILD') and not path.endswith(

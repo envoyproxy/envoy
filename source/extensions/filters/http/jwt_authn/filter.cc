@@ -64,7 +64,8 @@ void Filter::onComplete(const Status& status) {
     stats_.denied_.inc();
     state_ = Responded;
     // verification failed
-    Http::Code code = Http::Code::Unauthorized;
+    Http::Code code =
+        status == Status::JwtAudienceNotAllowed ? Http::Code::Forbidden : Http::Code::Unauthorized;
     // return failure reason as message body
     decoder_callbacks_->sendLocalReply(code, ::google::jwt_verify::getStatusString(status), nullptr,
                                        absl::nullopt, RcDetails::get().JwtAuthnAccessDenied);

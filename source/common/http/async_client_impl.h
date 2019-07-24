@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/scope_tracker.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/async_client.h"
@@ -73,7 +74,8 @@ class AsyncStreamImpl : public AsyncClient::Stream,
                         public StreamDecoderFilterCallbacks,
                         public Event::DeferredDeletable,
                         Logger::Loggable<Logger::Id::http>,
-                        LinkedObject<AsyncStreamImpl> {
+                        LinkedObject<AsyncStreamImpl>,
+                        public ScopeTrackedObject {
 public:
   AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
                   const AsyncClient::StreamOptions& options);
@@ -340,8 +342,16 @@ private:
   void setDecoderBufferLimit(uint32_t) override {}
   uint32_t decoderBufferLimit() override { return 0; }
   bool recreateStream() override { return false; }
+  const ScopeTrackedObject& scope() override { return *this; }
   void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr&) override {}
   Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override { return {}; }
+
+  // ScopeTrackedObject
+  void dumpState(std::ostream& os, int indent_level) const override {
+    const char* spaces = spacesForLevel(indent_level);
+    os << spaces << "AsyncClient " << this << DUMP_MEMBER(stream_id_) << "\n";
+    DUMP_DETAILS(&stream_info_);
+  }
 
   AsyncClient::StreamCallbacks& stream_callbacks_;
   const uint64_t stream_id_;
