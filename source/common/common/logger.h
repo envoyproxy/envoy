@@ -49,6 +49,7 @@ namespace Logger {
   FUNCTION(quic)                 \
   FUNCTION(pool)                 \
   FUNCTION(rbac)                 \
+  FUNCTION(abac)                 \
   FUNCTION(redis)                \
   FUNCTION(router)               \
   FUNCTION(runtime)              \

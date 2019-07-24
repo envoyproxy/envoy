@@ -24,10 +24,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://commondatastorage.googleapis.com/chromium-boringssl-docs/fips/boringssl-66005f41fbc3529ffe8d007708756720529da20d.tar.xz"],
     ),
     com_google_absl = dict(
-        sha256 = "7ddf863ddced6fa5bf7304103f9c7aa619c20a2fcf84475512c8d3834b9d14fa",
-        strip_prefix = "abseil-cpp-61c9bf3e3e1c28a4aa6d7f1be4b37fd473bb5529",
-        # 2019-06-05
-        urls = ["https://github.com/abseil/abseil-cpp/archive/61c9bf3e3e1c28a4aa6d7f1be4b37fd473bb5529.tar.gz"],
+        sha256 = "05a97ad5bb123ee3f6d65c7b06f6d7de5ce62e4fb971cbe4b5e391dd69704bb7",
+        strip_prefix = "abseil-cpp-ad1485c8986246b2ae9105e512738d0e97aec887",
+        # 2019-07-24
+        urls = ["https://github.com/abseil/abseil-cpp/archive/ad1485c8986246b2ae9105e512738d0e97aec887.tar.gz"],
     ),
     com_github_apache_thrift = dict(
         sha256 = "7d59ac4fdcb2c58037ebd4a9da5f9a49e3e034bf75b3f26d9fe48ba3d8806e6b",
@@ -246,5 +246,28 @@ REPOSITORY_LOCATIONS = dict(
         # Static snapshot of https://quiche.googlesource.com/quiche/+archive/2a930469533c3b541443488a629fe25cd8ff53d0.tar.gz
         sha256 = "fcdebf54c89d839ffa7eefae166c8e4b551c765559db13ff15bff98047f344fb",
         urls = ["https://storage.googleapis.com/quiche-envoy-integration/2a930469533c3b541443488a629fe25cd8ff53d0.tar.gz"],
+    ),
+    com_github_gflags_gflags = dict(
+        sha256 = "6e16c8bc91b1310a44f3965e616383dbda48f83e8c1eaa2370a215057b00cabe",
+        strip_prefix = "gflags-77592648e3f3be87d6c7123eb81cbad75f9aef5a",
+        urls = [
+            "https://mirror.bazel.build/github.com/gflags/gflags/archive/77592648e3f3be87d6c7123eb81cbad75f9aef5a.tar.gz",
+            "https://github.com/gflags/gflags/archive/77592648e3f3be87d6c7123eb81cbad75f9aef5a.tar.gz",
+        ],
+    ),
+    com_google_glog = dict(
+        sha256 = "819cb075d6b02b8e9c9c77c2be1d55cef7fec47e7c94359d2626f46268ae67bf",
+        strip_prefix = "glog-ba8a9f6952d04d1403b97df24e6836227751454e",
+        urls = ["https://github.com/google/glog/archive/ba8a9f6952d04d1403b97df24e6836227751454e.tar.gz"],
+    ),
+    com_google_cel_cpp = dict(
+        sha256 = "37df0e66c84ddffe7bbac6e659856f48b34dbd9e1e869f57275493a20b271d11",
+        strip_prefix = "cel-cpp-592129c73f70de6d5ff8977aa94e030a1a9c4e8a",
+        urls = ["https://github.com/google/cel-cpp/archive/592129c73f70de6d5ff8977aa94e030a1a9c4e8a.tar.gz"],
+    ),
+    com_google_re2 = dict(
+        sha256 = "f31db9cd224d018a7e4fe88ef84aaa874b0b3ed91d4d98ee5a1531101d3fdc64",
+        strip_prefix = "re2-87e2ad45e7b18738e1551474f7ee5886ff572059",
+        urls = ["https://github.com/google/re2/archive/87e2ad45e7b18738e1551474f7ee5886ff572059.tar.gz"],
     ),
 )

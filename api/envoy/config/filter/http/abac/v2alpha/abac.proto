@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package envoy.config.filter.http.abac.v2alpha;
+
+option java_outer_classname = "AbacProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.config.filter.http.abac.v2alpha";
+option go_package = "v2alpha";
+
+import "google/api/expr/v1alpha1/syntax.proto";
+
+// [#protodoc-title: ABAC]
+// Attribute-Based Access Control.
+
+// ABAC filter config.
+message ABAC {
+  google.api.expr.v1alpha1.Expr expr = 1;
+}
