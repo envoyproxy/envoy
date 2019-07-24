@@ -262,6 +262,8 @@ void FilterJson::translateFaultFilter(
 
   const Json::ObjectSharedPtr json_config_abort = json_config.getObject("abort", true);
   const Json::ObjectSharedPtr json_config_delay = json_config.getObject("delay", true);
+  const Json::ObjectSharedPtr json_config_abort_runtime = json_config.getObject("abort_runtime", true);
+  const Json::ObjectSharedPtr json_config_delay_runtime = json_config.getObject("delay_runtime", true);
 
   if (!json_config_abort->empty()) {
     auto* abort_fault = proto_config.mutable_abort();
@@ -284,6 +286,18 @@ void FilterJson::translateFaultFilter(
     JSON_UTIL_SET_DURATION_FROM_FIELD(*json_config_delay, *delay, fixed_delay, fixed_duration);
   }
 
+  if (!json_config_abort_runtime->empty()) {
+    auto* abort_runtime = proto_config.mutable_abort_runtime();
+    abort_runtime->set_abort_percent(json_config_abort_runtime->getString("abort_percent"));
+    abort_runtime->set_abort_http_status(json_config_abort_runtime->getString("abort_http_status"));
+  }
+
+  if (!json_config_delay_runtime->empty()) {
+    auto* delay_runtime = proto_config.mutable_delay_runtime();
+    delay_runtime->set_delay_percent(json_config_delay_runtime->getString("delay_percent"));
+    delay_runtime->set_delay_duration(json_config_delay_runtime->getString("delay_duration"));
+  }
+
   for (const auto& json_header_matcher : json_config.getObjectArray("headers", true)) {
     auto* header_matcher = proto_config.mutable_headers()->Add();
     RdsJson::translateHeaderMatcher(*json_header_matcher, *header_matcher);
@@ -291,10 +305,6 @@ void FilterJson::translateFaultFilter(
 
   JSON_UTIL_SET_STRING(json_config, proto_config, upstream_cluster);
   JSON_UTIL_SET_STRING(json_config, proto_config, downstream_cluster);
-  JSON_UTIL_SET_STRING(json_config, proto_config, abort_percent_key);
-  JSON_UTIL_SET_STRING(json_config, proto_config, abort_http_status_key);
-  JSON_UTIL_SET_STRING(json_config, proto_config, delay_percent_key);
-  JSON_UTIL_SET_STRING(json_config, proto_config, delay_duration_key);
 
   for (const auto& json_downstream_node : json_config.getStringArray("downstream_nodes", true)) {
     auto* downstream_node = proto_config.mutable_downstream_nodes()->Add();

@@ -63,13 +63,13 @@ FaultSettings::FaultSettings(const envoy::config::filter::http::fault::v2::HTTPF
         std::make_unique<Filters::Common::Fault::FaultRateLimitConfig>(fault.response_rate_limit());
   }
 
-  abort_percent_key_ = fault.abort_percent_key();
+  abort_percent_key_ = fault.has_abort_runtime() ? fault.abort_runtime().abort_percent() : std::string("");
 
-  delay_percent_key_ = fault.delay_percent_key();
+  delay_percent_key_ = fault.has_delay_runtime() ? fault.delay_runtime().delay_percent() : std::string("");
 
-  abort_http_status_key_ = fault.abort_http_status_key();
+  abort_http_status_key_ = fault.has_abort_runtime() ? fault.abort_runtime().abort_http_status() : std::string("");
 
-  delay_duration_key_ = fault.delay_duration_key();
+  delay_duration_key_ = fault.has_delay_runtime() ? fault.delay_runtime().delay_duration() : std::string("");
 
   downstream_cluster_ = fault.downstream_cluster();
 }

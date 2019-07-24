@@ -89,13 +89,21 @@ message HTTPFault {
   //  will each get an independent limit.
   filter.fault.v2.FaultRateLimit response_rate_limit = 7;
 
-  string abort_percent_key = 8;
+  FaultAbortRuntime abort_runtime = 8;
 
-  string abort_http_status_key = 9;
+  FaultDelayRuntime delay_runtime = 9;
 
-  string delay_percent_key = 10;
+  string downstream_cluster = 10;
+}
 
-  string delay_duration_key = 11;
+message FaultAbortRuntime {
+  string abort_percent = 1 [(validate.rules).string.min_bytes = 1];;
 
-  string downstream_cluster = 12;
+  string abort_http_status = 2 [(validate.rules).string.min_bytes = 1];;
+}
+
+message FaultDelayRuntime {
+  string delay_percent = 1 [(validate.rules).string.min_bytes = 1];
+
+  string delay_duration = 2 [(validate.rules).string.min_bytes = 1];
 }
