@@ -334,7 +334,7 @@ protected:
 
 /**
  * Provides generic functionality required by the ConfigProvider::ApiType specific dynamic config
- * providers (see MutableConfigProviderBase for example).
+ * providers.
  *
  * This class can not be instantiated directly; instead, it provides the foundation for
  * dynamic config provider implementations which derive from it.

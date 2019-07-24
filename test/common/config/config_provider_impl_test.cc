@@ -318,7 +318,7 @@ TEST_F(ConfigProviderImplTest, SharedOwnership) {
                      .size());
 }
 
-// A ConfigProviderManager that returns a mock ConfigProvider.
+// A ConfigProviderManager that returns a dummy ConfigProvider.
 class DummyConfigProviderManagerMockConfigProvider : public DummyConfigProviderManager {
 public:
   DummyConfigProviderManagerMockConfigProvider(Server::Admin& admin)

@@ -68,7 +68,7 @@ InlineScopedRoutesConfigProvider::InlineScopedRoutesConfigProvider(
                                                  ConfigProviderInstanceType::Inline,
                                                  ConfigProvider::ApiType::Delta),
       name_(std::move(name)),
-      config_(std::make_shared<ThreadLocalScopedConfigImpl>(std::move(scope_key_builder))),
+      config_(std::make_shared<ScopedConfigImpl>(std::move(scope_key_builder))),
       config_protos_(std::make_move_iterator(config_protos.begin()),
                      std::make_move_iterator(config_protos.end())),
       rds_config_source_(std::move(rds_config_source)) {}
@@ -94,7 +94,7 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
           *scope_, *this);
 
   initialize([scope_key_builder]() -> Envoy::Config::ConfigProvider::ConfigConstSharedPtr {
-    return std::make_shared<ThreadLocalScopedConfigImpl>(
+    return std::make_shared<ScopedConfigImpl>(
         envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::ScopeKeyBuilder(
             scope_key_builder));
   });
@@ -133,8 +133,8 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
     ENVOY_LOG(debug, "srds: add/update scoped_route '{}'", scoped_route_name);
     applyConfigUpdate([scoped_route_info](const ConfigProvider::ConfigConstSharedPtr& config)
                           -> ConfigProvider::ConfigConstSharedPtr {
-      auto* thread_local_scoped_config = const_cast<ThreadLocalScopedConfigImpl*>(
-          static_cast<const ThreadLocalScopedConfigImpl*>(config.get()));
+      auto* thread_local_scoped_config =
+          const_cast<ScopedConfigImpl*>(static_cast<const ScopedConfigImpl*>(config.get()));
       thread_local_scoped_config->addOrUpdateRoutingScope(scoped_route_info);
       return config;
     });
@@ -147,8 +147,8 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
     applyConfigUpdate([scoped_route_name](const ConfigProvider::ConfigConstSharedPtr& config)
                           -> ConfigProvider::ConfigConstSharedPtr {
       // In place update.
-      auto* thread_local_scoped_config = const_cast<ThreadLocalScopedConfigImpl*>(
-          static_cast<const ThreadLocalScopedConfigImpl*>(config.get()));
+      auto* thread_local_scoped_config =
+          const_cast<ScopedConfigImpl*>(static_cast<const ScopedConfigImpl*>(config.get()));
       thread_local_scoped_config->removeRoutingScope(scoped_route_name);
       return config;
     });

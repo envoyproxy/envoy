@@ -104,12 +104,11 @@ ScopeKeyBuilderImpl::computeScopeKey(const Http::HeaderMap& headers) const {
   return std::make_unique<ScopeKey>(std::move(key));
 }
 
-void ThreadLocalScopedConfigImpl::addOrUpdateRoutingScope(const ScopedRouteInfoConstSharedPtr&) {}
+void ScopedConfigImpl::addOrUpdateRoutingScope(const ScopedRouteInfoConstSharedPtr&) {}
 
-void ThreadLocalScopedConfigImpl::removeRoutingScope(const std::string&) {}
+void ScopedConfigImpl::removeRoutingScope(const std::string&) {}
 
-Router::ConfigConstSharedPtr
-ThreadLocalScopedConfigImpl::getRouteConfig(const Http::HeaderMap&) const {
+Router::ConfigConstSharedPtr ScopedConfigImpl::getRouteConfig(const Http::HeaderMap&) const {
   return std::make_shared<const NullConfigImpl>();
 }
 
