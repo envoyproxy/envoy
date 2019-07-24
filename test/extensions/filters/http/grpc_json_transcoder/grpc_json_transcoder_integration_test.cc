@@ -331,6 +331,112 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, InvalidJson) {
       R"({ "theme"  "Children" })", {}, {}, Status(),
       Http::TestHeaderMapImpl{{":status", "400"}, {"content-type", "text/plain"}},
       "Expected : between key:value pair.\n", false);
+
+  testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(
+      Http::TestHeaderMapImpl{{":method", "POST"}, {":path", "/shelf"}, {":authority", "host"}},
+      R"({ "theme" : "Children" }EXTRA)", {}, {}, Status(),
+      Http::TestHeaderMapImpl{{":status", "400"}, {"content-type", "text/plain"}},
+      "Parsing terminated before end of input.\n", false);
+}
+
+std::string generateDeepJson(int level, bool valid) {
+  std::string begin = R"({"k":)";
+  std::string deep_val = R"("v")";
+  std::string end = R"(})";
+  std::string json;
+
+  for (int i = 0; i < level; ++i) {
+    absl::StrAppend(&json, begin);
+  }
+  if (valid) {
+    absl::StrAppend(&json, deep_val);
+  }
+  for (int i = 0; i < level; ++i) {
+    absl::StrAppend(&json, end);
+  }
+  return json;
+}
+
+std::string generateDeepProto(int level) {
+  std::string proto = R"(fields{key:"k"value{string_value:"v"}})";
+  for (int i = 0; i < level - 1; ++i) {
+    proto = absl::StrCat(R"(fields{key:"k"value{struct_value{)", proto, R"(}}})");
+  }
+  return proto;
+}
+
+TEST_P(GrpcJsonTranscoderIntegrationTest, DeepStruct) {
+  std::string deepJson = generateDeepJson(32, true);
+  std::string deepProto = "content {" + generateDeepProto(32) + "}";
+  // Due to the limit of protobuf util, we can only compare to level 32.
+  testTranscoding<bookstore::EchoStructReqResp, bookstore::EchoStructReqResp>(
+      Http::TestHeaderMapImpl{
+          {":method", "POST"}, {":path", "/echoStruct"}, {":authority", "host"}},
+      deepJson, {deepProto}, {deepProto}, Status(),
+      Http::TestHeaderMapImpl{
+          {":status", "200"}, {"content-type", "application/json"}, {"grpc-status", "0"}},
+      R"({"content":)" + deepJson + R"(})");
+
+  // The valid deep struct is parsed sucessfully.
+  // Since we didn't set the response, it return 503.
+  testTranscoding<bookstore::EchoStructReqResp, bookstore::EchoStructReqResp>(
+      Http::TestHeaderMapImpl{
+          {":method", "POST"}, {":path", "/echoStruct"}, {":authority", "host"}},
+      generateDeepJson(100, true), {}, {}, Status(),
+      Http::TestHeaderMapImpl{{":status", "503"}, {"content-type", "application/grpc"}}, "");
+
+  // The invalid deep struct is detected.
+  testTranscoding<bookstore::EchoStructReqResp, bookstore::EchoStructReqResp>(
+      Http::TestHeaderMapImpl{
+          {":method", "POST"}, {":path", "/echoStruct"}, {":authority", "host"}},
+      generateDeepJson(100, false), {}, {}, Status(),
+      Http::TestHeaderMapImpl{{":status", "400"}, {"content-type", "text/plain"}},
+      "Unexpected token.\n", false);
+}
+
+std::string generateLargeJson(int level) {
+  std::string json = R"({"k":["v"]})";
+  for (int i = 0; i < level - 1; ++i) {
+    json = absl::StrCat(R"({"k":[)", json, ",", json, "]}");
+  }
+  return json;
+}
+
+std::string generateLargeProto(int level) {
+  std::string proto = R"(fields{key:"k"value{list_value{values{string_value:"v"}}}})";
+  for (int i = 0; i < level - 1; ++i) {
+    proto = absl::StrCat(R"(fields{key:"k"value{list_value{values{struct_value{)", proto,
+                         R"(}}values{struct_value{)", proto, R"(}}}}})");
+  }
+  return proto;
+}
+
+TEST_P(GrpcJsonTranscoderIntegrationTest, LargeStruct) {
+  // Generate a 40kB json payload.
+  std::string largeJson = generateLargeJson(12);
+  std::string largeProto = "content {" + generateLargeProto(12) + "}";
+  testTranscoding<bookstore::EchoStructReqResp, bookstore::EchoStructReqResp>(
+      Http::TestHeaderMapImpl{
+          {":method", "POST"}, {":path", "/echoStruct"}, {":authority", "host"}},
+      largeJson, {largeProto}, {largeProto}, Status(),
+      Http::TestHeaderMapImpl{
+          {":status", "200"}, {"content-type", "application/json"}, {"grpc-status", "0"}},
+      R"({"content":)" + largeJson + R"(})");
+}
+
+TEST_P(GrpcJsonTranscoderIntegrationTest, UnknownField) {
+  testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(
+      Http::TestHeaderMapImpl{{":method", "POST"},
+                              {":path", "/shelf"},
+                              {":authority", "host"},
+                              {"content-type", "application/json"}},
+      R"({"theme": "Children", "unknown1": "a", "unknown2" : {"a" : "b"}, "unknown3" : ["a", "b", "c"]})",
+      {R"(shelf { theme: "Children" })"}, {R"(id: 20 theme: "Children" )"}, Status(),
+      Http::TestHeaderMapImpl{{":status", "200"},
+                              {"content-type", "application/json"},
+                              {"content-length", "30"},
+                              {"grpc-status", "0"}},
+      R"({"id":"20","theme":"Children"})");
 }
 
 } // namespace
