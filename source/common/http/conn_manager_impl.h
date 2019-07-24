@@ -100,8 +100,8 @@ private:
     ActiveStreamFilterBase(ActiveStream& parent, bool dual_filter)
         : parent_(parent), iteration_state_(IterationState::Continue),
           iterate_from_current_filter_(false), headers_continued_(false),
-          continue_headers_continued_(false), end_stream_(false), dual_filter_(dual_filter),
-          decode_headers_called_(false) {}
+          continue_headers_continued_(false), end_stream_(false), end_stream_with_headers_(false),
+          dual_filter_(dual_filter), decode_headers_called_(false) {}
 
     // Functions in the following block are called after the filter finishes processing
     // corresponding data. Those functions handle state updates and data storage (if needed)
@@ -195,6 +195,8 @@ private:
     bool continue_headers_continued_ : 1;
     // If true, end_stream is called for this filter.
     bool end_stream_ : 1;
+    // True if end stream was set from decode/encode headers.
+    bool end_stream_with_headers_ : 1;
     const bool dual_filter_ : 1;
     bool decode_headers_called_ : 1;
   };

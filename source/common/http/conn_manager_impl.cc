@@ -860,7 +860,9 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
 
     const bool new_metadata_added = processNewlyAddedMetadata();
-
+    if ((*entry)->end_stream_ && !new_metadata_added) {
+      (*entry)->end_stream_with_headers_ = true;
+    }
     // If end_stream is set in headers, and a filter adds new metadata, we need to delay end_stream
     // in headers by inserting an empty data frame with end_stream set. The empty data frame is sent
     // after the new metadata.
@@ -1307,6 +1309,9 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
     FilterHeadersStatus status = (*entry)->handle_->encodeHeaders(headers, (*entry)->end_stream_);
     if ((*entry)->end_stream_) {
       (*entry)->handle_->encodeComplete();
+    }
+    if ((*entry)->end_stream_) {
+      (*entry)->end_stream_with_headers_ = true;
     }
     state_.filter_call_state_ &= ~FilterCallState::EncodeHeaders;
     ENVOY_STREAM_LOG(trace, "encode headers called: filter={} status={}", *this,
@@ -1772,7 +1777,15 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {
 
   // Make sure we handle filters returning StopIterationNoBuffer and then commonContinue by flushing
   // the terminal fin.
-  const bool end_stream_with_data = complete() && !trailers();
+  //
+  // Basically send an end stream with doData if
+  // 1) The request is complete.
+  // 2) The end stream is not being communicated via trailers.
+  // 3) The fin has not already been communicated from doHeaders, with the notable exception that
+  //    if the fin went with headers but then data or metadata was added (so there is now buffered
+  //    data) the fin should still be sent with the buffered data.
+  const bool end_stream_with_data =
+      complete() && !trailers() && (!end_stream_with_headers_ || bufferedData());
   if (bufferedData() || end_stream_with_data) {
     if (end_stream_with_data && !bufferedData()) {
       // In the StopIterationNoBuffer case the ConnectionManagerImpl will not have created a
