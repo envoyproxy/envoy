@@ -219,9 +219,10 @@ bool FaultFilter::isDelayEnabled() {
         downstream_cluster_delay_percent_key_, fault_settings_->requestDelay()->percentage());
   }
 
-  if (isOverriddenDelayRuntime()) {
+  if (isOverriddenDelayRuntime() && (fault_settings_->downstream_cluster() == downstream_cluster_ ||
+                                     fault_settings_->upstreamCluster() == upstream_cluster_)) {
     enabled |= config_->runtime().snapshot().featureEnabled(
-        fault_settings_->delayPercentKey(), fault_settings_->requestDelay()->percentage());
+        fault_settings_->delay_percent_key(), fault_settings_->requestDelay()->percentage());
   }
   return enabled;
 }
@@ -234,8 +235,9 @@ bool FaultFilter::isAbortEnabled() {
                                                             fault_settings_->abortPercentage());
   }
 
-  if (isOverriddenAbortRuntime()) {
-    enabled |= config_->runtime().snapshot().featureEnabled(fault_settings_->abortPercentKey(),
+  if (isOverriddenAbortRuntime() && (fault_settings_->downstream_cluster() == downstream_cluster_ ||
+                                     fault_settings_->upstreamCluster() == upstream_cluster_)) {
+    enabled |= config_->runtime().snapshot().featureEnabled(fault_settings_->abort_percent_key(),
                                                             fault_settings_->abortPercentage());
   }
   return enabled;
@@ -267,7 +269,7 @@ FaultFilter::delayDuration(const Http::HeaderMap& request_headers) {
 
   if (isOverriddenDelayRuntime()) {
     duration = std::chrono::milliseconds(config_->runtime().snapshot().getInteger(
-        fault_settings_->delayDurationKey(), duration.count()));
+        fault_settings_->delay_duration_key(), duration.count()));
   }
 
   // Delay only if the duration is >0ms
@@ -289,7 +291,7 @@ uint64_t FaultFilter::abortHttpStatus() {
   }
 
   if (isOverriddenAbortRuntime()) {
-    http_status = config_->runtime().snapshot().getInteger(fault_settings_->abortHttpStatusKey(),
+    http_status = config_->runtime().snapshot().getInteger(fault_settings_->abort_http_status_key(),
                                                            http_status);
   }
 
@@ -325,19 +327,19 @@ void FaultFilter::recordAbortsInjectedStats() {
 }
 
 bool FaultFilter::isOverriddenAbortRuntime() {
-  return !fault_settings_->abortPercentKey().empty() &&
-         !fault_settings_->abortHttpStatusKey().empty() &&
-         (fault_settings_->downstreamCluster().compare(downstream_cluster_) == 0 ||
-          (!upstream_cluster_.empty() &&
-           fault_settings_->upstreamCluster().compare(upstream_cluster_) == 0));
+  if (!config_->runtime().snapshot().get(fault_settings_->abort_percent_key()).empty() &&
+      !config_->runtime().snapshot().get(fault_settings_->abort_http_status_key()).empty()) {
+    return true;
+  }
+  return false;
 }
 
 bool FaultFilter::isOverriddenDelayRuntime() {
-  return !fault_settings_->delayPercentKey().empty() &&
-         !fault_settings_->delayDurationKey().empty() &&
-         (fault_settings_->downstreamCluster().compare(downstream_cluster_) == 0 ||
-          (!upstream_cluster_.empty() &&
-           fault_settings_->upstreamCluster().compare(upstream_cluster_) == 0));
+  if (!config_->runtime().snapshot().get(fault_settings_->delay_percent_key()).empty() &&
+      !config_->runtime().snapshot().get(fault_settings_->delay_duration_key()).empty()) {
+    return true;
+  }
+  return false;
 }
 
 Http::FilterDataStatus FaultFilter::decodeData(Buffer::Instance&, bool) {

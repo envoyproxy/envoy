@@ -62,11 +62,11 @@ public:
   const Filters::Common::Fault::FaultRateLimitConfig* responseRateLimit() const {
     return response_rate_limit_.get();
   }
-  const std::string& abortPercentKey() const { return abort_percent_key_; }
-  const std::string& delayPercentKey() const { return delay_percent_key_; }
-  const std::string& abortHttpStatusKey() const { return abort_http_status_key_; }
-  const std::string& delayDurationKey() const { return delay_duration_key_; }
-  const std::string& downstreamCluster() const { return downstream_cluster_; }
+  const std::string& abort_percent_key() const { return abort_percent_key_; }
+  const std::string& delay_percent_key() const { return delay_percent_key_; }
+  const std::string& abort_http_status_key() const { return abort_http_status_key_; }
+  const std::string& delay_duration_key() const { return delay_duration_key_; }
+  const std::string& downstream_cluster() const { return downstream_cluster_; }
 
 private:
   envoy::type::FractionalPercent abort_percentage_;

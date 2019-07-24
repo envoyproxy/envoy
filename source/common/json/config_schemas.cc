@@ -1042,12 +1042,7 @@ const std::string Json::Schema::FAULT_HTTP_FILTER_SCHEMA(R"EOF(
         "items" : {
           "type" : "object"
         }
-      },
-      "abort_percent_key" : {"type" : "string"},
-      "abort_http_status_key" : {"type" : "string"},
-      "delay_percent_key" : {"type" : "string"},
-      "delay_duration_key" : {"type" : "string"},
-      "downstream_cluster" : {"type" : "string"}
+      }
     },
     "additionalProperties" : false
   }
