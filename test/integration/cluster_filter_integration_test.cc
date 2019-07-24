@@ -50,18 +50,12 @@ private:
   bool write_greeted_{false};
 };
 
-class PoliteFilterConfigFactory : public Server::Configuration::NamedNetworkFilterConfigFactory {
+class PoliteFilterConfigFactory
+    : public Server::Configuration::NamedUpstreamNetworkFilterConfigFactory {
 public:
-  Network::FilterFactoryCb createFilterFactory(const Json::Object&,
-                                               Server::Configuration::FactoryContext&) override {
-    return [](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addFilter(std::make_shared<PoliteFilter>());
-    };
-  }
-
   Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&,
-                               Server::Configuration::FactoryContext&) override {
+                               Server::Configuration::CommonFactoryContext&) override {
     return [](Network::FilterManager& filter_manager) -> void {
       filter_manager.addFilter(std::make_shared<PoliteFilter>());
     };
@@ -75,7 +69,8 @@ public:
 };
 
 // perform static registration
-REGISTER_FACTORY(PoliteFilterConfigFactory, Server::Configuration::NamedNetworkFilterConfigFactory);
+REGISTER_FACTORY(PoliteFilterConfigFactory,
+                 Server::Configuration::NamedUpstreamNetworkFilterConfigFactory);
 
 class ClusterFilterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                      public BaseIntegrationTest {

@@ -32,18 +32,11 @@ namespace Server {
 namespace Configuration {
 
 /**
- * Context passed to network and HTTP filters to access server resources.
- * TODO(mattklein123): When we lock down visibility of the rest of the code, filters should only
- * access the rest of the server via interfaces exposed here.
+ * Common interface for downstream and upstream network filters.
  */
-class FactoryContext {
+class CommonFactoryContext {
 public:
-  virtual ~FactoryContext() = default;
-
-  /**
-   * @return AccessLogManager for use by the entire server.
-   */
-  virtual AccessLog::AccessLogManager& accessLogManager() PURE;
+  virtual ~CommonFactoryContext() = default;
 
   /**
    * @return Upstream::ClusterManager& singleton for use by the entire server.
@@ -57,22 +50,6 @@ public:
   virtual Event::Dispatcher& dispatcher() PURE;
 
   /**
-   * @return const Network::DrainDecision& a drain decision that filters can use to determine if
-   *         they should be doing graceful closes on connections when possible.
-   */
-  virtual const Network::DrainDecision& drainDecision() PURE;
-
-  /**
-   * @return whether external healthchecks are currently failed or not.
-   */
-  virtual bool healthCheckFailed() PURE;
-
-  /**
-   * @return the server-wide http tracer.
-   */
-  virtual Tracing::HttpTracer& httpTracer() PURE;
-
-  /**
    * @return the server's init manager. This can be used for extensions that need to initialize
    *         after cluster manager init but before the server starts listening. All extensions
    *         should register themselves during configuration load. initialize() will be called on
@@ -81,11 +58,6 @@ public:
    *         will start listening.
    */
   virtual Init::Manager& initManager() PURE;
-
-  /**
-   * @return ServerLifecycleNotifier& the lifecycle notifier for the server.
-   */
-  virtual ServerLifecycleNotifier& lifecycleNotifier() PURE;
 
   /**
    * @return information about the local environment the server is running in.
@@ -124,6 +96,58 @@ public:
   virtual Server::Admin& admin() PURE;
 
   /**
+   * @return TimeSource& a reference to the time source.
+   */
+  virtual TimeSource& timeSource() PURE;
+
+  /**
+   * @return ProtobufMessage::ValidationVisitor& validation visitor for filter configuration
+   *         messages.
+   */
+  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
+
+  /**
+   * @return Api::Api& a reference to the api object.
+   */
+  virtual Api::Api& api() PURE;
+};
+
+/**
+ * Context passed to network and HTTP filters to access server resources.
+ * TODO(mattklein123): When we lock down visibility of the rest of the code, filters should only
+ * access the rest of the server via interfaces exposed here.
+ */
+class FactoryContext : public virtual CommonFactoryContext {
+public:
+  virtual ~FactoryContext() = default;
+
+  /**
+   * @return AccessLogManager for use by the entire server.
+   */
+  virtual AccessLog::AccessLogManager& accessLogManager() PURE;
+
+  /**
+   * @return const Network::DrainDecision& a drain decision that filters can use to determine if
+   *         they should be doing graceful closes on connections when possible.
+   */
+  virtual const Network::DrainDecision& drainDecision() PURE;
+
+  /**
+   * @return whether external healthchecks are currently failed or not.
+   */
+  virtual bool healthCheckFailed() PURE;
+
+  /**
+   * @return the server-wide http tracer.
+   */
+  virtual Tracing::HttpTracer& httpTracer() PURE;
+
+  /**
+   * @return ServerLifecycleNotifier& the lifecycle notifier for the server.
+   */
+  virtual ServerLifecycleNotifier& lifecycleNotifier() PURE;
+
+  /**
    * @return Stats::Scope& the listener's stats scope.
    */
   virtual Stats::Scope& listenerScope() PURE;
@@ -133,11 +157,6 @@ public:
    * listener.
    */
   virtual const envoy::api::v2::core::Metadata& listenerMetadata() const PURE;
-
-  /**
-   * @return TimeSource& a reference to the time source.
-   */
-  virtual TimeSource& timeSource() PURE;
 
   /**
    * @return OverloadManager& the overload manager for the server.
@@ -158,17 +177,6 @@ public:
    * @return ProcessContext& a reference to the process context.
    */
   virtual ProcessContext& processContext() PURE;
-
-  /**
-   * @return ProtobufMessage::ValidationVisitor& validation visitor for filter configuration
-   *         messages.
-   */
-  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
-
-  /**
-   * @return Api::Api& a reference to the api object.
-   */
-  virtual Api::Api& api() PURE;
 };
 
 class ListenerFactoryContext : public virtual FactoryContext {
@@ -306,6 +314,38 @@ public:
    *         config, which arrives in an opaque google.protobuf.Struct message, will be converted to
    *         JSON and then parsed into this empty proto. Optional today, will be compulsory when v1
    *         is deprecated.
+   */
+  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() { return nullptr; }
+
+  /**
+   * @return std::string the identifying name for a particular implementation of a network filter
+   * produced by the factory.
+   */
+  virtual std::string name() PURE;
+};
+
+/**
+ * Implemented by each upstream cluster network filter and registered via
+ * Registry::registerFactory() or the convenience class RegisterFactory.
+ */
+class NamedUpstreamNetworkFilterConfigFactory : public ProtocolOptionsFactory {
+public:
+  ~NamedUpstreamNetworkFilterConfigFactory() override = default;
+
+  /**
+   * Create a particular upstream network filter factory implementation. If the implementation is
+   * unable to produce a factory with the provided parameters, it should throw an EnvoyException in
+   * the case of general error. The returned callback should always be initialized.
+   */
+  virtual Network::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
+                                                                CommonFactoryContext& context) {
+    UNREFERENCED_PARAMETER(config);
+    UNREFERENCED_PARAMETER(context);
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+
+  /**
+   * @return ProtobufTypes::MessagePtr create empty config proto message for v2.
    */
   virtual ProtobufTypes::MessagePtr createEmptyConfigProto() { return nullptr; }
 

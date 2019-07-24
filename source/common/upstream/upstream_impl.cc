@@ -544,7 +544,7 @@ ClusterLoadReportStats ClusterInfoImpl::generateLoadReportStats(Stats::Scope& sc
 }
 
 // Implements the FactoryContext interface required by network filters.
-class ClusterInfoImpl::FactoryContextImpl : public Server::Configuration::FactoryContext {
+class ClusterInfoImpl::FactoryContextImpl : public Server::Configuration::CommonFactoryContext {
 public:
   // Create from a TransportSocketFactoryContext using parent stats_scope and runtime
   // other contexts taken from TransportSocketFactoryContext.
@@ -553,37 +553,22 @@ public:
       : admin_(c.admin()), stats_scope_(stats_scope), cluster_manager_(c.clusterManager()),
         local_info_(c.localInfo()), dispatcher_(c.dispatcher()), random_(c.random()),
         runtime_(runtime), singleton_manager_(c.singletonManager()), tls_(c.threadLocal()),
-        init_manager_(c.initManager()), api_(c.api()) {}
+        init_manager_(c.initManager()), validation_visitor_(c.messageValidationVisitor()),
+        api_(c.api()) {}
 
-  // TODO(kyessenov) some contexts are not obviously available in the upstream
-  // code, and will throw NOT_IMPLEMENTED. These should be implemented by
-  // someone with a better understanding of the lifecycle and role of each context.
-  AccessLog::AccessLogManager& accessLogManager() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   Upstream::ClusterManager& clusterManager() override { return cluster_manager_; }
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
-  const Network::DrainDecision& drainDecision() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  bool healthCheckFailed() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  Tracing::HttpTracer& httpTracer() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   Init::Manager& initManager() override { return *init_manager_; }
-  Server::ServerLifecycleNotifier& lifecycleNotifier() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   const LocalInfo::LocalInfo& localInfo() const override { return local_info_; }
   Envoy::Runtime::RandomGenerator& random() override { return random_; }
-  virtual Envoy::Runtime::Loader& runtime() override { return runtime_; }
+  Envoy::Runtime::Loader& runtime() override { return runtime_; }
   Stats::Scope& scope() override { return stats_scope_; }
   Singleton::Manager& singletonManager() override { return singleton_manager_; }
   ThreadLocal::SlotAllocator& threadLocal() override { return tls_; }
   Server::Admin& admin() override { return admin_; }
-  Stats::Scope& listenerScope() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  const envoy::api::v2::core::Metadata& listenerMetadata() const override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
-  TimeSource& timeSource() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  Server::OverloadManager& overloadManager() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  Http::Context& httpContext() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  Grpc::Context& grpcContext() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  ProcessContext& processContext() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  TimeSource& timeSource() override { return api().timeSource(); }
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    return validation_visitor_;
   }
   Api::Api& api() override { return api_; }
 
@@ -598,6 +583,7 @@ private:
   Singleton::Manager& singleton_manager_;
   ThreadLocal::SlotAllocator& tls_;
   Init::Manager* init_manager_{};
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
   Api::Api& api_;
 };
 
@@ -710,9 +696,8 @@ ClusterInfoImpl::ClusterInfoImpl(
     const std::string& string_name = proto_config.name();
     ENVOY_LOG(debug, "  upstream filter #{}:", i);
     ENVOY_LOG(debug, "    name: {}", string_name);
-    auto& factory =
-        Config::Utility::getAndCheckFactory<Server::Configuration::NamedNetworkFilterConfigFactory>(
-            string_name);
+    auto& factory = Config::Utility::getAndCheckFactory<
+        Server::Configuration::NamedUpstreamNetworkFilterConfigFactory>(string_name);
     auto message = factory.createEmptyConfigProto().get();
     if (!proto_config.typed_config().value().empty()) {
       proto_config.typed_config().UnpackTo(message);
