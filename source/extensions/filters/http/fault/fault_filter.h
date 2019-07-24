@@ -81,7 +81,7 @@ class FaultFilterConfig {
 public:
   FaultFilterConfig(const envoy::config::filter::http::fault::v2::HTTPFault& fault,
                     Runtime::Loader& runtime, const std::string& stats_prefix, Stats::Scope& scope,
-                    TimeSource& time_source);
+                    TimeSource& time_source, std::string listener_filter_name);
 
   Runtime::Loader& runtime() { return runtime_; }
   FaultFilterStats& stats() { return stats_; }
@@ -89,6 +89,7 @@ public:
   Stats::Scope& scope() { return scope_; }
   const FaultSettings* settings() { return &settings_; }
   TimeSource& timeSource() { return time_source_; }
+  const std::string listener_filter_name() { return listener_filter_name_; }
 
 private:
   static FaultFilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -99,6 +100,7 @@ private:
   const std::string stats_prefix_;
   Stats::Scope& scope_;
   TimeSource& time_source_;
+  std::string listener_filter_name_;
 };
 
 using FaultFilterConfigSharedPtr = std::shared_ptr<FaultFilterConfig>;
@@ -233,10 +235,10 @@ private:
   const FaultSettings* fault_settings_;
   bool fault_active_{};
   std::unique_ptr<StreamRateLimiter> response_limiter_;
-  std::string downstream_cluster_delay_percent_key_{};
-  std::string downstream_cluster_abort_percent_key_{};
-  std::string downstream_cluster_delay_duration_key_{};
-  std::string downstream_cluster_abort_http_status_key_{};
+  std::string cluster_delay_percent_key_{};
+  std::string cluster_abort_percent_key_{};
+  std::string cluster_delay_duration_key_{};
+  std::string cluster_abort_http_status_key_{};
 };
 
 } // namespace Fault
