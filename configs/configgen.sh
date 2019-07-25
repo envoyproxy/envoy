@@ -12,7 +12,7 @@ mkdir -p "$OUT_DIR/certs"
 
 for FILE in $*; do
   case "$FILE" in
-  *.pem)
+  *.pem | *.lua)
     cp "$FILE" "$OUT_DIR/certs"
     ;;
   *)
