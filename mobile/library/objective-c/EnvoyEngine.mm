@@ -4,21 +4,51 @@
 
 @implementation EnvoyEngine
 
-+ (int)runWithConfig:(NSString *)config {
++ (EnvoyStatus)runWithConfig:(NSString *)config {
   return [self runWithConfig:config logLevel:@"info"];
 }
 
-+ (int)runWithConfig:(NSString *)config logLevel:(NSString *)logLevel {
++ (EnvoyStatus)runWithConfig:(NSString *)config logLevel:(NSString *)logLevel {
   try {
-    return run_engine(config.UTF8String, logLevel.UTF8String);
+    return (EnvoyStatus)run_engine(config.UTF8String, logLevel.UTF8String);
   } catch (NSException *e) {
     NSLog(@"Envoy exception: %@", e);
     NSDictionary *userInfo = @{@"exception" : e};
     [NSNotificationCenter.defaultCenter postNotificationName:@"EnvoyException"
                                                       object:self
                                                     userInfo:userInfo];
-    return 1;
+    return Failure;
   }
+}
+
++ (EnvoyStatus)sendHeaders:(EnvoyHeaders *)headers to:(EnvoyStream *)stream close:(BOOL)close {
+  NSLog(@"%@ not implemented, returning failure", NSStringFromSelector((SEL) __func__));
+  return Failure;
+}
+
++ (EnvoyStatus)sendData:(NSData *)data to:(EnvoyStream *)stream close:(BOOL)close {
+  NSLog(@"%@ not implemented, returning failure", NSStringFromSelector((SEL) __func__));
+  return Failure;
+}
+
++ (EnvoyStatus)sendMetadata:(EnvoyHeaders *)metadata to:(EnvoyStream *)stream close:(BOOL)close {
+  NSLog(@"%@ not implemented, returning failure", NSStringFromSelector((SEL) __func__));
+  return Failure;
+}
+
++ (EnvoyStatus)sendTrailers:(EnvoyHeaders *)trailers to:(EnvoyStream *)stream close:(BOOL)close {
+  NSLog(@"%@ not implemented, returning failure", NSStringFromSelector((SEL) __func__));
+  return Failure;
+}
+
++ (EnvoyStatus)locallyCloseStream:(EnvoyStream *)stream {
+  NSLog(@"%@ not implemented, returning failure", NSStringFromSelector((SEL) __func__));
+  return Failure;
+}
+
++ (EnvoyStatus)resetStream:(EnvoyStream *)stream {
+  NSLog(@"%@ not implemented, returning failure", NSStringFromSelector((SEL) __func__));
+  return Failure;
 }
 
 @end
