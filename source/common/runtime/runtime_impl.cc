@@ -557,7 +557,7 @@ void LoaderImpl::loadNewSnapshot() {
   });
 }
 
-Snapshot& LoaderImpl::snapshot() { return tls_->getTyped<Snapshot>(); }
+const Snapshot& LoaderImpl::snapshot() { return tls_->getTyped<Snapshot>(); }
 
 void LoaderImpl::mergeValues(const std::unordered_map<std::string, std::string>& values) {
   if (admin_layer_ == nullptr) {
@@ -585,7 +585,8 @@ std::unique_ptr<SnapshotImpl> LoaderImpl::createNewSnapshot() {
       layers.emplace_back(std::make_unique<const ProtoLayer>(layer.name(), layer.static_layer()));
       break;
     case envoy::config::bootstrap::v2::RuntimeLayer::kDiskLayer: {
-      std::string path = layer.disk_layer().symlink_root();
+      std::string path =
+          layer.disk_layer().symlink_root() + "/" + layer.disk_layer().subdirectory();
       if (layer.disk_layer().append_service_cluster()) {
         path += "/" + service_cluster_;
       }

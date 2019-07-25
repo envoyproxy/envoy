@@ -21,7 +21,7 @@ public:
   QuicEpollClock(const QuicEpollClock&) = delete;
   QuicEpollClock& operator=(const QuicEpollClock&) = delete;
 
-  ~QuicEpollClock() override {}
+  ~QuicEpollClock() override = default;
 
   // Returns the approximate current time as a QuicTime object.
   QuicTime ApproximateNow() const override;

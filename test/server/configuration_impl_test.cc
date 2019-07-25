@@ -380,9 +380,9 @@ TEST(InitialImplTest, LayeredRuntime) {
         health_check:
           min_interval: 5
     - name: root
-      disk_layer: { symlink_root: /srv/runtime/current/envoy }
+      disk_layer: { symlink_root: /srv/runtime/current, subdirectory: envoy }
     - name: override
-      disk_layer: { symlink_root: /srv/runtime/current/envoy_override, append_service_cluster: true }
+      disk_layer: { symlink_root: /srv/runtime/current, subdirectory: envoy_override, append_service_cluster: true }
     - name: admin
       admin_layer: {}
   )EOF";
@@ -448,15 +448,59 @@ TEST(InitialImplTest, DeprecatedRuntimeTranslation) {
       health_check:
         min_interval: 5
   - name: root
-    disk_layer: { symlink_root: /srv/runtime/current/envoy }
+    disk_layer: { symlink_root: /srv/runtime/current, subdirectory: envoy }
   - name: override
-    disk_layer: { symlink_root: /srv/runtime/current/envoy_override, append_service_cluster: true }
+    disk_layer: { symlink_root: /srv/runtime/current, subdirectory: envoy_override, append_service_cluster: true }
   - name: admin
     admin_layer: {}
   )EOF";
   const auto expected_runtime =
       TestUtility::parseYaml<envoy::config::bootstrap::v2::LayeredRuntime>(expected_yaml);
   EXPECT_THAT(config.runtime(), ProtoEq(expected_runtime));
+}
+
+TEST_F(ConfigurationImplTest, AdminSocketOptions) {
+  std::string json = R"EOF(
+  {
+    "admin": {
+      "access_log_path": "/dev/null",
+      "address": {
+        "socket_address": {
+          "address": "1.2.3.4",
+          "port_value": 5678
+        }
+      },
+      "socket_options": [
+         {
+           "level": 1,
+           "name": 2,
+           "int_value": 3,
+           "state": "STATE_PREBIND"
+         },
+         {
+           "level": 4,
+           "name": 5,
+           "int_value": 6,
+           "state": "STATE_BOUND"
+         },
+      ]
+    }
+  }
+  )EOF";
+
+  auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
+  InitialImpl config(bootstrap);
+  Network::MockListenSocket socket_mock;
+
+  ASSERT_EQ(config.admin().socketOptions()->size(), 2);
+  auto detail = config.admin().socketOptions()->at(0)->getOptionDetails(
+      socket_mock, envoy::api::v2::core::SocketOption::STATE_PREBIND);
+  ASSERT_NE(detail, absl::nullopt);
+  EXPECT_EQ(detail->name_, Envoy::Network::SocketOptionName(1, 2, "1/2"));
+  detail = config.admin().socketOptions()->at(1)->getOptionDetails(
+      socket_mock, envoy::api::v2::core::SocketOption::STATE_BOUND);
+  ASSERT_NE(detail, absl::nullopt);
+  EXPECT_EQ(detail->name_, Envoy::Network::SocketOptionName(4, 5, "4/5"));
 }
 
 } // namespace

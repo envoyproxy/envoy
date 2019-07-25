@@ -109,16 +109,15 @@ public:
     return histogramFromStatName(storage.statName());
   }
 
-  absl::optional<std::reference_wrapper<const Counter>> findCounter(StatName name) const override {
+  OptionalCounter findCounter(StatName name) const override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->findCounter(name);
   }
-  absl::optional<std::reference_wrapper<const Gauge>> findGauge(StatName name) const override {
+  OptionalGauge findGauge(StatName name) const override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->findGauge(name);
   }
-  absl::optional<std::reference_wrapper<const Histogram>>
-  findHistogram(StatName name) const override {
+  OptionalHistogram findHistogram(StatName name) const override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->findHistogram(name);
   }
@@ -170,16 +169,15 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.histogram(name);
   }
-  absl::optional<std::reference_wrapper<const Counter>> findCounter(StatName name) const override {
+  OptionalCounter findCounter(StatName name) const override {
     Thread::LockGuard lock(lock_);
     return store_.findCounter(name);
   }
-  absl::optional<std::reference_wrapper<const Gauge>> findGauge(StatName name) const override {
+  OptionalGauge findGauge(StatName name) const override {
     Thread::LockGuard lock(lock_);
     return store_.findGauge(name);
   }
-  absl::optional<std::reference_wrapper<const Histogram>>
-  findHistogram(StatName name) const override {
+  OptionalHistogram findHistogram(StatName name) const override {
     Thread::LockGuard lock(lock_);
     return store_.findHistogram(name);
   }
@@ -238,7 +236,7 @@ public:
          absl::optional<std::reference_wrapper<ProcessObject>> process_object = absl::nullopt);
   // Note that the derived class is responsible for tearing down the server in its
   // destructor.
-  ~IntegrationTestServer();
+  ~IntegrationTestServer() override;
 
   void waitUntilListenersReady();
 
@@ -257,27 +255,19 @@ public:
              absl::optional<std::reference_wrapper<ProcessObject>> process_object);
 
   void waitForCounterEq(const std::string& name, uint64_t value) override {
-    while (counter(name) == nullptr || counter(name)->value() != value) {
-      time_system_.sleep(std::chrono::milliseconds(10));
-    }
+    TestUtility::waitForCounterEq(stat_store(), name, value, time_system_);
   }
 
   void waitForCounterGe(const std::string& name, uint64_t value) override {
-    while (counter(name) == nullptr || counter(name)->value() < value) {
-      time_system_.sleep(std::chrono::milliseconds(10));
-    }
+    TestUtility::waitForCounterGe(stat_store(), name, value, time_system_);
   }
 
   void waitForGaugeGe(const std::string& name, uint64_t value) override {
-    while (gauge(name) == nullptr || gauge(name)->value() < value) {
-      time_system_.sleep(std::chrono::milliseconds(10));
-    }
+    TestUtility::waitForGaugeGe(stat_store(), name, value, time_system_);
   }
 
   void waitForGaugeEq(const std::string& name, uint64_t value) override {
-    while (gauge(name) == nullptr || gauge(name)->value() != value) {
-      time_system_.sleep(std::chrono::milliseconds(10));
-    }
+    TestUtility::waitForGaugeEq(stat_store(), name, value, time_system_);
   }
 
   Stats::CounterSharedPtr counter(const std::string& name) override {

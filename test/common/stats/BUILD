@@ -11,11 +11,11 @@ load(
 envoy_package()
 
 envoy_cc_test(
-    name = "heap_stat_data_test",
-    srcs = ["heap_stat_data_test.cc"],
+    name = "allocator_impl_test",
+    srcs = ["allocator_impl_test.cc"],
     deps = [
+        "//source/common/stats:allocator_lib",
         "//source/common/stats:fake_symbol_table_lib",
-        "//source/common/stats:heap_stat_data_lib",
         "//test/test_common:logging_lib",
     ],
 )
@@ -32,8 +32,8 @@ envoy_cc_test(
     name = "metric_impl_test",
     srcs = ["metric_impl_test.cc"],
     deps = [
+        "//source/common/stats:allocator_lib",
         "//source/common/stats:fake_symbol_table_lib",
-        "//source/common/stats:heap_stat_data_lib",
         "//source/common/stats:utility_lib",
         "//test/test_common:logging_lib",
     ],
@@ -72,6 +72,12 @@ envoy_cc_test(
         "//source/common/stats:stats_matcher_lib",
         "//test/test_common:utility_lib",
     ],
+)
+
+envoy_cc_test(
+    name = "refcount_ptr_test",
+    srcs = ["refcount_ptr_test.cc"],
+    deps = ["//include/envoy/stats:refcount_ptr_interface"],
 )
 
 envoy_cc_test(

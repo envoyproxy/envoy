@@ -163,9 +163,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       delayed_close_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, delayed_close_timeout, 1000)),
       normalize_path_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, normalize_path,
-          // TODO(htuch): we should have a
-          // boolean variant of featureEnabled()
-          // here.
+          // TODO(htuch): we should have a boolean variant of featureEnabled() here.
           context.runtime().snapshot().featureEnabled("http_connection_manager.normalize_path",
 #ifdef ENVOY_NORMALIZE_PATH_BY_DEFAULT
                                                       100
@@ -311,7 +309,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     processFilter(filters[i], i, "http", filter_factories_);
   }
 
-  for (auto upgrade_config : config.upgrade_configs()) {
+  for (const auto& upgrade_config : config.upgrade_configs()) {
     const std::string& name = upgrade_config.upgrade_type();
     const bool enabled = upgrade_config.has_enabled() ? upgrade_config.enabled().value() : true;
     if (findUpgradeCaseInsensitive(upgrade_filter_factories_, name) !=
@@ -362,21 +360,20 @@ void HttpConnectionManagerConfig::processFilter(
   filter_factories.push_back(callback);
 }
 
-Http::ServerConnectionPtr
-HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
-                                         const Buffer::Instance& data,
-                                         Http::ServerConnectionCallbacks& callbacks) {
+Http::ServerConnectionPtr HttpConnectionManagerConfig::createCodec(
+    Network::Connection& connection, const Buffer::Instance& data,
+    Http::ServerConnectionCallbacks& callbacks, const bool strict_header_validation) {
   switch (codec_type_) {
   case CodecType::HTTP1:
     return std::make_unique<Http::Http1::ServerConnectionImpl>(
-        connection, callbacks, http1_settings_, maxRequestHeadersKb());
+        connection, callbacks, http1_settings_, maxRequestHeadersKb(), strict_header_validation);
   case CodecType::HTTP2:
     return std::make_unique<Http::Http2::ServerConnectionImpl>(
         connection, callbacks, context_.scope(), http2_settings_, maxRequestHeadersKb());
   case CodecType::AUTO:
-    return Http::ConnectionManagerUtility::autoCreateCodec(connection, data, callbacks,
-                                                           context_.scope(), http1_settings_,
-                                                           http2_settings_, maxRequestHeadersKb());
+    return Http::ConnectionManagerUtility::autoCreateCodec(
+        connection, data, callbacks, context_.scope(), http1_settings_, http2_settings_,
+        maxRequestHeadersKb(), strict_header_validation);
   }
 
   NOT_REACHED_GCOVR_EXCL_LINE;

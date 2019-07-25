@@ -14,7 +14,7 @@ namespace Aws {
 class MockCredentialsProvider : public CredentialsProvider {
 public:
   MockCredentialsProvider();
-  ~MockCredentialsProvider();
+  ~MockCredentialsProvider() override;
 
   MOCK_METHOD0(getCredentials, Credentials());
 };
@@ -22,9 +22,25 @@ public:
 class MockSigner : public Signer {
 public:
   MockSigner();
-  ~MockSigner();
+  ~MockSigner() override;
 
   MOCK_METHOD2(sign, void(Http::Message&, bool));
+};
+
+class MockMetadataFetcher {
+public:
+  virtual ~MockMetadataFetcher() = default;
+
+  MOCK_CONST_METHOD3(fetch, absl::optional<std::string>(const std::string&, const std::string&,
+                                                        const absl::optional<std::string>&));
+};
+
+class DummyMetadataFetcher {
+public:
+  absl::optional<std::string> operator()(const std::string&, const std::string&,
+                                         const absl::optional<std::string>&) {
+    return absl::nullopt;
+  }
 };
 
 } // namespace Aws

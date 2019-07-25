@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/stats/refcount_ptr.h"
 #include "envoy/stats/stats.h"
 
 namespace Envoy {
@@ -71,7 +72,7 @@ public:
  * class (Sinks, in particular) will need to explicitly differentiate between histograms
  * representing durations and histograms representing other types of data.
  */
-class Histogram : public virtual Metric {
+class Histogram : public Metric {
 public:
   ~Histogram() override = default;
 
@@ -81,12 +82,12 @@ public:
   virtual void recordValue(uint64_t value) PURE;
 };
 
-using HistogramSharedPtr = std::shared_ptr<Histogram>;
+using HistogramSharedPtr = RefcountPtr<Histogram>;
 
 /**
  * A histogram that is stored in main thread and provides summary view of the histogram.
  */
-class ParentHistogram : public virtual Histogram {
+class ParentHistogram : public Histogram {
 public:
   ~ParentHistogram() override = default;
 
@@ -117,7 +118,7 @@ public:
   virtual const std::string bucketSummary() const PURE;
 };
 
-using ParentHistogramSharedPtr = std::shared_ptr<ParentHistogram>;
+using ParentHistogramSharedPtr = RefcountPtr<ParentHistogram>;
 
 } // namespace Stats
 } // namespace Envoy

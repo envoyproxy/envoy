@@ -67,7 +67,7 @@ public:
       : api_(Api::createApiForTest(stats_store_)),
         pool_(dispatcher_, host_, Upstream::ResourcePriority::Default, nullptr) {}
 
-  ~Http2ConnPoolImplTest() {
+  ~Http2ConnPoolImplTest() override {
     EXPECT_TRUE(TestUtility::gaugesZeroed(cluster_->stats_store_.gauges()));
   }
 

@@ -12,7 +12,9 @@
 #include <sstream>
 #include <string>
 
+#include "common/common/assert.h"
 #include "common/common/logger.h"
+#include "common/common/stl_helpers.h"
 
 #include "absl/base/optimization.h"
 #include "absl/synchronization/mutex.h"

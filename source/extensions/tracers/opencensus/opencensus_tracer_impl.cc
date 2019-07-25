@@ -69,7 +69,7 @@ startSpanHelper(const std::string& name, bool traced, const Http::HeaderMap& req
   for (const auto& incoming : oc_config.incoming_trace_context()) {
     bool found = false;
     switch (incoming) {
-    case OpenCensusConfig::trace_context: {
+    case OpenCensusConfig::TRACE_CONTEXT: {
       const Http::HeaderEntry* header = request_headers.get(Constants::get().TRACEPARENT);
       if (header != nullptr) {
         found = true;
@@ -79,7 +79,7 @@ startSpanHelper(const std::string& name, bool traced, const Http::HeaderMap& req
       break;
     }
 
-    case OpenCensusConfig::grpc_trace_bin: {
+    case OpenCensusConfig::GRPC_TRACE_BIN: {
       const Http::HeaderEntry* header = request_headers.get(Constants::get().GRPC_TRACE_BIN);
       if (header != nullptr) {
         found = true;
@@ -89,7 +89,7 @@ startSpanHelper(const std::string& name, bool traced, const Http::HeaderMap& req
       break;
     }
 
-    case OpenCensusConfig::cloud_trace_context: {
+    case OpenCensusConfig::CLOUD_TRACE_CONTEXT: {
       const Http::HeaderEntry* header = request_headers.get(Constants::get().X_CLOUD_TRACE_CONTEXT);
       if (header != nullptr) {
         found = true;
@@ -154,20 +154,20 @@ void Span::injectContext(Http::HeaderMap& request_headers) {
   using OpenCensusConfig = envoy::config::trace::v2::OpenCensusConfig;
   for (const auto& outgoing : oc_config_.outgoing_trace_context()) {
     switch (outgoing) {
-    case OpenCensusConfig::trace_context:
+    case OpenCensusConfig::TRACE_CONTEXT:
       request_headers.setReferenceKey(
           Constants::get().TRACEPARENT,
           ::opencensus::trace::propagation::ToTraceParentHeader(span_.context()));
       break;
 
-    case OpenCensusConfig::grpc_trace_bin: {
+    case OpenCensusConfig::GRPC_TRACE_BIN: {
       std::string val = ::opencensus::trace::propagation::ToGrpcTraceBinHeader(span_.context());
       val = Base64::encode(val.data(), val.size(), /*add_padding=*/false);
       request_headers.setReferenceKey(Constants::get().GRPC_TRACE_BIN, val);
       break;
     }
 
-    case OpenCensusConfig::cloud_trace_context:
+    case OpenCensusConfig::CLOUD_TRACE_CONTEXT:
       request_headers.setReferenceKey(
           Constants::get().X_CLOUD_TRACE_CONTEXT,
           ::opencensus::trace::propagation::ToCloudTraceContextHeader(span_.context()));
@@ -187,8 +187,9 @@ void Span::setSampled(bool sampled) { span_.AddAnnotation("setSampled", {{"sampl
 
 } // namespace
 
-Driver::Driver(const envoy::config::trace::v2::OpenCensusConfig& oc_config)
-    : oc_config_(oc_config) {
+Driver::Driver(const envoy::config::trace::v2::OpenCensusConfig& oc_config,
+               const LocalInfo::LocalInfo& localinfo)
+    : oc_config_(oc_config), local_info_(localinfo) {
   if (oc_config.has_trace_config()) {
     applyTraceConfig(oc_config.trace_config());
   }
@@ -202,7 +203,7 @@ Driver::Driver(const envoy::config::trace::v2::OpenCensusConfig& oc_config)
   }
   if (oc_config.zipkin_exporter_enabled()) {
     ::opencensus::exporters::trace::ZipkinExporterOptions opts(oc_config.zipkin_url());
-    opts.service_name = oc_config.zipkin_service_name();
+    opts.service_name = local_info_.clusterName();
     ::opencensus::exporters::trace::ZipkinExporter::Register(opts);
   }
 }

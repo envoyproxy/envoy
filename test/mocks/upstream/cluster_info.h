@@ -26,7 +26,7 @@ namespace Upstream {
 class MockLoadBalancerSubsetInfo : public LoadBalancerSubsetInfo {
 public:
   MockLoadBalancerSubsetInfo();
-  ~MockLoadBalancerSubsetInfo();
+  ~MockLoadBalancerSubsetInfo() override;
 
   // Upstream::LoadBalancerSubsetInfo
   MOCK_CONST_METHOD0(isEnabled, bool());
@@ -37,6 +37,7 @@ public:
   MOCK_CONST_METHOD0(localityWeightAware, bool());
   MOCK_CONST_METHOD0(scaleLocalityWeight, bool());
   MOCK_CONST_METHOD0(panicModeAny, bool());
+  MOCK_CONST_METHOD0(listAsAny, bool());
 
   std::vector<SubsetSelectorPtr> subset_selectors_;
 };
@@ -60,7 +61,7 @@ public:
 class MockClusterInfo : public ClusterInfo {
 public:
   MockClusterInfo();
-  ~MockClusterInfo();
+  ~MockClusterInfo() override;
 
   void resetResourceManager(uint64_t cx, uint64_t rq_pending, uint64_t rq, uint64_t rq_retry,
                             uint64_t conn_pool) {
@@ -134,7 +135,7 @@ public:
 class MockIdleTimeEnabledClusterInfo : public MockClusterInfo {
 public:
   MockIdleTimeEnabledClusterInfo();
-  ~MockIdleTimeEnabledClusterInfo();
+  ~MockIdleTimeEnabledClusterInfo() override;
 };
 
 } // namespace Upstream

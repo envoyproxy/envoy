@@ -22,6 +22,12 @@
 namespace Envoy {
 namespace Server {
 
+namespace Configuration {
+class TransportSocketFactoryContextImpl;
+}
+
+class ListenerFilterChainFactoryBuilder;
+
 /**
  * Prod implementation of ListenerComponentFactory that creates real sockets and attempts to fetch
  * sockets from the parent process via the hot restarter. The filter factory list is created from
@@ -220,7 +226,7 @@ public:
   ListenerImpl(const envoy::api::v2::Listener& config, const std::string& version_info,
                ListenerManagerImpl& parent, const std::string& name, bool modifiable,
                bool workers_started, uint64_t hash);
-  ~ListenerImpl();
+  ~ListenerImpl() override;
 
   /**
    * Helper functions to determine whether a listener is blocked for update or remove.
@@ -299,14 +305,6 @@ public:
           std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
     }
   }
-  void addListenSocketOption(const Network::Socket::OptionConstSharedPtr& option) override {
-    ensureSocketOptions();
-    listen_socket_options_->emplace_back(std::move(option));
-  }
-  void addListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) override {
-    ensureSocketOptions();
-    Network::Socket::appendOptions(listen_socket_options_, options);
-  }
   const Network::ListenerConfig& listenerConfig() const override { return *this; }
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
     return parent_.server_.messageValidationVisitor();
@@ -330,9 +328,19 @@ public:
   SystemTime last_updated_;
 
 private:
+  void addListenSocketOption(const Network::Socket::OptionConstSharedPtr& option) {
+    ensureSocketOptions();
+    listen_socket_options_->emplace_back(std::move(option));
+  }
+  void addListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) {
+    ensureSocketOptions();
+    Network::Socket::appendOptions(listen_socket_options_, options);
+  }
+
   ListenerManagerImpl& parent_;
-  FilterChainManagerImpl filter_chain_manager_;
   Network::Address::InstanceConstSharedPtr address_;
+  FilterChainManagerImpl filter_chain_manager_;
+
   Network::Address::SocketType socket_type_;
   Network::SocketSharedPtr socket_;
   Stats::ScopePtr global_scope_;   // Stats with global named scope, but needed for LDS cleanup.
@@ -361,6 +369,20 @@ private:
   const std::string version_info_;
   Network::Socket::OptionsSharedPtr listen_socket_options_;
   const std::chrono::milliseconds listener_filters_timeout_;
+  // to access ListenerManagerImpl::factory_.
+  friend class ListenerFilterChainFactoryBuilder;
+};
+
+class ListenerFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
+public:
+  ListenerFilterChainFactoryBuilder(
+      ListenerImpl& listener, Configuration::TransportSocketFactoryContextImpl& factory_context);
+  std::unique_ptr<Network::FilterChain>
+  buildFilterChain(const ::envoy::api::v2::listener::FilterChain& filter_chain) const override;
+
+private:
+  ListenerImpl& parent_;
+  Configuration::TransportSocketFactoryContextImpl& factory_context_;
 };
 
 } // namespace Server

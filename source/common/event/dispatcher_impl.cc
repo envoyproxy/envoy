@@ -25,6 +25,10 @@
 
 #include "event2/event.h"
 
+#ifdef ENVOY_HANDLE_SIGNALS
+#include "common/signal/signal_action.h"
+#endif
+
 namespace Envoy {
 namespace Event {
 
@@ -35,11 +39,19 @@ DispatcherImpl::DispatcherImpl(Buffer::WatermarkFactoryPtr&& factory, Api::Api& 
                                Event::TimeSystem& time_system)
     : api_(api), buffer_factory_(std::move(factory)),
       scheduler_(time_system.createScheduler(base_scheduler_)),
-      deferred_delete_timer_(createTimer([this]() -> void { clearDeferredDeleteList(); })),
-      post_timer_(createTimer([this]() -> void { runPostCallbacks(); })),
-      current_to_delete_(&to_delete_1_) {}
+      deferred_delete_timer_(createTimerInternal([this]() -> void { clearDeferredDeleteList(); })),
+      post_timer_(createTimerInternal([this]() -> void { runPostCallbacks(); })),
+      current_to_delete_(&to_delete_1_) {
+#ifdef ENVOY_HANDLE_SIGNALS
+  SignalAction::registerFatalErrorHandler(*this);
+#endif
+}
 
-DispatcherImpl::~DispatcherImpl() {}
+DispatcherImpl::~DispatcherImpl() {
+#ifdef ENVOY_HANDLE_SIGNALS
+  SignalAction::removeFatalErrorHandler(*this);
+#endif
+}
 
 void DispatcherImpl::initializeStats(Stats::Scope& scope, const std::string& prefix) {
   // This needs to be run in the dispatcher's thread, so that we have a thread id to log.
@@ -48,7 +60,7 @@ void DispatcherImpl::initializeStats(Stats::Scope& scope, const std::string& pre
     stats_ = std::make_unique<DispatcherStats>(
         DispatcherStats{ALL_DISPATCHER_STATS(POOL_HISTOGRAM_PREFIX(scope, stats_prefix_ + "."))});
     base_scheduler_.initializeStats(stats_.get());
-    ENVOY_LOG(debug, "running {} on thread {}", stats_prefix_, run_tid_->debugString());
+    ENVOY_LOG(debug, "running {} on thread {}", stats_prefix_, run_tid_.debugString());
   });
 }
 
@@ -130,10 +142,12 @@ DispatcherImpl::createListener(Network::Socket& socket, Network::ListenerCallbac
 Network::ListenerPtr DispatcherImpl::createUdpListener(Network::Socket& socket,
                                                        Network::UdpListenerCallbacks& cb) {
   ASSERT(isThreadSafe());
-  return Network::ListenerPtr{new Network::UdpListenerImpl(*this, socket, cb)};
+  return Network::ListenerPtr{new Network::UdpListenerImpl(*this, socket, cb, timeSource())};
 }
 
-TimerPtr DispatcherImpl::createTimer(TimerCb cb) {
+TimerPtr DispatcherImpl::createTimer(TimerCb cb) { return createTimerInternal(cb); }
+
+TimerPtr DispatcherImpl::createTimerInternal(TimerCb cb) {
   ASSERT(isThreadSafe());
   return scheduler_->createTimer(cb);
 }

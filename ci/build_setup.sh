@@ -13,6 +13,7 @@ echo "ENVOY_SRCDIR=${ENVOY_SRCDIR}"
 function setup_gcc_toolchain() {
   export CC=gcc
   export CXX=g++
+  export BAZEL_COMPILER=gcc
   echo "$CC/$CXX toolchain configured"
 }
 
@@ -20,6 +21,7 @@ function setup_clang_toolchain() {
   export PATH=/usr/lib/llvm-8/bin:$PATH
   export CC=clang
   export CXX=clang++
+  export BAZEL_COMPILER=clang
   export ASAN_SYMBOLIZER_PATH=/usr/lib/llvm-8/bin/llvm-symbolizer
   echo "$CC/$CXX toolchain configured"
 }
@@ -32,7 +34,7 @@ mkdir -p "${FAKE_HOME}"
 export HOME="${FAKE_HOME}"
 export PYTHONUSERBASE="${FAKE_HOME}"
 
-export BUILD_DIR=/build
+export BUILD_DIR=${BUILD_DIR:-/build}
 if [[ ! -d "${BUILD_DIR}" ]]
 then
   echo "${BUILD_DIR} mount missing - did you forget -v <something>:${BUILD_DIR}? Creating."
@@ -40,24 +42,9 @@ then
 fi
 export ENVOY_FILTER_EXAMPLE_SRCDIR="${BUILD_DIR}/envoy-filter-example"
 
-# Make sure that /source doesn't contain /build on the underlying host
-# filesystem, including via hard links or symlinks. We can get into weird
-# loops with Bazel symlinking and gcovr's path traversal if this is true, so
-# best to keep /source and /build in distinct directories on the host
-# filesystem.
-SENTINEL="${BUILD_DIR}"/bazel.sentinel
-touch "${SENTINEL}"
-if [[ -n "$(find -L "${ENVOY_SRCDIR}" -name "$(basename "${SENTINEL}")")" ]]
-then
-  rm -f "${SENTINEL}"
-  echo "/source mount must not contain /build mount"
-  exit 1
-fi
-rm -f "${SENTINEL}"
-
 # Environment setup.
 export USER=bazel
-export TEST_TMPDIR=/build/tmp
+export TEST_TMPDIR=${BUILD_DIR}/tmp
 export BAZEL="bazel"
 
 if [[ -f "/etc/redhat-release" ]]
@@ -69,9 +56,8 @@ fi
 
 # Not sandboxing, since non-privileged Docker can't do nested namespaces.
 export BAZEL_QUERY_OPTIONS="${BAZEL_OPTIONS}"
-export BAZEL_BUILD_OPTIONS="--strategy=Genrule=standalone --spawn_strategy=standalone \
-  --verbose_failures ${BAZEL_OPTIONS} --action_env=HOME --action_env=PYTHONUSERBASE \
-  --jobs=${NUM_CPUS} --show_task_finish --experimental_generate_json_trace_profile \
+export BAZEL_BUILD_OPTIONS="--verbose_failures ${BAZEL_OPTIONS} --action_env=HOME --action_env=PYTHONUSERBASE \
+  --local_cpu_resources=${NUM_CPUS} --show_task_finish --experimental_generate_json_trace_profile \
   --test_env=HOME --test_env=PYTHONUSERBASE --cache_test_results=no --test_output=all \
   ${BAZEL_BUILD_EXTRA_OPTIONS} ${BAZEL_EXTRA_TEST_OPTIONS}"
 
@@ -85,8 +71,8 @@ if [ "$1" != "-nofetch" ]; then
   fi
 
   # This is the hash on https://github.com/envoyproxy/envoy-filter-example.git we pin to.
-  (cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git fetch origin && git checkout -f 6c0625cb4cc9a21df97cef2a1d065463f2ae81ae)
-  cp -f "${ENVOY_SRCDIR}"/ci/WORKSPACE.filter.example "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/WORKSPACE
+  (cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git fetch origin && git checkout -f dcd3374baa9365ab7ab505018232994d6c8a8d81)
+  sed -e "s|{ENVOY_SRCDIR}|${ENVOY_SRCDIR}|" "${ENVOY_SRCDIR}"/ci/WORKSPACE.filter.example > "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/WORKSPACE
 fi
 
 # Also setup some space for building Envoy standalone.

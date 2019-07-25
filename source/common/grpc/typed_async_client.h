@@ -29,7 +29,7 @@ AsyncRequest* sendUntyped(RawAsyncClient* client, const Protobuf::MethodDescript
  */
 template <typename Request> class AsyncStream /* : public RawAsyncStream */ {
 public:
-  AsyncStream() {}
+  AsyncStream() = default;
   AsyncStream(RawAsyncStream* stream) : stream_(stream) {}
   AsyncStream(const AsyncStream& other) = default;
   void sendMessage(const Request& request, bool end_stream) {
@@ -93,18 +93,19 @@ private:
 
 template <typename Request, typename Response> class AsyncClient /* : public RawAsyncClient )*/ {
 public:
-  AsyncClient() {}
+  AsyncClient() = default;
   AsyncClient(RawAsyncClientPtr&& client) : client_(std::move(client)) {}
+  virtual ~AsyncClient() = default;
 
-  AsyncRequest* send(const Protobuf::MethodDescriptor& service_method,
-                     const Protobuf::Message& request, AsyncRequestCallbacks<Response>& callbacks,
-                     Tracing::Span& parent_span,
-                     const absl::optional<std::chrono::milliseconds>& timeout) {
+  virtual AsyncRequest* send(const Protobuf::MethodDescriptor& service_method,
+                             const Protobuf::Message& request,
+                             AsyncRequestCallbacks<Response>& callbacks, Tracing::Span& parent_span,
+                             const absl::optional<std::chrono::milliseconds>& timeout) {
     return Internal::sendUntyped(client_.get(), service_method, request, callbacks, parent_span,
                                  timeout);
   }
-  AsyncStream<Request> start(const Protobuf::MethodDescriptor& service_method,
-                             AsyncStreamCallbacks<Response>& callbacks) {
+  virtual AsyncStream<Request> start(const Protobuf::MethodDescriptor& service_method,
+                                     AsyncStreamCallbacks<Response>& callbacks) {
     return AsyncStream<Request>(Internal::startUntyped(client_.get(), service_method, callbacks));
   }
 

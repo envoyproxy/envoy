@@ -1,8 +1,7 @@
 #include "common/stats/isolated_store_impl.h"
 
-#include <string.h>
-
 #include <algorithm>
+#include <cstring>
 #include <string>
 
 #include "common/common/utility.h"
@@ -32,10 +31,11 @@ IsolatedStoreImpl::IsolatedStoreImpl(SymbolTable& symbol_table)
                                 import_mode);
       }),
       histograms_([this](StatName name) -> HistogramSharedPtr {
-        return std::make_shared<HistogramImpl>(name, *this, alloc_.symbolTable().toString(name),
-                                               std::vector<Tag>());
+        return HistogramSharedPtr(new HistogramImpl(
+            name, *this, alloc_.symbolTable().toString(name), std::vector<Tag>()));
       }),
-      null_gauge_(symbol_table) {}
+      null_counter_(new NullCounterImpl(symbol_table)),
+      null_gauge_(new NullGaugeImpl(symbol_table)) {}
 
 ScopePtr IsolatedStoreImpl::createScope(const std::string& name) {
   return std::make_unique<ScopePrefixer>(name, *this);

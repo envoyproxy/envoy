@@ -4,6 +4,8 @@
 
 # api
 /api/ @envoyproxy/api-shepherds
+# access loggers
+/*/extensions/access_loggers/common @auni53 @zuercher
 # csrf extension
 /*/extensions/filters/http/csrf @dschaller @mattklein123
 # original_src http filter extension
@@ -19,7 +21,7 @@ extensions/filters/common/original_src @snowp @klarose
 # jwt_authn http filter extension
 /*/extensions/filters/http/jwt_authn @qiwzhang @lizan
 # grpc_http1_reverse_bridge http filter extension
-/*/extensions/filters/http/grpc_http1_reverse_bridge @snowp
+/*/extensions/filters/http/grpc_http1_reverse_bridge @snowp @zuercher
 # header_to_metadata extension
 /*/extensions/filters/http/header_to_metadata @rgs1 @zuercher
 # alts transport socket extension
@@ -36,3 +38,11 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/network/zookeeper_proxy @rgs1 @snowp
 # redis cluster extension
 /*/extensions/clusters/redis @msukalski @henryyyang @mattklein123
+# dynamic forward proxy
+/*/extensions/clusters/dynamic_forward_proxy @mattklein123 @alyssawilk
+/*/extensions/common/dynamic_forward_proxy @mattklein123 @alyssawilk
+/*/extensions/filters/http/dynamic_forward_proxy @mattklein123 @alyssawilk
+# omit_canary_hosts retry predicate
+/*/extensions/retry/host/omit_canary_hosts @sriduth @snowp
+# http inspector
+/*/extensions/filters/listener/http_inspector @crazyxy @PiotrSikora @lizan

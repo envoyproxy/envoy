@@ -357,7 +357,7 @@ public:
         .WillByDefault(SaveArg<0>(&access_log_data_));
   }
 
-  ~TcpProxyTest() {
+  ~TcpProxyTest() override {
     if (filter_ != nullptr) {
       filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
     }
@@ -617,11 +617,11 @@ TEST_F(TcpProxyTest, ConnectAttemptsLimit) {
   setup(3, config);
 
   EXPECT_CALL(upstream_hosts_.at(0)->outlier_detector_,
-              putResult(Upstream::Outlier::Result::TIMEOUT));
+              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, _));
   EXPECT_CALL(upstream_hosts_.at(1)->outlier_detector_,
-              putResult(Upstream::Outlier::Result::CONNECT_FAILED));
+              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED, _));
   EXPECT_CALL(upstream_hosts_.at(2)->outlier_detector_,
-              putResult(Upstream::Outlier::Result::CONNECT_FAILED));
+              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED, _));
 
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
 
@@ -643,16 +643,16 @@ TEST_F(TcpProxyTest, OutlierDetection) {
   setup(3, config);
 
   EXPECT_CALL(upstream_hosts_.at(0)->outlier_detector_,
-              putResult(Upstream::Outlier::Result::TIMEOUT));
+              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, _));
   raiseEventUpstreamConnectFailed(0, Tcp::ConnectionPool::PoolFailureReason::Timeout);
 
   EXPECT_CALL(upstream_hosts_.at(1)->outlier_detector_,
-              putResult(Upstream::Outlier::Result::CONNECT_FAILED));
+              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED, _));
   raiseEventUpstreamConnectFailed(1,
                                   Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
 
   EXPECT_CALL(upstream_hosts_.at(2)->outlier_detector_,
-              putResult(Upstream::Outlier::Result::SUCCESS));
+              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS_FINAL, _));
   raiseEventUpstreamConnected(2);
 }
 

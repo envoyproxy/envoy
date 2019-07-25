@@ -3,6 +3,14 @@ REPOSITORY_LOCATIONS = dict(
         sha256 = "3c681998538231a2d24d0c07ed5a7658cb72bfb5fd4bf9911157c0e9ac6a2687",
         urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/0.17.0/bazel-gazelle-0.17.0.tar.gz"],
     ),
+    bazel_toolchains = dict(
+        sha256 = "68e7678473090542e679ce7e6aa8a3ba5669577dede2b404f9865d556bd99f10",
+        strip_prefix = "bazel-toolchains-0.28.0",
+        urls = [
+            "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/0.28.0.tar.gz",
+            "https://github.com/bazelbuild/bazel-toolchains/archive/0.28.0.tar.gz",
+        ],
+    ),
     boringssl = dict(
         # Use commits from branch "chromium-stable-with-bazel"
         sha256 = "448773376d063b1e9a19e4fd41002d1a31a968a13be20b3b66ecd4aab9cf14a8",
@@ -27,9 +35,13 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://files.pythonhosted.org/packages/c6/b4/510617906f8e0c5660e7d96fbc5585113f83ad547a3989b80297ac72a74c/thrift-0.11.0.tar.gz"],
     ),
     com_github_c_ares_c_ares = dict(
-        sha256 = "7deb7872cbd876c29036d5f37e30c4cbc3cc068d59d8b749ef85bb0736649f04",
-        strip_prefix = "c-ares-cares-1_15_0",
-        urls = ["https://github.com/c-ares/c-ares/archive/cares-1_15_0.tar.gz"],
+        sha256 = "bbaab13d6ad399a278d476f533e4d88a7ec7d729507348bb9c2e3b207ba4c606",
+        strip_prefix = "c-ares-d7e070e7283f822b1d2787903cce3615536c5610",
+        # 2019-06-19
+        # 27 new commits from release-1.15.0. Upgrade for commit 7d3591ee8a1a63e7748e68e6d880bd1763a32885 "getaddrinfo enhancements" and follow up fixes.
+        # Use getaddrinfo to query DNS record and TTL.
+        # TODO(crazyxy): Update to release-1.16.0 when it is released.
+        urls = ["https://github.com/c-ares/c-ares/archive/d7e070e7283f822b1d2787903cce3615536c5610.tar.gz"],
     ),
     com_github_circonus_labs_libcircllhist = dict(
         sha256 = "8165aa25e529d7d4b9ae849d3bf30371255a99d6db0421516abcff23214cdc2c",
@@ -61,11 +73,6 @@ REPOSITORY_LOCATIONS = dict(
         sha256 = "160845266e94db1d4922ef755637f6901266731c4cb3b30b45bf41efa0e6ab70",
         strip_prefix = "spdlog-1.3.1",
         urls = ["https://github.com/gabime/spdlog/archive/v1.3.1.tar.gz"],
-    ),
-    com_github_gcovr_gcovr = dict(
-        sha256 = "8a60ba6242d67a58320e9e16630d80448ef6d5284fda5fb3eff927b63c8b04a2",
-        strip_prefix = "gcovr-3.3",
-        urls = ["https://github.com/gcovr/gcovr/archive/3.3.tar.gz"],
     ),
     com_github_google_libprotobuf_mutator = dict(
         sha256 = "97b3639630040f41c45f45838ab00b78909e6b4cb69c8028e01302bea5b79495",
@@ -123,15 +130,16 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/benchmark/archive/v1.5.0.tar.gz"],
     ),
     com_github_libevent_libevent = dict(
-        sha256 = "6f799dd920aab9487cb04cd40627a5d4104fbbd246ebb5c8fd5e520055af2ef5",
+        sha256 = "549d34065eb2485dfad6c8de638caaa6616ed130eec36dd978f73b6bdd5af113",
         # This SHA includes the new "prepare" and "check" watchers, used for event loop performance
         # stats (see https://github.com/libevent/libevent/pull/793) and the fix for a race condition
         # in the watchers (see https://github.com/libevent/libevent/pull/802).
-        # This also includes the fix for https://github.com/libevent/libevent/issues/806
+        # This also includes the fixes for https://github.com/libevent/libevent/issues/806
+        # and https://github.com/lyft/envoy-mobile/issues/215.
         # TODO(mergeconflict): Update to v2.2 when it is released.
-        strip_prefix = "libevent-3b1864b625ec37c3051512845982f347f4cc5621",
-        # 2019-05-16
-        urls = ["https://github.com/libevent/libevent/archive/3b1864b625ec37c3051512845982f347f4cc5621.tar.gz"],
+        strip_prefix = "libevent-0d7d85c2083f7a4c9efe01c061486f332b576d28",
+        # 2019-07-02
+        urls = ["https://github.com/libevent/libevent/archive/0d7d85c2083f7a4c9efe01c061486f332b576d28.tar.gz"],
     ),
     net_zlib = dict(
         # TODO(moderation): revert to com_github_madler_zlib name pending resolution of workaround
@@ -152,10 +160,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/msgpack/msgpack-c/archive/cpp-3.1.1.tar.gz"],
     ),
     com_github_google_jwt_verify = dict(
-        sha256 = "700be26170c1917e83d1319b88a2112dccd1179cd78c5672940483e7c45ca6ae",
-        strip_prefix = "jwt_verify_lib-85cf0edf1f1bc507ff7d96a8d6a9bc20307b0fcf",
-        # 2018-12-01
-        urls = ["https://github.com/google/jwt_verify_lib/archive/85cf0edf1f1bc507ff7d96a8d6a9bc20307b0fcf.tar.gz"],
+        sha256 = "8ab9a0b3f8b7eab5f1cd059920e81fdc138cd4ee657c1412af891652929885c5",
+        strip_prefix = "jwt_verify_lib-6356535ae83a3f1820b6b06dae80cd6a0a03e7f2",
+        # 2019-07-01
+        urls = ["https://github.com/google/jwt_verify_lib/archive/6356535ae83a3f1820b6b06dae80cd6a0a03e7f2.tar.gz"],
     ),
     com_github_nodejs_http_parser = dict(
         sha256 = "ef26268c54c8084d17654ba2ed5140bffeffd2a040a895ffb22a6cca3f6c613f",
@@ -193,16 +201,16 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://files.pythonhosted.org/packages/f9/e7/4f80d582578f8489226370762d2cf6bc9381175d1929eba1754e03f70708/twitter.common.finagle-thrift-0.3.9.tar.gz"],
     ),
     com_google_googletest = dict(
-        sha256 = "a4cb4b0c3ebb191b798594aca674ad47eee255dcb4c26885cf7f49777703484f",
-        strip_prefix = "googletest-eb9225ce361affe561592e0912320b9db84985d0",
+        sha256 = "cbd251a40485fddd44cdf641af6df2953d45695853af6d68aeb11c7efcde6771",
+        strip_prefix = "googletest-d7003576dd133856432e2e07340f45926242cc3a",
         # TODO(akonradi): Switch this back to a released version later than 1.8.1 once there is
         # one available.
-        urls = ["https://github.com/google/googletest/archive/eb9225ce361affe561592e0912320b9db84985d0.tar.gz"],
+        urls = ["https://github.com/google/googletest/archive/d7003576dd133856432e2e07340f45926242cc3a.tar.gz"],
     ),
     com_google_protobuf = dict(
-        sha256 = "c10ef8d8ad5a9e5f850483051b7f9ee2c8bb3ca2e0e16a4cf105bd1321afb2d6",
-        strip_prefix = "protobuf-3.7.1",
-        urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v3.7.1/protobuf-all-3.7.1.tar.gz"],
+        sha256 = "b7220b41481011305bf9100847cf294393973e869973a9661046601959b2960b",
+        strip_prefix = "protobuf-3.8.0",
+        urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v3.8.0/protobuf-all-3.8.0.tar.gz"],
     ),
     grpc_httpjson_transcoding = dict(
         sha256 = "dedd76b0169eb8c72e479529301a1d9b914a4ccb4d2b5ddb4ebe92d63a7b2152",
@@ -215,21 +223,14 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/bazelbuild/rules_go/releases/download/0.18.5/rules_go-0.18.5.tar.gz"],
     ),
     rules_foreign_cc = dict(
-        sha256 = "980c1b74f5c18ea099889b0fb0479ee34b8a02845d3d302ecb16b15d73d624c8",
-        strip_prefix = "rules_foreign_cc-a0dc109915cea85909bef586e2b2a9bbdc6c8ff5",
-        # 2019-06-04
-        urls = ["https://github.com/bazelbuild/rules_foreign_cc/archive/a0dc109915cea85909bef586e2b2a9bbdc6c8ff5.tar.gz"],
+        sha256 = "c957e6663094a1478c43330c1bbfa71afeaf1ab86b7565233783301240c7a0ab",
+        strip_prefix = "rules_foreign_cc-a209b642c7687a8894c19b3dd40e43e6d3f38e83",
+        # 2019-07-17
+        urls = ["https://github.com/bazelbuild/rules_foreign_cc/archive/a209b642c7687a8894c19b3dd40e43e6d3f38e83.tar.gz"],
     ),
     six_archive = dict(
         sha256 = "105f8d68616f8248e24bf0e9372ef04d3cc10104f1980f54d57b2ce73a5ad56a",
-        urls = ["https://pypi.python.org/packages/source/s/six/six-1.10.0.tar.gz#md5=34eed507548117b2ab523ab14b2f8b55"],
-    ),
-    # I'd love to name this `com_github_google_subpar`, but something in the Subpar
-    # code assumes its repository name is just `subpar`.
-    subpar = dict(
-        sha256 = "b80297a1b8d38027a86836dbadc22f55dc3ecad56728175381aa6330705ac10f",
-        strip_prefix = "subpar-2.0.0",
-        urls = ["https://github.com/google/subpar/archive/2.0.0.tar.gz"],
+        urls = ["https://files.pythonhosted.org/packages/b3/b2/238e2590826bfdd113244a40d9d3eb26918bd798fc187e2360a8367068db/six-1.10.0.tar.gz"],
     ),
     io_opencensus_cpp = dict(
         sha256 = "d6d68704c419a9e892bd1f942e09509ebc5a318499a1abcf2c09734e5dc56e19",
@@ -242,8 +243,8 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/curl/curl/releases/download/curl-7_65_1/curl-7.65.1.tar.gz"],
     ),
     com_googlesource_quiche = dict(
-        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/88e3e05c341147f4052e17a2769ac2722739c498.tar.gz
-        sha256 = "74ac2169adecfdc086a4942be2758b9ec3bf1782f75d1b421b695b8f4a19cc82",
-        urls = ["https://storage.googleapis.com/quiche-envoy-integration/88e3e05c341147f4052e17a2769ac2722739c498.tar.gz"],
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/2a930469533c3b541443488a629fe25cd8ff53d0.tar.gz
+        sha256 = "fcdebf54c89d839ffa7eefae166c8e4b551c765559db13ff15bff98047f344fb",
+        urls = ["https://storage.googleapis.com/quiche-envoy-integration/2a930469533c3b541443488a629fe25cd8ff53d0.tar.gz"],
     ),
 )

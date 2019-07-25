@@ -20,13 +20,13 @@ public:
   ThresholdTriggerImpl(const envoy::config::overload::v2alpha::ThresholdTrigger& config)
       : threshold_(config.value()) {}
 
-  bool updateValue(double value) {
+  bool updateValue(double value) override {
     const bool fired = isFired();
     value_ = value;
     return fired != isFired();
   }
 
-  bool isFired() const { return value_.has_value() && value_ >= threshold_; }
+  bool isFired() const override { return value_.has_value() && value_ >= threshold_; }
 
 private:
   const double threshold_;
@@ -120,7 +120,7 @@ OverloadManagerImpl::OverloadManagerImpl(
     }
 
     for (const auto& trigger : action.triggers()) {
-      const std::string resource = trigger.name();
+      const std::string& resource = trigger.name();
 
       if (resources_.find(resource) == resources_.end()) {
         throw EnvoyException(

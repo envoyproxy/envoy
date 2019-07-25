@@ -471,7 +471,7 @@ public:
     mock_cluster_info_->transport_socket_factory_.reset();
   }
 
-  virtual envoy::api::v2::core::GrpcService createGoogleGrpcConfig() override {
+  envoy::api::v2::core::GrpcService createGoogleGrpcConfig() override {
     auto config = GrpcClientIntegrationTest::createGoogleGrpcConfig();
     TestUtility::setTestSslGoogleGrpcConfig(config, use_client_cert_);
     return config;

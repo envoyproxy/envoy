@@ -17,7 +17,7 @@ class Endpoint {
 public:
   Endpoint(int32_t ipv4, int16_t port, const std::string& service_name)
       : ipv4_(ipv4), port_(port), service_name_(service_name) {}
-  Endpoint() {}
+  Endpoint() = default;
 
   int32_t ipv4_{0};
   int16_t port_{0};
@@ -31,7 +31,7 @@ class Annotation {
 public:
   Annotation(int64_t timestamp, const std::string& value, absl::optional<Endpoint> host)
       : timestamp_(timestamp), value_(value), host_(host) {}
-  Annotation() {}
+  Annotation() = default;
 
   int64_t timestamp_{0};
   std::string value_;
@@ -60,7 +60,7 @@ public:
   BinaryAnnotation(const std::string& key, const std::string& value, AnnotationType annotation_type,
                    absl::optional<Endpoint> host)
       : key_(key), value_(value), annotation_type_(annotation_type), host_(host) {}
-  BinaryAnnotation() {}
+  BinaryAnnotation() = default;
 
   std::string key_;
   std::string value_;
@@ -80,7 +80,7 @@ public:
       : trace_id_(trace_id), name_(name), span_id_(span_id), parent_span_id_(parent_span_id),
         annotations_(std::move(annotations)), binary_annotations_(std::move(binary_annotations)),
         debug_(debug) {}
-  Span() {}
+  Span() = default;
 
   int64_t trace_id_{0};
   std::string name_;

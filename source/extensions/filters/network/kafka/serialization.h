@@ -153,7 +153,7 @@ public:
  */
 class BooleanDeserializer : public Deserializer<bool> {
 public:
-  BooleanDeserializer(){};
+  BooleanDeserializer() = default;
 
   uint32_t feed(absl::string_view& data) override { return buffer_.feed(data); }
 

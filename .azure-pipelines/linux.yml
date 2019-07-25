@@ -1,14 +1,45 @@
-resources:
-  containers:
-  - container: envoy-build
-    image: envoyproxy/envoy-build:ec38ecb88fd1abe55ab1daa2f6bd239ffccc9d98
-
 jobs:
-- job: BuildEnvoy
+- job: bazel
+  strategy:
+    matrix:
+      release:
+        CI_TARGET: 'bazel.release'
+  dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
   timeoutInMinutes: 360
   pool:
     vmImage: 'Ubuntu 16.04'
-  container: envoy-build
   steps:
-  - script: bazel build //source/exe:envoy-static
+  - bash: |
+      echo "disk space at beginning of build:"
+      df -h
+    displayName: "Check disk space at beginning"
 
+  - bash: |
+      sudo mkdir -p /etc/docker
+      echo '{
+        "ipv6": true,
+        "fixed-cidr-v6": "2001:db8:1::/64"
+      }' | sudo tee /etc/docker/daemon.json
+      sudo service docker restart
+    displayName: "Enable IPv6"
+
+  - script: ci/run_envoy_docker.sh 'ci/do_ci.sh $(CI_TARGET)'
+    workingDirectory: $(Build.SourcesDirectory)
+    env:
+      ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+      BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-clang --config=remote-ci --jobs=100 --curses=no"
+      BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+      BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+      GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+    displayName: "Run CI script"
+
+  - bash: |
+      echo "disk space at end of build:"
+      df -h
+    displayName: "Check disk space at end"
+    condition: always()
+
+  - task: PublishBuildArtifacts@1
+    inputs:
+      pathtoPublish: "$(Build.StagingDirectory)/envoy"
+      artifactName: $(CI_TARGET)

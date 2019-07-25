@@ -38,6 +38,11 @@
 namespace Envoy {
 namespace Server {
 
+namespace Utility {
+envoy::admin::v2alpha::ServerInfo::State serverState(Init::Manager::State state,
+                                                     bool health_check_failed);
+} // namespace Utility
+
 class AdminInternalAddressConfig : public Http::InternalAddressConfig {
   bool isInternalAddress(const Network::Address::Instance&) const override { return false; }
 };
@@ -71,6 +76,7 @@ public:
 
   void startHttpListener(const std::string& access_log_path, const std::string& address_out_path,
                          Network::Address::InstanceConstSharedPtr address,
+                         const Network::Socket::OptionsSharedPtr& socket_options,
                          Stats::ScopePtr&& listener_scope) override;
 
   // Network::FilterChainManager
@@ -99,7 +105,8 @@ public:
   const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
   Http::ServerConnectionPtr createCodec(Network::Connection& connection,
                                         const Buffer::Instance& data,
-                                        Http::ServerConnectionCallbacks& callbacks) override;
+                                        Http::ServerConnectionCallbacks& callbacks,
+                                        const bool strict_header_validation) override;
   Http::DateProvider& dateProvider() override { return date_provider_; }
   std::chrono::milliseconds drainTimeout() override { return std::chrono::milliseconds(100); }
   Http::FilterChainFactory& filterFactory() override { return *this; }
@@ -218,10 +225,11 @@ private:
   void writeListenersAsJson(Buffer::Instance& response);
   void writeListenersAsText(Buffer::Instance& response);
 
-  static bool shouldShowMetric(const std::shared_ptr<Stats::Metric>& metric, const bool used_only,
+  template <class StatType>
+  static bool shouldShowMetric(const StatType& metric, const bool used_only,
                                const absl::optional<std::regex>& regex) {
-    return ((!used_only || metric->used()) &&
-            (!regex.has_value() || std::regex_search(metric->name(), regex.value())));
+    return ((!used_only || metric.used()) &&
+            (!regex.has_value() || std::regex_search(metric.name(), regex.value())));
   }
   static std::string statsAsJson(const std::map<std::string, uint64_t>& all_stats,
                                  const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
@@ -229,11 +237,7 @@ private:
                                  const absl::optional<std::regex> regex = absl::nullopt,
                                  bool pretty_print = false);
 
-  static std::string
-  runtimeAsJson(const std::vector<std::pair<std::string, Runtime::Snapshot::Entry>>& entries);
   std::vector<const UrlHandler*> sortedHandlers() const;
-  static const std::vector<std::pair<std::string, Runtime::Snapshot::Entry>>
-  sortedRuntime(const std::unordered_map<std::string, const Runtime::Snapshot::Entry>& entries);
   envoy::admin::v2alpha::ServerInfo::State serverState();
   /**
    * URL handlers.
@@ -324,7 +328,9 @@ private:
 
   class AdminFilterChain : public Network::FilterChain {
   public:
-    AdminFilterChain() {}
+    // We can't use the default constructor because transport_socket_factory_ doesn't have a
+    // default constructor.
+    AdminFilterChain() {} // NOLINT(modernize-use-equals-default)
 
     // Network::FilterChain
     const Network::TransportSocketFactory& transportSocketFactory() const override {
@@ -444,10 +450,11 @@ private:
    * Determine whether a metric has never been emitted and choose to
    * not show it if we only wanted used metrics.
    */
-  static bool shouldShowMetric(const std::shared_ptr<Stats::Metric>& metric, const bool used_only,
+  template <class StatType>
+  static bool shouldShowMetric(const StatType& metric, const bool used_only,
                                const absl::optional<std::regex>& regex) {
-    return ((!used_only || metric->used()) &&
-            (!regex.has_value() || std::regex_search(metric->name(), regex.value())));
+    return ((!used_only || metric.used()) &&
+            (!regex.has_value() || std::regex_search(metric.name(), regex.value())));
   }
 };
 

@@ -49,7 +49,7 @@ private:
 class LogRecordingSink : public Logger::SinkDelegate {
 public:
   explicit LogRecordingSink(Logger::DelegatingLogSinkPtr log_sink);
-  virtual ~LogRecordingSink();
+  ~LogRecordingSink() override;
 
   // Logger::SinkDelegate
   void log(absl::string_view msg) override;
@@ -160,7 +160,7 @@ using ExpectedLogMessages = std::vector<StringPair>;
     Envoy::LogLevelSetter save_levels(spdlog::level::trace);                                       \
     Envoy::LogRecordingSink log_recorder(Envoy::Logger::Registry::getSink());                      \
     stmt;                                                                                          \
-    const std::vector<std::string> logs = log_recorder.messages();                                 \
+    const std::vector<std::string>& logs = log_recorder.messages();                                \
     ASSERT_EQ(0, logs.size()) << " Logs:\n   " << absl::StrJoin(logs, "   ");                      \
   } while (false)
 

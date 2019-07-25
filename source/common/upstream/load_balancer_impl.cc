@@ -115,11 +115,10 @@ LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set, ClusterStats
 // - normalized total health is = 100%. It means there are enough healthy hosts to handle the load.
 //   Do not enter panic mode, even if a specific priority has low number of healthy hosts.
 // - normalized total health is < 100%. There are not enough healthy hosts to handle the load.
-// Continue
-//   distributing the load among priority sets, but turn on panic mode for a given priority
+// Continue distributing the load among priority sets, but turn on panic mode for a given priority
 //   if # of healthy hosts in priority set is low.
-// - normalized total health is 0%. All hosts are down. Redirect 100% of traffic to P=0 and enable
-// panic mode.
+// - normalized total health is 0%. All hosts are down. Redirect 100% of traffic to P=0.
+//   And if panic threshold > 0% then enable panic mode for P=0, otherwise disable.
 
 void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
                                                    const PrioritySet& priority_set,
@@ -220,7 +219,11 @@ void LoadBalancerBase::recalculatePerPriorityPanic() {
   const uint32_t normalized_total_availability =
       calculateNormalizedTotalAvailability(per_priority_health_, per_priority_degraded_);
 
-  if (normalized_total_availability == 0) {
+  const uint64_t panic_threshold = std::min<uint64_t>(
+      100, runtime_.snapshot().getInteger(RuntimePanicThreshold, default_healthy_panic_percent_));
+
+  // Panic mode is disabled only when panic_threshold is 0%.
+  if (panic_threshold > 0 && normalized_total_availability == 0) {
     // Everything is terrible. All load should be to P=0. Turn on panic mode.
     ASSERT(per_priority_load_.healthy_priority_load_.get()[0] == 100);
     per_priority_panic_[0] = true;

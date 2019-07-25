@@ -422,7 +422,7 @@ MessagePtr Utility::prepareHeaders(const ::envoy::api::v2::core::HttpUri& http_u
 std::string Utility::queryParamsToString(const QueryParams& params) {
   std::string out;
   std::string delim = "?";
-  for (auto p : params) {
+  for (const auto& p : params) {
     absl::StrAppend(&out, delim, p.first, "=", p.second);
     delim = "&";
   }

@@ -415,7 +415,7 @@ struct TestCase {
   TestCase() = default;
   TestCase(enum InstanceType type, const std::string& address, uint32_t port)
       : address_(address), type_(type), port_(port) {}
-  TestCase(const TestCase& rhs) : address_(rhs.address_), type_(rhs.type_), port_(rhs.port_) {}
+  TestCase(const TestCase& rhs) = default;
 
   bool operator==(const TestCase& rhs) {
     return (type_ == rhs.type_ && address_ == rhs.address_ && port_ == rhs.port_);
@@ -431,7 +431,7 @@ public:
 protected:
   InstanceConstSharedPtr testCaseToInstance(const struct TestCase& test_case) {
     // Catch default construction.
-    if (test_case.address_ == "") {
+    if (test_case.address_.empty()) {
       return nullptr;
     }
     switch (test_case.type_) {
@@ -451,7 +451,7 @@ protected:
 
 TEST_P(MixedAddressTest, Equality) {
   TestCase lhs_case = ::testing::get<0>(GetParam());
-  TestCase rhs_case = ::testing::get<1>(GetParam());
+  const TestCase& rhs_case = ::testing::get<1>(GetParam());
   InstanceConstSharedPtr lhs = testCaseToInstance(lhs_case);
   InstanceConstSharedPtr rhs = testCaseToInstance(rhs_case);
   if (lhs_case == rhs_case) {

@@ -3,7 +3,11 @@
 #include <sys/un.h>
 #include <unistd.h>
 
-#ifdef __has_include
+// TODO(asraa): Remove <experimental/filesystem> and rely only on <filesystem> when Envoy requires
+// Clang >= 9.
+#if defined(_LIBCPP_VERSION) && !defined(__APPLE__)
+#include <filesystem>
+#elif defined __has_include
 #if __has_include(<experimental/filesystem>)
 #include <experimental/filesystem>
 #endif
@@ -38,7 +42,11 @@ std::string makeTempDir(char* name_template) {
   char* dirname = ::_mktemp(name_template);
   RELEASE_ASSERT(dirname != nullptr, fmt::format("failed to create tempdir from template: {} {}",
                                                  name_template, strerror(errno)));
+#if defined(_LIBCPP_VERSION) && _LIBCPP_VERSION >= 9000 && !defined(__APPLE__)
+  std::__fs::filesystem::create_directories(dirname);
+#elif defined __cpp_lib_experimental_filesystem
   std::experimental::filesystem::create_directories(dirname);
+#endif
 #else
   char* dirname = ::mkdtemp(name_template);
   RELEASE_ASSERT(dirname != nullptr, fmt::format("failed to create tempdir from template: {} {}",
@@ -77,39 +85,48 @@ char** argv_;
 } // namespace
 
 void TestEnvironment::createPath(const std::string& path) {
-#ifdef __cpp_lib_experimental_filesystem
+#if defined(_LIBCPP_VERSION) && _LIBCPP_VERSION >= 9000 && !defined(__APPLE__)
   // We don't want to rely on mkdir etc. if we can avoid it, since it might not
   // exist in some environments such as ClusterFuzz.
+  std::__fs::filesystem::create_directories(std::__fs::filesystem::path(path));
+#elif defined __cpp_lib_experimental_filesystem
   std::experimental::filesystem::create_directories(std::experimental::filesystem::path(path));
 #else
-  // No support on this system for std::experimental::filesystem.
+  // No support on this system for std::filesystem or std::experimental::filesystem.
   RELEASE_ASSERT(::system(("mkdir -p " + path).c_str()) == 0, "");
 #endif
 }
 
 void TestEnvironment::createParentPath(const std::string& path) {
-#ifdef __cpp_lib_experimental_filesystem
+#if defined(_LIBCPP_VERSION) && _LIBCPP_VERSION >= 9000 && !defined(__APPLE__)
   // We don't want to rely on mkdir etc. if we can avoid it, since it might not
   // exist in some environments such as ClusterFuzz.
+  std::__fs::filesystem::create_directories(std::__fs::filesystem::path(path).parent_path());
+#elif defined __cpp_lib_experimental_filesystem
   std::experimental::filesystem::create_directories(
       std::experimental::filesystem::path(path).parent_path());
 #else
-  // No support on this system for std::experimental::filesystem.
+  // No support on this system for std::filesystem or std::experimental::filesystem.
   RELEASE_ASSERT(::system(("mkdir -p $(dirname " + path + ")").c_str()) == 0, "");
 #endif
 }
 
 void TestEnvironment::removePath(const std::string& path) {
   RELEASE_ASSERT(absl::StartsWith(path, TestEnvironment::temporaryDirectory()), "");
-#ifdef __cpp_lib_experimental_filesystem
-  // We don't want to rely on rm etc. if we can avoid it, since it might not
+#if defined(_LIBCPP_VERSION) && _LIBCPP_VERSION >= 9000 && !defined(__APPLE__)
+  // We don't want to rely on mkdir etc. if we can avoid it, since it might not
   // exist in some environments such as ClusterFuzz.
+  if (!std::__fs::filesystem::exists(path)) {
+    return;
+  }
+  std::__fs::filesystem::remove_all(std::__fs::filesystem::path(path));
+#elif defined __cpp_lib_experimental_filesystem
   if (!std::experimental::filesystem::exists(path)) {
     return;
   }
   std::experimental::filesystem::remove_all(std::experimental::filesystem::path(path));
 #else
-  // No support on this system for std::experimental::filesystem.
+  // No support on this system for std::filesystem or std::experimental::filesystem.
   RELEASE_ASSERT(::system(("rm -rf " + path).c_str()) == 0, "");
 #endif
 }
@@ -216,6 +233,14 @@ std::string TestEnvironment::substitute(const std::string& str,
     out_json_string = std::regex_replace(out_json_string, lookup_family_regex, "v6_only");
     break;
   }
+
+  // Substitute socket options arguments.
+  const std::regex sol_socket_regex(R"(\{\{ sol_socket \}\})");
+  out_json_string =
+      std::regex_replace(out_json_string, sol_socket_regex, std::to_string(SOL_SOCKET));
+  const std::regex so_reuseport_regex(R"(\{\{ so_reuseport \}\})");
+  out_json_string =
+      std::regex_replace(out_json_string, so_reuseport_regex, std::to_string(SO_REUSEPORT));
 
   return out_json_string;
 }

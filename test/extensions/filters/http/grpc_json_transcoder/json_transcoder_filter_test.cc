@@ -335,6 +335,8 @@ TEST_F(GrpcJsonTranscoderFilterTest, NoTranscoding) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ(expected_request_headers, request_headers);
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.decodeMetadata(metadata_map));
 
   Buffer::OwnedImpl request_data{"{}"};
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(request_data, false));
@@ -738,7 +740,7 @@ protected:
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
-  ~GrpcJsonTranscoderFilterPrintTest() {
+  ~GrpcJsonTranscoderFilterPrintTest() override {
     delete filter_;
     delete config_;
   }

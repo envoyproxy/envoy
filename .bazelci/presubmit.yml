@@ -1,8 +1,11 @@
 ---
 tasks:
-  ubuntu_1804:
+  release:
     platform: ubuntu1804
     build_targets:
-      - "//source/..."
+      - "//source/exe:envoy-static"
     test_targets:
       - "//test/..."
+    test_flags:
+    # Workaround for https://github.com/envoyproxy/envoy/issues/7647
+      - "--deleted_packages=//test/extensions/tracers/dynamic_ot"

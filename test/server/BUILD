@@ -4,6 +4,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
+    "envoy_cc_test_binary",
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_select_hot_restart",
@@ -188,6 +189,37 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "filter_chain_manager_impl_test",
+    srcs = ["filter_chain_manager_impl_test.cc"],
+    data = ["//test/extensions/transport_sockets/tls/test_data:certs"],
+    deps = [
+        ":utility_lib",
+        "//source/common/api:os_sys_calls_lib",
+        "//source/common/config:metadata_lib",
+        "//source/common/network:addr_family_aware_socket_option_lib",
+        "//source/common/network:listen_socket_lib",
+        "//source/common/network:socket_option_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/protobuf",
+        "//source/extensions/filters/listener/original_dst:config",
+        "//source/extensions/filters/listener/tls_inspector:config",
+        "//source/extensions/filters/network/http_connection_manager:config",
+        "//source/extensions/transport_sockets/raw_buffer:config",
+        "//source/extensions/transport_sockets/tls:config",
+        "//source/extensions/transport_sockets/tls:ssl_socket_lib",
+        "//source/server:filter_chain_manager_lib",
+        "//source/server:listener_manager_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:registry_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_time_lib",
+        "//test/test_common:threadsafe_singleton_injector_lib",
+    ],
+)
+
 envoy_cc_fuzz_test(
     name = "server_fuzz_test",
     srcs = ["server_fuzz_test.cc"],
@@ -222,12 +254,12 @@ envoy_cc_test(
         ":invalid_runtime_bootstrap.yaml",
         ":node_bootstrap.yaml",
         ":node_bootstrap_no_admin_port.yaml",
+        ":node_bootstrap_with_admin_socket_options.yaml",
         ":node_bootstrap_without_access_log.yaml",
         ":runtime_bootstrap.yaml",
         ":runtime_test_data",
+        ":stats_sink_bootstrap.yaml",
         ":zipkin_tracing.yaml",
-        "//test/config/integration:server.json",
-        "//test/config/integration:server_config_files",
     ],
     deps = [
         "//source/common/common:version_lib",
@@ -247,6 +279,18 @@ envoy_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:test_time_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "ssl_context_manager_test",
+    srcs = ["ssl_context_manager_test.cc"],
+    deps = [
+        "//source/server:ssl_context_manager_lib",
+        "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -272,5 +316,21 @@ envoy_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test_binary(
+    name = "filter_chain_benchmark_test",
+    srcs = ["filter_chain_benchmark_test.cc"],
+    external_deps = [
+        "benchmark",
+        "googletest",
+    ],
+    deps = [
+        "//source/server:filter_chain_manager_lib",
+        "//test/test_common:environment_lib",
+        "//test/mocks/network:network_mocks",
+        # tranport socket config registration
+        "//source/extensions/transport_sockets/tls:config",
     ],
 )

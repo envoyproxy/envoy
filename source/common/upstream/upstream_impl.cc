@@ -23,7 +23,6 @@
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/config/protocol_json.h"
-#include "common/config/tls_context_json.h"
 #include "common/config/utility.h"
 #include "common/http/utility.h"
 #include "common/network/address_impl.h"
@@ -275,7 +274,7 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
   return connection;
 }
 
-void HostImpl::weight(uint32_t new_weight) { weight_ = std::max(1U, std::min(128U, new_weight)); }
+void HostImpl::weight(uint32_t new_weight) { weight_ = std::max(1U, new_weight); }
 
 std::vector<HostsPerLocalityConstSharedPtr> HostsPerLocalityImpl::filter(
     const std::vector<std::function<bool(const Host&)>>& predicates) const {
@@ -595,7 +594,10 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
   case envoy::api::v2::Cluster::ORIGINAL_DST_LB:
     if (config.type() != envoy::api::v2::Cluster::ORIGINAL_DST) {
       throw EnvoyException(fmt::format(
-          "cluster: LB type 'original_dst_lb' may only be used with cluster type 'original_dst'"));
+          "cluster: LB policy {} is not valid for Cluster type {}. Only 'original_dst_lb' "
+          "is allowed with cluster type 'original_dst'",
+          envoy::api::v2::Cluster_LbPolicy_Name(config.lb_policy()),
+          envoy::api::v2::Cluster_DiscoveryType_Name(config.type())));
     }
     lb_type_ = LoadBalancerType::OriginalDst;
     break;
@@ -1265,7 +1267,12 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
 }
 
 Network::DnsLookupFamily getDnsLookupFamilyFromCluster(const envoy::api::v2::Cluster& cluster) {
-  switch (cluster.dns_lookup_family()) {
+  return getDnsLookupFamilyFromEnum(cluster.dns_lookup_family());
+}
+
+Network::DnsLookupFamily
+getDnsLookupFamilyFromEnum(envoy::api::v2::Cluster::DnsLookupFamily family) {
+  switch (family) {
   case envoy::api::v2::Cluster::V6_ONLY:
     return Network::DnsLookupFamily::V6Only;
   case envoy::api::v2::Cluster::V4_ONLY:

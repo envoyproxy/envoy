@@ -10,6 +10,7 @@ EXTENSIONS = {
     #
     # Clusters
     #
+    "envoy.clusters.dynamic_forward_proxy":             "//source/extensions/clusters/dynamic_forward_proxy:cluster",
     "envoy.clusters.redis":                             "//source/extensions/clusters/redis:redis_cluster",
 
     #
@@ -31,6 +32,7 @@ EXTENSIONS = {
     "envoy.filters.http.buffer":                        "//source/extensions/filters/http/buffer:config",
     "envoy.filters.http.cors":                          "//source/extensions/filters/http/cors:config",
     "envoy.filters.http.csrf":                          "//source/extensions/filters/http/csrf:config",
+    "envoy.filters.http.dynamic_forward_proxy":         "//source/extensions/filters/http/dynamic_forward_proxy:config",
     "envoy.filters.http.dynamo":                        "//source/extensions/filters/http/dynamo:config",
     "envoy.filters.http.ext_authz":                     "//source/extensions/filters/http/ext_authz:config",
     "envoy.filters.http.fault":                         "//source/extensions/filters/http/fault:config",
@@ -55,16 +57,14 @@ EXTENSIONS = {
     # Listener filters
     #
 
-    # NOTE: The proxy_protocol filter is implicitly loaded if proxy_protocol functionality is
-    #       configured on the listener. Do not remove it in that case or configs will fail to load.
-    "envoy.filters.listener.proxy_protocol":            "//source/extensions/filters/listener/proxy_protocol:config",
-
+    "envoy.filters.listener.http_inspector":            "//source/extensions/filters/listener/http_inspector:config",
     # NOTE: The original_dst filter is implicitly loaded if original_dst functionality is
     #       configured on the listener. Do not remove it in that case or configs will fail to load.
     "envoy.filters.listener.original_dst":              "//source/extensions/filters/listener/original_dst:config",
-
     "envoy.filters.listener.original_src":               "//source/extensions/filters/listener/original_src:config",
-
+    # NOTE: The proxy_protocol filter is implicitly loaded if proxy_protocol functionality is
+    #       configured on the listener. Do not remove it in that case or configs will fail to load.
+    "envoy.filters.listener.proxy_protocol":            "//source/extensions/filters/listener/proxy_protocol:config",
     "envoy.filters.listener.tls_inspector":             "//source/extensions/filters/listener/tls_inspector:config",
 
     #
@@ -128,10 +128,12 @@ EXTENSIONS = {
 
     "envoy.transport_sockets.alts":                     "//source/extensions/transport_sockets/alts:config",
     "envoy.transport_sockets.tap":                      "//source/extensions/transport_sockets/tap:config",
+    "envoy.transport_sockets.tls":                      "//source/extensions/transport_sockets/tls:config",
 
     # Retry host predicates
     "envoy.retry_host_predicates.previous_hosts":          "//source/extensions/retry/host/previous_hosts:config",
-
+    "envoy.retry_host_predicates.omit_canary_hosts":            "//source/extensions/retry/host/omit_canary_hosts:config",
+    
     # Retry priorities
     "envoy.retry_priorities.previous_priorities":       "//source/extensions/retry/priority/previous_priorities:config",
 }
