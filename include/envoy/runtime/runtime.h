@@ -227,10 +227,10 @@ public:
   virtual const Snapshot& snapshot() PURE;
 
   /**
-   * @return const shared_ptr<Snapshot> the current snapshot. This function may safely be called
+   * @return shared_ptr<const Snapshot> the current snapshot. This function may safely be called
    *         from non-worker theads.
    */
-  virtual const std::shared_ptr<Snapshot> threadsafeSnapshot() PURE;
+  virtual std::shared_ptr<const Snapshot> threadsafeSnapshot() PURE;
 
   /**
    * Merge the given map of key-value pairs into the runtime's state. To remove a previous merge for

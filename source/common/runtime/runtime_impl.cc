@@ -552,12 +552,14 @@ void RtdsSubscription::validateUpdateSize(uint32_t num_resources) {
 }
 
 void LoaderImpl::loadNewSnapshot() {
-  ThreadLocal::ThreadLocalObjectSharedPtr ptr = createNewSnapshot();
-  tls_->set([ptr](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr { return ptr; });
+  std::shared_ptr<SnapshotImpl> ptr = createNewSnapshot();
+  tls_->set([ptr](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    return std::static_pointer_cast<ThreadLocal::ThreadLocalObject>(ptr);
+  });
 
   {
     absl::MutexLock lock(&snapshot_mutex_);
-    thread_safe_snapshot_ = std::dynamic_pointer_cast<Snapshot>(ptr);
+    thread_safe_snapshot_ = ptr;
   }
 }
 
@@ -566,9 +568,9 @@ const Snapshot& LoaderImpl::snapshot() {
   return tls_->getTyped<Snapshot>();
 }
 
-const std::shared_ptr<Snapshot> LoaderImpl::threadsafeSnapshot() {
+std::shared_ptr<const Snapshot> LoaderImpl::threadsafeSnapshot() {
   if (tls_->currentThreadRegistered()) {
-    return std::dynamic_pointer_cast<Snapshot>(tls_->get());
+    return std::dynamic_pointer_cast<const Snapshot>(tls_->get());
   }
 
   {
