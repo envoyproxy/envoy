@@ -52,41 +52,25 @@ bool PathUtil::canonicalPath(HeaderEntry& path_header) {
   return true;
 }
 
-/* static */
 void PathUtil::mergeSlashes(HeaderEntry& path_header) {
   const auto original_path = path_header.value().getStringView();
-  if (original_path.empty()) {
-    return;
-  }
-
-  bool has_adjacent_slashes = false;
-  for (size_t i = 1; i < original_path.size(); ++i) {
-    if (original_path[i] == '/' && original_path[i - 1] == '/') {
-      has_adjacent_slashes = true;
-      break;
-    }
-    // Only operate on path component in URL.
-    if (original_path[i] == '?') {
-      break;
-    }
-  }
-  if (!has_adjacent_slashes) {
+  // Only operate on path component in URL.
+  const size_t query_start = original_path.find('?');
+  const auto path = original_path.substr(0, query_start);
+  const auto query = absl::ClippedSubstr(original_path, query_start);
+  if (path.find("//") == absl::string_view::npos) {
     return;
   }
 
   std::string simplified_path;
   simplified_path.reserve(original_path.size());
-  for (size_t i = 0; i < original_path.size(); ++i) {
-    if (i > 0 && original_path[i] == '/' && original_path[i - 1] == '/') {
+  for (size_t i = 0; i < path.size(); ++i) {
+    if (i > 0 && path[i] == '/' && path[i - 1] == '/') {
       continue;
     }
-    // Only operate on path component in URL.
-    if (original_path[i] == '?') {
-      simplified_path.insert(simplified_path.end(), original_path.begin() + i, original_path.end());
-      break;
-    }
-    simplified_path.push_back(original_path[i]);
+    simplified_path.push_back(path[i]);
   }
+  simplified_path.insert(simplified_path.end(), query.begin(), query.end());
   path_header.value(simplified_path);
 }
 

@@ -87,21 +87,20 @@ TEST_F(PathUtilityTest, NormalizeCasePath) {
 
 // Paths that are valid get normalized.
 TEST_F(PathUtilityTest, MergeSlashes) {
-  const std::vector<std::pair<std::string, std::string>> non_normal_pairs{
-      {"", ""},                        // empty
-      {"/a", "/a"},                    // no-op
-      {"//a/b/c", "/a/b/c"},           // double / start
-      {"/a//b/c", "/a/b/c"},           // double / in the middle
-      {"/a//b?a=///c", "/a/b?a=///c"}, // slashes in the query are ignored
-      {"/a//b?", "/a/b?"},             // empty query
-  };
-
-  for (const auto& path_pair : non_normal_pairs) {
-    auto& path_header = pathHeaderEntry(path_pair.first);
+  auto mergeSlashes = [this](const std::string& path_value) {
+    auto& path_header = pathHeaderEntry(path_value);
     PathUtil::mergeSlashes(path_header);
-    EXPECT_EQ(path_header.value().getStringView(), path_pair.second)
-        << "original path: " << path_pair.first;
-  }
+    auto sanitized_path_value = path_header.value().getStringView();
+    return std::string(sanitized_path_value.begin(), sanitized_path_value.end());
+  };
+  EXPECT_EQ("", mergeSlashes(""));                        // empty
+  EXPECT_EQ("/a", mergeSlashes("/a"));                    // no-op
+  EXPECT_EQ("/a/b/c", mergeSlashes("//a/b/c"));           // double / start
+  EXPECT_EQ("/a/b/c", mergeSlashes("/a//b/c"));           // double / in the middle
+  EXPECT_EQ("/a/b/c", mergeSlashes("/a///b/c"));          // triple / in the middle
+  EXPECT_EQ("/a/b/c", mergeSlashes("/a////b/c"));         // quadruple / in the middle
+  EXPECT_EQ("/a/b?a=///c", mergeSlashes("/a//b?a=///c")); // slashes in the query are ignored
+  EXPECT_EQ("/a/b?", mergeSlashes("/a//b?"));             // empty query
 }
 
 } // namespace Http

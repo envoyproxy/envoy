@@ -397,7 +397,7 @@ bool ConnectionManagerUtility::maybeNormalizePath(HeaderMap& request_headers,
     is_valid_path = PathUtil::canonicalPath(*request_headers.Path());
   }
   // Merge slashes after path normalization to catch potential edge cases with percent encoding.
-  if (config.shouldMergeSlashes()) {
+  if (is_valid_path && config.shouldMergeSlashes()) {
     PathUtil::mergeSlashes(*request_headers.Path());
   }
   return is_valid_path;
