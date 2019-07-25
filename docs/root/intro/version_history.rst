@@ -3,6 +3,7 @@ Version history
 
 1.12.0 (pending)
 ================
+* fault: added overrides for default runtime keys in :ref:`HTTPFault <envoy_api_field_config.filter.http.fault.v2.HTTPFault>` filter.
 * config: async data access for local and remote data source.
 * http: added the ability to reject HTTP/1.1 requests with invalid HTTP header values, using the runtime feature `envoy.reloadable_features.strict_header_validation`.
 
