@@ -18,6 +18,7 @@ public:
   ~MockClusterSlotUpdateCallBack() = default;
 
   MOCK_METHOD2(onClusterSlotUpdate, bool(ClusterSlotsPtr&&, Upstream::HostMap));
+  MOCK_METHOD0(onHostHealthUpdate, void());
 };
 
 } // namespace Redis

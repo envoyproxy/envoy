@@ -7,6 +7,8 @@
 #include "test/common/upstream/utility.h"
 #include "test/mocks/upstream/mocks.h"
 
+using testing::Return;
+
 namespace Envoy {
 namespace Extensions {
 namespace Clusters {
@@ -70,7 +72,6 @@ public:
   }
 
   std::shared_ptr<RedisClusterLoadBalancerFactory> factory_;
-  SlotArraySharedPtr slot_array_;
   std::unique_ptr<RedisClusterThreadAwareLoadBalancer> lb_;
   std::shared_ptr<Upstream::MockClusterInfo> info_{new NiceMock<Upstream::MockClusterInfo>()};
   NiceMock<Runtime::MockRandomGenerator> random_;
@@ -162,6 +163,107 @@ TEST_F(RedisClusterLoadBalancerTest, ReadStrategiesHealthy) {
                      NetworkFilters::Common::Redis::Client::ReadPolicy::Master);
   validateAssignment(hosts, master_assignments, true,
                      NetworkFilters::Common::Redis::Client::ReadPolicy::PreferMaster);
+
+  ON_CALL(random_, random()).WillByDefault(Return(0));
+  validateAssignment(hosts, master_assignments, true,
+                     NetworkFilters::Common::Redis::Client::ReadPolicy::Any);
+  ON_CALL(random_, random()).WillByDefault(Return(1));
+  validateAssignment(hosts, replica_assignments, true,
+                     NetworkFilters::Common::Redis::Client::ReadPolicy::Any);
+}
+
+TEST_F(RedisClusterLoadBalancerTest, ReadStrategiesUnhealthyMaster) {
+  Upstream::HostVector hosts{
+      Upstream::makeTestHost(info_, "tcp://127.0.0.1:90"),
+      Upstream::makeTestHost(info_, "tcp://127.0.0.1:91"),
+      Upstream::makeTestHost(info_, "tcp://127.0.0.2:90"),
+      Upstream::makeTestHost(info_, "tcp://127.0.0.2:91"),
+  };
+
+  ClusterSlotsPtr slots = std::make_unique<std::vector<ClusterSlot>>(std::vector<ClusterSlot>{
+      ClusterSlot(0, 2000, hosts[0]->address()),
+      ClusterSlot(2001, 16383, hosts[1]->address()),
+  });
+  slots->at(0).addSlave(hosts[2]->address());
+  slots->at(1).addSlave(hosts[3]->address());
+  Upstream::HostMap all_hosts;
+  std::transform(hosts.begin(), hosts.end(), std::inserter(all_hosts, all_hosts.end()), makePair);
+  init();
+  factory_->onClusterSlotUpdate(std::move(slots), all_hosts);
+
+  hosts[0]->healthFlagSet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC);
+  hosts[1]->healthFlagSet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC);
+
+  factory_->onHostHealthUpdate();
+
+  // A list of (hash: host_index) pair
+  const std::vector<std::pair<uint32_t, uint32_t>> replica_assignments = {
+      {0, 2}, {1100, 2}, {2000, 2}, {18382, 2}, {2001, 3}, {2100, 3}, {16383, 3}, {19382, 3}};
+  const std::vector<std::pair<uint32_t, uint32_t>> master_assignments = {
+      {0, 0}, {1100, 0}, {2000, 0}, {18382, 0}, {2001, 1}, {2100, 1}, {16383, 1}, {19382, 1}};
+
+  validateAssignment(hosts, replica_assignments, true,
+                     NetworkFilters::Common::Redis::Client::ReadPolicy::Replica);
+  validateAssignment(hosts, replica_assignments, true,
+                     NetworkFilters::Common::Redis::Client::ReadPolicy::PreferReplica);
+  validateAssignment(hosts, master_assignments, true,
+                     NetworkFilters::Common::Redis::Client::ReadPolicy::Master);
+  validateAssignment(hosts, replica_assignments, true,
+                     NetworkFilters::Common::Redis::Client::ReadPolicy::PreferMaster);
+
+  ON_CALL(random_, random()).WillByDefault(Return(0));
+  validateAssignment(hosts, replica_assignments, true,
+                     NetworkFilters::Common::Redis::Client::ReadPolicy::Any);
+  ON_CALL(random_, random()).WillByDefault(Return(1));
+  validateAssignment(hosts, replica_assignments, true,
+                     NetworkFilters::Common::Redis::Client::ReadPolicy::Any);
+}
+
+TEST_F(RedisClusterLoadBalancerTest, ReadStrategiesUnhealthyReplica) {
+  Upstream::HostVector hosts{
+      Upstream::makeTestHost(info_, "tcp://127.0.0.1:90"),
+      Upstream::makeTestHost(info_, "tcp://127.0.0.1:91"),
+      Upstream::makeTestHost(info_, "tcp://127.0.0.2:90"),
+      Upstream::makeTestHost(info_, "tcp://127.0.0.2:91"),
+  };
+
+  ClusterSlotsPtr slots = std::make_unique<std::vector<ClusterSlot>>(std::vector<ClusterSlot>{
+      ClusterSlot(0, 2000, hosts[0]->address()),
+      ClusterSlot(2001, 16383, hosts[1]->address()),
+  });
+  slots->at(0).addSlave(hosts[2]->address());
+  slots->at(1).addSlave(hosts[3]->address());
+  Upstream::HostMap all_hosts;
+  std::transform(hosts.begin(), hosts.end(), std::inserter(all_hosts, all_hosts.end()), makePair);
+  init();
+  factory_->onClusterSlotUpdate(std::move(slots), all_hosts);
+
+  hosts[2]->healthFlagSet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC);
+  hosts[3]->healthFlagSet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC);
+
+  factory_->onHostHealthUpdate();
+
+  // A list of (hash: host_index) pair
+  const std::vector<std::pair<uint32_t, uint32_t>> replica_assignments = {
+      {0, 2}, {1100, 2}, {2000, 2}, {18382, 2}, {2001, 3}, {2100, 3}, {16383, 3}, {19382, 3}};
+  const std::vector<std::pair<uint32_t, uint32_t>> master_assignments = {
+      {0, 0}, {1100, 0}, {2000, 0}, {18382, 0}, {2001, 1}, {2100, 1}, {16383, 1}, {19382, 1}};
+
+  validateAssignment(hosts, replica_assignments, true,
+                     NetworkFilters::Common::Redis::Client::ReadPolicy::Replica);
+  validateAssignment(hosts, master_assignments, true,
+                     NetworkFilters::Common::Redis::Client::ReadPolicy::PreferReplica);
+  validateAssignment(hosts, master_assignments, true,
+                     NetworkFilters::Common::Redis::Client::ReadPolicy::Master);
+  validateAssignment(hosts, master_assignments, true,
+                     NetworkFilters::Common::Redis::Client::ReadPolicy::PreferMaster);
+
+  ON_CALL(random_, random()).WillByDefault(Return(0));
+  validateAssignment(hosts, master_assignments, true,
+                     NetworkFilters::Common::Redis::Client::ReadPolicy::Any);
+  ON_CALL(random_, random()).WillByDefault(Return(1));
+  validateAssignment(hosts, master_assignments, true,
+                     NetworkFilters::Common::Redis::Client::ReadPolicy::Any);
 }
 
 TEST_F(RedisClusterLoadBalancerTest, ClusterSlotUpdate) {

@@ -124,6 +124,8 @@ private:
 
   void onClusterSlotUpdate(ClusterSlotsPtr&&);
 
+  void reloadHealthyHostsHelper(const Upstream::HostSharedPtr& host) override;
+
   const envoy::api::v2::endpoint::LocalityLbEndpoints& localityLbEndpoint() const {
     // Always use the first endpoint.
     return load_assignment_.endpoints()[0];

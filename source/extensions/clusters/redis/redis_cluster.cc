@@ -114,6 +114,13 @@ void RedisCluster::onClusterSlotUpdate(ClusterSlotsPtr&& slots) {
   onPreInitComplete();
 }
 
+void RedisCluster::reloadHealthyHostsHelper(const Upstream::HostSharedPtr& host) {
+  if (lb_factory_) {
+    lb_factory_->onHostHealthUpdate();
+  }
+  ClusterImplBase::reloadHealthyHostsHelper(host);
+}
+
 // DnsDiscoveryResolveTarget
 RedisCluster::DnsDiscoveryResolveTarget::DnsDiscoveryResolveTarget(RedisCluster& parent,
                                                                    const std::string& dns_address,

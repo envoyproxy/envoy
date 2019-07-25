@@ -709,6 +709,8 @@ protected:
    */
   void onInitDone();
 
+  virtual void reloadHealthyHostsHelper(const HostSharedPtr& host);
+
   // This init manager is shared via TransportSocketFactoryContext. The initialization targets that
   // register with this init manager are expected to be for implementations of SdsApi (see
   // SdsApi::init_target_).
@@ -730,7 +732,6 @@ protected:
 private:
   void finishInitialization();
   void reloadHealthyHosts(const HostSharedPtr& host);
-  virtual void reloadHealthyHostsHelper(const HostSharedPtr& host);
 
   bool initialization_started_{};
   std::function<void()> initialization_complete_callback_;

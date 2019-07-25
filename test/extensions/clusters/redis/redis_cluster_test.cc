@@ -802,6 +802,52 @@ TEST_F(RedisClusterTest, RedisDiscoveryResolverBasic) {
   testRedisResolve();
 }
 
+TEST_F(RedisClusterTest, HostRemovalAfterHcFail) {
+  setupFromV2Yaml(BasicConfig);
+  auto health_checker = std::make_shared<Upstream::MockHealthChecker>();
+  EXPECT_CALL(*health_checker, start());
+  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_)).Times(2);
+  cluster_->setHealthChecker(health_checker);
+
+  const std::list<std::string> resolved_addresses{"127.0.0.1", "127.0.0.2"};
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
+  expectRedisResolve(true);
+
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(initialized_, ready());
+  cluster_->initialize([&]() -> void { initialized_.ready(); });
+
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(1);
+  expectClusterSlotResponse(singleSlotMasterSlave("127.0.0.1", "127.0.0.2", 22120));
+
+  // Verify that both hosts are initially marked with FAILED_ACTIVE_HC, then
+  // clear the flag to simulate that these hosts have been successfully health
+  // checked.
+  {
+    EXPECT_CALL(membership_updated_, ready());
+    const auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(2UL, hosts.size());
+
+    for (size_t i = 0; i < 2; ++i) {
+      EXPECT_TRUE(hosts[i]->healthFlagGet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC));
+      hosts[i]->healthFlagClear(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC);
+      hosts[i]->healthFlagClear(Upstream::Host::HealthFlag::PENDING_ACTIVE_HC);
+      health_checker->runCallbacks(hosts[i], Upstream::HealthTransition::Changed);
+    }
+    expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120", "127.0.0.2:22120"}));
+  }
+
+  // Failed HC
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(*cluster_callback_, onHostHealthUpdate());
+  const auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+  hosts[1]->healthFlagSet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC);
+  health_checker->runCallbacks(hosts[1], Upstream::HealthTransition::Changed);
+
+  EXPECT_THAT(2U, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_THAT(1U, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+}
+
 } // namespace Redis
 } // namespace Clusters
 } // namespace Extensions
