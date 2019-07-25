@@ -227,7 +227,7 @@ InstanceUtil::BootstrapVersion InstanceUtil::loadBootstrapConfig(
     MessageUtil::loadFromYaml(config_yaml, bootstrap_override, validation_visitor);
     bootstrap.MergeFrom(bootstrap_override);
   }
-  if (!config_proto.ByteSize() != 0) {
+  if (config_proto.ByteSize() != 0) {
     bootstrap.MergeFrom(config_proto);
   }
   MessageUtil::validate(bootstrap);
