@@ -129,7 +129,7 @@ TEST_P(ActiveQuicListenerTest, ReceiveFullQuicCHLO) {
       envoyAddressInstanceToQuicSocketAddress(listen_socket_->localAddress()),
       envoyAddressInstanceToQuicSocketAddress(client_socket_->localAddress()),
       quic::AllSupportedVersions()[0].transport_version, &clock, signed_config, &cache, &full_chlo);
-  // Overwrite version lable to highest current supported version.
+  // Overwrite version label to highest current supported version.
   full_chlo.SetVersion(quic::kVER, quic::CurrentSupportedVersions()[0]);
   quic::QuicConfig quic_config;
   quic_config.ToHandshakeMessage(&full_chlo, quic::CurrentSupportedVersions()[0].transport_version);

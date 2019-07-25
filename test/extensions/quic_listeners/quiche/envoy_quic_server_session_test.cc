@@ -61,13 +61,15 @@ public:
   MOCK_METHOD2(SendConnectionClosePacket, void(quic::QuicErrorCode, const std::string&));
 };
 
-class EnvoyQuicServerSessionTest : public ::testing::Test {
+class EnvoyQuicServerSessionTest : public testing::TestWithParam<bool> {
 public:
   EnvoyQuicServerSessionTest()
       : api_(Api::createApiForTest(time_system_)), dispatcher_(api_->allocateDispatcher()),
         connection_helper_(*dispatcher_),
-        alarm_factory_(*dispatcher_, *connection_helper_.GetClock()),
-        quic_version_(quic::ParsedVersionOfIndex(quic::CurrentSupportedVersions(), 0)),
+        alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
+          SetQuicReloadableFlag(quic_enable_version_99, GetParam());
+          return quic::ParsedVersionOfIndex(quic::CurrentSupportedVersions(), 0);
+        }()),
         listener_stats_({ALL_LISTENER_STATS(POOL_COUNTER(listener_config_.listenerScope()),
                                             POOL_GAUGE(listener_config_.listenerScope()),
                                             POOL_HISTOGRAM(listener_config_.listenerScope()))}),
@@ -145,14 +147,19 @@ protected:
   Http::ServerConnectionPtr http_connection_;
 };
 
-TEST_F(EnvoyQuicServerSessionTest, NewStream) {
+INSTANTIATE_TEST_SUITE_P(EnvoyQuicServerSessionTests, EnvoyQuicServerSessionTest,
+                         testing::ValuesIn({true, false}));
+
+TEST_P(EnvoyQuicServerSessionTest, NewStream) {
   installReadFilter();
 
   Http::MockStreamDecoder request_decoder;
   EXPECT_CALL(http_connection_callbacks_, newStream(_, false))
       .WillOnce(testing::ReturnRef(request_decoder));
+  quic::QuicStreamId stream_id =
+      quic_version_[0].transport_version == quic::QUIC_VERSION_99 ? 4u : 5u;
   quic::QuicSpdyStream* stream =
-      reinterpret_cast<quic::QuicSpdyStream*>(envoy_quic_session_.GetOrCreateStream(5u));
+      reinterpret_cast<quic::QuicSpdyStream*>(envoy_quic_session_.GetOrCreateStream(stream_id));
   // Receive a GET request on created stream.
   quic::QuicHeaderList headers;
   headers.OnHeaderBlockStart();
@@ -161,7 +168,7 @@ TEST_F(EnvoyQuicServerSessionTest, NewStream) {
   headers.OnHeader(":method", "GET");
   headers.OnHeader(":path", "/");
   headers.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0, /*compressed_header_bytes=*/0);
-  // Request headers should be propogated to decoder.
+  // Request headers should be propagated to decoder.
   EXPECT_CALL(request_decoder, decodeHeaders_(_, /*end_stream=*/true))
       .WillOnce(Invoke([&host](const Http::HeaderMapPtr& decoded_headers, bool) {
         EXPECT_EQ(host, decoded_headers->Host()->value().getStringView());
@@ -175,7 +182,7 @@ TEST_F(EnvoyQuicServerSessionTest, NewStream) {
   stream->OnStreamHeaderList(/*fin=*/true, headers.uncompressed_header_bytes(), headers);
 }
 
-TEST_F(EnvoyQuicServerSessionTest, OnResetFrame) {
+TEST_P(EnvoyQuicServerSessionTest, OnResetFrame) {
   installReadFilter();
   Http::MockStreamDecoder request_decoder;
   Http::MockStreamCallbacks stream_callbacks;
@@ -185,27 +192,30 @@ TEST_F(EnvoyQuicServerSessionTest, OnResetFrame) {
         encoder.getStream().addCallbacks(stream_callbacks);
         return request_decoder;
       }));
-  quic::QuicStream* stream1 = envoy_quic_session_.GetOrCreateStream(5u);
+  quic::QuicStreamId stream_id =
+      quic_version_[0].transport_version == quic::QUIC_VERSION_99 ? 4u : 5u;
+
+  quic::QuicStream* stream1 = envoy_quic_session_.GetOrCreateStream(stream_id);
   quic::QuicRstStreamFrame rst1(/*control_frame_id=*/1u, stream1->id(),
                                 quic::QUIC_ERROR_PROCESSING_STREAM, /*bytes_written=*/0u);
   EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::RemoteReset, _));
   stream1->OnStreamReset(rst1);
 
-  quic::QuicStream* stream2 = envoy_quic_session_.GetOrCreateStream(7u);
+  quic::QuicStream* stream2 = envoy_quic_session_.GetOrCreateStream(stream_id + 4u);
   quic::QuicRstStreamFrame rst2(/*control_frame_id=*/1u, stream2->id(), quic::QUIC_REFUSED_STREAM,
                                 /*bytes_written=*/0u);
   EXPECT_CALL(stream_callbacks,
               onResetStream(Http::StreamResetReason::RemoteRefusedStreamReset, _));
   stream2->OnStreamReset(rst2);
 
-  quic::QuicStream* stream3 = envoy_quic_session_.GetOrCreateStream(9u);
+  quic::QuicStream* stream3 = envoy_quic_session_.GetOrCreateStream(stream_id + 8u);
   quic::QuicRstStreamFrame rst3(/*control_frame_id=*/1u, stream3->id(),
                                 quic::QUIC_STREAM_CONNECTION_ERROR, /*bytes_written=*/0u);
   EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::ConnectionFailure, _));
   stream3->OnStreamReset(rst3);
 }
 
-TEST_F(EnvoyQuicServerSessionTest, ConnectionClose) {
+TEST_P(EnvoyQuicServerSessionTest, ConnectionClose) {
   installReadFilter();
 
   std::string error_details("dummy details");
@@ -218,7 +228,7 @@ TEST_F(EnvoyQuicServerSessionTest, ConnectionClose) {
   EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_.state());
 }
 
-TEST_F(EnvoyQuicServerSessionTest, ConnectionCloseWithActiveStream) {
+TEST_P(EnvoyQuicServerSessionTest, ConnectionCloseWithActiveStream) {
   installReadFilter();
 
   Http::MockStreamDecoder request_decoder;
@@ -229,7 +239,9 @@ TEST_F(EnvoyQuicServerSessionTest, ConnectionCloseWithActiveStream) {
         encoder.getStream().addCallbacks(stream_callbacks);
         return request_decoder;
       }));
-  quic::QuicStream* stream = envoy_quic_session_.GetOrCreateStream(5u);
+  quic::QuicStreamId stream_id =
+      quic_version_[0].transport_version == quic::QUIC_VERSION_99 ? 4u : 5u;
+  quic::QuicStream* stream = envoy_quic_session_.GetOrCreateStream(stream_id);
   EXPECT_CALL(*quic_connection_,
               SendConnectionClosePacket(quic::QUIC_NO_ERROR, "Closed by application"));
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
@@ -239,7 +251,7 @@ TEST_F(EnvoyQuicServerSessionTest, ConnectionCloseWithActiveStream) {
   EXPECT_TRUE(stream->write_side_closed() && stream->reading_stopped());
 }
 
-TEST_F(EnvoyQuicServerSessionTest, InitializeFilterChain) {
+TEST_P(EnvoyQuicServerSessionTest, InitializeFilterChain) {
   // Generate a CHLO packet.
   quic::CryptoHandshakeMessage chlo = quic::test::crypto_test_utils::GenerateDefaultInchoateCHLO(
       connection_helper_.GetClock(), quic::CurrentSupportedVersions()[0].transport_version,

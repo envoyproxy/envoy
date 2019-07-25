@@ -18,7 +18,7 @@
 namespace Envoy {
 namespace Quic {
 
-// Override for network filter chain, stats and QoS.
+// Derived for network filter chain, stats and QoS.
 class EnvoyQuicConnection : public quic::QuicConnection {
 public:
   EnvoyQuicConnection(quic::QuicConnectionId server_connection_id,
