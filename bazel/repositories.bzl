@@ -15,9 +15,6 @@ NOBORINGSSL_SKIP_TARGETS = {
     "tls_inspector": "envoy.filters.listener.tls_inspector",
 }
 
-# go version for rules_go
-GO_VERSION = "1.12.5"
-
 # Make all contents of an external repository accessible under a filegroup.  Used for external HTTP
 # archives, e.g. cares.
 BUILD_ALL_CONTENT = """filegroup(name = "all", srcs = glob(["**"]), visibility = ["//visibility:public"])"""
