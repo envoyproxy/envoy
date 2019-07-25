@@ -54,7 +54,7 @@ then
   COVERAGE_VALUE=$(llvm-cov export "${COVERAGE_BINARY}" -instr-profile="${COVERAGE_DATA}" \
     -ignore-filename-regex="${COVERAGE_IGNORE_REGEX}" -summary-only | \
     python3 -c "import sys, json; print(json.load(sys.stdin)['data'][0]['totals']['lines']['percent'])")
-  COVERAGE_THRESHOLD=96.9
+  COVERAGE_THRESHOLD=97.0
   COVERAGE_FAILED=$(echo "${COVERAGE_VALUE}<${COVERAGE_THRESHOLD}" | bc)
   if test ${COVERAGE_FAILED} -eq 1; then
       echo Code coverage ${COVERAGE_VALUE} is lower than limit of ${COVERAGE_THRESHOLD}
