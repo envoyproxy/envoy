@@ -278,3 +278,12 @@ message ControlPlane {
   // the Envoy is connected to.
   string identifier = 1;
 }
+
+// Identifies the direction of the transport relative to the local Envoy.
+enum TracingOperation {
+  // The transport is used for ingress/incoming requests.
+  INGRESS = 0;
+
+  // The transport is used for egress/outgoing requests.
+  EGRESS = 1;
+}

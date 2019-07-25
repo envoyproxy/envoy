@@ -135,6 +135,12 @@ public:
   virtual const envoy::api::v2::core::Metadata& listenerMetadata() const PURE;
 
   /**
+   * @return envoy::api::v2::core::TracingOperation the direction of the transport relative to the
+   * local proxy.
+   */
+  virtual envoy::api::v2::core::TracingOperation listenerOperation() const PURE;
+
+  /**
    * @return TimeSource& a reference to the time source.
    */
   virtual TimeSource& timeSource() PURE;

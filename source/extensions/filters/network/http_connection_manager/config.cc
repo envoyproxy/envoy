@@ -243,12 +243,10 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     std::vector<Http::LowerCaseString> request_headers_for_tags;
 
     switch (tracing_config.operation_name()) {
-    case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
-        Tracing::INGRESS:
+    case envoy::api::v2::core::TracingOperation::INGRESS:
       tracing_operation_name = Tracing::OperationName::Ingress;
       break;
-    case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
-        Tracing::EGRESS:
+    case envoy::api::v2::core::TracingOperation::EGRESS:
       tracing_operation_name = Tracing::OperationName::Egress;
       break;
     default:
