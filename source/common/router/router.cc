@@ -1217,6 +1217,7 @@ bool Filter::setupRetry() {
   // this filter which will make this a non-issue. The implementation of supporting retry in cases
   // where the request is not complete is more complicated so we will start with this for now.
   if (!downstream_end_stream_) {
+    config_.stats_.rq_retry_skipped_request_not_complete_.inc();
     return false;
   }
   pending_retries_++;

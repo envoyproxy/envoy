@@ -748,9 +748,11 @@ TEST_F(ClientContextConfigImplTest, SecretNotReady) {
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   Stats::IsolatedStoreImpl stats;
   NiceMock<Init::MockManager> init_manager;
+  NiceMock<Event::MockDispatcher> dispatcher;
   EXPECT_CALL(factory_context_, localInfo()).WillOnce(ReturnRef(local_info));
   EXPECT_CALL(factory_context_, stats()).WillOnce(ReturnRef(stats));
   EXPECT_CALL(factory_context_, initManager()).WillRepeatedly(Return(&init_manager));
+  EXPECT_CALL(factory_context_, dispatcher()).WillOnce(ReturnRef(dispatcher));
   auto sds_secret_configs =
       tls_context.mutable_common_tls_context()->mutable_tls_certificate_sds_secret_configs()->Add();
   sds_secret_configs->set_name("abc.com");
@@ -778,9 +780,11 @@ TEST_F(ClientContextConfigImplTest, ValidationContextNotReady) {
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   Stats::IsolatedStoreImpl stats;
   NiceMock<Init::MockManager> init_manager;
+  NiceMock<Event::MockDispatcher> dispatcher;
   EXPECT_CALL(factory_context_, localInfo()).WillOnce(ReturnRef(local_info));
   EXPECT_CALL(factory_context_, stats()).WillOnce(ReturnRef(stats));
   EXPECT_CALL(factory_context_, initManager()).WillRepeatedly(Return(&init_manager));
+  EXPECT_CALL(factory_context_, dispatcher()).WillOnce(ReturnRef(dispatcher));
   auto sds_secret_configs =
       tls_context.mutable_common_tls_context()->mutable_validation_context_sds_secret_config();
   sds_secret_configs->set_name("abc.com");
@@ -1079,9 +1083,11 @@ TEST_F(ServerContextConfigImplTest, SecretNotReady) {
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   Stats::IsolatedStoreImpl stats;
   NiceMock<Init::MockManager> init_manager;
+  NiceMock<Event::MockDispatcher> dispatcher;
   EXPECT_CALL(factory_context_, localInfo()).WillOnce(ReturnRef(local_info));
   EXPECT_CALL(factory_context_, stats()).WillOnce(ReturnRef(stats));
   EXPECT_CALL(factory_context_, initManager()).WillRepeatedly(Return(&init_manager));
+  EXPECT_CALL(factory_context_, dispatcher()).WillOnce(ReturnRef(dispatcher));
   auto sds_secret_configs =
       tls_context.mutable_common_tls_context()->mutable_tls_certificate_sds_secret_configs()->Add();
   sds_secret_configs->set_name("abc.com");
@@ -1109,9 +1115,11 @@ TEST_F(ServerContextConfigImplTest, ValidationContextNotReady) {
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   Stats::IsolatedStoreImpl stats;
   NiceMock<Init::MockManager> init_manager;
+  NiceMock<Event::MockDispatcher> dispatcher;
   EXPECT_CALL(factory_context_, localInfo()).WillOnce(ReturnRef(local_info));
   EXPECT_CALL(factory_context_, stats()).WillOnce(ReturnRef(stats));
   EXPECT_CALL(factory_context_, initManager()).WillRepeatedly(Return(&init_manager));
+  EXPECT_CALL(factory_context_, dispatcher()).WillOnce(ReturnRef(dispatcher));
   auto sds_secret_configs =
       tls_context.mutable_common_tls_context()->mutable_validation_context_sds_secret_config();
   sds_secret_configs->set_name("abc.com");

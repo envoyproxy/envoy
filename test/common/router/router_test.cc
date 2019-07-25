@@ -1934,6 +1934,7 @@ TEST_F(RouterTest, RetryRequestNotComplete) {
               putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED, _));
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+  EXPECT_EQ(1UL, stats_store_.counter("test.rq_retry_skipped_request_not_complete").value());
 }
 
 // Two requests are sent (slow request + hedged retry) and then global timeout
