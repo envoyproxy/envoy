@@ -610,6 +610,46 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
   EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
 }
 
+TEST_F(StaticLoaderImplTest, RuntimeFromNonWorkerThreads) {
+  // Force the thread to be considered a non-worker thread.
+  tls_.registered_ = false;
+  setup();
+
+  // Set up foo -> bar
+  loader_->mergeValues({{"foo", "bar"}});
+  EXPECT_EQ("bar", loader_->threadsafeSnapshot()->get("foo"));
+  const Snapshot* original_snapshot_pointer = loader_->threadsafeSnapshot().get();
+
+  // Now set up a test thread which verifies foo -> bar
+  //
+  // Then change foo and make sure the test thread picks up the change.
+  Thread::MutexBasicLockable mutex;
+  Thread::CondVar foo_read;
+  Thread::CondVar foo_changed;
+  const Snapshot* original_thread_snapshot_pointer = nullptr;
+  auto thread = Thread::threadFactoryForTest().createThread([&]() {
+    Thread::LockGuard lock(mutex);
+    EXPECT_EQ("bar", loader_->threadsafeSnapshot()->get("foo"));
+    original_thread_snapshot_pointer = loader_->threadsafeSnapshot().get();
+    EXPECT_EQ(original_thread_snapshot_pointer, loader_->threadsafeSnapshot().get());
+    foo_read.notifyOne();
+
+    foo_changed.wait(mutex);
+    EXPECT_EQ("eep", loader_->threadsafeSnapshot()->get("foo"));
+  });
+
+  {
+    Thread::LockGuard lock(mutex);
+    foo_read.wait(mutex);
+    loader_->mergeValues({{"foo", "eep"}});
+    foo_changed.notifyOne();
+    EXPECT_EQ("eep", loader_->threadsafeSnapshot()->get("foo"));
+  }
+
+  thread->join();
+  EXPECT_EQ(original_thread_snapshot_pointer, original_snapshot_pointer);
+}
+
 class DiskLayerTest : public testing::Test {
 protected:
   DiskLayerTest() : api_(Api::createApiForTest()) {}
