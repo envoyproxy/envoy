@@ -10,6 +10,9 @@ objc_library(
     srcs = [
         "EnvoyEngine.mm",
     ],
+    hdrs = [
+        "EnvoyEngine.h",
+    ],
     copts = ["-std=c++14"],
     visibility = ["//visibility:public"],
     deps = ["//library/common:envoy_main_interface_lib"],

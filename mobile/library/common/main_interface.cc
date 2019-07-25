@@ -1,5 +1,7 @@
 #include "library/common/main_interface.h"
 
+#include <unordered_map>
+
 #include "common/upstream/logical_dns_cluster.h"
 
 #include "exe/main_common.h"
@@ -9,14 +11,42 @@
 #include "extensions/transport_sockets/raw_buffer/config.h"
 #include "extensions/transport_sockets/tls/config.h"
 
+#include "library/common/buffer/utility.h"
+#include "library/common/http/dispatcher.h"
+#include "library/common/http/header_utility.h"
+
 // NOLINT(namespace-envoy)
+
+static std::unique_ptr<Envoy::MainCommon> main_common_;
+static std::unique_ptr<Envoy::Http::Dispatcher> http_dispatcher_;
+
+envoy_stream start_stream(envoy_observer observer) {
+  return {ENVOY_SUCCESS, http_dispatcher_->startStream(observer)};
+}
+
+envoy_status_t send_headers(envoy_stream_t stream_id, envoy_headers headers, bool end_stream) {
+  return http_dispatcher_->sendHeaders(stream_id, headers, end_stream);
+}
+
+// TODO: implement.
+envoy_status_t send_data(envoy_stream_t, envoy_data, bool) { return ENVOY_FAILURE; }
+envoy_status_t send_metadata(envoy_stream_t, envoy_headers, bool) { return ENVOY_FAILURE; }
+envoy_status_t send_trailers(envoy_stream_t, envoy_headers) { return ENVOY_FAILURE; }
+envoy_status_t locally_close_stream(envoy_stream_t) { return ENVOY_FAILURE; }
+envoy_status_t reset_stream(envoy_stream_t) { return ENVOY_FAILURE; }
+
+/*
+ * Setup envoy for interaction via the main interface.
+ */
+void setup_envoy() {
+  http_dispatcher_ = std::make_unique<Envoy::Http::Dispatcher>(
+      main_common_->server()->dispatcher(), main_common_->server()->clusterManager());
+}
 
 /**
  * External entrypoint for library.
  */
 envoy_status_t run_engine(const char* config, const char* log_level) {
-  std::unique_ptr<Envoy::MainCommon> main_common;
-
   char* envoy_argv[] = {strdup("envoy"), strdup("--config-yaml"), strdup(config),
                         strdup("-l"),    strdup(log_level),       nullptr};
 
@@ -42,7 +72,7 @@ envoy_status_t run_engine(const char* config, const char* log_level) {
   // This is a known problem, and will be addressed by:
   // https://github.com/lyft/envoy-mobile/issues/34
   try {
-    main_common = std::make_unique<Envoy::MainCommon>(5, envoy_argv);
+    main_common_ = std::make_unique<Envoy::MainCommon>(5, envoy_argv);
   } catch (const Envoy::NoServingException& e) {
     return ENVOY_SUCCESS;
   } catch (const Envoy::MalformedArgvException& e) {
@@ -55,5 +85,5 @@ envoy_status_t run_engine(const char* config, const char* log_level) {
 
   // Run the server listener loop outside try/catch blocks, so that unexpected
   // exceptions show up as a core-dumps for easier diagnostics.
-  return main_common->run() ? ENVOY_SUCCESS : ENVOY_FAILURE;
+  return main_common_->run() ? ENVOY_SUCCESS : ENVOY_FAILURE;
 }
