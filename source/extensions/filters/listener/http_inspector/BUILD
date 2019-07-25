@@ -13,7 +13,10 @@ envoy_package()
 envoy_cc_library(
     name = "http_inspector_lib",
     srcs = ["http_inspector.cc"],
-    hdrs = ["http_inspector.h"],
+    hdrs = [
+        "http_inspector.h",
+        "http_protocol_header.h",
+    ],
     deps = [
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",

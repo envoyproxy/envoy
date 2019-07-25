@@ -42,6 +42,22 @@ REAL_TIME_WHITELIST = ("./source/common/common/utility.h",
                        "./test/test_common/utility.cc", "./test/test_common/utility.h",
                        "./test/integration/integration.h")
 
+# Files matching these directories can use stats by string for now. These should
+# be eliminated but for now we don't want to grow this work. The goal for this
+# whitelist is to eliminate it by making code transformations similar to
+# https://github.com/envoyproxy/envoy/pull/7573 and others.
+#
+# TODO(#4196): Eliminate this list completely and then merge #4980.
+STAT_FROM_STRING_WHITELIST = ("./source/extensions/filters/http/ext_authz/ext_authz.cc",
+                              "./source/extensions/filters/http/fault/fault_filter.cc",
+                              "./source/extensions/filters/http/ip_tagging/ip_tagging_filter.cc",
+                              "./source/extensions/filters/network/mongo_proxy/proxy.cc",
+                              "./source/extensions/filters/network/zookeeper_proxy/filter.cc",
+                              "./source/extensions/stat_sinks/common/statsd/statsd.cc",
+                              "./source/extensions/transport_sockets/tls/context_impl.cc",
+                              "./source/server/guarddog_impl.cc",
+                              "./source/server/overload_manager_impl.cc")
+
 # Files in these paths can use MessageLite::SerializeAsString
 SERIALIZE_AS_STRING_WHITELIST = ("./test/common/protobuf/utility_test.cc",
                                  "./test/common/grpc/codec_test.cc")
@@ -316,6 +332,10 @@ def whitelistedForJsonStringToMessage(file_path):
   return file_path in JSON_STRING_TO_MESSAGE_WHITELIST
 
 
+def whitelistedForStatFromString(file_path):
+  return file_path in STAT_FROM_STRING_WHITELIST
+
+
 def findSubstringAndReturnError(pattern, file_path, error_message):
   with open(file_path) as f:
     text = f.read()
@@ -456,11 +476,24 @@ def hasCondVarWaitFor(line):
   return True
 
 
+# Determines whether the filename is either in the specified subdirectory, or
+# at the top level. We consider files in the top level for the benefit of
+# the check_format testcases in tools/testdata/check_format.
+def isInSubdir(filename, *subdirs):
+  # Skip this check for check_format's unit-tests.
+  if filename.count("/") <= 1:
+    return True
+  for subdir in subdirs:
+    if filename.startswith('./' + subdir + '/'):
+      return True
+  return False
+
+
 def checkSourceLine(line, file_path, reportError):
   # Check fixable errors. These may have been fixed already.
   if line.find(".  ") != -1:
     reportError("over-enthusiastic spaces")
-  if ('source' in file_path or 'include' in file_path) and X_ENVOY_USED_DIRECTLY_REGEX.match(line):
+  if isInSubdir(file_path, 'source', 'include') and X_ENVOY_USED_DIRECTLY_REGEX.match(line):
     reportError(
         "Please do not use the raw literal x-envoy in source code.  See Envoy::Http::PrefixValue.")
   if hasInvalidAngleBracketDirectory(line):
@@ -545,6 +578,11 @@ def checkSourceLine(line, file_path, reportError):
     # Centralize all usage of JSON parsing so it is easier to make changes in JSON parsing
     # behavior.
     reportError("Don't use Protobuf::util::JsonStringToMessage, use TestUtility::loadFromJson.")
+
+  if isInSubdir(file_path, 'source') and file_path.endswith('.cc') and \
+     not whitelistedForStatFromString(file_path) and \
+     ('.counter(' in line or '.gauge(' in line or '.histogram(' in line):
+    reportError("Don't lookup stats by name at runtime; use StatName saved during construction")
 
 
 def checkBuildLine(line, file_path, reportError):

@@ -9,6 +9,7 @@
 #include "common/common/macros.h"
 #include "common/http/headers.h"
 
+#include "extensions/filters/listener/http_inspector/http_protocol_header.h"
 #include "extensions/transport_sockets/well_known_names.h"
 
 #include "absl/strings/match.h"
@@ -64,46 +65,46 @@ void Filter::onRead() {
     return;
   } else if (result.rc_ < 0) {
     config_->stats().read_error_.inc();
-    done(false);
-    return;
+    return done(false);
   }
 
   parseHttpHeader(absl::string_view(reinterpret_cast<const char*>(buf_), result.rc_));
 }
 
 void Filter::parseHttpHeader(absl::string_view data) {
-  if (absl::StartsWith(data, Filter::HTTP2_CONNECTION_PREFACE)) {
+  const size_t len = std::min(data.length(), Filter::HTTP2_CONNECTION_PREFACE.length());
+  if (Filter::HTTP2_CONNECTION_PREFACE.compare(0, len, data, 0, len) == 0) {
+    if (data.length() < Filter::HTTP2_CONNECTION_PREFACE.length()) {
+      return;
+    }
     ENVOY_LOG(trace, "http inspector: http2 connection preface found");
     protocol_ = "HTTP/2";
     done(true);
   } else {
     const size_t pos = data.find_first_of("\r\n");
+    if (pos != absl::string_view::npos) {
+      const absl::string_view request_line = data.substr(0, pos);
+      const std::vector<absl::string_view> fields =
+          absl::StrSplit(request_line, absl::MaxSplits(' ', 4));
 
-    // Cannot find \r or \n
-    if (pos == absl::string_view::npos) {
-      ENVOY_LOG(trace, "http inspector: no request line detected");
-      return done(false);
+      // Method SP Request-URI SP HTTP-Version
+      if (fields.size() != 3) {
+        ENVOY_LOG(trace, "http inspector: invalid http1x request line");
+        return done(false);
+      }
+
+      if (http1xMethods().count(fields[0]) == 0 || httpProtocols().count(fields[2]) == 0) {
+        ENVOY_LOG(trace, "http inspector: method: {} or protocol: {} not valid", fields[0],
+                  fields[2]);
+        return done(false);
+      }
+
+      ENVOY_LOG(trace, "http inspector: method: {}, request uri: {}, protocol: {}", fields[0],
+                fields[1], fields[2]);
+
+      protocol_ = fields[2];
+      return done(true);
     }
-
-    const absl::string_view request_line = data.substr(0, pos);
-    std::vector<absl::string_view> fields = absl::StrSplit(request_line, absl::MaxSplits(' ', 4));
-
-    // Method SP Request-URI SP HTTP-Version
-    if (fields.size() != 3) {
-      ENVOY_LOG(trace, "http inspector: invalid http1x request line");
-      return done(false);
-    }
-
-    if (httpProtocols().count(fields[2]) == 0) {
-      ENVOY_LOG(trace, "http inspector: protocol: {} not valid", fields[2]);
-      return done(false);
-    }
-
-    ENVOY_LOG(trace, "http inspector: method: {}, request uri: {}, protocol: {}", fields[0],
-              fields[1], fields[2]);
-
-    protocol_ = fields[2];
-    done(true);
   }
 }
 
@@ -138,6 +139,48 @@ const absl::flat_hash_set<std::string>& Filter::httpProtocols() const {
   CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>,
                          Http::Headers::get().ProtocolStrings.Http10String,
                          Http::Headers::get().ProtocolStrings.Http11String);
+}
+
+const absl::flat_hash_set<std::string>& Filter::http1xMethods() const {
+  CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>,
+                         {HttpInspector::ExtendedHeader::get().MethodValues.Acl,
+                          HttpInspector::ExtendedHeader::get().MethodValues.Baseline_Control,
+                          HttpInspector::ExtendedHeader::get().MethodValues.Bind,
+                          HttpInspector::ExtendedHeader::get().MethodValues.Checkin,
+                          HttpInspector::ExtendedHeader::get().MethodValues.Checkout,
+                          HttpInspector::ExtendedHeader::get().MethodValues.Connect,
+                          HttpInspector::ExtendedHeader::get().MethodValues.Copy,
+                          HttpInspector::ExtendedHeader::get().MethodValues.Delete,
+                          HttpInspector::ExtendedHeader::get().MethodValues.Get,
+                          HttpInspector::ExtendedHeader::get().MethodValues.Head,
+                          HttpInspector::ExtendedHeader::get().MethodValues.Label,
+                          HttpInspector::ExtendedHeader::get().MethodValues.Link,
+                          HttpInspector::ExtendedHeader::get().MethodValues.Lock,
+                          HttpInspector::ExtendedHeader::get().MethodValues.Merge,
+                          HttpInspector::ExtendedHeader::get().MethodValues.Mkactivity,
+                          HttpInspector::ExtendedHeader::get().MethodValues.Mkcalendar,
+                          HttpInspector::ExtendedHeader::get().MethodValues.Mkcol,
+                          HttpInspector::ExtendedHeader::get().MethodValues.Mkredirectref,
+                          HttpInspector::ExtendedHeader::get().MethodValues.Mkworkspace,
+                          HttpInspector::ExtendedHeader::get().MethodValues.Move,
+                          HttpInspector::ExtendedHeader::get().MethodValues.Options,
+                          HttpInspector::ExtendedHeader::get().MethodValues.Orderpatch,
+                          HttpInspector::ExtendedHeader::get().MethodValues.Patch,
+                          HttpInspector::ExtendedHeader::get().MethodValues.Post,
+                          HttpInspector::ExtendedHeader::get().MethodValues.Proppatch,
+                          HttpInspector::ExtendedHeader::get().MethodValues.Purge,
+                          HttpInspector::ExtendedHeader::get().MethodValues.Put,
+                          HttpInspector::ExtendedHeader::get().MethodValues.Rebind,
+                          HttpInspector::ExtendedHeader::get().MethodValues.Report,
+                          HttpInspector::ExtendedHeader::get().MethodValues.Search,
+                          HttpInspector::ExtendedHeader::get().MethodValues.Trace,
+                          HttpInspector::ExtendedHeader::get().MethodValues.Unbind,
+                          HttpInspector::ExtendedHeader::get().MethodValues.Uncheckout,
+                          HttpInspector::ExtendedHeader::get().MethodValues.Unlink,
+                          HttpInspector::ExtendedHeader::get().MethodValues.Unlock,
+                          HttpInspector::ExtendedHeader::get().MethodValues.Update,
+                          HttpInspector::ExtendedHeader::get().MethodValues.Updateredirectref,
+                          HttpInspector::ExtendedHeader::get().MethodValues.Version_Control});
 }
 
 } // namespace HttpInspector
