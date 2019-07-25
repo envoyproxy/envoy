@@ -119,7 +119,7 @@ public:
  */
 class FactoryContext : public virtual CommonFactoryContext {
 public:
-  virtual ~FactoryContext() = default;
+  ~FactoryContext() override = default;
 
   /**
    * @return AccessLogManager for use by the entire server.

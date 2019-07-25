@@ -2700,7 +2700,7 @@ public:
 class TestUpstreamNetworkFilterConfigFactory
     : public Server::Configuration::NamedUpstreamNetworkFilterConfigFactory {
 public:
-  TestUpstreamNetworkFilterConfigFactory() {}
+  TestUpstreamNetworkFilterConfigFactory() = default;
   Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&,
                                Server::Configuration::CommonFactoryContext&) override {
