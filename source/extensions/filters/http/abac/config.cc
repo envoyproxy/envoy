@@ -18,7 +18,7 @@ AttributeBasedAccessControlFilterConfigFactory::createFilterFactoryFromProtoType
     Server::Configuration::FactoryContext&) {
   google::api::expr::runtime::InterpreterOptions options;
 
-  // Conformance with java/go runimes requires this setting
+  // Conformance with java/go runtimes requires this setting
   options.partial_string_match = true;
 
   auto builder = google::api::expr::runtime::CreateCelExpressionBuilder(options);

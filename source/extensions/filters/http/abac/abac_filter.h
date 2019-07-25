@@ -5,9 +5,6 @@
 #include "envoy/config/filter/http/abac/v2alpha/abac.pb.h"
 #include "envoy/http/filter.h"
 
-//#include "envoy/stats/scope.h"
-//#include "envoy/stats/stats_macros.h"
-
 #include "common/common/logger.h"
 
 #include "eval/public/cel_expression.h"
