@@ -1145,7 +1145,7 @@ public:
     const auto& header_config =
         MessageUtil::downcastAndValidate<const envoy::config::filter::accesslog::v2::HeaderFilter&>(
             *factory_config);
-    return FilterPtr{new HeaderFilter(header_config)};
+    return std::make_unique<HeaderFilter>(header_config);
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -1185,7 +1185,7 @@ config:
  */
 class SampleExtensionFilter : public Filter {
 public:
-  SampleExtensionFilter(size_t sample_rate) : sample_rate_(sample_rate) {}
+  SampleExtensionFilter(uint32_t sample_rate) : sample_rate_(sample_rate) {}
 
   // AccessLog::Filter
   bool evaluate(const StreamInfo::StreamInfo&, const Http::HeaderMap&, const Http::HeaderMap&,
@@ -1200,8 +1200,8 @@ public:
   }
 
 private:
-  size_t current_ = 0;
-  size_t sample_rate_;
+  uint32_t current_ = 0;
+  uint32_t sample_rate_;
 };
 
 /**
@@ -1217,7 +1217,7 @@ public:
         config, Envoy::ProtobufMessage::getNullValidationVisitor(), *this);
     const Json::ObjectSharedPtr filter_config =
         MessageUtil::getJsonObjectFromMessage(*factory_config);
-    return FilterPtr{new SampleExtensionFilter(filter_config->getInteger("rate"))};
+    return std::make_unique<SampleExtensionFilter>(filter_config->getInteger("rate"));
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -1245,7 +1245,7 @@ config:
   // For rate=5 expect 1st request to be recorded, 2nd-5th skipped, and 6th recorded.
   EXPECT_CALL(*file_, write(_));
   logger->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
-  for (int i = 2; i <= 5; ++i) {
+  for (int i = 0; i <= 3; ++i) {
     EXPECT_CALL(*file_, write(_)).Times(0);
     logger->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
   }
