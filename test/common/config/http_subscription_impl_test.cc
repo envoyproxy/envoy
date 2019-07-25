@@ -17,11 +17,11 @@ TEST_F(HttpSubscriptionImplTest, OnRequestReset) {
   EXPECT_CALL(*timer_, enableTimer(_));
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
   http_callbacks_->onFailure(Http::AsyncClient::FailureReason::Reset);
-  verifyStats(1, 0, 0, 1, 0);
+  EXPECT_TRUE(statsAre(1, 0, 0, 1, 0));
   timerTick();
-  verifyStats(2, 0, 0, 1, 0);
+  EXPECT_TRUE(statsAre(2, 0, 0, 1, 0));
   deliverConfigUpdate({"cluster0", "cluster1"}, "0", true);
-  verifyStats(3, 1, 0, 1, 7148434200721666028);
+  EXPECT_TRUE(statsAre(3, 1, 0, 1, 7148434200721666028));
 }
 
 // Validate that the client can recover from bad JSON responses.
@@ -34,28 +34,28 @@ TEST_F(HttpSubscriptionImplTest, BadJsonRecovery) {
   EXPECT_CALL(*timer_, enableTimer(_));
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
   http_callbacks_->onSuccess(std::move(message));
-  verifyStats(1, 0, 0, 1, 0);
+  EXPECT_TRUE(statsAre(1, 0, 0, 1, 0));
   request_in_progress_ = false;
   timerTick();
-  verifyStats(2, 0, 0, 1, 0);
+  EXPECT_TRUE(statsAre(2, 0, 0, 1, 0));
   deliverConfigUpdate({"cluster0", "cluster1"}, "0", true);
-  verifyStats(3, 1, 0, 1, 7148434200721666028);
+  EXPECT_TRUE(statsAre(3, 1, 0, 1, 7148434200721666028));
 }
 
 TEST_F(HttpSubscriptionImplTest, ConfigNotModified) {
   startSubscription({"cluster0", "cluster1"});
 
-  verifyStats(1, 0, 0, 0, 0);
+  EXPECT_TRUE(statsAre(1, 0, 0, 0, 0));
   timerTick();
-  verifyStats(2, 0, 0, 0, 0);
+  EXPECT_TRUE(statsAre(2, 0, 0, 0, 0));
 
   // accept and modify.
   deliverConfigUpdate({"cluster0", "cluster1"}, "0", true, true, "200");
-  verifyStats(3, 1, 0, 0, 7148434200721666028);
+  EXPECT_TRUE(statsAre(3, 1, 0, 0, 7148434200721666028));
 
   // accept and does not modify.
   deliverConfigUpdate({"cluster0", "cluster1"}, "0", true, false, "304");
-  verifyStats(4, 1, 0, 0, 7148434200721666028);
+  EXPECT_TRUE(statsAre(4, 1, 0, 0, 7148434200721666028));
 }
 
 } // namespace
