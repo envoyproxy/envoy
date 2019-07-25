@@ -21,6 +21,13 @@
   }
 }
 
++ (EnvoyStream)startStreamWithObserver:(EnvoyObserver *)observer {
+  NSLog(@"%@ not implemented, returning failure", NSStringFromSelector((SEL) __func__));
+  EnvoyStream stream;
+  stream.status = Failure;
+  return stream;
+}
+
 + (EnvoyStatus)sendHeaders:(EnvoyHeaders *)headers to:(EnvoyStream *)stream close:(BOOL)close {
   NSLog(@"%@ not implemented, returning failure", NSStringFromSelector((SEL) __func__));
   return Failure;

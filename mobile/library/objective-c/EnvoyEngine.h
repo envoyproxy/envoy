@@ -23,6 +23,14 @@
 + (EnvoyStatus)runWithConfig:(NSString *)config logLevel:(NSString *)logLevel;
 
 /**
+ Open an underlying HTTP stream.
+
+ @param observer the observer that will run the stream callbacks.
+ @return stream with a handle and success status, or a failure status.
+ */
++ (EnvoyStream)startStreamWithObserver:(EnvoyObserver *)observer;
+
+/**
  Send headers over the provided stream.
 
  @param metadata Headers to send over the stream.
