@@ -627,7 +627,7 @@ private:
   const absl::optional<envoy::api::v2::Cluster::CustomClusterType> cluster_type_;
 
   class FactoryContextImpl;
-  std::unique_ptr<Server::Configuration::CommonFactoryContext> factory_context_;
+  const std::unique_ptr<Server::Configuration::CommonFactoryContext> factory_context_;
   std::vector<Network::FilterFactoryCb> filter_factories_;
 };
 

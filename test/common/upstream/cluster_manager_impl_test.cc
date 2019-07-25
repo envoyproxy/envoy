@@ -2700,7 +2700,6 @@ public:
 class TestUpstreamNetworkFilterConfigFactory
     : public Server::Configuration::NamedUpstreamNetworkFilterConfigFactory {
 public:
-  TestUpstreamNetworkFilterConfigFactory() = default;
   Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&,
                                Server::Configuration::CommonFactoryContext&) override {
@@ -2711,7 +2710,7 @@ public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
   }
-  std::string name() override { CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.filter"); }
+  std::string name() override { return "envoy.test.filter"; }
 };
 
 // Verify that configured upstream filters are added to client connections.

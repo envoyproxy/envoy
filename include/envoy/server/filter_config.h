@@ -50,16 +50,6 @@ public:
   virtual Event::Dispatcher& dispatcher() PURE;
 
   /**
-   * @return the server's init manager. This can be used for extensions that need to initialize
-   *         after cluster manager init but before the server starts listening. All extensions
-   *         should register themselves during configuration load. initialize() will be called on
-   *         each registered target after cluster manager init but before the server starts
-   *         listening. Once all targets have initialized and invoked their callbacks, the server
-   *         will start listening.
-   */
-  virtual Init::Manager& initManager() PURE;
-
-  /**
    * @return information about the local environment the server is running in.
    */
   virtual const LocalInfo::LocalInfo& localInfo() const PURE;
@@ -141,6 +131,16 @@ public:
    * @return the server-wide http tracer.
    */
   virtual Tracing::HttpTracer& httpTracer() PURE;
+
+  /**
+   * @return the server's init manager. This can be used for extensions that need to initialize
+   *         after cluster manager init but before the server starts listening. All extensions
+   *         should register themselves during configuration load. initialize() will be called on
+   *         each registered target after cluster manager init but before the server starts
+   *         listening. Once all targets have initialized and invoked their callbacks, the server
+   *         will start listening.
+   */
+  virtual Init::Manager& initManager() PURE;
 
   /**
    * @return ServerLifecycleNotifier& the lifecycle notifier for the server.
@@ -338,16 +338,12 @@ public:
    * the case of general error. The returned callback should always be initialized.
    */
   virtual Network::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
-                                                                CommonFactoryContext& context) {
-    UNREFERENCED_PARAMETER(config);
-    UNREFERENCED_PARAMETER(context);
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
+                                                                CommonFactoryContext& context) PURE;
 
   /**
    * @return ProtobufTypes::MessagePtr create empty config proto message for v2.
    */
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() { return nullptr; }
+  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
 
   /**
    * @return std::string the identifying name for a particular implementation of a network filter

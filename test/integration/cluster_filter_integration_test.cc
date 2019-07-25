@@ -65,7 +65,7 @@ public:
     return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
   }
 
-  std::string name() override { CONSTRUCT_ON_FIRST_USE(std::string, "envoy.upstream.polite"); }
+  std::string name() override { return "envoy.upstream.polite"; }
 };
 
 // perform static registration

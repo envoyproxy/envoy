@@ -43,8 +43,6 @@ envoy_cc_test(
         "//source/common/stats:stats_lib",
         "//source/common/upstream:cluster_factory_lib",
         "//source/common/upstream:cluster_manager_lib",
-        "//source/extensions/filters/network/echo",
-        "//source/extensions/filters/network/echo:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:context_lib",
         "//test/mocks/access_log:access_log_mocks",
