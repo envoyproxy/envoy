@@ -3,7 +3,7 @@ Version history
 
 1.12.0 (pending)
 ================
-* fault: added overrides for default runtime keys in :ref:`HTTPFault <envoy_api_field_config.filter.http.fault.v2.HTTPFault>` filter.
+* fault: added overrides for default runtime keys in :ref:`HTTPFault <envoy_api_msg_config.filter.http.fault.v2.HTTPFault>` filter.
 * admin: added ability to configure listener :ref:`socket options <envoy_api_field_config.bootstrap.v2.Admin.socket_options>`.
 * admin: added config dump support for Secret Discovery Service :ref:`SecretConfigDump <envoy_api_msg_admin.v2alpha.SecretsConfigDump>`. 
 * config: async data access for local and remote data source.
