@@ -166,7 +166,7 @@ public:
  */
 class UpgradeReply : public DirectResponse, public ThriftObject {
 public:
-  UpgradeReply() {}
+  UpgradeReply() = default;
   UpgradeReply(Transport& transport)
       : thrift_obj_(std::make_unique<ThriftObjectImpl>(transport, protocol_)) {}
 

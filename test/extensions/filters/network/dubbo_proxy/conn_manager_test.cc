@@ -89,7 +89,9 @@ public:
 class ConnectionManagerTest : public testing::Test {
 public:
   ConnectionManagerTest() : stats_(DubboFilterStats::generateStats("test.", store_)) {}
-  ~ConnectionManagerTest() { filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList(); }
+  ~ConnectionManagerTest() override {
+    filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
+  }
 
   TimeSource& timeSystem() { return factory_context_.dispatcher().timeSource(); }
 

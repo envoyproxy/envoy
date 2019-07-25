@@ -14,7 +14,7 @@ namespace StreamInfo {
 class MockStreamInfo : public StreamInfo {
 public:
   MockStreamInfo();
-  ~MockStreamInfo();
+  ~MockStreamInfo() override;
 
   // StreamInfo::StreamInfo
   MOCK_METHOD1(setResponseFlag, void(ResponseFlag response_flag));

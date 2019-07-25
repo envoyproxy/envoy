@@ -55,7 +55,7 @@ class RoleBasedAccessControlFilter : public Network::ReadFilter,
 public:
   RoleBasedAccessControlFilter(RoleBasedAccessControlFilterConfigSharedPtr config)
       : config_(config) {}
-  ~RoleBasedAccessControlFilter() {}
+  ~RoleBasedAccessControlFilter() override = default;
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;

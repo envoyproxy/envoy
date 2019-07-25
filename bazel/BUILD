@@ -5,6 +5,7 @@ package(default_visibility = ["//visibility:public"])
 exports_files([
     "gen_sh_test_runner.sh",
     "sh_test_wrapper.sh",
+    "cc_wrapper.py",
 ])
 
 genrule(
