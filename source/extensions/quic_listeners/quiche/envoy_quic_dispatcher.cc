@@ -43,6 +43,8 @@ quic::QuicSession* EnvoyQuicDispatcher::CreateQuicSession(
       config(), quic::ParsedQuicVersionVector{version}, quic_connection, this, session_helper(),
       crypto_config(), compressed_certs_cache(), connection_handler_.dispatcher_);
   quic_session->Initialize();
+  // Filter chain can't be retrieved here as self address is unknown at this
+  // point.
   ++connection_handler_.num_connections_;
   return quic_session;
 }

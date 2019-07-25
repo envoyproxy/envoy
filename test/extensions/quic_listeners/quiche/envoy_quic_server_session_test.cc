@@ -175,21 +175,25 @@ TEST_F(EnvoyQuicServerSessionTest, NewStream) {
 }
 
 TEST_F(EnvoyQuicServerSessionTest, OnResetFrame) {
+  std::cerr << "============1\n";
   installReadFilter();
-
+  std::cerr << "============2\n";
   Http::MockStreamDecoder request_decoder;
   Http::MockStreamCallbacks stream_callbacks;
   EXPECT_CALL(http_connection_callbacks_, newStream(_, false))
       .WillRepeatedly(Invoke([&request_decoder, &stream_callbacks](Http::StreamEncoder& encoder,
                                                                    bool) -> Http::StreamDecoder& {
         encoder.getStream().addCallbacks(stream_callbacks);
+          std::cerr << "============3\n";
         return request_decoder;
       }));
   quic::QuicStream* stream1 = envoy_quic_session_.GetOrCreateStream(5u);
   quic::QuicRstStreamFrame rst1(/*control_frame_id=*/1u, stream1->id(),
                                 quic::QUIC_ERROR_PROCESSING_STREAM, /*bytes_written=*/0u);
   EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::RemoteReset, _));
+    std::cerr << "============4\n";
   stream1->OnStreamReset(rst1);
+    std::cerr << "============5\n";
 
   quic::QuicStream* stream2 = envoy_quic_session_.GetOrCreateStream(7u);
   quic::QuicRstStreamFrame rst2(/*control_frame_id=*/1u, stream2->id(), quic::QUIC_REFUSED_STREAM,

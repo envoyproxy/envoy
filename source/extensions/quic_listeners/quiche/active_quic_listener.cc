@@ -39,7 +39,7 @@ ActiveQuicListener::ActiveQuicListener(Server::ConnectionHandlerImpl& parent,
 }
 
 void ActiveQuicListener::onListenerShutdown() {
-  ENVOY_LOG_TO_LOGGER(parent_.logger_, debug, "Listener shutdown.");
+  ENVOY_LOG_TO_LOGGER(parent_.logger_, info, "Listener shutdown.");
   quic_dispatcher_->Shutdown();
 }
 

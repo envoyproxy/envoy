@@ -25,10 +25,11 @@
 namespace Envoy {
 namespace Quic {
 
+// Act as a Network::Connection to HCM and a FilterManager to FilterFactoryCb.
 class EnvoyQuicServerSession : public quic::QuicServerSessionBase,
                                public Network::FilterManagerConnection {
 public:
-  // Ownes connection.
+  // Owns connection.
   EnvoyQuicServerSession(const quic::QuicConfig& config,
                          const quic::ParsedQuicVersionVector& supported_versions,
                          quic::QuicConnection* connection, quic::QuicSession::Visitor* visitor,
@@ -48,10 +49,7 @@ public:
 
   // Network::Connection
   void addConnectionCallbacks(Network::ConnectionCallbacks& cb) override;
-  void addBytesSentCallback(Network::Connection::BytesSentCb /*cb*/) override {
-    // Proxy is not supported.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
+  void addBytesSentCallback(Network::Connection::BytesSentCb /*cb*/) override;
   void enableHalfClose(bool /*enabled*/) override {
     // Quic connection doesn't support half close.
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -125,7 +123,7 @@ public:
   // Network::WriteBufferSource
   Network::StreamBuffer getWriteBuffer() override { NOT_REACHED_GCOVR_EXCL_LINE; }
 
-  // Must be called before creating data streams.
+  // Called by QuicHttpServerConnectionImpl before creating data streams.
   void setHttpConnectionCallbacks(Http::ServerConnectionCallbacks& callbacks) {
     http_connection_callbacks_ = &callbacks;
   }
@@ -142,6 +140,7 @@ protected:
                                quic::QuicCompressedCertsCache* compressed_certs_cache) override;
 
   // quic::QuicSession
+  // Overridden to create stream as encoder and associate it with an decoder.
   quic::QuicSpdyStream* CreateIncomingStream(quic::QuicStreamId id) override;
   quic::QuicSpdyStream* CreateIncomingStream(quic::PendingStream* pending) override;
   quic::QuicSpdyStream* CreateOutgoingBidirectionalStream() override;

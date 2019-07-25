@@ -41,9 +41,6 @@ public:
   // Network::UdpReadFilterCallbacks
   Network::UdpListener& udpListener() override { NOT_REACHED_GCOVR_EXCL_LINE; }
 
-  // Return true if a filter chain is installed.
-  bool setUpFiltersForConnection(const Network::ConnectionSocketPtr& connection_socket);
-
 private:
   friend class ActiveQuicListenerPeer;
 

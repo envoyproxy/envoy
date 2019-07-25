@@ -23,6 +23,7 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_connection.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_connection_helper.h"
 #include "test/mocks/http/stream_decoder.h"
+#include "test/mocks/network/mocks.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -62,10 +63,14 @@ public:
         connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()),
         quic_version_(quic::CurrentSupportedVersions()[0]),
+        listener_stats_({ALL_LISTENER_STATS(POOL_COUNTER(listener_config_.listenerScope()),
+                                            POOL_GAUGE(listener_config_.listenerScope()),
+                                            POOL_HISTOGRAM(listener_config_.listenerScope()))}),
         quic_connection_(quic::test::TestConnectionId(),
                          quic::QuicSocketAddress(quic::QuicIpAddress::Any6(), 12345),
                          &connection_helper_, &alarm_factory_, &writer_,
-                         /*owns_writer=*/false, quic::Perspective::IS_SERVER, {quic_version_}),
+                         /*owns_writer=*/false, quic::Perspective::IS_SERVER, {quic_version_},
+                         listener_config_, listener_stats_),
         quic_session_(quic_config_, {quic_version_}, &quic_connection_, /*visitor=*/nullptr,
                       /*helper=*/nullptr, /*crypto_config=*/nullptr,
                       /*compressed_certs_cache=*/nullptr),
@@ -95,6 +100,8 @@ protected:
   testing::NiceMock<quic::test::MockPacketWriter> writer_;
   quic::ParsedQuicVersion quic_version_;
   quic::QuicConfig quic_config_;
+    testing::NiceMock<Network::MockListenerConfig> listener_config_;
+  Server::ListenerStats listener_stats_;
   EnvoyQuicConnection quic_connection_;
   MockQuicServerSession quic_session_;
   quic::QuicStreamId stream_id_{5};
@@ -146,14 +153,14 @@ TEST_F(EnvoyQuicServerStreamTest, DecodeHeadersBodyAndTrailers) {
       }))
       // Depends on QUIC version, there may be an empty STREAM_FRAME with FIN. But
       // since there is trailers, finished_reading should always be false.
-      .WillOnce(Invoke([this](Buffer::Instance& buffer, bool finished_reading) {
+      .WillOnce(Invoke([](Buffer::Instance& buffer, bool finished_reading) {
         EXPECT_FALSE(finished_reading);
         EXPECT_EQ(0, buffer.length());
       }));
   quic_stream_.OnStreamFrame(frame);
 
   EXPECT_CALL(stream_decoder_, decodeTrailers_(_))
-      .WillOnce(Invoke([this](const Http::HeaderMapPtr& headers) {
+      .WillOnce(Invoke([](const Http::HeaderMapPtr& headers) {
         Http::LowerCaseString key1("key1");
         Http::LowerCaseString key2(":final-offset");
         EXPECT_EQ("value1", headers->get(key1)->value().getStringView());

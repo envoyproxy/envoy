@@ -61,6 +61,7 @@ envoy_cc_test(
         "//source/extensions/quic_listeners/quiche:envoy_quic_connection_lib",
         "//source/extensions/quic_listeners/quiche:envoy_quic_server_stream_lib",
         "//test/mocks/http:stream_decoder_mock",
+        "//test/mocks/network:network_mocks",
         "//test/test_common:utility_lib",
         "@com_googlesource_quiche//:quic_core_http_spdy_session_lib",
     ],

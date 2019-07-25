@@ -67,6 +67,7 @@ void EnvoyQuicServerSession::OnConnectionClosed(const quic::QuicConnectionCloseF
                                                 quic::ConnectionCloseSource source) {
   quic::QuicServerSessionBase::OnConnectionClosed(frame, source);
   for (auto callback : network_connection_callbacks_) {
+    // Tell filters about connection close.
     callback->onEvent(source == quic::ConnectionCloseSource::FROM_PEER
                           ? Network::ConnectionEvent::RemoteClose
                           : Network::ConnectionEvent::LocalClose);
@@ -100,6 +101,12 @@ void EnvoyQuicServerSession::addConnectionCallbacks(Network::ConnectionCallbacks
   network_connection_callbacks_.push_back(&cb);
 }
 
+void EnvoyQuicServerSession::addBytesSentCallback(
+    Network::Connection::BytesSentCb /*cb*/) {
+  // Proxy is not supported.
+  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+}
+
 void EnvoyQuicServerSession::close(Network::ConnectionCloseType type) {
   // TODO(danzh): Implement FlushWrite and FlushWriteAndDelay mode.
   ASSERT(type == Network::ConnectionCloseType::NoFlush);
@@ -119,11 +126,17 @@ absl::string_view EnvoyQuicServerSession::requestedServerName() const {
 }
 
 const Network::Address::InstanceConstSharedPtr& EnvoyQuicServerSession::remoteAddress() const {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  auto quic_connection = dynamic_cast<const EnvoyQuicConnection*>(connection());
+  ASSERT(quic_connection->connectionSocket() != nullptr,
+         "remoteAddress() should only be called after OnPacketHeader");
+  return quic_connection->connectionSocket()->remoteAddress();
 }
 
 const Network::Address::InstanceConstSharedPtr& EnvoyQuicServerSession::localAddress() const {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  auto quic_connection = dynamic_cast<const EnvoyQuicConnection*>(connection());
+  ASSERT(quic_connection->connectionSocket() != nullptr,
+         "localAddress() should only be called after OnPacketHeader");
+  return quic_connection->connectionSocket()->localAddress();
 }
 
 const Ssl::ConnectionInfo* EnvoyQuicServerSession::ssl() const {
@@ -132,7 +145,8 @@ const Ssl::ConnectionInfo* EnvoyQuicServerSession::ssl() const {
 }
 
 void EnvoyQuicServerSession::rawWrite(Buffer::Instance& /*data*/, bool /*end_stream*/) {
-  // TODO(danzh): maybe send via MessageFrame?
+  // TODO(danzh): maybe send via MessageFrame? But MessageFrame is not reliable
+  // whereas TCP connection is reliable.
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 

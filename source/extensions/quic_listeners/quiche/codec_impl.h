@@ -49,6 +49,7 @@ public:
   // Http::Connection
   void shutdownNotice() override {
     // TODO(danzh): Add double-GOAWAY support in QUIC.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 };
 

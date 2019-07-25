@@ -26,6 +26,8 @@ bool EnvoyQuicConnection::OnPacketHeader(const quic::QuicPacketHeader& header) {
     Network::Address::InstanceConstSharedPtr remote_addr =
         quicAddressToEnvoyAddressInstance(peer_address());
     auto connection_socket_ = std::make_unique<Network::ConnectionSocketImpl>(
+        // Wraps the real IoHandle instance so that if this socket get closed,
+        // the real IoHandle won't be affected.
         std::make_unique<QuicIoHandleWrapper>(listener_config_.socket().ioHandle()),
         std::move(local_addr), std::move(remote_addr));
 

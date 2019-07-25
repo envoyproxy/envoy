@@ -18,7 +18,7 @@
 namespace Envoy {
 namespace Quic {
 
-// Override for stats and QoS.
+// Override for network filter chain, stats and QoS.
 class EnvoyQuicConnection : public quic::QuicConnection {
 public:
   EnvoyQuicConnection(quic::QuicConnectionId server_connection_id,
@@ -36,10 +36,15 @@ public:
   }
 
   // quic::QuicConnection
+  // Overridden to retrieve filter chain with initialized self address.
   bool OnPacketHeader(const quic::QuicPacketHeader& header) override;
 
   // Called in session Initialize().
   void setEnvoyConnection(Network::Connection& connection) { envoy_connection_ = &connection; }
+
+  const Network::ConnectionSocketPtr& connectionSocket() const {
+    return connection_socket_;
+  }
 
 protected:
   Network::Connection::ConnectionStats& connectionStats() const { return *connection_stats_; }
@@ -47,6 +52,8 @@ protected:
 private:
   // TODO(danzh): populate stats.
   std::unique_ptr<Network::Connection::ConnectionStats> connection_stats_;
+  // Only initialized after self address is known. Must not own the underlying
+  // socket because UDP socket is shared among all connections.
   Network::ConnectionSocketPtr connection_socket_;
   Network::Connection* envoy_connection_;
   Network::ListenerConfig& listener_config_;
