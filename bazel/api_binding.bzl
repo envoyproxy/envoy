@@ -25,6 +25,7 @@ def envoy_api_binding():
     if "envoy_api" not in native.existing_rules().keys():
         _default_envoy_api(name = "envoy_api")
 
+    # TODO(https://github.com/envoyproxy/envoy/issues/7719) need to remove both bindings and use canonical rules
     native.bind(
         name = "api_httpbody_protos",
         actual = "@com_google_googleapis//google/api:httpbody_cc_proto",
