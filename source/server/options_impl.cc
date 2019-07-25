@@ -179,6 +179,13 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
     concurrency_ = std::max(1U, concurrency.getValue());
   }
 
+  // Exactly one of config_path and config_yaml should be specified.
+  if (!config_path.isSet() && !config_yaml.isSet()) {
+    const std::string message =
+        "At least one of --config-path and --config-yaml should be non-empty";
+    throw MalformedArgvException(message);
+  }
+
   config_path_ = config_path.getValue();
   config_yaml_ = config_yaml.getValue();
   allow_unknown_fields_ = allow_unknown_fields.getValue();
