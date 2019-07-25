@@ -4,6 +4,8 @@
 #include "common/chromium_url/url_canon_stdstring.h"
 #include "common/common/logger.h"
 
+#include "absl/strings/str_join.h"
+#include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 
@@ -55,23 +57,16 @@ bool PathUtil::canonicalPath(HeaderEntry& path_header) {
 void PathUtil::mergeSlashes(HeaderEntry& path_header) {
   const auto original_path = path_header.value().getStringView();
   // Only operate on path component in URL.
-  const size_t query_start = original_path.find('?');
-  const auto path = original_path.substr(0, query_start);
-  const auto query = absl::ClippedSubstr(original_path, query_start);
+  const absl::string_view::size_type query_start = original_path.find('?');
+  const absl::string_view path = original_path.substr(0, query_start);
+  const absl::string_view query = absl::ClippedSubstr(original_path, query_start);
   if (path.find("//") == absl::string_view::npos) {
     return;
   }
-
-  std::string simplified_path;
-  simplified_path.reserve(original_path.size());
-  for (size_t i = 0; i < path.size(); ++i) {
-    if (i > 0 && path[i] == '/' && path[i - 1] == '/') {
-      continue;
-    }
-    simplified_path.push_back(path[i]);
-  }
-  simplified_path.insert(simplified_path.end(), query.begin(), query.end());
-  path_header.value(simplified_path);
+  const absl::string_view prefix = absl::StartsWith(path, "/") ? "/" : absl::string_view();
+  const absl::string_view suffix = absl::EndsWith(path, "/") ? "/" : absl::string_view();
+  path_header.value(absl::StrCat(
+      prefix, absl::StrJoin(absl::StrSplit(path, "/", absl::SkipEmpty()), "/"), query, suffix));
 }
 
 } // namespace Http
