@@ -19,7 +19,7 @@ namespace Grpc {
 class MockAsyncRequest : public AsyncRequest {
 public:
   MockAsyncRequest();
-  ~MockAsyncRequest();
+  ~MockAsyncRequest() override;
 
   MOCK_METHOD0(cancel, void());
 };
@@ -27,9 +27,9 @@ public:
 class MockAsyncStream : public RawAsyncStream {
 public:
   MockAsyncStream();
-  ~MockAsyncStream();
+  ~MockAsyncStream() override;
 
-  void sendMessageRaw(Buffer::InstancePtr&& request, bool end_stream) {
+  void sendMessageRaw(Buffer::InstancePtr&& request, bool end_stream) override {
     sendMessageRaw_(request, end_stream);
   }
   MOCK_METHOD2_T(sendMessageRaw_, void(Buffer::InstancePtr& request, bool end_stream));
@@ -85,7 +85,7 @@ public:
 class MockAsyncClientFactory : public AsyncClientFactory {
 public:
   MockAsyncClientFactory();
-  ~MockAsyncClientFactory();
+  ~MockAsyncClientFactory() override;
 
   MOCK_METHOD0(create, RawAsyncClientPtr());
 };
@@ -93,7 +93,7 @@ public:
 class MockAsyncClientManager : public AsyncClientManager {
 public:
   MockAsyncClientManager();
-  ~MockAsyncClientManager();
+  ~MockAsyncClientManager() override;
 
   MOCK_METHOD3(factoryForGrpcService,
                AsyncClientFactoryPtr(const envoy::api::v2::core::GrpcService& grpc_service,

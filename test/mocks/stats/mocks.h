@@ -271,10 +271,9 @@ public:
   MOCK_METHOD1(histogram, Histogram&(const std::string& name));
   MOCK_CONST_METHOD0(histograms, std::vector<ParentHistogramSharedPtr>());
 
-  MOCK_CONST_METHOD1(findCounter, absl::optional<std::reference_wrapper<const Counter>>(StatName));
-  MOCK_CONST_METHOD1(findGauge, absl::optional<std::reference_wrapper<const Gauge>>(StatName));
-  MOCK_CONST_METHOD1(findHistogram,
-                     absl::optional<std::reference_wrapper<const Histogram>>(StatName));
+  MOCK_CONST_METHOD1(findCounter, OptionalCounter(StatName));
+  MOCK_CONST_METHOD1(findGauge, OptionalGauge(StatName));
+  MOCK_CONST_METHOD1(findHistogram, OptionalHistogram(StatName));
 
   Counter& counterFromStatName(StatName name) override {
     return counter(symbol_table_->toString(name));

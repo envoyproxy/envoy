@@ -233,6 +233,7 @@ private:
   // - There may be active clusters referencing it in config_.cluster_manager_.
   // - There may be active connections referencing it.
   std::unique_ptr<Secret::SecretManager> secret_manager_;
+  bool workers_started_;
   bool shutdown_;
   const Options& options_;
   TimeSource& time_source_;

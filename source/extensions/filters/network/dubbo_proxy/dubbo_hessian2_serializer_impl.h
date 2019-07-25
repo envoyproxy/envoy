@@ -8,20 +8,20 @@ namespace NetworkFilters {
 namespace DubboProxy {
 class DubboHessian2SerializerImpl : public Serializer {
 public:
-  ~DubboHessian2SerializerImpl() = default;
-  virtual const std::string& name() const override {
+  ~DubboHessian2SerializerImpl() override = default;
+  const std::string& name() const override {
     return ProtocolSerializerNames::get().fromType(ProtocolType::Dubbo, type());
   }
-  virtual SerializationType type() const override { return SerializationType::Hessian2; }
+  SerializationType type() const override { return SerializationType::Hessian2; }
 
-  virtual std::pair<RpcInvocationSharedPtr, bool>
+  std::pair<RpcInvocationSharedPtr, bool>
   deserializeRpcInvocation(Buffer::Instance& buffer, ContextSharedPtr context) override;
 
-  virtual std::pair<RpcResultSharedPtr, bool>
-  deserializeRpcResult(Buffer::Instance& buffer, ContextSharedPtr context) override;
+  std::pair<RpcResultSharedPtr, bool> deserializeRpcResult(Buffer::Instance& buffer,
+                                                           ContextSharedPtr context) override;
 
-  virtual size_t serializeRpcResult(Buffer::Instance& output_buffer, const std::string& content,
-                                    RpcResponseType type) override;
+  size_t serializeRpcResult(Buffer::Instance& output_buffer, const std::string& content,
+                            RpcResponseType type) override;
 };
 
 } // namespace DubboProxy

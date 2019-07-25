@@ -531,7 +531,7 @@ public:
   FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory, uint32_t port,
                FakeHttpConnection::Type type, Network::Address::IpVersion version,
                Event::TestTimeSystem& time_system);
-  ~FakeUpstream();
+  ~FakeUpstream() override;
 
   FakeHttpConnection::Type httpType() { return http_type_; }
 

@@ -47,7 +47,7 @@ public:
   RemoteDataFetcher(Upstream::ClusterManager& cm, const ::envoy::api::v2::core::HttpUri& uri,
                     const std::string& content_hash, RemoteDataFetcherCallback& callback);
 
-  virtual ~RemoteDataFetcher() override;
+  ~RemoteDataFetcher() override;
 
   // Http::AsyncClient::Callbacks
   void onSuccess(Http::MessagePtr&& response) override;
