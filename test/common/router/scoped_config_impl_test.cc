@@ -394,7 +394,7 @@ TEST_F(ScopedRouteInfoDeathTest, AssertFailure) {
       "RouteConfigProvider's name 'bar_route' doesn't match route_configuration_name 'foo_route'.");
 }
 
-class ThreadLocalScopedConfigImplTest : public testing::Test {
+class ScopedConfigImplTest : public testing::Test {
 public:
   void SetUp() override {
     std::string yaml_plain = R"EOF(
@@ -445,12 +445,11 @@ public:
   std::shared_ptr<ScopedRouteInfo> scope_info_a_;
   std::shared_ptr<ScopedRouteInfo> scope_info_b_;
   ScopedRoutes::ScopeKeyBuilder key_builder_config_;
-  std::unique_ptr<ThreadLocalScopedConfigImpl> scoped_config_impl_;
+  std::unique_ptr<ScopedConfigImpl> scoped_config_impl_;
 };
 
-TEST_F(ThreadLocalScopedConfigImplTest, PickRoute) {
-  scoped_config_impl_ =
-      std::make_unique<ThreadLocalScopedConfigImpl>(std::move(key_builder_config_));
+TEST_F(ScopedConfigImplTest, PickRoute) {
+  scoped_config_impl_ = std::make_unique<ScopedConfigImpl>(std::move(key_builder_config_));
   scoped_config_impl_->addOrUpdateRoutingScope(scope_info_a_);
   scoped_config_impl_->addOrUpdateRoutingScope(scope_info_b_);
 
@@ -476,9 +475,8 @@ TEST_F(ThreadLocalScopedConfigImplTest, PickRoute) {
   EXPECT_EQ(route_config, nullptr);
 }
 
-TEST_F(ThreadLocalScopedConfigImplTest, Update) {
-  scoped_config_impl_ =
-      std::make_unique<ThreadLocalScopedConfigImpl>(std::move(key_builder_config_));
+TEST_F(ScopedConfigImplTest, Update) {
+  scoped_config_impl_ = std::make_unique<ScopedConfigImpl>(std::move(key_builder_config_));
 
   TestHeaderMapImpl headers{
       {"foo_header", ",,key=value,bar=foo,"},

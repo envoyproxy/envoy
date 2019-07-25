@@ -88,8 +88,11 @@ public:
   ScopedRdsConfigSubscription(
       const envoy::config::filter::network::http_connection_manager::v2::ScopedRds& scoped_rds,
       const uint64_t manager_identifier, const std::string& name,
+      const envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::
+          ScopeKeyBuilder& scope_key_builder,
       Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
       envoy::api::v2::core::ConfigSource rds_config_source,
+      RouteConfigProviderManager& route_config_provider_manager,
       ScopedRoutesConfigProviderManager& config_provider_manager);
 
   ~ScopedRdsConfigSubscription() override = default;
@@ -99,7 +102,7 @@ public:
   const ScopedRouteMap& scopedRouteMap() const { return scoped_route_map_; }
 
 private:
-  // Envoy::Config::ConfigSubscriptionCommonBase
+  // Envoy::Config::DeltaConfigSubscriptionInstance
   void start() override { subscription_->start({}); }
 
   // Envoy::Config::SubscriptionCallbacks
@@ -109,7 +112,7 @@ private:
                       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                       const std::string& version_info) override;
   void onConfigUpdateFailed(const EnvoyException*) override {
-    ConfigSubscriptionCommonBase::onConfigUpdateFailed();
+    DeltaConfigSubscriptionInstance::onConfigUpdateFailed();
   }
   std::string resourceName(const ProtobufWkt::Any& resource) override {
     return MessageUtil::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(resource,
@@ -125,36 +128,28 @@ private:
   Server::Configuration::FactoryContext& factory_context_;
   const std::string name_;
   std::unique_ptr<Envoy::Config::Subscription> subscription_;
+  const envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::ScopeKeyBuilder
+      scope_key_builder_;
   Stats::ScopePtr scope_;
   ScopedRdsStats stats_;
   const envoy::api::v2::core::ConfigSource rds_config_source_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   const std::string stat_prefix_;
-  ScopedRoutesConfigProviderManager& srds_config_provider_manager_;
+  RouteConfigProviderManager& route_config_provider_manager_;
 };
 
 using ScopedRdsConfigSubscriptionSharedPtr = std::shared_ptr<ScopedRdsConfigSubscription>;
 
 // A ConfigProvider for scoped RDS that dynamically fetches scoped routing configuration via a
 // subscription.
-class ScopedRdsConfigProvider : public Envoy::Config::DeltaMutableConfigProviderBase {
+class ScopedRdsConfigProvider : public Envoy::Config::MutableConfigProviderCommonBase {
 public:
   ScopedRdsConfigProvider(ScopedRdsConfigSubscriptionSharedPtr&& subscription,
-                          Server::Configuration::FactoryContext& factory_context,
-                          envoy::api::v2::core::ConfigSource rds_config_source,
-                          const envoy::config::filter::network::http_connection_manager::v2::
-                              ScopedRoutes::ScopeKeyBuilder& scope_key_builder);
+                          envoy::api::v2::core::ConfigSource rds_config_source);
 
   ScopedRdsConfigSubscription& subscription() {
     return *static_cast<ScopedRdsConfigSubscription*>(subscription_.get());
   }
-
-  // getConfig() is overloaded (const/non-const only). Make all base getConfig()s visible to avoid
-  // compiler warnings.
-  using DeltaMutableConfigProviderBase::getConfig;
-
-  // Envoy::Config::DeltaMutableConfigProviderBase
-  Envoy::Config::ConfigSharedPtr getConfig() override;
 
 private:
   const envoy::api::v2::core::ConfigSource rds_config_source_;
@@ -195,14 +190,6 @@ public:
 
   RouteConfigProviderManager& route_config_provider_manager() {
     return route_config_provider_manager_;
-  }
-
-  std::shared_ptr<RouteConfigProvider> createRouteConfigProvider(
-      Server::Configuration::FactoryContext& factory_context,
-      const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
-      const std::string& stat_name) {
-    return route_config_provider_manager_.createRdsRouteConfigProvider(rds, factory_context,
-                                                                       stat_name);
   }
 
 private:

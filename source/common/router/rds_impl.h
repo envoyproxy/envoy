@@ -194,8 +194,8 @@ public:
   // RouteConfigProviderManager
   RouteConfigProviderPtr createRdsRouteConfigProvider(
       const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
-      Server::Configuration::FactoryContext& factory_context,
-      const std::string& stat_prefix) override;
+      Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
+      Init::Manager& init_manager) override;
 
   RouteConfigProviderPtr
   createStaticRouteConfigProvider(const envoy::api::v2::RouteConfiguration& route_config,

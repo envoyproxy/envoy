@@ -53,11 +53,11 @@ protected:
     EXPECT_CALL(factory_context_.admin_.config_tracker_, add_("route_scopes", _));
     config_provider_manager_ = std::make_unique<ScopedRoutesConfigProviderManager>(
         factory_context_.admin_, route_config_provider_manager_);
-    EXPECT_CALL(route_config_provider_manager_, createRdsRouteConfigProvider(_, _, _))
+    EXPECT_CALL(route_config_provider_manager_, createRdsRouteConfigProvider(_, _, _, _))
         .WillRepeatedly(Invoke(
             [this](const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
-                   Server::Configuration::FactoryContext&,
-                   const std::string&) -> RouteConfigProviderPtr {
+                   Server::Configuration::FactoryContext&, const std::string&,
+                   Init::Manager&) -> RouteConfigProviderPtr {
               auto iter = cached_route_configs_.find(rds.route_config_name());
               if (iter == cached_route_configs_.end()) {
                 cached_route_configs_[rds.route_config_name()] = std::make_shared<MockConfig>();
