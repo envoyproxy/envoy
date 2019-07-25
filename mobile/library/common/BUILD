@@ -9,7 +9,13 @@ envoy_cc_library(
     srcs = ["main_interface.cc"],
     hdrs = ["main_interface.h"],
     repository = "@envoy",
-    deps = ["@envoy//source/exe:envoy_main_common_lib"],
+    deps = [
+        "//library/common/buffer:utility_lib",
+        "//library/common/http:dispatcher_lib",
+        "//library/common/http:header_utility_lib",
+        "//library/common/include:c_types_interface",
+        "@envoy//source/exe:envoy_main_common_lib",
+    ],
 )
 
 cc_library(

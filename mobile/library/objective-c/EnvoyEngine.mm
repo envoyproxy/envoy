@@ -1,9 +1,11 @@
 #import "library/objective-c/EnvoyEngine.h"
 
+#import "library/common/include/c_types.h"
 #import "library/common/main_interface.h"
 
 @implementation EnvoyEngine
 
+#pragma mark - class methods
 + (EnvoyStatus)runWithConfig:(NSString *)config {
   return [self runWithConfig:config logLevel:@"info"];
 }
@@ -56,6 +58,10 @@
 + (EnvoyStatus)resetStream:(EnvoyStream *)stream {
   NSLog(@"%@ not implemented, returning failure", NSStringFromSelector((SEL) __func__));
   return Failure;
+}
+
++ (void)setupEnvoy {
+  setup_envoy();
 }
 
 @end

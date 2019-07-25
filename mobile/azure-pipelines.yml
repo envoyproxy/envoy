@@ -363,3 +363,17 @@ stages:
           # # Check for the sentinel value that shows the app is alive and well.
           # - script: cat /tmp/envoy.log | grep 'Hello, world!'
           #   displayName: 'Check liveliness'
+  - stage: cpp_tests
+    dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
+    jobs:
+      - job: mac_dist
+        timeoutInMinutes: 60
+        pool:
+          vmImage: 'macos-10.14'
+        steps:
+          - checkout: self
+            submodules: true
+          - script: ./ci/mac_ci_setup.sh
+            displayName: 'Install dependencies'
+          - script: ./bazelw test //test/common/...
+            displayName: 'Run tests'
