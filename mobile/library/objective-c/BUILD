@@ -1,14 +1,14 @@
 licenses(["notice"])  # Apache 2
 
-exports_files(["EnvoyEngine.h"])
+exports_files([
+    "EnvoyEngine.h",
+    "EnvoyTypes.h",
+])
 
 objc_library(
     name = "envoy_engine_objc_lib",
     srcs = [
         "EnvoyEngine.mm",
-    ],
-    hdrs = [
-        "EnvoyEngine.h",
     ],
     copts = ["-std=c++14"],
     visibility = ["//visibility:public"],
