@@ -6,6 +6,7 @@
 
 #include "envoy/admin/v2alpha/server_info.pb.h"
 #include "envoy/common/pure.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/network/address.h"
 
 #include "spdlog/spdlog.h"

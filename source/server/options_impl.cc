@@ -180,7 +180,6 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   }
 
   config_path_ = config_path.getValue();
-  config_proto_ = config_proto.getValue();
   config_yaml_ = config_yaml.getValue();
   allow_unknown_fields_ = allow_unknown_fields.getValue();
   admin_address_path_ = admin_address_path.getValue();

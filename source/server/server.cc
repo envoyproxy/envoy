@@ -214,8 +214,8 @@ InstanceUtil::BootstrapVersion InstanceUtil::loadBootstrapConfig(
 
   // Exactly one of config_path and config_yaml should be specified.
   if (config_path.empty() && config_yaml.empty() && config_proto.ByteSize() == 0) {
-    const std::string message =
-        "At least one of --config-path and --config-yaml should be non-empty";
+    const std::string message = "At least one of --config-path, --config-yaml or "
+                                "Options::configProto() should be non-empty";
     throw EnvoyException(message);
   }
 

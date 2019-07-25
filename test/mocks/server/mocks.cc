@@ -21,6 +21,7 @@ namespace Server {
 MockOptions::MockOptions(const std::string& config_path) : config_path_(config_path) {
   ON_CALL(*this, concurrency()).WillByDefault(ReturnPointee(&concurrency_));
   ON_CALL(*this, configPath()).WillByDefault(ReturnRef(config_path_));
+  ON_CALL(*this, configProto()).WillByDefault(ReturnRef(config_proto_));
   ON_CALL(*this, configYaml()).WillByDefault(ReturnRef(config_yaml_));
   ON_CALL(*this, adminAddressPath()).WillByDefault(ReturnRef(admin_address_path_));
   ON_CALL(*this, serviceClusterName()).WillByDefault(ReturnRef(service_cluster_name_));
