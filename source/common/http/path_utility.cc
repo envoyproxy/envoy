@@ -66,7 +66,7 @@ void PathUtil::mergeSlashes(HeaderEntry& path_header) {
   const absl::string_view prefix = absl::StartsWith(path, "/") ? "/" : absl::string_view();
   const absl::string_view suffix = absl::EndsWith(path, "/") ? "/" : absl::string_view();
   path_header.value(absl::StrCat(
-      prefix, absl::StrJoin(absl::StrSplit(path, "/", absl::SkipEmpty()), "/"), query, suffix));
+      prefix, absl::StrJoin(absl::StrSplit(path, '/', absl::SkipEmpty()), "/"), query, suffix));
 }
 
 } // namespace Http
