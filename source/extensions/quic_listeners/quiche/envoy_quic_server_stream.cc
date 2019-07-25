@@ -133,6 +133,7 @@ Http::StreamResetReason quicRstErrorToEnvoyResetReason(quic::QuicRstStreamErrorC
 }
 
 void EnvoyQuicServerStream::OnStreamReset(const quic::QuicRstStreamFrame& frame) {
+  std::cerr << "OnStreamReset " << frame << "\n";
   quic::QuicSpdyServerStreamBase::OnStreamReset(frame);
   Http::StreamResetReason reason = quicRstErrorToEnvoyResetReason(frame.error_code);
   runResetCallbacks(reason);

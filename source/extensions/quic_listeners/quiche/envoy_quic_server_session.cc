@@ -101,8 +101,7 @@ void EnvoyQuicServerSession::addConnectionCallbacks(Network::ConnectionCallbacks
   network_connection_callbacks_.push_back(&cb);
 }
 
-void EnvoyQuicServerSession::addBytesSentCallback(
-    Network::Connection::BytesSentCb /*cb*/) {
+void EnvoyQuicServerSession::addBytesSentCallback(Network::Connection::BytesSentCb /*cb*/) {
   // Proxy is not supported.
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }

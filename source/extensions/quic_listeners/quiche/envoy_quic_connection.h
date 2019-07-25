@@ -30,6 +30,8 @@ public:
                       Network::ListenerConfig& listener_config,
                       Server::ListenerStats& listener_stats);
 
+  ~EnvoyQuicConnection() override {}
+
   // Called by EnvoyQuicSession::setConnectionStats().
   void setConnectionStats(const Network::Connection::ConnectionStats& stats) {
     connection_stats_ = std::make_unique<Network::Connection::ConnectionStats>(stats);
@@ -42,9 +44,7 @@ public:
   // Called in session Initialize().
   void setEnvoyConnection(Network::Connection& connection) { envoy_connection_ = &connection; }
 
-  const Network::ConnectionSocketPtr& connectionSocket() const {
-    return connection_socket_;
-  }
+  const Network::ConnectionSocketPtr& connectionSocket() const { return connection_socket_; }
 
 protected:
   Network::Connection::ConnectionStats& connectionStats() const { return *connection_stats_; }

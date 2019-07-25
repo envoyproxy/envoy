@@ -100,7 +100,7 @@ protected:
   testing::NiceMock<quic::test::MockPacketWriter> writer_;
   quic::ParsedQuicVersion quic_version_;
   quic::QuicConfig quic_config_;
-    testing::NiceMock<Network::MockListenerConfig> listener_config_;
+  testing::NiceMock<Network::MockListenerConfig> listener_config_;
   Server::ListenerStats listener_stats_;
   EnvoyQuicConnection quic_connection_;
   MockQuicServerSession quic_session_;

@@ -71,12 +71,13 @@ public:
         listener_stats_({ALL_LISTENER_STATS(POOL_COUNTER(listener_config_.listenerScope()),
                                             POOL_GAUGE(listener_config_.listenerScope()),
                                             POOL_HISTOGRAM(listener_config_.listenerScope()))}),
-        quic_connection_(&connection_helper_, &alarm_factory_, &writer_, quic_version_,
-                         listener_config_, listener_stats_),
+        quic_connection_(new TestEnvoyQuicConnection(&connection_helper_, &alarm_factory_, &writer_,
+                                                     quic_version_, listener_config_,
+                                                     listener_stats_)),
         crypto_config_(quic::QuicCryptoServerConfig::TESTING, quic::QuicRandom::GetInstance(),
                        std::make_unique<EnvoyQuicFakeProofSource>(),
                        quic::KeyExchangeSource::Default()),
-        envoy_quic_session_(quic_config_, quic_version_, &quic_connection_, /*visitor=*/nullptr,
+        envoy_quic_session_(quic_config_, quic_version_, quic_connection_, /*visitor=*/nullptr,
                             &crypto_stream_helper_, &crypto_config_, &compressed_certs_cache_,
                             *dispatcher_),
         read_filter_(new Network::MockReadFilter()) {
@@ -98,7 +99,7 @@ public:
     read_filter_->callbacks_->connection().addConnectionCallbacks(network_connection_callbacks_);
     read_filter_->callbacks_->connection().setConnectionStats(
         {read_total_, read_current_, write_total_, write_current_, nullptr, nullptr});
-    EXPECT_EQ(&read_total_, &quic_connection_.connectionStats().read_total_);
+    EXPECT_EQ(&read_total_, &quic_connection_->connectionStats().read_total_);
     EXPECT_CALL(*read_filter_, onNewConnection()).WillOnce(Invoke([this]() {
       // Create ServerConnection instance and setup callbacks for it.
       http_connection_ = std::make_unique<QuicHttpServerConnectionImpl>(envoy_quic_session_,
@@ -110,8 +111,8 @@ public:
   }
 
   void TearDown() override {
-    if (quic_connection_.connected()) {
-      EXPECT_CALL(quic_connection_,
+    if (quic_connection_->connected()) {
+      EXPECT_CALL(*quic_connection_,
                   SendConnectionClosePacket(quic::QUIC_NO_ERROR, "Closed by application"));
       EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
       envoy_quic_session_.close(Network::ConnectionCloseType::NoFlush);
@@ -128,7 +129,7 @@ protected:
   testing::NiceMock<quic::test::MockPacketWriter> writer_;
   testing::NiceMock<Network::MockListenerConfig> listener_config_;
   Server::ListenerStats listener_stats_;
-  TestEnvoyQuicConnection quic_connection_;
+  TestEnvoyQuicConnection* quic_connection_;
   quic::QuicConfig quic_config_;
   quic::QuicCryptoServerConfig crypto_config_;
   testing::NiceMock<quic::test::MockQuicCryptoServerStreamHelper> crypto_stream_helper_;
@@ -175,25 +176,20 @@ TEST_F(EnvoyQuicServerSessionTest, NewStream) {
 }
 
 TEST_F(EnvoyQuicServerSessionTest, OnResetFrame) {
-  std::cerr << "============1\n";
   installReadFilter();
-  std::cerr << "============2\n";
   Http::MockStreamDecoder request_decoder;
   Http::MockStreamCallbacks stream_callbacks;
   EXPECT_CALL(http_connection_callbacks_, newStream(_, false))
       .WillRepeatedly(Invoke([&request_decoder, &stream_callbacks](Http::StreamEncoder& encoder,
                                                                    bool) -> Http::StreamDecoder& {
         encoder.getStream().addCallbacks(stream_callbacks);
-          std::cerr << "============3\n";
         return request_decoder;
       }));
   quic::QuicStream* stream1 = envoy_quic_session_.GetOrCreateStream(5u);
   quic::QuicRstStreamFrame rst1(/*control_frame_id=*/1u, stream1->id(),
                                 quic::QUIC_ERROR_PROCESSING_STREAM, /*bytes_written=*/0u);
   EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::RemoteReset, _));
-    std::cerr << "============4\n";
   stream1->OnStreamReset(rst1);
-    std::cerr << "============5\n";
 
   quic::QuicStream* stream2 = envoy_quic_session_.GetOrCreateStream(7u);
   quic::QuicRstStreamFrame rst2(/*control_frame_id=*/1u, stream2->id(), quic::QUIC_REFUSED_STREAM,
@@ -216,7 +212,7 @@ TEST_F(EnvoyQuicServerSessionTest, ConnectionClose) {
   quic::QuicErrorCode error(quic::QUIC_INVALID_FRAME_DATA);
   quic::QuicConnectionCloseFrame frame(error, error_details);
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose));
-  quic_connection_.OnConnectionCloseFrame(frame);
+  quic_connection_->OnConnectionCloseFrame(frame);
   EXPECT_EQ(absl::StrCat(quic::QuicErrorCodeToString(error), " with details: ", error_details),
             envoy_quic_session_.transportFailureReason());
   EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_.state());
@@ -234,7 +230,7 @@ TEST_F(EnvoyQuicServerSessionTest, ConnectionCloseWithActiveStream) {
         return request_decoder;
       }));
   quic::QuicStream* stream = envoy_quic_session_.GetOrCreateStream(5u);
-  EXPECT_CALL(quic_connection_,
+  EXPECT_CALL(*quic_connection_,
               SendConnectionClosePacket(quic::QUIC_NO_ERROR, "Closed by application"));
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
   EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::ConnectionTermination, _));
@@ -252,7 +248,7 @@ TEST_F(EnvoyQuicServerSessionTest, InitializeFilterChain) {
   std::string packet_content(chlo.GetSerialized().AsStringPiece());
   auto encrypted_packet =
       std::unique_ptr<quic::QuicEncryptedPacket>(quic::test::ConstructEncryptedPacket(
-          quic_connection_.connection_id(), quic::EmptyQuicConnectionId(), /*version_flag=*/true,
+          quic_connection_->connection_id(), quic::EmptyQuicConnectionId(), /*version_flag=*/true,
           /*reset_flag*/ false, /*packet_number=*/1, packet_content));
 
   quic::QuicSocketAddress self_address(quic::QuicIpAddress::Loopback4(), 12344);
@@ -284,8 +280,8 @@ TEST_F(EnvoyQuicServerSessionTest, InitializeFilterChain) {
   // A reject should be sent because of the inchoate CHLO.
   EXPECT_CALL(writer_, WritePacket(_, _, _, _, _))
       .WillOnce(testing::Return(quic::WriteResult(quic::WRITE_STATUS_OK, 1)));
-  quic_connection_.ProcessUdpPacket(self_address, peer_address, *packet);
-  EXPECT_TRUE(quic_connection_.connected());
+  quic_connection_->ProcessUdpPacket(self_address, peer_address, *packet);
+  EXPECT_TRUE(quic_connection_->connected());
   EXPECT_FALSE(envoy_quic_session_.IsEncryptionEstablished());
 }
 
