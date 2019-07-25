@@ -32,7 +32,7 @@ QuicLogEmitter::~QuicLogEmitter() {
   if (content.back() == '\n') {
     // strip the last trailing '\n' because spd log will add a trailing '\n' to
     // the output.
-    content.replace(content.length() - 1, 1, 1, '\0');
+    content.back() = '\0';
   }
   GetLogger().log(level_, "{}", content.c_str());
 
