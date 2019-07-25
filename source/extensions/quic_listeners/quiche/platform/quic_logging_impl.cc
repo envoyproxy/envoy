@@ -6,8 +6,6 @@
 
 #include "extensions/quic_listeners/quiche/platform/quic_logging_impl.h"
 
-#include <openssl/pkcs7.h>
-
 #include <atomic>
 
 namespace quic {
