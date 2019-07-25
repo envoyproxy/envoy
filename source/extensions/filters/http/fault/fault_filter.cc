@@ -32,7 +32,20 @@ struct RcDetailsValues {
 };
 using RcDetails = ConstSingleton<RcDetailsValues>;
 
-FaultSettings::FaultSettings(const envoy::config::filter::http::fault::v2::HTTPFault& fault) {
+FaultSettings::FaultSettings(const envoy::config::filter::http::fault::v2::HTTPFault& fault)
+    : delay_percent_runtime_(PROTOBUF_GET_STRING_OR_DEFAULT(fault, delay_percent_runtime,
+                                                            RuntimeKeys::get().DelayPercentKey)),
+      abort_percent_runtime_(PROTOBUF_GET_STRING_OR_DEFAULT(fault, abort_percent_runtime,
+                                                            RuntimeKeys::get().AbortPercentKey)),
+      delay_duration_runtime_(PROTOBUF_GET_STRING_OR_DEFAULT(fault, delay_duration_runtime,
+                                                             RuntimeKeys::get().DelayDurationKey)),
+      abort_http_status_runtime_(PROTOBUF_GET_STRING_OR_DEFAULT(
+          fault, abort_http_status_runtime, RuntimeKeys::get().AbortHttpStatusKey)),
+      max_active_faults_runtime_(PROTOBUF_GET_STRING_OR_DEFAULT(
+          fault, max_active_faults_runtime, RuntimeKeys::get().MaxActiveFaultsKey)),
+      response_rate_limit_percent_runtime_(
+          PROTOBUF_GET_STRING_OR_DEFAULT(fault, response_rate_limit_percent_runtime,
+                                         RuntimeKeys::get().ResponseRateLimitPercentKey)) {
   if (fault.has_abort()) {
     const auto& abort = fault.abort();
     abort_percentage_ = abort.percentage();
@@ -162,7 +175,7 @@ void FaultFilter::maybeSetupResponseRateLimit(const Http::HeaderMap& request_hea
 
   // TODO(mattklein123): Allow runtime override via downstream cluster similar to the other keys.
   if (!config_->runtime().snapshot().featureEnabled(
-          RuntimeKeys::get().ResponseRateLimitPercentKey,
+          fault_settings_->responseRateLimitPercentRuntime(),
           fault_settings_->responseRateLimit()->percentage())) {
     return;
   }
@@ -184,9 +197,9 @@ void FaultFilter::maybeSetupResponseRateLimit(const Http::HeaderMap& request_hea
 
 bool FaultFilter::faultOverflow() {
   const uint64_t max_faults = config_->runtime().snapshot().getInteger(
-      RuntimeKeys::get().MaxActiveFaultsKey, fault_settings_->maxActiveFaults().has_value()
-                                                 ? fault_settings_->maxActiveFaults().value()
-                                                 : std::numeric_limits<uint64_t>::max());
+      fault_settings_->maxActiveFaultsRuntime(), fault_settings_->maxActiveFaults().has_value()
+                                                     ? fault_settings_->maxActiveFaults().value()
+                                                     : std::numeric_limits<uint64_t>::max());
   // Note: Since we don't compare/swap here this is a fuzzy limit which is similar to how the
   // other circuit breakers work.
   if (config_->stats().active_faults_.value() >= max_faults) {
@@ -203,7 +216,7 @@ bool FaultFilter::isDelayEnabled() {
   }
 
   bool enabled = config_->runtime().snapshot().featureEnabled(
-      RuntimeKeys::get().DelayPercentKey, fault_settings_->requestDelay()->percentage());
+      fault_settings_->delayPercentRuntime(), fault_settings_->requestDelay()->percentage());
   if (!downstream_cluster_delay_percent_key_.empty()) {
     enabled |= config_->runtime().snapshot().featureEnabled(
         downstream_cluster_delay_percent_key_, fault_settings_->requestDelay()->percentage());
@@ -212,8 +225,8 @@ bool FaultFilter::isDelayEnabled() {
 }
 
 bool FaultFilter::isAbortEnabled() {
-  bool enabled = config_->runtime().snapshot().featureEnabled(RuntimeKeys::get().AbortPercentKey,
-                                                              fault_settings_->abortPercentage());
+  bool enabled = config_->runtime().snapshot().featureEnabled(
+      fault_settings_->abortPercentRuntime(), fault_settings_->abortPercentage());
   if (!downstream_cluster_abort_percent_key_.empty()) {
     enabled |= config_->runtime().snapshot().featureEnabled(downstream_cluster_abort_percent_key_,
                                                             fault_settings_->abortPercentage());
@@ -239,7 +252,7 @@ FaultFilter::delayDuration(const Http::HeaderMap& request_headers) {
 
   std::chrono::milliseconds duration =
       std::chrono::milliseconds(config_->runtime().snapshot().getInteger(
-          RuntimeKeys::get().DelayDurationKey, config_duration.value().count()));
+          fault_settings_->delayDurationRuntime(), config_duration.value().count()));
   if (!downstream_cluster_delay_duration_key_.empty()) {
     duration = std::chrono::milliseconds(config_->runtime().snapshot().getInteger(
         downstream_cluster_delay_duration_key_, duration.count()));
@@ -256,7 +269,7 @@ FaultFilter::delayDuration(const Http::HeaderMap& request_headers) {
 uint64_t FaultFilter::abortHttpStatus() {
   // TODO(mattklein123): check http status codes obtained from runtime.
   uint64_t http_status = config_->runtime().snapshot().getInteger(
-      RuntimeKeys::get().AbortHttpStatusKey, fault_settings_->abortCode());
+      fault_settings_->abortHttpStatusRuntime(), fault_settings_->abortCode());
 
   if (!downstream_cluster_abort_http_status_key_.empty()) {
     http_status = config_->runtime().snapshot().getInteger(
