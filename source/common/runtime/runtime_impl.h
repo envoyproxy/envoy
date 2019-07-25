@@ -265,18 +265,6 @@ private:
   Api::Api& api_;
   std::vector<RtdsSubscriptionPtr> subscriptions_;
   Upstream::ClusterManager* cm_{};
-
-  // State of the snapshot for non-worker threads.
-  struct SnapshotState {
-    // If SnapshotState exists, this should be a pointer to a snapshot.
-    std::unique_ptr<Runtime::SnapshotImpl> snapshot_;
-    // This is set false during mergeValues, and indicates that next time a
-    // given thread calls snapshot() that snapshot_ should be replaced.
-    bool valid_;
-  };
-  absl::Mutex snapshot_mutex_;
-  absl::flat_hash_map<std::thread::id, std::unique_ptr<SnapshotState>>
-      snapshots_ GUARDED_BY(snapshot_mutex_);
 };
 
 } // namespace Runtime

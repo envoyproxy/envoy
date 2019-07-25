@@ -34,7 +34,6 @@ private:
 
     // ThreadLocal::Slot
     ThreadLocalObjectSharedPtr get() override;
-    bool currentThreadRegistered() override;
     void runOnAllThreads(Event::PostCb cb) override { parent_.runOnAllThreads(cb); }
     void runOnAllThreads(Event::PostCb cb, Event::PostCb main_callback) override {
       parent_.runOnAllThreads(cb, main_callback);
