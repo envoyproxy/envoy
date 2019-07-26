@@ -24,7 +24,7 @@ MockBufferBase<Buffer::OwnedImpl>::MockBufferBase(std::function<void()>, std::fu
 
 template <> MockBufferBase<Buffer::OwnedImpl>::MockBufferBase() : Buffer::OwnedImpl() {}
 
-MockBufferFactory::MockBufferFactory() {}
-MockBufferFactory::~MockBufferFactory() {}
+MockBufferFactory::MockBufferFactory() = default;
+MockBufferFactory::~MockBufferFactory() = default;
 
 } // namespace Envoy

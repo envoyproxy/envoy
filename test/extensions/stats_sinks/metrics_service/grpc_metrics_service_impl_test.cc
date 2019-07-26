@@ -91,7 +91,7 @@ class TestGrpcMetricsStreamer : public GrpcMetricsStreamer {
 public:
   int metric_count;
   // GrpcMetricsStreamer
-  void send(envoy::service::metrics::v2::StreamMetricsMessage& message) {
+  void send(envoy::service::metrics::v2::StreamMetricsMessage& message) override {
     metric_count = message.envoy_metrics_size();
   }
 };

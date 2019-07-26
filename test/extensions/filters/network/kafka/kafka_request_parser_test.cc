@@ -21,7 +21,7 @@ class KafkaRequestParserTest : public testing::Test, public BufferBasedTest {};
 
 class MockRequestParserResolver : public RequestParserResolver {
 public:
-  MockRequestParserResolver(){};
+  MockRequestParserResolver() = default;
   MOCK_CONST_METHOD3(createParser,
                      RequestParserSharedPtr(int16_t, int16_t, RequestContextSharedPtr));
 };

@@ -89,7 +89,7 @@ public:
     EXPECT_CALL(response_encoder_, getStream()).Times(AtLeast(0));
   }
 
-  ~HttpConnectionManagerImplTest() {
+  ~HttpConnectionManagerImplTest() override {
     filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   }
 

@@ -6,6 +6,7 @@
 #include <string>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/common/scope_tracker.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codec.h"
@@ -185,6 +186,11 @@ public:
    * @return tracing configuration.
    */
   virtual const Tracing::Config& tracingConfig() PURE;
+
+  /**
+   * @return the ScopeTrackedObject for this stream.
+   */
+  virtual const ScopeTrackedObject& scope() PURE;
 };
 
 /**

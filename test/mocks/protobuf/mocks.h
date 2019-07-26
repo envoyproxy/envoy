@@ -10,7 +10,7 @@ namespace ProtobufMessage {
 class MockValidationVisitor : public ValidationVisitor {
 public:
   MockValidationVisitor();
-  ~MockValidationVisitor();
+  ~MockValidationVisitor() override;
 
   MOCK_METHOD1(onUnknownField, void(absl::string_view));
 };

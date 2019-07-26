@@ -80,7 +80,7 @@ public:
         per_stream_buffer_limit_(http2_settings.initial_stream_window_size_), dispatching_(false),
         raised_goaway_(false), pending_deferred_reset_(false) {}
 
-  ~ConnectionImpl();
+  ~ConnectionImpl() override;
 
   // Http::Connection
   void dispatch(Buffer::Instance& data) override;

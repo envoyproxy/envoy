@@ -50,7 +50,7 @@ public:
         api_(Api::createApiForTest()), mock_dispatcher_(dispatcher),
         mock_upstream_ready_timer_(upstream_ready_timer) {}
 
-  ~ConnPoolImplForTest() {
+  ~ConnPoolImplForTest() override {
     EXPECT_EQ(0U, ready_clients_.size());
     EXPECT_EQ(0U, busy_clients_.size());
     EXPECT_EQ(0U, pending_requests_.size());
@@ -128,7 +128,7 @@ public:
       : upstream_ready_timer_(new NiceMock<Event::MockTimer>(&dispatcher_)),
         conn_pool_(dispatcher_, cluster_, upstream_ready_timer_) {}
 
-  ~Http1ConnPoolImplTest() {
+  ~Http1ConnPoolImplTest() override {
     EXPECT_TRUE(TestUtility::gaugesZeroed(cluster_->stats_store_.gauges()));
   }
 

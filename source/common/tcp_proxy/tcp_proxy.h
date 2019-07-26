@@ -178,7 +178,7 @@ class Filter : public Network::ReadFilter,
 public:
   Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager,
          TimeSource& time_source);
-  ~Filter();
+  ~Filter() override;
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
@@ -315,7 +315,7 @@ using DrainerPtr = std::unique_ptr<Drainer>;
 
 class UpstreamDrainManager : public ThreadLocal::ThreadLocalObject {
 public:
-  ~UpstreamDrainManager();
+  ~UpstreamDrainManager() override;
   void add(const Config::SharedConfigSharedPtr& config,
            Tcp::ConnectionPool::ConnectionDataPtr&& upstream_conn_data,
            const std::shared_ptr<Filter::UpstreamCallbacks>& callbacks,

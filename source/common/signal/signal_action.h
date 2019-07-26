@@ -1,9 +1,9 @@
 #pragma once
 
-#include <signal.h>
 #include <unistd.h>
 
 #include <algorithm>
+#include <csignal>
 #include <list>
 
 #include "common/common/non_copyable.h"

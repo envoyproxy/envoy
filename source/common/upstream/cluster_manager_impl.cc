@@ -18,7 +18,6 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
-#include "common/config/cds_json.h"
 #include "common/config/resources.h"
 #include "common/config/utility.h"
 #include "common/grpc/async_client_manager_impl.h"

@@ -85,7 +85,7 @@ protected:
     GetLogger().set_level(ERROR);
   }
 
-  ~QuicPlatformTest() {
+  ~QuicPlatformTest() override {
     SetVerbosityLogThreshold(verbosity_log_threshold_);
     GetLogger().set_level(log_level_);
   }
@@ -360,6 +360,18 @@ TEST_F(QuicPlatformTest, QuicLog) {
 #else
 #define VALUE_BY_COMPILE_MODE(debug_mode_value, release_mode_value) debug_mode_value
 #endif
+
+TEST_F(QuicPlatformTest, LogIoManipulators) {
+  GetLogger().set_level(ERROR);
+  QUIC_DLOG(ERROR) << "aaaa" << std::endl;
+  EXPECT_LOG_CONTAINS("error", "aaaa\n\n", QUIC_LOG(ERROR) << "aaaa" << std::endl << std::endl);
+  EXPECT_LOG_NOT_CONTAINS("error", "aaaa\n\n\n",
+                          QUIC_LOG(ERROR) << "aaaa" << std::endl
+                                          << std::endl);
+
+  EXPECT_LOG_CONTAINS("error", "42 in octal is 52",
+                      QUIC_LOG(ERROR) << 42 << " in octal is " << std::oct << 42);
+}
 
 TEST_F(QuicPlatformTest, QuicDLog) {
   int i = 0;
@@ -726,7 +738,7 @@ TEST_F(QuicPlatformTest, TestQuicOptional) {
 
 class QuicMemSliceTest : public Envoy::Buffer::BufferImplementationParamTest {
 public:
-  ~QuicMemSliceTest() override {}
+  ~QuicMemSliceTest() override = default;
 };
 
 INSTANTIATE_TEST_SUITE_P(QuicMemSliceTests, QuicMemSliceTest,

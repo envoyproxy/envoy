@@ -207,13 +207,13 @@ public:
   MOCK_METHOD0(version, std::string());
   MOCK_METHOD0(logLock, Thread::BasicLockable&());
   MOCK_METHOD0(accessLogLock, Thread::BasicLockable&());
-  MOCK_METHOD0(statsAllocator, Stats::StatDataAllocator&());
+  MOCK_METHOD0(statsAllocator, Stats::Allocator&());
 
 private:
   Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
   Thread::MutexBasicLockable log_lock_;
   Thread::MutexBasicLockable access_log_lock_;
-  Stats::HeapStatDataAllocator stats_allocator_;
+  Stats::AllocatorImpl stats_allocator_;
 };
 
 class MockListenerComponentFactory : public ListenerComponentFactory {
@@ -381,7 +381,6 @@ public:
 
   TimeSource& timeSource() override { return time_system_; }
 
-  std::unique_ptr<Secret::SecretManager> secret_manager_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   std::shared_ptr<testing::NiceMock<Network::MockDnsResolver>> dns_resolver_{
@@ -389,6 +388,7 @@ public:
   testing::NiceMock<Api::MockApi> api_;
   testing::NiceMock<MockAdmin> admin_;
   Event::GlobalTimeSystem time_system_;
+  std::unique_ptr<Secret::SecretManager> secret_manager_;
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   Thread::MutexBasicLockable access_log_lock_;
   testing::NiceMock<Runtime::MockLoader> runtime_loader_;
@@ -508,8 +508,9 @@ public:
   MOCK_METHOD0(api, Api::Api&());
 
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
-  std::unique_ptr<Secret::SecretManager> secret_manager_;
   testing::NiceMock<Api::MockApi> api_;
+  testing::NiceMock<MockConfigTracker> config_tracker_;
+  std::unique_ptr<Secret::SecretManager> secret_manager_;
 };
 
 class MockListenerFactoryContext : public MockFactoryContext, public ListenerFactoryContext {
@@ -517,14 +518,6 @@ public:
   MockListenerFactoryContext();
   ~MockListenerFactoryContext() override;
 
-  void addListenSocketOption(const Network::Socket::OptionConstSharedPtr& option) override {
-    addListenSocketOption_(option);
-  }
-  MOCK_METHOD1(addListenSocketOption_, void(const Network::Socket::OptionConstSharedPtr&));
-  void addListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) override {
-    addListenSocketOptions_(options);
-  }
-  MOCK_METHOD1(addListenSocketOptions_, void(const Network::Socket::OptionsSharedPtr&));
   const Network::ListenerConfig& listenerConfig() const override { return _listenerConfig_; }
   MOCK_CONST_METHOD0(listenerConfig_, const Network::ListenerConfig&());
 
