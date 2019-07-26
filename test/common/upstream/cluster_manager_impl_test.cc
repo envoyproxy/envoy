@@ -2708,7 +2708,7 @@ public:
     };
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
+    return std::make_unique<Envoy::ProtobufWkt::Empty>();
   }
   std::string name() override { return "envoy.test.filter"; }
 };

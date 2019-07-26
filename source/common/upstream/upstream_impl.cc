@@ -544,7 +544,7 @@ ClusterLoadReportStats ClusterInfoImpl::generateLoadReportStats(Stats::Scope& sc
 }
 
 // Implements the FactoryContext interface required by network filters.
-class ClusterInfoImpl::FactoryContextImpl : public Server::Configuration::CommonFactoryContext {
+class FactoryContextImpl : public Server::Configuration::CommonFactoryContext {
 public:
   // Create from a TransportSocketFactoryContext using parent stats_scope and runtime
   // other contexts taken from TransportSocketFactoryContext.
@@ -695,9 +695,9 @@ ClusterInfoImpl::ClusterInfoImpl(
     ENVOY_LOG(debug, "    name: {}", string_name);
     auto& factory = Config::Utility::getAndCheckFactory<
         Server::Configuration::NamedUpstreamNetworkFilterConfigFactory>(string_name);
-    auto message = factory.createEmptyConfigProto().get();
+    auto message = factory.createEmptyConfigProto();
     if (!proto_config.typed_config().value().empty()) {
-      proto_config.typed_config().UnpackTo(message);
+      proto_config.typed_config().UnpackTo(message.get());
     }
     Network::FilterFactoryCb callback =
         factory.createFilterFactoryFromProto(*message, *factory_context_);

@@ -11,11 +11,13 @@ namespace {
 
 class PoliteFilter : public Network::Filter, Logger::Loggable<Logger::Id::filter> {
 public:
+  PoliteFilter(const ProtobufWkt::StringValue& value) : greeting(value.value()) {}
+
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override {
     ENVOY_CONN_LOG(debug, "polite: onData {} bytes {} end_stream", read_callbacks_->connection(),
                    data.length(), end_stream);
     if (!read_greeted_) {
-      Buffer::OwnedImpl greeter("surely ");
+      Buffer::OwnedImpl greeter(greeting);
       read_callbacks_->injectReadDataToFilterChain(greeter, false);
       read_greeted_ = true;
     }
@@ -44,6 +46,7 @@ public:
   }
 
 private:
+  std::string greeting;
   Network::ReadFilterCallbacks* read_callbacks_{};
   Network::WriteFilterCallbacks* write_callbacks_{};
   bool read_greeted_{false};
@@ -54,15 +57,16 @@ class PoliteFilterConfigFactory
     : public Server::Configuration::NamedUpstreamNetworkFilterConfigFactory {
 public:
   Network::FilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message&,
+  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                Server::Configuration::CommonFactoryContext&) override {
-    return [](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addFilter(std::make_shared<PoliteFilter>());
+    auto config = dynamic_cast<const ProtobufWkt::StringValue&>(proto_config);
+    return [config](Network::FilterManager& filter_manager) -> void {
+      filter_manager.addFilter(std::make_shared<PoliteFilter>(config));
     };
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
+    return std::make_unique<ProtobufWkt::StringValue>();
   }
 
   std::string name() override { return "envoy.upstream.polite"; }
@@ -84,6 +88,9 @@ public:
       auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
       auto* filter = cluster_0->add_filters();
       filter->set_name("envoy.upstream.polite");
+      ProtobufWkt::StringValue config;
+      config.set_value("surely ");
+      filter->mutable_typed_config()->PackFrom(config);
     });
     BaseIntegrationTest::initialize();
   }
