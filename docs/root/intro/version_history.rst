@@ -3,6 +3,7 @@ Version history
 
 1.12.0 (pending)
 ================
+* router check tool: add coverage reporting & enforcement.
 
 1.11.0 (July 11, 2019)
 ======================

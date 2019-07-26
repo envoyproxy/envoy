@@ -19,6 +19,8 @@ envoy_cc_test_binary(
 envoy_cc_test_library(
     name = "router_check_main_lib",
     srcs = [
+        "coverage.cc",
+        "coverage.h",
         "router.cc",
         "router.h",
     ],
@@ -33,6 +35,8 @@ envoy_cc_test_library(
         "//source/common/json:json_loader_lib",
         "//source/common/router:config_lib",
         "//source/common/stats:stats_lib",
+        "//source/extensions/filters/http/buffer:config",
+        "//source/extensions/filters/http/csrf:config",
         "//test/mocks/server:server_mocks",
         "//test/test_common:printers_lib",
         "//test/test_common:utility_lib",
