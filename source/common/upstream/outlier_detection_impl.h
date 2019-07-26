@@ -290,7 +290,7 @@ public:
   create(const Cluster& cluster, const envoy::api::v2::cluster::OutlierDetection& config,
          Event::Dispatcher& dispatcher, Runtime::Loader& runtime, TimeSource& time_source,
          EventLoggerSharedPtr event_logger);
-  ~DetectorImpl();
+  ~DetectorImpl() override;
 
   void onConsecutive5xx(HostSharedPtr host);
   void onConsecutiveGatewayFailure(HostSharedPtr host);

@@ -342,13 +342,8 @@ void ConnPoolImpl::ActiveClient::onConnectTimeout() {
 }
 
 CodecClientPtr ProdConnPoolImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {
-
-  const bool strict_header_validation =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_header_validation");
-
   CodecClientPtr codec{new CodecClientProd(CodecClient::Type::HTTP1, std::move(data.connection_),
-                                           data.host_description_, dispatcher_,
-                                           strict_header_validation)};
+                                           data.host_description_, dispatcher_)};
   return codec;
 }
 

@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "envoy/common/scope_tracker.h"
 #include "envoy/common/time.h"
 #include "envoy/common/token_bucket.h"
 #include "envoy/event/timer.h"
@@ -43,7 +44,7 @@ public:
 class MockTimeSystem : public Event::TestTimeSystem {
 public:
   MockTimeSystem();
-  ~MockTimeSystem();
+  ~MockTimeSystem() override;
 
   // TODO(#4160): Eliminate all uses of MockTimeSystem, replacing with SimulatedTimeSystem,
   // where timer callbacks are triggered by the advancement of time. This implementation
@@ -85,5 +86,9 @@ inline bool operator==(const char* str, const StringViewSaver& saver) {
 inline bool operator==(const StringViewSaver& saver, const char* str) {
   return saver.value() == str;
 }
+
+class MockScopedTrackedObject : public ScopeTrackedObject {
+  MOCK_CONST_METHOD2(dumpState, void(std::ostream&, int));
+};
 
 } // namespace Envoy

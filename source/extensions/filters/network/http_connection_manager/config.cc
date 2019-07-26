@@ -360,20 +360,21 @@ void HttpConnectionManagerConfig::processFilter(
   filter_factories.push_back(callback);
 }
 
-Http::ServerConnectionPtr HttpConnectionManagerConfig::createCodec(
-    Network::Connection& connection, const Buffer::Instance& data,
-    Http::ServerConnectionCallbacks& callbacks, const bool strict_header_validation) {
+Http::ServerConnectionPtr
+HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
+                                         const Buffer::Instance& data,
+                                         Http::ServerConnectionCallbacks& callbacks) {
   switch (codec_type_) {
   case CodecType::HTTP1:
     return std::make_unique<Http::Http1::ServerConnectionImpl>(
-        connection, callbacks, http1_settings_, maxRequestHeadersKb(), strict_header_validation);
+        connection, callbacks, http1_settings_, maxRequestHeadersKb());
   case CodecType::HTTP2:
     return std::make_unique<Http::Http2::ServerConnectionImpl>(
         connection, callbacks, context_.scope(), http2_settings_, maxRequestHeadersKb());
   case CodecType::AUTO:
-    return Http::ConnectionManagerUtility::autoCreateCodec(
-        connection, data, callbacks, context_.scope(), http1_settings_, http2_settings_,
-        maxRequestHeadersKb(), strict_header_validation);
+    return Http::ConnectionManagerUtility::autoCreateCodec(connection, data, callbacks,
+                                                           context_.scope(), http1_settings_,
+                                                           http2_settings_, maxRequestHeadersKb());
   }
 
   NOT_REACHED_GCOVR_EXCL_LINE;

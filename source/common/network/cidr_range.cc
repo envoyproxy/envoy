@@ -34,13 +34,9 @@ CidrRange::CidrRange(InstanceConstSharedPtr address, int length)
   }
 }
 
-CidrRange::CidrRange(const CidrRange& other) : address_(other.address_), length_(other.length_) {}
+CidrRange::CidrRange(const CidrRange& other) = default;
 
-CidrRange& CidrRange::operator=(const CidrRange& other) {
-  address_ = other.address_;
-  length_ = other.length_;
-  return *this;
-}
+CidrRange& CidrRange::operator=(const CidrRange& other) = default;
 
 bool CidrRange::operator==(const CidrRange& other) const {
   // Lengths must be the same, and must be valid (i.e. not -1).

@@ -6,13 +6,13 @@ namespace HttpFilters {
 namespace Common {
 namespace Aws {
 
-MockCredentialsProvider::MockCredentialsProvider() {}
+MockCredentialsProvider::MockCredentialsProvider() = default;
 
-MockCredentialsProvider::~MockCredentialsProvider() {}
+MockCredentialsProvider::~MockCredentialsProvider() = default;
 
-MockSigner::MockSigner() {}
+MockSigner::MockSigner() = default;
 
-MockSigner::~MockSigner() {}
+MockSigner::~MockSigner() = default;
 
 } // namespace Aws
 } // namespace Common

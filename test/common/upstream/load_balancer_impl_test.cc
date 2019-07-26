@@ -829,6 +829,20 @@ TEST_P(RoundRobinLoadBalancerTest, MaxUnhealthyPanic) {
   EXPECT_EQ(3UL, stats_.lb_healthy_panic_.value());
 }
 
+// Ensure if the panic threshold is 0%, panic mode is disabled.
+TEST_P(RoundRobinLoadBalancerTest, DisablePanicMode) {
+  hostSet().healthy_hosts_ = {};
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
+
+  common_config_.mutable_healthy_panic_threshold()->set_value(0);
+
+  init(false);
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
+      .WillRepeatedly(Return(0));
+  EXPECT_EQ(nullptr, lb_->chooseHost(nullptr));
+  EXPECT_EQ(0UL, stats_.lb_healthy_panic_.value());
+}
+
 // Test of host set selection with host filter
 TEST_P(RoundRobinLoadBalancerTest, HostSelectionWithFilter) {
   NiceMock<Upstream::MockLoadBalancerContext> context;
@@ -1144,6 +1158,7 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingLocalEmpty) {
   HostsPerLocalitySharedPtr local_hosts_per_locality = makeHostsPerLocality({{}, {}});
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
+      .WillOnce(Return(50))
       .WillOnce(Return(50));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
       .WillOnce(Return(true));

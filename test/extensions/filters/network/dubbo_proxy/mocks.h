@@ -47,7 +47,7 @@ public:
 class MockRequestDecoderCallbacks : public RequestDecoderCallbacks {
 public:
   MockRequestDecoderCallbacks();
-  ~MockRequestDecoderCallbacks() = default;
+  ~MockRequestDecoderCallbacks() override = default;
 
   MOCK_METHOD0(newStream, StreamHandler&());
   MOCK_METHOD1(onHeartbeat, void(MessageMetadataSharedPtr));
@@ -57,7 +57,7 @@ public:
 class MockResponseDecoderCallbacks : public ResponseDecoderCallbacks {
 public:
   MockResponseDecoderCallbacks();
-  ~MockResponseDecoderCallbacks() = default;
+  ~MockResponseDecoderCallbacks() override = default;
 
   MOCK_METHOD0(newStream, StreamHandler&());
   MOCK_METHOD1(onHeartbeat, void(MessageMetadataSharedPtr));
@@ -79,7 +79,7 @@ public:
 class MockDecoderStateMachineDelegate : public DecoderStateMachine::Delegate {
 public:
   MockDecoderStateMachineDelegate() = default;
-  ~MockDecoderStateMachineDelegate() = default;
+  ~MockDecoderStateMachineDelegate() override = default;
 
   MOCK_METHOD2(newStream, ActiveStream*(MessageMetadataSharedPtr, ContextSharedPtr));
   MOCK_METHOD1(onHeartbeat, void(MessageMetadataSharedPtr));
@@ -88,7 +88,7 @@ public:
 class MockSerializer : public Serializer {
 public:
   MockSerializer();
-  ~MockSerializer();
+  ~MockSerializer() override;
 
   // DubboProxy::Serializer
   MOCK_CONST_METHOD0(name, const std::string&());
@@ -106,7 +106,7 @@ public:
 class MockProtocol : public Protocol {
 public:
   MockProtocol();
-  ~MockProtocol();
+  ~MockProtocol() override;
 
   MOCK_CONST_METHOD0(name, const std::string&());
   MOCK_CONST_METHOD0(type, ProtocolType());
@@ -157,7 +157,7 @@ namespace DubboFilters {
 class MockFilterChainFactoryCallbacks : public FilterChainFactoryCallbacks {
 public:
   MockFilterChainFactoryCallbacks();
-  ~MockFilterChainFactoryCallbacks();
+  ~MockFilterChainFactoryCallbacks() override;
 
   MOCK_METHOD1(addDecoderFilter, void(DecoderFilterSharedPtr));
   MOCK_METHOD1(addEncoderFilter, void(EncoderFilterSharedPtr));
@@ -167,7 +167,7 @@ public:
 class MockDecoderFilter : public DecoderFilter {
 public:
   MockDecoderFilter();
-  ~MockDecoderFilter();
+  ~MockDecoderFilter() override;
 
   // DubboProxy::DubboFilters::DecoderFilter
   MOCK_METHOD0(onDestroy, void());
@@ -178,7 +178,7 @@ public:
 class MockDecoderFilterCallbacks : public DecoderFilterCallbacks {
 public:
   MockDecoderFilterCallbacks();
-  ~MockDecoderFilterCallbacks();
+  ~MockDecoderFilterCallbacks() override;
 
   // DubboProxy::DubboFilters::DecoderFilterCallbacks
   MOCK_CONST_METHOD0(requestId, uint64_t());
@@ -206,7 +206,7 @@ public:
 class MockEncoderFilter : public EncoderFilter {
 public:
   MockEncoderFilter();
-  ~MockEncoderFilter();
+  ~MockEncoderFilter() override;
 
   // DubboProxy::DubboFilters::EncoderFilter
   MOCK_METHOD0(onDestroy, void());
@@ -217,7 +217,7 @@ public:
 class MockEncoderFilterCallbacks : public EncoderFilterCallbacks {
 public:
   MockEncoderFilterCallbacks();
-  ~MockEncoderFilterCallbacks();
+  ~MockEncoderFilterCallbacks() override;
 
   // DubboProxy::DubboFilters::MockEncoderFilterCallbacks
   MOCK_CONST_METHOD0(requestId, uint64_t());
@@ -242,7 +242,7 @@ public:
 class MockCodecFilter : public CodecFilter {
 public:
   MockCodecFilter();
-  ~MockCodecFilter();
+  ~MockCodecFilter() override;
 
   MOCK_METHOD0(onDestroy, void());
   MOCK_METHOD1(setEncoderFilterCallbacks, void(EncoderFilterCallbacks& callbacks));
@@ -254,7 +254,7 @@ public:
 class MockDirectResponse : public DirectResponse {
 public:
   MockDirectResponse() = default;
-  ~MockDirectResponse() = default;
+  ~MockDirectResponse() override = default;
 
   MOCK_CONST_METHOD3(encode,
                      DirectResponse::ResponseType(MessageMetadata&, Protocol&, Buffer::Instance&));
@@ -291,7 +291,7 @@ private:
 class MockFilterConfigFactory : public MockFactoryBase<ProtobufWkt::Struct> {
 public:
   MockFilterConfigFactory();
-  ~MockFilterConfigFactory();
+  ~MockFilterConfigFactory() override;
 
   DubboFilters::FilterFactoryCb
   createFilterFactoryFromProtoTyped(const ProtobufWkt::Struct& proto_config,
@@ -310,7 +310,7 @@ namespace Router {
 class MockRouteEntry : public RouteEntry {
 public:
   MockRouteEntry();
-  ~MockRouteEntry();
+  ~MockRouteEntry() override;
 
   // DubboProxy::Router::RouteEntry
   MOCK_CONST_METHOD0(clusterName, const std::string&());
@@ -322,7 +322,7 @@ public:
 class MockRoute : public Route {
 public:
   MockRoute();
-  ~MockRoute();
+  ~MockRoute() override;
 
   // DubboProxy::Router::Route
   MOCK_CONST_METHOD0(routeEntry, const RouteEntry*());
