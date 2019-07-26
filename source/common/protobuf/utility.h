@@ -32,6 +32,10 @@
   ((message).has_##field_name() ? DurationUtil::durationToMilliseconds((message).field_name())     \
                                 : (default_value))
 
+// Obtain the string value if the field is set. Otherwise, return the default value.
+#define PROTOBUF_GET_STRING_OR_DEFAULT(message, field_name, default_value)                         \
+  (!(message).field_name().empty() ? (message).field_name() : (default_value))
+
 // Obtain the milliseconds value of a google.protobuf.Duration field if set. Otherwise, return
 // absl::nullopt.
 #define PROTOBUF_GET_OPTIONAL_MS(message, field_name)                                              \
@@ -374,7 +378,7 @@ public:
 class HashedValue {
 public:
   HashedValue(const ProtobufWkt::Value& value) : value_(value), hash_(ValueUtil::hash(value)){};
-  HashedValue(const HashedValue& v) : value_(v.value_), hash_(v.hash_){};
+  HashedValue(const HashedValue& v) = default;
 
   const ProtobufWkt::Value& value() const { return value_; }
   std::size_t hash() const { return hash_; }

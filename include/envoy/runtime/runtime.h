@@ -220,11 +220,17 @@ public:
   virtual void initialize(Upstream::ClusterManager& cm) PURE;
 
   /**
-   * @return Snapshot& the current snapshot. This reference is safe to use for the duration of
+   * @return const Snapshot& the current snapshot. This reference is safe to use for the duration of
    *         the calling routine, but may be overwritten on a future event loop cycle so should be
-   *         fetched again when needed.
+   *         fetched again when needed. This may only be called from worker threads.
    */
-  virtual Snapshot& snapshot() PURE;
+  virtual const Snapshot& snapshot() PURE;
+
+  /**
+   * @return shared_ptr<const Snapshot> the current snapshot. This function may safely be called
+   *         from non-worker theads.
+   */
+  virtual std::shared_ptr<const Snapshot> threadsafeSnapshot() PURE;
 
   /**
    * Merge the given map of key-value pairs into the runtime's state. To remove a previous merge for

@@ -66,7 +66,7 @@ public:
     EXPECT_CALL(encoder_callbacks_, encodingBuffer()).Times(AtLeast(0));
   }
 
-  ~LuaHttpFilterTest() { filter_->onDestroy(); }
+  ~LuaHttpFilterTest() override { filter_->onDestroy(); }
 
   void setup(const std::string& lua_code) {
     config_.reset(new FilterConfig(lua_code, tls_, cluster_manager_));

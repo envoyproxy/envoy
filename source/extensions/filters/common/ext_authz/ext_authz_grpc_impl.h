@@ -50,7 +50,7 @@ public:
   // TODO(gsagula): remove `use_alpha` param when V2Alpha gets deprecated.
   GrpcClientImpl(Grpc::RawAsyncClientPtr&& async_client,
                  const absl::optional<std::chrono::milliseconds>& timeout, bool use_alpha);
-  ~GrpcClientImpl();
+  ~GrpcClientImpl() override;
 
   // ExtAuthz::Client
   void cancel() override;

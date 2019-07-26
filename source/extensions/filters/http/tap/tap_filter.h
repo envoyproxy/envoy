@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/access_log/access_log.h"
 #include "envoy/config/filter/http/tap/v2alpha/tap.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/stats/scope.h"

@@ -42,7 +42,7 @@ public:
   void evaluateHeaders(Http::HeaderMap& headers, const StreamInfo::StreamInfo& stream_info) const;
 
 protected:
-  HeaderParser() {}
+  HeaderParser() = default;
 
 private:
   std::vector<std::pair<Http::LowerCaseString, HeaderFormatterPtr>> headers_to_add_;

@@ -19,6 +19,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/tracers/opencensus:opencensus_tracer_impl",
         "//test/mocks/http:http_mocks",
+        "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/tracing:tracing_mocks",
     ],
 )

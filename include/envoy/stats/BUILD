@@ -18,10 +18,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "stats_interface",
     hdrs = [
+        "allocator.h",
         "histogram.h",
         "scope.h",
         "sink.h",
-        "stat_data_allocator.h",
         "stats.h",
         "stats_matcher.h",
         "store.h",
