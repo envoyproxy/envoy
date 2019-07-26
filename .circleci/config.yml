@@ -94,28 +94,6 @@ jobs:
            fingerprints:
              - "f6:f9:df:90:9c:4b:5f:9c:f4:69:fd:42:94:ff:88:24"
        - run: ci/filter_example_mirror.sh
-   ipv6_tests:
-     machine: true
-     steps:
-     - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
-     - checkout
-     - run:
-         name: enable ipv6
-         command: |
-           echo '{
-             "ipv6": true,
-             "fixed-cidr-v6": "2001:db8:1::/64"
-           }' | sudo tee /etc/docker/daemon.json
-
-           sudo service docker restart
-     - run: dig go.googlesource.com A go.googlesource.com AAAA # Debug IPv6 network issues
-     - run: ifconfig
-     - run: route -A inet -A inet6
-     - run: curl -v https://go.googlesource.com
-     - run: curl -6 -v https://go.googlesource.com || true
-     - run: ./ci/do_circle_ci_ipv6_tests.sh
-     - store_artifacts:
-         path: /tmp/envoy-docker/envoy/generated/failed-testlogs
 
    coverage:
      executor: ubuntu-build
@@ -195,7 +173,6 @@ workflows:
       - compile_time_options
       - api
       - filter_example_mirror
-      - ipv6_tests
       - coverage
       - format
       - clang_tidy
