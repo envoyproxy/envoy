@@ -5,8 +5,6 @@
 
 #include <cstddef>
 
-#include "/usr/local/google/home/danzh/.cache/bazel/_bazel_danzh/3af5f831530d3ae92cc2833051a9b35d/execroot/envoy/bazel-out/k8-fastbuild/bin/include/envoy/buffer/_virtual_includes/buffer_interface/envoy/buffer/buffer.h"
-
 #pragma GCC diagnostic push
 // QUICHE allows unused parameters.
 #pragma GCC diagnostic ignored "-Wunused-parameter"

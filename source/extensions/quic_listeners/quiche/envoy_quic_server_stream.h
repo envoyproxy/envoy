@@ -36,10 +36,6 @@ public:
   void readDisable(bool disable) override;
   // quic::QuicSpdyStream
   void OnBodyAvailable() override;
-  void OnDataAvailable() override {
-    std::cerr << "========== OnDataAvailable\n";
-    quic::QuicSpdyServerStreamBase::OnDataAvailable();
-  }
   void OnStreamReset(const quic::QuicRstStreamFrame& frame) override;
   // quic::QuicServerSessionBase
   void OnConnectionClosed(quic::QuicErrorCode error, quic::ConnectionCloseSource source) override;
