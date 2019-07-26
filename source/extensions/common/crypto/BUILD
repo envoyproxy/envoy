@@ -11,7 +11,11 @@ envoy_package()
 envoy_cc_library(
     name = "utility_lib",
     srcs = [
+        "crypto_impl.cc",
         "utility.cc",
+    ],
+    hdrs = [
+        "crypto_impl.h",
     ],
     external_deps = [
         "ssl",

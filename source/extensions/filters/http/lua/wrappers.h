@@ -5,6 +5,7 @@
 
 #include "common/crypto/utility.h"
 
+#include "extensions/common/crypto/crypto_impl.h"
 #include "extensions/filters/common/lua/lua.h"
 
 #include "openssl/evp.h"
@@ -210,7 +211,7 @@ private:
  */
 class PublicKeyWrapper : public Filters::Common::Lua::BaseLuaObject<PublicKeyWrapper> {
 public:
-  PublicKeyWrapper(std::unique_ptr<Envoy::Common::Crypto::CryptoWrapper>* key)
+  PublicKeyWrapper(Envoy::Common::Crypto::CryptoObjectUniquePtr* key)
       : public_key_(std::move(*key)) {}
   static ExportedFunctions exportedFunctions() { return {{"get", static_luaGet}}; }
 
@@ -222,7 +223,7 @@ private:
   DECLARE_LUA_FUNCTION(PublicKeyWrapper, luaGet);
 
   // PublicKeyPtr public_key_;
-  std::unique_ptr<Envoy::Common::Crypto::CryptoWrapper> public_key_;
+  Envoy::Common::Crypto::CryptoObjectUniquePtr public_key_;
 };
 
 } // namespace Lua

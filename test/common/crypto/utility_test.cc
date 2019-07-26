@@ -2,6 +2,8 @@
 #include "common/common/hex.h"
 #include "common/crypto/utility.h"
 
+#include "extensions/common/crypto/crypto_impl.h"
+
 #include "gtest/gtest.h"
 #include "openssl/evp.h"
 
@@ -60,16 +62,17 @@ TEST(UtilityTest, TestImportPublicKey) {
              "d5af8136a9630a6cc0cde157dc8e00f39540628d5f335b2c36c54c7c8bc3738a6b21acff815405afa28e5"
              "183f550dac19abcf1145a7f9ced987db680e4a229cac75dee347ec9ebce1fc3dbbbb0203010001";
 
-  std::unique_ptr<CryptoWrapper> cryptoPtr = Utility::importPublicKey(Hex::decode(key));
-  CryptoWrapper* crypto = cryptoPtr.get();
-  EVP_PKEY* pub_key = reinterpret_cast<EVP_PKEY*>(crypto->get());
-  EXPECT_NE(nullptr, pub_key);
+  Common::Crypto::CryptoObjectUniquePtr cryptoPtr(
+      Common::Crypto::Utility::importPublicKey(Hex::decode(key)));
+  auto wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyWrapper>(&cryptoPtr);
+  EVP_PKEY* pkey = wrapper->getEVP_PKEY();
+  EXPECT_NE(nullptr, pkey);
 
   key = "badkey";
-  cryptoPtr = Utility::importPublicKey(Hex::decode(key));
-  crypto = cryptoPtr.get();
-  pub_key = reinterpret_cast<EVP_PKEY*>(crypto->get());
-  EXPECT_EQ(nullptr, pub_key);
+  cryptoPtr = Common::Crypto::Utility::importPublicKey(Hex::decode(key));
+  wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyWrapper>(&cryptoPtr);
+  pkey = wrapper->getEVP_PKEY();
+  EXPECT_EQ(nullptr, pkey);
 }
 
 TEST(UtilityTest, TestVerifySignature) {
@@ -90,9 +93,10 @@ TEST(UtilityTest, TestVerifySignature) {
       "295234f7c14fa46303b7e977d2c89ba8a39a46a35f33eb07a332";
   auto data = "hello";
 
-  std::unique_ptr<CryptoWrapper> cryptoPtr = Utility::importPublicKey(Hex::decode(key));
-  CryptoWrapper* crypto = cryptoPtr.get();
-  EVP_PKEY* pub_key = reinterpret_cast<EVP_PKEY*>(crypto->get());
+  Common::Crypto::CryptoObjectUniquePtr cryptoPtr(
+      Common::Crypto::Utility::importPublicKey(Hex::decode(key)));
+  auto wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyWrapper>(&cryptoPtr);
+  EVP_PKEY* pub_key = wrapper->getEVP_PKEY();
 
   std::vector<uint8_t> text(data, data + strlen(data));
 

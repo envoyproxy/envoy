@@ -5,6 +5,8 @@
 #include "common/common/assert.h"
 #include "common/common/stack_array.h"
 
+#include "extensions/common/crypto/crypto_impl.h"
+
 #include "absl/strings/ascii.h"
 #include "absl/strings/str_cat.h"
 #include "openssl/bytestring.h"
@@ -15,16 +17,6 @@
 namespace Envoy {
 namespace Common {
 namespace Crypto {
-
-class PublicKeyWrapper : public virtual CryptoWrapper {
-private:
-  bssl::UniquePtr<EVP_PKEY> pkey_;
-
-public:
-  void* get() override { return pkey_.get(); }
-
-  void set(void* object) override { pkey_.reset(reinterpret_cast<EVP_PKEY*>(object)); }
-};
 
 namespace Utility {
 
@@ -88,15 +80,15 @@ const VerificationOutput verifySignature(absl::string_view hash, void* pubKey,
   return {false, absl::StrCat("Failed to verify digest. Error code: ", ok)};
 }
 
-std::unique_ptr<CryptoWrapper> importPublicKey(const std::vector<uint8_t>& key) {
+CryptoObjectUniquePtr importPublicKey(const std::vector<uint8_t>& key) {
   CBS cbs({key.data(), key.size()});
 
   EVP_PKEY* pkey(EVP_parse_public_key(&cbs));
 
   auto publicKeyWrapper = new PublicKeyWrapper();
-  publicKeyWrapper->set(pkey);
+  publicKeyWrapper->setEVP_PKEY(pkey);
 
-  std::unique_ptr<CryptoWrapper> publicKeyPtr = std::make_unique<PublicKeyWrapper>();
+  std::unique_ptr<PublicKeyWrapper> publicKeyPtr = std::make_unique<PublicKeyWrapper>();
   publicKeyPtr.reset(publicKeyWrapper);
 
   return publicKeyPtr;

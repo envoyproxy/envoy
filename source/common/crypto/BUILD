@@ -13,11 +13,9 @@ envoy_cc_library(
     hdrs = [
         "utility.h",
     ],
-    external_deps = [
-        "ssl",
-    ],
     deps = [
         "//include/envoy/buffer:buffer_interface",
+        "//include/envoy/common/crypto:crypto_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:stack_array",
     ],

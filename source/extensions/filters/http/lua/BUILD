@@ -40,6 +40,7 @@ envoy_cc_library(
         "//include/envoy/stream_info:stream_info_interface",
         "//source/common/crypto:utility_lib",
         "//source/common/http:utility_lib",
+        "//source/extensions/common/crypto:utility_lib",
         "//source/extensions/filters/common/lua:lua_lib",
         "//source/extensions/filters/common/lua:wrappers_lib",
     ],
