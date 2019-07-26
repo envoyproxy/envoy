@@ -176,6 +176,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryPost) {
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, QueryParams) {
+  HttpIntegrationTest::initialize();
   // 1. Binding theme='Children' in CreateShelfRequest
   // Using the following HTTP template:
   //   POST /shelves
@@ -508,6 +509,7 @@ std::string jsonStrToPbStrucStr(std::string json) {
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, DeepStruct) {
+  HttpIntegrationTest::initialize();
   // Due to the limit of protobuf util, we can only compare to level 32.
   std::string deepJson = createDeepJson(32, true);
   std::string deepProto = "content {" + jsonStrToPbStrucStr(deepJson) + "}";
@@ -545,6 +547,7 @@ std::string createLargeJson(int level) {
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, LargeStruct) {
+  HttpIntegrationTest::initialize();
   // Create a 40kB json payload.
   std::string largeJson = createLargeJson(12);
   std::string largeProto = "content {" + jsonStrToPbStrucStr(largeJson) + "}";
@@ -558,6 +561,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, LargeStruct) {
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnknownField) {
+  HttpIntegrationTest::initialize();
   testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(
       Http::TestHeaderMapImpl{{":method", "POST"},
                               {":path", "/shelf"},
@@ -573,6 +577,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnknownField) {
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, UTF8) {
+  HttpIntegrationTest::initialize();
   testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(
       Http::TestHeaderMapImpl{{":method", "POST"},
                               {":path", "/shelf"},
