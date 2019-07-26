@@ -80,7 +80,8 @@ public:
   virtual const std::string& configYaml() const PURE;
 
   /**
-   * @return const envoy::config::bootstrap::v2::Bootstrap& a bootstrap proto object.
+   * @return const envoy::config::bootstrap::v2::Bootstrap& a bootstrap proto object
+   * that merges into the config last, after configYaml and configPath.
    */
   virtual const envoy::config::bootstrap::v2::Bootstrap& configProto() const PURE;
 
