@@ -144,7 +144,7 @@ private:
   std::ostringstream stream_;
 };
 
-class NullLogStream {
+class NullLogStream : public std::ostream {
 public:
   NullLogStream& stream() { return *this; }
 };
