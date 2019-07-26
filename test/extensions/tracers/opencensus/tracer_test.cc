@@ -134,18 +134,17 @@ TEST(OpenCensusTracerTest, Span) {
     const auto& sd = (spans[0].name() == operation_name) ? spans[0] : spans[1];
     ENVOY_LOG_MISC(debug, "{}", sd.DebugString());
 
-    EXPECT_EQ("my_operation_1", sd.name());
+    EXPECT_EQ("different_name", sd.name());
     EXPECT_TRUE(sd.context().IsValid());
     EXPECT_TRUE(sd.context().trace_options().IsSampled());
     ::opencensus::trace::SpanId zeros;
     EXPECT_EQ(zeros, sd.parent_span_id());
     parent_span_id = sd.context().span_id();
 
-    ASSERT_EQ(4, sd.annotations().events().size());
-    EXPECT_EQ("setOperation", sd.annotations().events()[0].event().description());
-    EXPECT_EQ("my annotation", sd.annotations().events()[1].event().description());
-    EXPECT_EQ("spawnChild", sd.annotations().events()[2].event().description());
-    EXPECT_EQ("setSampled", sd.annotations().events()[3].event().description());
+    ASSERT_EQ(3, sd.annotations().events().size());
+    EXPECT_EQ("my annotation", sd.annotations().events()[0].event().description());
+    EXPECT_EQ("spawnChild", sd.annotations().events()[1].event().description());
+    EXPECT_EQ("setSampled", sd.annotations().events()[2].event().description());
     EXPECT_TRUE(sd.has_ended());
   }
 
