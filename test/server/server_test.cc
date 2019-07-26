@@ -452,6 +452,25 @@ TEST_P(ServerInstanceImplTest, BootstrapNode) {
   EXPECT_EQ(VersionInfo::version(), server_->localInfo().node().build_version());
 }
 
+TEST_P(ServerInstanceImplTest, LoadsBootstrapFromConfigProtoOptions) {
+  options_.config_proto_.mutable_node()->set_id("foo");
+  initialize("test/server/node_bootstrap.yaml");
+  EXPECT_EQ("foo", server_->localInfo().node().id());
+}
+
+TEST_P(ServerInstanceImplTest, LoadsBootstrapFromConfigYamlAfterConfigPath) {
+  options_.config_yaml_ = "node:\n  id: 'bar'";
+  initialize("test/server/node_bootstrap.yaml");
+  EXPECT_EQ("bar", server_->localInfo().node().id());
+}
+
+TEST_P(ServerInstanceImplTest, LoadsBootstrapFromConfigProtoOptionsLast) {
+  options_.config_yaml_ = "node:\n  id: 'bar'";
+  options_.config_proto_.mutable_node()->set_id("foo");
+  initialize("test/server/node_bootstrap.yaml");
+  EXPECT_EQ("foo", server_->localInfo().node().id());
+}
+
 // Validate server localInfo() from bootstrap Node with CLI overrides.
 TEST_P(ServerInstanceImplTest, BootstrapNodeWithOptionsOverride) {
   options_.service_cluster_name_ = "some_cluster_name";
