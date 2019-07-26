@@ -1,3 +1,5 @@
+import Foundation
+
 /// Client that is able to send and receive requests through Envoy.
 @objc
 public protocol Client {
