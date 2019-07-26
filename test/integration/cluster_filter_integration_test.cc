@@ -46,7 +46,7 @@ public:
   }
 
 private:
-  std::string greeting;
+  const std::string greeting;
   Network::ReadFilterCallbacks* read_callbacks_{};
   Network::WriteFilterCallbacks* write_callbacks_{};
   bool read_greeted_{false};
