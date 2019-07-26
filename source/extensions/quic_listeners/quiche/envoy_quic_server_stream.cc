@@ -1,8 +1,11 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_server_stream.h"
 
+#include <openssl/bio.h>
 #include <openssl/evp.h>
 
 #include <cstddef>
+
+#include "/usr/local/google/home/danzh/.cache/bazel/_bazel_danzh/3af5f831530d3ae92cc2833051a9b35d/execroot/envoy/bazel-out/k8-fastbuild/bin/include/envoy/buffer/_virtual_includes/buffer_interface/envoy/buffer/buffer.h"
 
 #pragma GCC diagnostic push
 // QUICHE allows unused parameters.
@@ -77,24 +80,20 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
   Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
   // TODO(danzh): check Envoy per stream buffer limit.
   // Currently read out all the data.
-  uint64_t bytes_to_read = ReadableBytes();
-  if (bytes_to_read > 0) {
-    constexpr uint64_t MaxSlices = 2;
-    Buffer::RawSlice slices[MaxSlices];
-    const uint64_t num_slices = buffer->reserve(bytes_to_read, slices, MaxSlices);
-    STACK_ARRAY(iov, iovec, num_slices);
-    uint64_t max_len = 0;
-    for (uint64_t i = 0; i < num_slices; ++i) {
-      Buffer::RawSlice& slice = slices[i];
-      iov[i].iov_base = slice.mem_;
-      iov[i].iov_len = slice.len_;
-      max_len += slice.len_;
+  while (HasBytesToRead()) {
+    struct iovec iov;
+    if (GetReadableRegions(&iov, 1) == 0) {
+      // No more data to read.
+      break;
     }
-    ASSERT(max_len >= bytes_to_read);
-    size_t bytes_read = Readv(iov.begin(), num_slices);
-    ASSERT(bytes_read == bytes_to_read);
-    buffer->commit(slices, num_slices);
+    size_t bytes_read = iov.iov_len;
+    Buffer::RawSlice slice;
+    ASSERT(buffer->reserve(bytes_read, &slice, 1) == 1);
+    memcpy(slice.mem_, iov.iov_base, iov.iov_len);
+    buffer->commit(&slice, 1);
+    MarkConsumed(bytes_read);
   }
+
   // True if no trailer and FIN read.
   bool finished_reading = IsDoneReading();
   // If this is the last stream data, set end_stream if there is no
@@ -110,7 +109,7 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
 void EnvoyQuicServerStream::OnTrailingHeadersComplete(bool fin, size_t frame_len,
                                                       const quic::QuicHeaderList& header_list) {
   quic::QuicSpdyServerStreamBase::OnTrailingHeadersComplete(fin, frame_len, header_list);
-  if (!FinishedReadingHeaders()) {
+  if (!FinishedReadingTrailers()) {
     // Before QPack trailers can arrive before body. Only decode trailers after finishing decoding
     // body.
     ASSERT(decoder() != nullptr);
@@ -133,7 +132,6 @@ Http::StreamResetReason quicRstErrorToEnvoyResetReason(quic::QuicRstStreamErrorC
 }
 
 void EnvoyQuicServerStream::OnStreamReset(const quic::QuicRstStreamFrame& frame) {
-  std::cerr << "OnStreamReset " << frame << "\n";
   quic::QuicSpdyServerStreamBase::OnStreamReset(frame);
   Http::StreamResetReason reason = quicRstErrorToEnvoyResetReason(frame.error_code);
   runResetCallbacks(reason);

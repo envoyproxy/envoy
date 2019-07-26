@@ -56,13 +56,15 @@ public:
                                              quic::QuicCompressedCertsCache*));
 };
 
-class EnvoyQuicServerStreamTest : public ::testing::Test {
+class EnvoyQuicServerStreamTest : public testing::TestWithParam<bool> {
 public:
   EnvoyQuicServerStreamTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()),
         connection_helper_(*dispatcher_),
-        alarm_factory_(*dispatcher_, *connection_helper_.GetClock()),
-        quic_version_(quic::CurrentSupportedVersions()[0]),
+        alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
+          SetQuicReloadableFlag(quic_enable_version_99, GetParam());
+          return quic::CurrentSupportedVersions()[0];
+        }()),
         listener_stats_({ALL_LISTENER_STATS(POOL_COUNTER(listener_config_.listenerScope()),
                                             POOL_GAUGE(listener_config_.listenerScope()),
                                             POOL_HISTOGRAM(listener_config_.listenerScope()))}),
@@ -74,7 +76,10 @@ public:
         quic_session_(quic_config_, {quic_version_}, &quic_connection_, /*visitor=*/nullptr,
                       /*helper=*/nullptr, /*crypto_config=*/nullptr,
                       /*compressed_certs_cache=*/nullptr),
+        stream_id_(quic_version_.transport_version == quic::QUIC_VERSION_99 ? 4u : 5u),
         quic_stream_(stream_id_, &quic_session_, quic::BIDIRECTIONAL) {
+    quic::SetVerbosityLogThreshold(3);
+
     quic_stream_.setDecoder(stream_decoder_);
   }
 
@@ -87,8 +92,10 @@ public:
 
     trailers_.OnHeaderBlockStart();
     trailers_.OnHeader("key1", "value1");
-    // ":final-offset" is required and stripped off by quic.
-    trailers_.OnHeader(":final-offset", absl::StrCat("", request_body_.length()));
+    if (quic_version_.transport_version != quic::QUIC_VERSION_99) {
+      // ":final-offset" is required and stripped off by quic.
+      trailers_.OnHeader(":final-offset", absl::StrCat("", request_body_.length()));
+    }
     trailers_.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0, /*compressed_header_bytes=*/0);
   }
 
@@ -104,7 +111,7 @@ protected:
   Server::ListenerStats listener_stats_;
   EnvoyQuicConnection quic_connection_;
   MockQuicServerSession quic_session_;
-  quic::QuicStreamId stream_id_{5};
+  quic::QuicStreamId stream_id_;
   EnvoyQuicServerStream quic_stream_;
   Http::MockStreamDecoder stream_decoder_;
   quic::QuicHeaderList headers_;
@@ -113,7 +120,10 @@ protected:
   std::string request_body_{"Hello world"};
 };
 
-TEST_F(EnvoyQuicServerStreamTest, DecodeHeadersAndBody) {
+INSTANTIATE_TEST_SUITE_P(EnvoyQuicServerStreamTests, EnvoyQuicServerStreamTest,
+                         testing::ValuesIn({true, false}));
+
+TEST_P(EnvoyQuicServerStreamTest, DecodeHeadersAndBody) {
   EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
       .WillOnce(Invoke([this](const Http::HeaderMapPtr& headers, bool) {
         EXPECT_EQ(host_, headers->Host()->value().getStringView());
@@ -121,7 +131,11 @@ TEST_F(EnvoyQuicServerStreamTest, DecodeHeadersAndBody) {
         EXPECT_EQ(Http::Headers::get().MethodValues.Get,
                   headers->Method()->value().getStringView());
       }));
-  quic_stream_.OnStreamHeaderList(/*fin=*/false, headers_.uncompressed_header_bytes(), headers_);
+  if (quic_version_.transport_version == quic::QUIC_VERSION_99) {
+    quic_stream_.OnHeadersDecoded(headers_);
+  } else {
+    quic_stream_.OnStreamHeaderList(/*fin=*/false, headers_.uncompressed_header_bytes(), headers_);
+  }
   EXPECT_TRUE(quic_stream_.FinishedReadingHeaders());
 
   quic::QuicStreamFrame frame(stream_id_, true, 0, request_body_);
@@ -130,10 +144,19 @@ TEST_F(EnvoyQuicServerStreamTest, DecodeHeadersAndBody) {
         EXPECT_EQ(request_body_, buffer.toString());
         EXPECT_TRUE(finished_reading);
       }));
+  if (quic_version_.transport_version == quic::QUIC_VERSION_99) {
+    std::unique_ptr<char[]> data_buffer;
+    quic::HttpEncoder encoder;
+    quic::QuicByteCount data_frame_header_length =
+        encoder.SerializeDataFrameHeader(request_body_.length(), &data_buffer);
+    quic::QuicStringPiece data_frame_header(data_buffer.get(), data_frame_header_length);
+    std::string data = absl::StrCat(data_frame_header, request_body_);
+    frame = quic::QuicStreamFrame(stream_id_, true, 0, data);
+  }
   quic_stream_.OnStreamFrame(frame);
 }
 
-TEST_F(EnvoyQuicServerStreamTest, DecodeHeadersBodyAndTrailers) {
+TEST_P(EnvoyQuicServerStreamTest, DecodeHeadersBodyAndTrailers) {
   EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
       .WillOnce(Invoke([this](const Http::HeaderMapPtr& headers, bool) {
         EXPECT_EQ(host_, headers->Host()->value().getStringView());
