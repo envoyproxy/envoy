@@ -24,7 +24,7 @@ then
   echo "Updating Workspace file."
   sed -e "s|{ENVOY_SRCDIR}|${ENVOY_SRCDIR}|" "${ENVOY_SRCDIR}"/ci/WORKSPACE.filter.example > "${CHECKOUT_DIR}"/WORKSPACE
 
-  echo "Commiting, and Pushing..."
+  echo "Committing, and Pushing..."
   git -C "$CHECKOUT_DIR" commit -a -m "Update Envoy submodule to $ENVOY_SHA"
   git -C "$CHECKOUT_DIR" push origin master
   echo "Done"
