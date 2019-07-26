@@ -36,14 +36,14 @@ Hello Envoy Distributors,
 The Envoy security team would like to provide advanced notice to the Envoy
 Private Distributors List of some details on the pending Envoy $VERSION
 security release, following the process described at
-https://github.com/envoyproxy/envoy/blob/master/SECURITY_RELEASE_PROCESS.md.
+https://github.com/envoyproxy/envoy/blob/master/SECURITY.md.
 
 This release will be made available on the $ORDINALDAY of $MONTH $YEAR at
 $PDTHOUR PDT ($GMTHOUR GMT). This release will fix $NUMDEFECTS security
 defect(s). The highest rated security defect is considered $SEVERITY severity.
 
 Below we provide details of these vulnerabilities under our embargo policy
-(https://github.com/envoyproxy/envoy/blob/master/SECURITY_RELEASE_PROCESS.md#embargo-policy).
+(https://github.com/envoyproxy/envoy/blob/master/SECURITY.md#embargo-policy).
 This information should be treated as confidential until public release by the
 Envoy maintainers on the Envoy GitHub.
 

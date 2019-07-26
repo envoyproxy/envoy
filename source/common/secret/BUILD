@@ -19,6 +19,7 @@ envoy_cc_library(
         "//include/envoy/server:transport_socket_config_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
+        "@envoy_api//envoy/admin/v2alpha:config_dump_cc",
         "@envoy_api//envoy/api/v2/auth:cert_cc",
     ],
 )

@@ -52,10 +52,10 @@
     can be promoted to other issue types once it's clear they are actionable (at which point the
     question label should be removed).
 * Make sure that ongoing PRs are moving forward at the right pace or closing them.
-* Participate when called upon in the [security release process](SECURITY_RELEASE_PROCESS.md). Note
-  that although this should be a rare occurrence, if a serious vulnerability is found, the process
-  may take up to several full days of work to implement. This reality should be taken into account
-  when discussing time commitment obligations with employers.
+* Participate when called upon in the [security release process](SECURITY.md). Note that although
+  this should be a rare occurrence, if a serious vulnerability is found, the process may take up to
+  several full days of work to implement. This reality should be taken into account when discussing
+  time commitment obligations with employers.
 * In general continue to be willing to spend at least 25% of ones time working on Envoy (~1.25
   business days per week).
 * We currently maintain an "on-call" rotation within the maintainers. Each on-call is 1 week.
