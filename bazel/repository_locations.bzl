@@ -120,9 +120,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/lightstep/lightstep-tracer-cpp/archive/v0.8.0.tar.gz"],
     ),
     com_github_datadog_dd_opentracing_cpp = dict(
-        sha256 = "5996ec077c637feb159ed0297cdb35f0de5713123f22796341965d3551fd55f8",
-        strip_prefix = "dd-opentracing-cpp-886d45bfa9cb08e1b2c5229a92b3aabe90a6eca5",
-        urls = ["https://github.com/DataDog/dd-opentracing-cpp/archive/886d45bfa9cb08e1b2c5229a92b3aabe90a6eca5.tar.gz"],
+        sha256 = "f7fb2ad541f812c36fd78f9a38e4582d87dadb563ab80bee3f7c3a2132a425c5",
+        strip_prefix = "dd-opentracing-cpp-1.0.1",
+        urls = ["https://github.com/DataDog/dd-opentracing-cpp/archive/v1.0.1.tar.gz"],
     ),
     com_github_google_benchmark = dict(
         sha256 = "3c6a165b6ecc948967a1ead710d4a181d7b0fbcaa183ef7ea84604994966221a",
