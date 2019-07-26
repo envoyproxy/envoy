@@ -53,15 +53,6 @@ jobs:
        - store_artifacts:
            path: /build/envoy/generated
            destination: /
-   tsan:
-     executor: ubuntu-build
-     steps:
-       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
-       - checkout
-       - run: ci/do_circle_ci.sh bazel.tsan
-       - store_artifacts:
-           path: /build/envoy/generated
-           destination: /
 
    compile_time_options:
      executor: ubuntu-build
@@ -169,7 +160,6 @@ workflows:
             tags:
               only: /^v.*/
       - asan
-      - tsan
       - compile_time_options
       - api
       - filter_example_mirror
