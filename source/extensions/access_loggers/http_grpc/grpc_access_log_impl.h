@@ -61,7 +61,7 @@ using GrpcAccessLoggerCacheSharedPtr = std::shared_ptr<GrpcAccessLoggerCache>;
 
 class GrpcAccessLoggerImpl : public GrpcAccessLogger {
 public:
-  GrpcAccessLoggerImpl(Grpc::RawAsyncClientPtr&& client, const std::string& log_name,
+  GrpcAccessLoggerImpl(Grpc::RawAsyncClientPtr&& client, std::string log_name,
                        const LocalInfo::LocalInfo& local_info);
 
   void log(envoy::data::accesslog::v2::HTTPAccessLogEntry&& entry) override;
@@ -121,9 +121,9 @@ private:
 class HttpGrpcAccessLog : public Common::ImplBase {
 public:
   HttpGrpcAccessLog(AccessLog::FilterPtr&& filter,
-                    const envoy::config::accesslog::v2::HttpGrpcAccessLogConfig& config,
+                    envoy::config::accesslog::v2::HttpGrpcAccessLogConfig config,
                     ThreadLocal::SlotAllocator& tls,
-                    const GrpcAccessLoggerCacheSharedPtr& access_logger_cache);
+                    GrpcAccessLoggerCacheSharedPtr access_logger_cache);
 
   static void responseFlagsToAccessLogResponseFlags(
       envoy::data::accesslog::v2::AccessLogCommon& common_access_log,
@@ -134,7 +134,7 @@ private:
    * Per-thread cached logger.
    */
   struct ThreadLocalLogger : public ThreadLocal::ThreadLocalObject {
-    ThreadLocalLogger(const GrpcAccessLoggerSharedPtr& logger);
+    ThreadLocalLogger(GrpcAccessLoggerSharedPtr logger);
 
     const GrpcAccessLoggerSharedPtr logger_;
   };

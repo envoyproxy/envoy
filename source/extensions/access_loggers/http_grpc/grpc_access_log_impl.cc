@@ -42,10 +42,9 @@ void GrpcAccessLoggerImpl::LocalStream::onRemoteClose(Grpc::Status::GrpcStatus,
   }
 }
 
-GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(Grpc::RawAsyncClientPtr&& client,
-                                           const std::string& log_name,
+GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(Grpc::RawAsyncClientPtr&& client, std::string log_name,
                                            const LocalInfo::LocalInfo& local_info)
-    : client_(std::move(client)), log_name_(log_name), local_info_(local_info) {}
+    : client_(std::move(client)), log_name_(std::move(log_name)), local_info_(local_info) {}
 
 void GrpcAccessLoggerImpl::log(envoy::data::accesslog::v2::HTTPAccessLogEntry&& entry) {
   // TODO(euroelessar): Add batching and flushing.
@@ -101,15 +100,15 @@ GrpcAccessLoggerSharedPtr GrpcAccessLoggerCacheImpl::getOrCreateLogger(
   return logger;
 }
 
-HttpGrpcAccessLog::ThreadLocalLogger::ThreadLocalLogger(const GrpcAccessLoggerSharedPtr& logger)
-    : logger_(logger) {}
+HttpGrpcAccessLog::ThreadLocalLogger::ThreadLocalLogger(GrpcAccessLoggerSharedPtr logger)
+    : logger_(std::move(logger)) {}
 
-HttpGrpcAccessLog::HttpGrpcAccessLog(
-    AccessLog::FilterPtr&& filter,
-    const envoy::config::accesslog::v2::HttpGrpcAccessLogConfig& config,
-    ThreadLocal::SlotAllocator& tls, const GrpcAccessLoggerCacheSharedPtr& access_logger_cache)
-    : Common::ImplBase(std::move(filter)), config_(config), tls_slot_(tls.allocateSlot()),
-      access_logger_cache_(access_logger_cache) {
+HttpGrpcAccessLog::HttpGrpcAccessLog(AccessLog::FilterPtr&& filter,
+                                     envoy::config::accesslog::v2::HttpGrpcAccessLogConfig config,
+                                     ThreadLocal::SlotAllocator& tls,
+                                     GrpcAccessLoggerCacheSharedPtr access_logger_cache)
+    : Common::ImplBase(std::move(filter)), config_(std::move(config)),
+      tls_slot_(tls.allocateSlot()), access_logger_cache_(std::move(access_logger_cache)) {
   for (const auto& header : config_.additional_request_headers_to_log()) {
     request_headers_to_log_.emplace_back(header);
   }

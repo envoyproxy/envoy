@@ -51,7 +51,8 @@ public:
     EXPECT_CALL(stream, sendMessageRaw_(_, false))
         .WillOnce(Invoke([expected_message](Buffer::InstancePtr& request, bool) {
           envoy::service::accesslog::v2::StreamAccessLogsMessage message;
-          Buffer::ZeroCopyInputStreamImpl request_stream(std::move(request));
+          Buffer::ZeroCopyInputStreamImpl request_stream(
+              envoy::data::accesslog::v2::HTTPAccessLogEntry(request));
           EXPECT_TRUE(message.ParseFromZeroCopyStream(&request_stream));
           EXPECT_EQ(message.DebugString(), expected_message.DebugString());
         }));
@@ -87,7 +88,7 @@ http_logs:
 )EOF");
   envoy::data::accesslog::v2::HTTPAccessLogEntry entry;
   entry.mutable_request()->set_path("/test/path1");
-  logger_->log(std::move(entry));
+  logger_->log(envoy::data::accesslog::v2::HTTPAccessLogEntry(entry));
 
   expectStreamMessage(stream, R"EOF(
 http_logs:
@@ -96,7 +97,7 @@ http_logs:
       path: /test/path2
 )EOF");
   entry.mutable_request()->set_path("/test/path2");
-  logger_->log(std::move(entry));
+  logger_->log(envoy::data::accesslog::v2::HTTPAccessLogEntry(entry));
 
   // Verify that sending an empty response message doesn't do anything bad.
   callbacks->onReceiveMessage(
@@ -120,7 +121,7 @@ http_logs:
       path: /test/path3
 )EOF");
   entry.mutable_request()->set_path("/test/path3");
-  logger_->log(std::move(entry));
+  logger_->log(envoy::data::accesslog::v2::HTTPAccessLogEntry(entry));
 }
 
 // Test that stream failure is handled correctly.
@@ -135,7 +136,7 @@ TEST_F(GrpcAccessLoggerImplTest, StreamFailure) {
           }));
   EXPECT_CALL(local_info_, node());
   envoy::data::accesslog::v2::HTTPAccessLogEntry entry;
-  logger_->log(std::move(entry));
+  logger_->log(envoy::data::accesslog::v2::HTTPAccessLogEntry(entry));
 }
 
 class GrpcAccessLoggerCacheImplTest : public testing::Test {
