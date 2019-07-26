@@ -4,6 +4,8 @@
 
 #include "extensions/filters/http/well_known_names.h"
 
+#include "jwt_verify_lib/status.h"
+
 using ::google::jwt_verify::Status;
 
 namespace Envoy {
@@ -55,7 +57,8 @@ void Filter::setPayload(const ProtobufWkt::Struct& payload) {
 }
 
 void Filter::onComplete(const Status& status) {
-  ENVOY_LOG(debug, "Called Filter : check complete {}", int(status));
+  ENVOY_LOG(debug, "Called Filter : check complete {}",
+            ::google::jwt_verify::getStatusString(status));
   // This stream has been reset, abort the callback.
   if (state_ == Responded) {
     return;
