@@ -11,13 +11,13 @@ namespace {
 
 class PoliteFilter : public Network::Filter, Logger::Loggable<Logger::Id::filter> {
 public:
-  PoliteFilter(const ProtobufWkt::StringValue& value) : greeting(value.value()) {}
+  PoliteFilter(const ProtobufWkt::StringValue& value) : greeting_(value.value()) {}
 
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override {
     ENVOY_CONN_LOG(debug, "polite: onData {} bytes {} end_stream", read_callbacks_->connection(),
                    data.length(), end_stream);
     if (!read_greeted_) {
-      Buffer::OwnedImpl greeter(greeting);
+      Buffer::OwnedImpl greeter(greeting_);
       read_callbacks_->injectReadDataToFilterChain(greeter, false);
       read_greeted_ = true;
     }
@@ -46,7 +46,7 @@ public:
   }
 
 private:
-  const std::string greeting;
+  const std::string greeting_;
   Network::ReadFilterCallbacks* read_callbacks_{};
   Network::WriteFilterCallbacks* write_callbacks_{};
   bool read_greeted_{false};
