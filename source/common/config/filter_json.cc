@@ -171,9 +171,11 @@ void FilterJson::translateHttpConnectionManager(
     const auto json_tracing = json_config.getObject("tracing");
     auto* tracing = proto_config.mutable_tracing();
 
-    envoy::api::v2::core::TracingOperation operation_name{};
-    envoy::api::v2::core::TracingOperation_Parse(
-        StringUtil::toUpper(json_tracing->getString("operation_name")), &operation_name);
+    envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::Tracing::
+        OperationName operation_name{};
+    envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::Tracing::
+        OperationName_Parse(StringUtil::toUpper(json_tracing->getString("operation_name")),
+                            &operation_name);
     tracing->set_operation_name(operation_name);
 
     for (const std::string& header :

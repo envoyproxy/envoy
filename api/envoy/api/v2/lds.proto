@@ -183,5 +183,5 @@ message Listener {
   reserved 14;
 
   // Specifies the intended direction of the traffic relative to the local Envoy.
-  core.TracingOperation tracing_operation = 16;
+  core.TrafficDirection traffic_direction = 16;
 }

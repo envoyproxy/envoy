@@ -279,11 +279,14 @@ message ControlPlane {
   string identifier = 1;
 }
 
-// Identifies the direction of the transport relative to the local Envoy.
-enum TracingOperation {
+// Identifies the direction of the traffic relative to the local Envoy.
+enum TrafficDirection {
+  // Default option is unspecified.
+  UNSPECIFIED = 0;
+
   // The transport is used for ingress/incoming requests.
-  INGRESS = 0;
+  INGRESS = 1;
 
   // The transport is used for egress/outgoing requests.
-  EGRESS = 1;
+  EGRESS = 2;
 }
