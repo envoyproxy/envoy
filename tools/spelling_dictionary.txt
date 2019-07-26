@@ -2,6 +2,7 @@
 # lower case and title case (e.g. HTTP will accept http and Http). Entries in all lower case
 # will accept title case (e.g. lyft matches Lyft).
 AAAA
+ABAC
 ACK
 AES
 AFAICT
