@@ -56,6 +56,10 @@ inline envoy::api::v2::core::Metadata
 replaceInvalidStringValues(const envoy::api::v2::core::Metadata& upstream_metadata) {
   envoy::api::v2::core::Metadata processed = upstream_metadata;
   for (auto& metadata_struct : *processed.mutable_filter_metadata()) {
+    // Metadata fields consist of keyed Structs, which is a map of dynamically typed values. These
+    // values can be null, a number, a string, a boolean, a list of values, or a recursive struct.
+    // This clears any invalid characters in string values. It  may not be likely a coverage-driven
+    // fuzzer will explore recursive structs, so this case is not handled here.
     for (auto& field : *metadata_struct.second.mutable_fields()) {
       if (field.second.kind_case() == ProtobufWkt::Value::kStringValue) {
         field.second.set_string_value(replaceInvalidCharacters(field.second.string_value()));
