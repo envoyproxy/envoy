@@ -51,8 +51,7 @@ public:
     EXPECT_CALL(stream, sendMessageRaw_(_, false))
         .WillOnce(Invoke([expected_message](Buffer::InstancePtr& request, bool) {
           envoy::service::accesslog::v2::StreamAccessLogsMessage message;
-          Buffer::ZeroCopyInputStreamImpl request_stream(
-              envoy::data::accesslog::v2::HTTPAccessLogEntry(request));
+          Buffer::ZeroCopyInputStreamImpl request_stream(std::move(request));
           EXPECT_TRUE(message.ParseFromZeroCopyStream(&request_stream));
           EXPECT_EQ(message.DebugString(), expected_message.DebugString());
         }));
