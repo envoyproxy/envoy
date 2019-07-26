@@ -31,7 +31,11 @@ class GrpcAccessLogger {
 public:
   virtual ~GrpcAccessLogger() = default;
 
-  virtual void log(envoy::data::accesslog::v2::HTTPAccessLogEntry& entry) PURE;
+  /**
+   * Log http access entry.
+   * @param entry supplies the access log to send.
+   */
+  virtual void log(envoy::data::accesslog::v2::HTTPAccessLogEntry&& entry) PURE;
 };
 
 using GrpcAccessLoggerSharedPtr = std::shared_ptr<GrpcAccessLogger>;
@@ -44,6 +48,11 @@ class GrpcAccessLoggerCache {
 public:
   virtual ~GrpcAccessLoggerCache() = default;
 
+  /**
+   * Get existing logger or create a new one for the given configuration.
+   * @param config supplies the configuration for the logger.
+   * @return GrpcAccessLoggerSharedPtr ready for logging requests.
+   */
   virtual GrpcAccessLoggerSharedPtr
   getOrCreateLogger(const ::envoy::config::accesslog::v2::CommonGrpcAccessLogConfig& config) PURE;
 };
@@ -55,7 +64,7 @@ public:
   GrpcAccessLoggerImpl(Grpc::RawAsyncClientPtr&& client, const std::string& log_name,
                        const LocalInfo::LocalInfo& local_info);
 
-  void log(envoy::data::accesslog::v2::HTTPAccessLogEntry& entry) override;
+  void log(envoy::data::accesslog::v2::HTTPAccessLogEntry&& entry) override;
 
 private:
   struct LocalStream
@@ -77,7 +86,7 @@ private:
   Grpc::AsyncClient<envoy::service::accesslog::v2::StreamAccessLogsMessage,
                     envoy::service::accesslog::v2::StreamAccessLogsResponse>
       client_;
-  std::string log_name_;
+  const std::string log_name_;
   absl::optional<LocalStream> stream_;
   const LocalInfo::LocalInfo& local_info_;
 };
@@ -96,7 +105,8 @@ private:
    * Per-thread cache.
    */
   struct ThreadLocalCache : public ThreadLocal::ThreadLocalObject {
-    std::unordered_map<std::size_t, GrpcAccessLoggerSharedPtr> access_loggers_;
+    // Access loggers indexed by the hash of logger's configuration.
+    absl::flat_hash_map<std::size_t, GrpcAccessLoggerSharedPtr> access_loggers_;
   };
 
   Grpc::AsyncClientManager& async_client_manager_;
@@ -126,7 +136,7 @@ private:
   struct ThreadLocalLogger : public ThreadLocal::ThreadLocalObject {
     ThreadLocalLogger(const GrpcAccessLoggerSharedPtr& logger);
 
-    GrpcAccessLoggerSharedPtr logger_;
+    const GrpcAccessLoggerSharedPtr logger_;
   };
 
   // Common::ImplBase
@@ -135,8 +145,8 @@ private:
                const StreamInfo::StreamInfo& stream_info) override;
 
   const envoy::config::accesslog::v2::HttpGrpcAccessLogConfig config_;
-  ThreadLocal::SlotPtr tls_slot_;
-  GrpcAccessLoggerCacheSharedPtr access_logger_cache_;
+  const ThreadLocal::SlotPtr tls_slot_;
+  const GrpcAccessLoggerCacheSharedPtr access_logger_cache_;
   std::vector<Http::LowerCaseString> request_headers_to_log_;
   std::vector<Http::LowerCaseString> response_headers_to_log_;
   std::vector<Http::LowerCaseString> response_trailers_to_log_;

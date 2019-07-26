@@ -87,7 +87,7 @@ http_logs:
 )EOF");
   envoy::data::accesslog::v2::HTTPAccessLogEntry entry;
   entry.mutable_request()->set_path("/test/path1");
-  logger_->log(entry);
+  logger_->log(std::move(entry));
 
   expectStreamMessage(stream, R"EOF(
 http_logs:
@@ -96,7 +96,7 @@ http_logs:
       path: /test/path2
 )EOF");
   entry.mutable_request()->set_path("/test/path2");
-  logger_->log(entry);
+  logger_->log(std::move(entry));
 
   // Verify that sending an empty response message doesn't do anything bad.
   callbacks->onReceiveMessage(
@@ -120,7 +120,7 @@ http_logs:
       path: /test/path3
 )EOF");
   entry.mutable_request()->set_path("/test/path3");
-  logger_->log(entry);
+  logger_->log(std::move(entry));
 }
 
 // Test that stream failure is handled correctly.
@@ -135,7 +135,7 @@ TEST_F(GrpcAccessLoggerImplTest, StreamFailure) {
           }));
   EXPECT_CALL(local_info_, node());
   envoy::data::accesslog::v2::HTTPAccessLogEntry entry;
-  logger_->log(entry);
+  logger_->log(std::move(entry));
 }
 
 class GrpcAccessLoggerCacheImplTest : public testing::Test {
@@ -194,7 +194,7 @@ TEST_F(GrpcAccessLoggerCacheImplTest, Deduplication) {
 class MockGrpcAccessLogger : public GrpcAccessLogger {
 public:
   // GrpcAccessLogger
-  MOCK_METHOD1(log, void(envoy::data::accesslog::v2::HTTPAccessLogEntry& entry));
+  MOCK_METHOD1(log, void(envoy::data::accesslog::v2::HTTPAccessLogEntry&& entry));
 };
 
 class MockGrpcAccessLoggerCache : public GrpcAccessLoggerCache {
@@ -228,7 +228,7 @@ public:
     TestUtility::loadFromYaml(expected_log_entry_yaml, expected_log_entry);
     EXPECT_CALL(*logger_, log(_))
         .WillOnce(
-            Invoke([expected_log_entry](envoy::data::accesslog::v2::HTTPAccessLogEntry& entry) {
+            Invoke([expected_log_entry](envoy::data::accesslog::v2::HTTPAccessLogEntry&& entry) {
               EXPECT_EQ(entry.DebugString(), expected_log_entry.DebugString());
             }));
   }

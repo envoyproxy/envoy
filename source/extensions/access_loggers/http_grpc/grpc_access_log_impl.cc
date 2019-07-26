@@ -47,7 +47,7 @@ GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(Grpc::RawAsyncClientPtr&& client,
                                            const LocalInfo::LocalInfo& local_info)
     : client_(std::move(client)), log_name_(log_name), local_info_(local_info) {}
 
-void GrpcAccessLoggerImpl::log(envoy::data::accesslog::v2::HTTPAccessLogEntry& entry) {
+void GrpcAccessLoggerImpl::log(envoy::data::accesslog::v2::HTTPAccessLogEntry&& entry) {
   // TODO(euroelessar): Add batching and flushing.
   envoy::service::accesslog::v2::StreamAccessLogsMessage message;
   message.mutable_http_logs()->add_log_entry()->Swap(&entry);
@@ -81,13 +81,12 @@ GrpcAccessLoggerCacheImpl::GrpcAccessLoggerCacheImpl(Grpc::AsyncClientManager& a
                                                      const LocalInfo::LocalInfo& local_info)
     : async_client_manager_(async_client_manager), scope_(scope), tls_slot_(tls.allocateSlot()),
       local_info_(local_info) {
-  tls_slot_->set([](Event::Dispatcher&) {
-    return ThreadLocal::ThreadLocalObjectSharedPtr{new ThreadLocalCache()};
-  });
+  tls_slot_->set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalCache>(); });
 }
 
 GrpcAccessLoggerSharedPtr GrpcAccessLoggerCacheImpl::getOrCreateLogger(
     const envoy::config::accesslog::v2::CommonGrpcAccessLogConfig& config) {
+  // TODO(euroelessar): Consider cleaning up loggers.
   auto& cache = tls_slot_->getTyped<ThreadLocalCache>();
   const std::size_t cache_key = MessageUtil::hash(config);
   const auto it = cache.access_loggers_.find(cache_key);
@@ -96,9 +95,9 @@ GrpcAccessLoggerSharedPtr GrpcAccessLoggerCacheImpl::getOrCreateLogger(
   }
   const Grpc::AsyncClientFactoryPtr factory =
       async_client_manager_.factoryForGrpcService(config.grpc_service(), scope_, false);
-  const auto logger = std::static_pointer_cast<GrpcAccessLogger>(
-      std::make_shared<GrpcAccessLoggerImpl>(factory->create(), config.log_name(), local_info_));
-  cache.access_loggers_.insert(std::make_pair(cache_key, logger));
+  const GrpcAccessLoggerSharedPtr logger =
+      std::make_shared<GrpcAccessLoggerImpl>(factory->create(), config.log_name(), local_info_);
+  cache.access_loggers_.emplace(cache_key, logger);
   return logger;
 }
 
@@ -124,8 +123,8 @@ HttpGrpcAccessLog::HttpGrpcAccessLog(
   }
 
   tls_slot_->set([this](Event::Dispatcher&) {
-    return ThreadLocal::ThreadLocalObjectSharedPtr{
-        new ThreadLocalLogger(access_logger_cache_->getOrCreateLogger(config_.common_config()))};
+    return std::make_shared<ThreadLocalLogger>(
+        access_logger_cache_->getOrCreateLogger(config_.common_config()));
   });
 }
 
@@ -427,7 +426,7 @@ void HttpGrpcAccessLog::emitLog(const Http::HeaderMap& request_headers,
     }
   }
 
-  tls_slot_->getTyped<ThreadLocalLogger>().logger_->log(log_entry);
+  tls_slot_->getTyped<ThreadLocalLogger>().logger_->log(std::move(log_entry));
 }
 
 } // namespace HttpGrpc
