@@ -14,6 +14,7 @@ using CelList = google::api::expr::runtime::CelList;
 namespace {
 
 constexpr absl::string_view kMetadata = "metadata";
+
 constexpr absl::string_view kConnection = "connection";
 constexpr absl::string_view kRequestedServerName = "requested_server_name";
 constexpr absl::string_view kLocalAddress = "local_address";
@@ -23,6 +24,7 @@ constexpr absl::string_view kSubjectLocalCertificate = "subject_local_certificat
 constexpr absl::string_view kIssuerPeerCertificate = "issuer_peer_certificate";
 constexpr absl::string_view kSubjectPeerCertificate = "subject_peer_certificate";
 constexpr absl::string_view kTlsVersion = "tls_version";
+
 constexpr absl::string_view kRequest = "request";
 constexpr absl::string_view kPath = "path";
 constexpr absl::string_view kHost = "host";
@@ -146,7 +148,7 @@ Http::FilterHeadersStatus AttributeBasedAccessControlFilter::decodeHeaders(Http:
   auto eval_status = expr_->Evaluate(activation, &arena);
   if (!eval_status.ok()) {
     ENVOY_LOG(debug, "evaluation failed: {}", eval_status.status().message());
-    return Http::FilterHeadersStatus::StopIterationAndWatermark;
+    return Http::FilterHeadersStatus::StopIteration;
   }
 
   auto result = eval_status.ValueOrDie();
@@ -162,7 +164,7 @@ Http::FilterHeadersStatus AttributeBasedAccessControlFilter::decodeHeaders(Http:
     ENVOY_LOG(debug, "expression did not evaluate to 'true': type {}",
               CelValue::TypeName(result.type()));
   }
-  return Http::FilterHeadersStatus::StopIterationAndWatermark;
+  return Http::FilterHeadersStatus::StopIteration;
 }
 
 } // namespace ABACFilter
