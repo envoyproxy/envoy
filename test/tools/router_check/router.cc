@@ -421,8 +421,8 @@ Options::Options(int argc, char** argv) {
   TCLAP::SwitchArg is_proto("p", "useproto", "Use Proto test file schema", cmd, false);
   TCLAP::SwitchArg is_detailed("d", "details", "Show detailed test execution results", cmd, false);
   TCLAP::ValueArg<double> fail_under("f", "fail-under",
-                                     "Fail if test coverage is under a specifed amount", false, 0.0,
-                                     "float", cmd);
+                                     "Fail if test coverage is under a specified amount", false,
+                                     0.0, "float", cmd);
   TCLAP::ValueArg<std::string> config_path("c", "config-path", "Path to configuration file.", false,
                                            "", "string", cmd);
   TCLAP::ValueArg<std::string> test_path("t", "test-path", "Path to test file.", false, "",
