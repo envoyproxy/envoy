@@ -56,10 +56,10 @@ InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_syste
                            ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
                            Filesystem::Instance& file_system,
                            std::unique_ptr<ProcessContext> process_context)
-    : secret_manager_(std::make_unique<Secret::SecretManagerImpl>()), workers_started_(false),
-      shutdown_(false), options_(options), time_source_(time_system), restarter_(restarter),
-      start_time_(time(nullptr)), original_start_time_(start_time_), stats_store_(store),
-      thread_local_(tls), api_(new Api::Impl(thread_factory, store, time_system, file_system)),
+    : workers_started_(false), shutdown_(false), options_(options), time_source_(time_system),
+      restarter_(restarter), start_time_(time(nullptr)), original_start_time_(start_time_),
+      stats_store_(store), thread_local_(tls),
+      api_(new Api::Impl(thread_factory, store, time_system, file_system)),
       dispatcher_(api_->allocateDispatcher()),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
       handler_(new ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
@@ -333,6 +333,8 @@ void InstanceImpl::initialize(const Options& options,
   }
 
   loadServerFlags(initial_config.flagsPath());
+
+  secret_manager_ = std::make_unique<Secret::SecretManagerImpl>(admin_->getConfigTracker());
 
   // Initialize the overload manager early so other modules can register for actions.
   overload_manager_ = std::make_unique<OverloadManagerImpl>(

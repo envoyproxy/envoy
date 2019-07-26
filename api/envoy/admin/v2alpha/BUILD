@@ -11,6 +11,7 @@ api_proto_library_internal(
         "//envoy/api/v2:lds",
         "//envoy/api/v2:rds",
         "//envoy/api/v2:srds",
+        "//envoy/api/v2/auth:cert",
         "//envoy/config/bootstrap/v2:bootstrap",
     ],
 )
