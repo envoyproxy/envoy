@@ -37,8 +37,8 @@ public:
 using GrpcAccessLoggerSharedPtr = std::shared_ptr<GrpcAccessLogger>;
 
 /**
- * Interface for an access logger cache. The cache deals with threading and deduplicates loggers for
- * the same configuration.
+ * Interface for an access logger cache. The cache deals with threading and de-duplicates loggers
+ * for the same configuration.
  */
 class GrpcAccessLoggerCache {
 public:
