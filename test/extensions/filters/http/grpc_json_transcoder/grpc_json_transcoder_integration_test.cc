@@ -501,7 +501,7 @@ std::string createDeepJson(int level, bool valid) {
 
 std::string jsonStrToPbStrucStr(std::string json) {
   Envoy::ProtobufWkt::Struct message;
-  Protobuf::util::JsonStringToMessage(json, &message);
+  TestUtility::loadFromJson(json, message);
   std::string structStr;
   TextFormat::PrintToString(message, &structStr);
   return structStr;
