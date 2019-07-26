@@ -672,8 +672,8 @@ TEST_P(ServerInstanceImplTest, NoOptionsPassed) {
           std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
           Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr)),
       EnvoyException,
-      "At least one of Options::configPath, Options::configYaml or Options::configProto() should "
-      "be non-empty");
+      "At least one of --config-path or --config-yaml or Options::configProto() should be "
+      "non-empty");
 }
 
 // Validate that when std::exception is unexpectedly thrown, we exit safely.
