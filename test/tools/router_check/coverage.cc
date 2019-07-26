@@ -13,10 +13,10 @@ void Coverage::markCovered(const Envoy::Router::RouteEntry* route) {
 }
 
 double Coverage::report() {
-  int total_route_count = 0;
+  int size_t = 0;
   for (const auto& host : route_config_.virtual_hosts()) {
-    total_route_count += host.routes_size();
+    size_t += host.routes_size();
   }
-  return static_cast<double>(seen_routes_.size()) / total_route_count;
+  return static_cast<double>(seen_routes_.size()) / size_t;
 }
 } // namespace Envoy
