@@ -96,7 +96,7 @@ MockStreamInfo::MockStreamInfo()
       .WillByDefault(ReturnRef(upstream_transport_failure_reason_));
 }
 
-MockStreamInfo::~MockStreamInfo() {}
+MockStreamInfo::~MockStreamInfo() = default;
 
 } // namespace StreamInfo
 } // namespace Envoy

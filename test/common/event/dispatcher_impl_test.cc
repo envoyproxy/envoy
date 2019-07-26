@@ -28,7 +28,7 @@ namespace {
 class TestDeferredDeletable : public DeferredDeletable {
 public:
   TestDeferredDeletable(std::function<void()> on_destroy) : on_destroy_(on_destroy) {}
-  ~TestDeferredDeletable() { on_destroy_(); }
+  ~TestDeferredDeletable() override { on_destroy_(); }
 
 private:
   std::function<void()> on_destroy_;
@@ -185,6 +185,40 @@ TEST_F(DispatcherImplTest, Timer) {
   while (!work_finished_) {
     cv_.wait(mu_);
   }
+}
+
+TEST_F(DispatcherImplTest, IsThreadSafe) {
+  dispatcher_->post([this]() {
+    {
+      Thread::LockGuard lock(mu_);
+      // Thread safe because it is called within the dispatcher thread's context.
+      EXPECT_TRUE(dispatcher_->isThreadSafe());
+      work_finished_ = true;
+    }
+    cv_.notifyOne();
+  });
+
+  Thread::LockGuard lock(mu_);
+  while (!work_finished_) {
+    cv_.wait(mu_);
+  }
+  // Not thread safe because it is not called within the dispatcher thread's context.
+  EXPECT_FALSE(dispatcher_->isThreadSafe());
+}
+
+class NotStartedDispatcherImplTest : public testing::Test {
+protected:
+  NotStartedDispatcherImplTest()
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()) {}
+
+  Api::ApiPtr api_;
+  DispatcherPtr dispatcher_;
+};
+
+TEST_F(NotStartedDispatcherImplTest, IsThreadSafe) {
+  // Thread safe because the dispatcher has not started.
+  // Therefore, no thread id has been assigned.
+  EXPECT_TRUE(dispatcher_->isThreadSafe());
 }
 
 TEST(TimerImplTest, TimerEnabledDisabled) {

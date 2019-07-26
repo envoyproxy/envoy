@@ -51,7 +51,7 @@ public:
         init_fetch_timeout, validation_visitor_);
   }
 
-  ~HttpSubscriptionTestHarness() {
+  ~HttpSubscriptionTestHarness() override {
     // Stop subscribing on the way out.
     if (request_in_progress_) {
       EXPECT_CALL(http_request_, cancel());

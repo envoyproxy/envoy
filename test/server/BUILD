@@ -260,8 +260,6 @@ envoy_cc_test(
         ":runtime_test_data",
         ":stats_sink_bootstrap.yaml",
         ":zipkin_tracing.yaml",
-        "//test/config/integration:server.json",
-        "//test/config/integration:server_config_files",
     ],
     deps = [
         "//source/common/common:version_lib",

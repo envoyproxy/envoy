@@ -67,10 +67,14 @@ EOF
   done
   cat << EOF
     ],
-    tags = ["manual"],
+    # no-remote due to https://github.com/bazelbuild/bazel/issues/4685
+    tags = ["manual", "no-remote"],
     coverage = False,
-    # Needed when invoking external shell tests etc.
-    local = True,
+    # Due to the nature of coverage_tests, the shard of coverage_tests are very uneven, some of
+    # shard can take 100s and some takes only 10s, so we use the maximum sharding to here to let
+    # Bazel scheduling them across CPU cores.
+    # Sharding can be disabled by --test_sharding_strategy=disabled.
+    shard_count = 50,
 )
 EOF
 

@@ -17,7 +17,7 @@ namespace Network {
 class MockConnectionCallbacks : public ConnectionCallbacks {
 public:
   MockConnectionCallbacks();
-  ~MockConnectionCallbacks();
+  ~MockConnectionCallbacks() override;
 
   // Network::ConnectionCallbacks
   MOCK_METHOD1(onEvent, void(Network::ConnectionEvent event));
@@ -48,7 +48,7 @@ public:
 class MockConnection : public Connection, public MockConnectionBase {
 public:
   MockConnection();
-  ~MockConnection();
+  ~MockConnection() override;
 
   // Network::Connection
   MOCK_METHOD1(addConnectionCallbacks, void(ConnectionCallbacks& cb));
@@ -95,7 +95,7 @@ public:
 class MockClientConnection : public ClientConnection, public MockConnectionBase {
 public:
   MockClientConnection();
-  ~MockClientConnection();
+  ~MockClientConnection() override;
 
   // Network::Connection
   MOCK_METHOD1(addConnectionCallbacks, void(ConnectionCallbacks& cb));
@@ -145,7 +145,7 @@ public:
 class MockFilterManagerConnection : public FilterManagerConnection, public MockConnectionBase {
 public:
   MockFilterManagerConnection();
-  ~MockFilterManagerConnection();
+  ~MockFilterManagerConnection() override;
 
   // Network::Connection
   MOCK_METHOD1(addConnectionCallbacks, void(ConnectionCallbacks& cb));

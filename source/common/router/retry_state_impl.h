@@ -27,7 +27,7 @@ public:
                               const Upstream::ClusterInfo& cluster, Runtime::Loader& runtime,
                               Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
                               Upstream::ResourcePriority priority);
-  ~RetryStateImpl();
+  ~RetryStateImpl() override;
 
   /**
    * Returns the RetryPolicy extracted from the x-envoy-retry-on header.

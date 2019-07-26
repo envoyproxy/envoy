@@ -10,7 +10,7 @@ namespace DubboProxy {
 class ContextBase : public Context {
 public:
   ContextBase() = default;
-  ~ContextBase() override {}
+  ~ContextBase() override = default;
 
   // Override from Context
   size_t body_size() const override { return body_size_; }
@@ -27,7 +27,7 @@ protected:
 class ContextImpl : public ContextBase {
 public:
   ContextImpl() = default;
-  ~ContextImpl() override {}
+  ~ContextImpl() override = default;
 
   bool is_heartbeat() const { return is_heartbeat_; }
   void set_heartbeat(bool is_heartbeat) { is_heartbeat_ = is_heartbeat; }

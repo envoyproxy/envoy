@@ -21,7 +21,7 @@ namespace ThriftProxy {
  */
 class CompactProtocolImpl : public Protocol {
 public:
-  CompactProtocolImpl() {}
+  CompactProtocolImpl() = default;
 
   // Protocol
   const std::string& name() const override { return ProtocolNames::get().COMPACT; }

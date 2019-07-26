@@ -196,7 +196,7 @@ TEST_F(StatMergerThreadLocalTest, filterOutUninitializedGauges) {
 
   // We don't get "newgauge1" in the aggregated list, but we *do* get it if we try to
   // find it by name.
-  absl::optional<std::reference_wrapper<const Gauge>> find = store_.findGauge(g1.statName());
+  OptionalGauge find = store_.findGauge(g1.statName());
   ASSERT_TRUE(find);
   EXPECT_EQ(&g1, &(find->get()));
 }
