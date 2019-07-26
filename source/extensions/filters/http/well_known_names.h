@@ -12,6 +12,8 @@ namespace HttpFilters {
  */
 class HttpFilterNameValues {
 public:
+  // ABAC HTTP Authorization filter
+  const std::string Abac = "envoy.filters.http.abac";
   // Buffer filter
   const std::string Buffer = "envoy.buffer";
   // CORS filter
@@ -48,8 +50,6 @@ public:
   const std::string ExtAuthorization = "envoy.ext_authz";
   // RBAC HTTP Authorization filter
   const std::string Rbac = "envoy.filters.http.rbac";
-  // ABAC HTTP Authorization filter
-  const std::string Abac = "envoy.filters.http.abac";
   // JWT authentication filter
   const std::string JwtAuthn = "envoy.filters.http.jwt_authn";
   // Header to metadata filter

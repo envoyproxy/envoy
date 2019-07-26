@@ -145,8 +145,8 @@ Http::FilterHeadersStatus AttributeBasedAccessControlFilter::decodeHeaders(Http:
 
   auto eval_status = expr_->Evaluate(activation, &arena);
   if (!eval_status.ok()) {
-    ENVOY_LOG(debug, "evaluation failed: {}", eval_status.message());
-    return Http::FilterHeadersStatus::StopIteration;
+    ENVOY_LOG(debug, "evaluation failed: {}", eval_status.status().message());
+    return Http::FilterHeadersStatus::StopIterationAndWatermark;
   }
 
   auto result = eval_status.ValueOrDie();
@@ -162,7 +162,7 @@ Http::FilterHeadersStatus AttributeBasedAccessControlFilter::decodeHeaders(Http:
     ENVOY_LOG(debug, "expression did not evaluate to 'true': type {}",
               CelValue::TypeName(result.type()));
   }
-  return Http::FilterHeadersStatus::StopIteration;
+  return Http::FilterHeadersStatus::StopIterationAndWatermark;
 }
 
 } // namespace ABACFilter
