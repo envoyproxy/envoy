@@ -17,7 +17,7 @@ namespace JwtAuthn {
 // The Envoy filter to process JWT auth.
 class Filter : public Http::StreamDecoderFilter,
                public Verifier::Callbacks,
-               public Logger::Loggable<Logger::Id::filter> {
+               public Logger::Loggable<Logger::Id::jwt> {
 public:
   Filter(FilterConfigSharedPtr config);
 
