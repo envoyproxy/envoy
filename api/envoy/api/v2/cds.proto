@@ -651,7 +651,7 @@ message Cluster {
   // policy that it supports.  This provides a mechanism for starting to
   // use new LB policies that are not yet supported by all clients.
   repeated IntraLocalityLoadBalancingPolicy
-      intra_locality_load_balancing_policy = 33;
+      intra_locality_load_balancing_policy = 40;
 }
 
 // An extensible structure containing the address Envoy should bind to when
