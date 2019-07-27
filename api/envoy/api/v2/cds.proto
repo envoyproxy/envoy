@@ -632,6 +632,26 @@ message Cluster {
   // If this flag is not set to true, Envoy will wait until the hosts fail active health
   // checking before removing it from the cluster.
   bool drain_connections_on_host_removal = 32;
+
+  // New mechanism for LB policy configuration.  If set and understood
+  // by the client, replaces the lb_policy field, the common_lb_config
+  // field, and the fields in the lb_config oneof.  For backward
+  // compatibility, management servers should populate both sets of fields.
+  //
+  // Every LB policy defined via this mechanism will be identified via a
+  // unique name.  If the policy that needs configuration parameters, it
+  // musts define a message for its own configuration, which will be stored
+  // in the config field.  The name of the policy will tell clients
+  // which type of message they should expect to see in the config field.
+  message IntraLocalityLoadBalancingPolicy {
+    string name = 1;  // Required.  The name of the LB policy.
+    google.protobuf.Any config = 2;  // Optional.  Config for the LB policy.
+  }
+  // Each client will iterate over the list in order and stop at the first
+  // policy that it supports.  This provides a mechanism for starting to
+  // use new LB policies that are not yet supported by all clients.
+  repeated IntraLocalityLoadBalancingPolicy
+      intra_locality_load_balancing_policy = 33;
 }
 
 // An extensible structure containing the address Envoy should bind to when
