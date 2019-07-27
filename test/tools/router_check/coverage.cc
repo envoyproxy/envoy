@@ -6,7 +6,8 @@
 
 namespace Envoy {
 void Coverage::markCovered(const Envoy::Router::RouteEntry* route) {
-  const bool seen = std::find(seen_routes_.begin(), seen_routes_.end(), route) != seen_routes_.end();
+  const bool seen =
+      std::find(seen_routes_.begin(), seen_routes_.end(), route) != seen_routes_.end();
   if (!seen) {
     seen_routes_.push_back(route);
   }
