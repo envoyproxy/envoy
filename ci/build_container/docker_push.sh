@@ -21,7 +21,7 @@ else
 fi
 
 diff_want_build='false'
-if [[ -z $(git diff ${diff_base} ci/build_container/) ]]; then
+if [[ ! -z $(git diff --name-only "${diff_base}..HEAD" ci/build_container/) ]]; then
     echo "There are changes in the ci/build_container directory"
     diff_want_build='true'
 fi
