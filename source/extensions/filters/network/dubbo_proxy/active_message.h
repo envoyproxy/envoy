@@ -78,6 +78,8 @@ public:
   Event::Dispatcher& dispatcher() override;
   void resetStream() override;
 
+  bool dual_filter() const { return dual_filter_; }
+
 protected:
   ActiveMessage& parent_;
   const bool dual_filter_ : 1;
@@ -184,6 +186,9 @@ public:
   MessageMetadataSharedPtr metadata() const { return metadata_; }
   ContextSharedPtr context() const { return context_; }
   bool pending_stream_decoded() const { return pending_stream_decoded_; }
+
+  // This function is for testing only.
+  void clearMetadataForTesting() { metadata_.reset(); }
 
 private:
   void addDecoderFilterWorker(DubboFilters::DecoderFilterSharedPtr filter, bool dual_filter);
