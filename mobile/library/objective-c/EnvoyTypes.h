@@ -13,7 +13,7 @@ typedef NSArray<NSDictionary<NSString *, NSString *> *> EnvoyHeaders;
 
 /// Error code associated with terminal status of a HTTP stream.
 typedef NS_ENUM(NSUInteger, EnvoyErrorCode) {
-  StreamReset = 0,
+  EnvoyErrorCodeStreamReset = 0,
 };
 
 // MARK: - EnvoyError
@@ -32,9 +32,9 @@ typedef NS_ENUM(NSUInteger, EnvoyErrorCode) {
 // MARK: - EnvoyStatus
 
 /// Result codes returned by all calls made to this interface.
-typedef NS_ENUM(NSUInteger, EnvoyStatus) {
-  Success = 0,
-  Failure = 1,
+typedef NS_CLOSED_ENUM(NSUInteger, EnvoyStatus){
+    EnvoyStatusSuccess = 0,
+    EnvoyStatusFailure = 1,
 };
 
 // MARK: - EnvoyStream
