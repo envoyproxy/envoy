@@ -17,6 +17,6 @@ double Coverage::report() {
   for (const auto& host : route_config_.virtual_hosts()) {
     size_t += host.routes_size();
   }
-  return static_cast<double>(seen_routes_.size()) / size_t;
+  return 100 * static_cast<double>(seen_routes_.size()) / size_t;
 }
 } // namespace Envoy
