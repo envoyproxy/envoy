@@ -184,15 +184,11 @@ public:
    * @param connection supplies the owning connection.
    * @param data supplies the currently available read data.
    * @param callbacks supplies the callbacks to install into the codec.
-   * @param strict_header_validation indicates whether or not the codec should validate the values
-   * of each HTTP header (NOTE: this argument only affects the H/1.1 codec; the H/2 codec always
-   * does this)
    * @return a codec or nullptr if no codec can be created.
    */
   virtual ServerConnectionPtr createCodec(Network::Connection& connection,
                                           const Buffer::Instance& data,
-                                          ServerConnectionCallbacks& callbacks,
-                                          const bool strict_header_validation) PURE;
+                                          ServerConnectionCallbacks& callbacks) PURE;
 
   /**
    * @return DateProvider& the date provider to use for
