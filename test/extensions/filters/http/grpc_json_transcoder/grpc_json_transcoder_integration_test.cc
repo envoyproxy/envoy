@@ -548,8 +548,8 @@ std::string createLargeJson(int level) {
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, LargeStruct) {
   HttpIntegrationTest::initialize();
-  // Create a 40kB json payload.
-  std::string largeJson = createLargeJson(12);
+  // Create a 160kB json payload.
+  std::string largeJson = createLargeJson(14);
   std::string largeProto = "content {" + jsonStrToPbStrucStr(largeJson) + "}";
   testTranscoding<bookstore::EchoStructReqResp, bookstore::EchoStructReqResp>(
       Http::TestHeaderMapImpl{
