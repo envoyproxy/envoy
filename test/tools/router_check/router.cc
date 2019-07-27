@@ -282,7 +282,7 @@ bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config, const std::str
 
     actual = tool_config.headers_->get_(Http::Headers::get().Path);
   }
-  bool matches = compareResults(actual, expected, "path_rewrite");
+  const bool matches = compareResults(actual, expected, "path_rewrite");
   if (matches) {
     coverage_.markCovered(tool_config.route_->routeEntry());
   }
