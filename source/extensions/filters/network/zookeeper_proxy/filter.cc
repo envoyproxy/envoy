@@ -282,11 +282,11 @@ void ZooKeeperFilter::onResponse(const OpCodes opcode, const int32_t xid, const 
     break;
   case OpCodes::GETCHILDREN:
     opname = "getchildren_resp";
-    config_->stats_.getchildren_rq_.inc();
+    config_->stats_.getchildren_resp_.inc();
     break;
   case OpCodes::GETCHILDREN2:
     opname = "getchildren2_resp";
-    config_->stats_.getchildren2_rq_.inc();
+    config_->stats_.getchildren2_resp_.inc();
     break;
   case OpCodes::DELETE:
     opname = "remove_resp";
