@@ -72,10 +72,34 @@ following statistics:
   checkwatches_rq, Counter, Number of checkwatches requests
   removewatches_rq, Counter, Number of removewatches requests
   check_rq, Counter, Number of check requests
+  response_bytes, Counter, Number of bytes in decoded response messages
   connect_resp, Counter, Number of connect responses
   ping_resp, Counter, Number of ping responses
   auth_resp, Counter, Number of auth responses
   watch_event, Counter, Number of watch events fired by the server
+  getdata_resp, Counter, Number of getdata responses
+  create_resp, Counter, Number of create responses
+  create2_resp, Counter, Number of create2 responses
+  createcontainer_resp, Counter, Number of createcontainer responses
+  createttl_resp, Counter, Number of createttl responses
+  setdata_resp, Counter, Number of setdata responses
+  getchildren_resp, Counter, Number of getchildren responses
+  getchildren2_resp, Counter, Number of getchildren2 responses
+  getephemerals_resp, Counter, Number of getephemerals responses
+  getallchildrennumber_resp, Counter, Number of getallchildrennumber responses
+  remove_resp, Counter, Number of remove responses
+  exists_resp, Counter, Number of exists responses
+  getacl_resp, Counter, Number of getacl responses
+  setacl_resp, Counter, Number of setacl responses
+  sync_resp, Counter, Number of sync responses
+  multi_resp, Counter, Number of multi responses
+  reconfig_resp, Counter, Number of reconfig responses
+  close_resp, Counter, Number of close responses
+  setauth_resp, Counter, Number of setauth responses
+  setwatches_resp, Counter, Number of setwatches responses
+  checkwatches_resp, Counter, Number of checkwatches responses
+  removewatches_resp, Counter, Number of removewatches responses
+  check_resp, Counter, Number of check responses
 
 .. _config_network_filters_zookeeper_proxy_dynamic_metadata:
 
