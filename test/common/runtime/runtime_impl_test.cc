@@ -623,6 +623,8 @@ TEST_F(StaticLoaderImplTest, RuntimeFromNonWorkerThreads) {
   // Now set up a test thread which verifies foo -> bar
   //
   // Then change foo and make sure the test thread picks up the change.
+  bool read_bar = false;
+  bool updated_eep = false;
   Thread::MutexBasicLockable mutex;
   Thread::CondVar foo_read;
   Thread::CondVar foo_changed;
@@ -631,6 +633,7 @@ TEST_F(StaticLoaderImplTest, RuntimeFromNonWorkerThreads) {
     {
       Thread::LockGuard lock(mutex);
       EXPECT_EQ("bar", loader_->threadsafeSnapshot()->get("foo"));
+      read_bar  = true;
       original_thread_snapshot_pointer = loader_->threadsafeSnapshot().get();
       EXPECT_EQ(original_thread_snapshot_pointer, loader_->threadsafeSnapshot().get());
       foo_read.notifyOne();
@@ -638,7 +641,9 @@ TEST_F(StaticLoaderImplTest, RuntimeFromNonWorkerThreads) {
 
     {
       Thread::LockGuard lock(mutex);
-      foo_changed.wait(mutex);
+      while (!updated_eep) {
+        foo_changed.wait(mutex);
+      }
       EXPECT_EQ("eep", loader_->threadsafeSnapshot()->get("foo"));
     }
   });
@@ -646,8 +651,11 @@ TEST_F(StaticLoaderImplTest, RuntimeFromNonWorkerThreads) {
   {
     {
       Thread::LockGuard lock(mutex);
-      foo_read.wait(mutex);
+      while (!read_bar) {
+        foo_read.wait(mutex);
+      }
       loader_->mergeValues({{"foo", "eep"}});
+      updated_eep = true;
     }
     {
       Thread::LockGuard lock(mutex);
