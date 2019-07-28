@@ -17,9 +17,13 @@ envoy_cc_test(
     ],
     data = [
         "gen_unittest_certs.sh",
+        # TODO(mattklein123): We should consolidate all of our test certs in a single place as
+        # right now we have a bunch of duplication which is confusing.
+        "//test/config/integration/certs",
         "//test/extensions/transport_sockets/tls/test_data:certs",
     ],
     external_deps = ["ssl"],
+    shard_count = 4,
     deps = [
         "//include/envoy/network:transport_socket_interface",
         "//source/common/buffer:buffer_lib",

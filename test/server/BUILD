@@ -122,6 +122,7 @@ envoy_cc_test(
         "//test/test_common:logging_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
     ],
 )
 
@@ -260,8 +261,6 @@ envoy_cc_test(
         ":runtime_test_data",
         ":stats_sink_bootstrap.yaml",
         ":zipkin_tracing.yaml",
-        "//test/config/integration:server.json",
-        "//test/config/integration:server_config_files",
     ],
     deps = [
         "//source/common/common:version_lib",

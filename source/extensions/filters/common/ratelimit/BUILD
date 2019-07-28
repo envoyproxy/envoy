@@ -39,6 +39,15 @@ envoy_cc_library(
         "//include/envoy/ratelimit:ratelimit_interface",
         "//include/envoy/singleton:manager_interface",
         "//include/envoy/tracing:http_tracer_interface",
+        "//source/common/stats:symbol_table_lib",
         "@envoy_api//envoy/config/ratelimit/v2:rls_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "stat_names_lib",
+    hdrs = ["stat_names.h"],
+    deps = [
+        "//source/common/stats:symbol_table_lib",
     ],
 )

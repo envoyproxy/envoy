@@ -72,7 +72,7 @@ public:
                 const std::vector<Tag>& tags)
       : HistogramImplHelper(name, tag_extracted_name, tags, parent.symbolTable()), parent_(parent) {
   }
-  ~HistogramImpl() {
+  ~HistogramImpl() override {
     // We must explicitly free the StatName here in order to supply the
     // SymbolTable reference. An RAII alternative would be to store a
     // reference to the SymbolTable in MetricImpl, which would cost 8 bytes
@@ -99,7 +99,7 @@ class NullHistogramImpl : public HistogramImplHelper {
 public:
   explicit NullHistogramImpl(SymbolTable& symbol_table)
       : HistogramImplHelper(symbol_table), symbol_table_(symbol_table) {}
-  ~NullHistogramImpl() { MetricImpl::clear(symbol_table_); }
+  ~NullHistogramImpl() override { MetricImpl::clear(symbol_table_); }
 
   bool used() const override { return false; }
   SymbolTable& symbolTable() override { return symbol_table_; }

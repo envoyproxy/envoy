@@ -56,7 +56,7 @@ private:
   public:
     explicit ResourceVersion(absl::string_view version) : version_(version) {}
     // Builds a ResourceVersion in the waitingForServer state.
-    ResourceVersion() {}
+    ResourceVersion() = default;
 
     // If true, we currently have no version of this resource - we are waiting for the server to
     // provide us with one.

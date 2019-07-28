@@ -50,7 +50,7 @@ public:
     filter_->onBelowWriteBufferLowWatermark();
   }
 
-  ~RateLimitFilterTest() {
+  ~RateLimitFilterTest() override {
     for (const Stats::GaugeSharedPtr& gauge : stats_store_.gauges()) {
       EXPECT_EQ(0U, gauge->value());
     }
