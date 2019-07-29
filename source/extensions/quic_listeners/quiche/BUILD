@@ -15,6 +15,7 @@ envoy_cc_library(
     external_deps = ["quiche_quic_platform"],
     tags = ["nofips"],
     deps = [
+        "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",
         "@com_googlesource_quiche//:quic_core_alarm_interface_lib",
     ],

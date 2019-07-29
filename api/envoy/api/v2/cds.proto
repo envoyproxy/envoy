@@ -16,6 +16,7 @@ import "envoy/api/v2/discovery.proto";
 import "envoy/api/v2/core/health_check.proto";
 import "envoy/api/v2/core/protocol.proto";
 import "envoy/api/v2/cluster/circuit_breaker.proto";
+import "envoy/api/v2/cluster/filter.proto";
 import "envoy/api/v2/cluster/outlier_detection.proto";
 import "envoy/api/v2/eds.proto";
 import "envoy/type/percent.proto";
@@ -51,7 +52,7 @@ service ClusterDiscoveryService {
 // [#protodoc-title: Clusters]
 
 // Configuration for a single upstream cluster.
-// [#comment:next free field: 40]
+// [#comment:next free field: 41]
 message Cluster {
   // Supplies the name of the cluster which must be unique across all clusters.
   // The cluster name is used when emitting
@@ -632,6 +633,11 @@ message Cluster {
   // If this flag is not set to true, Envoy will wait until the hosts fail active health
   // checking before removing it from the cluster.
   bool drain_connections_on_host_removal = 32;
+
+  // An optional list of network filters that make up the filter chain for
+  // outgoing connections made by the cluster. Order matters as the filters are
+  // processed sequentially as connection events happen.
+  repeated cluster.Filter filters = 40;
 }
 
 // An extensible structure containing the address Envoy should bind to when

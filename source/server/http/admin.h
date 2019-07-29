@@ -105,8 +105,7 @@ public:
   const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
   Http::ServerConnectionPtr createCodec(Network::Connection& connection,
                                         const Buffer::Instance& data,
-                                        Http::ServerConnectionCallbacks& callbacks,
-                                        const bool strict_header_validation) override;
+                                        Http::ServerConnectionCallbacks& callbacks) override;
   Http::DateProvider& dateProvider() override { return date_provider_; }
   std::chrono::milliseconds drainTimeout() override { return std::chrono::milliseconds(100); }
   Http::FilterChainFactory& filterFactory() override { return *this; }

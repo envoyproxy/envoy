@@ -26,6 +26,13 @@ echo "build ${BAZEL_BUILD_OPTIONS}" >> .bazelrc
 # by clang-tidy
 "${ENVOY_SRCDIR}/tools/gen_compilation_database.py" --run_bazel_build --include_headers
 
+# Do not run clang-tidy against win32 impl
+# TODO(scw00): We should run clang-tidy against win32 impl. But currently we only have 
+# linux ci box.
+function exclude_win32_impl() {
+  grep -v source/common/filesystem/win32/ | grep -v source/common/common/win32 | grep -v source/exe/win32
+}
+
 # Do not run incremental clang-tidy on check_format testdata files.
 function exclude_testdata() {
   grep -v tools/testdata/check_format/
@@ -38,7 +45,7 @@ function exclude_chromium_url() {
 }
 
 function filter_excludes() {
-  exclude_testdata | exclude_chromium_url
+  exclude_testdata | exclude_chromium_url | exclude_win32_impl
 }
 
 if [[ "${RUN_FULL_CLANG_TIDY}" == 1 ]]; then

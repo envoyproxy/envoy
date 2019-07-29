@@ -55,6 +55,7 @@ genrule(
 quiche_copt = [
     # Remove these after upstream fix.
     "-Wno-unused-parameter",
+    "-Wno-unused-function",
     "-Wno-type-limits",
     # quic_inlined_frame.h uses offsetof() to optimize memory usage in frames.
     "-Wno-invalid-offsetof",
@@ -2032,6 +2033,7 @@ envoy_cc_library(
     copts = quiche_copt,
     repository = "@envoy",
     tags = ["nofips"],
+    visibility = ["//visibility:public"],
     deps = [
         ":quic_core_connection_lib",
         ":quic_core_crypto_crypto_handshake_lib",
@@ -2574,6 +2576,7 @@ envoy_cc_library(
     copts = quiche_copt,
     repository = "@envoy",
     tags = ["nofips"],
+    visibility = ["//visibility:public"],
     deps = [
         ":quic_core_alarm_factory_interface_lib",
         ":quic_core_alarm_interface_lib",
@@ -2904,6 +2907,186 @@ envoy_cc_library(
         ":quic_core_types_lib",
         ":quic_platform_base",
     ],
+)
+
+envoy_cc_test_library(
+    name = "quic_test_tools_config_peer_lib",
+    srcs = ["quiche/quic/test_tools/quic_config_peer.cc"],
+    hdrs = ["quiche/quic/test_tools/quic_config_peer.h"],
+    copts = quiche_copt,
+    repository = "@envoy",
+    deps = [
+        ":quic_core_config_lib",
+        ":quic_core_packets_lib",
+        ":quic_platform_base",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "quic_test_tools_framer_peer_lib",
+    srcs = ["quiche/quic/test_tools/quic_framer_peer.cc"],
+    hdrs = ["quiche/quic/test_tools/quic_framer_peer.h"],
+    copts = quiche_copt,
+    repository = "@envoy",
+    deps = [
+        ":quic_core_crypto_encryption_lib",
+        ":quic_core_framer_lib",
+        ":quic_core_packets_lib",
+        ":quic_platform_base",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "quic_test_tools_mock_clock_lib",
+    srcs = ["quiche/quic/test_tools/mock_clock.cc"],
+    hdrs = ["quiche/quic/test_tools/mock_clock.h"],
+    copts = quiche_copt,
+    repository = "@envoy",
+    deps = [
+        ":quic_core_time_lib",
+        ":quic_platform",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "quic_test_tools_mock_random_lib",
+    srcs = ["quiche/quic/test_tools/mock_random.cc"],
+    hdrs = ["quiche/quic/test_tools/mock_random.h"],
+    copts = quiche_copt,
+    repository = "@envoy",
+    deps = [":quic_core_crypto_random_lib"],
+)
+
+envoy_cc_test_library(
+    name = "quic_test_tools_packet_generator_peer_lib",
+    srcs = ["quiche/quic/test_tools/quic_packet_generator_peer.cc"],
+    hdrs = ["quiche/quic/test_tools/quic_packet_generator_peer.h"],
+    copts = quiche_copt,
+    repository = "@envoy",
+    deps = [
+        ":quic_core_packet_creator_lib",
+        ":quic_core_packet_generator_lib",
+        ":quic_core_packets_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "quic_test_tools_sent_packet_manager_peer_lib",
+    srcs = ["quiche/quic/test_tools/quic_sent_packet_manager_peer.cc"],
+    hdrs = ["quiche/quic/test_tools/quic_sent_packet_manager_peer.h"],
+    copts = quiche_copt,
+    repository = "@envoy",
+    deps = [
+        ":quic_core_congestion_control_congestion_control_interface_lib",
+        ":quic_core_packets_lib",
+        ":quic_core_sent_packet_manager_lib",
+        ":quic_test_tools_unacked_packet_map_peer_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "quic_test_tools_simple_quic_framer_lib",
+    srcs = ["quiche/quic/test_tools/simple_quic_framer.cc"],
+    hdrs = ["quiche/quic/test_tools/simple_quic_framer.h"],
+    copts = quiche_copt,
+    repository = "@envoy",
+    deps = [
+        ":quic_core_crypto_encryption_lib",
+        ":quic_core_framer_lib",
+        ":quic_core_packets_lib",
+        ":quic_platform_base",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "quic_test_tools_stream_send_buffer_peer_lib",
+    srcs = ["quiche/quic/test_tools/quic_stream_send_buffer_peer.cc"],
+    hdrs = ["quiche/quic/test_tools/quic_stream_send_buffer_peer.h"],
+    copts = quiche_copt,
+    repository = "@envoy",
+    deps = [":quic_core_stream_send_buffer_lib"],
+)
+
+envoy_cc_test_library(
+    name = "quic_test_tools_stream_peer_lib",
+    srcs = ["quiche/quic/test_tools/quic_stream_peer.cc"],
+    hdrs = ["quiche/quic/test_tools/quic_stream_peer.h"],
+    copts = quiche_copt,
+    repository = "@envoy",
+    deps = [
+        ":quic_core_packets_lib",
+        ":quic_core_session_lib",
+        ":quic_core_stream_send_buffer_lib",
+        ":quic_platform_base",
+        ":quic_test_tools_stream_send_buffer_peer_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "quic_test_tools_test_utils_interface_lib",
+    srcs = [
+        "quiche/quic/test_tools/crypto_test_utils.cc",
+        "quiche/quic/test_tools/mock_quic_session_visitor.cc",
+        "quiche/quic/test_tools/mock_quic_time_wait_list_manager.cc",
+        "quiche/quic/test_tools/quic_connection_peer.cc",
+        "quiche/quic/test_tools/quic_dispatcher_peer.cc",
+        "quiche/quic/test_tools/quic_test_utils.cc",
+    ],
+    hdrs = [
+        "quiche/quic/test_tools/crypto_test_utils.h",
+        "quiche/quic/test_tools/mock_quic_session_visitor.h",
+        "quiche/quic/test_tools/mock_quic_time_wait_list_manager.h",
+        "quiche/quic/test_tools/quic_connection_peer.h",
+        "quiche/quic/test_tools/quic_dispatcher_peer.h",
+        "quiche/quic/test_tools/quic_test_utils.h",
+    ],
+    copts = quiche_copt,
+    external_deps = ["ssl"],
+    repository = "@envoy",
+    deps = [
+        ":quic_core_buffer_allocator_lib",
+        ":quic_core_congestion_control_congestion_control_interface_lib",
+        ":quic_core_connection_lib",
+        ":quic_core_connection_stats_lib",
+        ":quic_core_crypto_crypto_handshake_lib",
+        ":quic_core_crypto_encryption_lib",
+        ":quic_core_crypto_proof_source_interface_lib",
+        ":quic_core_crypto_random_lib",
+        ":quic_core_data_lib",
+        ":quic_core_framer_lib",
+        ":quic_core_http_client_lib",
+        ":quic_core_http_spdy_session_lib",
+        ":quic_core_packet_creator_lib",
+        ":quic_core_packet_writer_interface_lib",
+        ":quic_core_packets_lib",
+        ":quic_core_received_packet_manager_lib",
+        ":quic_core_sent_packet_manager_lib",
+        ":quic_core_server_id_lib",
+        ":quic_core_server_lib",
+        ":quic_core_session_lib",
+        ":quic_core_time_wait_list_manager_lib",
+        ":quic_core_utils_lib",
+        ":quic_platform",
+        ":quic_platform_test",
+        ":quic_test_tools_config_peer_lib",
+        ":quic_test_tools_framer_peer_lib",
+        ":quic_test_tools_mock_clock_lib",
+        ":quic_test_tools_mock_random_lib",
+        ":quic_test_tools_packet_generator_peer_lib",
+        ":quic_test_tools_sent_packet_manager_peer_lib",
+        ":quic_test_tools_simple_quic_framer_lib",
+        ":quic_test_tools_stream_peer_lib",
+        ":spdy_core_framer_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "quic_test_tools_unacked_packet_map_peer_lib",
+    srcs = ["quiche/quic/test_tools/quic_unacked_packet_map_peer.cc"],
+    hdrs = ["quiche/quic/test_tools/quic_unacked_packet_map_peer.h"],
+    copts = quiche_copt,
+    repository = "@envoy",
+    deps = [":quic_core_unacked_packet_map_lib"],
 )
 
 envoy_cc_test_library(
