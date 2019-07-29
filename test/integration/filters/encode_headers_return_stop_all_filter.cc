@@ -35,6 +35,10 @@ public:
 
     createTimerForContinue();
 
+    Http::MetadataMap metadata_map = {{"headers", "headers"}};
+    Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
+    encoder_callbacks_->addEncodedMetadata(std::move(metadata_map_ptr));
+
     Http::HeaderEntry* entry_buffer = header_map.get(Envoy::Http::LowerCaseString("buffer_limit"));
     if (entry_buffer == nullptr) {
       return Http::FilterHeadersStatus::StopAllIterationAndBuffer;

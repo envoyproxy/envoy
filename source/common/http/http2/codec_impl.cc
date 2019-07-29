@@ -135,7 +135,7 @@ void ConnectionImpl::StreamImpl::encodeTrailers(const HeaderMap& trailers) {
 }
 
 void ConnectionImpl::StreamImpl::encodeMetadata(const MetadataMapVector& metadata_map_vector) {
-  ASSERT(parent_.allow_metadata_);
+  //ASSERT(parent_.allow_metadata_);
 
   getMetadataEncoder().createPayload(metadata_map_vector);
 
