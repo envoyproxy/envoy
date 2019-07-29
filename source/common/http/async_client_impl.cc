@@ -194,11 +194,11 @@ void AsyncRequestImpl::initialize() {
 
 void AsyncRequestImpl::onComplete() { callbacks_.onSuccess(std::move(response_)); }
 
-void AsyncRequestImpl::onHeaders(HeaderMapPtr&& headers, bool end_stream) {
+void AsyncRequestImpl::onHeaders(HeaderMapPtr&& headers, bool) {
   response_ = std::make_unique<ResponseMessageImpl>(std::move(headers));
 }
 
-void AsyncRequestImpl::onData(Buffer::Instance& data, bool end_stream) {
+void AsyncRequestImpl::onData(Buffer::Instance& data, bool) {
   if (!response_->body()) {
     response_->body() = std::make_unique<Buffer::OwnedImpl>();
   }
