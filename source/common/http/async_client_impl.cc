@@ -196,10 +196,6 @@ void AsyncRequestImpl::onComplete() { callbacks_.onSuccess(std::move(response_))
 
 void AsyncRequestImpl::onHeaders(HeaderMapPtr&& headers, bool end_stream) {
   response_ = std::make_unique<ResponseMessageImpl>(std::move(headers));
-
-  if (end_stream) {
-    onComplete();
-  }
 }
 
 void AsyncRequestImpl::onData(Buffer::Instance& data, bool end_stream) {
@@ -207,14 +203,13 @@ void AsyncRequestImpl::onData(Buffer::Instance& data, bool end_stream) {
     response_->body() = std::make_unique<Buffer::OwnedImpl>();
   }
   response_->body()->move(data);
-
-  if (end_stream) {
-    onComplete();
-  }
 }
 
 void AsyncRequestImpl::onTrailers(HeaderMapPtr&& trailers) {
   response_->trailers(std::move(trailers));
+}
+
+void AsyncRequestImpl::onClosure() {
   onComplete();
 }
 

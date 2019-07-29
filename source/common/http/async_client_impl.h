@@ -389,6 +389,7 @@ private:
   void onHeaders(HeaderMapPtr&& headers, bool end_stream) override;
   void onData(Buffer::Instance& data, bool end_stream) override;
   void onTrailers(HeaderMapPtr&& trailers) override;
+  void onClosure() override;
   void onReset() override;
 
   // Http::StreamDecoderFilterCallbacks
