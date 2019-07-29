@@ -56,10 +56,10 @@ InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_syste
                            ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
                            Filesystem::Instance& file_system,
                            std::unique_ptr<ProcessContext> process_context)
-    : secret_manager_(std::make_unique<Secret::SecretManagerImpl>()), workers_started_(false),
-      shutdown_(false), options_(options), time_source_(time_system), restarter_(restarter),
-      start_time_(time(nullptr)), original_start_time_(start_time_), stats_store_(store),
-      thread_local_(tls), api_(new Api::Impl(thread_factory, store, time_system, file_system)),
+    : workers_started_(false), shutdown_(false), options_(options), time_source_(time_system),
+      restarter_(restarter), start_time_(time(nullptr)), original_start_time_(start_time_),
+      stats_store_(store), thread_local_(tls),
+      api_(new Api::Impl(thread_factory, store, time_system, file_system)),
       dispatcher_(api_->allocateDispatcher()),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
       handler_(new ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
@@ -210,12 +210,12 @@ InstanceUtil::BootstrapVersion InstanceUtil::loadBootstrapConfig(
     ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api) {
   const std::string& config_path = options.configPath();
   const std::string& config_yaml = options.configYaml();
+  const envoy::config::bootstrap::v2::Bootstrap& config_proto = options.configProto();
 
   // Exactly one of config_path and config_yaml should be specified.
-  if (config_path.empty() && config_yaml.empty()) {
-    const std::string message =
-        "At least one of --config-path and --config-yaml should be non-empty";
-    throw EnvoyException(message);
+  if (config_path.empty() && config_yaml.empty() && config_proto.ByteSize() == 0) {
+    throw EnvoyException("At least one of --config-path or --config-yaml or Options::configProto() "
+                         "should be non-empty");
   }
 
   if (!config_path.empty()) {
@@ -225,6 +225,9 @@ InstanceUtil::BootstrapVersion InstanceUtil::loadBootstrapConfig(
     envoy::config::bootstrap::v2::Bootstrap bootstrap_override;
     MessageUtil::loadFromYaml(config_yaml, bootstrap_override, validation_visitor);
     bootstrap.MergeFrom(bootstrap_override);
+  }
+  if (config_proto.ByteSize() != 0) {
+    bootstrap.MergeFrom(config_proto);
   }
   MessageUtil::validate(bootstrap);
   return BootstrapVersion::V2;
@@ -333,6 +336,8 @@ void InstanceImpl::initialize(const Options& options,
   }
 
   loadServerFlags(initial_config.flagsPath());
+
+  secret_manager_ = std::make_unique<Secret::SecretManagerImpl>(admin_->getConfigTracker());
 
   // Initialize the overload manager early so other modules can register for actions.
   overload_manager_ = std::make_unique<OverloadManagerImpl>(

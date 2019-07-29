@@ -843,6 +843,11 @@ public:
    */
   virtual absl::optional<std::string> eds_service_name() const PURE;
 
+  /**
+   * Create network filters on a new upstream connection.
+   */
+  virtual void createNetworkFilterChain(Network::Connection& connection) const PURE;
+
 protected:
   /**
    * Invoked by extensionProtocolOptionsTyped.
