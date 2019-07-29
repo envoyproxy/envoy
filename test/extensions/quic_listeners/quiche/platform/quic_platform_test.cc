@@ -361,6 +361,18 @@ TEST_F(QuicPlatformTest, QuicLog) {
 #define VALUE_BY_COMPILE_MODE(debug_mode_value, release_mode_value) debug_mode_value
 #endif
 
+TEST_F(QuicPlatformTest, LogIoManipulators) {
+  GetLogger().set_level(ERROR);
+  QUIC_DLOG(ERROR) << "aaaa" << std::endl;
+  EXPECT_LOG_CONTAINS("error", "aaaa\n\n", QUIC_LOG(ERROR) << "aaaa" << std::endl << std::endl);
+  EXPECT_LOG_NOT_CONTAINS("error", "aaaa\n\n\n",
+                          QUIC_LOG(ERROR) << "aaaa" << std::endl
+                                          << std::endl);
+
+  EXPECT_LOG_CONTAINS("error", "42 in octal is 52",
+                      QUIC_LOG(ERROR) << 42 << " in octal is " << std::oct << 42);
+}
+
 TEST_F(QuicPlatformTest, QuicDLog) {
   int i = 0;
 

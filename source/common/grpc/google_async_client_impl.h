@@ -237,10 +237,10 @@ private:
   struct PendingMessage {
     PendingMessage(Buffer::InstancePtr request, bool end_stream);
     // End-of-stream with no additional message.
-    PendingMessage() : end_stream_(true) {}
+    PendingMessage() = default;
 
     const absl::optional<grpc::ByteBuffer> buf_;
-    const bool end_stream_;
+    const bool end_stream_{true};
   };
 
   GoogleAsyncTag init_tag_{*this, GoogleAsyncTag::Operation::Init};
