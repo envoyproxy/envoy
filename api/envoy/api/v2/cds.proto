@@ -129,8 +129,7 @@ message Cluster {
   // The timeout for new network connections to hosts in the cluster.
   google.protobuf.Duration connect_timeout = 4 [
     (validate.rules).duration.gt = {},
-    (gogoproto.stdduration) = true,
-    (gogoproto.nullable) = false
+    (gogoproto.stdduration) = true
   ];
 
   // Soft limit on size of the cluster’s connections read and write buffers. If

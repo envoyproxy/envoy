@@ -65,7 +65,7 @@ message DiscoveryResponse {
   string version_info = 1;
 
   // The response resources. These resources are typed and depend on the API being called.
-  repeated google.protobuf.Any resources = 2 [(gogoproto.nullable) = false];
+  repeated google.protobuf.Any resources = 2;
 
   // [#not-implemented-hide:]
   // Canary is used to support two Envoy command line flags:
@@ -196,7 +196,7 @@ message DeltaDiscoveryResponse {
 
   // The response resources. These are typed resources, whose types must match
   // the type_url field.
-  repeated Resource resources = 2 [(gogoproto.nullable) = false];
+  repeated Resource resources = 2;
 
   // field id 3 IS available!
 

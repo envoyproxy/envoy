@@ -132,5 +132,5 @@ message RouteConfiguration {
 message Vhds {
   // Configuration source specifier for VHDS.
   envoy.api.v2.core.ConfigSource config_source = 1
-      [(validate.rules).message.required = true, (gogoproto.nullable) = false];
+      [(validate.rules).message.required = true];
 }
