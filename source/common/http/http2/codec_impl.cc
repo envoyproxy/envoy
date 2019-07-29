@@ -557,8 +557,8 @@ int ConnectionImpl::onInvalidFrame(int32_t stream_id, int error_code) {
   }
 
   if (stream != nullptr) {
-    // nghttp2 returns error, and ConnectionManager will call resetAllStreams(). Null out
-    // stream->decoder_ to avoid referring to it.
+    // nghttp2 returns error, and ConnectionManager will call resetAllStreams(). Should not refer to
+    // decoder_ from now on. Null out stream->decoder_.
     stream->decoder_ = nullptr;
   }
 
@@ -619,8 +619,8 @@ int ConnectionImpl::onMetadataReceived(int32_t stream_id, const uint8_t* data, s
   bool success = stream->getMetadataDecoder().receiveMetadata(data, len);
 
   if (!success) {
-    // nghttp2 returns error, and ConnectionManager will call resetAllStreams(). Null out
-    // stream->decoder_ to avoid referring to it.
+    // nghttp2 returns error, and ConnectionManager will call resetAllStreams(). Should not refer to
+    // decoder_ from now on. Null out stream->decoder_.
     stream->decoder_ = nullptr;
   }
 
@@ -636,8 +636,8 @@ int ConnectionImpl::onMetadataFrameComplete(int32_t stream_id, bool end_metadata
 
   bool result = stream->getMetadataDecoder().onMetadataFrameComplete(end_metadata);
   if (!result) {
-    // nghttp2 returns error, and ConnectionManager will call resetAllStreams(). Null out
-    // stream->decoder_ to avoid referring to it.
+    // nghttp2 returns error, and ConnectionManager will call resetAllStreams(). Should not refer to
+    // decoder_ from now on. Null out stream->decoder_.
     stream->decoder_ = nullptr;
   }
   return result ? 0 : NGHTTP2_ERR_CALLBACK_FAILURE;
