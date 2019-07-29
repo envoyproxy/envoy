@@ -122,6 +122,7 @@ envoy_cc_test(
         "//test/test_common:logging_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
     ],
 )
 
