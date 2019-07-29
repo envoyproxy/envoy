@@ -157,7 +157,7 @@ namespace DubboFilters {
 class MockFilterChainFactory : public FilterChainFactory {
 public:
   MockFilterChainFactory();
-  ~MockFilterChainFactory();
+  ~MockFilterChainFactory() override;
 
   MOCK_METHOD1(createFilterChain, void(DubboFilters::FilterChainFactoryCallbacks& callbacks));
 };
