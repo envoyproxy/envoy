@@ -11,23 +11,23 @@ typedef UInt64 EnvoyStreamID;
 /// A set of headers that may be passed to/from an Envoy stream.
 typedef NSArray<NSDictionary<NSString *, NSString *> *> EnvoyHeaders;
 
-// MARK: - EnvoyErrorCode
+// MARK: - EnvoyEngineErrorCode
 
 /// Error code associated with terminal status of a HTTP stream.
-typedef NS_ENUM(NSUInteger, EnvoyErrorCode) {
-  EnvoyErrorCodeStreamReset = 0,
+typedef NS_ENUM(NSUInteger, EnvoyEngineErrorCode) {
+  EnvoyEngineErrorCodeStreamReset = 0,
 };
 
-// MARK: - EnvoyError
+// MARK: - EnvoyEngineError
 
 /// Error structure.
-@interface EnvoyError : NSError
+@interface EnvoyEngineError : NSError
 
 /// Message with additional details on the error.
 @property (nonatomic, copy) NSString *message;
 
 /// Error code representing the Envoy error.
-@property (nonatomic, assign) EnvoyErrorCode errorCode;
+@property (nonatomic, assign) EnvoyEngineErrorCode errorCode;
 
 @end
 
@@ -89,7 +89,7 @@ typedef struct {
  * Called when the async HTTP stream has an error.
  * @param error the error received/caused by the async HTTP stream.
  */
-@property (nonatomic, strong) void (^onError)(EnvoyError *error);
+@property (nonatomic, strong) void (^onError)(EnvoyEngineError *error);
 
 @end
 
