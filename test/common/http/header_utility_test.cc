@@ -272,6 +272,22 @@ regex_match: \d{3}
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
 }
 
+TEST(MatchHeadersTest, HeaderSafeRegexMatch) {
+  TestHeaderMapImpl matching_headers{{"match-header", "123"}};
+  TestHeaderMapImpl unmatching_headers{{"match-header", "1234"}, {"match-header", "123.456"}};
+  const std::string yaml = R"EOF(
+name: match-header
+safe_regex_match:
+  google_re_engine: {}
+  regex: \d{3}
+  )EOF";
+
+  std::vector<HeaderUtility::HeaderData> header_data;
+  header_data.push_back(HeaderUtility::HeaderData(parseHeaderMatcherFromYaml(yaml)));
+  EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
+  EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
+}
+
 TEST(MatchHeadersTest, HeaderRegexInverseMatch) {
   TestHeaderMapImpl matching_headers{{"match-header", "1234"}, {"match-header", "123.456"}};
   TestHeaderMapImpl unmatching_headers{{"match-header", "123"}};

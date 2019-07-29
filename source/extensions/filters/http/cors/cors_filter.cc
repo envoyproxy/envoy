@@ -136,7 +136,7 @@ bool CorsFilter::isOriginAllowedRegex(const Http::HeaderString& origin) {
   }
   for (const auto& regex : *allowOriginRegexes()) {
     const absl::string_view origin_view = origin.getStringView();
-    if (std::regex_match(origin_view.begin(), origin_view.end(), regex)) {
+    if (regex->match(origin_view)) {
       return true;
     }
   }
@@ -152,7 +152,7 @@ const std::list<std::string>* CorsFilter::allowOrigins() {
   return nullptr;
 }
 
-const std::list<std::regex>* CorsFilter::allowOriginRegexes() {
+const std::list<Regex::CompiledMatcherPtr>* CorsFilter::allowOriginRegexes() {
   for (const auto policy : policies_) {
     if (policy && !policy->allowOriginRegexes().empty()) {
       return &policy->allowOriginRegexes();

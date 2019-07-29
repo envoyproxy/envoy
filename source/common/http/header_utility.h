@@ -1,9 +1,9 @@
 #pragma once
 
-#include <regex>
 #include <vector>
 
 #include "envoy/api/v2/route/route.pb.h"
+#include "envoy/common/regex.h"
 #include "envoy/http/header_map.h"
 #include "envoy/json/json_object.h"
 #include "envoy/type/range.pb.h"
@@ -39,7 +39,7 @@ public:
     const Http::LowerCaseString name_;
     HeaderMatchType header_match_type_;
     std::string value_;
-    std::regex regex_pattern_;
+    Regex::CompiledMatcherPtr regex_;
     envoy::type::Int64Range range_;
     const bool invert_match_;
   };

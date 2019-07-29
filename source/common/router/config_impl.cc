@@ -5,7 +5,6 @@
 #include <cstdint>
 #include <map>
 #include <memory>
-#include <regex>
 #include <string>
 #include <vector>
 
@@ -20,6 +19,7 @@
 #include "common/common/fmt.h"
 #include "common/common/hash.h"
 #include "common/common/logger.h"
+#include "common/common/regex.h"
 #include "common/common/utility.h"
 #include "common/config/metadata.h"
 #include "common/config/rds_json.h"
@@ -154,7 +154,10 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config,
     allow_origin_.push_back(origin);
   }
   for (const auto& regex : config.allow_origin_regex()) {
-    allow_origin_regex_.push_back(RegexUtil::parseRegex(regex));
+    allow_origin_regex_.push_back(Regex::Utility::parseStdRegexAsCompiledMatcher(regex));
+  }
+  for (const auto& regex : config.allow_origin_safe_regex()) {
+    allow_origin_regex_.push_back(Regex::Utility::parseRegex(regex));
   }
   if (config.has_allow_credentials()) {
     allow_credentials_ = PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_credentials);
@@ -443,7 +446,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
   }
 
   for (const auto& query_parameter : route.match().query_parameters()) {
-    config_query_parameters_.push_back(query_parameter);
+    config_query_parameters_.push_back(
+        std::make_unique<ConfigUtility::QueryParameterMatcher>(query_parameter));
   }
 
   if (!route.route().hash_policy().empty()) {
@@ -555,7 +559,7 @@ RouteEntryImplBase::loadRuntimeData(const envoy::api::v2::route::RouteMatch& rou
 }
 
 void RouteEntryImplBase::finalizePathHeader(Http::HeaderMap& headers,
-                                            const std::string& matched_path,
+                                            absl::string_view matched_path,
                                             bool insert_envoy_original_path) const {
   const auto& rewrite = getPathRewrite();
   if (rewrite.empty()) {
@@ -896,32 +900,36 @@ RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::HeaderMap& headers,
 RegexRouteEntryImpl::RegexRouteEntryImpl(const VirtualHostImpl& vhost,
                                          const envoy::api::v2::route::Route& route,
                                          Server::Configuration::FactoryContext& factory_context)
-    : RouteEntryImplBase(vhost, route, factory_context),
-      regex_(RegexUtil::parseRegex(route.match().regex())), regex_str_(route.match().regex()) {}
+    : RouteEntryImplBase(vhost, route, factory_context) {
+  if (route.match().path_specifier_case() == envoy::api::v2::route::RouteMatch::kRegex) {
+    regex_ = Regex::Utility::parseStdRegexAsCompiledMatcher(route.match().regex());
+    regex_str_ = route.match().regex();
+  } else {
+    ASSERT(route.match().path_specifier_case() == envoy::api::v2::route::RouteMatch::kSafeRegex);
+    regex_ = Regex::Utility::parseRegex(route.match().safe_regex());
+    regex_str_ = route.match().safe_regex().regex();
+  }
+}
 
-void RegexRouteEntryImpl::rewritePathHeader(Http::HeaderMap& headers,
-                                            bool insert_envoy_original_path) const {
+absl::string_view RegexRouteEntryImpl::pathOnly(const Http::HeaderMap& headers) const {
   const Http::HeaderString& path = headers.Path()->value();
   const absl::string_view query_string = Http::Utility::findQueryStringStart(path);
   const size_t path_string_length = path.size() - query_string.length();
+  return path.getStringView().substr(0, path_string_length);
+}
+
+void RegexRouteEntryImpl::rewritePathHeader(Http::HeaderMap& headers,
+                                            bool insert_envoy_original_path) const {
   // TODO(yuval-k): This ASSERT can happen if the path was changed by a filter without clearing the
   // route cache. We should consider if ASSERT-ing is the desired behavior in this case.
-
-  const absl::string_view path_view = path.getStringView();
-  ASSERT(std::regex_match(path_view.begin(), path_view.begin() + path_string_length, regex_));
-  const std::string matched_path(path_view.begin(), path_view.begin() + path_string_length);
-
-  finalizePathHeader(headers, matched_path, insert_envoy_original_path);
+  ASSERT(regex_->match(pathOnly(headers)));
+  finalizePathHeader(headers, pathOnly(headers), insert_envoy_original_path);
 }
 
 RouteConstSharedPtr RegexRouteEntryImpl::matches(const Http::HeaderMap& headers,
                                                  uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, random_value)) {
-    const Http::HeaderString& path = headers.Path()->value();
-    const absl::string_view query_string = Http::Utility::findQueryStringStart(path);
-    if (std::regex_match(path.getStringView().begin(),
-                         path.getStringView().begin() + (path.size() - query_string.length()),
-                         regex_)) {
+    if (regex_->match(pathOnly(headers))) {
       return clusterEntry(headers, random_value);
     }
   }
@@ -967,19 +975,22 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtu
   }
 
   for (const auto& route : virtual_host.routes()) {
-    const bool has_prefix =
-        route.match().path_specifier_case() == envoy::api::v2::route::RouteMatch::kPrefix;
-    const bool has_path =
-        route.match().path_specifier_case() == envoy::api::v2::route::RouteMatch::kPath;
-    const bool has_regex =
-        route.match().path_specifier_case() == envoy::api::v2::route::RouteMatch::kRegex;
-    if (has_prefix) {
+    switch (route.match().path_specifier_case()) {
+    case envoy::api::v2::route::RouteMatch::kPrefix: {
       routes_.emplace_back(new PrefixRouteEntryImpl(*this, route, factory_context));
-    } else if (has_path) {
+      break;
+    }
+    case envoy::api::v2::route::RouteMatch::kPath: {
       routes_.emplace_back(new PathRouteEntryImpl(*this, route, factory_context));
-    } else {
-      ASSERT(has_regex);
+      break;
+    }
+    case envoy::api::v2::route::RouteMatch::kRegex:
+    case envoy::api::v2::route::RouteMatch::kSafeRegex: {
       routes_.emplace_back(new RegexRouteEntryImpl(*this, route, factory_context));
+      break;
+    }
+    case envoy::api::v2::route::RouteMatch::PATH_SPECIFIER_NOT_SET:
+      NOT_REACHED_GCOVR_EXCL_LINE;
     }
 
     if (validate_clusters) {
@@ -1004,10 +1015,20 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtu
 
 VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
     const envoy::api::v2::route::VirtualCluster& virtual_cluster, Stats::StatNamePool& pool)
-    : pattern_(RegexUtil::parseRegex(virtual_cluster.pattern())),
-      stat_name_(pool.add(virtual_cluster.name())) {
+    : stat_name_(pool.add(virtual_cluster.name())) {
   if (virtual_cluster.method() != envoy::api::v2::core::RequestMethod::METHOD_UNSPECIFIED) {
     method_ = envoy::api::v2::core::RequestMethod_Name(virtual_cluster.method());
+  }
+
+  if (virtual_cluster.pattern().empty() == !virtual_cluster.has_regex()) {
+    throw EnvoyException("virtual clusters must define either 'pattern' or 'regex'");
+  }
+
+  if (!virtual_cluster.pattern().empty()) {
+    regex_ = Regex::Utility::parseStdRegexAsCompiledMatcher(virtual_cluster.pattern());
+  } else {
+    ASSERT(virtual_cluster.has_regex());
+    regex_ = Regex::Utility::parseRegex(virtual_cluster.regex());
   }
 }
 
@@ -1156,7 +1177,7 @@ VirtualHostImpl::virtualClusterFromEntries(const Http::HeaderMap& headers) const
         !entry.method_ || headers.Method()->value().getStringView() == entry.method_.value();
 
     absl::string_view path_view = headers.Path()->value().getStringView();
-    if (method_matches && std::regex_match(path_view.begin(), path_view.end(), entry.pattern_)) {
+    if (method_matches && entry.regex_->match(path_view)) {
       return &entry;
     }
   }

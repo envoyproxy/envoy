@@ -83,7 +83,7 @@ private:
   friend class CorsFilterTest;
 
   const std::list<std::string>* allowOrigins();
-  const std::list<std::regex>* allowOriginRegexes();
+  const std::list<Regex::CompiledMatcherPtr>* allowOriginRegexes();
   const std::string& allowMethods();
   const std::string& allowHeaders();
   const std::string& exposeHeaders();

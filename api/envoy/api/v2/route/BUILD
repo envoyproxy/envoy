@@ -10,6 +10,8 @@ api_proto_library_internal(
         "//envoy/api/v2/core:base",
         "//envoy/type:percent",
         "//envoy/type:range",
+        "//envoy/type/matcher:regex",
+        "//envoy/type/matcher:string",
     ],
 )
 

@@ -3,6 +3,7 @@
 #include <string>
 
 #include "envoy/api/v2/core/base.pb.h"
+#include "envoy/common/regex.h"
 #include "envoy/type/matcher/metadata.pb.h"
 #include "envoy/type/matcher/number.pb.h"
 #include "envoy/type/matcher/string.pb.h"
@@ -72,11 +73,7 @@ private:
 
 class StringMatcher : public ValueMatcher {
 public:
-  StringMatcher(const envoy::type::matcher::StringMatcher& matcher) : matcher_(matcher) {
-    if (matcher.match_pattern_case() == envoy::type::matcher::StringMatcher::kRegex) {
-      regex_ = RegexUtil::parseRegex(matcher_.regex());
-    }
-  }
+  StringMatcher(const envoy::type::matcher::StringMatcher& matcher);
 
   bool match(const absl::string_view value) const;
 
@@ -84,7 +81,7 @@ public:
 
 private:
   const envoy::type::matcher::StringMatcher matcher_;
-  std::regex regex_;
+  Regex::CompiledMatcherPtr regex_;
 };
 
 class LowerCaseStringMatcher : public ValueMatcher {

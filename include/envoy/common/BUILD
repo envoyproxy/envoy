@@ -30,6 +30,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "regex_interface",
+    hdrs = ["regex.h"],
+)
+
+envoy_cc_library(
     name = "token_bucket_interface",
     hdrs = ["token_bucket.h"],
     deps = [

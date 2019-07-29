@@ -257,6 +257,15 @@ TEST(MetadataTest, MatchDoubleListValue) {
   metadataValue.Clear();
 }
 
+TEST(StringMatcher, SafeRegexValue) {
+  envoy::type::matcher::StringMatcher matcher;
+  matcher.mutable_safe_regex()->mutable_google_re_engine();
+  matcher.mutable_safe_regex()->set_regex("foo.*");
+  EXPECT_TRUE(Matchers::StringMatcher(matcher).match("foo"));
+  EXPECT_TRUE(Matchers::StringMatcher(matcher).match("foobar"));
+  EXPECT_FALSE(Matchers::StringMatcher(matcher).match("bar"));
+}
+
 TEST(LowerCaseStringMatcher, MatchExactValue) {
   envoy::type::matcher::StringMatcher matcher;
   matcher.set_exact("Foo");

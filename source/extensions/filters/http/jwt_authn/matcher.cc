@@ -1,6 +1,7 @@
 #include "extensions/filters/http/jwt_authn/matcher.h"
 
 #include "common/common/logger.h"
+#include "common/common/regex.h"
 #include "common/router/config_impl.h"
 
 #include "absl/strings/match.h"
@@ -28,7 +29,8 @@ public:
     }
 
     for (const auto& query_parameter : rule.match().query_parameters()) {
-      config_query_parameters_.push_back(query_parameter);
+      config_query_parameters_.push_back(
+          std::make_unique<Router::ConfigUtility::QueryParameterMatcher>(query_parameter));
     }
   }
 
@@ -51,7 +53,8 @@ protected:
 
 private:
   std::vector<Http::HeaderUtility::HeaderData> config_headers_;
-  std::vector<Router::ConfigUtility::QueryParameterMatcher> config_query_parameters_;
+  std::vector<std::unique_ptr<Router::ConfigUtility::QueryParameterMatcher>>
+      config_query_parameters_;
 };
 
 /**
@@ -111,8 +114,9 @@ private:
  */
 class RegexMatcherImpl : public BaseMatcherImpl {
 public:
+  // TODO(mattklein123): Update the filter matchers to use safe regex.
   RegexMatcherImpl(const RequirementRule& rule)
-      : BaseMatcherImpl(rule), regex_(RegexUtil::parseRegex(rule.match().regex())),
+      : BaseMatcherImpl(rule), regex_(Regex::Utility::parseStdRegex(rule.match().regex())),
         regex_str_(rule.match().regex()) {}
 
   bool matches(const Http::HeaderMap& headers) const override {

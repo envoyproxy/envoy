@@ -401,22 +401,6 @@ TEST(Primes, findPrimeLargerThan) {
   EXPECT_EQ(10007, Primes::findPrimeLargerThan(9991));
 }
 
-TEST(RegexUtil, parseRegex) {
-  EXPECT_THROW_WITH_REGEX(RegexUtil::parseRegex("(+invalid)"), EnvoyException,
-                          "Invalid regex '\\(\\+invalid\\)': .+");
-
-  {
-    std::regex regex = RegexUtil::parseRegex("x*");
-    EXPECT_NE(0, regex.flags() & std::regex::optimize);
-  }
-
-  {
-    std::regex regex = RegexUtil::parseRegex("x*", std::regex::icase);
-    EXPECT_NE(0, regex.flags() & std::regex::icase);
-    EXPECT_EQ(0, regex.flags() & std::regex::optimize);
-  }
-}
-
 class WeightedClusterEntry {
 public:
   WeightedClusterEntry(const std::string name, const uint64_t weight)

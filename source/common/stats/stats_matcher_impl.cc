@@ -48,7 +48,7 @@ bool StatsMatcherImpl::rejects(const std::string& name) const {
   // This is an XNOR, which can be evaluated by checking for equality.
 
   return (is_inclusive_ == std::any_of(matchers_.begin(), matchers_.end(),
-                                       [&name](auto matcher) { return matcher.match(name); }));
+                                       [&name](auto& matcher) { return matcher.match(name); }));
 }
 
 } // namespace Stats

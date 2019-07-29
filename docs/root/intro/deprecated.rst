@@ -12,7 +12,22 @@ Deprecated items below are listed in chronological order.
 
 Version 1.12.0 (pending)
 ========================
-* The ORIGINAL_DST_LB :ref:`load balancing policy <envoy_api_field_Cluster.lb_policy>` is deprecated, use CLUSTER_PROVIDED policy instead when configuring an :ref:`original destination cluster <envoy_api_field_Cluster.type>`.
+* The ORIGINAL_DST_LB :ref:`load balancing policy <envoy_api_field_Cluster.lb_policy>` is
+  deprecated, use CLUSTER_PROVIDED policy instead when configuring an :ref:`original destination
+  cluster <envoy_api_field_Cluster.type>`.
+* The `regex` field in :ref:`StringMatcher <envoy_api_msg_type.matcher.StringMatcher>` has been
+  deprecated in favor of the `safe_regex` field.
+* The `regex` field in :ref:`RouteMatch <envoy_api_msg_route.RouteMatch>` has been
+  deprecated in favor of the `safe_regex` field.
+* The `allow_origin_regex` field in :ref:`CorsPolicy <envoy_api_msg_route.CorsPolicy>` has been
+  deprecated in favor of the `allow_origin_safe_regex` field.
+* The `pattern` field in :ref:`VirtualCluster <envoy_api_msg_route.VirtualCluster>` has been
+  deprecated in favor of the `regex` field.
+* The `regex_match` field in :ref:`HeaderMatcher <envoy_api_msg_route.HeaderMatcher>` has been
+  deprecated in favor of the `safe_regex_match` field.
+* The `value` and `regex` fields in :ref:`QueryParameterMatcher
+  <envoy_api_msg_route.QueryParameterMatcher>` has been deprecated in favor of the `string_match`
+  and `present_match` fields.
 
 Version 1.11.0 (July 11, 2019)
 ==============================

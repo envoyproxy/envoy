@@ -154,6 +154,7 @@ def envoy_dependencies(skip_targets = []):
     _io_opentracing_cpp()
     _net_zlib()
     _repository_impl("bazel_toolchains")
+    _com_googlesource_code_re2()
 
     _python_deps()
     _cc_deps()
@@ -335,6 +336,9 @@ def _io_opentracing_cpp():
         name = "opentracing",
         actual = "@io_opentracing_cpp//:opentracing",
     )
+
+def _com_googlesource_code_re2():
+    _repository_impl("com_googlesource_code_re2")
 
 def _com_lightstep_tracer_cpp():
     location = REPOSITORY_LOCATIONS["com_lightstep_tracer_cpp"]
