@@ -166,6 +166,10 @@ void AsyncStreamImpl::streamError(Status::GrpcStatus grpc_status, const std::str
   resetStream();
 }
 
+void AsyncStreamImpl::onClosure() {
+  // No-op since stream closure is handled within other callbacks.
+}
+
 void AsyncStreamImpl::onReset() {
   if (http_reset_) {
     return;
