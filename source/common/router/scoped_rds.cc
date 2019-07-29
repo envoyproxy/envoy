@@ -143,22 +143,30 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
               (overriding_init_manager == nullptr ? factory_context_.initManager()
                                                   : *overriding_init_manager)));
       // Detect if there is key conflict between two scopes.
+      ScopedRouteInfoConstSharedPtr prev_scoped_route_info;
       auto iter = scope_name_by_hash_.find(scoped_route_info->scopeKey().hash());
-      if (iter != scope_name_by_hash_.end() && iter->second != scoped_route_info->scopeName()) {
-        throw EnvoyException(
-            fmt::format("scope key conflict found, first scope is '{}', second scope is '{}'",
-                        iter->second, scoped_route_info->scopeName()));
+      if (iter != scope_name_by_hash_.end()) {
+        if (iter->second != scoped_route_info->scopeName()) {
+          throw EnvoyException(
+              fmt::format("scope key conflict found, first scope is '{}', second scope is '{}'",
+                          iter->second, scoped_route_info->scopeName()));
+        }
+        prev_scoped_route_info = scoped_route_map_[scoped_route_info->scopeName()];
       }
       scope_name_by_hash_[scoped_route_info->scopeKey().hash()] = scoped_route_info->scopeName();
       scoped_route_map_[scoped_route_info->scopeName()] = scoped_route_info;
-      applyConfigUpdate([scoped_route_info](ConfigProvider::ConfigConstSharedPtr config)
-                            -> ConfigProvider::ConfigConstSharedPtr {
-        auto* thread_local_scoped_config =
-            const_cast<ScopedConfigImpl*>(static_cast<const ScopedConfigImpl*>(config.get()));
+      applyConfigUpdate(
+          [scoped_route_info](
+              ConfigProvider::ConfigConstSharedPtr config) -> ConfigProvider::ConfigConstSharedPtr {
+            auto* thread_local_scoped_config =
+                const_cast<ScopedConfigImpl*>(static_cast<const ScopedConfigImpl*>(config.get()));
 
-        thread_local_scoped_config->addOrUpdateRoutingScope(scoped_route_info);
-        return config;
-      });
+            thread_local_scoped_config->addOrUpdateRoutingScope(scoped_route_info);
+            return config;
+          },
+          [prev_scoped_route_info]() {
+            /*Make sure previous route_config_info is destructed in main thread.*/
+          });
       any_applied = true;
       ENVOY_LOG(debug, "srds: add/update scoped_route '{}'", scoped_route_info->scopeName());
     } catch (const EnvoyException& e) {

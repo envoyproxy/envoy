@@ -100,8 +100,8 @@ ScopeKeyBuilderImpl::computeScopeKey(const Http::HeaderMap& headers) const {
 
 void ScopedConfigImpl::addOrUpdateRoutingScope(
     const ScopedRouteInfoConstSharedPtr& scoped_route_info) {
-  scoped_route_info_by_name_.try_emplace(scoped_route_info->scopeName(), scoped_route_info);
-  scoped_route_info_by_key_.try_emplace(scoped_route_info->scopeKey().hash(), scoped_route_info);
+  scoped_route_info_by_name_[scoped_route_info->scopeName()] = scoped_route_info;
+  scoped_route_info_by_key_[scoped_route_info->scopeKey().hash()] = scoped_route_info;
 }
 
 void ScopedConfigImpl::removeRoutingScope(const std::string& scope_name) {

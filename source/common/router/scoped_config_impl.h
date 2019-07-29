@@ -203,9 +203,9 @@ public:
 private:
   ScopeKeyBuilderImpl scope_key_builder_;
   // From scope name to cached ScopedRouteInfo.
-  absl::flat_hash_map<std::string, const ScopedRouteInfoConstSharedPtr> scoped_route_info_by_name_;
+  absl::flat_hash_map<std::string, ScopedRouteInfoConstSharedPtr> scoped_route_info_by_name_;
   // Hash by ScopeKey hash to lookup in constant time.
-  absl::flat_hash_map<uint64_t, const ScopedRouteInfoConstSharedPtr> scoped_route_info_by_key_;
+  absl::flat_hash_map<uint64_t, ScopedRouteInfoConstSharedPtr> scoped_route_info_by_key_;
 };
 
 /**
