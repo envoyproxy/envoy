@@ -11,6 +11,12 @@ features:
 * Customizable access log filters that allow different types of requests and responses to be written
   to different access logs.
 
+Access log filters
+------------------
+
+Envoy supports pluggable access log :ref:`filters <arch_overview_access_log_filters>`.
+
+
 Access logging sinks
 --------------------
 
