@@ -146,6 +146,7 @@ void AsyncStreamImpl::closeLocal(bool end_stream) {
 
   local_closed_ |= end_stream;
   if (complete()) {
+    stream_callbacks_.onClosure();
     cleanup();
   }
 }
@@ -153,6 +154,7 @@ void AsyncStreamImpl::closeLocal(bool end_stream) {
 void AsyncStreamImpl::closeRemote(bool end_stream) {
   remote_closed_ |= end_stream;
   if (complete()) {
+    stream_callbacks_.onClosure();
     cleanup();
   }
 }
