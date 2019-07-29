@@ -244,6 +244,7 @@ TEST_F(AsyncClientImplTest, RetryWithStream) {
 
   // Normal response.
   expectResponseHeaders(stream_callbacks_, 200, true);
+  EXPECT_CALL(stream_callbacks_, onClosure());
   HeaderMapPtr response_headers2(new TestHeaderMapImpl{{":status", "200"}});
   response_decoder_->decodeHeaders(std::move(response_headers2), true);
 }
@@ -291,6 +292,7 @@ TEST_F(AsyncClientImplTest, MultipleStreams) {
   EXPECT_CALL(stream_encoder2, encodeData(BufferEqual(body2.get()), true));
 
   expectResponseHeaders(stream_callbacks2, 503, true);
+  EXPECT_CALL(stream_callbacks_, onClosure());
 
   AsyncClient::Stream* stream2 = client_.start(stream_callbacks2, AsyncClient::StreamOptions());
   stream2->sendHeaders(headers2, false);
