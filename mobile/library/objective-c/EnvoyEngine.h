@@ -2,6 +2,8 @@
 
 #import <Foundation/Foundation.h>
 
+NS_ASSUME_NONNULL_BEGIN
+
 /// Wrapper layer to simplify calling into Envoy's C/++ API.
 @interface EnvoyEngine : NSObject
 
@@ -91,3 +93,5 @@
 + (void)setupEnvoy;
 
 @end
+
+NS_ASSUME_NONNULL_END

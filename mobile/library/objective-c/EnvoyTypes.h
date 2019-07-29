@@ -1,5 +1,7 @@
 #import <Foundation/Foundation.h>
 
+NS_ASSUME_NONNULL_BEGIN
+
 // MARK: - Aliases
 
 /// Handle to an outstanding Envoy HTTP stream. Valid only for the duration of the stream and not
@@ -90,3 +92,5 @@ typedef struct {
 @property (nonatomic, strong) void (^onError)(EnvoyError *error);
 
 @end
+
+NS_ASSUME_NONNULL_END
