@@ -209,9 +209,7 @@ void AsyncRequestImpl::onTrailers(HeaderMapPtr&& trailers) {
   response_->trailers(std::move(trailers));
 }
 
-void AsyncRequestImpl::onClosure() {
-  onComplete();
-}
+void AsyncRequestImpl::onClosure() { onComplete(); }
 
 void AsyncRequestImpl::onReset() {
   if (!cancelled_) {
