@@ -814,8 +814,8 @@ TEST_F(Http1ServerConnectionImplTest, UpgradeRequestWithNoBody) {
   codec_->dispatch(buffer);
 }
 
-TEST_F(Http1ServerConnectionImplTest, HighWatermarkTest) {
-  EXPECT_CALL(connection_, bufferLimit()).Times(1).WillOnce(Return(40)); // < 47 bytes written
+TEST_F(Http1ServerConnectionImplTest, WatermarkTest) {
+  EXPECT_CALL(connection_, bufferLimit()).Times(1).WillOnce(Return(10));
   initialize();
 
   NiceMock<Http::MockStreamDecoder> decoder;
@@ -847,8 +847,6 @@ TEST_F(Http1ServerConnectionImplTest, HighWatermarkTest) {
   static_cast<ServerConnection*>(codec_.get())
       ->onUnderlyingConnectionBelowWriteBufferLowWatermark();
 }
-
-// TODO(mergeconflict): implement OverflowWatermarkTest
 
 class Http1ClientConnectionImplTest : public testing::Test {
 public:
@@ -1153,8 +1151,8 @@ TEST_F(Http1ClientConnectionImplTest, UpgradeResponseWithEarlyData) {
   codec_->dispatch(response);
 }
 
-TEST_F(Http1ClientConnectionImplTest, HighWatermarkTest) {
-  EXPECT_CALL(connection_, bufferLimit()).Times(1).WillOnce(Return(40)); // < 49 bytes written
+TEST_F(Http1ClientConnectionImplTest, WatermarkTest) {
+  EXPECT_CALL(connection_, bufferLimit()).Times(1).WillOnce(Return(10));
   initialize();
 
   InSequence s;
@@ -1181,8 +1179,6 @@ TEST_F(Http1ClientConnectionImplTest, HighWatermarkTest) {
   static_cast<ClientConnection*>(codec_.get())
       ->onUnderlyingConnectionBelowWriteBufferLowWatermark();
 }
-
-// TODO(mergeconflict): implement OverflowWatermarkTest
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/3589. Upstream sends multiple
 // responses to the same request. The request causes the write buffer to go above high

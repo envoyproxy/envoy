@@ -212,25 +212,25 @@ TEST_P(HttpTimeoutIntegrationTest, HedgedPerTryTimeoutWithBodyNoBufferSecondRequ
 TEST_P(HttpTimeoutIntegrationTest,
        HedgedPerTryTimeoutLowUpstreamBufferLimitLargeRequestFirstRequestWins) {
   config_helper_.setBufferLimits(1024, 1024 * 1024); // Set buffer limits upstream and downstream.
-  testRouterRequestAndResponseWithHedgedPerTryTimeout(2000, 1024, true);
+  testRouterRequestAndResponseWithHedgedPerTryTimeout(1024 * 1024, 1024, true);
 }
 
 TEST_P(HttpTimeoutIntegrationTest,
        HedgedPerTryTimeoutLowUpstreamBufferLimitLargeRequestSecondRequestWins) {
   config_helper_.setBufferLimits(1024, 1024 * 1024); // Set buffer limits upstream and downstream.
-  testRouterRequestAndResponseWithHedgedPerTryTimeout(2000, 1024, false);
+  testRouterRequestAndResponseWithHedgedPerTryTimeout(1024 * 1024, 1024, false);
 }
 
 TEST_P(HttpTimeoutIntegrationTest,
        HedgedPerTryTimeoutLowDownstreamBufferLimitLargeResponseFirstRequestWins) {
   config_helper_.setBufferLimits(1024 * 1024, 1024); // Set buffer limits upstream and downstream.
-  testRouterRequestAndResponseWithHedgedPerTryTimeout(1024, 2000, true);
+  testRouterRequestAndResponseWithHedgedPerTryTimeout(1024, 1024 * 1024, true);
 }
 
 TEST_P(HttpTimeoutIntegrationTest,
        HedgedPerTryTimeoutLowDownstreamBufferLimitLargeResponseSecondRequestWins) {
   config_helper_.setBufferLimits(1024 * 1024, 1024); // Set buffer limits upstream and downstream.
-  testRouterRequestAndResponseWithHedgedPerTryTimeout(1024, 2000, false);
+  testRouterRequestAndResponseWithHedgedPerTryTimeout(1024, 1024 * 1024, false);
 }
 
 // Sends a request with x-envoy-hedge-on-per-try-timeout, sleeps (with

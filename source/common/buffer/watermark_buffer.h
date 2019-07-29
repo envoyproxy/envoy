@@ -3,6 +3,8 @@
 #include <functional>
 #include <string>
 
+#include "envoy/runtime/runtime.h"
+
 #include "common/buffer/buffer_impl.h"
 
 namespace Envoy {
@@ -18,7 +20,8 @@ public:
   WatermarkBuffer(std::function<void()> below_low_watermark,
                   std::function<void()> above_high_watermark,
                   std::function<void()> above_overflow_watermark)
-      : below_low_watermark_(below_low_watermark), above_high_watermark_(above_high_watermark),
+      : runtime_(Runtime::LoaderSingleton::getExisting()),
+        below_low_watermark_(below_low_watermark), above_high_watermark_(above_high_watermark),
         above_overflow_watermark_(above_overflow_watermark) {}
 
   // Override all functions from Instance which can result in changing the size
@@ -37,14 +40,15 @@ public:
   Api::IoCallUint64Result write(Network::IoHandle& io_handle) override;
   void postProcess() override { checkLowWatermark(); }
 
-  void setWatermarks(uint32_t watermark) { setWatermarks(watermark / 2, watermark, watermark * 2); }
-  void setWatermarks(uint32_t low_watermark, uint32_t high_watermark, uint32_t overflow_watermark);
+  void setWatermarks(uint32_t watermark) { setWatermarks(watermark / 2, watermark); }
+  void setWatermarks(uint32_t low_watermark, uint32_t high_watermark);
   uint32_t highWatermark() const { return high_watermark_; }
 
 private:
   void checkHighAndOverflowWatermarks();
   void checkLowWatermark();
 
+  Runtime::Loader* runtime_;
   std::function<void()> below_low_watermark_;
   std::function<void()> above_high_watermark_;
   std::function<void()> above_overflow_watermark_;

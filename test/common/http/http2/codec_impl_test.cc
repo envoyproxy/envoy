@@ -485,7 +485,7 @@ TEST_P(Http2CodecImplDeferredResetTest, DeferredResetClient) {
   TestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   request_encoder_->encodeHeaders(request_headers, false);
-  Buffer::OwnedImpl body(std::string(65536, 'a'));
+  Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
   EXPECT_CALL(client_stream_callbacks, onAboveWriteBufferHighWatermark()).Times(AnyNumber());
   request_encoder_->encodeData(body, true);
   EXPECT_CALL(client_stream_callbacks, onResetStream(StreamResetReason::LocalReset, _));
@@ -523,7 +523,7 @@ TEST_P(Http2CodecImplDeferredResetTest, DeferredResetServer) {
           Invoke([&](Buffer::Instance& data, bool) -> void { client_wrapper_.buffer_.add(data); }));
   TestHeaderMapImpl response_headers{{":status", "200"}};
   response_encoder_->encodeHeaders(response_headers, false);
-  Buffer::OwnedImpl body(std::string(65536, 'a'));
+  Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
   EXPECT_CALL(server_stream_callbacks_, onAboveWriteBufferHighWatermark()).Times(AnyNumber());
   response_encoder_->encodeData(body, true);
   EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalReset, _));
@@ -537,8 +537,6 @@ TEST_P(Http2CodecImplDeferredResetTest, DeferredResetServer) {
   setupDefaultConnectionMocks();
   client_wrapper_.dispatch(Buffer::OwnedImpl(), *client_);
 }
-
-// TODO(mergeconflict): implement similar tests that reset the stream even quicker on overflow.
 
 class Http2CodecImplFlowControlTest : public Http2CodecImplTest {};
 
@@ -722,7 +720,7 @@ TEST_P(Http2CodecImplFlowControlTest, FlowControlPendingRecvData) {
   // the recv buffer can be overrun by a client which negotiates a larger
   // SETTINGS_MAX_FRAME_SIZE but there's no current easy way to tweak that in
   // envoy (without sending raw HTTP/2 frames) so we lower the buffer limit instead.
-  server_->getStream(1)->setWriteBufferWatermarks(10, 20, 40);
+  server_->getStream(1)->setWriteBufferWatermarks(10, 20);
 
   EXPECT_CALL(request_decoder_, decodeData(_, false));
   Buffer::OwnedImpl data(std::string(40, 'a'));

@@ -709,7 +709,7 @@ TEST_P(ConnectionImplTest, WriteWithWatermarks) {
 
   connect();
 
-  client_connection_->setBufferLimits(8); // < 11 bytes written
+  client_connection_->setBufferLimits(2);
 
   std::string data_to_write = "hello world";
   Buffer::OwnedImpl first_buffer_to_write(data_to_write);
@@ -762,8 +762,7 @@ TEST_P(ConnectionImplTest, WriteWithWatermarks) {
 }
 
 // Read and write random bytes and ensure we don't encounter issues.
-// TODO(mergeconflict): fix this test
-TEST_P(ConnectionImplTest, DISABLED_WatermarkFuzzing) {
+TEST_P(ConnectionImplTest, WatermarkFuzzing) {
   useMockBuffer();
   setUpBasicConnection();
 

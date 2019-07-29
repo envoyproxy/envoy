@@ -30,4 +30,7 @@ envoy_cc_library(
     name = "threadsafe_singleton",
     hdrs = ["threadsafe_singleton.h"],
     external_deps = ["abseil_base"],
+    deps = [
+        "//source/common/common:assert_lib",
+    ],
 )

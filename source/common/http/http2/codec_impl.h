@@ -171,10 +171,9 @@ protected:
     void readDisable(bool disable) override;
     uint32_t bufferLimit() override { return pending_recv_data_.highWatermark(); }
 
-    void setWriteBufferWatermarks(uint32_t low_watermark, uint32_t high_watermark,
-                                  uint32_t overflow_watermark) {
-      pending_recv_data_.setWatermarks(low_watermark, high_watermark, overflow_watermark);
-      pending_send_data_.setWatermarks(low_watermark, high_watermark, overflow_watermark);
+    void setWriteBufferWatermarks(uint32_t low_watermark, uint32_t high_watermark) {
+      pending_recv_data_.setWatermarks(low_watermark, high_watermark);
+      pending_send_data_.setWatermarks(low_watermark, high_watermark);
     }
 
     // If the receive buffer encounters watermark callbacks, enable/disable reads or close this

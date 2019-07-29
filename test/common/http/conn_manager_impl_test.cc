@@ -3148,8 +3148,8 @@ TEST_F(HttpConnectionManagerImplTest, AlterFilterWatermarkLimits) {
   EXPECT_EQ(100, decoder_filters_[0]->callbacks_->decoderBufferLimit());
 }
 
-TEST_F(HttpConnectionManagerImplTest, HitFilterHighWatermark) {
-  initial_buffer_limit_ = 4;
+TEST_F(HttpConnectionManagerImplTest, HitFilterWatermarkLimits) {
+  initial_buffer_limit_ = 1;
   streaming_filter_ = true;
   setup(false, "");
   setUpEncoderAndDecoder(false, false);
@@ -3180,7 +3180,7 @@ TEST_F(HttpConnectionManagerImplTest, HitFilterHighWatermark) {
   // callbacks should be called.
   EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
   EXPECT_CALL(callbacks2, onAboveWriteBufferHighWatermark());
-  Buffer::OwnedImpl fake_response("Over twelve bytes.");
+  Buffer::OwnedImpl fake_response("A long enough string to go over watermarks");
   EXPECT_CALL(*encoder_filters_[1], encodeData(_, false))
       .WillOnce(Return(FilterDataStatus::StopIterationAndWatermark));
   decoder_filters_[0]->callbacks_->encodeData(fake_response, false);
@@ -3194,8 +3194,6 @@ TEST_F(HttpConnectionManagerImplTest, HitFilterHighWatermark) {
   EXPECT_CALL(callbacks2, onBelowWriteBufferLowWatermark()).Times(0);
   encoder_filters_[1]->callbacks_->setEncoderBufferLimit((buffer_len + 1) * 2);
 }
-
-// TODO(mergeconflict): implement HitFilterOverflowWatermark
 
 TEST_F(HttpConnectionManagerImplTest, HitRequestBufferLimits) {
   initial_buffer_limit_ = 10;
@@ -3261,7 +3259,7 @@ TEST_F(HttpConnectionManagerImplTest, HitRequestBufferLimitsIntermediateFilter) 
   conn_manager_->onData(fake_input, false);
 }
 
-TEST_F(HttpConnectionManagerImplTest, HitResponseBufferHighWatermarkBeforeHeaders) {
+TEST_F(HttpConnectionManagerImplTest, HitResponseBufferLimitsBeforeHeaders) {
   initial_buffer_limit_ = 10;
   setup(false, "");
   setUpEncoderAndDecoder(false, false);
@@ -3280,7 +3278,7 @@ TEST_F(HttpConnectionManagerImplTest, HitResponseBufferHighWatermarkBeforeHeader
   expectOnDestroy();
   Http::TestHeaderMapImpl expected_response_headers{
       {":status", "500"}, {"content-length", "21"}, {"content-type", "text/plain"}};
-  Buffer::OwnedImpl fake_response("Over ten bytes");
+  Buffer::OwnedImpl fake_response("A long enough string to go over watermarks");
   // Fake response starts doing through the filter.
   EXPECT_CALL(*encoder_filters_[1], encodeData(_, false))
       .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
@@ -3295,7 +3293,7 @@ TEST_F(HttpConnectionManagerImplTest, HitResponseBufferHighWatermarkBeforeHeader
   EXPECT_EQ(1U, stats_.named_.rs_too_large_.value());
 }
 
-TEST_F(HttpConnectionManagerImplTest, HitResponseBufferHighWatermarkAfterHeaders) {
+TEST_F(HttpConnectionManagerImplTest, HitResponseBufferLimitsAfterHeaders) {
   initial_buffer_limit_ = 10;
   setup(false, "");
   setUpEncoderAndDecoder(false, false);
@@ -3312,7 +3310,7 @@ TEST_F(HttpConnectionManagerImplTest, HitResponseBufferHighWatermarkAfterHeaders
 
   // Now overload the buffer with response data. The filter returns
   // StopIterationAndBuffer, which will trigger an early reset.
-  const std::string data = "Over ten bytes";
+  const std::string data = "A long enough string to go over watermarks";
   Buffer::OwnedImpl fake_response(data);
   InSequence s;
   EXPECT_CALL(*encoder_filters_[1], encodeData(_, false))
@@ -3322,8 +3320,6 @@ TEST_F(HttpConnectionManagerImplTest, HitResponseBufferHighWatermarkAfterHeaders
 
   EXPECT_EQ(1U, stats_.named_.rs_too_large_.value());
 }
-
-// TODO(mergeconflict): implement HitResponseBufferOverflowWatermark before and after headers
 
 TEST_F(HttpConnectionManagerImplTest, FilterHeadReply) {
   InSequence s;
