@@ -27,4 +27,4 @@ Further reading
 ---------------
 
 * Access log :ref:`configuration <config_access_log>`.
-* Filter :ref:`configuration <envoy.config.filter.accesslog.v2.AccessLogFilter>`.
+* Filter :ref:`configuration <envoy_api_field_config.filter.accesslog.v2.AccessLogFilter>`.
