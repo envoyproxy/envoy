@@ -186,6 +186,24 @@ RequestParser::parsePartitions(const Json::Object& json_data) {
   return partition_descriptors;
 }
 
+void RequestParser::forEachStatString(const StringFn& fn) {
+  for (const std::string& str : SINGLE_TABLE_OPERATIONS) {
+    fn(str);
+  }
+  for (const std::string& str : SUPPORTED_ERROR_TYPES) {
+    fn(str);
+  }
+  for (const std::string& str : BATCH_OPERATIONS) {
+    fn(str);
+  }
+  for (const std::string& str : TRANSACT_OPERATIONS) {
+    fn(str);
+  }
+  for (const std::string& str : TRANSACT_ITEM_OPERATIONS) {
+    fn(str);
+  }
+}
+
 } // namespace Dynamo
 } // namespace HttpFilters
 } // namespace Extensions

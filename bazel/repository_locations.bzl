@@ -120,9 +120,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/lightstep/lightstep-tracer-cpp/archive/v0.8.0.tar.gz"],
     ),
     com_github_datadog_dd_opentracing_cpp = dict(
-        sha256 = "a3d1c03e7af570fa64c01df259e6e9bb78637a6bd9c65c6bf7e8703e466dc22f",
-        strip_prefix = "dd-opentracing-cpp-0.4.2",
-        urls = ["https://github.com/DataDog/dd-opentracing-cpp/archive/v0.4.2.tar.gz"],
+        sha256 = "f7fb2ad541f812c36fd78f9a38e4582d87dadb563ab80bee3f7c3a2132a425c5",
+        strip_prefix = "dd-opentracing-cpp-1.0.1",
+        urls = ["https://github.com/DataDog/dd-opentracing-cpp/archive/v1.0.1.tar.gz"],
     ),
     com_github_google_benchmark = dict(
         sha256 = "3c6a165b6ecc948967a1ead710d4a181d7b0fbcaa183ef7ea84604994966221a",
@@ -230,12 +230,12 @@ REPOSITORY_LOCATIONS = dict(
     ),
     six_archive = dict(
         sha256 = "105f8d68616f8248e24bf0e9372ef04d3cc10104f1980f54d57b2ce73a5ad56a",
-        urls = ["https://pypi.python.org/packages/source/s/six/six-1.10.0.tar.gz#md5=34eed507548117b2ab523ab14b2f8b55"],
+        urls = ["https://files.pythonhosted.org/packages/b3/b2/238e2590826bfdd113244a40d9d3eb26918bd798fc187e2360a8367068db/six-1.10.0.tar.gz"],
     ),
     io_opencensus_cpp = dict(
-        sha256 = "d6d68704c419a9e892bd1f942e09509ebc5a318499a1abcf2c09734e5dc56e19",
-        strip_prefix = "opencensus-cpp-1145dd77ffb7a2845c71c8e6ca188ef55e4ff607",
-        urls = ["https://github.com/census-instrumentation/opencensus-cpp/archive/1145dd77ffb7a2845c71c8e6ca188ef55e4ff607.tar.gz"],
+        sha256 = "9223b4d54af4151910dede03aa58247e90df72167fcc91d5f75e73a141568036",
+        strip_prefix = "opencensus-cpp-e292a374fb42c6cb2743f1689234bd409f4fda20",
+        urls = ["https://github.com/census-instrumentation/opencensus-cpp/archive/e292a374fb42c6cb2743f1689234bd409f4fda20.tar.gz"],
     ),
     com_github_curl = dict(
         sha256 = "821aeb78421375f70e55381c9ad2474bf279fc454b791b7e95fc83562951c690",

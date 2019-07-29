@@ -142,6 +142,18 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "cluster_filter_integration_test",
+    srcs = ["cluster_filter_integration_test.cc"],
+    deps = [
+        ":integration_lib",
+        "//include/envoy/network:filter_interface",
+        "//include/envoy/registry",
+        "//source/extensions/filters/network/tcp_proxy:config",
+        "//test/config:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "custom_cluster_integration_test",
     srcs = ["custom_cluster_integration_test.cc"],
     deps = [
@@ -418,6 +430,7 @@ envoy_cc_test_library(
         "//source/common/network:filter_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:utility_lib",
+        "//source/common/runtime:runtime_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:thread_local_store_lib",
         "//source/common/thread_local:thread_local_lib",
