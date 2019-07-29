@@ -1,15 +1,15 @@
 #include "extensions/filters/network/dubbo_proxy/conn_manager.h"
 
-#include <stdint.h>
+#include <cstdint>
 
 #include "envoy/common/exception.h"
 
 #include "common/common/fmt.h"
 
 #include "extensions/filters/network/dubbo_proxy/app_exception.h"
+#include "extensions/filters/network/dubbo_proxy/dubbo_hessian2_serializer_impl.h"
 #include "extensions/filters/network/dubbo_proxy/dubbo_protocol_impl.h"
 #include "extensions/filters/network/dubbo_proxy/heartbeat_response.h"
-#include "extensions/filters/network/dubbo_proxy/hessian_deserializer_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -21,9 +21,8 @@ constexpr uint32_t BufferLimit = UINT32_MAX;
 ConnectionManager::ConnectionManager(Config& config, Runtime::RandomGenerator& random_generator,
                                      TimeSource& time_system)
     : config_(config), time_system_(time_system), stats_(config_.stats()),
-      random_generator_(random_generator), deserializer_(config.createDeserializer()),
-      protocol_(config.createProtocol()),
-      decoder_(std::make_unique<Decoder>(*protocol_.get(), *deserializer_.get(), *this)) {}
+      random_generator_(random_generator), protocol_(config.createProtocol()),
+      decoder_(std::make_unique<RequestDecoder>(*protocol_, *this)) {}
 
 Network::FilterStatus ConnectionManager::onData(Buffer::Instance& data, bool end_stream) {
   ENVOY_LOG(trace, "dubbo: read {} bytes", data.length());
@@ -79,13 +78,13 @@ void ConnectionManager::onBelowWriteBufferLowWatermark() {
   read_callbacks_->connection().readDisable(false);
 }
 
-DecoderEventHandler* ConnectionManager::newDecoderEventHandler() {
+StreamHandler& ConnectionManager::newStream() {
   ENVOY_LOG(debug, "dubbo: create the new docoder event handler");
 
   ActiveMessagePtr new_message(std::make_unique<ActiveMessage>(*this));
   new_message->createFilterChain();
   new_message->moveIntoList(std::move(new_message), active_message_list_);
-  return (*active_message_list_.begin()).get();
+  return **active_message_list_.begin();
 }
 
 void ConnectionManager::onHeartbeat(MessageMetadataSharedPtr metadata) {
@@ -97,12 +96,11 @@ void ConnectionManager::onHeartbeat(MessageMetadataSharedPtr metadata) {
   }
 
   metadata->setResponseStatus(ResponseStatus::Ok);
-  metadata->setMessageType(MessageType::Response);
-  metadata->setEventFlag(true);
+  metadata->setMessageType(MessageType::HeartbeatResponse);
 
   HeartbeatResponse heartbeat;
   Buffer::OwnedImpl response_buffer;
-  heartbeat.encode(*metadata, *protocol_, *deserializer_, response_buffer);
+  heartbeat.encode(*metadata, *protocol_, response_buffer);
 
   read_callbacks_->connection().write(response_buffer, false);
 }
@@ -121,11 +119,7 @@ void ConnectionManager::dispatch() {
   try {
     bool underflow = false;
     while (!underflow) {
-      Network::FilterStatus status = decoder_->onData(request_buffer_, underflow);
-      if (status == Network::FilterStatus::StopIteration) {
-        stopped_ = true;
-        break;
-      }
+      decoder_->onData(request_buffer_, underflow);
     }
     return;
   } catch (const EnvoyException& ex) {
@@ -143,10 +137,16 @@ void ConnectionManager::sendLocalReply(MessageMetadata& metadata,
     return;
   }
 
-  Buffer::OwnedImpl buffer;
-  const DubboFilters::DirectResponse::ResponseType result =
-      response.encode(metadata, *protocol_, *deserializer_, buffer);
-  read_callbacks_->connection().write(buffer, end_stream);
+  DubboFilters::DirectResponse::ResponseType result =
+      DubboFilters::DirectResponse::ResponseType::ErrorReply;
+
+  try {
+    Buffer::OwnedImpl buffer;
+    result = response.encode(metadata, *protocol_, buffer);
+    read_callbacks_->connection().write(buffer, end_stream);
+  } catch (const EnvoyException& ex) {
+    ENVOY_CONN_LOG(error, "dubbo error: {}", read_callbacks_->connection(), ex.what());
+  }
 
   if (end_stream) {
     read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);

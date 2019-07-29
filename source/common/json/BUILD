@@ -30,9 +30,3 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
     ],
 )
-
-envoy_cc_library(
-    name = "json_validator_lib",
-    hdrs = ["json_validator.h"],
-    deps = ["//include/envoy/json:json_object_interface"],
-)

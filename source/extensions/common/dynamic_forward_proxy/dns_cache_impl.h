@@ -39,7 +39,7 @@ public:
   DnsCacheImpl(Event::Dispatcher& main_thread_dispatcher, ThreadLocal::SlotAllocator& tls,
                Stats::Scope& root_scope,
                const envoy::config::common::dynamic_forward_proxy::v2alpha::DnsCacheConfig& config);
-  ~DnsCacheImpl();
+  ~DnsCacheImpl() override;
 
   // DnsCache
   LoadDnsCacheEntryResult loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
@@ -63,7 +63,7 @@ private:
 
   // Per-thread DNS cache info including the currently known hosts as well as any pending callbacks.
   struct ThreadLocalHostInfo : public ThreadLocal::ThreadLocalObject {
-    ~ThreadLocalHostInfo();
+    ~ThreadLocalHostInfo() override;
     void updateHostMap(const TlsHostMapSharedPtr& new_host_map);
 
     TlsHostMapSharedPtr host_map_;
@@ -71,13 +71,21 @@ private:
   };
 
   struct DnsHostInfoImpl : public DnsHostInfo {
-    DnsHostInfoImpl(TimeSource& time_source) : time_source_(time_source) { touch(); }
+    DnsHostInfoImpl(TimeSource& time_source, absl::string_view resolved_host, bool is_ip_address)
+        : time_source_(time_source), resolved_host_(resolved_host), is_ip_address_(is_ip_address) {
+      touch();
+    }
 
     // DnsHostInfo
     Network::Address::InstanceConstSharedPtr address() override { return address_; }
+    const std::string& resolvedHost() override { return resolved_host_; }
+    bool isIpAddress() override { return is_ip_address_; }
     void touch() override { last_used_time_ = time_source_.monotonicTime().time_since_epoch(); }
 
     TimeSource& time_source_;
+    const std::string resolved_host_;
+    const bool is_ip_address_;
+    bool first_resolve_complete_{};
     Network::Address::InstanceConstSharedPtr address_;
     // Using std::chrono::steady_clock::duration is required for compilation within an atomic vs.
     // using MonotonicTime.
@@ -89,14 +97,13 @@ private:
   // Primary host information that accounts for TTL, re-resolution, etc.
   struct PrimaryHostInfo {
     PrimaryHostInfo(DnsCacheImpl& parent, absl::string_view host_to_resolve, uint16_t port,
-                    const Event::TimerCb& timer_cb);
+                    bool is_ip_address, const Event::TimerCb& timer_cb);
     ~PrimaryHostInfo();
 
     DnsCacheImpl& parent_;
-    const std::string host_to_resolve_;
     const uint16_t port_;
     const Event::TimerPtr refresh_timer_;
-    DnsHostInfoImplSharedPtr host_info_;
+    const DnsHostInfoImplSharedPtr host_info_;
     Network::ActiveDnsQuery* active_query_{};
   };
 

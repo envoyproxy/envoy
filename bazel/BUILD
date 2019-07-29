@@ -5,6 +5,7 @@ package(default_visibility = ["//visibility:public"])
 exports_files([
     "gen_sh_test_runner.sh",
     "sh_test_wrapper.sh",
+    "cc_wrapper.py",
 ])
 
 genrule(
@@ -86,6 +87,20 @@ config_setting(
 )
 
 config_setting(
+    name = "clang_build",
+    flag_values = {
+        "@bazel_tools//tools/cpp:compiler": "clang",
+    },
+)
+
+config_setting(
+    name = "gcc_build",
+    flag_values = {
+        "@bazel_tools//tools/cpp:compiler": "gcc",
+    },
+)
+
+config_setting(
     name = "disable_tcmalloc",
     values = {"define": "tcmalloc=disabled"},
 )
@@ -98,6 +113,11 @@ config_setting(
 config_setting(
     name = "disable_signal_trace",
     values = {"define": "signal_trace=disabled"},
+)
+
+config_setting(
+    name = "disable_object_dump_on_signal_trace",
+    values = {"define": "object_dump_on_signal_trace=disabled"},
 )
 
 config_setting(
@@ -195,6 +215,11 @@ config_setting(
 )
 
 config_setting(
+    name = "linux_mips64",
+    values = {"cpu": "mips64"},
+)
+
+config_setting(
     name = "windows_x86_64",
     values = {"cpu": "x64_windows"},
 )
@@ -272,6 +297,7 @@ alias(
             ":linux_x86_64": ":linux_x86_64",
             ":linux_aarch64": ":linux_aarch64",
             ":linux_ppc": ":linux_ppc",
+            ":linux_mips64": ":linux_mips64",
             # If we're not on an linux platform return a value that will never match in the select() statement calling this
             # since it would have already been matched above.
             "//conditions:default": ":linux_x86_64",

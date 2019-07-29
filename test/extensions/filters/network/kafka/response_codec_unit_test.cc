@@ -105,7 +105,8 @@ TEST_F(ResponseCodecUnitTest, shouldUseNewParserAsResponse) {
   testee.onData(buffer_);
 
   // then
-  // There were no interactions with `callback_`.
+  ASSERT_EQ(testee.getCurrentParserForTest(), parser3);
+  // Also, there were no interactions with `callback_`.
 }
 
 TEST_F(ResponseCodecUnitTest, shouldPassParsedMessageToCallback) {
@@ -115,14 +116,14 @@ TEST_F(ResponseCodecUnitTest, shouldPassParsedMessageToCallback) {
   const AbstractResponseSharedPtr parsed_message =
       std::make_shared<Response<int32_t>>(ResponseMetadata{0, 0, 0}, 0);
 
-  MockParserSharedPtr parser = std::make_shared<MockParser>();
+  MockParserSharedPtr all_consuming_parser = std::make_shared<MockParser>();
   auto consume_and_return = [&parsed_message](absl::string_view& data) -> ResponseParseResponse {
     data = {data.data() + data.size(), 0};
     return ResponseParseResponse::parsedMessage(parsed_message);
   };
-  EXPECT_CALL(*parser, parse(_)).WillOnce(Invoke(consume_and_return));
+  EXPECT_CALL(*all_consuming_parser, parse(_)).WillOnce(Invoke(consume_and_return));
 
-  EXPECT_CALL(*factory_, create(_)).WillOnce(Return(parser));
+  EXPECT_CALL(*factory_, create(_)).WillOnce(Return(all_consuming_parser));
   EXPECT_CALL(parser_resolver_, createParser(_)).Times(0);
 
   EXPECT_CALL(*callback_, onMessage(parsed_message));
@@ -134,7 +135,37 @@ TEST_F(ResponseCodecUnitTest, shouldPassParsedMessageToCallback) {
   testee.onData(buffer_);
 
   // then
-  // `callback_` had `onMessage` invoked once with matching argument.
+  ASSERT_EQ(testee.getCurrentParserForTest(), nullptr);
+  // Also, `callback_` had `onMessage` invoked once with matching argument.
+}
+
+TEST_F(ResponseCodecUnitTest, shouldPassParsedMessageToCallbackAndInitializeNextParser) {
+  // given
+  putGarbageIntoBuffer();
+
+  const AbstractResponseSharedPtr parsed_message =
+      std::make_shared<Response<int32_t>>(ResponseMetadata{0, 0, 0}, 0);
+
+  MockParserSharedPtr parser1 = std::make_shared<MockParser>();
+  EXPECT_CALL(*parser1, parse(_))
+      .WillOnce(Return(ResponseParseResponse::parsedMessage(parsed_message)));
+
+  MockParserSharedPtr parser2 = std::make_shared<MockParser>();
+  EXPECT_CALL(*parser2, parse(_)).Times(AnyNumber()).WillRepeatedly(Invoke(consumeOneByte));
+
+  EXPECT_CALL(*factory_, create(_)).WillOnce(Return(parser1)).WillOnce(Return(parser2));
+
+  EXPECT_CALL(*callback_, onMessage(parsed_message));
+  EXPECT_CALL(*callback_, onFailedParse(_)).Times(0);
+
+  ResponseDecoder testee{factory_, parser_resolver_, {callback_}};
+
+  // when
+  testee.onData(buffer_);
+
+  // then
+  ASSERT_EQ(testee.getCurrentParserForTest(), parser2);
+  // Also, `callback_` had `onMessage` invoked once with matching argument.
 }
 
 TEST_F(ResponseCodecUnitTest, shouldPassParseFailureDataToCallback) {
@@ -162,7 +193,8 @@ TEST_F(ResponseCodecUnitTest, shouldPassParseFailureDataToCallback) {
   testee.onData(buffer_);
 
   // then
-  // `callback_` had `onFailedParse` invoked once with matching argument.
+  ASSERT_EQ(testee.getCurrentParserForTest(), nullptr);
+  // Also, `callback_` had `onFailedParse` invoked once with matching argument.
 }
 
 } // namespace ResponseCodecUnitTest

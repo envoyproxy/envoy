@@ -1,15 +1,13 @@
 #include "extensions/clusters/dynamic_forward_proxy/cluster.h"
 
+#include "common/network/transport_socket_options_impl.h"
+
 #include "extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Clusters {
 namespace DynamicForwardProxy {
-
-// TODO(mattklein123): Make sure that the cluster's hosts display their host name in admin output.
-// TODO(mattklein123): Allow customizing TLS on a per-host basis. For example, setting SNI and
-//                     doing certificate validation.
 
 Cluster::Cluster(
     const envoy::api::v2::Cluster& cluster,
@@ -58,14 +56,15 @@ void Cluster::onDnsHostAddOrUpdate(
   HostInfoMapSharedPtr current_map = getCurrentHostMap();
   const auto host_map_it = current_map->find(host);
   if (host_map_it != current_map->end()) {
-    // If we only have an address change, we can do that swap inline without any other updates. The
-    // appropriate R/W locking is in place to allow this. The details of this locking are:
+    // If we only have an address change, we can do that swap inline without any other updates.
+    // The appropriate R/W locking is in place to allow this. The details of this locking are:
     //  - Hosts are not thread local, they are global.
     //  - We take a read lock when reading the address and a write lock when changing it.
     //  - Address updates are very rare.
-    //  - Address reads are only done when a connection is being made and a "real" host description
-    //    is created or the host is queries via the admin endpoint. Both of these operations are
-    //    relatively rare and the read lock is held for a short period of time.
+    //  - Address reads are only done when a connection is being made and a "real" host
+    //    description is created or the host is queried via the admin endpoint. Both of
+    //    these operations are relatively rare and the read lock is held for a short period
+    //    of time.
     //
     // TODO(mattklein123): Right now the dynamic forward proxy / DNS cache works similar to how
     //                     logical DNS works, meaning that we only store a single address per
@@ -82,11 +81,20 @@ void Cluster::onDnsHostAddOrUpdate(
   }
 
   ENVOY_LOG(debug, "adding new dfproxy cluster host '{}'", host);
+
+  // Create an override transport socket options that automatically provides both SNI as well as
+  // SAN verification for the resolved host if the cluster has been configured with TLS.
+  Network::TransportSocketOptionsSharedPtr transport_socket_options =
+      std::make_shared<Network::TransportSocketOptionsImpl>(
+          !host_info->isIpAddress() ? host_info->resolvedHost() : "",
+          std::vector<std::string>{host_info->resolvedHost()});
+
   const auto new_host_map = std::make_shared<HostInfoMap>(*current_map);
-  const auto emplaced = new_host_map->try_emplace(
-      host, host_info,
-      std::make_shared<Upstream::LogicalHost>(info(), host, host_info->address(),
-                                              dummy_locality_lb_endpoint_, dummy_lb_endpoint_));
+  const auto emplaced =
+      new_host_map->try_emplace(host, host_info,
+                                std::make_shared<Upstream::LogicalHost>(
+                                    info(), host, host_info->address(), dummy_locality_lb_endpoint_,
+                                    dummy_lb_endpoint_, transport_socket_options));
   Upstream::HostVector hosts_added;
   hosts_added.emplace_back(emplaced.first->second.logical_host_);
 

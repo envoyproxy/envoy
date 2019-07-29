@@ -11,7 +11,7 @@
 namespace Envoy {
 namespace Grpc {
 
-Encoder::Encoder() {}
+Encoder::Encoder() = default;
 
 void Encoder::newFrame(uint8_t flags, uint64_t length, std::array<uint8_t, 5>& output) {
   output[0] = flags;

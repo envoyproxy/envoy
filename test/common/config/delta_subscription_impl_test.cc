@@ -8,7 +8,7 @@ namespace {
 
 class DeltaSubscriptionImplTest : public DeltaSubscriptionTestHarness, public testing::Test {
 protected:
-  DeltaSubscriptionImplTest() {}
+  DeltaSubscriptionImplTest() = default;
 };
 
 TEST_F(DeltaSubscriptionImplTest, UpdateResourcesCausesRequest) {

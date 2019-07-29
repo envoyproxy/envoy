@@ -441,13 +441,22 @@ ProtobufTypes::MessagePtr ListenerManagerImpl::dumpListenerConfigs() {
       static_listener.mutable_listener()->MergeFrom(listener->config());
       TimestampUtil::systemClockToTimestamp(listener->last_updated_,
                                             *(static_listener.mutable_last_updated()));
-    } else {
-      auto& dynamic_listener = *config_dump->mutable_dynamic_active_listeners()->Add();
-      dynamic_listener.set_version_info(listener->versionInfo());
-      dynamic_listener.mutable_listener()->MergeFrom(listener->config());
-      TimestampUtil::systemClockToTimestamp(listener->last_updated_,
-                                            *(dynamic_listener.mutable_last_updated()));
+      continue;
     }
+    envoy::admin::v2alpha::ListenersConfigDump_DynamicListener* dump_listener;
+    // Listeners are always added to active_listeners_ list before workers are started.
+    // This applies even when the listeners are still waiting for initialization.
+    // To avoid confusion in config dump, in that case, we add these listeners to warming
+    // listeners config dump rather than active ones.
+    if (workers_started_) {
+      dump_listener = config_dump->mutable_dynamic_active_listeners()->Add();
+    } else {
+      dump_listener = config_dump->mutable_dynamic_warming_listeners()->Add();
+    }
+    dump_listener->set_version_info(listener->versionInfo());
+    dump_listener->mutable_listener()->MergeFrom(listener->config());
+    TimestampUtil::systemClockToTimestamp(listener->last_updated_,
+                                          *(dump_listener->mutable_last_updated()));
   }
 
   for (const auto& listener : warming_listeners_) {
@@ -741,9 +750,14 @@ bool ListenerManagerImpl::removeListener(const std::string& name) {
     warming_listeners_.erase(existing_warming_listener);
   }
 
-  // If there is an active listener it needs to be moved to draining.
+  // If there is an active listener it needs to be moved to draining after workers have started, or
+  // destroyed directly.
   if (existing_active_listener != active_listeners_.end()) {
-    drainListener(std::move(*existing_active_listener));
+    // Listeners in active_listeners_ are added to workers after workers start, so we drain
+    // listeners only after this occurs.
+    if (workers_started_) {
+      drainListener(std::move(*existing_active_listener));
+    }
     active_listeners_.erase(existing_active_listener);
   }
 

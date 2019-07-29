@@ -48,7 +48,7 @@ public:
           Buffer::OwnedImpl("Lorem ipsum dolor sit amet, consectetuer adipiscing elit.");
       buffer->add(new_buffer);
     }
-    return std::move(buffer);
+    return buffer;
   }
 
   Network::Address::InstanceConstSharedPtr addr_;

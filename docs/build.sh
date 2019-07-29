@@ -76,6 +76,7 @@ PROTO_RST="
   /envoy/api/v2/cds/envoy/api/v2/cds.proto.rst
   /envoy/api/v2/cluster/outlier_detection/envoy/api/v2/cluster/outlier_detection.proto.rst
   /envoy/api/v2/cluster/circuit_breaker/envoy/api/v2/cluster/circuit_breaker.proto.rst
+  /envoy/api/v2/cluster/filter/envoy/api/v2/cluster/filter.proto.rst
   /envoy/api/v2/rds/envoy/api/v2/rds.proto.rst
   /envoy/api/v2/route/route/envoy/api/v2/route/route.proto.rst
   /envoy/api/v2/srds/envoy/api/v2/srds.proto.rst

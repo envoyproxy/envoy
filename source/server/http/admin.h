@@ -76,6 +76,7 @@ public:
 
   void startHttpListener(const std::string& access_log_path, const std::string& address_out_path,
                          Network::Address::InstanceConstSharedPtr address,
+                         const Network::Socket::OptionsSharedPtr& socket_options,
                          Stats::ScopePtr&& listener_scope) override;
 
   // Network::FilterChainManager
@@ -235,11 +236,7 @@ private:
                                  const absl::optional<std::regex> regex = absl::nullopt,
                                  bool pretty_print = false);
 
-  static std::string
-  runtimeAsJson(const std::vector<std::pair<std::string, Runtime::Snapshot::Entry>>& entries);
   std::vector<const UrlHandler*> sortedHandlers() const;
-  static const std::vector<std::pair<std::string, Runtime::Snapshot::Entry>>
-  sortedRuntime(const std::unordered_map<std::string, const Runtime::Snapshot::Entry>& entries);
   envoy::admin::v2alpha::ServerInfo::State serverState();
   /**
    * URL handlers.
@@ -330,7 +327,9 @@ private:
 
   class AdminFilterChain : public Network::FilterChain {
   public:
-    AdminFilterChain() {}
+    // We can't use the default constructor because transport_socket_factory_ doesn't have a
+    // default constructor.
+    AdminFilterChain() {} // NOLINT(modernize-use-equals-default)
 
     // Network::FilterChain
     const Network::TransportSocketFactory& transportSocketFactory() const override {
