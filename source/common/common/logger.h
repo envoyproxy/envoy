@@ -42,6 +42,7 @@ namespace Logger {
   FUNCTION(hystrix)              \
   FUNCTION(init)                 \
   FUNCTION(io)                   \
+  FUNCTION(jwt)                  \
   FUNCTION(kafka)                \
   FUNCTION(lua)                  \
   FUNCTION(main)                 \

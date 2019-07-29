@@ -9,13 +9,13 @@ quic::QuicTime EnvoyQuicClock::ApproximateNow() const {
 }
 
 quic::QuicTime EnvoyQuicClock::Now() const {
-  return quic::QuicTime::Zero() + quic::QuicTime::Delta::FromMicroseconds(
-                                      microsecondsSinceEpoch(time_system_.monotonicTime()));
+  return quic::QuicTime::Zero() + quic::QuicTime::Delta::FromMicroseconds(microsecondsSinceEpoch(
+                                      dispatcher_.timeSource().monotonicTime()));
 }
 
 quic::QuicWallTime EnvoyQuicClock::WallNow() const {
   return quic::QuicWallTime::FromUNIXMicroseconds(
-      microsecondsSinceEpoch(time_system_.systemTime()));
+      microsecondsSinceEpoch(dispatcher_.timeSource().systemTime()));
 }
 
 } // namespace Quic

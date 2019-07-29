@@ -425,6 +425,7 @@ envoy_cc_library(
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/network:dns_interface",
         "//include/envoy/runtime:runtime_interface",
+        "//include/envoy/server:filter_config_interface",
         "//include/envoy/server:transport_socket_config_interface",
         "//include/envoy/ssl:context_manager_interface",
         "//include/envoy/thread_local:thread_local_interface",
