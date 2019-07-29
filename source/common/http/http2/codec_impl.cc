@@ -542,8 +542,8 @@ int ConnectionImpl::onInvalidFrame(int32_t stream_id, int error_code) {
   // The stream is about to be closed due to an invalid header or messaging. Don't kill the
   // entire connection if one stream has bad headers or messaging.
   if (error_code == NGHTTP2_ERR_HTTP_HEADER || error_code == NGHTTP2_ERR_HTTP_MESSAGING) {
-    StreamImpl* stream = getStream(stream_id);
     stats_.rx_messaging_error_.inc();
+    StreamImpl* stream = getStream(stream_id);
     if (stream != nullptr) {
       // See comment below in onStreamClose() for why we do this.
       stream->reset_due_to_messaging_error_ = true;
