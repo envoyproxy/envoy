@@ -164,6 +164,10 @@ void StreamEncoderImpl::encodeData(Buffer::Instance& data, bool end_stream) {
 
 void StreamEncoderImpl::encodeTrailers(const HeaderMap&) { endEncode(); }
 
+void StreamEncoderImpl::encodeMetadata(const MetadataMapVector&) {
+  ENVOY_LOG_MISC(error, "HTTP1 doesn't support metadata");
+}
+
 void StreamEncoderImpl::endEncode() {
   if (chunk_encoding_) {
     connection_.buffer().add(LAST_CHUNK);

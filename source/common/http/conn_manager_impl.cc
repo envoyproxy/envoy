@@ -1449,8 +1449,6 @@ void ConnectionManagerImpl::ActiveStream::encodeMetadata(ActiveStreamEncoderFilt
     // metadata in case encodeHeaders returns StopAllIteration. The latter can happen when headers
     // callbacks generate new metadata.
     if (!(*entry)->encode_headers_called_ || (*entry)->stoppedAll()) {
-      ENVOY_STREAM_LOG(trace, "+++++++ store metadata encode metadata called: filter={}", *this,
-                       static_cast<const void*>((*entry).get()));
       (*entry)->getSavedResponseMetadata()->emplace_back(std::move(metadata_map_ptr));
       return;
     }

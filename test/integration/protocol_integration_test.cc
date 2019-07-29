@@ -980,7 +980,6 @@ name: encode-headers-return-stop-all-filter
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  ENVOY_LOG_MISC(warn, "+++++++++ metadata received by response: {}", response->metadata_map());
   EXPECT_EQ(count_ * size_ + added_decoded_data_size_, response->body().size());
 }
 
