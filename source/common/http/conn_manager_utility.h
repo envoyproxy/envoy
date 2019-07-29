@@ -37,7 +37,7 @@ public:
   autoCreateCodec(Network::Connection& connection, const Buffer::Instance& data,
                   ServerConnectionCallbacks& callbacks, Stats::Scope& scope,
                   const Http1Settings& http1_settings, const Http2Settings& http2_settings,
-                  const uint32_t max_request_headers_kb, bool strict_header_validation);
+                  const uint32_t max_request_headers_kb);
 
   /**
    * Mutates request headers in various ways. This functionality is broken out because of its
