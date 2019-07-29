@@ -2107,7 +2107,8 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::handleMetadataAfterHeader
   iterate_from_current_filter_ = true;
   // If encodeHeaders() returns StopAllIteration, we should skip draining metadata, and wait
   // for doMetadata() to drain the metadata after iteration continues.
-  if (!stoppedAll() && saved_response_metadata_ != nullptr && !getSavedResponseMetadata()->empty()) {
+  if (!stoppedAll() && saved_response_metadata_ != nullptr &&
+      !getSavedResponseMetadata()->empty()) {
     drainSavedResponseMetadata();
   }
   // Restores the original value of iterate_from_current_filter_.
