@@ -633,7 +633,7 @@ TEST_F(StaticLoaderImplTest, RuntimeFromNonWorkerThreads) {
     {
       Thread::LockGuard lock(mutex);
       EXPECT_EQ("bar", loader_->threadsafeSnapshot()->get("foo"));
-      read_bar  = true;
+      read_bar = true;
       original_thread_snapshot_pointer = loader_->threadsafeSnapshot().get();
       EXPECT_EQ(original_thread_snapshot_pointer, loader_->threadsafeSnapshot().get());
       foo_read.notifyOne();
