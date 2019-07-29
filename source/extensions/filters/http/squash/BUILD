@@ -23,6 +23,7 @@ envoy_cc_library(
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:empty_string",
         "//source/common/common:enum_to_int",
+        "//source/common/common:scope_tracker",
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",

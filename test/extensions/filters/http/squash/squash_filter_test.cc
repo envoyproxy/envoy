@@ -330,6 +330,7 @@ TEST_F(SquashFilterTest, Timeout) {
   EXPECT_CALL(request_, cancel());
   EXPECT_CALL(filter_callbacks_, continueDecoding());
 
+  EXPECT_CALL(filter_callbacks_.dispatcher_, setTrackedObject(_)).Times(2);
   attachmentTimeout_timer_->callback_();
 
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(buffer, false));
@@ -359,6 +360,7 @@ TEST_F(SquashFilterTest, CheckRetryPollingAttachment) {
 
   // Expect the second get attachment request
   expectAsyncClientSend();
+  EXPECT_CALL(filter_callbacks_.dispatcher_, setTrackedObject(_)).Times(2);
   retry_timer->callback_();
   EXPECT_CALL(filter_callbacks_, continueDecoding());
   completeGetStatusRequest("attached");
@@ -378,6 +380,7 @@ TEST_F(SquashFilterTest, CheckRetryPollingAttachmentOnFailure) {
   // Expect the second get attachment request
   expectAsyncClientSend();
 
+  EXPECT_CALL(filter_callbacks_.dispatcher_, setTrackedObject(_)).Times(2);
   retry_timer->callback_();
 
   EXPECT_CALL(filter_callbacks_, continueDecoding());
@@ -433,6 +436,7 @@ TEST_F(SquashFilterTest, TimerExpiresInline) {
   EXPECT_CALL(*attachmentTimeout_timer_, enableTimer(config_->attachmentTimeout()))
       .WillOnce(Invoke([&](const std::chrono::milliseconds&) {
         // timer expires inline
+        EXPECT_CALL(filter_callbacks_.dispatcher_, setTrackedObject(_)).Times(2);
         attachmentTimeout_timer_->callback_();
       }));
 
