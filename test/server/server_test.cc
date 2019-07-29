@@ -452,6 +452,25 @@ TEST_P(ServerInstanceImplTest, BootstrapNode) {
   EXPECT_EQ(VersionInfo::version(), server_->localInfo().node().build_version());
 }
 
+TEST_P(ServerInstanceImplTest, LoadsBootstrapFromConfigProtoOptions) {
+  options_.config_proto_.mutable_node()->set_id("foo");
+  initialize("test/server/node_bootstrap.yaml");
+  EXPECT_EQ("foo", server_->localInfo().node().id());
+}
+
+TEST_P(ServerInstanceImplTest, LoadsBootstrapFromConfigYamlAfterConfigPath) {
+  options_.config_yaml_ = "node:\n  id: 'bar'";
+  initialize("test/server/node_bootstrap.yaml");
+  EXPECT_EQ("bar", server_->localInfo().node().id());
+}
+
+TEST_P(ServerInstanceImplTest, LoadsBootstrapFromConfigProtoOptionsLast) {
+  options_.config_yaml_ = "node:\n  id: 'bar'";
+  options_.config_proto_.mutable_node()->set_id("foo");
+  initialize("test/server/node_bootstrap.yaml");
+  EXPECT_EQ("foo", server_->localInfo().node().id());
+}
+
 // Validate server localInfo() from bootstrap Node with CLI overrides.
 TEST_P(ServerInstanceImplTest, BootstrapNodeWithOptionsOverride) {
   options_.service_cluster_name_ = "some_cluster_name";
@@ -671,7 +690,9 @@ TEST_P(ServerInstanceImplTest, NoOptionsPassed) {
           hooks_, restart_, stats_store_, fakelock_, component_factory_,
           std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
           Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr)),
-      EnvoyException, "At least one of --config-path and --config-yaml should be non-empty");
+      EnvoyException,
+      "At least one of --config-path or --config-yaml or Options::configProto() should be "
+      "non-empty");
 }
 
 // Validate that when std::exception is unexpectedly thrown, we exit safely.

@@ -142,6 +142,18 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "cluster_filter_integration_test",
+    srcs = ["cluster_filter_integration_test.cc"],
+    deps = [
+        ":integration_lib",
+        "//include/envoy/network:filter_interface",
+        "//include/envoy/registry",
+        "//source/extensions/filters/network/tcp_proxy:config",
+        "//test/config:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "custom_cluster_integration_test",
     srcs = ["custom_cluster_integration_test.cc"],
     deps = [
