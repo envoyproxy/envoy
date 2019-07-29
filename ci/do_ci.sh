@@ -207,25 +207,6 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   # these tests under "-c opt" to save time in CI.
   bazel test ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c opt //test/common/common:assert_test //test/server:server_test
   exit 0
-elif [[ "$CI_TARGET" == "bazel.ipv6_tests" ]]; then
-  # This is around until Circle supports IPv6. We try to run a limited set of IPv6 tests as fast
-  # as possible for basic sanity testing.
-
-  # Hack to avoid returning IPv6 DNS
-  sed -i 's_#precedence ::ffff:0:0/96  100_precedence ::ffff:0:0/96  100_' /etc/gai.conf
-  # Debug IPv6 network issues
-  apt-get update && apt-get install -y dnsutils net-tools curl && \
-    ifconfig && \
-    route -A inet -A inet6 && \
-    curl -v https://go.googlesource.com && \
-    curl -6 -v https://go.googlesource.com && \
-    dig go.googlesource.com A go.googlesource.com AAAA
-
-  setup_clang_toolchain
-  echo "Testing..."
-  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} --test_env=ENVOY_IP_TEST_VERSIONS=v6only -c fastbuild \
-    //test/integration/... //test/common/network/...
-  exit 0
 elif [[ "$CI_TARGET" == "bazel.api" ]]; then
   setup_clang_toolchain
   echo "Building API..."

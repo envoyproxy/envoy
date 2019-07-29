@@ -260,8 +260,6 @@ envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
     deps = [
-        "//source/common/config:cds_json_lib",
-        "//source/common/config:rds_json_lib",
         "//source/common/config:utility_lib",
         "//source/common/config:well_known_names",
         "//source/common/stats:stats_lib",

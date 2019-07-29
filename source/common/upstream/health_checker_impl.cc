@@ -187,6 +187,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onEvent(Network::Conne
     // For the raw disconnect event, we are either between intervals in which case we already have
     // a timer setup, or we did the close or got a reset, in which case we already setup a new
     // timer. There is nothing to do here other than blow away the client.
+    response_headers_.reset();
     parent_.dispatcher_.deferredDelete(std::move(client_));
   }
 }
@@ -336,10 +337,8 @@ Http::CodecClient::Type HttpHealthCheckerImpl::codecClientType(bool use_http2) {
 
 Http::CodecClient*
 ProdHttpHealthCheckerImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {
-  const bool strict_header_validation =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_header_validation");
   return new Http::CodecClientProd(codec_client_type_, std::move(data.connection_),
-                                   data.host_description_, dispatcher_, strict_header_validation);
+                                   data.host_description_, dispatcher_);
 }
 
 TcpHealthCheckMatcher::MatchSegments TcpHealthCheckMatcher::loadProtoBytes(
@@ -747,7 +746,7 @@ Http::CodecClientPtr
 ProdGrpcHealthCheckerImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {
   return std::make_unique<Http::CodecClientProd>(Http::CodecClient::Type::HTTP2,
                                                  std::move(data.connection_),
-                                                 data.host_description_, dispatcher_, false);
+                                                 data.host_description_, dispatcher_);
 }
 
 std::ostream& operator<<(std::ostream& out, HealthState state) {

@@ -49,15 +49,28 @@ public:
   virtual void deliverConfigUpdate(const std::vector<std::string>& cluster_names,
                                    const std::string& version, bool accept) PURE;
 
-  virtual void verifyStats(uint32_t attempt, uint32_t success, uint32_t rejected, uint32_t failure,
-                           uint64_t version) {
+  virtual testing::AssertionResult statsAre(uint32_t attempt, uint32_t success, uint32_t rejected,
+                                            uint32_t failure, uint64_t version) {
     // TODO(fredlas) rework update_success_ to make sense across all xDS carriers. Its value in
-    // verifyStats() calls in many tests will probably have to be changed.
+    // statsAre() calls in many tests will probably have to be changed.
     UNREFERENCED_PARAMETER(attempt);
-    EXPECT_EQ(success, stats_.update_success_.value());
-    EXPECT_EQ(rejected, stats_.update_rejected_.value());
-    EXPECT_EQ(failure, stats_.update_failure_.value());
-    EXPECT_EQ(version, stats_.version_.value());
+    if (success != stats_.update_success_.value()) {
+      return testing::AssertionFailure() << "update_success: expected " << success << ", got "
+                                         << stats_.update_success_.value();
+    }
+    if (rejected != stats_.update_rejected_.value()) {
+      return testing::AssertionFailure() << "update_rejected: expected " << rejected << ", got "
+                                         << stats_.update_rejected_.value();
+    }
+    if (failure != stats_.update_failure_.value()) {
+      return testing::AssertionFailure() << "update_failure: expected " << failure << ", got "
+                                         << stats_.update_failure_.value();
+    }
+    if (version != stats_.version_.value()) {
+      return testing::AssertionFailure()
+             << "version: expected " << version << ", got " << stats_.version_.value();
+    }
+    return testing::AssertionSuccess();
   }
 
   virtual void verifyControlPlaneStats(uint32_t connected_state) {

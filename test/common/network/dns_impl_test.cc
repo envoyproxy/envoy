@@ -369,6 +369,7 @@ public:
     return asString() == rhs.asString();
   }
   const std::string& asString() const override { return antagonistic_name_; }
+  absl::string_view asStringView() const override { return antagonistic_name_; }
   const std::string& logicalName() const override { return antagonistic_name_; }
   Api::SysCallIntResult bind(int fd) const override { return instance_.bind(fd); }
   Api::SysCallIntResult connect(int fd) const override { return instance_.connect(fd); }

@@ -33,6 +33,7 @@
 #include "test/mocks/tcp/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
@@ -2687,6 +2688,61 @@ TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsNullIsOkay) {
       "cluster_1", ResourcePriority::Default, Http::Protocol::Http11, &context);
 
   EXPECT_NE(nullptr, cp);
+}
+
+class TestUpstreamNetworkFilter : public Network::WriteFilter {
+public:
+  Network::FilterStatus onWrite(Buffer::Instance&, bool) override {
+    return Network::FilterStatus::Continue;
+  }
+};
+
+class TestUpstreamNetworkFilterConfigFactory
+    : public Server::Configuration::NamedUpstreamNetworkFilterConfigFactory {
+public:
+  Network::FilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message&,
+                               Server::Configuration::CommonFactoryContext&) override {
+    return [](Network::FilterManager& filter_manager) -> void {
+      filter_manager.addWriteFilter(std::make_shared<TestUpstreamNetworkFilter>());
+    };
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Envoy::ProtobufWkt::Empty>();
+  }
+  std::string name() override { return "envoy.test.filter"; }
+};
+
+// Verify that configured upstream filters are added to client connections.
+TEST_F(ClusterManagerImplTest, AddUpstreamFilters) {
+  TestUpstreamNetworkFilterConfigFactory factory;
+  Registry::InjectFactory<Server::Configuration::NamedUpstreamNetworkFilterConfigFactory> registry(
+      factory);
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      hosts:
+      - socket_address:
+          address: "127.0.0.1"
+          port_value: 11001
+      filters:
+      - name: envoy.test.filter
+  )EOF";
+
+  create(parseBootstrapFromV2Yaml(yaml));
+  Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
+  EXPECT_CALL(*connection, addReadFilter(_)).Times(0);
+  EXPECT_CALL(*connection, addWriteFilter(_)).Times(1);
+  EXPECT_CALL(*connection, addFilter(_)).Times(0);
+  EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
+      .WillOnce(Return(connection));
+  auto conn_data = cluster_manager_->tcpConnForCluster("cluster_1", nullptr, nullptr);
+  EXPECT_EQ(connection, conn_data.connection_.get());
+  factory_.tls_.shutdownThread();
 }
 
 class ClusterManagerInitHelperTest : public testing::Test {
