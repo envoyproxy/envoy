@@ -1445,8 +1445,8 @@ void ConnectionManagerImpl::ActiveStream::encodeMetadata(ActiveStreamEncoderFilt
 
   for (; entry != encoder_filters_.end(); entry++) {
     // If the filter pointed by entry has stopped for all frame type, stores metadata and returns.
-    // If the filter pointed by entry hasn't returned from decodeHeaders, stores newly added
-    // metadata in case decodeHeaders returns StopAllIteration. The latter can happen when headers
+    // If the filter pointed by entry hasn't returned from encodeHeaders, stores newly added
+    // metadata in case encodeHeaders returns StopAllIteration. The latter can happen when headers
     // callbacks generate new metadata.
     if (!(*entry)->encode_headers_called_ || (*entry)->stoppedAll()) {
       ENVOY_STREAM_LOG(trace, "+++++++ store metadata encode metadata called: filter={}", *this,
@@ -2105,7 +2105,7 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::handleMetadataAfterHeader
   // If we drain accumulated metadata, the iteration must start with the current filter.
   const bool saved_state = iterate_from_current_filter_;
   iterate_from_current_filter_ = true;
-  // If decodeHeaders() returns StopAllIteration, we should skip draining metadata, and wait
+  // If encodeHeaders() returns StopAllIteration, we should skip draining metadata, and wait
   // for doMetadata() to drain the metadata after iteration continues.
   if (!stoppedAll() && saved_response_metadata_ != nullptr && !getSavedResponseMetadata()->empty()) {
     drainSavedResponseMetadata();
