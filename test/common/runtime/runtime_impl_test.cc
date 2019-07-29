@@ -641,7 +641,7 @@ TEST_F(StaticLoaderImplTest, RuntimeFromNonWorkerThreads) {
 
     {
       Thread::LockGuard lock(mutex);
-      while (!updated_eep) {
+      if (!updated_eep) {
         foo_changed.wait(mutex);
       }
       EXPECT_EQ("eep", loader_->threadsafeSnapshot()->get("foo"));
@@ -649,19 +649,18 @@ TEST_F(StaticLoaderImplTest, RuntimeFromNonWorkerThreads) {
   });
 
   {
-    {
-      Thread::LockGuard lock(mutex);
-      while (!read_bar) {
-        foo_read.wait(mutex);
-      }
-      loader_->mergeValues({{"foo", "eep"}});
-      updated_eep = true;
+    Thread::LockGuard lock(mutex);
+    if (!read_bar) {
+      foo_read.wait(mutex);
     }
-    {
-      Thread::LockGuard lock(mutex);
-      foo_changed.notifyOne();
-      EXPECT_EQ("eep", loader_->threadsafeSnapshot()->get("foo"));
-    }
+    loader_->mergeValues({{"foo", "eep"}});
+    updated_eep = true;
+  }
+
+  {
+    Thread::LockGuard lock(mutex);
+    foo_changed.notifyOne();
+    EXPECT_EQ("eep", loader_->threadsafeSnapshot()->get("foo"));
   }
 
   thread->join();
