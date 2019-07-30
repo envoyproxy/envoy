@@ -87,7 +87,8 @@ MockStreamInfo::MockStreamInfo()
       .WillByDefault(Invoke([this](const absl::string_view requested_server_name) {
         requested_server_name_ = std::string(requested_server_name);
       }));
-  ON_CALL(*this, requestedServerName()).WillByDefault(ReturnRef(requested_server_name_));
+  ON_CALL(*this, requestedServerName())
+      .WillByDefault(Return(absl::string_view(requested_server_name_)));
   ON_CALL(*this, setRouteName(_)).WillByDefault(Invoke([this](const absl::string_view route_name) {
     route_name_ = std::string(route_name);
   }));

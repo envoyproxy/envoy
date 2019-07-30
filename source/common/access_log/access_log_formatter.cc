@@ -403,7 +403,7 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
   } else if (field_name == "REQUESTED_SERVER_NAME") {
     field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
       if (!stream_info.requestedServerName().empty()) {
-        return stream_info.requestedServerName();
+        return std::string(stream_info.requestedServerName());
       } else {
         return UnspecifiedValueString;
       }

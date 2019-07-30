@@ -172,7 +172,7 @@ public:
     requested_server_name_ = std::string(requested_server_name);
   }
 
-  const std::string& requestedServerName() const override { return requested_server_name_; }
+  absl::string_view requestedServerName() const override { return requested_server_name_; }
 
   void setUpstreamTransportFailureReason(absl::string_view failure_reason) override {
     upstream_transport_failure_reason_ = std::string(failure_reason);

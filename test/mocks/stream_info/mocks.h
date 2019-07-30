@@ -76,7 +76,7 @@ public:
   MOCK_METHOD0(filterState, FilterState&());
   MOCK_CONST_METHOD0(filterState, const FilterState&());
   MOCK_METHOD1(setRequestedServerName, void(const absl::string_view));
-  MOCK_CONST_METHOD0(requestedServerName, const std::string&());
+  MOCK_CONST_METHOD0(requestedServerName, absl::string_view());
   MOCK_METHOD1(setUpstreamTransportFailureReason, void(absl::string_view));
   MOCK_CONST_METHOD0(upstreamTransportFailureReason, const std::string&());
 

@@ -232,7 +232,7 @@ void HttpGrpcAccessLog::emitLog(const Http::HeaderMap& request_headers,
     auto* tls_properties = common_properties->mutable_tls_properties();
     const auto* downstream_ssl_connection = stream_info.downstreamSslConnection();
 
-    tls_properties->set_tls_sni_hostname(stream_info.requestedServerName());
+    tls_properties->set_tls_sni_hostname(std::string(stream_info.requestedServerName()));
 
     auto* local_properties = tls_properties->mutable_local_certificate_properties();
     for (const auto& uri_san : downstream_ssl_connection->uriSanLocalCertificate()) {

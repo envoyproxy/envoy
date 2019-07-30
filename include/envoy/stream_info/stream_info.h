@@ -467,7 +467,7 @@ public:
   /**
    * @return SNI value for downstream host.
    */
-  virtual const std::string& requestedServerName() const PURE;
+  virtual absl::string_view requestedServerName() const PURE;
 
   /**
    * @param failure_reason the upstream transport failure reason.
