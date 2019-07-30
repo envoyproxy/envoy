@@ -63,6 +63,27 @@ absl::optional<CelValue> RequestWrapper::operator[](CelValue key) const {
     }
   } else if (value == TotalSize) {
     return CelValue::CreateInt64(info_.bytesReceived() + wrapper_.headers_.byteSize());
+  } else if (value == Duration) {
+    auto duration = info_.requestComplete();
+    if (duration.has_value()) {
+      return CelValue::CreateDuration(absl::FromChrono(duration.value()));
+    }
+  }
+  return {};
+}
+
+absl::optional<CelValue> ResponseWrapper::operator[](CelValue key) const {
+  if (!key.IsString()) {
+    return {};
+  }
+  auto value = key.StringOrDie().value();
+  if (value == Code) {
+    auto code = info_.responseCode();
+    if (code.has_value()) {
+      return CelValue::CreateInt64(code.value());
+    }
+  } else if (value == Size) {
+    return CelValue::CreateInt64(info_.bytesSent());
   }
   return {};
 }
@@ -74,8 +95,34 @@ absl::optional<CelValue> ConnectionWrapper::operator[](CelValue key) const {
   auto value = key.StringOrDie().value();
   if (value == LocalAddress) {
     return CelValue::CreateString(info_.downstreamLocalAddress()->asStringView());
+  } else if (value == LocalPort) {
+    if (info_.downstreamLocalAddress()->ip() != nullptr) {
+      return CelValue::CreateInt64(info_.downstreamLocalAddress()->ip()->port());
+    }
   } else if (value == RemoteAddress) {
     return CelValue::CreateString(info_.downstreamRemoteAddress()->asStringView());
+  } else if (value == RemotePort) {
+    if (info_.downstreamRemoteAddress()->ip() != nullptr) {
+      return CelValue::CreateInt64(info_.downstreamRemoteAddress()->ip()->port());
+    }
+  } else if (value == UpstreamAddress) {
+    auto upstream_host = info_.upstreamHost();
+    if (upstream_host != nullptr && upstream_host->address() != nullptr) {
+      return CelValue::CreateString(upstream_host->address()->asStringView());
+    }
+  } else if (value == UpstreamPort) {
+    auto upstream_host = info_.upstreamHost();
+    if (upstream_host != nullptr && upstream_host->address() != nullptr &&
+        upstream_host->address()->ip() != nullptr) {
+      return CelValue::CreateInt64(upstream_host->address()->ip()->port());
+    }
+  }
+
+  auto downstream_ssl = info_.downstreamSslConnection();
+  if (downstream_ssl != nullptr) {
+    if (value == MTLS) {
+      return CelValue::CreateBool(downstream_ssl->peerCertificatePresented());
+    }
   }
 
   return {};

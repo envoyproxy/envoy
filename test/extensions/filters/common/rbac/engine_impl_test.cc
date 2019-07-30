@@ -4,6 +4,7 @@
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/ssl/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -25,7 +26,10 @@ void checkEngine(const RBAC::RoleBasedAccessControlEngineImpl& engine, bool expe
                  const Envoy::Http::HeaderMap& headers = Envoy::Http::HeaderMapImpl(),
                  const envoy::api::v2::core::Metadata& metadata = envoy::api::v2::core::Metadata(),
                  std::string* policy_id = nullptr) {
-  EXPECT_EQ(expected, engine.allowed(connection, headers, metadata, policy_id));
+  NiceMock<StreamInfo::MockStreamInfo> info;
+  EXPECT_CALL(info, dynamicMetadata())
+      .WillRepeatedly(ReturnRef(const_cast<envoy::api::v2::core::Metadata&>(metadata)));
+  EXPECT_EQ(expected, engine.allowed(connection, headers, info, policy_id));
 }
 
 TEST(RoleBasedAccessControlEngineImpl, Disabled) {

@@ -38,8 +38,10 @@ absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena* arena
                                   const Http::HeaderMap& headers) {
   google::api::expr::runtime::Activation activation;
   const RequestWrapper request(headers, info);
+  const ResponseWrapper response(info);
   const ConnectionWrapper connection(info);
   activation.InsertValue(Request, CelValue::CreateMap(&request));
+  activation.InsertValue(Response, CelValue::CreateMap(&response));
   activation.InsertValue(Metadata, CelValue::CreateMessage(&info.dynamicMetadata(), arena));
   activation.InsertValue(Connection, CelValue::CreateMap(&connection));
 

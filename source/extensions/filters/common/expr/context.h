@@ -14,7 +14,7 @@ namespace Expr {
 
 using CelValue = google::api::expr::runtime::CelValue;
 
-// Symbols for traversing the request properties in the expressions
+// Symbols for traversing the request properties
 constexpr absl::string_view Request = "request";
 constexpr absl::string_view Path = "path";
 constexpr absl::string_view Host = "host";
@@ -27,14 +27,24 @@ constexpr absl::string_view ID = "id";
 constexpr absl::string_view UserAgent = "useragent";
 constexpr absl::string_view Size = "size";
 constexpr absl::string_view TotalSize = "total_size";
+constexpr absl::string_view Duration = "duration";
 
-// Per-request metadata
+// Symbols for traversing the response properties
+constexpr absl::string_view Response = "response";
+constexpr absl::string_view Code = "code";
+
+// Per-request or per-connection metadata
 constexpr absl::string_view Metadata = "metadata";
 
-// Downstream connection properties
+// Connection properties
 constexpr absl::string_view Connection = "connection";
 constexpr absl::string_view LocalAddress = "local_address";
+constexpr absl::string_view LocalPort = "local_port";
 constexpr absl::string_view RemoteAddress = "remote_address";
+constexpr absl::string_view RemotePort = "remote_port";
+constexpr absl::string_view UpstreamAddress = "upstream_address";
+constexpr absl::string_view UpstreamPort = "upstream_port";
+constexpr absl::string_view MTLS = "mtls";
 
 class RequestWrapper;
 
@@ -66,6 +76,15 @@ public:
 
 private:
   const HeadersWrapper wrapper_;
+  const StreamInfo::StreamInfo& info_;
+};
+
+class ResponseWrapper : public BaseWrapper {
+public:
+  ResponseWrapper(const StreamInfo::StreamInfo& info) : info_(info) {}
+  absl::optional<CelValue> operator[](CelValue key) const override;
+
+private:
   const StreamInfo::StreamInfo& info_;
 };
 
