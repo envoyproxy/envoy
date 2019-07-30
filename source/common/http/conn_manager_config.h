@@ -353,6 +353,12 @@ public:
    * @return if the HttpConnectionManager should normalize url following RFC3986
    */
   virtual bool shouldNormalizePath() const PURE;
+
+  /**
+   * @return if the HttpConnectionManager should merge two or more adjacent slashes in the path into
+   * one.
+   */
+  virtual bool shouldMergeSlashes() const PURE;
 };
 } // namespace Http
 } // namespace Envoy
