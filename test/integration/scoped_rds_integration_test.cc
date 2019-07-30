@@ -256,14 +256,14 @@ key:
   initialize();
   registerTestServerPorts({"http"});
 
-  // No scope key matches "bluh-route".
+  // No scope key matches "xyz-route".
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(
       Http::TestHeaderMapImpl{{":method", "GET"},
                               {":path", "/meh"},
                               {":authority", "host"},
                               {":scheme", "http"},
-                              {"Addr", "x-foo-key=bluh-route"}});
+                              {"Addr", "x-foo-key=xyz-route"}});
   response->waitForEndStream();
   verifyResponse(std::move(response), "404", Http::TestHeaderMapImpl{},
                  "route config not found for SRDS");
