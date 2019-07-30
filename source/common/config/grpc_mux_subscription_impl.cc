@@ -22,8 +22,12 @@ GrpcMuxSubscriptionImpl::GrpcMuxSubscriptionImpl(GrpcMux& grpc_mux,
 void GrpcMuxSubscriptionImpl::start(const std::set<std::string>& resources) {
   if (init_fetch_timeout_.count() > 0) {
     init_fetch_timeout_timer_ = dispatcher_.createTimer([this]() -> void {
-      ENVOY_LOG(warn, "gRPC config: initial fetch timed out for {}", type_url_);
-      callbacks_.onConfigUpdateFailed(new EnvoyException("intial fetch timedout"));
+      try {
+        throw EnvoyException("intial fetch timed out");
+      } catch (const EnvoyException& ee) {
+        ENVOY_LOG(warn, "gRPC config: initial fetch timed out for {}", type_url_);
+        callbacks_.onConfigUpdateFailed(&ee);
+      }
     });
     init_fetch_timeout_timer_->enableTimer(init_fetch_timeout_);
   }
@@ -67,6 +71,8 @@ void GrpcMuxSubscriptionImpl::onConfigUpdateFailed(const EnvoyException* e) {
     stats_.update_failure_.inc();
     ENVOY_LOG(debug, "gRPC update for {} failed", type_url_);
   } else {
+    // fetch timeout should be disabled only when the actual timeout happens - not on network
+    // disconnections.
     disableInitFetchTimeoutTimer();
     stats_.update_rejected_.inc();
     ENVOY_LOG(warn, "gRPC config for {} rejected: {}", type_url_, e->what());
