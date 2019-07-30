@@ -150,10 +150,10 @@ public:
     ON_CALL(response_.decoder_, decodeTrailers_(_)).WillByDefault(InvokeWithoutArgs([this] {
       response_.closeRemote();
     }));
-    request_.encoder_->encodeHeaders(request_headers, end_stream);
     if (!end_stream) {
       request_.encoder_->getStream().addCallbacks(request_.stream_callbacks_);
     }
+    request_.encoder_->encodeHeaders(request_headers, end_stream);
     request_.stream_state_ = end_stream ? StreamState::Closed : StreamState::PendingDataOrTrailers;
     response_.stream_state_ = StreamState::PendingHeaders;
   }

@@ -1112,6 +1112,28 @@ TEST_P(Http2IntegrationTest, PauseAndResume) {
   // Now send the final data frame and make sure it gets proxied.
   codec_client_->sendData(*request_encoder_, 0, true);
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+
+  response->waitForHeaders();
+  upstream_request_->encodeData(0, true);
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+}
+
+TEST_P(Http2IntegrationTest, PauseAndResumeHeadersOnly) {
+  config_helper_.addFilter(R"EOF(
+  name: stop-iteration-and-continue-filter
+  config: {}
+  )EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
   upstream_request_->encodeHeaders(default_response_headers_, true);
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());

@@ -22,6 +22,7 @@ filegroup(
         "jaeger-tracing/service1-envoy-jaeger.yaml",
         "jaeger-tracing/service2-envoy-jaeger.yaml",
         "lua/envoy.yaml",
+        "lua/lib/mylibrary.lua",
         "zipkin-tracing/front-envoy-zipkin.yaml",
         "zipkin-tracing/service1-envoy-zipkin.yaml",
         "zipkin-tracing/service2-envoy-zipkin.yaml",

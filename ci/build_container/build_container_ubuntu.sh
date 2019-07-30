@@ -23,7 +23,7 @@ case $ARCH in
         ldconfig
         ;;
     'x86_64' )
-	    wget -O - http://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
+        wget -O - http://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
         apt-add-repository "deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-8 main"
         apt-get update
         apt-get install -y clang-8 clang-format-8 clang-tidy-8 lld-8 libc++-8-dev libc++abi-8-dev
@@ -48,12 +48,6 @@ case $ARCH in
         curl -fSL https://oplab9.parqtec.unicamp.br/pub/ppc64el/bazel/ubuntu_16.04/latest/${BAZEL_LATEST} \
           -o /usr/local/bin/bazel
         chmod +x /usr/local/bin/bazel
-        ;;
-    'x86_64' )
-        echo "deb [arch=amd64] http://storage.googleapis.com/bazel-apt stable jdk1.8" | tee /etc/apt/sources.list.d/bazel.list
-        curl https://bazel.build/bazel-release.pub.gpg | apt-key add -
-        apt-get update
-        apt-get install -y bazel
         ;;
 esac
 apt-get install -y aspell

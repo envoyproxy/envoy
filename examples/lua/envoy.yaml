@@ -28,8 +28,10 @@ static_resources:
             typed_config:
               "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
               inline_code: |
+                local mylibrary = require("lib.mylibrary")
+              
                 function envoy_on_request(request_handle)
-                  request_handle:headers():add("foo", "bar")
+                  request_handle:headers():add("foo", mylibrary.foobar())
                 end
                 function envoy_on_response(response_handle)
                   body_size = response_handle:body():length()
