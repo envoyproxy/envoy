@@ -284,9 +284,9 @@ enum TrafficDirection {
   // Default option is unspecified.
   UNSPECIFIED = 0;
 
-  // The transport is used for ingress/incoming requests.
-  INGRESS = 1;
+  // The transport is used for incoming traffic.
+  INBOUND = 1;
 
-  // The transport is used for egress/outgoing requests.
-  EGRESS = 2;
+  // The transport is used for outgoing traffic.
+  OUTBOUND = 2;
 }
