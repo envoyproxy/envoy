@@ -127,6 +127,9 @@ Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::Head
         Filters::Common::Expr::evaluate(*config_->expr(), callbacks_->streamInfo(), headers);
     if (!eval_status.has_value()) {
       ENVOY_LOG(debug, "evaluation failed");
+      callbacks_->sendLocalReply(Http::Code::Forbidden, "RBAC: access denied", nullptr,
+                                 absl::nullopt, RcDetails::get().RbacAccessDenied);
+      config_->stats().denied_.inc();
       return Http::FilterHeadersStatus::StopIteration;
     }
     auto result = eval_status.value();
@@ -138,6 +141,9 @@ Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::Head
                          : (result.IsInt64() ? absl::StrCat(result.Int64OrDie()) : "")));
     if (!result.IsBool() || (result.IsBool() && !result.BoolOrDie())) {
       ENVOY_LOG(debug, "enforced: denied by condition");
+      callbacks_->sendLocalReply(Http::Code::Forbidden, "RBAC: access denied", nullptr,
+                                 absl::nullopt, RcDetails::get().RbacAccessDenied);
+      config_->stats().denied_.inc();
       return Http::FilterHeadersStatus::StopIteration;
     }
   }

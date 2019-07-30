@@ -76,7 +76,7 @@ public:
 
 private:
   const StreamInfo::StreamInfo& info_;
-}
+};
 
 } // namespace Expr
 } // namespace Common
