@@ -292,7 +292,7 @@ TEST_F(AsyncClientImplTest, MultipleStreams) {
   EXPECT_CALL(stream_encoder2, encodeData(BufferEqual(body2.get()), true));
 
   expectResponseHeaders(stream_callbacks2, 503, true);
-  EXPECT_CALL(stream_callbacks_, onClosure());
+  EXPECT_CALL(stream_callbacks2, onClosure());
 
   AsyncClient::Stream* stream2 = client_.start(stream_callbacks2, AsyncClient::StreamOptions());
   stream2->sendHeaders(headers2, false);
@@ -760,6 +760,7 @@ TEST_F(AsyncClientImplTest, StreamTimeoutHeadReply) {
   TestHeaderMapImpl expected_timeout{
       {":status", "504"}, {"content-length", "24"}, {"content-type", "text/plain"}};
   EXPECT_CALL(stream_callbacks_, onHeaders_(HeaderMapEqualRef(&expected_timeout), true));
+  EXPECT_CALL(stream_callbacks_, onClosure());
 
   AsyncClient::Stream* stream = client_.start(
       stream_callbacks_, AsyncClient::StreamOptions().setTimeout(std::chrono::milliseconds(40)));
