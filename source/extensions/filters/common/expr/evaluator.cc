@@ -2,8 +2,6 @@
 
 #include "envoy/common/exception.h"
 
-#include "common/protobuf/protobuf.h"
-
 #include "eval/public/builtin_func_registrar.h"
 #include "eval/public/cel_expr_builder_factory.h"
 
@@ -35,17 +33,17 @@ ExpressionPtr create(const google::api::expr::v1alpha1::Expr& expr) {
   return std::move(cel_expression_status.ValueOrDie());
 }
 
-absl::optional<CelValue> evaluate(const Expression& expr, const StreamInfo::StreamInfo& info,
+absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena* arena,
+                                  const StreamInfo::StreamInfo& info,
                                   const Http::HeaderMap& headers) {
-  Protobuf::Arena arena;
   google::api::expr::runtime::Activation activation;
   const RequestWrapper request(headers, info);
   const ConnectionWrapper connection(info);
   activation.InsertValue(Request, CelValue::CreateMap(&request));
-  activation.InsertValue(Metadata, CelValue::CreateMessage(&info.dynamicMetadata(), &arena));
+  activation.InsertValue(Metadata, CelValue::CreateMessage(&info.dynamicMetadata(), arena));
   activation.InsertValue(Connection, CelValue::CreateMap(&connection));
 
-  auto eval_status = expr.Evaluate(activation, &arena);
+  auto eval_status = expr.Evaluate(activation, arena);
   if (!eval_status.ok()) {
     return {};
   }

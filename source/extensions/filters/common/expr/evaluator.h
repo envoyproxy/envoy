@@ -3,6 +3,7 @@
 #include "envoy/stream_info/stream_info.h"
 
 #include "common/http/headers.h"
+#include "common/protobuf/protobuf.h"
 
 #include "extensions/filters/common/expr/context.h"
 
@@ -22,8 +23,10 @@ using ExpressionPtr = std::unique_ptr<Expression>;
 // Throws an exception if fails to construct a runtime expression.
 ExpressionPtr create(const google::api::expr::v1alpha1::Expr& expr);
 
-// Evaluates an expression for a request.
-absl::optional<CelValue> evaluate(const Expression& expr, const StreamInfo::StreamInfo& info,
+// Evaluates an expression for a request. The arena is used to hold intermediate computational
+// results and potentially the final value.
+absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena* arena,
+                                  const StreamInfo::StreamInfo& info,
                                   const Http::HeaderMap& headers);
 
 } // namespace Expr

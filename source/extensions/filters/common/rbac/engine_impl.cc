@@ -35,7 +35,8 @@ bool RoleBasedAccessControlEngineImpl::allowed(const Network::Connection& connec
   }
 
   if (!matched && expr_ != nullptr) {
-    auto eval_status = Expr::evaluate(*expr_, info, headers);
+    Protobuf::Arena arena;
+    auto eval_status = Expr::evaluate(*expr_, &arena, info, headers);
 
     // evaluation error is effectively a denial
     if (!eval_status.has_value()) {
