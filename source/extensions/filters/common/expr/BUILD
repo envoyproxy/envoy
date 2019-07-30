@@ -14,8 +14,8 @@ envoy_cc_library(
     hdrs = ["evaluator.h"],
     deps = [
         ":context_lib",
-        "//source/common/protobuf",
         "//source/common/http:utility_lib",
+        "//source/common/protobuf",
         "@com_google_cel_cpp//eval/public:builtin_func_registrar",
         "@com_google_cel_cpp//eval/public:cel_expr_builder_factory",
         "@com_google_cel_cpp//eval/public:cel_expression",

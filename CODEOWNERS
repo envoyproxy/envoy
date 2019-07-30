@@ -20,8 +20,6 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/network/thrift_proxy @zuercher @brian-pane
 # jwt_authn http filter extension
 /*/extensions/filters/http/jwt_authn @qiwzhang @lizan
-# abac http filter extension
-/*/extensions/filters/http/abac @kyessenov @PiotrSikora
 # grpc_http1_reverse_bridge http filter extension
 /*/extensions/filters/http/grpc_http1_reverse_bridge @snowp @zuercher
 # header_to_metadata extension

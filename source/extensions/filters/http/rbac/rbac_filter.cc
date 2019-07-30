@@ -25,7 +25,8 @@ RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
     : stats_(Filters::Common::RBAC::generateStats(stats_prefix, scope)),
       engine_(Filters::Common::RBAC::createEngine(proto_config)),
       shadow_engine_(Filters::Common::RBAC::createShadowEngine(proto_config)),
-      expr_(proto_config.has_condition() ? Filters::Common::Expr::create(proto_config.condition()) : nullptr) {}
+      expr_(proto_config.has_condition() ? Filters::Common::Expr::create(proto_config.condition())
+                                         : nullptr) {}
 
 const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl>&
 RoleBasedAccessControlFilterConfig::engine(const Router::RouteConstSharedPtr route,
@@ -121,17 +122,22 @@ Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::Head
     ENVOY_LOG(debug, "no engine, allowed by default");
   }
 
-  if (expr_ != nullptr) {
-    auto eval_status = Filter::Common::Expr::Evaluate(expr_, headers, callbacks_->streamInfo());
+  if (config_->expr() != nullptr) {
+    auto eval_status =
+        Filters::Common::Expr::evaluate(*config_->expr(), callbacks_->streamInfo(), headers);
     if (!eval_status.has_value()) {
       ENVOY_LOG(debug, "evaluation failed");
       return Http::FilterHeadersStatus::StopIteration;
     }
     auto result = eval_status.value();
-    ENVOY_LOG(trace, "value: {}", result.IsError() ? result.ErrorOrDie()->message() : 
-        (result.IsString() ? result.StringOrDie().value() : ""));
-    if (! result.IsBool() || (result.IsBool() && !result.BoolOrDie())) {
-      ENVOY_LOG(debug, "evaluated to non-bool or false");
+    ENVOY_LOG(trace, "value: {}",
+              result.IsError()
+                  ? result.ErrorOrDie()->message()
+                  : (result.IsString()
+                         ? result.StringOrDie().value()
+                         : (result.IsInt64() ? absl::StrCat(result.Int64OrDie()) : "")));
+    if (!result.IsBool() || (result.IsBool() && !result.BoolOrDie())) {
+      ENVOY_LOG(debug, "enforced: denied by condition");
       return Http::FilterHeadersStatus::StopIteration;
     }
   }

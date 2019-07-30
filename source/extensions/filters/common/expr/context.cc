@@ -1,5 +1,8 @@
 #include "extensions/filters/common/expr/context.h"
 
+#include "absl/strings/numbers.h"
+#include "absl/time/time.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Filters {
@@ -42,16 +45,39 @@ absl::optional<CelValue> RequestWrapper::operator[](CelValue key) const {
     return convertHeaderEntry(wrapper_.headers_.Referer());
   } else if (value == Headers) {
     return CelValue::CreateMap(&wrapper_);
-    // time of the request?
   } else if (value == Time) {
     return CelValue::CreateTimestamp(absl::FromChrono(info_.startTime()));
   } else if (value == ID) {
     return convertHeaderEntry(wrapper_.headers_.RequestId());
   } else if (value == UserAgent) {
     return convertHeaderEntry(wrapper_.headers_.UserAgent());
+  } else if (value == Size) {
+    // it is important to make a choice whether to rely on content-length vs stream info
+    // (which is not available at the time of the request headers)
+    auto length_header = wrapper_.headers_.ContentLength();
+    if (length_header != nullptr) {
+      int64_t length;
+      if (absl::SimpleAtoi(length_header->value().getStringView(), &length)) {
+        return CelValue::CreateInt64(length);
+      }
+    }
+  } else if (value == TotalSize) {
+    return CelValue::CreateInt64(info_.bytesReceived() + wrapper_.headers_.byteSize());
   }
-  // size = content length
-  // useragent
+  return {};
+}
+
+absl::optional<CelValue> ConnectionWrapper::operator[](CelValue key) const {
+  if (!key.IsString()) {
+    return {};
+  }
+  auto value = key.StringOrDie().value();
+  if (value == LocalAddress) {
+    return CelValue::CreateString(info_.downstreamLocalAddress()->asStringView());
+  } else if (value == RemoteAddress) {
+    return CelValue::CreateString(info_.downstreamRemoteAddress()->asStringView());
+  }
+
   return {};
 }
 

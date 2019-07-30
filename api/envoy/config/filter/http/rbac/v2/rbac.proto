@@ -8,6 +8,7 @@ option java_package = "io.envoyproxy.envoy.config.filter.http.rbac.v2";
 option go_package = "v2";
 
 import "envoy/config/rbac/v2/rbac.proto";
+import "google/api/expr/v1alpha1/syntax.proto";
 
 import "validate/validate.proto";
 import "gogoproto/gogo.proto";
@@ -25,6 +26,9 @@ message RBAC {
   // but will emit stats and logs and can be used for rule testing.
   // If absent, no shadow RBAC policy will be applied.
   config.rbac.v2.RBAC shadow_rules = 2;
+
+  // A symbolic expression over request attributes specifying an access control condition.
+  google.api.expr.v1alpha1.Expr condition = 3;
 }
 
 message RBACPerRoute {
