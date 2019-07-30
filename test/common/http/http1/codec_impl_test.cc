@@ -18,6 +18,7 @@
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
@@ -598,7 +599,8 @@ TEST_F(Http1ServerConnectionImplDeathTest, MetadataTest) {
   MetadataMapPtr metadata_map_ptr = std::make_unique<MetadataMap>(metadata_map);
   MetadataMapVector metadata_map_vector;
   metadata_map_vector.push_back(std::move(metadata_map_ptr));
-  EXPECT_DEATH_LOG_TO_STDERR(response_encoder->encodeMetadata(metadata_map_vector), "");
+  EXPECT_LOG_CONTAINS("error", "HTTP1 doesn't support metadata",
+                      response_encoder->encodeMetadata(metadata_map_vector));
 }
 
 TEST_F(Http1ServerConnectionImplTest, ChunkedResponse) {
