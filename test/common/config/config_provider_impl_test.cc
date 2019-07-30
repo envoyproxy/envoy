@@ -207,7 +207,7 @@ DummyConfigSubscription::DummyConfigSubscription(
     DummyConfigProviderManager& config_provider_manager)
     : ConfigSubscriptionInstance("DummyDS", manager_identifier, config_provider_manager,
                                  factory_context) {
-  // Returns a null value.
+  // A nullptr is shared as the initial value.
   initialize(nullptr);
 }
 
