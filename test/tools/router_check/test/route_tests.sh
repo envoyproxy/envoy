@@ -30,6 +30,10 @@ TEST_OUTPUT=$("${PATH_BIN}" "-c" "${PATH_CONFIG}/Weighted.yaml" "-t" "${PATH_CON
 # Test the proto text test file support
 TEST_OUTPUT=$("${PATH_BIN}" "-c" "${PATH_CONFIG}/Weighted.yaml" "-t" "${PATH_CONFIG}/Weighted.golden.proto.pb_text" "--details" "--useproto")
 
+# Test the coverage report generation
+TEST_OUTPUT=$("${PATH_BIN}" "-c" "${PATH_CONFIG}/Runtime.yaml" "-t" "${PATH_CONFIG}/Runtime.golden.proto.json" "--details" "--useproto", "--coverage")
+
+
 # Bad config file
 echo testing bad config output
 BAD_CONFIG_OUTPUT=$(("${PATH_BIN}" "${PATH_CONFIG}/Redirect.golden.json" "${PATH_CONFIG}/TestRoutes.yaml") 2>&1) ||

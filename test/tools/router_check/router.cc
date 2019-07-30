@@ -69,20 +69,23 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_file) {
   auto stats = std::make_unique<Stats::IsolatedStoreImpl>();
   auto api = Api::createApiForTest(*stats);
   TestUtility::loadFromFile(router_config_file, route_config, *api);
-
+  unsigned long route_count = 0;
+  for (const auto& virtual_host_config : route_config.virtual_hosts()) {
+    route_count += virtual_host_config.routes().size();
+  }
   auto factory_context = std::make_unique<NiceMock<Server::Configuration::MockFactoryContext>>();
   auto config = std::make_unique<Router::ConfigImpl>(route_config, *factory_context, false);
 
   return RouterCheckTool(std::move(factory_context), std::move(config), std::move(stats),
-                         std::move(api));
+                         std::move(api), route_count);
 }
 
 RouterCheckTool::RouterCheckTool(
     std::unique_ptr<NiceMock<Server::Configuration::MockFactoryContext>> factory_context,
     std::unique_ptr<Router::ConfigImpl> config, std::unique_ptr<Stats::IsolatedStoreImpl> stats,
-    Api::ApiPtr api)
+    Api::ApiPtr api, unsigned long route_size)
     : factory_context_(std::move(factory_context)), config_(std::move(config)),
-      stats_(std::move(stats)), api_(std::move(api)) {
+      stats_(std::move(stats)), api_(std::move(api)), route_count_(route_size) {
   ON_CALL(factory_context_->runtime_loader_.snapshot_,
           featureEnabled(_, testing::An<const envoy::type::FractionalPercent&>(),
                          testing::An<uint64_t>()))
@@ -99,7 +102,6 @@ bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_jso
     headers_finalized_ = false;
     ToolConfig tool_config = ToolConfig::create(check_config);
     tool_config.route_ = config_->route(*tool_config.headers_, tool_config.random_value_);
-
     std::string test_name = check_config->getString("test_name", "");
     if (details_) {
       std::cout << test_name << std::endl;
@@ -168,12 +170,16 @@ bool RouterCheckTool::compareEntries(const std::string& expected_routes) {
   MessageUtil::validate(validation_config);
 
   bool no_failures = true;
+  std::unordered_set<Router::RouteConstSharedPtr> unique_routes;
+  unique_routes = {};
+
   for (const envoy::RouterCheckToolSchema::ValidationItem& check_config :
        validation_config.tests()) {
-    active_runtime = check_config.input().runtime();
+    active_runtime_ = check_config.input().runtime();
     headers_finalized_ = false;
     ToolConfig tool_config = ToolConfig::create(check_config);
     tool_config.route_ = config_->route(*tool_config.headers_, tool_config.random_value_);
+    
 
     const std::string& test_name = check_config.test_name();
     if (details_) {
@@ -200,8 +206,19 @@ bool RouterCheckTool::compareEntries(const std::string& expected_routes) {
         no_failures = false;
       }
     }
+
+    if (tool_config.route_ && tool_config.route_->routeEntry()) {
+      unique_routes.insert(tool_config.route_);
+    }
   }
 
+  if (is_coverage_enabled_) {
+    float coverage = 100 * (static_cast<float>(unique_routes.size())/route_count_);
+    std::cerr << "#route coverage%: " << std::setprecision(4) << coverage << std::endl;
+    std::cerr << "#routes in configuration: " << route_count_ << std::endl;
+    std::cerr << "#routes hit during test: " << unique_routes.size() << std::endl;
+  }
+  
   return no_failures;
 }
 
@@ -407,7 +424,7 @@ bool RouterCheckTool::compareResults(const std::string& actual, const std::strin
 bool RouterCheckTool::runtimeMock(const std::string& key,
                                   const envoy::type::FractionalPercent& default_value,
                                   uint64_t random_value) {
-  return !active_runtime.empty() && active_runtime.compare(key) == 0 &&
+  return !active_runtime_.empty() && active_runtime_.compare(key) == 0 &&
          ProtobufPercentHelper::evaluateFractionalPercent(default_value, random_value);
 }
 
@@ -419,6 +436,7 @@ Options::Options(int argc, char** argv) {
                                            "", "string", cmd);
   TCLAP::ValueArg<std::string> test_path("t", "test-path", "Path to test file.", false, "",
                                          "string", cmd);
+  TCLAP::SwitchArg is_coverage_enabled("x", "coverage", "Calculate route test coverage.", cmd, false);
   TCLAP::UnlabeledMultiArg<std::string> unlabelled_configs(
       "unlabelled-configs", "unlabelled configs", false, "unlabelledConfigStrings", cmd);
   try {
@@ -434,6 +452,7 @@ Options::Options(int argc, char** argv) {
   if (is_proto_) {
     config_path_ = config_path.getValue();
     test_path_ = test_path.getValue();
+    is_coverage_enabled_ = is_coverage_enabled.getValue();
     if (config_path_.empty() || test_path_.empty()) {
       std::cerr << "error: "
                 << "Both --config-path/c and --test-path/t are mandatory with --useproto"

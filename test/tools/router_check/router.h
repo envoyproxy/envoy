@@ -88,11 +88,16 @@ public:
    */
   void setShowDetails() { details_ = true; }
 
+  /*
+   * Enable printing the code coverage ratio.
+   */
+  void enableCoverage() { is_coverage_enabled_ = true; }
+
 private:
   RouterCheckTool(
       std::unique_ptr<NiceMock<Server::Configuration::MockFactoryContext>> factory_context,
       std::unique_ptr<Router::ConfigImpl> config, std::unique_ptr<Stats::IsolatedStoreImpl> stats,
-      Api::ApiPtr api);
+      Api::ApiPtr api, unsigned long route_size);
 
   bool compareCluster(ToolConfig& tool_config, const std::string& expected);
   bool compareCluster(ToolConfig& tool_config,
@@ -137,12 +142,15 @@ private:
 
   bool details_{false};
 
+  bool is_coverage_enabled_{false};
+
   // TODO(hennna): Switch away from mocks following work done by @rlazarus in github issue #499.
   std::unique_ptr<NiceMock<Server::Configuration::MockFactoryContext>> factory_context_;
   std::unique_ptr<Router::ConfigImpl> config_;
   std::unique_ptr<Stats::IsolatedStoreImpl> stats_;
   Api::ApiPtr api_;
-  std::string active_runtime;
+  std::string active_runtime_;
+  const unsigned long route_count_;
 };
 
 /**
@@ -182,6 +190,12 @@ public:
    */
   bool isDetailed() const { return is_detailed_; }
 
+
+  /**
+   * @return true if test coverage calculation is enabled.
+   */
+  bool isCoverageEnabled() const { return is_coverage_enabled_; }
+
 private:
   std::string test_path_;
   std::string config_path_;
@@ -189,5 +203,6 @@ private:
   std::string unlabelled_config_path_;
   bool is_proto_;
   bool is_detailed_;
+  bool is_coverage_enabled_;
 };
 } // namespace Envoy
