@@ -3,6 +3,7 @@
 #include "envoy/config/filter/fault/v2/fault.pb.h"
 #include "envoy/http/header_map.h"
 
+#include "common/http/headers.h"
 #include "common/singleton/const_singleton.h"
 
 namespace Envoy {
@@ -13,8 +14,11 @@ namespace Fault {
 
 class HeaderNameValues {
 public:
-  const Http::LowerCaseString DelayRequest{"x-envoy-fault-delay-request"};
-  const Http::LowerCaseString ThroughputResponse{"x-envoy-fault-throughput-response"};
+  const char* prefix() { return ThreadSafeSingleton<Http::PrefixValue>::get().prefix(); }
+
+  const Http::LowerCaseString DelayRequest{absl::StrCat(prefix(), "-fault-delay-request")};
+  const Http::LowerCaseString ThroughputResponse{
+      absl::StrCat(prefix(), "-fault-throughput-response")};
 };
 
 using HeaderNames = ConstSingleton<HeaderNameValues>;

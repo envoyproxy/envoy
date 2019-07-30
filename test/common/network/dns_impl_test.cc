@@ -237,7 +237,6 @@ private:
         buffer_.drain(size_);
         size_ = 0;
       }
-      return;
     }
 
     TestDnsServerQuery& parent_;
@@ -363,13 +362,14 @@ public:
   CustomInstance(const std::string& address, uint32_t port) : instance_(address, port) {
     antagonistic_name_ = fmt::format("{}:borked_port_{}", address, port);
   }
-  ~CustomInstance() override {}
+  ~CustomInstance() override = default;
 
   // Address::Instance
   bool operator==(const Address::Instance& rhs) const override {
     return asString() == rhs.asString();
   }
   const std::string& asString() const override { return antagonistic_name_; }
+  absl::string_view asStringView() const override { return antagonistic_name_; }
   const std::string& logicalName() const override { return antagonistic_name_; }
   Api::SysCallIntResult bind(int fd) const override { return instance_.bind(fd); }
   Api::SysCallIntResult connect(int fd) const override { return instance_.connect(fd); }

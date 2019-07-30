@@ -88,4 +88,28 @@ message HTTPFault {
   //  This is a per-stream limit versus a connection level limit. This means that concurrent streams
   //  will each get an independent limit.
   filter.fault.v2.FaultRateLimit response_rate_limit = 7;
+
+  // The runtime key to override the :ref:`default <config_http_filters_fault_injection_runtime>`
+  // runtime. The default is: fault.http.delay.fixed_delay_percent
+  string delay_percent_runtime = 8;
+
+  // The runtime key to override the :ref:`default <config_http_filters_fault_injection_runtime>`
+  // runtime. The default is: fault.http.abort.abort_percent
+  string abort_percent_runtime = 9;
+
+  // The runtime key to override the :ref:`default <config_http_filters_fault_injection_runtime>`
+  // runtime. The default is: fault.http.delay.fixed_duration_ms
+  string delay_duration_runtime = 10;
+
+  // The runtime key to override the :ref:`default <config_http_filters_fault_injection_runtime>`
+  // runtime. The default is: fault.http.abort.http_status
+  string abort_http_status_runtime = 11;
+
+  // The runtime key to override the :ref:`default <config_http_filters_fault_injection_runtime>`
+  // runtime. The default is: fault.http.max_active_faults
+  string max_active_faults_runtime = 12;
+
+  // The runtime key to override the :ref:`default <config_http_filters_fault_injection_runtime>`
+  // runtime. The default is: fault.http.rate_limit.response_percent
+  string response_rate_limit_percent_runtime = 13;
 }

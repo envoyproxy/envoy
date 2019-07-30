@@ -25,6 +25,12 @@ public:
     InProgress,
     // Permission denied.
     Permission,
+    // Message too big to send.
+    MessageTooBig,
+    // Kernel interrupt.
+    Interrupt,
+    // Requested a nonexistent interface or a non-local source address.
+    AddressNotAvailable,
     // Other error codes cannot be mapped to any one above in getErrorCode().
     UnknownError
   };

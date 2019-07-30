@@ -25,13 +25,13 @@ MockLoadBalancerSubsetInfo::MockLoadBalancerSubsetInfo() {
   ON_CALL(*this, subsetSelectors()).WillByDefault(ReturnRef(subset_selectors_));
 }
 
-MockLoadBalancerSubsetInfo::~MockLoadBalancerSubsetInfo() {}
+MockLoadBalancerSubsetInfo::~MockLoadBalancerSubsetInfo() = default;
 
 MockIdleTimeEnabledClusterInfo::MockIdleTimeEnabledClusterInfo() {
   ON_CALL(*this, idleTimeout()).WillByDefault(Return(std::chrono::milliseconds(1000)));
 }
 
-MockIdleTimeEnabledClusterInfo::~MockIdleTimeEnabledClusterInfo() {}
+MockIdleTimeEnabledClusterInfo::~MockIdleTimeEnabledClusterInfo() = default;
 
 MockClusterInfo::MockClusterInfo()
     : stats_(ClusterInfoImpl::generateStats(stats_store_)),
@@ -82,7 +82,7 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, clusterType()).WillByDefault(ReturnRef(cluster_type_));
 }
 
-MockClusterInfo::~MockClusterInfo() {}
+MockClusterInfo::~MockClusterInfo() = default;
 
 } // namespace Upstream
 } // namespace Envoy

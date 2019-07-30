@@ -32,27 +32,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "cds_json_lib",
-    srcs = ["cds_json.cc"],
-    hdrs = ["cds_json.h"],
-    external_deps = ["abseil_optional"],
-    deps = [
-        ":address_json_lib",
-        ":json_utility_lib",
-        ":protocol_json_lib",
-        ":tls_context_json_lib",
-        ":utility_lib",
-        "//include/envoy/json:json_object_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
-        "//source/common/common:assert_lib",
-        "//source/common/json:config_schemas_lib",
-        "//source/common/network:utility_lib",
-        "@envoy_api//envoy/api/v2:cds_cc",
-        "@envoy_api//envoy/api/v2/cluster:circuit_breaker_cc",
-    ],
-)
-
-envoy_cc_library(
     name = "filesystem_subscription_lib",
     srcs = ["filesystem_subscription_impl.cc"],
     hdrs = ["filesystem_subscription_impl.h"],
@@ -73,8 +52,15 @@ envoy_cc_library(
     srcs = ["datasource.cc"],
     hdrs = ["datasource.h"],
     deps = [
+        ":remote_data_fetcher_lib",
         "//include/envoy/api:api_interface",
+        "//include/envoy/init:manager_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/common:empty_string",
+        "//source/common/init:target_lib",
+        "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/api/v2/core:base_cc",
+        "@envoy_api//envoy/api/v2/core:http_uri_cc",
     ],
 )
 
@@ -330,18 +316,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "tls_context_json_lib",
-    srcs = ["tls_context_json.cc"],
-    hdrs = ["tls_context_json.h"],
-    deps = [
-        ":json_utility_lib",
-        "//include/envoy/json:json_object_interface",
-        "//source/common/common:utility_lib",
-        "@envoy_api//envoy/api/v2/auth:cert_cc",
-    ],
-)
-
-envoy_cc_library(
     name = "type_to_endpoint_lib",
     srcs = ["type_to_endpoint.cc"],
     hdrs = ["type_to_endpoint.h"],
@@ -411,5 +385,18 @@ envoy_cc_library(
         "//include/envoy/thread_local:thread_local_interface",
         "//source/common/init:target_lib",
         "//source/common/protobuf",
+    ],
+)
+
+envoy_cc_library(
+    name = "remote_data_fetcher_lib",
+    srcs = ["remote_data_fetcher.cc"],
+    hdrs = ["remote_data_fetcher.h"],
+    deps = [
+        "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/common:hex_lib",
+        "//source/common/crypto:utility_lib",
+        "//source/common/http:utility_lib",
+        "@envoy_api//envoy/api/v2/core:http_uri_cc",
     ],
 )

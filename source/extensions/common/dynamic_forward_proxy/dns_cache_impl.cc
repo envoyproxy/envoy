@@ -79,23 +79,43 @@ void DnsCacheImpl::startCacheLoad(const std::string& host, uint16_t default_port
     return;
   }
 
-  // TODO(mattklein123): Figure out if we want to support addresses of the form <IP>:<port>. This
-  //                     seems unlikely to be useful in TLS scenarios, but it is technically
-  //                     supported. We might want to block this form for now.
-  const auto colon_pos = host.find(':');
+  // First try to see if there is a port included. This also checks to see that there is not a ']'
+  // as the last character which is indicative of an IPv6 address without a port. This is a best
+  // effort attempt.
+  const auto colon_pos = host.rfind(':');
   absl::string_view host_to_resolve = host;
-  if (colon_pos != absl::string_view::npos) {
+  if (colon_pos != absl::string_view::npos && host_to_resolve.back() != ']') {
     const absl::string_view string_view_host = host;
     host_to_resolve = string_view_host.substr(0, colon_pos);
     const auto port_str = string_view_host.substr(colon_pos + 1);
     uint64_t port64;
     if (port_str.empty() || !absl::SimpleAtoi(port_str, &port64) || port64 > 65535) {
       // Just attempt to resolve whatever we were given. This will very likely fail.
-      // TODO(mattklein123): Should we actually fail here or do something different?
       host_to_resolve = host;
     } else {
       default_port = port64;
     }
+  }
+
+  // Now see if this is an IP address. We need to know this because some things (such as setting
+  // SNI) are special cased if this is an IP address. Either way, we still go through the normal
+  // resolver flow. We could short-circuit the DNS resolver in this case, but the extra code to do
+  // so is not worth it since the DNS resolver should handle it for us.
+  bool is_ip_address = false;
+  try {
+    absl::string_view potential_ip_address = host_to_resolve;
+    // TODO(mattklein123): Optimally we would support bracket parsing in parseInternetAddress(),
+    // but we still need to trim the brackets to send the IPv6 address into the DNS resolver. For
+    // now, just do all the trimming here, but in the future we should consider whether we can
+    // have unified [] handling as low as possible in the stack.
+    if (potential_ip_address.front() == '[' && potential_ip_address.back() == ']') {
+      potential_ip_address.remove_prefix(1);
+      potential_ip_address.remove_suffix(1);
+    }
+    Network::Utility::parseInternetAddress(std::string(potential_ip_address));
+    is_ip_address = true;
+    host_to_resolve = potential_ip_address;
+  } catch (const EnvoyException&) {
   }
 
   // TODO(mattklein123): Right now, the same host with different ports will become two
@@ -104,9 +124,9 @@ void DnsCacheImpl::startCacheLoad(const std::string& host, uint16_t default_port
   auto& primary_host =
       *primary_hosts_
            // try_emplace() is used here for direct argument forwarding.
-           .try_emplace(host,
-                        std::make_unique<PrimaryHostInfo>(*this, host_to_resolve, default_port,
-                                                          [this, host]() { onReResolve(host); }))
+           .try_emplace(host, std::make_unique<PrimaryHostInfo>(
+                                  *this, host_to_resolve, default_port, is_ip_address,
+                                  [this, host]() { onReResolve(host); }))
            .first->second;
   startResolve(host, primary_host);
 }
@@ -132,12 +152,12 @@ void DnsCacheImpl::onReResolve(const std::string& host) {
 
 void DnsCacheImpl::startResolve(const std::string& host, PrimaryHostInfo& host_info) {
   ENVOY_LOG(debug, "starting main thread resolve for host='{}' dns='{}' port='{}'", host,
-            host_info.host_to_resolve_, host_info.port_);
+            host_info.host_info_->resolved_host_, host_info.port_);
   ASSERT(host_info.active_query_ == nullptr);
 
   stats_.dns_query_attempt_.inc();
   host_info.active_query_ =
-      resolver_->resolve(host_info.host_to_resolve_, dns_lookup_family_,
+      resolver_->resolve(host_info.host_info_->resolved_host_, dns_lookup_family_,
                          [this, host](std::list<Network::DnsResponse>&& response) {
                            finishResolve(host, std::move(response));
                          });
@@ -151,11 +171,8 @@ void DnsCacheImpl::finishResolve(const std::string& host,
 
   auto& primary_host_info = *primary_host_it->second;
   primary_host_info.active_query_ = nullptr;
-  const bool first_resolve = primary_host_info.host_info_ == nullptr;
-  if (primary_host_info.host_info_ == nullptr) {
-    primary_host_info.host_info_ =
-        std::make_shared<DnsHostInfoImpl>(main_thread_dispatcher_.timeSource());
-  }
+  const bool first_resolve = !primary_host_info.host_info_->first_resolve_complete_;
+  primary_host_info.host_info_->first_resolve_complete_ = true;
 
   const auto new_address = !response.empty()
                                ? Network::Utility::getAddressWithPort(*(response.front().address_),
@@ -211,9 +228,8 @@ void DnsCacheImpl::runRemoveCallbacks(const std::string& host) {
 void DnsCacheImpl::updateTlsHostsMap() {
   TlsHostMapSharedPtr new_host_map = std::make_shared<TlsHostMap>();
   for (const auto& primary_host : primary_hosts_) {
-    // Do not include hosts without host info. This only happens before we get the first
-    // resolution.
-    if (primary_host.second->host_info_ != nullptr) {
+    // Do not include hosts that have not resolved at least once.
+    if (primary_host.second->host_info_->first_resolve_complete_) {
       new_host_map->emplace(primary_host.first, primary_host.second->host_info_);
     }
   }
@@ -248,9 +264,11 @@ void DnsCacheImpl::ThreadLocalHostInfo::updateHostMap(const TlsHostMapSharedPtr&
 
 DnsCacheImpl::PrimaryHostInfo::PrimaryHostInfo(DnsCacheImpl& parent,
                                                absl::string_view host_to_resolve, uint16_t port,
-                                               const Event::TimerCb& timer_cb)
-    : parent_(parent), host_to_resolve_(host_to_resolve), port_(port),
-      refresh_timer_(parent.main_thread_dispatcher_.createTimer(timer_cb)) {
+                                               bool is_ip_address, const Event::TimerCb& timer_cb)
+    : parent_(parent), port_(port),
+      refresh_timer_(parent.main_thread_dispatcher_.createTimer(timer_cb)),
+      host_info_(std::make_shared<DnsHostInfoImpl>(parent.main_thread_dispatcher_.timeSource(),
+                                                   host_to_resolve, is_ip_address)) {
   parent_.stats_.host_added_.inc();
   parent_.stats_.num_hosts_.inc();
 }

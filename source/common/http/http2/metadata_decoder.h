@@ -44,13 +44,6 @@ public:
    */
   bool onMetadataFrameComplete(bool end_metadata);
 
-  /**
-   * @return payload_.
-   */
-  Buffer::OwnedImpl& payload() { return payload_; }
-
-  MetadataMap& getMetadataMap() { return *metadata_map_; }
-
 private:
   friend class MetadataEncoderDecoderTest_VerifyEncoderDecoderOnMultipleMetadataMaps_Test;
   friend class MetadataEncoderDecoderTest_VerifyEncoderDecoderMultipleMetadataReachSizeLimit_Test;

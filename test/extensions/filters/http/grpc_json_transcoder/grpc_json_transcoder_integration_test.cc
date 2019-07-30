@@ -41,7 +41,6 @@ public:
             )EOF";
     config_helper_.addFilter(
         fmt::format(filter, TestEnvironment::runfilesPath("/test/proto/bookstore.descriptor")));
-    HttpIntegrationTest::initialize();
   }
 
   /**
@@ -161,6 +160,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, GrpcJsonTranscoderIntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryPost) {
+  HttpIntegrationTest::initialize();
   testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(
       Http::TestHeaderMapImpl{{":method", "POST"},
                               {":path", "/shelf"},
@@ -176,6 +176,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryPost) {
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGet) {
+  HttpIntegrationTest::initialize();
   testTranscoding<Empty, bookstore::ListShelvesResponse>(
       Http::TestHeaderMapImpl{{":method", "GET"}, {":path", "/shelves"}, {":authority", "host"}},
       "", {""}, {R"(shelves { id: 20 theme: "Children" }
@@ -189,6 +190,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGet) {
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetHttpBody) {
+  HttpIntegrationTest::initialize();
   testTranscoding<Empty, google::api::HttpBody>(
       Http::TestHeaderMapImpl{{":method", "GET"}, {":path", "/index"}, {":authority", "host"}}, "",
       {""}, {R"(content_type: "text/html" data: "<h1>Hello!</h1>" )"}, Status(),
@@ -200,6 +202,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetHttpBody) {
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetError) {
+  HttpIntegrationTest::initialize();
   testTranscoding<bookstore::GetShelfRequest, bookstore::Shelf>(
       Http::TestHeaderMapImpl{
           {":method", "GET"}, {":path", "/shelves/100?"}, {":authority", "host"}},
@@ -209,7 +212,30 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetError) {
       "");
 }
 
+TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetError1) {
+  const std::string filter =
+      R"EOF(
+            name: envoy.grpc_json_transcoder
+            config:
+              proto_descriptor : "{}"
+              services : "bookstore.Bookstore"
+              ignore_unknown_query_parameters : true
+            )EOF";
+  config_helper_.addFilter(
+      fmt::format(filter, TestEnvironment::runfilesPath("/test/proto/bookstore.descriptor")));
+  HttpIntegrationTest::initialize();
+  testTranscoding<bookstore::GetShelfRequest, bookstore::Shelf>(
+      Http::TestHeaderMapImpl{{":method", "GET"},
+                              {":path", "/shelves/100?unknown=1&shelf=9999"},
+                              {":authority", "host"}},
+      "", {"shelf: 9999"}, {}, Status(Code::NOT_FOUND, "Shelf 9999 Not Found"),
+      Http::TestHeaderMapImpl{
+          {":status", "404"}, {"grpc-status", "5"}, {"grpc-message", "Shelf 9999 Not Found"}},
+      "");
+}
+
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryDelete) {
+  HttpIntegrationTest::initialize();
   testTranscoding<bookstore::DeleteBookRequest, Empty>(
       Http::TestHeaderMapImpl{
           {":method", "DELETE"}, {":path", "/shelves/456/books/123"}, {":authority", "host"}},
@@ -222,6 +248,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryDelete) {
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryPatch) {
+  HttpIntegrationTest::initialize();
   testTranscoding<bookstore::UpdateBookRequest, bookstore::Book>(
       Http::TestHeaderMapImpl{
           {":method", "PATCH"}, {":path", "/shelves/456/books/123"}, {":authority", "host"}},
@@ -236,6 +263,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryPatch) {
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryCustom) {
+  HttpIntegrationTest::initialize();
   testTranscoding<bookstore::GetShelfRequest, Empty>(
       Http::TestHeaderMapImpl{
           {":method", "OPTIONS"}, {":path", "/shelves/456"}, {":authority", "host"}},
@@ -248,6 +276,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryCustom) {
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, BindingAndBody) {
+  HttpIntegrationTest::initialize();
   testTranscoding<bookstore::CreateBookRequest, bookstore::Book>(
       Http::TestHeaderMapImpl{
           {":method", "PUT"}, {":path", "/shelves/1/books"}, {":authority", "host"}},
@@ -259,6 +288,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, BindingAndBody) {
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, ServerStreamingGet) {
+  HttpIntegrationTest::initialize();
   testTranscoding<bookstore::ListBooksRequest, bookstore::Book>(
       Http::TestHeaderMapImpl{
           {":method", "GET"}, {":path", "/shelves/1/books"}, {":authority", "host"}},
@@ -271,6 +301,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, ServerStreamingGet) {
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, StreamingPost) {
+  HttpIntegrationTest::initialize();
   testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(
       Http::TestHeaderMapImpl{
           {":method", "POST"}, {":path", "/bulk/shelves"}, {":authority", "host"}},
@@ -300,6 +331,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, StreamingPost) {
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, InvalidJson) {
+  HttpIntegrationTest::initialize();
   // Usually the response would be
   // "Unexpected token.\n"
   //    "INVALID_JSON\n"

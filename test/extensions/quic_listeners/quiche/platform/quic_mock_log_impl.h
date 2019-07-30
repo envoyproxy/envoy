@@ -19,9 +19,9 @@ namespace quic {
 // destruction(or StopCapturingLogs()).
 class QuicEnvoyMockLog : public QuicLogSink {
 public:
-  QuicEnvoyMockLog() : is_capturing_(false) {}
+  QuicEnvoyMockLog() = default;
 
-  virtual ~QuicEnvoyMockLog() {
+  ~QuicEnvoyMockLog() override {
     if (is_capturing_) {
       StopCapturingLogs();
     }
@@ -43,7 +43,7 @@ public:
 
 private:
   QuicLogSink* original_sink_;
-  bool is_capturing_;
+  bool is_capturing_{false};
 };
 
 // ScopedDisableExitOnDFatal is used to disable exiting the program when we encounter a

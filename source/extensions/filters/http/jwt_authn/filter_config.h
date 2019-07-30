@@ -59,7 +59,7 @@ struct JwtAuthnFilterStats {
 /**
  * The filter config object to hold config and relevant objects.
  */
-class FilterConfig : public Logger::Loggable<Logger::Id::config>, public AuthFactory {
+class FilterConfig : public Logger::Loggable<Logger::Id::jwt>, public AuthFactory {
 public:
   ~FilterConfig() override = default;
 
@@ -92,12 +92,6 @@ public:
   }
 
   JwtAuthnFilterStats& stats() { return stats_; }
-
-  // Get the Config.
-  const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication&
-  getProtoConfig() const {
-    return proto_config_;
-  }
 
   // Get per-thread cache object.
   ThreadLocalCache& getCache() const { return tls_->getTyped<ThreadLocalCache>(); }

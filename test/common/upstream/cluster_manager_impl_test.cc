@@ -33,6 +33,7 @@
 #include "test/mocks/tcp/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
@@ -543,7 +544,8 @@ static_resources:
 
   EXPECT_THROW_WITH_MESSAGE(
       create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
-      "cluster: cluster type 'original_dst' may only be used with LB type 'original_dst_lb'");
+      "cluster: LB policy ROUND_ROBIN is not valid for Cluster type ORIGINAL_DST. Only "
+      "'original_dst_lb' is allowed with cluster type 'original_dst'");
 }
 
 TEST_F(ClusterManagerImplTest, OriginalDstLbRestriction2) {
@@ -566,7 +568,8 @@ static_resources:
 
   EXPECT_THROW_WITH_MESSAGE(
       create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
-      "cluster: LB type 'original_dst_lb' may only be used with cluster type 'original_dst'");
+      "cluster: LB policy ORIGINAL_DST_LB is not valid for Cluster type STATIC. Only "
+      "'original_dst_lb' is allowed with cluster type 'original_dst'");
 }
 
 TEST_F(ClusterManagerImplTest, SubsetLoadBalancerInitialization) {
@@ -2128,14 +2131,14 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
 
 class MockConnPoolWithDestroy : public Http::ConnectionPool::MockInstance {
 public:
-  ~MockConnPoolWithDestroy() { onDestroy(); }
+  ~MockConnPoolWithDestroy() override { onDestroy(); }
 
   MOCK_METHOD0(onDestroy, void());
 };
 
 class MockTcpConnPoolWithDestroy : public Tcp::ConnectionPool::MockInstance {
 public:
-  ~MockTcpConnPoolWithDestroy() { onDestroy(); }
+  ~MockTcpConnPoolWithDestroy() override { onDestroy(); }
 
   MOCK_METHOD0(onDestroy, void());
 };
@@ -2687,6 +2690,61 @@ TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsNullIsOkay) {
   EXPECT_NE(nullptr, cp);
 }
 
+class TestUpstreamNetworkFilter : public Network::WriteFilter {
+public:
+  Network::FilterStatus onWrite(Buffer::Instance&, bool) override {
+    return Network::FilterStatus::Continue;
+  }
+};
+
+class TestUpstreamNetworkFilterConfigFactory
+    : public Server::Configuration::NamedUpstreamNetworkFilterConfigFactory {
+public:
+  Network::FilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message&,
+                               Server::Configuration::CommonFactoryContext&) override {
+    return [](Network::FilterManager& filter_manager) -> void {
+      filter_manager.addWriteFilter(std::make_shared<TestUpstreamNetworkFilter>());
+    };
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Envoy::ProtobufWkt::Empty>();
+  }
+  std::string name() override { return "envoy.test.filter"; }
+};
+
+// Verify that configured upstream filters are added to client connections.
+TEST_F(ClusterManagerImplTest, AddUpstreamFilters) {
+  TestUpstreamNetworkFilterConfigFactory factory;
+  Registry::InjectFactory<Server::Configuration::NamedUpstreamNetworkFilterConfigFactory> registry(
+      factory);
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      hosts:
+      - socket_address:
+          address: "127.0.0.1"
+          port_value: 11001
+      filters:
+      - name: envoy.test.filter
+  )EOF";
+
+  create(parseBootstrapFromV2Yaml(yaml));
+  Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
+  EXPECT_CALL(*connection, addReadFilter(_)).Times(0);
+  EXPECT_CALL(*connection, addWriteFilter(_)).Times(1);
+  EXPECT_CALL(*connection, addFilter(_)).Times(0);
+  EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
+      .WillOnce(Return(connection));
+  auto conn_data = cluster_manager_->tcpConnForCluster("cluster_1", nullptr, nullptr);
+  EXPECT_EQ(connection, conn_data.connection_.get());
+  factory_.tls_.shutdownThread();
+}
+
 class ClusterManagerInitHelperTest : public testing::Test {
 public:
   MOCK_METHOD1(onClusterInit, void(Cluster& cluster));
@@ -2838,8 +2896,8 @@ public:
         expect_success = false;
         continue;
       }
-      EXPECT_CALL(os_sys_calls, setsockopt_(_, name_val.first.value().first,
-                                            name_val.first.value().second, _, sizeof(int)))
+      EXPECT_CALL(os_sys_calls,
+                  setsockopt_(_, name_val.first.level(), name_val.first.option(), _, sizeof(int)))
           .WillOnce(Invoke([&name_val](int, int, int, const void* optval, socklen_t) -> int {
             EXPECT_EQ(name_val.second, *static_cast<const int*>(optval));
             return 0;
@@ -3009,7 +3067,7 @@ TEST_F(SockoptsTest, SockoptsClusterOnly) {
   )EOF";
   initialize(yaml);
   std::vector<std::pair<Network::SocketOptionName, int>> names_vals{
-      {Network::SocketOptionName({1, 2}), 3}, {Network::SocketOptionName({4, 5}), 6}};
+      {ENVOY_MAKE_SOCKET_OPTION_NAME(1, 2), 3}, {ENVOY_MAKE_SOCKET_OPTION_NAME(4, 5), 6}};
   expectSetsockopts(names_vals);
 }
 
@@ -3037,7 +3095,7 @@ TEST_F(SockoptsTest, SockoptsClusterManagerOnly) {
   )EOF";
   initialize(yaml);
   std::vector<std::pair<Network::SocketOptionName, int>> names_vals{
-      {Network::SocketOptionName({1, 2}), 3}, {Network::SocketOptionName({4, 5}), 6}};
+      {ENVOY_MAKE_SOCKET_OPTION_NAME(1, 2), 3}, {ENVOY_MAKE_SOCKET_OPTION_NAME(4, 5), 6}};
   expectSetsockopts(names_vals);
 }
 
@@ -3067,7 +3125,7 @@ TEST_F(SockoptsTest, SockoptsClusterOverride) {
   )EOF";
   initialize(yaml);
   std::vector<std::pair<Network::SocketOptionName, int>> names_vals{
-      {Network::SocketOptionName({1, 2}), 3}, {Network::SocketOptionName({4, 5}), 6}};
+      {ENVOY_MAKE_SOCKET_OPTION_NAME(1, 2), 3}, {ENVOY_MAKE_SOCKET_OPTION_NAME(4, 5), 6}};
   expectSetsockopts(names_vals);
 }
 
@@ -3116,16 +3174,15 @@ public:
                   options, socket, envoy::api::v2::core::SocketOption::STATE_PREBIND)));
               return connection_;
             }));
-    EXPECT_CALL(os_sys_calls, setsockopt_(_, ENVOY_SOCKET_SO_KEEPALIVE.value().first,
-                                          ENVOY_SOCKET_SO_KEEPALIVE.value().second, _, sizeof(int)))
+    EXPECT_CALL(os_sys_calls, setsockopt_(_, ENVOY_SOCKET_SO_KEEPALIVE.level(),
+                                          ENVOY_SOCKET_SO_KEEPALIVE.option(), _, sizeof(int)))
         .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
           EXPECT_EQ(1, *static_cast<const int*>(optval));
           return 0;
         }));
     if (keepalive_probes.has_value()) {
-      EXPECT_CALL(os_sys_calls,
-                  setsockopt_(_, ENVOY_SOCKET_TCP_KEEPCNT.value().first,
-                              ENVOY_SOCKET_TCP_KEEPCNT.value().second, _, sizeof(int)))
+      EXPECT_CALL(os_sys_calls, setsockopt_(_, ENVOY_SOCKET_TCP_KEEPCNT.level(),
+                                            ENVOY_SOCKET_TCP_KEEPCNT.option(), _, sizeof(int)))
           .WillOnce(
               Invoke([&keepalive_probes](int, int, int, const void* optval, socklen_t) -> int {
                 EXPECT_EQ(keepalive_probes.value(), *static_cast<const int*>(optval));
@@ -3133,18 +3190,16 @@ public:
               }));
     }
     if (keepalive_time.has_value()) {
-      EXPECT_CALL(os_sys_calls,
-                  setsockopt_(_, ENVOY_SOCKET_TCP_KEEPIDLE.value().first,
-                              ENVOY_SOCKET_TCP_KEEPIDLE.value().second, _, sizeof(int)))
+      EXPECT_CALL(os_sys_calls, setsockopt_(_, ENVOY_SOCKET_TCP_KEEPIDLE.level(),
+                                            ENVOY_SOCKET_TCP_KEEPIDLE.option(), _, sizeof(int)))
           .WillOnce(Invoke([&keepalive_time](int, int, int, const void* optval, socklen_t) -> int {
             EXPECT_EQ(keepalive_time.value(), *static_cast<const int*>(optval));
             return 0;
           }));
     }
     if (keepalive_interval.has_value()) {
-      EXPECT_CALL(os_sys_calls,
-                  setsockopt_(_, ENVOY_SOCKET_TCP_KEEPINTVL.value().first,
-                              ENVOY_SOCKET_TCP_KEEPINTVL.value().second, _, sizeof(int)))
+      EXPECT_CALL(os_sys_calls, setsockopt_(_, ENVOY_SOCKET_TCP_KEEPINTVL.level(),
+                                            ENVOY_SOCKET_TCP_KEEPINTVL.option(), _, sizeof(int)))
           .WillOnce(
               Invoke([&keepalive_interval](int, int, int, const void* optval, socklen_t) -> int {
                 EXPECT_EQ(keepalive_interval.value(), *static_cast<const int*>(optval));

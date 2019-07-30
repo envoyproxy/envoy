@@ -29,6 +29,16 @@ public:
   virtual ~Slot() = default;
 
   /**
+   * Returns if there is thread local data for this thread.
+   *
+   * This should return true for Envoy worker threads and false for threads which do not have thread
+   * local storage allocated.
+   *
+   * @return true if registerThread has been called for this thread, false otherwise.
+   */
+  virtual bool currentThreadRegistered() PURE;
+
+  /**
    * @return ThreadLocalObjectSharedPtr a thread local object stored in the slot.
    */
   virtual ThreadLocalObjectSharedPtr get() PURE;

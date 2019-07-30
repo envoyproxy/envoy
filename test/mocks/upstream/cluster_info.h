@@ -26,7 +26,7 @@ namespace Upstream {
 class MockLoadBalancerSubsetInfo : public LoadBalancerSubsetInfo {
 public:
   MockLoadBalancerSubsetInfo();
-  ~MockLoadBalancerSubsetInfo();
+  ~MockLoadBalancerSubsetInfo() override;
 
   // Upstream::LoadBalancerSubsetInfo
   MOCK_CONST_METHOD0(isEnabled, bool());
@@ -61,7 +61,7 @@ public:
 class MockClusterInfo : public ClusterInfo {
 public:
   MockClusterInfo();
-  ~MockClusterInfo();
+  ~MockClusterInfo() override;
 
   void resetResourceManager(uint64_t cx, uint64_t rq_pending, uint64_t rq, uint64_t rq_retry,
                             uint64_t conn_pool) {
@@ -105,6 +105,7 @@ public:
   MOCK_CONST_METHOD0(drainConnectionsOnHostRemoval, bool());
   MOCK_CONST_METHOD0(warmHosts, bool());
   MOCK_CONST_METHOD0(eds_service_name, absl::optional<std::string>());
+  MOCK_CONST_METHOD1(createNetworkFilterChain, void(Network::Connection&));
 
   std::string name_{"fake_cluster"};
   absl::optional<std::string> eds_service_name_;
@@ -135,7 +136,7 @@ public:
 class MockIdleTimeEnabledClusterInfo : public MockClusterInfo {
 public:
   MockIdleTimeEnabledClusterInfo();
-  ~MockIdleTimeEnabledClusterInfo();
+  ~MockIdleTimeEnabledClusterInfo() override;
 };
 
 } // namespace Upstream

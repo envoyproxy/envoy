@@ -31,6 +31,15 @@ dynamic_resources:
   lds_config:
     path: /dev/null
 static_resources:
+  secrets:
+  - name: "secret_static_0"
+    tls_certificate:
+      certificate_chain:
+        inline_string: "DUMMY_INLINE_BYTES"
+      private_key:
+        inline_string: "DUMMY_INLINE_BYTES"
+      password:
+        inline_string: "DUMMY_INLINE_BYTES"
   clusters:
     name: cluster_0
     hosts:
@@ -63,7 +72,7 @@ static_resources:
     name: listener_0
     address:
       socket_address:
-        address: 127.0.0.1
+        address: 0.0.0.0
         port_value: 0
         protocol: udp
 )EOF";
@@ -240,7 +249,11 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& 
   for (int i = 0; i < static_resources->listeners_size(); ++i) {
     auto* listener = static_resources->mutable_listeners(i);
     auto* listener_socket_addr = listener->mutable_address()->mutable_socket_address();
-    listener_socket_addr->set_address(Network::Test::getLoopbackAddressString(version));
+    if (listener_socket_addr->address() == "0.0.0.0" || listener_socket_addr->address() == "::") {
+      listener_socket_addr->set_address(Network::Test::getAnyAddressString(version));
+    } else {
+      listener_socket_addr->set_address(Network::Test::getLoopbackAddressString(version));
+    }
   }
 
   for (int i = 0; i < static_resources->clusters_size(); ++i) {
@@ -699,4 +712,5 @@ void EdsHelper::setEdsAndWait(
   RELEASE_ASSERT(
       update_successes_ == server_stats.counter("cluster.cluster_0.update_success")->value(), "");
 }
+
 } // namespace Envoy

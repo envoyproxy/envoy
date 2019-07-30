@@ -51,7 +51,7 @@ envoy_cc_test(
         "@com_googlesource_quiche//:quic_core_types_lib",
         "@com_googlesource_quiche//:quic_platform_expect_bug",
         "@com_googlesource_quiche//:quic_platform_mem_slice_span",
-        "@com_googlesource_quiche//:quic_platform_mem_slice_storage_lib",
+        "@com_googlesource_quiche//:quic_platform_mem_slice_storage",
         "@com_googlesource_quiche//:quic_platform_mock_log",
         "@com_googlesource_quiche//:quic_platform_port_utils",
         "@com_googlesource_quiche//:quic_platform_sleep",
@@ -221,5 +221,6 @@ envoy_cc_test(
         "//source/extensions/quic_listeners/quiche/platform:envoy_quic_clock_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_time_lib",
+        "//test/test_common:utility_lib",
     ],
 )

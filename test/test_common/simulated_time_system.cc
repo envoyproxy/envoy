@@ -55,7 +55,7 @@ public:
         time_system_(time_system), index_(time_system.nextIndex()), armed_(false), pending_(false) {
   }
 
-  virtual ~Alarm();
+  ~Alarm() override;
 
   // Timer
   void disableTimer() override;

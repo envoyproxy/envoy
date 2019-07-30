@@ -44,17 +44,11 @@ Histogram& ScopePrefixer::histogramFromStatName(StatName name) {
   return scope_.histogramFromStatName(StatName(stat_name_storage.get()));
 }
 
-absl::optional<std::reference_wrapper<const Counter>>
-ScopePrefixer::findCounter(StatName name) const {
-  return scope_.findCounter(name);
-}
+OptionalCounter ScopePrefixer::findCounter(StatName name) const { return scope_.findCounter(name); }
 
-absl::optional<std::reference_wrapper<const Gauge>> ScopePrefixer::findGauge(StatName name) const {
-  return scope_.findGauge(name);
-}
+OptionalGauge ScopePrefixer::findGauge(StatName name) const { return scope_.findGauge(name); }
 
-absl::optional<std::reference_wrapper<const Histogram>>
-ScopePrefixer::findHistogram(StatName name) const {
+OptionalHistogram ScopePrefixer::findHistogram(StatName name) const {
   return scope_.findHistogram(name);
 }
 

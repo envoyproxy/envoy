@@ -13,6 +13,14 @@ public:
   void SetUp() override { setDownstreamProtocol(Http::CodecClient::Type::HTTP2); }
 
   void simultaneousRequest(int32_t request1_bytes, int32_t request2_bytes);
+
+protected:
+  // Utility function to add filters.
+  void addFilters(std::vector<std::string> filters) {
+    for (const auto& filter : filters) {
+      config_helper_.addFilter(filter);
+    }
+  }
 };
 
 class Http2RingHashIntegrationTest : public Http2IntegrationTest {
@@ -45,5 +53,11 @@ public:
     setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
   }
+
+  void testRequestMetadataWithStopAllFilter();
+
+  void verifyHeadersOnlyTest();
+
+  void runHeaderOnlyTest(bool send_request_body, size_t body_size);
 };
 } // namespace Envoy

@@ -116,7 +116,7 @@ protected:
 
 class EdsWithHealthCheckUpdateTest : public EdsTest {
 protected:
-  EdsWithHealthCheckUpdateTest() {}
+  EdsWithHealthCheckUpdateTest() = default;
 
   // Build the initial cluster with some endpoints.
   void initializeCluster(const std::vector<uint32_t> endpoint_ports,
@@ -1671,7 +1671,7 @@ TEST_F(EdsTest, MalformedIP) {
 
 class EdsAssignmentTimeoutTest : public EdsTest {
 public:
-  EdsAssignmentTimeoutTest() : interval_timer_(nullptr) {
+  EdsAssignmentTimeoutTest() {
     EXPECT_CALL(dispatcher_, createTimer_(_))
         .WillOnce(Invoke([this](Event::TimerCb cb) {
           timer_cb_ = cb;
@@ -1684,7 +1684,7 @@ public:
     resetCluster();
   }
 
-  Event::MockTimer* interval_timer_;
+  Event::MockTimer* interval_timer_{nullptr};
   Event::TimerCb timer_cb_;
 };
 

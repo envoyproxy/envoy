@@ -43,7 +43,8 @@ namespace Router {
   COUNTER(rq_redirect)                                                                             \
   COUNTER(rq_direct_response)                                                                      \
   COUNTER(rq_total)                                                                                \
-  COUNTER(rq_reset_after_downstream_response_started)
+  COUNTER(rq_reset_after_downstream_response_started)                                              \
+  COUNTER(rq_retry_skipped_request_not_complete)
 // clang-format on
 
 /**
@@ -234,7 +235,7 @@ public:
         downstream_end_stream_(false), do_shadowing_(false), is_retry_(false),
         attempting_internal_redirect_with_complete_stream_(false) {}
 
-  ~Filter();
+  ~Filter() override;
 
   // Http::StreamFilterBase
   void onDestroy() override;
@@ -243,6 +244,7 @@ public:
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap& trailers) override;
+  Http::FilterMetadataStatus decodeMetadata(Http::MetadataMap& metadata_map) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
   // Upstream::LoadBalancerContext
@@ -356,11 +358,12 @@ private:
                            public Http::ConnectionPool::Callbacks,
                            public LinkedObject<UpstreamRequest> {
     UpstreamRequest(Filter& parent, Http::ConnectionPool::Instance& pool);
-    ~UpstreamRequest();
+    ~UpstreamRequest() override;
 
     void encodeHeaders(bool end_stream);
     void encodeData(Buffer::Instance& data, bool end_stream);
     void encodeTrailers(const Http::HeaderMap& trailers);
+    void encodeMetadata(Http::MetadataMapPtr&& metadata_map_ptr);
 
     void resetStream();
     void setupPerTryTimeout();
@@ -458,6 +461,7 @@ private:
     // access logging is configured.
     Http::HeaderMapPtr upstream_headers_;
     Http::HeaderMapPtr upstream_trailers_;
+    Http::MetadataMapVector downstream_metadata_map_vector_;
 
     bool calling_encode_headers_ : 1;
     bool upstream_canary_ : 1;
@@ -523,6 +527,7 @@ private:
   // for the remaining upstream requests to return.
   void resetOtherUpstreams(UpstreamRequest& upstream_request);
   void sendNoHealthyUpstreamResponse();
+  // TODO(soya3129): Save metadata for retry, redirect and shadowing case.
   bool setupRetry();
   bool setupRedirect(const Http::HeaderMap& headers, UpstreamRequest& upstream_request);
   void updateOutlierDetection(Upstream::Outlier::Result result, UpstreamRequest& upstream_request,

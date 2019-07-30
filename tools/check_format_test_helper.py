@@ -102,26 +102,26 @@ def emitStdoutAsError(stdout):
   logging.error("\n".join(stdout))
 
 
-def expectError(status, stdout, expected_substring):
+def expectError(filename, status, stdout, expected_substring):
   if status == 0:
-    logging.error("Expected failure `%s`, but succeeded" % expected_substring)
+    logging.error("%s: Expected failure `%s`, but succeeded" % (filename, expected_substring))
     return 1
   for line in stdout:
     if expected_substring in line:
       return 0
-  logging.error("Could not find '%s' in:\n" % expected_substring)
+  logging.error("%s: Could not find '%s' in:\n" % (filename, expected_substring))
   emitStdoutAsError(stdout)
   return 1
 
 
 def fixFileExpectingFailure(filename, expected_substring):
   command, infile, outfile, status, stdout = fixFileHelper(filename)
-  return expectError(status, stdout, expected_substring)
+  return expectError(filename, status, stdout, expected_substring)
 
 
 def checkFileExpectingError(filename, expected_substring):
   command, status, stdout = runCheckFormat("check", getInputFile(filename))
-  return expectError(status, stdout, expected_substring)
+  return expectError(filename, status, stdout, expected_substring)
 
 
 def checkAndFixError(filename, expected_substring):
@@ -208,6 +208,15 @@ if __name__ == "__main__":
       "version_history.rst",
       "Version history line malformed. Does not match VERSION_HISTORY_NEW_LINE_REGEX in "
       "check_format.py")
+  errors += checkUnfixableError(
+      "counter_from_string.cc",
+      "Don't lookup stats by name at runtime; use StatName saved during construction")
+  errors += checkUnfixableError(
+      "gauge_from_string.cc",
+      "Don't lookup stats by name at runtime; use StatName saved during construction")
+  errors += checkUnfixableError(
+      "histogram_from_string.cc",
+      "Don't lookup stats by name at runtime; use StatName saved during construction")
 
   errors += fixFileExpectingFailure(
       "api/missing_package.proto",

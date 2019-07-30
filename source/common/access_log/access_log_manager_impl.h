@@ -64,7 +64,7 @@ public:
                     Thread::BasicLockable& lock, AccessLogFileStats& stats_,
                     std::chrono::milliseconds flush_interval_msec,
                     Thread::ThreadFactory& thread_factory);
-  ~AccessLogFileImpl();
+  ~AccessLogFileImpl() override;
 
   // AccessLog::AccessLogFile
   void write(absl::string_view data) override;

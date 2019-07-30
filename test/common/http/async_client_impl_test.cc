@@ -908,6 +908,21 @@ TEST_F(AsyncClientImplTest, RdsGettersTest) {
   EXPECT_CALL(stream_callbacks_, onReset());
 }
 
+TEST_F(AsyncClientImplTest, DumpState) {
+  TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  AsyncClient::Stream* stream = client_.start(stream_callbacks_, AsyncClient::StreamOptions());
+  Http::StreamDecoderFilterCallbacks* filter_callbacks =
+      static_cast<Http::AsyncStreamImpl*>(stream);
+
+  std::stringstream out;
+  filter_callbacks->scope().dumpState(out);
+  std::string state = out.str();
+  EXPECT_THAT(state, testing::HasSubstr("protocol_: 1"));
+
+  EXPECT_CALL(stream_callbacks_, onReset());
+}
+
 } // namespace
 
 // Must not be in anonymous namespace for friend to work.

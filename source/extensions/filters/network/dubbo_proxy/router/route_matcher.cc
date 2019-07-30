@@ -5,6 +5,8 @@
 
 #include "common/protobuf/utility.h"
 
+#include "extensions/filters/network/dubbo_proxy/serializer_impl.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -62,7 +64,7 @@ ParameterRouteEntryImpl::ParameterRouteEntryImpl(
   }
 }
 
-ParameterRouteEntryImpl::~ParameterRouteEntryImpl() {}
+ParameterRouteEntryImpl::~ParameterRouteEntryImpl() = default;
 
 bool ParameterRouteEntryImpl::matchParameter(absl::string_view request_data,
                                              const ParameterData& config_data) const {
@@ -81,13 +83,16 @@ bool ParameterRouteEntryImpl::matchParameter(absl::string_view request_data,
 
 RouteConstSharedPtr ParameterRouteEntryImpl::matches(const MessageMetadata& metadata,
                                                      uint64_t random_value) const {
-  if (!metadata.hasParameters()) {
+  ASSERT(metadata.hasInvocationInfo());
+  const auto invocation = dynamic_cast<const RpcInvocationImpl*>(&metadata.invocation_info());
+  ASSERT(invocation);
+  if (!invocation->hasParameters()) {
     return nullptr;
   }
 
   ENVOY_LOG(debug, "dubbo route matcher: parameter name match");
   for (auto& config_data : parameter_data_list_) {
-    const std::string& data = metadata.getParameterValue(config_data.index_);
+    const std::string& data = invocation->getParameterValue(config_data.index_);
     if (data.empty()) {
       ENVOY_LOG(debug,
                 "dubbo route matcher: parameter matching failed, there are no parameters in the "
@@ -133,23 +138,27 @@ MethodRouteEntryImpl::MethodRouteEntryImpl(
   }
 }
 
-MethodRouteEntryImpl::~MethodRouteEntryImpl() {}
+MethodRouteEntryImpl::~MethodRouteEntryImpl() = default;
 
 RouteConstSharedPtr MethodRouteEntryImpl::matches(const MessageMetadata& metadata,
                                                   uint64_t random_value) const {
-  if (metadata.hasHeaders() && !RouteEntryImplBase::headersMatch(metadata.headers())) {
+  ASSERT(metadata.hasInvocationInfo());
+  const auto invocation = dynamic_cast<const RpcInvocationImpl*>(&metadata.invocation_info());
+  ASSERT(invocation);
+
+  if (invocation->hasHeaders() && !RouteEntryImplBase::headersMatch(invocation->headers())) {
     ENVOY_LOG(error, "dubbo route matcher: headers not match");
     return nullptr;
   }
 
-  if (!metadata.method_name().has_value()) {
+  if (invocation->method_name().empty()) {
     ENVOY_LOG(error, "dubbo route matcher: there is no method name in the metadata");
     return nullptr;
   }
 
-  if (!method_name_.match(metadata.method_name().value())) {
+  if (!method_name_.match(invocation->method_name())) {
     ENVOY_LOG(debug, "dubbo route matcher: method matching failed, input method '{}'",
-              metadata.method_name().value());
+              invocation->method_name());
     return nullptr;
   }
 
@@ -161,7 +170,8 @@ RouteConstSharedPtr MethodRouteEntryImpl::matches(const MessageMetadata& metadat
   return clusterEntry(random_value);
 }
 
-RouteMatcher::RouteMatcher(const RouteConfig& config)
+SignleRouteMatcherImpl::SignleRouteMatcherImpl(const RouteConfig& config,
+                                               Server::Configuration::FactoryContext&)
     : service_name_(config.interface()), group_(config.group()), version_(config.version()) {
   using envoy::config::filter::network::dubbo_proxy::v2alpha1::RouteMatch;
 
@@ -171,13 +181,16 @@ RouteMatcher::RouteMatcher(const RouteConfig& config)
   ENVOY_LOG(debug, "dubbo route matcher: routes list size {}", routes_.size());
 }
 
-RouteConstSharedPtr RouteMatcher::route(const MessageMetadata& metadata,
-                                        uint64_t random_value) const {
-  if (service_name_ == metadata.service_name() &&
+RouteConstSharedPtr SignleRouteMatcherImpl::route(const MessageMetadata& metadata,
+                                                  uint64_t random_value) const {
+  ASSERT(metadata.hasInvocationInfo());
+  const auto& invocation = metadata.invocation_info();
+
+  if (service_name_ == invocation.service_name() &&
       (group_.value().empty() ||
-       (metadata.service_group().has_value() && metadata.service_group().value() == group_)) &&
-      (version_.value().empty() || (metadata.service_version().has_value() &&
-                                    metadata.service_version().value() == version_))) {
+       (invocation.service_group().has_value() && invocation.service_group().value() == group_)) &&
+      (version_.value().empty() || (invocation.service_version().has_value() &&
+                                    invocation.service_version().value() == version_))) {
     for (const auto& route : routes_) {
       RouteConstSharedPtr route_entry = route->matches(metadata, random_value);
       if (nullptr != route_entry) {
@@ -191,9 +204,11 @@ RouteConstSharedPtr RouteMatcher::route(const MessageMetadata& metadata,
   return nullptr;
 }
 
-MultiRouteMatcher::MultiRouteMatcher(const RouteConfigList& route_config_list) {
+MultiRouteMatcher::MultiRouteMatcher(const RouteConfigList& route_config_list,
+                                     Server::Configuration::FactoryContext& context) {
   for (const auto& route_config : route_config_list) {
-    route_matcher_list_.emplace_back(std::make_unique<RouteMatcher>(route_config));
+    route_matcher_list_.emplace_back(
+        std::make_unique<SignleRouteMatcherImpl>(route_config, context));
   }
   ENVOY_LOG(debug, "route matcher list size {}", route_matcher_list_.size());
 }
@@ -209,6 +224,16 @@ RouteConstSharedPtr MultiRouteMatcher::route(const MessageMetadata& metadata,
 
   return nullptr;
 }
+
+class DefaultRouteMatcherConfigFactory : public RouteMatcherFactoryBase<MultiRouteMatcher> {
+public:
+  DefaultRouteMatcherConfigFactory() : RouteMatcherFactoryBase(RouteMatcherType::Default) {}
+};
+
+/**
+ * Static registration for the Dubbo protocol. @see RegisterFactory.
+ */
+REGISTER_FACTORY(DefaultRouteMatcherConfigFactory, NamedRouteMatcherConfigFactory);
 
 } // namespace Router
 } // namespace DubboProxy
