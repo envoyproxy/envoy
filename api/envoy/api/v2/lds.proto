@@ -54,7 +54,7 @@ message Listener {
   // The address that the listener should listen on. In general, the address must be unique, though
   // that is governed by the bind rules of the OS. E.g., multiple listeners can listen on port 0 on
   // Linux as the actual port will be allocated by the OS.
-  core.Address address = 2 [(validate.rules).message.required = true, (gogoproto.nullable) = false];
+  core.Address address = 2 [(validate.rules).message.required = true];
 
   // A list of filter chains to consider for this listener. The
   // :ref:`FilterChain <envoy_api_msg_listener.FilterChain>` with the most specific
@@ -63,7 +63,7 @@ message Listener {
   //
   // Example using SNI for filter chain selection can be found in the
   // :ref:`FAQ entry <faq_how_to_setup_sni>`.
-  repeated listener.FilterChain filter_chains = 3 [(gogoproto.nullable) = false];
+  repeated listener.FilterChain filter_chains = 3;
 
   // If a connection is redirected using *iptables*, the port on which the proxy
   // receives it might be different from the original destination address. When this flag is set to
@@ -129,7 +129,7 @@ message Listener {
   // :ref:`protocol <envoy_api_field_core.SocketAddress.protocol>` is :ref:'UDP
   // <envoy_api_field_core.Protocol.UDP>`.
   // UDP listeners currently support a single filter.
-  repeated listener.ListenerFilter listener_filters = 9 [(gogoproto.nullable) = false];
+  repeated listener.ListenerFilter listener_filters = 9;
 
   // The timeout to wait for all listener filters to complete operation. If the timeout is reached,
   // the accepted socket is closed without a connection being created. Specify 0 to disable the
