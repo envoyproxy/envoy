@@ -32,10 +32,18 @@ namespace Secret {
  */
 class SdsApi : public Config::SubscriptionCallbacks {
 public:
+  struct SecretData {
+    const std::string resource_name_;
+    std::string version_info_;
+    SystemTime last_updated_;
+  };
+
   SdsApi(envoy::api::v2::core::ConfigSource sds_config, absl::string_view sds_config_name,
-         Config::SubscriptionFactory& subscription_factory,
+         Config::SubscriptionFactory& subscription_factory, TimeSource& time_source,
          ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
          Init::Manager& init_manager, std::function<void()> destructor_cb);
+
+  SecretData secretData();
 
 protected:
   // Creates new secrets.
@@ -68,6 +76,8 @@ private:
   Cleanup clean_up_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   Config::SubscriptionFactory& subscription_factory_;
+  TimeSource& time_source_;
+  SecretData secret_data_;
 };
 
 class TlsCertificateSdsApi;
@@ -90,17 +100,18 @@ public:
     Config::Utility::checkLocalInfo("TlsCertificateSdsApi", secret_provider_context.localInfo());
     return std::make_shared<TlsCertificateSdsApi>(
         sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
+        secret_provider_context.dispatcher().timeSource(),
         secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
         *secret_provider_context.initManager(), destructor_cb);
   }
 
   TlsCertificateSdsApi(const envoy::api::v2::core::ConfigSource& sds_config,
                        const std::string& sds_config_name,
-                       Config::SubscriptionFactory& subscription_factory,
+                       Config::SubscriptionFactory& subscription_factory, TimeSource& time_source,
                        ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
                        Init::Manager& init_manager, std::function<void()> destructor_cb)
-      : SdsApi(sds_config, sds_config_name, subscription_factory, validation_visitor, stats,
-               init_manager, std::move(destructor_cb)) {}
+      : SdsApi(sds_config, sds_config_name, subscription_factory, time_source, validation_visitor,
+               stats, init_manager, std::move(destructor_cb)) {}
 
   // SecretProvider
   const envoy::api::v2::auth::TlsCertificate* secret() const override {
@@ -138,17 +149,19 @@ public:
                                     secret_provider_context.localInfo());
     return std::make_shared<CertificateValidationContextSdsApi>(
         sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
+        secret_provider_context.dispatcher().timeSource(),
         secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
         *secret_provider_context.initManager(), destructor_cb);
   }
   CertificateValidationContextSdsApi(const envoy::api::v2::core::ConfigSource& sds_config,
                                      const std::string& sds_config_name,
                                      Config::SubscriptionFactory& subscription_factory,
+                                     TimeSource& time_source,
                                      ProtobufMessage::ValidationVisitor& validation_visitor,
                                      Stats::Store& stats, Init::Manager& init_manager,
                                      std::function<void()> destructor_cb)
-      : SdsApi(sds_config, sds_config_name, subscription_factory, validation_visitor, stats,
-               init_manager, std::move(destructor_cb)) {}
+      : SdsApi(sds_config, sds_config_name, subscription_factory, time_source, validation_visitor,
+               stats, init_manager, std::move(destructor_cb)) {}
 
   // SecretProvider
   const envoy::api::v2::auth::CertificateValidationContext* secret() const override {

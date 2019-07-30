@@ -1113,6 +1113,42 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
   EXPECT_EQ(0UL, config_->stats().active_faults_.value());
 }
 
+class FaultFilterSettingsTest : public FaultFilterTest {};
+
+TEST_F(FaultFilterSettingsTest, CheckDefaultRuntimeKeys) {
+  envoy::config::filter::http::fault::v2::HTTPFault fault;
+
+  Fault::FaultSettings settings(fault);
+
+  EXPECT_EQ("fault.http.delay.fixed_delay_percent", settings.delayPercentRuntime());
+  EXPECT_EQ("fault.http.abort.abort_percent", settings.abortPercentRuntime());
+  EXPECT_EQ("fault.http.delay.fixed_duration_ms", settings.delayDurationRuntime());
+  EXPECT_EQ("fault.http.abort.http_status", settings.abortHttpStatusRuntime());
+  EXPECT_EQ("fault.http.max_active_faults", settings.maxActiveFaultsRuntime());
+  EXPECT_EQ("fault.http.rate_limit.response_percent", settings.responseRateLimitPercentRuntime());
+}
+
+TEST_F(FaultFilterSettingsTest, CheckOverrideRuntimeKeys) {
+  envoy::config::filter::http::fault::v2::HTTPFault fault;
+  fault.set_abort_percent_runtime(std::string("fault.abort_percent_runtime"));
+  fault.set_delay_percent_runtime(std::string("fault.delay_percent_runtime"));
+  fault.set_abort_http_status_runtime(std::string("fault.abort_http_status_runtime"));
+  fault.set_delay_duration_runtime(std::string("fault.delay_duration_runtime"));
+  fault.set_max_active_faults_runtime(std::string("fault.max_active_faults_runtime"));
+  fault.set_response_rate_limit_percent_runtime(
+      std::string("fault.response_rate_limit_percent_runtime"));
+
+  Fault::FaultSettings settings(fault);
+
+  EXPECT_EQ("fault.delay_percent_runtime", settings.delayPercentRuntime());
+  EXPECT_EQ("fault.abort_percent_runtime", settings.abortPercentRuntime());
+  EXPECT_EQ("fault.delay_duration_runtime", settings.delayDurationRuntime());
+  EXPECT_EQ("fault.abort_http_status_runtime", settings.abortHttpStatusRuntime());
+  EXPECT_EQ("fault.max_active_faults_runtime", settings.maxActiveFaultsRuntime());
+  EXPECT_EQ("fault.response_rate_limit_percent_runtime",
+            settings.responseRateLimitPercentRuntime());
+}
+
 } // namespace
 } // namespace Fault
 } // namespace HttpFilters

@@ -51,7 +51,7 @@ public:
    * The connection will be closed immediately if it returns false.
    */
   TsiSocket(HandshakerFactory handshaker_factory, HandshakeValidator handshake_validator);
-  virtual ~TsiSocket();
+  ~TsiSocket() override;
 
   // Network::TransportSocket
   void setTransportSocketCallbacks(Envoy::Network::TransportSocketCallbacks& callbacks) override;

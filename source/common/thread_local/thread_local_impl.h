@@ -18,7 +18,7 @@ namespace ThreadLocal {
 class InstanceImpl : Logger::Loggable<Logger::Id::main>, public Instance {
 public:
   InstanceImpl() : main_thread_id_(std::this_thread::get_id()) {}
-  ~InstanceImpl();
+  ~InstanceImpl() override;
 
   // ThreadLocal::Instance
   SlotPtr allocateSlot() override;
@@ -30,10 +30,11 @@ public:
 private:
   struct SlotImpl : public Slot {
     SlotImpl(InstanceImpl& parent, uint64_t index) : parent_(parent), index_(index) {}
-    ~SlotImpl() { parent_.removeSlot(*this); }
+    ~SlotImpl() override { parent_.removeSlot(*this); }
 
     // ThreadLocal::Slot
     ThreadLocalObjectSharedPtr get() override;
+    bool currentThreadRegistered() override;
     void runOnAllThreads(Event::PostCb cb) override { parent_.runOnAllThreads(cb); }
     void runOnAllThreads(Event::PostCb cb, Event::PostCb main_callback) override {
       parent_.runOnAllThreads(cb, main_callback);

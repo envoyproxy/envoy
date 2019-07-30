@@ -144,6 +144,7 @@ private:
     StreamInfo::StreamInfo& streamInfo() override;
     Tracing::Span& activeSpan() override;
     Tracing::Config& tracingConfig() override;
+    const ScopeTrackedObject& scope() override { return parent_; }
 
     // Functions to set or get iteration state.
     bool canIterate() { return iteration_state_ == IterationState::Continue; }

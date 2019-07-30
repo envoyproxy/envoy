@@ -13,8 +13,10 @@
 #include "common/common/stack_array.h"
 #include "common/common/utility.h"
 #include "common/http/exception.h"
+#include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
+#include "common/runtime/runtime_impl.h"
 
 namespace Envoy {
 namespace Http {
@@ -323,7 +325,8 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, http_parser_type
                                uint32_t max_headers_kb)
     : connection_(connection), output_buffer_([&]() -> void { this->onBelowLowWatermark(); },
                                               [&]() -> void { this->onAboveHighWatermark(); }),
-      max_headers_kb_(max_headers_kb) {
+      max_headers_kb_(max_headers_kb), strict_header_validation_(Runtime::runtimeFeatureEnabled(
+                                           "envoy.reloadable_features.strict_header_validation")) {
   output_buffer_.setWatermarks(connection.bufferLimit());
   http_parser_init(&parser_, type);
   parser_.data = this;
@@ -421,11 +424,21 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
     // Ignore trailers.
     return;
   }
-  // http-parser should filter for this
-  // (https://tools.ietf.org/html/rfc7230#section-3.2.6), but it doesn't today. HeaderStrings
-  // have an invariant that they must not contain embedded zero characters
-  // (NUL, ASCII 0x0).
-  if (absl::string_view(data, length).find('\0') != absl::string_view::npos) {
+
+  const absl::string_view header_value = absl::string_view(data, length);
+
+  if (strict_header_validation_) {
+    if (!Http::HeaderUtility::headerIsValid(header_value)) {
+      ENVOY_CONN_LOG(debug, "invalid header value: {}", connection_, header_value);
+      error_code_ = Http::Code::BadRequest;
+      sendProtocolError();
+      throw CodecProtocolException("http/1.1 protocol error: header value contains invalid chars");
+    }
+  } else if (header_value.find('\0') != absl::string_view::npos) {
+    // http-parser should filter for this
+    // (https://tools.ietf.org/html/rfc7230#section-3.2.6), but it doesn't today. HeaderStrings
+    // have an invariant that they must not contain embedded zero characters
+    // (NUL, ASCII 0x0).
     throw CodecProtocolException("http/1.1 protocol error: header value contains NUL");
   }
 

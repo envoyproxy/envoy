@@ -192,7 +192,7 @@ public:
 
 protected:
   struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {
-    ThreadLocalConfig(ConfigProvider::ConfigConstSharedPtr initial_config)
+    explicit ThreadLocalConfig(ConfigProvider::ConfigConstSharedPtr initial_config)
         : config_(std::move(initial_config)) {}
 
     ConfigProvider::ConfigConstSharedPtr config_;
@@ -227,7 +227,10 @@ protected:
         [this, update_fn]() {
           tls_->getTyped<ThreadLocalConfig>().config_ = update_fn(this->getConfig());
         },
-        /*Make sure this subscription will not be teared down during the update propagation.*/
+        /*During the update propagation, a subscription may get teared down in main thread due to
+        all owners/providers destructed in a xDS update (e.g. LDS demolishes RouteConfigProvider and
+        its subscription). Hold a reference to the shared subscription instance to make sure the
+        update can be safely pushed to workers in such an event.*/
         [shared_this, complete_cb]() { complete_cb(); });
   }
 

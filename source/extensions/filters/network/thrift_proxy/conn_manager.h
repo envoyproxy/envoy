@@ -61,7 +61,7 @@ class ConnectionManager : public Network::ReadFilter,
 public:
   ConnectionManager(Config& config, Runtime::RandomGenerator& random_generator,
                     TimeSource& time_system);
-  ~ConnectionManager();
+  ~ConnectionManager() override;
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
@@ -164,7 +164,7 @@ private:
       stream_info_.setDownstreamRemoteAddress(
           parent_.read_callbacks_->connection().remoteAddress());
     }
-    ~ActiveRpc() {
+    ~ActiveRpc() override {
       request_timer_->complete();
       parent_.stats_.request_active_.dec();
 

@@ -29,7 +29,7 @@ namespace Envoy {
  * input file.
  */
 struct ToolConfig {
-  ToolConfig() : random_value_(0){};
+  ToolConfig() = default;
 
   /**
    * @param check_config tool config json object pointer.
@@ -49,7 +49,7 @@ struct ToolConfig {
 
   std::unique_ptr<Http::TestHeaderMapImpl> headers_;
   Router::RouteConstSharedPtr route_;
-  int random_value_;
+  int random_value_{0};
 
 private:
   ToolConfig(std::unique_ptr<Http::TestHeaderMapImpl> headers, int random_value);

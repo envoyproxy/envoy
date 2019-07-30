@@ -114,6 +114,8 @@ public:
    *                      callbacks is called and the routine returns nullptr. NOTE: Once a callback
    *                      is called, the handle is no longer valid and any further cancellation
    *                      should be done by resetting the stream.
+   * @warning Do not call cancel() from the callbacks, as the request is implicitly canceled when
+   *          the callbacks are called.
    */
   virtual Cancellable* newStream(Http::StreamDecoder& response_decoder, Callbacks& callbacks) PURE;
 
