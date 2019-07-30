@@ -10,13 +10,7 @@ bool ScopeKey::operator==(const ScopeKey& other) const {
     // An empty key equals to nothing, "NULL" != "NULL".
     return false;
   }
-  return std::equal(fragments_.begin(), fragments_.end(), other.fragments_.begin(),
-                    other.fragments_.end(),
-                    [](const std::unique_ptr<ScopeKeyFragmentBase>& left,
-                       const std::unique_ptr<ScopeKeyFragmentBase>& right) -> bool {
-                      // Both should be non-NULL now.
-                      return *left == *right;
-                    });
+  return this->hash() == other.hash();
 }
 
 HeaderValueExtractorImpl::HeaderValueExtractorImpl(
@@ -104,13 +98,32 @@ ScopeKeyBuilderImpl::computeScopeKey(const Http::HeaderMap& headers) const {
   return std::make_unique<ScopeKey>(std::move(key));
 }
 
-void ThreadLocalScopedConfigImpl::addOrUpdateRoutingScope(const ScopedRouteInfoConstSharedPtr&) {}
+void ScopedConfigImpl::addOrUpdateRoutingScope(
+    const ScopedRouteInfoConstSharedPtr& scoped_route_info) {
+  scoped_route_info_by_name_[scoped_route_info->scopeName()] = scoped_route_info;
+  scoped_route_info_by_key_[scoped_route_info->scopeKey().hash()] = scoped_route_info;
+}
 
-void ThreadLocalScopedConfigImpl::removeRoutingScope(const std::string&) {}
+void ScopedConfigImpl::removeRoutingScope(const std::string& scope_name) {
+  const auto iter = scoped_route_info_by_name_.find(scope_name);
+  if (iter != scoped_route_info_by_name_.end()) {
+    ASSERT(scoped_route_info_by_key_.count(iter->second->scopeKey().hash()) == 1);
+    scoped_route_info_by_key_.erase(iter->second->scopeKey().hash());
+    scoped_route_info_by_name_.erase(iter);
+  }
+}
 
 Router::ConfigConstSharedPtr
-ThreadLocalScopedConfigImpl::getRouteConfig(const Http::HeaderMap&) const {
-  return std::make_shared<const NullConfigImpl>();
+ScopedConfigImpl::getRouteConfig(const Http::HeaderMap& headers) const {
+  std::unique_ptr<ScopeKey> scope_key = scope_key_builder_.computeScopeKey(headers);
+  if (scope_key == nullptr) {
+    return nullptr;
+  }
+  auto iter = scoped_route_info_by_key_.find(scope_key->hash());
+  if (iter != scoped_route_info_by_key_.end()) {
+    return iter->second->routeConfig();
+  }
+  return nullptr;
 }
 
 } // namespace Router

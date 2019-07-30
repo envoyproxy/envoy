@@ -147,21 +147,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "scoped_config_manager_lib",
-    srcs = ["scoped_config_manager.cc"],
-    hdrs = ["scoped_config_manager.h"],
-    deps = [
-        "@envoy_api//envoy/api/v2:srds_cc",
-    ],
-)
-
-envoy_cc_library(
     name = "scoped_config_lib",
     srcs = ["scoped_config_impl.cc"],
     hdrs = ["scoped_config_impl.h"],
+    external_deps = [
+        "abseil_str_format",
+    ],
     deps = [
         ":config_lib",
-        ":scoped_config_manager_lib",
+        "//include/envoy/router:rds_interface",
         "//include/envoy/router:scopes_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "@envoy_api//envoy/api/v2:srds_cc",
@@ -175,11 +169,15 @@ envoy_cc_library(
     hdrs = ["scoped_rds.h"],
     deps = [
         ":scoped_config_lib",
+        "//include/envoy/config:config_provider_interface",
         "//include/envoy/config:subscription_interface",
+        "//include/envoy/router:route_config_provider_manager_interface",
         "//include/envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:config_provider_lib",
+        "//source/common/init:manager_lib",
+        "//source/common/init:watcher_lib",
         "@envoy_api//envoy/admin/v2alpha:config_dump_cc",
         "@envoy_api//envoy/api/v2:srds_cc",
     ],

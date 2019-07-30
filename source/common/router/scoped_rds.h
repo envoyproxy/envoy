@@ -4,6 +4,8 @@
 
 #include "envoy/api/v2/srds.pb.h"
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+#include "envoy/config/subscription.h"
+#include "envoy/router/route_config_provider_manager.h"
 #include "envoy/stats/scope.h"
 
 #include "common/config/config_provider_impl.h"
@@ -86,30 +88,31 @@ public:
   ScopedRdsConfigSubscription(
       const envoy::config::filter::network::http_connection_manager::v2::ScopedRds& scoped_rds,
       const uint64_t manager_identifier, const std::string& name,
+      const envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::
+          ScopeKeyBuilder& scope_key_builder,
       Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
+      envoy::api::v2::core::ConfigSource rds_config_source,
+      RouteConfigProviderManager& route_config_provider_manager,
       ScopedRoutesConfigProviderManager& config_provider_manager);
 
   ~ScopedRdsConfigSubscription() override = default;
 
   const std::string& name() const { return name_; }
 
-  const ScopedConfigManager::ScopedRouteMap& scopedRouteMap() const {
-    return scoped_config_manager_.scopedRouteMap();
-  }
+  const ScopedRouteMap& scopedRouteMap() const { return scoped_route_map_; }
 
 private:
-  // Envoy::Config::ConfigSubscriptionCommonBase
+  // Envoy::Config::DeltaConfigSubscriptionInstance
   void start() override { subscription_->start({}); }
 
   // Envoy::Config::SubscriptionCallbacks
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                       const std::string& version_info) override;
-  void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>&,
-                      const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
+  void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
+                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                      const std::string& version_info) override;
   void onConfigUpdateFailed(const EnvoyException*) override {
-    ConfigSubscriptionCommonBase::onConfigUpdateFailed();
+    DeltaConfigSubscriptionInstance::onConfigUpdateFailed();
   }
   std::string resourceName(const ProtobufWkt::Any& resource) override {
     return MessageUtil::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(resource,
@@ -117,39 +120,38 @@ private:
         .name();
   }
 
+  // ScopedRouteInfo by scope name.
+  ScopedRouteMap scoped_route_map_;
+  // A map of (hash, scope-name), used to detect the key conflict between scopes.
+  absl::flat_hash_map<uint64_t, std::string> scope_name_by_hash_;
+  // For creating RDS subscriptions.
+  Server::Configuration::FactoryContext& factory_context_;
   const std::string name_;
   std::unique_ptr<Envoy::Config::Subscription> subscription_;
+  const envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::ScopeKeyBuilder
+      scope_key_builder_;
   Stats::ScopePtr scope_;
   ScopedRdsStats stats_;
-  ScopedConfigManager scoped_config_manager_;
+  const envoy::api::v2::core::ConfigSource rds_config_source_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
+  const std::string stat_prefix_;
+  RouteConfigProviderManager& route_config_provider_manager_;
 };
 
 using ScopedRdsConfigSubscriptionSharedPtr = std::shared_ptr<ScopedRdsConfigSubscription>;
 
 // A ConfigProvider for scoped RDS that dynamically fetches scoped routing configuration via a
 // subscription.
-class ScopedRdsConfigProvider : public Envoy::Config::DeltaMutableConfigProviderBase {
+class ScopedRdsConfigProvider : public Envoy::Config::MutableConfigProviderCommonBase {
 public:
   ScopedRdsConfigProvider(ScopedRdsConfigSubscriptionSharedPtr&& subscription,
-                          Server::Configuration::FactoryContext& factory_context,
-                          envoy::api::v2::core::ConfigSource rds_config_source,
-                          const envoy::config::filter::network::http_connection_manager::v2::
-                              ScopedRoutes::ScopeKeyBuilder& scope_key_builder);
+                          envoy::api::v2::core::ConfigSource rds_config_source);
 
-  ScopedRdsConfigSubscription& subscription() { return *subscription_; }
-
-  // getConfig() is overloaded (const/non-const only). Make all base getConfig()s visible to avoid
-  // compiler warnings.
-  using DeltaMutableConfigProviderBase::getConfig;
-
-  // Envoy::Config::DeltaMutableConfigProviderBase
-  Envoy::Config::ConfigSharedPtr getConfig() override {
-    return std::dynamic_pointer_cast<Envoy::Config::ConfigProvider::Config>(tls_->get());
+  ScopedRdsConfigSubscription& subscription() {
+    return *static_cast<ScopedRdsConfigSubscription*>(subscription_.get());
   }
 
 private:
-  ScopedRdsConfigSubscription* subscription_;
   const envoy::api::v2::core::ConfigSource rds_config_source_;
 };
 
@@ -157,8 +159,10 @@ private:
 // (xds) config providers.
 class ScopedRoutesConfigProviderManager : public Envoy::Config::ConfigProviderManagerImplBase {
 public:
-  ScopedRoutesConfigProviderManager(Server::Admin& admin)
-      : Envoy::Config::ConfigProviderManagerImplBase(admin, "route_scopes") {}
+  ScopedRoutesConfigProviderManager(
+      Server::Admin& admin, Router::RouteConfigProviderManager& route_config_provider_manager)
+      : Envoy::Config::ConfigProviderManagerImplBase(admin, "route_scopes"),
+        route_config_provider_manager_(route_config_provider_manager) {}
 
   ~ScopedRoutesConfigProviderManager() override = default;
 
@@ -183,6 +187,13 @@ public:
       std::vector<std::unique_ptr<const Protobuf::Message>>&& config_protos,
       Server::Configuration::FactoryContext& factory_context,
       const Envoy::Config::ConfigProviderManager::OptionalArg& optarg) override;
+
+  RouteConfigProviderManager& route_config_provider_manager() {
+    return route_config_provider_manager_;
+  }
+
+private:
+  RouteConfigProviderManager& route_config_provider_manager_;
 };
 
 // The optional argument passed to the ConfigProviderManager::create*() functions.
