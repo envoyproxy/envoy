@@ -7,6 +7,8 @@ import "envoy/api/v2/route/route.proto";
 import "envoy/type/matcher/metadata.proto";
 import "envoy/type/matcher/string.proto";
 
+import "google/api/expr/v1alpha1/syntax.proto";
+
 package envoy.config.rbac.v2;
 
 option java_outer_classname = "RbacProto";
@@ -77,6 +79,9 @@ message RBAC {
 
   // Maps from policy name to policy. A match occurs when at least one policy matches the request.
   map<string, Policy> policies = 2;
+
+  // A symbolic expression specifying an access control condition.
+  google.api.expr.v1alpha1.Expr condition = 3;
 }
 
 // Policy specifies a role and the principals that are assigned/denied the role. A policy matches if

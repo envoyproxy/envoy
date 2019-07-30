@@ -24,9 +24,7 @@ RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
     const std::string& stats_prefix, Stats::Scope& scope)
     : stats_(Filters::Common::RBAC::generateStats(stats_prefix, scope)),
       engine_(Filters::Common::RBAC::createEngine(proto_config)),
-      shadow_engine_(Filters::Common::RBAC::createShadowEngine(proto_config)),
-      expr_(proto_config.has_condition() ? Filters::Common::Expr::create(proto_config.condition())
-                                         : nullptr) {}
+      shadow_engine_(Filters::Common::RBAC::createShadowEngine(proto_config)) {}
 
 const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl>&
 RoleBasedAccessControlFilterConfig::engine(const Router::RouteConstSharedPtr route,
@@ -78,8 +76,8 @@ Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::Head
   if (shadow_engine.has_value()) {
     std::string shadow_resp_code =
         Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultAllowed;
-    if (shadow_engine->allowed(*callbacks_->connection(), headers,
-                               callbacks_->streamInfo().dynamicMetadata(), &effective_policy_id)) {
+    if (shadow_engine->allowed(*callbacks_->connection(), headers, callbacks_->streamInfo(),
+                               &effective_policy_id)) {
       ENVOY_LOG(debug, "shadow allowed");
       config_->stats().shadow_allowed_.inc();
     } else {
@@ -107,10 +105,10 @@ Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::Head
   const auto& engine =
       config_->engine(callbacks_->route(), Filters::Common::RBAC::EnforcementMode::Enforced);
   if (engine.has_value()) {
-    if (engine->allowed(*callbacks_->connection(), headers,
-                        callbacks_->streamInfo().dynamicMetadata(), nullptr)) {
+    if (engine->allowed(*callbacks_->connection(), headers, callbacks_->streamInfo(), nullptr)) {
       ENVOY_LOG(debug, "enforced allowed");
       config_->stats().allowed_.inc();
+      return Http::FilterHeadersStatus::Continue;
     } else {
       ENVOY_LOG(debug, "enforced denied");
       callbacks_->sendLocalReply(Http::Code::Forbidden, "RBAC: access denied", nullptr,
@@ -118,36 +116,9 @@ Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::Head
       config_->stats().denied_.inc();
       return Http::FilterHeadersStatus::StopIteration;
     }
-  } else {
-    ENVOY_LOG(debug, "no engine, allowed by default");
   }
 
-  if (config_->expr() != nullptr) {
-    auto eval_status =
-        Filters::Common::Expr::evaluate(*config_->expr(), callbacks_->streamInfo(), headers);
-    if (!eval_status.has_value()) {
-      ENVOY_LOG(debug, "evaluation failed");
-      callbacks_->sendLocalReply(Http::Code::Forbidden, "RBAC: access denied", nullptr,
-                                 absl::nullopt, RcDetails::get().RbacAccessDenied);
-      config_->stats().denied_.inc();
-      return Http::FilterHeadersStatus::StopIteration;
-    }
-    auto result = eval_status.value();
-    ENVOY_LOG(trace, "value: {}",
-              result.IsError()
-                  ? result.ErrorOrDie()->message()
-                  : (result.IsString()
-                         ? result.StringOrDie().value()
-                         : (result.IsInt64() ? absl::StrCat(result.Int64OrDie()) : "")));
-    if (!result.IsBool() || (result.IsBool() && !result.BoolOrDie())) {
-      ENVOY_LOG(debug, "enforced: denied by condition");
-      callbacks_->sendLocalReply(Http::Code::Forbidden, "RBAC: access denied", nullptr,
-                                 absl::nullopt, RcDetails::get().RbacAccessDenied);
-      config_->stats().denied_.inc();
-      return Http::FilterHeadersStatus::StopIteration;
-    }
-  }
-
+  ENVOY_LOG(debug, "no engine, allowed by default");
   return Http::FilterHeadersStatus::Continue;
 }
 

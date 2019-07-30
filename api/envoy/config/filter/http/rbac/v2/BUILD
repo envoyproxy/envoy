@@ -5,12 +5,6 @@ licenses(["notice"])  # Apache 2
 api_proto_library_internal(
     name = "rbac",
     srcs = ["rbac.proto"],
-    external_cc_proto_deps = [
-        "@com_google_googleapis//google/api/expr/v1alpha1:syntax_cc_proto",
-    ],
-    external_proto_deps = [
-        "@com_google_googleapis//google/api/expr/v1alpha1:syntax_proto",
-    ],
     require_py = False,
     deps = ["//envoy/config/rbac/v2:rbac"],
 )

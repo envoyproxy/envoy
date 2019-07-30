@@ -53,6 +53,7 @@ envoy_cc_library(
     srcs = ["engine_impl.cc"],
     hdrs = ["engine_impl.h"],
     deps = [
+        "//source/extensions/filters/common/expr:evaluator_lib",
         "//source/extensions/filters/common/rbac:engine_interface",
         "//source/extensions/filters/common/rbac:matchers_lib",
         "@envoy_api//envoy/api/v2/core:base_cc",

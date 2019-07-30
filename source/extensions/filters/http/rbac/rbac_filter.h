@@ -9,7 +9,6 @@
 
 #include "common/common/logger.h"
 
-#include "extensions/filters/common/expr/evaluator.h"
 #include "extensions/filters/common/rbac/engine_impl.h"
 #include "extensions/filters/common/rbac/utility.h"
 
@@ -48,8 +47,6 @@ public:
   engine(const Router::RouteConstSharedPtr route,
          Filters::Common::RBAC::EnforcementMode mode) const;
 
-  Filters::Common::Expr::Expression* expr() { return expr_.get(); }
-
 private:
   const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl>&
   engine(Filters::Common::RBAC::EnforcementMode mode) const {
@@ -60,7 +57,6 @@ private:
 
   const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> engine_;
   const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> shadow_engine_;
-  const Filters::Common::Expr::ExpressionPtr expr_;
 };
 
 using RoleBasedAccessControlFilterConfigSharedPtr =

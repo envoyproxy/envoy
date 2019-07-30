@@ -5,6 +5,13 @@ load("@envoy_api//bazel:api_build_system.bzl", "api_go_proto_library", "api_prot
 api_proto_library_internal(
     name = "rbac",
     srcs = ["rbac.proto"],
+    external_cc_proto_deps = [
+        "@com_google_googleapis//google/api/expr/v1alpha1:syntax_cc_proto",
+    ],
+    external_proto_deps = [
+        "@com_google_googleapis//google/api/expr/v1alpha1:syntax_proto",
+    ],
+    require_py = False,
     visibility = ["//visibility:public"],
     deps = [
         "//envoy/api/v2/core:address",
@@ -14,13 +21,13 @@ api_proto_library_internal(
     ],
 )
 
-api_go_proto_library(
-    name = "rbac",
-    proto = ":rbac",
-    deps = [
-        "//envoy/api/v2/core:address_go_proto",
-        "//envoy/api/v2/route:route_go_proto",
-        "//envoy/type/matcher:metadata_go_proto",
-        "//envoy/type/matcher:string_go_proto",
-    ],
-)
+#api_go_proto_library(
+#    name = "rbac",
+#    proto = ":rbac",
+#    deps = [
+#        "//envoy/api/v2/core:address_go_proto",
+#        "//envoy/api/v2/route:route_go_proto",
+#        "//envoy/type/matcher:metadata_go_proto",
+#        "//envoy/type/matcher:string_go_proto",
+#    ],
+#)

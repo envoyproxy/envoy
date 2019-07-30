@@ -80,8 +80,7 @@ RoleBasedAccessControlFilter::checkEngine(Filters::Common::RBAC::EnforcementMode
   const auto& engine = config_->engine(mode);
   if (engine.has_value()) {
     std::string effective_policy_id;
-    if (engine->allowed(callbacks_->connection(),
-                        callbacks_->connection().streamInfo().dynamicMetadata(),
+    if (engine->allowed(callbacks_->connection(), callbacks_->connection().streamInfo(),
                         &effective_policy_id)) {
       if (mode == Filters::Common::RBAC::EnforcementMode::Shadow) {
         ENVOY_LOG(debug, "shadow allowed");
