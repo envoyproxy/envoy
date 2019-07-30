@@ -14,10 +14,10 @@ do
 done
 
 if [[ -z "${CIRCLE_PR_NUMBER}" && "${branch_want_push}" == "true" ]]; then
-  diff_base="HEAD^"
+    diff_base="HEAD^"
 else
-  git fetch https://github.com/envoyproxy/envoy.git master
-  diff_base="$(git merge-base HEAD FETCH_HEAD)"
+    git fetch https://github.com/envoyproxy/envoy.git master
+    diff_base="$(git merge-base HEAD FETCH_HEAD)"
 fi
 
 diff_want_build='false'
@@ -43,6 +43,7 @@ if [[ -z "${CIRCLE_PR_NUMBER}" && "${branch_want_push}" == "true" ]]; then
 
     if [[ ! -z "${GCP_SERVICE_ACCOUNT_KEY}" ]]; then
         echo ${GCP_SERVICE_ACCOUNT_KEY} | base64 --decode | gcloud auth activate-service-account --key-file=-
+        gcloud auth configure-docker
     fi
 
     for distro in ubuntu centos
