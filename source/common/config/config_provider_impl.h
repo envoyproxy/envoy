@@ -136,7 +136,7 @@ class MutableConfigProviderCommonBase;
  * This class can not be instantiated directly; instead, it provides the foundation for
  * config subscription implementations which derive from it.
  *
- * A subscription is supposed to be co-owned by config providers with the same config source, it's
+ * A subscription is intended to be co-owned by config providers with the same config source, it's
  * designed to be created/destructed on admin thread only.
  *
  * xDS config providers and subscriptions are split to avoid lifetime issues with arguments
@@ -239,8 +239,8 @@ protected:
 
   const std::string name_;
   absl::optional<LastConfigInfo> config_info_;
-  // This slot holds a Config implementation in each thread, which is shared between
-  // bound providers.
+  // This slot holds a Config implementation in each thread, which is intended to be shared between
+  // config providers from the same config source.
   ThreadLocal::SlotPtr tls_;
 
 private:
