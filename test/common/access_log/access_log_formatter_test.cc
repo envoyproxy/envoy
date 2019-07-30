@@ -207,7 +207,7 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
     StreamInfoFormatter upstream_format("REQUESTED_SERVER_NAME");
     std::string requested_server_name = "stub_server";
     EXPECT_CALL(stream_info, requestedServerName())
-        .WillRepeatedly(ReturnRef(requested_server_name));
+        .WillRepeatedly(Return(absl::string_view(requested_server_name)));
     EXPECT_EQ("stub_server", upstream_format.format(header, header, header, stream_info));
   }
 
@@ -215,7 +215,7 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
     StreamInfoFormatter upstream_format("REQUESTED_SERVER_NAME");
     std::string requested_server_name;
     EXPECT_CALL(stream_info, requestedServerName())
-        .WillRepeatedly(ReturnRef(requested_server_name));
+        .WillRepeatedly(Return(absl::string_view(requested_server_name)));
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
   }
   {
