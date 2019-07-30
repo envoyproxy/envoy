@@ -194,22 +194,36 @@ void AsyncRequestImpl::initialize() {
 
 void AsyncRequestImpl::onComplete() { callbacks_.onSuccess(std::move(response_)); }
 
-void AsyncRequestImpl::onHeaders(HeaderMapPtr&& headers, bool) {
+void AsyncRequestImpl::onHeaders(HeaderMapPtr&& headers, bool end_stream) {
   response_ = std::make_unique<ResponseMessageImpl>(std::move(headers));
+
+  if (end_stream) {
+    onComplete();
+  }
 }
 
-void AsyncRequestImpl::onData(Buffer::Instance& data, bool) {
+void AsyncRequestImpl::onData(Buffer::Instance& data, bool end_stream) {
   if (!response_->body()) {
     response_->body() = std::make_unique<Buffer::OwnedImpl>();
   }
   response_->body()->move(data);
+
+  if (end_stream) {
+    onComplete();
+  }
 }
 
 void AsyncRequestImpl::onTrailers(HeaderMapPtr&& trailers) {
   response_->trailers(std::move(trailers));
+  onComplete();
 }
 
-void AsyncRequestImpl::onClosure() { onComplete(); }
+void AsyncRequestImpl::onClosure() {
+  // TODO(goaway): This seems like an appealing place to call onComplete(), but current logic and
+  // usage requires AsyncRequestImpl to fire onComplete() in certain cases (e.g. pool failure) when
+  // the local side actually hasn't yet been closed. These cases should arguably signal with stream
+  // reset instead, enabling cleanup.
+}
 
 void AsyncRequestImpl::onReset() {
   if (!cancelled_) {
