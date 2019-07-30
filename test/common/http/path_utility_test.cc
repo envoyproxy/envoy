@@ -100,6 +100,7 @@ TEST_F(PathUtilityTest, MergeSlashes) {
   EXPECT_EQ("/a", mergeSlashes("/a"));                    // no-op
   EXPECT_EQ("/a/b/c", mergeSlashes("//a/b/c"));           // double / start
   EXPECT_EQ("/a/b/c", mergeSlashes("/a//b/c"));           // double / in the middle
+  EXPECT_EQ("/a/b/c/", mergeSlashes("/a/b/c//"));         // double / end
   EXPECT_EQ("/a/b/c", mergeSlashes("/a///b/c"));          // triple / in the middle
   EXPECT_EQ("/a/b/c", mergeSlashes("/a////b/c"));         // quadruple / in the middle
   EXPECT_EQ("/a/b?a=///c", mergeSlashes("/a//b?a=///c")); // slashes in the query are ignored

@@ -427,10 +427,9 @@ message HttpConnectionManager {
 
   // Determines if adjacent slashes in the path are merged into one before any processing of
   // requests by HTTP filters or routing. This affects the upstream *:path* header as well. Without
-  // setting this option, incoming requests with path `//dir/file` will not match against route with
-  // `prefix` match set to `/dir`. Defaults to `false`.
-  // Note that slash merging is not part of `HTTP spec <https://tools.ietf.org/html/rfc3986>` and
-  // is provided for convenience.
+  // setting this option, incoming requests with path `//dir///file` will not match against route
+  // with `prefix` match set to `/dir`. Defaults to `false`. Note that slash merging is not part of
+  // `HTTP spec <https://tools.ietf.org/html/rfc3986>` and is provided for convenience.
   bool merge_slashes = 33;
 }
 
