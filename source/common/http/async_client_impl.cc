@@ -146,7 +146,7 @@ void AsyncStreamImpl::closeLocal(bool end_stream) {
 
   local_closed_ |= end_stream;
   if (complete()) {
-    stream_callbacks_.onClosure();
+    stream_callbacks_.onComplete();
     cleanup();
   }
 }
@@ -154,7 +154,7 @@ void AsyncStreamImpl::closeLocal(bool end_stream) {
 void AsyncStreamImpl::closeRemote(bool end_stream) {
   remote_closed_ |= end_stream;
   if (complete()) {
-    stream_callbacks_.onClosure();
+    stream_callbacks_.onComplete();
     cleanup();
   }
 }
@@ -188,41 +188,27 @@ void AsyncRequestImpl::initialize() {
   sendHeaders(request_->headers(), !request_->body());
   if (!remoteClosed() && request_->body()) {
     sendData(*request_->body(), true);
+  } else if (remoteClosed() && request_->body()) {
+    closeLocal(true);
   }
   // TODO(mattklein123): Support request trailers.
 }
 
 void AsyncRequestImpl::onComplete() { callbacks_.onSuccess(std::move(response_)); }
 
-void AsyncRequestImpl::onHeaders(HeaderMapPtr&& headers, bool end_stream) {
+void AsyncRequestImpl::onHeaders(HeaderMapPtr&& headers, bool) {
   response_ = std::make_unique<ResponseMessageImpl>(std::move(headers));
-
-  if (end_stream) {
-    onComplete();
-  }
 }
 
-void AsyncRequestImpl::onData(Buffer::Instance& data, bool end_stream) {
+void AsyncRequestImpl::onData(Buffer::Instance& data, bool) {
   if (!response_->body()) {
     response_->body() = std::make_unique<Buffer::OwnedImpl>();
   }
   response_->body()->move(data);
-
-  if (end_stream) {
-    onComplete();
-  }
 }
 
 void AsyncRequestImpl::onTrailers(HeaderMapPtr&& trailers) {
   response_->trailers(std::move(trailers));
-  onComplete();
-}
-
-void AsyncRequestImpl::onClosure() {
-  // TODO(goaway): This seems like an appealing place to call onComplete(), but current logic and
-  // usage requires AsyncRequestImpl to fire onComplete() in certain cases (e.g. pool failure) when
-  // the local side actually hasn't yet been closed. These cases should arguably signal with stream
-  // reset instead, enabling cleanup.
 }
 
 void AsyncRequestImpl::onReset() {

@@ -80,7 +80,7 @@ public:
      * Useful for asymmetric cases where end_stream may not be bidirectionally observable.
      * Note this is NOT called on stream reset.
      */
-    virtual void onClosure() PURE;
+    virtual void onComplete() PURE;
 
     /**
      * Called when the async HTTP stream is reset.
