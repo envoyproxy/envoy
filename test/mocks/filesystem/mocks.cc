@@ -7,7 +7,7 @@ namespace Envoy {
 namespace Filesystem {
 
 MockFile::MockFile() : num_opens_(0), num_writes_(0), is_open_(false) {}
-MockFile::~MockFile() {}
+MockFile::~MockFile() = default;
 
 Api::IoCallBoolResult MockFile::open() {
   Thread::LockGuard lock(open_mutex_);

@@ -25,7 +25,7 @@ namespace {
 /**
  * Object to implement Authenticator interface.
  */
-class AuthenticatorImpl : public Logger::Loggable<Logger::Id::filter>,
+class AuthenticatorImpl : public Logger::Loggable<Logger::Id::jwt>,
                           public Authenticator,
                           public Common::JwksFetcher::JwksReceiver {
 public:
@@ -99,7 +99,7 @@ void AuthenticatorImpl::verify(Http::HeaderMap& headers, std::vector<JwtLocation
   set_payload_cb_ = std::move(set_payload_cb);
   callback_ = std::move(callback);
 
-  ENVOY_LOG(debug, "Jwt authentication starts");
+  ENVOY_LOG(debug, "JWT authentication starts (allow_failed={})", is_allow_failed_);
   if (tokens_.empty()) {
     doneWithStatus(Status::JwtMissed);
     return;
@@ -119,9 +119,9 @@ void AuthenticatorImpl::startVerify() {
     return;
   }
 
+  ENVOY_LOG(debug, "Verifying JWT token of issuer {}", jwt_->iss_);
   // Check if token extracted from the location contains the issuer specified by config.
   if (!curr_token_->isIssuerSpecified(jwt_->iss_)) {
-    ENVOY_LOG(debug, "Jwt issuer {} does not match required", jwt_->iss_);
     doneWithStatus(Status::JwtUnknownIssuer);
     return;
   }
@@ -236,11 +236,11 @@ void AuthenticatorImpl::verifyKey() {
 }
 
 void AuthenticatorImpl::doneWithStatus(const Status& status) {
+  ENVOY_LOG(debug, "JWT token verification completed with: {}",
+            ::google::jwt_verify::getStatusString(status));
   // if on allow missing or failed this should verify all tokens, otherwise stop on ok.
   if ((Status::Ok == status && !is_allow_failed_) || tokens_.empty()) {
     tokens_.clear();
-    ENVOY_LOG(debug, "Jwt authentication completed with: {}",
-              ::google::jwt_verify::getStatusString(status));
     callback_(is_allow_failed_ ? Status::Ok : status);
     callback_ = nullptr;
     return;

@@ -204,6 +204,7 @@ public:
     const std::string RefusedStream{"refused-stream"};
     const std::string Retriable4xx{"retriable-4xx"};
     const std::string RetriableStatusCodes{"retriable-status-codes"};
+    const std::string Reset{"reset"};
   } EnvoyRetryOnValues;
 
   struct {

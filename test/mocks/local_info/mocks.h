@@ -12,7 +12,7 @@ namespace LocalInfo {
 class MockLocalInfo : public LocalInfo {
 public:
   MockLocalInfo();
-  ~MockLocalInfo();
+  ~MockLocalInfo() override;
 
   MOCK_CONST_METHOD0(address, Network::Address::InstanceConstSharedPtr());
   MOCK_CONST_METHOD0(zoneName, const std::string&());

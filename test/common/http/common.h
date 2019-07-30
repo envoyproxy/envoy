@@ -24,7 +24,7 @@ public:
         destroy_cb_(destroy_cb) {
     codec_.reset(codec);
   }
-  ~CodecClientForTest() {
+  ~CodecClientForTest() override {
     if (destroy_cb_) {
       destroy_cb_(this);
     }

@@ -15,9 +15,9 @@
 #include "extensions/filters/network/dubbo_proxy/active_message.h"
 #include "extensions/filters/network/dubbo_proxy/decoder.h"
 #include "extensions/filters/network/dubbo_proxy/decoder_event_handler.h"
-#include "extensions/filters/network/dubbo_proxy/deserializer.h"
 #include "extensions/filters/network/dubbo_proxy/filters/filter.h"
 #include "extensions/filters/network/dubbo_proxy/protocol.h"
+#include "extensions/filters/network/dubbo_proxy/serializer.h"
 #include "extensions/filters/network/dubbo_proxy/stats.h"
 
 namespace Envoy {
@@ -35,14 +35,13 @@ public:
   virtual DubboFilters::FilterChainFactory& filterFactory() PURE;
   virtual DubboFilterStats& stats() PURE;
   virtual ProtocolPtr createProtocol() PURE;
-  virtual DeserializerPtr createDeserializer() PURE;
   virtual Router::Config& routerConfig() PURE;
 };
 
 // class ActiveMessagePtr;
 class ConnectionManager : public Network::ReadFilter,
                           public Network::ConnectionCallbacks,
-                          public DecoderCallbacks,
+                          public RequestDecoderCallbacks,
                           Logger::Loggable<Logger::Id::dubbo> {
 public:
   using ConfigProtocolType = envoy::config::filter::network::dubbo_proxy::v2alpha1::ProtocolType;
@@ -63,8 +62,8 @@ public:
   void onAboveWriteBufferHighWatermark() override;
   void onBelowWriteBufferLowWatermark() override;
 
-  // DecoderCallbacks
-  DecoderEventHandler* newDecoderEventHandler() override;
+  // RequestDecoderCallbacks
+  StreamHandler& newStream() override;
   void onHeartbeat(MessageMetadataSharedPtr metadata) override;
 
   DubboFilterStats& stats() const { return stats_; }
@@ -72,7 +71,7 @@ public:
   TimeSource& time_system() const { return time_system_; }
   Runtime::RandomGenerator& random_generator() const { return random_generator_; }
   Config& config() const { return config_; }
-  SerializationType downstreamSerializationType() const { return deserializer_->type(); }
+  SerializationType downstreamSerializationType() const { return protocol_->serializer()->type(); }
   ProtocolType downstreamProtocolType() const { return protocol_->type(); }
 
   void continueDecoding();
@@ -95,9 +94,9 @@ private:
   DubboFilterStats& stats_;
   Runtime::RandomGenerator& random_generator_;
 
-  DeserializerPtr deserializer_;
+  SerializerPtr serializer_;
   ProtocolPtr protocol_;
-  DecoderPtr decoder_;
+  RequestDecoderPtr decoder_;
   Network::ReadFilterCallbacks* read_callbacks_{};
 };
 

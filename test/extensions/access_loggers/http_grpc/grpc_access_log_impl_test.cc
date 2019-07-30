@@ -1,5 +1,6 @@
 #include <memory>
 
+#include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/network/address_impl.h"
 
 #include "extensions/access_loggers/http_grpc/grpc_access_log_impl.h"
@@ -24,18 +25,15 @@ namespace AccessLoggers {
 namespace HttpGrpc {
 namespace {
 
-class GrpcAccessLogStreamerImplTest : public testing::Test {
+class GrpcAccessLoggerImplTest : public testing::Test {
 public:
   using MockAccessLogStream = Grpc::MockAsyncStream;
   using AccessLogCallbacks =
       Grpc::AsyncStreamCallbacks<envoy::service::accesslog::v2::StreamAccessLogsResponse>;
 
-  GrpcAccessLogStreamerImplTest() {
-    EXPECT_CALL(*factory_, create()).WillOnce(Invoke([this] {
-      return Grpc::RawAsyncClientPtr{async_client_};
-    }));
-    streamer_ = std::make_unique<GrpcAccessLogStreamerImpl>(Grpc::AsyncClientFactoryPtr{factory_},
-                                                            tls_, local_info_);
+  GrpcAccessLoggerImplTest() {
+    logger_ = std::make_unique<GrpcAccessLoggerImpl>(Grpc::RawAsyncClientPtr{async_client_},
+                                                     log_name_, local_info_);
   }
 
   void expectStreamStart(MockAccessLogStream& stream, AccessLogCallbacks** callbacks_to_set) {
@@ -47,53 +45,86 @@ public:
         }));
   }
 
-  NiceMock<ThreadLocal::MockInstance> tls_;
+  void expectStreamMessage(MockAccessLogStream& stream, const std::string& expected_message_yaml) {
+    envoy::service::accesslog::v2::StreamAccessLogsMessage expected_message;
+    TestUtility::loadFromYaml(expected_message_yaml, expected_message);
+    EXPECT_CALL(stream, sendMessageRaw_(_, false))
+        .WillOnce(Invoke([expected_message](Buffer::InstancePtr& request, bool) {
+          envoy::service::accesslog::v2::StreamAccessLogsMessage message;
+          Buffer::ZeroCopyInputStreamImpl request_stream(std::move(request));
+          EXPECT_TRUE(message.ParseFromZeroCopyStream(&request_stream));
+          EXPECT_EQ(message.DebugString(), expected_message.DebugString());
+        }));
+  }
+
+  std::string log_name_ = "test_log_name";
   LocalInfo::MockLocalInfo local_info_;
   Grpc::MockAsyncClient* async_client_{new Grpc::MockAsyncClient};
-  Grpc::MockAsyncClientFactory* factory_{new Grpc::MockAsyncClientFactory};
-  std::unique_ptr<GrpcAccessLogStreamerImpl> streamer_;
+  std::unique_ptr<GrpcAccessLoggerImpl> logger_;
 };
 
 // Test basic stream logging flow.
-TEST_F(GrpcAccessLogStreamerImplTest, BasicFlow) {
+TEST_F(GrpcAccessLoggerImplTest, BasicFlow) {
   InSequence s;
 
   // Start a stream for the first log.
-  MockAccessLogStream stream1;
-  AccessLogCallbacks* callbacks1;
-  expectStreamStart(stream1, &callbacks1);
+  MockAccessLogStream stream;
+  AccessLogCallbacks* callbacks;
+  expectStreamStart(stream, &callbacks);
   EXPECT_CALL(local_info_, node());
-  EXPECT_CALL(stream1, sendMessageRaw_(_, false));
-  envoy::service::accesslog::v2::StreamAccessLogsMessage message_log1;
-  streamer_->send(message_log1, "log1");
+  expectStreamMessage(stream, R"EOF(
+identifier:
+  node:
+    id: node_name
+    cluster: cluster_name
+    locality:
+      zone: zone_name
+  log_name: test_log_name
+http_logs:
+  log_entry:
+    request:
+      path: /test/path1
+)EOF");
+  envoy::data::accesslog::v2::HTTPAccessLogEntry entry;
+  entry.mutable_request()->set_path("/test/path1");
+  logger_->log(envoy::data::accesslog::v2::HTTPAccessLogEntry(entry));
 
-  message_log1.Clear();
-  EXPECT_CALL(stream1, sendMessageRaw_(_, false));
-  streamer_->send(message_log1, "log1");
-
-  // Start a stream for the second log.
-  MockAccessLogStream stream2;
-  AccessLogCallbacks* callbacks2;
-  expectStreamStart(stream2, &callbacks2);
-  EXPECT_CALL(local_info_, node());
-  EXPECT_CALL(stream2, sendMessageRaw_(_, false));
-  envoy::service::accesslog::v2::StreamAccessLogsMessage message_log2;
-  streamer_->send(message_log2, "log2");
+  expectStreamMessage(stream, R"EOF(
+http_logs:
+  log_entry:
+    request:
+      path: /test/path2
+)EOF");
+  entry.mutable_request()->set_path("/test/path2");
+  logger_->log(envoy::data::accesslog::v2::HTTPAccessLogEntry(entry));
 
   // Verify that sending an empty response message doesn't do anything bad.
-  callbacks1->onReceiveMessage(
+  callbacks->onReceiveMessage(
       std::make_unique<envoy::service::accesslog::v2::StreamAccessLogsResponse>());
 
-  // Close stream 2 and make sure we make a new one.
-  callbacks2->onRemoteClose(Grpc::Status::Internal, "bad");
-  expectStreamStart(stream2, &callbacks2);
+  // Close the stream and make sure we make a new one.
+  callbacks->onRemoteClose(Grpc::Status::Internal, "bad");
+  expectStreamStart(stream, &callbacks);
   EXPECT_CALL(local_info_, node());
-  EXPECT_CALL(stream2, sendMessageRaw_(_, false));
-  streamer_->send(message_log2, "log2");
+  expectStreamMessage(stream, R"EOF(
+identifier:
+  node:
+    id: node_name
+    cluster: cluster_name
+    locality:
+      zone: zone_name
+  log_name: test_log_name
+http_logs:
+  log_entry:
+    request:
+      path: /test/path3
+)EOF");
+  entry.mutable_request()->set_path("/test/path3");
+  logger_->log(envoy::data::accesslog::v2::HTTPAccessLogEntry(entry));
 }
 
 // Test that stream failure is handled correctly.
-TEST_F(GrpcAccessLogStreamerImplTest, StreamFailure) {
+TEST_F(GrpcAccessLoggerImplTest, StreamFailure) {
   InSequence s;
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _))
@@ -103,15 +134,75 @@ TEST_F(GrpcAccessLogStreamerImplTest, StreamFailure) {
             return nullptr;
           }));
   EXPECT_CALL(local_info_, node());
-  envoy::service::accesslog::v2::StreamAccessLogsMessage message_log1;
-  streamer_->send(message_log1, "log1");
+  envoy::data::accesslog::v2::HTTPAccessLogEntry entry;
+  logger_->log(envoy::data::accesslog::v2::HTTPAccessLogEntry(entry));
 }
 
-class MockGrpcAccessLogStreamer : public GrpcAccessLogStreamer {
+class GrpcAccessLoggerCacheImplTest : public testing::Test {
 public:
-  // GrpcAccessLogStreamer
-  MOCK_METHOD2(send, void(envoy::service::accesslog::v2::StreamAccessLogsMessage& message,
-                          const std::string& log_name));
+  GrpcAccessLoggerCacheImplTest() {
+    logger_cache_ = std::make_unique<GrpcAccessLoggerCacheImpl>(async_client_manager_, scope_, tls_,
+                                                                local_info_);
+  }
+
+  void expectClientCreation() {
+    factory_ = new Grpc::MockAsyncClientFactory;
+    async_client_ = new Grpc::MockAsyncClient;
+    EXPECT_CALL(async_client_manager_, factoryForGrpcService(_, _, false))
+        .WillOnce(Invoke([this](const envoy::api::v2::core::GrpcService&, Stats::Scope&, bool) {
+          EXPECT_CALL(*factory_, create()).WillOnce(Invoke([this] {
+            return Grpc::RawAsyncClientPtr{async_client_};
+          }));
+          return Grpc::AsyncClientFactoryPtr{factory_};
+        }));
+  }
+
+  LocalInfo::MockLocalInfo local_info_;
+  NiceMock<ThreadLocal::MockInstance> tls_;
+  Grpc::MockAsyncClientManager async_client_manager_;
+  Grpc::MockAsyncClient* async_client_ = nullptr;
+  Grpc::MockAsyncClientFactory* factory_ = nullptr;
+  std::unique_ptr<GrpcAccessLoggerCacheImpl> logger_cache_;
+  NiceMock<Stats::MockIsolatedStatsStore> scope_;
+};
+
+TEST_F(GrpcAccessLoggerCacheImplTest, Deduplication) {
+  InSequence s;
+
+  ::envoy::config::accesslog::v2::CommonGrpcAccessLogConfig config;
+  config.set_log_name("log-1");
+  config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("cluster-1");
+
+  expectClientCreation();
+  GrpcAccessLoggerSharedPtr logger1 = logger_cache_->getOrCreateLogger(config);
+  EXPECT_EQ(logger1, logger_cache_->getOrCreateLogger(config));
+
+  // Changing log name leads to another logger.
+  config.set_log_name("log-2");
+  expectClientCreation();
+  EXPECT_NE(logger1, logger_cache_->getOrCreateLogger(config));
+
+  config.set_log_name("log-1");
+  EXPECT_EQ(logger1, logger_cache_->getOrCreateLogger(config));
+
+  // Changing cluster name leads to another logger.
+  config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("cluster-2");
+  expectClientCreation();
+  EXPECT_NE(logger1, logger_cache_->getOrCreateLogger(config));
+}
+
+class MockGrpcAccessLogger : public GrpcAccessLogger {
+public:
+  // GrpcAccessLogger
+  MOCK_METHOD1(log, void(envoy::data::accesslog::v2::HTTPAccessLogEntry&& entry));
+};
+
+class MockGrpcAccessLoggerCache : public GrpcAccessLoggerCache {
+public:
+  // GrpcAccessLoggerCache
+  MOCK_METHOD1(getOrCreateLogger,
+               GrpcAccessLoggerSharedPtr(
+                   const ::envoy::config::accesslog::v2::CommonGrpcAccessLogConfig& config));
 };
 
 class HttpGrpcAccessLogTest : public testing::Test {
@@ -119,22 +210,26 @@ public:
   void init() {
     ON_CALL(*filter_, evaluate(_, _, _, _)).WillByDefault(Return(true));
     config_.mutable_common_config()->set_log_name("hello_log");
-    access_log_ =
-        std::make_unique<HttpGrpcAccessLog>(AccessLog::FilterPtr{filter_}, config_, streamer_);
+    EXPECT_CALL(*logger_cache_, getOrCreateLogger(_))
+        .WillOnce([this](const ::envoy::config::accesslog::v2::CommonGrpcAccessLogConfig& config) {
+          EXPECT_EQ(config.DebugString(), config_.common_config().DebugString());
+          return logger_;
+        });
+    access_log_ = std::make_unique<HttpGrpcAccessLog>(AccessLog::FilterPtr{filter_}, config_, tls_,
+                                                      logger_cache_);
   }
 
-  void expectLog(const std::string& expected_request_msg_yaml) {
+  void expectLog(const std::string& expected_log_entry_yaml) {
     if (access_log_ == nullptr) {
       init();
     }
 
-    envoy::service::accesslog::v2::StreamAccessLogsMessage expected_request_msg;
-    TestUtility::loadFromYaml(expected_request_msg_yaml, expected_request_msg);
-    EXPECT_CALL(*streamer_, send(_, "hello_log"))
-        .WillOnce(Invoke(
-            [expected_request_msg](envoy::service::accesslog::v2::StreamAccessLogsMessage& message,
-                                   const std::string&) {
-              EXPECT_EQ(message.DebugString(), expected_request_msg.DebugString());
+    envoy::data::accesslog::v2::HTTPAccessLogEntry expected_log_entry;
+    TestUtility::loadFromYaml(expected_log_entry_yaml, expected_log_entry);
+    EXPECT_CALL(*logger_, log(_))
+        .WillOnce(
+            Invoke([expected_log_entry](envoy::data::accesslog::v2::HTTPAccessLogEntry&& entry) {
+              EXPECT_EQ(entry.DebugString(), expected_log_entry.DebugString());
             }));
   }
 
@@ -147,30 +242,30 @@ public:
     };
 
     expectLog(fmt::format(R"EOF(
-    http_logs:
-      log_entry:
-        common_properties:
-          downstream_remote_address:
-            socket_address:
-              address: "127.0.0.1"
-              port_value: 0
-          downstream_local_address:
-            socket_address:
-              address: "127.0.0.2"
-              port_value: 0
-          start_time: {{}}
-        request:
-          request_method: {}
-          request_headers_bytes: {}
-        response: {{}}
+common_properties:
+  downstream_remote_address:
+    socket_address:
+      address: "127.0.0.1"
+      port_value: 0
+  downstream_local_address:
+    socket_address:
+      address: "127.0.0.2"
+      port_value: 0
+  start_time: {{}}
+request:
+  request_method: {}
+  request_headers_bytes: {}
+response: {{}}
     )EOF",
                           request_method, request_method.length() + 7));
     access_log_->log(&request_headers, nullptr, nullptr, stream_info);
   }
 
   AccessLog::MockFilter* filter_{new NiceMock<AccessLog::MockFilter>()};
+  NiceMock<ThreadLocal::MockInstance> tls_;
   envoy::config::accesslog::v2::HttpGrpcAccessLogConfig config_;
-  std::shared_ptr<MockGrpcAccessLogStreamer> streamer_{new MockGrpcAccessLogStreamer()};
+  std::shared_ptr<MockGrpcAccessLogger> logger_{new MockGrpcAccessLogger()};
+  std::shared_ptr<MockGrpcAccessLoggerCache> logger_cache_{new MockGrpcAccessLoggerCache()};
   std::unique_ptr<HttpGrpcAccessLog> access_log_;
 };
 
@@ -188,25 +283,23 @@ TEST_F(HttpGrpcAccessLogTest, Marshalling) {
     (*stream_info.metadata_.mutable_filter_metadata())["foo"] = ProtobufWkt::Struct();
 
     expectLog(R"EOF(
-http_logs:
-  log_entry:
-    common_properties:
-      downstream_remote_address:
-        socket_address:
-          address: "127.0.0.1"
-          port_value: 0
-      downstream_local_address:
-        pipe:
-          path: "/foo"
-      start_time:
-        seconds: 3600
-      time_to_last_downstream_tx_byte:
-        nanos: 2000000
-      metadata:
-        filter_metadata:
-          foo: {}
-    request: {}
-    response: {}
+common_properties:
+  downstream_remote_address:
+    socket_address:
+      address: "127.0.0.1"
+      port_value: 0
+  downstream_local_address:
+    pipe:
+      path: "/foo"
+  start_time:
+    seconds: 3600
+  time_to_last_downstream_tx_byte:
+    nanos: 2000000
+  metadata:
+    filter_metadata:
+      foo: {}
+request: {}
+response: {}
 )EOF");
     access_log_->log(nullptr, nullptr, nullptr, stream_info);
   }
@@ -218,23 +311,21 @@ http_logs:
     stream_info.last_downstream_tx_byte_sent_ = std::chrono::nanoseconds(2000000);
 
     expectLog(R"EOF(
-http_logs:
-  log_entry:
-    common_properties:
-      downstream_remote_address:
-        socket_address:
-          address: "127.0.0.1"
-          port_value: 0
-      downstream_local_address:
-        socket_address:
-          address: "127.0.0.2"
-          port_value: 0
-      start_time:
-        seconds: 3600
-      time_to_last_downstream_tx_byte:
-        nanos: 2000000
-    request: {}
-    response: {}
+common_properties:
+  downstream_remote_address:
+    socket_address:
+      address: "127.0.0.1"
+      port_value: 0
+  downstream_local_address:
+    socket_address:
+      address: "127.0.0.2"
+      port_value: 0
+  start_time:
+    seconds: 3600
+  time_to_last_downstream_tx_byte:
+    nanos: 2000000
+request: {}
+response: {}
 )EOF");
     access_log_->log(nullptr, nullptr, nullptr, stream_info);
   }
@@ -277,64 +368,62 @@ http_logs:
     Http::TestHeaderMapImpl response_headers{{":status", "200"}};
 
     expectLog(R"EOF(
-http_logs:
-  log_entry:
-    common_properties:
-      downstream_remote_address:
-        socket_address:
-          address: "127.0.0.1"
-          port_value: 0
-      downstream_local_address:
-        socket_address:
-          address: "127.0.0.2"
-          port_value: 0
-      start_time:
-        seconds: 3600
-      time_to_last_rx_byte:
-        nanos: 2000000
-      time_to_first_upstream_tx_byte:
-        nanos: 4000000
-      time_to_last_upstream_tx_byte:
-        nanos:  6000000
-      time_to_first_upstream_rx_byte:
-        nanos: 8000000
-      time_to_last_upstream_rx_byte:
-        nanos: 10000000
-      time_to_first_downstream_tx_byte:
-        nanos: 12000000
-      time_to_last_downstream_tx_byte:
-        nanos: 14000000
-      upstream_remote_address:
-        socket_address:
-          address: "10.0.0.1"
-          port_value: 443
-      upstream_local_address:
-        socket_address:
-          address: "10.0.0.2"
-          port_value: 0
-      upstream_cluster: "fake_cluster"
-      response_flags:
-        fault_injected: true
-      route_name: "route-name-test"
-    protocol_version: HTTP10
-    request:
-      scheme: "scheme_value"
-      authority: "authority_value"
-      path: "path_value"
-      user_agent: "user-agent_value"
-      referer: "referer_value"
-      forwarded_for: "x-forwarded-for_value"
-      request_id: "x-request-id_value"
-      original_path: "x-envoy-original-path_value"
-      request_headers_bytes: 230
-      request_body_bytes: 10
-      request_method: "POST"
-    response:
-      response_code:
-        value: 200
-      response_headers_bytes: 10
-      response_body_bytes: 20
-      response_code_details: "via_upstream"
+common_properties:
+  downstream_remote_address:
+    socket_address:
+      address: "127.0.0.1"
+      port_value: 0
+  downstream_local_address:
+    socket_address:
+      address: "127.0.0.2"
+      port_value: 0
+  start_time:
+    seconds: 3600
+  time_to_last_rx_byte:
+    nanos: 2000000
+  time_to_first_upstream_tx_byte:
+    nanos: 4000000
+  time_to_last_upstream_tx_byte:
+    nanos:  6000000
+  time_to_first_upstream_rx_byte:
+    nanos: 8000000
+  time_to_last_upstream_rx_byte:
+    nanos: 10000000
+  time_to_first_downstream_tx_byte:
+    nanos: 12000000
+  time_to_last_downstream_tx_byte:
+    nanos: 14000000
+  upstream_remote_address:
+    socket_address:
+      address: "10.0.0.1"
+      port_value: 443
+  upstream_local_address:
+    socket_address:
+      address: "10.0.0.2"
+      port_value: 0
+  upstream_cluster: "fake_cluster"
+  response_flags:
+    fault_injected: true
+  route_name: "route-name-test"
+protocol_version: HTTP10
+request:
+  scheme: "scheme_value"
+  authority: "authority_value"
+  path: "path_value"
+  user_agent: "user-agent_value"
+  referer: "referer_value"
+  forwarded_for: "x-forwarded-for_value"
+  request_id: "x-request-id_value"
+  original_path: "x-envoy-original-path_value"
+  request_headers_bytes: 230
+  request_body_bytes: 10
+  request_method: "POST"
+response:
+  response_code:
+    value: 200
+  response_headers_bytes: 10
+  response_body_bytes: 20
+  response_code_details: "via_upstream"
 )EOF");
     access_log_->log(&request_headers, &response_headers, nullptr, stream_info);
   }
@@ -350,24 +439,22 @@ http_logs:
     };
 
     expectLog(R"EOF(
-http_logs:
-  log_entry:
-    common_properties:
-      downstream_remote_address:
-        socket_address:
-          address: "127.0.0.1"
-          port_value: 0
-      downstream_local_address:
-        socket_address:
-          address: "127.0.0.2"
-          port_value: 0
-      start_time:
-        seconds: 3600
-      upstream_transport_failure_reason: "TLS error"
-    request:
-      request_method: "METHOD_UNSPECIFIED"
-      request_headers_bytes: 16
-    response: {}
+common_properties:
+  downstream_remote_address:
+    socket_address:
+      address: "127.0.0.1"
+      port_value: 0
+  downstream_local_address:
+    socket_address:
+      address: "127.0.0.2"
+      port_value: 0
+  start_time:
+    seconds: 3600
+  upstream_transport_failure_reason: "TLS error"
+request:
+  request_method: "METHOD_UNSPECIFIED"
+  request_headers_bytes: 16
+response: {}
 )EOF");
     access_log_->log(&request_headers, nullptr, nullptr, stream_info);
   }
@@ -396,38 +483,36 @@ http_logs:
     };
 
     expectLog(R"EOF(
-http_logs:
-  log_entry:
-    common_properties:
-      downstream_remote_address:
-        socket_address:
-          address: "127.0.0.1"
-          port_value: 0
-      downstream_local_address:
-        socket_address:
-          address: "127.0.0.2"
-          port_value: 0
-      start_time:
-        seconds: 3600
-      tls_properties:
-        tls_version: TLSv1_3
-        tls_cipher_suite: 0x2cc0
-        tls_sni_hostname: sni
-        local_certificate_properties:
-          subject_alt_name:
-          - uri: localSan1
-          - uri: localSan2
-          subject: localSubject
-        peer_certificate_properties:
-          subject_alt_name:
-          - uri: peerSan1
-          - uri: peerSan2
-          subject: peerSubject
-        tls_session_id: D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B
-    request:
-      request_method: "METHOD_UNSPECIFIED"
-      request_headers_bytes: 16
-    response: {}
+common_properties:
+  downstream_remote_address:
+    socket_address:
+      address: "127.0.0.1"
+      port_value: 0
+  downstream_local_address:
+    socket_address:
+      address: "127.0.0.2"
+      port_value: 0
+  start_time:
+    seconds: 3600
+  tls_properties:
+    tls_version: TLSv1_3
+    tls_cipher_suite: 0x2cc0
+    tls_sni_hostname: sni
+    local_certificate_properties:
+      subject_alt_name:
+      - uri: localSan1
+      - uri: localSan2
+      subject: localSubject
+    peer_certificate_properties:
+      subject_alt_name:
+      - uri: peerSan1
+      - uri: peerSan2
+      subject: peerSubject
+    tls_session_id: D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B
+request:
+  request_method: "METHOD_UNSPECIFIED"
+  request_headers_bytes: 16
+response: {}
 )EOF");
     access_log_->log(&request_headers, nullptr, nullptr, stream_info);
   }
@@ -449,28 +534,26 @@ http_logs:
     };
 
     expectLog(R"EOF(
-http_logs:
-  log_entry:
-    common_properties:
-      downstream_remote_address:
-        socket_address:
-          address: "127.0.0.1"
-          port_value: 0
-      downstream_local_address:
-        socket_address:
-          address: "127.0.0.2"
-          port_value: 0
-      start_time:
-        seconds: 3600
-      tls_properties:
-        tls_version: TLSv1_2
-        tls_cipher_suite: 0x2f
-        tls_sni_hostname: sni
-        local_certificate_properties: {}
-        peer_certificate_properties: {}
-    request:
-      request_method: "METHOD_UNSPECIFIED"
-    response: {}
+common_properties:
+  downstream_remote_address:
+    socket_address:
+      address: "127.0.0.1"
+      port_value: 0
+  downstream_local_address:
+    socket_address:
+      address: "127.0.0.2"
+      port_value: 0
+  start_time:
+    seconds: 3600
+  tls_properties:
+    tls_version: TLSv1_2
+    tls_cipher_suite: 0x2f
+    tls_sni_hostname: sni
+    local_certificate_properties: {}
+    peer_certificate_properties: {}
+request:
+  request_method: "METHOD_UNSPECIFIED"
+response: {}
 )EOF");
     access_log_->log(nullptr, nullptr, nullptr, stream_info);
   }
@@ -492,28 +575,26 @@ http_logs:
     };
 
     expectLog(R"EOF(
-http_logs:
-  log_entry:
-    common_properties:
-      downstream_remote_address:
-        socket_address:
-          address: "127.0.0.1"
-          port_value: 0
-      downstream_local_address:
-        socket_address:
-          address: "127.0.0.2"
-          port_value: 0
-      start_time:
-        seconds: 3600
-      tls_properties:
-        tls_version: TLSv1_1
-        tls_cipher_suite: 0x2f
-        tls_sni_hostname: sni
-        local_certificate_properties: {}
-        peer_certificate_properties: {}
-    request:
-      request_method: "METHOD_UNSPECIFIED"
-    response: {}
+common_properties:
+  downstream_remote_address:
+    socket_address:
+      address: "127.0.0.1"
+      port_value: 0
+  downstream_local_address:
+    socket_address:
+      address: "127.0.0.2"
+      port_value: 0
+  start_time:
+    seconds: 3600
+  tls_properties:
+    tls_version: TLSv1_1
+    tls_cipher_suite: 0x2f
+    tls_sni_hostname: sni
+    local_certificate_properties: {}
+    peer_certificate_properties: {}
+request:
+  request_method: "METHOD_UNSPECIFIED"
+response: {}
 )EOF");
     access_log_->log(nullptr, nullptr, nullptr, stream_info);
   }
@@ -535,28 +616,26 @@ http_logs:
     };
 
     expectLog(R"EOF(
-http_logs:
-  log_entry:
-    common_properties:
-      downstream_remote_address:
-        socket_address:
-          address: "127.0.0.1"
-          port_value: 0
-      downstream_local_address:
-        socket_address:
-          address: "127.0.0.2"
-          port_value: 0
-      start_time:
-        seconds: 3600
-      tls_properties:
-        tls_version: TLSv1
-        tls_cipher_suite: 0x2f
-        tls_sni_hostname: sni
-        local_certificate_properties: {}
-        peer_certificate_properties: {}
-    request:
-      request_method: "METHOD_UNSPECIFIED"
-    response: {}
+common_properties:
+  downstream_remote_address:
+    socket_address:
+      address: "127.0.0.1"
+      port_value: 0
+  downstream_local_address:
+    socket_address:
+      address: "127.0.0.2"
+      port_value: 0
+  start_time:
+    seconds: 3600
+  tls_properties:
+    tls_version: TLSv1
+    tls_cipher_suite: 0x2f
+    tls_sni_hostname: sni
+    local_certificate_properties: {}
+    peer_certificate_properties: {}
+request:
+  request_method: "METHOD_UNSPECIFIED"
+response: {}
 )EOF");
     access_log_->log(nullptr, nullptr, nullptr, stream_info);
   }
@@ -578,28 +657,26 @@ http_logs:
     };
 
     expectLog(R"EOF(
-http_logs:
-  log_entry:
-    common_properties:
-      downstream_remote_address:
-        socket_address:
-          address: "127.0.0.1"
-          port_value: 0
-      downstream_local_address:
-        socket_address:
-          address: "127.0.0.2"
-          port_value: 0
-      start_time:
-        seconds: 3600
-      tls_properties:
-        tls_version: VERSION_UNSPECIFIED
-        tls_cipher_suite: 0x2f
-        tls_sni_hostname: sni
-        local_certificate_properties: {}
-        peer_certificate_properties: {}
-    request:
-      request_method: "METHOD_UNSPECIFIED"
-    response: {}
+common_properties:
+  downstream_remote_address:
+    socket_address:
+      address: "127.0.0.1"
+      port_value: 0
+  downstream_local_address:
+    socket_address:
+      address: "127.0.0.2"
+      port_value: 0
+  start_time:
+    seconds: 3600
+  tls_properties:
+    tls_version: VERSION_UNSPECIFIED
+    tls_cipher_suite: 0x2f
+    tls_sni_hostname: sni
+    local_certificate_properties: {}
+    peer_certificate_properties: {}
+request:
+  request_method: "METHOD_UNSPECIFIED"
+response: {}
 )EOF");
     access_log_->log(nullptr, nullptr, nullptr, stream_info);
   }
@@ -653,38 +730,36 @@ TEST_F(HttpGrpcAccessLogTest, MarshallingAdditionalHeaders) {
     };
 
     expectLog(R"EOF(
-http_logs:
-  log_entry:
-    common_properties:
-      downstream_remote_address:
-        socket_address:
-          address: "127.0.0.1"
-          port_value: 0
-      downstream_local_address:
-        socket_address:
-          address: "127.0.0.2"
-          port_value: 0
-      start_time:
-        seconds: 3600
-    request:
-      scheme: "scheme_value"
-      authority: "authority_value"
-      path: "path_value"
-      request_method: "POST"
-      request_headers_bytes: 132
-      request_headers:
-        "x-custom-request": "custom_value"
-        "x-custom-empty": ""
-        "x-envoy-max-retries": "3"
-    response:
-      response_headers_bytes: 92
-      response_headers:
-        "x-custom-response": "custom_value"
-        "x-custom-empty": ""
-        "x-envoy-immediate-health-check-fail": "true"
-      response_trailers:
-        "x-logged-trailer": "value"
-        "x-empty-trailer": ""
+common_properties:
+  downstream_remote_address:
+    socket_address:
+      address: "127.0.0.1"
+      port_value: 0
+  downstream_local_address:
+    socket_address:
+      address: "127.0.0.2"
+      port_value: 0
+  start_time:
+    seconds: 3600
+request:
+  scheme: "scheme_value"
+  authority: "authority_value"
+  path: "path_value"
+  request_method: "POST"
+  request_headers_bytes: 132
+  request_headers:
+    "x-custom-request": "custom_value"
+    "x-custom-empty": ""
+    "x-envoy-max-retries": "3"
+response:
+  response_headers_bytes: 92
+  response_headers:
+    "x-custom-response": "custom_value"
+    "x-custom-empty": ""
+    "x-envoy-immediate-health-check-fail": "true"
+  response_trailers:
+    "x-logged-trailer": "value"
+    "x-empty-trailer": ""
 )EOF");
     access_log_->log(&request_headers, &response_headers, &response_trailers, stream_info);
   }

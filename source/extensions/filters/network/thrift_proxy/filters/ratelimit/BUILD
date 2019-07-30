@@ -18,6 +18,7 @@ envoy_cc_library(
         "//source/common/tracing:http_tracer_lib",
         "//source/extensions/filters/common/ratelimit:ratelimit_client_interface",
         "//source/extensions/filters/common/ratelimit:ratelimit_lib",
+        "//source/extensions/filters/common/ratelimit:stat_names_lib",
         "//source/extensions/filters/network/thrift_proxy:app_exception_lib",
         "//source/extensions/filters/network/thrift_proxy/filters:filter_interface",
         "//source/extensions/filters/network/thrift_proxy/router:router_ratelimit_interface",
