@@ -37,7 +37,7 @@ bool ConfigSubscriptionInstance::checkAndApplyConfigUpdate(const Protobuf::Messa
   config_info_ = {new_hash, version_info};
   ENVOY_LOG(debug, "{}: loading new configuration: config_name={} hash={}", name_, config_name,
             new_hash);
-  auto new_config_impl = onConfigProtoUpdate(config_proto);
+  ConfigProvider::ConfigConstSharedPtr new_config_impl = onConfigProtoUpdate(config_proto);
   applyConfigUpdate([new_config_impl](ConfigProvider::ConfigConstSharedPtr)
                         -> ConfigProvider::ConfigConstSharedPtr { return new_config_impl; });
   return true;

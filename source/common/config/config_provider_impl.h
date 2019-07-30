@@ -219,7 +219,7 @@ protected:
   void applyConfigUpdate(
       const std::function<
           ConfigProvider::ConfigConstSharedPtr(ConfigProvider::ConfigConstSharedPtr)>& update_fn,
-      Event::PostCb complete_cb = []() {}) {
+      const Event::PostCb& complete_cb = []() {}) {
     // It is safe to call shared_from_this here as this is in main thread, and destruction of a
     // ConfigSubscriptionCommonBase owner (i.e., a provider) happens in main thread as well.
     auto shared_this = shared_from_this();
