@@ -179,9 +179,9 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
     Init::WatcherImpl noop_watcher(
         // Note: we just throw it away.
         fmt::format("SRDS ConfigUpdate watcher {}:{}", name_, version_info),
-        []() { ENVOY_LOG_MISC(trace, ""); });
+        []() { /*Do nothing.*/ });
     overriding_init_manager->initialize(noop_watcher);
-    // New subscriptions should be created, now lift the floodgate.
+    // New RDS subscriptions should be created, now lift the floodgate.
     factory_context_.clusterManager().adsMux().resume(
         Envoy::Config::TypeUrl::get().RouteConfiguration);
   }
