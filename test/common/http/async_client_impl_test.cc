@@ -550,6 +550,7 @@ TEST_F(AsyncClientImplTest, ResetInOnHeaders) {
       .WillOnce(Invoke([&stream](HeaderMap&, bool) { stream->reset(); }));
   EXPECT_CALL(stream_callbacks_, onData(_, _)).Times(0);
   EXPECT_CALL(stream_callbacks_, onReset());
+  EXPECT_CALL(stream_callbacks_, onClosure());
 
   stream->sendHeaders(headers, false);
   stream->sendData(*body, false);
