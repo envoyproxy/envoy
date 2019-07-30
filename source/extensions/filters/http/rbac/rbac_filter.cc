@@ -24,7 +24,8 @@ RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
     const std::string& stats_prefix, Stats::Scope& scope)
     : stats_(Filters::Common::RBAC::generateStats(stats_prefix, scope)),
       engine_(Filters::Common::RBAC::createEngine(proto_config)),
-      shadow_engine_(Filters::Common::RBAC::createShadowEngine(proto_config)) {}
+      shadow_engine_(Filters::Common::RBAC::createShadowEngine(proto_config)),
+      expr_(proto_config.has_condition() ? Filters::Common::Expr::create(proto_config.condition()) : nullptr) {}
 
 const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl>&
 RoleBasedAccessControlFilterConfig::engine(const Router::RouteConstSharedPtr route,
@@ -109,7 +110,6 @@ Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::Head
                         callbacks_->streamInfo().dynamicMetadata(), nullptr)) {
       ENVOY_LOG(debug, "enforced allowed");
       config_->stats().allowed_.inc();
-      return Http::FilterHeadersStatus::Continue;
     } else {
       ENVOY_LOG(debug, "enforced denied");
       callbacks_->sendLocalReply(Http::Code::Forbidden, "RBAC: access denied", nullptr,
@@ -117,9 +117,25 @@ Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::Head
       config_->stats().denied_.inc();
       return Http::FilterHeadersStatus::StopIteration;
     }
+  } else {
+    ENVOY_LOG(debug, "no engine, allowed by default");
   }
 
-  ENVOY_LOG(debug, "no engine, allowed by default");
+  if (expr_ != nullptr) {
+    auto eval_status = Filter::Common::Expr::Evaluate(expr_, headers, callbacks_->streamInfo());
+    if (!eval_status.has_value()) {
+      ENVOY_LOG(debug, "evaluation failed");
+      return Http::FilterHeadersStatus::StopIteration;
+    }
+    auto result = eval_status.value();
+    ENVOY_LOG(trace, "value: {}", result.IsError() ? result.ErrorOrDie()->message() : 
+        (result.IsString() ? result.StringOrDie().value() : ""));
+    if (! result.IsBool() || (result.IsBool() && !result.BoolOrDie())) {
+      ENVOY_LOG(debug, "evaluated to non-bool or false");
+      return Http::FilterHeadersStatus::StopIteration;
+    }
+  }
+
   return Http::FilterHeadersStatus::Continue;
 }
 

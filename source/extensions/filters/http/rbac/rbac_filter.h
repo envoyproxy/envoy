@@ -11,6 +11,7 @@
 
 #include "extensions/filters/common/rbac/engine_impl.h"
 #include "extensions/filters/common/rbac/utility.h"
+#include "extensions/filters/common/expr/evaluator.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -57,6 +58,7 @@ private:
 
   const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> engine_;
   const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> shadow_engine_;
+  const std::unique_ptr<google::api::expr::runtime::CelExpression> expr_;
 };
 
 using RoleBasedAccessControlFilterConfigSharedPtr =

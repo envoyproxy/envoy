@@ -22,7 +22,6 @@ namespace Logger {
 // clang-format off
 // TODO: find out a way for extensions to register new logger IDs
 #define ALL_LOGGER_IDS(FUNCTION) \
-  FUNCTION(abac)                 \
   FUNCTION(admin)                \
   FUNCTION(aws)                  \
   FUNCTION(assert)               \

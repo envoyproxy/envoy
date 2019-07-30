@@ -29,7 +29,6 @@ EXTENSIONS = {
     # HTTP filters
     #
 
-    "envoy.filters.http.abac":                          "//source/extensions/filters/http/abac:config",
     "envoy.filters.http.buffer":                        "//source/extensions/filters/http/buffer:config",
     "envoy.filters.http.cors":                          "//source/extensions/filters/http/cors:config",
     "envoy.filters.http.csrf":                          "//source/extensions/filters/http/csrf:config",

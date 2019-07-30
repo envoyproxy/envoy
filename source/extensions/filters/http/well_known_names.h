@@ -12,8 +12,6 @@ namespace HttpFilters {
  */
 class HttpFilterNameValues {
 public:
-  // ABAC HTTP Authorization filter
-  const std::string Abac = "envoy.filters.http.abac";
   // Buffer filter
   const std::string Buffer = "envoy.buffer";
   // CORS filter
