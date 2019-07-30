@@ -247,23 +247,10 @@ REPOSITORY_LOCATIONS = dict(
         sha256 = "fcdebf54c89d839ffa7eefae166c8e4b551c765559db13ff15bff98047f344fb",
         urls = ["https://storage.googleapis.com/quiche-envoy-integration/2a930469533c3b541443488a629fe25cd8ff53d0.tar.gz"],
     ),
-    com_github_gflags_gflags = dict(
-        sha256 = "6e16c8bc91b1310a44f3965e616383dbda48f83e8c1eaa2370a215057b00cabe",
-        strip_prefix = "gflags-77592648e3f3be87d6c7123eb81cbad75f9aef5a",
-        urls = [
-            "https://mirror.bazel.build/github.com/gflags/gflags/archive/77592648e3f3be87d6c7123eb81cbad75f9aef5a.tar.gz",
-            "https://github.com/gflags/gflags/archive/77592648e3f3be87d6c7123eb81cbad75f9aef5a.tar.gz",
-        ],
-    ),
-    com_google_glog = dict(
-        sha256 = "819cb075d6b02b8e9c9c77c2be1d55cef7fec47e7c94359d2626f46268ae67bf",
-        strip_prefix = "glog-ba8a9f6952d04d1403b97df24e6836227751454e",
-        urls = ["https://github.com/google/glog/archive/ba8a9f6952d04d1403b97df24e6836227751454e.tar.gz"],
-    ),
     com_google_cel_cpp = dict(
-        sha256 = "37df0e66c84ddffe7bbac6e659856f48b34dbd9e1e869f57275493a20b271d11",
-        strip_prefix = "cel-cpp-592129c73f70de6d5ff8977aa94e030a1a9c4e8a",
-        urls = ["https://github.com/google/cel-cpp/archive/592129c73f70de6d5ff8977aa94e030a1a9c4e8a.tar.gz"],
+        sha256 = "a0e6a6ccf25c1e57ba3c7a997edd9279f8e0b0112e0a3ac705a5568fa32792fc",
+        strip_prefix = "cel-cpp-d56f26adb53d0f41508a909d15e74d9ffb0e8a6c",
+        urls = ["https://github.com/google/cel-cpp/archive/d56f26adb53d0f41508a909d15e74d9ffb0e8a6c.tar.gz"],
     ),
     com_google_re2 = dict(
         sha256 = "f31db9cd224d018a7e4fe88ef84aaa874b0b3ed91d4d98ee5a1531101d3fdc64",

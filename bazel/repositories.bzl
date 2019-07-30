@@ -153,8 +153,6 @@ def envoy_dependencies(skip_targets = []):
     _com_lightstep_tracer_cpp()
     _io_opentracing_cpp()
     _net_zlib()
-    _repository_impl("com_github_gflags_gflags")
-    _repository_impl("com_google_glog")
     _repository_impl("com_google_re2")
     _repository_impl("com_google_cel_cpp")
     _repository_impl("bazel_toolchains")
