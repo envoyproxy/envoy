@@ -1,4 +1,5 @@
 #include <fstream>
+#include <string>
 
 #include "common/network/address_impl.h"
 #include "common/thread_local/thread_local_impl.h"
@@ -78,6 +79,11 @@ DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v2::Bootstrap& input) {
 
   std::unique_ptr<InstanceImpl> server;
   try {
+    // If a custom prefix is used, set the value of the prefix before server initialization.
+    if (!input.header_prefix().empty()) {
+      ThreadSafeSingleton<Http::PrefixValue>::get().setPrefix(
+          std::string(input.header_prefix()).c_str());
+    }
     server = std::make_unique<InstanceImpl>(
         options, test_time.timeSystem(),
         std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"), hooks, restart, stats_store,
