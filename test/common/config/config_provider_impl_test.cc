@@ -21,8 +21,7 @@ class DummyConfigProviderManager;
 
 class DummyConfig : public Envoy::Config::ConfigProvider::Config {
 public:
-  DummyConfig() {}
-  DummyConfig(const test::common::config::DummyConfig& config_proto) {
+  explicit DummyConfig(const test::common::config::DummyConfig& config_proto) {
     protos_.push_back(config_proto);
   }
   void addProto(const test::common::config::DummyConfig& config_proto) {
@@ -107,7 +106,7 @@ using DummyConfigSubscriptionSharedPtr = std::shared_ptr<DummyConfigSubscription
 
 class DummyDynamicConfigProvider : public MutableConfigProviderCommonBase {
 public:
-  DummyDynamicConfigProvider(DummyConfigSubscriptionSharedPtr&& subscription)
+  explicit DummyDynamicConfigProvider(DummyConfigSubscriptionSharedPtr&& subscription)
       : MutableConfigProviderCommonBase(std::move(subscription), ApiType::Full),
         subscription_(static_cast<DummyConfigSubscription*>(
             MutableConfigProviderCommonBase::subscription_.get())) {}
@@ -132,7 +131,7 @@ private:
 
 class DummyConfigProviderManager : public ConfigProviderManagerImplBase {
 public:
-  DummyConfigProviderManager(Server::Admin& admin)
+  explicit DummyConfigProviderManager(Server::Admin& admin)
       : ConfigProviderManagerImplBase(admin, "dummy") {}
 
   ~DummyConfigProviderManager() override = default;
@@ -628,7 +627,6 @@ public:
                           const std::string&,
                           const Envoy::Config::ConfigProviderManager::OptionalArg&) override {
     DeltaDummyConfigSubscriptionSharedPtr subscription =
-
         getSubscription<DeltaDummyConfigSubscription>(
             config_source_proto, factory_context.initManager(),
             [&factory_context](const uint64_t manager_identifier,
