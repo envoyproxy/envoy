@@ -31,6 +31,15 @@ dynamic_resources:
   lds_config:
     path: /dev/null
 static_resources:
+  secrets:
+  - name: "secret_static_0"
+    tls_certificate:
+      certificate_chain:
+        inline_string: "DUMMY_INLINE_BYTES"
+      private_key:
+        inline_string: "DUMMY_INLINE_BYTES"
+      password:
+        inline_string: "DUMMY_INLINE_BYTES"
   clusters:
     name: cluster_0
     hosts:
@@ -703,4 +712,5 @@ void EdsHelper::setEdsAndWait(
   RELEASE_ASSERT(
       update_successes_ == server_stats.counter("cluster.cluster_0.update_success")->value(), "");
 }
+
 } // namespace Envoy

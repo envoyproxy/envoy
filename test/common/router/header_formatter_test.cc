@@ -1068,6 +1068,14 @@ response_headers_to_add:
       key: "x-request-start-default"
       value: "%START_TIME%"
     append: true
+  - header:
+      key: "set-cookie"
+      value: "foo"
+  - header:
+      key: "set-cookie"
+      value: "bar"
+    append: true
+
 response_headers_to_remove: ["x-nope"]
 )EOF";
 
@@ -1097,6 +1105,15 @@ response_headers_to_remove: ["x-nope"]
   EXPECT_TRUE(header_map.has("x-request-start-range"));
   EXPECT_EQ("123456000, 1, 12, 123, 1234, 12345, 123456, 1234560, 12345600, 123456000",
             header_map.get_("x-request-start-range"));
+  EXPECT_EQ("foo", header_map.get_("set-cookie"));
+
+  // Per https://github.com/envoyproxy/envoy/issues/7488 make sure we don't
+  // combine set-cookie headers
+  std::vector<absl::string_view> out;
+  Http::HeaderUtility::getAllOfHeader(header_map, "set-cookie", out);
+  ASSERT_EQ(out.size(), 2);
+  ASSERT_EQ(out[0], "foo");
+  ASSERT_EQ(out[1], "bar");
 }
 
 TEST(HeaderParserTest, EvaluateRequestHeadersRemoveBeforeAdd) {

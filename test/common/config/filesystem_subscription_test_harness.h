@@ -32,7 +32,7 @@ public:
         api_(Api::createApiForTest(stats_store_)), dispatcher_(api_->allocateDispatcher()),
         subscription_(*dispatcher_, path_, callbacks_, stats_, validation_visitor_, *api_) {}
 
-  ~FilesystemSubscriptionTestHarness() {
+  ~FilesystemSubscriptionTestHarness() override {
     if (::access(path_.c_str(), F_OK) != -1) {
       EXPECT_EQ(0, ::unlink(path_.c_str()));
     }
@@ -86,11 +86,11 @@ public:
     updateFile(file_json);
   }
 
-  void verifyStats(uint32_t attempt, uint32_t success, uint32_t rejected, uint32_t failure,
-                   uint64_t version) override {
+  AssertionResult statsAre(uint32_t attempt, uint32_t success, uint32_t rejected, uint32_t failure,
+                           uint64_t version) override {
     // The first attempt always fail unless there was a file there to begin with.
-    SubscriptionTestHarness::verifyStats(attempt, success, rejected,
-                                         failure + (file_at_start_ ? 0 : 1), version);
+    return SubscriptionTestHarness::statsAre(attempt, success, rejected,
+                                             failure + (file_at_start_ ? 0 : 1), version);
   }
 
   void expectConfigUpdateFailed() override {

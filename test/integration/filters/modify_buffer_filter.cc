@@ -13,7 +13,7 @@ namespace Envoy {
 // the content of the filter buffer.
 class ModifyBufferStreamFilter : public Http::PassThroughFilter {
 public:
-  Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) {
+  Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override {
     decoder_callbacks_->addDecodedData(data, true);
 
     if (end_stream) {
@@ -27,7 +27,7 @@ public:
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
-  Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) {
+  Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override {
     encoder_callbacks_->addEncodedData(data, true);
 
     if (end_stream) {
@@ -46,7 +46,8 @@ class ModifyBuffferFilterConfig : public Extensions::HttpFilters::Common::EmptyH
 public:
   ModifyBuffferFilterConfig() : EmptyHttpFilterConfig("modify-buffer-filter") {}
 
-  Http::FilterFactoryCb createFilter(const std::string&, Server::Configuration::FactoryContext&) {
+  Http::FilterFactoryCb createFilter(const std::string&,
+                                     Server::Configuration::FactoryContext&) override {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamFilter(std::make_shared<::Envoy::ModifyBufferStreamFilter>());
     };

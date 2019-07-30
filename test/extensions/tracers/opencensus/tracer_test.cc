@@ -12,6 +12,7 @@
 #include "extensions/tracers/opencensus/opencensus_tracer_impl.h"
 
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 
 #include "gmock/gmock.h"
@@ -101,7 +102,8 @@ void registerSpanCatcher() {
 TEST(OpenCensusTracerTest, Span) {
   registerSpanCatcher();
   OpenCensusConfig oc_config;
-  std::unique_ptr<Tracing::Driver> driver(new OpenCensus::Driver(oc_config));
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  std::unique_ptr<Tracing::Driver> driver(new OpenCensus::Driver(oc_config, local_info));
 
   NiceMock<Tracing::MockConfig> config;
   Http::TestHeaderMapImpl request_headers{
@@ -132,18 +134,17 @@ TEST(OpenCensusTracerTest, Span) {
     const auto& sd = (spans[0].name() == operation_name) ? spans[0] : spans[1];
     ENVOY_LOG_MISC(debug, "{}", sd.DebugString());
 
-    EXPECT_EQ("my_operation_1", sd.name());
+    EXPECT_EQ("different_name", sd.name());
     EXPECT_TRUE(sd.context().IsValid());
     EXPECT_TRUE(sd.context().trace_options().IsSampled());
     ::opencensus::trace::SpanId zeros;
     EXPECT_EQ(zeros, sd.parent_span_id());
     parent_span_id = sd.context().span_id();
 
-    ASSERT_EQ(4, sd.annotations().events().size());
-    EXPECT_EQ("setOperation", sd.annotations().events()[0].event().description());
-    EXPECT_EQ("my annotation", sd.annotations().events()[1].event().description());
-    EXPECT_EQ("spawnChild", sd.annotations().events()[2].event().description());
-    EXPECT_EQ("setSampled", sd.annotations().events()[3].event().description());
+    ASSERT_EQ(3, sd.annotations().events().size());
+    EXPECT_EQ("my annotation", sd.annotations().events()[0].event().description());
+    EXPECT_EQ("spawnChild", sd.annotations().events()[1].event().description());
+    EXPECT_EQ("setSampled", sd.annotations().events()[2].event().description());
     EXPECT_TRUE(sd.has_ended());
   }
 
@@ -166,6 +167,7 @@ TEST(OpenCensusTracerTest, PropagateTraceContext) {
   // The test calls the helper with each kind of incoming context in turn.
   auto helper = [](const std::string& header, const std::string& value) {
     OpenCensusConfig oc_config;
+    NiceMock<LocalInfo::MockLocalInfo> local_info;
     oc_config.add_incoming_trace_context(OpenCensusConfig::NONE);
     oc_config.add_incoming_trace_context(OpenCensusConfig::TRACE_CONTEXT);
     oc_config.add_incoming_trace_context(OpenCensusConfig::GRPC_TRACE_BIN);
@@ -174,7 +176,7 @@ TEST(OpenCensusTracerTest, PropagateTraceContext) {
     oc_config.add_outgoing_trace_context(OpenCensusConfig::TRACE_CONTEXT);
     oc_config.add_outgoing_trace_context(OpenCensusConfig::GRPC_TRACE_BIN);
     oc_config.add_outgoing_trace_context(OpenCensusConfig::CLOUD_TRACE_CONTEXT);
-    std::unique_ptr<Tracing::Driver> driver(new OpenCensus::Driver(oc_config));
+    std::unique_ptr<Tracing::Driver> driver(new OpenCensus::Driver(oc_config, local_info));
     NiceMock<Tracing::MockConfig> config;
     Http::TestHeaderMapImpl request_headers{
         {":path", "/"},
@@ -239,7 +241,8 @@ namespace {
 // the exporter (either zero or one).
 int SamplerTestHelper(const OpenCensusConfig& oc_config) {
   registerSpanCatcher();
-  std::unique_ptr<Tracing::Driver> driver(new OpenCensus::Driver(oc_config));
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  std::unique_ptr<Tracing::Driver> driver(new OpenCensus::Driver(oc_config, local_info));
   auto span = ::opencensus::trace::Span::StartSpan("test_span");
   span.End();
   // Retrieve SpanData from the OpenCensus trace exporter.

@@ -310,7 +310,7 @@ public:
   explicit StatName(const SymbolTable::Storage size_and_data) : size_and_data_(size_and_data) {}
 
   // Constructs an empty StatName object.
-  StatName() : size_and_data_(nullptr) {}
+  StatName() = default;
 
   // Constructs a StatName object with new storage, which must be of size
   // src.size(). This is used in the a flow where we first construct a StatName
@@ -365,7 +365,7 @@ public:
   bool empty() const { return size_and_data_ == nullptr || dataSize() == 0; }
 
 private:
-  const uint8_t* size_and_data_;
+  const uint8_t* size_and_data_{nullptr};
 };
 
 StatName StatNameStorage::statName() const { return StatName(bytes_.get()); }

@@ -22,7 +22,7 @@ public:
 
   AutonomousStream(FakeHttpConnection& parent, Http::StreamEncoder& encoder,
                    AutonomousUpstream& upstream);
-  ~AutonomousStream();
+  ~AutonomousStream() override;
 
   void setEndStream(bool set) override;
 
@@ -55,7 +55,7 @@ public:
   AutonomousUpstream(uint32_t port, FakeHttpConnection::Type type,
                      Network::Address::IpVersion version, Event::TestTimeSystem& time_system)
       : FakeUpstream(port, type, version, time_system) {}
-  ~AutonomousUpstream();
+  ~AutonomousUpstream() override;
   bool
   createNetworkFilterChain(Network::Connection& connection,
                            const std::vector<Network::FilterFactoryCb>& filter_factories) override;

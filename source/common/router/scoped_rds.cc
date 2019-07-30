@@ -200,8 +200,7 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
             thread_local_scoped_config->removeRoutingScope(scope_name);
             return config;
           },
-          // We need to delete the associated RouteConfigProvider in main thread.
-          [to_be_deleted]() { /*to_be_deleted is destructed in main thread.*/ });
+          [to_be_deleted]() { /*to_be_deleted will be destructed in main thread.*/ });
       any_applied = true;
       ENVOY_LOG(debug, "srds: remove scoped route '{}'", scope_name);
     }

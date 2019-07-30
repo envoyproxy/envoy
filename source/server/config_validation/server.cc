@@ -92,7 +92,7 @@ void ValidationInstance::initialize(const Options& options,
   listener_manager_ = std::make_unique<ListenerManagerImpl>(*this, *this, *this, false);
   thread_local_.registerThread(*dispatcher_, true);
   runtime_loader_ = component_factory.createRuntime(*this, initial_config);
-  secret_manager_ = std::make_unique<Secret::SecretManagerImpl>();
+  secret_manager_ = std::make_unique<Secret::SecretManagerImpl>(admin().getConfigTracker());
   ssl_context_manager_ =
       createContextManager(Ssl::ContextManagerFactory::name(), api_->timeSource());
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(

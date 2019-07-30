@@ -113,8 +113,8 @@ def envoy_proto_library(name, external_deps = [], **kwargs):
     external_proto_deps = []
     external_cc_proto_deps = []
     if "api_httpbody_protos" in external_deps:
-        external_cc_proto_deps.append("@googleapis//:api_httpbody_protos")
-        external_proto_deps.append("@googleapis//:api_httpbody_protos_proto")
+        external_cc_proto_deps.append("@com_google_googleapis//google/api:httpbody_cc_proto")
+        external_proto_deps.append("@com_google_googleapis//google/api:httpbody_proto")
     api_proto_library(
         name,
         external_cc_proto_deps = external_cc_proto_deps,

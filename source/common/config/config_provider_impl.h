@@ -136,7 +136,7 @@ class MutableConfigProviderCommonBase;
  * This class can not be instantiated directly; instead, it provides the foundation for
  * config subscription implementations which derive from it.
  *
- * A subscription is supposed to be co-owned by config providers with the same config source, it's
+ * A subscription is intended to be co-owned by config providers with the same config source, it's
  * designed to be created/destructed on admin thread only.
  *
  * xDS config providers and subscriptions are split to avoid lifetime issues with arguments
@@ -192,7 +192,7 @@ public:
 
 protected:
   struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {
-    ThreadLocalConfig(ConfigProvider::ConfigConstSharedPtr initial_config)
+    explicit ThreadLocalConfig(ConfigProvider::ConfigConstSharedPtr initial_config)
         : config_(std::move(initial_config)) {}
 
     ConfigProvider::ConfigConstSharedPtr config_;
@@ -227,7 +227,10 @@ protected:
         [this, update_fn]() {
           tls_->getTyped<ThreadLocalConfig>().config_ = update_fn(this->getConfig());
         },
-        /*Make sure this subscription will not be teared down during the update propagation.*/
+        /*During the update propagation, a subscription may get teared down in main thread due to
+        all owners/providers destructed in a xDS update (e.g. LDS demolishes RouteConfigProvider and
+        its subscription). Hold a reference to the shared subscription instance to make sure the
+        update can be safely pushed to workers in such an event.*/
         [shared_this, complete_cb]() { complete_cb(); });
   }
 
@@ -239,8 +242,8 @@ protected:
 
   const std::string name_;
   absl::optional<LastConfigInfo> config_info_;
-  // This slot holds a Config implementation in each thread, which is shared between
-  // bound providers.
+  // This slot holds a Config implementation in each thread, which is intended to be shared between
+  // config providers from the same config source.
   ThreadLocal::SlotPtr tls_;
 
 private:

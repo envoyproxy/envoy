@@ -9,8 +9,6 @@ envoy_package()
 
 exports_files([
     "server.yaml",
-    "server.json",
-    "server_ads.yaml",
     "server_unix_listener.yaml",
 ])
 

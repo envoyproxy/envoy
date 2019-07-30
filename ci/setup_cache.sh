@@ -17,13 +17,6 @@ if [[ ! -z "${GCP_SERVICE_ACCOUNT_KEY}" ]]; then
   echo "${GCP_SERVICE_ACCOUNT_KEY}" | base64 --decode > "${GCP_SERVICE_ACCOUNT_KEY_FILE}"
 fi
 
-if [[ -n "${BAZEL_REMOTE_CACHE}" ]]; then
-  export BAZEL_BUILD_EXTRA_OPTIONS="${BAZEL_BUILD_EXTRA_OPTIONS} \
-    --experimental_inmemory_dotd_files \
-    --experimental_inmemory_jdeps_files \
-    --experimental_remote_download_outputs=toplevel"
-fi
-
 if [[ "${BAZEL_REMOTE_CACHE}" =~ ^http ]]; then
   if [[ ! -z "${GCP_SERVICE_ACCOUNT_KEY}" ]]; then
     export BAZEL_BUILD_EXTRA_OPTIONS="${BAZEL_BUILD_EXTRA_OPTIONS} \
@@ -40,7 +33,7 @@ elif [[ ! -z "${BAZEL_REMOTE_CACHE}" ]]; then
     --remote_cache=${BAZEL_REMOTE_CACHE} \
     --remote_instance_name=${BAZEL_REMOTE_INSTANCE} \
     --google_credentials=${GCP_SERVICE_ACCOUNT_KEY_FILE} \
-    --tls_enabled=true --auth_enabled=true"
+    --auth_enabled=true"
   echo "Set up bazel remote read/write cache at ${BAZEL_REMOTE_CACHE} instance: ${BAZEL_REMOTE_INSTANCE}."
 else
   echo "No remote cache bucket is set, skipping setup remote cache."

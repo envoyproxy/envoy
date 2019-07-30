@@ -23,47 +23,19 @@ void Router::setDecoderFilterCallbacks(DubboFilters::DecoderFilterCallbacks& cal
   callbacks_ = &callbacks;
 }
 
-Network::FilterStatus Router::transportBegin() {
-  upstream_request_buffer_.drain(upstream_request_buffer_.length());
-  ProtocolDataPassthroughConverter::initProtocolConverter(upstream_request_buffer_);
-  return Network::FilterStatus::Continue;
-}
+FilterStatus Router::onMessageDecoded(MessageMetadataSharedPtr metadata, ContextSharedPtr ctx) {
+  ASSERT(metadata->hasInvocationInfo());
+  const auto& invocation = metadata->invocation_info();
 
-Network::FilterStatus Router::transportEnd() {
-  // If the connection fails, the callback of the filter will be suspended,
-  // so it is impossible to call the transportEnd interface.
-  // the encodeData function will be called only if the connection is successful.
-  ASSERT(upstream_request_);
-  ASSERT(upstream_request_->conn_data_);
-
-  upstream_request_->encodeData(upstream_request_buffer_);
-
-  if (upstream_request_->metadata_->message_type() == MessageType::Oneway) {
-    // No response expected
-    upstream_request_->onResponseComplete();
-    cleanup();
-    ENVOY_LOG(debug, "dubbo upstream request: the message is one-way and no response is required");
-  }
-
-  filter_complete_ = true;
-
-  return Network::FilterStatus::Continue;
-}
-
-Network::FilterStatus Router::messageBegin(MessageType, int64_t, SerializationType) {
-  return Network::FilterStatus::Continue;
-}
-
-Network::FilterStatus Router::messageEnd(MessageMetadataSharedPtr metadata) {
   route_ = callbacks_->route();
   if (!route_) {
     ENVOY_STREAM_LOG(debug, "dubbo router: no cluster match for interface '{}'", *callbacks_,
-                     metadata->service_name());
+                     invocation.service_name());
     callbacks_->sendLocalReply(AppException(ResponseStatus::ServiceNotFound,
                                             fmt::format("dubbo router: no route for interface '{}'",
-                                                        metadata->service_name())),
+                                                        invocation.service_name())),
                                false);
-    return Network::FilterStatus::StopIteration;
+    return FilterStatus::StopIteration;
   }
 
   route_entry_ = route_->routeEntry();
@@ -76,12 +48,12 @@ Network::FilterStatus Router::messageEnd(MessageMetadataSharedPtr metadata) {
         AppException(ResponseStatus::ServerError, fmt::format("dubbo router: unknown cluster '{}'",
                                                               route_entry_->clusterName())),
         false);
-    return Network::FilterStatus::StopIteration;
+    return FilterStatus::StopIteration;
   }
 
   cluster_ = cluster->info();
   ENVOY_STREAM_LOG(debug, "dubbo router: cluster '{}' match for interface '{}'", *callbacks_,
-                   route_entry_->clusterName(), metadata->service_name());
+                   route_entry_->clusterName(), invocation.service_name());
 
   if (cluster_->maintenanceMode()) {
     callbacks_->sendLocalReply(
@@ -89,7 +61,7 @@ Network::FilterStatus Router::messageEnd(MessageMetadataSharedPtr metadata) {
                      fmt::format("dubbo router: maintenance mode for cluster '{}'",
                                  route_entry_->clusterName())),
         false);
-    return Network::FilterStatus::StopIteration;
+    return FilterStatus::StopIteration;
   }
 
   Tcp::ConnectionPool::Instance* conn_pool = cluster_manager_.tcpConnPoolForCluster(
@@ -100,14 +72,14 @@ Network::FilterStatus Router::messageEnd(MessageMetadataSharedPtr metadata) {
             ResponseStatus::ServerError,
             fmt::format("dubbo router: no healthy upstream for '{}'", route_entry_->clusterName())),
         false);
-    return Network::FilterStatus::StopIteration;
+    return FilterStatus::StopIteration;
   }
 
   ENVOY_STREAM_LOG(debug, "dubbo router: decoding request", *callbacks_);
+  upstream_request_buffer_.move(ctx->message_origin_data(), ctx->message_size());
 
-  upstream_request_ = std::make_unique<UpstreamRequest>(*this, *conn_pool, metadata,
-                                                        callbacks_->downstreamSerializationType(),
-                                                        callbacks_->downstreamProtocolType());
+  upstream_request_ = std::make_unique<UpstreamRequest>(
+      *this, *conn_pool, metadata, callbacks_->serializationType(), callbacks_->protocolType());
   return upstream_request_->start();
 }
 
@@ -118,8 +90,7 @@ void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
 
   // Handle normal response.
   if (!upstream_request_->response_started_) {
-    callbacks_->startUpstreamResponse(*upstream_request_->deserializer_.get(),
-                                      *upstream_request_->protocol_.get());
+    callbacks_->startUpstreamResponse();
     upstream_request_->response_started_ = true;
   }
 
@@ -191,23 +162,22 @@ Router::UpstreamRequest::UpstreamRequest(Router& parent, Tcp::ConnectionPool::In
                                          SerializationType serialization_type,
                                          ProtocolType protocol_type)
     : parent_(parent), conn_pool_(pool), metadata_(metadata),
-      deserializer_(
-          NamedDeserializerConfigFactory::getFactory(serialization_type).createDeserializer()),
-      protocol_(NamedProtocolConfigFactory::getFactory(protocol_type).createProtocol()),
+      protocol_(
+          NamedProtocolConfigFactory::getFactory(protocol_type).createProtocol(serialization_type)),
       request_complete_(false), response_started_(false), response_complete_(false),
       stream_reset_(false) {}
 
-Router::UpstreamRequest::~UpstreamRequest() {}
+Router::UpstreamRequest::~UpstreamRequest() = default;
 
-Network::FilterStatus Router::UpstreamRequest::start() {
+FilterStatus Router::UpstreamRequest::start() {
   Tcp::ConnectionPool::Cancellable* handle = conn_pool_.newConnection(*this);
   if (handle) {
     // Pause while we wait for a connection.
     conn_pool_handle_ = handle;
-    return Network::FilterStatus::StopIteration;
+    return FilterStatus::StopIteration;
   }
 
-  return Network::FilterStatus::Continue;
+  return FilterStatus::Continue;
 }
 
 void Router::UpstreamRequest::resetStream() {
@@ -270,6 +240,7 @@ void Router::UpstreamRequest::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr
   conn_pool_handle_ = nullptr;
 
   onRequestStart(continue_decoding);
+  encodeData(parent_.upstream_request_buffer_);
 }
 
 void Router::UpstreamRequest::onRequestStart(bool continue_decoding) {
