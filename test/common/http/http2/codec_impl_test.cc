@@ -97,6 +97,8 @@ public:
     setting.initial_stream_window_size_ = ::testing::get<2>(tp);
     setting.initial_connection_window_size_ = ::testing::get<3>(tp);
     setting.allow_metadata_ = allow_metadata_;
+    setting.max_outbound_frames_ = max_outbound_frames_;
+    setting.max_outbound_control_frames_ = max_outbound_control_frames_;
   }
 
   // corruptMetadataFramePayload assumes data contains at least 10 bytes of the beginning of a
@@ -141,6 +143,8 @@ public:
   bool corrupt_metadata_frame_ = false;
 
   uint32_t max_request_headers_kb_ = Http::DEFAULT_MAX_REQUEST_HEADERS_KB;
+  uint32_t max_outbound_frames_ = Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES;
+  uint32_t max_outbound_control_frames_ = Http2Settings::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES;
 };
 
 class Http2CodecImplTest : public ::testing::TestWithParam<Http2SettingsTestParam>,
@@ -1037,6 +1041,212 @@ TEST_P(Http2CodecImplTestAll, TestCodecHeaderCompression) {
     EXPECT_EQ(0, nghttp2_session_get_hd_deflate_dynamic_table_size(client_->session()));
     EXPECT_EQ(0, nghttp2_session_get_hd_deflate_dynamic_table_size(server_->session()));
   }
+}
+
+// Verify that codec detects PING flood
+TEST_P(Http2CodecImplTest, PingFlood) {
+  initialize();
+
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  request_encoder_->encodeHeaders(request_headers, false);
+
+  // Send one frame above the outbound control queue size limit
+  for (uint32_t i = 0; i < Http2Settings::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES + 1; ++i) {
+    EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
+  }
+
+  int ack_count = 0;
+  Buffer::OwnedImpl buffer;
+  ON_CALL(server_connection_, write(_, _))
+      .WillByDefault(Invoke([&buffer, &ack_count](Buffer::Instance& frame, bool) {
+        ++ack_count;
+        buffer.move(frame);
+      }));
+
+  EXPECT_THROW(client_->sendPendingFrames(), FrameFloodException);
+  EXPECT_EQ(ack_count, Http2Settings::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES);
+  EXPECT_EQ(1, stats_store_.counter("http2.outbound_control_flood").value());
+}
+
+// Verify that outbound control frame counter decreases when send buffer is drained
+TEST_P(Http2CodecImplTest, PingFloodCounterReset) {
+  static const int kMaxOutboundControlFrames = 100;
+  max_outbound_control_frames_ = kMaxOutboundControlFrames;
+  initialize();
+
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  request_encoder_->encodeHeaders(request_headers, false);
+
+  for (int i = 0; i < kMaxOutboundControlFrames; ++i) {
+    EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
+  }
+
+  int ack_count = 0;
+  Buffer::OwnedImpl buffer;
+  ON_CALL(server_connection_, write(_, _))
+      .WillByDefault(Invoke([&buffer, &ack_count](Buffer::Instance& frame, bool) {
+        ++ack_count;
+        buffer.move(frame);
+      }));
+
+  // We should be 1 frame under the control frame flood mitigation threshold.
+  EXPECT_NO_THROW(client_->sendPendingFrames());
+  EXPECT_EQ(ack_count, kMaxOutboundControlFrames);
+
+  // Drain kMaxOutboundFrames / 2 slices from the send buffer
+  buffer.drain(buffer.length() / 2);
+
+  // Send kMaxOutboundFrames / 2 more pings.
+  for (int i = 0; i < kMaxOutboundControlFrames / 2; ++i) {
+    EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
+  }
+  // The number of outbound frames should be half of max so the connection should not be terminated.
+  EXPECT_NO_THROW(client_->sendPendingFrames());
+
+  // 1 more ping frame should overflow the outbound frame limit.
+  EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
+  EXPECT_THROW(client_->sendPendingFrames(), FrameFloodException);
+}
+
+// Verify that codec detects flood of outbound HEADER frames
+TEST_P(Http2CodecImplTest, ResponseHeadersFlood) {
+  initialize();
+
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  request_encoder_->encodeHeaders(request_headers, false);
+
+  int frame_count = 0;
+  Buffer::OwnedImpl buffer;
+  ON_CALL(server_connection_, write(_, _))
+      .WillByDefault(Invoke([&buffer, &frame_count](Buffer::Instance& frame, bool) {
+        ++frame_count;
+        buffer.move(frame);
+      }));
+
+  TestHeaderMapImpl response_headers{{":status", "200"}};
+  for (uint32_t i = 0; i < Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES + 1; ++i) {
+    EXPECT_NO_THROW(response_encoder_->encodeHeaders(response_headers, false));
+  }
+  // Presently flood mitigation is done only when processing downstream data
+  // So we need to send stream from downstream client to trigger mitigation
+  EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
+  EXPECT_THROW(client_->sendPendingFrames(), FrameFloodException);
+
+  EXPECT_EQ(frame_count, Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
+  EXPECT_EQ(1, stats_store_.counter("http2.outbound_flood").value());
+}
+
+// Verify that codec detects flood of outbound DATA frames
+TEST_P(Http2CodecImplTest, ResponseDataFlood) {
+  initialize();
+
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  request_encoder_->encodeHeaders(request_headers, false);
+
+  int frame_count = 0;
+  Buffer::OwnedImpl buffer;
+  ON_CALL(server_connection_, write(_, _))
+      .WillByDefault(Invoke([&buffer, &frame_count](Buffer::Instance& frame, bool) {
+        ++frame_count;
+        buffer.move(frame);
+      }));
+
+  TestHeaderMapImpl response_headers{{":status", "200"}};
+  response_encoder_->encodeHeaders(response_headers, false);
+  // Account for the single HEADERS frame above
+  for (uint32_t i = 0; i < Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES; ++i) {
+    Buffer::OwnedImpl data("0");
+    EXPECT_NO_THROW(response_encoder_->encodeData(data, false));
+  }
+  // Presently flood mitigation is done only when processing downstream data
+  // So we need to send stream from downstream client to trigger mitigation
+  EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
+  EXPECT_THROW(client_->sendPendingFrames(), FrameFloodException);
+
+  EXPECT_EQ(frame_count, Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
+  EXPECT_EQ(1, stats_store_.counter("http2.outbound_flood").value());
+}
+
+// Verify that outbound frame counter decreases when send buffer is drained
+TEST_P(Http2CodecImplTest, ResponseDataFloodCounterReset) {
+  static const int kMaxOutboundFrames = 100;
+  max_outbound_frames_ = kMaxOutboundFrames;
+  initialize();
+
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  request_encoder_->encodeHeaders(request_headers, false);
+
+  int frame_count = 0;
+  Buffer::OwnedImpl buffer;
+  ON_CALL(server_connection_, write(_, _))
+      .WillByDefault(Invoke([&buffer, &frame_count](Buffer::Instance& frame, bool) {
+        ++frame_count;
+        buffer.move(frame);
+      }));
+
+  TestHeaderMapImpl response_headers{{":status", "200"}};
+  response_encoder_->encodeHeaders(response_headers, false);
+  // Account for the single HEADERS frame above
+  for (uint32_t i = 0; i < kMaxOutboundFrames - 1; ++i) {
+    Buffer::OwnedImpl data("0");
+    EXPECT_NO_THROW(response_encoder_->encodeData(data, false));
+  }
+
+  EXPECT_EQ(frame_count, kMaxOutboundFrames);
+  // Drain kMaxOutboundFrames / 2 slices from the send buffer
+  buffer.drain(buffer.length() / 2);
+
+  for (uint32_t i = 0; i < kMaxOutboundFrames / 2 + 1; ++i) {
+    Buffer::OwnedImpl data("0");
+    EXPECT_NO_THROW(response_encoder_->encodeData(data, false));
+  }
+
+  // Presently flood mitigation is done only when processing downstream data
+  // So we need to send a frame from downstream client to trigger mitigation
+  EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
+  EXPECT_THROW(client_->sendPendingFrames(), FrameFloodException);
+}
+
+// Verify that control frames are added to the counter of outbound frames of all types.
+TEST_P(Http2CodecImplTest, PingStacksWithDataFlood) {
+  initialize();
+
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  request_encoder_->encodeHeaders(request_headers, false);
+
+  int frame_count = 0;
+  Buffer::OwnedImpl buffer;
+  ON_CALL(server_connection_, write(_, _))
+      .WillByDefault(Invoke([&buffer, &frame_count](Buffer::Instance& frame, bool) {
+        ++frame_count;
+        buffer.move(frame);
+      }));
+
+  TestHeaderMapImpl response_headers{{":status", "200"}};
+  response_encoder_->encodeHeaders(response_headers, false);
+  // Account for the single HEADERS frame above
+  for (uint32_t i = 0; i < Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES - 1; ++i) {
+    Buffer::OwnedImpl data("0");
+    EXPECT_NO_THROW(response_encoder_->encodeData(data, false));
+  }
+  // Send one PING frame above the outbound queue size limit
+  EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
+  EXPECT_THROW(client_->sendPendingFrames(), FrameFloodException);
+
+  EXPECT_EQ(frame_count, Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES);
+  EXPECT_EQ(1, stats_store_.counter("http2.outbound_flood").value());
 }
 
 } // namespace Http2

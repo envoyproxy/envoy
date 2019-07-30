@@ -91,6 +91,21 @@ message Http2ProtocolOptions {
   // docs](https://github.com/envoyproxy/envoy/blob/master/source/docs/h2_metadata.md) for more
   // information.
   bool allow_metadata = 6;
+
+  // Limit the number of pending outbound downstream frames of all types (frames that are waiting to
+  // be written into the socket). Exceeding this limit triggers flood mitigation and connection is
+  // terminated. The "http2.outbound_flood" stat tracks the number of terminated connections due to
+  // flood mitigation. The default limit is 10000.
+  // [#comment:TODO: implement same limits for upstream outbound frames as well.]
+  google.protobuf.UInt32Value max_outbound_frames = 7 [(validate.rules).uint32 = {gte: 1}];
+
+  // Limit the number of pending outbound downstream frames of types PING, SETTINGS and RST_STREAM,
+  // preventing high memory utilization when receiving continuous stream of these frames. Exceeding
+  // this limit triggers flood mitigation and connection is terminated. The
+  // "http2.outbound_control_flood" stat tracks the number of terminated connections due to flood
+  // mitigation. The default limit is 1000.
+  // [#comment:TODO: implement same limits for upstream outbound frames as well.]
+  google.protobuf.UInt32Value max_outbound_control_frames = 8 [(validate.rules).uint32 = {gte: 1}];
 }
 
 // [#not-implemented-hide:]
