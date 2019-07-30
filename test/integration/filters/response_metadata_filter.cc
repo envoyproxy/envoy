@@ -16,8 +16,7 @@ class ResponseMetadataStreamFilter : public Http::PassThroughFilter {
 public:
   // Inserts one new metadata_map.
   Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap&, bool) override {
-    Http::MetadataMap metadata_map = {
-        {"headers", "headers"}, {"duplicate", "duplicate"}};
+    Http::MetadataMap metadata_map = {{"headers", "headers"}, {"duplicate", "duplicate"}};
     Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
     encoder_callbacks_->addEncodedMetadata(std::move(metadata_map_ptr));
     return Http::FilterHeadersStatus::Continue;
@@ -25,8 +24,7 @@ public:
 
   // Inserts one new metadata_map.
   Http::FilterDataStatus encodeData(Buffer::Instance&, bool) override {
-    Http::MetadataMap metadata_map = {
-        {"data", "data"}, {"duplicate", "duplicate"}};
+    Http::MetadataMap metadata_map = {{"data", "data"}, {"duplicate", "duplicate"}};
     Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
     encoder_callbacks_->addEncodedMetadata(std::move(metadata_map_ptr));
     return Http::FilterDataStatus::Continue;
@@ -45,8 +43,7 @@ public:
 
   // Inserts two metadata_maps by calling decoder_callbacks_->encodeMetadata() twice.
   Http::FilterHeadersStatus encode100ContinueHeaders(Http::HeaderMap&) override {
-    Http::MetadataMap metadata_map = {
-        {"100-continue", "100-continue"}, {"duplicate", "duplicate"}};
+    Http::MetadataMap metadata_map = {{"100-continue", "100-continue"}, {"duplicate", "duplicate"}};
     Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
     encoder_callbacks_->addEncodedMetadata(std::move(metadata_map_ptr));
     metadata_map = {{"duplicate", "duplicate"}};
