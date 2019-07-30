@@ -131,6 +131,5 @@ message RouteConfiguration {
 // [#not-implemented-hide:]
 message Vhds {
   // Configuration source specifier for VHDS.
-  envoy.api.v2.core.ConfigSource config_source = 1
-      [(validate.rules).message.required = true];
+  envoy.api.v2.core.ConfigSource config_source = 1 [(validate.rules).message.required = true];
 }
