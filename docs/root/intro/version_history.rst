@@ -14,6 +14,7 @@ Version history
 * router: added :ref:`rq_retry_skipped_request_not_complete <config_http_filters_router_stats>` counter stat to router stats.
 * tls: added verification of IP address SAN fields in certificates against configured SANs in the
   certificate validation context.
+* upstream: added network filter chains to upstream connections, see :ref:`filters<envoy_api_field_Cluster.filters>`.
 
 1.11.0 (July 11, 2019)
 ======================
