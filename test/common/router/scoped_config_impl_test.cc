@@ -359,7 +359,7 @@ public:
     route_config_ = std::make_shared<NiceMock<MockConfig>>();
     route_config_->name_ = "foo_route";
 
-    route_config_provider_ = absl::make_unique<MockRouteConfigProvider>();
+    route_config_provider_ = std::make_unique<MockRouteConfigProvider>();
     EXPECT_CALL(*route_config_provider_, config()).WillRepeatedly(Return(route_config_));
     EXPECT_CALL(*route_config_provider_, configInfo())
         .WillRepeatedly(Return(RouteConfigProvider::ConfigInfo{route_configuration_, ""}));
@@ -437,7 +437,7 @@ public:
     route_config->name_ = scoped_route_config.route_configuration_name();
 
     std::unique_ptr<MockRouteConfigProvider> route_config_provider =
-        absl::make_unique<NiceMock<MockRouteConfigProvider>>();
+        std::make_unique<NiceMock<MockRouteConfigProvider>>();
     EXPECT_CALL(*route_config_provider, config()).WillRepeatedly(Return(route_config));
     return std::make_shared<ScopedRouteInfo>(std::move(scoped_route_config),
                                              std::move(route_config_provider));
