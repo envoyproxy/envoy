@@ -46,3 +46,5 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/retry/host/omit_canary_hosts @sriduth @snowp
 # http inspector
 /*/extensions/filters/listener/http_inspector @crazyxy @PiotrSikora @lizan
+# attribute context
+/*/extensions/filters/common/expr @kyessenov @yangminzhu
