@@ -1242,11 +1242,10 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
 
 Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection,
                                                  const Buffer::Instance& data,
-                                                 Http::ServerConnectionCallbacks& callbacks,
-                                                 const bool strict_header_validation) {
+                                                 Http::ServerConnectionCallbacks& callbacks) {
   return Http::ConnectionManagerUtility::autoCreateCodec(
       connection, data, callbacks, server_.stats(), Http::Http1Settings(), Http::Http2Settings(),
-      maxRequestHeadersKb(), strict_header_validation);
+      maxRequestHeadersKb());
 }
 
 bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,

@@ -34,7 +34,7 @@ protected:
 class EvilMathSingleton : public TestSingleton {
 public:
   EvilMathSingleton() { value_ = -50; }
-  virtual void addOne() {
+  void addOne() override {
     Thread::LockGuard lock(lock_);
     ++value_;
     ++value_;

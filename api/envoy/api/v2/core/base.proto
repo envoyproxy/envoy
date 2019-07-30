@@ -258,8 +258,7 @@ message SocketOption {
   }
   // The state in which the option will be applied. When used in BindConfig
   // STATE_PREBIND is currently the only valid value.
-  SocketState state = 6
-      [(validate.rules).message.required = true, (validate.rules).enum.defined_only = true];
+  SocketState state = 6 [(validate.rules).enum.defined_only = true];
 }
 
 // Runtime derived FractionalPercent with defaults for when the numerator or denominator is not

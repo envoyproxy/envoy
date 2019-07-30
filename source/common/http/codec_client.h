@@ -53,7 +53,7 @@ public:
    */
   enum class Type { HTTP1, HTTP2 };
 
-  ~CodecClient();
+  ~CodecClient() override;
 
   /**
    * Add a connection callback to the underlying network connection.
@@ -241,8 +241,7 @@ using CodecClientPtr = std::unique_ptr<CodecClient>;
 class CodecClientProd : public CodecClient {
 public:
   CodecClientProd(Type type, Network::ClientConnectionPtr&& connection,
-                  Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher,
-                  bool strict_header_validation);
+                  Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher);
 };
 
 } // namespace Http

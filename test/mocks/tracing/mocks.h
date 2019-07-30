@@ -13,7 +13,7 @@ namespace Tracing {
 class MockConfig : public Config {
 public:
   MockConfig();
-  ~MockConfig();
+  ~MockConfig() override;
 
   MOCK_CONST_METHOD0(operationName, OperationName());
   MOCK_CONST_METHOD0(requestHeadersForTags, const std::vector<Http::LowerCaseString>&());
@@ -27,7 +27,7 @@ public:
 class MockSpan : public Span {
 public:
   MockSpan();
-  ~MockSpan();
+  ~MockSpan() override;
 
   MOCK_METHOD1(setOperation, void(absl::string_view operation));
   MOCK_METHOD2(setTag, void(absl::string_view name, absl::string_view value));
@@ -48,7 +48,7 @@ public:
 class MockHttpTracer : public HttpTracer {
 public:
   MockHttpTracer();
-  ~MockHttpTracer();
+  ~MockHttpTracer() override;
 
   SpanPtr startSpan(const Config& config, Http::HeaderMap& request_headers,
                     const StreamInfo::StreamInfo& stream_info,
@@ -64,7 +64,7 @@ public:
 class MockDriver : public Driver {
 public:
   MockDriver();
-  ~MockDriver();
+  ~MockDriver() override;
 
   SpanPtr startSpan(const Config& config, Http::HeaderMap& request_headers,
                     const std::string& operation_name, SystemTime start_time,

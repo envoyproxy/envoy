@@ -16,6 +16,7 @@ namespace Secret {
 
 class SecretManagerImpl : public SecretManager {
 public:
+  SecretManagerImpl(Server::ConfigTracker& config_tracker);
   void addStaticSecret(const envoy::api::v2::auth::Secret& secret) override;
 
   TlsCertificateConfigProviderSharedPtr
@@ -52,6 +53,8 @@ public:
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context) override;
 
 private:
+  ProtobufTypes::MessagePtr dumpSecretConfigs();
+
   template <class SecretType>
   class DynamicSecretProviders : public Logger::Loggable<Logger::Id::secret> {
   public:
@@ -76,6 +79,17 @@ private:
         dynamic_secret_providers_[map_key] = secret_provider;
       }
       return secret_provider;
+    }
+
+    std::vector<std::shared_ptr<SecretType>> allSecretProviders() {
+      std::vector<std::shared_ptr<SecretType>> providers;
+      for (const auto& secret_entry : dynamic_secret_providers_) {
+        std::shared_ptr<SecretType> secret_provider = secret_entry.second.lock();
+        if (secret_provider) {
+          providers.push_back(std::move(secret_provider));
+        }
+      }
+      return providers;
     }
 
   private:
@@ -105,6 +119,8 @@ private:
   DynamicSecretProviders<TlsCertificateSdsApi> certificate_providers_;
   DynamicSecretProviders<CertificateValidationContextSdsApi> validation_context_providers_;
   DynamicSecretProviders<TlsSessionTicketKeysSdsApi> session_ticket_keys_providers_;
+
+  Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
 };
 
 } // namespace Secret
