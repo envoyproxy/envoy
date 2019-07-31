@@ -5,9 +5,9 @@
 #include "envoy/api/v2/core/base.pb.h"
 
 namespace Envoy {
-void Coverage::markCovered(const Envoy::Router::RouteEntry* route) {
-  if (std::find(seen_routes_.begin(), seen_routes_.end(), route) == seen_routes_.end()) {
-    seen_routes_.push_back(route);
+void Coverage::markCovered(const Envoy::Router::RouteEntry& route) {
+  if (std::find(seen_routes_.begin(), seen_routes_.end(), &route) == seen_routes_.end()) {
+    seen_routes_.push_back(&route);
   }
 }
 

@@ -8,7 +8,7 @@ namespace Envoy {
 class Coverage : Logger::Loggable<Logger::Id::testing> {
 public:
   Coverage(envoy::api::v2::RouteConfiguration config) : route_config_(config){};
-  void markCovered(const Envoy::Router::RouteEntry* route);
+  void markCovered(const Envoy::Router::RouteEntry& route);
   double report();
 
 private:
