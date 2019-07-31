@@ -1,7 +1,7 @@
 #include <string>
 
+#include "common/stats/allocator_impl.h"
 #include "common/stats/fake_symbol_table_impl.h"
-#include "common/stats/heap_stat_data.h"
 #include "common/stats/utility.h"
 
 #include "test/test_common/logging.h"
@@ -15,7 +15,7 @@ namespace {
 class MetricImplTest : public testing::Test {
 protected:
   MetricImplTest() : alloc_(symbol_table_), pool_(symbol_table_) {}
-  ~MetricImplTest() { clearStorage(); }
+  ~MetricImplTest() override { clearStorage(); }
 
   StatName makeStat(absl::string_view name) { return pool_.add(name); }
 
@@ -25,7 +25,7 @@ protected:
   }
 
   FakeSymbolTableImpl symbol_table_;
-  HeapStatDataAllocator alloc_;
+  AllocatorImpl alloc_;
   StatNamePool pool_;
 };
 

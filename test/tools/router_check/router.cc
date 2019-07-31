@@ -82,7 +82,12 @@ RouterCheckTool::RouterCheckTool(
     std::unique_ptr<Router::ConfigImpl> config, std::unique_ptr<Stats::IsolatedStoreImpl> stats,
     Api::ApiPtr api)
     : factory_context_(std::move(factory_context)), config_(std::move(config)),
-      stats_(std::move(stats)), api_(std::move(api)) {}
+      stats_(std::move(stats)), api_(std::move(api)) {
+  ON_CALL(factory_context_->runtime_loader_.snapshot_,
+          featureEnabled(_, testing::An<const envoy::type::FractionalPercent&>(),
+                         testing::An<uint64_t>()))
+      .WillByDefault(testing::Invoke(this, &RouterCheckTool::runtimeMock));
+}
 
 // TODO(jyotima): Remove this code path once the json schema code path is deprecated.
 bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_json) {
@@ -165,6 +170,7 @@ bool RouterCheckTool::compareEntries(const std::string& expected_routes) {
   bool no_failures = true;
   for (const envoy::RouterCheckToolSchema::ValidationItem& check_config :
        validation_config.tests()) {
+    active_runtime = check_config.input().runtime();
     headers_finalized_ = false;
     ToolConfig tool_config = ToolConfig::create(check_config);
     tool_config.route_ = config_->route(*tool_config.headers_, tool_config.random_value_);
@@ -394,6 +400,15 @@ bool RouterCheckTool::compareResults(const std::string& actual, const std::strin
               << "], test type: " << test_type << std::endl;
   }
   return false;
+}
+
+// The Mock for runtime value checks.
+// This is a simple implementation to mimic the actual runtime checks in Snapshot.featureEnabled
+bool RouterCheckTool::runtimeMock(const std::string& key,
+                                  const envoy::type::FractionalPercent& default_value,
+                                  uint64_t random_value) {
+  return !active_runtime.empty() && active_runtime.compare(key) == 0 &&
+         ProtobufPercentHelper::evaluateFractionalPercent(default_value, random_value);
 }
 
 Options::Options(int argc, char** argv) {

@@ -4,6 +4,8 @@
 
 # api
 /api/ @envoyproxy/api-shepherds
+# access loggers
+/*/extensions/access_loggers/common @auni53 @zuercher
 # csrf extension
 /*/extensions/filters/http/csrf @dschaller @mattklein123
 # original_src http filter extension
@@ -42,3 +44,5 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/http/dynamic_forward_proxy @mattklein123 @alyssawilk
 # omit_canary_hosts retry predicate
 /*/extensions/retry/host/omit_canary_hosts @sriduth @snowp
+# http inspector
+/*/extensions/filters/listener/http_inspector @crazyxy @PiotrSikora @lizan

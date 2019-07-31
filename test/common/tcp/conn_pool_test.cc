@@ -34,7 +34,7 @@ namespace {
 struct TestConnectionState : public ConnectionPool::ConnectionState {
   TestConnectionState(int id, std::function<void()> on_destructor)
       : id_(id), on_destructor_(on_destructor) {}
-  ~TestConnectionState() { on_destructor_(); }
+  ~TestConnectionState() override { on_destructor_(); }
 
   int id_;
   std::function<void()> on_destructor_;
@@ -79,7 +79,7 @@ public:
                      Upstream::ResourcePriority::Default, nullptr, nullptr),
         mock_dispatcher_(dispatcher), mock_upstream_ready_timer_(upstream_ready_timer) {}
 
-  ~ConnPoolImplForTest() {
+  ~ConnPoolImplForTest() override {
     EXPECT_EQ(0U, ready_conns_.size());
     EXPECT_EQ(0U, busy_conns_.size());
     EXPECT_EQ(0U, pending_requests_.size());
@@ -158,7 +158,7 @@ public:
       : upstream_ready_timer_(new NiceMock<Event::MockTimer>(&dispatcher_)),
         conn_pool_(dispatcher_, cluster_, upstream_ready_timer_) {}
 
-  ~TcpConnPoolImplTest() {
+  ~TcpConnPoolImplTest() override {
     EXPECT_TRUE(TestUtility::gaugesZeroed(cluster_->stats_store_.gauges()));
   }
 
@@ -180,7 +180,7 @@ public:
                                     Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000"),
                                     Upstream::ResourcePriority::Default, nullptr, nullptr)} {}
 
-  ~TcpConnPoolImplDestructorTest() {}
+  ~TcpConnPoolImplDestructorTest() override = default;
 
   void prepareConn() {
     connection_ = new NiceMock<Network::MockClientConnection>();

@@ -51,7 +51,7 @@ private:
         public Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks,
         public Network::ConnectionCallbacks {
     RedisActiveHealthCheckSession(RedisHealthChecker& parent, const Upstream::HostSharedPtr& host);
-    ~RedisActiveHealthCheckSession();
+    ~RedisActiveHealthCheckSession() override;
 
     // ActiveHealthCheckSession
     void onInterval() override;
@@ -79,6 +79,8 @@ private:
     std::chrono::milliseconds bufferFlushTimeoutInMs() const override {
       return std::chrono::milliseconds(1);
     }
+
+    uint32_t maxUpstreamUnknownConnections() const override { return 0; }
 
     // Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks
     void onResponse(NetworkFilters::Common::Redis::RespValuePtr&& value) override;

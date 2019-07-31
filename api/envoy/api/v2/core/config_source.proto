@@ -112,13 +112,12 @@ message ConfigSource {
     AggregatedConfigSource ads = 3;
   }
 
-  // Optional initialization timeout.
   // When this timeout is specified, Envoy will wait no longer than the specified time for first
   // config response on this xDS subscription during the :ref:`initialization process
   // <arch_overview_initialization>`. After reaching the timeout, Envoy will move to the next
   // initialization phase, even if the first config is not delivered yet. The timer is activated
   // when the xDS API subscription starts, and is disarmed on first config update or on error. 0
   // means no timeout - Envoy will wait indefinitely for the first xDS config (unless another
-  // timeout applies). Default 0.
+  // timeout applies). The default is 15s.
   google.protobuf.Duration initial_fetch_timeout = 4;
 }

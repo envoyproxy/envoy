@@ -15,7 +15,7 @@ namespace Redis {
 class MockClusterSlotUpdateCallBack : public ClusterSlotUpdateCallBack {
 public:
   MockClusterSlotUpdateCallBack();
-  ~MockClusterSlotUpdateCallBack() = default;
+  ~MockClusterSlotUpdateCallBack() override = default;
 
   MOCK_METHOD2(onClusterSlotUpdate, bool(ClusterSlotsPtr&&, Upstream::HostMap));
   MOCK_METHOD0(onHostHealthUpdate, void());

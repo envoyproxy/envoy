@@ -39,30 +39,37 @@ void XfccIntegrationTest::TearDown() {
 }
 
 Network::TransportSocketFactoryPtr XfccIntegrationTest::createClientSslContext(bool mtls) {
-  std::string json_tls = R"EOF(
-{
-  "ca_cert_file": "{{ test_rundir }}/test/config/integration/certs/cacert.pem",
-  "verify_subject_alt_name": [ "spiffe://lyft.com/backend-team", "lyft.com", "www.lyft.com" ]
-}
+  const std::string yaml_tls = R"EOF(
+common_tls_context:
+  validation_context:
+    trusted_ca:
+      filename: {{ test_rundir }}/test/config/integration/certs/cacert.pem
+    verify_subject_alt_name: [ spiffe://lyft.com/backend-team, lyft.com, www.lyft.com ]
 )EOF";
-  std::string json_mtls = R"EOF(
-{
-  "ca_cert_file": "{{ test_rundir }}/test/config/integration/certs/cacert.pem",
-  "cert_chain_file": "{{ test_rundir }}/test/config/integration/certs/clientcert.pem",
-  "private_key_file": "{{ test_rundir }}/test/config/integration/certs/clientkey.pem",
-  "verify_subject_alt_name": [ "spiffe://lyft.com/backend-team", "lyft.com", "www.lyft.com" ]
-}
+
+  const std::string yaml_mtls = R"EOF(
+common_tls_context:
+  validation_context:
+    trusted_ca:
+      filename: {{ test_rundir }}/test/config/integration/certs/cacert.pem
+    verify_subject_alt_name: [ spiffe://lyft.com/backend-team, lyft.com, www.lyft.com ]
+  tls_certificates:
+    certificate_chain:
+      filename: {{ test_rundir }}/test/config/integration/certs/clientcert.pem
+    private_key:
+      filename: {{ test_rundir }}/test/config/integration/certs/clientkey.pem
 )EOF";
 
   std::string target;
   if (mtls) {
-    target = json_mtls;
+    target = yaml_mtls;
   } else {
-    target = json_tls;
+    target = yaml_tls;
   }
-  Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(target);
+  envoy::api::v2::auth::UpstreamTlsContext config;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(target), config);
   auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
-      *loader, factory_context_);
+      config, factory_context_);
   static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
   return Network::TransportSocketFactoryPtr{
       new Extensions::TransportSockets::Tls::ClientSslSocketFactory(
@@ -70,16 +77,16 @@ Network::TransportSocketFactoryPtr XfccIntegrationTest::createClientSslContext(b
 }
 
 Network::TransportSocketFactoryPtr XfccIntegrationTest::createUpstreamSslContext() {
-  std::string json = R"EOF(
-{
-  "cert_chain_file": "{{ test_rundir }}/test/config/integration/certs/upstreamcert.pem",
-  "private_key_file": "{{ test_rundir }}/test/config/integration/certs/upstreamkey.pem"
-}
-)EOF";
+  envoy::api::v2::auth::DownstreamTlsContext tls_context;
+  auto* common_tls_context = tls_context.mutable_common_tls_context();
+  auto* tls_cert = common_tls_context->add_tls_certificates();
+  tls_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"));
+  tls_cert->mutable_private_key()->set_filename(
+      TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
 
-  Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
   auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
-      *loader, factory_context_);
+      tls_context, factory_context_);
   static Stats::Scope* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
   return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
       std::move(cfg), *context_manager_, *upstream_stats_store, std::vector<std::string>{});

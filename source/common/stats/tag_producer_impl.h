@@ -29,7 +29,7 @@ namespace Stats {
 class TagProducerImpl : public TagProducer {
 public:
   TagProducerImpl(const envoy::config::metrics::v2::StatsConfig& config);
-  TagProducerImpl() {}
+  TagProducerImpl() = default;
 
   /**
    * Take a metric name and a vector then add proper tags into the vector and

@@ -12,7 +12,7 @@ namespace DynamicForwardProxy {
 class MockDnsCache : public DnsCache {
 public:
   MockDnsCache();
-  ~MockDnsCache();
+  ~MockDnsCache() override;
 
   struct MockLoadDnsCacheEntryResult {
     LoadDnsCacheEntryStatus status_;
@@ -38,7 +38,7 @@ public:
 class MockLoadDnsCacheEntryHandle : public DnsCache::LoadDnsCacheEntryHandle {
 public:
   MockLoadDnsCacheEntryHandle();
-  ~MockLoadDnsCacheEntryHandle();
+  ~MockLoadDnsCacheEntryHandle() override;
 
   MOCK_METHOD0(onDestroy, void());
 };
@@ -46,7 +46,7 @@ public:
 class MockDnsCacheManager : public DnsCacheManager {
 public:
   MockDnsCacheManager();
-  ~MockDnsCacheManager();
+  ~MockDnsCacheManager() override;
 
   MOCK_METHOD1(
       getCache,
@@ -59,18 +59,21 @@ public:
 class MockDnsHostInfo : public DnsHostInfo {
 public:
   MockDnsHostInfo();
-  ~MockDnsHostInfo();
+  ~MockDnsHostInfo() override;
 
   MOCK_METHOD0(address, Network::Address::InstanceConstSharedPtr());
+  MOCK_METHOD0(resolvedHost, const std::string&());
+  MOCK_METHOD0(isIpAddress, bool());
   MOCK_METHOD0(touch, void());
 
   Network::Address::InstanceConstSharedPtr address_;
+  std::string resolved_host_;
 };
 
 class MockUpdateCallbacks : public DnsCache::UpdateCallbacks {
 public:
   MockUpdateCallbacks();
-  ~MockUpdateCallbacks();
+  ~MockUpdateCallbacks() override;
 
   MOCK_METHOD2(onDnsHostAddOrUpdate,
                void(const std::string& host, const DnsHostInfoSharedPtr& address));
@@ -80,7 +83,7 @@ public:
 class MockLoadDnsCacheEntryCallbacks : public DnsCache::LoadDnsCacheEntryCallbacks {
 public:
   MockLoadDnsCacheEntryCallbacks();
-  ~MockLoadDnsCacheEntryCallbacks();
+  ~MockLoadDnsCacheEntryCallbacks() override;
 
   MOCK_METHOD0(onLoadDnsCacheComplete, void());
 };

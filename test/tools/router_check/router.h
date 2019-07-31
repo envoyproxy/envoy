@@ -29,7 +29,7 @@ namespace Envoy {
  * input file.
  */
 struct ToolConfig {
-  ToolConfig() : random_value_(0){};
+  ToolConfig() = default;
 
   /**
    * @param check_config tool config json object pointer.
@@ -49,7 +49,7 @@ struct ToolConfig {
 
   std::unique_ptr<Http::TestHeaderMapImpl> headers_;
   Router::RouteConstSharedPtr route_;
-  int random_value_;
+  int random_value_{0};
 
 private:
   ToolConfig(std::unique_ptr<Http::TestHeaderMapImpl> headers, int random_value);
@@ -119,7 +119,7 @@ private:
   bool compareCustomHeaderField(ToolConfig& tool_config, const std::string& field,
                                 const std::string& expected);
   bool compareCustomHeaderField(ToolConfig& tool_config,
-                                const envoy::RouterCheckToolSchema::ValidationAssert& expecte);
+                                const envoy::RouterCheckToolSchema::ValidationAssert& expected);
   /**
    * Compare the expected and actual route parameter values. Print out match details if details_
    * flag is set.
@@ -130,6 +130,9 @@ private:
   bool compareResults(const std::string& actual, const std::string& expected,
                       const std::string& test_type);
 
+  bool runtimeMock(const std::string& key, const envoy::type::FractionalPercent& default_value,
+                   uint64_t random_value);
+
   bool headers_finalized_{false};
 
   bool details_{false};
@@ -139,6 +142,7 @@ private:
   std::unique_ptr<Router::ConfigImpl> config_;
   std::unique_ptr<Stats::IsolatedStoreImpl> stats_;
   Api::ApiPtr api_;
+  std::string active_runtime;
 };
 
 /**

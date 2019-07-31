@@ -26,7 +26,7 @@ namespace Api {
 class MockApi : public Api {
 public:
   MockApi();
-  ~MockApi();
+  ~MockApi() override;
 
   // Api::Api
   Event::DispatcherPtr allocateDispatcher() override;
@@ -49,7 +49,7 @@ public:
 class MockOsSysCalls : public OsSysCallsImpl {
 public:
   MockOsSysCalls();
-  ~MockOsSysCalls();
+  ~MockOsSysCalls() override;
 
   // Api::OsSysCalls
   SysCallIntResult setsockopt(int sockfd, int level, int optname, const void* optval,

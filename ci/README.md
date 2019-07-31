@@ -70,10 +70,10 @@ The build artifact can be found in `/tmp/envoy-docker-build/envoy/source/exe/env
 `$ENVOY_DOCKER_BUILD_DIR` points).
 
 To leverage a [bazel remote cache](https://github.com/envoyproxy/envoy/tree/master/bazel#advanced-caching-setup) add the http_remote_cache endpoint to
-the BAZEL_BUILD_OPTIONS environment variable
+the BAZEL_BUILD_EXTRA_OPTIONS environment variable
 
 ```bash
-BAZEL_BUILD_OPTIONS='--remote_http_cache=http://127.0.0.1:28080' ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.release'
+./ci/run_envoy_docker.sh "BAZEL_BUILD_EXTRA_OPTIONS='--remote_http_cache=http://127.0.0.1:28080' ./ci/do_ci.sh bazel.release"
 ```
 
 The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:

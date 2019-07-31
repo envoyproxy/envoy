@@ -213,6 +213,7 @@ private:
     bool enableRedirection() const override { return false; }
     uint32_t maxBufferSizeBeforeFlush() const override { return 0; }
     std::chrono::milliseconds bufferFlushTimeoutInMs() const override { return buffer_timeout_; }
+    uint32_t maxUpstreamUnknownConnections() const override { return 0; }
     Extensions::NetworkFilters::Common::Redis::Client::ReadPolicy readPolicy() const override {
       return Extensions::NetworkFilters::Common::Redis::Client::ReadPolicy::Any;
     }

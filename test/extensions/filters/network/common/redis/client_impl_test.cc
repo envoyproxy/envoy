@@ -40,7 +40,7 @@ public:
     return Common::Redis::DecoderPtr{decoder_};
   }
 
-  ~RedisClientImplTest() {
+  ~RedisClientImplTest() override {
     client_.reset();
 
     EXPECT_TRUE(TestUtility::gaugesZeroed(host_->cluster_.stats_store_.gauges()));
@@ -77,6 +77,7 @@ public:
                                  *config_);
     EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_cx_total_.value());
     EXPECT_EQ(1UL, host_->stats_.cx_total_.value());
+    EXPECT_EQ(false, client_->active());
 
     // NOP currently.
     upstream_connection_->runHighWatermarkCallbacks();
@@ -92,6 +93,7 @@ public:
     Common::Redis::RespValuePtr response1{new Common::Redis::RespValue()};
     response1->type(Common::Redis::RespType::SimpleString);
     response1->asString() = "OK";
+    EXPECT_EQ(true, client_->active());
     ClientImpl* client_impl = dynamic_cast<ClientImpl*>(client_.get());
     EXPECT_NE(client_impl, nullptr);
     client_impl->onRespValue(std::move(response1));
@@ -152,6 +154,7 @@ class ConfigBufferSizeGTSingleRequest : public Config {
   std::chrono::milliseconds bufferFlushTimeoutInMs() const override {
     return std::chrono::milliseconds(1);
   }
+  uint32_t maxUpstreamUnknownConnections() const override { return 0; }
   ReadPolicy readPolicy() const override { return ReadPolicy::Master; }
 };
 
@@ -465,6 +468,7 @@ class ConfigOutlierDisabled : public Config {
     return std::chrono::milliseconds(0);
   }
   ReadPolicy readPolicy() const override { return ReadPolicy::Master; }
+  uint32_t maxUpstreamUnknownConnections() const override { return 0; }
 };
 
 TEST_F(RedisClientImplTest, OutlierDisabled) {

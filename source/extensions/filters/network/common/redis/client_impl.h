@@ -12,8 +12,7 @@
 #include "common/protobuf/utility.h"
 #include "common/singleton/const_singleton.h"
 #include "common/upstream/load_balancer_impl.h"
-
-#include "source/extensions/filters/network/common/redis/_virtual_includes/codec_interface/extensions/filters/network/common/redis/codec.h"
+#include "common/upstream/upstream_impl.h"
 
 #include "extensions/filters/network/common/redis/client.h"
 
@@ -47,6 +46,9 @@ public:
   std::chrono::milliseconds bufferFlushTimeoutInMs() const override {
     return buffer_flush_timeout_;
   }
+  uint32_t maxUpstreamUnknownConnections() const override {
+    return max_upstream_unknown_connections_;
+  }
   ReadPolicy readPolicy() const override { return read_policy_; }
 
 private:
@@ -55,6 +57,7 @@ private:
   const bool enable_redirection_;
   const uint32_t max_buffer_size_before_flush_;
   const std::chrono::milliseconds buffer_flush_timeout_;
+  const uint32_t max_upstream_unknown_connections_;
   ReadPolicy read_policy_;
 };
 
@@ -64,7 +67,7 @@ public:
                           EncoderPtr&& encoder, DecoderFactory& decoder_factory,
                           const Config& config);
 
-  ~ClientImpl();
+  ~ClientImpl() override;
 
   // Client
   void addConnectionCallbacks(Network::ConnectionCallbacks& callbacks) override {
@@ -72,6 +75,7 @@ public:
   }
   void close() override;
   PoolRequest* makeRequest(const RespValue& request, PoolCallbacks& callbacks) override;
+  bool active() override { return !pending_requests_.empty(); }
   void flushBufferAndResetTimer();
 
 private:
@@ -91,7 +95,7 @@ private:
 
   struct PendingRequest : public PoolRequest {
     PendingRequest(ClientImpl& parent, PoolCallbacks& callbacks);
-    ~PendingRequest();
+    ~PendingRequest() override;
 
     // PoolRequest
     void cancel() override;

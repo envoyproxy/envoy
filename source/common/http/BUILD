@@ -142,12 +142,14 @@ envoy_cc_library(
         ":conn_manager_config_interface",
         ":exception_lib",
         ":header_map_lib",
+        ":header_utility_lib",
         ":headers_lib",
         ":path_utility_lib",
         ":user_agent_lib",
         ":utility_lib",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/buffer:buffer_interface",
+        "//include/envoy/common:scope_tracker_interface",
         "//include/envoy/common:time_interface",
         "//include/envoy/event:deferred_deletable",
         "//include/envoy/event:dispatcher_interface",
@@ -171,9 +173,11 @@ envoy_cc_library(
         "//source/common/access_log:access_log_formatter_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
+        "//source/common/common:dump_state_utils",
         "//source/common/common:empty_string",
         "//source/common/common:enum_to_int",
         "//source/common/common:linked_object",
+        "//source/common/common:scope_tracker",
         "//source/common/common:utility_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
@@ -214,6 +218,7 @@ envoy_cc_library(
         ":headers_lib",
         "//include/envoy/http:header_map_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:dump_state_utils",
         "//source/common/common:empty_string",
         "//source/common/common:non_copyable",
         "//source/common/common:utility_lib",
@@ -227,6 +232,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/http:header_map_interface",
         "//source/common/singleton:const_singleton",
+        "//source/common/singleton:threadsafe_singleton",
     ],
 )
 
@@ -308,6 +314,9 @@ envoy_cc_library(
     name = "header_utility_lib",
     srcs = ["header_utility.cc"],
     hdrs = ["header_utility.h"],
+    external_deps = [
+        "nghttp2",
+    ],
     deps = [
         "//include/envoy/http:header_map_interface",
         "//include/envoy/json:json_object_interface",

@@ -130,8 +130,7 @@ message OpenCensusConfig {
   // The URL to Zipkin, e.g. "http://127.0.0.1:9411/api/v2/spans"
   string zipkin_url = 6;
 
-  // The Zipkin service name.
-  string zipkin_service_name = 7;
+  reserved 7; // Formerly zipkin_service_name.
 
   enum TraceContext {
     // No-op default, no trace context is utilized.

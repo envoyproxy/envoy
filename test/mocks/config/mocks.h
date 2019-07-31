@@ -25,7 +25,7 @@ public:
           return resourceName_(TestUtility::anyConvert<ResourceType>(resource));
         }));
   }
-  ~MockSubscriptionCallbacks() override {}
+  ~MockSubscriptionCallbacks() override = default;
   static std::string resourceName_(const envoy::api::v2::ClusterLoadAssignment& resource) {
     return resource.cluster_name();
   }

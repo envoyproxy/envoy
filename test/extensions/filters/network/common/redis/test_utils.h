@@ -18,15 +18,16 @@ namespace Redis {
 namespace Client {
 
 inline envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings
-createConnPoolSettings(
-    int64_t millis = 20, bool hashtagging = true, bool redirection_support = true,
-    envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings::ReadPolicy
-        read_policy = envoy::config::filter::network::redis_proxy::v2::
-            RedisProxy_ConnPoolSettings_ReadPolicy_MASTER) {
+createConnPoolSettings(int64_t millis = 20, bool hashtagging = true,
+                       bool redirection_support = true, uint32_t max_unknown_conns = 100,
+                       envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings::ReadPolicy
+                       read_policy = envoy::config::filter::network::redis_proxy::v2::
+                       RedisProxy_ConnPoolSettings_ReadPolicy_MASTER) {
   envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings setting{};
   setting.mutable_op_timeout()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(millis));
   setting.set_enable_hashtagging(hashtagging);
   setting.set_enable_redirection(redirection_support);
+  setting.mutable_max_upstream_unknown_connections()->set_value(max_unknown_conns);
   setting.set_read_policy(read_policy);
   return setting;
 }

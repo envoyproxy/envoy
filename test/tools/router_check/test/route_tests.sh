@@ -18,6 +18,7 @@ done
 
 # Testing expected matches using --useproto
 # --useproto needs the test schema as a validation.proto message.
+TESTS+=("Runtime")
 for t in "${TESTS[@]}"
 do
   TEST_OUTPUT=$("${PATH_BIN}" "-c" "${PATH_CONFIG}/${t}.yaml" "-t" "${PATH_CONFIG}/${t}.golden.proto.json" "--details" "--useproto")

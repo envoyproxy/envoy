@@ -66,7 +66,7 @@ class HeaderToMetadataFilter : public Http::StreamFilter,
                                public Logger::Loggable<Logger::Id::filter> {
 public:
   HeaderToMetadataFilter(const ConfigSharedPtr config);
-  ~HeaderToMetadataFilter();
+  ~HeaderToMetadataFilter() override;
 
   // Http::StreamFilterBase
   void onDestroy() override {}

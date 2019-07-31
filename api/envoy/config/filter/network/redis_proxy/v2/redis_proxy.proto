@@ -10,6 +10,7 @@ option go_package = "v2";
 import "envoy/api/v2/core/base.proto";
 
 import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
 import "gogoproto/gogo.proto";
@@ -83,7 +84,14 @@ message RedisProxy {
     // defaults to 3ms.
     google.protobuf.Duration buffer_flush_timeout = 5 [(gogoproto.stdduration) = true];
 
-    // All ReadPolicy settings except MASTER may return stale data because replicas replication is
+    // `max_upstream_unknown_connections` controls how many upstream connections to unknown hosts
+    // can be created at any given time by any given worker thread (see `enable_redirection` for
+    // more details). If the host is unknown and a connection cannot be created due to enforcing
+    // this limit, then redirection will fail and the original redirection error will be passed
+    // downstream unchanged. This limit defaults to 100.
+    google.protobuf.UInt32Value max_upstream_unknown_connections = 6;
+
+    // All ReadPolicy settings except MASTER may return stale data because replication is
     // asynchronous and requires some delay. You need to ensure that your application can tolerate
     // stale data.
     enum ReadPolicy {
@@ -100,7 +108,7 @@ message RedisProxy {
     }
 
     // Read policy, by default it is read from master.
-    ReadPolicy read_policy = 6;
+    ReadPolicy read_policy = 7;
   }
 
   // Network settings for the connection pool to the upstream clusters.
@@ -155,7 +163,7 @@ message RedisProxy {
     }
 
     // List of prefix routes.
-    repeated Route routes = 1 [(gogoproto.nullable) = false];
+    repeated Route routes = 1;
 
     // Indicates that prefix matching should be case insensitive.
     bool case_insensitive = 2;
@@ -201,7 +209,7 @@ message RedisProxy {
   // See the :ref:`configuration section
   // <arch_overview_redis_configuration>` of the architecture overview for recommendations on
   // configuring the backing clusters.
-  PrefixRoutes prefix_routes = 5 [(gogoproto.nullable) = false];
+  PrefixRoutes prefix_routes = 5;
 
   // Authenticate Redis client connections locally by forcing downstream clients to issue a 'Redis
   // AUTH command <https://redis.io/commands/auth>`_ with this password before enabling any other

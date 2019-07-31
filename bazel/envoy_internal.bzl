@@ -41,6 +41,10 @@ def envoy_copts(repository, test = False):
                repository + "//bazel:windows_fastbuild_build": [],
                repository + "//bazel:windows_dbg_build": [],
            }) + select({
+               repository + "//bazel:clang_build": ["-fno-limit-debug-info", "-Wgnu-conditional-omitted-operand"],
+               repository + "//bazel:gcc_build": ["-Wno-maybe-uninitialized"],
+               "//conditions:default": [],
+           }) + select({
                repository + "//bazel:disable_tcmalloc": ["-DABSL_MALLOC_HOOK_MMAP_DISABLE"],
                "//conditions:default": ["-DTCMALLOC"],
            }) + select({
@@ -49,6 +53,9 @@ def envoy_copts(repository, test = False):
            }) + select({
                repository + "//bazel:disable_signal_trace": [],
                "//conditions:default": ["-DENVOY_HANDLE_SIGNALS"],
+           }) + select({
+               repository + "//bazel:disable_object_dump_on_signal_trace": [],
+               "//conditions:default": ["-DENVOY_OBJECT_TRACE_ON_DUMP"],
            }) + select({
                repository + "//bazel:enable_log_debug_assert_in_release": ["-DENVOY_LOG_DEBUG_ASSERT_IN_RELEASE"],
                "//conditions:default": [],
@@ -78,14 +85,6 @@ def envoy_select_force_libcpp(if_libcpp, default = None):
         "@envoy//bazel:windows_x86_64": [],
         "//conditions:default": default or [],
     })
-
-def envoy_static_link_libstdcpp_linkopts():
-    return envoy_select_force_libcpp(
-        # TODO(PiotrSikora): statically link libc++ once that's possible.
-        # See: https://reviews.llvm.org/D53238
-        ["-stdlib=libc++"],
-        ["-static-libstdc++", "-static-libgcc"],
-    )
 
 # Dependencies on tcmalloc_and_profiler should be wrapped with this function.
 def tcmalloc_external_dep(repository):
