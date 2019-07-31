@@ -235,6 +235,7 @@ struct Http2Settings {
   uint32_t initial_connection_window_size_{DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE};
   bool allow_connect_{DEFAULT_ALLOW_CONNECT};
   bool allow_metadata_{DEFAULT_ALLOW_METADATA};
+  bool stream_error_on_invalid_http_messaging_{DEFAULT_STREAM_ERROR_ON_INVALID_HTTP_MESSAGING};
   uint32_t max_outbound_frames_{DEFAULT_MAX_OUTBOUND_FRAMES};
   uint32_t max_outbound_control_frames_{DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES};
   uint32_t max_consecutive_inbound_frames_with_empty_payload_{
@@ -279,6 +280,8 @@ struct Http2Settings {
   static const bool DEFAULT_ALLOW_CONNECT = false;
   // By default Envoy does not allow METADATA support.
   static const bool DEFAULT_ALLOW_METADATA = false;
+  // By default Envoy does not allow invalid headers.
+  static const bool DEFAULT_STREAM_ERROR_ON_INVALID_HTTP_MESSAGING = false;
 
   // Default limit on the number of outbound frames of all types.
   static const uint32_t DEFAULT_MAX_OUTBOUND_FRAMES = 10000;

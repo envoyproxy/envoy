@@ -1584,6 +1584,12 @@ TEST_P(Http2FloodMitigationTest, Data) {
 
 // Verify that the server can detect flood of RST_STREAM frames.
 TEST_P(Http2FloodMitigationTest, RST_STREAM) {
+  // Use invalid HTTP headers to trigger sending RST_STREAM frames.
+  config_helper_.addConfigModifier(
+      [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void {
+        hcm.mutable_http2_protocol_options()->set_stream_error_on_invalid_http_messaging(true);
+      });
   beginSession();
 
   int i = 0;
@@ -1715,6 +1721,56 @@ TEST_P(Http2FloodMitigationTest, WindowUpdate) {
 
   floodServer(Http2Frame::makeWindowUpdateFrame(request_idx, 1),
               "http2.inbound_window_update_frames_flood");
+}
+
+// Verify that the HTTP/2 connection is terminated upon receiving invalid HEADERS frame.
+TEST_P(Http2FloodMitigationTest, ZerolenHeader) {
+  beginSession();
+
+  // Send invalid request.
+  uint32_t request_idx = 0;
+  auto request = Http2Frame::makeMalformedRequestWithZerolenHeader(request_idx, "host", "/");
+  sendFame(request);
+
+  tcp_client_->waitForDisconnect();
+
+  EXPECT_EQ(1, test_server_->counter("http2.rx_messaging_error")->value());
+  EXPECT_EQ(1,
+            test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
+}
+
+// Verify that only the offending stream is terminated upon receiving invalid HEADERS frame.
+TEST_P(Http2FloodMitigationTest, ZerolenHeaderAllowed) {
+  config_helper_.addConfigModifier(
+      [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void {
+        hcm.mutable_http2_protocol_options()->set_stream_error_on_invalid_http_messaging(true);
+      });
+  autonomous_upstream_ = true;
+  beginSession();
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+
+  // Send invalid request.
+  uint32_t request_idx = 0;
+  auto request = Http2Frame::makeMalformedRequestWithZerolenHeader(request_idx, "host", "/");
+  sendFame(request);
+  // Make sure we've got RST_STREAM from the server.
+  auto response = readFrame();
+  EXPECT_EQ(Http2Frame::Type::RST_STREAM, response.type());
+
+  // Send valid request using the same connection.
+  request_idx++;
+  request = Http2Frame::makeRequest(request_idx, "host", "/");
+  sendFame(request);
+  response = readFrame();
+  EXPECT_EQ(Http2Frame::Type::HEADERS, response.type());
+  EXPECT_EQ(Http2Frame::ResponseStatus::_200, response.responseStatus());
+
+  tcp_client_->close();
+
+  EXPECT_EQ(1, test_server_->counter("http2.rx_messaging_error")->value());
+  EXPECT_EQ(0,
+            test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
 }
 
 } // namespace Envoy

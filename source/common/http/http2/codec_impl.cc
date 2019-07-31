@@ -579,16 +579,19 @@ int ConnectionImpl::onInvalidFrame(int32_t stream_id, int error_code) {
   ENVOY_CONN_LOG(debug, "invalid frame: {} on stream {}", connection_, nghttp2_strerror(error_code),
                  stream_id);
 
-  // The stream is about to be closed due to an invalid header or messaging. Don't kill the
-  // entire connection if one stream has bad headers or messaging.
   if (error_code == NGHTTP2_ERR_HTTP_HEADER || error_code == NGHTTP2_ERR_HTTP_MESSAGING) {
     stats_.rx_messaging_error_.inc();
-    StreamImpl* stream = getStream(stream_id);
-    if (stream != nullptr) {
-      // See comment below in onStreamClose() for why we do this.
-      stream->reset_due_to_messaging_error_ = true;
+
+    if (stream_error_on_invalid_http_messaging_) {
+      // The stream is about to be closed due to an invalid header or messaging. Don't kill the
+      // entire connection if one stream has bad headers or messaging.
+      StreamImpl* stream = getStream(stream_id);
+      if (stream != nullptr) {
+        // See comment below in onStreamClose() for why we do this.
+        stream->reset_due_to_messaging_error_ = true;
+      }
+      return 0;
     }
-    return 0;
   }
 
   // Cause dispatch to return with an error code.

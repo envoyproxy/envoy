@@ -97,6 +97,7 @@ public:
     setting.initial_stream_window_size_ = ::testing::get<2>(tp);
     setting.initial_connection_window_size_ = ::testing::get<3>(tp);
     setting.allow_metadata_ = allow_metadata_;
+    setting.stream_error_on_invalid_http_messaging_ = stream_error_on_invalid_http_messaging_;
     setting.max_outbound_frames_ = max_outbound_frames_;
     setting.max_outbound_control_frames_ = max_outbound_control_frames_;
     setting.max_consecutive_inbound_frames_with_empty_payload_ =
@@ -128,6 +129,7 @@ public:
   const Http2SettingsTuple client_settings_;
   const Http2SettingsTuple server_settings_;
   bool allow_metadata_ = false;
+  bool stream_error_on_invalid_http_messaging_ = false;
   Stats::IsolatedStoreImpl stats_store_;
   Http2Settings client_http2settings_;
   NiceMock<Network::MockConnection> client_connection_;
@@ -202,6 +204,20 @@ TEST_P(Http2CodecImplTest, ContinueHeaders) {
 TEST_P(Http2CodecImplTest, InvalidContinueWithFin) {
   initialize();
 
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  request_encoder_->encodeHeaders(request_headers, true);
+
+  TestHeaderMapImpl continue_headers{{":status", "100"}};
+  EXPECT_THROW(response_encoder_->encodeHeaders(continue_headers, true), CodecProtocolException);
+  EXPECT_EQ(1, stats_store_.counter("http2.rx_messaging_error").value());
+}
+
+TEST_P(Http2CodecImplTest, InvalidContinueWithFinAllowed) {
+  stream_error_on_invalid_http_messaging_ = true;
+  initialize();
+
   MockStreamCallbacks request_callbacks;
   request_encoder_->getStream().addCallbacks(request_callbacks);
 
@@ -227,6 +243,23 @@ TEST_P(Http2CodecImplTest, InvalidContinueWithFin) {
 }
 
 TEST_P(Http2CodecImplTest, InvalidRepeatContinue) {
+  initialize();
+
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  request_encoder_->encodeHeaders(request_headers, true);
+
+  TestHeaderMapImpl continue_headers{{":status", "100"}};
+  EXPECT_CALL(response_decoder_, decode100ContinueHeaders_(_));
+  response_encoder_->encode100ContinueHeaders(continue_headers);
+
+  EXPECT_THROW(response_encoder_->encodeHeaders(continue_headers, true), CodecProtocolException);
+  EXPECT_EQ(1, stats_store_.counter("http2.rx_messaging_error").value());
+};
+
+TEST_P(Http2CodecImplTest, InvalidRepeatContinueAllowed) {
+  stream_error_on_invalid_http_messaging_ = true;
   initialize();
 
   MockStreamCallbacks request_callbacks;
@@ -280,6 +313,28 @@ TEST_P(Http2CodecImplTest, Invalid103) {
 TEST_P(Http2CodecImplTest, Invalid204WithContentLength) {
   initialize();
 
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  request_encoder_->encodeHeaders(request_headers, true);
+
+  TestHeaderMapImpl response_headers{{":status", "204"}, {"content-length", "3"}};
+  // What follows is a hack to get headers that should span into continuation frames. The default
+  // maximum frame size is 16K. We will add 3,000 headers that will take us above this size and
+  // not easily compress with HPACK. (I confirmed this generates 26,468 bytes of header data
+  // which should contain a continuation.)
+  for (uint i = 1; i < 3000; i++) {
+    response_headers.addCopy(std::to_string(i), std::to_string(i));
+  }
+
+  EXPECT_THROW(response_encoder_->encodeHeaders(response_headers, false), CodecProtocolException);
+  EXPECT_EQ(1, stats_store_.counter("http2.rx_messaging_error").value());
+};
+
+TEST_P(Http2CodecImplTest, Invalid204WithContentLengthAllowed) {
+  stream_error_on_invalid_http_messaging_ = true;
+  initialize();
+
   MockStreamCallbacks request_callbacks;
   request_encoder_->getStream().addCallbacks(request_callbacks);
 
@@ -329,7 +384,15 @@ TEST_P(Http2CodecImplTest, RefusedStreamReset) {
   response_encoder_->getStream().resetStream(StreamResetReason::LocalRefusedStreamReset);
 }
 
-TEST_P(Http2CodecImplTest, InvalidFrame) {
+TEST_P(Http2CodecImplTest, InvalidHeadersFrame) {
+  initialize();
+
+  EXPECT_THROW(request_encoder_->encodeHeaders(TestHeaderMapImpl{}, true), CodecProtocolException);
+  EXPECT_EQ(1, stats_store_.counter("http2.rx_messaging_error").value());
+}
+
+TEST_P(Http2CodecImplTest, InvalidHeadersFrameAllowed) {
+  stream_error_on_invalid_http_messaging_ = true;
   initialize();
 
   MockStreamCallbacks request_callbacks;

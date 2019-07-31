@@ -82,6 +82,8 @@ public:
       : stats_{ALL_HTTP2_CODEC_STATS(POOL_COUNTER_PREFIX(stats, "http2."))},
         connection_(connection), max_request_headers_kb_(max_request_headers_kb),
         per_stream_buffer_limit_(http2_settings.initial_stream_window_size_),
+        stream_error_on_invalid_http_messaging_(
+            http2_settings.stream_error_on_invalid_http_messaging_),
         flood_detected_(false), max_outbound_frames_(http2_settings.max_outbound_frames_),
         frame_buffer_releasor_([this](const Buffer::OwnedBufferFragmentImpl* fragment) {
           releaseOutboundFrame(fragment);
@@ -308,6 +310,7 @@ protected:
   const uint32_t max_request_headers_kb_;
   uint32_t per_stream_buffer_limit_;
   bool allow_metadata_;
+  const bool stream_error_on_invalid_http_messaging_;
   bool flood_detected_;
 
   // Set if the type of frame that is about to be sent is PING or SETTINGS with the ACK flag set, or

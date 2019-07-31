@@ -592,6 +592,36 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLength) {
                                                           {"content-length", "-1"}});
   auto response = std::move(encoder_decoder.second);
 
+  codec_client_->waitForDisconnect();
+
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("400", response->headers().Status()->value().getStringView());
+  } else {
+    ASSERT_TRUE(response->reset());
+    EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->reset_reason());
+  }
+}
+
+// TODO(PiotrSikora): move this HTTP/2 only variant to http2_integration_test.cc.
+TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLengthAllowed) {
+  config_helper_.addConfigModifier(
+      [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void {
+        hcm.mutable_http2_protocol_options()->set_stream_error_on_invalid_http_messaging(true);
+      });
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                          {":path", "/test/long/url"},
+                                                          {":authority", "host"},
+                                                          {"content-length", "-1"}});
+  auto response = std::move(encoder_decoder.second);
+
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     codec_client_->waitForDisconnect();
   } else {
@@ -609,6 +639,34 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLength) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengths) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                          {":path", "/test/long/url"},
+                                                          {":authority", "host"},
+                                                          {"content-length", "3,2"}});
+  auto response = std::move(encoder_decoder.second);
+
+  codec_client_->waitForDisconnect();
+
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("400", response->headers().Status()->value().getStringView());
+  } else {
+    ASSERT_TRUE(response->reset());
+    EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->reset_reason());
+  }
+}
+
+// TODO(PiotrSikora): move this HTTP/2 only variant to http2_integration_test.cc.
+TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengthsAllowed) {
+  config_helper_.addConfigModifier(
+      [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void {
+        hcm.mutable_http2_protocol_options()->set_stream_error_on_invalid_http_messaging(true);
+      });
+
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto encoder_decoder =

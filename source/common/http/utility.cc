@@ -266,6 +266,7 @@ Utility::parseHttp2Settings(const envoy::api::v2::core::Http2ProtocolOptions& co
       Http::Http2Settings::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT);
   ret.allow_connect_ = config.allow_connect();
   ret.allow_metadata_ = config.allow_metadata();
+  ret.stream_error_on_invalid_http_messaging_ = config.stream_error_on_invalid_http_messaging();
   return ret;
 }
 

@@ -49,7 +49,7 @@ message Http1ProtocolOptions {
   string default_host_for_http_10 = 3;
 }
 
-// [#comment:next free field: 12]
+// [#comment:next free field: 13]
 message Http2ProtocolOptions {
   // `Maximum table size <https://httpwg.org/specs/rfc7541.html#rfc.section.4.2>`_
   // (in octets) that the encoder is permitted to use for the dynamic HPACK table. Valid values
@@ -142,6 +142,13 @@ message Http2ProtocolOptions {
   // [#comment:TODO: implement same limits for upstream inbound frames as well.]
   google.protobuf.UInt32Value max_inbound_window_update_frames_per_data_frame_sent = 11
       [(validate.rules).uint32 = {gte: 1}];
+
+  // Allows invalid HTTP messaging and headers. When this option is disabled (default), then
+  // the whole HTTP/2 connection is terminated upon receiving invalid HEADERS frame. However,
+  // when this option is enabled, only the offending stream is terminated.
+  //
+  // See [RFC7540, sec. 8.1](https://tools.ietf.org/html/rfc7540#section-8.1) for details.
+  bool stream_error_on_invalid_http_messaging = 12;
 }
 
 // [#not-implemented-hide:]
