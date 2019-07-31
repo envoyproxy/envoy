@@ -34,7 +34,7 @@ TEST_F(HttpSubscriptionImplTest, BadJsonRecovery) {
   EXPECT_CALL(random_gen_, random()).WillOnce(Return(0));
   EXPECT_CALL(*timer_, enableTimer(_));
   EXPECT_CALL(callbacks_,
-              onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, _));
+              onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, _));
   http_callbacks_->onSuccess(std::move(message));
   EXPECT_TRUE(statsAre(1, 0, 0, 1, 0));
   request_in_progress_ = false;
