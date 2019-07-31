@@ -1139,7 +1139,7 @@ message RateLimit {
     //
     // .. code-block:: cpp
     //
-    //   ("<descriptor_key>", "<header_value_queried_from_header>")
+    //   ("request_headers", "<header_value_queried_from_header>")
     message RequestHeaders {
       // The header name to be queried from the request headers. The header’s
       // value is used to populate the value of the descriptor entry for the
