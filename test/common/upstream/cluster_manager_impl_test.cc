@@ -3526,7 +3526,9 @@ TEST_F(ClusterManagerImplTest, ConnPoolsNotDrainedOnHostSetChange) {
       0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr, {},
       hosts_removed, 100);
 
-  EXPECT_EQ(0, factory_.stats_.counter("upstream_connections_closed_on_host_set_change").value());
+  EXPECT_EQ(
+      0, factory_.stats_.counter("cluster_manager.upstream_connections_closed_on_host_set_change")
+             .value());
 }
 
 } // namespace
