@@ -1533,6 +1533,7 @@ void ConnectionManagerImpl::ActiveStream::encodeData(
 
     recordLatestDataFilter(entry, state_.latest_data_encoding_filter_, encoder_filters_);
 
+    (*entry)->inline_buffered_data_ = false;
     (*entry)->end_stream_ = end_stream && !response_trailers_;
     FilterDataStatus status = (*entry)->handle_->encodeData(data, (*entry)->end_stream_);
     if ((*entry)->end_stream_) {
@@ -1741,6 +1742,8 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {
                      static_cast<const void*>(this));
     return;
   }
+
+  ASSERT(!canIterate() || inline_buffered_data_);
 
   ENVOY_STREAM_LOG(trace, "continuing filter chain: filter={}", parent_,
                    static_cast<const void*>(this));
