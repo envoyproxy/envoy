@@ -354,7 +354,7 @@ TEST_F(ConfigProviderImplTest, DuplicateConfigProto) {
       config_source_proto, factory_context_, "dummy_prefix",
       ConfigProviderManager::NullOptionalArg());
   auto* typed_provider = static_cast<DummyDynamicConfigProvider*>(provider.get());
-  auto subscription = static_cast<DummyConfigSubscription&>(typed_provider->subscription());
+  auto& subscription = static_cast<DummyConfigSubscription&>(typed_provider->subscription());
   EXPECT_EQ(subscription.getConfig(), nullptr);
   // First time issuing a configUpdate(). A new ConfigProvider::Config should be created.
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> untyped_dummy_configs;

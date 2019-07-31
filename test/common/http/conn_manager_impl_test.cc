@@ -4396,7 +4396,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSRDSRouteNotFound) {
 
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
-  EXPECT_EQ(response_body, "route config not found for SRDS");
+  EXPECT_EQ(response_body, "route scope not found");
 }
 
 TEST_F(HttpConnectionManagerImplTest, TestSRDSUpdate) {
@@ -4428,7 +4428,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSRDSUpdate) {
 
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
-  EXPECT_EQ(response_body, "route config not found for SRDS");
+  EXPECT_EQ(response_body, "route scope not found");
 
   // Now route config provider returns something.
   setupFilterChain(1, 0); // Recreate the chain for second stream.

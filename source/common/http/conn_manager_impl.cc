@@ -471,7 +471,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
 
   stream_info_.setRequestedServerName(
       connection_manager_.read_callbacks_->connection().requestedServerName());
-} // namespace Http
+}
 
 ConnectionManagerImpl::ActiveStream::~ActiveStream() {
   stream_info_.onRequestComplete();
@@ -623,12 +623,14 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
       return;
     }
     snapped_route_config_ = snapped_scoped_routes_config_->getRouteConfig(*request_headers_);
+    // NOTE: if a RDS subscription hasn't got a RouteConfiguration back, a Router::NullConfigImpl is
+    // returned, in that case we let it pass.
     if (snapped_route_config_ == nullptr) {
-      ENVOY_STREAM_LOG(trace, "can't find SRDS RouteConfig.", *this);
+      ENVOY_STREAM_LOG(trace, "can't find SRDS scope.", *this);
       // Stop decoding now.
       maybeEndDecode(true);
       sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Http::Code::NotFound,
-                     "route config not found for SRDS", nullptr, is_head_request_, absl::nullopt,
+                     "route scope not found", nullptr, is_head_request_, absl::nullopt,
                      StreamInfo::ResponseCodeDetails::get().RouteConfigurationNotFound);
       return;
     }

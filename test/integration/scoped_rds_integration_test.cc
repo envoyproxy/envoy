@@ -95,7 +95,6 @@ fragments:
                       const Http::TestHeaderMapImpl& expected_headers,
                       const std::string& expected_body) {
     EXPECT_TRUE(response->complete());
-    Http::PrintTo(response->headers(), &std::cerr);
     EXPECT_EQ(response_code, response->headers().Status()->value().getStringView());
     expected_headers.iterate(
         [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
@@ -222,20 +221,15 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, ScopedRdsIntegrationTest,
 
 // Test that a SRDS DiscoveryResponse is successfully processed.
 TEST_P(ScopedRdsIntegrationTest, BasicSuccess) {
-  const std::string scope_route1 = R"EOF(
-name: foo_scope1
-route_configuration_name: foo_route1
+  const std::string scope_tmpl = R"EOF(
+name: {}
+route_configuration_name: {}
 key:
   fragments:
-    - string_key: foo-route
+    - string_key: {}
 )EOF";
-  const std::string scope_route2 = R"EOF(
-name: foo_scope2
-route_configuration_name: foo_route1
-key:
-  fragments:
-    - string_key: bar-route
-)EOF";
+  const std::string scope_route1 = fmt::format(scope_tmpl, "foo_scope1", "foo_route1", "foo-route");
+  const std::string scope_route2 = fmt::format(scope_tmpl, "foo_scope2", "foo_route1", "bar-route");
 
   const std::string route_config_tmpl = R"EOF(
       name: {}
@@ -251,6 +245,7 @@ key:
     createScopedRdsStream();
     sendScopedRdsResponse({scope_route1, scope_route2}, "1");
     createRdsStream("foo_route1");
+    // CreateRdsStream waits for connection which is fired by RDS subscription.
     sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1", "cluster_0"), "1");
   };
   initialize();
@@ -265,11 +260,11 @@ key:
                               {":scheme", "http"},
                               {"Addr", "x-foo-key=xyz-route"}});
   response->waitForEndStream();
-  verifyResponse(std::move(response), "404", Http::TestHeaderMapImpl{},
-                 "route config not found for SRDS");
+  verifyResponse(std::move(response), "404", Http::TestHeaderMapImpl{}, "route scope not found");
   cleanupUpstreamAndDownstream();
 
   // Test "foo-route" and 'bar-route' both gets routed to cluster_0.
+  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
   for (const std::string& scope_key : std::vector<std::string>{"foo-route", "bar-route"}) {
     sendRequestAndVerifyResponse(
         Http::TestHeaderMapImpl{{":method", "GET"},
@@ -287,19 +282,16 @@ key:
                                13237225503670494420UL);
 
   // Add a new scope scope_route3 with a brand new RouteConfiguration foo_route2.
-  const std::string scope_route3 = R"EOF(
-name: foo_scope3
-route_configuration_name: foo_route2
-key:
-  fragments:
-    - string_key: baz-route
-)EOF";
+  const std::string scope_route3 = fmt::format(scope_tmpl, "foo_scope3", "foo_route2", "baz-route");
+
   sendScopedRdsResponse({scope_route3, scope_route1, scope_route2}, "2");
   test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_attempt", 2);
   sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1", "cluster_1"), "3");
   createRdsStream("foo_route2");
   test_server_->waitForCounterGe("http.config_test.rds.foo_route2.update_attempt", 1);
   sendRdsResponse(fmt::format(route_config_tmpl, "foo_route2", "cluster_0"), "1");
+  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 2);
+  test_server_->waitForCounterGe("http.config_test.rds.foo_route2.update_success", 1);
   test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_success", 2);
   // The version gauge should be set to xxHash64("2").
   test_server_->waitForGaugeEq("http.config_test.scoped_rds.foo-scoped-routes.version",
@@ -325,7 +317,7 @@ key:
                               {"Addr", fmt::format("x-foo-key={}", "baz-route")}},
       456, Http::TestHeaderMapImpl{{":status", "200"}, {"service", "bluh"}}, 123, /*cluster_0*/ 0);
 
-  // Delete foo_scope1 and requests within the scope gets 400s
+  // Delete foo_scope1 and requests within the scope gets 400s.
   sendScopedRdsResponse({scope_route3, scope_route2}, "3");
   test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_success", 3);
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -336,8 +328,39 @@ key:
                               {":scheme", "http"},
                               {"Addr", "x-foo-key=foo-route"}});
   response->waitForEndStream();
-  verifyResponse(std::move(response), "404", Http::TestHeaderMapImpl{},
-                 "route config not found for SRDS");
+  verifyResponse(std::move(response), "404", Http::TestHeaderMapImpl{}, "route scope not found");
+  cleanupUpstreamAndDownstream();
+  // Add a new scope foo_scope4.
+  const std::string& scope_route4 =
+      fmt::format(scope_tmpl, "foo_scope4", "foo_route4", "xyz-route");
+  sendScopedRdsResponse({scope_route3, scope_route2, scope_route4}, "4");
+  test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_success", 4);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestHeaderMapImpl{{":method", "GET"},
+                              {":path", "/meh"},
+                              {":authority", "host"},
+                              {":scheme", "http"},
+                              {"Addr", "x-foo-key=xyz-route"}});
+  response->waitForEndStream();
+  // Get 404 because RDS hasn't pushed route configuration "foo_route4" yet.
+  // But scope is found and the Router::NullConfigImpl is returned.
+  verifyResponse(std::move(response), "404", Http::TestHeaderMapImpl{}, "");
+  cleanupUpstreamAndDownstream();
+
+  // RDS updated foo_route4, requests with socpe key "xyz-route" now hit cluster_1.
+  test_server_->waitForCounterGe("http.config_test.rds.foo_route4.update_attempt", 1);
+  createRdsStream("foo_route4");
+  sendRdsResponse(fmt::format(route_config_tmpl, "foo_route4", "cluster_1"), "3");
+  test_server_->waitForCounterGe("http.config_test.rds.foo_route4.update_success", 1);
+  sendRequestAndVerifyResponse(
+      Http::TestHeaderMapImpl{{":method", "GET"},
+                              {":path", "/meh"},
+                              {":authority", "host"},
+                              {":scheme", "http"},
+                              {"Addr", "x-foo-key=xyz-route"}},
+      456, Http::TestHeaderMapImpl{{":status", "200"}, {"service", "xyz-route"}}, 123,
+      /*cluster_1 */ 1);
 }
 
 // Test that a bad config update updates the corresponding stats.
@@ -364,10 +387,9 @@ key:
                                                                    {":path", "/meh"},
                                                                    {":authority", "host"},
                                                                    {":scheme", "http"},
-                                                                   {"Addr", "foo"}});
+                                                                   {"Addr", "x-foo-key=foo"}});
   response->waitForEndStream();
-  verifyResponse(std::move(response), "404", Http::TestHeaderMapImpl{},
-                 "route config not found for SRDS");
+  verifyResponse(std::move(response), "404", Http::TestHeaderMapImpl{}, "route scope not found");
   cleanupUpstreamAndDownstream();
 
   // SRDS update fixed the problem.
@@ -397,7 +419,7 @@ key:
                               {":path", "/meh"},
                               {":authority", "host"},
                               {":scheme", "http"},
-                              {"Addr", fmt::format("x-foo-key={}", "foo")}},
+                              {"Addr", "x-foo-key=foo"}},
       456, Http::TestHeaderMapImpl{{":status", "200"}, {"service", "bluh"}}, 123, /*cluster_0*/ 0);
 }
 
