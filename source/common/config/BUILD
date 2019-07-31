@@ -415,22 +415,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "watch_lib",
-    srcs = ["watch_impl.cc"],
-    hdrs = ["watch_impl.h"],
-    deps = [
-        "//include/envoy/config:watch_map_interface",
-        "//source/common/protobuf",
-    ],
-)
-
-envoy_cc_library(
     name = "watch_map_lib",
-    srcs = ["watch_map_impl.cc"],
-    hdrs = ["watch_map_impl.h"],
+    srcs = ["watch_map.cc"],
+    hdrs = ["watch_map.h"],
     deps = [
-        ":watch_lib",
-        "//include/envoy/config:watch_map_interface",
+        "//include/envoy/config:subscription_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/protobuf",
