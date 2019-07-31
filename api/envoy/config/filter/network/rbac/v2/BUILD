@@ -5,6 +5,5 @@ licenses(["notice"])  # Apache 2
 api_proto_library_internal(
     name = "rbac",
     srcs = ["rbac.proto"],
-    require_py = False,
     deps = ["//envoy/config/rbac/v2:rbac"],
 )

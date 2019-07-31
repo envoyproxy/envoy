@@ -11,7 +11,9 @@ api_proto_library_internal(
     external_proto_deps = [
         "@com_google_googleapis//google/api/expr/v1alpha1:syntax_proto",
     ],
-    require_py = False,
+    external_py_proto_deps = [
+        "@com_google_googleapis//google/api/expr/v1alpha1:syntax_py_proto",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         "//envoy/api/v2/core:address",
@@ -21,13 +23,14 @@ api_proto_library_internal(
     ],
 )
 
-#api_go_proto_library(
-#    name = "rbac",
-#    proto = ":rbac",
-#    deps = [
-#        "//envoy/api/v2/core:address_go_proto",
-#        "//envoy/api/v2/route:route_go_proto",
-#        "//envoy/type/matcher:metadata_go_proto",
-#        "//envoy/type/matcher:string_go_proto",
-#    ],
-#)
+api_go_proto_library(
+    name = "rbac",
+    proto = ":rbac",
+    deps = [
+        "//envoy/api/v2/core:address_go_proto",
+        "//envoy/api/v2/route:route_go_proto",
+        "//envoy/type/matcher:metadata_go_proto",
+        "//envoy/type/matcher:string_go_proto",
+        "@com_google_googleapis//google/api/expr/v1alpha1:cel_go_proto",
+    ],
+)
