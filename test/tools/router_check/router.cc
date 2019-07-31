@@ -73,9 +73,8 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_file) {
   auto factory_context = std::make_unique<NiceMock<Server::Configuration::MockFactoryContext>>();
   auto config = std::make_unique<Router::ConfigImpl>(route_config, *factory_context, false);
 
-  Coverage coverage_report = Coverage(route_config);
   return RouterCheckTool(std::move(factory_context), std::move(config), std::move(stats),
-                         std::move(api), std::move(coverage_report));
+                         std::move(api), Coverage(route_config));
 }
 
 RouterCheckTool::RouterCheckTool(

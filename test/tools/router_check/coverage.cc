@@ -6,18 +6,16 @@
 
 namespace Envoy {
 void Coverage::markCovered(const Envoy::Router::RouteEntry* route) {
-  const bool seen =
-      std::find(seen_routes_.begin(), seen_routes_.end(), route) != seen_routes_.end();
-  if (!seen) {
+  if (std::find(seen_routes_.begin(), seen_routes_.end(), route) == seen_routes_.end()) {
     seen_routes_.push_back(route);
   }
 }
 
 double Coverage::report() {
-  int size_t = 0;
+  uint64_t num_routes = 0;
   for (const auto& host : route_config_.virtual_hosts()) {
-    size_t += host.routes_size();
+    num_routes += host.routes_size();
   }
-  return 100 * static_cast<double>(seen_routes_.size()) / size_t;
+  return 100 * static_cast<double>(seen_routes_.size()) / num_routes;
 }
 } // namespace Envoy
