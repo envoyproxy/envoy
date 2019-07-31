@@ -50,7 +50,7 @@ ip_tags:
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
   }
 
-  ~IpTaggingFilterTest() { filter_->onDestroy(); }
+  ~IpTaggingFilterTest() override { filter_->onDestroy(); }
 
   IpTaggingFilterConfigSharedPtr config_;
   std::unique_ptr<IpTaggingFilter> filter_;

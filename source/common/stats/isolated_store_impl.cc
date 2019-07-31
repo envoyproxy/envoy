@@ -1,8 +1,7 @@
 #include "common/stats/isolated_store_impl.h"
 
-#include <string.h>
-
 #include <algorithm>
+#include <cstring>
 #include <string>
 
 #include "common/common/utility.h"

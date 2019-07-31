@@ -89,6 +89,7 @@ private:
   Protobuf::util::JsonPrintOptions print_options_;
 
   bool match_incoming_request_route_{false};
+  bool ignore_unknown_query_parameters_{false};
 };
 
 using JsonTranscoderConfigSharedPtr = std::shared_ptr<JsonTranscoderConfig>;

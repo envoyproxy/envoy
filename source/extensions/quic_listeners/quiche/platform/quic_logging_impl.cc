@@ -28,14 +28,20 @@ QuicLogEmitter::~QuicLogEmitter() {
     // TODO(wub): Change to a thread-safe version of strerror.
     stream_ << ": " << strerror(saved_errno_) << " [" << saved_errno_ << "]";
   }
-  GetLogger().log(level_, "{}", stream_.str().c_str());
+  std::string content = stream_.str();
+  if (!content.empty() && content.back() == '\n') {
+    // strip the last trailing '\n' because spd log will add a trailing '\n' to
+    // the output.
+    content.back() = '\0';
+  }
+  GetLogger().log(level_, "{}", content.c_str());
 
   // Normally there is no log sink and we can avoid acquiring the lock.
   if (g_quic_log_sink.load(std::memory_order_relaxed) != nullptr) {
     absl::MutexLock lock(&g_quic_log_sink_mutex);
     QuicLogSink* sink = g_quic_log_sink.load(std::memory_order_relaxed);
     if (sink != nullptr) {
-      sink->Log(level_, stream_.str());
+      sink->Log(level_, content);
     }
   }
 

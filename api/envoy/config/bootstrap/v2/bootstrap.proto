@@ -37,7 +37,7 @@ message Bootstrap {
   message StaticResources {
     // Static :ref:`Listeners <envoy_api_msg_Listener>`. These listeners are
     // available regardless of LDS configuration.
-    repeated envoy.api.v2.Listener listeners = 1 [(gogoproto.nullable) = false];
+    repeated envoy.api.v2.Listener listeners = 1;
 
     // If a network based configuration source is specified for :ref:`cds_config
     // <envoy_api_field_config.bootstrap.v2.Bootstrap.DynamicResources.cds_config>`, it's necessary
@@ -45,11 +45,11 @@ message Bootstrap {
     // how to speak to the management server. These cluster definitions may not
     // use :ref:`EDS <arch_overview_dynamic_config_eds>` (i.e. they should be static
     // IP or DNS-based).
-    repeated envoy.api.v2.Cluster clusters = 2 [(gogoproto.nullable) = false];
+    repeated envoy.api.v2.Cluster clusters = 2;
 
     // These static secrets can be used by :ref:`SdsSecretConfig
     // <envoy_api_msg_auth.SdsSecretConfig>`
-    repeated envoy.api.v2.auth.Secret secrets = 3 [(gogoproto.nullable) = false];
+    repeated envoy.api.v2.auth.Secret secrets = 3;
   }
   // Statically specified resources.
   StaticResources static_resources = 2;
@@ -133,6 +133,17 @@ message Bootstrap {
   // over the wire individually because the statsd protocol doesn't have any way to represent a
   // histogram summary. Be aware that this can be a very large volume of data.
   bool enable_dispatcher_stats = 16;
+
+  // Optional string which will be used in lieu of x-envoy in prefixing headers.
+  //
+  // For example, if this string is present and set to X-Foo, then x-envoy-retry-on will be
+  // transformed into x-foo-retry-on etc.
+  //
+  // Note this applies to the headers Envoy will generate, the headers Envoy will sanitize, and the
+  // headers Envoy will trust for core code and core extensions only. Be VERY careful making
+  // changes to this string, especially in multi-layer Envoy deployments or deployments using
+  // extensions which are not upstream.
+  string header_prefix = 18;
 }
 
 // Administration interface :ref:`operations documentation
@@ -150,6 +161,10 @@ message Admin {
   // The TCP address that the administration server will listen on.
   // If not specified, Envoy will not start an administration server.
   envoy.api.v2.core.Address address = 3;
+
+  // Additional socket options that may not be present in Envoy source code or
+  // precompiled binaries.
+  repeated envoy.api.v2.core.SocketOption socket_options = 4;
 }
 
 // Cluster manager :ref:`architecture overview <arch_overview_cluster_manager>`.

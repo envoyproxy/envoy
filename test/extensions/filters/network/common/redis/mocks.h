@@ -27,7 +27,7 @@ void PrintTo(const RespValuePtr& value, std::ostream* os);
 class MockEncoder : public Common::Redis::Encoder {
 public:
   MockEncoder();
-  ~MockEncoder();
+  ~MockEncoder() override;
 
   MOCK_METHOD2(encode, void(const Common::Redis::RespValue& value, Buffer::Instance& out));
 
@@ -38,7 +38,7 @@ private:
 class MockDecoder : public Common::Redis::Decoder {
 public:
   MockDecoder();
-  ~MockDecoder();
+  ~MockDecoder() override;
 
   MOCK_METHOD1(decode, void(Buffer::Instance& data));
 };
@@ -48,7 +48,7 @@ namespace Client {
 class MockClient : public Client {
 public:
   MockClient();
-  ~MockClient();
+  ~MockClient() override;
 
   void raiseEvent(Network::ConnectionEvent event) {
     for (Network::ConnectionCallbacks* callbacks : callbacks_) {
@@ -69,6 +69,7 @@ public:
   }
 
   MOCK_METHOD1(addConnectionCallbacks, void(Network::ConnectionCallbacks& callbacks));
+  MOCK_METHOD0(active, bool());
   MOCK_METHOD0(close, void());
   MOCK_METHOD2(makeRequest,
                PoolRequest*(const Common::Redis::RespValue& request, PoolCallbacks& callbacks));
@@ -79,7 +80,7 @@ public:
 class MockPoolRequest : public PoolRequest {
 public:
   MockPoolRequest();
-  ~MockPoolRequest();
+  ~MockPoolRequest() override;
 
   MOCK_METHOD0(cancel, void());
 };
@@ -87,7 +88,7 @@ public:
 class MockPoolCallbacks : public PoolCallbacks {
 public:
   MockPoolCallbacks();
-  ~MockPoolCallbacks();
+  ~MockPoolCallbacks() override;
 
   void onResponse(Common::Redis::RespValuePtr&& value) override { onResponse_(value); }
 

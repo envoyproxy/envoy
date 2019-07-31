@@ -40,7 +40,7 @@ public:
     cm_.thread_local_cluster_.cluster_.info_->resetResourceManager(0, 1, 0, 0, 0);
   }
 
-  ~ProxyFilterTest() {
+  ~ProxyFilterTest() override {
     EXPECT_TRUE(
         cm_.thread_local_cluster_.cluster_.info_->resource_manager_->pendingRequests().canCreate());
   }

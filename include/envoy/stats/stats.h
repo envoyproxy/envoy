@@ -10,12 +10,11 @@
 #include "envoy/stats/symbol_table.h"
 
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Stats {
 
-class StatDataAllocator;
+class Allocator;
 struct Tag;
 
 /**
@@ -23,7 +22,7 @@ struct Tag;
  */
 class Metric : public RefcountInterface {
 public:
-  virtual ~Metric() = default;
+  ~Metric() override = default;
   /**
    * Returns the full name of the Metric. This is intended for most uses, such
    * as streaming out the name to a stats sink or admin request, or comparing

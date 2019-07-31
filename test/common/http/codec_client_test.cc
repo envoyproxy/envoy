@@ -58,7 +58,7 @@ public:
                                                    dispatcher_);
   }
 
-  ~CodecClientTest() { EXPECT_EQ(0U, client_->numActiveRequests()); }
+  ~CodecClientTest() override { EXPECT_EQ(0U, client_->numActiveRequests()); }
 
   Event::MockDispatcher dispatcher_;
   Network::MockClientConnection* connection_;

@@ -59,6 +59,11 @@ TEST_F(BufferFilterTest, HeaderOnlyRequest) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers, true));
 }
 
+TEST_F(BufferFilterTest, TestMetadata) {
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.decodeMetadata(metadata_map));
+}
+
 TEST_F(BufferFilterTest, RequestWithData) {
   InSequence s;
 

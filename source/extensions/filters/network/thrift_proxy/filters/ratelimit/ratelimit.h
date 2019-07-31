@@ -9,7 +9,10 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
+#include "common/stats/symbol_table_impl.h"
+
 #include "extensions/filters/common/ratelimit/ratelimit.h"
+#include "extensions/filters/common/ratelimit/stat_names.h"
 #include "extensions/filters/network/thrift_proxy/filters/filter.h"
 
 namespace Envoy {
@@ -28,7 +31,8 @@ public:
          const LocalInfo::LocalInfo& local_info, Stats::Scope& scope, Runtime::Loader& runtime,
          Upstream::ClusterManager& cm)
       : domain_(config.domain()), stage_(config.stage()), local_info_(local_info), scope_(scope),
-        runtime_(runtime), cm_(cm), failure_mode_deny_(config.failure_mode_deny()) {}
+        runtime_(runtime), cm_(cm), failure_mode_deny_(config.failure_mode_deny()),
+        stat_names_(scope_.symbolTable()) {}
 
   const std::string& domain() const { return domain_; }
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
@@ -36,8 +40,8 @@ public:
   Stats::Scope& scope() { return scope_; }
   Runtime::Loader& runtime() { return runtime_; }
   Upstream::ClusterManager& cm() { return cm_; }
-
   bool failureModeAllow() const { return !failure_mode_deny_; };
+  Filters::Common::RateLimit::StatNames& statNames() { return stat_names_; }
 
 private:
   const std::string domain_;
@@ -47,6 +51,7 @@ private:
   Runtime::Loader& runtime_;
   Upstream::ClusterManager& cm_;
   const bool failure_mode_deny_;
+  Filters::Common::RateLimit::StatNames stat_names_;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;

@@ -135,9 +135,8 @@ class RawHttpClientImpl : public Client,
                           public Http::AsyncClient::Callbacks,
                           Logger::Loggable<Logger::Id::config> {
 public:
-  explicit RawHttpClientImpl(Upstream::ClusterManager& cm, ClientConfigSharedPtr config,
-                             TimeSource& time_source);
-  ~RawHttpClientImpl();
+  explicit RawHttpClientImpl(Upstream::ClusterManager& cm, ClientConfigSharedPtr config, TimeSource& time_source);
+  ~RawHttpClientImpl() override;
 
   // ExtAuthz::Client
   void cancel() override;

@@ -1,7 +1,6 @@
 #include "common/stats/tag_extractor_impl.h"
 
-#include <string.h>
-
+#include <cstring>
 #include <string>
 
 #include "envoy/common/exception.h"

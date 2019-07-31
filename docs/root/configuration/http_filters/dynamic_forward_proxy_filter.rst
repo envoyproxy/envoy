@@ -25,14 +25,12 @@ HTTP dynamic forward proxy.
   <envoy_api_field_core.Http1ProtocolOptions.allow_absolute_url>` parameter has been set to true
   to allow Envoy to proxy absolute HTTP URLs.
 
-.. attention::
+.. note::
 
-  While configuring a :ref:`tls_context <envoy_api_field_Cluster.tls_Context>` on the cluster with
+  Configuring a :ref:`tls_context <envoy_api_field_Cluster.tls_Context>` on the cluster with
   *trusted_ca* certificates instructs Envoy to use TLS when connecting to upstream hosts and verify
-  the certificate chain, currently it is not possible to configure per-host TLS configuration
-  parameters including SNI, subject alt name verification, etc. This will be added in a future
-  change. **This means that the following configuration will not fully validate TLS certificates**.
-  Use with care until full support for per-host validation is implemented.
+  the certificate chain. Additionally, Envoy will automatically perform SAN verification for the
+  resolved host name as well as specify the host name via SNI.
 
 .. code-block:: yaml
 
