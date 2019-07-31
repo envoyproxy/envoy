@@ -116,13 +116,9 @@ absl::optional<CelValue> ConnectionWrapper::operator[](CelValue key) const {
         upstream_host->address()->ip() != nullptr) {
       return CelValue::CreateInt64(upstream_host->address()->ip()->port());
     }
-  }
-
-  auto downstream_ssl = info_.downstreamSslConnection();
-  if (downstream_ssl != nullptr) {
-    if (value == MTLS) {
-      return CelValue::CreateBool(downstream_ssl->peerCertificatePresented());
-    }
+  } else if (value == MTLS) {
+    return CelValue::CreateBool(info_.downstreamSslConnection() != nullptr &&
+                                info_.downstreamSslConnection()->peerCertificatePresented());
   }
 
   return {};

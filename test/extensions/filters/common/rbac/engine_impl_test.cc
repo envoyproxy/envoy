@@ -27,8 +27,7 @@ void checkEngine(const RBAC::RoleBasedAccessControlEngineImpl& engine, bool expe
                  const envoy::api::v2::core::Metadata& metadata = envoy::api::v2::core::Metadata(),
                  std::string* policy_id = nullptr) {
   NiceMock<StreamInfo::MockStreamInfo> info;
-  EXPECT_CALL(info, dynamicMetadata())
-      .WillRepeatedly(ReturnRef(const_cast<envoy::api::v2::core::Metadata&>(metadata)));
+  EXPECT_CALL(Const(info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
   EXPECT_EQ(expected, engine.allowed(connection, headers, info, policy_id));
 }
 
