@@ -45,7 +45,7 @@ bool RoleBasedAccessControlEngineImpl::allowed(const Network::Connection& connec
     auto result = eval_status.value();
 
     // condition is effectively OR-ed with policy matchers
-    // non-bool is effectivey "false"
+    // non-bool is effectively "false"
     matched = result.IsBool() ? result.BoolOrDie() : false;
   }
 
