@@ -76,6 +76,7 @@ public:
 
   void startHttpListener(const std::string& access_log_path, const std::string& address_out_path,
                          Network::Address::InstanceConstSharedPtr address,
+                         const Network::Socket::OptionsSharedPtr& socket_options,
                          Stats::ScopePtr&& listener_scope) override;
 
   // Network::FilterChainManager
@@ -104,8 +105,7 @@ public:
   const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
   Http::ServerConnectionPtr createCodec(Network::Connection& connection,
                                         const Buffer::Instance& data,
-                                        Http::ServerConnectionCallbacks& callbacks,
-                                        const bool strict_header_validation) override;
+                                        Http::ServerConnectionCallbacks& callbacks) override;
   Http::DateProvider& dateProvider() override { return date_provider_; }
   std::chrono::milliseconds drainTimeout() override { return std::chrono::milliseconds(100); }
   Http::FilterChainFactory& filterFactory() override { return *this; }
@@ -143,6 +143,7 @@ public:
   bool proxy100Continue() const override { return false; }
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   bool shouldNormalizePath() const override { return true; }
+  bool shouldMergeSlashes() const override { return true; }
   Http::Code request(absl::string_view path_and_query, absl::string_view method,
                      Http::HeaderMap& response_headers, std::string& body) override;
   void closeSocket();
@@ -327,7 +328,9 @@ private:
 
   class AdminFilterChain : public Network::FilterChain {
   public:
-    AdminFilterChain() {}
+    // We can't use the default constructor because transport_socket_factory_ doesn't have a
+    // default constructor.
+    AdminFilterChain() {} // NOLINT(modernize-use-equals-default)
 
     // Network::FilterChain
     const Network::TransportSocketFactory& transportSocketFactory() const override {

@@ -1,6 +1,8 @@
 #include <sstream>
 #include <vector>
 
+#include "common/common/macros.h"
+
 #include "extensions/filters/network/redis_proxy/command_splitter_impl.h"
 
 #include "test/integration/integration.h"
@@ -14,7 +16,8 @@ namespace {
 // in the cluster. The load balancing policy must be set
 // to random for proper test operation.
 
-const std::string CONFIG = R"EOF(
+const std::string& testConfig() {
+  CONSTRUCT_ON_FIRST_USE(std::string, R"EOF(
 admin:
   access_log_path: /dev/null
   address:
@@ -50,15 +53,18 @@ static_resources:
           value:
             cluster_refresh_rate: 1s
             cluster_refresh_timeout: 4s
-)EOF";
+)EOF");
+}
 
 // This is the basic redis_proxy configuration with an upstream
 // authentication password specified.
 
-const std::string CONFIG_WITH_AUTH = CONFIG + R"EOF(
+const std::string& testConfigWithAuth() {
+  CONSTRUCT_ON_FIRST_USE(std::string, testConfig() + R"EOF(
       extension_protocol_options:
         envoy.redis_proxy: { auth_password: { inline_string: somepassword }}
-)EOF";
+)EOF");
+}
 
 // This function encodes commands as an array of bulkstrings as transmitted by Redis clients to
 // Redis servers, according to the Redis protocol.
@@ -77,7 +83,7 @@ std::string makeBulkStringArray(std::vector<std::string>&& command_strings) {
 class RedisClusterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                     public BaseIntegrationTest {
 public:
-  RedisClusterIntegrationTest(const std::string& config = CONFIG, int num_upstreams = 2)
+  RedisClusterIntegrationTest(const std::string& config = testConfig(), int num_upstreams = 2)
       : BaseIntegrationTest(GetParam(), config), num_upstreams_(num_upstreams),
         version_(GetParam()) {}
 
@@ -265,7 +271,7 @@ protected:
 
 class RedisClusterWithAuthIntegrationTest : public RedisClusterIntegrationTest {
 public:
-  RedisClusterWithAuthIntegrationTest(const std::string& config = CONFIG_WITH_AUTH,
+  RedisClusterWithAuthIntegrationTest(const std::string& config = testConfigWithAuth(),
                                       int num_upstreams = 2)
       : RedisClusterIntegrationTest(config, num_upstreams) {}
 };

@@ -5,7 +5,7 @@
      srcs = ["collector.proto"],
      deps = [
 -        "@lightstep_vendored_googleapis//:googleapis_proto",
-+        "@googleapis//:http_api_protos_proto",
++        "@com_google_googleapis//google/api:annotations_proto",
          "@com_google_protobuf//:timestamp_proto",
      ],
      visibility = ["//visibility:public"],

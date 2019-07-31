@@ -245,6 +245,7 @@ SIGSEGV
 SIGTERM
 SimpleAtoi
 SNI
+SPD
 SPDY
 SPIFFE
 SPKI
@@ -299,6 +300,7 @@ XDS
 decRefCount
 getaddrinfo
 sendto
+ssize
 upcasts
 vip
 xDSes

@@ -226,7 +226,7 @@ public:
   ListenerImpl(const envoy::api::v2::Listener& config, const std::string& version_info,
                ListenerManagerImpl& parent, const std::string& name, bool modifiable,
                bool workers_started, uint64_t hash);
-  ~ListenerImpl();
+  ~ListenerImpl() override;
 
   /**
    * Helper functions to determine whether a listener is blocked for update or remove.
@@ -298,20 +298,15 @@ public:
   const envoy::api::v2::core::Metadata& listenerMetadata() const override {
     return config_.metadata();
   };
+  envoy::api::v2::core::TrafficDirection direction() const override {
+    return config_.traffic_direction();
+  };
   TimeSource& timeSource() override { return api().timeSource(); }
   void ensureSocketOptions() {
     if (!listen_socket_options_) {
       listen_socket_options_ =
           std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
     }
-  }
-  void addListenSocketOption(const Network::Socket::OptionConstSharedPtr& option) override {
-    ensureSocketOptions();
-    listen_socket_options_->emplace_back(std::move(option));
-  }
-  void addListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) override {
-    ensureSocketOptions();
-    Network::Socket::appendOptions(listen_socket_options_, options);
   }
   const Network::ListenerConfig& listenerConfig() const override { return *this; }
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
@@ -336,6 +331,15 @@ public:
   SystemTime last_updated_;
 
 private:
+  void addListenSocketOption(const Network::Socket::OptionConstSharedPtr& option) {
+    ensureSocketOptions();
+    listen_socket_options_->emplace_back(std::move(option));
+  }
+  void addListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) {
+    ensureSocketOptions();
+    Network::Socket::appendOptions(listen_socket_options_, options);
+  }
+
   ListenerManagerImpl& parent_;
   Network::Address::InstanceConstSharedPtr address_;
   FilterChainManagerImpl filter_chain_manager_;

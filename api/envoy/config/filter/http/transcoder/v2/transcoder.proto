@@ -114,4 +114,10 @@ message GrpcJsonTranscoder {
   // The client could ``post`` a json body ``{"shelf": 1234}`` with the path of
   // ``/bookstore.Bookstore/GetShelfRequest`` to call ``GetShelfRequest``.
   bool auto_mapping = 7;
+
+  // Whether to ignore query parameters that cannot be mapped to a corresponding
+  // protobuf field. Use this if you cannot control the query parameters and do
+  // not know them beforehand. Otherwise use ``ignored_query_parameters``.
+  // Defaults to false.
+  bool ignore_unknown_query_parameters = 8;
 }

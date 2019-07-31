@@ -115,7 +115,7 @@ public:
  */
 class DecoderFilterCallbacks : public virtual FilterCallbacksBase {
 public:
-  virtual ~DecoderFilterCallbacks() = default;
+  ~DecoderFilterCallbacks() override = default;
 
   /**
    * Continue iterating through the filter chain with buffered data. This routine can only be
@@ -158,7 +158,7 @@ public:
  */
 class EncoderFilterCallbacks : public virtual FilterCallbacksBase {
 public:
-  virtual ~EncoderFilterCallbacks() = default;
+  ~EncoderFilterCallbacks() override = default;
 
   /**
    * Continue iterating through the filter chain with buffered data. This routine can only be
@@ -175,7 +175,7 @@ public:
  */
 class FilterBase {
 public:
-  virtual ~FilterBase() {}
+  virtual ~FilterBase() = default;
 
   /**
    * This routine is called prior to a filter being destroyed. This may happen after normal stream
@@ -194,7 +194,7 @@ public:
  */
 class DecoderFilter : public StreamDecoder, public FilterBase {
 public:
-  virtual ~DecoderFilter() = default;
+  ~DecoderFilter() override = default;
 
   /**
    * Called by the connection manager once to initialize the filter decoder callbacks that the
@@ -210,7 +210,7 @@ using DecoderFilterSharedPtr = std::shared_ptr<DecoderFilter>;
  */
 class EncoderFilter : public StreamEncoder, public FilterBase {
 public:
-  virtual ~EncoderFilter() = default;
+  ~EncoderFilter() override = default;
 
   /**
    * Called by the connection manager once to initialize the filter encoder callbacks that the

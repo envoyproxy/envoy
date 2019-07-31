@@ -51,7 +51,7 @@ public:
 class TsiHandshaker final : public Event::DeferredDeletable {
 public:
   explicit TsiHandshaker(CHandshakerPtr&& handshaker, Event::Dispatcher& dispatcher);
-  ~TsiHandshaker();
+  ~TsiHandshaker() override;
 
   /**
    * Conduct next step of handshake, see

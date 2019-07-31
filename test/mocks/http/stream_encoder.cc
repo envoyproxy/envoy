@@ -7,7 +7,7 @@ MockStreamEncoder::MockStreamEncoder() {
   ON_CALL(*this, getStream()).WillByDefault(ReturnRef(stream_));
 }
 
-MockStreamEncoder::~MockStreamEncoder() {}
+MockStreamEncoder::~MockStreamEncoder() = default;
 
 } // namespace Http
 } // namespace Envoy

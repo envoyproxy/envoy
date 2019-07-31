@@ -8,7 +8,6 @@ load(
     "envoy_external_dep_path",
     "envoy_linkstatic",
     "envoy_select_force_libcpp",
-    "envoy_static_link_libstdcpp_linkopts",
     "tcmalloc_external_dep",
 )
 
@@ -144,8 +143,8 @@ def envoy_cc_test(
         repository = repository,
         tags = test_lib_tags,
         copts = copts,
-        # Restrict only to the code coverage tools.
-        visibility = ["@envoy//test/coverage:__pkg__"],
+        # Allow public visibility so these can be consumed in coverage tests in external projects.
+        visibility = ["//visibility:public"],
     )
     native.cc_test(
         name = name,
@@ -205,7 +204,7 @@ def envoy_cc_test_binary(
     envoy_cc_binary(
         name,
         testonly = 1,
-        linkopts = _envoy_test_linkopts() + envoy_static_link_libstdcpp_linkopts(),
+        linkopts = _envoy_test_linkopts(),
         **kargs
     )
 

@@ -13,6 +13,7 @@
 #include "envoy/network/io_handle.h"
 
 #include "absl/numeric/int128.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Network {
@@ -116,6 +117,11 @@ public:
    * For pipe addresses: "/foo"
    */
   virtual const std::string& asString() const PURE;
+
+  /**
+   * @return Similar to asString but returns a string view.
+   */
+  virtual absl::string_view asStringView() const PURE;
 
   /**
    * @return a human readable string for the address that represents the
