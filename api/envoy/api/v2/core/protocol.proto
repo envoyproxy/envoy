@@ -49,6 +49,7 @@ message Http1ProtocolOptions {
   string default_host_for_http_10 = 3;
 }
 
+// [#comment:next free field: 12]
 message Http2ProtocolOptions {
   // `Maximum table size <https://httpwg.org/specs/rfc7541.html#rfc.section.4.2>`_
   // (in octets) that the encoder is permitted to use for the dynamic HPACK table. Valid values
@@ -94,18 +95,53 @@ message Http2ProtocolOptions {
 
   // Limit the number of pending outbound downstream frames of all types (frames that are waiting to
   // be written into the socket). Exceeding this limit triggers flood mitigation and connection is
-  // terminated. The "http2.outbound_flood" stat tracks the number of terminated connections due to
-  // flood mitigation. The default limit is 10000.
+  // terminated. The ``http2.outbound_flood`` stat tracks the number of terminated connections due
+  // to flood mitigation. The default limit is 10000.
   // [#comment:TODO: implement same limits for upstream outbound frames as well.]
   google.protobuf.UInt32Value max_outbound_frames = 7 [(validate.rules).uint32 = {gte: 1}];
 
   // Limit the number of pending outbound downstream frames of types PING, SETTINGS and RST_STREAM,
   // preventing high memory utilization when receiving continuous stream of these frames. Exceeding
   // this limit triggers flood mitigation and connection is terminated. The
-  // "http2.outbound_control_flood" stat tracks the number of terminated connections due to flood
+  // ``http2.outbound_control_flood`` stat tracks the number of terminated connections due to flood
   // mitigation. The default limit is 1000.
   // [#comment:TODO: implement same limits for upstream outbound frames as well.]
   google.protobuf.UInt32Value max_outbound_control_frames = 8 [(validate.rules).uint32 = {gte: 1}];
+
+  // Limit the number of consecutive inbound frames of types HEADERS, CONTINUATION and DATA with an
+  // empty payload and no end stream flag. Those frames have no legitimate use and are abusive, but
+  // might be a result of a broken HTTP/2 implementation. The `http2.inbound_empty_frames_flood``
+  // stat tracks the number of connections terminated due to flood mitigation.
+  // Setting this to 0 will terminate connection upon receiving first frame with an empty payload
+  // and no end stream flag. The default limit is 1.
+  // [#comment:TODO: implement same limits for upstream inbound frames as well.]
+  google.protobuf.UInt32Value max_consecutive_inbound_frames_with_empty_payload = 9;
+
+  // Limit the number of inbound PRIORITY frames allowed per each opened stream. If the number
+  // of PRIORITY frames received over the lifetime of connection exceeds the value calculated
+  // using this formula::
+  //
+  //     max_inbound_priority_frames_per_stream * (1 + inbound_streams)
+  //
+  // the connection is terminated. The ``http2.inbound_priority_frames_flood`` stat tracks
+  // the number of connections terminated due to flood mitigation. The default limit is 100.
+  // [#comment:TODO: implement same limits for upstream inbound frames as well.]
+  google.protobuf.UInt32Value max_inbound_priority_frames_per_stream = 10;
+
+  // Limit the number of inbound WINDOW_UPDATE frames allowed per DATA frame sent. If the number
+  // of WINDOW_UPDATE frames received over the lifetime of connection exceeds the value calculated
+  // using this formula::
+  //
+  //     1 + 2 * (inbound_streams +
+  //              max_inbound_window_update_frames_per_data_frame_sent * outbound_data_frames)
+  //
+  // the connection is terminated. The ``http2.inbound_priority_frames_flood`` stat tracks
+  // the number of connections terminated due to flood mitigation. The default limit is 10.
+  // Setting this to 1 should be enough to support HTTP/2 implementations with basic flow control,
+  // but more complex implementations that try to estimate available bandwidth require at least 2.
+  // [#comment:TODO: implement same limits for upstream inbound frames as well.]
+  google.protobuf.UInt32Value max_inbound_window_update_frames_per_data_frame_sent = 11
+      [(validate.rules).uint32 = {gte: 1}];
 }
 
 // [#not-implemented-hide:]

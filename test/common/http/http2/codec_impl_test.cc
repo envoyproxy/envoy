@@ -99,6 +99,11 @@ public:
     setting.allow_metadata_ = allow_metadata_;
     setting.max_outbound_frames_ = max_outbound_frames_;
     setting.max_outbound_control_frames_ = max_outbound_control_frames_;
+    setting.max_consecutive_inbound_frames_with_empty_payload_ =
+        max_consecutive_inbound_frames_with_empty_payload_;
+    setting.max_inbound_priority_frames_per_stream_ = max_inbound_priority_frames_per_stream_;
+    setting.max_inbound_window_update_frames_per_data_frame_sent_ =
+        max_inbound_window_update_frames_per_data_frame_sent_;
   }
 
   // corruptMetadataFramePayload assumes data contains at least 10 bytes of the beginning of a
@@ -145,6 +150,12 @@ public:
   uint32_t max_request_headers_kb_ = Http::DEFAULT_MAX_REQUEST_HEADERS_KB;
   uint32_t max_outbound_frames_ = Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES;
   uint32_t max_outbound_control_frames_ = Http2Settings::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES;
+  uint32_t max_consecutive_inbound_frames_with_empty_payload_ =
+      Http2Settings::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD;
+  uint32_t max_inbound_priority_frames_per_stream_ =
+      Http2Settings::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM;
+  uint32_t max_inbound_window_update_frames_per_data_frame_sent_ =
+      Http2Settings::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT;
 };
 
 class Http2CodecImplTest : public ::testing::TestWithParam<Http2SettingsTestParam>,

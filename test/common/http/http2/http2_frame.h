@@ -49,10 +49,16 @@ public:
     END_HEADERS = 4,
   };
 
+  enum class DataFlags : uint8_t {
+    NONE = 0,
+    END_STREAM = 1,
+  };
+
   // See https://tools.ietf.org/html/rfc7541#appendix-A for static header indexes
   enum class StaticHeaderIndex : uint8_t {
     UNKNOWN,
     METHOD_GET = 2,
+    METHOD_POST = 3,
     PATH = 4,
     STATUS_200 = 8,
     STATUS_404 = 13,
@@ -65,9 +71,18 @@ public:
   // Methods for creating HTTP2 frames
   static Http2Frame makePingFrame(absl::string_view data = nullptr);
   static Http2Frame makeEmptySettingsFrame(SettingsFlags flags = SettingsFlags::NONE);
+  static Http2Frame makeEmptyHeadersFrame(uint32_t stream_index,
+                                          HeadersFlags flags = HeadersFlags::NONE);
+  static Http2Frame makeEmptyContinuationFrame(uint32_t stream_index,
+                                               HeadersFlags flags = HeadersFlags::NONE);
+  static Http2Frame makeEmptyDataFrame(uint32_t stream_index, DataFlags flags = DataFlags::NONE);
+  static Http2Frame makePriorityFrame(uint32_t stream_index, uint32_t dependent_index);
+  static Http2Frame makeWindowUpdateFrame(uint32_t stream_index, uint32_t increment);
   static Http2Frame makeMalformedRequest(uint32_t stream_index);
   static Http2Frame makeRequest(uint32_t stream_index, absl::string_view host,
                                 absl::string_view path);
+  static Http2Frame makePostRequest(uint32_t stream_index, absl::string_view host,
+                                    absl::string_view path);
 
   Type type() const { return static_cast<Type>(data_[3]); }
   ResponseStatus responseStatus() const;

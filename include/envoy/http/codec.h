@@ -237,6 +237,11 @@ struct Http2Settings {
   bool allow_metadata_{DEFAULT_ALLOW_METADATA};
   uint32_t max_outbound_frames_{DEFAULT_MAX_OUTBOUND_FRAMES};
   uint32_t max_outbound_control_frames_{DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES};
+  uint32_t max_consecutive_inbound_frames_with_empty_payload_{
+      DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD};
+  uint32_t max_inbound_priority_frames_per_stream_{DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM};
+  uint32_t max_inbound_window_update_frames_per_data_frame_sent_{
+      DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT};
 
   // disable HPACK compression
   static const uint32_t MIN_HPACK_TABLE_SIZE = 0;
@@ -279,6 +284,13 @@ struct Http2Settings {
   static const uint32_t DEFAULT_MAX_OUTBOUND_FRAMES = 10000;
   // Default limit on the number of outbound frames of types PING, SETTINGS and RST_STREAM.
   static const uint32_t DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES = 1000;
+  // Default limit on the number of consecutive inbound frames with an empty payload
+  // and no end stream flag.
+  static const uint32_t DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD = 1;
+  // Default limit on the number of inbound frames of type PRIORITY (per stream).
+  static const uint32_t DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM = 100;
+  // Default limit on the number of inbound frames of type WINDOW_UPDATE (per DATA frame sent).
+  static const uint32_t DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT = 10;
 };
 
 /**

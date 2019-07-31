@@ -255,6 +255,15 @@ Utility::parseHttp2Settings(const envoy::api::v2::core::Http2ProtocolOptions& co
   ret.max_outbound_control_frames_ =
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_outbound_control_frames,
                                       Http::Http2Settings::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES);
+  ret.max_consecutive_inbound_frames_with_empty_payload_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      config, max_consecutive_inbound_frames_with_empty_payload,
+      Http::Http2Settings::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD);
+  ret.max_inbound_priority_frames_per_stream_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      config, max_inbound_priority_frames_per_stream,
+      Http::Http2Settings::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM);
+  ret.max_inbound_window_update_frames_per_data_frame_sent_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      config, max_inbound_window_update_frames_per_data_frame_sent,
+      Http::Http2Settings::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT);
   ret.allow_connect_ = config.allow_connect();
   ret.allow_metadata_ = config.allow_metadata();
   return ret;
