@@ -1,4 +1,3 @@
-#include <iostream>
 #include <memory>
 #include <string>
 
@@ -3321,10 +3320,10 @@ TEST_F(ClusterManagerImplTest, ConnPoolsDrainedOnHostSetChange) {
       0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr, hosts, {},
       100);
 
-  //here actually no conn pools are being drained, as this is initial addition of hosts
-	EXPECT_EQ(
-		1, factory_.stats_.counter("cluster_manager.upstream_connections_closed_on_host_set_change")
-					 .value());
+  // here actually no conn pools are being drained, as this is initial addition of hosts
+  EXPECT_EQ(
+      1, factory_.stats_.counter("cluster_manager.upstream_connections_closed_on_host_set_change")
+             .value());
 
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
@@ -3405,7 +3404,9 @@ TEST_F(ClusterManagerImplTest, ConnPoolsDrainedOnHostSetChange) {
       0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr,
       hosts_added, {}, 100);
 
-  EXPECT_EQ(3, factory_.stats_.counter("cluster_manager.upstream_connections_closed_on_host_set_change").value());
+  EXPECT_EQ(
+      3, factory_.stats_.counter("cluster_manager.upstream_connections_closed_on_host_set_change")
+             .value());
 }
 
 TEST_F(ClusterManagerImplTest, ConnPoolsNotDrainedOnHostSetChange) {
