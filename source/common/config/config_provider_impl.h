@@ -227,13 +227,13 @@ protected:
         [this, update_fn]() {
           tls_->getTyped<ThreadLocalConfig>().config_ = update_fn(this->getConfig());
         },
-        /* During the update propagation, a subscription may get teared down in main thread due to
-        all owners/providers destructed in a xDS update (e.g. LDS demolishes a RouteConfigProvider
-        and its subscription).
-        If such a race condition happens, hold a reference to the "*this" subscription instance in
-        this cb will ensure the shared "*this" gets posted back to main thread, after all the
-        workers finish calling the update_fn, at which point it's safe to destruct "*this"
-        instance. */
+        // During the update propagation, a subscription may get teared down in main thread due to
+        // all owners/providers destructed in a xDS update (e.g. LDS demolishes a
+        // RouteConfigProvider and its subscription).
+        // If such a race condition happens, holding a reference to the "*this" subscription
+        // instance in this cb will ensure the shared "*this" gets posted back to main thread, after
+        // all the workers finish calling the update_fn, at which point it's safe to destruct
+        // "*this" instance.
         [shared_this, complete_cb]() { complete_cb(); });
   }
 
