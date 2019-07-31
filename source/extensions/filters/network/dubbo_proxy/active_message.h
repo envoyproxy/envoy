@@ -78,8 +78,6 @@ public:
   Event::Dispatcher& dispatcher() override;
   void resetStream() override;
 
-  bool dual_filter() const { return dual_filter_; }
-
 protected:
   ActiveMessage& parent_;
   const bool dual_filter_ : 1;
@@ -126,6 +124,8 @@ public:
 
 private:
   DubboFilters::EncoderFilterSharedPtr handle_;
+
+  friend class ActiveMessage;
 };
 
 using ActiveMessageEncoderFilterPtr = std::unique_ptr<ActiveMessageEncoderFilter>;

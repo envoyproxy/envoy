@@ -202,7 +202,7 @@ ActiveMessage::~ActiveMessage() {
 
   for (auto& filter : encoder_filters_) {
     // Do not call on destroy twice for dual registered filters.
-    if (!filter->dual_filter()) {
+    if (!filter->dual_filter_) {
       ENVOY_LOG(debug, "destroy encoder filter");
       filter->handler()->onDestroy();
     }
