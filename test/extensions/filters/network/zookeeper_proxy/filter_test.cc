@@ -414,26 +414,20 @@ public:
     }
   }
 
-  void expectSetDynamicMetadata(const std::map<std::string, std::string>& expected) {
-    EXPECT_CALL(filter_callbacks_.connection_, streamInfo())
-        .WillRepeatedly(ReturnRef(stream_info_));
-    EXPECT_CALL(stream_info_,
-                setDynamicMetadata("envoy.filters.network.zookeeper_proxy", MapEq(expected)));
-  }
+  using StrStrMap = std::map<std::string, std::string>;
 
-  void expectSetDynamicMetadata(const std::map<std::string, std::string>& first,
-                                const std::map<std::string, std::string>& second) {
+  void expectSetDynamicMetadata(const std::vector<StrStrMap>& values) {
     EXPECT_CALL(filter_callbacks_.connection_, streamInfo())
         .WillRepeatedly(ReturnRef(stream_info_));
-    EXPECT_CALL(stream_info_, setDynamicMetadata(_, _))
-        .WillOnce(Invoke([first](const std::string& key, const ProtobufWkt::Struct& obj) -> void {
-          EXPECT_STREQ(key.c_str(), "envoy.filters.network.zookeeper_proxy");
-          protoMapEq(obj, first);
-        }))
-        .WillOnce(Invoke([second](const std::string& key, const ProtobufWkt::Struct& obj) -> void {
-          EXPECT_STREQ(key.c_str(), "envoy.filters.network.zookeeper_proxy");
-          protoMapEq(obj, second);
-        }));
+
+    auto& call = EXPECT_CALL(stream_info_, setDynamicMetadata(_, _));
+
+    for (const auto& value : values) {
+      call.WillOnce(Invoke([value](const std::string& key, const ProtobufWkt::Struct& obj) -> void {
+        EXPECT_STREQ(key.c_str(), "envoy.filters.network.zookeeper_proxy");
+        protoMapEq(obj, value);
+      }));
+    }
   }
 
   void testCreate(CreateFlags flags, const OpCodes opcode = OpCodes::CREATE) {
@@ -454,8 +448,8 @@ public:
     }
 
     expectSetDynamicMetadata(
-        {{"opname", opname}, {"path", "/foo"}, {"create_type", createFlagsToString(flags)}},
-        {{"bytes", "35"}});
+        {{{"opname", opname}, {"path", "/foo"}, {"create_type", createFlagsToString(flags)}},
+         {{"bytes", "35"}}});
 
     EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
 
@@ -477,22 +471,20 @@ public:
     EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
   }
 
-  void testRequest(Buffer::OwnedImpl& data, const std::map<std::string, std::string>& first,
-                   const std::map<std::string, std::string>& second, const Stats::Counter& stat,
-                   const uint64_t request_bytes) {
-    expectSetDynamicMetadata(first, second);
+  void testRequest(Buffer::OwnedImpl& data, const std::vector<StrStrMap>& metadata_values,
+                   const Stats::Counter& stat, const uint64_t request_bytes) {
+    expectSetDynamicMetadata(metadata_values);
     EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
     EXPECT_EQ(1UL, stat.value());
     EXPECT_EQ(request_bytes, config_->stats().request_bytes_.value());
     EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
   }
 
-  void testResponse(const std::map<std::string, std::string>& first,
-                    const std::map<std::string, std::string>& second, const Stats::Counter& stat,
+  void testResponse(const std::vector<StrStrMap>& metadata_values, const Stats::Counter& stat,
                     uint32_t xid = 1000) {
     Buffer::OwnedImpl data = encodeResponseHeader(xid, 2000, 0);
 
-    expectSetDynamicMetadata(first, second);
+    expectSetDynamicMetadata(metadata_values);
     EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(data, false));
     EXPECT_EQ(1UL, stat.value());
     EXPECT_EQ(20UL, config_->stats().response_bytes_.value());
@@ -512,14 +504,14 @@ TEST_F(ZooKeeperFilterTest, Connect) {
 
   Buffer::OwnedImpl data = encodeConnect();
 
-  testRequest(data, {{"opname", "connect"}}, {{"bytes", "32"}}, config_->stats().connect_rq_, 32);
+  testRequest(data, {{{"opname", "connect"}}, {{"bytes", "32"}}}, config_->stats().connect_rq_, 32);
 
   data = encodeConnectResponse();
-  expectSetDynamicMetadata({{"opname", "connect_response"},
-                            {"protocol_version", "0"},
-                            {"timeout", "10"},
-                            {"readonly", "0"}},
-                           {{"bytes", "24"}});
+  expectSetDynamicMetadata({{{"opname", "connect_response"},
+                             {"protocol_version", "0"},
+                             {"timeout", "10"},
+                             {"readonly", "0"}},
+                            {{"bytes", "24"}}});
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(data, false));
   EXPECT_EQ(1UL, config_->stats().connect_resp_.value());
   EXPECT_EQ(24UL, config_->stats().response_bytes_.value());
@@ -531,15 +523,15 @@ TEST_F(ZooKeeperFilterTest, ConnectReadonly) {
 
   Buffer::OwnedImpl data = encodeConnect(true);
 
-  testRequest(data, {{"opname", "connect_readonly"}}, {{"bytes", "33"}},
+  testRequest(data, {{{"opname", "connect_readonly"}}, {{"bytes", "33"}}},
               config_->stats().connect_readonly_rq_, 33);
 
   data = encodeConnectResponse(true);
-  expectSetDynamicMetadata({{"opname", "connect_response"},
-                            {"protocol_version", "0"},
-                            {"timeout", "10"},
-                            {"readonly", "1"}},
-                           {{"bytes", "25"}});
+  expectSetDynamicMetadata({{{"opname", "connect_response"},
+                             {"protocol_version", "0"},
+                             {"timeout", "10"},
+                             {"readonly", "1"}},
+                            {{"bytes", "25"}}});
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(data, false));
   EXPECT_EQ(1UL, config_->stats().connect_resp_.value());
   EXPECT_EQ(25UL, config_->stats().response_bytes_.value());
@@ -598,8 +590,8 @@ TEST_F(ZooKeeperFilterTest, PingRequest) {
 
   Buffer::OwnedImpl data = encodePing();
 
-  testRequest(data, {{"opname", "ping"}}, {{"bytes", "12"}}, config_->stats().ping_rq_, 12);
-  testResponse({{"opname", "ping_response"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}},
+  testRequest(data, {{{"opname", "ping"}}, {{"bytes", "12"}}}, config_->stats().ping_rq_, 12);
+  testResponse({{{"opname", "ping_response"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
                config_->stats().ping_resp_, enumToSignedInt(XidCodes::PING_XID));
 }
 
@@ -608,9 +600,9 @@ TEST_F(ZooKeeperFilterTest, AuthRequest) {
 
   Buffer::OwnedImpl data = encodeAuth("digest");
 
-  testRequest(data, {{"opname", "auth"}}, {{"bytes", "36"}},
+  testRequest(data, {{{"opname", "auth"}}, {{"bytes", "36"}}},
               scope_.counter("test.zookeeper.auth.digest_rq"), 36);
-  testResponse({{"opname", "auth_response"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}},
+  testResponse({{{"opname", "auth_response"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
                config_->stats().auth_resp_, enumToSignedInt(XidCodes::AUTH_XID));
 }
 
@@ -619,9 +611,10 @@ TEST_F(ZooKeeperFilterTest, GetDataRequest) {
 
   Buffer::OwnedImpl data = encodePathWatch("/foo", true);
 
-  testRequest(data, {{"opname", "getdata"}, {"path", "/foo"}, {"watch", "true"}}, {{"bytes", "21"}},
+  testRequest(data,
+              {{{"opname", "getdata"}, {"path", "/foo"}, {"watch", "true"}}, {{"bytes", "21"}}},
               config_->stats().getdata_rq_, 21);
-  testResponse({{"opname", "getdata_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}},
+  testResponse({{{"opname", "getdata_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
                config_->stats().getdata_resp_);
 }
 
@@ -632,9 +625,9 @@ TEST_F(ZooKeeperFilterTest, GetDataRequestEmptyPath) {
   // by the server.
   Buffer::OwnedImpl data = encodePathWatch("", true);
 
-  testRequest(data, {{"opname", "getdata"}, {"path", ""}, {"watch", "true"}}, {{"bytes", "17"}},
+  testRequest(data, {{{"opname", "getdata"}, {"path", ""}, {"watch", "true"}}, {{"bytes", "17"}}},
               config_->stats().getdata_rq_, 17);
-  testResponse({{"opname", "getdata_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}},
+  testResponse({{{"opname", "getdata_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
                config_->stats().getdata_resp_);
 }
 
@@ -642,7 +635,7 @@ TEST_F(ZooKeeperFilterTest, CreateRequestPersistent) { testCreate(CreateFlags::P
 
 TEST_F(ZooKeeperFilterTest, CreateRequestPersistentSequential) {
   testCreate(CreateFlags::PERSISTENT_SEQUENTIAL);
-  testResponse({{"opname", "create_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}},
+  testResponse({{{"opname", "create_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
                config_->stats().create_resp_);
 }
 
@@ -650,26 +643,29 @@ TEST_F(ZooKeeperFilterTest, CreateRequestEphemeral) { testCreate(CreateFlags::EP
 
 TEST_F(ZooKeeperFilterTest, CreateRequestEphemeralSequential) {
   testCreate(CreateFlags::EPHEMERAL_SEQUENTIAL);
-  testResponse({{"opname", "create_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}},
+  testResponse({{{"opname", "create_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
                config_->stats().create_resp_);
 }
 
 TEST_F(ZooKeeperFilterTest, CreateRequestContainer) {
   testCreate(CreateFlags::CONTAINER, OpCodes::CREATECONTAINER);
-  testResponse({{"opname", "createcontainer_resp"}, {"zxid", "2000"}, {"error", "0"}},
-               {{"bytes", "20"}}, config_->stats().createcontainer_resp_);
+  testResponse(
+      {{{"opname", "createcontainer_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
+      config_->stats().createcontainer_resp_);
 }
 
 TEST_F(ZooKeeperFilterTest, CreateRequestTTL) {
   testCreate(CreateFlags::PERSISTENT_WITH_TTL, OpCodes::CREATETTL);
-  testResponse({{"opname", "createttl_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}},
-               config_->stats().createttl_resp_);
+  testResponse(
+      {{{"opname", "createttl_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
+      config_->stats().createttl_resp_);
 }
 
 TEST_F(ZooKeeperFilterTest, CreateRequestTTLSequential) {
   testCreate(CreateFlags::PERSISTENT_SEQUENTIAL_WITH_TTL, OpCodes::CREATETTL);
-  testResponse({{"opname", "createttl_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}},
-               config_->stats().createttl_resp_);
+  testResponse(
+      {{{"opname", "createttl_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
+      config_->stats().createttl_resp_);
 }
 
 TEST_F(ZooKeeperFilterTest, CreateRequest2) {
@@ -678,9 +674,11 @@ TEST_F(ZooKeeperFilterTest, CreateRequest2) {
   Buffer::OwnedImpl data = encodeCreateRequest("/foo", "bar", CreateFlags::PERSISTENT, false,
                                                enumToSignedInt(OpCodes::CREATE2));
 
-  testRequest(data, {{"opname", "create2"}, {"path", "/foo"}, {"create_type", "persistent"}},
-              {{"bytes", "35"}}, config_->stats().create2_rq_, 35);
-  testResponse({{"opname", "create2_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}},
+  testRequest(
+      data,
+      {{{"opname", "create2"}, {"path", "/foo"}, {"create_type", "persistent"}}, {{"bytes", "35"}}},
+      config_->stats().create2_rq_, 35);
+  testResponse({{{"opname", "create2_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
                config_->stats().create2_resp_);
 }
 
@@ -689,9 +687,9 @@ TEST_F(ZooKeeperFilterTest, SetRequest) {
 
   Buffer::OwnedImpl data = encodeSetRequest("/foo", "bar", -1);
 
-  testRequest(data, {{"opname", "setdata"}, {"path", "/foo"}}, {{"bytes", "31"}},
+  testRequest(data, {{{"opname", "setdata"}, {"path", "/foo"}}, {{"bytes", "31"}}},
               config_->stats().setdata_rq_, 31);
-  testResponse({{"opname", "setdata_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}},
+  testResponse({{{"opname", "setdata_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
                config_->stats().setdata_resp_);
 }
 
@@ -700,10 +698,12 @@ TEST_F(ZooKeeperFilterTest, GetChildrenRequest) {
 
   Buffer::OwnedImpl data = encodePathWatch("/foo", false, enumToSignedInt(OpCodes::GETCHILDREN));
 
-  testRequest(data, {{"opname", "getchildren"}, {"path", "/foo"}, {"watch", "false"}},
-              {{"bytes", "21"}}, config_->stats().getchildren_rq_, 21);
-  testResponse({{"opname", "getchildren_resp"}, {"zxid", "2000"}, {"error", "0"}},
-               {{"bytes", "20"}}, config_->stats().getchildren_resp_);
+  testRequest(
+      data, {{{"opname", "getchildren"}, {"path", "/foo"}, {"watch", "false"}}, {{"bytes", "21"}}},
+      config_->stats().getchildren_rq_, 21);
+  testResponse(
+      {{{"opname", "getchildren_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
+      config_->stats().getchildren_resp_);
 }
 
 TEST_F(ZooKeeperFilterTest, GetChildrenRequest2) {
@@ -711,10 +711,12 @@ TEST_F(ZooKeeperFilterTest, GetChildrenRequest2) {
 
   Buffer::OwnedImpl data = encodePathWatch("/foo", false, enumToSignedInt(OpCodes::GETCHILDREN2));
 
-  testRequest(data, {{"opname", "getchildren2"}, {"path", "/foo"}, {"watch", "false"}},
-              {{"bytes", "21"}}, config_->stats().getchildren2_rq_, 21);
-  testResponse({{"opname", "getchildren2_resp"}, {"zxid", "2000"}, {"error", "0"}},
-               {{"bytes", "20"}}, config_->stats().getchildren2_resp_);
+  testRequest(
+      data, {{{"opname", "getchildren2"}, {"path", "/foo"}, {"watch", "false"}}, {{"bytes", "21"}}},
+      config_->stats().getchildren2_rq_, 21);
+  testResponse(
+      {{{"opname", "getchildren2_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
+      config_->stats().getchildren2_resp_);
 }
 
 TEST_F(ZooKeeperFilterTest, DeleteRequest) {
@@ -722,10 +724,11 @@ TEST_F(ZooKeeperFilterTest, DeleteRequest) {
 
   Buffer::OwnedImpl data = encodeDeleteRequest("/foo", -1);
 
-  testRequest(data, {{"opname", "remove"}, {"path", "/foo"}, {"version", "-1"}}, {{"bytes", "24"}},
-              config_->stats().remove_rq_, 24);
-  testResponse({{"opname", "remove_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}},
-               config_->stats().remove_resp_);
+  testRequest(data,
+              {{{"opname", "delete"}, {"path", "/foo"}, {"version", "-1"}}, {{"bytes", "24"}}},
+              config_->stats().delete_rq_, 24);
+  testResponse({{{"opname", "delete_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
+               config_->stats().delete_resp_);
 }
 
 TEST_F(ZooKeeperFilterTest, ExistsRequest) {
@@ -733,9 +736,10 @@ TEST_F(ZooKeeperFilterTest, ExistsRequest) {
 
   Buffer::OwnedImpl data = encodePathWatch("/foo", false, enumToSignedInt(OpCodes::EXISTS));
 
-  testRequest(data, {{"opname", "exists"}, {"path", "/foo"}, {"watch", "false"}}, {{"bytes", "21"}},
+  testRequest(data,
+              {{{"opname", "exists"}, {"path", "/foo"}, {"watch", "false"}}, {{"bytes", "21"}}},
               config_->stats().exists_rq_, 21);
-  testResponse({{"opname", "exists_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}},
+  testResponse({{{"opname", "exists_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
                config_->stats().exists_resp_);
 }
 
@@ -744,9 +748,9 @@ TEST_F(ZooKeeperFilterTest, GetAclRequest) {
 
   Buffer::OwnedImpl data = encodePath("/foo", enumToSignedInt(OpCodes::GETACL));
 
-  testRequest(data, {{"opname", "getacl"}, {"path", "/foo"}}, {{"bytes", "20"}},
+  testRequest(data, {{{"opname", "getacl"}, {"path", "/foo"}}, {{"bytes", "20"}}},
               config_->stats().getacl_rq_, 20);
-  testResponse({{"opname", "getacl_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}},
+  testResponse({{{"opname", "getacl_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
                config_->stats().getacl_resp_);
 }
 
@@ -755,9 +759,10 @@ TEST_F(ZooKeeperFilterTest, SetAclRequest) {
 
   Buffer::OwnedImpl data = encodeSetAclRequest("/foo", "digest", "passwd", -1);
 
-  testRequest(data, {{"opname", "setacl"}, {"path", "/foo"}, {"version", "-1"}}, {{"bytes", "52"}},
+  testRequest(data,
+              {{{"opname", "setacl"}, {"path", "/foo"}, {"version", "-1"}}, {{"bytes", "52"}}},
               config_->stats().setacl_rq_, 52);
-  testResponse({{"opname", "setacl_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}},
+  testResponse({{{"opname", "setacl_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
                config_->stats().setacl_resp_);
 }
 
@@ -766,9 +771,9 @@ TEST_F(ZooKeeperFilterTest, SyncRequest) {
 
   Buffer::OwnedImpl data = encodePath("/foo", enumToSignedInt(OpCodes::SYNC));
 
-  testRequest(data, {{"opname", "sync"}, {"path", "/foo"}}, {{"bytes", "20"}},
+  testRequest(data, {{{"opname", "sync"}, {"path", "/foo"}}, {{"bytes", "20"}}},
               config_->stats().sync_rq_, 20);
-  testResponse({{"opname", "sync_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}},
+  testResponse({{{"opname", "sync_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
                config_->stats().sync_resp_);
 }
 
@@ -777,10 +782,11 @@ TEST_F(ZooKeeperFilterTest, GetEphemeralsRequest) {
 
   Buffer::OwnedImpl data = encodePath("/foo", enumToSignedInt(OpCodes::GETEPHEMERALS));
 
-  testRequest(data, {{"opname", "getephemerals"}, {"path", "/foo"}}, {{"bytes", "20"}},
+  testRequest(data, {{{"opname", "getephemerals"}, {"path", "/foo"}}, {{"bytes", "20"}}},
               config_->stats().getephemerals_rq_, 20);
-  testResponse({{"opname", "getephemerals_resp"}, {"zxid", "2000"}, {"error", "0"}},
-               {{"bytes", "20"}}, config_->stats().getephemerals_resp_);
+  testResponse(
+      {{{"opname", "getephemerals_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
+      config_->stats().getephemerals_resp_);
 }
 
 TEST_F(ZooKeeperFilterTest, GetAllChildrenNumberRequest) {
@@ -788,10 +794,11 @@ TEST_F(ZooKeeperFilterTest, GetAllChildrenNumberRequest) {
 
   Buffer::OwnedImpl data = encodePath("/foo", enumToSignedInt(OpCodes::GETALLCHILDRENNUMBER));
 
-  testRequest(data, {{"opname", "getallchildrennumber"}, {"path", "/foo"}}, {{"bytes", "20"}},
+  testRequest(data, {{{"opname", "getallchildrennumber"}, {"path", "/foo"}}, {{"bytes", "20"}}},
               config_->stats().getallchildrennumber_rq_, 20);
-  testResponse({{"opname", "getallchildrennumber_resp"}, {"zxid", "2000"}, {"error", "0"}},
-               {{"bytes", "20"}}, config_->stats().getallchildrennumber_resp_);
+  testResponse({{{"opname", "getallchildrennumber_resp"}, {"zxid", "2000"}, {"error", "0"}},
+                {{"bytes", "20"}}},
+               config_->stats().getallchildrennumber_resp_);
 }
 
 TEST_F(ZooKeeperFilterTest, CheckRequest) {
@@ -799,14 +806,14 @@ TEST_F(ZooKeeperFilterTest, CheckRequest) {
 
   Buffer::OwnedImpl data = encodePathVersion("/foo", 100, enumToSignedInt(OpCodes::CHECK));
 
-  expectSetDynamicMetadata({{"bytes", "24"}});
+  expectSetDynamicMetadata({{{"bytes", "24"}}});
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(1UL, config_->stats().check_rq_.value());
   EXPECT_EQ(24UL, config_->stats().request_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 
-  testResponse({{"opname", "check_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}},
+  testResponse({{{"opname", "check_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
                config_->stats().check_resp_);
 }
 
@@ -834,7 +841,7 @@ TEST_F(ZooKeeperFilterTest, MultiRequest) {
   EXPECT_EQ(1UL, config_->stats().check_rq_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 
-  testResponse({{"opname", "multi_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}},
+  testResponse({{{"opname", "multi_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
                config_->stats().multi_resp_);
 }
 
@@ -843,8 +850,9 @@ TEST_F(ZooKeeperFilterTest, ReconfigRequest) {
 
   Buffer::OwnedImpl data = encodeReconfigRequest("s1", "s2", "s3", 1000);
 
-  testRequest(data, {{"opname", "reconfig"}}, {{"bytes", "38"}}, config_->stats().reconfig_rq_, 38);
-  testResponse({{"opname", "reconfig_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}},
+  testRequest(data, {{{"opname", "reconfig"}}, {{"bytes", "38"}}}, config_->stats().reconfig_rq_,
+              38);
+  testResponse({{{"opname", "reconfig_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
                config_->stats().reconfig_resp_);
 }
 
@@ -858,10 +866,11 @@ TEST_F(ZooKeeperFilterTest, SetWatchesRequestControlXid) {
   Buffer::OwnedImpl data =
       encodeSetWatchesRequest(dataw, existw, childw, enumToSignedInt(XidCodes::SET_WATCHES_XID));
 
-  testRequest(data, {{"opname", "setwatches"}}, {{"bytes", "76"}}, config_->stats().setwatches_rq_,
-              76);
-  testResponse({{"opname", "setwatches_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}},
-               config_->stats().setwatches_resp_, enumToSignedInt(XidCodes::SET_WATCHES_XID));
+  testRequest(data, {{{"opname", "setwatches"}}, {{"bytes", "76"}}},
+              config_->stats().setwatches_rq_, 76);
+  testResponse(
+      {{{"opname", "setwatches_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
+      config_->stats().setwatches_resp_, enumToSignedInt(XidCodes::SET_WATCHES_XID));
 }
 
 TEST_F(ZooKeeperFilterTest, SetWatchesRequest) {
@@ -873,10 +882,11 @@ TEST_F(ZooKeeperFilterTest, SetWatchesRequest) {
 
   Buffer::OwnedImpl data = encodeSetWatchesRequest(dataw, existw, childw);
 
-  testRequest(data, {{"opname", "setwatches"}}, {{"bytes", "76"}}, config_->stats().setwatches_rq_,
-              76);
-  testResponse({{"opname", "setwatches_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}},
-               config_->stats().setwatches_resp_);
+  testRequest(data, {{{"opname", "setwatches"}}, {{"bytes", "76"}}},
+              config_->stats().setwatches_rq_, 76);
+  testResponse(
+      {{{"opname", "setwatches_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
+      config_->stats().setwatches_resp_);
 }
 
 TEST_F(ZooKeeperFilterTest, CheckWatchesRequest) {
@@ -885,10 +895,11 @@ TEST_F(ZooKeeperFilterTest, CheckWatchesRequest) {
   Buffer::OwnedImpl data = encodePathVersion("/foo", enumToSignedInt(WatcherType::CHILDREN),
                                              enumToSignedInt(OpCodes::CHECKWATCHES));
 
-  testRequest(data, {{"opname", "checkwatches"}, {"path", "/foo"}}, {{"bytes", "24"}},
+  testRequest(data, {{{"opname", "checkwatches"}, {"path", "/foo"}}, {{"bytes", "24"}}},
               config_->stats().checkwatches_rq_, 24);
-  testResponse({{"opname", "checkwatches_resp"}, {"zxid", "2000"}, {"error", "0"}},
-               {{"bytes", "20"}}, config_->stats().checkwatches_resp_);
+  testResponse(
+      {{{"opname", "checkwatches_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
+      config_->stats().checkwatches_resp_);
 }
 
 TEST_F(ZooKeeperFilterTest, RemoveWatchesRequest) {
@@ -897,10 +908,11 @@ TEST_F(ZooKeeperFilterTest, RemoveWatchesRequest) {
   Buffer::OwnedImpl data = encodePathVersion("/foo", enumToSignedInt(WatcherType::DATA),
                                              enumToSignedInt(OpCodes::REMOVEWATCHES));
 
-  testRequest(data, {{"opname", "removewatches"}, {"path", "/foo"}}, {{"bytes", "24"}},
+  testRequest(data, {{{"opname", "removewatches"}, {"path", "/foo"}}, {{"bytes", "24"}}},
               config_->stats().removewatches_rq_, 24);
-  testResponse({{"opname", "removewatches_resp"}, {"zxid", "2000"}, {"error", "0"}},
-               {{"bytes", "20"}}, config_->stats().removewatches_resp_);
+  testResponse(
+      {{{"opname", "removewatches_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
+      config_->stats().removewatches_resp_);
 }
 
 TEST_F(ZooKeeperFilterTest, CloseRequest) {
@@ -908,8 +920,8 @@ TEST_F(ZooKeeperFilterTest, CloseRequest) {
 
   Buffer::OwnedImpl data = encodeCloseRequest();
 
-  testRequest(data, {{"opname", "close"}}, {{"bytes", "12"}}, config_->stats().close_rq_, 12);
-  testResponse({{"opname", "close_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}},
+  testRequest(data, {{{"opname", "close"}}, {{"bytes", "12"}}}, config_->stats().close_rq_, 12);
+  testResponse({{{"opname", "close_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
                config_->stats().close_resp_);
 }
 
@@ -917,12 +929,12 @@ TEST_F(ZooKeeperFilterTest, WatchEvent) {
   initialize();
 
   Buffer::OwnedImpl data = encodeWatchEvent("/foo", 1, 0);
-  expectSetDynamicMetadata({{"opname", "watch_event"},
-                            {"event_type", "1"},
-                            {"client_state", "0"},
-                            {"zxid", "1000"},
-                            {"error", "0"}},
-                           {{"bytes", "36"}});
+  expectSetDynamicMetadata({{{"opname", "watch_event"},
+                             {"event_type", "1"},
+                             {"client_state", "0"},
+                             {"zxid", "1000"},
+                             {"error", "0"}},
+                            {{"bytes", "36"}}});
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(data, false));
   EXPECT_EQ(1UL, config_->stats().watch_event_.value());
   EXPECT_EQ(36UL, config_->stats().response_bytes_.value());

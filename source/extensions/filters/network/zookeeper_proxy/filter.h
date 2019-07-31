@@ -39,7 +39,7 @@ namespace ZooKeeperProxy {
   COUNTER(getchildren2_rq)                                              \
   COUNTER(getephemerals_rq)                                             \
   COUNTER(getallchildrennumber_rq)                                      \
-  COUNTER(remove_rq)                                                    \
+  COUNTER(delete_rq)                                                    \
   COUNTER(exists_rq)                                                    \
   COUNTER(getacl_rq)                                                    \
   COUNTER(setacl_rq)                                                    \
@@ -67,7 +67,7 @@ namespace ZooKeeperProxy {
   COUNTER(getchildren2_resp)                                            \
   COUNTER(getephemerals_resp)                                           \
   COUNTER(getallchildrennumber_resp)                                    \
-  COUNTER(remove_resp)                                                  \
+  COUNTER(delete_resp)                                                  \
   COUNTER(exists_resp)                                                  \
   COUNTER(getacl_resp)                                                  \
   COUNTER(setacl_resp)                                                  \

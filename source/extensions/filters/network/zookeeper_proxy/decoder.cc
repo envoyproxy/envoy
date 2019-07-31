@@ -18,7 +18,7 @@ constexpr uint32_t ZXID_LENGTH = 8;
 constexpr uint32_t TIMEOUT_LENGTH = 4;
 constexpr uint32_t SESSION_LENGTH = 8;
 constexpr uint32_t MULTI_HEADER_LENGTH = 9;
-constexpr uint32_t PROTO_VERSION_LENGTH = 4;
+constexpr uint32_t PROTOCOL_VERSION_LENGTH = 4;
 constexpr uint32_t SERVER_HEADER_LENGTH = 16;
 
 const char* createFlagsToString(CreateFlags flags) {
@@ -201,6 +201,8 @@ void DecoderImpl::decodeOnWrite(Buffer::Instance& data, uint64_t& offset) {
   // Find the corresponding request for this XID.
   const auto it = requests_by_xid_.find(xid);
   if (it == requests_by_xid_.end()) {
+    // If this happens, it's a server-side bug.
+    ASSERT(false);
     return;
   }
 
@@ -231,11 +233,7 @@ void DecoderImpl::parseConnect(Buffer::Instance& data, uint64_t& offset, uint32_
   // Skip password.
   skipString(data, offset);
 
-  // Read readonly flag, if it's there.
-  bool readonly{};
-  if (data.length() >= offset + 1) {
-    readonly = helper_.peekBool(data, offset);
-  }
+  const bool readonly = maybeReadBool(data, offset);
 
   callbacks_.onConnect(readonly);
 }
@@ -484,19 +482,15 @@ void DecoderImpl::decode(Buffer::Instance& data, DecodeType dtype) {
 }
 
 void DecoderImpl::parseConnectResponse(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
-  ensureMinLength(len, PROTO_VERSION_LENGTH + TIMEOUT_LENGTH + SESSION_LENGTH + INT_LENGTH);
+  ensureMinLength(len, PROTOCOL_VERSION_LENGTH + TIMEOUT_LENGTH + SESSION_LENGTH + INT_LENGTH);
 
-  auto timeout = helper_.peekInt32(data, offset);
+  const auto timeout = helper_.peekInt32(data, offset);
 
   // Skip session id + password.
   offset += SESSION_LENGTH;
   skipString(data, offset);
 
-  // Read readonly flag, if it's there.
-  bool readonly{};
-  if (data.length() >= offset + 1) {
-    readonly = helper_.peekBool(data, offset);
-  }
+  const bool readonly = maybeReadBool(data, offset);
 
   callbacks_.onConnectResponse(0, timeout, readonly);
 }
@@ -510,6 +504,13 @@ void DecoderImpl::parseWatchEvent(Buffer::Instance& data, uint64_t& offset, cons
   const auto path = helper_.peekString(data, offset);
 
   callbacks_.onWatchEvent(event_type, client_state, path, zxid, error);
+}
+
+bool DecoderImpl::maybeReadBool(Buffer::Instance& data, uint64_t& offset) {
+  if (data.length() >= offset + 1) {
+    return helper_.peekBool(data, offset);
+  }
+  return false;
 }
 
 } // namespace ZooKeeperProxy

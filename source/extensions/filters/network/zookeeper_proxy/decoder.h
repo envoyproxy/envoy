@@ -154,6 +154,7 @@ private:
   void parseConnectResponse(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseWatchEvent(Buffer::Instance& data, uint64_t& offset, uint32_t len, int64_t zxid,
                        int32_t error);
+  bool maybeReadBool(Buffer::Instance& data, uint64_t& offset);
 
   DecoderCallbacks& callbacks_;
   const uint32_t max_packet_bytes_;

@@ -166,8 +166,8 @@ void ZooKeeperFilter::onGetChildrenRequest(const std::string& path, const bool w
 }
 
 void ZooKeeperFilter::onDeleteRequest(const std::string& path, const int32_t version) {
-  config_->stats_.remove_rq_.inc();
-  setDynamicMetadata({{"opname", "remove"}, {"path", path}, {"version", std::to_string(version)}});
+  config_->stats_.delete_rq_.inc();
+  setDynamicMetadata({{"opname", "delete"}, {"path", path}, {"version", std::to_string(version)}});
 }
 
 void ZooKeeperFilter::onExistsRequest(const std::string& path, const bool watch) {
@@ -289,8 +289,8 @@ void ZooKeeperFilter::onResponse(const OpCodes opcode, const int32_t xid, const 
     config_->stats_.getchildren2_resp_.inc();
     break;
   case OpCodes::DELETE:
-    opname = "remove_resp";
-    config_->stats_.remove_resp_.inc();
+    opname = "delete_resp";
+    config_->stats_.delete_resp_.inc();
     break;
   case OpCodes::EXISTS:
     opname = "exists_resp";
