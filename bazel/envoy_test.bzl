@@ -115,6 +115,16 @@ def envoy_cc_fuzz_test(name, corpus, deps = [], tags = [], **kwargs):
         tags = ["manual"] + tags,
     )
 
+    native.cc_binary(
+        name = name + "_driver",
+        copts = envoy_copts("@envoy", test = True),
+        linkopts =  ["-L/opt/clang+llvm-8.0.0-x86_64-linux-gnu-ubuntu-18.04/lib/clang/8.0.0/lib/linux -lclang_rt.fuzzer-x86_64"] + _envoy_test_linkopts(), # CLI linkopt in libclang fuzzer
+        linkstatic = 1,
+        testonly = 1,
+        deps = [":" + test_lib_name],
+        tags = ["manual"] + tags,
+    )
+
 # Envoy C++ test targets should be specified with this function.
 def envoy_cc_test(
         name,

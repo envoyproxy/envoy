@@ -125,3 +125,9 @@ build:docker-clang --config=rbe-toolchain
 # CI configurations
 build:remote-ci --remote_cache=grpcs://remotebuildexecution.googleapis.com
 build:remote-ci --remote_executor=grpcs://remotebuildexecution.googleapis.com
+
+# Fuzz builds
+build:asan-fuzzer --config=asan
+build:asan-fuzzer --copt=-fsanitize=fuzzer-no-link
+build:asan-fuzzer --define=FUZZING_ENGINE=libfuzzer
+build:asan-fuzzer --copt=-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
