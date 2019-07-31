@@ -213,7 +213,8 @@ TEST_F(EdsTest, ValidateFail) {
 // Validate onConfigUpdate() on stream disconnection.
 TEST_F(EdsTest, StreamDisconnection) {
   initialize();
-  eds_callbacks_->onConfigUpdateFailed(nullptr);
+  eds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure,
+                                       nullptr);
   EXPECT_FALSE(initialized_);
 }
 

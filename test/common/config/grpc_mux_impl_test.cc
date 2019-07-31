@@ -210,10 +210,11 @@ TEST_F(GrpcMuxImplTest, TypeUrlMismatch) {
     invalid_response->set_type_url("foo");
     invalid_response->mutable_resources()->Add()->set_type_url("bar");
     EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _))
-        .WillOnce(Invoke([](const EnvoyException* e) {
-          EXPECT_TRUE(IsSubstring("", "", "bar does not match foo type URL in DiscoveryResponse",
-                                  e->what()));
-        }));
+        .WillOnce(
+            Invoke([](Envoy::Config::ConfigUpdateFailureReason reason, const EnvoyException* e) {
+              EXPECT_TRUE(IsSubstring(
+                  "", "", "bar does not match foo type URL in DiscoveryResponse", e->what()));
+            }));
 
     expectSendMessage("foo", {"x", "y"}, "", "", Grpc::Status::GrpcStatus::Internal,
                       fmt::format("bar does not match foo type URL in DiscoveryResponse {}",
