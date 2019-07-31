@@ -1495,10 +1495,7 @@ void Http2FloodMitigationTest::startHttp2Session() {
 }
 
 // Verify that the server detects the flood of the given frame.
-void Http2FloodMitigationTest::floodServer(const Http2Frame& frame) {
-  config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
-  beginSession();
-
+void Http2FloodMitigationTest::floodServer(const Http2Frame& frame, const std::string& flood_stat) {
   // pack the as many frames as we can into 16k buffer
   const int FrameCount = (16 * 1024) / frame.size();
   std::vector<char> buf(FrameCount * frame.size());
@@ -1518,7 +1515,7 @@ void Http2FloodMitigationTest::floodServer(const Http2Frame& frame) {
   }
 
   EXPECT_LE(total_bytes_sent, TransmitThreshold) << "Flood mitigation is broken.";
-  EXPECT_EQ(1, test_server_->counter("http2.outbound_control_flood")->value());
+  EXPECT_EQ(1, test_server_->counter(flood_stat)->value());
   // Verify that connection was closed abortively
   EXPECT_EQ(0,
             test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
@@ -1526,7 +1523,8 @@ void Http2FloodMitigationTest::floodServer(const Http2Frame& frame) {
 
 // Verify that the server detects the flood using specified request parameters.
 void Http2FloodMitigationTest::floodServer(absl::string_view host, absl::string_view path,
-                                           Http2Frame::ResponseStatus expected_http_status) {
+                                           Http2Frame::ResponseStatus expected_http_status,
+                                           const std::string& flood_stat) {
   uint32_t request_idx = 0;
   auto request = Http2Frame::makeRequest(request_idx, host, path);
   sendFame(request);
@@ -1541,7 +1539,7 @@ void Http2FloodMitigationTest::floodServer(absl::string_view host, absl::string_
     total_bytes_sent += request.size();
   }
   EXPECT_LE(total_bytes_sent, TransmitThreshold) << "Flood mitigation is broken.";
-  EXPECT_EQ(1, test_server_->counter("http2.outbound_flood")->value());
+  EXPECT_EQ(1, test_server_->counter(flood_stat)->value());
   // Verify that connection was closed abortively
   EXPECT_EQ(0,
             test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
@@ -1553,12 +1551,14 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, Http2FloodMitigationTest,
 
 TEST_P(Http2FloodMitigationTest, Ping) {
   setNetworkConnectionBufferSize();
-  floodServer(Http2Frame::makePingFrame());
+  beginSession();
+  floodServer(Http2Frame::makePingFrame(), "http2.outbound_control_flood");
 }
 
 TEST_P(Http2FloodMitigationTest, Settings) {
   setNetworkConnectionBufferSize();
-  floodServer(Http2Frame::makeEmptySettingsFrame());
+  beginSession();
+  floodServer(Http2Frame::makeEmptySettingsFrame(), "http2.outbound_control_flood");
 }
 
 // Verify that the server can detect flood of internally generated 404 responses.
@@ -1568,7 +1568,7 @@ TEST_P(Http2FloodMitigationTest, 404) {
   beginSession();
 
   // Send requests to a non existent path to generate 404s
-  floodServer("host", "/notfound", Http2Frame::ResponseStatus::_404);
+  floodServer("host", "/notfound", Http2Frame::ResponseStatus::_404, "http2.outbound_flood");
 }
 
 // Verify that the server can detect flood of DATA frames
@@ -1579,7 +1579,7 @@ TEST_P(Http2FloodMitigationTest, Data) {
   beginSession();
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
-  floodServer("host", "/test/long/url", Http2Frame::ResponseStatus::_200);
+  floodServer("host", "/test/long/url", Http2Frame::ResponseStatus::_200, "http2.outbound_flood");
 }
 
 // Verify that the server can detect flood of RST_STREAM frames.
@@ -1603,6 +1603,118 @@ TEST_P(Http2FloodMitigationTest, RST_STREAM) {
   // Verify that connection was closed abortively
   EXPECT_EQ(0,
             test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
+}
+
+TEST_P(Http2FloodMitigationTest, EmptyHeaders) {
+  config_helper_.addConfigModifier(
+      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void {
+        hcm.mutable_http2_protocol_options()
+            ->mutable_max_consecutive_inbound_frames_with_empty_payload()
+            ->set_value(0);
+      });
+  beginSession();
+
+  uint32_t request_idx = 0;
+  auto request = Http2Frame::makeEmptyHeadersFrame(request_idx);
+  sendFame(request);
+
+  tcp_client_->waitForDisconnect();
+
+  EXPECT_EQ(1, test_server_->counter("http2.inbound_empty_frames_flood")->value());
+  // Verify that connection was closed abortively
+  EXPECT_EQ(0,
+            test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
+}
+
+TEST_P(Http2FloodMitigationTest, EmptyHeadersContinuation) {
+  beginSession();
+
+  uint32_t request_idx = 0;
+  auto request = Http2Frame::makeEmptyHeadersFrame(request_idx);
+  sendFame(request);
+
+  for (int i = 0; i < 2; i++) {
+    request = Http2Frame::makeEmptyContinuationFrame(request_idx);
+    sendFame(request);
+  }
+
+  tcp_client_->waitForDisconnect();
+
+  EXPECT_EQ(1, test_server_->counter("http2.inbound_empty_frames_flood")->value());
+  // Verify that connection was closed abortively
+  EXPECT_EQ(0,
+            test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
+}
+
+TEST_P(Http2FloodMitigationTest, EmptyData) {
+  beginSession();
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+
+  uint32_t request_idx = 0;
+  auto request = Http2Frame::makePostRequest(request_idx, "host", "/");
+  sendFame(request);
+
+  for (int i = 0; i < 2; i++) {
+    request = Http2Frame::makeEmptyDataFrame(request_idx);
+    sendFame(request);
+  }
+
+  tcp_client_->waitForDisconnect();
+
+  EXPECT_EQ(1, test_server_->counter("http2.inbound_empty_frames_flood")->value());
+  // Verify that connection was closed abortively
+  EXPECT_EQ(0,
+            test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
+}
+
+TEST_P(Http2FloodMitigationTest, PriorityIdleStream) {
+  beginSession();
+
+  floodServer(Http2Frame::makePriorityFrame(0, 1), "http2.inbound_priority_frames_flood");
+}
+
+TEST_P(Http2FloodMitigationTest, PriorityOpenStream) {
+  beginSession();
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+
+  // Open stream.
+  uint32_t request_idx = 0;
+  auto request = Http2Frame::makeRequest(request_idx, "host", "/");
+  sendFame(request);
+
+  floodServer(Http2Frame::makePriorityFrame(request_idx, request_idx + 1),
+              "http2.inbound_priority_frames_flood");
+}
+
+TEST_P(Http2FloodMitigationTest, PriorityClosedStream) {
+  autonomous_upstream_ = true;
+  beginSession();
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+
+  // Open stream.
+  uint32_t request_idx = 0;
+  auto request = Http2Frame::makeRequest(request_idx, "host", "/");
+  sendFame(request);
+  // Reading response marks this stream as closed in nghttp2.
+  auto frame = readFrame();
+  EXPECT_EQ(Http2Frame::Type::HEADERS, frame.type());
+
+  floodServer(Http2Frame::makePriorityFrame(request_idx, request_idx + 1),
+              "http2.inbound_priority_frames_flood");
+}
+
+TEST_P(Http2FloodMitigationTest, WindowUpdate) {
+  beginSession();
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+
+  // Open stream.
+  uint32_t request_idx = 0;
+  auto request = Http2Frame::makeRequest(request_idx, "host", "/");
+  sendFame(request);
+
+  floodServer(Http2Frame::makeWindowUpdateFrame(request_idx, 1),
+              "http2.inbound_window_update_frames_flood");
 }
 
 } // namespace Envoy

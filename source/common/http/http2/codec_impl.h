@@ -41,6 +41,9 @@ const std::string CLIENT_MAGIC_PREFIX = "PRI * HTTP/2";
 #define ALL_HTTP2_CODEC_STATS(COUNTER)                                                             \
   COUNTER(header_overflow)                                                                         \
   COUNTER(headers_cb_no_stream)                                                                    \
+  COUNTER(inbound_empty_frames_flood)                                                              \
+  COUNTER(inbound_priority_frames_flood)                                                           \
+  COUNTER(inbound_window_update_frames_flood)                                                      \
   COUNTER(outbound_control_flood)                                                                  \
   COUNTER(outbound_flood)                                                                          \
   COUNTER(rx_messaging_error)                                                                      \
@@ -79,7 +82,7 @@ public:
       : stats_{ALL_HTTP2_CODEC_STATS(POOL_COUNTER_PREFIX(stats, "http2."))},
         connection_(connection), max_request_headers_kb_(max_request_headers_kb),
         per_stream_buffer_limit_(http2_settings.initial_stream_window_size_),
-        max_outbound_frames_(http2_settings.max_outbound_frames_),
+        flood_detected_(false), max_outbound_frames_(http2_settings.max_outbound_frames_),
         frame_buffer_releasor_([this](const Buffer::OwnedBufferFragmentImpl* fragment) {
           releaseOutboundFrame(fragment);
         }),
@@ -87,6 +90,12 @@ public:
         control_frame_buffer_releasor_([this](const Buffer::OwnedBufferFragmentImpl* fragment) {
           releaseOutboundControlFrame(fragment);
         }),
+        max_consecutive_inbound_frames_with_empty_payload_(
+            http2_settings.max_consecutive_inbound_frames_with_empty_payload_),
+        max_inbound_priority_frames_per_stream_(
+            http2_settings.max_inbound_priority_frames_per_stream_),
+        max_inbound_window_update_frames_per_data_frame_sent_(
+            http2_settings.max_inbound_window_update_frames_per_data_frame_sent_),
         dispatching_(false), raised_goaway_(false), pending_deferred_reset_(false) {}
 
   ~ConnectionImpl() override;
@@ -299,6 +308,7 @@ protected:
   const uint32_t max_request_headers_kb_;
   uint32_t per_stream_buffer_limit_;
   bool allow_metadata_;
+  bool flood_detected_;
 
   // Set if the type of frame that is about to be sent is PING or SETTINGS with the ACK flag set, or
   // RST_STREAM.
@@ -320,11 +330,46 @@ protected:
   // corresponding http2_protocol_options. Default value is 1000.
   const uint32_t max_outbound_control_frames_;
   const Buffer::OwnedBufferFragmentImpl::Releasor control_frame_buffer_releasor_;
+  // This counter keeps track of the number of consecutive inbound frames of types HEADERS,
+  // CONTINUATION and DATA with an empty payload and no end stream flag. If this counter exceeds
+  // the `max_consecutive_inbound_frames_with_empty_payload_` value the connection is terminated.
+  uint32_t consecutive_inbound_frames_with_empty_payload_ = 0;
+  // Maximum number of consecutive inbound frames of types HEADERS, CONTINUATION and DATA without
+  // a payload. Initialized from corresponding http2_protocol_options. Default value is 1.
+  const uint32_t max_consecutive_inbound_frames_with_empty_payload_;
+
+  // This counter keeps track of the number of inbound streams.
+  uint32_t inbound_streams_ = 0;
+  // This counter keeps track of the number of inbound PRIORITY frames. If this counter exceeds
+  // the value calculated using this formula:
+  //
+  //     max_inbound_priority_frames_per_stream_ * (1 + inbound_streams_)
+  //
+  // the connection is terminated.
+  uint64_t inbound_priority_frames_ = 0;
+  // Maximum number of inbound PRIORITY frames per stream. Initialized from corresponding
+  // http2_protocol_options. Default value is 100.
+  const uint32_t max_inbound_priority_frames_per_stream_;
+
+  // This counter keeps track of the number of inbound WINDOW_UPDATE frames. If this counter exceeds
+  // the value calculated using this formula:
+  //
+  //     1 + 2 * (inbound_streams_ +
+  //              max_inbound_window_update_frames_per_data_frame_sent_ * outbound_data_frames_)
+  //
+  // the connection is terminated.
+  uint64_t inbound_window_update_frames_ = 0;
+  // This counter keeps track of the number of outbound DATA frames.
+  uint64_t outbound_data_frames_ = 0;
+  // Maximum number of inbound WINDOW_UPDATE frames per outbound DATA frame sent. Initialized
+  // from corresponding http2_protocol_options. Default value is 10.
+  const uint32_t max_inbound_window_update_frames_per_data_frame_sent_;
 
 private:
   virtual ConnectionCallbacks& callbacks() PURE;
   virtual int onBeginHeaders(const nghttp2_frame* frame) PURE;
   int onData(int32_t stream_id, const uint8_t* data, size_t len);
+  int onBeforeFrameReceived(const nghttp2_frame_hd* hd);
   int onFrameReceived(const nghttp2_frame* frame);
   int onBeforeFrameSend(const nghttp2_frame* frame);
   int onFrameSend(const nghttp2_frame* frame);
@@ -347,6 +392,8 @@ private:
   bool addOutboundFrameFragment(Buffer::OwnedImpl& output, const uint8_t* data, size_t length);
   virtual void checkOutboundQueueLimits() PURE;
   void incrementOutboundFrameCount(bool is_outbound_flood_monitored_control_frame);
+  virtual bool trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) PURE;
+  virtual bool checkInboundFrameLimits() PURE;
 
   void releaseOutboundFrame(const Buffer::OwnedBufferFragmentImpl* fragment);
   void releaseOutboundControlFrame(const Buffer::OwnedBufferFragmentImpl* fragment);
@@ -382,6 +429,8 @@ private:
   // of the clean-up loop, leaving resources in a half cleaned up state.
   // TODO(yanavlasov): add flood mitigation for upstream connections as well.
   void checkOutboundQueueLimits() override {}
+  bool trackInboundFrames(const nghttp2_frame_hd*, uint32_t) override { return true; }
+  bool checkInboundFrameLimits() override { return true; }
 
   Http::ConnectionCallbacks& callbacks_;
 };
@@ -401,6 +450,8 @@ private:
   int onBeginHeaders(const nghttp2_frame* frame) override;
   int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) override;
   void checkOutboundQueueLimits() override;
+  bool trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) override;
+  bool checkInboundFrameLimits() override;
 
   // Http::Connection
   // The reason for overriding the dispatch method is to do flood mitigation only when

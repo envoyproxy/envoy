@@ -71,9 +71,9 @@ public:
 
 protected:
   void startHttp2Session();
-  void floodServer(const Http2Frame& frame);
+  void floodServer(const Http2Frame& frame, const std::string& flood_stat);
   void floodServer(absl::string_view host, absl::string_view path,
-                   Http2Frame::ResponseStatus expected_http_status);
+                   Http2Frame::ResponseStatus expected_http_status, const std::string& flood_stat);
   Http2Frame readFrame();
   void sendFame(const Http2Frame& frame);
   void setNetworkConnectionBufferSize();
