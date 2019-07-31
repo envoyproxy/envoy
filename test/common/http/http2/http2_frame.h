@@ -79,6 +79,9 @@ public:
   static Http2Frame makePriorityFrame(uint32_t stream_index, uint32_t dependent_index);
   static Http2Frame makeWindowUpdateFrame(uint32_t stream_index, uint32_t increment);
   static Http2Frame makeMalformedRequest(uint32_t stream_index);
+  static Http2Frame makeMalformedRequestWithZerolenHeader(uint32_t stream_index,
+                                                          absl::string_view host,
+                                                          absl::string_view path);
   static Http2Frame makeRequest(uint32_t stream_index, absl::string_view host,
                                 absl::string_view path);
   static Http2Frame makePostRequest(uint32_t stream_index, absl::string_view host,
@@ -126,6 +129,7 @@ private:
   // Headers are directly encoded
   void appendStaticHeader(StaticHeaderIndex index);
   void appendHeaderWithoutIndexing(StaticHeaderIndex index, absl::string_view value);
+  void appendEmptyHeader();
 
   // This method updates payload length in the HTTP2 header based on the size of the data_
   void adjustPayloadSize() {

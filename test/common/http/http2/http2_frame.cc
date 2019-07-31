@@ -104,6 +104,12 @@ void Http2Frame::appendHeaderWithoutIndexing(StaticHeaderIndex index, absl::stri
   appendData(value);
 }
 
+void Http2Frame::appendEmptyHeader() {
+  data_.push_back(0x40);
+  data_.push_back(0x00);
+  data_.push_back(0x00);
+}
+
 Http2Frame Http2Frame::makePingFrame(absl::string_view data) {
   static constexpr size_t kPingPayloadSize = 8;
   Http2Frame frame;
@@ -165,6 +171,21 @@ Http2Frame Http2Frame::makeMalformedRequest(uint32_t stream_index) {
                     makeRequestStreamId(stream_index));
   frame.appendStaticHeader(
       StaticHeaderIndex::STATUS_200); // send :status as request header, which is invalid
+  frame.adjustPayloadSize();
+  return frame;
+}
+
+Http2Frame Http2Frame::makeMalformedRequestWithZerolenHeader(uint32_t stream_index,
+                                                             absl::string_view host,
+                                                             absl::string_view path) {
+  Http2Frame frame;
+  frame.buildHeader(Type::HEADERS, 0, orFlags(HeadersFlags::END_STREAM, HeadersFlags::END_HEADERS),
+                    makeRequestStreamId(stream_index));
+  frame.appendStaticHeader(StaticHeaderIndex::METHOD_GET);
+  frame.appendStaticHeader(StaticHeaderIndex::SCHEME_HTTPS);
+  frame.appendHeaderWithoutIndexing(StaticHeaderIndex::PATH, path);
+  frame.appendHeaderWithoutIndexing(StaticHeaderIndex::HOST, host);
+  frame.appendEmptyHeader();
   frame.adjustPayloadSize();
   return frame;
 }
