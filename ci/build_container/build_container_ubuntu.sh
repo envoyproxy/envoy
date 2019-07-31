@@ -37,7 +37,7 @@ case $ARCH in
         wget -O - http://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
         apt-add-repository "deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-8 main"
         apt-get update
-        apt-get install -y --no-install-recommends clang-8 clang-format-8 clang-tidy-8 lld-8 libc++-8-dev libc++abi-8-dev
+        apt-get install -y --no-install-recommends clang-8 clang-format-8 clang-tidy-8 lld-8 libc++-8-dev libc++abi-8-dev llvm-8
         ;;
 esac
 
