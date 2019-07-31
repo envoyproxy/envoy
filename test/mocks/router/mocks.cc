@@ -120,9 +120,6 @@ MockRouteConfigProvider::MockRouteConfigProvider() {
   ON_CALL(*this, config()).WillByDefault(Return(route_config_));
 }
 
-MockRouteConfigProviderManager::MockRouteConfigProviderManager() {}
-MockRouteConfigProviderManager::~MockRouteConfigProviderManager() {}
-
 MockScopedConfig::MockScopedConfig() {
   ON_CALL(*this, getRouteConfig(_)).WillByDefault(Return(route_config_));
 }

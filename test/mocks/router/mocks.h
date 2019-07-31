@@ -397,8 +397,8 @@ public:
 
 class MockRouteConfigProviderManager : public RouteConfigProviderManager {
 public:
-  MockRouteConfigProviderManager();
-  ~MockRouteConfigProviderManager() override;
+  MockRouteConfigProviderManager() = default;
+  ~MockRouteConfigProviderManager() override = default;
 
   MOCK_METHOD4(createRdsRouteConfigProvider,
                RouteConfigProviderPtr(
