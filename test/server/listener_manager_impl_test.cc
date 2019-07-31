@@ -449,6 +449,25 @@ filter_chains:
                           EnvoyException, "foo: Cannot find field");
 }
 
+TEST_F(ListenerManagerImplWithRealFiltersTest, BadOrdering) {
+  const std::string yaml = R"EOF(
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters:
+  - name: envoy.tcp_proxy
+    config: {}
+  - name: unknown_but_will_not_be_processed
+    config: {}
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true),
+                          EnvoyException,
+                          "Error: envoy.tcp_proxy must be the terminal network filter.");
+}
+
 TEST_F(ListenerManagerImplWithRealFiltersTest, BadFilterName) {
   const std::string yaml = R"EOF(
 address:

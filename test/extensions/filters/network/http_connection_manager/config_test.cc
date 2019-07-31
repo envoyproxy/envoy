@@ -196,9 +196,6 @@ tracing:
   request_headers_for_tags:
   - foo
 http_filters:
-- name: envoy.health_check
-  config:
-      pass_through_mode: false
 - name: envoy.router
   config: {}
   )EOF";

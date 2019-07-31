@@ -25,6 +25,7 @@
 #include "server/transport_socket_config_impl.h"
 
 #include "extensions/filters/listener/well_known_names.h"
+#include "extensions/filters/network/well_known_names.h"
 #include "extensions/transport_sockets/well_known_names.h"
 
 #include "absl/strings/match.h"
@@ -52,6 +53,11 @@ std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetwor
     Configuration::FactoryContext& context) {
   std::vector<Network::FilterFactoryCb> ret;
   for (ssize_t i = 0; i < filters.size(); i++) {
+    if (filters[i].name() == Extensions::NetworkFilters::NetworkFilterNames::get().TcpProxy &&
+        i != filters.size() - 1) {
+      throw EnvoyException(
+          fmt::format("Error: envoy.tcp_proxy must be the terminal network filter."));
+    }
     const auto& proto_config = filters[i];
     const std::string& string_name = proto_config.name();
     ENVOY_LOG(debug, "  filter #{}:", i);
