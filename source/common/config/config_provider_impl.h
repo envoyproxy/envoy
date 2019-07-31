@@ -150,6 +150,12 @@ class ConfigSubscriptionCommonBase
     : protected Logger::Loggable<Logger::Id::config>,
       public std::enable_shared_from_this<ConfigSubscriptionCommonBase> {
 public:
+  // Callback for updating a Config implementation held in each worker thread, the callback is
+  // called in applyConfigUpdate() with the current version Config, and is expected to return the
+  // new version Config.
+  using ConfigUpdateCb =
+      std::function<ConfigProvider::ConfigConstSharedPtr(ConfigProvider::ConfigConstSharedPtr)>;
+
   struct LastConfigInfo {
     absl::optional<uint64_t> last_config_hash_;
     std::string last_config_version_;
@@ -216,8 +222,6 @@ protected:
    * returns a updated/new version Config.
    * @param complete_cb the callback to run when the update propagation is done.
    */
-  using ConfigUpdateCb =
-      std::function<ConfigProvider::ConfigConstSharedPtr(ConfigProvider::ConfigConstSharedPtr)>;
   void applyConfigUpdate(
       const ConfigUpdateCb& update_fn, const Event::PostCb& complete_cb = []() {}) {
     // It is safe to call shared_from_this here as this is in main thread, and destruction of a
