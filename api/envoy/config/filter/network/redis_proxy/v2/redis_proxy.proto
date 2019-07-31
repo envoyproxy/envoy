@@ -144,7 +144,7 @@ message RedisProxy {
     }
 
     // List of prefix routes.
-    repeated Route routes = 1 [(gogoproto.nullable) = false];
+    repeated Route routes = 1;
 
     // Indicates that prefix matching should be case insensitive.
     bool case_insensitive = 2;
@@ -190,7 +190,7 @@ message RedisProxy {
   // See the :ref:`configuration section
   // <arch_overview_redis_configuration>` of the architecture overview for recommendations on
   // configuring the backing clusters.
-  PrefixRoutes prefix_routes = 5 [(gogoproto.nullable) = false];
+  PrefixRoutes prefix_routes = 5;
 
   // Authenticate Redis client connections locally by forcing downstream clients to issue a 'Redis
   // AUTH command <https://redis.io/commands/auth>`_ with this password before enabling any other

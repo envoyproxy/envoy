@@ -7,9 +7,20 @@ ARCH="$(uname -m)"
 # Setup basic requirements and install them.
 apt-get update
 export DEBIAN_FRONTEND=noninteractive
-apt-get install -y wget software-properties-common make cmake git python python-pip python3 python3-pip \
-  unzip bc libtool ninja-build automake zip time golang gdb strace wireshark tshark tcpdump lcov \
-  apt-transport-https
+apt-get install -y --no-install-recommends software-properties-common apt-transport-https
+
+# gcc-7
+add-apt-repository -y ppa:ubuntu-toolchain-r/test
+apt-get update
+apt-get install -y --no-install-recommends g++-7
+update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-7 1000
+update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 1000
+update-alternatives --config gcc
+update-alternatives --config g++
+
+apt-get install -y --no-install-recommends curl wget make cmake git python python-pip python3 python3-pip \
+  unzip bc libtool ninja-build automake zip time gdb strace tshark tcpdump patch \
+
 # clang 8.
 case $ARCH in
     'ppc64le' )
@@ -26,21 +37,11 @@ case $ARCH in
         wget -O - http://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
         apt-add-repository "deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-8 main"
         apt-get update
-        apt-get install -y clang-8 clang-format-8 clang-tidy-8 lld-8 libc++-8-dev libc++abi-8-dev
+        apt-get install -y --no-install-recommends clang-8 clang-format-8 clang-tidy-8 lld-8 libc++-8-dev libc++abi-8-dev llvm-8
         ;;
 esac
-# gcc-7
-add-apt-repository -y ppa:ubuntu-toolchain-r/test
-apt update
-apt install -y g++-7
-update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-7 1000
-update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 1000
-update-alternatives --install /usr/bin/gcov gcov /usr/bin/gcov-7 1000
-update-alternatives --config gcc
-update-alternatives --config g++
-update-alternatives --config gcov
+
 # Bazel and related dependencies.
-apt-get install -y openjdk-8-jdk curl
 case $ARCH in
     'ppc64le' )
         BAZEL_LATEST="$(curl https://oplab9.parqtec.unicamp.br/pub/ppc64el/bazel/ubuntu_16.04/latest/ 2>&1 \
@@ -50,6 +51,7 @@ case $ARCH in
         chmod +x /usr/local/bin/bazel
         ;;
 esac
+
 apt-get install -y aspell
 rm -rf /var/lib/apt/lists/*
 
@@ -63,3 +65,5 @@ setcap cap_net_raw,cap_net_admin=eip /usr/sbin/tcpdump
 pip3 install virtualenv
 
 ./build_container_common.sh
+
+apt-get clean

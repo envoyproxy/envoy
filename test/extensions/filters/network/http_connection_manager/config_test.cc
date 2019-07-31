@@ -412,6 +412,56 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathFalse) {
   EXPECT_FALSE(config.shouldNormalizePath());
 }
 
+// Validated that by default we don't merge slashes.
+TEST_F(HttpConnectionManagerConfigTest, MergeSlashesDefault) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
+  EXPECT_FALSE(config.shouldMergeSlashes());
+}
+
+// Validated that when configured, we merge slashes.
+TEST_F(HttpConnectionManagerConfigTest, MergeSlashesTrue) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  merge_slashes: true
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
+  EXPECT_TRUE(config.shouldMergeSlashes());
+}
+
+// Validated that when explicitly set false, we don't merge slashes.
+TEST_F(HttpConnectionManagerConfigTest, MergeSlashesFalse) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  merge_slashes: false
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
+  EXPECT_FALSE(config.shouldMergeSlashes());
+}
+
 TEST_F(HttpConnectionManagerConfigTest, ConfiguredRequestTimeout) {
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http
