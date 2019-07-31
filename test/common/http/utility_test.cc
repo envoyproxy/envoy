@@ -265,6 +265,9 @@ TEST(HttpUtility, parseHttp2Settings) {
               http2_settings.initial_stream_window_size_);
     EXPECT_EQ(Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE,
               http2_settings.initial_connection_window_size_);
+    EXPECT_EQ(Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES, http2_settings.max_outbound_frames_);
+    EXPECT_EQ(Http2Settings::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES,
+              http2_settings.max_outbound_control_frames_);
   }
 
   {

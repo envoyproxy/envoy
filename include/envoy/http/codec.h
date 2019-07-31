@@ -235,6 +235,8 @@ struct Http2Settings {
   uint32_t initial_connection_window_size_{DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE};
   bool allow_connect_{DEFAULT_ALLOW_CONNECT};
   bool allow_metadata_{DEFAULT_ALLOW_METADATA};
+  uint32_t max_outbound_frames_{DEFAULT_MAX_OUTBOUND_FRAMES};
+  uint32_t max_outbound_control_frames_{DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES};
 
   // disable HPACK compression
   static const uint32_t MIN_HPACK_TABLE_SIZE = 0;
@@ -272,6 +274,11 @@ struct Http2Settings {
   static const bool DEFAULT_ALLOW_CONNECT = false;
   // By default Envoy does not allow METADATA support.
   static const bool DEFAULT_ALLOW_METADATA = false;
+
+  // Default limit on the number of outbound frames of all types.
+  static const uint32_t DEFAULT_MAX_OUTBOUND_FRAMES = 10000;
+  // Default limit on the number of outbound frames of types PING, SETTINGS and RST_STREAM.
+  static const uint32_t DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES = 1000;
 };
 
 /**
