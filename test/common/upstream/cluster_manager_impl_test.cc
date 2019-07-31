@@ -3427,7 +3427,6 @@ TEST_F(ClusterManagerImplTest, ConnPoolsNotDrainedOnHostSetChange) {
 
   ReadyWatcher initialized;
   EXPECT_CALL(initialized, ready());
-
   create(parseBootstrapFromV2Yaml(yaml));
 
   // Set up for an initialize callback.
@@ -3477,7 +3476,6 @@ TEST_F(ClusterManagerImplTest, ConnPoolsNotDrainedOnHostSetChange) {
   Http::ConnectionPool::MockInstance* cp1 =
       dynamic_cast<Http::ConnectionPool::MockInstance*>(cluster_manager_->httpConnPoolForCluster(
           "cluster_1", ResourcePriority::Default, Http::Protocol::Http11, nullptr));
-
   Http::ConnectionPool::MockInstance* cp2 =
       dynamic_cast<Http::ConnectionPool::MockInstance*>(cluster_manager_->httpConnPoolForCluster(
           "cluster_1", ResourcePriority::Default, Http::Protocol::Http11, nullptr));
@@ -3485,7 +3483,6 @@ TEST_F(ClusterManagerImplTest, ConnPoolsNotDrainedOnHostSetChange) {
   Tcp::ConnectionPool::MockInstance* tcp1 =
       dynamic_cast<Tcp::ConnectionPool::MockInstance*>(cluster_manager_->tcpConnPoolForCluster(
           "cluster_1", ResourcePriority::Default, nullptr, nullptr));
-
   Tcp::ConnectionPool::MockInstance* tcp2 =
       dynamic_cast<Tcp::ConnectionPool::MockInstance*>(cluster_manager_->tcpConnPoolForCluster(
           "cluster_1", ResourcePriority::Default, nullptr, nullptr));
@@ -3494,7 +3491,6 @@ TEST_F(ClusterManagerImplTest, ConnPoolsNotDrainedOnHostSetChange) {
   EXPECT_NE(tcp1, tcp2);
 
   HostSharedPtr host3 = makeTestHost(cluster.info(), "tcp://127.0.0.1:82");
-
   HostVector hosts_added;
   hosts_added.push_back(host3);
 
