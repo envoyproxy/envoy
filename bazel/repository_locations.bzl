@@ -13,10 +13,10 @@ REPOSITORY_LOCATIONS = dict(
     ),
     boringssl = dict(
         # Use commits from branch "chromium-stable-with-bazel"
-        sha256 = "448773376d063b1e9a19e4fd41002d1a31a968a13be20b3b66ecd4aab9cf14a8",
-        strip_prefix = "boringssl-e534d74f5732e1aeebd514f05271d089c530c2f9",
-        # chromium-75.0.3770.80
-        urls = ["https://github.com/google/boringssl/archive/e534d74f5732e1aeebd514f05271d089c530c2f9.tar.gz"],
+        sha256 = "18edf961f8377e8d10fd8497bc8a331def9cb60a6c2a50a4c8eb322b045042d5",
+        strip_prefix = "boringssl-87d1c8f292e5184fd727efe84f458d89687d7742",
+        # chromium-76.0.3809.87
+        urls = ["https://github.com/google/boringssl/archive/87d1c8f292e5184fd727efe84f458d89687d7742.tar.gz"],
     ),
     boringssl_fips = dict(
         sha256 = "b12ad676ee533824f698741bd127f6fbc82c46344398a6d78d25e62c6c418c73",
