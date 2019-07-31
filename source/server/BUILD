@@ -273,7 +273,6 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/listener:well_known_names",
-        "//source/extensions/filters/network:well_known_names",
         "//source/extensions/transport_sockets:well_known_names",
         "@envoy_api//envoy/admin/v2alpha:config_dump_cc",
         "@envoy_api//envoy/api/v2:lds_cc",

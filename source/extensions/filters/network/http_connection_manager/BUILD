@@ -38,7 +38,6 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/router:rds_lib",
         "//source/common/router:scoped_rds_lib",
-        "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
     ],

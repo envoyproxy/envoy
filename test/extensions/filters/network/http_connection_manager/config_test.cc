@@ -515,6 +515,7 @@ http_filters:
   EXPECT_CALL(context_.thread_local_, allocateSlot());
   Network::FilterFactoryCb cb1 = factory.createFilterFactoryFromProto(proto_config, context_);
   Network::FilterFactoryCb cb2 = factory.createFilterFactoryFromProto(proto_config, context_);
+  EXPECT_TRUE(factory.isTerminalFilter());
 }
 
 TEST_F(HttpConnectionManagerConfigTest, BadHttpConnectionMangerConfig) {
@@ -765,13 +766,13 @@ TEST_F(FilterChainTest, createCustomUpgradeFilterChain) {
 
   auto foo_config = hcm_config.add_upgrade_configs();
   foo_config->set_upgrade_type("foo");
+  foo_config->add_filters()->ParseFromString("\n"
+                                             "\x18"
+                                             "envoy.http_dynamo_filter");
+  foo_config->add_filters()->ParseFromString("\n"
+                                             "\x18"
+                                             "envoy.http_dynamo_filter");
   foo_config->add_filters()->ParseFromString("\n\fenvoy.router");
-  foo_config->add_filters()->ParseFromString("\n"
-                                             "\x18"
-                                             "envoy.http_dynamo_filter");
-  foo_config->add_filters()->ParseFromString("\n"
-                                             "\x18"
-                                             "envoy.http_dynamo_filter");
 
   HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
                                      route_config_provider_manager_,
@@ -796,6 +797,27 @@ TEST_F(FilterChainTest, createCustomUpgradeFilterChain) {
     EXPECT_CALL(callbacks, addStreamFilter(_)).Times(2); // Dynamo
     EXPECT_TRUE(config.createUpgradeFilterChain("Foo", nullptr, callbacks));
   }
+}
+
+TEST_F(FilterChainTest, createCustomUpgradeFilterChainWithRouterNotLast) {
+  auto hcm_config = parseHttpConnectionManagerFromV2Yaml(basic_config_);
+  auto websocket_config = hcm_config.add_upgrade_configs();
+  websocket_config->set_upgrade_type("websocket");
+
+  ASSERT_TRUE(websocket_config->add_filters()->ParseFromString("\n\fenvoy.router"));
+
+  auto foo_config = hcm_config.add_upgrade_configs();
+  foo_config->set_upgrade_type("foo");
+  foo_config->add_filters()->ParseFromString("\n\fenvoy.router");
+  foo_config->add_filters()->ParseFromString("\n"
+                                             "\x18"
+                                             "envoy.http_dynamo_filter");
+
+  EXPECT_THROW_WITH_MESSAGE(
+      HttpConnectionManagerConfig(hcm_config, context_, date_provider_,
+                                  route_config_provider_manager_,
+                                  scoped_routes_config_provider_manager_),
+      EnvoyException, "Error: envoy.router must be terminal filter in foo upgrade filter chain.");
 }
 
 TEST_F(FilterChainTest, invalidConfig) {
