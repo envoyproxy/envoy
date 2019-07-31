@@ -24,6 +24,8 @@
 #include "common/router/rds_impl.h"
 #include "common/router/scoped_rds.h"
 
+#include "extensions/filters/http/well_known_names.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -306,6 +308,10 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
   const auto& filters = config.http_filters();
   for (int32_t i = 0; i < filters.size(); i++) {
+    if (filters[i].name() == HttpFilters::HttpFilterNames::get().Router &&
+        i != filters.size() - 1) {
+      throw EnvoyException(fmt::format("Error: envoy.router must be terminal filter."));
+    }
     processFilter(filters[i], i, "http", filter_factories_);
   }
 
