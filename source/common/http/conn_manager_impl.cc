@@ -258,17 +258,16 @@ StreamDecoder& ConnectionManagerImpl::newStream(StreamEncoder& response_encoder,
   return **streams_.begin();
 }
 
-void ConnectionManagerImpl::handleCodecException(const char* error,
-                                                 Network::ConnectionCloseType close_type) {
+void ConnectionManagerImpl::handleCodecException(const char* error) {
   ENVOY_CONN_LOG(debug, "dispatch error: {}", read_callbacks_->connection(), error);
 
-  // In the protocol error case, we need to reset all streams now. If the close_type is
-  // FlushWriteAndDelay, the connection might stick around long enough for a pending stream to come
-  // back and try to encode. In other cases it avoids needless processing of upstream responses when
-  // downstream connection is closed.
+  // In the protocol error case, we need to reset all streams now. The connection might stick around
+  // long enough for a pending stream to come back and try to encode.
   resetAllStreams();
 
-  read_callbacks_->connection().close(close_type);
+  // HTTP/1.1 codec has already sent a 400 response if possible. HTTP/2 codec has already sent
+  // GOAWAY.
+  read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWriteAndDelay);
 }
 
 Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool) {
@@ -290,14 +289,11 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
     try {
       codec_->dispatch(data);
     } catch (const FrameFloodException& e) {
-      // Abortively close flooded connections
-      handleCodecException(e.what(), Network::ConnectionCloseType::NoFlush);
+      handleCodecException(e.what());
       return Network::FilterStatus::StopIteration;
     } catch (const CodecProtocolException& e) {
       stats_.named_.downstream_cx_protocol_error_.inc();
-      // HTTP/1.1 codec has already sent a 400 response if possible. HTTP/2 codec has already sent
-      // GOAWAY.
-      handleCodecException(e.what(), Network::ConnectionCloseType::FlushWriteAndDelay);
+      handleCodecException(e.what());
       return Network::FilterStatus::StopIteration;
     }
 

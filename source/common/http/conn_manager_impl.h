@@ -653,7 +653,7 @@ private:
   void onDrainTimeout();
   void startDrainSequence();
   Tracing::HttpTracer& tracer() { return http_context_.tracer(); }
-  void handleCodecException(const char* error, Network::ConnectionCloseType close_type);
+  void handleCodecException(const char* error);
 
   enum class DrainState { NotDraining, Draining, Closing };
 

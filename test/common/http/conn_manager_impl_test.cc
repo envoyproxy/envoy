@@ -2330,7 +2330,8 @@ TEST_F(HttpConnectionManagerImplTest, FrameFloodError) {
   EXPECT_CALL(filter_factory_, createFilterChain(_)).Times(0);
 
   // FrameFloodException should result in reset of the streams followed by abortive close.
-  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWriteAndDelay));
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");

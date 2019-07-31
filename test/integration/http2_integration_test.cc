@@ -1516,8 +1516,7 @@ void Http2FloodMitigationTest::floodServer(const Http2Frame& frame, const std::s
 
   EXPECT_LE(total_bytes_sent, TransmitThreshold) << "Flood mitigation is broken.";
   EXPECT_EQ(1, test_server_->counter(flood_stat)->value());
-  // Verify that connection was closed abortively
-  EXPECT_EQ(0,
+  EXPECT_EQ(1,
             test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
 }
 
@@ -1539,9 +1538,10 @@ void Http2FloodMitigationTest::floodServer(absl::string_view host, absl::string_
     total_bytes_sent += request.size();
   }
   EXPECT_LE(total_bytes_sent, TransmitThreshold) << "Flood mitigation is broken.";
-  EXPECT_EQ(1, test_server_->counter(flood_stat)->value());
-  // Verify that connection was closed abortively
-  EXPECT_EQ(0,
+  if (!flood_stat.empty()) {
+    EXPECT_EQ(1, test_server_->counter(flood_stat)->value());
+  }
+  EXPECT_EQ(1,
             test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
 }
 
@@ -1606,9 +1606,24 @@ TEST_P(Http2FloodMitigationTest, RST_STREAM) {
   }
   EXPECT_LE(total_bytes_sent, TransmitThreshold) << "Flood mitigation is broken.";
   EXPECT_EQ(1, test_server_->counter("http2.outbound_control_flood")->value());
-  // Verify that connection was closed abortively
-  EXPECT_EQ(0,
+  EXPECT_EQ(1,
             test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
+}
+
+// Verify that the server stop reading downstream connection on protocol error.
+TEST_P(Http2FloodMitigationTest, TooManyStreams) {
+  config_helper_.addConfigModifier(
+      [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void {
+        hcm.mutable_http2_protocol_options()->mutable_max_concurrent_streams()->set_value(2);
+      });
+  autonomous_upstream_ = true;
+  beginSession();
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+
+  // Exceed the number of streams allowed by the server. The server should stop reading from the
+  // client. Verify that the client was unable to stuff a lot of data into the server.
+  floodServer("host", "/test/long/url", Http2Frame::ResponseStatus::_200, "");
 }
 
 TEST_P(Http2FloodMitigationTest, EmptyHeaders) {
@@ -1628,8 +1643,7 @@ TEST_P(Http2FloodMitigationTest, EmptyHeaders) {
   tcp_client_->waitForDisconnect();
 
   EXPECT_EQ(1, test_server_->counter("http2.inbound_empty_frames_flood")->value());
-  // Verify that connection was closed abortively
-  EXPECT_EQ(0,
+  EXPECT_EQ(1,
             test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
 }
 
@@ -1648,8 +1662,7 @@ TEST_P(Http2FloodMitigationTest, EmptyHeadersContinuation) {
   tcp_client_->waitForDisconnect();
 
   EXPECT_EQ(1, test_server_->counter("http2.inbound_empty_frames_flood")->value());
-  // Verify that connection was closed abortively
-  EXPECT_EQ(0,
+  EXPECT_EQ(1,
             test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
 }
 
@@ -1669,8 +1682,7 @@ TEST_P(Http2FloodMitigationTest, EmptyData) {
   tcp_client_->waitForDisconnect();
 
   EXPECT_EQ(1, test_server_->counter("http2.inbound_empty_frames_flood")->value());
-  // Verify that connection was closed abortively
-  EXPECT_EQ(0,
+  EXPECT_EQ(1,
             test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
 }
 
