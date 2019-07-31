@@ -227,7 +227,8 @@ TEST_F(EdsTest, OnConfigUpdateWrongName) {
   try {
     eds_callbacks_->onConfigUpdate(resources, "");
   } catch (const EnvoyException& e) {
-    eds_callbacks_->onConfigUpdateFailed(&e);
+    eds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected,
+                                         &e);
   }
   EXPECT_TRUE(initialized_);
 }
@@ -254,7 +255,8 @@ TEST_F(EdsTest, OnConfigUpdateWrongSize) {
   try {
     eds_callbacks_->onConfigUpdate(resources, "");
   } catch (const EnvoyException& e) {
-    eds_callbacks_->onConfigUpdateFailed(&e);
+    eds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected,
+                                         &e);
   }
   EXPECT_TRUE(initialized_);
 }

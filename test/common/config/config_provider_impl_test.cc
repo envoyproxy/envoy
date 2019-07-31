@@ -70,7 +70,8 @@ public:
   }
 
   // Envoy::Config::SubscriptionCallbacks
-  void onConfigUpdateFailed(const EnvoyException*) override {}
+  void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason,
+                            const EnvoyException*) override {}
 
   // Envoy::Config::SubscriptionCallbacks
   std::string resourceName(const ProtobufWkt::Any&) override { return ""; }
@@ -523,7 +524,8 @@ public:
                       const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
-  void onConfigUpdateFailed(const EnvoyException*) override {
+  void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason,
+                            const EnvoyException*) override {
     ConfigSubscriptionCommonBase::onConfigUpdateFailed();
   }
   std::string resourceName(const ProtobufWkt::Any&) override {

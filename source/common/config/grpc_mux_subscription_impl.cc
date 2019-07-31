@@ -22,12 +22,8 @@ GrpcMuxSubscriptionImpl::GrpcMuxSubscriptionImpl(GrpcMux& grpc_mux,
 void GrpcMuxSubscriptionImpl::start(const std::set<std::string>& resources) {
   if (init_fetch_timeout_.count() > 0) {
     init_fetch_timeout_timer_ = dispatcher_.createTimer([this]() -> void {
-      try {
-        throw EnvoyException("initial fetch timed out");
-      } catch (const EnvoyException& ee) {
-        ENVOY_LOG(warn, "gRPC config: initial fetch timed out for {}", type_url_);
-        callbacks_.onConfigUpdateFailed(&ee);
-      }
+      callbacks_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout,
+                                      nullptr);
     });
     init_fetch_timeout_timer_->enableTimer(init_fetch_timeout_);
   }
@@ -65,20 +61,28 @@ void GrpcMuxSubscriptionImpl::onConfigUpdate(
             resources.size(), version_info);
 }
 
-void GrpcMuxSubscriptionImpl::onConfigUpdateFailed(const EnvoyException* e) {
-  // TODO(htuch): Less fragile signal that this is failure vs. reject.
-  if (e == nullptr) {
+void GrpcMuxSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason reason,
+                                                   const EnvoyException* e) {
+  switch (reason) {
+  case Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure:
     stats_.update_failure_.inc();
     ENVOY_LOG(debug, "gRPC update for {} failed", type_url_);
-  } else {
-    // fetch timeout should be disabled only when the actual timeout happens - not on network
-    // disconnections.
+    break;
+  case Envoy::Config::ConfigUpdateFailureReason::FetchTimedout:
+    disableInitFetchTimeoutTimer();
+    ENVOY_LOG(warn, "gRPC config: initial fetch timed out for {}", type_url_);
+    break;
+  case Envoy::Config::ConfigUpdateFailureReason::UpdateRejected:
+    ASSERT(e);
     disableInitFetchTimeoutTimer();
     stats_.update_rejected_.inc();
     ENVOY_LOG(warn, "gRPC config for {} rejected: {}", type_url_, e->what());
+    break;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
   stats_.update_attempt_.inc();
-  callbacks_.onConfigUpdateFailed(e);
+  callbacks_.onConfigUpdateFailed(reason, e);
 }
 
 std::string GrpcMuxSubscriptionImpl::resourceName(const ProtobufWkt::Any& resource) {

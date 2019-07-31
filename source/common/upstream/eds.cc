@@ -251,7 +251,8 @@ bool EdsClusterImpl::updateHostsPerLocality(
   return false;
 }
 
-void EdsClusterImpl::onConfigUpdateFailed(const EnvoyException* e) {
+void EdsClusterImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason,
+                                          const EnvoyException* e) {
   //  We should not call onPreInitComplete if this method called because of stream disconnection.
   if (e == nullptr) {
     return;

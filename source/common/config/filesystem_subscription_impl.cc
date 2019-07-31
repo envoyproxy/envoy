@@ -49,11 +49,13 @@ void FilesystemSubscriptionImpl::refresh() {
       ENVOY_LOG(warn, "Filesystem config update rejected: {}", e.what());
       ENVOY_LOG(debug, "Failed configuration:\n{}", message.DebugString());
       stats_.update_rejected_.inc();
+      callbacks_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &e);
     } else {
       ENVOY_LOG(warn, "Filesystem config update failure: {}", e.what());
       stats_.update_failure_.inc();
+      callbacks_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure,
+                                      &e);
     }
-    callbacks_.onConfigUpdateFailed(&e);
   }
 }
 
