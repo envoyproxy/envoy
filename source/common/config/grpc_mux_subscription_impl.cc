@@ -73,6 +73,7 @@ void GrpcMuxSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason rea
     ENVOY_LOG(warn, "gRPC config: initial fetch timed out for {}", type_url_);
     break;
   case Envoy::Config::ConfigUpdateFailureReason::UpdateRejected:
+    // We expect Envoy exception to be thrown when update is rejected.
     ASSERT(e);
     disableInitFetchTimeoutTimer();
     stats_.update_rejected_.inc();
