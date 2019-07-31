@@ -1280,9 +1280,8 @@ TEST_F(ConnectionManagerTest, SendLocalReplyInMessageDecoded) {
       }));
   EXPECT_CALL(*decoder_filter, onMessageDecoded(_, _))
       .WillOnce(Invoke([&](MessageMetadataSharedPtr, ContextSharedPtr) -> FilterStatus {
-        EXPECT_EQ(1, conn_manager_->getActiveMessagesForTesting().size());
-        EXPECT_NE(nullptr, conn_manager_->getActiveMessagesForTesting().front()->metadata());
-        conn_manager_->getActiveMessagesForTesting().front()->clearMetadataForTesting();
+        EXPECT_EQ(1, conn_manager_->getActiveMessagesForTest().size());
+        EXPECT_NE(nullptr, conn_manager_->getActiveMessagesForTest().front()->metadata());
         callbacks->sendLocalReply(direct_response, false);
         return FilterStatus::StopIteration;
       }));

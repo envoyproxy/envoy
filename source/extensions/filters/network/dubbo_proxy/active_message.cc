@@ -349,11 +349,7 @@ FilterStatus ActiveMessage::applyEncoderFilters(ActiveMessageEncoderFilter* filt
 }
 
 void ActiveMessage::sendLocalReply(const DubboFilters::DirectResponse& response, bool end_stream) {
-  if (!metadata_) {
-    // If the sendLocalReply function is called before the messageEnd callback,
-    // metadata_ is nullptr, metadata object needs to be created in order to generate a local reply.
-    metadata_ = std::make_shared<MessageMetadata>();
-  }
+  ASSERT(metadata_);
   metadata_->setRequestId(request_id_);
   parent_.sendLocalReply(*metadata_, response, end_stream);
 

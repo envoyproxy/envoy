@@ -80,7 +80,7 @@ public:
                       bool end_stream);
 
   // This function is for testing only.
-  std::list<ActiveMessagePtr>& getActiveMessagesForTesting() { return active_message_list_; }
+  std::list<ActiveMessagePtr>& getActiveMessagesForTest() { return active_message_list_; }
 
 private:
   void dispatch();

@@ -187,9 +187,6 @@ public:
   ContextSharedPtr context() const { return context_; }
   bool pending_stream_decoded() const { return pending_stream_decoded_; }
 
-  // This function is for testing only.
-  void clearMetadataForTesting() { metadata_.reset(); }
-
 private:
   void addDecoderFilterWorker(DubboFilters::DecoderFilterSharedPtr filter, bool dual_filter);
   void addEncoderFilterWorker(DubboFilters::EncoderFilterSharedPtr, bool dual_filter);
