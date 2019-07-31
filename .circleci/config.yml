@@ -123,11 +123,7 @@ jobs:
        - run: ci/do_circle_ci.sh check_spelling_pedantic
    build_image:
      docker:
-       - image: circleci/python:3.7
-         environment:
-           # See comment in do_circle_ci.sh for why we do this.
-           NUM_CPUS: 8
-     resource_class: xlarge
+       - image: google/cloud-sdk
      steps:
        - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
