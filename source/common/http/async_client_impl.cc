@@ -143,7 +143,8 @@ void AsyncStreamImpl::sendTrailers(HeaderMap& trailers) {
 
 void AsyncStreamImpl::closeLocal(bool end_stream) {
   ASSERT(!(local_closed_ && end_stream));
-  // Due to the fact that send calls can synchronously result in stream closure, it's possible for this to be called after the local side is already closed.
+  // Due to the fact that send calls can synchronously result in stream closure, it's possible for
+  // this to be called after the local side is already closed.
   if (local_closed_) {
     return;
   }
@@ -156,7 +157,9 @@ void AsyncStreamImpl::closeLocal(bool end_stream) {
 }
 
 void AsyncStreamImpl::closeRemote(bool end_stream) {
-  // Due to the fact that callbacks can synchronously result in stream closure, it's possible for this to get called after the remote is already closed (e.g. if the the stream is reset in the callback itself).
+  // Due to the fact that callbacks can synchronously result in stream closure, it's possible for
+  // this to get called after the remote is already closed (e.g. if the the stream is reset in the
+  // callback itself).
   if (remote_closed_) {
     return;
   }
@@ -195,10 +198,14 @@ AsyncRequestImpl::AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent
 
 void AsyncRequestImpl::initialize() {
   sendHeaders(request_->headers(), !request_->body());
-  if (!remoteClosed() && request_->body()) {
-    sendData(*request_->body(), true);
-  } else if (remoteClosed() && request_->body()) {
-    closeLocal(true);
+  if (request_->body()) {
+    // sendHeaders can result in synchronous stream closure in certain cases (e.g. connection pool
+    // failure).
+    if (remoteClosed()) {
+      closeLocal(true);
+    } else {
+      sendData(*request_->body(), true);
+    }
   }
   // TODO(mattklein123): Support request trailers.
 }
