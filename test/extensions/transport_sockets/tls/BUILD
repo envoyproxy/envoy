@@ -23,6 +23,7 @@ envoy_cc_test(
         "//test/extensions/transport_sockets/tls/test_data:certs",
     ],
     external_deps = ["ssl"],
+    shard_count = 4,
     deps = [
         "//include/envoy/network:transport_socket_interface",
         "//source/common/buffer:buffer_lib",

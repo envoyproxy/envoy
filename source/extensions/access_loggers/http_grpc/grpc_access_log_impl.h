@@ -24,63 +24,52 @@ namespace HttpGrpc {
 // TODO(mattklein123): Stats
 
 /**
- * Interface for an access log streamer. The streamer deals with threading and sends access logs
- * on the correct stream.
+ * Interface for an access logger. The logger provides abstraction on top of gRPC stream, deals with
+ * reconnects and performs batching.
  */
-class GrpcAccessLogStreamer {
+class GrpcAccessLogger {
 public:
-  virtual ~GrpcAccessLogStreamer() = default;
+  virtual ~GrpcAccessLogger() = default;
 
   /**
-   * Send an access log.
-   * @param message supplies the access log to send.
-   * @param log_name supplies the name of the log stream to send on.
+   * Log http access entry.
+   * @param entry supplies the access log to send.
    */
-  virtual void send(envoy::service::accesslog::v2::StreamAccessLogsMessage& message,
-                    const std::string& log_name) PURE;
+  virtual void log(envoy::data::accesslog::v2::HTTPAccessLogEntry&& entry) PURE;
 };
 
-using GrpcAccessLogStreamerSharedPtr = std::shared_ptr<GrpcAccessLogStreamer>;
+using GrpcAccessLoggerSharedPtr = std::shared_ptr<GrpcAccessLogger>;
 
 /**
- * Production implementation of GrpcAccessLogStreamer that supports per-thread and per-log
- * streams.
+ * Interface for an access logger cache. The cache deals with threading and de-duplicates loggers
+ * for the same configuration.
  */
-class GrpcAccessLogStreamerImpl : public Singleton::Instance, public GrpcAccessLogStreamer {
+class GrpcAccessLoggerCache {
 public:
-  GrpcAccessLogStreamerImpl(Grpc::AsyncClientFactoryPtr&& factory, ThreadLocal::SlotAllocator& tls,
-                            const LocalInfo::LocalInfo& local_info);
+  virtual ~GrpcAccessLoggerCache() = default;
 
-  // GrpcAccessLogStreamer
-  void send(envoy::service::accesslog::v2::StreamAccessLogsMessage& message,
-            const std::string& log_name) override {
-    tls_slot_->getTyped<ThreadLocalStreamer>().send(message, log_name);
-  }
+  /**
+   * Get existing logger or create a new one for the given configuration.
+   * @param config supplies the configuration for the logger.
+   * @return GrpcAccessLoggerSharedPtr ready for logging requests.
+   */
+  virtual GrpcAccessLoggerSharedPtr
+  getOrCreateLogger(const ::envoy::config::accesslog::v2::CommonGrpcAccessLogConfig& config) PURE;
+};
+
+using GrpcAccessLoggerCacheSharedPtr = std::shared_ptr<GrpcAccessLoggerCache>;
+
+class GrpcAccessLoggerImpl : public GrpcAccessLogger {
+public:
+  GrpcAccessLoggerImpl(Grpc::RawAsyncClientPtr&& client, std::string log_name,
+                       const LocalInfo::LocalInfo& local_info);
+
+  void log(envoy::data::accesslog::v2::HTTPAccessLogEntry&& entry) override;
 
 private:
-  /**
-   * Shared state that is owned by the per-thread streamers. This allows the main streamer/TLS
-   * slot to be destroyed while the streamers hold onto the shared state.
-   */
-  struct SharedState {
-    SharedState(Grpc::AsyncClientFactoryPtr&& factory, const LocalInfo::LocalInfo& local_info)
-        : factory_(std::move(factory)), local_info_(local_info) {}
-
-    Grpc::AsyncClientFactoryPtr factory_;
-    const LocalInfo::LocalInfo& local_info_;
-  };
-
-  using SharedStateSharedPtr = std::shared_ptr<SharedState>;
-
-  struct ThreadLocalStreamer;
-
-  /**
-   * Per-thread stream state.
-   */
-  struct ThreadLocalStream
+  struct LocalStream
       : public Grpc::AsyncStreamCallbacks<envoy::service::accesslog::v2::StreamAccessLogsResponse> {
-    ThreadLocalStream(ThreadLocalStreamer& parent, const std::string& log_name)
-        : parent_(parent), log_name_(log_name) {}
+    LocalStream(GrpcAccessLoggerImpl& parent) : parent_(parent) {}
 
     // Grpc::AsyncStreamCallbacks
     void onCreateInitialMetadata(Http::HeaderMap&) override {}
@@ -90,27 +79,40 @@ private:
     void onReceiveTrailingMetadata(Http::HeaderMapPtr&&) override {}
     void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
 
-    ThreadLocalStreamer& parent_;
-    const std::string log_name_;
+    GrpcAccessLoggerImpl& parent_;
     Grpc::AsyncStream<envoy::service::accesslog::v2::StreamAccessLogsMessage> stream_{};
   };
 
-  /**
-   * Per-thread multi-stream state.
-   */
-  struct ThreadLocalStreamer : public ThreadLocal::ThreadLocalObject {
-    ThreadLocalStreamer(const SharedStateSharedPtr& shared_state);
-    void send(envoy::service::accesslog::v2::StreamAccessLogsMessage& message,
-              const std::string& log_name);
+  Grpc::AsyncClient<envoy::service::accesslog::v2::StreamAccessLogsMessage,
+                    envoy::service::accesslog::v2::StreamAccessLogsResponse>
+      client_;
+  const std::string log_name_;
+  absl::optional<LocalStream> stream_;
+  const LocalInfo::LocalInfo& local_info_;
+};
 
-    Grpc::AsyncClient<envoy::service::accesslog::v2::StreamAccessLogsMessage,
-                      envoy::service::accesslog::v2::StreamAccessLogsResponse>
-        client_;
-    std::unordered_map<std::string, ThreadLocalStream> stream_map_;
-    SharedStateSharedPtr shared_state_;
+class GrpcAccessLoggerCacheImpl : public Singleton::Instance, public GrpcAccessLoggerCache {
+public:
+  GrpcAccessLoggerCacheImpl(Grpc::AsyncClientManager& async_client_manager, Stats::Scope& scope,
+                            ThreadLocal::SlotAllocator& tls,
+                            const LocalInfo::LocalInfo& local_info);
+
+  GrpcAccessLoggerSharedPtr getOrCreateLogger(
+      const ::envoy::config::accesslog::v2::CommonGrpcAccessLogConfig& config) override;
+
+private:
+  /**
+   * Per-thread cache.
+   */
+  struct ThreadLocalCache : public ThreadLocal::ThreadLocalObject {
+    // Access loggers indexed by the hash of logger's configuration.
+    absl::flat_hash_map<std::size_t, GrpcAccessLoggerSharedPtr> access_loggers_;
   };
 
+  Grpc::AsyncClientManager& async_client_manager_;
+  Stats::Scope& scope_;
   ThreadLocal::SlotPtr tls_slot_;
+  const LocalInfo::LocalInfo& local_info_;
 };
 
 /**
@@ -119,21 +121,32 @@ private:
 class HttpGrpcAccessLog : public Common::ImplBase {
 public:
   HttpGrpcAccessLog(AccessLog::FilterPtr&& filter,
-                    const envoy::config::accesslog::v2::HttpGrpcAccessLogConfig& config,
-                    GrpcAccessLogStreamerSharedPtr grpc_access_log_streamer);
+                    envoy::config::accesslog::v2::HttpGrpcAccessLogConfig config,
+                    ThreadLocal::SlotAllocator& tls,
+                    GrpcAccessLoggerCacheSharedPtr access_logger_cache);
 
   static void responseFlagsToAccessLogResponseFlags(
       envoy::data::accesslog::v2::AccessLogCommon& common_access_log,
       const StreamInfo::StreamInfo& stream_info);
 
 private:
+  /**
+   * Per-thread cached logger.
+   */
+  struct ThreadLocalLogger : public ThreadLocal::ThreadLocalObject {
+    ThreadLocalLogger(GrpcAccessLoggerSharedPtr logger);
+
+    const GrpcAccessLoggerSharedPtr logger_;
+  };
+
   // Common::ImplBase
   void emitLog(const Http::HeaderMap& request_headers, const Http::HeaderMap& response_headers,
                const Http::HeaderMap& response_trailers,
                const StreamInfo::StreamInfo& stream_info) override;
 
   const envoy::config::accesslog::v2::HttpGrpcAccessLogConfig config_;
-  GrpcAccessLogStreamerSharedPtr grpc_access_log_streamer_;
+  const ThreadLocal::SlotPtr tls_slot_;
+  const GrpcAccessLoggerCacheSharedPtr access_logger_cache_;
   std::vector<Http::LowerCaseString> request_headers_to_log_;
   std::vector<Http::LowerCaseString> response_headers_to_log_;
   std::vector<Http::LowerCaseString> response_trailers_to_log_;

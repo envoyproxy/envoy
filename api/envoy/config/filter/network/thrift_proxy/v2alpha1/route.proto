@@ -25,16 +25,16 @@ message RouteConfiguration {
 
   // The list of routes that will be matched, in order, against incoming requests. The first route
   // that matches will be used.
-  repeated Route routes = 2 [(gogoproto.nullable) = false];
+  repeated Route routes = 2;
 }
 
 // [#comment:next free field: 3]
 message Route {
   // Route matching parameters.
-  RouteMatch match = 1 [(validate.rules).message.required = true, (gogoproto.nullable) = false];
+  RouteMatch match = 1 [(validate.rules).message.required = true];
 
   // Route request to some upstream cluster.
-  RouteAction route = 2 [(validate.rules).message.required = true, (gogoproto.nullable) = false];
+  RouteAction route = 2 [(validate.rules).message.required = true];
 }
 
 // [#comment:next free field: 5]

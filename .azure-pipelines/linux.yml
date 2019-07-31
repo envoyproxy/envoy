@@ -4,6 +4,8 @@ jobs:
     matrix:
       release:
         CI_TARGET: 'bazel.release'
+      tsan:
+        CI_TARGET: 'bazel.tsan'
   dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
   timeoutInMinutes: 360
   pool:
@@ -43,3 +45,4 @@ jobs:
     inputs:
       pathtoPublish: "$(Build.StagingDirectory)/envoy"
       artifactName: $(CI_TARGET)
+    condition: always()

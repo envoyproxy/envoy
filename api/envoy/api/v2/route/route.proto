@@ -58,7 +58,7 @@ message VirtualHost {
 
   // The list of routes that will be matched, in order, for incoming requests.
   // The first route that matches will be used.
-  repeated Route routes = 3 [(gogoproto.nullable) = false];
+  repeated Route routes = 3;
 
   enum TlsRequirementType {
     // No TLS requirement for the virtual host.
@@ -164,7 +164,7 @@ message Route {
   string name = 14;
 
   // Route matching parameters.
-  RouteMatch match = 1 [(validate.rules).message.required = true, (gogoproto.nullable) = false];
+  RouteMatch match = 1 [(validate.rules).message.required = true];
 
   oneof action {
     option (validate.required) = true;
