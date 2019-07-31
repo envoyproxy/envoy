@@ -6,6 +6,8 @@
 
 namespace Envoy {
 void Coverage::markCovered(const Envoy::Router::RouteEntry& route) {
+  // n.b. If we reach the end of the seen routes without finding the specified
+  // route we add it as seen, otherwise it's a duplicate.
   if (std::find(seen_routes_.begin(), seen_routes_.end(), &route) == seen_routes_.end()) {
     seen_routes_.push_back(&route);
   }
