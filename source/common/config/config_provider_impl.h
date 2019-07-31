@@ -219,7 +219,7 @@ protected:
   using ConfigUpdateCb =
       std::function<ConfigProvider::ConfigConstSharedPtr(ConfigProvider::ConfigConstSharedPtr)>;
   void applyConfigUpdate(
-      const ConfigUpdateFn& update_fn, const Event::PostCb& complete_cb = []() {}) {
+      const ConfigUpdateCb& update_fn, const Event::PostCb& complete_cb = []() {}) {
     // It is safe to call shared_from_this here as this is in main thread, and destruction of a
     // ConfigSubscriptionCommonBase owner (i.e., a provider) happens in main thread as well.
     auto shared_this = shared_from_this();
@@ -227,10 +227,13 @@ protected:
         [this, update_fn]() {
           tls_->getTyped<ThreadLocalConfig>().config_ = update_fn(this->getConfig());
         },
-        /*During the update propagation, a subscription may get teared down in main thread due to
+        /* During the update propagation, a subscription may get teared down in main thread due to
         all owners/providers destructed in a xDS update (e.g. LDS demolishes a RouteConfigProvider
-        and its subscription). Hold a reference to the shared subscription instance to make sure the
-        update can be safely pushed to workers in such an event.*/
+        and its subscription).
+        If such a race condition happens, hold a reference to the "*this" subscription instance in
+        this cb will ensure the shared "*this" gets posted back to main thread, after all the
+        workers finish calling the update_fn, at which point it's safe to destruct "*this"
+        instance. */
         [shared_this, complete_cb]() { complete_cb(); });
   }
 
