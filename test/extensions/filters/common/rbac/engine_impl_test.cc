@@ -136,6 +136,49 @@ TEST(RoleBasedAccessControlEngineImpl, HeaderCondition) {
   checkEngine(engine, true, Envoy::Network::MockConnection(), headers);
 }
 
+TEST(RoleBasedAccessControlEngineImpl, MetadataCondition) {
+  envoy::config::rbac::v2::Policy policy;
+  policy.add_permissions()->set_any(true);
+  policy.add_principals()->set_any(true);
+  policy.mutable_condition()->MergeFrom(
+      TestUtility::parseYaml<google::api::expr::v1alpha1::Expr>(R"EOF(
+    call_expr:
+      function: _==_
+      args:
+      - call_expr:
+          function: _[_]
+          args:
+          - call_expr:
+              function: _[_]
+              args:
+              - select_expr:
+                  operand:
+                    ident_expr:
+                      name: metadata
+                  field: filter_metadata
+              - const_expr:
+                  string_value: other
+          - const_expr:
+              string_value: label
+      - const_expr:
+          string_value: prod
+  )EOF"));
+
+  envoy::config::rbac::v2::RBAC rbac;
+  rbac.set_action(envoy::config::rbac::v2::RBAC_Action::RBAC_Action_ALLOW);
+  (*rbac.mutable_policies())["foo"] = policy;
+  RBAC::RoleBasedAccessControlEngineImpl engine(rbac);
+
+  Envoy::Http::HeaderMapImpl headers;
+
+  auto label = MessageUtil::keyValueStruct("label", "prod");
+  envoy::api::v2::core::Metadata metadata;
+  metadata.mutable_filter_metadata()->insert(
+      Protobuf::MapPair<std::string, ProtobufWkt::Struct>("other", label));
+
+  checkEngine(engine, true, Envoy::Network::MockConnection(), headers, metadata);
+}
+
 TEST(RoleBasedAccessControlEngineImpl, ConjunctiveCondition) {
   envoy::config::rbac::v2::Policy policy;
   policy.add_permissions()->set_destination_port(123);
