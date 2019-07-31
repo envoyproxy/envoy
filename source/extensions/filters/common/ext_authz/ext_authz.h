@@ -27,7 +27,7 @@ struct ConstantValues {
   const std::string TraceOk = "ext_authz_ok";
 };
 
-typedef ConstSingleton<ConstantValues> Constants;
+using Constants = ConstSingleton<ConstantValues>;
 
 /**
  * Possible async results for a check call.
