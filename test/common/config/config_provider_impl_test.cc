@@ -759,7 +759,7 @@ TEST_F(DeltaConfigProviderImplTest, DeltaSubscriptionFailure) {
   timeSystem().setSystemTime(time);
   const EnvoyException ex(fmt::format("config failure"));
   // Verify the failure updates the lastUpdated() timestamp.
-  subscription.onConfigUpdateFailed(&ex);
+  subscription.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, &ex);
   EXPECT_EQ(std::chrono::time_point_cast<std::chrono::milliseconds>(provider->lastUpdated())
                 .time_since_epoch(),
             time);
