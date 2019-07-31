@@ -11,10 +11,18 @@ namespace RBAC {
 RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
     const envoy::config::rbac::v2::RBAC& rules)
     : allowed_if_matched_(rules.action() ==
-                          envoy::config::rbac::v2::RBAC_Action::RBAC_Action_ALLOW),
-      expr_(rules.has_condition() ? Expr::create(rules.condition()) : nullptr) {
+                          envoy::config::rbac::v2::RBAC_Action::RBAC_Action_ALLOW) {
+  // guard expression builder by presence of a condition in policies
   for (const auto& policy : rules.policies()) {
-    policies_.insert(std::make_pair(policy.first, policy.second));
+    if (policy.second.has_condition()) {
+      builder_ = Expr::createBuilder();
+      break;
+    }
+  }
+
+  for (const auto& policy : rules.policies()) {
+    policies_.insert(std::make_pair(
+        policy.first, std::make_unique<PolicyMatcher>(policy.second, builder_.get())));
   }
 }
 
@@ -25,28 +33,13 @@ bool RoleBasedAccessControlEngineImpl::allowed(const Network::Connection& connec
   bool matched = false;
 
   for (auto it = policies_.begin(); it != policies_.end(); it++) {
-    if (it->second.matches(connection, headers, info.dynamicMetadata())) {
+    if (it->second->matches(connection, headers, info)) {
       matched = true;
       if (effective_policy_id != nullptr) {
         *effective_policy_id = it->first;
       }
       break;
     }
-  }
-
-  if (!matched && expr_ != nullptr) {
-    Protobuf::Arena arena;
-    auto eval_status = Expr::evaluate(*expr_, &arena, info, headers);
-
-    // evaluation error is effectively a denial
-    if (!eval_status.has_value()) {
-      return false;
-    }
-    auto result = eval_status.value();
-
-    // condition is effectively OR-ed with policy matchers
-    // non-bool is effectively "false"
-    matched = result.IsBool() ? result.BoolOrDie() : false;
   }
 
   // only allowed if:

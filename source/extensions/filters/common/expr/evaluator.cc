@@ -11,7 +11,7 @@ namespace Filters {
 namespace Common {
 namespace Expr {
 
-ExpressionPtr create(const google::api::expr::v1alpha1::Expr& expr) {
+BuilderPtr createBuilder() {
   google::api::expr::runtime::InterpreterOptions options;
 
   // Conformance with spec/go runtimes requires this setting
@@ -24,8 +24,12 @@ ExpressionPtr create(const google::api::expr::v1alpha1::Expr& expr) {
     throw EnvoyException(
         absl::StrCat("failed to register built-in functions: ", register_status.message()));
   }
+  return builder;
+}
+
+ExpressionPtr createExpression(Builder& builder, const google::api::expr::v1alpha1::Expr& expr) {
   google::api::expr::v1alpha1::SourceInfo source_info;
-  auto cel_expression_status = builder->CreateExpression(&expr, &source_info);
+  auto cel_expression_status = builder.CreateExpression(&expr, &source_info);
   if (!cel_expression_status.ok()) {
     throw EnvoyException(
         absl::StrCat("failed to create an expression: ", cel_expression_status.status().message()));
@@ -51,6 +55,17 @@ absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena* arena
   }
 
   return eval_status.ValueOrDie();
+}
+
+bool matches(const Expression& expr, const StreamInfo::StreamInfo& info,
+             const Http::HeaderMap& headers) {
+  Protobuf::Arena arena;
+  auto eval_status = Expr::evaluate(expr, &arena, info, headers);
+  if (!eval_status.has_value()) {
+    return false;
+  }
+  auto result = eval_status.value();
+  return result.IsBool() ? result.BoolOrDie() : false;
 }
 
 } // namespace Expr

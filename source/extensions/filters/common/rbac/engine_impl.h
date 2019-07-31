@@ -2,7 +2,6 @@
 
 #include "envoy/config/filter/http/rbac/v2/rbac.pb.h"
 
-#include "extensions/filters/common/expr/evaluator.h"
 #include "extensions/filters/common/rbac/engine.h"
 #include "extensions/filters/common/rbac/matchers.h"
 
@@ -25,9 +24,9 @@ public:
 private:
   const bool allowed_if_matched_;
 
-  std::map<std::string, PolicyMatcher> policies_;
+  std::map<std::string, std::unique_ptr<PolicyMatcher>> policies_;
 
-  Expr::ExpressionPtr expr_;
+  Expr::BuilderPtr builder_;
 };
 
 } // namespace RBAC
