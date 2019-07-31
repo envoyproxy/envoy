@@ -143,8 +143,12 @@ void AsyncStreamImpl::sendTrailers(HeaderMap& trailers) {
 
 void AsyncStreamImpl::closeLocal(bool end_stream) {
   ASSERT(!(local_closed_ && end_stream));
+  // Due to the fact that send calls can synchronously result in stream closure, it's possible for this to be called after the local side is already closed.
+  if (local_closed_) {
+    return;
+  }
 
-  local_closed_ |= end_stream;
+  local_closed_ = end_stream;
   if (complete()) {
     stream_callbacks_.onComplete();
     cleanup();
@@ -152,7 +156,12 @@ void AsyncStreamImpl::closeLocal(bool end_stream) {
 }
 
 void AsyncStreamImpl::closeRemote(bool end_stream) {
-  remote_closed_ |= end_stream;
+  // Due to the fact that callbacks can synchronously result in stream closure, it's possible for this to get called after the remote is already closed (e.g. if the the stream is reset in the callback itself).
+  if (remote_closed_) {
+    return;
+  }
+
+  remote_closed_ = end_stream;
   if (complete()) {
     stream_callbacks_.onComplete();
     cleanup();
