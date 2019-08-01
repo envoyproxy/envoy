@@ -109,20 +109,6 @@ public:
   MOCK_METHOD0(onWriteable, void());
 };
 
-class MockMutableConfigProviderBase : public MutableConfigProviderBase {
-public:
-  MockMutableConfigProviderBase(std::shared_ptr<ConfigSubscriptionInstance>&& subscription,
-                                ConfigProvider::ConfigConstSharedPtr initial_config,
-                                Server::Configuration::FactoryContext& factory_context);
-
-  MOCK_CONST_METHOD0(getConfig, ConfigConstSharedPtr());
-  MOCK_METHOD1(onConfigProtoUpdate, ConfigConstSharedPtr(const Protobuf::Message& config_proto));
-  MOCK_METHOD1(initialize, void(const ConfigConstSharedPtr& initial_config));
-  MOCK_METHOD1(onConfigUpdate, void(const ConfigConstSharedPtr& config));
-
-  ConfigSubscriptionCommonBase& subscription() { return *subscription_.get(); }
-};
-
 class MockConfigProviderManager : public ConfigProviderManager {
 public:
   MockConfigProviderManager() = default;
