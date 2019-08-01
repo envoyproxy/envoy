@@ -117,7 +117,7 @@ public:
       auto mock_auth = std::make_unique<MockAuthenticator>();
       EXPECT_CALL(*mock_auth, doVerify(_, _, _, _))
           .WillOnce(Invoke(
-              [&callbacks, iss = providers[i]](Http::HeaderMap&, std::vector<JwtLocationConstPtr>*,
+              [&callbacks, iss = provider](Http::HeaderMap&, std::vector<JwtLocationConstPtr>*,
                                                SetPayloadCallback, AuthenticatorCallback callback) {
                 callbacks[iss] = std::move(callback);
               }));
