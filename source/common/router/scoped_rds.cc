@@ -116,6 +116,9 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   envoy::config::filter::network::http_connection_manager::v2::Rds rds;
   rds.mutable_config_source()->MergeFrom(rds_config_source_);
 
+  // If new route config sources come after the factory_context_.initManager()'s initialize() been
+  // called, that initManager can't accepct new targets. Instead we use a local override which will
+  // start new subscriptions but not wait on them to be ready (to not block on main thread).
   std::unique_ptr<Init::ManagerImpl> overriding_init_manager;
   if (factory_context_.initManager().state() == Init::Manager::State::Initialized) {
     // Pause RDS to not send a burst of RDS requests until we start all the new subscriptions.
