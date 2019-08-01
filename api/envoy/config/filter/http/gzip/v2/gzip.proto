@@ -25,7 +25,8 @@ message Gzip {
   // .. attention:
   //
   //    **This field is deprecated**. Set the `compressor` field instead.
-  google.protobuf.UInt32Value content_length = 2 [(validate.rules).uint32.gte = 30, deprecated=true];
+  google.protobuf.UInt32Value content_length = 2
+      [(validate.rules).uint32.gte = 30, deprecated = true];
 
   message CompressionLevel {
     enum Enum {
@@ -64,21 +65,21 @@ message Gzip {
   // .. attention:
   //
   //    **This field is deprecated**. Set the `compressor` field instead.
-  repeated string content_type = 6 [(validate.rules).repeated = {max_items: 50}, deprecated=true];
+  repeated string content_type = 6 [(validate.rules).repeated = {max_items: 50}, deprecated = true];
 
   // If true, disables compression when the response contains an etag header. When it is false, the
   // filter will preserve weak etags and remove the ones that require strong validation.
   // .. attention:
   //
   //    **This field is deprecated**. Set the `compressor` field instead.
-  bool disable_on_etag_header = 7 [deprecated=true];
+  bool disable_on_etag_header = 7 [deprecated = true];
 
   // If true, removes accept-encoding from the request headers before dispatching it to the upstream
   // so that responses do not get compressed before reaching the filter.
   // .. attention:
   //
   //    **This field is deprecated**. Set the `compressor` field instead.
-  bool remove_accept_encoding_header = 8 [deprecated=true];
+  bool remove_accept_encoding_header = 8 [deprecated = true];
 
   // Value from 9 to 15 that represents the base two logarithmic of the compressor's window size.
   // Larger window results in better compression at the expense of memory usage. The default is 12
