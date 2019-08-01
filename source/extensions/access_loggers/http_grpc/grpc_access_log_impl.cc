@@ -32,64 +32,83 @@ TLSProperties_TLSVersion tlsVersionStringToEnum(const std::string& tls_version) 
 }
 }; // namespace
 
-GrpcAccessLogStreamerImpl::GrpcAccessLogStreamerImpl(Grpc::AsyncClientFactoryPtr&& factory,
-                                                     ThreadLocal::SlotAllocator& tls,
-                                                     const LocalInfo::LocalInfo& local_info)
-    : tls_slot_(tls.allocateSlot()) {
-  SharedStateSharedPtr shared_state = std::make_shared<SharedState>(std::move(factory), local_info);
-  tls_slot_->set([shared_state](Event::Dispatcher&) {
-    return ThreadLocal::ThreadLocalObjectSharedPtr{new ThreadLocalStreamer(shared_state)};
-  });
-}
-
-void GrpcAccessLogStreamerImpl::ThreadLocalStream::onRemoteClose(Grpc::Status::GrpcStatus,
-                                                                 const std::string&) {
-  auto it = parent_.stream_map_.find(log_name_);
-  ASSERT(it != parent_.stream_map_.end());
-  if (it->second.stream_ != nullptr) {
-    // Only erase if we have a stream. Otherwise we had an inline failure and we will clear the
+void GrpcAccessLoggerImpl::LocalStream::onRemoteClose(Grpc::Status::GrpcStatus,
+                                                      const std::string&) {
+  ASSERT(parent_.stream_ != absl::nullopt);
+  if (parent_.stream_->stream_ != nullptr) {
+    // Only reset if we have a stream. Otherwise we had an inline failure and we will clear the
     // stream data in send().
-    parent_.stream_map_.erase(it);
+    parent_.stream_.reset();
   }
 }
 
-GrpcAccessLogStreamerImpl::ThreadLocalStreamer::ThreadLocalStreamer(
-    const SharedStateSharedPtr& shared_state)
-    : client_(shared_state->factory_->create()), shared_state_(shared_state) {}
+GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(Grpc::RawAsyncClientPtr&& client, std::string log_name,
+                                           const LocalInfo::LocalInfo& local_info)
+    : client_(std::move(client)), log_name_(std::move(log_name)), local_info_(local_info) {}
 
-void GrpcAccessLogStreamerImpl::ThreadLocalStreamer::send(
-    envoy::service::accesslog::v2::StreamAccessLogsMessage& message, const std::string& log_name) {
-  auto stream_it = stream_map_.find(log_name);
-  if (stream_it == stream_map_.end()) {
-    stream_it = stream_map_.emplace(log_name, ThreadLocalStream(*this, log_name)).first;
+void GrpcAccessLoggerImpl::log(envoy::data::accesslog::v2::HTTPAccessLogEntry&& entry) {
+  // TODO(euroelessar): Add batching and flushing.
+  envoy::service::accesslog::v2::StreamAccessLogsMessage message;
+  message.mutable_http_logs()->add_log_entry()->Swap(&entry);
+
+  if (stream_ == absl::nullopt) {
+    stream_.emplace(*this);
   }
 
-  auto& stream_entry = stream_it->second;
-  if (stream_entry.stream_ == nullptr) {
-    stream_entry.stream_ =
+  if (stream_->stream_ == nullptr) {
+    stream_->stream_ =
         client_->start(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                            "envoy.service.accesslog.v2.AccessLogService.StreamAccessLogs"),
-                       stream_entry);
+                       *stream_);
 
     auto* identifier = message.mutable_identifier();
-    *identifier->mutable_node() = shared_state_->local_info_.node();
-    identifier->set_log_name(log_name);
+    *identifier->mutable_node() = local_info_.node();
+    identifier->set_log_name(log_name_);
   }
 
-  if (stream_entry.stream_ != nullptr) {
-    stream_entry.stream_->sendMessage(message, false);
+  if (stream_->stream_ != nullptr) {
+    stream_->stream_->sendMessage(message, false);
   } else {
     // Clear out the stream data due to stream creation failure.
-    stream_map_.erase(stream_it);
+    stream_.reset();
   }
 }
 
-HttpGrpcAccessLog::HttpGrpcAccessLog(
-    AccessLog::FilterPtr&& filter,
-    const envoy::config::accesslog::v2::HttpGrpcAccessLogConfig& config,
-    GrpcAccessLogStreamerSharedPtr grpc_access_log_streamer)
-    : Common::ImplBase(std::move(filter)), config_(config),
-      grpc_access_log_streamer_(grpc_access_log_streamer) {
+GrpcAccessLoggerCacheImpl::GrpcAccessLoggerCacheImpl(Grpc::AsyncClientManager& async_client_manager,
+                                                     Stats::Scope& scope,
+                                                     ThreadLocal::SlotAllocator& tls,
+                                                     const LocalInfo::LocalInfo& local_info)
+    : async_client_manager_(async_client_manager), scope_(scope), tls_slot_(tls.allocateSlot()),
+      local_info_(local_info) {
+  tls_slot_->set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalCache>(); });
+}
+
+GrpcAccessLoggerSharedPtr GrpcAccessLoggerCacheImpl::getOrCreateLogger(
+    const envoy::config::accesslog::v2::CommonGrpcAccessLogConfig& config) {
+  // TODO(euroelessar): Consider cleaning up loggers.
+  auto& cache = tls_slot_->getTyped<ThreadLocalCache>();
+  const std::size_t cache_key = MessageUtil::hash(config);
+  const auto it = cache.access_loggers_.find(cache_key);
+  if (it != cache.access_loggers_.end()) {
+    return it->second;
+  }
+  const Grpc::AsyncClientFactoryPtr factory =
+      async_client_manager_.factoryForGrpcService(config.grpc_service(), scope_, false);
+  const GrpcAccessLoggerSharedPtr logger =
+      std::make_shared<GrpcAccessLoggerImpl>(factory->create(), config.log_name(), local_info_);
+  cache.access_loggers_.emplace(cache_key, logger);
+  return logger;
+}
+
+HttpGrpcAccessLog::ThreadLocalLogger::ThreadLocalLogger(GrpcAccessLoggerSharedPtr logger)
+    : logger_(std::move(logger)) {}
+
+HttpGrpcAccessLog::HttpGrpcAccessLog(AccessLog::FilterPtr&& filter,
+                                     envoy::config::accesslog::v2::HttpGrpcAccessLogConfig config,
+                                     ThreadLocal::SlotAllocator& tls,
+                                     GrpcAccessLoggerCacheSharedPtr access_logger_cache)
+    : Common::ImplBase(std::move(filter)), config_(std::move(config)),
+      tls_slot_(tls.allocateSlot()), access_logger_cache_(std::move(access_logger_cache)) {
   for (const auto& header : config_.additional_request_headers_to_log()) {
     request_headers_to_log_.emplace_back(header);
   }
@@ -101,6 +120,11 @@ HttpGrpcAccessLog::HttpGrpcAccessLog(
   for (const auto& header : config_.additional_response_trailers_to_log()) {
     response_trailers_to_log_.emplace_back(header);
   }
+
+  tls_slot_->set([this](Event::Dispatcher&) {
+    return std::make_shared<ThreadLocalLogger>(
+        access_logger_cache_->getOrCreateLogger(config_.common_config()));
+  });
 }
 
 void HttpGrpcAccessLog::responseFlagsToAccessLogResponseFlags(
@@ -189,12 +213,10 @@ void HttpGrpcAccessLog::emitLog(const Http::HeaderMap& request_headers,
                                 const Http::HeaderMap& response_headers,
                                 const Http::HeaderMap& response_trailers,
                                 const StreamInfo::StreamInfo& stream_info) {
-  envoy::service::accesslog::v2::StreamAccessLogsMessage message;
-  auto* log_entry = message.mutable_http_logs()->add_log_entry();
-
   // Common log properties.
   // TODO(mattklein123): Populate sample_rate field.
-  auto* common_properties = log_entry->mutable_common_properties();
+  envoy::data::accesslog::v2::HTTPAccessLogEntry log_entry;
+  auto* common_properties = log_entry.mutable_common_properties();
 
   if (stream_info.downstreamRemoteAddress() != nullptr) {
     Network::Utility::addressToProtobufAddress(
@@ -308,20 +330,20 @@ void HttpGrpcAccessLog::emitLog(const Http::HeaderMap& request_headers,
   if (stream_info.protocol()) {
     switch (stream_info.protocol().value()) {
     case Http::Protocol::Http10:
-      log_entry->set_protocol_version(envoy::data::accesslog::v2::HTTPAccessLogEntry::HTTP10);
+      log_entry.set_protocol_version(envoy::data::accesslog::v2::HTTPAccessLogEntry::HTTP10);
       break;
     case Http::Protocol::Http11:
-      log_entry->set_protocol_version(envoy::data::accesslog::v2::HTTPAccessLogEntry::HTTP11);
+      log_entry.set_protocol_version(envoy::data::accesslog::v2::HTTPAccessLogEntry::HTTP11);
       break;
     case Http::Protocol::Http2:
-      log_entry->set_protocol_version(envoy::data::accesslog::v2::HTTPAccessLogEntry::HTTP2);
+      log_entry.set_protocol_version(envoy::data::accesslog::v2::HTTPAccessLogEntry::HTTP2);
       break;
     }
   }
 
   // HTTP request properties.
   // TODO(mattklein123): Populate port field.
-  auto* request_properties = log_entry->mutable_request();
+  auto* request_properties = log_entry.mutable_request();
   if (request_headers.Scheme() != nullptr) {
     request_properties->set_scheme(std::string(request_headers.Scheme()->value().getStringView()));
   }
@@ -372,7 +394,7 @@ void HttpGrpcAccessLog::emitLog(const Http::HeaderMap& request_headers,
   }
 
   // HTTP response properties.
-  auto* response_properties = log_entry->mutable_response();
+  auto* response_properties = log_entry.mutable_response();
   if (stream_info.responseCode()) {
     response_properties->mutable_response_code()->set_value(stream_info.responseCode().value());
   }
@@ -403,8 +425,7 @@ void HttpGrpcAccessLog::emitLog(const Http::HeaderMap& request_headers,
     }
   }
 
-  // TODO(mattklein123): Consider batching multiple logs and flushing.
-  grpc_access_log_streamer_->send(message, config_.common_config().log_name());
+  tls_slot_->getTyped<ThreadLocalLogger>().logger_->log(std::move(log_entry));
 }
 
 } // namespace HttpGrpc

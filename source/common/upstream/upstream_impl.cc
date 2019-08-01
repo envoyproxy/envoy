@@ -23,7 +23,6 @@
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/config/protocol_json.h"
-#include "common/config/tls_context_json.h"
 #include "common/config/utility.h"
 #include "common/http/utility.h"
 #include "common/network/address_impl.h"
@@ -272,6 +271,7 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
       cluster.transportSocketFactory().createTransportSocket(transport_socket_options),
       connection_options);
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());
+  cluster.createNetworkFilterChain(*connection);
   return connection;
 }
 
@@ -543,12 +543,53 @@ ClusterLoadReportStats ClusterInfoImpl::generateLoadReportStats(Stats::Scope& sc
   return {ALL_CLUSTER_LOAD_REPORT_STATS(POOL_COUNTER(scope))};
 }
 
-ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
-                                 const envoy::api::v2::core::BindConfig& bind_config,
-                                 Runtime::Loader& runtime,
-                                 Network::TransportSocketFactoryPtr&& socket_factory,
-                                 Stats::ScopePtr&& stats_scope, bool added_via_api,
-                                 ProtobufMessage::ValidationVisitor& validation_visitor)
+// Implements the FactoryContext interface required by network filters.
+class FactoryContextImpl : public Server::Configuration::CommonFactoryContext {
+public:
+  // Create from a TransportSocketFactoryContext using parent stats_scope and runtime
+  // other contexts taken from TransportSocketFactoryContext.
+  FactoryContextImpl(Stats::Scope& stats_scope, Envoy::Runtime::Loader& runtime,
+                     Server::Configuration::TransportSocketFactoryContext& c)
+      : admin_(c.admin()), stats_scope_(stats_scope), cluster_manager_(c.clusterManager()),
+        local_info_(c.localInfo()), dispatcher_(c.dispatcher()), random_(c.random()),
+        runtime_(runtime), singleton_manager_(c.singletonManager()), tls_(c.threadLocal()),
+        validation_visitor_(c.messageValidationVisitor()), api_(c.api()) {}
+
+  Upstream::ClusterManager& clusterManager() override { return cluster_manager_; }
+  Event::Dispatcher& dispatcher() override { return dispatcher_; }
+  const LocalInfo::LocalInfo& localInfo() const override { return local_info_; }
+  Envoy::Runtime::RandomGenerator& random() override { return random_; }
+  Envoy::Runtime::Loader& runtime() override { return runtime_; }
+  Stats::Scope& scope() override { return stats_scope_; }
+  Singleton::Manager& singletonManager() override { return singleton_manager_; }
+  ThreadLocal::SlotAllocator& threadLocal() override { return tls_; }
+  Server::Admin& admin() override { return admin_; }
+  TimeSource& timeSource() override { return api().timeSource(); }
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
+    return validation_visitor_;
+  }
+  Api::Api& api() override { return api_; }
+
+private:
+  Server::Admin& admin_;
+  Stats::Scope& stats_scope_;
+  Upstream::ClusterManager& cluster_manager_;
+  const LocalInfo::LocalInfo& local_info_;
+  Event::Dispatcher& dispatcher_;
+  Envoy::Runtime::RandomGenerator& random_;
+  Envoy::Runtime::Loader& runtime_;
+  Singleton::Manager& singleton_manager_;
+  ThreadLocal::SlotAllocator& tls_;
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
+  Api::Api& api_;
+};
+
+ClusterInfoImpl::ClusterInfoImpl(
+    const envoy::api::v2::Cluster& config, const envoy::api::v2::core::BindConfig& bind_config,
+    Runtime::Loader& runtime, Network::TransportSocketFactoryPtr&& socket_factory,
+    Stats::ScopePtr&& stats_scope, bool added_via_api,
+    ProtobufMessage::ValidationVisitor& validation_visitor,
+    Server::Configuration::TransportSocketFactoryContext& factory_context)
     : runtime_(runtime), name_(config.name()), type_(config.type()),
       max_requests_per_connection_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_requests_per_connection, 0)),
@@ -578,7 +619,9 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
       cluster_type_(config.has_cluster_type()
                         ? absl::make_optional<envoy::api::v2::Cluster::CustomClusterType>(
                               config.cluster_type())
-                        : absl::nullopt) {
+                        : absl::nullopt),
+      factory_context_(
+          std::make_unique<FactoryContextImpl>(*stats_scope_, runtime, factory_context)) {
   switch (config.lb_policy()) {
   case envoy::api::v2::Cluster::ROUND_ROBIN:
     lb_type_ = LoadBalancerType::RoundRobin;
@@ -642,6 +685,24 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
   // https://github.com/lyft/protoc-gen-validate/issues/97 resolved. This just provides early
   // validation of sanity of fields that we should catch at config ingestion.
   DurationUtil::durationToMilliseconds(common_lb_config_.update_merge_window());
+
+  // Create upstream filter factories
+  auto filters = config.filters();
+  for (ssize_t i = 0; i < filters.size(); i++) {
+    const auto& proto_config = filters[i];
+    const std::string& string_name = proto_config.name();
+    ENVOY_LOG(debug, "  upstream filter #{}:", i);
+    ENVOY_LOG(debug, "    name: {}", string_name);
+    auto& factory = Config::Utility::getAndCheckFactory<
+        Server::Configuration::NamedUpstreamNetworkFilterConfigFactory>(string_name);
+    auto message = factory.createEmptyConfigProto();
+    if (!proto_config.typed_config().value().empty()) {
+      proto_config.typed_config().UnpackTo(message.get());
+    }
+    Network::FilterFactoryCb callback =
+        factory.createFilterFactoryFromProto(*message, *factory_context_);
+    filter_factories_.push_back(callback);
+  }
 }
 
 ProtocolOptionsConfigConstSharedPtr
@@ -678,6 +739,12 @@ Network::TransportSocketFactoryPtr createTransportSocketFactory(
   return config_factory.createTransportSocketFactory(*message, factory_context);
 }
 
+void ClusterInfoImpl::createNetworkFilterChain(Network::Connection& connection) const {
+  for (const auto& factory : filter_factories_) {
+    factory(connection);
+  }
+}
+
 ClusterImplBase::ClusterImplBase(
     const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
@@ -689,7 +756,8 @@ ClusterImplBase::ClusterImplBase(
   auto socket_factory = createTransportSocketFactory(cluster, factory_context);
   info_ = std::make_unique<ClusterInfoImpl>(
       cluster, factory_context.clusterManager().bindConfig(), runtime, std::move(socket_factory),
-      std::move(stats_scope), added_via_api, factory_context.messageValidationVisitor());
+      std::move(stats_scope), added_via_api, factory_context.messageValidationVisitor(),
+      factory_context);
   // Create the default (empty) priority set before registering callbacks to
   // avoid getting an update the first time it is accessed.
   priority_set_.getOrCreateHostSet(0);

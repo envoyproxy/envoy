@@ -329,7 +329,8 @@ customers, of which approximately 400 are using Seven in production. [links]
 We announce on our blog all upstream patches we apply to "Seven." [link to blog
 posts]
 
-> 4. Not be a downstream or rebuild of another distribution.
+> 4. Not be a downstream or rebuild of another distribution. If you offer Envoy as a publicly
+>    available infrastructure or platform service, this condition does not need to apply.
 
 This does not apply, "Seven" is a unique snowflake distribution.
 
@@ -376,6 +377,7 @@ CrashOverride will vouch for the "Seven" distribution joining the distribution l
 | vulnerabilityreports@cloudfoundry.org     | Cloud Foundry |
 | secalert@datawire.io                      | Datawire      |
 | google-internal-envoy-security@google.com | Google        |
+| argoprod@us.ibm.com                       | IBM           |
 | vulnerabilities@discuss.istio.io          | Istio         |
 | secalert@redhat.com                       | Red Hat       |
 | envoy-security@solo.io                    | solo.io       |

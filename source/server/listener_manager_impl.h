@@ -226,7 +226,7 @@ public:
   ListenerImpl(const envoy::api::v2::Listener& config, const std::string& version_info,
                ListenerManagerImpl& parent, const std::string& name, bool modifiable,
                bool workers_started, uint64_t hash);
-  ~ListenerImpl();
+  ~ListenerImpl() override;
 
   /**
    * Helper functions to determine whether a listener is blocked for update or remove.
@@ -297,6 +297,9 @@ public:
   Admin& admin() override { return parent_.server_.admin(); }
   const envoy::api::v2::core::Metadata& listenerMetadata() const override {
     return config_.metadata();
+  };
+  envoy::api::v2::core::TrafficDirection direction() const override {
+    return config_.traffic_direction();
   };
   TimeSource& timeSource() override { return api().timeSource(); }
   void ensureSocketOptions() {

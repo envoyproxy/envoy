@@ -50,7 +50,7 @@ public:
         api_(Api::createApiForTest()), mock_dispatcher_(dispatcher),
         mock_upstream_ready_timer_(upstream_ready_timer) {}
 
-  ~ConnPoolImplForTest() {
+  ~ConnPoolImplForTest() override {
     EXPECT_EQ(0U, ready_clients_.size());
     EXPECT_EQ(0U, busy_clients_.size());
     EXPECT_EQ(0U, pending_requests_.size());
@@ -128,7 +128,7 @@ public:
       : upstream_ready_timer_(new NiceMock<Event::MockTimer>(&dispatcher_)),
         conn_pool_(dispatcher_, cluster_, upstream_ready_timer_) {}
 
-  ~Http1ConnPoolImplTest() {
+  ~Http1ConnPoolImplTest() override {
     EXPECT_TRUE(TestUtility::gaugesZeroed(cluster_->stats_store_.gauges()));
   }
 
@@ -267,6 +267,38 @@ TEST_F(Http1ConnPoolImplTest, VerifyBufferLimits) {
 
   EXPECT_CALL(conn_pool_, onClientDestroy());
   EXPECT_CALL(callbacks.pool_failure_, ready());
+  conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  dispatcher_.clearDeferredDeleteList();
+}
+
+/**
+ * Verify that canceling pending connections within the callback works.
+ */
+TEST_F(Http1ConnPoolImplTest, VerifyCancelInCallback) {
+  Http::ConnectionPool::Cancellable* handle1{};
+  // In this scenario, all connections must succeed, so when
+  // one fails, the others are canceled.
+  // Note: We rely on the fact that the implementation cancels the second request first,
+  // to simplify the test.
+  ConnPoolCallbacks callbacks1;
+  EXPECT_CALL(callbacks1.pool_failure_, ready()).Times(0);
+  ConnPoolCallbacks callbacks2;
+  EXPECT_CALL(callbacks2.pool_failure_, ready()).WillOnce(Invoke([&]() -> void {
+    handle1->cancel();
+  }));
+
+  NiceMock<Http::MockStreamDecoder> outer_decoder;
+  // Create the first client.
+  conn_pool_.expectClientCreate();
+  handle1 = conn_pool_.newStream(outer_decoder, callbacks1);
+  ASSERT_NE(nullptr, handle1);
+
+  // Create the second client.
+  Http::ConnectionPool::Cancellable* handle2 = conn_pool_.newStream(outer_decoder, callbacks2);
+  ASSERT_NE(nullptr, handle2);
+
+  // Simulate connection failure.
+  EXPECT_CALL(conn_pool_, onClientDestroy());
   conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   dispatcher_.clearDeferredDeleteList();
 }

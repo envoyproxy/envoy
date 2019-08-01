@@ -172,10 +172,7 @@ protected:
   void initialize(const std::string& bootstrap_path) { initialize(bootstrap_path, false); }
 
   void initialize(const std::string& bootstrap_path, const bool use_intializing_instance) {
-    if (bootstrap_path.empty() && options_.config_path_.empty()) {
-      options_.config_path_ = TestEnvironment::temporaryFileSubstitute(
-          "test/config/integration/server.json", {{"upstream_0", 0}, {"upstream_1", 0}}, version_);
-    } else if (options_.config_path_.empty()) {
+    if (options_.config_path_.empty()) {
       options_.config_path_ = TestEnvironment::temporaryFileSubstitute(
           bootstrap_path, {{"upstream_0", 0}, {"upstream_1", 0}}, version_);
     }
@@ -455,6 +452,25 @@ TEST_P(ServerInstanceImplTest, BootstrapNode) {
   EXPECT_EQ(VersionInfo::version(), server_->localInfo().node().build_version());
 }
 
+TEST_P(ServerInstanceImplTest, LoadsBootstrapFromConfigProtoOptions) {
+  options_.config_proto_.mutable_node()->set_id("foo");
+  initialize("test/server/node_bootstrap.yaml");
+  EXPECT_EQ("foo", server_->localInfo().node().id());
+}
+
+TEST_P(ServerInstanceImplTest, LoadsBootstrapFromConfigYamlAfterConfigPath) {
+  options_.config_yaml_ = "node:\n  id: 'bar'";
+  initialize("test/server/node_bootstrap.yaml");
+  EXPECT_EQ("bar", server_->localInfo().node().id());
+}
+
+TEST_P(ServerInstanceImplTest, LoadsBootstrapFromConfigProtoOptionsLast) {
+  options_.config_yaml_ = "node:\n  id: 'bar'";
+  options_.config_proto_.mutable_node()->set_id("foo");
+  initialize("test/server/node_bootstrap.yaml");
+  EXPECT_EQ("foo", server_->localInfo().node().id());
+}
+
 // Validate server localInfo() from bootstrap Node with CLI overrides.
 TEST_P(ServerInstanceImplTest, BootstrapNodeWithOptionsOverride) {
   options_.service_cluster_name_ = "some_cluster_name";
@@ -568,17 +584,37 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithoutAccessLog) {
                             "An admin access log path is required for a listening server.");
 }
 
+namespace {
+void bindAndListenTcpSocket(const Network::Address::InstanceConstSharedPtr& address,
+                            const Network::Socket::OptionsSharedPtr& options) {
+  auto socket = std::make_unique<Network::TcpListenSocket>(address, options, true);
+  // Some kernels erroneously allow `bind` without SO_REUSEPORT for addresses
+  // with some other socket already listening on it, see #7636.
+  if (::listen(socket->ioHandle().fd(), 1) != 0) {
+    // Mimic bind exception for the test simplicity.
+    throw Network::SocketBindException(fmt::format("cannot listen: {}", strerror(errno)), errno);
+  }
+}
+} // namespace
+
 // Test that `socket_options` field in an Admin proto is honored.
 TEST_P(ServerInstanceImplTest, BootstrapNodeWithSocketOptions) {
+  // Start Envoy instance with admin port with SO_REUSEPORT option.
   ASSERT_NO_THROW(initialize("test/server/node_bootstrap_with_admin_socket_options.yaml"));
   const auto address = server_->admin().socket().localAddress();
-  EXPECT_THAT_THROWS_MESSAGE(std::make_unique<Network::TcpListenSocket>(address, nullptr, true),
-                             EnvoyException, HasSubstr("Address already in use"));
+
+  // First attempt to bind and listen socket should fail due to the lack of SO_REUSEPORT socket
+  // options.
+  EXPECT_THAT_THROWS_MESSAGE(bindAndListenTcpSocket(address, nullptr), EnvoyException,
+                             HasSubstr(strerror(EADDRINUSE)));
+
+  // Second attempt should succeed as kernel allows multiple sockets to listen the same address iff
+  // both of them use SO_REUSEPORT socket option.
   auto options = std::make_shared<Network::Socket::Options>();
   options->emplace_back(std::make_shared<Network::SocketOptionImpl>(
       envoy::api::v2::core::SocketOption::STATE_PREBIND,
       ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_REUSEPORT), 1));
-  EXPECT_NO_THROW(std::make_unique<Network::TcpListenSocket>(address, options, true));
+  EXPECT_NO_THROW(bindAndListenTcpSocket(address, options));
 }
 
 // Empty bootstrap succeeds.
@@ -654,7 +690,9 @@ TEST_P(ServerInstanceImplTest, NoOptionsPassed) {
           hooks_, restart_, stats_store_, fakelock_, component_factory_,
           std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
           Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr)),
-      EnvoyException, "At least one of --config-path and --config-yaml should be non-empty");
+      EnvoyException,
+      "At least one of --config-path or --config-yaml or Options::configProto() should be "
+      "non-empty");
 }
 
 // Validate that when std::exception is unexpectedly thrown, we exit safely.

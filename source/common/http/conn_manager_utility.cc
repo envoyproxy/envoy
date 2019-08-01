@@ -41,14 +41,13 @@ std::string ConnectionManagerUtility::determineNextProtocol(Network::Connection&
 ServerConnectionPtr ConnectionManagerUtility::autoCreateCodec(
     Network::Connection& connection, const Buffer::Instance& data,
     ServerConnectionCallbacks& callbacks, Stats::Scope& scope, const Http1Settings& http1_settings,
-    const Http2Settings& http2_settings, const uint32_t max_request_headers_kb,
-    bool strict_header_validation) {
+    const Http2Settings& http2_settings, const uint32_t max_request_headers_kb) {
   if (determineNextProtocol(connection, data) == Http2::ALPN_STRING) {
     return std::make_unique<Http2::ServerConnectionImpl>(connection, callbacks, scope,
                                                          http2_settings, max_request_headers_kb);
   } else {
-    return std::make_unique<Http1::ServerConnectionImpl>(
-        connection, callbacks, http1_settings, max_request_headers_kb, strict_header_validation);
+    return std::make_unique<Http1::ServerConnectionImpl>(connection, callbacks, http1_settings,
+                                                         max_request_headers_kb);
   }
 }
 
@@ -392,10 +391,15 @@ void ConnectionManagerUtility::mutateResponseHeaders(HeaderMap& response_headers
 bool ConnectionManagerUtility::maybeNormalizePath(HeaderMap& request_headers,
                                                   const ConnectionManagerConfig& config) {
   ASSERT(request_headers.Path());
+  bool is_valid_path = true;
   if (config.shouldNormalizePath()) {
-    return PathUtil::canonicalPath(*request_headers.Path());
+    is_valid_path = PathUtil::canonicalPath(*request_headers.Path());
   }
-  return true;
+  // Merge slashes after path normalization to catch potential edge cases with percent encoding.
+  if (is_valid_path && config.shouldMergeSlashes()) {
+    PathUtil::mergeSlashes(*request_headers.Path());
+  }
+  return is_valid_path;
 }
 
 } // namespace Http

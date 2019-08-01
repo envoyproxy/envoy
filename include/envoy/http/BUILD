@@ -62,6 +62,7 @@ envoy_cc_library(
         ":codec_interface",
         ":header_map_interface",
         "//include/envoy/access_log:access_log_interface",
+        "//include/envoy/common:scope_tracker_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/grpc:status",
         "//include/envoy/router:router_interface",

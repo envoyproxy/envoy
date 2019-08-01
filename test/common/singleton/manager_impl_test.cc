@@ -29,7 +29,7 @@ static Registry::RegisterFactory<Singleton::RegistrationImpl<test_singleton_name
 
 class TestSingleton : public Instance {
 public:
-  ~TestSingleton() { onDestroy(); }
+  ~TestSingleton() override { onDestroy(); }
 
   MOCK_METHOD0(onDestroy, void());
 };
