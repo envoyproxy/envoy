@@ -76,6 +76,9 @@ message AccessLogFilter {
 
     // gRPC status filter.
     GrpcStatusFilter grpc_status_filter = 10;
+
+    // Extension filter.
+    ExtensionFilter extension_filter = 11;
   }
 }
 
@@ -226,4 +229,17 @@ message GrpcStatusFilter {
   // If included and set to true, the filter will instead block all responses with a gRPC status or
   // inferred gRPC status enumerated in statuses, and allow all other responses.
   bool exclude = 2;
+}
+
+// Extension filter is statically registered at runtime.
+message ExtensionFilter {
+  // The name of the filter implementation to instantiate. The name must
+  // match a statically registered filter.
+  string name = 1;
+
+  // Custom configuration that depends on the filter being instantiated.
+  oneof config_type {
+    google.protobuf.Struct config = 2;
+    google.protobuf.Any typed_config = 3;
+  }
 }

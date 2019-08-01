@@ -79,6 +79,9 @@ public:
   void sendLocalReply(MessageMetadata& metadata, const DubboFilters::DirectResponse& response,
                       bool end_stream);
 
+  // This function is for testing only.
+  std::list<ActiveMessagePtr>& getActiveMessagesForTest() { return active_message_list_; }
+
 private:
   void dispatch();
   void resetAllMessages(bool local_reset);
