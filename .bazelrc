@@ -16,8 +16,8 @@ build --experimental_local_memory_estimate
 build --host_force_python=PY2
 build --action_env=BAZEL_LINKLIBS=-l%:libstdc++.a
 build --action_env=BAZEL_LINKOPTS=-lm:-static-libgcc
-build --host_javabase=@bazel_tools//tools/jdk:remote_jdk
-build --javabase=@bazel_tools//tools/jdk:remote_jdk
+build --host_javabase=@bazel_tools//tools/jdk:remote_jdk11
+build --javabase=@bazel_tools//tools/jdk:remote_jdk11
 
 # Basic ASAN/UBSAN that works for gcc
 build:asan --action_env=BAZEL_LINKLIBS=
