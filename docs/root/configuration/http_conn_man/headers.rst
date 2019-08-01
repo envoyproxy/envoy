@@ -622,8 +622,8 @@ Supported variable names are:
 
       route:
         cluster: www
-        request_headers_to_add:
-          - header:
-              key: "x-request-start"
-              value: "%START_TIME(%s.%3f)%"
-            append: true
+      request_headers_to_add:
+        - header:
+            key: "x-request-start"
+            value: "%START_TIME(%s.%3f)%"
+          append: true
