@@ -173,8 +173,8 @@ private:
     // either because [de|en]codeHeaders() of the current filter returns StopAllIteration or because
     // [de|en]codeHeaders() adds new metadata to [de|en]code, but we don't know
     // [de|en]codeHeaders()'s return value yet. The storage is created on demand.
-    std::unique_ptr<MetadataMapVector> saved_request_metadata_ = nullptr;
-    std::unique_ptr<MetadataMapVector> saved_response_metadata_ = nullptr;
+    std::unique_ptr<MetadataMapVector> saved_request_metadata_{nullptr};
+    std::unique_ptr<MetadataMapVector> saved_response_metadata_{nullptr};
     // The state of iteration.
     enum class IterationState {
       Continue,            // Iteration has not stopped for any frame type.
