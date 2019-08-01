@@ -71,9 +71,10 @@ envoy_status_t locally_close_stream(envoy_stream_t stream);
 envoy_status_t reset_stream(envoy_stream_t stream);
 
 /**
- * External entrypoint for library.
+ * External entry point for library.
  * @param config, the configuration blob to run envoy with.
  * @param log_level, the logging level to run envoy with.
+ * @return envoy_status_t, the resulting status of the operation.
  */
 envoy_status_t run_engine(const char* config, const char* log_level);
 
