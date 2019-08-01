@@ -113,7 +113,7 @@ public:
   std::unordered_map<std::string, AuthenticatorCallback>
   createAsyncMockAuthsAndVerifier(const std::vector<std::string>& providers) {
     std::unordered_map<std::string, AuthenticatorCallback> callbacks;
-    for (std::size_t i = 0; i < providers.size(); ++i) {
+    for (const auto& provider : providers) {
       auto mock_auth = std::make_unique<MockAuthenticator>();
       EXPECT_CALL(*mock_auth, doVerify(_, _, _, _))
           .WillOnce(Invoke(
@@ -122,7 +122,7 @@ public:
                 callbacks[iss] = std::move(callback);
               }));
       EXPECT_CALL(*mock_auth, onDestroy()).Times(1);
-      mock_auths_[providers[i]] = std::move(mock_auth);
+      mock_auths_[provider] = std::move(mock_auth);
     }
     createVerifier();
     return callbacks;
