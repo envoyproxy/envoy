@@ -5,8 +5,7 @@ executors:
     description: "A regular build executor based on ubuntu image"
     docker:
       # NOTE: Update bazel/toolchains/rbe_toolchains_config.bzl with sha256 digest to match the image here.
-      # revert back once image tested
-      - image: gcr.io/tetratelabs/envoy-build:ec9150342c7d270216faf8df87ecc9e1e8fc373b
+      - image: envoyproxy/envoy-build:b02c73f3ebbaf5c7852fa814eb3d61e841588068
     resource_class: xlarge
     working_directory: /source
 

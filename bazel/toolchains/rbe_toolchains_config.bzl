@@ -3,14 +3,9 @@ load("@bazel_toolchains//rules:rbe_repo.bzl", "rbe_autoconfig")
 load("@envoy//bazel/toolchains:configs/versions.bzl", _generated_toolchain_config_suite_autogen_spec = "TOOLCHAIN_CONFIG_AUTOGEN_SPEC")
 
 _ENVOY_BUILD_IMAGE_REGISTRY = "gcr.io"
-_ENVOY_BUILD_IMAGE_REPOSITORY = "tetratelabs/envoy-build"
-_ENVOY_BUILD_IMAGE_DIGEST = "sha256:ec159c0ef37835d870de0ca03ec60c9074ec61cd5985a932114fea34cb0be3b8"
+_ENVOY_BUILD_IMAGE_REPOSITORY = "envoy-ci/envoy-build"
+_ENVOY_BUILD_IMAGE_DIGEST = "sha256:555fb7b0aa578d11852b57c6c14fd54ab4450ad001a9f03bb5c43d5454460c28"
 _CONFIGS_OUTPUT_BASE = "bazel/toolchains/configs"
-
-# We don't have JDK in the image anymore other than Bazel embedded one though it is not usable outside Bazel.
-# This is a workaround to https://github.com/bazelbuild/bazel-toolchains/issues/649 otherwise config generation doesn't work.
-# TODO(lizan): Clean this up once the issue above is resolved.
-_ENVOY_BUILD_IMAGE_JAVA_HOME = "/usr/lib/jvm/java-8-openjdk-amd64"
 
 _CLANG_ENV = {
     "BAZEL_COMPILER": "clang",
@@ -51,7 +46,7 @@ def _envoy_rbe_toolchain(name, env, toolchain_config_spec_name):
     rbe_autoconfig(
         name = name + "_gen",
         export_configs = True,
-        java_home = _ENVOY_BUILD_IMAGE_JAVA_HOME,
+        create_java_configs = False,
         digest = _ENVOY_BUILD_IMAGE_DIGEST,
         registry = _ENVOY_BUILD_IMAGE_REGISTRY,
         repository = _ENVOY_BUILD_IMAGE_REPOSITORY,
@@ -63,7 +58,7 @@ def _envoy_rbe_toolchain(name, env, toolchain_config_spec_name):
 
     rbe_autoconfig(
         name = name,
-        java_home = _ENVOY_BUILD_IMAGE_JAVA_HOME,
+        create_java_configs = False,
         digest = _ENVOY_BUILD_IMAGE_DIGEST,
         registry = _ENVOY_BUILD_IMAGE_REGISTRY,
         repository = _ENVOY_BUILD_IMAGE_REPOSITORY,
