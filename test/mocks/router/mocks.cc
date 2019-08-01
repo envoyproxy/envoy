@@ -126,6 +126,7 @@ MockRouteConfigProviderManager::~MockRouteConfigProviderManager() {}
 MockScopedConfig::MockScopedConfig() {
   ON_CALL(*this, getRouteConfig(_)).WillByDefault(Return(route_config_));
 }
+MockScopedConfig::~MockScopedConfig() = default;
 
 MockScopedRouteConfigProvider::MockScopedRouteConfigProvider()
     : config_(std::make_shared<MockScopedConfig>()) {

@@ -21,6 +21,7 @@ class DummyConfigProviderManager;
 
 class DummyConfig : public Envoy::Config::ConfigProvider::Config {
 public:
+  DummyConfig() {}
   explicit DummyConfig(const test::common::config::DummyConfig& config_proto) {
     protos_.push_back(config_proto);
   }
