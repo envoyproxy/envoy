@@ -203,7 +203,7 @@ TEST_F(StreamInfoImplTest, DynamicMetadataTest) {
 
 TEST_F(StreamInfoImplTest, DumpStateTest) {
   StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem());
-  std::string prefix = "";
+  std::string prefix;
 
   for (int i = 0; i < 7; ++i) {
     std::stringstream out;

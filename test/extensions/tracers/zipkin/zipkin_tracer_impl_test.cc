@@ -510,7 +510,7 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3HeadersEmptyParentSpanTest) {
                                    ZipkinCoreConstants::get().SAMPLED);
 
   // Set parent span id to empty string, to ensure it is ignored
-  const std::string parent_span_id = "";
+  const std::string parent_span_id;
   request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID, parent_span_id);
 
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,

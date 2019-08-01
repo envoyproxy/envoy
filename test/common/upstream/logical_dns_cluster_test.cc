@@ -198,7 +198,7 @@ using LogicalDnsConfigTuple =
 std::vector<LogicalDnsConfigTuple> generateLogicalDnsParams() {
   std::vector<LogicalDnsConfigTuple> dns_config;
   {
-    std::string family_yaml("");
+    std::string family_yaml;
     Network::DnsLookupFamily family(Network::DnsLookupFamily::Auto);
     std::list<std::string> dns_response{"127.0.0.1", "127.0.0.2"};
     dns_config.push_back(std::make_tuple(family_yaml, family, dns_response));

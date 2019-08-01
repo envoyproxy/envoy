@@ -30,7 +30,7 @@ protected:
   TestComponentFactory component_factory_;
 };
 
-std::string ValidationServerTest::directory_ = "";
+std::string ValidationServerTest::directory_;
 
 // ValidationServerTest_1 is created only to run different set of parameterized
 // tests than set of tests for ValidationServerTest.

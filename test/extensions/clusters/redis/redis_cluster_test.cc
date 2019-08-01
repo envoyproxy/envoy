@@ -458,7 +458,7 @@ using RedisDnsConfigTuple = std::tuple<std::string, Network::DnsLookupFamily,
 std::vector<RedisDnsConfigTuple> generateRedisDnsParams() {
   std::vector<RedisDnsConfigTuple> dns_config;
   {
-    std::string family_yaml("");
+    std::string family_yaml;
     Network::DnsLookupFamily family(Network::DnsLookupFamily::Auto);
     std::list<std::string> dns_response{"127.0.0.1", "127.0.0.2"};
     std::list<std::string> resolved_host{"127.0.0.1:22120"};

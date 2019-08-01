@@ -67,7 +67,7 @@ TEST(StringDeserializer, ShouldDeserialize) {
 }
 
 TEST(StringDeserializer, ShouldDeserializeEmptyString) {
-  const std::string value = "";
+  const std::string value;
   serializeThenDeserializeAndCheckEquality<StringDeserializer>(value);
 }
 

@@ -88,7 +88,7 @@ TEST(UUIDUtilsTest, setAndCheckTraceable) {
   EXPECT_TRUE(UuidUtils::setTraceableUuid(uuid, UuidTraceStatus::NoTrace));
   EXPECT_EQ(UuidTraceStatus::NoTrace, UuidUtils::isTraceableUuid(uuid));
 
-  std::string invalid_uuid = "";
+  std::string invalid_uuid;
   EXPECT_FALSE(UuidUtils::setTraceableUuid(invalid_uuid, UuidTraceStatus::Forced));
 }
 } // namespace Envoy

@@ -82,7 +82,7 @@ TEST_F(MySQLCodecTest, MySQLServerChallengeV10EncDec) {
  */
 TEST_F(MySQLCodecTest, MySQLServerChallengeIncompleteProtocol) {
   ServerGreeting mysql_greet_encode{};
-  std::string data = "";
+  std::string data;
 
   Buffer::InstancePtr decode_data(new Buffer::OwnedImpl(data));
   ServerGreeting mysql_greet_decode{};

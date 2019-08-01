@@ -470,7 +470,7 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CERT");
     NiceMock<Ssl::MockConnectionInfo> connection_info;
-    std::string expected_cert = "";
+    std::string expected_cert;
     ON_CALL(connection_info, urlEncodedPemEncodedPeerCertificate())
         .WillByDefault(ReturnRef(expected_cert));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(&connection_info));

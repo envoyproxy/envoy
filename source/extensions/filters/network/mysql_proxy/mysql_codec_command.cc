@@ -31,7 +31,7 @@ int Command::parseMessage(Buffer::Instance& buffer, uint32_t len) {
   case Command::Cmd::COM_INIT_DB:
   case Command::Cmd::COM_CREATE_DB:
   case Command::Cmd::COM_DROP_DB: {
-    std::string db = "";
+    std::string db;
     BufferHelper::readStringBySize(buffer, len - 1, db);
     setDb(db);
     break;

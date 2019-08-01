@@ -206,7 +206,7 @@ bool RouterCheckTool::compareEntries(const std::string& expected_routes) {
 }
 
 bool RouterCheckTool::compareCluster(ToolConfig& tool_config, const std::string& expected) {
-  std::string actual = "";
+  std::string actual;
 
   if (tool_config.route_->routeEntry() != nullptr) {
     actual = tool_config.route_->routeEntry()->clusterName();
@@ -226,7 +226,7 @@ bool RouterCheckTool::compareCluster(
 }
 
 bool RouterCheckTool::compareVirtualCluster(ToolConfig& tool_config, const std::string& expected) {
-  std::string actual = "";
+  std::string actual;
 
   if (tool_config.route_->routeEntry() != nullptr &&
       tool_config.route_->routeEntry()->virtualCluster(*tool_config.headers_) != nullptr) {
@@ -249,7 +249,7 @@ bool RouterCheckTool::compareVirtualCluster(
 }
 
 bool RouterCheckTool::compareVirtualHost(ToolConfig& tool_config, const std::string& expected) {
-  std::string actual = "";
+  std::string actual;
   if (tool_config.route_->routeEntry() != nullptr) {
     Stats::StatName stat_name = tool_config.route_->routeEntry()->virtualHost().statName();
     actual = tool_config.symbolTable().toString(stat_name);
@@ -269,7 +269,7 @@ bool RouterCheckTool::compareVirtualHost(
 }
 
 bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config, const std::string& expected) {
-  std::string actual = "";
+  std::string actual;
   Envoy::StreamInfo::StreamInfoImpl stream_info(Envoy::Http::Protocol::Http11,
                                                 factory_context_->dispatcher().timeSource());
   if (tool_config.route_->routeEntry() != nullptr) {
@@ -296,7 +296,7 @@ bool RouterCheckTool::compareRewritePath(
 }
 
 bool RouterCheckTool::compareRewriteHost(ToolConfig& tool_config, const std::string& expected) {
-  std::string actual = "";
+  std::string actual;
   Envoy::StreamInfo::StreamInfoImpl stream_info(Envoy::Http::Protocol::Http11,
                                                 factory_context_->dispatcher().timeSource());
   if (tool_config.route_->routeEntry() != nullptr) {
@@ -323,7 +323,7 @@ bool RouterCheckTool::compareRewriteHost(
 }
 
 bool RouterCheckTool::compareRedirectPath(ToolConfig& tool_config, const std::string& expected) {
-  std::string actual = "";
+  std::string actual;
   if (tool_config.route_->directResponseEntry() != nullptr) {
     actual = tool_config.route_->directResponseEntry()->newPath(*tool_config.headers_);
   }
@@ -363,7 +363,7 @@ bool RouterCheckTool::compareHeaderField(ToolConfig& tool_config, const std::str
 
 bool RouterCheckTool::compareCustomHeaderField(ToolConfig& tool_config, const std::string& field,
                                                const std::string& expected) {
-  std::string actual = "";
+  std::string actual;
   Envoy::StreamInfo::StreamInfoImpl stream_info(Envoy::Http::Protocol::Http11,
                                                 factory_context_->dispatcher().timeSource());
   stream_info.setDownstreamRemoteAddress(Network::Utility::getCanonicalIpv4LoopbackAddress());

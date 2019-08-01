@@ -8,7 +8,7 @@ namespace ThriftProxy {
 static const std::string TApplicationException = "TApplicationException";
 static const std::string MessageField = "message";
 static const std::string TypeField = "type";
-static const std::string StopField = "";
+static const std::string StopField;
 
 DirectResponse::ResponseType AppException::encode(MessageMetadata& metadata,
                                                   ThriftProxy::Protocol& proto,
