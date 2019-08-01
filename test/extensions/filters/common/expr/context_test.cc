@@ -27,7 +27,7 @@ constexpr absl::string_view Undefined = "undefined";
 TEST(Context, RequestAttributes) {
   NiceMock<StreamInfo::MockStreamInfo> info;
   Http::TestHeaderMapImpl header_map{
-      {":method", "POST"},           {":scheme", "http"},      {":path", "/meow"},
+      {":method", "POST"},           {":scheme", "http"},      {":path", "/meow?yes=1"},
       {":authority", "kittens.com"}, {"referer", "dogs.com"},  {"user-agent", "envoy-mobile"},
       {"content-length", "10"},      {"x-request-id", "blah"},
   };
@@ -60,6 +60,13 @@ TEST(Context, RequestAttributes) {
 
   {
     auto value = request[CelValue::CreateString(Path)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ("/meow?yes=1", value.value().StringOrDie().value());
+  }
+
+  {
+    auto value = request[CelValue::CreateString(UrlPath)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsString());
     EXPECT_EQ("/meow", value.value().StringOrDie().value());
@@ -105,7 +112,7 @@ TEST(Context, RequestAttributes) {
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsInt64());
     // this includes the headers size
-    EXPECT_EQ(132, value.value().Int64OrDie());
+    EXPECT_EQ(138, value.value().Int64OrDie());
   }
 
   {
@@ -177,10 +184,12 @@ TEST(Context, ConnectionAttributes) {
       Network::Utility::parseInternetAddress("10.20.30.40", 456, false);
   Network::Address::InstanceConstSharedPtr upstream =
       Network::Utility::parseInternetAddress("10.1.2.3", 679, false);
+  const std::string sni_name = "kittens.com";
   EXPECT_CALL(info, downstreamLocalAddress()).WillRepeatedly(ReturnRef(local));
   EXPECT_CALL(info, downstreamRemoteAddress()).WillRepeatedly(ReturnRef(remote));
   EXPECT_CALL(info, downstreamSslConnection()).WillRepeatedly(Return(&connection_info));
   EXPECT_CALL(info, upstreamHost()).WillRepeatedly(Return(host));
+  EXPECT_CALL(info, requestedServerName()).WillRepeatedly(ReturnRef(sni_name));
   EXPECT_CALL(connection_info, peerCertificatePresented()).WillRepeatedly(Return(true));
   EXPECT_CALL(*host, address()).WillRepeatedly(Return(upstream));
 
@@ -236,6 +245,13 @@ TEST(Context, ConnectionAttributes) {
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsBool());
     EXPECT_TRUE(value.value().BoolOrDie());
+  }
+
+  {
+    auto value = connection[CelValue::CreateString(RequestedServerName)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ(sni_name, value.value().StringOrDie().value());
   }
 }
 

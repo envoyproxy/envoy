@@ -16,6 +16,7 @@ Version history
 * tls: added verification of IP address SAN fields in certificates against configured SANs in the
   certificate validation context.
 * upstream: added network filter chains to upstream connections, see :ref:`filters<envoy_api_field_Cluster.filters>`.
+* rbac: added conditions to the policy, see :ref:`requested server name <envoy_api_field_config.rbac.v2.Policy.condition>`.
 
 1.11.0 (July 11, 2019)
 ======================

@@ -35,6 +35,13 @@ absl::optional<CelValue> RequestWrapper::operator[](CelValue key) const {
   auto value = key.StringOrDie().value();
   if (value == Path) {
     return convertHeaderEntry(wrapper_.headers_.Path());
+  } else if (value == UrlPath) {
+    absl::string_view path = wrapper_.headers_.Path()->value().getStringView();
+    size_t query_offset = path.find('?');
+    if (query_offset == absl::string_view::npos) {
+      return CelValue::CreateString(path);
+    }
+    return CelValue::CreateString(path.substr(0, query_offset));
   } else if (value == Host) {
     return convertHeaderEntry(wrapper_.headers_.Host());
   } else if (value == Scheme) {
@@ -119,6 +126,8 @@ absl::optional<CelValue> ConnectionWrapper::operator[](CelValue key) const {
   } else if (value == MTLS) {
     return CelValue::CreateBool(info_.downstreamSslConnection() != nullptr &&
                                 info_.downstreamSslConnection()->peerCertificatePresented());
+  } else if (value == RequestedServerName) {
+    return CelValue::CreateString(info_.requestedServerName());
   }
 
   return {};

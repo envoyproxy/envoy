@@ -17,6 +17,7 @@ using CelValue = google::api::expr::runtime::CelValue;
 // Symbols for traversing the request properties
 constexpr absl::string_view Request = "request";
 constexpr absl::string_view Path = "path";
+constexpr absl::string_view UrlPath = "url_path";
 constexpr absl::string_view Host = "host";
 constexpr absl::string_view Scheme = "scheme";
 constexpr absl::string_view Method = "method";
@@ -45,6 +46,7 @@ constexpr absl::string_view RemotePort = "remote_port";
 constexpr absl::string_view UpstreamAddress = "upstream_address";
 constexpr absl::string_view UpstreamPort = "upstream_port";
 constexpr absl::string_view MTLS = "mtls";
+constexpr absl::string_view RequestedServerName = "requested_server_name";
 
 class RequestWrapper;
 

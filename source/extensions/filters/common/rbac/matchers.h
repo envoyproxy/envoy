@@ -181,7 +181,7 @@ private:
  * matches a permission, the principals are then checked for a match.
  * The condition is a conjunction clause.
  */
-class PolicyMatcher : public Matcher {
+class PolicyMatcher : public Matcher, NonCopyable {
 public:
   PolicyMatcher(const envoy::config::rbac::v2::Policy& policy, Expr::Builder* builder)
       : permissions_(policy.permissions()), principals_(policy.principals()),
