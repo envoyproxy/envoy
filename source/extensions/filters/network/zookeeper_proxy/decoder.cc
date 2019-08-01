@@ -200,11 +200,9 @@ void DecoderImpl::decodeOnWrite(Buffer::Instance& data, uint64_t& offset) {
 
   // Find the corresponding request for this XID.
   const auto it = requests_by_xid_.find(xid);
-  if (it == requests_by_xid_.end()) {
-    // If this happens, it's a server-side bug.
-    ASSERT(false);
-    return;
-  }
+
+  // If this fails, it's a server-side bug.
+  ASSERT(it != requests_by_xid_.end());
 
   const auto opcode = it->second;
   requests_by_xid_.erase(it);
