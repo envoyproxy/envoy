@@ -47,7 +47,7 @@ public:
   }
 
   void validateAssignment(Upstream::HostVector& hosts,
-                          const std::vector<std::pair<uint32_t, uint32_t>> expected_assignments,
+                          const std::vector<std::pair<uint32_t, uint32_t>>& expected_assignments,
                           bool read_command = false,
                           NetworkFilters::Common::Redis::Client::ReadPolicy read_policy =
                               NetworkFilters::Common::Redis::Client::ReadPolicy::Master) {
@@ -264,6 +264,38 @@ TEST_F(RedisClusterLoadBalancerTest, ReadStrategiesUnhealthyReplica) {
   ON_CALL(random_, random()).WillByDefault(Return(1));
   validateAssignment(hosts, master_assignments, true,
                      NetworkFilters::Common::Redis::Client::ReadPolicy::Any);
+}
+
+TEST_F(RedisClusterLoadBalancerTest, ReadStrategiesNoReplica) {
+  Upstream::HostVector hosts{Upstream::makeTestHost(info_, "tcp://127.0.0.1:90"),
+                             Upstream::makeTestHost(info_, "tcp://127.0.0.1:91")};
+
+  ClusterSlotsPtr slots = std::make_unique<std::vector<ClusterSlot>>(std::vector<ClusterSlot>{
+      ClusterSlot(0, 2000, hosts[0]->address()),
+      ClusterSlot(2001, 16383, hosts[1]->address()),
+  });
+  Upstream::HostMap all_hosts;
+  std::transform(hosts.begin(), hosts.end(), std::inserter(all_hosts, all_hosts.end()), makePair);
+  init();
+  factory_->onClusterSlotUpdate(std::move(slots), all_hosts);
+
+  // A list of (hash: host_index) pair
+  const std::vector<std::pair<uint32_t, uint32_t>> master_assignments = {
+      {0, 0}, {1100, 0}, {2000, 0}, {18382, 0}, {2001, 1}, {2100, 1}, {16383, 1}, {19382, 1}};
+  validateAssignment(hosts, master_assignments, true,
+                     NetworkFilters::Common::Redis::Client::ReadPolicy::Master);
+  validateAssignment(hosts, master_assignments, true,
+                     NetworkFilters::Common::Redis::Client::ReadPolicy::PreferMaster);
+  validateAssignment(hosts, master_assignments, true,
+                     NetworkFilters::Common::Redis::Client::ReadPolicy::Any);
+  validateAssignment(hosts, master_assignments, true,
+                     NetworkFilters::Common::Redis::Client::ReadPolicy::PreferReplica);
+
+  Upstream::LoadBalancerPtr lb = lb_->factory()->create();
+  TestLoadBalancerContext context(1100, true,
+                                  NetworkFilters::Common::Redis::Client::ReadPolicy::Replica);
+  auto host = lb->chooseHost(&context);
+  EXPECT_TRUE(host == nullptr);
 }
 
 TEST_F(RedisClusterLoadBalancerTest, ClusterSlotUpdate) {

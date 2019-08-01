@@ -20,7 +20,7 @@ Redis::RespValue makeAuthCommand(const std::string& password) {
 
 ReadOnlyRequest ReadOnlyRequest::instance_;
 
-ReadOnlyRequest::ReadOnlyRequest() : Extensions::NetworkFilters::Common::Redis::RespValue() {
+ReadOnlyRequest::ReadOnlyRequest() {
   std::vector<NetworkFilters::Common::Redis::RespValue> values(1);
   values[0].type(NetworkFilters::Common::Redis::RespType::BulkString);
   values[0].asString() = "readonly";

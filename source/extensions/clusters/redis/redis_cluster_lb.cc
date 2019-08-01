@@ -41,7 +41,7 @@ bool RedisClusterLoadBalancerFactory::onClusterSlotUpdate(ClusterSlotsPtr&& slot
       Upstream::HostVectorSharedPtr replicas = std::make_shared<Upstream::HostVector>();
       master_and_replicas->push_back(master_host->second);
 
-      for (auto slave : slot.slaves()) {
+      for (auto const& slave : slot.slaves()) {
         auto slave_host = all_hosts.find(slave->asString());
         ASSERT(slave_host != all_hosts.end(),
                "we expect all address to be found in the updated_hosts");
@@ -76,7 +76,7 @@ void RedisClusterLoadBalancerFactory::onHostHealthUpdate() {
 
   auto shard_vector = std::make_shared<std::vector<RedisShardSharedPtr>>();
 
-  for (auto shard : *current_shard_vector) {
+  for (auto const& shard : *current_shard_vector) {
     shard_vector->emplace_back(std::make_shared<RedisShard>(
         shard->master(), shard->replicas().hostsPtr(), shard->allHosts().hostsPtr()));
   }

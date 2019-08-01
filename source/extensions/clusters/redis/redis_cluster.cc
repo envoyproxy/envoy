@@ -81,7 +81,7 @@ void RedisCluster::onClusterSlotUpdate(ClusterSlotsPtr&& slots) {
 
   for (const ClusterSlot& slot : *slots) {
     new_hosts.emplace_back(new RedisHost(info(), "", slot.master(), *this, true));
-    for (auto slave : slot.slaves()) {
+    for (auto const& slave : slot.slaves()) {
       new_hosts.emplace_back(new RedisHost(info(), "", slave, *this, false));
     }
   }

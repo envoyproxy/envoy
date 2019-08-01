@@ -53,8 +53,8 @@ private:
   absl::flat_hash_set<Network::Address::InstanceConstSharedPtr> slaves_;
 };
 
-typedef std::unique_ptr<std::vector<ClusterSlot>> ClusterSlotsPtr;
-typedef std::shared_ptr<std::vector<ClusterSlot>> ClusterSlotsSharedPtr;
+using ClusterSlotsPtr = std::unique_ptr<std::vector<ClusterSlot>>;
+using ClusterSlotsSharedPtr = std::shared_ptr<std::vector<ClusterSlot>>;
 
 class RedisLoadBalancerContext {
 public:
@@ -132,12 +132,12 @@ private:
     RedisShard(Upstream::HostConstSharedPtr master, Upstream::HostVectorConstSharedPtr replicas,
                Upstream::HostVectorConstSharedPtr all_hosts)
         : master_(std::move(master)) {
-      replicas_.updateHosts(
-          Upstream::HostSetImpl::partitionHosts(replicas, Upstream::HostsPerLocalityImpl::empty()),
-          nullptr, {}, {});
-      all_hosts_.updateHosts(
-          Upstream::HostSetImpl::partitionHosts(all_hosts, Upstream::HostsPerLocalityImpl::empty()),
-          nullptr, {}, {});
+      replicas_.updateHosts(Upstream::HostSetImpl::partitionHosts(
+                                std::move(replicas), Upstream::HostsPerLocalityImpl::empty()),
+                            nullptr, {}, {});
+      all_hosts_.updateHosts(Upstream::HostSetImpl::partitionHosts(
+                                 std::move(all_hosts), Upstream::HostsPerLocalityImpl::empty()),
+                             nullptr, {}, {});
     }
     Upstream::HostConstSharedPtr master() const { return master_; }
     const Upstream::HostSetImpl& replicas() const { return replicas_; }
@@ -149,10 +149,10 @@ private:
     Upstream::HostSetImpl all_hosts_{0, absl::nullopt};
   };
 
-  typedef std::shared_ptr<const RedisShard> RedisShardSharedPtr;
-  typedef std::shared_ptr<std::vector<RedisShardSharedPtr>> ShardVectorSharedPtr;
-  typedef std::array<uint64_t, MaxSlot> SlotArray;
-  typedef std::shared_ptr<const SlotArray> SlotArraySharedPtr;
+  using RedisShardSharedPtr = std::shared_ptr<const RedisShard>;
+  using ShardVectorSharedPtr = std::shared_ptr<std::vector<RedisShardSharedPtr>>;
+  using SlotArray = std::array<uint64_t, MaxSlot>;
+  using SlotArraySharedPtr = std::shared_ptr<const SlotArray>;
 
   /*
    * This class implements load balancing according to `Redis Cluster
