@@ -118,7 +118,7 @@ public:
       EXPECT_CALL(*mock_auth, doVerify(_, _, _, _))
           .WillOnce(Invoke(
               [&callbacks, iss = provider](Http::HeaderMap&, std::vector<JwtLocationConstPtr>*,
-                                               SetPayloadCallback, AuthenticatorCallback callback) {
+                                           SetPayloadCallback, AuthenticatorCallback callback) {
                 callbacks[iss] = std::move(callback);
               }));
       EXPECT_CALL(*mock_auth, onDestroy()).Times(1);
