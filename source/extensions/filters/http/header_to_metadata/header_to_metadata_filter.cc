@@ -1,5 +1,6 @@
 #include "extensions/filters/http/header_to_metadata/header_to_metadata_filter.h"
 
+#include "common/common/base64.h"
 #include "common/config/well_known_names.h"
 #include "common/protobuf/protobuf.h"
 
@@ -14,7 +15,7 @@ namespace HttpFilters {
 namespace HeaderToMetadataFilter {
 namespace {
 
-const uint32_t MAX_HEADER_VALUE_LEN = 100;
+const uint32_t MAX_HEADER_VALUE_LEN = 10 * 1024;
 
 } // namespace
 
@@ -109,6 +110,18 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& meta
       val.set_number_value(dval);
     } else {
       ENVOY_LOG(debug, "value to number conversion failed");
+      return false;
+    }
+    break;
+  }
+  case envoy::config::filter::http::header_to_metadata::v2::Config_ValueType_BASE64URL_SERIALIZED: {
+    const auto decoded = Base64Url::decode(std::string(value));
+    if (decoded.empty()) {
+      ENVOY_LOG(debug, "Base64Url decode failed");
+      return false;
+    }
+    if (!val.ParseFromString(decoded)) {
+      ENVOY_LOG(debug, "parse from decoded string failed");
       return false;
     }
     break;

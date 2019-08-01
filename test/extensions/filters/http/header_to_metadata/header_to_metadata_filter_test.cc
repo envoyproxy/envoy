@@ -1,4 +1,6 @@
+#include "common/common/base64.h"
 #include "common/http/header_map_impl.h"
+#include "common/protobuf/protobuf.h"
 
 #include "extensions/filters/http/header_to_metadata/header_to_metadata_filter.h"
 
@@ -64,6 +66,15 @@ MATCHER_P(MapEqNum, rhs, "") {
   EXPECT_TRUE(!rhs.empty());
   for (auto const& entry : rhs) {
     EXPECT_EQ(obj.fields().at(entry.first).number_value(), entry.second);
+  }
+  return true;
+}
+
+MATCHER_P(MapEqValue, rhs, "") {
+  const ProtobufWkt::Struct& obj = arg;
+  EXPECT_TRUE(!rhs.empty());
+  for (auto const& entry : rhs) {
+    EXPECT_TRUE(TestUtility::protoEqual(obj.fields().at(entry.first), entry.second));
   }
   return true;
 }
@@ -155,6 +166,82 @@ response_rules:
 }
 
 /**
+ * Test the value gets written as a Base64Url serialized type.
+ */
+TEST_F(HeaderToMetadataTest, Base64UrlSerializedTypeTest) {
+  const std::string response_config_yaml = R"EOF(
+response_rules:
+  - header: x-authenticated
+    on_header_present:
+      key: auth
+      type: BASE64URL_SERIALIZED
+)EOF";
+  initializeFilter(response_config_yaml);
+
+  ProtobufWkt::Value value;
+  auto* s = value.mutable_struct_value();
+
+  ProtobufWkt::Value v;
+  v.set_string_value("blafoo");
+  (*s->mutable_fields())["k1"] = v;
+  v.set_number_value(2019.07);
+  (*s->mutable_fields())["k2"] = v;
+  v.set_bool_value(true);
+  (*s->mutable_fields())["k3"] = v;
+
+  std::string output;
+  ASSERT_TRUE(value.SerializeToString(&output));
+  const auto encoded = Base64Url::encode(output.c_str(), output.size());
+  Http::TestHeaderMapImpl incoming_headers{{"x-authenticated", encoded}};
+  std::map<std::string, ProtobufWkt::Value> expected = {{"auth", value}};
+
+  EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+  EXPECT_CALL(req_info_,
+              setDynamicMetadata("envoy.filters.http.header_to_metadata", MapEqValue(expected)));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(incoming_headers, false));
+}
+
+/**
+ * Base64Url serialized type with invalid Base64Url encoding.
+ */
+TEST_F(HeaderToMetadataTest, Base64UrlSerializedTypeInvalidBase64UrlTest) {
+  const std::string response_config_yaml = R"EOF(
+response_rules:
+  - header: x-authenticated
+    on_header_present:
+      key: auth
+      type: BASE64URL_SERIALIZED
+)EOF";
+  initializeFilter(response_config_yaml);
+  Http::TestHeaderMapImpl incoming_headers{{"x-authenticated", "invalid"}};
+
+  EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+  EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(incoming_headers, false));
+}
+
+/**
+ * Base64Url serialized type with invalid serialized protobuf.
+ */
+TEST_F(HeaderToMetadataTest, Base64UrlSerializedTypeInvalidProtobufTest) {
+  const std::string response_config_yaml = R"EOF(
+response_rules:
+  - header: x-authenticated
+    on_header_present:
+      key: auth
+      type: BASE64URL_SERIALIZED
+)EOF";
+  initializeFilter(response_config_yaml);
+  std::string output = "invalid";
+  const auto encoded = Base64Url::encode(output.c_str(), output.size());
+  Http::TestHeaderMapImpl incoming_headers{{"x-authenticated", encoded}};
+
+  EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+  EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(incoming_headers, false));
+}
+
+/**
  * Headers not present.
  */
 TEST_F(HeaderToMetadataTest, HeaderNotPresent) {
@@ -221,7 +308,7 @@ TEST_F(HeaderToMetadataTest, EmptyHeaderValue) {
  */
 TEST_F(HeaderToMetadataTest, HeaderValueTooLong) {
   initializeFilter(request_config_yaml);
-  Http::TestHeaderMapImpl incoming_headers{{"X-VERSION", std::string(101, 'x')}};
+  Http::TestHeaderMapImpl incoming_headers{{"X-VERSION", std::string(10 * 1024 + 1, 'x')}};
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);

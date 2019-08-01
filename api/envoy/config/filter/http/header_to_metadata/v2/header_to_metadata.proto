@@ -20,6 +20,11 @@ message Config {
   enum ValueType {
     STRING = 0;
     NUMBER = 1;
+
+    // `Base64Url <https://tools.ietf.org/html/rfc4648#section-5>`_ encoded string of
+    // serialized `protobuf.Value
+    // <https://github.com/protocolbuffers/protobuf/blob/master/src/google/protobuf/struct.proto#L62>`_
+    BASE64URL_SERIALIZED = 2;
   }
 
   message KeyValuePair {
