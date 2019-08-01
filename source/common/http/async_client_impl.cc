@@ -202,6 +202,9 @@ void AsyncRequestImpl::initialize() {
     // sendHeaders can result in synchronous stream closure in certain cases (e.g. connection pool
     // failure).
     if (remoteClosed()) {
+      // In the case that we had a locally-generated response, we manually close the stream locally
+      // to fire the completion callback. This is a no-op if we had a locally-generated reset
+      // instead.
       closeLocal(true);
     } else {
       sendData(*request_->body(), true);
