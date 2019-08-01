@@ -240,7 +240,7 @@ Driver::Driver(const envoy::config::trace::v2::OpenCensusConfig& oc_config,
   if (oc_config.stackdriver_exporter_enabled()) {
     ::opencensus::exporters::trace::StackdriverOptions opts;
     opts.project_id = oc_config.stackdriver_project_id();
-    ::opencensus::exporters::trace::StackdriverExporter::Register(opts);
+    ::opencensus::exporters::trace::StackdriverExporter::Register(std::move(opts));
   }
   if (oc_config.zipkin_exporter_enabled()) {
     ::opencensus::exporters::trace::ZipkinExporterOptions opts(oc_config.zipkin_url());
