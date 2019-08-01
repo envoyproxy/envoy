@@ -1,7 +1,7 @@
 package io.envoyproxy.envoymobile
 
 import android.content.Context
-import io.envoyproxy.envoymobile.engine.EnvoyEngine
+import io.envoyproxy.envoymobile.engine.AndroidEngine
 
 /**
  * Available logging levels for an Envoy instance. Note some levels may be compiled out.
@@ -39,7 +39,7 @@ class Envoy @JvmOverloads constructor(
     load(context)
 
     runner = Thread(Runnable {
-      EnvoyEngine.run(config.trim(), logLevel.level)
+      AndroidEngine.run(config.trim(), logLevel.level)
     })
 
     runner.start()
@@ -63,7 +63,7 @@ class Envoy @JvmOverloads constructor(
   companion object {
     @JvmStatic
     fun load(context: Context) {
-      EnvoyEngine.load(context)
+      AndroidEngine.load(context)
     }
   }
 }
