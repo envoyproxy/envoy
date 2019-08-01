@@ -24,7 +24,7 @@ namespace Http {
 namespace Http1 {
 
 /**
- * All stats for the HTTP/2 codec. @see stats_macros.h
+ * All stats for the HTTP/1 codec. @see stats_macros.h
  */
 // clang-format off
 #define ALL_HTTP1_CODEC_STATS(COUNTER)                                                             \
