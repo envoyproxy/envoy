@@ -53,6 +53,8 @@ void FilesystemSubscriptionImpl::refresh() {
     } else {
       ENVOY_LOG(warn, "Filesystem config update failure: {}", e.what());
       stats_.update_failure_.inc();
+      // ConnectionFailure is not a meaninful error code for file system but it has been chosen so
+      // that the behaviour is uniform across all subscription types.
       callbacks_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure,
                                       &e);
     }

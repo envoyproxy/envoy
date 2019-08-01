@@ -74,13 +74,11 @@ void GrpcMuxSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason rea
     break;
   case Envoy::Config::ConfigUpdateFailureReason::UpdateRejected:
     // We expect Envoy exception to be thrown when update is rejected.
-    ASSERT(e);
+    ASSERT(e != nullptr);
     disableInitFetchTimeoutTimer();
     stats_.update_rejected_.inc();
     ENVOY_LOG(warn, "gRPC config for {} rejected: {}", type_url_, e->what());
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
   stats_.update_attempt_.inc();
   callbacks_.onConfigUpdateFailed(reason, e);
