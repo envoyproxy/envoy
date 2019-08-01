@@ -16,6 +16,20 @@ do
   TEST_OUTPUT=$("${PATH_BIN}" "${PATH_CONFIG}/${t}.yaml" "${PATH_CONFIG}/${t}.golden.json" "--details")
 done
 
+# Testing coverage flag passes
+COVERAGE_CMD="${PATH_BIN} ${PATH_CONFIG}/Redirect.yaml ${PATH_CONFIG}/Redirect.golden.json --details -f "
+TEST_OUTPUT=$($COVERAGE_CMD "1.0")
+COVERAGE_OUTPUT=$($COVERAGE_CMD "1.0" 2>&1) || echo "${COVERAGE_OUTPUT:-no-output}"
+if [[ "${COVERAGE_OUTPUT}" != *"Current route coverage: "* ]] ; then
+  exit 1
+fi
+
+# Testing coverage flag fails
+COVERAGE_OUTPUT=$($COVERAGE_CMD "100" 2>&1) || echo "${COVERAGE_OUTPUT:-no-output}"
+if [[ "${COVERAGE_OUTPUT}" != *"Failed to meet coverage requirement: 100%"* ]] ; then
+  exit 1
+fi
+
 # Testing expected matches using --useproto
 # --useproto needs the test schema as a validation.proto message.
 TESTS+=("Runtime")
@@ -31,17 +45,17 @@ TEST_OUTPUT=$("${PATH_BIN}" "-c" "${PATH_CONFIG}/Weighted.yaml" "-t" "${PATH_CON
 TEST_OUTPUT=$("${PATH_BIN}" "-c" "${PATH_CONFIG}/Weighted.yaml" "-t" "${PATH_CONFIG}/Weighted.golden.proto.pb_text" "--details" "--useproto")
 
 # Bad config file
-echo testing bad config output
+echo "testing bad config output"
 BAD_CONFIG_OUTPUT=$(("${PATH_BIN}" "${PATH_CONFIG}/Redirect.golden.json" "${PATH_CONFIG}/TestRoutes.yaml") 2>&1) ||
-  echo ${BAD_CONFIG_OUTPUT:-no-output}
+  echo "${BAD_CONFIG_OUTPUT:-no-output}"
 if [[ "${BAD_CONFIG_OUTPUT}" != *"Unable to parse"* ]]; then
   exit 1
 fi
 
 # Failure test case
-echo testing failure test case
+echo "testing failure test case"
 FAILURE_OUTPUT=$("${PATH_BIN}" "${PATH_CONFIG}/TestRoutes.yaml" "${PATH_CONFIG}/Weighted.golden.json" "--details" 2>&1) ||
-  echo ${FAILURE_OUTPUT:-no-output}
+  echo "${FAILURE_OUTPUT:-no-output}"
 if [[ "${FAILURE_OUTPUT}" != *"expected: [cluster1], actual: [instant-server], test type: cluster_name"* ]]; then
   exit 1
 fi

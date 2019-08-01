@@ -37,7 +37,7 @@ message Bootstrap {
   message StaticResources {
     // Static :ref:`Listeners <envoy_api_msg_Listener>`. These listeners are
     // available regardless of LDS configuration.
-    repeated envoy.api.v2.Listener listeners = 1 [(gogoproto.nullable) = false];
+    repeated envoy.api.v2.Listener listeners = 1;
 
     // If a network based configuration source is specified for :ref:`cds_config
     // <envoy_api_field_config.bootstrap.v2.Bootstrap.DynamicResources.cds_config>`, it's necessary
@@ -45,11 +45,11 @@ message Bootstrap {
     // how to speak to the management server. These cluster definitions may not
     // use :ref:`EDS <arch_overview_dynamic_config_eds>` (i.e. they should be static
     // IP or DNS-based).
-    repeated envoy.api.v2.Cluster clusters = 2 [(gogoproto.nullable) = false];
+    repeated envoy.api.v2.Cluster clusters = 2;
 
     // These static secrets can be used by :ref:`SdsSecretConfig
     // <envoy_api_msg_auth.SdsSecretConfig>`
-    repeated envoy.api.v2.auth.Secret secrets = 3 [(gogoproto.nullable) = false];
+    repeated envoy.api.v2.auth.Secret secrets = 3;
   }
   // Statically specified resources.
   StaticResources static_resources = 2;

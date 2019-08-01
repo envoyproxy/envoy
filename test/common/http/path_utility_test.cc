@@ -85,5 +85,27 @@ TEST_F(PathUtilityTest, NormalizeCasePath) {
 // "/../c\r\n\"  '\n' '\r' should be excluded by http parser
 // "/a/\0c",     '\0' should be excluded by http parser
 
+// Paths that are valid get normalized.
+TEST_F(PathUtilityTest, MergeSlashes) {
+  auto mergeSlashes = [this](const std::string& path_value) {
+    auto& path_header = pathHeaderEntry(path_value);
+    PathUtil::mergeSlashes(path_header);
+    auto sanitized_path_value = path_header.value().getStringView();
+    return std::string(sanitized_path_value);
+  };
+  EXPECT_EQ("", mergeSlashes(""));                        // empty
+  EXPECT_EQ("a/b/c", mergeSlashes("a//b/c"));             // relative
+  EXPECT_EQ("/a/b/c/", mergeSlashes("/a//b/c/"));         // ends with slash
+  EXPECT_EQ("a/b/c/", mergeSlashes("a//b/c/"));           // relative ends with slash
+  EXPECT_EQ("/a", mergeSlashes("/a"));                    // no-op
+  EXPECT_EQ("/a/b/c", mergeSlashes("//a/b/c"));           // double / start
+  EXPECT_EQ("/a/b/c", mergeSlashes("/a//b/c"));           // double / in the middle
+  EXPECT_EQ("/a/b/c/", mergeSlashes("/a/b/c//"));         // double / end
+  EXPECT_EQ("/a/b/c", mergeSlashes("/a///b/c"));          // triple / in the middle
+  EXPECT_EQ("/a/b/c", mergeSlashes("/a////b/c"));         // quadruple / in the middle
+  EXPECT_EQ("/a/b?a=///c", mergeSlashes("/a//b?a=///c")); // slashes in the query are ignored
+  EXPECT_EQ("/a/b?", mergeSlashes("/a//b?"));             // empty query
+}
+
 } // namespace Http
 } // namespace Envoy

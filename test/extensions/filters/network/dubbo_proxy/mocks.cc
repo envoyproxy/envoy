@@ -48,10 +48,17 @@ MockSerializer::~MockSerializer() = default;
 
 namespace DubboFilters {
 
+MockFilterChainFactory::MockFilterChainFactory() = default;
+MockFilterChainFactory::~MockFilterChainFactory() = default;
+
 MockFilterChainFactoryCallbacks::MockFilterChainFactoryCallbacks() = default;
 MockFilterChainFactoryCallbacks::~MockFilterChainFactoryCallbacks() = default;
 
-MockDecoderFilter::MockDecoderFilter() = default;
+MockDecoderFilter::MockDecoderFilter() {
+  ON_CALL(*this, setDecoderFilterCallbacks(_))
+      .WillByDefault(
+          Invoke([this](DecoderFilterCallbacks& callbacks) -> void { callbacks_ = &callbacks; }));
+}
 MockDecoderFilter::~MockDecoderFilter() = default;
 
 MockDecoderFilterCallbacks::MockDecoderFilterCallbacks() {
@@ -65,7 +72,11 @@ MockDecoderFilterCallbacks::MockDecoderFilterCallbacks() {
 }
 MockDecoderFilterCallbacks::~MockDecoderFilterCallbacks() = default;
 
-MockEncoderFilter::MockEncoderFilter() = default;
+MockEncoderFilter::MockEncoderFilter() {
+  ON_CALL(*this, setEncoderFilterCallbacks(_))
+      .WillByDefault(
+          Invoke([this](EncoderFilterCallbacks& callbacks) -> void { callbacks_ = &callbacks; }));
+}
 MockEncoderFilter::~MockEncoderFilter() = default;
 
 MockEncoderFilterCallbacks::MockEncoderFilterCallbacks() {
@@ -79,7 +90,14 @@ MockEncoderFilterCallbacks::MockEncoderFilterCallbacks() {
 }
 MockEncoderFilterCallbacks::~MockEncoderFilterCallbacks() = default;
 
-MockCodecFilter::MockCodecFilter() = default;
+MockCodecFilter::MockCodecFilter() {
+  ON_CALL(*this, setDecoderFilterCallbacks(_))
+      .WillByDefault(Invoke(
+          [this](DecoderFilterCallbacks& callbacks) -> void { decoder_callbacks_ = &callbacks; }));
+  ON_CALL(*this, setEncoderFilterCallbacks(_))
+      .WillByDefault(Invoke(
+          [this](EncoderFilterCallbacks& callbacks) -> void { encoder_callbacks_ = &callbacks; }));
+}
 MockCodecFilter::~MockCodecFilter() = default;
 
 MockFilterConfigFactory::MockFilterConfigFactory()
