@@ -298,6 +298,9 @@ public:
   const envoy::api::v2::core::Metadata& listenerMetadata() const override {
     return config_.metadata();
   };
+  envoy::api::v2::core::TrafficDirection direction() const override {
+    return config_.traffic_direction();
+  };
   TimeSource& timeSource() override { return api().timeSource(); }
   void ensureSocketOptions() {
     if (!listen_socket_options_) {

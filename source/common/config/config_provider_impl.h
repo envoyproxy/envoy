@@ -150,6 +150,12 @@ class ConfigSubscriptionCommonBase
     : protected Logger::Loggable<Logger::Id::config>,
       public std::enable_shared_from_this<ConfigSubscriptionCommonBase> {
 public:
+  // Callback for updating a Config implementation held in each worker thread, the callback is
+  // called in applyConfigUpdate() with the current version Config, and is expected to return the
+  // new version Config.
+  using ConfigUpdateCb =
+      std::function<ConfigProvider::ConfigConstSharedPtr(ConfigProvider::ConfigConstSharedPtr)>;
+
   struct LastConfigInfo {
     absl::optional<uint64_t> last_config_hash_;
     std::string last_config_version_;
@@ -217,9 +223,7 @@ protected:
    * @param complete_cb the callback to run when the update propagation is done.
    */
   void applyConfigUpdate(
-      const std::function<
-          ConfigProvider::ConfigConstSharedPtr(ConfigProvider::ConfigConstSharedPtr)>& update_fn,
-      Event::PostCb complete_cb = []() {}) {
+      const ConfigUpdateCb& update_fn, const Event::PostCb& complete_cb = []() {}) {
     // It is safe to call shared_from_this here as this is in main thread, and destruction of a
     // ConfigSubscriptionCommonBase owner (i.e., a provider) happens in main thread as well.
     auto shared_this = shared_from_this();
@@ -227,10 +231,13 @@ protected:
         [this, update_fn]() {
           tls_->getTyped<ThreadLocalConfig>().config_ = update_fn(this->getConfig());
         },
-        /*During the update propagation, a subscription may get teared down in main thread due to
-        all owners/providers destructed in a xDS update (e.g. LDS demolishes RouteConfigProvider and
-        its subscription). Hold a reference to the shared subscription instance to make sure the
-        update can be safely pushed to workers in such an event.*/
+        // During the update propagation, a subscription may get teared down in main thread due to
+        // all owners/providers destructed in a xDS update (e.g. LDS demolishes a
+        // RouteConfigProvider and its subscription).
+        // If such a race condition happens, holding a reference to the "*this" subscription
+        // instance in this cb will ensure the shared "*this" gets posted back to main thread, after
+        // all the workers finish calling the update_fn, at which point it's safe to destruct
+        // "*this" instance.
         [shared_this, complete_cb]() { complete_cb(); });
   }
 
@@ -321,7 +328,6 @@ protected:
 class DeltaConfigSubscriptionInstance : public ConfigSubscriptionCommonBase {
 protected:
   using ConfigSubscriptionCommonBase::ConfigSubscriptionCommonBase;
-  ~DeltaConfigSubscriptionInstance() override = default;
 
   /**
    * Must be called by the derived class' constructor.
@@ -344,8 +350,6 @@ protected:
  */
 class MutableConfigProviderCommonBase : public ConfigProvider {
 public:
-  ~MutableConfigProviderCommonBase() override = default;
-
   // Envoy::Config::ConfigProvider
   SystemTime lastUpdated() const override { return subscription_->lastUpdated(); }
   ApiType apiType() const override { return api_type_; }
@@ -384,8 +388,6 @@ private:
  */
 class ConfigProviderManagerImplBase : public ConfigProviderManager, public Singleton::Instance {
 public:
-  ~ConfigProviderManagerImplBase() override = default;
-
   /**
    * This is invoked by the /config_dump admin handler.
    * @return ProtobufTypes::MessagePtr the config dump proto corresponding to the associated

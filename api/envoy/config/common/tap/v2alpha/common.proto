@@ -20,8 +20,7 @@ message CommonExtensionConfig {
   // [#not-implemented-hide:]
   message TapDSConfig {
     // Configuration for the source of TapDS updates for this Cluster.
-    envoy.api.v2.core.ConfigSource config_source = 1
-        [(validate.rules).message.required = true, (gogoproto.nullable) = false];
+    envoy.api.v2.core.ConfigSource config_source = 1 [(validate.rules).message.required = true];
 
     // Tap config to request from XDS server.
     string name = 2 [(validate.rules).string.min_bytes = 1];
