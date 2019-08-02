@@ -93,17 +93,17 @@ build:rbe-toolchain --host_platform=@envoy//bazel/toolchains:rbe_ubuntu_clang_pl
 build:rbe-toolchain --platforms=@envoy//bazel/toolchains:rbe_ubuntu_clang_platform
 build:rbe-toolchain --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
 
-build:rbe-toolchain-clang --config rbe-toolchain
+build:rbe-toolchain-clang --config=rbe-toolchain
 build:rbe-toolchain-clang --crosstool_top=@rbe_ubuntu_clang//cc:toolchain
 build:rbe-toolchain-clang --extra_toolchains=@rbe_ubuntu_clang//config:cc-toolchain
 build:rbe-toolchain-clang --action_env=CC=clang --action_env=CXX=clang++ --action_env=PATH=/usr/sbin:/usr/bin:/sbin:/bin:/usr/lib/llvm-8/bin
 
-build:rbe-toolchain-clang-libc++ --config rbe-toolchain
+build:rbe-toolchain-clang-libc++ --config=rbe-toolchain
 build:rbe-toolchain-clang-libc++ --crosstool_top=@rbe_ubuntu_clang_libcxx//cc:toolchain
 build:rbe-toolchain-clang-libc++ --extra_toolchains=@rbe_ubuntu_clang_libcxx//config:cc-toolchain
 build:rbe-toolchain-clang-libc++ --action_env=CC=clang --action_env=CXX=clang++ --action_env=PATH=/usr/sbin:/usr/bin:/sbin:/bin:/usr/lib/llvm-8/bin
 
-build:rbe-toolchain-gcc --config rbe-toolchain
+build:rbe-toolchain-gcc --config=rbe-toolchain
 build:rbe-toolchain-gcc --crosstool_top=@rbe_ubuntu_gcc//cc:toolchain
 build:rbe-toolchain-gcc --extra_toolchains=@rbe_ubuntu_gcc//config:cc-toolchain
 build:rbe-toolchain-gcc --action_env=CC=gcc --action_env=CXX=g++ --action_env=PATH=/usr/sbin:/usr/bin:/sbin:/bin:/usr/lib/llvm-8/bin
