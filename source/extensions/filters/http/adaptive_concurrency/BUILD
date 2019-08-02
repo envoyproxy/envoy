@@ -18,11 +18,6 @@ envoy_cc_library(
     hdrs = ["adaptive_concurrency_filter.h"],
     deps = [
         "//include/envoy/http:filter_interface",
-        "//include/envoy/runtime:runtime_interface",
-        "//include/envoy/stats:stats_interface",
-        "//include/envoy/stats:stats_macros",
-        "//source/common/common:assert_lib",
-        "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/adaptive_concurrency/concurrency_controller:concurrency_controller_lib",
         "@envoy_api//envoy/config/filter/http/adaptive_concurrency/v2alpha:adaptive_concurrency_cc",
