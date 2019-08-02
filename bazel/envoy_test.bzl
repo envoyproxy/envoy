@@ -116,11 +116,12 @@ def envoy_cc_fuzz_test(name, corpus, deps = [], tags = [], **kwargs):
     )
 
     native.cc_binary(
-        name = name + "_driver",
+        name = name + "_with_libfuzzer",
         copts = envoy_copts("@envoy", test = True),
         linkopts = ["-fsanitize=fuzzer"] + _envoy_test_linkopts(),
         linkstatic = 1,
         testonly = 1,
+        data = [corpus_name],
         deps = [":" + test_lib_name],
         tags = ["manual"] + tags,
     )
