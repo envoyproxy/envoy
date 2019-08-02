@@ -100,10 +100,10 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& meta
   }
 
   std::string decodedValue = std::string(value);
-  if (encode == envoy::config::filter::http::header_to_metadata::v2::Config_ValueEncode_BASE64URL) {
-    decodedValue = Base64Url::decode(decodedValue);
+  if (encode == envoy::config::filter::http::header_to_metadata::v2::Config_ValueEncode_BASE64) {
+    decodedValue = Base64::decodeWithoutPadding(value);
     if (decodedValue.empty()) {
-      ENVOY_LOG(debug, "Base64Url decode failed");
+      ENVOY_LOG(debug, "Base64 decode failed");
       return false;
     }
   }

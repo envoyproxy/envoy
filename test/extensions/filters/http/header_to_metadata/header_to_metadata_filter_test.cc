@@ -166,7 +166,7 @@ response_rules:
 }
 
 /**
- * Test the value in Base64Url gets written as a string.
+ * Test the Base64 encoded value gets written as a string.
  */
 TEST_F(HeaderToMetadataTest, StringTypeInBase64UrlTest) {
   const std::string response_config_yaml = R"EOF(
@@ -175,11 +175,11 @@ response_rules:
     on_header_present:
       key: auth
       type: STRING
-      encode: BASE64URL
+      encode: BASE64
 )EOF";
   initializeFilter(response_config_yaml);
   std::string data = "Non-ascii-characters";
-  const auto encoded = Base64Url::encode(data.c_str(), data.size());
+  const auto encoded = Base64::encode(data.c_str(), data.size());
   Http::TestHeaderMapImpl incoming_headers{{"x-authenticated", encoded}};
   std::map<std::string, std::string> expected = {{"auth", data}};
   Http::TestHeaderMapImpl empty_headers;
@@ -191,7 +191,7 @@ response_rules:
 }
 
 /**
- * Test the value gets written as a protobuf value in Base64Url.
+ * Test the Base64 encoded protobuf value gets written as a protobuf value.
  */
 TEST_F(HeaderToMetadataTest, ProtobufValueTypeInBase64UrlTest) {
   const std::string response_config_yaml = R"EOF(
@@ -200,7 +200,7 @@ response_rules:
     on_header_present:
       key: auth
       type: PROTOBUF_VALUE
-      encode: BASE64URL
+      encode: BASE64
 )EOF";
   initializeFilter(response_config_yaml);
 
@@ -217,7 +217,7 @@ response_rules:
 
   std::string data;
   ASSERT_TRUE(value.SerializeToString(&data));
-  const auto encoded = Base64Url::encode(data.c_str(), data.size());
+  const auto encoded = Base64::encode(data.c_str(), data.size());
   Http::TestHeaderMapImpl incoming_headers{{"x-authenticated", encoded}};
   std::map<std::string, ProtobufWkt::Value> expected = {{"auth", value}};
 
@@ -228,7 +228,7 @@ response_rules:
 }
 
 /**
- * Test the value is not written for bad Base64Url.
+ * Test bad Base64 encoding is not written.
  */
 TEST_F(HeaderToMetadataTest, ProtobufValueTypeInBadBase64UrlTest) {
   const std::string response_config_yaml = R"EOF(
@@ -237,7 +237,7 @@ response_rules:
     on_header_present:
       key: auth
       type: PROTOBUF_VALUE
-      encode: BASE64URL
+      encode: BASE64
 )EOF";
   initializeFilter(response_config_yaml);
   Http::TestHeaderMapImpl incoming_headers{{"x-authenticated", "invalid"}};
@@ -248,7 +248,7 @@ response_rules:
 }
 
 /**
- * Test the value is not written for bad protobuf value.
+ * Test the bad protobuf value is not written.
  */
 TEST_F(HeaderToMetadataTest, BadProtobufValueTypeInBase64UrlTest) {
   const std::string response_config_yaml = R"EOF(
@@ -257,11 +257,11 @@ response_rules:
     on_header_present:
       key: auth
       type: PROTOBUF_VALUE
-      encode: BASE64URL
+      encode: BASE64
 )EOF";
   initializeFilter(response_config_yaml);
   std::string data = "invalid";
-  const auto encoded = Base64Url::encode(data.c_str(), data.size());
+  const auto encoded = Base64::encode(data.c_str(), data.size());
   Http::TestHeaderMapImpl incoming_headers{{"x-authenticated", encoded}};
 
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));

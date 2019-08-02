@@ -31,8 +31,10 @@ message Config {
     // The value is not encoded.
     NONE = 0;
 
-    // The value is encoded in `Base64Url <https://tools.ietf.org/html/rfc4648#section-5>`_.
-    BASE64URL = 1;
+    // The value is encoded in `Base64 <https://tools.ietf.org/html/rfc4648#section-4>`_.
+    // Note: this is mostly used for STRING and PROTOBUF_VALUE to escape the
+    // non-ASCII characters in the header.
+    BASE64 = 1;
   }
 
   message KeyValuePair {
