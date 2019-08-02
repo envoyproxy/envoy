@@ -80,6 +80,7 @@ message HttpConnectionManager {
   google.protobuf.BoolValue add_user_agent = 6;
 
   message Tracing {
+    // [#comment:TODO(kyessenov): Align this field with listener traffic direction field.]
     enum OperationName {
       option (gogoproto.goproto_enum_prefix) = false;
 

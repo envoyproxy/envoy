@@ -5,7 +5,7 @@ executors:
     description: "A regular build executor based on ubuntu image"
     docker:
       # NOTE: Update bazel/toolchains/rbe_toolchains_config.bzl with sha256 digest to match the image here.
-      - image: envoyproxy/envoy-build:8246167b9d238797cbc6c03dccc9e3921c37617d
+      - image: envoyproxy/envoy-build:b02c73f3ebbaf5c7852fa814eb3d61e841588068
     resource_class: xlarge
     working_directory: /source
 

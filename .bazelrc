@@ -16,6 +16,8 @@ build --experimental_local_memory_estimate
 build --host_force_python=PY2
 build --action_env=BAZEL_LINKLIBS=-l%:libstdc++.a
 build --action_env=BAZEL_LINKOPTS=-lm:-static-libgcc
+build --host_javabase=@bazel_tools//tools/jdk:remote_jdk11
+build --javabase=@bazel_tools//tools/jdk:remote_jdk11
 
 # Basic ASAN/UBSAN that works for gcc
 build:asan --action_env=BAZEL_LINKLIBS=
@@ -25,7 +27,6 @@ build:asan --copt -fsanitize=address,undefined
 build:asan --linkopt -fsanitize=address,undefined
 build:asan --copt -fno-sanitize=vptr
 build:asan --linkopt -fno-sanitize=vptr
-build:asan --linkopt -fuse-ld=lld
 build:asan --linkopt -ldl
 build:asan --define tcmalloc=disabled
 build:asan --build_tag_filters=-no_asan
@@ -39,12 +40,17 @@ build:asan --test_env=ASAN_SYMBOLIZER_PATH
 
 # Clang ASAN/UBSAN
 build:clang-asan --config=asan
+build:clang-asan --linkopt -fuse-ld=lld
 
 # macOS ASAN/UBSAN
 build:macos-asan --config=asan
 # Workaround, see https://github.com/bazelbuild/bazel/issues/6932
 build:macos-asan --copt -Wno-macro-redefined
 build:macos-asan --copt -D_FORTIFY_SOURCE=0
+# Workaround, see https://github.com/bazelbuild/bazel/issues/4341
+build:macos-asan --copt -DGRPC_BAZEL_BUILD
+# Dynamic link cause issues like: `dyld: malformed mach-o: load commands size (59272) > 32768`
+build:macos-asan --dynamic_mode=off
 
 # Clang TSAN
 build:clang-tsan --define ENVOY_CONFIG_TSAN=1
@@ -83,10 +89,6 @@ build:sizeopt -c opt --copt -Os
 build --test_env=HEAPCHECK=normal --test_env=PPROF_PATH
 
 # Remote execution: https://docs.bazel.build/versions/master/remote-execution.html
-build:rbe-toolchain --host_javabase=@rbe_ubuntu_clang//java:jdk
-build:rbe-toolchain --javabase=@rbe_ubuntu_clang//java:jdk
-build:rbe-toolchain --host_java_toolchain=@bazel_tools//tools/jdk:toolchain_hostjdk8
-build:rbe-toolchain --java_toolchain=@bazel_tools//tools/jdk:toolchain_hostjdk8
 build:rbe-toolchain --host_platform=@envoy//bazel/toolchains:rbe_ubuntu_clang_platform
 build:rbe-toolchain --platforms=@envoy//bazel/toolchains:rbe_ubuntu_clang_platform
 build:rbe-toolchain --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
@@ -110,7 +112,7 @@ build:remote-clang --config=remote
 build:remote-clang --config=rbe-toolchain
 
 # Docker sandbox
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build:cfc514546bc0284536893cca5fa43d7128edcd35
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build:8246167b9d238797cbc6c03dccc9e3921c37617d
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker
