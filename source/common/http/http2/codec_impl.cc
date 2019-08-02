@@ -346,6 +346,59 @@ void ConnectionImpl::StreamImpl::onMetadataDecoded(MetadataMapPtr&& metadata_map
   decoder_->decodeMetadata(std::move(metadata_map_ptr));
 }
 
+namespace {
+
+const char InvalidHttpMessagingOverrideKey[] =
+    "envoy.reloadable_features.http2_protocol_options.stream_error_on_invalid_http_messaging";
+const char MaxOutboundFramesOverrideKey[] =
+    "envoy.reloadable_features.http2_protocol_options.max_outbound_frames";
+const char MaxOutboundControlFramesOverrideKey[] =
+    "envoy.reloadable_features.http2_protocol_options.max_outbound_control_frames";
+const char MaxConsecutiveInboundFramesWithEmptyPayloadOverrideKey[] =
+    "envoy.reloadable_features.http2_protocol_options."
+    "max_consecutive_inbound_frames_with_empty_payload";
+const char MaxInboundPriorityFramesPerStreamOverrideKey[] =
+    "envoy.reloadable_features.http2_protocol_options.max_inbound_priority_frames_per_stream";
+const char MaxInboundWindowUpdateFramesPerDataFrameSentOverrideKey[] =
+    "envoy.reloadable_features.http2_protocol_options."
+    "max_inbound_window_update_frames_per_data_frame_sent";
+
+bool checkRuntimeOverride(bool config_value, const char* override_key) {
+  return Runtime::runtimeFeatureEnabled(override_key) ? true : config_value;
+}
+
+} // namespace
+
+ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
+                               const Http2Settings& http2_settings,
+                               const uint32_t max_request_headers_kb)
+    : stats_{ALL_HTTP2_CODEC_STATS(POOL_COUNTER_PREFIX(stats, "http2."))}, connection_(connection),
+      max_request_headers_kb_(max_request_headers_kb),
+      per_stream_buffer_limit_(http2_settings.initial_stream_window_size_),
+      stream_error_on_invalid_http_messaging_(checkRuntimeOverride(
+          http2_settings.stream_error_on_invalid_http_messaging_, InvalidHttpMessagingOverrideKey)),
+      flood_detected_(false),
+      max_outbound_frames_(
+          Runtime::getInteger(MaxOutboundFramesOverrideKey, http2_settings.max_outbound_frames_)),
+      frame_buffer_releasor_([this](const Buffer::OwnedBufferFragmentImpl* fragment) {
+        releaseOutboundFrame(fragment);
+      }),
+      max_outbound_control_frames_(Runtime::getInteger(
+          MaxOutboundControlFramesOverrideKey, http2_settings.max_outbound_control_frames_)),
+      control_frame_buffer_releasor_([this](const Buffer::OwnedBufferFragmentImpl* fragment) {
+        releaseOutboundControlFrame(fragment);
+      }),
+      max_consecutive_inbound_frames_with_empty_payload_(
+          Runtime::getInteger(MaxConsecutiveInboundFramesWithEmptyPayloadOverrideKey,
+                              http2_settings.max_consecutive_inbound_frames_with_empty_payload_)),
+      max_inbound_priority_frames_per_stream_(
+          Runtime::getInteger(MaxInboundPriorityFramesPerStreamOverrideKey,
+                              http2_settings.max_inbound_priority_frames_per_stream_)),
+      max_inbound_window_update_frames_per_data_frame_sent_(Runtime::getInteger(
+          MaxInboundWindowUpdateFramesPerDataFrameSentOverrideKey,
+          http2_settings.max_inbound_window_update_frames_per_data_frame_sent_)),
+      dispatching_(false), raised_goaway_(false), pending_deferred_reset_(false) {}
+
 ConnectionImpl::~ConnectionImpl() { nghttp2_session_del(session_); }
 
 void ConnectionImpl::dispatch(Buffer::Instance& data) {
