@@ -2,6 +2,7 @@
 
 #include "test/common/http/common.h"
 #include "test/common/http/http2/frame_replay.h"
+#include "test/mocks/runtime/mocks.h"
 
 #include "gtest/gtest.h"
 
@@ -22,8 +23,12 @@ namespace Http2 {
 namespace {
 
 // For organizational purposes only.
-class RequestFrameCommentTest : public ::testing::Test {};
-class ResponseFrameCommentTest : public ::testing::Test {};
+class RequestFrameCommentTest : public ::testing::Test {
+  Runtime::ScopedMockLoaderSingleton runtime_;
+};
+class ResponseFrameCommentTest : public ::testing::Test {
+  Runtime::ScopedMockLoaderSingleton runtime_;
+};
 
 // Validate that a simple Huffman encoded request HEADERS frame can be decoded.
 TEST_F(RequestFrameCommentTest, SimpleExampleHuffman) {

@@ -11,6 +11,7 @@
 #include "test/common/http/common.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
@@ -137,6 +138,7 @@ public:
   MockStreamDecoder request_decoder_;
   StreamEncoder* response_encoder_{};
   MockStreamCallbacks server_stream_callbacks_;
+  Runtime::ScopedMockLoaderSingleton runtime_;
   // Corrupt a metadata frame payload.
   bool corrupt_metadata_frame_ = false;
 

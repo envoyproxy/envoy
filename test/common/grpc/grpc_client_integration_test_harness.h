@@ -286,8 +286,8 @@ public:
     EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
         .WillRepeatedly(Return(http_conn_pool_.get()));
     http_async_client_ = std::make_unique<Http::AsyncClientImpl>(
-        cluster_info_ptr_, *stats_store_, *dispatcher_, local_info_, cm_, runtime_, random_,
-        std::move(shadow_writer_ptr_), http_context_);
+        cluster_info_ptr_, *stats_store_, *dispatcher_, local_info_, cm_, runtime_.loader(),
+        random_, std::move(shadow_writer_ptr_), http_context_);
     EXPECT_CALL(cm_, httpAsyncClientForCluster(fake_cluster_name_))
         .WillRepeatedly(ReturnRef(*http_async_client_));
     EXPECT_CALL(cm_, get(Eq(fake_cluster_name_))).WillRepeatedly(Return(&thread_local_cluster_));
@@ -438,7 +438,7 @@ public:
   Upstream::ClusterInfoConstSharedPtr cluster_info_ptr_{mock_cluster_info_};
   Upstream::MockThreadLocalCluster thread_local_cluster_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  Runtime::MockLoader runtime_;
+  Runtime::ScopedMockLoaderSingleton runtime_;
   Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{test_time_.timeSystem()};
   NiceMock<Runtime::MockRandomGenerator> random_;
   Http::AsyncClientPtr http_async_client_;

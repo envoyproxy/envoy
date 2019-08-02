@@ -16,6 +16,7 @@
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
@@ -73,7 +74,9 @@ TEST(ConnectionImplUtility, updateBufferStats) {
   ConnectionImplUtility::updateBufferStats(3, 3, previous_total, counter, gauge);
 }
 
-class ConnectionImplDeathTest : public testing::TestWithParam<Address::IpVersion> {};
+class ConnectionImplDeathTest : public testing::TestWithParam<Address::IpVersion> {
+  Runtime::ScopedMockLoaderSingleton runtime_;
+};
 INSTANTIATE_TEST_SUITE_P(IpVersions, ConnectionImplDeathTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -224,6 +227,7 @@ protected:
   MockWatermarkBuffer* client_write_buffer_ = nullptr;
   Address::InstanceConstSharedPtr source_address_;
   Socket::OptionsSharedPtr socket_options_;
+  Runtime::ScopedMockLoaderSingleton runtime_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ConnectionImplTest,
@@ -1399,6 +1403,7 @@ public:
   Event::MockFileEvent* file_event_;
   Event::FileReadyCb file_ready_cb_;
   TransportSocketCallbacks* transport_socket_callbacks_;
+  Runtime::ScopedMockLoaderSingleton runtime_;
 };
 
 // The purpose of this case is to verify the destructor order of the object.
@@ -1942,6 +1947,7 @@ protected:
 
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
+  Runtime::ScopedMockLoaderSingleton runtime_;
 };
 INSTANTIATE_TEST_SUITE_P(IpVersions, TcpClientConnectionImplTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
@@ -1986,6 +1992,7 @@ protected:
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   const std::string path_{TestEnvironment::unixDomainSocketPath("foo")};
+  Runtime::ScopedMockLoaderSingleton runtime_;
 };
 
 // Validate we skip setting socket options on UDS.

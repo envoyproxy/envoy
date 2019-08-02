@@ -9,6 +9,8 @@
 
 #include "gmock/gmock.h"
 
+using testing::NiceMock;
+
 namespace Envoy {
 namespace Runtime {
 
@@ -67,7 +69,8 @@ public:
   MOCK_METHOD0(threadsafeSnapshot, std::shared_ptr<const Snapshot>());
   MOCK_METHOD1(mergeValues, void(const std::unordered_map<std::string, std::string>&));
 
-  testing::NiceMock<MockSnapshot> snapshot_;
+  std::shared_ptr<MockSnapshot> threadsafe_snapshot_;
+  MockSnapshot& snapshot_;
 };
 
 class MockOverrideLayer : public Snapshot::OverrideLayer {
@@ -77,6 +80,27 @@ public:
 
   MOCK_CONST_METHOD0(name, const std::string&());
   MOCK_CONST_METHOD0(values, const Snapshot::EntryMap&());
+};
+
+/**
+ * Convenience class for introducing a scoped mock loader singleton in tests, very similar to
+ * Runtime::ScopedLoaderSingleton. Intended usage:
+ *
+ *   1. Add `Runtime::ScopedMockLoaderSingleton runtime_` as a member of your test suite.
+ *   2. Set expectations on `runtime_.snapshot()`, and on `runtime_.loader()` if needed.
+ *
+ * Note: this could be implemented using ScopedLoaderSingleton directly, but it's a bit jankier
+ * that way. ScopedLoaderSingleton swallows the unique_ptr it's given, which makes it hard to mock.
+ */
+class ScopedMockLoaderSingleton {
+public:
+  ScopedMockLoaderSingleton();
+  ~ScopedMockLoaderSingleton();
+  Runtime::MockLoader& loader();
+  Runtime::MockSnapshot& snapshot();
+
+private:
+  NiceMock<Runtime::MockLoader> loader_;
 };
 
 } // namespace Runtime

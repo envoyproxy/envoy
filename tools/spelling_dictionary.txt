@@ -543,6 +543,9 @@ istio
 istream
 istringstream
 iteratively
+janky
+jankier
+jankiest
 jitter
 jittered
 jittering

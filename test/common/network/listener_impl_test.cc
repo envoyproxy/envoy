@@ -4,6 +4,7 @@
 
 #include "test/common/network/listener_impl_test_base.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
@@ -54,7 +55,9 @@ static void errorCallbackTest(Address::IpVersion version) {
   dispatcher->run(Event::Dispatcher::RunType::Block);
 }
 
-class ListenerImplDeathTest : public testing::TestWithParam<Address::IpVersion> {};
+class ListenerImplDeathTest : public testing::TestWithParam<Address::IpVersion> {
+  Runtime::ScopedMockLoaderSingleton runtime_;
+};
 INSTANTIATE_TEST_SUITE_P(IpVersions, ListenerImplDeathTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -72,7 +75,9 @@ public:
   MOCK_METHOD1(getLocalAddress, Address::InstanceConstSharedPtr(int fd));
 };
 
-using ListenerImplTest = ListenerImplTestBase;
+class ListenerImplTest : public ListenerImplTestBase {
+  Runtime::ScopedMockLoaderSingleton runtime_;
+};
 INSTANTIATE_TEST_SUITE_P(IpVersions, ListenerImplTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);

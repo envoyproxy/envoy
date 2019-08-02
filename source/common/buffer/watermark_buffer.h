@@ -20,8 +20,8 @@ public:
   WatermarkBuffer(std::function<void()> below_low_watermark,
                   std::function<void()> above_high_watermark,
                   std::function<void()> above_overflow_watermark)
-      : runtime_(Runtime::LoaderSingleton::getExisting()),
-        below_low_watermark_(below_low_watermark), above_high_watermark_(above_high_watermark),
+      : runtime_(Runtime::LoaderSingleton::get()), below_low_watermark_(below_low_watermark),
+        above_high_watermark_(above_high_watermark),
         above_overflow_watermark_(above_overflow_watermark) {}
 
   // Override all functions from Instance which can result in changing the size
@@ -48,7 +48,7 @@ private:
   void checkHighAndOverflowWatermarks();
   void checkLowWatermark();
 
-  Runtime::Loader* runtime_;
+  Runtime::Loader& runtime_;
   std::function<void()> below_low_watermark_;
   std::function<void()> above_high_watermark_;
   std::function<void()> above_overflow_watermark_;

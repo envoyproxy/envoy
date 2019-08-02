@@ -18,6 +18,7 @@
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
@@ -161,6 +162,7 @@ public:
   std::shared_ptr<Network::MockReadFilter> read_filter_;
   std::string name_;
   const Network::FilterChainSharedPtr filter_chain_;
+  Runtime::ScopedMockLoaderSingleton runtime_;
 };
 
 // Parameterize the listener socket address version.
@@ -967,6 +969,7 @@ public:
   std::shared_ptr<Network::MockReadFilter> read_filter_;
   std::string name_;
   const Network::FilterChainSharedPtr filter_chain_;
+  Runtime::ScopedMockLoaderSingleton runtime_;
 };
 
 // Parameterize the listener socket address version.

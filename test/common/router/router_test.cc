@@ -84,7 +84,7 @@ public:
   RouterTestBase(bool start_child_span, bool suppress_envoy_headers,
                  Protobuf::RepeatedPtrField<std::string> strict_headers_to_check)
       : http_context_(stats_store_.symbolTable()), shadow_writer_(new MockShadowWriter()),
-        config_("test.", local_info_, stats_store_, cm_, runtime_, random_,
+        config_("test.", local_info_, stats_store_, cm_, runtime_.loader(), random_,
                 ShadowWriterPtr{shadow_writer_}, true, start_child_span, suppress_envoy_headers,
                 std::move(strict_headers_to_check), test_time_.timeSystem(), http_context_),
         router_(config_) {
@@ -237,7 +237,7 @@ public:
   envoy::api::v2::core::Locality upstream_locality_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   NiceMock<Upstream::MockClusterManager> cm_;
-  NiceMock<Runtime::MockLoader> runtime_;
+  Runtime::ScopedMockLoaderSingleton runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   Http::ConnectionPool::MockCancellable cancellable_;
   Http::ContextImpl http_context_;
@@ -3083,7 +3083,7 @@ TEST_F(RouterTest, Shadow) {
       }));
   expectResponseTimerCreate();
 
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("bar", 0, 43, 10000)).WillOnce(Return(true));
+  EXPECT_CALL(runtime_.snapshot(), featureEnabled("bar", 0, 43, 10000)).WillOnce(Return(true));
 
   Http::TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);

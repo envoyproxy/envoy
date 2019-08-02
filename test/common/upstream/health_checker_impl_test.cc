@@ -139,7 +139,7 @@ public:
     )EOF";
 
     health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                        dispatcher_, runtime_, random_,
+                                                        dispatcher_, runtime_.loader(), random_,
                                                         HealthCheckEventLoggerPtr(event_logger_)));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
@@ -162,7 +162,7 @@ public:
     )EOF";
 
     health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                        dispatcher_, runtime_, random_,
+                                                        dispatcher_, runtime_.loader(), random_,
                                                         HealthCheckEventLoggerPtr(event_logger_)));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
@@ -184,7 +184,7 @@ public:
     )EOF";
 
     health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                        dispatcher_, runtime_, random_,
+                                                        dispatcher_, runtime_.loader(), random_,
                                                         HealthCheckEventLoggerPtr(event_logger_)));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
@@ -206,7 +206,7 @@ public:
     )EOF";
 
     health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                        dispatcher_, runtime_, random_,
+                                                        dispatcher_, runtime_.loader(), random_,
                                                         HealthCheckEventLoggerPtr(event_logger_)));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
@@ -228,7 +228,7 @@ public:
     )EOF";
 
     health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                        dispatcher_, runtime_, random_,
+                                                        dispatcher_, runtime_.loader(), random_,
                                                         HealthCheckEventLoggerPtr(event_logger_)));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
@@ -251,7 +251,7 @@ public:
     )EOF";
 
     health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                        dispatcher_, runtime_, random_,
+                                                        dispatcher_, runtime_.loader(), random_,
                                                         HealthCheckEventLoggerPtr(event_logger_)));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
@@ -272,7 +272,7 @@ public:
     )EOF";
 
     health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                        dispatcher_, runtime_, random_,
+                                                        dispatcher_, runtime_.loader(), random_,
                                                         HealthCheckEventLoggerPtr(event_logger_)));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
@@ -297,7 +297,7 @@ public:
     )EOF";
 
     health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                        dispatcher_, runtime_, random_,
+                                                        dispatcher_, runtime_.loader(), random_,
                                                         HealthCheckEventLoggerPtr(event_logger_)));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
@@ -318,7 +318,7 @@ public:
     )EOF";
 
     health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                        dispatcher_, runtime_, random_,
+                                                        dispatcher_, runtime_.loader(), random_,
                                                         HealthCheckEventLoggerPtr(event_logger_)));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
@@ -341,7 +341,7 @@ public:
                                    host);
 
     health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                        dispatcher_, runtime_, random_,
+                                                        dispatcher_, runtime_.loader(), random_,
                                                         HealthCheckEventLoggerPtr(event_logger_)));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
@@ -412,7 +412,7 @@ public:
     )EOF";
 
     health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                        dispatcher_, runtime_, random_,
+                                                        dispatcher_, runtime_.loader(), random_,
                                                         HealthCheckEventLoggerPtr(event_logger_)));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
@@ -436,7 +436,7 @@ public:
     )EOF";
 
     health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                        dispatcher_, runtime_, random_,
+                                                        dispatcher_, runtime_.loader(), random_,
                                                         HealthCheckEventLoggerPtr(event_logger_)));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
@@ -589,7 +589,7 @@ public:
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::vector<TestSessionPtr> test_sessions_;
   std::shared_ptr<TestHttpHealthCheckerImpl> health_checker_;
-  NiceMock<Runtime::MockLoader> runtime_;
+  Runtime::ScopedMockLoaderSingleton runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   MockHealthCheckEventLogger* event_logger_{};
   std::list<uint32_t> connection_index_{};
@@ -609,8 +609,8 @@ TEST_F(HttpHealthCheckerImplTest, Success) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
   health_checker_->start();
 
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+  EXPECT_CALL(runtime_.snapshot(), getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot(), getInteger("health_check.min_interval", _))
       .WillOnce(Return(45000));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(45000)));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
@@ -630,8 +630,8 @@ TEST_F(HttpHealthCheckerImplTest, Degraded) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
   health_checker_->start();
 
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+  EXPECT_CALL(runtime_.snapshot(), getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot(), getInteger("health_check.min_interval", _))
       .WillRepeatedly(Return(45000));
 
   // We start off as healthy, and should go degraded after receiving the degraded health response.
@@ -644,7 +644,7 @@ TEST_F(HttpHealthCheckerImplTest, Degraded) {
   // Then, after receiving a regular health check response we should go back to healthy.
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
   expectStreamCreate(0);
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot(), getInteger("health_check.max_interval", _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
   test_sessions_[0]->interval_timer_->callback_();
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_));
@@ -784,8 +784,8 @@ TEST_F(HttpHealthCheckerImplTest, SuccessWithSpurious100Continue) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
   health_checker_->start();
 
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+  EXPECT_CALL(runtime_.snapshot(), getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot(), getInteger("health_check.min_interval", _))
       .WillOnce(Return(45000));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(45000)));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
@@ -811,8 +811,8 @@ TEST_F(HttpHealthCheckerImplTest, SuccessWithSpuriousMetadata) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
   health_checker_->start();
 
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+  EXPECT_CALL(runtime_.snapshot(), getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot(), getInteger("health_check.min_interval", _))
       .WillOnce(Return(45000));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(45000)));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
@@ -843,8 +843,8 @@ TEST_F(HttpHealthCheckerImplTest, SuccessWithMultipleHosts) {
   EXPECT_CALL(*test_sessions_[1]->timeout_timer_, enableTimer(_));
   health_checker_->start();
 
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _)).Times(2);
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+  EXPECT_CALL(runtime_.snapshot(), getInteger("health_check.max_interval", _)).Times(2);
+  EXPECT_CALL(runtime_.snapshot(), getInteger("health_check.min_interval", _))
       .Times(2)
       .WillRepeatedly(Return(45000));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(45000)));
@@ -876,8 +876,8 @@ TEST_F(HttpHealthCheckerImplTest, SuccessWithMultipleHostSets) {
   EXPECT_CALL(*test_sessions_[1]->timeout_timer_, enableTimer(_));
   health_checker_->start();
 
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _)).Times(2);
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+  EXPECT_CALL(runtime_.snapshot(), getInteger("health_check.max_interval", _)).Times(2);
+  EXPECT_CALL(runtime_.snapshot(), getInteger("health_check.min_interval", _))
       .Times(2)
       .WillRepeatedly(Return(45000));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(45000)));
@@ -907,14 +907,14 @@ TEST_F(HttpHealthCheckerImplTest, ZeroRetryInterval) {
     )EOF";
 
   health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                      dispatcher_, runtime_, random_,
+                                                      dispatcher_, runtime_.loader(), random_,
                                                       HealthCheckEventLoggerPtr(event_logger_)));
   health_checker_->addHostCheckCompleteCb(
       [this](HostSharedPtr host, HealthTransition changed_state) -> void {
         onHostStatus(host, changed_state);
       });
 
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
+  EXPECT_CALL(runtime_.snapshot(), featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(true));
 
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
@@ -934,8 +934,8 @@ TEST_F(HttpHealthCheckerImplTest, ZeroRetryInterval) {
       }));
   health_checker_->start();
 
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _)).WillOnce(Return(0));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _)).WillOnce(Return(0));
+  EXPECT_CALL(runtime_.snapshot(), getInteger("health_check.max_interval", _)).WillOnce(Return(0));
+  EXPECT_CALL(runtime_.snapshot(), getInteger("health_check.min_interval", _)).WillOnce(Return(0));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(1)));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
   absl::optional<std::string> health_checked_cluster("locations-production-iad");
@@ -947,7 +947,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheck) {
   const std::string host = "fake_cluster";
   const std::string path = "/healthcheck";
   setupServiceValidationHC();
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
+  EXPECT_CALL(runtime_.snapshot(), featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(true));
 
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
@@ -967,8 +967,8 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheck) {
       }));
   health_checker_->start();
 
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+  EXPECT_CALL(runtime_.snapshot(), getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot(), getInteger("health_check.min_interval", _))
       .WillOnce(Return(45000));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(45000)));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
@@ -982,7 +982,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithCustomHostValue) {
   const std::string path = "/healthcheck";
   setupServiceValidationWithCustomHostValueHC(host);
   // requires non-empty `service_name` in config.
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
+  EXPECT_CALL(runtime_.snapshot(), featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(true));
 
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
@@ -1000,8 +1000,8 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithCustomHostValue) {
       }));
   health_checker_->start();
 
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+  EXPECT_CALL(runtime_.snapshot(), getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot(), getInteger("health_check.min_interval", _))
       .WillOnce(Return(45000));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(45000)));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
@@ -1036,7 +1036,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithAdditionalHeaders) {
 
   setupServiceValidationWithAdditionalHeaders();
   // requires non-empty `service_name` in config.
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
+  EXPECT_CALL(runtime_.snapshot(), featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(true));
 
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
@@ -1076,8 +1076,8 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithAdditionalHeaders) {
       }));
   health_checker_->start();
 
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+  EXPECT_CALL(runtime_.snapshot(), getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot(), getInteger("health_check.min_interval", _))
       .WillOnce(Return(45000));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(45000)));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
@@ -1093,7 +1093,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithAdditionalHeaders) {
 TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithoutUserAgent) {
   setupServiceValidationWithoutUserAgent();
   // requires non-empty `service_name` in config.
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
+  EXPECT_CALL(runtime_.snapshot(), featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(true));
 
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
@@ -1116,8 +1116,8 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithoutUserAgent) {
           [&](const Http::HeaderMap& headers, bool) { EXPECT_EQ(headers.UserAgent(), nullptr); }));
   health_checker_->start();
 
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+  EXPECT_CALL(runtime_.snapshot(), getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot(), getInteger("health_check.min_interval", _))
       .WillOnce(Return(45000));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(45000)));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
@@ -1133,7 +1133,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithoutUserAgent) {
 TEST_F(HttpHealthCheckerImplTest, ServiceDoesNotMatchFail) {
   setupServiceValidationHC();
   EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, true));
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
+  EXPECT_CALL(runtime_.snapshot(), featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(true));
 
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed)).Times(1);
@@ -1147,8 +1147,8 @@ TEST_F(HttpHealthCheckerImplTest, ServiceDoesNotMatchFail) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
   health_checker_->start();
 
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+  EXPECT_CALL(runtime_.snapshot(), getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot(), getInteger("health_check.min_interval", _))
       .WillOnce(Return(45000));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(45000)));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
@@ -1163,7 +1163,7 @@ TEST_F(HttpHealthCheckerImplTest, ServiceDoesNotMatchFail) {
 TEST_F(HttpHealthCheckerImplTest, ServiceNotPresentInResponseFail) {
   setupServiceValidationHC();
   EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, true));
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
+  EXPECT_CALL(runtime_.snapshot(), featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(true));
 
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed)).Times(1);
@@ -1177,8 +1177,8 @@ TEST_F(HttpHealthCheckerImplTest, ServiceNotPresentInResponseFail) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
   health_checker_->start();
 
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+  EXPECT_CALL(runtime_.snapshot(), getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot(), getInteger("health_check.min_interval", _))
       .WillOnce(Return(45000));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(45000)));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
@@ -1191,7 +1191,7 @@ TEST_F(HttpHealthCheckerImplTest, ServiceNotPresentInResponseFail) {
 
 TEST_F(HttpHealthCheckerImplTest, ServiceCheckRuntimeOff) {
   setupServiceValidationHC();
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
+  EXPECT_CALL(runtime_.snapshot(), featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(false));
 
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
@@ -1204,8 +1204,8 @@ TEST_F(HttpHealthCheckerImplTest, ServiceCheckRuntimeOff) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
   health_checker_->start();
 
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+  EXPECT_CALL(runtime_.snapshot(), getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot(), getInteger("health_check.min_interval", _))
       .WillOnce(Return(45000));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(45000)));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
@@ -1216,7 +1216,7 @@ TEST_F(HttpHealthCheckerImplTest, ServiceCheckRuntimeOff) {
 
 TEST_F(HttpHealthCheckerImplTest, SuccessStartFailedFailFirstServiceCheck) {
   setupNoServiceValidationHC();
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
+  EXPECT_CALL(runtime_.snapshot(), featureEnabled("health_check.verify_cluster", 100))
       .WillRepeatedly(Return(true));
   absl::optional<std::string> health_checked_cluster("locations-production-iad");
   expectSuccessStartFailedFailFirst(health_checked_cluster);
@@ -1253,8 +1253,9 @@ TEST_F(HttpHealthCheckerImplTest, SuccessStartFailedSuccessFirst) {
   // Test fast success immediately moves us to healthy.
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed)).Times(1);
   EXPECT_CALL(*event_logger_, logAddHealthy(_, _, true));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _)).WillOnce(Return(500));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _));
+  EXPECT_CALL(runtime_.snapshot(), getInteger("health_check.max_interval", _))
+      .WillOnce(Return(500));
+  EXPECT_CALL(runtime_.snapshot(), getInteger("health_check.min_interval", _));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(500)));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
   respond(0, "200", false);
@@ -1970,7 +1971,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithAltPort) {
   const std::string host = "fake_cluster";
   const std::string path = "/healthcheck";
   setupServiceValidationHC();
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
+  EXPECT_CALL(runtime_.snapshot(), featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(true));
 
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
@@ -1989,8 +1990,8 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithAltPort) {
       }));
   health_checker_->start();
 
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+  EXPECT_CALL(runtime_.snapshot(), getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot(), getInteger("health_check.min_interval", _))
       .WillOnce(Return(45000));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(45000)));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
@@ -2018,8 +2019,8 @@ TEST_F(HttpHealthCheckerImplTest, SuccessWithMultipleHostsAndAltPort) {
   EXPECT_CALL(*test_sessions_[1]->timeout_timer_, enableTimer(_));
   health_checker_->start();
 
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _)).Times(2);
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+  EXPECT_CALL(runtime_.snapshot(), getInteger("health_check.max_interval", _)).Times(2);
+  EXPECT_CALL(runtime_.snapshot(), getInteger("health_check.min_interval", _))
       .Times(2)
       .WillRepeatedly(Return(45000));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(45000)));
@@ -2067,7 +2068,7 @@ public:
     )EOF";
 
     health_checker_.reset(new TestProdHttpHealthChecker(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                        dispatcher_, runtime_, random_,
+                                                        dispatcher_, runtime_.loader(), random_,
                                                         HealthCheckEventLoggerPtr(event_logger_)));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
@@ -2089,7 +2090,7 @@ public:
     )EOF";
 
     health_checker_.reset(new TestProdHttpHealthChecker(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                        dispatcher_, runtime_, random_,
+                                                        dispatcher_, runtime_.loader(), random_,
                                                         HealthCheckEventLoggerPtr(event_logger_)));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
@@ -2339,9 +2340,9 @@ public:
       - text: "02"
     )EOF";
 
-    health_checker_.reset(
-        new TcpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml.str()), dispatcher_,
-                                 runtime_, random_, HealthCheckEventLoggerPtr(event_logger_)));
+    health_checker_.reset(new TcpHealthCheckerImpl(
+        *cluster_, parseHealthCheckFromV2Yaml(yaml.str()), dispatcher_, runtime_.loader(), random_,
+        HealthCheckEventLoggerPtr(event_logger_)));
   }
 
   void setupNoData() {
@@ -2354,7 +2355,7 @@ public:
     )EOF";
 
     health_checker_.reset(new TcpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                   dispatcher_, runtime_, random_,
+                                                   dispatcher_, runtime_.loader(), random_,
                                                    HealthCheckEventLoggerPtr(event_logger_)));
   }
 
@@ -2373,7 +2374,7 @@ public:
     )EOF";
 
     health_checker_.reset(new TcpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
-                                                   dispatcher_, runtime_, random_,
+                                                   dispatcher_, runtime_.loader(), random_,
                                                    HealthCheckEventLoggerPtr(event_logger_)));
   }
 
@@ -2396,7 +2397,7 @@ public:
   Event::MockTimer* timeout_timer_{};
   Event::MockTimer* interval_timer_{};
   Network::ReadFilterSharedPtr read_filter_;
-  NiceMock<Runtime::MockLoader> runtime_;
+  Runtime::ScopedMockLoaderSingleton runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
 };
 
@@ -2944,8 +2945,8 @@ public:
 
   void setupHC() {
     const auto config = createGrpcHealthCheckConfig();
-    health_checker_.reset(new TestGrpcHealthCheckerImpl(*cluster_, config, dispatcher_, runtime_,
-                                                        random_,
+    health_checker_.reset(new TestGrpcHealthCheckerImpl(*cluster_, config, dispatcher_,
+                                                        runtime_.loader(), random_,
                                                         HealthCheckEventLoggerPtr(event_logger_)));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
@@ -2956,8 +2957,8 @@ public:
   void setupHCWithUnhealthyThreshold(int value) {
     auto config = createGrpcHealthCheckConfig();
     config.mutable_unhealthy_threshold()->set_value(value);
-    health_checker_.reset(new TestGrpcHealthCheckerImpl(*cluster_, config, dispatcher_, runtime_,
-                                                        random_,
+    health_checker_.reset(new TestGrpcHealthCheckerImpl(*cluster_, config, dispatcher_,
+                                                        runtime_.loader(), random_,
                                                         HealthCheckEventLoggerPtr(event_logger_)));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
@@ -2971,8 +2972,8 @@ public:
     if (authority.has_value()) {
       config.mutable_grpc_health_check()->set_authority(authority.value());
     }
-    health_checker_.reset(new TestGrpcHealthCheckerImpl(*cluster_, config, dispatcher_, runtime_,
-                                                        random_,
+    health_checker_.reset(new TestGrpcHealthCheckerImpl(*cluster_, config, dispatcher_,
+                                                        runtime_.loader(), random_,
                                                         HealthCheckEventLoggerPtr(event_logger_)));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
@@ -2983,8 +2984,8 @@ public:
   void setupNoReuseConnectionHC() {
     auto config = createGrpcHealthCheckConfig();
     config.mutable_reuse_connection()->set_value(false);
-    health_checker_.reset(new TestGrpcHealthCheckerImpl(*cluster_, config, dispatcher_, runtime_,
-                                                        random_,
+    health_checker_.reset(new TestGrpcHealthCheckerImpl(*cluster_, config, dispatcher_,
+                                                        runtime_.loader(), random_,
                                                         HealthCheckEventLoggerPtr(event_logger_)));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
@@ -3002,8 +3003,8 @@ public:
     config.mutable_interval_jitter()->set_seconds(0);
     config.mutable_unhealthy_threshold()->set_value(3);
     config.mutable_healthy_threshold()->set_value(3);
-    health_checker_.reset(new TestGrpcHealthCheckerImpl(*cluster_, config, dispatcher_, runtime_,
-                                                        random_,
+    health_checker_.reset(new TestGrpcHealthCheckerImpl(*cluster_, config, dispatcher_,
+                                                        runtime_.loader(), random_,
                                                         HealthCheckEventLoggerPtr(event_logger_)));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
@@ -3071,9 +3072,9 @@ public:
     }
     health_checker_->start();
 
-    EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _))
+    EXPECT_CALL(runtime_.snapshot(), getInteger("health_check.max_interval", _))
         .Times(num_healthchecks);
-    EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+    EXPECT_CALL(runtime_.snapshot(), getInteger("health_check.min_interval", _))
         .Times(num_healthchecks)
         .WillRepeatedly(Return(45000));
     for (size_t i = 0; i < num_healthchecks; i++) {
@@ -3193,8 +3194,8 @@ public:
         }));
     health_checker_->start();
 
-    EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
-    EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+    EXPECT_CALL(runtime_.snapshot(), getInteger("health_check.max_interval", _));
+    EXPECT_CALL(runtime_.snapshot(), getInteger("health_check.min_interval", _))
         .WillOnce(Return(45000));
     expectHealthcheckStop(0, 45000);
 
@@ -3211,7 +3212,7 @@ public:
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::vector<TestSessionPtr> test_sessions_;
   std::shared_ptr<TestGrpcHealthCheckerImpl> health_checker_;
-  NiceMock<Runtime::MockLoader> runtime_;
+  Runtime::ScopedMockLoaderSingleton runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   MockHealthCheckEventLogger* event_logger_{};
   std::list<uint32_t> connection_index_{};
@@ -3349,8 +3350,9 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessStartFailedSuccessFirst) {
   expectHealthcheckStart(0);
   health_checker_->start();
 
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _)).WillOnce(Return(500));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _));
+  EXPECT_CALL(runtime_.snapshot(), getInteger("health_check.max_interval", _))
+      .WillOnce(Return(500));
+  EXPECT_CALL(runtime_.snapshot(), getInteger("health_check.min_interval", _));
   expectHealthcheckStop(0, 500);
   // Fast success immediately moves us to healthy.
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));

@@ -8,6 +8,7 @@
 
 #include "test/fuzz/fuzz_runner.h"
 #include "test/integration/server.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 
@@ -18,6 +19,7 @@ namespace {
 // Derived from //test/server:server_fuzz_test.cc, but starts the server in configuration validation
 // mode (quits upon validation of the given config)
 DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v2::Bootstrap& input) {
+  Runtime::ScopedMockLoaderSingleton runtime;
   testing::NiceMock<MockOptions> options;
   TestComponentFactory component_factory;
   Fuzz::PerTestEnvironment test_env;

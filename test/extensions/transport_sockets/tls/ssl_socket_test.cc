@@ -27,6 +27,7 @@
 #include "test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_cert_info.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
@@ -720,6 +721,7 @@ protected:
                                    const Network::Address::IpVersion version);
 
   Event::DispatcherPtr dispatcher_;
+  Runtime::ScopedMockLoaderSingleton runtime_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, SslSocketTest,

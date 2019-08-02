@@ -68,8 +68,8 @@ public:
                 Outlier::EventLoggerSharedPtr outlier_event_logger,
                 bool added_via_api) -> std::pair<ClusterSharedPtr, ThreadAwareLoadBalancer*> {
               auto result = ClusterFactoryImplBase::create(
-                  cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_, random_,
-                  dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
+                  cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_.loader(),
+                  random_, dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
                   outlier_event_logger, added_via_api, validation_visitor_, *api_);
               // Convert from load balancer unique_ptr -> raw pointer -> unique_ptr.
               return std::make_pair(result.first, result.second.release());
@@ -124,7 +124,7 @@ public:
   NiceMock<ThreadLocal::MockInstance> tls_;
   std::shared_ptr<NiceMock<Network::MockDnsResolver>> dns_resolver_{
       new NiceMock<Network::MockDnsResolver>};
-  NiceMock<Runtime::MockLoader> runtime_;
+  Runtime::ScopedMockLoaderSingleton runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager_{
@@ -224,8 +224,9 @@ public:
 
   void create(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
     cluster_manager_ = std::make_unique<TestClusterManagerImpl>(
-        bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
-        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, *api_, http_context_);
+        bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_.loader(),
+        factory_.random_, factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, *api_,
+        http_context_);
   }
 
   void createWithLocalClusterUpdate(const bool enable_merge_window = true) {
@@ -258,8 +259,8 @@ public:
     const auto& bootstrap = parseBootstrapFromV2Yaml(yaml);
 
     cluster_manager_ = std::make_unique<MockedUpdatedClusterManagerImpl>(
-        bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
-        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, *api_,
+        bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_.loader(),
+        factory_.random_, factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, *api_,
         local_cluster_update_, local_hosts_removed_, http_context_);
   }
 

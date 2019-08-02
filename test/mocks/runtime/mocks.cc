@@ -6,6 +6,7 @@
 using testing::_;
 using testing::Return;
 using testing::ReturnArg;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Runtime {
@@ -18,13 +19,26 @@ MockSnapshot::MockSnapshot() { ON_CALL(*this, getInteger(_, _)).WillByDefault(Re
 
 MockSnapshot::~MockSnapshot() = default;
 
-MockLoader::MockLoader() { ON_CALL(*this, snapshot()).WillByDefault(ReturnRef(snapshot_)); }
+MockLoader::MockLoader()
+    : threadsafe_snapshot_(std::make_shared<NiceMock<MockSnapshot>>()),
+      snapshot_(*threadsafe_snapshot_) {
+  ON_CALL(*this, snapshot()).WillByDefault(ReturnRef(snapshot_));
+  ON_CALL(*this, threadsafeSnapshot()).WillByDefault(Return(threadsafe_snapshot_));
+}
 
 MockLoader::~MockLoader() = default;
 
 MockOverrideLayer::MockOverrideLayer() = default;
 
 MockOverrideLayer::~MockOverrideLayer() = default;
+
+ScopedMockLoaderSingleton::ScopedMockLoaderSingleton() { LoaderSingleton::initialize(&loader_); }
+
+ScopedMockLoaderSingleton::~ScopedMockLoaderSingleton() { LoaderSingleton::clear(); }
+
+Runtime::MockLoader& ScopedMockLoaderSingleton::loader() { return loader_; }
+
+Runtime::MockSnapshot& ScopedMockLoaderSingleton::snapshot() { return loader_.snapshot_; }
 
 } // namespace Runtime
 } // namespace Envoy

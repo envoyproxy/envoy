@@ -5,6 +5,7 @@
 #include "common/network/io_socket_handle_impl.h"
 
 #include "test/common/buffer/utility.h"
+#include "test/mocks/runtime/mocks.h"
 
 #include "gtest/gtest.h"
 
@@ -21,6 +22,7 @@ public:
     buffer_.setWatermarks(5, 10);
   }
 
+  Runtime::ScopedMockLoaderSingleton runtime_;
   Buffer::WatermarkBuffer buffer_{[&]() -> void { ++times_low_watermark_called_; },
                                   [&]() -> void { ++times_high_watermark_called_; },
                                   [&]() -> void { ++times_overflow_watermark_called_; }};

@@ -22,6 +22,7 @@
 #include "test/fuzz/utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 
 #include "gmock/gmock.h"
 
@@ -345,6 +346,7 @@ namespace {
 enum class HttpVersion { Http1, Http2 };
 
 void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersion http_version) {
+  Runtime::ScopedMockLoaderSingleton runtime;
   Stats::IsolatedStoreImpl stats_store;
   NiceMock<Network::MockConnection> client_connection;
   const Http2Settings client_http2settings{fromHttp2Settings(input.h2_settings().client())};

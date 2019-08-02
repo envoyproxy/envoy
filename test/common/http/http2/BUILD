@@ -24,6 +24,7 @@ envoy_cc_test(
         "//test/common/http:common_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
     ],
@@ -82,7 +83,10 @@ envoy_cc_test(
         "response_header_corpus/simple_example_huffman",
         "response_header_corpus/simple_example_plain",
     ],
-    deps = [":frame_replay_lib"],
+    deps = [
+        ":frame_replay_lib",
+        "//test/mocks/runtime:runtime_mocks",
+    ],
 )
 
 envoy_cc_test(
@@ -104,12 +108,18 @@ envoy_cc_fuzz_test(
     name = "response_header_fuzz_test",
     srcs = ["response_header_fuzz_test.cc"],
     corpus = "response_header_corpus",
-    deps = [":frame_replay_lib"],
+    deps = [
+        ":frame_replay_lib",
+        "//test/mocks/runtime:runtime_mocks",
+    ],
 )
 
 envoy_cc_fuzz_test(
     name = "request_header_fuzz_test",
     srcs = ["request_header_fuzz_test.cc"],
     corpus = "request_header_corpus",
-    deps = [":frame_replay_lib"],
+    deps = [
+        ":frame_replay_lib",
+        "//test/mocks/runtime:runtime_mocks",
+    ],
 )

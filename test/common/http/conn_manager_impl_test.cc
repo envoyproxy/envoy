@@ -107,8 +107,8 @@ public:
     filter_callbacks_.connection_.remote_address_ =
         std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
     conn_manager_ = std::make_unique<ConnectionManagerImpl>(
-        *this, drain_close_, random_, http_context_, runtime_, local_info_, cluster_manager_,
-        &overload_manager_, test_time_.timeSystem());
+        *this, drain_close_, random_, http_context_, runtime_.loader(), local_info_,
+        cluster_manager_, &overload_manager_, test_time_.timeSystem());
     conn_manager_->initializeReadFilterCallbacks(filter_callbacks_);
 
     if (tracing) {
@@ -286,7 +286,7 @@ public:
   NiceMock<Tracing::MockHttpTracer> tracer_;
   Stats::IsolatedStoreImpl fake_stats_;
   Http::ContextImpl http_context_;
-  NiceMock<Runtime::MockLoader> runtime_;
+  Runtime::ScopedMockLoaderSingleton runtime_;
   NiceMock<Envoy::AccessLog::MockAccessLogManager> log_manager_;
   std::string access_log_path_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
@@ -699,8 +699,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
   EXPECT_CALL(*span, setTag(Eq(":method"), Eq("GET")));
   // Verify if the activeSpan interface returns reference to the current span.
   EXPECT_CALL(*span, setTag(Eq("service-cluster"), Eq("scoobydoo")));
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled",
-                                                 An<const envoy::type::FractionalPercent&>(), _))
+  EXPECT_CALL(runtime_.snapshot(), featureEnabled("tracing.global_enabled",
+                                                  An<const envoy::type::FractionalPercent&>(), _))
       .WillOnce(Return(true));
   EXPECT_CALL(*span, setOperation(_)).Times(0);
 
@@ -765,8 +765,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
           Invoke([&](const Tracing::Span& applyToSpan) -> void { EXPECT_EQ(span, &applyToSpan); }));
   EXPECT_CALL(*span, finishSpan());
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled",
-                                                 An<const envoy::type::FractionalPercent&>(), _))
+  EXPECT_CALL(runtime_.snapshot(), featureEnabled("tracing.global_enabled",
+                                                  An<const envoy::type::FractionalPercent&>(), _))
       .WillOnce(Return(true));
   EXPECT_CALL(*span, setOperation(_)).Times(0);
 
@@ -828,8 +828,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
           Invoke([&](const Tracing::Span& applyToSpan) -> void { EXPECT_EQ(span, &applyToSpan); }));
   EXPECT_CALL(*span, finishSpan());
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled",
-                                                 An<const envoy::type::FractionalPercent&>(), _))
+  EXPECT_CALL(runtime_.snapshot(), featureEnabled("tracing.global_enabled",
+                                                  An<const envoy::type::FractionalPercent&>(), _))
       .WillOnce(Return(true));
   EXPECT_CALL(*span, setOperation(Eq("testOp")));
 
@@ -906,8 +906,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
           Invoke([&](const Tracing::Span& applyToSpan) -> void { EXPECT_EQ(span, &applyToSpan); }));
   EXPECT_CALL(*span, finishSpan());
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled",
-                                                 An<const envoy::type::FractionalPercent&>(), _))
+  EXPECT_CALL(runtime_.snapshot(), featureEnabled("tracing.global_enabled",
+                                                  An<const envoy::type::FractionalPercent&>(), _))
       .WillOnce(Return(true));
   EXPECT_CALL(*span, setOperation(_)).Times(0);
 
@@ -984,8 +984,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
           Invoke([&](const Tracing::Span& applyToSpan) -> void { EXPECT_EQ(span, &applyToSpan); }));
   EXPECT_CALL(*span, finishSpan());
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled",
-                                                 An<const envoy::type::FractionalPercent&>(), _))
+  EXPECT_CALL(runtime_.snapshot(), featureEnabled("tracing.global_enabled",
+                                                  An<const envoy::type::FractionalPercent&>(), _))
       .WillOnce(Return(true));
   // Verify that span operation overridden by value supplied in response header.
   EXPECT_CALL(*span, setOperation(Eq("testOp")));
@@ -1041,8 +1041,8 @@ TEST_F(HttpConnectionManagerImplTest,
                                      percent1,
                                      false});
 
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled",
-                                                 An<const envoy::type::FractionalPercent&>(), _))
+  EXPECT_CALL(runtime_.snapshot(), featureEnabled("tracing.global_enabled",
+                                                  An<const envoy::type::FractionalPercent&>(), _))
       .WillOnce(Return(false));
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
 
@@ -1314,7 +1314,7 @@ TEST_F(HttpConnectionManagerImplTest, DoNotStartSpanIfTracingIsNotEnabled) {
   tracing_config_.reset();
 
   EXPECT_CALL(tracer_, startSpan_(_, _, _, _)).Times(0);
-  ON_CALL(runtime_.snapshot_,
+  ON_CALL(runtime_.snapshot(),
           featureEnabled("tracing.global_enabled", An<const envoy::type::FractionalPercent&>(), _))
       .WillByDefault(Return(true));
 

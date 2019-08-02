@@ -66,9 +66,9 @@ protected:
           return server_response_timer_;
         }));
     hds_delegate_ = std::make_unique<HdsDelegate>(
-        stats_store_, Grpc::RawAsyncClientPtr(async_client_), dispatcher_, runtime_, stats_store_,
-        ssl_context_manager_, random_, test_factory_, log_manager_, cm_, local_info_, admin_,
-        singleton_manager_, tls_, validation_visitor_, *api_);
+        stats_store_, Grpc::RawAsyncClientPtr(async_client_), dispatcher_, runtime_.loader(),
+        stats_store_, ssl_context_manager_, random_, test_factory_, log_manager_, cm_, local_info_,
+        admin_, singleton_manager_, tls_, validation_visitor_, *api_);
   }
 
   // Creates a HealthCheckSpecifier message that contains one endpoint and one
@@ -117,7 +117,7 @@ protected:
   std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier> message;
   Grpc::MockAsyncStream async_stream_;
   Grpc::MockAsyncClient* async_client_;
-  Runtime::MockLoader runtime_;
+  Runtime::ScopedMockLoaderSingleton runtime_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
   Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager_;

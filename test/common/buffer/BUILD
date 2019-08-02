@@ -85,6 +85,7 @@ envoy_cc_test(
         "//source/common/buffer:buffer_lib",
         "//source/common/buffer:watermark_buffer_lib",
         "//source/common/network:address_lib",
+        "//test/mocks/runtime:runtime_mocks",
     ],
 )
 

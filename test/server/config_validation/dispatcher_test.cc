@@ -9,6 +9,7 @@
 
 #include "server/config_validation/api.h"
 
+#include "test/mocks/runtime/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/test_time.h"
@@ -35,6 +36,7 @@ public:
 private:
   // Using config validation API.
   std::unique_ptr<Api::ValidationImpl> validation_;
+  Runtime::ScopedMockLoaderSingleton runtime_;
 };
 
 // Simple test which creates a connection to fake upstream client. This is to test if

@@ -27,6 +27,7 @@ envoy_extension_cc_test(
         "//test/mocks/api:api_mocks",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",

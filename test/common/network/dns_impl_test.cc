@@ -23,6 +23,7 @@
 #include "common/network/utility.h"
 
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
@@ -450,6 +451,7 @@ protected:
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   DnsResolverSharedPtr resolver_;
+  Runtime::ScopedMockLoaderSingleton runtime_;
 };
 
 static bool hasAddress(const std::list<Address::InstanceConstSharedPtr>& results,

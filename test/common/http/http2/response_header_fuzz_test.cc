@@ -6,6 +6,7 @@
 
 #include "test/common/http/http2/frame_replay.h"
 #include "test/fuzz/fuzz_runner.h"
+#include "test/mocks/runtime/mocks.h"
 
 using testing::AnyNumber;
 
@@ -28,6 +29,7 @@ void Replay(const Frame& frame) {
 }
 
 DEFINE_FUZZER(const uint8_t* buf, size_t len) {
+  Runtime::ScopedMockLoaderSingleton runtime;
   Frame frame;
   frame.assign(buf, buf + len);
   // Replay with the fuzzer bytes.
