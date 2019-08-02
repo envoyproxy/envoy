@@ -5,9 +5,9 @@ Getting Started
 
 This section gets you started with a very simple configuration and provides some example configurations.
 
-Envoy does not currently provide separate pre-built binaries, but does provide Docker images. This is
-the fastest way to get started using Envoy. Should you wish to use Envoy outside of a
-Docker container, you will need to :ref:`build it <building>`.
+Envoy provides official :ref:`pre-built Docker images <install_binaries>` and other pre-built binaries
+are available via `GetEnvoy.io <https://www.getenvoy.io/>`_. This is the fastest way to get started using Envoy.
+You can also :ref:`build it <building>` from source.
 
 These examples use the :ref:`v2 Envoy API <envoy_api_reference>`, but use only the static configuration
 feature of the API, which is most useful for simple requirements. For more complex requirements
