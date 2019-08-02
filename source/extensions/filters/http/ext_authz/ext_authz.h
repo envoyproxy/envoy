@@ -46,7 +46,9 @@ public:
         clear_route_cache_(config.clear_route_cache()),
         max_request_bytes_(config.with_request_body().max_request_bytes()),
         status_on_error_(toErrorCode(config.status_on_error().code())), local_info_(local_info),
-        scope_(scope), runtime_(runtime), http_context_(http_context) {}
+        scope_(scope), runtime_(runtime), http_context_(http_context),
+        metadata_context_namespaces_(config.metadata_context_namespaces().begin(),
+                                     config.metadata_context_namespaces().end()) {}
 
   bool allowPartialMessage() const { return allow_partial_message_; }
 
@@ -68,6 +70,10 @@ public:
 
   Http::Context& httpContext() { return http_context_; }
 
+  const std::vector<std::string>& metadataContextNamespaces() {
+    return metadata_context_namespaces_;
+  }
+
 private:
   static Http::Code toErrorCode(uint64_t status) {
     const auto code = static_cast<Http::Code>(status);
@@ -86,6 +92,7 @@ private:
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
   Http::Context& http_context_;
+  const std::vector<std::string> metadata_context_namespaces_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
