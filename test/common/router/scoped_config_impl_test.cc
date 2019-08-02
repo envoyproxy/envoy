@@ -425,8 +425,8 @@ public:
     route_configuration_name: foo_route
     key:
       fragments:
-        - string_key: meh
-        - string_key: meh
+        - string_key: xyz
+        - string_key: xyz
 )EOF");
     scope_info_b_ = makeScopedRouteInfo(R"EOF(
     name: bar_scope
@@ -511,9 +511,9 @@ TEST_F(ScopedConfigImplTest, Update) {
   scoped_config_impl_->addOrUpdateRoutingScope(scope_info_a_v2_);
   EXPECT_EQ(scoped_config_impl_->getRouteConfig(headers), nullptr);
 
-  // foo_scope now is keyed by (meh, meh).
+  // foo_scope now is keyed by (xyz, xyz).
   EXPECT_EQ(scoped_config_impl_->getRouteConfig(
-                TestHeaderMapImpl{{"foo_header", ",bar=meh,foo=bar"}, {"bar_header", ";;meh"}}),
+                TestHeaderMapImpl{{"foo_header", ",bar=xyz,foo=bar"}, {"bar_header", ";;xyz"}}),
             scope_info_a_v2_->routeConfig());
 
   // Remove scope "foo_scope".
@@ -525,7 +525,7 @@ TEST_F(ScopedConfigImplTest, Update) {
   EXPECT_NO_THROW(scoped_config_impl_->removeRoutingScope("foo_scope1"));
   EXPECT_NO_THROW(scoped_config_impl_->removeRoutingScope("base_scope"));
   EXPECT_NO_THROW(scoped_config_impl_->removeRoutingScope("bluh_scope"));
-  EXPECT_NO_THROW(scoped_config_impl_->removeRoutingScope("meh_scope"));
+  EXPECT_NO_THROW(scoped_config_impl_->removeRoutingScope("xyz_scope"));
 }
 
 } // namespace
