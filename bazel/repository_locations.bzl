@@ -1,22 +1,24 @@
 REPOSITORY_LOCATIONS = dict(
     bazel_gazelle = dict(
-        sha256 = "3c681998538231a2d24d0c07ed5a7658cb72bfb5fd4bf9911157c0e9ac6a2687",
-        urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/0.17.0/bazel-gazelle-0.17.0.tar.gz"],
+        sha256 = "be9296bfd64882e3c08e3283c58fcb461fa6dd3c171764fcc4cf322f60615a9b",
+        urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/0.18.1/bazel-gazelle-0.18.1.tar.gz"],
     ),
     bazel_toolchains = dict(
-        sha256 = "68e7678473090542e679ce7e6aa8a3ba5669577dede2b404f9865d556bd99f10",
-        strip_prefix = "bazel-toolchains-0.28.0",
-        urls = [
-            "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/0.28.0.tar.gz",
-            "https://github.com/bazelbuild/bazel-toolchains/archive/0.28.0.tar.gz",
-        ],
+        sha256 = "0710ec5a88201c4c3038ea458f7e9078cc3ad7ad61736ab287c115438eb91b1d",
+        strip_prefix = "bazel-toolchains-5a8611ee011d0d68498b16bf42a9c69d139bc708",
+        # 2019-08-01
+        # Need:
+        # - https://github.com/bazelbuild/bazel-toolchains/pull/644 to select correct toolchain from same image
+        # - https://github.com/bazelbuild/bazel-toolchains/pull/650 to support no java config
+        # TODO(lizan): Update to release when new version is released.
+        urls = ["https://github.com/bazelbuild/bazel-toolchains/archive/5a8611ee011d0d68498b16bf42a9c69d139bc708.tar.gz"],
     ),
     boringssl = dict(
         # Use commits from branch "chromium-stable-with-bazel"
-        sha256 = "448773376d063b1e9a19e4fd41002d1a31a968a13be20b3b66ecd4aab9cf14a8",
-        strip_prefix = "boringssl-e534d74f5732e1aeebd514f05271d089c530c2f9",
-        # chromium-75.0.3770.80
-        urls = ["https://github.com/google/boringssl/archive/e534d74f5732e1aeebd514f05271d089c530c2f9.tar.gz"],
+        sha256 = "18edf961f8377e8d10fd8497bc8a331def9cb60a6c2a50a4c8eb322b045042d5",
+        strip_prefix = "boringssl-87d1c8f292e5184fd727efe84f458d89687d7742",
+        # chromium-76.0.3809.87
+        urls = ["https://github.com/google/boringssl/archive/87d1c8f292e5184fd727efe84f458d89687d7742.tar.gz"],
     ),
     boringssl_fips = dict(
         sha256 = "b12ad676ee533824f698741bd127f6fbc82c46344398a6d78d25e62c6c418c73",
@@ -24,10 +26,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://commondatastorage.googleapis.com/chromium-boringssl-docs/fips/boringssl-66005f41fbc3529ffe8d007708756720529da20d.tar.xz"],
     ),
     com_google_absl = dict(
-        sha256 = "7ddf863ddced6fa5bf7304103f9c7aa619c20a2fcf84475512c8d3834b9d14fa",
-        strip_prefix = "abseil-cpp-61c9bf3e3e1c28a4aa6d7f1be4b37fd473bb5529",
-        # 2019-06-05
-        urls = ["https://github.com/abseil/abseil-cpp/archive/61c9bf3e3e1c28a4aa6d7f1be4b37fd473bb5529.tar.gz"],
+        sha256 = "3df5970908ed9a09ba51388d04661803a6af18c373866f442cede7f381e0b94a",
+        strip_prefix = "abseil-cpp-14550beb3b7b97195e483fb74b5efb906395c31e",
+        # 2019-07-31
+        urls = ["https://github.com/abseil/abseil-cpp/archive/14550beb3b7b97195e483fb74b5efb906395c31e.tar.gz"],
     ),
     com_github_apache_thrift = dict(
         sha256 = "7d59ac4fdcb2c58037ebd4a9da5f9a49e3e034bf75b3f26d9fe48ba3d8806e6b",
@@ -105,9 +107,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/nanopb/nanopb/archive/0.3.9.3.tar.gz"],
     ),
     com_github_nghttp2_nghttp2 = dict(
-        sha256 = "fe9a75ec44e3a2e8f7f0cb83ad91e663bbc4c5085baf37b57ee2610846d7cf5d",
-        strip_prefix = "nghttp2-1.38.0",
-        urls = ["https://github.com/nghttp2/nghttp2/releases/download/v1.38.0/nghttp2-1.38.0.tar.gz"],
+        sha256 = "25b623cd04dc6a863ca3b34ed6247844effe1aa5458229590b3f56a6d53cd692",
+        strip_prefix = "nghttp2-1.39.1",
+        urls = ["https://github.com/nghttp2/nghttp2/releases/download/v1.39.1/nghttp2-1.39.1.tar.gz"],
     ),
     io_opentracing_cpp = dict(
         sha256 = "015c4187f7a6426a2b5196f0ccd982aa87f010cf61f507ae3ce5c90523f92301",
@@ -142,9 +144,6 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/libevent/libevent/archive/0d7d85c2083f7a4c9efe01c061486f332b576d28.tar.gz"],
     ),
     net_zlib = dict(
-        # TODO(moderation): revert to com_github_madler_zlib name pending resolution of workaround
-        # in rules_go https://github.com/bazelbuild/rules_go/blob/master/go/private/repositories.bzl#L87-L101
-        # for issue in protocolbuffers/protobuf https://github.com/protocolbuffers/protobuf/issues/5472
         sha256 = "629380c90a77b964d896ed37163f5c3a34f6e6d897311f1df2a7016355c45eff",
         strip_prefix = "zlib-1.2.11",
         urls = ["https://github.com/madler/zlib/archive/v1.2.11.tar.gz"],
@@ -155,9 +154,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/jbeder/yaml-cpp/archive/0f9a586ca1dc29c2ecb8dd715a315b93e3f40f79.tar.gz"],
     ),
     com_github_msgpack_msgpack_c = dict(
-        sha256 = "bda49f996a73d2c6080ff0523e7b535917cd28c8a79c3a5da54fc29332d61d1e",
-        strip_prefix = "msgpack-c-cpp-3.1.1",
-        urls = ["https://github.com/msgpack/msgpack-c/archive/cpp-3.1.1.tar.gz"],
+        sha256 = "fbaa28c363a316fd7523f31d1745cf03eab0d1e1ea5a1c60aa0dffd4ce551afe",
+        strip_prefix = "msgpack-3.2.0",
+        urls = ["https://github.com/msgpack/msgpack-c/releases/download/cpp-3.2.0/msgpack-3.2.0.tar.gz"],
     ),
     com_github_google_jwt_verify = dict(
         sha256 = "8ab9a0b3f8b7eab5f1cd059920e81fdc138cd4ee657c1412af891652929885c5",
@@ -203,6 +202,7 @@ REPOSITORY_LOCATIONS = dict(
     com_google_googletest = dict(
         sha256 = "cbd251a40485fddd44cdf641af6df2953d45695853af6d68aeb11c7efcde6771",
         strip_prefix = "googletest-d7003576dd133856432e2e07340f45926242cc3a",
+        # 2019-07-16
         # TODO(akonradi): Switch this back to a released version later than 1.8.1 once there is
         # one available.
         urls = ["https://github.com/google/googletest/archive/d7003576dd133856432e2e07340f45926242cc3a.tar.gz"],
@@ -235,6 +235,7 @@ REPOSITORY_LOCATIONS = dict(
     io_opencensus_cpp = dict(
         sha256 = "9223b4d54af4151910dede03aa58247e90df72167fcc91d5f75e73a141568036",
         strip_prefix = "opencensus-cpp-e292a374fb42c6cb2743f1689234bd409f4fda20",
+        # 2019-07-15
         urls = ["https://github.com/census-instrumentation/opencensus-cpp/archive/e292a374fb42c6cb2743f1689234bd409f4fda20.tar.gz"],
     ),
     com_github_curl = dict(

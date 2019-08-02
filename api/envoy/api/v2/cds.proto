@@ -127,11 +127,8 @@ message Cluster {
   EdsClusterConfig eds_cluster_config = 3;
 
   // The timeout for new network connections to hosts in the cluster.
-  google.protobuf.Duration connect_timeout = 4 [
-    (validate.rules).duration.gt = {},
-    (gogoproto.stdduration) = true,
-    (gogoproto.nullable) = false
-  ];
+  google.protobuf.Duration connect_timeout = 4
+      [(validate.rules).duration.gt = {}, (gogoproto.stdduration) = true];
 
   // Soft limit on size of the cluster’s connections read and write buffers. If
   // unspecified, an implementation defined default is applied (1MiB).
