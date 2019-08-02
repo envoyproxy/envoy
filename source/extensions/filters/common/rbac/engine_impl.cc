@@ -15,7 +15,7 @@ RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
   // guard expression builder by presence of a condition in policies
   for (const auto& policy : rules.policies()) {
     if (policy.second.has_condition()) {
-      builder_ = Expr::createBuilder();
+      builder_ = Expr::createBuilder(&constant_arena_);
       break;
     }
   }

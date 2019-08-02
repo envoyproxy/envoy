@@ -11,7 +11,7 @@ namespace Filters {
 namespace Common {
 namespace RBAC {
 
-class RoleBasedAccessControlEngineImpl : public RoleBasedAccessControlEngine {
+class RoleBasedAccessControlEngineImpl : public RoleBasedAccessControlEngine, NonCopyable {
 public:
   RoleBasedAccessControlEngineImpl(const envoy::config::rbac::v2::RBAC& rules);
 
@@ -26,6 +26,7 @@ private:
 
   std::map<std::string, std::unique_ptr<PolicyMatcher>> policies_;
 
+  Protobuf::Arena constant_arena_;
   Expr::BuilderPtr builder_;
 };
 

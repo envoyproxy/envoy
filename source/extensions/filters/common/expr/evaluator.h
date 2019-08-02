@@ -21,9 +21,10 @@ using BuilderPtr = std::unique_ptr<Builder>;
 using Expression = google::api::expr::runtime::CelExpression;
 using ExpressionPtr = std::unique_ptr<Expression>;
 
-// Creates an expression builder.
+// Creates an expression builder. The optional arena is used to enable constant folding
+// for intermediate evaluation results.
 // Throws an exception if fails to construct an expression builder.
-BuilderPtr createBuilder();
+BuilderPtr createBuilder(Protobuf::Arena* arena);
 
 // Creates an interpretable expression from a protobuf representation.
 // Throws an exception if fails to construct a runtime expression.

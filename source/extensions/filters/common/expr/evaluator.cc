@@ -11,11 +11,16 @@ namespace Filters {
 namespace Common {
 namespace Expr {
 
-BuilderPtr createBuilder() {
+BuilderPtr createBuilder(Protobuf::Arena* arena) {
   google::api::expr::runtime::InterpreterOptions options;
 
   // Conformance with spec/go runtimes requires this setting
   options.partial_string_match = true;
+
+  if (arena != nullptr) {
+    options.constant_folding = true;
+    options.constant_arena = arena;
+  }
 
   auto builder = google::api::expr::runtime::CreateCelExpressionBuilder(options);
   auto register_status =
