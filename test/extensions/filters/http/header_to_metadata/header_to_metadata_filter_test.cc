@@ -166,15 +166,41 @@ response_rules:
 }
 
 /**
- * Test the value gets written as a Base64Url serialized type.
+ * Test the value in Base64Url gets written as a string.
  */
-TEST_F(HeaderToMetadataTest, Base64UrlSerializedTypeTest) {
+TEST_F(HeaderToMetadataTest, StringTypeInBase64UrlTest) {
   const std::string response_config_yaml = R"EOF(
 response_rules:
   - header: x-authenticated
     on_header_present:
       key: auth
-      type: BASE64URL_SERIALIZED
+      type: STRING
+      encode: BASE64URL
+)EOF";
+  initializeFilter(response_config_yaml);
+  std::string data = "Non-ascii-characters";
+  const auto encoded = Base64Url::encode(data.c_str(), data.size());
+  Http::TestHeaderMapImpl incoming_headers{{"x-authenticated", encoded}};
+  std::map<std::string, std::string> expected = {{"auth", data}};
+  Http::TestHeaderMapImpl empty_headers;
+
+  EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+  EXPECT_CALL(req_info_,
+              setDynamicMetadata("envoy.filters.http.header_to_metadata", MapEq(expected)));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(incoming_headers, false));
+}
+
+/**
+ * Test the value gets written as a protobuf value in Base64Url.
+ */
+TEST_F(HeaderToMetadataTest, ProtobufValueTypeInBase64UrlTest) {
+  const std::string response_config_yaml = R"EOF(
+response_rules:
+  - header: x-authenticated
+    on_header_present:
+      key: auth
+      type: PROTOBUF_VALUE
+      encode: BASE64URL
 )EOF";
   initializeFilter(response_config_yaml);
 
@@ -189,9 +215,9 @@ response_rules:
   v.set_bool_value(true);
   (*s->mutable_fields())["k3"] = v;
 
-  std::string output;
-  ASSERT_TRUE(value.SerializeToString(&output));
-  const auto encoded = Base64Url::encode(output.c_str(), output.size());
+  std::string data;
+  ASSERT_TRUE(value.SerializeToString(&data));
+  const auto encoded = Base64Url::encode(data.c_str(), data.size());
   Http::TestHeaderMapImpl incoming_headers{{"x-authenticated", encoded}};
   std::map<std::string, ProtobufWkt::Value> expected = {{"auth", value}};
 
@@ -202,15 +228,16 @@ response_rules:
 }
 
 /**
- * Base64Url serialized type with invalid Base64Url encoding.
+ * Test the value is not written for bad Base64Url.
  */
-TEST_F(HeaderToMetadataTest, Base64UrlSerializedTypeInvalidBase64UrlTest) {
+TEST_F(HeaderToMetadataTest, ProtobufValueTypeInBadBase64UrlTest) {
   const std::string response_config_yaml = R"EOF(
 response_rules:
   - header: x-authenticated
     on_header_present:
       key: auth
-      type: BASE64URL_SERIALIZED
+      type: PROTOBUF_VALUE
+      encode: BASE64URL
 )EOF";
   initializeFilter(response_config_yaml);
   Http::TestHeaderMapImpl incoming_headers{{"x-authenticated", "invalid"}};
@@ -221,19 +248,20 @@ response_rules:
 }
 
 /**
- * Base64Url serialized type with invalid serialized protobuf.
+ * Test the value is not written for bad protobuf value.
  */
-TEST_F(HeaderToMetadataTest, Base64UrlSerializedTypeInvalidProtobufTest) {
+TEST_F(HeaderToMetadataTest, BadProtobufValueTypeInBase64UrlTest) {
   const std::string response_config_yaml = R"EOF(
 response_rules:
   - header: x-authenticated
     on_header_present:
       key: auth
-      type: BASE64URL_SERIALIZED
+      type: PROTOBUF_VALUE
+      encode: BASE64URL
 )EOF";
   initializeFilter(response_config_yaml);
-  std::string output = "invalid";
-  const auto encoded = Base64Url::encode(output.c_str(), output.size());
+  std::string data = "invalid";
+  const auto encoded = Base64Url::encode(data.c_str(), data.size());
   Http::TestHeaderMapImpl incoming_headers{{"x-authenticated", encoded}};
 
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
@@ -308,7 +336,7 @@ TEST_F(HeaderToMetadataTest, EmptyHeaderValue) {
  */
 TEST_F(HeaderToMetadataTest, HeaderValueTooLong) {
   initializeFilter(request_config_yaml);
-  Http::TestHeaderMapImpl incoming_headers{{"X-VERSION", std::string(10 * 1024 + 1, 'x')}};
+  Http::TestHeaderMapImpl incoming_headers{{"X-VERSION", std::string(8 * 1024 + 1, 'x')}};
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
