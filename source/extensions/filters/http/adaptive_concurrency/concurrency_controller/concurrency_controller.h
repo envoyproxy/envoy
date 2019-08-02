@@ -9,7 +9,8 @@ namespace AdaptiveConcurrency {
 namespace ConcurrencyController {
 
 /**
- * Adaptive concurrency controller interface.
+ * Adaptive concurrency controller interface. All implementations of this
+ * interface must be thread-safe.
  */
 class ConcurrencyController {
 public:
@@ -17,7 +18,8 @@ public:
 
   /**
    * Called during decoding when the adaptive concurrency filter is attempting
-   * to forward a request. Returns true if a request is successfully forwarded.
+   * to forward a request. Returns true once the controller's internal state is
+   * updated and the request can be forwarded.
    */
   virtual bool tryForwardRequest() PURE;
 

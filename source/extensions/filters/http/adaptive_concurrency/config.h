@@ -20,10 +20,6 @@ class AdaptiveConcurrencyFilterFactory
 public:
   AdaptiveConcurrencyFilterFactory() : FactoryBase(HttpFilterNames::get().AdaptiveConcurrency) {}
 
-  Http::FilterFactoryCb
-  createFilterFactory(const Json::Object& json_config, const std::string& stats_prefix,
-                      Server::Configuration::FactoryContext& context) override;
-
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::config::filter::http::adaptive_concurrency::v2alpha::AdaptiveConcurrency&
           proto_config,
