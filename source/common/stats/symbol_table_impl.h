@@ -630,5 +630,44 @@ private:
   HashSet hash_set_;
 };
 
+// Captures StatNames for lookup by string, keeping two maps: a map of
+// 'built-ins' that is expected to be populated during initialization, and a map
+// of dynamically discovered names. The latter map is protected by a mutex, and
+// can be mutated at runtime.
+class StatNameSet {
+public:
+  explicit StatNameSet(SymbolTable& symbol_table);
+
+  /**
+   * Adds a string to the builtin map, which is not mutex protected. This
+   * map is always consulted first as a hit there means no lock is required.
+   */
+  void rememberBuiltin(absl::string_view str);
+
+  /**
+   * Finds a StatName by name. If 'str' has been remembered as a built-in, then
+   * no lock is required. Otherwise we first consult dynamic_stat_names_ under a
+   * lock that's private to the StatNameSet. If that's empty, we need to create
+   * the StatName in the pool, which requires taking a global lock.
+   *
+   * TODO(jmarantz): Potential perf issue here with contention, both on this
+   * set's mutex and also the SymbolTable mutex which must be taken during
+   * StatNamePool::add().
+   */
+  StatName getStatName(absl::string_view str);
+
+  /**
+   * Adds a StatName using the pool, but without remembering it in any maps.
+   */
+  StatName add(absl::string_view str) { return pool_.add(str); }
+
+private:
+  Stats::StatNamePool pool_;
+  absl::Mutex mutex_;
+  using StringStatNameMap = absl::flat_hash_map<std::string, Stats::StatName>;
+  StringStatNameMap builtin_stat_names_;
+  StringStatNameMap dynamic_stat_names_ GUARDED_BY(mutex_);
+};
+
 } // namespace Stats
 } // namespace Envoy

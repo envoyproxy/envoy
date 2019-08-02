@@ -31,18 +31,20 @@ public:
 
   static size_t groupIndex(uint64_t status);
 
-  Stats::StatName getStatName(const std::string& str);
+  /**
+   * Finds a StatName by name.
+   *
+   * TODO(jmarantz): Potential perf issue here with mutex contention for names
+   * that have not been remembered as builtins in the constructor.
+   */
+  Stats::StatName getStatName(const std::string& str) { return stat_name_set_.getStatName(str); }
 
 private:
   Stats::SymbolTable::StoragePtr addPrefix(const std::vector<Stats::StatName>& names);
 
   Stats::Scope& scope_;
-  Stats::StatNamePool pool_ GUARDED_BY(mutex_);
+  Stats::StatNameSet stat_name_set_;
   const Stats::StatName prefix_;
-  absl::Mutex mutex_;
-  using StringStatNameMap = absl::flat_hash_map<std::string, Stats::StatName>;
-  StringStatNameMap builtin_stat_names_;
-  StringStatNameMap dynamic_stat_names_ GUARDED_BY(mutex_);
 
 public:
   const Stats::StatName batch_failure_unprocessed_keys_;
