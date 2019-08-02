@@ -135,9 +135,7 @@ Span::Span(const envoy::config::trace::v2::OpenCensusConfig& oc_config,
            ::opencensus::trace::Span&& span)
     : span_(std::move(span)), oc_config_(oc_config) {}
 
-void Span::setOperation(absl::string_view operation) {
-  span_.AddAnnotation("setOperation", {{"operation", operation}});
-}
+void Span::setOperation(absl::string_view operation) { span_.SetName(operation); }
 
 void Span::setTag(absl::string_view name, absl::string_view value) {
   span_.AddAttribute(name, value);

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 
 #include "common/common/assert.h"
@@ -16,7 +17,7 @@ namespace Quic {
 // wraps an Event::Timer object and provide interface for QUIC to interact with the timer.
 class EnvoyQuicAlarm : public quic::QuicAlarm {
 public:
-  EnvoyQuicAlarm(Event::Scheduler& scheduler, quic::QuicClock& clock,
+  EnvoyQuicAlarm(Event::Dispatcher& dispatcher, const quic::QuicClock& clock,
                  quic::QuicArenaScopedPtr<quic::QuicAlarm::Delegate> delegate);
 
   ~EnvoyQuicAlarm() override { ASSERT(!IsSet()); };
@@ -30,9 +31,9 @@ public:
 private:
   quic::QuicTime::Delta getDurationBeforeDeadline();
 
-  Event::Scheduler& scheduler_;
+  Event::Dispatcher& dispatcher_;
   Event::TimerPtr timer_;
-  quic::QuicClock& clock_;
+  const quic::QuicClock& clock_;
 };
 
 } // namespace Quic

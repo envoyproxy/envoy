@@ -43,15 +43,13 @@ public:
 
   // Http::ConnectionManagerConfig
   ServerConnectionPtr createCodec(Network::Connection& connection, const Buffer::Instance& instance,
-                                  ServerConnectionCallbacks& callbacks,
-                                  const bool strict_header_validation) override {
-    return ServerConnectionPtr{
-        createCodec_(connection, instance, callbacks, strict_header_validation)};
+                                  ServerConnectionCallbacks& callbacks) override {
+    return ServerConnectionPtr{createCodec_(connection, instance, callbacks)};
   }
 
   MOCK_METHOD0(accessLogs, const std::list<AccessLog::InstanceSharedPtr>&());
-  MOCK_METHOD4(createCodec_, ServerConnection*(Network::Connection&, const Buffer::Instance&,
-                                               ServerConnectionCallbacks&, const bool));
+  MOCK_METHOD3(createCodec_, ServerConnection*(Network::Connection&, const Buffer::Instance&,
+                                               ServerConnectionCallbacks&));
   MOCK_METHOD0(dateProvider, DateProvider&());
   MOCK_METHOD0(drainTimeout, std::chrono::milliseconds());
   MOCK_METHOD0(filterFactory, FilterChainFactory&());
@@ -85,6 +83,7 @@ public:
   MOCK_CONST_METHOD0(proxy100Continue, bool());
   MOCK_CONST_METHOD0(http1Settings, const Http::Http1Settings&());
   MOCK_CONST_METHOD0(shouldNormalizePath, bool());
+  MOCK_CONST_METHOD0(shouldMergeSlashes, bool());
 
   std::unique_ptr<Http::InternalAddressConfig> internal_address_config_ =
       std::make_unique<DefaultInternalAddressConfig>();
@@ -1224,6 +1223,42 @@ TEST_F(ConnectionManagerUtilityTest, SanitizePathRelativePAth) {
   HeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
   ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
   EXPECT_EQ(header_map.Path()->value().getStringView(), "/abc");
+}
+
+// maybeNormalizePath() does not touch adjacent slashes by default.
+TEST_F(ConnectionManagerUtilityTest, MergeSlashesDefaultOff) {
+  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
+  ON_CALL(config_, shouldMergeSlashes()).WillByDefault(Return(false));
+  HeaderMapImpl original_headers;
+  original_headers.insertPath().value(std::string("/xyz///abc"));
+
+  HeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
+  ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
+  EXPECT_EQ(header_map.Path()->value().getStringView(), "/xyz///abc");
+}
+
+// maybeNormalizePath() merges adjacent slashes.
+TEST_F(ConnectionManagerUtilityTest, MergeSlashes) {
+  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
+  ON_CALL(config_, shouldMergeSlashes()).WillByDefault(Return(true));
+  HeaderMapImpl original_headers;
+  original_headers.insertPath().value(std::string("/xyz///abc"));
+
+  HeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
+  ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
+  EXPECT_EQ(header_map.Path()->value().getStringView(), "/xyz/abc");
+}
+
+// maybeNormalizePath() merges adjacent slashes if normalization if off.
+TEST_F(ConnectionManagerUtilityTest, MergeSlashesWithoutNormalization) {
+  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(false));
+  ON_CALL(config_, shouldMergeSlashes()).WillByDefault(Return(true));
+  HeaderMapImpl original_headers;
+  original_headers.insertPath().value(std::string("/xyz/..//abc"));
+
+  HeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
+  ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
+  EXPECT_EQ(header_map.Path()->value().getStringView(), "/xyz/../abc");
 }
 
 // test preserve_external_request_id true does not reset the passed requestId if passed

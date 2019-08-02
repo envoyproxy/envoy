@@ -37,6 +37,9 @@ makeHermeticPathsAndPorts(Fuzz::PerTestEnvironment& test_env,
   // we lose here. If we don't sanitize here, we get flakes due to port bind conflicts, file
   // conflicts, etc.
   output.clear_admin();
+  // The header_prefix is a write-once then read-only singleton that persists across tests. We clear
+  // this field so that fuzz tests don't fail over multiple iterations.
+  output.clear_header_prefix();
   if (output.has_runtime()) {
     output.mutable_runtime()->set_symlink_root(test_env.temporaryPath(""));
   }

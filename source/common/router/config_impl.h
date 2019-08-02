@@ -133,12 +133,12 @@ private:
   Runtime::Loader& loader_;
   std::list<std::string> allow_origin_;
   std::list<std::regex> allow_origin_regex_;
-  std::string allow_methods_;
-  std::string allow_headers_;
-  std::string expose_headers_;
-  std::string max_age_{};
+  const std::string allow_methods_;
+  const std::string allow_headers_;
+  const std::string expose_headers_;
+  const std::string max_age_;
   absl::optional<bool> allow_credentials_{};
-  bool legacy_enabled_;
+  const bool legacy_enabled_;
 };
 
 class ConfigImpl;
@@ -265,7 +265,7 @@ private:
  */
 class ShadowPolicyImpl : public ShadowPolicy {
 public:
-  ShadowPolicyImpl(const envoy::api::v2::route::RouteAction& config);
+  explicit ShadowPolicyImpl(const envoy::api::v2::route::RouteAction& config);
 
   // Router::ShadowPolicy
   const std::string& cluster() const override { return cluster_; }
@@ -284,8 +284,9 @@ private:
  */
 class HashPolicyImpl : public HashPolicy {
 public:
-  HashPolicyImpl(const Protobuf::RepeatedPtrField<envoy::api::v2::route::RouteAction::HashPolicy>&
-                     hash_policy);
+  explicit HashPolicyImpl(
+      const Protobuf::RepeatedPtrField<envoy::api::v2::route::RouteAction::HashPolicy>&
+          hash_policy);
 
   // Router::HashPolicy
   absl::optional<uint64_t> generateHash(const Network::Address::Instance* downstream_addr,
@@ -336,7 +337,7 @@ private:
  */
 class DecoratorImpl : public Decorator {
 public:
-  DecoratorImpl(const envoy::api::v2::route::Decorator& decorator);
+  explicit DecoratorImpl(const envoy::api::v2::route::Decorator& decorator);
 
   // Decorator::apply
   void apply(Tracing::Span& span) const override;
@@ -353,7 +354,7 @@ private:
  */
 class RouteTracingImpl : public RouteTracing {
 public:
-  RouteTracingImpl(const envoy::api::v2::route::Tracing& tracing);
+  explicit RouteTracingImpl(const envoy::api::v2::route::Tracing& tracing);
 
   // Tracing::getClientSampling
   const envoy::type::FractionalPercent& getClientSampling() const override;

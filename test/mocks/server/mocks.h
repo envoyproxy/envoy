@@ -6,6 +6,7 @@
 #include <string>
 
 #include "envoy/common/mutex_tracer.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/server/admin.h"
 #include "envoy/server/configuration.h"
 #include "envoy/server/drain_manager.h"
@@ -59,6 +60,7 @@ public:
   MOCK_CONST_METHOD0(baseId, uint64_t());
   MOCK_CONST_METHOD0(concurrency, uint32_t());
   MOCK_CONST_METHOD0(configPath, const std::string&());
+  MOCK_CONST_METHOD0(configProto, const envoy::config::bootstrap::v2::Bootstrap&());
   MOCK_CONST_METHOD0(configYaml, const std::string&());
   MOCK_CONST_METHOD0(allowUnknownFields, bool());
   MOCK_CONST_METHOD0(adminAddressPath, const std::string&());
@@ -84,6 +86,7 @@ public:
   MOCK_CONST_METHOD0(toCommandLineOptions, Server::CommandLineOptionsPtr());
 
   std::string config_path_;
+  envoy::config::bootstrap::v2::Bootstrap config_proto_;
   std::string config_yaml_;
   std::string admin_address_path_;
   std::string service_cluster_name_;
@@ -455,6 +458,7 @@ public:
   MOCK_METHOD0(listenerScope, Stats::Scope&());
   MOCK_CONST_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_CONST_METHOD0(listenerMetadata, const envoy::api::v2::core::Metadata&());
+  MOCK_CONST_METHOD0(direction, envoy::api::v2::core::TrafficDirection());
   MOCK_METHOD0(timeSource, TimeSource&());
   Event::TestTimeSystem& timeSystem() { return time_system_; }
   Grpc::Context& grpcContext() override { return grpc_context_; }

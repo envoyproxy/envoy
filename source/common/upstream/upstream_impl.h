@@ -17,8 +17,10 @@
 #include "envoy/event/timer.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/dns.h"
+#include "envoy/network/filter.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/secret/secret_manager.h"
+#include "envoy/server/filter_config.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/scope.h"
@@ -502,13 +504,14 @@ private:
 /**
  * Implementation of ClusterInfo that reads from JSON.
  */
-class ClusterInfoImpl : public ClusterInfo {
+class ClusterInfoImpl : public ClusterInfo, protected Logger::Loggable<Logger::Id::upstream> {
 public:
   ClusterInfoImpl(const envoy::api::v2::Cluster& config,
                   const envoy::api::v2::core::BindConfig& bind_config, Runtime::Loader& runtime,
                   Network::TransportSocketFactoryPtr&& socket_factory,
                   Stats::ScopePtr&& stats_scope, bool added_via_api,
-                  ProtobufMessage::ValidationVisitor& validation_visitor);
+                  ProtobufMessage::ValidationVisitor& validation_visitor,
+                  Server::Configuration::TransportSocketFactoryContext&);
 
   static ClusterStats generateStats(Stats::Scope& scope);
   static ClusterLoadReportStats generateLoadReportStats(Stats::Scope& scope);
@@ -575,6 +578,8 @@ public:
 
   absl::optional<std::string> eds_service_name() const override { return eds_service_name_; }
 
+  void createNetworkFilterChain(Network::Connection&) const override;
+
 private:
   struct ResourceManagers {
     ResourceManagers(const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,
@@ -620,6 +625,8 @@ private:
   const bool warm_hosts_;
   absl::optional<std::string> eds_service_name_;
   const absl::optional<envoy::api::v2::Cluster::CustomClusterType> cluster_type_;
+  const std::unique_ptr<Server::Configuration::CommonFactoryContext> factory_context_;
+  std::vector<Network::FilterFactoryCb> filter_factories_;
 };
 
 /**

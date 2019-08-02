@@ -42,9 +42,15 @@ void QuicRecordTestOutputToFile(const std::string& filename, QuicStringPiece dat
     return;
   }
 
+  static constexpr Envoy::Filesystem::FlagSet DefaultFlags{
+      1 << Envoy::Filesystem::File::Operation::Read |
+      1 << Envoy::Filesystem::File::Operation::Write |
+      1 << Envoy::Filesystem::File::Operation::Create |
+      1 << Envoy::Filesystem::File::Operation::Append};
+
   const std::string output_path = output_dir + filename;
   Envoy::Filesystem::FilePtr file = file_system.createFile(output_path);
-  if (!file->open().rc_) {
+  if (!file->open(DefaultFlags).rc_) {
     QUIC_LOG(ERROR) << "Failed to open test output file: " << output_path;
     return;
   }
