@@ -89,7 +89,7 @@ public:
 
   Stats::IsolatedStoreImpl stats_store_;
   Ssl::MockContextManager ssl_context_manager_;
-  ClusterSharedPtr cluster_;
+  OriginalDstClusterSharedPtr cluster_;
   ReadyWatcher membership_updated_;
   ReadyWatcher initialized_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -198,8 +198,7 @@ TEST_F(OriginalDstClusterTest, NoContext) {
   // No downstream connection => no host.
   {
     TestLoadBalancerContext lb_context(nullptr);
-    OriginalDstCluster::LoadBalancer lb(cluster_->prioritySet(), cluster_,
-                                        cluster_->info()->lbOriginalDstConfig());
+    OriginalDstCluster::LoadBalancer lb(cluster_);
     EXPECT_CALL(dispatcher_, post(_)).Times(0);
     HostConstSharedPtr host = lb.chooseHost(&lb_context);
     EXPECT_EQ(host, nullptr);
@@ -214,8 +213,7 @@ TEST_F(OriginalDstClusterTest, NoContext) {
     // First argument is normally the reference to the ThreadLocalCluster's HostSet, but in these
     // tests we do not have the thread local clusters, so we pass a reference to the HostSet of the
     // primary cluster. The implementation handles both cases the same.
-    OriginalDstCluster::LoadBalancer lb(cluster_->prioritySet(), cluster_,
-                                        cluster_->info()->lbOriginalDstConfig());
+    OriginalDstCluster::LoadBalancer lb(cluster_);
     EXPECT_CALL(dispatcher_, post(_)).Times(0);
     HostConstSharedPtr host = lb.chooseHost(&lb_context);
     EXPECT_EQ(host, nullptr);
@@ -228,8 +226,7 @@ TEST_F(OriginalDstClusterTest, NoContext) {
     connection.local_address_ = std::make_shared<Network::Address::PipeInstance>("unix://foo");
     EXPECT_CALL(connection, localAddressRestored()).WillRepeatedly(Return(true));
 
-    OriginalDstCluster::LoadBalancer lb(cluster_->prioritySet(), cluster_,
-                                        cluster_->info()->lbOriginalDstConfig());
+    OriginalDstCluster::LoadBalancer lb(cluster_);
     EXPECT_CALL(dispatcher_, post(_)).Times(0);
     HostConstSharedPtr host = lb.chooseHost(&lb_context);
     EXPECT_EQ(host, nullptr);
@@ -264,8 +261,7 @@ TEST_F(OriginalDstClusterTest, Membership) {
   connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11");
   EXPECT_CALL(connection, localAddressRestored()).WillRepeatedly(Return(true));
 
-  OriginalDstCluster::LoadBalancer lb(cluster_->prioritySet(), cluster_,
-                                      cluster_->info()->lbOriginalDstConfig());
+  OriginalDstCluster::LoadBalancer lb(cluster_);
   Event::PostCb post_cb;
   EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
   HostConstSharedPtr host = lb.chooseHost(&lb_context);
@@ -357,9 +353,7 @@ TEST_F(OriginalDstClusterTest, Membership2) {
   connection2.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.10.11.12");
   EXPECT_CALL(connection2, localAddressRestored()).WillRepeatedly(Return(true));
 
-  OriginalDstCluster::LoadBalancer lb(cluster_->prioritySet(), cluster_,
-                                      cluster_->info()->lbOriginalDstConfig());
-
+  OriginalDstCluster::LoadBalancer lb(cluster_);
   EXPECT_CALL(membership_updated_, ready());
   Event::PostCb post_cb;
   EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
@@ -443,8 +437,7 @@ TEST_F(OriginalDstClusterTest, Connection) {
   connection.local_address_ = std::make_shared<Network::Address::Ipv6Instance>("FD00::1");
   EXPECT_CALL(connection, localAddressRestored()).WillRepeatedly(Return(true));
 
-  OriginalDstCluster::LoadBalancer lb(cluster_->prioritySet(), cluster_,
-                                      cluster_->info()->lbOriginalDstConfig());
+  OriginalDstCluster::LoadBalancer lb(cluster_);
   Event::PostCb post_cb;
   EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
   HostConstSharedPtr host = lb.chooseHost(&lb_context);
@@ -493,18 +486,16 @@ TEST_F(OriginalDstClusterTest, MultipleClusters) {
   connection.local_address_ = std::make_shared<Network::Address::Ipv6Instance>("FD00::1");
   EXPECT_CALL(connection, localAddressRestored()).WillRepeatedly(Return(true));
 
-  OriginalDstCluster::LoadBalancer lb1(cluster_->prioritySet(), cluster_,
-                                       cluster_->info()->lbOriginalDstConfig());
-  OriginalDstCluster::LoadBalancer lb2(second, cluster_, cluster_->info()->lbOriginalDstConfig());
+  OriginalDstCluster::LoadBalancer lb(cluster_);
   Event::PostCb post_cb;
   EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
-  HostConstSharedPtr host = lb1.chooseHost(&lb_context);
+  HostConstSharedPtr host = lb.chooseHost(&lb_context);
   post_cb();
   ASSERT_NE(host, nullptr);
   EXPECT_EQ(*connection.local_address_, *host->address());
 
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
-  // Check that lb2 also gets updated
+  // Check that 'second' also gets updated
   EXPECT_EQ(1UL, second.hostSetsPerPriority()[0]->hosts().size());
 
   EXPECT_EQ(host, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
@@ -532,8 +523,7 @@ TEST_F(OriginalDstClusterTest, UseHttpHeaderEnabled) {
       0UL,
       cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().get().size());
 
-  OriginalDstCluster::LoadBalancer lb(cluster_->prioritySet(), cluster_,
-                                      cluster_->info()->lbOriginalDstConfig());
+  OriginalDstCluster::LoadBalancer lb(cluster_);
   Event::PostCb post_cb;
 
   // HTTP header override.
@@ -604,8 +594,7 @@ TEST_F(OriginalDstClusterTest, UseHttpHeaderDisabled) {
       0UL,
       cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().get().size());
 
-  OriginalDstCluster::LoadBalancer lb(cluster_->prioritySet(), cluster_,
-                                      cluster_->info()->lbOriginalDstConfig());
+  OriginalDstCluster::LoadBalancer lb(cluster_);
   Event::PostCb post_cb;
 
   // Downstream connection with original_dst filter, HTTP header override ignored.

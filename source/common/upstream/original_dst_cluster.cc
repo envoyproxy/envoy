@@ -16,19 +16,12 @@
 namespace Envoy {
 namespace Upstream {
 
-// Static cast below is guaranteed to succeed, as code instantiating the cluster
-// configuration, that is run prior to this code, checks that an OriginalDstCluster is
-// always configured with an OriginalDstCluster::LoadBalancer, and that an
-// OriginalDstCluster::LoadBalancer is never configured with any other type of cluster,
-// and throws an exception otherwise.
-
-OriginalDstCluster::LoadBalancer::LoadBalancer(
-    PrioritySet& priority_set, ClusterSharedPtr& parent,
-    const absl::optional<envoy::api::v2::Cluster::OriginalDstLbConfig>& config)
-    : priority_set_(priority_set), parent_(std::static_pointer_cast<OriginalDstCluster>(parent)),
-      info_(parent->info()), use_http_header_(config ? config.value().use_http_header() : false) {
-  // priority_set_ is initially empty.
-  priority_set_.addMemberUpdateCb(
+OriginalDstCluster::LoadBalancer::LoadBalancer(OriginalDstClusterSharedPtr& parent)
+    : parent_(parent), info_(parent->info()),
+      use_http_header_(info_->lbOriginalDstConfig()
+                           ? info_->lbOriginalDstConfig().value().use_http_header()
+                           : false) {
+  parent->prioritySet().addMemberUpdateCb(
       [this](const HostVector& hosts_added, const HostVector& hosts_removed) -> void {
         // Update the hosts map
         // TODO(ramaraochavali): use cluster stats and move the log lines to debug.
@@ -46,7 +39,6 @@ OriginalDstCluster::LoadBalancer::LoadBalancer(
 
 HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerContext* context) {
   if (context) {
-
     // Check if override host header is present, if yes use it otherwise check local address.
     Network::Address::InstanceConstSharedPtr dst_host = nullptr;
     if (use_http_header_) {
@@ -209,14 +201,15 @@ OriginalDstClusterFactory::createClusterImpl(
   // TODO(mattklein123): The original DST load balancer type should be deprecated and instead
   //                     the cluster should directly supply the load balancer. This will remove
   //                     a special case and allow this cluster to be compiled out as an extension.
-  return std::make_pair(
+  auto new_cluster =
       std::make_shared<OriginalDstCluster>(cluster, context.runtime(), socket_factory_context,
-                                           std::move(stats_scope), context.addedViaApi()),
-      nullptr);
+                                           std::move(stats_scope), context.addedViaApi());
+  auto lb = std::make_unique<OriginalDstCluster::ThreadAwareLoadBalancer>(new_cluster);
+  return std::make_pair(new_cluster, std::move(lb));
 }
 
 /**
- * Static registration for the strict dns cluster factory. @see RegisterFactory.
+ * Static registration for the original dst cluster factory. @see RegisterFactory.
  */
 REGISTER_FACTORY(OriginalDstClusterFactory, ClusterFactory);
 

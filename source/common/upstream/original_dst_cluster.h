@@ -48,8 +48,7 @@ public:
    */
   class LoadBalancer : public Upstream::LoadBalancer {
   public:
-    LoadBalancer(PrioritySet& priority_set, ClusterSharedPtr& parent,
-                 const absl::optional<envoy::api::v2::Cluster::OriginalDstLbConfig>& config);
+    LoadBalancer(std::shared_ptr<OriginalDstCluster>& parent);
 
     // Upstream::LoadBalancer
     HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
@@ -100,7 +99,6 @@ public:
 
     Network::Address::InstanceConstSharedPtr requestOverrideHost(LoadBalancerContext* context);
 
-    PrioritySet& priority_set_;                // Thread local priority set.
     std::weak_ptr<OriginalDstCluster> parent_; // Primary cluster managed by the main thread.
     ClusterInfoConstSharedPtr info_;
     const bool use_http_header_;
@@ -108,6 +106,27 @@ public:
   };
 
 private:
+  struct LoadBalancerFactory : public Upstream::LoadBalancerFactory {
+    LoadBalancerFactory(std::shared_ptr<OriginalDstCluster>& cluster) : cluster_(cluster) {}
+
+    // Upstream::LoadBalancerFactory
+    Upstream::LoadBalancerPtr create() override { return std::make_unique<LoadBalancer>(cluster_); }
+
+    std::shared_ptr<OriginalDstCluster> cluster_;
+  };
+
+  struct ThreadAwareLoadBalancer : public Upstream::ThreadAwareLoadBalancer {
+    ThreadAwareLoadBalancer(std::shared_ptr<OriginalDstCluster>& cluster) : cluster_(cluster) {}
+
+    // Upstream::ThreadAwareLoadBalancer
+    Upstream::LoadBalancerFactorySharedPtr factory() override {
+      return std::make_shared<LoadBalancerFactory>(cluster_);
+    }
+    void initialize() override {}
+
+    std::shared_ptr<OriginalDstCluster> cluster_;
+  };
+
   void addHost(HostSharedPtr&);
   void cleanup();
 
@@ -117,7 +136,11 @@ private:
   Event::Dispatcher& dispatcher_;
   const std::chrono::milliseconds cleanup_interval_ms_;
   Event::TimerPtr cleanup_timer_;
+
+  friend class OriginalDstClusterFactory;
 };
+
+typedef std::shared_ptr<OriginalDstCluster> OriginalDstClusterSharedPtr;
 
 class OriginalDstClusterFactory : public ClusterFactoryImplBase {
 public:
