@@ -32,7 +32,7 @@ public:
   static size_t groupIndex(uint64_t status);
 
   /**
-   * Finds a StatName by name.
+   * Finds or creates a StatName by string, taking a global lock if needed.
    *
    * TODO(jmarantz): Potential perf issue here with mutex contention for names
    * that have not been remembered as builtins in the constructor.

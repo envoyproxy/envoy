@@ -169,7 +169,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
         Http::HeaderMapImpl::appendToHeader(header_to_modify->value(), header.second);
       }
     }
-    config_->incCounter(cluster_->statsScope(), config_->ok_);
+    config_->incCounter(cluster_->statsScope(), config_->ext_authz_ok_);
     continueDecoding();
     break;
   }
@@ -177,7 +177,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   case CheckStatus::Denied: {
     ENVOY_STREAM_LOG(trace, "ext_authz filter rejected the request. Response status code: '{}",
                      *callbacks_, enumToInt(response->status_code));
-    config_->incCounter(cluster_->statsScope(), config_->denied_);
+    config_->incCounter(cluster_->statsScope(), config_->ext_authz_denied_);
     Http::CodeStats::ResponseStatInfo info{config_->scope(),
                                            cluster_->statsScope(),
                                            empty_stat_name,
@@ -207,10 +207,10 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   }
 
   case CheckStatus::Error: {
-    config_->incCounter(cluster_->statsScope(), config_->error_);
+    config_->incCounter(cluster_->statsScope(), config_->ext_authz_error_);
     if (config_->failureModeAllow()) {
       ENVOY_STREAM_LOG(trace, "ext_authz filter allowed the request with error", *callbacks_);
-      config_->incCounter(cluster_->statsScope(), config_->failure_mode_allowed_);
+      config_->incCounter(cluster_->statsScope(), config_->ext_authz_failure_mode_allowed_);
       continueDecoding();
     } else {
       ENVOY_STREAM_LOG(

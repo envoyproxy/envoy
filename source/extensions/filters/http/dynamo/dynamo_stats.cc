@@ -62,9 +62,8 @@ Stats::Counter& DynamoStats::buildPartitionStatCounter(const std::string& table_
   // Use the last 7 characters of the partition id.
   absl::string_view id_last_7 = absl::string_view(partition_id).substr(partition_id.size() - 7);
   const Stats::SymbolTable::StoragePtr stat_name_storage =
-      addPrefix({table_, stat_name_set_.getStatName(table_name), capacity_,
-                 stat_name_set_.getStatName(operation),
-                 stat_name_set_.getStatName(absl::StrCat("__partition_id=", id_last_7))});
+      addPrefix({table_, getStatName(table_name), capacity_, getStatName(operation),
+                 getStatName(absl::StrCat("__partition_id=", id_last_7))});
   return scope_.counterFromStatName(Stats::StatName(stat_name_storage.get()));
 }
 
