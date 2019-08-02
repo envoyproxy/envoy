@@ -239,7 +239,9 @@ ScopeKey makeKey(const std::vector<const char*>& parts) {
 
 TEST(ScopeKeyDeathTest, AddNullFragment) {
   ScopeKey key;
+#if !defined(NDEBUG)
   EXPECT_DEBUG_DEATH(key.addFragment(nullptr), "null fragment not allowed in ScopeKey.");
+#endif
 }
 
 TEST(ScopeKeyTest, Unmatches) {
