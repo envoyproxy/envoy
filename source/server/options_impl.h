@@ -75,6 +75,12 @@ public:
     signal_handling_enabled_ = signal_handling_enabled;
   }
   void setCpusetThreads(bool cpuset_threads_enabled) { cpuset_threads_ = cpuset_threads_enabled; }
+  void setAllowUnkownFields(bool allow_unknown_fields) {
+    allow_unknown_fields_ = allow_unknown_fields;
+  }
+  void setRejectUnknownFieldsDynamic(bool reject_unknown_fields_dynamic) {
+    reject_unknown_fields_dynamic_ = reject_unknown_fields_dynamic;
+  }
 
   // Server::Options
   uint64_t baseId() const override { return base_id_; }
@@ -85,6 +91,7 @@ public:
   }
   const std::string& configYaml() const override { return config_yaml_; }
   bool allowUnknownFields() const override { return allow_unknown_fields_; }
+  bool rejectUnknownFieldsDynamic() const override { return reject_unknown_fields_dynamic_; }
   const std::string& adminAddressPath() const override { return admin_address_path_; }
   Network::Address::IpVersion localAddressIpVersion() const override {
     return local_address_ip_version_;
@@ -124,6 +131,7 @@ private:
   envoy::config::bootstrap::v2::Bootstrap config_proto_;
   std::string config_yaml_;
   bool allow_unknown_fields_{false};
+  bool reject_unknown_fields_dynamic_{false};
   std::string admin_address_path_;
   Network::Address::IpVersion local_address_ip_version_;
   spdlog::level::level_enum log_level_;

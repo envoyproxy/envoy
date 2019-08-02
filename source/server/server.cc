@@ -56,9 +56,14 @@ InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_syste
                            ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
                            Filesystem::Instance& file_system,
                            std::unique_ptr<ProcessContext> process_context)
-    : workers_started_(false), shutdown_(false), options_(options), time_source_(time_system),
-      restarter_(restarter), start_time_(time(nullptr)), original_start_time_(start_time_),
-      stats_store_(store), thread_local_(tls),
+    : workers_started_(false), shutdown_(false), options_(options),
+      validation_context_(
+          options_.allowUnknownFields() ? ProtobufMessage::getNullValidationVisitor()
+                                        : ProtobufMessage::getStrictValidationVisitor(),
+          !options.rejectUnknownFieldsDynamic() ? ProtobufMessage::getNullValidationVisitor()
+                                                : ProtobufMessage::getStrictValidationVisitor()),
+      time_source_(time_system), restarter_(restarter), start_time_(time(nullptr)),
+      original_start_time_(start_time_), stats_store_(store), thread_local_(tls),
       api_(new Api::Impl(thread_factory, store, time_system, file_system)),
       dispatcher_(api_->allocateDispatcher()),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
@@ -269,7 +274,8 @@ void InstanceImpl::initialize(const Options& options,
             Buffer::OwnedImpl().usesOldImpl() ? "old (libevent)" : "new");
 
   // Handle configuration that needs to take place prior to the main configuration load.
-  InstanceUtil::loadBootstrapConfig(bootstrap_, options, messageValidationVisitor(), *api_);
+  InstanceUtil::loadBootstrapConfig(bootstrap_, options,
+                                    messageValidationContext().staticValidationVisitor(), *api_);
   bootstrap_config_update_time_ = time_source_.systemTime();
 
   // Immediate after the bootstrap has been loaded, override the header prefix, if configured to
@@ -342,7 +348,7 @@ void InstanceImpl::initialize(const Options& options,
   // Initialize the overload manager early so other modules can register for actions.
   overload_manager_ = std::make_unique<OverloadManagerImpl>(
       *dispatcher_, stats_store_, thread_local_, bootstrap_.overload_manager(),
-      messageValidationVisitor(), *api_);
+      messageValidationContext().staticValidationVisitor(), *api_);
 
   heap_shrinker_ =
       std::make_unique<Memory::HeapShrinker>(*dispatcher_, *overload_manager_, stats_store_);
@@ -375,7 +381,7 @@ void InstanceImpl::initialize(const Options& options,
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       *admin_, Runtime::LoaderSingleton::get(), stats_store_, thread_local_, *random_generator_,
       dns_resolver_, *ssl_context_manager_, *dispatcher_, *local_info_, *secret_manager_,
-      messageValidationVisitor(), *api_, http_context_, access_log_manager_, *singleton_manager_);
+      messageValidationContext(), *api_, http_context_, access_log_manager_, *singleton_manager_);
 
   // Now the configuration gets parsed. The configuration may start setting
   // thread local data per above. See MainImpl::initialize() for why ConfigImpl
@@ -405,8 +411,8 @@ void InstanceImpl::initialize(const Options& options,
             ->create(),
         *dispatcher_, Runtime::LoaderSingleton::get(), stats_store_, *ssl_context_manager_,
         *random_generator_, info_factory_, access_log_manager_, *config_.clusterManager(),
-        *local_info_, *admin_, *singleton_manager_, thread_local_, messageValidationVisitor(),
-        *api_);
+        *local_info_, *admin_, *singleton_manager_, thread_local_,
+        messageValidationContext().dynamicValidationVisitor(), *api_);
   }
 
   for (Stats::SinkPtr& sink : config_.statsSinks()) {
@@ -438,8 +444,8 @@ Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
   ENVOY_LOG(info, "runtime: {}", MessageUtil::getYamlStringFromMessage(config.runtime()));
   return std::make_unique<Runtime::LoaderImpl>(
       server.dispatcher(), server.threadLocal(), config.runtime(), server.localInfo(),
-      server.initManager(), server.stats(), server.random(), server.messageValidationVisitor(),
-      server.api());
+      server.initManager(), server.stats(), server.random(),
+      server.messageValidationContext().dynamicValidationVisitor(), server.api());
 }
 
 void InstanceImpl::loadServerFlags(const absl::optional<std::string>& flags_path) {

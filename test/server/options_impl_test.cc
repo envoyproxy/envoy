@@ -76,7 +76,8 @@ TEST_F(OptionsImplTest, All) {
       "--service-cluster cluster --service-node node --service-zone zone "
       "--file-flush-interval-msec 9000 "
       "--drain-time-s 60 --log-format [%v] --parent-shutdown-time-s 90 --log-path /foo/bar "
-      "--disable-hot-restart --cpuset-threads");
+      "--disable-hot-restart --cpuset-threads --allow-unknown-fields "
+      "--reject-unknown-fields-dynamic");
   EXPECT_EQ(Server::Mode::Validate, options->mode());
   EXPECT_EQ(2U, options->concurrency());
   EXPECT_EQ("hello", options->configPath());
@@ -93,9 +94,11 @@ TEST_F(OptionsImplTest, All) {
   EXPECT_EQ(std::chrono::milliseconds(9000), options->fileFlushIntervalMsec());
   EXPECT_EQ(std::chrono::seconds(60), options->drainTime());
   EXPECT_EQ(std::chrono::seconds(90), options->parentShutdownTime());
-  EXPECT_EQ(true, options->hotRestartDisabled());
-  EXPECT_EQ(true, options->libeventBufferEnabled());
-  EXPECT_EQ(true, options->cpusetThreadsEnabled());
+  EXPECT_TRUE(options->hotRestartDisabled());
+  EXPECT_TRUE(options->libeventBufferEnabled());
+  EXPECT_TRUE(options->cpusetThreadsEnabled());
+  EXPECT_TRUE(options->allowUnknownFields());
+  EXPECT_TRUE(options->rejectUnknownFieldsDynamic());
 
   options = createOptionsImpl("envoy --mode init_only");
   EXPECT_EQ(Server::Mode::InitOnly, options->mode());
@@ -130,6 +133,8 @@ TEST_F(OptionsImplTest, SetAll) {
   options->setHotRestartDisabled(!options->hotRestartDisabled());
   options->setSignalHandling(!options->signalHandlingEnabled());
   options->setCpusetThreads(!options->cpusetThreadsEnabled());
+  options->setAllowUnkownFields(true);
+  options->setRejectUnknownFieldsDynamic(true);
 
   EXPECT_EQ(109876, options->baseId());
   EXPECT_EQ(42U, options->concurrency());
@@ -154,6 +159,8 @@ TEST_F(OptionsImplTest, SetAll) {
   EXPECT_EQ(!hot_restart_disabled, options->hotRestartDisabled());
   EXPECT_EQ(!signal_handling_enabled, options->signalHandlingEnabled());
   EXPECT_EQ(!cpuset_threads_enabled, options->cpusetThreadsEnabled());
+  EXPECT_TRUE(options->allowUnknownFields());
+  EXPECT_TRUE(options->rejectUnknownFieldsDynamic());
 
   // Validate that CommandLineOptions is constructed correctly.
   Server::CommandLineOptionsPtr command_line_options = options->toCommandLineOptions();
@@ -190,8 +197,8 @@ TEST_F(OptionsImplTest, DefaultParams) {
   EXPECT_EQ("", options->adminAddressPath());
   EXPECT_EQ(Network::Address::IpVersion::v4, options->localAddressIpVersion());
   EXPECT_EQ(Server::Mode::Serve, options->mode());
-  EXPECT_EQ(false, options->hotRestartDisabled());
-  EXPECT_EQ(false, options->cpusetThreadsEnabled());
+  EXPECT_FALSE(options->hotRestartDisabled());
+  EXPECT_FALSE(options->cpusetThreadsEnabled());
 
   // Validate that CommandLineOptions is constructed correctly with default params.
   Server::CommandLineOptionsPtr command_line_options = options->toCommandLineOptions();
@@ -202,8 +209,10 @@ TEST_F(OptionsImplTest, DefaultParams) {
   EXPECT_EQ(envoy::admin::v2alpha::CommandLineOptions::v4,
             command_line_options->local_address_ip_version());
   EXPECT_EQ(envoy::admin::v2alpha::CommandLineOptions::Serve, command_line_options->mode());
-  EXPECT_EQ(false, command_line_options->disable_hot_restart());
-  EXPECT_EQ(false, command_line_options->cpuset_threads());
+  EXPECT_FALSE(command_line_options->disable_hot_restart());
+  EXPECT_FALSE(command_line_options->cpuset_threads());
+  EXPECT_FALSE(command_line_options->allow_unknown_fields());
+  EXPECT_FALSE(command_line_options->reject_unknown_fields_dynamic());
 }
 
 // Validates that the server_info proto is in sync with the options.

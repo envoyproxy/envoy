@@ -201,9 +201,8 @@ public:
     return config_.statsFlushInterval();
   }
 
-  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
-    return options_.allowUnknownFields() ? ProtobufMessage::getStrictValidationVisitor()
-                                         : ProtobufMessage::getNullValidationVisitor();
+  ProtobufMessage::ValidationContext& messageValidationContext() override {
+    return validation_context_;
   }
 
   // ServerLifecycleNotifier
@@ -236,6 +235,7 @@ private:
   bool workers_started_;
   bool shutdown_;
   const Options& options_;
+  ProtobufMessage::ValidationContextImpl validation_context_;
   TimeSource& time_source_;
   HotRestart& restarter_;
   const time_t start_time_;
