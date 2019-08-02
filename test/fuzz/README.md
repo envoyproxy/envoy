@@ -46,7 +46,7 @@ The fuzz test will be executed in three environments:
    
 1. Using the libFuzzer fuzzing engine and ASAN when run in the Envoy repository with `bazel run
    //test/path/to/some_fuzz_test_with_libfuzzer --config asan-fuzzer`. This is where real fuzzing
-   takes place locally. The built binary can take libFuzzer command-link flags, including the number
+   takes place locally. The built binary can take libFuzzer command-line flags, including the number
    of runs and the maximum input length.
 
 3. Via fuzzing library test drivers in OSS-Fuzz. This is where the real fuzzing takes places on a VM
