@@ -537,6 +537,34 @@ TEST_P(StatNameTest, SharedStatNameStorageSetSwap) {
   set2.free(*table_);
 }
 
+TEST_P(StatNameTest, StatNameSet) {
+  StatNameSet set(*table_);
+
+  // Test that we get a consistent StatName object from a remembered name.
+  set.rememberBuiltin("remembered");
+  const Stats::StatName remembered = set.getStatName("remembered");
+  EXPECT_EQ("remembered", table_->toString(remembered));
+  EXPECT_EQ(remembered.data(), set.getStatName("remembered").data());
+
+  // Same test for a dynamically allocated name. The only difference between
+  // the behavior with a remembered vs dynamic name is that when looking
+  // up a remembered name, a mutex is not taken. But we have no easy way
+  // to test for that. So we'll at least cover the code.
+  const Stats::StatName dynamic = set.getStatName("dynamic");
+  EXPECT_EQ("dynamic", table_->toString(dynamic));
+  EXPECT_EQ(dynamic.data(), set.getStatName("dynamic").data());
+
+  // There's another corner case for the same "dynamic" name from a
+  // different set. Here we will get a different StatName object
+  // out of the second set, though it will share the same underlying
+  // symbol-table symbol.
+  StatNameSet set2(*table_);
+  const Stats::StatName dynamic2 = set2.getStatName("dynamic");
+  EXPECT_EQ("dynamic", table_->toString(dynamic2));
+  EXPECT_EQ(dynamic2.data(), set2.getStatName("dynamic").data());
+  EXPECT_NE(dynamic2.data(), dynamic.data());
+}
+
 // Tests the memory savings realized from using symbol tables with 1k
 // clusters. This test shows the memory drops from almost 8M to less than
 // 2M. Note that only SymbolTableImpl is tested for memory consumption,
