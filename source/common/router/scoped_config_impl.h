@@ -147,7 +147,7 @@ private:
 class ScopedRouteInfo {
 public:
   ScopedRouteInfo(envoy::api::v2::ScopedRouteConfiguration&& config_proto,
-                  std::shared_ptr<RouteConfigProvider>&& route_provider)
+                  std::unique_ptr<RouteConfigProvider>&& route_provider)
       : config_proto_(std::move(config_proto)), route_provider_(std::move(route_provider)) {
     ASSERT(route_provider_ != nullptr, "ScopedRouteInfo expects a valid RouteConfigProvider.");
     ASSERT(
@@ -176,7 +176,7 @@ public:
 private:
   const envoy::api::v2::ScopedRouteConfiguration config_proto_;
   ScopeKey scope_key_;
-  std::shared_ptr<RouteConfigProvider> route_provider_;
+  std::unique_ptr<RouteConfigProvider> route_provider_;
 };
 using ScopedRouteInfoConstSharedPtr = std::shared_ptr<const ScopedRouteInfo>;
 // Ordered map for consistent config dumping.

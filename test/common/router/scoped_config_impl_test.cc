@@ -239,7 +239,9 @@ ScopeKey makeKey(const std::vector<const char*>& parts) {
 
 TEST(ScopeKeyDeathTest, AddNullFragment) {
   ScopeKey key;
+#if !defined(NDEBUG)
   EXPECT_DEBUG_DEATH(key.addFragment(nullptr), "null fragment not allowed in ScopeKey.");
+#endif
 }
 
 TEST(ScopeKeyTest, Unmatches) {
@@ -359,7 +361,7 @@ public:
     route_config_ = std::make_shared<NiceMock<MockConfig>>();
     route_config_->name_ = "foo_route";
 
-    route_config_provider_ = std::make_shared<MockRouteConfigProvider>();
+    route_config_provider_ = std::make_unique<MockRouteConfigProvider>();
     EXPECT_CALL(*route_config_provider_, config()).WillRepeatedly(Return(route_config_));
     EXPECT_CALL(*route_config_provider_, configInfo())
         .WillRepeatedly(Return(RouteConfigProvider::ConfigInfo{route_configuration_, ""}));
@@ -369,13 +371,13 @@ public:
   envoy::api::v2::ScopedRouteConfiguration scoped_route_config_;
   std::shared_ptr<MockConfig> route_config_;
   std::unique_ptr<ScopedRouteInfo> info_;
-  std::shared_ptr<MockRouteConfigProvider> route_config_provider_;
+  std::unique_ptr<MockRouteConfigProvider> route_config_provider_;
 };
 
 TEST_F(ScopedRouteInfoTest, Creation) {
   envoy::api::v2::ScopedRouteConfiguration config_copy = scoped_route_config_;
-  info_ =
-      std::make_unique<ScopedRouteInfo>(std::move(scoped_route_config_), route_config_provider_);
+  info_ = std::make_unique<ScopedRouteInfo>(std::move(scoped_route_config_),
+                                            std::move(route_config_provider_));
   EXPECT_EQ(info_->routeConfig().get(), route_config_.get());
   EXPECT_TRUE(TestUtility::protoEqual(info_->configProto(), config_copy));
   EXPECT_EQ(info_->scopeName(), "foo_scope");
@@ -390,7 +392,7 @@ TEST_F(ScopedRouteInfoDeathTest, AssertFailure) {
 
   route_config_->name_ = "bar_route";
   EXPECT_DEBUG_DEATH(
-      ScopedRouteInfo(std::move(scoped_route_config_), route_config_provider_),
+      ScopedRouteInfo(std::move(scoped_route_config_), std::move(route_config_provider_)),
       "RouteConfigProvider's name 'bar_route' doesn't match route_configuration_name 'foo_route'.");
 }
 
@@ -420,6 +422,14 @@ public:
         - string_key: foo
         - string_key: bar
 )EOF");
+    scope_info_a_v2_ = makeScopedRouteInfo(R"EOF(
+    name: foo_scope
+    route_configuration_name: foo_route
+    key:
+      fragments:
+        - string_key: xyz
+        - string_key: xyz
+)EOF");
     scope_info_b_ = makeScopedRouteInfo(R"EOF(
     name: bar_scope
     route_configuration_name: bar_route
@@ -436,13 +446,15 @@ public:
     std::shared_ptr<MockConfig> route_config = std::make_shared<NiceMock<MockConfig>>();
     route_config->name_ = scoped_route_config.route_configuration_name();
 
-    std::shared_ptr<MockRouteConfigProvider> route_config_provider =
-        std::make_shared<NiceMock<MockRouteConfigProvider>>();
+    std::unique_ptr<MockRouteConfigProvider> route_config_provider =
+        std::make_unique<NiceMock<MockRouteConfigProvider>>();
     EXPECT_CALL(*route_config_provider, config()).WillRepeatedly(Return(route_config));
-    return std::make_shared<ScopedRouteInfo>(std::move(scoped_route_config), route_config_provider);
+    return std::make_shared<ScopedRouteInfo>(std::move(scoped_route_config),
+                                             std::move(route_config_provider));
   }
 
   std::shared_ptr<ScopedRouteInfo> scope_info_a_;
+  std::shared_ptr<ScopedRouteInfo> scope_info_a_v2_;
   std::shared_ptr<ScopedRouteInfo> scope_info_b_;
   ScopedRoutes::ScopeKeyBuilder key_builder_config_;
   std::unique_ptr<ScopedConfigImpl> scoped_config_impl_;
@@ -488,16 +500,34 @@ TEST_F(ScopedConfigImplTest, Update) {
   // Add scope_key (bar, baz).
   scoped_config_impl_->addOrUpdateRoutingScope(scope_info_b_);
   EXPECT_EQ(scoped_config_impl_->getRouteConfig(headers), nullptr);
+  EXPECT_EQ(scoped_config_impl_->getRouteConfig(
+                TestHeaderMapImpl{{"foo_header", ",,key=v,bar=bar,"}, {"bar_header", ";val1;baz"}}),
+            scope_info_b_->routeConfig());
 
   // Add scope_key (foo, bar).
   scoped_config_impl_->addOrUpdateRoutingScope(scope_info_a_);
   // Found scope_info_a_.
   EXPECT_EQ(scoped_config_impl_->getRouteConfig(headers), scope_info_a_->routeConfig());
 
+  // Update scope foo_scope.
+  scoped_config_impl_->addOrUpdateRoutingScope(scope_info_a_v2_);
+  EXPECT_EQ(scoped_config_impl_->getRouteConfig(headers), nullptr);
+
+  // foo_scope now is keyed by (xyz, xyz).
+  EXPECT_EQ(scoped_config_impl_->getRouteConfig(
+                TestHeaderMapImpl{{"foo_header", ",bar=xyz,foo=bar"}, {"bar_header", ";;xyz"}}),
+            scope_info_a_v2_->routeConfig());
+
   // Remove scope "foo_scope".
   scoped_config_impl_->removeRoutingScope("foo_scope");
   // scope_info_a_ is gone.
   EXPECT_EQ(scoped_config_impl_->getRouteConfig(headers), nullptr);
+
+  // Now delete some non-existent scopes.
+  EXPECT_NO_THROW(scoped_config_impl_->removeRoutingScope("foo_scope1"));
+  EXPECT_NO_THROW(scoped_config_impl_->removeRoutingScope("base_scope"));
+  EXPECT_NO_THROW(scoped_config_impl_->removeRoutingScope("bluh_scope"));
+  EXPECT_NO_THROW(scoped_config_impl_->removeRoutingScope("xyz_scope"));
 }
 
 } // namespace

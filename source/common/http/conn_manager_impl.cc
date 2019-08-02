@@ -647,6 +647,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   // header only, the stream will be marked as done once a subsequent decodeData/decodeTrailers is
   // called with end_stream=true.
   maybeEndDecode(end_stream);
+
   // Drop new requests when overloaded as soon as we have decoded the headers.
   if (connection_manager_.overload_stop_accepting_requests_ref_ ==
       Server::OverloadActionState::Active) {

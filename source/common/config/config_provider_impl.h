@@ -136,7 +136,7 @@ class MutableConfigProviderCommonBase;
  * This class can not be instantiated directly; instead, it provides the foundation for
  * config subscription implementations which derive from it.
  *
- * A subscription is supposed to be co-owned by config providers with the same config source, it's
+ * A subscription is intended to be co-owned by config providers with the same config source, it's
  * designed to be created/destructed on admin thread only.
  *
  * xDS config providers and subscriptions are split to avoid lifetime issues with arguments
@@ -150,6 +150,12 @@ class ConfigSubscriptionCommonBase
     : protected Logger::Loggable<Logger::Id::config>,
       public std::enable_shared_from_this<ConfigSubscriptionCommonBase> {
 public:
+  // Callback for updating a Config implementation held in each worker thread, the callback is
+  // called in applyConfigUpdate() with the current version Config, and is expected to return the
+  // new version Config.
+  using ConfigUpdateCb =
+      std::function<ConfigProvider::ConfigConstSharedPtr(ConfigProvider::ConfigConstSharedPtr)>;
+
   struct LastConfigInfo {
     absl::optional<uint64_t> last_config_hash_;
     std::string last_config_version_;
@@ -192,7 +198,7 @@ public:
 
 protected:
   struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {
-    ThreadLocalConfig(ConfigProvider::ConfigConstSharedPtr initial_config)
+    explicit ThreadLocalConfig(ConfigProvider::ConfigConstSharedPtr initial_config)
         : config_(std::move(initial_config)) {}
 
     ConfigProvider::ConfigConstSharedPtr config_;
@@ -217,9 +223,7 @@ protected:
    * @param complete_cb the callback to run when the update propagation is done.
    */
   void applyConfigUpdate(
-      const std::function<
-          ConfigProvider::ConfigConstSharedPtr(ConfigProvider::ConfigConstSharedPtr)>& update_fn,
-      const Event::PostCb& complete_cb = []() {}) {
+      const ConfigUpdateCb& update_fn, const Event::PostCb& complete_cb = []() {}) {
     // It is safe to call shared_from_this here as this is in main thread, and destruction of a
     // ConfigSubscriptionCommonBase owner (i.e., a provider) happens in main thread as well.
     auto shared_this = shared_from_this();
@@ -227,7 +231,13 @@ protected:
         [this, update_fn]() {
           tls_->getTyped<ThreadLocalConfig>().config_ = update_fn(this->getConfig());
         },
-        /*Make sure this subscription will not be teared down during the update propagation.*/
+        // During the update propagation, a subscription may get teared down in main thread due to
+        // all owners/providers destructed in a xDS update (e.g. LDS demolishes a
+        // RouteConfigProvider and its subscription).
+        // If such a race condition happens, holding a reference to the "*this" subscription
+        // instance in this cb will ensure the shared "*this" gets posted back to main thread, after
+        // all the workers finish calling the update_fn, at which point it's safe to destruct
+        // "*this" instance.
         [shared_this, complete_cb]() { complete_cb(); });
   }
 
@@ -239,8 +249,8 @@ protected:
 
   const std::string name_;
   absl::optional<LastConfigInfo> config_info_;
-  // This slot holds a Config implementation in each thread, which is shared between
-  // bound providers.
+  // This slot holds a Config implementation in each thread, which is intended to be shared between
+  // config providers from the same config source.
   ThreadLocal::SlotPtr tls_;
 
 private:
@@ -318,7 +328,6 @@ protected:
 class DeltaConfigSubscriptionInstance : public ConfigSubscriptionCommonBase {
 protected:
   using ConfigSubscriptionCommonBase::ConfigSubscriptionCommonBase;
-  ~DeltaConfigSubscriptionInstance() override = default;
 
   /**
    * Must be called by the derived class' constructor.
@@ -341,8 +350,6 @@ protected:
  */
 class MutableConfigProviderCommonBase : public ConfigProvider {
 public:
-  ~MutableConfigProviderCommonBase() override = default;
-
   // Envoy::Config::ConfigProvider
   SystemTime lastUpdated() const override { return subscription_->lastUpdated(); }
   ApiType apiType() const override { return api_type_; }
@@ -381,8 +388,6 @@ private:
  */
 class ConfigProviderManagerImplBase : public ConfigProviderManager, public Singleton::Instance {
 public:
-  ~ConfigProviderManagerImplBase() override = default;
-
   /**
    * This is invoked by the /config_dump admin handler.
    * @return ProtobufTypes::MessagePtr the config dump proto corresponding to the associated

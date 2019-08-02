@@ -290,6 +290,7 @@ public:
   bool proxy100Continue() const override { return proxy_100_continue_; }
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   bool shouldNormalizePath() const override { return normalize_path_; }
+  bool shouldMergeSlashes() const override { return merge_slashes_; }
 
   DangerousDeprecatedTestTime test_time_;
   NiceMock<Router::MockRouteConfigProvider> route_config_provider_;
@@ -339,6 +340,7 @@ public:
   bool preserve_external_request_id_ = false;
   Http::Http1Settings http1_settings_;
   bool normalize_path_ = false;
+  bool merge_slashes_ = false;
   NiceMock<Network::MockClientConnection> upstream_conn_; // for websocket tests
   NiceMock<Tcp::ConnectionPool::MockInstance> conn_pool_; // for websocket tests
 

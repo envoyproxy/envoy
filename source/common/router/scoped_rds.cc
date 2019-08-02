@@ -116,6 +116,9 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   envoy::config::filter::network::http_connection_manager::v2::Rds rds;
   rds.mutable_config_source()->MergeFrom(rds_config_source_);
 
+  // If new route config sources come after the factory_context_.initManager()'s initialize() been
+  // called, that initManager can't accept new targets. Instead we use a local override which will
+  // start new subscriptions but not wait on them to be ready (to not block on main thread).
   std::unique_ptr<Init::ManagerImpl> overriding_init_manager;
   if (factory_context_.initManager().state() == Init::Manager::State::Initialized) {
     // Pause RDS to not send a burst of RDS requests until we start all the new subscriptions.
@@ -165,7 +168,8 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
             return config;
           },
           [prev_scoped_route_info]() {
-            /*Make sure previous route_config_info is destructed in main thread.*/
+            /*Make sure previous route_config_info is destructed in main thread, as it holds a
+             * RouteConfigProvider instance which is supposed to be destructed on main thread.*/
           });
       any_applied = true;
       ENVOY_LOG(debug, "srds: add/update scoped_route '{}'", scoped_route_info->scopeName());
@@ -178,9 +182,10 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
     // up.
     Init::WatcherImpl noop_watcher(
         // Note: we just throw it away.
-        fmt::format("SRDS ConfigUpdate watcher {}:{}", name_, version_info), []() { /*Noop*/ });
+        fmt::format("SRDS ConfigUpdate watcher {}:{}", name_, version_info),
+        []() { /*Do nothing.*/ });
     overriding_init_manager->initialize(noop_watcher);
-    // New subscriptions should be created, now lift the floodgate.
+    // New RDS subscriptions should be created, now lift the floodgate.
     factory_context_.clusterManager().adsMux().resume(
         Envoy::Config::TypeUrl::get().RouteConfiguration);
   }
@@ -199,8 +204,7 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
             thread_local_scoped_config->removeRoutingScope(scope_name);
             return config;
           },
-          // We need to delete the associated RouteConfigProvider in main thread.
-          [to_be_deleted]() { /*to_be_deleted is destructed in main thread.*/ });
+          [to_be_deleted]() { /*to_be_deleted will be destructed in main thread.*/ });
       any_applied = true;
       ENVOY_LOG(debug, "srds: remove scoped route '{}'", scope_name);
     }

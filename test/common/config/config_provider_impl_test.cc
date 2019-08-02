@@ -22,7 +22,7 @@ class DummyConfigProviderManager;
 class DummyConfig : public Envoy::Config::ConfigProvider::Config {
 public:
   DummyConfig() = default;
-  DummyConfig(const test::common::config::DummyConfig& config_proto) {
+  explicit DummyConfig(const test::common::config::DummyConfig& config_proto) {
     protos_.push_back(config_proto);
   }
   void addProto(const test::common::config::DummyConfig& config_proto) {
@@ -107,7 +107,7 @@ using DummyConfigSubscriptionSharedPtr = std::shared_ptr<DummyConfigSubscription
 
 class DummyDynamicConfigProvider : public MutableConfigProviderCommonBase {
 public:
-  DummyDynamicConfigProvider(DummyConfigSubscriptionSharedPtr&& subscription)
+  explicit DummyDynamicConfigProvider(DummyConfigSubscriptionSharedPtr&& subscription)
       : MutableConfigProviderCommonBase(std::move(subscription), ApiType::Full),
         subscription_(static_cast<DummyConfigSubscription*>(
             MutableConfigProviderCommonBase::subscription_.get())) {}
@@ -132,7 +132,7 @@ private:
 
 class DummyConfigProviderManager : public ConfigProviderManagerImplBase {
 public:
-  DummyConfigProviderManager(Server::Admin& admin)
+  explicit DummyConfigProviderManager(Server::Admin& admin)
       : ConfigProviderManagerImplBase(admin, "dummy") {}
 
   ~DummyConfigProviderManager() override = default;
@@ -207,7 +207,7 @@ DummyConfigSubscription::DummyConfigSubscription(
     DummyConfigProviderManager& config_provider_manager)
     : ConfigSubscriptionInstance("DummyDS", manager_identifier, config_provider_manager,
                                  factory_context) {
-  // Returns a null value.
+  // A nullptr is shared as the initial value.
   initialize(nullptr);
 }
 
