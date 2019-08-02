@@ -33,8 +33,6 @@ jobs:
       BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
       BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
       GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
-      # TODO(lizan): remove this once new image is available
-      IMAGE_ID: b02c73f3ebbaf5c7852fa814eb3d61e841588068
     displayName: "Run CI script"
 
   - bash: |
