@@ -83,6 +83,9 @@ private:
   void open();
   void createFlushStructures();
 
+  // return default flags set which used by open
+  static Filesystem::FlagSet defaultFlags();
+
   // Minimum size before the flush thread will be told to flush.
   static const uint64_t MIN_FLUSH_SIZE = 1024 * 64;
 
