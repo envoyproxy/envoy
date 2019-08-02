@@ -106,6 +106,11 @@ private:
   void start() override { subscription_->start({}); }
 
   // Envoy::Config::SubscriptionCallbacks
+
+  // NOTE: StoW form onConfigUpdate(resources, version_info) will throw an EnvoyException on any
+  // error and essentially reject an update. While the Delta form onConfigUpdate(added_resources,
+  // removed_resources, version_info) by design will partially accept correct RouteConfiguration
+  // from management server.
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                       const std::string& version_info) override;
   void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,

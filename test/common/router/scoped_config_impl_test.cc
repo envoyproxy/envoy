@@ -420,6 +420,14 @@ public:
         - string_key: foo
         - string_key: bar
 )EOF");
+    scope_info_a_v2_ = makeScopedRouteInfo(R"EOF(
+    name: foo_scope
+    route_configuration_name: foo_route
+    key:
+      fragments:
+        - string_key: meh
+        - string_key: meh
+)EOF");
     scope_info_b_ = makeScopedRouteInfo(R"EOF(
     name: bar_scope
     route_configuration_name: bar_route
@@ -444,6 +452,7 @@ public:
   }
 
   std::shared_ptr<ScopedRouteInfo> scope_info_a_;
+  std::shared_ptr<ScopedRouteInfo> scope_info_a_v2_;
   std::shared_ptr<ScopedRouteInfo> scope_info_b_;
   ScopedRoutes::ScopeKeyBuilder key_builder_config_;
   std::unique_ptr<ScopedConfigImpl> scoped_config_impl_;
@@ -489,16 +498,34 @@ TEST_F(ScopedConfigImplTest, Update) {
   // Add scope_key (bar, baz).
   scoped_config_impl_->addOrUpdateRoutingScope(scope_info_b_);
   EXPECT_EQ(scoped_config_impl_->getRouteConfig(headers), nullptr);
+  EXPECT_EQ(scoped_config_impl_->getRouteConfig(
+                TestHeaderMapImpl{{"foo_header", ",,key=v,bar=bar,"}, {"bar_header", ";val1;baz"}}),
+            scope_info_b_->routeConfig());
 
   // Add scope_key (foo, bar).
   scoped_config_impl_->addOrUpdateRoutingScope(scope_info_a_);
   // Found scope_info_a_.
   EXPECT_EQ(scoped_config_impl_->getRouteConfig(headers), scope_info_a_->routeConfig());
 
+  // Update scope foo_scope.
+  scoped_config_impl_->addOrUpdateRoutingScope(scope_info_a_v2_);
+  EXPECT_EQ(scoped_config_impl_->getRouteConfig(headers), nullptr);
+
+  // foo_scope now is keyed by (meh, meh).
+  EXPECT_EQ(scoped_config_impl_->getRouteConfig(
+                TestHeaderMapImpl{{"foo_header", ",bar=meh,foo=bar"}, {"bar_header", ";;meh"}}),
+            scope_info_a_v2_->routeConfig());
+
   // Remove scope "foo_scope".
   scoped_config_impl_->removeRoutingScope("foo_scope");
   // scope_info_a_ is gone.
   EXPECT_EQ(scoped_config_impl_->getRouteConfig(headers), nullptr);
+
+  // Now delete some non-existent scopes.
+  EXPECT_NO_THROW(scoped_config_impl_->removeRoutingScope("foo_scope1"));
+  EXPECT_NO_THROW(scoped_config_impl_->removeRoutingScope("base_scope"));
+  EXPECT_NO_THROW(scoped_config_impl_->removeRoutingScope("bluh_scope"));
+  EXPECT_NO_THROW(scoped_config_impl_->removeRoutingScope("meh_scope"));
 }
 
 } // namespace

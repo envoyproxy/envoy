@@ -168,7 +168,8 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
             return config;
           },
           [prev_scoped_route_info]() {
-            /*Make sure previous route_config_info is destructed in main thread.*/
+            /*Make sure previous route_config_info is destructed in main thread, as it holds a
+             * RouteConfigProvider instance which is supposed to be destructed on main thread.*/
           });
       any_applied = true;
       ENVOY_LOG(debug, "srds: add/update scoped_route '{}'", scoped_route_info->scopeName());
