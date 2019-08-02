@@ -25,9 +25,21 @@ AdaptiveConcurrencyFilter::AdaptiveConcurrencyFilter(
 
 AdaptiveConcurrencyFilter::~AdaptiveConcurrencyFilter() {}
 
-Http::FilterHeadersStatus AdaptiveConcurrencyFilter::decodeHeaders(Http::HeaderMap&, bool) {
-  // TODO (tonya11en).
-  return Http::FilterHeadersStatus::Continue;
+Http::FilterHeadersStatus AdaptiveConcurrencyFilter::decodeHeaders(Http::HeaderMap&, bool end_stream) {
+  if (!end_stream) {
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  if (controller_->tryForwardRequest()) {
+    rq_start_time_ = config_->timeSource().monotonicTime();
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  // TODO (tonya11en): Remove filler words.
+  decoder_callbacks_->sendLocalReply(
+    Http::Code::ServiceUnavailable, "filler words", nullptr,
+    absl::nullopt, "more filler words");
+  return Http::FilterHeadersStatus::StopIteration;
 }
 
 void AdaptiveConcurrencyFilter::onDestroy() {
@@ -35,8 +47,12 @@ void AdaptiveConcurrencyFilter::onDestroy() {
 }
 
 Http::FilterHeadersStatus AdaptiveConcurrencyFilter::encodeHeaders(Http::HeaderMap&,
-                                                                   bool /*end_stream*/) {
-  // TODO (tonya11en).
+                                                                   bool end_stream) {
+  if (end_stream) {
+    const std::chrono::nanoseconds rq_latency = config_->timeSource().monotonicTime() - rq_start_time_;
+    controller_->recordLatencySample(rq_latency);
+  }
+
   return Http::FilterHeadersStatus::Continue;
 }
 
