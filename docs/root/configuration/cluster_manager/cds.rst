@@ -24,6 +24,7 @@ CDS has a statistics tree rooted at *cluster_manager.cds.* with the following st
   :widths: 1, 1, 2
 
   config_reload, Counter, Total API fetches that resulted in a config reload due to a different config
+  init_fetch_timeout, Counter, Total :ref:`initial fetch timeouts <envoy_api_field_core.ConfigSource.initial_fetch_timeout>`
   update_attempt, Counter, Total API fetches attempted
   update_success, Counter, Total API fetches completed successfully
   update_failure, Counter, Total API fetches that failed because of network errors
