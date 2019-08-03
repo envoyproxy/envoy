@@ -5,8 +5,7 @@ Getting Started
 
 This section gets you started with a very simple configuration and provides some example configurations.
 
-Envoy provides official :ref:`pre-built Docker images <install_binaries>` and other pre-built binaries
-are available via `GetEnvoy.io <https://www.getenvoy.io/>`_. This is the fastest way to get started using Envoy.
+The fastest way to get started using Envoy is :ref:`installing pre-built binaries <install_binaries>`.
 You can also :ref:`build it <building>` from source.
 
 These examples use the :ref:`v2 Envoy API <envoy_api_reference>`, but use only the static configuration

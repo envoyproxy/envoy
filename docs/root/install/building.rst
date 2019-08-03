@@ -68,12 +68,12 @@ tests.
   organizations track and deploy master in production. We encourage you to do the same so that
   issues can be reported as early as possible in the development process.
 
-There are packaged Envoy pre-built binaries in rpm, deb, and Homebrew packages are available via
+Packaged Envoy pre-built binaries for a variety of platforms are available via
 `GetEnvoy.io <https://www.getenvoy.io/>`_.
 
 We will consider producing additional binary types depending on community interest in helping with
-CI, packaging, etc. Please open an `issue <https://github.com/envoyproxy/envoy/issues>`_ in GitHub
-if desired.
+CI, packaging, etc. Please open an `issue in GetEnvoy <https://github.com/tetratelabs/getenvoy/issues>`_
+for pre-built binaries for different platforms.
 
 Modifying Envoy
 ---------------
