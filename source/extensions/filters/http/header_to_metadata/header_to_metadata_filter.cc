@@ -15,6 +15,7 @@ namespace HttpFilters {
 namespace HeaderToMetadataFilter {
 namespace {
 
+// TODO(yangminzhu): Make MAX_HEADER_VALUE_LEN configurable.
 const uint32_t MAX_HEADER_VALUE_LEN = 8 * 1024;
 
 } // namespace
