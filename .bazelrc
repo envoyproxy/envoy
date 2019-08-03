@@ -92,10 +92,20 @@ build --test_env=HEAPCHECK=normal --test_env=PPROF_PATH
 build:rbe-toolchain --host_platform=@envoy//bazel/toolchains:rbe_ubuntu_clang_platform
 build:rbe-toolchain --platforms=@envoy//bazel/toolchains:rbe_ubuntu_clang_platform
 build:rbe-toolchain --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
-build:rbe-toolchain --crosstool_top=@rbe_ubuntu_clang//cc:toolchain
-build:rbe-toolchain --extra_toolchains=@rbe_ubuntu_clang//config:cc-toolchain
-build:rbe-toolchain --linkopt=-fuse-ld=lld
-build:rbe-toolchain --action_env=CC=clang --action_env=CXX=clang++ --action_env=PATH=/usr/sbin:/usr/bin:/sbin:/bin:/usr/lib/llvm-8/bin
+
+build:rbe-toolchain-clang --config=rbe-toolchain
+build:rbe-toolchain-clang --crosstool_top=@rbe_ubuntu_clang//cc:toolchain
+build:rbe-toolchain-clang --extra_toolchains=@rbe_ubuntu_clang//config:cc-toolchain
+build:rbe-toolchain-clang --action_env=CC=clang --action_env=CXX=clang++ --action_env=PATH=/usr/sbin:/usr/bin:/sbin:/bin:/usr/lib/llvm-8/bin
+
+build:rbe-toolchain-clang-libc++ --config=rbe-toolchain
+build:rbe-toolchain-clang-libc++ --crosstool_top=@rbe_ubuntu_clang_libcxx//cc:toolchain
+build:rbe-toolchain-clang-libc++ --extra_toolchains=@rbe_ubuntu_clang_libcxx//config:cc-toolchain
+build:rbe-toolchain-clang-libc++ --action_env=CC=clang --action_env=CXX=clang++ --action_env=PATH=/usr/sbin:/usr/bin:/sbin:/bin:/usr/lib/llvm-8/bin
+
+build:rbe-toolchain-gcc --config=rbe-toolchain
+build:rbe-toolchain-gcc --crosstool_top=@rbe_ubuntu_gcc//cc:toolchain
+build:rbe-toolchain-gcc --extra_toolchains=@rbe_ubuntu_gcc//config:cc-toolchain
 
 build:remote --spawn_strategy=remote,sandboxed,local
 build:remote --strategy=Javac=remote,sandboxed,local
@@ -109,7 +119,7 @@ build:remote --experimental_remote_download_outputs=toplevel
 test:remote --experimental_remote_download_outputs=minimal
 
 build:remote-clang --config=remote
-build:remote-clang --config=rbe-toolchain
+build:remote-clang --config=rbe-toolchain-clang
 
 # Docker sandbox
 build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build:8246167b9d238797cbc6c03dccc9e3921c37617d
@@ -122,7 +132,7 @@ build:docker-sandbox --experimental_docker_verbose
 build:docker-sandbox --experimental_enable_docker_sandbox
 
 build:docker-clang --config=docker-sandbox
-build:docker-clang --config=rbe-toolchain
+build:docker-clang --config=rbe-toolchain-clang
 
 # CI configurations
 build:remote-ci --remote_cache=grpcs://remotebuildexecution.googleapis.com
