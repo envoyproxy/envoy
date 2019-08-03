@@ -21,8 +21,8 @@ public:
     for (size_t i = 0; i < cidr_range_strings.size(); i++) {
       std::pair<std::string, std::vector<Address::CidrRange>> ip_tags;
       ip_tags.first = fmt::format("tag_{0}", i);
-      for (size_t j = 0; j < cidr_range_strings[i].size(); j++) {
-        ip_tags.second.push_back(Address::CidrRange::create(cidr_range_strings[i][j]));
+      for (const auto& j : cidr_range_strings[i]) {
+        ip_tags.second.push_back(Address::CidrRange::create(j));
       }
       output.push_back(ip_tags);
     }

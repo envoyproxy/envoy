@@ -110,8 +110,9 @@ private:
                       const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
-  void onConfigUpdateFailed(const EnvoyException*) override {
-    DeltaConfigSubscriptionInstance::onConfigUpdateFailed();
+  void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason,
+                            const EnvoyException*) override {
+    ConfigSubscriptionCommonBase::onConfigUpdateFailed();
   }
   std::string resourceName(const ProtobufWkt::Any& resource) override {
     return MessageUtil::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(resource,

@@ -6,6 +6,10 @@ jobs:
         CI_TARGET: 'bazel.release'
       tsan:
         CI_TARGET: 'bazel.tsan'
+      gcc:
+        CI_TARGET: 'bazel.gcc'
+      compile_time_options:
+        CI_TARGET: 'bazel.compile_time_options'
   dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
   timeoutInMinutes: 360
   pool:
@@ -29,12 +33,11 @@ jobs:
     workingDirectory: $(Build.SourcesDirectory)
     env:
       ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
-      BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-clang --config=remote-ci --jobs=100 --curses=no"
+      ENVOY_RBE: "true"
+      BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=remote --jobs=100 --curses=no"
       BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
       BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
       GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
-      # TODO(lizan): remove this once new image is available
-      IMAGE_ID: b02c73f3ebbaf5c7852fa814eb3d61e841588068
     displayName: "Run CI script"
 
   - bash: |

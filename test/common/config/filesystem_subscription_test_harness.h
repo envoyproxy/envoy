@@ -81,7 +81,7 @@ public:
     if (accept) {
       version_ = version;
     } else {
-      EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
+      EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _));
     }
     updateFile(file_json);
   }

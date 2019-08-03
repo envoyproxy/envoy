@@ -15,7 +15,8 @@ TEST_F(GrpcSubscriptionImplTest, StreamCreationFailure) {
   InSequence s;
   EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(nullptr));
 
-  EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
+  EXPECT_CALL(callbacks_,
+              onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, _));
   EXPECT_CALL(random_, random());
   EXPECT_CALL(*timer_, enableTimer(_));
   subscription_->start({"cluster0", "cluster1"});
@@ -37,7 +38,8 @@ TEST_F(GrpcSubscriptionImplTest, StreamCreationFailure) {
 TEST_F(GrpcSubscriptionImplTest, RemoteStreamClose) {
   startSubscription({"cluster0", "cluster1"});
   EXPECT_TRUE(statsAre(1, 0, 0, 0, 0));
-  EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
+  EXPECT_CALL(callbacks_,
+              onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, _));
   EXPECT_CALL(*timer_, enableTimer(_));
   EXPECT_CALL(random_, random());
   subscription_->grpcMux().grpcStreamForTest().onRemoteClose(Grpc::Status::GrpcStatus::Canceled,
