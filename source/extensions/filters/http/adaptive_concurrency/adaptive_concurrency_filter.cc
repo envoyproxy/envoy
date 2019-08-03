@@ -15,15 +15,15 @@ namespace AdaptiveConcurrency {
 
 AdaptiveConcurrencyFilterConfig::AdaptiveConcurrencyFilterConfig(
     const envoy::config::filter::http::adaptive_concurrency::v2alpha::AdaptiveConcurrency&,
-    Runtime::Loader& runtime, const std::string& stats_prefix, Stats::Scope& scope,
+    Runtime::Loader& runtime, std::string stats_prefix, Stats::Scope& scope,
     TimeSource& time_source)
-    : runtime_(runtime), stats_prefix_(stats_prefix), scope_(scope), time_source_(time_source) {}
+    : runtime_(runtime), stats_prefix_(std::move(stats_prefix)), scope_(scope), time_source_(time_source) {}
 
 AdaptiveConcurrencyFilter::AdaptiveConcurrencyFilter(
     AdaptiveConcurrencyFilterConfigSharedPtr config, ConcurrencyControllerSharedPtr controller)
-    : config_(config), controller_(controller) {}
+    : config_(std::move(config)), controller_(std::move(controller)) {}
 
-AdaptiveConcurrencyFilter::~AdaptiveConcurrencyFilter() {}
+AdaptiveConcurrencyFilter::~AdaptiveConcurrencyFilter() = default;
 
 Http::FilterHeadersStatus AdaptiveConcurrencyFilter::decodeHeaders(Http::HeaderMap&,
                                                                    bool end_stream) {

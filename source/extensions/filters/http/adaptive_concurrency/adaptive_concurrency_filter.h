@@ -28,11 +28,11 @@ public:
   AdaptiveConcurrencyFilterConfig(
       const envoy::config::filter::http::adaptive_concurrency::v2alpha::AdaptiveConcurrency&
           adaptive_concurrency,
-      Runtime::Loader& runtime, const std::string& stats_prefix, Stats::Scope& scope,
+      Runtime::Loader& runtime, std::string stats_prefix, Stats::Scope& scope,
       TimeSource& time_source);
 
   Runtime::Loader& runtime() { return runtime_; }
-  const std::string& statsPrefix() { return stats_prefix_; }
+  const std::string& statsPrefix() const { return stats_prefix_; }
   Stats::Scope& scope() { return scope_; }
   TimeSource& timeSource() { return time_source_; }
 

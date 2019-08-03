@@ -2,6 +2,8 @@
 
 #include <chrono>
 
+#include "envoy/common/pure.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
