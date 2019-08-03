@@ -44,7 +44,7 @@ message SocketAddress {
   // address must be an IP (*STATIC* or *EDS* clusters) or a hostname resolved by DNS
   // (*STRICT_DNS* or *LOGICAL_DNS* clusters). Address resolution can be customized
   // via :ref:`resolver_name <envoy_api_field_core.SocketAddress.resolver_name>`.
-  string address = 2 [(validate.rules).string.min_bytes = 1];
+  string address = 2 [(validate.rules).string.address = true];
   oneof port_specifier {
     option (validate.required) = true;
     uint32 port_value = 3 [(validate.rules).uint32.lte = 65535];
