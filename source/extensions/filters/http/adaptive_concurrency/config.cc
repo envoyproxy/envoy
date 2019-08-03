@@ -19,7 +19,8 @@ Http::FilterFactoryCb AdaptiveConcurrencyFilterFactory::createFilterFactoryFromP
 
   // TODO (tonya11en): Noop controller needs to be replaced with an actual
   // implementation in a future patch.
-  auto noop_ctl = std::make_shared<ConcurrencyController::NoopController>();
+  std::shared_ptr<ConcurrencyController::ConcurrencyController> noop_ctl =
+      std::make_shared<ConcurrencyController::NoopController>();
 
   AdaptiveConcurrencyFilterConfigSharedPtr filter_config(new AdaptiveConcurrencyFilterConfig(
       config, context.runtime(), stats_prefix, context.scope(), context.timeSource()));

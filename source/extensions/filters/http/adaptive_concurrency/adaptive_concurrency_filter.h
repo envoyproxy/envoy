@@ -6,13 +6,13 @@
 #include <unordered_set>
 #include <vector>
 
+#include "envoy/common/time.h"
+#include "envoy/config/filter/http/adaptive_concurrency/v2alpha/adaptive_concurrency.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
-#include "envoy/common/time.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "envoy/config/filter/http/adaptive_concurrency/v2alpha/adaptive_concurrency.pb.h"
 #include "extensions/filters/http/adaptive_concurrency/concurrency_controller/concurrency_controller.h"
 
 namespace Envoy {
