@@ -457,8 +457,8 @@ void DecoderImpl::decode(Buffer::Instance& data, DecodeType dtype) {
       // by the message.
       //
       // Note: we need to keep two cursors — offset and helper_'s internal one — because
-      //       a buffer may contain multiple messages, so offset is global and helper_'s
-      //       internal cursor is reset for each individual message.
+      //       a buffer may contain multiple messages, so offset is global while helper_'s
+      //       internal cursor gets reset for each individual message.
       helper_.reset();
 
       const uint64_t current = offset;
