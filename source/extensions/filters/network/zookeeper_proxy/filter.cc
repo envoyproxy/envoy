@@ -21,8 +21,8 @@ ZooKeeperFilterConfig::ZooKeeperFilterConfig(const std::string& stat_prefix,
     : scope_(scope), max_packet_bytes_(max_packet_bytes), stat_prefix_(stat_prefix),
       stats_(generateStats(stat_prefix, scope)) {}
 
-ZooKeeperFilter::ZooKeeperFilter(ZooKeeperFilterConfigSharedPtr config)
-    : config_(std::move(config)), decoder_(createDecoder(*this)) {}
+ZooKeeperFilter::ZooKeeperFilter(ZooKeeperFilterConfigSharedPtr config, TimeSource& time_source)
+    : config_(std::move(config)), decoder_(createDecoder(*this, time_source)) {}
 
 void ZooKeeperFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
@@ -42,8 +42,8 @@ Network::FilterStatus ZooKeeperFilter::onWrite(Buffer::Instance& data, bool) {
 
 Network::FilterStatus ZooKeeperFilter::onNewConnection() { return Network::FilterStatus::Continue; }
 
-DecoderPtr ZooKeeperFilter::createDecoder(DecoderCallbacks& callbacks) {
-  return std::make_unique<DecoderImpl>(callbacks, config_->maxPacketBytes());
+DecoderPtr ZooKeeperFilter::createDecoder(DecoderCallbacks& callbacks, TimeSource& time_source) {
+  return std::make_unique<DecoderImpl>(callbacks, config_->maxPacketBytes(), time_source);
 }
 
 void ZooKeeperFilter::setDynamicMetadata(const std::string& key, const std::string& value) {
@@ -235,8 +235,11 @@ void ZooKeeperFilter::onCloseRequest() {
 }
 
 void ZooKeeperFilter::onConnectResponse(const int32_t proto_version, const int32_t timeout,
-                                        const bool readonly) {
+                                        const bool readonly,
+                                        const std::chrono::milliseconds& latency) {
   config_->stats_.connect_resp_.inc();
+  config_->scope_.histogram(fmt::format("{}.connect_response_latency", config_->stat_prefix_))
+      .recordValue(latency.count());
   setDynamicMetadata({{"opname", "connect_response"},
                       {"protocol_version", std::to_string(proto_version)},
                       {"timeout", std::to_string(timeout)},
@@ -244,7 +247,7 @@ void ZooKeeperFilter::onConnectResponse(const int32_t proto_version, const int32
 }
 
 void ZooKeeperFilter::onResponse(const OpCodes opcode, const int32_t xid, const int64_t zxid,
-                                 const int32_t error) {
+                                 const int32_t error, const std::chrono::milliseconds& latency) {
   std::string opname = "";
 
   switch (opcode) {
@@ -347,6 +350,9 @@ void ZooKeeperFilter::onResponse(const OpCodes opcode, const int32_t xid, const 
   default:
     break;
   }
+
+  config_->scope_.histogram(fmt::format("{}.{}_latency", config_->stat_prefix_, opname))
+      .recordValue(latency.count());
 
   setDynamicMetadata({{"opname", opname},
                       {"xid", std::to_string(xid)},

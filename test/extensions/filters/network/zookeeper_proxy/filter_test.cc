@@ -4,6 +4,7 @@
 #include "extensions/filters/network/zookeeper_proxy/filter.h"
 
 #include "test/mocks/network/mocks.h"
+#include "test/test_common/simulated_time_system.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -31,7 +32,7 @@ public:
 
   void initialize() {
     config_ = std::make_shared<ZooKeeperFilterConfig>(stat_prefix_, 1048576, scope_);
-    filter_ = std::make_unique<ZooKeeperFilter>(config_);
+    filter_ = std::make_unique<ZooKeeperFilter>(config_, time_system_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
   }
 
@@ -497,6 +498,7 @@ public:
   std::string stat_prefix_{"test.zookeeper"};
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
+  Event::SimulatedTimeSystem time_system_;
 };
 
 TEST_F(ZooKeeperFilterTest, Connect) {
