@@ -52,7 +52,7 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: web_service
+                address: web.service.com
                 port_value: 80
 admin:
   access_log_path: "/dev/null"

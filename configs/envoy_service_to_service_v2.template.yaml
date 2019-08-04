@@ -398,11 +398,11 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: main_website.com
+                address: main.website.com
                 port_value: 443
                 protocol: TCP
     tls_context:
-      sni: www.main_website.com
+      sni: www.main.website.com
   - name: local_service
     connect_timeout: 0.25s
     type: STATIC
