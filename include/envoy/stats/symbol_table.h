@@ -105,7 +105,7 @@ public:
    * @param stat_names the names to join.
    * @return Storage allocated for the joined name.
    */
-  virtual StoragePtr join(const std::vector<StatName>& stat_names) const PURE;
+  virtual StoragePtr join(const StatNameVec& stat_names) const PURE;
 
   /**
    * Populates a StatNameList from a list of encodings. This is not done at

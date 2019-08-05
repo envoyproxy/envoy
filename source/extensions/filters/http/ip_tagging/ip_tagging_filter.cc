@@ -93,13 +93,10 @@ Http::FilterHeadersStatus IpTaggingFilter::decodeHeaders(Http::HeaderMap& header
     // should be exposed and other observability options like logging tags need to be implemented.
     for (const std::string& tag : tags) {
       config_->incHit(tag);
-      // config_->scope().counter(fmt::format("{}{}.hit", config_->statsPrefix(), tag)).inc();
     }
   } else {
     config_->incNoHit();
-    // config_->scope().counter(fmt::format("{}no_hit", config_->statsPrefix())).inc();
   }
-  // config_->scope().counter(fmt::format("{}total", config_->statsPrefix())).inc();
   config_->incTotal();
   return Http::FilterHeadersStatus::Continue;
 }

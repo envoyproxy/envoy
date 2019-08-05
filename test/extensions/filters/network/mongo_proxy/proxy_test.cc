@@ -8,6 +8,7 @@
 
 #include "extensions/filters/network/mongo_proxy/bson_impl.h"
 #include "extensions/filters/network/mongo_proxy/codec_impl.h"
+#include "extensions/filters/network/mongo_proxy/mongo_stats.h"
 #include "extensions/filters/network/mongo_proxy/proxy.h"
 #include "extensions/filters/network/well_known_names.h"
 
@@ -62,7 +63,7 @@ public:
 
 class MongoProxyFilterTest : public testing::Test {
 public:
-  MongoProxyFilterTest() { setup(); }
+  MongoProxyFilterTest() : mongo_stats_(std::make_shared<MongoStats>(store_, "test")) { setup(); }
 
   void setup() {
     ON_CALL(runtime_.snapshot_, featureEnabled("mongo.proxy_enabled", 100))
@@ -82,9 +83,9 @@ public:
   }
 
   void initializeFilter(bool emit_dynamic_metadata = false) {
-    filter_ = std::make_unique<TestProxyFilter>("test.", store_, runtime_, access_log_,
-                                                fault_config_, drain_decision_,
-                                                dispatcher_.timeSource(), emit_dynamic_metadata);
+    filter_ = std::make_unique<TestProxyFilter>(
+        "test.", store_, runtime_, access_log_, fault_config_, drain_decision_,
+        dispatcher_.timeSource(), emit_dynamic_metadata, mongo_stats_);
     filter_->initializeReadFilterCallbacks(read_filter_callbacks_);
     filter_->onNewConnection();
 
@@ -114,6 +115,7 @@ public:
 
   Buffer::OwnedImpl fake_data_;
   NiceMock<TestStatStore> store_;
+  MongoStatsSharedPtr mongo_stats_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Envoy::AccessLog::MockAccessLogFile> file_{

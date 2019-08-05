@@ -319,10 +319,10 @@ TEST_P(StatNameTest, HashTable) {
 }
 
 TEST_P(StatNameTest, Sort) {
-  std::vector<StatName> names{makeStat("a.c"),   makeStat("a.b"), makeStat("d.e"),
-                              makeStat("d.a.a"), makeStat("d.a"), makeStat("a.c")};
-  const std::vector<StatName> sorted_names{makeStat("a.b"), makeStat("a.c"),   makeStat("a.c"),
-                                           makeStat("d.a"), makeStat("d.a.a"), makeStat("d.e")};
+  StatNameVec names{makeStat("a.c"),   makeStat("a.b"), makeStat("d.e"),
+                    makeStat("d.a.a"), makeStat("d.a"), makeStat("a.c")};
+  const StatNameVec sorted_names{makeStat("a.b"), makeStat("a.c"),   makeStat("a.c"),
+                                 makeStat("d.a"), makeStat("d.a.a"), makeStat("d.e")};
   EXPECT_NE(names, sorted_names);
   std::sort(names.begin(), names.end(), StatNameLessThan(*table_));
   EXPECT_EQ(names, sorted_names);

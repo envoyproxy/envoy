@@ -37,6 +37,7 @@ constexpr uint64_t StatNameMaxSize = 1 << (8 * StatNameSizeEncodingBytes); // 65
 
 /** Transient representations of a vector of 32-bit symbols */
 using SymbolVec = std::vector<Symbol>;
+using StatNameVec = std::vector<StatName>;
 
 /**
  * SymbolTableImpl manages a namespace optimized for stats, which are typically
@@ -132,7 +133,7 @@ public:
   bool lessThan(const StatName& a, const StatName& b) const override;
   void free(const StatName& stat_name) override;
   void incRefCount(const StatName& stat_name) override;
-  StoragePtr join(const std::vector<StatName>& stat_names) const override;
+  StoragePtr join(const StatNameVec& stat_names) const override;
   void populateList(const absl::string_view* names, uint32_t num_names,
                     StatNameList& list) override;
   StoragePtr encode(absl::string_view name) override;
