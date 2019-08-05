@@ -55,7 +55,7 @@ message CommonGrpcAccessLogConfig {
 
   // Interval for flushing access logs to the gRPC stream. Logger will flush requests every time
   // this interval is elapsed, or when batch size limit is hit, whichever comes first. Defaults to
-  // 10 seconds.
+  // 1 second.
   google.protobuf.Duration buffer_flush_interval = 3 [(validate.rules).duration.gt = {}];
 
   // Soft size limit in bytes for access log entries buffer. Logger will buffer requests until
