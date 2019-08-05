@@ -21,6 +21,9 @@ using ValueType = envoy::config::filter::http::header_to_metadata::v2::Config::V
 using ValueEncode = envoy::config::filter::http::header_to_metadata::v2::Config::ValueEncode;
 using HeaderToMetadataRules = std::vector<std::pair<Http::LowerCaseString, Rule>>;
 
+// TODO(yangminzhu): Make MAX_HEADER_VALUE_LEN configurable.
+const uint32_t MAX_HEADER_VALUE_LEN = 8 * 1024;
+
 /**
  *  Encapsulates the filter configuration with STL containers and provides an area for any custom
  *  configuration logic.

@@ -13,12 +13,6 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace HeaderToMetadataFilter {
-namespace {
-
-// TODO(yangminzhu): Make MAX_HEADER_VALUE_LEN configurable.
-const uint32_t MAX_HEADER_VALUE_LEN = 8 * 1024;
-
-} // namespace
 
 Config::Config(const envoy::config::filter::http::header_to_metadata::v2::Config config) {
   request_set_ = Config::configToVector(config.request_rules(), request_rules_);
@@ -112,7 +106,7 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& meta
   // Sane enough, add the key/value.
   switch (type) {
   case envoy::config::filter::http::header_to_metadata::v2::Config_ValueType_STRING:
-    val.set_string_value(decodedValue);
+    val.set_string_value(std::move(decodedValue));
     break;
   case envoy::config::filter::http::header_to_metadata::v2::Config_ValueType_NUMBER: {
     double dval;
