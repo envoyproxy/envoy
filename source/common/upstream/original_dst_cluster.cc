@@ -142,16 +142,16 @@ void OriginalDstCluster::cleanup() {
   ENVOY_LOG(trace, "Stale original dst hosts cleanup triggered.");
   auto host_map = getCurrentHostMap();
   if (!host_map->empty()) {
-    ENVOY_LOG(debug, "Cleaning up stale original dst hosts.");
+    ENVOY_LOG(trace, "Cleaning up stale original dst hosts.");
     for (const auto& pair : *host_map) {
       const std::string& addr = pair.first;
       const HostSharedPtr& host = pair.second;
       if (host->used()) {
-        ENVOY_LOG(debug, "Keeping active host {}.", addr);
+        ENVOY_LOG(trace, "Keeping active host {}.", addr);
         keeping_hosts->emplace_back(host);
         host->used(false); // Mark to be removed during the next round.
       } else {
-        ENVOY_LOG(debug, "Removing stale host {}.", addr);
+        ENVOY_LOG(trace, "Removing stale host {}.", addr);
         to_be_removed.emplace_back(host);
       }
     }
