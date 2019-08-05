@@ -42,7 +42,7 @@ protected:
   static void expectReservationFailure(const Slice::Reservation& reservation, const Slice& slice,
                                        uint64_t reservable_size) {
     EXPECT_EQ(nullptr, reservation.mem_);
-    EXPECT_EQ(0, reservation.mem_);
+    EXPECT_EQ(nullptr, reservation.mem_);
     EXPECT_EQ(reservable_size, slice.reservableSize());
   }
 

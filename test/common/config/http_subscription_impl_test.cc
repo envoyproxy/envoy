@@ -15,7 +15,8 @@ TEST_F(HttpSubscriptionImplTest, OnRequestReset) {
   startSubscription({"cluster0", "cluster1"});
   EXPECT_CALL(random_gen_, random()).WillOnce(Return(0));
   EXPECT_CALL(*timer_, enableTimer(_));
-  EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
+  EXPECT_CALL(callbacks_,
+              onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, _));
   http_callbacks_->onFailure(Http::AsyncClient::FailureReason::Reset);
   EXPECT_TRUE(statsAre(1, 0, 0, 1, 0));
   timerTick();
@@ -32,7 +33,8 @@ TEST_F(HttpSubscriptionImplTest, BadJsonRecovery) {
   message->body() = std::make_unique<Buffer::OwnedImpl>(";!@#badjso n");
   EXPECT_CALL(random_gen_, random()).WillOnce(Return(0));
   EXPECT_CALL(*timer_, enableTimer(_));
-  EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
+  EXPECT_CALL(callbacks_,
+              onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, _));
   http_callbacks_->onSuccess(std::move(message));
   EXPECT_TRUE(statsAre(1, 0, 0, 1, 0));
   request_in_progress_ = false;
