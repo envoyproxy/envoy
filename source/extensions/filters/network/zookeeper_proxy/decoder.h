@@ -111,7 +111,7 @@ using DecoderPtr = std::unique_ptr<Decoder>;
 
 class DecoderImpl : public Decoder, Logger::Loggable<Logger::Id::filter> {
 public:
-  explicit DecoderImpl(DecoderCallbacks& callbacks, uint32_t max_packet_bytes)
+  DecoderImpl(DecoderCallbacks& callbacks, uint32_t max_packet_bytes)
       : callbacks_(callbacks), max_packet_bytes_(max_packet_bytes), helper_(max_packet_bytes) {}
 
   // ZooKeeperProxy::Decoder
