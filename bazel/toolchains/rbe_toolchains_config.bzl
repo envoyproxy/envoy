@@ -4,7 +4,7 @@ load("@envoy//bazel/toolchains:configs/versions.bzl", _generated_toolchain_confi
 
 _ENVOY_BUILD_IMAGE_REGISTRY = "gcr.io"
 _ENVOY_BUILD_IMAGE_REPOSITORY = "envoy-ci/envoy-build"
-_ENVOY_BUILD_IMAGE_DIGEST = "sha256:555fb7b0aa578d11852b57c6c14fd54ab4450ad001a9f03bb5c43d5454460c28"
+_ENVOY_BUILD_IMAGE_DIGEST = "sha256:d1f6087fdeb6a6e5d4fd52a5dc06b15f43f49e2c20fc813bcaaa12333485a70b"
 _CONFIGS_OUTPUT_BASE = "bazel/toolchains/configs"
 
 _CLANG_ENV = {
@@ -28,7 +28,7 @@ _CLANG_LIBCXX_ENV = dicts.add(_CLANG_ENV, {
 _GCC_ENV = {
     "BAZEL_COMPILER": "gcc",
     "BAZEL_LINKLIBS": "-l%:libstdc++.a",
-    "BAZEL_LINKOPTS": "-lm:-static-libgcc:-fuse-ld=lld",
+    "BAZEL_LINKOPTS": "-lm:-static-libgcc",
     "CC": "gcc",
     "CXX": "g++",
     "PATH": "/usr/sbin:/usr/bin:/sbin:/bin:/usr/lib/llvm-8/bin",

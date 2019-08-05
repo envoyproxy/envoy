@@ -91,7 +91,8 @@ public:
   }
 
   // Envoy::Config::SubscriptionCallbacks
-  void onConfigUpdateFailed(const EnvoyException*) override {}
+  void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason,
+                            const EnvoyException*) override {}
 
   // Envoy::Config::SubscriptionCallbacks
   std::string resourceName(const ProtobufWkt::Any&) override { return ""; }
@@ -549,7 +550,8 @@ public:
                       const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
-  void onConfigUpdateFailed(const EnvoyException*) override {
+  void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason,
+                            const EnvoyException*) override {
     ConfigSubscriptionCommonBase::onConfigUpdateFailed();
   }
   std::string resourceName(const ProtobufWkt::Any&) override {
@@ -725,7 +727,8 @@ TEST_F(DeltaConfigProviderImplTest, DeltaSubscriptionFailure) {
   timeSystem().setSystemTime(time);
   const EnvoyException ex(fmt::format("config failure"));
   // Verify the failure updates the lastUpdated() timestamp.
-  subscription.onConfigUpdateFailed(&ex);
+  subscription.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure,
+                                    &ex);
   EXPECT_EQ(std::chrono::time_point_cast<std::chrono::milliseconds>(provider->lastUpdated())
                 .time_since_epoch(),
             time);

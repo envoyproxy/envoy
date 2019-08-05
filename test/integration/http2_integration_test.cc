@@ -1182,10 +1182,10 @@ Http2RingHashIntegrationTest::~Http2RingHashIntegrationTest() {
     codec_client_->close();
     codec_client_ = nullptr;
   }
-  for (auto it = fake_upstream_connections_.begin(); it != fake_upstream_connections_.end(); ++it) {
-    AssertionResult result = (*it)->close();
+  for (auto& fake_upstream_connection : fake_upstream_connections_) {
+    AssertionResult result = fake_upstream_connection->close();
     RELEASE_ASSERT(result, result.message());
-    result = (*it)->waitForDisconnect();
+    result = fake_upstream_connection->waitForDisconnect();
     RELEASE_ASSERT(result, result.message());
   }
 }
