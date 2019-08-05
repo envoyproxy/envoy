@@ -211,6 +211,7 @@ public:
                                     secret_provider_context.localInfo());
     return std::make_shared<TlsSessionTicketKeysSdsApi>(
         sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
+                secret_provider_context.dispatcher().timeSource(),
         secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
         *secret_provider_context.initManager(), destructor_cb);
   }
@@ -218,10 +219,11 @@ public:
   TlsSessionTicketKeysSdsApi(const envoy::api::v2::core::ConfigSource& sds_config,
                              const std::string& sds_config_name,
                              Config::SubscriptionFactory& subscription_factory,
+                             TimeSource& time_source,
                              ProtobufMessage::ValidationVisitor& validation_visitor,
                              Stats::Store& stats, Init::Manager& init_manager,
                              std::function<void()> destructor_cb)
-      : SdsApi(sds_config, sds_config_name, subscription_factory, validation_visitor, stats,
+      : SdsApi(sds_config, sds_config_name, subscription_factory, time_source, validation_visitor, stats,
                init_manager, std::move(destructor_cb)) {}
 
   // SecretProvider

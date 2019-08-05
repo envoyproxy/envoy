@@ -152,7 +152,8 @@ private:
 
   const bool require_client_certificate_;
   std::vector<SessionTicketKey> session_ticket_keys_;
-  Secret::TlsSessionTicketKeysConfigProviderSharedPtr session_ticket_keys_provider_;
+  const Secret::TlsSessionTicketKeysConfigProviderSharedPtr session_ticket_keys_provider_;
+  bool session_ticket_keys_dynamic_sds_ = false;
   Common::CallbackHandle* stk_update_callback_handle_{};
   Common::CallbackHandle* stk_validation_callback_handle_{};
 
