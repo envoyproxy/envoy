@@ -140,7 +140,7 @@ private:
   friend class OriginalDstClusterFactory;
 };
 
-typedef std::shared_ptr<OriginalDstCluster> OriginalDstClusterSharedPtr;
+using OriginalDstClusterSharedPtr = std::shared_ptr<OriginalDstCluster>;
 
 class OriginalDstClusterFactory : public ClusterFactoryImplBase {
 public:
