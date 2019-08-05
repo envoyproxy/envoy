@@ -55,7 +55,9 @@ TEST_F(AdaptiveConcurrencyFilterTest, DecodeHeadersTestForwarding) {
 
   Http::TestHeaderMapImpl request_headers;
 
-  EXPECT_CALL(*controller_, forwardingDecision()).Times(1).WillRepeatedly(Return(RequestForwardingAction::MustForward));
+  EXPECT_CALL(*controller_, forwardingDecision())
+      .Times(1)
+      .WillRepeatedly(Return(RequestForwardingAction::MustForward));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
@@ -65,7 +67,9 @@ TEST_F(AdaptiveConcurrencyFilterTest, DecodeHeadersTestBlock) {
 
   Http::TestHeaderMapImpl request_headers;
 
-  EXPECT_CALL(*controller_, forwardingDecision()).Times(1).WillRepeatedly(Return(RequestForwardingAction::Block));
+  EXPECT_CALL(*controller_, forwardingDecision())
+      .Times(1)
+      .WillRepeatedly(Return(RequestForwardingAction::Block));
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::ServiceUnavailable, _, _, _, _))
       .Times(1);
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
@@ -89,7 +93,9 @@ TEST_F(AdaptiveConcurrencyFilterTest, EncodeHeadersValidTest) {
 
   // Get the filter to record the request start time via decode.
   Http::TestHeaderMapImpl request_headers;
-  EXPECT_CALL(*controller_, forwardingDecision()).Times(1).WillRepeatedly(Return(RequestForwardingAction::MustForward));
+  EXPECT_CALL(*controller_, forwardingDecision())
+      .Times(1)
+      .WillRepeatedly(Return(RequestForwardingAction::MustForward));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
   filter_->decodeComplete();
 

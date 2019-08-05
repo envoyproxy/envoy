@@ -9,12 +9,12 @@
 #include "envoy/common/time.h"
 #include "envoy/config/filter/http/adaptive_concurrency/v2alpha/adaptive_concurrency.pb.h"
 #include "envoy/http/filter.h"
-#include "extensions/filters/http/common/pass_through_filter.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "extensions/filters/http/adaptive_concurrency/concurrency_controller/concurrency_controller.h"
+#include "extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -41,7 +41,8 @@ private:
   TimeSource& time_source_;
 };
 
-using AdaptiveConcurrencyFilterConfigSharedPtr = std::shared_ptr<const AdaptiveConcurrencyFilterConfig>;
+using AdaptiveConcurrencyFilterConfigSharedPtr =
+    std::shared_ptr<const AdaptiveConcurrencyFilterConfig>;
 using ConcurrencyControllerSharedPtr =
     std::shared_ptr<ConcurrencyController::ConcurrencyController>;
 
@@ -49,7 +50,8 @@ using ConcurrencyControllerSharedPtr =
  * A filter that samples request latencies and dynamically adjusts the request
  * concurrency window.
  */
-class AdaptiveConcurrencyFilter : public Http::PassThroughFilter, Logger::Loggable<Logger::Id::filter> {
+class AdaptiveConcurrencyFilter : public Http::PassThroughFilter,
+                                  Logger::Loggable<Logger::Id::filter> {
 public:
   AdaptiveConcurrencyFilter(AdaptiveConcurrencyFilterConfigSharedPtr config,
                             ConcurrencyControllerSharedPtr controller);

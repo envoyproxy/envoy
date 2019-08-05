@@ -1,11 +1,13 @@
+#include "extensions/filters/http/adaptive_concurrency/adaptive_concurrency_filter.h"
+
 #include <chrono>
 #include <cstdint>
 #include <string>
 #include <vector>
 
-#include "extensions/filters/http/adaptive_concurrency/concurrency_controller/concurrency_controller.h"
-#include "extensions/filters/http/adaptive_concurrency/adaptive_concurrency_filter.h"
 #include "common/common/assert.h"
+
+#include "extensions/filters/http/adaptive_concurrency/concurrency_controller/concurrency_controller.h"
 #include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
@@ -35,15 +37,15 @@ AdaptiveConcurrencyFilter::~AdaptiveConcurrencyFilter() = default;
 
 Http::FilterHeadersStatus AdaptiveConcurrencyFilter::decodeHeaders(Http::HeaderMap&, bool) {
   if (!forwarding_action_) {
-    forwarding_action_ =
-      std::make_unique<ConcurrencyController::RequestForwardingAction>(controller_->forwardingDecision());
+    forwarding_action_ = std::make_unique<ConcurrencyController::RequestForwardingAction>(
+        controller_->forwardingDecision());
   }
 
   if (*forwarding_action_ == ConcurrencyController::RequestForwardingAction::Block) {
-      // TODO (tonya11en): Remove filler words.
-      decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "filler words", nullptr,
-                                         absl::nullopt, "more filler words");
-      return Http::FilterHeadersStatus::StopIteration;
+    // TODO (tonya11en): Remove filler words.
+    decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "filler words", nullptr,
+                                       absl::nullopt, "more filler words");
+    return Http::FilterHeadersStatus::StopIteration;
   }
 
   return Http::FilterHeadersStatus::Continue;
