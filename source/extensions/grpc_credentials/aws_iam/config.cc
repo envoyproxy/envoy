@@ -28,7 +28,7 @@ std::shared_ptr<grpc::ChannelCredentials> AwsIamGrpcCredentialsFactory::getChann
   std::shared_ptr<grpc::ChannelCredentials> creds =
       Grpc::CredsUtility::defaultSslChannelCredentials(grpc_service_config, api);
 
-  std::shared_ptr<grpc::CallCredentials> call_creds = nullptr;
+  std::shared_ptr<grpc::CallCredentials> call_creds;
   for (const auto& credential : google_grpc.call_credentials()) {
     switch (credential.credential_specifier_case()) {
     case envoy::api::v2::core::GrpcService::GoogleGrpc::CallCredentials::kFromPlugin: {
@@ -100,7 +100,7 @@ AwsIamHeaderAuthenticator::GetMetadata(grpc::string_ref service_url, grpc::strin
     return grpc::Status(grpc::StatusCode::INTERNAL, e.what());
   }
 
-  signedHeadersToMetadata(message.headers(), metadata);
+  signedHeadersToMetadata(message.headers(), *metadata);
 
   return grpc::Status::OK;
 }
@@ -124,11 +124,11 @@ AwsIamHeaderAuthenticator::buildMessageToSign(grpc::string_ref service_url,
 }
 
 void AwsIamHeaderAuthenticator::signedHeadersToMetadata(
-    const Http::HeaderMap& headers, std::multimap<grpc::string, grpc::string>* metadata) {
+    const Http::HeaderMap& headers, std::multimap<grpc::string, grpc::string>& metadata) {
 
   headers.iterate(
       [](const Http::HeaderEntry& entry, void* context) -> Http::HeaderMap::Iterate {
-        auto* md = static_cast<decltype(metadata)>(context);
+        auto* md = static_cast<std::multimap<grpc::string, grpc::string>*>(context);
         const auto& key = entry.key().getStringView();
         // Skip pseudo-headers
         if (key.empty() || key[0] == ':') {
@@ -137,7 +137,7 @@ void AwsIamHeaderAuthenticator::signedHeadersToMetadata(
         md->emplace(key, entry.value().getStringView());
         return Http::HeaderMap::Iterate::Continue;
       },
-      metadata);
+      &metadata);
 }
 
 REGISTER_FACTORY(AwsIamGrpcCredentialsFactory, Grpc::GoogleGrpcCredentialsFactory);

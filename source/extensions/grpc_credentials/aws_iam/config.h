@@ -51,9 +51,9 @@ private:
                                                      grpc::string_ref method_name);
 
   static void signedHeadersToMetadata(const Http::HeaderMap& headers,
-                                      std::multimap<grpc::string, grpc::string>* metadata);
+                                      std::multimap<grpc::string, grpc::string>& metadata);
 
-  HttpFilters::Common::Aws::SignerPtr signer_;
+  const HttpFilters::Common::Aws::SignerPtr signer_;
 };
 
 } // namespace AwsIam

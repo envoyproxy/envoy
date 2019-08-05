@@ -1,5 +1,3 @@
-#ifdef ENVOY_GOOGLE_GRPC
-
 #include "envoy/config/grpc_credential/v2alpha/aws_iam.pb.h"
 
 #include "common/common/fmt.h"
@@ -116,4 +114,3 @@ TEST_P(GrpcAwsIamClientIntegrationTest, AwsIamGrpcAuth_EnvRegion) {
 } // namespace
 } // namespace Grpc
 } // namespace Envoy
-#endif
