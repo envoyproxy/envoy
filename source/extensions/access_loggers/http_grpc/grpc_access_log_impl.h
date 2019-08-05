@@ -63,7 +63,7 @@ class GrpcAccessLoggerImpl : public GrpcAccessLogger {
 public:
   GrpcAccessLoggerImpl(Grpc::RawAsyncClientPtr&& client, std::string log_name,
                        std::chrono::milliseconds buffer_flush_interval_msec,
-                       size_t buffer_size_bytes, Event::Dispatcher& dispatcher,
+                       uint64_t buffer_size_bytes, Event::Dispatcher& dispatcher,
                        const LocalInfo::LocalInfo& local_info);
 
   void log(envoy::data::accesslog::v2::HTTPAccessLogEntry&& entry) override;
@@ -93,8 +93,8 @@ private:
   const std::string log_name_;
   const std::chrono::milliseconds buffer_flush_interval_msec_;
   const Event::TimerPtr flush_timer_;
-  const size_t buffer_size_bytes_;
-  size_t approximate_message_size_bytes_ = 0;
+  const uint64_t buffer_size_bytes_;
+  uint64_t approximate_message_size_bytes_ = 0;
   envoy::service::accesslog::v2::StreamAccessLogsMessage message_;
   absl::optional<LocalStream> stream_;
   const LocalInfo::LocalInfo& local_info_;
