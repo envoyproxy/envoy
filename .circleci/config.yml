@@ -4,7 +4,8 @@ executors:
   ubuntu-build:
     description: "A regular build executor based on ubuntu image"
     docker:
-      - image: envoyproxy/envoy-build:8246167b9d238797cbc6c03dccc9e3921c37617d
+      # NOTE: Update bazel/toolchains/rbe_toolchains_config.bzl with sha256 digest to match the image here.
+      - image: envoyproxy/envoy-build:cd8574de783791b3353579b489222bfda74888da
     resource_class: xlarge
     working_directory: /source
 
@@ -52,25 +53,7 @@ jobs:
        - store_artifacts:
            path: /build/envoy/generated
            destination: /
-   tsan:
-     executor: ubuntu-build
-     steps:
-       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
-       - checkout
-       - run: ci/do_circle_ci.sh bazel.tsan
-       - store_artifacts:
-           path: /build/envoy/generated
-           destination: /
 
-   compile_time_options:
-     executor: ubuntu-build
-     steps:
-       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
-       - checkout
-       - run: ci/do_circle_ci.sh bazel.compile_time_options
-       - store_artifacts:
-           path: /build/envoy/generated
-           destination: /
    api:
      executor: ubuntu-build
      steps:
@@ -93,28 +76,6 @@ jobs:
            fingerprints:
              - "f6:f9:df:90:9c:4b:5f:9c:f4:69:fd:42:94:ff:88:24"
        - run: ci/filter_example_mirror.sh
-   ipv6_tests:
-     machine: true
-     steps:
-     - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
-     - checkout
-     - run:
-         name: enable ipv6
-         command: |
-           echo '{
-             "ipv6": true,
-             "fixed-cidr-v6": "2001:db8:1::/64"
-           }' | sudo tee /etc/docker/daemon.json
-
-           sudo service docker restart
-     - run: dig go.googlesource.com A go.googlesource.com AAAA # Debug IPv6 network issues
-     - run: ifconfig
-     - run: route -A inet -A inet6
-     - run: curl -v https://go.googlesource.com
-     - run: curl -6 -v https://go.googlesource.com || true
-     - run: ./ci/do_circle_ci_ipv6_tests.sh
-     - store_artifacts:
-         path: /tmp/envoy-docker/envoy/generated/failed-testlogs
 
    coverage:
      executor: ubuntu-build
@@ -153,11 +114,7 @@ jobs:
        - run: ci/do_circle_ci.sh check_spelling_pedantic
    build_image:
      docker:
-       - image: circleci/python:3.7
-         environment:
-           # See comment in do_circle_ci.sh for why we do this.
-           NUM_CPUS: 8
-     resource_class: xlarge
+       - image: google/cloud-sdk
      steps:
        - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
@@ -190,11 +147,8 @@ workflows:
             tags:
               only: /^v.*/
       - asan
-      - tsan
-      - compile_time_options
       - api
       - filter_example_mirror
-      - ipv6_tests
       - coverage
       - format
       - clang_tidy

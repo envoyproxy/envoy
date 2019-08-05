@@ -243,7 +243,7 @@ envoy_cc_library(
     hdrs = ["envoy_quic_clock.h"],
     visibility = ["//visibility:public"],
     deps = [
-        "//include/envoy/event:timer_interface",
+        "//include/envoy/event:dispatcher_interface",
         "@com_googlesource_quiche//:quic_platform",
     ],
 )

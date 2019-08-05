@@ -112,8 +112,7 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
           overload_manager ? overload_manager->getThreadLocalOverloadState().getState(
                                  Server::OverloadActionNames::get().DisableHttpKeepAlive)
                            : Server::OverloadManager::getInactiveState()),
-      time_source_(time_source), strict_header_validation_(Runtime::runtimeFeatureEnabled(
-                                     "envoy.reloadable_features.strict_header_validation")) {}
+      time_source_(time_source) {}
 
 const HeaderMapImpl& ConnectionManagerImpl::continueHeader() {
   CONSTRUCT_ON_FIRST_USE(HeaderMapImpl,
@@ -261,8 +260,7 @@ StreamDecoder& ConnectionManagerImpl::newStream(StreamEncoder& response_encoder,
 
 Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool) {
   if (!codec_) {
-    codec_ =
-        config_.createCodec(read_callbacks_->connection(), data, *this, strict_header_validation_);
+    codec_ = config_.createCodec(read_callbacks_->connection(), data, *this);
     if (codec_->protocol() == Protocol::Http2) {
       stats_.named_.downstream_cx_http2_total_.inc();
       stats_.named_.downstream_cx_http2_active_.inc();
@@ -860,7 +858,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
 
     const bool new_metadata_added = processNewlyAddedMetadata();
-
     // If end_stream is set in headers, and a filter adds new metadata, we need to delay end_stream
     // in headers by inserting an empty data frame with end_stream set. The empty data frame is sent
     // after the new metadata.
@@ -1770,16 +1767,8 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {
 
   doMetadata();
 
-  // Make sure we handle filters returning StopIterationNoBuffer and then commonContinue by flushing
-  // the terminal fin.
-  const bool end_stream_with_data = complete() && !trailers();
-  if (bufferedData() || end_stream_with_data) {
-    if (end_stream_with_data && !bufferedData()) {
-      // In the StopIterationNoBuffer case the ConnectionManagerImpl will not have created a
-      // buffer but encode/decodeData expects the buffer to exist, so create one.
-      bufferedData() = createBuffer();
-    }
-    doData(end_stream_with_data);
+  if (bufferedData()) {
+    doData(complete() && !trailers());
   }
 
   if (trailers()) {
@@ -1869,6 +1858,12 @@ bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfterDataCallbac
         status == FilterDataStatus::StopIterationAndWatermark) {
       buffer_was_streaming = status == FilterDataStatus::StopIterationAndWatermark;
       commonHandleBufferData(provided_data);
+    } else if (complete() && !trailers() && !bufferedData()) {
+      // If this filter is doing StopIterationNoBuffer and this stream is terminated with a zero
+      // byte data frame, we need to create an empty buffer to make sure that when commonContinue
+      // is called, the pipeline resumes with an empty data frame with end_stream = true
+      ASSERT(end_stream_);
+      bufferedData() = createBuffer();
     }
 
     return false;

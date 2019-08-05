@@ -258,8 +258,7 @@ message SocketOption {
   }
   // The state in which the option will be applied. When used in BindConfig
   // STATE_PREBIND is currently the only valid value.
-  SocketState state = 6
-      [(validate.rules).message.required = true, (validate.rules).enum.defined_only = true];
+  SocketState state = 6 [(validate.rules).enum.defined_only = true];
 }
 
 // Runtime derived FractionalPercent with defaults for when the numerator or denominator is not
@@ -278,4 +277,16 @@ message ControlPlane {
   // of control plane. This can be used to identify which control plane instance,
   // the Envoy is connected to.
   string identifier = 1;
+}
+
+// Identifies the direction of the traffic relative to the local Envoy.
+enum TrafficDirection {
+  // Default option is unspecified.
+  UNSPECIFIED = 0;
+
+  // The transport is used for incoming traffic.
+  INBOUND = 1;
+
+  // The transport is used for outgoing traffic.
+  OUTBOUND = 2;
 }

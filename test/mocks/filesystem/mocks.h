@@ -19,7 +19,7 @@ public:
   ~MockFile() override;
 
   // Filesystem::File
-  Api::IoCallBoolResult open() override;
+  Api::IoCallBoolResult open(FlagSet flag) override;
   Api::IoCallSizeResult write(absl::string_view buffer) override;
   Api::IoCallBoolResult close() override;
   bool isOpen() const override { return is_open_; };

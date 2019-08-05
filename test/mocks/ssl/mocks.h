@@ -20,7 +20,7 @@ namespace Ssl {
 class MockContextManager : public ContextManager {
 public:
   MockContextManager();
-  ~MockContextManager();
+  ~MockContextManager() override;
 
   MOCK_METHOD2(createSslClientContext,
                ClientContextSharedPtr(Stats::Scope& scope, const ClientContextConfig& config));
@@ -34,7 +34,7 @@ public:
 class MockConnectionInfo : public ConnectionInfo {
 public:
   MockConnectionInfo();
-  ~MockConnectionInfo();
+  ~MockConnectionInfo() override;
 
   MOCK_CONST_METHOD0(peerCertificatePresented, bool());
   MOCK_CONST_METHOD0(uriSanLocalCertificate, std::vector<std::string>());
@@ -59,7 +59,7 @@ public:
 class MockClientContext : public ClientContext {
 public:
   MockClientContext();
-  ~MockClientContext();
+  ~MockClientContext() override;
 
   MOCK_CONST_METHOD0(daysUntilFirstCertExpires, size_t());
   MOCK_CONST_METHOD0(getCaCertInformation, CertificateDetailsPtr());
@@ -69,7 +69,7 @@ public:
 class MockClientContextConfig : public ClientContextConfig {
 public:
   MockClientContextConfig();
-  ~MockClientContextConfig();
+  ~MockClientContextConfig() override;
 
   MOCK_CONST_METHOD0(alpnProtocols, const std::string&());
   MOCK_CONST_METHOD0(cipherSuites, const std::string&());
@@ -91,7 +91,7 @@ public:
 class MockServerContextConfig : public ServerContextConfig {
 public:
   MockServerContextConfig();
-  ~MockServerContextConfig();
+  ~MockServerContextConfig() override;
 
   MOCK_CONST_METHOD0(alpnProtocols, const std::string&());
   MOCK_CONST_METHOD0(cipherSuites, const std::string&());

@@ -97,7 +97,7 @@ if [[ "$CI_TARGET" == "bazel.release" ]]; then
   # toolchain is kept consistent. This ifdef is checked in
   # test/common/stats/stat_test_utility.cc when computing
   # Stats::TestUtil::MemoryTest::mode().
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --cxxopt=-DMEMORY_TEST_EXACT=1"
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_env=ENVOY_MEMORY_TEST_EXACT=true"
 
   setup_clang_toolchain
   echo "bazel release build with tests..."
@@ -122,6 +122,11 @@ elif [[ "$CI_TARGET" == "bazel.sizeopt" ]]; then
   bazel_binary_build sizeopt
   echo "Testing ${TEST_TARGETS}"
   bazel test ${BAZEL_BUILD_OPTIONS} --config=sizeopt ${TEST_TARGETS}
+  exit 0
+elif [[ "$CI_TARGET" == "bazel.gcc" ]]; then
+  setup_gcc_toolchain
+  echo "bazel fastbuild build..."
+  bazel_binary_build fastbuild
   exit 0
 elif [[ "$CI_TARGET" == "bazel.debug" ]]; then
   setup_clang_toolchain
@@ -153,8 +158,8 @@ elif [[ "$CI_TARGET" == "bazel.asan" ]]; then
   rm -rf "${TAP_TMP}"
   mkdir -p "${TAP_TMP}"
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-asan \
-    //test/extensions/transport_sockets/tls/integration:ssl_integration_test \
-    --test_env=TAP_PATH="${TAP_TMP}/tap"
+    --strategy=TestRunner=local --test_env=TAP_PATH="${TAP_TMP}/tap" \
+    //test/extensions/transport_sockets/tls/integration:ssl_integration_test
   # Verify that some pb_text files have been created. We can't check for pcap,
   # since tcpdump is not available in general due to CircleCI lack of support
   # for privileged Docker executors.
@@ -185,7 +190,6 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   # changes, this build type may need to be broken up.
   # TODO(mpwarres): remove quiche=enabled once QUICHE is built by default.
   COMPILE_TIME_OPTIONS="\
-    --config libc++ \
     --define signal_trace=disabled \
     --define hot_restart=disabled \
     --define google_grpc=disabled \
@@ -194,7 +198,7 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
     --define quiche=enabled \
     --define path_normalization_by_default=true \
   "
-  setup_clang_toolchain
+  setup_clang_libcxx_toolchain
   # This doesn't go into CI but is available for developer convenience.
   echo "bazel with different compiletime options build with tests..."
   # Building all the dependencies from scratch to link them against libc++.
@@ -206,25 +210,6 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   # "--define log_debug_assert_in_release=enabled" must be tested with a release build, so run only
   # these tests under "-c opt" to save time in CI.
   bazel test ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c opt //test/common/common:assert_test //test/server:server_test
-  exit 0
-elif [[ "$CI_TARGET" == "bazel.ipv6_tests" ]]; then
-  # This is around until Circle supports IPv6. We try to run a limited set of IPv6 tests as fast
-  # as possible for basic sanity testing.
-
-  # Hack to avoid returning IPv6 DNS
-  sed -i 's_#precedence ::ffff:0:0/96  100_precedence ::ffff:0:0/96  100_' /etc/gai.conf
-  # Debug IPv6 network issues
-  apt-get update && apt-get install -y dnsutils net-tools curl && \
-    ifconfig && \
-    route -A inet -A inet6 && \
-    curl -v https://go.googlesource.com && \
-    curl -6 -v https://go.googlesource.com && \
-    dig go.googlesource.com A go.googlesource.com AAAA
-
-  setup_clang_toolchain
-  echo "Testing..."
-  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} --test_env=ENVOY_IP_TEST_VERSIONS=v6only -c fastbuild \
-    //test/integration/... //test/common/network/...
   exit 0
 elif [[ "$CI_TARGET" == "bazel.api" ]]; then
   setup_clang_toolchain

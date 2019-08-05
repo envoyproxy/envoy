@@ -116,7 +116,7 @@ protected:
 
 class EdsWithHealthCheckUpdateTest : public EdsTest {
 protected:
-  EdsWithHealthCheckUpdateTest() {}
+  EdsWithHealthCheckUpdateTest() = default;
 
   // Build the initial cluster with some endpoints.
   void initializeCluster(const std::vector<uint32_t> endpoint_ports,
@@ -210,6 +210,14 @@ TEST_F(EdsTest, ValidateFail) {
   EXPECT_FALSE(initialized_);
 }
 
+// Validate onConfigUpdate() on stream disconnection.
+TEST_F(EdsTest, StreamDisconnection) {
+  initialize();
+  eds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure,
+                                       nullptr);
+  EXPECT_FALSE(initialized_);
+}
+
 // Validate that onConfigUpdate() with unexpected cluster names rejects config.
 TEST_F(EdsTest, OnConfigUpdateWrongName) {
   envoy::api::v2::ClusterLoadAssignment cluster_load_assignment;
@@ -217,8 +225,12 @@ TEST_F(EdsTest, OnConfigUpdateWrongName) {
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
   resources.Add()->PackFrom(cluster_load_assignment);
   initialize();
-  EXPECT_THROW(eds_callbacks_->onConfigUpdate(resources, ""), EnvoyException);
-  eds_callbacks_->onConfigUpdateFailed(nullptr);
+  try {
+    eds_callbacks_->onConfigUpdate(resources, "");
+  } catch (const EnvoyException& e) {
+    eds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected,
+                                         &e);
+  }
   EXPECT_TRUE(initialized_);
 }
 
@@ -241,8 +253,12 @@ TEST_F(EdsTest, OnConfigUpdateWrongSize) {
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
   resources.Add()->PackFrom(cluster_load_assignment);
   resources.Add()->PackFrom(cluster_load_assignment);
-  EXPECT_THROW(eds_callbacks_->onConfigUpdate(resources, ""), EnvoyException);
-  eds_callbacks_->onConfigUpdateFailed(nullptr);
+  try {
+    eds_callbacks_->onConfigUpdate(resources, "");
+  } catch (const EnvoyException& e) {
+    eds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected,
+                                         &e);
+  }
   EXPECT_TRUE(initialized_);
 }
 
@@ -1658,7 +1674,7 @@ TEST_F(EdsTest, MalformedIP) {
 
 class EdsAssignmentTimeoutTest : public EdsTest {
 public:
-  EdsAssignmentTimeoutTest() : interval_timer_(nullptr) {
+  EdsAssignmentTimeoutTest() {
     EXPECT_CALL(dispatcher_, createTimer_(_))
         .WillOnce(Invoke([this](Event::TimerCb cb) {
           timer_cb_ = cb;
@@ -1671,7 +1687,7 @@ public:
     resetCluster();
   }
 
-  Event::MockTimer* interval_timer_;
+  Event::MockTimer* interval_timer_{nullptr};
   Event::TimerCb timer_cb_;
 };
 

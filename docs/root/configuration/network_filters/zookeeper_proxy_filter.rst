@@ -72,6 +72,34 @@ following statistics:
   checkwatches_rq, Counter, Number of checkwatches requests
   removewatches_rq, Counter, Number of removewatches requests
   check_rq, Counter, Number of check requests
+  response_bytes, Counter, Number of bytes in decoded response messages
+  connect_resp, Counter, Number of connect responses
+  ping_resp, Counter, Number of ping responses
+  auth_resp, Counter, Number of auth responses
+  watch_event, Counter, Number of watch events fired by the server
+  getdata_resp, Counter, Number of getdata responses
+  create_resp, Counter, Number of create responses
+  create2_resp, Counter, Number of create2 responses
+  createcontainer_resp, Counter, Number of createcontainer responses
+  createttl_resp, Counter, Number of createttl responses
+  setdata_resp, Counter, Number of setdata responses
+  getchildren_resp, Counter, Number of getchildren responses
+  getchildren2_resp, Counter, Number of getchildren2 responses
+  getephemerals_resp, Counter, Number of getephemerals responses
+  getallchildrennumber_resp, Counter, Number of getallchildrennumber responses
+  remove_resp, Counter, Number of remove responses
+  exists_resp, Counter, Number of exists responses
+  getacl_resp, Counter, Number of getacl responses
+  setacl_resp, Counter, Number of setacl responses
+  sync_resp, Counter, Number of sync responses
+  multi_resp, Counter, Number of multi responses
+  reconfig_resp, Counter, Number of reconfig responses
+  close_resp, Counter, Number of close responses
+  setauth_resp, Counter, Number of setauth responses
+  setwatches_resp, Counter, Number of setwatches responses
+  checkwatches_resp, Counter, Number of checkwatches responses
+  removewatches_resp, Counter, Number of removewatches responses
+  check_resp, Counter, Number of check responses
 
 .. _config_network_filters_zookeeper_proxy_dynamic_metadata:
 
@@ -90,3 +118,10 @@ The ZooKeeper filter emits the following dynamic metadata for each message parse
   <bytes>, string, "The size of the request message in bytes"
   <watch>, string, "True if a watch is being set, false otherwise"
   <version>, string, "The version parameter, if any, given with the request"
+  <timeout>, string, "The timeout parameter in a connect response"
+  <protocol_version>, string, "The protocol version in a connect response"
+  <readonly>, string, "The readonly flag in a connect response"
+  <zxid>, string, "The zxid field in a response header"
+  <error>, string, "The error field in a response header"
+  <client_state>, string, "The state field in a watch event"
+  <event_type>, string, "The event type in a a watch event"

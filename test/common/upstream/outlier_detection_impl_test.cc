@@ -87,8 +87,8 @@ public:
   }
 
   template <typename T> void loadRq(HostVector& hosts, int num_rq, T code) {
-    for (uint64_t i = 0; i < hosts.size(); i++) {
-      loadRq(hosts[i], num_rq, code);
+    for (auto& host : hosts) {
+      loadRq(host, num_rq, code);
     }
   }
 

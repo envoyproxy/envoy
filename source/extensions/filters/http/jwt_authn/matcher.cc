@@ -19,7 +19,7 @@ namespace {
 /**
  * Perform a match against any HTTP header or pseudo-header.
  */
-class BaseMatcherImpl : public Matcher, public Logger::Loggable<Logger::Id::filter> {
+class BaseMatcherImpl : public Matcher, public Logger::Loggable<Logger::Id::jwt> {
 public:
   BaseMatcherImpl(const RequirementRule& rule)
       : case_sensitive_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(rule.match(), case_sensitive, true)) {

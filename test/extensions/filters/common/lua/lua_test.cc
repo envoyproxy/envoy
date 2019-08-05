@@ -23,7 +23,7 @@ namespace {
 // not aligned by Envoy. See https://github.com/envoyproxy/envoy/issues/5551 for details.
 class alignas(32) TestObject : public BaseLuaObject<TestObject> {
 public:
-  ~TestObject() { onDestroy(); }
+  ~TestObject() override { onDestroy(); }
 
   static ExportedFunctions exportedFunctions() { return {{"testCall", static_luaTestCall}}; }
 

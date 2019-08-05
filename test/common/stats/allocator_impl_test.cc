@@ -14,7 +14,7 @@ namespace {
 class AllocatorImplTest : public testing::Test {
 protected:
   AllocatorImplTest() : alloc_(symbol_table_), pool_(symbol_table_) {}
-  ~AllocatorImplTest() { clearStorage(); }
+  ~AllocatorImplTest() override { clearStorage(); }
 
   StatNameStorage makeStatStorage(absl::string_view name) {
     return StatNameStorage(name, symbol_table_);

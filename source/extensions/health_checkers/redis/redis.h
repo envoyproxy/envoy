@@ -51,7 +51,7 @@ private:
         public Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks,
         public Network::ConnectionCallbacks {
     RedisActiveHealthCheckSession(RedisHealthChecker& parent, const Upstream::HostSharedPtr& host);
-    ~RedisActiveHealthCheckSession();
+    ~RedisActiveHealthCheckSession() override;
 
     // ActiveHealthCheckSession
     void onInterval() override;

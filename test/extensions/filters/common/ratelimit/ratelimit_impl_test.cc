@@ -36,7 +36,7 @@ namespace {
 
 class MockRequestCallbacks : public RequestCallbacks {
 public:
-  void complete(LimitStatus status, Http::HeaderMapPtr&& headers) {
+  void complete(LimitStatus status, Http::HeaderMapPtr&& headers) override {
     complete_(status, headers.get());
   }
 

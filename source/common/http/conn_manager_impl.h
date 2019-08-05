@@ -144,6 +144,7 @@ private:
     StreamInfo::StreamInfo& streamInfo() override;
     Tracing::Span& activeSpan() override;
     Tracing::Config& tracingConfig() override;
+    const ScopeTrackedObject& scope() override { return parent_; }
 
     // Functions to set or get iteration state.
     bool canIterate() { return iteration_state_ == IterationState::Continue; }
@@ -678,8 +679,6 @@ private:
   const Server::OverloadActionState& overload_stop_accepting_requests_ref_;
   const Server::OverloadActionState& overload_disable_keepalive_ref_;
   TimeSource& time_source_;
-
-  const bool strict_header_validation_;
 };
 
 } // namespace Http

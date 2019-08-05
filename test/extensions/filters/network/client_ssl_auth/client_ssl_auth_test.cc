@@ -59,7 +59,7 @@ protected:
   ClientSslAuthFilterTest()
       : request_(&cm_.async_client_), interval_timer_(new Event::MockTimer(&dispatcher_)),
         api_(Api::createApiForTest(stats_store_)) {}
-  ~ClientSslAuthFilterTest() { tls_.shutdownThread(); }
+  ~ClientSslAuthFilterTest() override { tls_.shutdownThread(); }
 
   void setup() {
     std::string yaml = R"EOF(

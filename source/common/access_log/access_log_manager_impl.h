@@ -64,7 +64,7 @@ public:
                     Thread::BasicLockable& lock, AccessLogFileStats& stats_,
                     std::chrono::milliseconds flush_interval_msec,
                     Thread::ThreadFactory& thread_factory);
-  ~AccessLogFileImpl();
+  ~AccessLogFileImpl() override;
 
   // AccessLog::AccessLogFile
   void write(absl::string_view data) override;
@@ -82,6 +82,9 @@ private:
   void flushThreadFunc();
   void open();
   void createFlushStructures();
+
+  // return default flags set which used by open
+  static Filesystem::FlagSet defaultFlags();
 
   // Minimum size before the flush thread will be told to flush.
   static const uint64_t MIN_FLUSH_SIZE = 1024 * 64;

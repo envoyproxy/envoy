@@ -25,7 +25,7 @@ public:
           return resourceName_(TestUtility::anyConvert<ResourceType>(resource));
         }));
   }
-  ~MockSubscriptionCallbacks() override {}
+  ~MockSubscriptionCallbacks() override = default;
   static std::string resourceName_(const envoy::api::v2::ClusterLoadAssignment& resource) {
     return resource.cluster_name();
   }
@@ -37,7 +37,8 @@ public:
                  void(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
                       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                       const std::string& system_version_info));
-  MOCK_METHOD1_T(onConfigUpdateFailed, void(const EnvoyException* e));
+  MOCK_METHOD2_T(onConfigUpdateFailed,
+                 void(Envoy::Config::ConfigUpdateFailureReason reason, const EnvoyException* e));
   MOCK_METHOD1_T(resourceName, std::string(const ProtobufWkt::Any& resource));
 };
 
@@ -93,7 +94,8 @@ public:
 
   MOCK_METHOD2(onConfigUpdate, void(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                                     const std::string& version_info));
-  MOCK_METHOD1(onConfigUpdateFailed, void(const EnvoyException* e));
+  MOCK_METHOD2(onConfigUpdateFailed,
+               void(Envoy::Config::ConfigUpdateFailureReason reason, const EnvoyException* e));
   MOCK_METHOD1(resourceName, std::string(const ProtobufWkt::Any& resource));
 };
 
@@ -107,20 +109,6 @@ public:
   MOCK_METHOD1(onDiscoveryResponse,
                void(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message));
   MOCK_METHOD0(onWriteable, void());
-};
-
-class MockMutableConfigProviderBase : public MutableConfigProviderBase {
-public:
-  MockMutableConfigProviderBase(std::shared_ptr<ConfigSubscriptionInstance>&& subscription,
-                                ConfigProvider::ConfigConstSharedPtr initial_config,
-                                Server::Configuration::FactoryContext& factory_context);
-
-  MOCK_CONST_METHOD0(getConfig, ConfigConstSharedPtr());
-  MOCK_METHOD1(onConfigProtoUpdate, ConfigConstSharedPtr(const Protobuf::Message& config_proto));
-  MOCK_METHOD1(initialize, void(const ConfigConstSharedPtr& initial_config));
-  MOCK_METHOD1(onConfigUpdate, void(const ConfigConstSharedPtr& config));
-
-  ConfigSubscriptionCommonBase& subscription() { return *subscription_.get(); }
 };
 
 class MockConfigProviderManager : public ConfigProviderManager {

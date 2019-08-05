@@ -38,7 +38,7 @@ public:
         rate_limit_settings_, callbacks_, stats_, init_fetch_timeout);
   }
 
-  ~DeltaSubscriptionTestHarness() {
+  ~DeltaSubscriptionTestHarness() override {
     while (!nonce_acks_required_.empty()) {
       EXPECT_FALSE(nonce_acks_sent_.empty());
       EXPECT_EQ(nonce_acks_required_.front(), nonce_acks_sent_.front());
@@ -127,7 +127,8 @@ public:
     if (accept) {
       expectSendMessage({}, version);
     } else {
-      EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
+      EXPECT_CALL(callbacks_, onConfigUpdateFailed(
+                                  Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, _));
       expectSendMessage({}, {}, Grpc::Status::GrpcStatus::Internal, "bad config", {});
     }
     subscription_->onDiscoveryResponse(std::move(response));
@@ -150,7 +151,7 @@ public:
   }
 
   void expectConfigUpdateFailed() override {
-    EXPECT_CALL(callbacks_, onConfigUpdateFailed(nullptr));
+    EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, nullptr));
   }
 
   void expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds timeout) override {

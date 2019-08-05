@@ -175,6 +175,7 @@ envoy_cc_library(
     hdrs = ["scoped_rds.h"],
     deps = [
         ":scoped_config_lib",
+        "//include/envoy/config:config_provider_interface",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
@@ -240,6 +241,7 @@ envoy_cc_library(
         "//source/common/common:hex_lib",
         "//source/common/common:linked_object",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/common:scope_tracker",
         "//source/common/common:utility_lib",
         "//source/common/grpc:common_lib",
         "//source/common/http:codes_lib",

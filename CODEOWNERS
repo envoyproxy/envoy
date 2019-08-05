@@ -47,3 +47,5 @@ extensions/filters/common/original_src @snowp @klarose
 # aws_iam grpc credentials
 /*/extensions/grpc_credentials/aws_iam @lavignes @mattklein123
 /*/extensions/filters/http/common/aws @lavignes @mattklein123
+# http inspector
+/*/extensions/filters/listener/http_inspector @crazyxy @PiotrSikora @lizan

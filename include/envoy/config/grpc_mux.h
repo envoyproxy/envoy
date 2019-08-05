@@ -2,6 +2,7 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
+#include "envoy/config/subscription.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "common/protobuf/protobuf.h"
@@ -42,9 +43,11 @@ public:
   /**
    * Called when either the subscription is unable to fetch a config update or when onConfigUpdate
    * invokes an exception.
+   * @param reason supplies the update failure reason.
    * @param e supplies any exception data on why the fetch failed. May be nullptr.
    */
-  virtual void onConfigUpdateFailed(const EnvoyException* e) PURE;
+  virtual void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
+                                    const EnvoyException* e) PURE;
 
   /**
    * Obtain the "name" of a v2 API resource in a google.protobuf.Any, e.g. the route config name for

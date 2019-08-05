@@ -19,7 +19,7 @@ ConnectionManager::ConnectionManager(Config& config, Runtime::RandomGenerator& r
       decoder_(std::make_unique<Decoder>(*transport_, *protocol_, *this)),
       random_generator_(random_generator), time_source_(time_source) {}
 
-ConnectionManager::~ConnectionManager() {}
+ConnectionManager::~ConnectionManager() = default;
 
 Network::FilterStatus ConnectionManager::onData(Buffer::Instance& data, bool end_stream) {
   request_buffer_.move(data);

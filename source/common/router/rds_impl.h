@@ -57,7 +57,7 @@ public:
   StaticRouteConfigProviderImpl(const envoy::api::v2::RouteConfiguration& config,
                                 Server::Configuration::FactoryContext& factory_context,
                                 RouteConfigProviderManagerImpl& route_config_provider_manager);
-  ~StaticRouteConfigProviderImpl();
+  ~StaticRouteConfigProviderImpl() override;
 
   // Router::RouteConfigProvider
   Router::ConfigConstSharedPtr config() override { return config_; }
@@ -114,7 +114,8 @@ private:
   void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
                       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                       const std::string&) override;
-  void onConfigUpdateFailed(const EnvoyException* e) override;
+  void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
+                            const EnvoyException* e) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override {
     return MessageUtil::anyConvert<envoy::api::v2::RouteConfiguration>(resource,
                                                                        validation_visitor_)
