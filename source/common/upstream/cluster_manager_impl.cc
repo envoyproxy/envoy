@@ -327,7 +327,7 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
 
           // Whenever hosts are removed from the cluster, we make each TLS cluster drain it's
           // connection pools for the removed hosts. If `close_connections_on_host_set_change` is
-          // enabled, this case will be covered by first <code>if</code> statement, where all
+          // enabled, this case will be covered by first `if` statement, where all
           // connection pools are drained.
           if (!hosts_removed.empty()) {
             postThreadLocalHostRemoval(cluster, hosts_removed);
