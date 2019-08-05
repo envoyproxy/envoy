@@ -60,6 +60,6 @@ message CommonGrpcAccessLogConfig {
 
   // Soft size limit in bytes for access log entries buffer. Logger will buffer requests until
   // this limit it hit, or every time flush interval is elapsed, whichever comes first. Setting it
-  // to zero effectively disables the batching. Defaults to 0.
+  // to zero effectively disables the batching. Defaults to 16384.
   google.protobuf.UInt32Value buffer_size_bytes = 4;
 }

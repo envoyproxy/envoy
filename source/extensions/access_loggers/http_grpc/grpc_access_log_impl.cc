@@ -44,7 +44,8 @@ void GrpcAccessLoggerImpl::LocalStream::onRemoteClose(Grpc::Status::GrpcStatus,
 
 GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(Grpc::RawAsyncClientPtr&& client, std::string log_name,
                                            std::chrono::milliseconds buffer_flush_interval_msec,
-                                           size_t buffer_size_bytes, Event::Dispatcher& dispatcher,
+                                           uint64_t buffer_size_bytes,
+                                           Event::Dispatcher& dispatcher,
                                            const LocalInfo::LocalInfo& local_info)
     : client_(std::move(client)), log_name_(log_name),
       buffer_flush_interval_msec_(buffer_flush_interval_msec),
@@ -120,8 +121,8 @@ GrpcAccessLoggerSharedPtr GrpcAccessLoggerCacheImpl::getOrCreateLogger(
       async_client_manager_.factoryForGrpcService(config.grpc_service(), scope_, false);
   const GrpcAccessLoggerSharedPtr logger = std::make_shared<GrpcAccessLoggerImpl>(
       factory->create(), config.log_name(),
-      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, buffer_flush_interval, 10000)),
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, buffer_size_bytes, 0), cache.dispatcher_,
+      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, buffer_flush_interval, 1000)),
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, buffer_size_bytes, 16384), cache.dispatcher_,
       local_info_);
   cache.access_loggers_.emplace(cache_key, logger);
   return logger;
