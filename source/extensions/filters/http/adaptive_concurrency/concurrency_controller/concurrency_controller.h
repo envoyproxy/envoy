@@ -11,6 +11,18 @@ namespace AdaptiveConcurrency {
 namespace ConcurrencyController {
 
 /**
+ * The controller's decision on whether a request will be forwarded.
+ */
+enum RequestForwardingAction {
+  // The concurrency limit is exceeded, so the request cannot be forwarded.
+  Block,
+
+  // The controller has allowed the request through and changed its internal
+  // state. The request must be forwarded.
+  MustForward
+};
+
+/**
  * Adaptive concurrency controller interface. All implementations of this
  * interface must be thread-safe.
  */
@@ -20,10 +32,9 @@ public:
 
   /**
    * Called during decoding when the adaptive concurrency filter is attempting
-   * to forward a request. Returns true once the controller's internal state is
-   * updated and the request can be forwarded.
+   * to forward a request. Returns its decision on whether to forward a request.
    */
-  virtual bool tryForwardRequest() PURE;
+  virtual RequestForwardingAction forwardingDecision() PURE;
 
   /**
    * Called during encoding when the request latency is known. Records the

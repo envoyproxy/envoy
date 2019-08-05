@@ -16,7 +16,7 @@ namespace ConcurrencyController {
 class NoopController : public ConcurrencyController {
 public:
   // ConcurrencyController.
-  bool tryForwardRequest() override { return true; }
+  RequestAction forwardingDecision() override { return RequestForwardingAction::MustForward; }
   void recordLatencySample(const std::chrono::nanoseconds&) override {}
 };
 
