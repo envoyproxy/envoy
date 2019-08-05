@@ -90,6 +90,22 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "active_quic_listener_test",
+    srcs = ["active_quic_listener_test.cc"],
+    tags = ["nofips"],
+    deps = [
+        ":quic_test_utils_for_envoy_lib",
+        "//source/extensions/quic_listeners/quiche:active_quic_listener_lib",
+        "//source/extensions/quic_listeners/quiche:envoy_quic_utils_lib",
+        "//source/server:configuration_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:network_utility_lib",
+        "//test/test_common:simulated_time_system_lib",
+    ],
+)
+
 envoy_cc_test_library(
     name = "quic_test_utils_for_envoy_lib",
     srcs = ["crypto_test_utils_for_envoy.cc"],
