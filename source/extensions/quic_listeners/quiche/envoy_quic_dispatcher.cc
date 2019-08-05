@@ -10,11 +10,12 @@ EnvoyQuicDispatcher::EnvoyQuicDispatcher(
     std::unique_ptr<quic::QuicConnectionHelperInterface> helper,
     std::unique_ptr<quic::QuicAlarmFactory> alarm_factory,
     uint8_t expected_server_connection_id_length, Server::ConnectionHandlerImpl& connection_handler,
-    ActiveQuicListener& listener)
+    Network::ListenerConfig& listener_config, Server::ListenerStats& listener_stats)
     : quic::QuicDispatcher(&quic_config_, crypto_config, version_manager, std::move(helper),
                            std::make_unique<EnvoyQuicCryptoServerStreamHelper>(),
                            std::move(alarm_factory), expected_server_connection_id_length),
-      connection_handler_(connection_handler), listener_(listener) {
+      connection_handler_(connection_handler), listener_config_(listener_config),
+      listener_stats_(listener_stats) {
   // Turn off chlo buffering in QuicDispatcher because per event loop clean
   // up is not implemented.
   // TODO(danzh): Add a per event loop callback to
@@ -38,7 +39,7 @@ quic::QuicSession* EnvoyQuicDispatcher::CreateQuicSession(
   auto quic_connection = new EnvoyQuicConnection(
       server_connection_id, peer_address, helper(), alarm_factory(), writer(),
       /*owns_writer=*/false, quic::Perspective::IS_SERVER, quic::ParsedQuicVersionVector{version},
-      listener_.config_, listener_.stats_);
+      listener_config_, listener_stats_);
   auto quic_session = new EnvoyQuicServerSession(
       config(), quic::ParsedQuicVersionVector{version}, quic_connection, this, session_helper(),
       crypto_config(), compressed_certs_cache(), connection_handler_.dispatcher_);

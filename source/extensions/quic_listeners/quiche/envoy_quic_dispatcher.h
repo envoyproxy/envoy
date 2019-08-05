@@ -14,8 +14,8 @@
 
 #include <string>
 
+#include "envoy/network/listener.h"
 #include "server/connection_handler_impl.h"
-#include "extensions/quic_listeners/quiche/active_quic_listener.h"
 
 namespace Envoy {
 namespace Quic {
@@ -47,7 +47,8 @@ public:
                       std::unique_ptr<quic::QuicAlarmFactory> alarm_factory,
                       uint8_t expected_server_connection_id_length,
                       Server::ConnectionHandlerImpl& connection_handler,
-                      ActiveQuicListener& listener);
+                      Network::ListenerConfig& listener_config,
+                      Server::ListenerStats& listener_stats);
 
   void OnConnectionClosed(quic::QuicConnectionId connection_id, quic::QuicErrorCode error,
                           const std::string& error_details,
@@ -63,7 +64,8 @@ private:
   // TODO(danzh): initialize from Envoy config.
   quic::QuicConfig quic_config_;
   Server::ConnectionHandlerImpl& connection_handler_;
-  ActiveQuicListener& listener_;
+  Network::ListenerConfig& listener_config_;
+  Server::ListenerStats& listener_stats_;
 };
 
 } // namespace Quic

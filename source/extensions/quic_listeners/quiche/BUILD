@@ -167,29 +167,44 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "active_quic_listener_lib",
+    name = "envoy_quic_dispatcher_lib",
     srcs = [
-        "active_quic_listener.cc",
         "envoy_quic_dispatcher.cc",
     ],
     hdrs = [
-        "active_quic_listener.h",
         "envoy_quic_dispatcher.h",
+    ],
+    tags = ["nofips"],
+    deps = [
+        ":envoy_quic_connection_lib",
+        ":envoy_quic_proof_source_lib",
+        ":envoy_quic_server_session_lib",
+        "//include/envoy/network:listener_interface",
+        "//source/server:connection_handler_lib",
+        "@com_googlesource_quiche//:quic_core_server_lib",
+        "@com_googlesource_quiche//:quic_core_utils_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "active_quic_listener_lib",
+    srcs = [
+        "active_quic_listener.cc",
+    ],
+    hdrs = [
+        "active_quic_listener.h",
     ],
     tags = ["nofips"],
     deps = [
         ":envoy_quic_alarm_factory_lib",
         ":envoy_quic_connection_helper_lib",
-        ":envoy_quic_connection_lib",
+        ":envoy_quic_dispatcher_lib",
         ":envoy_quic_packet_writer_lib",
         ":envoy_quic_proof_source_lib",
-        ":envoy_quic_server_session_lib",
         ":envoy_quic_utils_lib",
         "//include/envoy/network:listener_interface",
         "//source/common/network:listener_lib",
         "//source/server:connection_handler_lib",
-        "@com_googlesource_quiche//:quic_core_server_lib",
-        "@com_googlesource_quiche//:quic_core_utils_lib",
     ],
 )
 

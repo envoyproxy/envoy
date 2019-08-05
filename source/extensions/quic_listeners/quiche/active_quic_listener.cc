@@ -33,7 +33,7 @@ ActiveQuicListener::ActiveQuicListener(Server::ConnectionHandlerImpl& parent,
       std::make_unique<EnvoyQuicAlarmFactory>(parent.dispatcher_, *connection_helper->GetClock());
   quic_dispatcher_ = std::make_unique<EnvoyQuicDispatcher>(
       crypto_config_.get(), &version_manager_, std::move(connection_helper),
-      std::move(alarm_factory), quic::kQuicDefaultConnectionIdLength, parent, *this);
+      std::move(alarm_factory), quic::kQuicDefaultConnectionIdLength, parent, config_, stats_);
   quic_dispatcher_->InitializeWithWriter(
       new EnvoyQuicPacketWriter(*dynamic_cast<Network::UdpListener*>(listener_.get())));
 }
