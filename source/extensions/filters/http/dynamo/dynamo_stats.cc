@@ -39,19 +39,20 @@ DynamoStats::DynamoStats(Stats::Scope& scope, const std::string& prefix)
       [this](const std::string& str) { stat_name_set_.rememberBuiltin(str); });
 }
 
-Stats::SymbolTable::StoragePtr DynamoStats::addPrefix(const std::vector<Stats::StatName>& names) {
-  std::vector<Stats::StatName> names_with_prefix{prefix_};
-  names_with_prefix.reserve(names.end() - names.begin());
+Stats::SymbolTable::StoragePtr DynamoStats::addPrefix(const Stats::StatNameVec& names) {
+  Stats::StatNameVec names_with_prefix;
+  names_with_prefix.reserve(1 + names.end() - names.begin());
+  names_with_prefix.push_back(prefix_);
   names_with_prefix.insert(names_with_prefix.end(), names.begin(), names.end());
   return scope_.symbolTable().join(names_with_prefix);
 }
 
-Stats::Counter& DynamoStats::counter(const std::vector<Stats::StatName>& names) {
+Stats::Counter& DynamoStats::counter(const Stats::StatNameVec& names) {
   const Stats::SymbolTable::StoragePtr stat_name_storage = addPrefix(names);
   return scope_.counterFromStatName(Stats::StatName(stat_name_storage.get()));
 }
 
-Stats::Histogram& DynamoStats::histogram(const std::vector<Stats::StatName>& names) {
+Stats::Histogram& DynamoStats::histogram(const Stats::StatNameVec& names) {
   const Stats::SymbolTable::StoragePtr stat_name_storage = addPrefix(names);
   return scope_.histogramFromStatName(Stats::StatName(stat_name_storage.get()));
 }

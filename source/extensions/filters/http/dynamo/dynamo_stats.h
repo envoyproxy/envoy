@@ -16,8 +16,8 @@ class DynamoStats {
 public:
   DynamoStats(Stats::Scope& scope, const std::string& prefix);
 
-  Stats::Counter& counter(const std::vector<Stats::StatName>& names);
-  Stats::Histogram& histogram(const std::vector<Stats::StatName>& names);
+  Stats::Counter& counter(const Stats::StatNameVec& names);
+  Stats::Histogram& histogram(const Stats::StatNameVec& names);
 
   /**
    * Creates the partition id stats string. The stats format is
@@ -40,7 +40,7 @@ public:
   Stats::StatName getStatName(const std::string& str) { return stat_name_set_.getStatName(str); }
 
 private:
-  Stats::SymbolTable::StoragePtr addPrefix(const std::vector<Stats::StatName>& names);
+  Stats::SymbolTable::StoragePtr addPrefix(const Stats::StatNameVec& names);
 
   Stats::Scope& scope_;
   Stats::StatNameSet stat_name_set_;
