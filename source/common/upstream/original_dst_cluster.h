@@ -48,7 +48,7 @@ public:
    */
   class LoadBalancer : public Upstream::LoadBalancer {
   public:
-    LoadBalancer(std::shared_ptr<OriginalDstCluster>& parent);
+    LoadBalancer(const std::shared_ptr<OriginalDstCluster>& parent);
 
     // Upstream::LoadBalancer
     HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;

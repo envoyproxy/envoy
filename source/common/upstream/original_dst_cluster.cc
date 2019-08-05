@@ -16,7 +16,7 @@
 namespace Envoy {
 namespace Upstream {
 
-OriginalDstCluster::LoadBalancer::LoadBalancer(OriginalDstClusterSharedPtr& parent)
+OriginalDstCluster::LoadBalancer::LoadBalancer(const OriginalDstClusterSharedPtr& parent)
     : parent_(parent), info_(parent->info()),
       use_http_header_(info_->lbOriginalDstConfig()
                            ? info_->lbOriginalDstConfig().value().use_http_header()
