@@ -83,6 +83,7 @@ public:
   MOCK_CONST_METHOD0(proxy100Continue, bool());
   MOCK_CONST_METHOD0(http1Settings, const Http::Http1Settings&());
   MOCK_CONST_METHOD0(shouldNormalizePath, bool());
+  MOCK_CONST_METHOD0(shouldMergeSlashes, bool());
 
   std::unique_ptr<Http::InternalAddressConfig> internal_address_config_ =
       std::make_unique<DefaultInternalAddressConfig>();
@@ -1222,6 +1223,42 @@ TEST_F(ConnectionManagerUtilityTest, SanitizePathRelativePAth) {
   HeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
   ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
   EXPECT_EQ(header_map.Path()->value().getStringView(), "/abc");
+}
+
+// maybeNormalizePath() does not touch adjacent slashes by default.
+TEST_F(ConnectionManagerUtilityTest, MergeSlashesDefaultOff) {
+  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
+  ON_CALL(config_, shouldMergeSlashes()).WillByDefault(Return(false));
+  HeaderMapImpl original_headers;
+  original_headers.insertPath().value(std::string("/xyz///abc"));
+
+  HeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
+  ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
+  EXPECT_EQ(header_map.Path()->value().getStringView(), "/xyz///abc");
+}
+
+// maybeNormalizePath() merges adjacent slashes.
+TEST_F(ConnectionManagerUtilityTest, MergeSlashes) {
+  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
+  ON_CALL(config_, shouldMergeSlashes()).WillByDefault(Return(true));
+  HeaderMapImpl original_headers;
+  original_headers.insertPath().value(std::string("/xyz///abc"));
+
+  HeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
+  ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
+  EXPECT_EQ(header_map.Path()->value().getStringView(), "/xyz/abc");
+}
+
+// maybeNormalizePath() merges adjacent slashes if normalization if off.
+TEST_F(ConnectionManagerUtilityTest, MergeSlashesWithoutNormalization) {
+  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(false));
+  ON_CALL(config_, shouldMergeSlashes()).WillByDefault(Return(true));
+  HeaderMapImpl original_headers;
+  original_headers.insertPath().value(std::string("/xyz/..//abc"));
+
+  HeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
+  ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
+  EXPECT_EQ(header_map.Path()->value().getStringView(), "/xyz/../abc");
 }
 
 // test preserve_external_request_id true does not reset the passed requestId if passed

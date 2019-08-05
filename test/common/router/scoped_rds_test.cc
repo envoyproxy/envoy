@@ -177,7 +177,8 @@ TEST_F(ScopedRdsTest, ConfigUpdateFailure) {
   timeSystem().setSystemTime(time);
   const EnvoyException ex(fmt::format("config failure"));
   // Verify the failure updates the lastUpdated() timestamp.
-  subscription_callbacks_->onConfigUpdateFailed(&ex);
+  subscription_callbacks_->onConfigUpdateFailed(
+      Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &ex);
   EXPECT_EQ(std::chrono::time_point_cast<std::chrono::milliseconds>(provider_->lastUpdated())
                 .time_since_epoch(),
             time);

@@ -412,7 +412,8 @@ TEST_F(LdsApiTest, FailureSubscription) {
   setup();
 
   EXPECT_CALL(init_watcher_, ready());
-  lds_callbacks_->onConfigUpdateFailed({});
+  lds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure,
+                                       {});
   EXPECT_EQ("", lds_->versionInfo());
 }
 
