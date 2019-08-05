@@ -98,8 +98,8 @@ void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
       });
 
   ASSERT(host_address_map_.empty());
-  for (uint32_t i = 0; i < cluster_->prioritySet().hostSetsPerPriority().size(); i++) {
-    for (auto& host : cluster_->prioritySet().hostSetsPerPriority()[i]->hosts()) {
+  for (const auto& i : cluster_->prioritySet().hostSetsPerPriority()) {
+    for (auto& host : i->hosts()) {
       host_address_map_[host->address()->asString()] = host;
     }
   }
