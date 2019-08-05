@@ -287,7 +287,7 @@ void ProxyFilter::chargeReplyStats(ActiveQuery& active_query, Stats::StatNameVec
   }
 
   // Write 3 different histograms; appending 3 different suffixes to the name
-  // that was passed in.  Here we ovrerwrite the passed-in names, but we restore
+  // that was passed in. Here we overwrite the passed-in names, but we restore
   // names to its original state upon return.
   size_t orig_size = names.size();
   names.push_back(mongo_stats_->reply_num_docs_);

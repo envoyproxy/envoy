@@ -48,8 +48,7 @@ REAL_TIME_WHITELIST = ("./source/common/common/utility.h",
 # https://github.com/envoyproxy/envoy/pull/7573 and others.
 #
 # TODO(#4196): Eliminate this list completely and then merge #4980.
-STAT_FROM_STRING_WHITELIST = ("./source/extensions/filters/network/mongo_proxy/proxy.cc",
-                              "./source/extensions/stat_sinks/common/statsd/statsd.cc",
+STAT_FROM_STRING_WHITELIST = ("./source/extensions/stat_sinks/common/statsd/statsd.cc",
                               "./source/extensions/transport_sockets/tls/context_impl.cc",
                               "./source/server/guarddog_impl.cc",
                               "./source/server/overload_manager_impl.cc")
