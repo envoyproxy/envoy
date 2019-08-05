@@ -37,7 +37,6 @@ constexpr uint64_t StatNameMaxSize = 1 << (8 * StatNameSizeEncodingBytes); // 65
 
 /** Transient representations of a vector of 32-bit symbols */
 using SymbolVec = std::vector<Symbol>;
-using StatNameVec = std::vector<StatName>;
 
 /**
  * SymbolTableImpl manages a namespace optimized for stats, which are typically

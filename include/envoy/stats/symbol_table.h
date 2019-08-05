@@ -19,6 +19,7 @@ namespace Stats {
  * declaration for StatName is in source/common/stats/symbol_table_impl.h
  */
 class StatName;
+using StatNameVec = std::vector<StatName>;
 
 class StatNameList;
 
