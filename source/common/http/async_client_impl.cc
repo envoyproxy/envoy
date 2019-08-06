@@ -142,9 +142,21 @@ void AsyncStreamImpl::sendTrailers(HeaderMap& trailers) {
 }
 
 void AsyncStreamImpl::closeLocal(bool end_stream) {
+  // TODO(goaway): This assert maybe merits reconsideration. It seems to be saying that we shouldn't
+  // get here when trying to send the final frame of a stream that has already been closed locally,
+  // but it's fine for us to get here if we're trying to send a non-final frame. There's not an
+  // obvious reason why the first case would be not okay but the second case okay.
   ASSERT(!(local_closed_ && end_stream));
-  // Due to the fact that send calls can synchronously result in stream closure, it's possible for
-  // this to be called after the local side is already closed.
+  // This guard ensures that we don't attempt to clean up a stream or fire a completion callback
+  // for a stream that has already been closed. Both send* calls and resets can result in stream
+  // closure, and this state may be updated synchronously during stream interaction and callbacks.
+  // Additionally AsyncRequestImpl maintains behavior wherein its onComplete callback will fire
+  // immediately upon receiving a complete response, regardless of whether it has finished sending
+  // a request.
+  // Previous logic treated post-closure entry here as more-or-less benign (providing later-stage
+  // guards against redundant cleanup), but to surface consistent stream state via callbacks,
+  // it's necessary to be more rigorous.
+  // TODO(goaway): Consider deeper cleanup of assumptions here.
   if (local_closed_) {
     return;
   }
@@ -157,9 +169,14 @@ void AsyncStreamImpl::closeLocal(bool end_stream) {
 }
 
 void AsyncStreamImpl::closeRemote(bool end_stream) {
-  // Due to the fact that callbacks can synchronously result in stream closure, it's possible for
-  // this to get called after the remote is already closed (e.g. if the the stream is reset in the
-  // callback itself).
+  // This guard ensures that we don't attempt to clean up a stream or fire a completion callback for
+  // a stream that has already been closed. This function is called synchronously after callbacks
+  // have executed, and it's possible for callbacks to, for instance, directly reset a stream or
+  // close the remote manually. The test case ResetInOnHeaders covers this case specifically.
+  // Previous logic treated post-closure entry here as more-or-less benign (providing later-stage
+  // guards against redundant cleanup), but to surface consistent stream state via callbacks, it's
+  // necessary to be more rigorous.
+  // TODO(goaway): Consider deeper cleanup of assumptions here.
   if (remote_closed_) {
     return;
   }
@@ -198,6 +215,12 @@ AsyncRequestImpl::AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent
 
 void AsyncRequestImpl::initialize() {
   sendHeaders(request_->headers(), !request_->body());
+  // AsyncRequestImpl has historically been implemented to fire onComplete immediately upon
+  // receiving a complete response, regardless of whether the underlying stream was fully closed (in
+  // other words, regardless of whether the complete request had been sent). This had the potential
+  // to leak half-closed streams, which is now covered by manually firing closeLocal below. (See
+  // test PoolFailureWithBody for an example execution path.)
+  // TODO(goaway): Consider deeper cleanup of assumptions here.
   if (request_->body()) {
     // sendHeaders can result in synchronous stream closure in certain cases (e.g. connection pool
     // failure).
