@@ -37,7 +37,6 @@ using testing::SaveArg;
 
 namespace Envoy {
 namespace Upstream {
-namespace OriginalDstClusterTest {
 namespace {
 
 class TestLoadBalancerContext : public LoadBalancerContextBase {
@@ -109,7 +108,7 @@ TEST(OriginalDstClusterConfigTest, GoodConfig) {
     name: name
     connect_timeout: 0.25s
     type: original_dst
-    lb_policy: original_dst_lb
+    lb_policy: cluster_provided
     cleanup_interval: 1s
   )EOF"; // Help Emacs balance quotation marks: "
 
@@ -261,10 +260,10 @@ TEST_F(OriginalDstClusterTest, Membership) {
   connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11");
   EXPECT_CALL(connection, localAddressRestored()).WillRepeatedly(Return(true));
 
-  OriginalDstCluster::LoadBalancer lb(cluster_);
   Event::PostCb post_cb;
   EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
-  HostConstSharedPtr host = lb.chooseHost(&lb_context);
+  // Mock the cluster manager by recreating the load balancer each time to get a fresh host map
+  HostConstSharedPtr host = OriginalDstCluster::LoadBalancer(cluster_).chooseHost(&lb_context);
   post_cb();
   auto cluster_hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
 
@@ -283,7 +282,8 @@ TEST_F(OriginalDstClusterTest, Membership) {
             *cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->address());
 
   // Same host is returned on the 2nd call
-  HostConstSharedPtr host2 = lb.chooseHost(&lb_context);
+  // Mock the cluster manager by recreating the load balancer with the new host map
+  HostConstSharedPtr host2 = OriginalDstCluster::LoadBalancer(cluster_).chooseHost(&lb_context);
   EXPECT_EQ(host2, host);
 
   // Make host time out, no membership changes happen on the first timeout.
@@ -311,7 +311,8 @@ TEST_F(OriginalDstClusterTest, Membership) {
   // New host gets created
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
-  HostConstSharedPtr host3 = lb.chooseHost(&lb_context);
+  // Mock the cluster manager by recreating the load balancer with the new host map
+  HostConstSharedPtr host3 = OriginalDstCluster::LoadBalancer(cluster_).chooseHost(&lb_context);
   post_cb();
   EXPECT_NE(host3, nullptr);
   EXPECT_NE(host3, host);
@@ -636,6 +637,5 @@ TEST_F(OriginalDstClusterTest, UseHttpHeaderDisabled) {
 }
 
 } // namespace
-} // namespace OriginalDstClusterTest
 } // namespace Upstream
 } // namespace Envoy
