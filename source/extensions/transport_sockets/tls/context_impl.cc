@@ -51,7 +51,11 @@ bool cbsContainsU16(CBS& cbs, uint16_t n) {
 ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
                          TimeSource& time_source)
     : scope_(scope), stats_(generateStats(scope)), time_source_(time_source),
-      tls_max_version_(config.maxProtocolVersion()) {
+      tls_max_version_(config.maxProtocolVersion()), stat_name_set_(scope.symbolTable()),
+      ssl_ciphers_(stat_name_set_.add("ssl.ciphers")),
+      ssl_versions_(stat_name_set_.add("ssl.versions")),
+      ssl_curves_(stat_name_set_.add("ssl.curves")),
+      ssl_sigalgs_(stat_name_set_.add("ssl.sigalgs")) {
   const auto tls_certificates = config.tlsCertificates();
   tls_contexts_.resize(std::max(static_cast<size_t>(1), tls_certificates.size()));
 
@@ -347,6 +351,27 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   }
 
   parsed_alpn_protocols_ = parseAlpnProtocols(config.alpnProtocols());
+
+  // Ciphers
+  stat_name_set_.rememberBuiltin("AEAD-AES128-GCM-SHA256");
+  stat_name_set_.rememberBuiltin("ECDHE-ECDSA-AES128-GCM-SHA256");
+  stat_name_set_.rememberBuiltin("ECDHE-RSA-AES128-GCM-SHA256");
+  stat_name_set_.rememberBuiltin("ECDHE-RSA-AES128-SHA");
+  stat_name_set_.rememberBuiltin("ECDHE-RSA-CHACHA20-POLY1305");
+
+  // Curves
+  stat_name_set_.rememberBuiltin("\\25519");
+
+  // Algorithms
+  stat_name_set_.rememberBuiltin("rsa_pss_rsae_sha256");
+  stat_name_set_.rememberBuiltin("ecdsa_secp256r1_sha256");
+  stat_name_set_.rememberBuiltin("rsa_pss_rsae_sha256");
+
+  // Versions
+  stat_name_set_.rememberBuiltin("TLSv1");
+  stat_name_set_.rememberBuiltin("TLSv1.1");
+  stat_name_set_.rememberBuiltin("TLSv1.2");
+  stat_name_set_.rememberBuiltin("TLSv1.3");
 }
 
 int ServerContextImpl::alpnSelectCallback(const unsigned char** out, unsigned char* outlen,
@@ -455,6 +480,12 @@ int ContextImpl::verifyCertificate(X509* cert, const std::vector<std::string>& v
   return 1;
 }
 
+void ContextImpl::incCounter(const Stats::StatName name, absl::string_view value) const {
+  Stats::SymbolTable::StoragePtr storage =
+      scope_.symbolTable().join({name, stat_name_set_.getStatName(value)});
+  scope_.counterFromStatName(Stats::StatName(storage.get())).inc();
+}
+
 void ContextImpl::logHandshake(SSL* ssl) const {
   stats_.handshake_.inc();
 
@@ -462,22 +493,19 @@ void ContextImpl::logHandshake(SSL* ssl) const {
     stats_.session_reused_.inc();
   }
 
-  const char* cipher = SSL_get_cipher_name(ssl);
-  scope_.counter(fmt::format("ssl.ciphers.{}", std::string{cipher})).inc();
-
-  const char* version = SSL_get_version(ssl);
-  scope_.counter(fmt::format("ssl.versions.{}", std::string{version})).inc();
+  incCounter(ssl_ciphers_, SSL_get_cipher_name(ssl));
+  incCounter(ssl_versions_, SSL_get_version(ssl));
 
   uint16_t curve_id = SSL_get_curve_id(ssl);
   if (curve_id) {
-    const char* curve = SSL_get_curve_name(curve_id);
-    scope_.counter(fmt::format("ssl.curves.{}", std::string{curve})).inc();
+    // Note: in the unit tests, this curve name is always literal "\25519" (6 chars).
+    incCounter(ssl_curves_, SSL_get_curve_name(curve_id));
   }
 
   uint16_t sigalg_id = SSL_get_peer_signature_algorithm(ssl);
   if (sigalg_id) {
     const char* sigalg = SSL_get_signature_algorithm_name(sigalg_id, 1 /* include curve */);
-    scope_.counter(fmt::format("ssl.sigalgs.{}", std::string{sigalg})).inc();
+    incCounter(ssl_sigalgs_, sigalg);
   }
 
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
