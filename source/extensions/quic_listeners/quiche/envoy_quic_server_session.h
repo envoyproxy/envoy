@@ -27,7 +27,8 @@ namespace Quic {
 
 // Act as a Network::Connection to HCM and a FilterManager to FilterFactoryCb.
 class EnvoyQuicServerSession : public quic::QuicServerSessionBase,
-                               public Network::FilterManagerConnection {
+                               public Network::FilterManagerConnection,
+                               protected Logger::Loggable<Logger::Id::connection> {
 public:
   // Owns connection.
   EnvoyQuicServerSession(const quic::QuicConfig& config,
@@ -42,6 +43,7 @@ public:
   ~EnvoyQuicServerSession() override;
 
   // Network::FilterManager
+  // Overridden to delegate calls to filter_manager_.
   void addWriteFilter(Network::WriteFilterSharedPtr filter) override;
   void addFilter(Network::FilterSharedPtr filter) override;
   void addReadFilter(Network::ReadFilterSharedPtr filter) override;
@@ -50,10 +52,7 @@ public:
   // Network::Connection
   void addConnectionCallbacks(Network::ConnectionCallbacks& cb) override;
   void addBytesSentCallback(Network::Connection::BytesSentCb /*cb*/) override;
-  void enableHalfClose(bool /*enabled*/) override {
-    // Quic connection doesn't support half close.
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
+  void enableHalfClose(bool enabled) override;
   void close(Network::ConnectionCloseType type) override;
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
   uint64_t id() const override {
@@ -77,6 +76,7 @@ public:
   const Network::Address::InstanceConstSharedPtr& localAddress() const override;
   absl::optional<Network::Connection::UnixDomainSocketPeerCredentials>
   unixSocketPeerCredentials() const override {
+    // Unix domain socket is not supported.
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
   void setConnectionStats(const Network::Connection::ConnectionStats& stats) override {
@@ -92,23 +92,17 @@ public:
     // All writes should be handled by Quic internally.
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
-  void setBufferLimits(uint32_t /*limit*/) override {
-    // QUIC manages its own buffer.
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
-  uint32_t bufferLimit() const override { NOT_REACHED_GCOVR_EXCL_LINE; }
+  void setBufferLimits(uint32_t limit) override;
+  uint32_t bufferLimit() const override;
   bool localAddressRestored() const override {
     // SO_ORIGINAL_DST not supported by QUIC.
     return false;
   }
   bool aboveHighWatermark() const override {
-    // QUIC doesn't have connection level buffer limit.
+    ENVOY_CONN_LOG(error, "QUIC doesn't have connection level write buffer limit.", *this);
     return false;
   }
-  const Network::ConnectionSocket::OptionsSharedPtr& socketOptions() const override {
-    // QUIC is not supported in upstream.
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
+  const Network::ConnectionSocket::OptionsSharedPtr& socketOptions() const override;
   absl::string_view requestedServerName() const override;
   StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
   const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
@@ -119,7 +113,10 @@ public:
   void rawWrite(Buffer::Instance& data, bool end_stream) override;
 
   // Network::ReadBufferSource
-  Network::StreamBuffer getReadBuffer() override { NOT_REACHED_GCOVR_EXCL_LINE; }
+  Network::StreamBuffer getReadBuffer() override {
+    // Network filter has to stop iteration to prevent hitting this line.
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
   // Network::WriteBufferSource
   Network::StreamBuffer getWriteBuffer() override { NOT_REACHED_GCOVR_EXCL_LINE; }
 

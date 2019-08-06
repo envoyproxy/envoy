@@ -23,8 +23,9 @@
 namespace Envoy {
 namespace Quic {
 
-void EnvoyQuicServerStream::encode100ContinueHeaders(const Http::HeaderMap& /*headers*/) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+void EnvoyQuicServerStream::encode100ContinueHeaders(const Http::HeaderMap& headers) {
+  ASSERT(headers.Status()->value() == "100");
+  encodeHeaders(headers, false);
 }
 void EnvoyQuicServerStream::encodeHeaders(const Http::HeaderMap& /*headers*/, bool /*end_stream*/) {
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;

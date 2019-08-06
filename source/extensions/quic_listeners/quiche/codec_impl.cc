@@ -13,5 +13,15 @@ bool QuicHttpConnectionImplBase::wantsToWrite() {
   return quic_session_.HasDataToWrite();
 }
 
+// TODO(danzh): modify QUIC stack to react based on aggregated bytes across all
+// the streams. And call StreamCallbackHelper::runHighWatermarkCallbacks() for each stream.
+void QuicHttpConnectionImplBase::onUnderlyingConnectionAboveWriteBufferHighWatermark() {
+  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+}
+
+void QuicHttpConnectionImplBase::onUnderlyingConnectionBelowWriteBufferLowWatermark() {
+  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+}
+
 } // namespace Quic
 } // namespace Envoy
