@@ -16,6 +16,7 @@ Version history
 * listeners: added :ref:`HTTP inspector listener filter <config_listener_filters_http_inspector>`.
 * router: added :ref:`rq_retry_skipped_request_not_complete <config_http_filters_router_stats>` counter stat to router stats.
 * router check tool: add coverage reporting & enforcement.
+* router check tool: add comprehensive coverage reporting.
 * tls: added verification of IP address SAN fields in certificates against configured SANs in the
   certificate validation context.
 * upstream: added network filter chains to upstream connections, see :ref:`filters<envoy_api_field_Cluster.filters>`.

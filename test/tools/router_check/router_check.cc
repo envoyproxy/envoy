@@ -25,7 +25,7 @@ int main(int argc, char* argv[]) {
       return EXIT_FAILURE;
     }
 
-    const double current_coverage = checktool.coverage();
+    const double current_coverage = checktool.coverage(options.comprehensiveCoverage());
     std::cerr << "Current route coverage: " << current_coverage << "%" << std::endl;
     if (enforce_coverage) {
       if (current_coverage < options.failUnder()) {
