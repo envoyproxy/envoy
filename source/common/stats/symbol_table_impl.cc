@@ -361,7 +361,7 @@ void StatNameStorageSet::free(SymbolTable& symbol_table) {
   }
 }
 
-SymbolTable::StoragePtr SymbolTableImpl::join(const std::vector<StatName>& stat_names) const {
+SymbolTable::StoragePtr SymbolTableImpl::join(const StatNameVec& stat_names) const {
   uint64_t num_bytes = 0;
   for (StatName stat_name : stat_names) {
     num_bytes += stat_name.dataSize();
