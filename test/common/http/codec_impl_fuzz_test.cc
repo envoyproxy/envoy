@@ -359,7 +359,8 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
                                                                stats_store, client_http2settings,
                                                                max_request_headers_kb);
   } else {
-    client = std::make_unique<Http1::ClientConnectionImpl>(client_connection, client_callbacks);
+    client = std::make_unique<Http1::ClientConnectionImpl>(client_connection, stats_store,
+                                                           client_callbacks);
   }
 
   NiceMock<Network::MockConnection> server_connection;
@@ -371,8 +372,9 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
                                                                max_request_headers_kb);
   } else {
     const Http1Settings server_http1settings{fromHttp1Settings(input.h1_settings().server())};
-    server = std::make_unique<Http1::ServerConnectionImpl>(
-        server_connection, server_callbacks, server_http1settings, max_request_headers_kb);
+    server = std::make_unique<Http1::ServerConnectionImpl>(server_connection, stats_store,
+                                                           server_callbacks, server_http1settings,
+                                                           max_request_headers_kb);
   }
 
   ReorderBuffer client_write_buf{*server};
