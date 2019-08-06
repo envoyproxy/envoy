@@ -48,9 +48,10 @@ REAL_TIME_WHITELIST = ("./source/common/common/utility.h",
 # https://github.com/envoyproxy/envoy/pull/7573 and others.
 #
 # TODO(#4196): Eliminate this list completely and then merge #4980.
-STAT_FROM_STRING_WHITELIST = ("./source/extensions/transport_sockets/tls/context_impl.cc",
-                              "./source/server/guarddog_impl.cc",
-                              "./source/server/overload_manager_impl.cc")
+#
+# Note that until https://github.com/envoyproxy/envoy-wasm/issues/93 is
+# resolved, WASM will require the whitelist. No other files should be added.
+STAT_FROM_STRING_WHITELIST = ("")
 
 # Files in these paths can use MessageLite::SerializeAsString
 SERIALIZE_AS_STRING_WHITELIST = ("./test/common/protobuf/utility_test.cc",
