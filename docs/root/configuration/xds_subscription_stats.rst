@@ -1,7 +1,11 @@
 .. _subscription_statistics:
 
-Subscription statistics
-=======================
+xDS subscription statistics
+===========================
+
+Envoy discovers its various dynamic resources via discovery
+services referred to as *xDS*. Resources are requested via :ref:`subscriptions <xds_protocol>`, 
+by specifying a filesystem path to watch, initiating gRPC streams or polling a REST-JSON URL. 
 
 The following statistics are generated for all subscriptions.
 
