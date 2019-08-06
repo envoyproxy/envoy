@@ -20,6 +20,7 @@ Configuration reference
   rate_limit
   runtime
   statistics
+  subscription_stats
   tools/router_check
   overload_manager/overload_manager
   secret
