@@ -123,6 +123,12 @@ message OpenCensusConfig {
   // The Cloud project_id to use for Stackdriver tracing.
   string stackdriver_project_id = 4;
 
+  // (optional) By default, the Stackdriver exporter will connect to production
+  // Stackdriver. If stackdriver_address is non-empty, it will instead connect
+  // to this address, which is in the gRPC format:
+  // https://github.com/grpc/grpc/blob/master/doc/naming.md
+  string stackdriver_address = 10;
+
   // Enables the Zipkin exporter if set to true. The url and service name must
   // also be set.
   bool zipkin_exporter_enabled = 5;
