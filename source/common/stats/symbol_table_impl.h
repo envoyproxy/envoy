@@ -634,13 +634,20 @@ private:
 // 'built-ins' that is expected to be populated during initialization, and a map
 // of dynamically discovered names. The latter map is protected by a mutex, and
 // can be mutated at runtime.
+//
+// Ideally, builtins should be added during process initialization, in the
+// outermost relevant context. And as the builtins map is not mutex protected,
+// builtins must *not* be added in the request-path.
 class StatNameSet {
 public:
   explicit StatNameSet(SymbolTable& symbol_table);
 
   /**
-   * Adds a string to the builtin map, which is not mutex protected. This
-   * map is always consulted first as a hit there means no lock is required.
+   * Adds a string to the builtin map, which is not mutex protected. This map is
+   * always consulted first as a hit there means no lock is required.
+   *
+   * Builtins can only be added immediately after construction, as the builtins
+   * map is not mutex-protected.
    */
   void rememberBuiltin(absl::string_view str);
 
