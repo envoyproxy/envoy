@@ -6,7 +6,7 @@ index d99239c..4dc8cae 100644
      return registry->Register(std::move(status.ValueOrDie()));
    }
  
-+#if defined(__GNUC__) || defined(__GNUG__)
++#if defined(__GNUC__) && !defined(__clang__)
 +  inline cel_base::Status RunWrap(std::function<ReturnType()> func,
 +                       const absl::Span<const CelValue> argset,
 +                       ::google::protobuf::Arena* arena, CelValue* result,
@@ -50,7 +50,7 @@ index d99239c..4dc8cae 100644
      }
  
 +
-+#if defined(__GNUC__) || defined(__GNUG__)
++#if defined(__GNUC__) && !defined(__clang__)
 +    const auto* handler = &handler_;
 +    std::function<ReturnType(Arguments...)> wrapped_handler =
 +        [handler, arena](Arguments... args) -> ReturnType {
