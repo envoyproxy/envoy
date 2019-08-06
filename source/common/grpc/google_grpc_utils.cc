@@ -87,8 +87,8 @@ Buffer::InstancePtr GoogleGrpcUtils::makeBufferInstance(const grpc::ByteBuffer& 
     return nullptr;
   }
 
-  for (size_t i = 0; i < slices.size(); i++) {
-    buffer->addBufferFragment(*new GrpcSliceBufferFragmentImpl(std::move(slices[i])));
+  for (auto& slice : slices) {
+    buffer->addBufferFragment(*new GrpcSliceBufferFragmentImpl(std::move(slice)));
   }
   return buffer;
 }

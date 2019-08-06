@@ -400,10 +400,10 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalActiveHealthSkipped) {
     const auto& hosts = cluster.prioritySet().hostSetsPerPriority()[0]->hosts();
     EXPECT_EQ(2UL, hosts.size());
 
-    for (size_t i = 0; i < hosts.size(); ++i) {
-      EXPECT_TRUE(hosts[i]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
-      hosts[i]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
-      hosts[i]->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
+    for (const auto& host : hosts) {
+      EXPECT_TRUE(host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+      host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+      host->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
     }
   }
 
