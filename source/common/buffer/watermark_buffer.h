@@ -61,8 +61,8 @@ private:
   // Set to true after above_high_watermark_ has been called, and reset to false after
   // below_low_watermark_ has been called.
   bool above_high_watermark_called_{false};
-  // Set to true after above_overflow_watermark_ has been called. Never reset, because we assume
-  // the stream will be forcibly closed in response.
+  // Set to true after above_overflow_watermark_ has been called. Never reset, because we expect
+  // the associated connection and/or stream will be closed immediately in response to an overflow.
   bool above_overflow_watermark_called_{false};
 };
 
