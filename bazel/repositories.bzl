@@ -154,7 +154,7 @@ def envoy_dependencies(skip_targets = []):
     _io_opentracing_cpp()
     _net_zlib()
     _repository_impl("com_google_re2")
-    _repository_impl("com_google_cel_cpp")
+    _com_google_cel_cpp()
     _repository_impl("bazel_toolchains")
 
     _python_deps()
@@ -315,6 +315,16 @@ def _net_zlib():
     native.bind(
         name = "zlib",
         actual = "@envoy//bazel/foreign_cc:zlib",
+    )
+
+def _com_google_cel_cpp():
+    location = REPOSITORY_LOCATIONS["com_google_cel_cpp"]
+    http_archive(
+        name = "com_google_cel_cpp",
+        # TODO(kyessenov): requires C++17 partial template specialization available in clang-8 but not gcc
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:com_google_cel_cpp.patch"],
+        **location
     )
 
 def _com_github_nghttp2_nghttp2():

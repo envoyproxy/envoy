@@ -1,0 +1,67 @@
+diff --git a/eval/public/cel_function_adapter.h b/eval/public/cel_function_adapter.h
+index d99239c..4dc8cae 100644
+--- a/eval/public/cel_function_adapter.h
++++ b/eval/public/cel_function_adapter.h
+@@ -118,6 +118,34 @@ class FunctionAdapter : public CelFunction {
+     return registry->Register(std::move(status.ValueOrDie()));
+   }
+ 
++#if defined(__GNUC__) || defined(__GNUG__)
++  inline cel_base::Status RunWrap(std::function<ReturnType()> func,
++                       const absl::Span<const CelValue> argset,
++                       ::google::protobuf::Arena* arena, CelValue* result,
++                       int arg_index) const {
++    return CreateReturnValue(func(), arena, result);
++  }
++
++  template <typename Arg, typename... Args>
++  inline cel_base::Status RunWrap(std::function<ReturnType(Arg, Args...)> func,
++                       const absl::Span<const CelValue> argset,
++                       ::google::protobuf::Arena* arena, CelValue* result,
++                       int arg_index) const {
++    Arg argument;
++    if (!ConvertFromValue(argset[arg_index], &argument)) {
++      return cel_base::Status(cel_base::StatusCode::kInvalidArgument,
++                          "Type conversion failed");
++    }
++
++    std::function<ReturnType(Args...)> wrapped_func =
++        [func, argument](Args... args) -> ReturnType {
++      return func(argument, args...);
++    };
++
++    return RunWrap(std::move(wrapped_func), argset, arena, result,
++                   arg_index + 1);
++  }
++#else
+   template <int arg_index>
+   inline cel_base::Status RunWrap(absl::Span<const CelValue> arguments,
+                               std::tuple<::google::protobuf::Arena*, Arguments...> input,
+@@ -137,6 +165,7 @@ class FunctionAdapter : public CelFunction {
+       ::google::protobuf::Arena* arena) const {
+     return CreateReturnValue(absl::apply(handler_, input), arena, result);
+   }
++#endif
+ 
+   ::cel_base::Status Evaluate(absl::Span<const CelValue> arguments,
+                           CelValue* result,
+@@ -146,9 +175,19 @@ class FunctionAdapter : public CelFunction {
+                           "Argument number mismatch");
+     }
+ 
++
++#if defined(__GNUC__) || defined(__GNUG__)
++    const auto* handler = &handler_;
++    std::function<ReturnType(Arguments...)> wrapped_handler =
++        [handler, arena](Arguments... args) -> ReturnType {
++      return (*handler)(arena, args...);
++    };
++    return RunWrap(std::move(wrapped_handler), arguments, arena, result, 0);
++#else
+     std::tuple<::google::protobuf::Arena*, Arguments...> input;
+     std::get<0>(input) = arena;
+     return RunWrap<0>(arguments, input, result, arena);
++#endif
+   }
+ 
+  private:
