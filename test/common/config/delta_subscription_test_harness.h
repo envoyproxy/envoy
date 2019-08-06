@@ -127,7 +127,8 @@ public:
     if (accept) {
       expectSendMessage({}, version);
     } else {
-      EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
+      EXPECT_CALL(callbacks_, onConfigUpdateFailed(
+                                  Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, _));
       expectSendMessage({}, {}, Grpc::Status::GrpcStatus::Internal, "bad config", {});
     }
     subscription_->onDiscoveryResponse(std::move(response));
@@ -150,7 +151,7 @@ public:
   }
 
   void expectConfigUpdateFailed() override {
-    EXPECT_CALL(callbacks_, onConfigUpdateFailed(nullptr));
+    EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, nullptr));
   }
 
   void expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds timeout) override {

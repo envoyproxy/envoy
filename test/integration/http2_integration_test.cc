@@ -472,6 +472,32 @@ TEST_P(Http2MetadataIntegrationTest, ProxyLargeMetadataInRequest) {
   ASSERT_TRUE(response->complete());
 }
 
+TEST_P(Http2MetadataIntegrationTest, RequestMetadataReachSizeLimit) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  std::string value = std::string(10 * 1024, '1');
+  Http::MetadataMap metadata_map = {{"key", value}};
+  codec_client_->sendMetadata(*request_encoder_, metadata_map);
+  codec_client_->sendData(*request_encoder_, 1, false);
+  codec_client_->sendMetadata(*request_encoder_, metadata_map);
+  codec_client_->sendData(*request_encoder_, 1, false);
+  for (int i = 0; i < 200; i++) {
+    codec_client_->sendMetadata(*request_encoder_, metadata_map);
+    if (codec_client_->disconnected()) {
+      break;
+    }
+  }
+
+  // Verifies client connection will be closed.
+  codec_client_->waitForDisconnect();
+  ASSERT_FALSE(response->complete());
+}
+
 static std::string request_metadata_filter = R"EOF(
 name: request-metadata-filter
 config: {}
@@ -1156,10 +1182,10 @@ Http2RingHashIntegrationTest::~Http2RingHashIntegrationTest() {
     codec_client_->close();
     codec_client_ = nullptr;
   }
-  for (auto it = fake_upstream_connections_.begin(); it != fake_upstream_connections_.end(); ++it) {
-    AssertionResult result = (*it)->close();
+  for (auto& fake_upstream_connection : fake_upstream_connections_) {
+    AssertionResult result = fake_upstream_connection->close();
     RELEASE_ASSERT(result, result.message());
-    result = (*it)->waitForDisconnect();
+    result = fake_upstream_connection->waitForDisconnect();
     RELEASE_ASSERT(result, result.message());
   }
 }

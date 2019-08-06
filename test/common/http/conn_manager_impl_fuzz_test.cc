@@ -110,6 +110,7 @@ public:
   bool proxy100Continue() const override { return proxy_100_continue_; }
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   bool shouldNormalizePath() const override { return false; }
+  bool shouldMergeSlashes() const override { return false; }
 
   const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager config_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;

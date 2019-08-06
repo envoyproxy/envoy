@@ -70,6 +70,7 @@ py_binary(
     name = "capture_fuzz_gen",
     srcs = ["capture_fuzz_gen.py"],
     licenses = ["notice"],  # Apache 2
+    python_version = "PY3",
     visibility = ["//visibility:public"],
     deps = [
         ":capture_fuzz_proto_py",
