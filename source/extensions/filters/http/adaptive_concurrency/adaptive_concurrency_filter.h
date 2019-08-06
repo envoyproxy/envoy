@@ -58,7 +58,6 @@ public:
   ~AdaptiveConcurrencyFilter() override;
 
   // Http::StreamDecoderFilter
-  void decodeComplete() override;
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap&, bool) override;
 
   // Http::StreamEncoderFilter

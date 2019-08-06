@@ -13,7 +13,7 @@ namespace ConcurrencyController {
 /**
  * The controller's decision on whether a request will be forwarded.
  */
-enum RequestForwardingAction {
+enum class RequestForwardingAction {
   // The concurrency limit is exceeded, so the request cannot be forwarded.
   Block,
 

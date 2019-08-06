@@ -24,7 +24,7 @@ AdaptiveConcurrencyFilterConfig::AdaptiveConcurrencyFilterConfig(
   // TODO (tonya11en): Remove these noop calls when stats/runtime values are
   // implemented.
   //
-  // Calling for test coverage.
+  // Calling so the builds pass with these currently unused variables.
   runtime_.snapshot();
   scope_.constSymbolTable();
 }
@@ -36,26 +36,17 @@ AdaptiveConcurrencyFilter::AdaptiveConcurrencyFilter(
 AdaptiveConcurrencyFilter::~AdaptiveConcurrencyFilter() = default;
 
 Http::FilterHeadersStatus AdaptiveConcurrencyFilter::decodeHeaders(Http::HeaderMap&, bool) {
-  if (!forwarding_action_) {
-    forwarding_action_ = std::make_unique<ConcurrencyController::RequestForwardingAction>(
-        controller_->forwardingDecision());
-  }
+  const auto forwarding_action = controller_->forwardingDecision();
 
-  if (*forwarding_action_ == ConcurrencyController::RequestForwardingAction::Block) {
+  if (forwarding_action == ConcurrencyController::RequestForwardingAction::Block) {
     // TODO (tonya11en): Remove filler words.
     decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "filler words", nullptr,
                                        absl::nullopt, "more filler words");
     return Http::FilterHeadersStatus::StopIteration;
   }
 
+  rq_start_time_ = config_->timeSource().monotonicTime();
   return Http::FilterHeadersStatus::Continue;
-}
-
-void AdaptiveConcurrencyFilter::decodeComplete() {
-  ASSERT(forwarding_action_ != nullptr);
-  if (*forwarding_action_ == ConcurrencyController::RequestForwardingAction::MustForward) {
-    rq_start_time_ = config_->timeSource().monotonicTime();
-  }
 }
 
 void AdaptiveConcurrencyFilter::encodeComplete() {

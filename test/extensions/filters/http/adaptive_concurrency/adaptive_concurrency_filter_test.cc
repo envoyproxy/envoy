@@ -59,7 +59,12 @@ TEST_F(AdaptiveConcurrencyFilterTest, DecodeHeadersTestForwarding) {
       .Times(1)
       .WillRepeatedly(Return(RequestForwardingAction::MustForward));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  Buffer::OwnedImpl request_body;
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(request_body, false));
+
+  Http::TestHeaderMapImpl request_trailers;
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 }
 
 TEST_F(AdaptiveConcurrencyFilterTest, DecodeHeadersTestBlock) {
@@ -76,15 +81,6 @@ TEST_F(AdaptiveConcurrencyFilterTest, DecodeHeadersTestBlock) {
             filter_->decodeHeaders(request_headers, true));
 }
 
-TEST_F(AdaptiveConcurrencyFilterTest, DecodeHeadersDeathTest) {
-  SetupTest();
-
-  Http::TestHeaderMapImpl response_headers;
-
-  // The start time was never set.
-  EXPECT_DEATH({ filter_->decodeComplete(); }, "");
-}
-
 TEST_F(AdaptiveConcurrencyFilterTest, EncodeHeadersValidTest) {
   SetupTest();
 
@@ -97,7 +93,6 @@ TEST_F(AdaptiveConcurrencyFilterTest, EncodeHeadersValidTest) {
       .Times(1)
       .WillRepeatedly(Return(RequestForwardingAction::MustForward));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
-  filter_->decodeComplete();
 
   const std::chrono::nanoseconds advance_time = std::chrono::milliseconds(42);
   mt = time_system_.monotonicTime();
