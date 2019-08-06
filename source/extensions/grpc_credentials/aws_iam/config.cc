@@ -92,7 +92,8 @@ AwsIamHeaderAuthenticator::GetMetadata(grpc::string_ref service_url, grpc::strin
                                        const grpc::AuthContext&,
                                        std::multimap<grpc::string, grpc::string>* metadata) {
 
-  Http::RequestMessageImpl message = buildMessageToSign(service_url, method_name);
+  auto message = buildMessageToSign(absl::string_view(service_url.data(), service_url.length()),
+                                    absl::string_view(method_name.data(), method_name.length()));
 
   try {
     signer_->sign(message, false);
@@ -106,11 +107,10 @@ AwsIamHeaderAuthenticator::GetMetadata(grpc::string_ref service_url, grpc::strin
 }
 
 Http::RequestMessageImpl
-AwsIamHeaderAuthenticator::buildMessageToSign(grpc::string_ref service_url,
-                                              grpc::string_ref method_name) {
+AwsIamHeaderAuthenticator::buildMessageToSign(absl::string_view service_url,
+                                              absl::string_view method_name) {
 
-  const std::string uri = fmt::format("{}/{}", std::string(service_url.data(), service_url.size()),
-                                      std::string(method_name.data(), method_name.size()));
+  const auto uri = fmt::format("{}/{}", service_url, method_name);
   absl::string_view host;
   absl::string_view path;
   Http::Utility::extractHostPathFromUri(uri, host, path);

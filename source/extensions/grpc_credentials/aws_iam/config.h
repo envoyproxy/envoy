@@ -47,8 +47,8 @@ public:
   bool IsBlocking() const override { return true; }
 
 private:
-  static Http::RequestMessageImpl buildMessageToSign(grpc::string_ref service_url,
-                                                     grpc::string_ref method_name);
+  static Http::RequestMessageImpl buildMessageToSign(absl::string_view service_url,
+                                                     absl::string_view method_name);
 
   static void signedHeadersToMetadata(const Http::HeaderMap& headers,
                                       std::multimap<grpc::string, grpc::string>& metadata);
