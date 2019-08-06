@@ -5,7 +5,7 @@ executors:
     description: "A regular build executor based on ubuntu image"
     docker:
       # NOTE: Update bazel/toolchains/rbe_toolchains_config.bzl with sha256 digest to match the image here.
-      - image: envoyproxy/envoy-build:8246167b9d238797cbc6c03dccc9e3921c37617d
+      - image: envoyproxy/envoy-build:cd8574de783791b3353579b489222bfda74888da
     resource_class: xlarge
     working_directory: /source
 
@@ -54,15 +54,6 @@ jobs:
            path: /build/envoy/generated
            destination: /
 
-   compile_time_options:
-     executor: ubuntu-build
-     steps:
-       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
-       - checkout
-       - run: ci/do_circle_ci.sh bazel.compile_time_options
-       - store_artifacts:
-           path: /build/envoy/generated
-           destination: /
    api:
      executor: ubuntu-build
      steps:
@@ -156,7 +147,6 @@ workflows:
             tags:
               only: /^v.*/
       - asan
-      - compile_time_options
       - api
       - filter_example_mirror
       - coverage
