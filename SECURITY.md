@@ -369,17 +369,17 @@ CrashOverride will vouch for the "Seven" distribution joining the distribution l
 
 ### Members
 
-| E-mail                                    | Organization  |
-|-------------------------------------------|:-------------:|
-| envoy-security-team@aspenmesh.io          | Aspen Mesh    |
-| aws-app-mesh-security@amazon.com          | AWS           |
-| security@cilium.io                        | Cilium        |
-| vulnerabilityreports@cloudfoundry.org     | Cloud Foundry |
-| secalert@datawire.io                      | Datawire      |
-| google-internal-envoy-security@google.com | Google        |
-| argoprod@us.ibm.com                       | IBM           |
-| vulnerabilities@discuss.istio.io          | Istio         |
-| secalert@redhat.com                       | Red Hat       |
-| envoy-security@solo.io                    | solo.io       |
-| envoy-security@tetrate.io                 | Tetrate       |
-| security@vmware.com                       | VMware        |
+| E-mail                                                | Organization  |
+|-------------------------------------------------------|:-------------:|
+| envoy-security-team@aspenmesh.io                      | Aspen Mesh    |
+| aws-app-mesh-security@amazon.com                      | AWS           |
+| security@cilium.io                                    | Cilium        |
+| vulnerabilityreports@cloudfoundry.org                 | Cloud Foundry |
+| secalert@datawire.io                                  | Datawire      |
+| google-internal-envoy-security@google.com             | Google        |
+| argoprod@us.ibm.com                                   | IBM           |
+| istio-security-vulnerability-reports@googlegroups.com | Istio         |
+| secalert@redhat.com                                   | Red Hat       |
+| envoy-security@solo.io                                | solo.io       |
+| envoy-security@tetrate.io                             | Tetrate       |
+| security@vmware.com                                   | VMware        |
