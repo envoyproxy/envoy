@@ -49,7 +49,7 @@ public:
   }
 
   envoy::api::v2::core::GrpcService createGoogleGrpcConfig() override {
-    auto config = GrpcClientIntegrationTest::createGoogleGrpcConfig();
+    auto config = GrpcSslClientIntegrationTest::createGoogleGrpcConfig();
     auto* google_grpc = config.mutable_google_grpc();
     google_grpc->set_credentials_factory_name(credentials_factory_name_);
     auto* ssl_creds = google_grpc->mutable_channel_credentials()->mutable_ssl_credentials();

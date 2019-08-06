@@ -19,7 +19,7 @@ namespace AwsIam {
  */
 class AwsIamGrpcCredentialsFactory : public Grpc::GoogleGrpcCredentialsFactory {
 public:
-  virtual std::shared_ptr<grpc::ChannelCredentials>
+  std::shared_ptr<grpc::ChannelCredentials>
   getChannelCredentials(const envoy::api::v2::core::GrpcService& grpc_service_config,
                         Api::Api& api) override;
 
