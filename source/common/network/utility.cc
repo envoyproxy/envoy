@@ -246,7 +246,8 @@ bool Utility::isLocalConnection(const Network::ConnectionSocket& socket) {
   // connection. However, this is a rare exception and such assumption results in big
   // performance optimization.
   if (remote_address->type() == Envoy::Network::Address::Type::Pipe ||
-      remote_address == socket.localAddress() || isLoopbackAddress(*remote_address)) {
+      remote_address->equalsExceptPort(*socket.localAddress()) ||
+      isLoopbackAddress(*remote_address)) {
     return true;
   }
 

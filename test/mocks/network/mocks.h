@@ -366,6 +366,9 @@ public:
   bool operator==(const Address::Instance& other) const override {
     return asString() == other.asString();
   }
+  bool equalsExceptPort(const Address::Instance& other) const override {
+    return asString() == other.asString();
+  }
 
   MOCK_CONST_METHOD1(bind, Api::SysCallIntResult(int));
   MOCK_CONST_METHOD1(connect, Api::SysCallIntResult(int));

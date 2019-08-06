@@ -102,6 +102,7 @@ public:
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
+  bool equalsExceptPort(const Instance& rhs) const override;
   Api::SysCallIntResult bind(int fd) const override;
   Api::SysCallIntResult connect(int fd) const override;
   const Ip* ip() const override { return &ip_; }
@@ -176,6 +177,7 @@ public:
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
+  bool equalsExceptPort(const Instance& rhs) const override;
   Api::SysCallIntResult bind(int fd) const override;
   Api::SysCallIntResult connect(int fd) const override;
   const Ip* ip() const override { return &ip_; }
@@ -239,6 +241,7 @@ public:
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
+  bool equalsExceptPort(const Instance& rhs) const override;
   Api::SysCallIntResult bind(int fd) const override;
   Api::SysCallIntResult connect(int fd) const override;
   const Ip* ip() const override { return nullptr; }
