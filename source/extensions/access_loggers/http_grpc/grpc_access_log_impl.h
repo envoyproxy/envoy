@@ -62,6 +62,8 @@ using GrpcAccessLoggerCacheSharedPtr = std::shared_ptr<GrpcAccessLoggerCache>;
 class GrpcAccessLoggerImpl : public GrpcAccessLogger {
 public:
   GrpcAccessLoggerImpl(Grpc::RawAsyncClientPtr&& client, std::string log_name,
+                       std::chrono::milliseconds buffer_flush_interval_msec,
+                       uint64_t buffer_size_bytes, Event::Dispatcher& dispatcher,
                        const LocalInfo::LocalInfo& local_info);
 
   void log(envoy::data::accesslog::v2::HTTPAccessLogEntry&& entry) override;
@@ -83,10 +85,17 @@ private:
     Grpc::AsyncStream<envoy::service::accesslog::v2::StreamAccessLogsMessage> stream_{};
   };
 
+  void flush();
+
   Grpc::AsyncClient<envoy::service::accesslog::v2::StreamAccessLogsMessage,
                     envoy::service::accesslog::v2::StreamAccessLogsResponse>
       client_;
   const std::string log_name_;
+  const std::chrono::milliseconds buffer_flush_interval_msec_;
+  const Event::TimerPtr flush_timer_;
+  const uint64_t buffer_size_bytes_;
+  uint64_t approximate_message_size_bytes_ = 0;
+  envoy::service::accesslog::v2::StreamAccessLogsMessage message_;
   absl::optional<LocalStream> stream_;
   const LocalInfo::LocalInfo& local_info_;
 };
@@ -105,6 +114,9 @@ private:
    * Per-thread cache.
    */
   struct ThreadLocalCache : public ThreadLocal::ThreadLocalObject {
+    ThreadLocalCache(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
+
+    Event::Dispatcher& dispatcher_;
     // Access loggers indexed by the hash of logger's configuration.
     absl::flat_hash_map<std::size_t, GrpcAccessLoggerSharedPtr> access_loggers_;
   };
