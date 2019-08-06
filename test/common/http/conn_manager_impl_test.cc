@@ -3151,6 +3151,11 @@ TEST_F(HttpConnectionManagerImplTest, AlterFilterWatermarkLimits) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, HitFilterWatermarkLimits) {
+  // Disable overflow watermark for this test.
+  // TODO(mergeconflict): enable for a subsequent test.
+  EXPECT_CALL(runtime_.snapshot(), getInteger("buffer.overflow.high_watermark_multiplier", _))
+      .WillRepeatedly(Return(0));
+
   initial_buffer_limit_ = 1;
   streaming_filter_ = true;
   setup(false, "");
@@ -3262,6 +3267,11 @@ TEST_F(HttpConnectionManagerImplTest, HitRequestBufferLimitsIntermediateFilter) 
 }
 
 TEST_F(HttpConnectionManagerImplTest, HitResponseBufferLimitsBeforeHeaders) {
+  // Disable overflow watermark for this test.
+  // TODO(mergeconflict): enable for a subsequent test.
+  EXPECT_CALL(runtime_.snapshot(), getInteger("buffer.overflow.high_watermark_multiplier", _))
+      .WillRepeatedly(Return(0));
+
   initial_buffer_limit_ = 10;
   setup(false, "");
   setUpEncoderAndDecoder(false, false);
@@ -3296,6 +3306,11 @@ TEST_F(HttpConnectionManagerImplTest, HitResponseBufferLimitsBeforeHeaders) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, HitResponseBufferLimitsAfterHeaders) {
+  // Disable overflow watermark for this test.
+  // TODO(mergeconflict): enable for a subsequent test.
+  EXPECT_CALL(runtime_.snapshot(), getInteger("buffer.overflow.high_watermark_multiplier", _))
+      .WillRepeatedly(Return(0));
+
   initial_buffer_limit_ = 10;
   setup(false, "");
   setUpEncoderAndDecoder(false, false);

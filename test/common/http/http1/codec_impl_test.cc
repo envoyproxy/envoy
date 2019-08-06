@@ -815,6 +815,11 @@ TEST_F(Http1ServerConnectionImplTest, UpgradeRequestWithNoBody) {
 }
 
 TEST_F(Http1ServerConnectionImplTest, WatermarkTest) {
+  // Disable overflow watermark for this test.
+  // TODO(mergeconflict): enable for a subsequent test.
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"buffer.overflow.high_watermark_multiplier", "0"}});
+
   EXPECT_CALL(connection_, bufferLimit()).Times(1).WillOnce(Return(10));
   initialize();
 
@@ -852,6 +857,7 @@ class Http1ClientConnectionImplTest : public testing::Test {
 public:
   Http1ClientConnectionImplTest() : api_(Api::createApiForTest()) {
     envoy::config::bootstrap::v2::LayeredRuntime config;
+    config.add_layers()->mutable_admin_layer();
 
     // Create a runtime loader, so that tests can manually manipulate runtime
     // guarded features.
@@ -1152,6 +1158,11 @@ TEST_F(Http1ClientConnectionImplTest, UpgradeResponseWithEarlyData) {
 }
 
 TEST_F(Http1ClientConnectionImplTest, WatermarkTest) {
+  // Disable overflow watermark for this test.
+  // TODO(mergeconflict): enable for a subsequent test.
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"buffer.overflow.high_watermark_multiplier", "0"}});
+
   EXPECT_CALL(connection_, bufferLimit()).Times(1).WillOnce(Return(10));
   initialize();
 

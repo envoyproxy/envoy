@@ -172,6 +172,9 @@ public:
   void setUpstreamCount(uint32_t count) { fake_upstreams_count_ = count; }
   // Make test more deterministic by using a fixed RNG value.
   void setDeterministic() { deterministic_ = true; }
+  // Sets the runtime value `buffer.overflow.high_watermark_multiplier` to 0, disabling the
+  // overflow watermark feature for the scope of the test.
+  void clearBufferOverflowHighWatermarkMultiplier();
 
   FakeHttpConnection::Type upstreamProtocol() const { return upstream_protocol_; }
 

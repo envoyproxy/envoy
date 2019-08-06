@@ -99,6 +99,9 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, SdsStaticDownstreamIntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(SdsStaticDownstreamIntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
+  // TODO(mergeconflict): enable for a subsequent test.
+  clearBufferOverflowHighWatermarkMultiplier();
+
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection();
   };
@@ -157,6 +160,9 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, SdsStaticUpstreamIntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(SdsStaticUpstreamIntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
+  // TODO(mergeconflict): enable for a subsequent test.
+  clearBufferOverflowHighWatermarkMultiplier();
+
   testRouterRequestAndResponseWithBody(16 * 1024 * 1024, 16 * 1024 * 1024, false, nullptr);
 }
 

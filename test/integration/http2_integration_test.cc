@@ -27,6 +27,9 @@ TEST_P(Http2IntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
 }
 
 TEST_P(Http2IntegrationTest, FlowControlOnAndGiantBody) {
+  // TODO(mergeconflict): enable for a subsequent test.
+  clearBufferOverflowHighWatermarkMultiplier();
+
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
   testRouterRequestAndResponseWithBody(1024 * 1024, 1024 * 1024, false);
 }
@@ -1056,6 +1059,9 @@ void Http2IntegrationTest::simultaneousRequest(int32_t request1_bytes, int32_t r
 TEST_P(Http2IntegrationTest, SimultaneousRequest) { simultaneousRequest(1024, 512); }
 
 TEST_P(Http2IntegrationTest, SimultaneousRequestWithBufferLimits) {
+  // TODO(mergeconflict): enable for a subsequent test.
+  clearBufferOverflowHighWatermarkMultiplier();
+
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
   simultaneousRequest(1024 * 32, 1024 * 16);
 }

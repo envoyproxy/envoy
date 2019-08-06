@@ -9,12 +9,16 @@
 
 #include "gtest/gtest.h"
 
+using ::testing::_;
+using ::testing::Return;
+
 namespace Envoy {
 namespace Buffer {
 namespace {
 
 const char TEN_BYTES[] = "0123456789";
 
+// TODO(mergeconflict): add tests for overflow behavior
 class WatermarkBufferTest : public BufferImplementationParamTest {
 public:
   WatermarkBufferTest() {
@@ -216,6 +220,11 @@ TEST_P(WatermarkBufferTest, WatermarkFdFunctions) {
 }
 
 TEST_P(WatermarkBufferTest, MoveWatermarks) {
+  // Disable overflow watermark for this test.
+  // TODO(mergeconflict): enable for a subsequent test.
+  EXPECT_CALL(runtime_.snapshot(), getInteger("buffer.overflow.high_watermark_multiplier", _))
+      .WillRepeatedly(Return(0));
+
   buffer_.add(TEN_BYTES, 9);
   EXPECT_EQ(0, times_high_watermark_called_);
   buffer_.setWatermarks(1, 9);

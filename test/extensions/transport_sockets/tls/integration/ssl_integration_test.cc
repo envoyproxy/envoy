@@ -82,6 +82,9 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, SslIntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(SslIntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
+  // TODO(mergeconflict): enable for a subsequent test.
+  clearBufferOverflowHighWatermarkMultiplier();
+
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection({});
   };

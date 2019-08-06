@@ -449,6 +449,9 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryHostPredicateFilter) {
 // Very similar set-up to testRetry but with a 16k request the request will not
 // be buffered and the 503 will be returned to the user.
 TEST_P(ProtocolIntegrationTest, RetryHittingBufferLimit) {
+  // TODO(mergeconflict): enable for a subsequent test.
+  clearBufferOverflowHighWatermarkMultiplier();
+
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -510,6 +513,9 @@ TEST_P(DownstreamProtocolIntegrationTest, HittingDecoderFilterLimit) {
 // Test hitting the dynamo filter with too many response bytes to buffer. Given the request headers
 // are sent on early, the stream/connection will be reset.
 TEST_P(ProtocolIntegrationTest, HittingEncoderFilterLimit) {
+  // TODO(mergeconflict): enable for a subsequent test.
+  clearBufferOverflowHighWatermarkMultiplier();
+
   useAccessLog();
   config_helper_.addFilter("{ name: envoy.http_dynamo_filter, config: {} }");
   config_helper_.setBufferLimits(1024, 1024);
@@ -850,6 +856,9 @@ name: passthrough-filter
 // Tests StopAllIterationAndWatermark. decode-headers-return-stop-all-watermark-filter sets buffer
 // limit to 100. Verifies data pause when limit is reached, and resume after iteration continues.
 TEST_P(DownstreamProtocolIntegrationTest, testDecodeHeadersReturnsStopAllWatermark) {
+  // TODO(mergeconflict): enable for a subsequent test.
+  clearBufferOverflowHighWatermarkMultiplier();
+
   config_helper_.addFilter(R"EOF(
 name: decode-headers-return-stop-all-filter
 )EOF");
@@ -985,6 +994,9 @@ name: encode-headers-return-stop-all-filter
 
 // Tests encodeHeaders() returns StopAllIterationAndWatermark.
 TEST_P(DownstreamProtocolIntegrationTest, testEncodeHeadersReturnsStopAllWatermark) {
+  // TODO(mergeconflict): enable for a subsequent test.
+  clearBufferOverflowHighWatermarkMultiplier();
+
   config_helper_.addFilter(R"EOF(
 name: encode-headers-return-stop-all-filter
 )EOF");

@@ -211,24 +211,36 @@ TEST_P(HttpTimeoutIntegrationTest, HedgedPerTryTimeoutWithBodyNoBufferSecondRequ
 
 TEST_P(HttpTimeoutIntegrationTest,
        HedgedPerTryTimeoutLowUpstreamBufferLimitLargeRequestFirstRequestWins) {
+  // TODO(mergeconflict): enable for a subsequent test.
+  clearBufferOverflowHighWatermarkMultiplier();
+
   config_helper_.setBufferLimits(1024, 1024 * 1024); // Set buffer limits upstream and downstream.
   testRouterRequestAndResponseWithHedgedPerTryTimeout(1024 * 1024, 1024, true);
 }
 
 TEST_P(HttpTimeoutIntegrationTest,
        HedgedPerTryTimeoutLowUpstreamBufferLimitLargeRequestSecondRequestWins) {
+  // TODO(mergeconflict): enable for a subsequent test.
+  clearBufferOverflowHighWatermarkMultiplier();
+
   config_helper_.setBufferLimits(1024, 1024 * 1024); // Set buffer limits upstream and downstream.
   testRouterRequestAndResponseWithHedgedPerTryTimeout(1024 * 1024, 1024, false);
 }
 
 TEST_P(HttpTimeoutIntegrationTest,
        HedgedPerTryTimeoutLowDownstreamBufferLimitLargeResponseFirstRequestWins) {
+  // TODO(mergeconflict): enable for a subsequent test.
+  clearBufferOverflowHighWatermarkMultiplier();
+
   config_helper_.setBufferLimits(1024 * 1024, 1024); // Set buffer limits upstream and downstream.
   testRouterRequestAndResponseWithHedgedPerTryTimeout(1024, 1024 * 1024, true);
 }
 
 TEST_P(HttpTimeoutIntegrationTest,
        HedgedPerTryTimeoutLowDownstreamBufferLimitLargeResponseSecondRequestWins) {
+  // TODO(mergeconflict): enable for a subsequent test.
+  clearBufferOverflowHighWatermarkMultiplier();
+
   config_helper_.setBufferLimits(1024 * 1024, 1024); // Set buffer limits upstream and downstream.
   testRouterRequestAndResponseWithHedgedPerTryTimeout(1024, 1024 * 1024, false);
 }

@@ -707,6 +707,10 @@ TEST_P(ConnectionImplTest, BasicWrite) {
 
 // Similar to BasicWrite, only with watermarks set.
 TEST_P(ConnectionImplTest, WriteWithWatermarks) {
+  // Disable overflow watermark for this test.
+  // TODO(mergeconflict): enable for a subsequent test.
+  EXPECT_CALL(runtime_.snapshot(), getInteger("buffer.overflow.high_watermark_multiplier", _))
+      .WillRepeatedly(Return(0));
   useMockBuffer();
 
   setUpBasicConnection();
@@ -767,6 +771,10 @@ TEST_P(ConnectionImplTest, WriteWithWatermarks) {
 
 // Read and write random bytes and ensure we don't encounter issues.
 TEST_P(ConnectionImplTest, WatermarkFuzzing) {
+  // Disable overflow watermark for this test.
+  // TODO(mergeconflict): enable for a subsequent test.
+  EXPECT_CALL(runtime_.snapshot(), getInteger("buffer.overflow.high_watermark_multiplier", _))
+      .WillRepeatedly(Return(0));
   useMockBuffer();
   setUpBasicConnection();
 

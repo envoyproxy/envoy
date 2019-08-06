@@ -91,6 +91,9 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamDisconnect) {
 }
 
 TEST_P(TcpProxyIntegrationTest, TcpProxyLargeWrite) {
+  // TODO(mergeconflict): enable for a subsequent test.
+  clearBufferOverflowHighWatermarkMultiplier();
+
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
 
@@ -330,6 +333,9 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithNoData) {
 }
 
 TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
+  // TODO(mergeconflict): enable for a subsequent test.
+  clearBufferOverflowHighWatermarkMultiplier();
+
   config_helper_.setBufferLimits(1024, 1024);
   enable_half_close_ = false;
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {

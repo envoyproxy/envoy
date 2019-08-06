@@ -363,6 +363,22 @@ void BaseIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol)
   }
 }
 
+void BaseIntegrationTest::clearBufferOverflowHighWatermarkMultiplier() {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    TestUtility::loadFromYaml(R"EOF(
+layers:
+  - name: haha
+    admin_layer: {}
+  - name: hoho
+    static_layer:
+      buffer:
+        overflow:
+          high_watermark_multiplier: 0
+    )EOF",
+                              *bootstrap.mutable_layered_runtime());
+  });
+}
+
 IntegrationTcpClientPtr BaseIntegrationTest::makeTcpConnection(uint32_t port) {
   return std::make_unique<IntegrationTcpClient>(*dispatcher_, *mock_buffer_factory_, port, version_,
                                                 enable_half_close_);

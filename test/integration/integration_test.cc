@@ -116,6 +116,9 @@ TEST_P(IntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
 }
 
 TEST_P(IntegrationTest, FlowControlOnAndGiantBody) {
+  // TODO(mergeconflict): enable for a subsequent test.
+  clearBufferOverflowHighWatermarkMultiplier();
+
   config_helper_.setBufferLimits(1024, 1024);
   testRouterRequestAndResponseWithBody(1024 * 1024, 1024 * 1024, false);
 }
@@ -215,6 +218,9 @@ TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
 // Test hitting the bridge filter with too many response bytes to buffer. Given
 // the headers are not proxied, the connection manager will send a local error reply.
 TEST_P(IntegrationTest, HittingGrpcFilterLimitBufferingHeaders) {
+  // TODO(mergeconflict): enable for a subsequent test.
+  clearBufferOverflowHighWatermarkMultiplier();
+
   config_helper_.addFilter("{ name: envoy.grpc_http1_bridge, config: {} }");
   config_helper_.setBufferLimits(1024, 1024);
 
@@ -651,6 +657,9 @@ TEST_P(IntegrationTest, ViaAppendWith100Continue) {
 // sent by Envoy, it will wait for response acknowledgment (via FIN/RST) from the client before
 // closing the socket (with a timeout for ensuring cleanup).
 TEST_P(IntegrationTest, TestDelayedConnectionTeardownOnGracefulClose) {
+  // TODO(mergeconflict): enable for a subsequent test.
+  clearBufferOverflowHighWatermarkMultiplier();
+
   // This test will trigger an early 413 Payload Too Large response due to buffer limits being
   // exceeded. The following filter is needed since the router filter will never trigger a 413.
   config_helper_.addFilter("{ name: envoy.http_dynamo_filter, config: {} }");

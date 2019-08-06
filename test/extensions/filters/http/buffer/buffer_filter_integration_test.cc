@@ -18,6 +18,8 @@ TEST_P(BufferIntegrationTest, RouterNotFoundBodyBuffer) {
 
 TEST_P(BufferIntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
   config_helper_.addFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
+  // TODO(mergeconflict): enable for a subsequent test.
+  clearBufferOverflowHighWatermarkMultiplier();
   testRouterRequestAndResponseWithBody(4 * 1024 * 1024, 4 * 1024 * 1024, false);
 }
 
@@ -38,6 +40,8 @@ TEST_P(BufferIntegrationTest, RouterRequestAndResponseWithZeroByteBodyBuffer) {
 
 TEST_P(BufferIntegrationTest, RouterRequestBufferLimitExceeded) {
   config_helper_.addFilter(ConfigHelper::SMALL_BUFFER_FILTER);
+  // TODO(mergeconflict): enable for a subsequent test.
+  clearBufferOverflowHighWatermarkMultiplier();
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -77,6 +81,8 @@ TEST_P(BufferIntegrationTest, RouteDisabled) {
   config_helper_.addConfigModifier(mod);
   config_helper_.addFilter(ConfigHelper::SMALL_BUFFER_FILTER);
   config_helper_.setBufferLimits(1024, 1024);
+  // TODO(mergeconflict): enable for a subsequent test.
+  clearBufferOverflowHighWatermarkMultiplier();
 
   initialize();
 

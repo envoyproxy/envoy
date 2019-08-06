@@ -471,6 +471,10 @@ TEST_P(Http2CodecImplTest, BadMetadataVecReceivedTest) {
 class Http2CodecImplDeferredResetTest : public Http2CodecImplTest {};
 
 TEST_P(Http2CodecImplDeferredResetTest, DeferredResetClient) {
+  // Disable overflow watermark for this test.
+  // TODO(mergeconflict): enable for a subsequent test.
+  EXPECT_CALL(runtime_.snapshot(), getInteger("buffer.overflow.high_watermark_multiplier", _))
+      .WillRepeatedly(Return(0));
   initialize();
 
   InSequence s;
@@ -510,6 +514,10 @@ TEST_P(Http2CodecImplDeferredResetTest, DeferredResetClient) {
 }
 
 TEST_P(Http2CodecImplDeferredResetTest, DeferredResetServer) {
+  // Disable overflow watermark for this test.
+  // TODO(mergeconflict): enable for a subsequent test.
+  EXPECT_CALL(runtime_.snapshot(), getInteger("buffer.overflow.high_watermark_multiplier", _))
+      .WillRepeatedly(Return(0));
   initialize();
 
   InSequence s;
