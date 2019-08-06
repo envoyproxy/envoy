@@ -109,7 +109,7 @@ All http1 statistics are rooted at *http1.*
    :header: Name, Type, Description
    :widths: 1, 1, 2
 
-   metadata_not_supported_error, Counter, Total number of parsing metadata with http1 error
+   metadata_not_supported_error, Counter, Total number of metadata dropped during HTTP/1 encoding
 
 Http2 codec statistics
 ~~~~~~~~~~~~~~~~~~~~~~
