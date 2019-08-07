@@ -596,7 +596,14 @@ def _com_googlesource_quiche():
     )
 
 def _com_github_grpc_grpc():
-    _repository_impl("com_github_grpc_grpc")
+    _repository_impl(
+        "com_github_grpc_grpc",
+        patches = [
+            "@envoy//bazel:grpc-protoinfo-1.patch",
+            "@envoy//bazel:grpc-protoinfo-2.patch",
+        ],
+        patch_args = ["-p1"],
+    )
 
     # Rebind some stuff to match what the gRPC Bazel is expecting.
     native.bind(

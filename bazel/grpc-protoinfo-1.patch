@@ -1,0 +1,56 @@
+commit 49f0fb9035120d0f5b5fa49846324c0b2d59c257
+Author: Marcel Hlopko <hlopko@google.com>
+Date:   Thu Jun 20 18:55:56 2019 +0200
+
+    Migrate from dep.proto to dep[ProtoInfo]
+
+diff --git a/WORKSPACE b/WORKSPACE
+index 2db3c5db2f..60582d1a0f 100644
+--- a/WORKSPACE
++++ b/WORKSPACE
+@@ -20,7 +20,7 @@ register_toolchains(
+ 
+ git_repository(
+     name = "io_bazel_rules_python",
+-    commit = "8b5d0683a7d878b28fffe464779c8a53659fc645",
++    commit = "fdbb17a4118a1728d19e638a5291b4c4266ea5b8",
+     remote = "https://github.com/bazelbuild/rules_python.git",
+ )
+ 
+diff --git a/bazel/generate_cc.bzl b/bazel/generate_cc.bzl
+index b7edcda702..581165a190 100644
+--- a/bazel/generate_cc.bzl
++++ b/bazel/generate_cc.bzl
+@@ -41,11 +41,11 @@ def _join_directories(directories):
+ 
+ def generate_cc_impl(ctx):
+     """Implementation of the generate_cc rule."""
+-    protos = [f for src in ctx.attr.srcs for f in src.proto.check_deps_sources.to_list()]
++    protos = [f for src in ctx.attr.srcs for f in src[ProtoInfo].check_deps_sources.to_list()]
+     includes = [
+         f
+         for src in ctx.attr.srcs
+-        for f in src.proto.transitive_imports.to_list()
++        for f in src[ProtoInfo].transitive_imports.to_list()
+     ]
+     outs = []
+     proto_root = get_proto_root(
+diff --git a/bazel/python_rules.bzl b/bazel/python_rules.bzl
+index 17004f3474..3df30f8262 100644
+--- a/bazel/python_rules.bzl
++++ b/bazel/python_rules.bzl
+@@ -28,12 +28,12 @@ def _get_staged_proto_file(context, source_file):
+ def _generate_py_impl(context):
+     protos = []
+     for src in context.attr.deps:
+-        for file in src.proto.direct_sources:
++        for file in src[ProtoInfo].direct_sources:
+             protos.append(_get_staged_proto_file(context, file))
+     includes = [
+         file
+         for src in context.attr.deps
+-        for file in src.proto.transitive_imports.to_list()
++        for file in src[ProtoInfo].transitive_imports.to_list()
+     ]
+     proto_root = get_proto_root(context.label.workspace_root)
+     format_str = (_GENERATED_GRPC_PROTO_FORMAT if context.executable.plugin else _GENERATED_PROTO_FORMAT)
