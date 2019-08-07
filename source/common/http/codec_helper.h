@@ -73,9 +73,9 @@ protected:
     // removed multiple times.
     // The vector may not be safely resized without making sure the run.*Callbacks() helper
     // functions above still handle removeCallbacks_() calls mid-loop.
-    for (size_t i = 0; i < callbacks_.size(); i++) {
-      if (callbacks_[i] == &callbacks) {
-        callbacks_[i] = nullptr;
+    for (auto& callback : callbacks_) {
+      if (callback == &callbacks) {
+        callback = nullptr;
         return;
       }
     }

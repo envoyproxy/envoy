@@ -39,7 +39,9 @@ void HttpSubscriptionImpl::start(const std::set<std::string>& resource_names) {
   if (init_fetch_timeout_.count() > 0) {
     init_fetch_timeout_timer_ = dispatcher_.createTimer([this]() -> void {
       ENVOY_LOG(warn, "REST config: initial fetch timed out for", path_);
-      callbacks_.onConfigUpdateFailed(nullptr);
+      stats_.init_fetch_timeout_.inc();
+      callbacks_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout,
+                                      nullptr);
     });
     init_fetch_timeout_timer_->enableTimer(init_fetch_timeout_);
   }
@@ -87,7 +89,7 @@ void HttpSubscriptionImpl::parseResponse(const Http::Message& response) {
   } catch (const EnvoyException& e) {
     ENVOY_LOG(warn, "REST config update rejected: {}", e.what());
     stats_.update_rejected_.inc();
-    callbacks_.onConfigUpdateFailed(&e);
+    callbacks_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &e);
   }
 }
 
@@ -101,7 +103,7 @@ void HttpSubscriptionImpl::onFetchFailure(const EnvoyException* e) {
 
 void HttpSubscriptionImpl::handleFailure(const EnvoyException* e) {
   stats_.update_failure_.inc();
-  callbacks_.onConfigUpdateFailed(e);
+  callbacks_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, e);
 }
 
 void HttpSubscriptionImpl::disableInitFetchTimeoutTimer() {

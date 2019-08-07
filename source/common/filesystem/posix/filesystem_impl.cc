@@ -28,15 +28,36 @@ FileImplPosix::~FileImplPosix() {
   }
 }
 
-void FileImplPosix::openFile() {
-  const int flags = O_RDWR | O_APPEND | O_CREAT;
-  const int mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
-
-  fd_ = ::open(path_.c_str(), flags, mode);
+void FileImplPosix::openFile(FlagSet in) {
+  const auto flags_and_mode = translateFlag(in);
+  fd_ = ::open(path_.c_str(), flags_and_mode.flags_, flags_and_mode.mode_);
 }
 
 ssize_t FileImplPosix::writeFile(absl::string_view buffer) {
   return ::write(fd_, buffer.data(), buffer.size());
+}
+
+FileImplPosix::FlagsAndMode FileImplPosix::translateFlag(FlagSet in) {
+  int out = 0;
+  mode_t mode = 0;
+  if (in.test(File::Operation::Create)) {
+    out |= O_CREAT;
+    mode |= S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
+  }
+
+  if (in.test(File::Operation::Append)) {
+    out |= O_APPEND;
+  }
+
+  if (in.test(File::Operation::Read) && in.test(File::Operation::Write)) {
+    out |= O_RDWR;
+  } else if (in.test(File::Operation::Read)) {
+    out |= O_RDONLY;
+  } else if (in.test(File::Operation::Write)) {
+    out |= O_WRONLY;
+  }
+
+  return {out, mode};
 }
 
 bool FileImplPosix::closeFile() { return ::close(fd_) != -1; }

@@ -98,7 +98,18 @@ following statistics:
 Per codec statistics
 -----------------------
 
-Each codec has the option of adding per-codec statistics. Currently only http2 has codec stats.
+Each codec has the option of adding per-codec statistics. Both http1 and http2 have codec stats.
+
+Http1 codec statistics
+~~~~~~~~~~~~~~~~~~~~~~
+
+All http1 statistics are rooted at *http1.*
+
+.. csv-table::
+   :header: Name, Type, Description
+   :widths: 1, 1, 2
+
+   metadata_not_supported_error, Counter, Total number of metadata dropped during HTTP/1 encoding
 
 Http2 codec statistics
 ~~~~~~~~~~~~~~~~~~~~~~
