@@ -223,6 +223,40 @@ private:
 };
 
 /**
+ * Extension filter factory that reads from ExtensionFilter proto.
+ */
+class ExtensionFilterFactory {
+public:
+  virtual ~ExtensionFilterFactory() = default;
+
+  /**
+   * Create a particular extension filter implementation from a config proto. If the
+   * implementation is unable to produce a filter with the provided parameters, it should throw an
+   * EnvoyException. The returned pointer should never be nullptr.
+   * @param config supplies the custom configuration for this filter type.
+   * @param runtime supplies the runtime loader.
+   * @param random supplies the random generator.
+   * @return an instance of extension filter implementation from a config proto.
+   */
+  virtual FilterPtr
+  createFilter(const envoy::config::filter::accesslog::v2::ExtensionFilter& config,
+               Runtime::Loader& runtime, Runtime::RandomGenerator& random) PURE;
+
+  /**
+   * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The config, which
+   * arrives in an opaque google.protobuf.Struct message, will be converted to JSON and then parsed
+   * into this empty proto.
+   */
+  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
+
+  /**
+   * @return std::string the identifying name for a particular Filter implementation
+   * produced by the factory.
+   */
+  virtual std::string name() const PURE;
+};
+
+/**
  * Access log factory that reads the configuration from proto.
  */
 class AccessLogFactory {

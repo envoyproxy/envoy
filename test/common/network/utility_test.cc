@@ -29,6 +29,7 @@ TEST(NetworkUtility, Url) {
   EXPECT_THROW(Utility::hostFromTcpUrl("tcp://foo"), EnvoyException);
   EXPECT_THROW(Utility::portFromTcpUrl("tcp://foo"), EnvoyException);
   EXPECT_THROW(Utility::portFromTcpUrl("tcp://foo:bar"), EnvoyException);
+  EXPECT_THROW(Utility::portFromTcpUrl("tcp://https://foo:1234"), EnvoyException);
   EXPECT_THROW(Utility::hostFromTcpUrl(""), EnvoyException);
   EXPECT_THROW(Utility::portFromTcpUrl("tcp://foo:999999999999"), EnvoyException);
 }
@@ -40,6 +41,7 @@ TEST(NetworkUtility, udpUrl) {
   EXPECT_THROW(Utility::portFromUdpUrl("bogus://foo:1234"), EnvoyException);
   EXPECT_THROW(Utility::hostFromUdpUrl("tcp://foo"), EnvoyException);
   EXPECT_THROW(Utility::portFromUdpUrl("tcp://foo:1234"), EnvoyException);
+  EXPECT_THROW(Utility::portFromUdpUrl("udp://https://foo:1234"), EnvoyException);
   EXPECT_THROW(Utility::hostFromUdpUrl(""), EnvoyException);
   EXPECT_THROW(Utility::portFromUdpUrl("udp://foo:999999999999"), EnvoyException);
 }

@@ -3,10 +3,11 @@
 Extending Envoy for custom use cases
 ====================================
 
-The Envoy architecture makes it fairly easily extensible via a variety of differerent extension
+The Envoy architecture makes it fairly easily extensible via a variety of different extension
 types including:
 
 * :ref:`Access loggers <arch_overview_access_logs>`
+* :ref:`Access log filters <arch_overview_access_log_filters>`
 * :ref:`Clusters <arch_overview_service_discovery>`
 * :ref:`Listener filters <arch_overview_listener_filters>`
 * :ref:`Network filters <arch_overview_network_filters>`
