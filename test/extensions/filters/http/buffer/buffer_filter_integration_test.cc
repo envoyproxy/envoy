@@ -54,7 +54,9 @@ TEST_P(BufferIntegrationTest, RouterRequestPopulateContentLength) {
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
   auto* content_length = upstream_request_->headers().ContentLength();
   ASSERT_NE(content_length, nullptr);
-  EXPECT_EQ(atoi(std::string(content_length->value().getStringView()).c_str()), 9);
+  EXPECT_EQ(content_length->value().getStringView(), "9");
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
 }
 
 TEST_P(BufferIntegrationTest, RouterRequestBufferLimitExceeded) {

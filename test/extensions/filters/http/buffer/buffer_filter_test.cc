@@ -42,7 +42,7 @@ public:
     return std::make_shared<BufferFilterConfig>(proto_config);
   }
 
-  BufferFilterTest() : config_(setupConfig()), filter_(config_) {
+  BufferFilterTest() : config_(setupConfig()), filter_(config_), api_(Api::createApiForTest()) {
     filter_.setDecoderFilterCallbacks(callbacks_);
 
     // Create a runtime loader, so that tests can manually manipulate runtime
