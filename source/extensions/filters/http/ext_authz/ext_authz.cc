@@ -66,10 +66,11 @@ void Filter::initiateCall(const Http::HeaderMap& headers) {
     context_extensions = maybe_merged_per_route_config.value().takeContextExtensions();
   }
 
+  // If metadata_context_namespaces is specified, pass matching metadata to the ext_authz service
   envoy::api::v2::core::Metadata metadata_context;
   const auto& request_metadata = callbacks_->streamInfo().dynamicMetadata().filter_metadata();
-  for (const auto& contextKey : config_->metadataContextNamespaces()) {
-    const auto& metadata_it = request_metadata.find(contextKey);
+  for (const auto& context_key : config_->metadataContextNamespaces()) {
+    const auto& metadata_it = request_metadata.find(context_key);
     if (metadata_it != request_metadata.end()) {
       (*metadata_context.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
     }
