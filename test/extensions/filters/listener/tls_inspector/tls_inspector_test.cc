@@ -32,7 +32,7 @@ namespace {
 class TlsInspectorTest : public testing::Test {
 public:
   TlsInspectorTest()
-      : cfg_(std::make_shared<Config>(store_)),
+      : cfg_(std::make_shared<Config>(store_, std::chrono::milliseconds::max())),
         io_handle_(std::make_unique<Network::IoSocketHandleImpl>(42)) {}
   ~TlsInspectorTest() override { io_handle_->close(); }
 
@@ -65,8 +65,9 @@ public:
 
 // Test that an exception is thrown for an invalid value for max_client_hello_size
 TEST_F(TlsInspectorTest, MaxClientHelloSize) {
-  EXPECT_THROW_WITH_MESSAGE(Config(store_, Config::TLS_MAX_CLIENT_HELLO + 1), EnvoyException,
-                            "max_client_hello_size of 65537 is greater than maximum of 65536.");
+  EXPECT_THROW_WITH_MESSAGE(
+      Config(store_, std::chrono::milliseconds::max(), Config::TLS_MAX_CLIENT_HELLO + 1),
+      EnvoyException, "max_client_hello_size of 65537 is greater than maximum of 65536.");
 }
 
 // Test that the filter detects Closed events and terminates.
@@ -196,7 +197,7 @@ TEST_F(TlsInspectorTest, NoExtensions) {
 // maximum allowed size.
 TEST_F(TlsInspectorTest, ClientHelloTooBig) {
   const size_t max_size = 50;
-  cfg_ = std::make_shared<Config>(store_, max_size);
+  cfg_ = std::make_shared<Config>(store_, std::chrono::milliseconds::max(), max_size);
   std::vector<uint8_t> client_hello = Tls::Test::generateClientHello("example.com", "");
   ASSERT(client_hello.size() > max_size);
   init();

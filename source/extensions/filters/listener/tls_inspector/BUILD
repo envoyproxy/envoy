@@ -36,5 +36,6 @@ envoy_cc_library(
         "//include/envoy/server:filter_config_interface",
         "//source/extensions/filters/listener:well_known_names",
         "//source/extensions/filters/listener/tls_inspector:tls_inspector_lib",
+        "@envoy_api//envoy/config/filter/listener/tls_inspector/v2alpha1:tls_inspector_cc",
     ],
 )

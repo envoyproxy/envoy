@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package envoy.config.filter.listener.tls_inspector.v2alpha1;
+
+option java_outer_classname = "TlsInspectorProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.config.filter.listener.tls_inspector.v2alpha1";
+
+option go_package = "v2alpha1";
+
+import "google/protobuf/duration.proto";
+import "validate/validate.proto";
+
+// [#protodoc-title: Tls Inspector Listener Filter]
+// Sniff the Tls protocol before filter chain match.
+
+// The Tls Inspector listener filter inspect the initial bytes of the connection and determine if
+// the connection is TLS. The config defines when the listener config should give up.
+message TlsInspector {
+
+  // The timeout to stop sniffing and mark the connection as plain text.
+  google.protobuf.Duration fallback_timeout = 1 [(validate.rules).duration.gt = {}];
+
+  // Mark the connection as plain text if this number of bytes is received but cannot determine as
+  // TLS connection.
+  uint32 max_client_hello_size = 2;
+}

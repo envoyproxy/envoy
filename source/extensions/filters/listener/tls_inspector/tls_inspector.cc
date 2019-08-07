@@ -23,9 +23,10 @@ namespace Extensions {
 namespace ListenerFilters {
 namespace TlsInspector {
 
-Config::Config(Stats::Scope& scope, uint32_t max_client_hello_size)
+Config::Config(Stats::Scope& scope, std::chrono::milliseconds fallback_timeout,
+               uint32_t max_client_hello_size)
     : stats_{ALL_TLS_INSPECTOR_STATS(POOL_COUNTER_PREFIX(scope, "tls_inspector."))},
-      ssl_ctx_(SSL_CTX_new(TLS_with_buffers_method())),
+      ssl_ctx_(SSL_CTX_new(TLS_with_buffers_method())), fallback_timeout_(fallback_timeout),
       max_client_hello_size_(max_client_hello_size) {
 
   if (max_client_hello_size_ > TLS_MAX_CLIENT_HELLO) {

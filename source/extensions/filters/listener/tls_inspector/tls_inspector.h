@@ -41,17 +41,21 @@ struct TlsInspectorStats {
  */
 class Config {
 public:
-  Config(Stats::Scope& scope, uint32_t max_client_hello_size = TLS_MAX_CLIENT_HELLO);
+  Config(Stats::Scope& scope,
+         std::chrono::milliseconds fallback_timeout = std::chrono::milliseconds::max(),
+         uint32_t max_client_hello_size = TLS_MAX_CLIENT_HELLO);
 
   const TlsInspectorStats& stats() const { return stats_; }
   bssl::UniquePtr<SSL> newSsl();
   uint32_t maxClientHelloSize() const { return max_client_hello_size_; }
+  std::chrono::milliseconds fallbackTimeout() const { return fallback_timeout_; }
 
   static constexpr size_t TLS_MAX_CLIENT_HELLO = 64 * 1024;
 
 private:
   TlsInspectorStats stats_;
   bssl::UniquePtr<SSL_CTX> ssl_ctx_;
+  const std::chrono::milliseconds fallback_timeout_;
   const uint32_t max_client_hello_size_;
 };
 
