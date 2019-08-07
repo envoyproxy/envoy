@@ -147,7 +147,9 @@ TEST_F(GrpcMuxImplTest, ResetStream) {
   expectSendMessage("baz", {"z"}, "");
   grpc_mux_->start();
 
-  EXPECT_CALL(callbacks_, onConfigUpdateFailed(_)).Times(3);
+  EXPECT_CALL(callbacks_,
+              onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, _))
+      .Times(3);
   EXPECT_CALL(random_, random());
   ASSERT_TRUE(timer != nullptr); // initialized from dispatcher mock.
   EXPECT_CALL(*timer, enableTimer(_));
@@ -207,10 +209,11 @@ TEST_F(GrpcMuxImplTest, TypeUrlMismatch) {
   {
     invalid_response->set_type_url("foo");
     invalid_response->mutable_resources()->Add()->set_type_url("bar");
-    EXPECT_CALL(callbacks_, onConfigUpdateFailed(_)).WillOnce(Invoke([](const EnvoyException* e) {
-      EXPECT_TRUE(
-          IsSubstring("", "", "bar does not match foo type URL in DiscoveryResponse", e->what()));
-    }));
+    EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _))
+        .WillOnce(Invoke([](Envoy::Config::ConfigUpdateFailureReason, const EnvoyException* e) {
+          EXPECT_TRUE(IsSubstring("", "", "bar does not match foo type URL in DiscoveryResponse",
+                                  e->what()));
+        }));
 
     expectSendMessage("foo", {"x", "y"}, "", "", Grpc::Status::GrpcStatus::Internal,
                       fmt::format("bar does not match foo type URL in DiscoveryResponse {}",

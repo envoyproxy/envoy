@@ -17,6 +17,7 @@
 #include "test/test_common/global.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
+#include "test/tools/router_check/coverage.h"
 #include "test/tools/router_check/json/tool_config_schemas.h"
 #include "test/tools/router_check/validation.pb.h"
 #include "test/tools/router_check/validation.pb.validate.h"
@@ -88,11 +89,13 @@ public:
    */
   void setShowDetails() { details_ = true; }
 
+  float coverage() { return coverage_.report(); }
+
 private:
   RouterCheckTool(
       std::unique_ptr<NiceMock<Server::Configuration::MockFactoryContext>> factory_context,
       std::unique_ptr<Router::ConfigImpl> config, std::unique_ptr<Stats::IsolatedStoreImpl> stats,
-      Api::ApiPtr api);
+      Api::ApiPtr api, Coverage coverage);
 
   bool compareCluster(ToolConfig& tool_config, const std::string& expected);
   bool compareCluster(ToolConfig& tool_config,
@@ -143,6 +146,7 @@ private:
   std::unique_ptr<Stats::IsolatedStoreImpl> stats_;
   Api::ApiPtr api_;
   std::string active_runtime;
+  Coverage coverage_;
 };
 
 /**
@@ -173,6 +177,11 @@ public:
   const std::string& unlabelledTestPath() const { return unlabelled_test_path_; }
 
   /**
+   * @return the minimum required percentage of routes coverage.
+   */
+  double failUnder() const { return fail_under_; }
+
+  /**
    * @return true if proto schema test is used.
    */
   bool isProto() const { return is_proto_; }
@@ -187,6 +196,7 @@ private:
   std::string config_path_;
   std::string unlabelled_test_path_;
   std::string unlabelled_config_path_;
+  float fail_under_;
   bool is_proto_;
   bool is_detailed_;
 };
