@@ -136,21 +136,21 @@ TEST_P(EnvoyQuicServerStreamTest, DecodeHeadersAndBody) {
   }
   EXPECT_TRUE(quic_stream_.FinishedReadingHeaders());
 
-  quic::QuicStreamFrame frame(stream_id_, true, 0, request_body_);
   EXPECT_CALL(stream_decoder_, decodeData(_, _))
       .WillOnce(Invoke([this](Buffer::Instance& buffer, bool finished_reading) {
         EXPECT_EQ(request_body_, buffer.toString());
         EXPECT_TRUE(finished_reading);
       }));
+  std::string data = request_body_;
   if (quic_version_.transport_version == quic::QUIC_VERSION_99) {
     std::unique_ptr<char[]> data_buffer;
     quic::HttpEncoder encoder;
     quic::QuicByteCount data_frame_header_length =
         encoder.SerializeDataFrameHeader(request_body_.length(), &data_buffer);
     quic::QuicStringPiece data_frame_header(data_buffer.get(), data_frame_header_length);
-    std::string data = absl::StrCat(data_frame_header, request_body_);
-    frame = quic::QuicStreamFrame(stream_id_, true, 0, data);
+    data = absl::StrCat(data_frame_header, request_body_);
   }
+  quic::QuicStreamFrame frame = quic::QuicStreamFrame(stream_id_, true, 0, data);
   quic_stream_.OnStreamFrame(frame);
 }
 
