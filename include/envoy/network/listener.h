@@ -68,6 +68,7 @@ public:
    *         connection being created. 0 specifies a disabled timeout.
    */
   virtual std::chrono::milliseconds listenerFiltersTimeout() const PURE;
+  virtual bool continueOnListenerFiltersTimeout() const PURE;
 
   /**
    * @return Stats::Scope& the stats scope to use for all listener specific stats.
