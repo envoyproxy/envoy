@@ -224,6 +224,7 @@ public:
   MOCK_METHOD2(addEncodedData, void(Buffer::Instance& data, bool streaming));
   MOCK_METHOD2(injectEncodedDataToFilterChain, void(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD0(addEncodedTrailers, HeaderMap&());
+  MOCK_METHOD1(addEncodedMetadata, void(Http::MetadataMapPtr&&));
   MOCK_METHOD0(continueEncoding, void());
   MOCK_METHOD0(encodingBuffer, const Buffer::Instance*());
   MOCK_METHOD1(modifyEncodingBuffer, void(std::function<void(Buffer::Instance&)>));
