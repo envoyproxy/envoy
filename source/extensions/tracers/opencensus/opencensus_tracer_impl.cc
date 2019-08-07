@@ -215,6 +215,8 @@ void Span::injectContext(Http::HeaderMap& request_headers) {
                                       ::opencensus::trace::propagation::ToB3SpanIdHeader(ctx));
       request_headers.setReferenceKey(Constants::get().X_B3_SAMPLED,
                                       ::opencensus::trace::propagation::ToB3SampledHeader(ctx));
+      // OpenCensus's trace context propagation doesn't produce the
+      // "X-B3-Flags:" header.
       break;
     }
   }
