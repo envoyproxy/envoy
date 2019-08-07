@@ -24,8 +24,6 @@ AdaptiveConcurrencyFilter::AdaptiveConcurrencyFilter(
     AdaptiveConcurrencyFilterConfigSharedPtr config, ConcurrencyControllerSharedPtr controller)
     : config_(std::move(config)), controller_(std::move(controller)) {}
 
-AdaptiveConcurrencyFilter::~AdaptiveConcurrencyFilter() = default;
-
 Http::FilterHeadersStatus AdaptiveConcurrencyFilter::decodeHeaders(Http::HeaderMap&, bool) {
   if (controller_->forwardingDecision() == ConcurrencyController::RequestForwardingAction::Block) {
     // TODO (tonya11en): Remove filler words.

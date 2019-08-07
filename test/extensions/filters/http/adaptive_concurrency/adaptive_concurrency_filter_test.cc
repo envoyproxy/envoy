@@ -52,8 +52,7 @@ TEST_F(AdaptiveConcurrencyFilterTest, DecodeHeadersTestForwarding) {
   Http::TestHeaderMapImpl request_headers;
 
   EXPECT_CALL(*controller_, forwardingDecision())
-      .Times(1)
-      .WillRepeatedly(Return(RequestForwardingAction::Forward));
+      .WillOnce(Return(RequestForwardingAction::Forward));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 
   Buffer::OwnedImpl request_body;
@@ -67,10 +66,8 @@ TEST_F(AdaptiveConcurrencyFilterTest, DecodeHeadersTestBlock) {
   Http::TestHeaderMapImpl request_headers;
 
   EXPECT_CALL(*controller_, forwardingDecision())
-      .Times(1)
-      .WillRepeatedly(Return(RequestForwardingAction::Block));
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::ServiceUnavailable, _, _, _, _))
-      .Times(1);
+      .WillOnce(Return(RequestForwardingAction::Block));
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::ServiceUnavailable, _, _, _, _));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, true));
 }
@@ -82,8 +79,7 @@ TEST_F(AdaptiveConcurrencyFilterTest, EncodeHeadersValidTest) {
   // Get the filter to record the request start time via decode.
   Http::TestHeaderMapImpl request_headers;
   EXPECT_CALL(*controller_, forwardingDecision())
-      .Times(1)
-      .WillRepeatedly(Return(RequestForwardingAction::Forward));
+      .WillOnce(Return(RequestForwardingAction::Forward));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 
   const std::chrono::nanoseconds advance_time = std::chrono::milliseconds(42);
@@ -92,7 +88,7 @@ TEST_F(AdaptiveConcurrencyFilterTest, EncodeHeadersValidTest) {
 
   Http::TestHeaderMapImpl response_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
-  EXPECT_CALL(*controller_, recordLatencySample(advance_time)).Times(1);
+  EXPECT_CALL(*controller_, recordLatencySample(advance_time));
   filter_->encodeComplete();
 }
 

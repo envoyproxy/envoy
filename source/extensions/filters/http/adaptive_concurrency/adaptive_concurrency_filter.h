@@ -51,7 +51,6 @@ class AdaptiveConcurrencyFilter : public Http::PassThroughFilter,
 public:
   AdaptiveConcurrencyFilter(AdaptiveConcurrencyFilterConfigSharedPtr config,
                             ConcurrencyControllerSharedPtr controller);
-  ~AdaptiveConcurrencyFilter() override;
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap&, bool) override;
