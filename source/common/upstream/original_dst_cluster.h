@@ -60,7 +60,7 @@ public:
   private:
     Network::Address::InstanceConstSharedPtr requestOverrideHost(LoadBalancerContext* context);
 
-    std::shared_ptr<OriginalDstCluster> parent_; // Primary cluster managed by the main thread.
+    const std::shared_ptr<OriginalDstCluster> parent_;
     HostMapConstSharedPtr host_map_;
   };
 
@@ -71,7 +71,7 @@ private:
     // Upstream::LoadBalancerFactory
     Upstream::LoadBalancerPtr create() override { return std::make_unique<LoadBalancer>(cluster_); }
 
-    std::shared_ptr<OriginalDstCluster> cluster_;
+    const std::shared_ptr<OriginalDstCluster> cluster_;
   };
 
   struct ThreadAwareLoadBalancer : public Upstream::ThreadAwareLoadBalancer {
@@ -84,7 +84,7 @@ private:
     }
     void initialize() override {}
 
-    std::shared_ptr<OriginalDstCluster> cluster_;
+    const std::shared_ptr<OriginalDstCluster> cluster_;
   };
 
   HostMapConstSharedPtr getCurrentHostMap() {
