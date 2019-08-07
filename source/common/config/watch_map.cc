@@ -141,7 +141,7 @@ std::set<std::string> WatchMap::findAdditions(const std::vector<std::string>& ne
     auto entry = watch_interest_.find(name);
     if (entry == watch_interest_.end()) {
       newly_added_to_subscription.insert(name);
-      watch_interest_[name] = {watch};
+      watch_interest_[name] = watch;
     } else {
       entry->second.insert(watch);
     }
