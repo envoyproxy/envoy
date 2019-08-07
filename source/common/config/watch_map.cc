@@ -41,7 +41,6 @@ AddedRemoved WatchMap::updateWatchInterest(Watch* watch,
 }
 
 absl::flat_hash_set<Watch*> WatchMap::watchesInterestedIn(const std::string& resource_name) {
-  // Note that std::set_union needs sorted sets. Better to do it ourselves with insert().
   absl::flat_hash_set<Watch*> ret = wildcard_watches_;
   auto watches_interested = watch_interest_.find(resource_name);
   if (watches_interested != watch_interest_.end()) {
@@ -141,7 +140,7 @@ std::set<std::string> WatchMap::findAdditions(const std::vector<std::string>& ne
     auto entry = watch_interest_.find(name);
     if (entry == watch_interest_.end()) {
       newly_added_to_subscription.insert(name);
-      watch_interest_[name] = watch;
+      watch_interest_[name] = {watch};
     } else {
       entry->second.insert(watch);
     }
