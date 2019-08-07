@@ -180,12 +180,15 @@ void DecoderImpl::decodeOnWrite(Buffer::Instance& data, uint64_t& offset) {
   const auto it = requests_by_xid_.find(xid);
 
   std::chrono::milliseconds latency;
+  OpCodes opcode;
 
   if (xid_code != XidCodes::WATCH_XID) {
     // If this fails, it's a server-side bug.
     ASSERT(it != requests_by_xid_.end());
     latency = std::chrono::duration_cast<std::chrono::milliseconds>(time_source_.monotonicTime() -
                                                                     it->second.start_time);
+    opcode = it->second.opcode;
+    requests_by_xid_.erase(it);
   }
 
   // Connect responses are special, they have no full reply header
@@ -216,9 +219,8 @@ void DecoderImpl::decodeOnWrite(Buffer::Instance& data, uint64_t& offset) {
     break;
   }
 
-  callbacks_.onResponse(it->second.opcode, xid, zxid, error, latency);
+  callbacks_.onResponse(opcode, xid, zxid, error, latency);
   offset += (len - (XID_LENGTH + ZXID_LENGTH + INT_LENGTH));
-  requests_by_xid_.erase(it);
 }
 
 void DecoderImpl::ensureMinLength(const int32_t len, const int32_t minlen) const {
