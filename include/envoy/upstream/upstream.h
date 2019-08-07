@@ -646,23 +646,49 @@ using ProtocolOptionsConfigConstSharedPtr = std::shared_ptr<const ProtocolOption
  */
 class ClusterTypedMetadataFactory : public Envoy::Config::TypedMetadataFactory {};
 
+/**
+ * Interface for connection policy subscriber. `ConnectionRequestPolicy` uses
+ * this interface as a contract between the policy implementation and policy
+ * user(subscriber).
+ */
 class ConnectionRequestPolicySubscriber {
 public:
   virtual ~ConnectionRequestPolicySubscriber() = default;
+  // Number of requests currently attached to the subscriber.
   virtual uint64_t requestCount() const PURE;
+
+  // Resource manager used by the subscriber.
   virtual ResourceManager& resourceManager() const PURE;
 };
 
+/**
+ * Interface for connection policy. This policy controls the states to
+ * transition a connection policy subscriber on:
+ *  - a new stream (request) attached to a connection policy subscriber(a connection
+ *  implemention for all practical purposes).
+ *  - on reset of a stream(request) in the connection.
+ *
+ *  Policies could be :
+ *    - Aggregate request count based:  Total requests attached till now.
+ *    - Current requests count based: Number of requests currently attached.
+ */
 class ConnectionRequestPolicy {
 public:
-  enum class State { Init, Ready, Active, Overflow, Drain };
+  enum class State {
+    Init,     // Initial
+    Ready,    // Ready to accept new streams(requests)
+    Active,   // At least one stream(request) is attached
+    Overflow, // Exceeded max allowed streams(requests)
+    Drain     // Marked for close. Do not attach any more stream (request)
+  };
 
   virtual ~ConnectionRequestPolicy() = default;
 
+  // State transition on attaching a new stream(request) to a policy subscriber.
   virtual State onNewStream(const ConnectionRequestPolicySubscriber&) const PURE;
-  virtual State onStreamReset(const ConnectionRequestPolicySubscriber&, const State&) const PURE;
 
-  // virtual Action onNewConnection(const ConnectionRequestPolicySubscriber&) PURE;
+  // State transition on detaching stream(request) from a policy subscriber.
+  virtual State onStreamReset(const ConnectionRequestPolicySubscriber&, const State&) const PURE;
 };
 
 /**

@@ -501,6 +501,10 @@ private:
   };
 };
 
+/*
+ * An implementation of `ConnectionRequestPolicy` that is based on the aggregate
+ * count of streams(requests) for its policies.
+ */
 class AggregateRequestsConnectionPolicy : public ConnectionRequestPolicy {
 public:
   using State = ConnectionRequestPolicy::State;
@@ -594,6 +598,11 @@ public:
 
   void createNetworkFilterChain(Network::Connection&) const override;
 
+  /**
+   * Returns instance of connection policy for the cluster.
+   * TODO(conqerAtApple): Currently returns `AggregateRequestsConnectionPolicy`
+   * In actual implementation, will be injected into this object.
+   */
   const ConnectionRequestPolicy& connectionPolicy() const override;
 
 private:
