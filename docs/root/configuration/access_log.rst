@@ -296,6 +296,19 @@ The following command operators are supported:
   TCP
     Not implemented ("-").
 
+%REQ_WITHOUT_QUERY(X?Y):Z%
+  HTTP
+    Same as **%REQ(X?Y):Z%** but it removes query string from a header entry value.
+    For example, for the following header entry:
+
+    ``":path" : "/?ok=true"``
+
+    * ``%REQ(:PATH)%`` will log: ``/?ok=true``
+    * ``%REQ_WITHOUT_QUERY(:PATH)%`` will log: ``/``
+
+  TCP
+    Not implemented ("-").
+
 %RESP(X?Y):Z%
   HTTP
     Same as **%REQ(X?Y):Z%** but taken from HTTP response headers.

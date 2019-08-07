@@ -546,30 +546,37 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
 
 TEST(AccessLogFormatterTest, requestHeaderFormatter) {
   StreamInfo::MockStreamInfo stream_info;
-  Http::TestHeaderMapImpl request_header{{":method", "GET"}, {":path", "/"}};
+  Http::TestHeaderMapImpl request_header{{":method", "GET"}, {":path", "/?ok=true"}};
   Http::TestHeaderMapImpl response_header{{":method", "PUT"}};
   Http::TestHeaderMapImpl response_trailer{{":method", "POST"}, {"test-2", "test-2"}};
 
   {
-    RequestHeaderFormatter formatter(":Method", "", absl::optional<size_t>());
+    RequestHeaderFormatter formatter(":Method", "", absl::optional<size_t>(), false);
     EXPECT_EQ("GET",
               formatter.format(request_header, response_header, response_trailer, stream_info));
   }
 
   {
-    RequestHeaderFormatter formatter(":path", ":method", absl::optional<size_t>());
+    RequestHeaderFormatter formatter(":path", ":method", absl::optional<size_t>(), false);
+    EXPECT_EQ("/?ok=true",
+              formatter.format(request_header, response_header, response_trailer, stream_info));
+  }
+
+  {
+    RequestHeaderFormatter formatter(":path", ":method", absl::optional<size_t>(),
+                                     true /* to remove query string from :path */);
     EXPECT_EQ("/",
               formatter.format(request_header, response_header, response_trailer, stream_info));
   }
 
   {
-    RequestHeaderFormatter formatter(":TEST", ":METHOD", absl::optional<size_t>());
+    RequestHeaderFormatter formatter(":TEST", ":METHOD", absl::optional<size_t>(), false);
     EXPECT_EQ("GET",
               formatter.format(request_header, response_header, response_trailer, stream_info));
   }
 
   {
-    RequestHeaderFormatter formatter("does_not_exist", "", absl::optional<size_t>());
+    RequestHeaderFormatter formatter("does_not_exist", "", absl::optional<size_t>(), false);
     EXPECT_EQ("-",
               formatter.format(request_header, response_header, response_trailer, stream_info));
   }
@@ -920,7 +927,7 @@ TEST(AccessLogFormatterTest, JsonFormatterMultiTokenTest) {
 
 TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
   StreamInfo::MockStreamInfo stream_info;
-  Http::TestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
+  Http::TestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/?ok=true"}};
   Http::TestHeaderMapImpl response_header{{"second", "PUT"}, {"test", "test"}};
   Http::TestHeaderMapImpl response_trailer{{"third", "POST"}, {"test-2", "test-2"}};
 
@@ -1026,6 +1033,20 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
     EXPECT_CALL(stream_info, startTime()).WillOnce(Return(start_time));
     FormatterImpl formatter(format);
     EXPECT_EQ("%%|%%123456000|1522796769%%123|1%%1522796769",
+              formatter.format(request_header, response_header, response_trailer, stream_info));
+  }
+
+  {
+    const std::string format = "%REQ(:PATH)%";
+    FormatterImpl formatter(format);
+    EXPECT_EQ("/?ok=true",
+              formatter.format(request_header, response_header, response_trailer, stream_info));
+  }
+
+  {
+    const std::string format = "%REQ_WITHOUT_QUERY(:PATH)%";
+    FormatterImpl formatter(format);
+    EXPECT_EQ("/",
               formatter.format(request_header, response_header, response_trailer, stream_info));
   }
 }

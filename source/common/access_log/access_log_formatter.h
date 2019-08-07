@@ -61,8 +61,10 @@ private:
 
   // the indexes of where the parameters for each directive is expected to begin
   static const size_t ReqParamStart{sizeof("REQ(") - 1};
+  static const size_t ReqWithoutQueryParamStart{sizeof("REQ_WITHOUT_QUERY(") - 1};
   static const size_t RespParamStart{sizeof("RESP(") - 1};
   static const size_t TrailParamStart{sizeof("TRAILER(") - 1};
+  static const size_t DynamicMetadataParamStart{sizeof("DYNAMIC_METADATA(") - 1};
   static const size_t StartTimeParamStart{sizeof("START_TIME(") - 1};
 };
 
@@ -137,7 +139,7 @@ private:
 class HeaderFormatter {
 public:
   HeaderFormatter(const std::string& main_header, const std::string& alternative_header,
-                  absl::optional<size_t> max_length);
+                  absl::optional<size_t> max_length, bool remove_query);
 
   std::string format(const Http::HeaderMap& headers) const;
 
@@ -145,6 +147,7 @@ private:
   Http::LowerCaseString main_header_;
   Http::LowerCaseString alternative_header_;
   absl::optional<size_t> max_length_;
+  const bool remove_query_;
 };
 
 /**
@@ -153,7 +156,7 @@ private:
 class RequestHeaderFormatter : public FormatterProvider, HeaderFormatter {
 public:
   RequestHeaderFormatter(const std::string& main_header, const std::string& alternative_header,
-                         absl::optional<size_t> max_length);
+                         absl::optional<size_t> max_length, bool remove_query);
 
   // Formatter::format
   std::string format(const Http::HeaderMap& request_headers, const Http::HeaderMap&,

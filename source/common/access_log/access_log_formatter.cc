@@ -222,7 +222,6 @@ void AccessLogFormatParser::parseCommand(const std::string& token, const size_t 
 std::vector<FormatterProviderPtr> AccessLogFormatParser::parse(const std::string& format) {
   std::string current_token;
   std::vector<FormatterProviderPtr> formatters;
-  const std::string DYNAMIC_META_TOKEN = "DYNAMIC_METADATA(";
   const std::regex command_w_args_regex(R"EOF(%([A-Z]|_)+(\([^\)]*\))?(:[0-9]+)?(%))EOF");
 
   for (size_t pos = 0; pos < format.length(); ++pos) {
@@ -245,14 +244,16 @@ std::vector<FormatterProviderPtr> AccessLogFormatParser::parse(const std::string
       pos += 1;
       int command_end_position = pos + token.length();
 
-      if (absl::StartsWith(token, "REQ(")) {
+      const bool req_without_query = absl::StartsWith(token, "REQ_WITHOUT_QUERY(");
+      if (absl::StartsWith(token, "REQ(") || req_without_query) {
         std::string main_header, alternative_header;
         absl::optional<size_t> max_length;
 
-        parseCommandHeader(token, ReqParamStart, main_header, alternative_header, max_length);
+        parseCommandHeader(token, req_without_query ? ReqWithoutQueryParamStart : ReqParamStart,
+                           main_header, alternative_header, max_length);
 
-        formatters.emplace_back(FormatterProviderPtr{
-            new RequestHeaderFormatter(main_header, alternative_header, max_length)});
+        formatters.emplace_back(FormatterProviderPtr{new RequestHeaderFormatter(
+            main_header, alternative_header, max_length, req_without_query)});
       } else if (absl::StartsWith(token, "RESP(")) {
         std::string main_header, alternative_header;
         absl::optional<size_t> max_length;
@@ -269,13 +270,13 @@ std::vector<FormatterProviderPtr> AccessLogFormatParser::parse(const std::string
 
         formatters.emplace_back(FormatterProviderPtr{
             new ResponseTrailerFormatter(main_header, alternative_header, max_length)});
-      } else if (absl::StartsWith(token, DYNAMIC_META_TOKEN)) {
+      } else if (absl::StartsWith(token, "DYNAMIC_METADATA(")) {
         std::string filter_namespace;
         absl::optional<size_t> max_length;
         std::vector<std::string> path;
-        const size_t start = DYNAMIC_META_TOKEN.size();
 
-        parseCommand(token, start, ":", filter_namespace, path, max_length);
+        parseCommand(token, DynamicMetadataParamStart, ":", filter_namespace, path, max_length);
+
         formatters.emplace_back(
             FormatterProviderPtr{new DynamicMetadataFormatter(filter_namespace, path, max_length)});
       } else if (absl::StartsWith(token, "START_TIME")) {
@@ -508,8 +509,9 @@ std::string PlainStringFormatter::format(const Http::HeaderMap&, const Http::Hea
 
 HeaderFormatter::HeaderFormatter(const std::string& main_header,
                                  const std::string& alternative_header,
-                                 absl::optional<size_t> max_length)
-    : main_header_(main_header), alternative_header_(alternative_header), max_length_(max_length) {}
+                                 absl::optional<size_t> max_length, bool remove_query)
+    : main_header_(main_header), alternative_header_(alternative_header), max_length_(max_length),
+      remove_query_(remove_query) {}
 
 std::string HeaderFormatter::format(const Http::HeaderMap& headers) const {
   const Http::HeaderEntry* header = headers.get(main_header_);
@@ -522,7 +524,14 @@ std::string HeaderFormatter::format(const Http::HeaderMap& headers) const {
   if (!header) {
     header_value_string = UnspecifiedValueString;
   } else {
-    header_value_string = std::string(header->value().getStringView());
+    absl::string_view header_value = header->value().getStringView();
+    if (remove_query_) {
+      const size_t query_pos = header_value.find('?');
+      header_value_string = std::string(
+          header_value.data(), query_pos != header_value.npos ? query_pos : header_value.size());
+    } else {
+      header_value_string = std::string(header_value);
+    }
   }
 
   if (max_length_ && header_value_string.length() > max_length_.value()) {
@@ -535,7 +544,7 @@ std::string HeaderFormatter::format(const Http::HeaderMap& headers) const {
 ResponseHeaderFormatter::ResponseHeaderFormatter(const std::string& main_header,
                                                  const std::string& alternative_header,
                                                  absl::optional<size_t> max_length)
-    : HeaderFormatter(main_header, alternative_header, max_length) {}
+    : HeaderFormatter(main_header, alternative_header, max_length, false) {}
 
 std::string ResponseHeaderFormatter::format(const Http::HeaderMap&,
                                             const Http::HeaderMap& response_headers,
@@ -546,8 +555,8 @@ std::string ResponseHeaderFormatter::format(const Http::HeaderMap&,
 
 RequestHeaderFormatter::RequestHeaderFormatter(const std::string& main_header,
                                                const std::string& alternative_header,
-                                               absl::optional<size_t> max_length)
-    : HeaderFormatter(main_header, alternative_header, max_length) {}
+                                               absl::optional<size_t> max_length, bool remove_query)
+    : HeaderFormatter(main_header, alternative_header, max_length, remove_query) {}
 
 std::string RequestHeaderFormatter::format(const Http::HeaderMap& request_headers,
                                            const Http::HeaderMap&, const Http::HeaderMap&,
@@ -558,7 +567,7 @@ std::string RequestHeaderFormatter::format(const Http::HeaderMap& request_header
 ResponseTrailerFormatter::ResponseTrailerFormatter(const std::string& main_header,
                                                    const std::string& alternative_header,
                                                    absl::optional<size_t> max_length)
-    : HeaderFormatter(main_header, alternative_header, max_length) {}
+    : HeaderFormatter(main_header, alternative_header, max_length, false) {}
 
 std::string ResponseTrailerFormatter::format(const Http::HeaderMap&, const Http::HeaderMap&,
                                              const Http::HeaderMap& response_trailers,
