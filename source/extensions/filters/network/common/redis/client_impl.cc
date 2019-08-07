@@ -160,10 +160,10 @@ void ClientImpl::onEvent(Network::ConnectionEvent event) {
 void ClientImpl::onRespValue(RespValuePtr&& value) {
   ASSERT(!pending_requests_.empty());
   PendingRequest& request = pending_requests_.front();
-  bool canceled = request.canceled_;
+  const bool canceled = request.canceled_;
   PoolCallbacks& callbacks = request.callbacks_;
 
-  // We need to ensure the request is pop before calling the callbacks, since the callbacks might
+  // We need to ensure the request is popped before calling the callback, since the callback might
   // result in closing the connection.
   pending_requests_.pop_front();
   if (canceled) {

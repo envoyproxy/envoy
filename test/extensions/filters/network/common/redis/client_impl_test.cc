@@ -811,6 +811,8 @@ TEST_F(RedisClientImplTest, MovedRedirectionNotEnabled) {
 }
 
 TEST_F(RedisClientImplTest, RemoveFailedHealthCheck) {
+  // This test simulates a health check response signaling traffic should be drained from the host.
+  // As a result, the health checker will close the client in the call back.
   InSequence s;
 
   setup();
@@ -840,6 +842,8 @@ TEST_F(RedisClientImplTest, RemoveFailedHealthCheck) {
 }
 
 TEST_F(RedisClientImplTest, RemoveFailedHost) {
+  // This test simulates a health check request failed due to remote host closing the connection.
+  // As a result the health checker will close the client in the call back.
   InSequence s;
 
   setup();
