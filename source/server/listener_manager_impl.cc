@@ -311,7 +311,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
         Config::Utility::getAndCheckFactory<Configuration::NamedListenerFilterConfigFactory>(
             Extensions::ListenerFilters::ListenerFilterNames::get().TlsInspector);
     listener_filter_factories_.push_back(
-        factory.createFilterFactoryFromProto(Envoy::ProtobufWkt::Empty(), *this));
+        factory.createFilterFactoryFromProto(*factory.createEmptyConfigProto(), *this));
   }
 }
 
