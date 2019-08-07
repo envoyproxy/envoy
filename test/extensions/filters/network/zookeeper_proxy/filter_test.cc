@@ -490,6 +490,14 @@ public:
     EXPECT_EQ(1UL, stat.value());
     EXPECT_EQ(20UL, config_->stats().response_bytes_.value());
     EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+    const auto histogram_name =
+        fmt::format("test.zookeeper.{}_latency", metadata_values[0].find("opname")->second);
+    EXPECT_NE(absl::nullopt, findHistogram(histogram_name));
+  }
+
+  Stats::OptionalHistogram findHistogram(const std::string& name) {
+    Stats::StatNameManagedStorage storage(name, scope_.symbolTable());
+    return scope_.findHistogram(storage.statName());
   }
 
   ZooKeeperFilterConfigSharedPtr config_;
@@ -518,6 +526,7 @@ TEST_F(ZooKeeperFilterTest, Connect) {
   EXPECT_EQ(1UL, config_->stats().connect_resp_.value());
   EXPECT_EQ(24UL, config_->stats().response_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+  EXPECT_NE(absl::nullopt, findHistogram("test.zookeeper.connect_response_latency"));
 }
 
 TEST_F(ZooKeeperFilterTest, ConnectReadonly) {
@@ -538,6 +547,7 @@ TEST_F(ZooKeeperFilterTest, ConnectReadonly) {
   EXPECT_EQ(1UL, config_->stats().connect_resp_.value());
   EXPECT_EQ(25UL, config_->stats().response_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+  EXPECT_NE(absl::nullopt, findHistogram("test.zookeeper.connect_response_latency"));
 }
 
 TEST_F(ZooKeeperFilterTest, Fallback) {
