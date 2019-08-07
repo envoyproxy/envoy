@@ -17,17 +17,8 @@ namespace AdaptiveConcurrency {
 
 AdaptiveConcurrencyFilterConfig::AdaptiveConcurrencyFilterConfig(
     const envoy::config::filter::http::adaptive_concurrency::v2alpha::AdaptiveConcurrency&,
-    Runtime::Loader& runtime, std::string stats_prefix, Stats::Scope& scope,
-    TimeSource& time_source)
-    : runtime_(runtime), stats_prefix_(std::move(stats_prefix)), scope_(scope),
-      time_source_(time_source) {
-  // TODO (tonya11en): Remove these noop calls when stats/runtime values are
-  // implemented.
-  //
-  // Calling so the builds pass with these currently unused variables.
-  runtime_.snapshot();
-  scope_.constSymbolTable();
-}
+    Runtime::Loader&, std::string stats_prefix, Stats::Scope&, TimeSource& time_source)
+    : stats_prefix_(std::move(stats_prefix)), time_source_(time_source) {}
 
 AdaptiveConcurrencyFilter::AdaptiveConcurrencyFilter(
     AdaptiveConcurrencyFilterConfigSharedPtr config, ConcurrencyControllerSharedPtr controller)
@@ -36,9 +27,7 @@ AdaptiveConcurrencyFilter::AdaptiveConcurrencyFilter(
 AdaptiveConcurrencyFilter::~AdaptiveConcurrencyFilter() = default;
 
 Http::FilterHeadersStatus AdaptiveConcurrencyFilter::decodeHeaders(Http::HeaderMap&, bool) {
-  const auto forwarding_action = controller_->forwardingDecision();
-
-  if (forwarding_action == ConcurrencyController::RequestForwardingAction::Block) {
+  if (controller_->forwardingDecision() == ConcurrencyController::RequestForwardingAction::Block) {
     // TODO (tonya11en): Remove filler words.
     decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "filler words", nullptr,
                                        absl::nullopt, "more filler words");
@@ -50,8 +39,7 @@ Http::FilterHeadersStatus AdaptiveConcurrencyFilter::decodeHeaders(Http::HeaderM
 }
 
 void AdaptiveConcurrencyFilter::encodeComplete() {
-  const std::chrono::nanoseconds rq_latency =
-      config_->timeSource().monotonicTime() - rq_start_time_;
+  const auto rq_latency = config_->timeSource().monotonicTime() - rq_start_time_;
   controller_->recordLatencySample(rq_latency);
 }
 

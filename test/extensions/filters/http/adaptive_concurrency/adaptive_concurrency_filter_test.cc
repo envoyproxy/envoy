@@ -29,7 +29,16 @@ public:
 
 class AdaptiveConcurrencyFilterTest : public testing::Test {
 public:
-  void SetupTest();
+  AdaptiveConcurrencyFilterTest() {
+    filter_.reset();
+
+    const envoy::config::filter::http::adaptive_concurrency::v2alpha::AdaptiveConcurrency config;
+    auto config_ptr = std::make_shared<AdaptiveConcurrencyFilterConfig>(
+        config, runtime_, "testprefix.", stats_, time_system_);
+
+    filter_ = std::make_unique<AdaptiveConcurrencyFilter>(config_ptr, controller_);
+    filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  }
 
   std::unique_ptr<AdaptiveConcurrencyFilter> filter_;
   Event::SimulatedTimeSystem time_system_;
@@ -39,25 +48,12 @@ public:
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
 };
 
-void AdaptiveConcurrencyFilterTest::SetupTest() {
-  filter_.reset();
-
-  const envoy::config::filter::http::adaptive_concurrency::v2alpha::AdaptiveConcurrency config;
-  auto config_ptr = std::make_shared<AdaptiveConcurrencyFilterConfig>(
-      config, runtime_, "testprefix.", stats_, time_system_);
-
-  filter_ = std::make_unique<AdaptiveConcurrencyFilter>(config_ptr, controller_);
-  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
-}
-
 TEST_F(AdaptiveConcurrencyFilterTest, DecodeHeadersTestForwarding) {
-  SetupTest();
-
   Http::TestHeaderMapImpl request_headers;
 
   EXPECT_CALL(*controller_, forwardingDecision())
       .Times(1)
-      .WillRepeatedly(Return(RequestForwardingAction::MustForward));
+      .WillRepeatedly(Return(RequestForwardingAction::Forward));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 
   Buffer::OwnedImpl request_body;
@@ -68,8 +64,6 @@ TEST_F(AdaptiveConcurrencyFilterTest, DecodeHeadersTestForwarding) {
 }
 
 TEST_F(AdaptiveConcurrencyFilterTest, DecodeHeadersTestBlock) {
-  SetupTest();
-
   Http::TestHeaderMapImpl request_headers;
 
   EXPECT_CALL(*controller_, forwardingDecision())
@@ -82,8 +76,6 @@ TEST_F(AdaptiveConcurrencyFilterTest, DecodeHeadersTestBlock) {
 }
 
 TEST_F(AdaptiveConcurrencyFilterTest, EncodeHeadersValidTest) {
-  SetupTest();
-
   auto mt = time_system_.monotonicTime();
   time_system_.setMonotonicTime(mt + std::chrono::milliseconds(123));
 
@@ -91,7 +83,7 @@ TEST_F(AdaptiveConcurrencyFilterTest, EncodeHeadersValidTest) {
   Http::TestHeaderMapImpl request_headers;
   EXPECT_CALL(*controller_, forwardingDecision())
       .Times(1)
-      .WillRepeatedly(Return(RequestForwardingAction::MustForward));
+      .WillRepeatedly(Return(RequestForwardingAction::Forward));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 
   const std::chrono::nanoseconds advance_time = std::chrono::milliseconds(42);

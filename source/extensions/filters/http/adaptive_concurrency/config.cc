@@ -6,7 +6,6 @@
 #include "common/config/filter_json.h"
 
 #include "extensions/filters/http/adaptive_concurrency/adaptive_concurrency_filter.h"
-#include "extensions/filters/http/adaptive_concurrency/concurrency_controller/noop_controller.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -14,20 +13,10 @@ namespace HttpFilters {
 namespace AdaptiveConcurrency {
 
 Http::FilterFactoryCb AdaptiveConcurrencyFilterFactory::createFilterFactoryFromProtoTyped(
-    const envoy::config::filter::http::adaptive_concurrency::v2alpha::AdaptiveConcurrency& config,
-    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
+    const envoy::config::filter::http::adaptive_concurrency::v2alpha::AdaptiveConcurrency&,
+    const std::string&, Server::Configuration::FactoryContext&) {
 
-  // TODO (tonya11en): Noop controller needs to be replaced with an actual
-  // implementation in a future patch.
-  std::shared_ptr<ConcurrencyController::ConcurrencyController> noop_ctl =
-      std::make_shared<ConcurrencyController::NoopController>();
-
-  AdaptiveConcurrencyFilterConfigSharedPtr filter_config(new AdaptiveConcurrencyFilterConfig(
-      config, context.runtime(), stats_prefix, context.scope(), context.timeSource()));
-
-  return [filter_config, noop_ctl](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<AdaptiveConcurrencyFilter>(filter_config, noop_ctl));
-  };
+  return [](Http::FilterChainFactoryCallbacks&) -> void {};
 }
 
 /**

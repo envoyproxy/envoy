@@ -17,7 +17,6 @@ envoy_cc_library(
     srcs = [],
     hdrs = [
         "concurrency_controller.h",
-        "noop_controller.h",
     ],
     deps = [
     ],

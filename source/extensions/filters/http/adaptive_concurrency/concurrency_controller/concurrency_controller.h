@@ -19,7 +19,7 @@ enum class RequestForwardingAction {
 
   // The controller has allowed the request through and changed its internal
   // state. The request must be forwarded.
-  MustForward
+  Forward
 };
 
 /**

@@ -3,8 +3,6 @@
 #include <cstdint>
 #include <memory>
 #include <string>
-#include <unordered_set>
-#include <vector>
 
 #include "envoy/common/time.h"
 #include "envoy/config/filter/http/adaptive_concurrency/v2alpha/adaptive_concurrency.pb.h"
@@ -35,9 +33,7 @@ public:
   TimeSource& timeSource() const { return time_source_; }
 
 private:
-  Runtime::Loader& runtime_;
   const std::string stats_prefix_;
-  Stats::Scope& scope_;
   TimeSource& time_source_;
 };
 
