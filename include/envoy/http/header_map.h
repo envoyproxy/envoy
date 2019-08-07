@@ -331,6 +331,7 @@ private:
   HEADER_FUNC(RequestId)                                                                           \
   HEADER_FUNC(Scheme)                                                                              \
   HEADER_FUNC(Server)                                                                              \
+  HEADER_FUNC(SetCookie)                                                                           \
   HEADER_FUNC(Status)                                                                              \
   HEADER_FUNC(TE)                                                                                  \
   HEADER_FUNC(TransferEncoding)                                                                    \
