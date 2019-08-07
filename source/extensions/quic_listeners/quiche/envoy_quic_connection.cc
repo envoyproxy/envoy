@@ -20,12 +20,13 @@ EnvoyQuicConnection::EnvoyQuicConnection(
 
 bool EnvoyQuicConnection::OnPacketHeader(const quic::QuicPacketHeader& header) {
   if (quic::QuicConnection::OnPacketHeader(header) && connection_socket_ == nullptr) {
+    ASSERT(self_address().IsInitialized());
     // Self address should be initialized by now. It's time to install filters.
     Network::Address::InstanceConstSharedPtr local_addr =
         quicAddressToEnvoyAddressInstance(self_address());
     Network::Address::InstanceConstSharedPtr remote_addr =
         quicAddressToEnvoyAddressInstance(peer_address());
-    auto connection_socket_ = std::make_unique<Network::ConnectionSocketImpl>(
+    connection_socket_ = std::make_unique<Network::ConnectionSocketImpl>(
         // Wraps the real IoHandle instance so that if this socket get closed,
         // the real IoHandle won't be affected.
         std::make_unique<QuicIoHandleWrapper>(listener_config_.socket().ioHandle()),

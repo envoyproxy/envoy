@@ -20,13 +20,17 @@
 namespace Envoy {
 namespace Quic {
 
+// Envoy specific provider of server connection id and decision maker of
+// accepting new connection or not.
 class EnvoyQuicCryptoServerStreamHelper : public quic::QuicCryptoServerStream::Helper {
 public:
   ~EnvoyQuicCryptoServerStreamHelper() override {}
 
+  // quic::QuicCryptoServerStream::Helper
   quic::QuicConnectionId
   GenerateConnectionIdForReject(quic::QuicTransportVersion /*version*/,
                                 quic::QuicConnectionId /*connection_id*/) const override {
+    // TODO(danzh): create reject connection id based on given connection_id.
     return quic::QuicUtils::CreateRandomConnectionId();
   }
 
@@ -35,6 +39,8 @@ public:
                             const quic::QuicSocketAddress& /*peer_address*/,
                             const quic::QuicSocketAddress& /*self_address*/,
                             std::string* /*error_details*/) const override {
+    // TODO(danzh): decide to accept or not based on information from given handshake message, i.e.
+    // user agent and SNI.
     return true;
   }
 };

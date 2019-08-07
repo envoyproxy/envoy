@@ -251,6 +251,17 @@ TEST_P(EnvoyQuicServerSessionTest, ConnectionCloseWithActiveStream) {
   EXPECT_TRUE(stream->write_side_closed() && stream->reading_stopped());
 }
 
+TEST_P(EnvoyQuicServerSessionTest, ShutdownNotice) {
+  installReadFilter();
+  // Not verifying dummy implementation, just to have coverage.
+  EXPECT_DEBUG_DEATH(envoy_quic_session_.enableHalfClose(true), "");
+  envoy_quic_session_.setBufferLimits(1024 * 1024);
+  EXPECT_EQ(nullptr, envoy_quic_session_.ssl());
+  EXPECT_FALSE(envoy_quic_session_.aboveHighWatermark());
+  EXPECT_DEBUG_DEATH(envoy_quic_session_.setDelayedCloseTimeout(std::chrono::milliseconds(1)), "");
+  http_connection_->shutdownNotice();
+}
+
 TEST_P(EnvoyQuicServerSessionTest, InitializeFilterChain) {
   // Generate a CHLO packet.
   quic::CryptoHandshakeMessage chlo = quic::test::crypto_test_utils::GenerateDefaultInchoateCHLO(
@@ -294,6 +305,7 @@ TEST_P(EnvoyQuicServerSessionTest, InitializeFilterChain) {
       .WillOnce(testing::Return(quic::WriteResult(quic::WRITE_STATUS_OK, 1)));
   quic_connection_->ProcessUdpPacket(self_address, peer_address, *packet);
   EXPECT_TRUE(quic_connection_->connected());
+  EXPECT_EQ(nullptr, envoy_quic_session_.socketOptions());
   EXPECT_FALSE(envoy_quic_session_.IsEncryptionEstablished());
 }
 

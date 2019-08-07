@@ -106,6 +106,29 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "envoy_quic_dispatcher_test",
+    srcs = ["envoy_quic_dispatcher_test.cc"],
+    tags = ["nofips"],
+    deps = [
+        ":quic_test_utils_for_envoy_lib",
+        "//include/envoy/stats:stats_macros",
+        "//source/extensions/quic_listeners/quiche:envoy_quic_alarm_factory_lib",
+        "//source/extensions/quic_listeners/quiche:envoy_quic_connection_helper_lib",
+        "//source/extensions/quic_listeners/quiche:envoy_quic_dispatcher_lib",
+        "//source/extensions/quic_listeners/quiche:envoy_quic_proof_source_lib",
+        "//source/extensions/quic_listeners/quiche:envoy_quic_server_session_lib",
+        "//source/server:configuration_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:global_lib",
+        "//test/test_common:simulated_time_system_lib",
+    ],
+)
+
 envoy_cc_test_library(
     name = "quic_test_utils_for_envoy_lib",
     srcs = ["crypto_test_utils_for_envoy.cc"],

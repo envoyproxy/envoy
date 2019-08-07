@@ -18,6 +18,8 @@
 namespace Envoy {
 namespace Quic {
 
+// Derived to provide EnvoyQuicClock and default random generator and buffer
+// allocator.
 class EnvoyQuicConnectionHelper : public quic::QuicConnectionHelperInterface {
 public:
   EnvoyQuicConnectionHelper(Event::Dispatcher& dispatcher)

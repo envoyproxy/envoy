@@ -1,6 +1,7 @@
 #include "envoy/http/codec.h"
 
 #include "common/common/assert.h"
+#include "common/common/logger.h"
 
 #include "extensions/quic_listeners/quiche/envoy_quic_server_session.h"
 
@@ -10,9 +11,10 @@ namespace Quic {
 // QuicHttpConnectionImplBase instance is a thin QUIC codec just providing quic interface to HCM.
 // Owned by HCM and created during onNewConnection() if the network connection
 // is a QUIC connection.
-class QuicHttpConnectionImplBase : public virtual Http::Connection {
+class QuicHttpConnectionImplBase : public virtual Http::Connection,
+                                   protected Logger::Loggable<Logger::Id::quic> {
 public:
-  QuicHttpConnectionImplBase(quic::QuicSpdySession& quic_session) : quic_session_(quic_session) {}
+  QuicHttpConnectionImplBase(EnvoyQuicServerSession& quic_session) : quic_session_(quic_session) {}
 
   // Http::Connection
   void dispatch(Buffer::Instance& /*data*/) override {
@@ -25,16 +27,11 @@ public:
   }
   void goAway() override;
   bool wantsToWrite() override;
-  void onUnderlyingConnectionAboveWriteBufferHighWatermark() override {
-    // Data in L4 buffers is managed by QUIC.
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
-  void onUnderlyingConnectionBelowWriteBufferLowWatermark() override {
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
+  void onUnderlyingConnectionAboveWriteBufferHighWatermark() override;
+  void onUnderlyingConnectionBelowWriteBufferLowWatermark() override;
 
-private:
-  quic::QuicSpdySession& quic_session_;
+protected:
+  EnvoyQuicServerSession& quic_session_;
 };
 
 class QuicHttpServerConnectionImpl : public QuicHttpConnectionImplBase,
@@ -49,7 +46,7 @@ public:
   // Http::Connection
   void shutdownNotice() override {
     // TODO(danzh): Add double-GOAWAY support in QUIC.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    ENVOY_CONN_LOG(error, "Shutdown notice is not propagated to QUIC.", quic_session_);
   }
 };
 

@@ -13,6 +13,7 @@
 
 namespace Envoy {
 namespace Quic {
+
 EnvoyQuicServerSession::EnvoyQuicServerSession(
     const quic::QuicConfig& config, const quic::ParsedQuicVersionVector& supported_versions,
     quic::QuicConnection* connection, quic::QuicSession::Visitor* visitor,
@@ -106,22 +107,47 @@ void EnvoyQuicServerSession::addBytesSentCallback(Network::Connection::BytesSent
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 
+void EnvoyQuicServerSession::enableHalfClose(bool enabled) {
+  ASSERT(!enabled, "Quic connection doesn't support half close.");
+}
+
+void EnvoyQuicServerSession::setBufferLimits(uint32_t /*limit*/) {
+  // TODO(danzh): add interface to quic for connection level buffer throttling.
+  // Currently read buffer is capped by connection level flow control. And
+  // write buffer is not capped.
+  ENVOY_CONN_LOG(error, "Quic manages its own buffer currently.", *this);
+}
+
+uint32_t EnvoyQuicServerSession::bufferLimit() const {
+  // As quic connection is not HTTP1.1, this method shouldn't be called by HCM.
+  NOT_REACHED_GCOVR_EXCL_LINE;
+}
+
 void EnvoyQuicServerSession::close(Network::ConnectionCloseType type) {
   // TODO(danzh): Implement FlushWrite and FlushWriteAndDelay mode.
   ASSERT(type == Network::ConnectionCloseType::NoFlush);
   connection()->CloseConnection(quic::QUIC_NO_ERROR, "Closed by application",
                                 quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
 }
-void EnvoyQuicServerSession::setDelayedCloseTimeout(std::chrono::milliseconds /*timeout*/) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+
+void EnvoyQuicServerSession::setDelayedCloseTimeout(std::chrono::milliseconds timeout) {
+  ASSERT(timeout == std::chrono::milliseconds::zero(),
+         "Delayed close of connection is not supported");
 }
 
 std::chrono::milliseconds EnvoyQuicServerSession::delayedCloseTimeout() const {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  // Not called outside of Network::ConnectionImpl. Maybe remove this interface
+  // from Network::Connection.
+  NOT_REACHED_GCOVR_EXCL_LINE;
+}
+
+const Network::ConnectionSocket::OptionsSharedPtr& EnvoyQuicServerSession::socketOptions() const {
+  ENVOY_CONN_LOG(error, "QUIC does not support connection pooling", *this);
+  return dynamic_cast<const EnvoyQuicConnection*>(connection())->connectionSocket()->options();
 }
 
 absl::string_view EnvoyQuicServerSession::requestedServerName() const {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  return absl::string_view(GetCryptoStream()->crypto_negotiated_params().sni);
 }
 
 const Network::Address::InstanceConstSharedPtr& EnvoyQuicServerSession::remoteAddress() const {
@@ -140,13 +166,13 @@ const Network::Address::InstanceConstSharedPtr& EnvoyQuicServerSession::localAdd
 
 const Ssl::ConnectionInfo* EnvoyQuicServerSession::ssl() const {
   // TODO(danzh): construct Ssl::ConnectionInfo from crypto stream
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  ENVOY_CONN_LOG(error, "Ssl::ConnectionInfo instance is not populated.", *this);
+  return nullptr;
 }
 
 void EnvoyQuicServerSession::rawWrite(Buffer::Instance& /*data*/, bool /*end_stream*/) {
-  // TODO(danzh): maybe send via MessageFrame? But MessageFrame is not reliable
-  // whereas TCP connection is reliable.
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  // Network filter should stop iteration.
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 } // namespace Quic

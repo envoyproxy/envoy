@@ -11,6 +11,8 @@
 #pragma GCC diagnostic pop
 
 #include <memory>
+
+#include "common/common/logger.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/listener.h"
 #include "server/connection_handler_impl.h"
@@ -19,7 +21,8 @@ namespace Envoy {
 namespace Quic {
 
 // Derived for network filter chain, stats and QoS.
-class EnvoyQuicConnection : public quic::QuicConnection {
+class EnvoyQuicConnection : public quic::QuicConnection,
+                            protected Logger::Loggable<Logger::Id::connection> {
 public:
   EnvoyQuicConnection(quic::QuicConnectionId server_connection_id,
                       quic::QuicSocketAddress initial_peer_address,
