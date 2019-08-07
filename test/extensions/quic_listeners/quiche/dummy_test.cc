@@ -10,7 +10,7 @@ namespace Quiche {
 namespace {
 
 TEST(DummyTest, Dummy) {
-  http2::Http2String foo = "bar";
+  std::string foo = "bar";
   EXPECT_EQ("bar cowbell", moreCowbell(foo));
 }
 

@@ -5,6 +5,7 @@
 // porting layer for QUICHE.
 
 #include <memory>
+#include <string>
 
 #include "extensions/quic_listeners/quiche/platform/flags_impl.h"
 
@@ -54,7 +55,7 @@ TEST(Http2PlatformTest, Http2Deque) {
 }
 
 TEST(Http2PlatformTest, Http2EstimateMemoryUsage) {
-  http2::Http2String s = "foo";
+  std::string s = "foo";
   // Stubbed out to always return 0.
   EXPECT_EQ(0, http2::Http2EstimateMemoryUsage(s));
 }
@@ -108,13 +109,8 @@ TEST(Http2PlatformTest, Http2ReconstructObject) {
   EXPECT_EQ("", s);
 }
 
-TEST(Http2PlatformTest, Http2String) {
-  http2::Http2String s = "foo";
-  EXPECT_EQ('o', s[1]);
-}
-
 TEST(Http2PlatformTest, Http2StringPiece) {
-  http2::Http2String s = "bar";
+  std::string s = "bar";
   http2::Http2StringPiece sp(s);
   EXPECT_EQ('b', sp[0]);
 }

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "quiche/http2/platform/api/http2_string.h"
+#include <string>
 
 namespace Envoy {
 namespace Extensions {
@@ -9,7 +9,7 @@ namespace Quiche {
 
 // Placeholder use of a QUICHE platform type.
 // TODO(mpwarres): remove once real uses of QUICHE platform added.
-http2::Http2String moreCowbell(const http2::Http2String& s);
+std::string moreCowbell(const std::string& s);
 
 } // namespace Quiche
 } // namespace QuicListeners
