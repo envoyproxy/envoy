@@ -160,15 +160,20 @@ void ClientImpl::onEvent(Network::ConnectionEvent event) {
 void ClientImpl::onRespValue(RespValuePtr&& value) {
   ASSERT(!pending_requests_.empty());
   PendingRequest& request = pending_requests_.front();
+  const bool canceled = request.canceled_;
+  PoolCallbacks& callbacks = request.callbacks_;
 
-  if (request.canceled_) {
+  // We need to ensure the request is popped before calling the callback, since the callback might
+  // result in closing the connection.
+  pending_requests_.pop_front();
+  if (canceled) {
     host_->cluster().stats().upstream_rq_cancelled_.inc();
   } else if (config_.enableRedirection() && (value->type() == Common::Redis::RespType::Error)) {
     std::vector<absl::string_view> err = StringUtil::splitToken(value->asString(), " ", false);
     bool redirected = false;
     if (err.size() == 3) {
       if (err[0] == RedirectionResponse::get().MOVED || err[0] == RedirectionResponse::get().ASK) {
-        redirected = request.callbacks_.onRedirection(*value);
+        redirected = callbacks.onRedirection(*value);
         if (redirected) {
           host_->cluster().stats().upstream_internal_redirect_succeeded_total_.inc();
         } else {
@@ -177,13 +182,11 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
       }
     }
     if (!redirected) {
-      request.callbacks_.onResponse(std::move(value));
+      callbacks.onResponse(std::move(value));
     }
   } else {
-    request.callbacks_.onResponse(std::move(value));
+    callbacks.onResponse(std::move(value));
   }
-
-  pending_requests_.pop_front();
 
   // If there are no remaining ops in the pipeline we need to disable the timer.
   // Otherwise we boost the timer since we are receiving responses and there are more to flush
