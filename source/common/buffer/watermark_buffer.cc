@@ -72,8 +72,7 @@ void WatermarkBuffer::setWatermarks(uint32_t low_watermark, uint32_t high_waterm
   ASSERT(low_watermark < high_watermark || (high_watermark == 0 && low_watermark == 0));
   low_watermark_ = low_watermark;
   high_watermark_ = high_watermark;
-  overflow_watermark_ = high_watermark * runtime_.threadsafeSnapshot()->getInteger(
-                                             "buffer.overflow.high_watermark_multiplier", 2);
+  overflow_watermark_ = high_watermark * overflow_multiplier_;
   checkHighAndOverflowWatermarks();
   checkLowWatermark();
 }

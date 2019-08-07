@@ -20,9 +20,10 @@ public:
   WatermarkBuffer(std::function<void()> below_low_watermark,
                   std::function<void()> above_high_watermark,
                   std::function<void()> above_overflow_watermark)
-      : runtime_(Runtime::LoaderSingleton::get()), below_low_watermark_(below_low_watermark),
-        above_high_watermark_(above_high_watermark),
-        above_overflow_watermark_(above_overflow_watermark) {}
+      : below_low_watermark_(below_low_watermark), above_high_watermark_(above_high_watermark),
+        above_overflow_watermark_(above_overflow_watermark),
+        overflow_multiplier_(Runtime::LoaderSingleton::get().threadsafeSnapshot()->getInteger(
+            "buffer.overflow.high_watermark_multiplier", 2)) {}
 
   // Override all functions from Instance which can result in changing the size
   // of the underlying buffer.
@@ -48,11 +49,11 @@ private:
   void checkHighAndOverflowWatermarks();
   void checkLowWatermark();
 
-  Runtime::Loader& runtime_;
   std::function<void()> below_low_watermark_;
   std::function<void()> above_high_watermark_;
   std::function<void()> above_overflow_watermark_;
 
+  const uint32_t overflow_multiplier_{0};
   // Used for enforcing buffer limits (off by default). If these are set to non-zero by a call to
   // setWatermarks() the watermark callbacks will be called as described above.
   uint32_t overflow_watermark_{0};

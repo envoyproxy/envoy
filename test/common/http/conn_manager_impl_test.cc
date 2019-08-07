@@ -338,6 +338,20 @@ public:
   std::vector<MockStreamEncoderFilter*> encoder_filters_;
 };
 
+// A couple tests below, relating to buffer watermarks, should have the same results whether the
+// overflow watermark is enabled or disabled.
+class HttpConnectionManagerImplTestP : public HttpConnectionManagerImplTest,
+                                       public testing::WithParamInterface<int64_t> {
+public:
+  HttpConnectionManagerImplTestP() {
+    EXPECT_CALL(runtime_.snapshot(), getInteger("buffer.overflow.high_watermark_multiplier", _))
+        .WillRepeatedly(Return(GetParam()));
+  }
+};
+// A value of 0 disables the overflow watermark, and 2 sets the overflow watermark to 2x the
+// high watermark.
+INSTANTIATE_TEST_SUITE_P(OverflowWatermark, HttpConnectionManagerImplTestP, testing::Values(0, 2));
+
 TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponse) {
   setup(false, "envoy-custom-server", false);
 
@@ -3150,9 +3164,8 @@ TEST_F(HttpConnectionManagerImplTest, AlterFilterWatermarkLimits) {
   EXPECT_EQ(100, decoder_filters_[0]->callbacks_->decoderBufferLimit());
 }
 
-TEST_F(HttpConnectionManagerImplTest, HitFilterWatermarkLimits) {
+TEST_F(HttpConnectionManagerImplTest, HitFilterHighWatermark) {
   // Disable overflow watermark for this test.
-  // TODO(mergeconflict): enable for a subsequent test.
   EXPECT_CALL(runtime_.snapshot(), getInteger("buffer.overflow.high_watermark_multiplier", _))
       .WillRepeatedly(Return(0));
 
@@ -3200,6 +3213,25 @@ TEST_F(HttpConnectionManagerImplTest, HitFilterWatermarkLimits) {
   EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark());
   EXPECT_CALL(callbacks2, onBelowWriteBufferLowWatermark()).Times(0);
   encoder_filters_[1]->callbacks_->setEncoderBufferLimit((buffer_len + 1) * 2);
+}
+
+TEST_F(HttpConnectionManagerImplTest, HitFilterOverflowWatermark) {
+  initial_buffer_limit_ = 1;
+  streaming_filter_ = true;
+  setup(false, "");
+  setUpEncoderAndDecoder(false, false);
+
+  // The filter is a streaming filter. Sending 4 bytes should hit the
+  // watermark limit and disable reads on the stream.
+  EXPECT_CALL(stream_, resetStream(StreamResetReason::LocalReset));
+
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+
+  // Kick off the incoming data. |fake_input| is not sent, but instead kicks
+  // off sending the headers and |data| queued up in setUpEncoderAndDecoder().
+  Buffer::OwnedImpl fake_input("asdf");
+  conn_manager_->onData(fake_input, false);
 }
 
 TEST_F(HttpConnectionManagerImplTest, HitRequestBufferLimits) {
@@ -3266,12 +3298,7 @@ TEST_F(HttpConnectionManagerImplTest, HitRequestBufferLimitsIntermediateFilter) 
   conn_manager_->onData(fake_input, false);
 }
 
-TEST_F(HttpConnectionManagerImplTest, HitResponseBufferLimitsBeforeHeaders) {
-  // Disable overflow watermark for this test.
-  // TODO(mergeconflict): enable for a subsequent test.
-  EXPECT_CALL(runtime_.snapshot(), getInteger("buffer.overflow.high_watermark_multiplier", _))
-      .WillRepeatedly(Return(0));
-
+TEST_P(HttpConnectionManagerImplTestP, HitResponseBufferLimitsBeforeHeaders) {
   initial_buffer_limit_ = 10;
   setup(false, "");
   setUpEncoderAndDecoder(false, false);
@@ -3305,12 +3332,7 @@ TEST_F(HttpConnectionManagerImplTest, HitResponseBufferLimitsBeforeHeaders) {
   EXPECT_EQ(1U, stats_.named_.rs_too_large_.value());
 }
 
-TEST_F(HttpConnectionManagerImplTest, HitResponseBufferLimitsAfterHeaders) {
-  // Disable overflow watermark for this test.
-  // TODO(mergeconflict): enable for a subsequent test.
-  EXPECT_CALL(runtime_.snapshot(), getInteger("buffer.overflow.high_watermark_multiplier", _))
-      .WillRepeatedly(Return(0));
-
+TEST_P(HttpConnectionManagerImplTestP, HitResponseBufferLimitsAfterHeaders) {
   initial_buffer_limit_ = 10;
   setup(false, "");
   setUpEncoderAndDecoder(false, false);

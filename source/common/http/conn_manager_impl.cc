@@ -2080,9 +2080,10 @@ bool ConnectionManagerImpl::ActiveStreamDecoderFilter::recreateStream() {
 }
 
 Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamEncoderFilter::createBuffer() {
-  auto buffer = new Buffer::WatermarkBuffer([this]() -> void { this->responseDataDrained(); },
-                                            [this]() -> void { this->responseDataTooLarge(); },
-                                            [this]() -> void { this->resetStream(); });
+  auto buffer = new Buffer::WatermarkBuffer(
+      [this]() -> void { this->responseDataDrained(); },
+      [this]() -> void { this->responseDataExceedsHighWatermark(); },
+      [this]() -> void { this->responseDataExceedsOverflowWatermark(); });
   buffer->setWatermarks(parent_.buffer_limit_);
   return Buffer::WatermarkBufferPtr{buffer};
 }
@@ -2116,39 +2117,45 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::
 
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::continueEncoding() { commonContinue(); }
 
-void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataTooLarge() {
+void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataExceedsHighWatermark() {
   if (parent_.state_.encoder_filters_streaming_) {
+    // If we are streaming the response, there's still an opportunity to drain the response buffer.
     onEncoderFilterAboveWriteBufferHighWatermark();
   } else {
-    parent_.connection_manager_.stats_.named_.rs_too_large_.inc();
+    // Otherwise, treat it as an overflow: send a 500 if possible and reset the stream.
+    responseDataExceedsOverflowWatermark();
+  }
+}
 
-    // If headers have not been sent to the user, send a 500.
-    if (!headers_continued_) {
-      // Make sure we won't end up with nested watermark calls from the body buffer.
-      parent_.state_.encoder_filters_streaming_ = true;
-      allowIteration();
+void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataExceedsOverflowWatermark() {
+  parent_.connection_manager_.stats_.named_.rs_too_large_.inc();
 
-      parent_.stream_info_.setResponseCodeDetails(
-          StreamInfo::ResponseCodeDetails::get().RequestHeadersTooLarge);
-      Http::Utility::sendLocalReply(
-          Grpc::Common::hasGrpcContentType(*parent_.request_headers_),
-          [&](HeaderMapPtr&& response_headers, bool end_stream) -> void {
-            parent_.chargeStats(*response_headers);
-            parent_.response_headers_ = std::move(response_headers);
-            parent_.response_encoder_->encodeHeaders(*parent_.response_headers_, end_stream);
-            parent_.state_.local_complete_ = end_stream;
-          },
-          [&](Buffer::Instance& data, bool end_stream) -> void {
-            parent_.response_encoder_->encodeData(data, end_stream);
-            parent_.state_.local_complete_ = end_stream;
-          },
-          parent_.state_.destroyed_, Http::Code::InternalServerError,
-          CodeUtility::toString(Http::Code::InternalServerError), absl::nullopt,
-          parent_.is_head_request_);
-      parent_.maybeEndEncode(parent_.state_.local_complete_);
-    } else {
-      resetStream();
-    }
+  // If headers have not been sent to the user, send a 500.
+  if (!headers_continued_) {
+    // Make sure we won't end up with nested watermark calls from the body buffer.
+    parent_.state_.encoder_filters_streaming_ = true;
+    allowIteration();
+
+    parent_.stream_info_.setResponseCodeDetails(
+        StreamInfo::ResponseCodeDetails::get().RequestHeadersTooLarge);
+    Http::Utility::sendLocalReply(
+        Grpc::Common::hasGrpcContentType(*parent_.request_headers_),
+        [&](HeaderMapPtr&& response_headers, bool end_stream) -> void {
+          parent_.chargeStats(*response_headers);
+          parent_.response_headers_ = std::move(response_headers);
+          parent_.response_encoder_->encodeHeaders(*parent_.response_headers_, end_stream);
+          parent_.state_.local_complete_ = end_stream;
+        },
+        [&](Buffer::Instance& data, bool end_stream) -> void {
+          parent_.response_encoder_->encodeData(data, end_stream);
+          parent_.state_.local_complete_ = end_stream;
+        },
+        parent_.state_.destroyed_, Http::Code::InternalServerError,
+        CodeUtility::toString(Http::Code::InternalServerError), absl::nullopt,
+        parent_.is_head_request_);
+    parent_.maybeEndEncode(parent_.state_.local_complete_);
+  } else {
+    resetStream();
   }
 }
 

@@ -372,7 +372,8 @@ private:
       callback(*parent_.buffered_response_data_.get());
     }
 
-    void responseDataTooLarge();
+    void responseDataExceedsHighWatermark();
+    void responseDataExceedsOverflowWatermark();
     void responseDataDrained();
 
     StreamEncoderFilterSharedPtr handle_;
