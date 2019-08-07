@@ -1,7 +1,5 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_server_stream.h"
 
-#include "/usr/local/google/home/danzh/.cache/bazel/_bazel_danzh/3af5f831530d3ae92cc2833051a9b35d/execroot/envoy/bazel-out/k8-fastbuild/bin/include/envoy/event/_virtual_includes/dispatcher_interface/envoy/event/dispatcher.h"
-
 #pragma GCC diagnostic push
 // QUICHE allows unused parameters.
 #pragma GCC diagnostic ignored "-Wunused-parameter"
