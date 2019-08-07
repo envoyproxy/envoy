@@ -164,11 +164,22 @@ TEST(OpenCensusTracerTest, Span) {
 
 namespace {
 
+using testing::PrintToString;
+
+MATCHER_P2(ContainHeader, header, expected_value,
+           "contains the header " + PrintToString(header) + " with value " +
+               PrintToString(expected_value)) {
+  auto found_value = arg.get(Http::LowerCaseString(header));
+  if (found_value == nullptr) {
+    return false;
+  }
+  return found_value->value().getStringView() == expected_value;
+}
+
 // Given incoming headers, test that trace context propagation works and generates all the expected
 // outgoing headers.
 void TestIncomingHeaders(
     const std::initializer_list<std::pair<const char*, const char*>>& headers) {
-  using Envoy::Http::LowerCaseString;
   registerSpanCatcher();
   OpenCensusConfig oc_config;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
@@ -190,7 +201,7 @@ void TestIncomingHeaders(
       {"x-request-id", "foo"},
   };
   for (const auto& kv : headers) {
-    request_headers.addCopy(LowerCaseString(kv.first), kv.second);
+    request_headers.addCopy(Http::LowerCaseString(kv.first), kv.second);
   }
 
   const std::string operation_name{"my_operation_2"};
@@ -219,22 +230,21 @@ void TestIncomingHeaders(
   // Check injectContext.
   // The SpanID is unpredictable so re-serialize context to check it.
   const auto& ctx = sd.context();
-  auto test_outgoing = [&injected_headers](const char* header, std::string expected_value) {
-    auto val = injected_headers.get(LowerCaseString(header));
-    ASSERT_NE(nullptr, val);
-    EXPECT_EQ(expected_value, val->value().getStringView());
-  };
-  test_outgoing("traceparent", ::opencensus::trace::propagation::ToTraceParentHeader(ctx));
+  const auto& hdrs = injected_headers;
+  EXPECT_THAT(hdrs, ContainHeader("traceparent",
+                                  ::opencensus::trace::propagation::ToTraceParentHeader(ctx)));
   {
     std::string expected = ::opencensus::trace::propagation::ToGrpcTraceBinHeader(ctx);
     expected = Base64::encode(expected.data(), expected.size(), /*add_padding=*/false);
-    test_outgoing("grpc-trace-bin", expected);
+    EXPECT_THAT(hdrs, ContainHeader("grpc-trace-bin", expected));
   }
-  test_outgoing("x-cloud-trace-context",
-                ::opencensus::trace::propagation::ToCloudTraceContextHeader(ctx));
-  test_outgoing("x-b3-traceid", "404142434445464748494a4b4c4d4e4f");
-  test_outgoing("x-b3-spanid", ::opencensus::trace::propagation::ToB3SpanIdHeader(ctx));
-  test_outgoing("x-b3-sampled", "1");
+  EXPECT_THAT(hdrs,
+              ContainHeader("x-cloud-trace-context",
+                            ::opencensus::trace::propagation::ToCloudTraceContextHeader(ctx)));
+  EXPECT_THAT(hdrs, ContainHeader("x-b3-traceid", "404142434445464748494a4b4c4d4e4f"));
+  EXPECT_THAT(
+      hdrs, ContainHeader("x-b3-spanid", ::opencensus::trace::propagation::ToB3SpanIdHeader(ctx)));
+  EXPECT_THAT(hdrs, ContainHeader("x-b3-sampled", "1"));
 }
 } // namespace
 
