@@ -1861,7 +1861,8 @@ bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfterDataCallbac
     FilterDataStatus status, Buffer::Instance& provided_data, bool& buffer_was_streaming) {
 
   if (status == FilterDataStatus::Continue) {
-    if (iteration_state_ == IterationState::StopSingleIteration || inline_buffered_data_) {
+    if (iteration_state_ == IterationState::StopSingleIteration ||
+        (inline_buffered_data_ && iteration_state_ == IterationState::Continue)) {
       commonHandleBufferData(provided_data);
       commonContinue();
       return false;
