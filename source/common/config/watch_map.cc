@@ -128,9 +128,9 @@ void WatchMap::onConfigUpdate(
   }
 }
 
-void WatchMap::onConfigUpdateFailed(const EnvoyException* e) {
+void WatchMap::onConfigUpdateFailed(ConfigUpdateFailureReason reason, const EnvoyException* e) {
   for (auto& watch : watches_) {
-    watch->callbacks_.onConfigUpdateFailed(e);
+    watch->callbacks_.onConfigUpdateFailed(reason, e);
   }
 }
 
