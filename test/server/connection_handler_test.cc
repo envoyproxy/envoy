@@ -38,10 +38,12 @@ public:
     TestListener(ConnectionHandlerTest& parent, uint64_t tag, bool bind_to_port,
                  bool hand_off_restored_destination_connections, const std::string& name,
                  Network::Address::SocketType socket_type,
-                 std::chrono::milliseconds listener_filters_timeout)
+                 std::chrono::milliseconds listener_filters_timeout,
+                 bool continue_on_listener_filters_timeout)
         : parent_(parent), tag_(tag), bind_to_port_(bind_to_port),
           hand_off_restored_destination_connections_(hand_off_restored_destination_connections),
-          name_(name), listener_filters_timeout_(listener_filters_timeout) {
+          name_(name), listener_filters_timeout_(listener_filters_timeout),
+          continue_on_listener_filters_timeout_(continue_on_listener_filters_timeout) {
       EXPECT_CALL(socket_, socketType()).WillOnce(Return(socket_type));
     }
 
@@ -58,6 +60,9 @@ public:
     std::chrono::milliseconds listenerFiltersTimeout() const override {
       return listener_filters_timeout_;
     }
+    bool continueOnListenerFiltersTimeout() const override {
+      return continue_on_listener_filters_timeout_;
+    }
     Stats::Scope& listenerScope() override { return parent_.stats_store_; }
     uint64_t listenerTag() const override { return tag_; }
     const std::string& name() const override { return name_; }
@@ -69,6 +74,7 @@ public:
     const bool hand_off_restored_destination_connections_;
     const std::string name_;
     const std::chrono::milliseconds listener_filters_timeout_;
+    const bool continue_on_listener_filters_timeout_;
   };
 
   using TestListenerPtr = std::unique_ptr<TestListener>;
@@ -80,7 +86,7 @@ public:
       std::chrono::milliseconds listener_filters_timeout = std::chrono::milliseconds(15000)) {
     TestListener* listener =
         new TestListener(*this, tag, bind_to_port, hand_off_restored_destination_connections, name,
-                         socket_type, listener_filters_timeout);
+                         socket_type, listener_filters_timeout, false);
     listener->moveIntoListBack(TestListenerPtr{listener}, listeners_);
     return listener;
   }
