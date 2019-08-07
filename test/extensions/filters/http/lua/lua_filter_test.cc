@@ -772,7 +772,8 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
                           {":path", "/"},
                           {":method", "POST"},
                           {":authority", "foo"},
-                          {"set-cookie", "flavor=chocolate; Path=/,variant=chewy; Path=/"},
+                          {"set-cookie", "flavor=chocolate; Path=/"},
+                          {"set-cookie", "variant=chewy; Path=/"},
                           {"content-length", "11"}}),
                       message->headers());
             callbacks = &cb;
@@ -994,8 +995,9 @@ TEST_F(LuaHttpFilterTest, HttpCallImmediateResponse) {
 
   Http::MessagePtr response_message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  Http::TestHeaderMapImpl expected_headers{
-      {":status", "403"}, {"set-cookie", "flavor=chocolate; Path=/,variant=chewy; Path=/"}};
+  Http::TestHeaderMapImpl expected_headers{{":status", "403"},
+                                           {"set-cookie", "flavor=chocolate; Path=/"},
+                                           {"set-cookie", "variant=chewy; Path=/"}};
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
   callbacks->onSuccess(std::move(response_message));
 }
