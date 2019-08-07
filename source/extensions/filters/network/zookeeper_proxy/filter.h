@@ -121,7 +121,7 @@ class ZooKeeperFilter : public Network::Filter,
                         DecoderCallbacks,
                         Logger::Loggable<Logger::Id::filter> {
 public:
-  explicit ZooKeeperFilter(ZooKeeperFilterConfigSharedPtr config, TimeSource& time_source);
+  ZooKeeperFilter(ZooKeeperFilterConfigSharedPtr config, TimeSource& time_source);
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;

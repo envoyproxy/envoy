@@ -181,8 +181,8 @@ void DecoderImpl::decodeOnWrite(Buffer::Instance& data, uint64_t& offset) {
 
   std::chrono::milliseconds latency;
 
-  // If this fails, it's a server-side bug.
   if (xid_code != XidCodes::WATCH_XID) {
+    // If this fails, it's a server-side bug.
     ASSERT(it != requests_by_xid_.end());
     latency = std::chrono::duration_cast<std::chrono::milliseconds>(time_source_.monotonicTime() -
                                                                     it->second.start_time);
