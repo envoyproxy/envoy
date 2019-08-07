@@ -9,7 +9,7 @@
 #include "quiche/quic/core/quic_dispatcher.h"
 #include "quiche/quic/test_tools/crypto_test_utils.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
-
+#include "quiche/quic/platform/api/quic_text_utils.h"
 #pragma GCC diagnostic pop
 
 #include <memory>
@@ -95,6 +95,7 @@ public:
     quic::CryptoHandshakeMessage chlo = quic::test::crypto_test_utils::GenerateDefaultInchoateCHLO(
         &clock, quic::AllSupportedVersions()[0].transport_version, &crypto_config_);
     chlo.SetVector(quic::kCOPT, quic::QuicTagVector{quic::kREJ});
+    chlo.SetStringPiece(quic::kSNI, "www.abc.com");
     quic::CryptoHandshakeMessage full_chlo;
     quic::QuicReferenceCountedPointer<quic::QuicSignedServerConfig> signed_config(
         new quic::QuicSignedServerConfig);
@@ -184,7 +185,10 @@ TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponCHLO) {
       envoyAddressInstanceToQuicSocketAddress(listen_socket_->localAddress()), peer_addr,
       *received_packet);
   EXPECT_EQ(1u, envoy_quic_dispatcher_.session_map().size());
+  EXPECT_TRUE(
+      envoy_quic_dispatcher_.session_map().find(connection_id)->second->IsEncryptionEstablished());
   EXPECT_EQ(1u, connection_handler_.numConnections());
+  EXPECT_EQ("www.abc.com", read_filter->callbacks_->connection().requestedServerName());
   EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
   // Shutdown() to close the connection.
   envoy_quic_dispatcher_.Shutdown();

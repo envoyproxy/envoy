@@ -107,8 +107,8 @@ void EnvoyQuicServerSession::addBytesSentCallback(Network::Connection::BytesSent
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 
-void EnvoyQuicServerSession::enableHalfClose(bool /*enabled*/) {
-  ENVOY_LOG(error, "Quic connection doesn't support half close.");
+void EnvoyQuicServerSession::enableHalfClose(bool enabled) {
+  ASSERT(!enabled, "Quic connection doesn't support half close.");
 }
 
 void EnvoyQuicServerSession::setBufferLimits(uint32_t /*limit*/) {
@@ -129,8 +129,9 @@ void EnvoyQuicServerSession::close(Network::ConnectionCloseType type) {
   connection()->CloseConnection(quic::QUIC_NO_ERROR, "Closed by application",
                                 quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
 }
+
 void EnvoyQuicServerSession::setDelayedCloseTimeout(std::chrono::milliseconds timeout) {
-  ASSERT(timeout > std::chrono::milliseconds::zero(),
+  ASSERT(timeout == std::chrono::milliseconds::zero(),
          "Delayed close of connection is not supported");
 }
 
