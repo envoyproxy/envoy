@@ -768,13 +768,12 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
       .WillOnce(
           Invoke([&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& cb,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            EXPECT_EQ((Http::TestHeaderMapImpl{
-                          {":path", "/"},
-                          {":method", "POST"},
-                          {":authority", "foo"},
-                          {"set-cookie", "flavor=chocolate; Path=/"},
-                          {"set-cookie", "variant=chewy; Path=/"},
-                          {"content-length", "11"}}),
+            EXPECT_EQ((Http::TestHeaderMapImpl{{":path", "/"},
+                                               {":method", "POST"},
+                                               {":authority", "foo"},
+                                               {"set-cookie", "flavor=chocolate; Path=/"},
+                                               {"set-cookie", "variant=chewy; Path=/"},
+                                               {"content-length", "11"}}),
                       message->headers());
             callbacks = &cb;
             return &request;
