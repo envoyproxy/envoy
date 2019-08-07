@@ -69,6 +69,7 @@ void GrpcMuxSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason rea
     ENVOY_LOG(debug, "gRPC update for {} failed", type_url_);
     break;
   case Envoy::Config::ConfigUpdateFailureReason::FetchTimedout:
+    stats_.init_fetch_timeout_.inc();
     disableInitFetchTimeoutTimer();
     ENVOY_LOG(warn, "gRPC config: initial fetch timed out for {}", type_url_);
     break;

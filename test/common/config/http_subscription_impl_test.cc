@@ -18,11 +18,11 @@ TEST_F(HttpSubscriptionImplTest, OnRequestReset) {
   EXPECT_CALL(callbacks_,
               onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, _));
   http_callbacks_->onFailure(Http::AsyncClient::FailureReason::Reset);
-  EXPECT_TRUE(statsAre(1, 0, 0, 1, 0));
+  EXPECT_TRUE(statsAre(1, 0, 0, 1, 0, 0));
   timerTick();
-  EXPECT_TRUE(statsAre(2, 0, 0, 1, 0));
+  EXPECT_TRUE(statsAre(2, 0, 0, 1, 0, 0));
   deliverConfigUpdate({"cluster0", "cluster1"}, "0", true);
-  EXPECT_TRUE(statsAre(3, 1, 0, 1, 7148434200721666028));
+  EXPECT_TRUE(statsAre(3, 1, 0, 1, 0, 7148434200721666028));
 }
 
 // Validate that the client can recover from bad JSON responses.
@@ -36,28 +36,28 @@ TEST_F(HttpSubscriptionImplTest, BadJsonRecovery) {
   EXPECT_CALL(callbacks_,
               onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, _));
   http_callbacks_->onSuccess(std::move(message));
-  EXPECT_TRUE(statsAre(1, 0, 0, 1, 0));
+  EXPECT_TRUE(statsAre(1, 0, 0, 1, 0, 0));
   request_in_progress_ = false;
   timerTick();
-  EXPECT_TRUE(statsAre(2, 0, 0, 1, 0));
+  EXPECT_TRUE(statsAre(2, 0, 0, 1, 0, 0));
   deliverConfigUpdate({"cluster0", "cluster1"}, "0", true);
-  EXPECT_TRUE(statsAre(3, 1, 0, 1, 7148434200721666028));
+  EXPECT_TRUE(statsAre(3, 1, 0, 1, 0, 7148434200721666028));
 }
 
 TEST_F(HttpSubscriptionImplTest, ConfigNotModified) {
   startSubscription({"cluster0", "cluster1"});
 
-  EXPECT_TRUE(statsAre(1, 0, 0, 0, 0));
+  EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0));
   timerTick();
-  EXPECT_TRUE(statsAre(2, 0, 0, 0, 0));
+  EXPECT_TRUE(statsAre(2, 0, 0, 0, 0, 0));
 
   // accept and modify.
   deliverConfigUpdate({"cluster0", "cluster1"}, "0", true, true, "200");
-  EXPECT_TRUE(statsAre(3, 1, 0, 0, 7148434200721666028));
+  EXPECT_TRUE(statsAre(3, 1, 0, 0, 0, 7148434200721666028));
 
   // accept and does not modify.
   deliverConfigUpdate({"cluster0", "cluster1"}, "0", true, false, "304");
-  EXPECT_TRUE(statsAre(4, 1, 0, 0, 7148434200721666028));
+  EXPECT_TRUE(statsAre(4, 1, 0, 0, 0, 7148434200721666028));
 }
 
 } // namespace

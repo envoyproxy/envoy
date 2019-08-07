@@ -98,6 +98,7 @@ using SubscriptionPtr = std::unique_ptr<Subscription>;
  * Per subscription stats. @see stats_macros.h
  */
 #define ALL_SUBSCRIPTION_STATS(COUNTER, GAUGE)                                                     \
+  COUNTER(init_fetch_timeout)                                                                      \
   COUNTER(update_attempt)                                                                          \
   COUNTER(update_failure)                                                                          \
   COUNTER(update_rejected)                                                                         \

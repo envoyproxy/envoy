@@ -16,6 +16,7 @@ envoy_extension_cc_test(
     srcs = ["header_to_metadata_filter_test.cc"],
     extension_name = "envoy.filters.http.header_to_metadata",
     deps = [
+        "//source/common/common:base64_lib",
         "//source/extensions/filters/http/header_to_metadata:header_to_metadata_filter_lib",
         "//test/mocks/server:server_mocks",
     ],
