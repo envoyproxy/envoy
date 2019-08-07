@@ -73,18 +73,15 @@ public:
   void removeWatch(Watch* watch);
 
   // SubscriptionCallbacks
-  virtual void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
-                              const std::string& version_info) override;
-  virtual void
-  onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
-                 const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                 const std::string& system_version_info) override;
+  void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                      const std::string& version_info) override;
+  void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
+                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                      const std::string& system_version_info) override;
 
-  virtual void onConfigUpdateFailed(const EnvoyException* e) override;
+  void onConfigUpdateFailed(const EnvoyException* e) override;
 
-  virtual std::string resourceName(const ProtobufWkt::Any&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
+  std::string resourceName(const ProtobufWkt::Any&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
   WatchMap(const WatchMap&) = delete;
   WatchMap& operator=(const WatchMap&) = delete;
