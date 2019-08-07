@@ -8,7 +8,8 @@ This is useful in different situations including protecting some applications fr
 with partial requests and high network latency.
 
 If enabled the buffer filter populates content-length header if it is not present in the request
-already.
+already. The behavior can be disabled using the runtime feature
+`envoy.reloadable_features.buffer_filter_populate_content_length`.
 
 * :ref:`v2 API reference <envoy_api_msg_config.filter.http.buffer.v2.Buffer>`
 * This filter should be configured with the name *envoy.buffer*.

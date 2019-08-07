@@ -147,7 +147,7 @@ TEST_F(BufferFilterTest, ContentLengthPopulationAlreadyPresent) {
 TEST_F(BufferFilterTest, ContentLengthPopulationRuntimeGuard) {
   InSequence s;
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.buffer_populate_content_length", "false"}});
+      {{"envoy.reloadable_features.buffer_filter_populate_content_length", "false"}});
 
   Http::TestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers, false));
