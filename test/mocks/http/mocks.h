@@ -347,6 +347,7 @@ public:
   MOCK_METHOD2(onHeaders_, void(HeaderMap& headers, bool end_stream));
   MOCK_METHOD2(onData, void(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD1(onTrailers_, void(HeaderMap& headers));
+  MOCK_METHOD0(onComplete, void());
   MOCK_METHOD0(onReset, void());
 };
 
