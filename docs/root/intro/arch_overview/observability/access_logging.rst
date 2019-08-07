@@ -11,6 +11,16 @@ features:
 * Customizable access log filters that allow different types of requests and responses to be written
   to different access logs.
 
+.. _arch_overview_access_log_filters:
+
+Access log filters
+------------------
+
+Envoy supports several built-in
+:ref:`access log filters<envoy_api_msg_config.filter.accesslog.v2.AccessLogFilter>` and
+:ref:`extension filters<envoy_api_field_config.filter.accesslog.v2.AccessLogFilter.extension_filter>`
+that are registered at runtime.
+
 Access logging sinks
 --------------------
 
