@@ -65,8 +65,7 @@ TEST_F(AdaptiveConcurrencyFilterTest, DecodeHeadersTestForwarding) {
 TEST_F(AdaptiveConcurrencyFilterTest, DecodeHeadersTestBlock) {
   Http::TestHeaderMapImpl request_headers;
 
-  EXPECT_CALL(*controller_, forwardingDecision())
-      .WillOnce(Return(RequestForwardingAction::Block));
+  EXPECT_CALL(*controller_, forwardingDecision()).WillOnce(Return(RequestForwardingAction::Block));
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::ServiceUnavailable, _, _, _, _));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, true));
