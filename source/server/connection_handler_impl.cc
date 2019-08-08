@@ -163,9 +163,8 @@ void ConnectionHandlerImpl::ActiveSocket::onTimeout() {
   ASSERT(inserted());
   if (listener_.continue_on_listener_filters_timeout_) {
     newConnection();
-  } else {
-    unlink();
   }
+  unlink();
 }
 
 void ConnectionHandlerImpl::ActiveSocket::startTimer() {
