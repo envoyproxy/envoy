@@ -12,6 +12,7 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "common/common/logger.h"
+#include "common/stats/symbol_table_impl.h"
 
 #include "extensions/filters/network/zookeeper_proxy/decoder.h"
 
@@ -103,8 +104,10 @@ public:
 
   Stats::Scope& scope_;
   const uint32_t max_packet_bytes_;
-  const std::string stat_prefix_;
   ZooKeeperProxyStats stats_;
+  Stats::StatNameSet stat_name_set_;
+  const Stats::StatName stat_prefix_;
+  const Stats::StatName auth_;
 
 private:
   ZooKeeperProxyStats generateStats(const std::string& prefix, Stats::Scope& scope) {

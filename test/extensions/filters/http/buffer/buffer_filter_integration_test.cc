@@ -36,6 +36,29 @@ TEST_P(BufferIntegrationTest, RouterRequestAndResponseWithZeroByteBodyBuffer) {
   testRouterRequestAndResponseWithBody(0, 0, false);
 }
 
+TEST_P(BufferIntegrationTest, RouterRequestPopulateContentLength) {
+  config_helper_.addFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(Http::TestHeaderMapImpl{
+      {":method", "POST"}, {":scheme", "http"}, {":path", "/shelf"}, {":authority", "host"}});
+  request_encoder_ = &encoder_decoder.first;
+  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
+  codec_client_->sendData(*request_encoder_, "123", false);
+  codec_client_->sendData(*request_encoder_, "456", false);
+  codec_client_->sendData(*request_encoder_, "789", true);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  auto* content_length = upstream_request_->headers().ContentLength();
+  ASSERT_NE(content_length, nullptr);
+  EXPECT_EQ(content_length->value().getStringView(), "9");
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+}
+
 TEST_P(BufferIntegrationTest, RouterRequestBufferLimitExceeded) {
   config_helper_.addFilter(ConfigHelper::SMALL_BUFFER_FILTER);
   initialize();

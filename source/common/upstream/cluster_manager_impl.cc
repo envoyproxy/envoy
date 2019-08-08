@@ -1114,16 +1114,10 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     }
     case LoadBalancerType::ClusterProvided:
     case LoadBalancerType::RingHash:
-    case LoadBalancerType::Maglev: {
+    case LoadBalancerType::Maglev:
+    case LoadBalancerType::OriginalDst: {
       ASSERT(lb_factory_ != nullptr);
       lb_ = lb_factory_->create();
-      break;
-    }
-    case LoadBalancerType::OriginalDst: {
-      ASSERT(lb_factory_ == nullptr);
-      lb_ = std::make_unique<OriginalDstCluster::LoadBalancer>(
-          priority_set_, parent.parent_.active_clusters_.at(cluster->name())->cluster_,
-          cluster->lbOriginalDstConfig());
       break;
     }
     }
