@@ -180,6 +180,11 @@ public:
   virtual bool libeventBufferEnabled() const PURE;
 
   /**
+   * @return whether to use the fake symbol table implementation.
+   */
+  virtual bool fakeSymbolTableEnabled() const PURE;
+
+  /**
    * @return bool indicating whether cpuset size should determine the number of worker threads.
    */
   virtual bool cpusetThreadsEnabled() const PURE;
