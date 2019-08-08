@@ -9,6 +9,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
+#include "common/runtime/runtime_impl.h"
 
 #include "extensions/filters/http/well_known_names.h"
 
@@ -57,7 +58,7 @@ void BufferFilter::initConfig() {
   settings_ = route_local ? route_local : settings_;
 }
 
-Http::FilterHeadersStatus BufferFilter::decodeHeaders(Http::HeaderMap&, bool end_stream) {
+Http::FilterHeadersStatus BufferFilter::decodeHeaders(Http::HeaderMap& headers, bool end_stream) {
   if (end_stream) {
     // If this is a header-only request, we don't need to do any buffering.
     return Http::FilterHeadersStatus::Continue;
@@ -70,12 +71,22 @@ Http::FilterHeadersStatus BufferFilter::decodeHeaders(Http::HeaderMap&, bool end
   }
 
   callbacks_->setDecoderBufferLimit(settings_->maxRequestBytes());
+  request_headers_ = &headers;
 
   return Http::FilterHeadersStatus::StopIteration;
 }
 
-Http::FilterDataStatus BufferFilter::decodeData(Buffer::Instance&, bool end_stream) {
+Http::FilterDataStatus BufferFilter::decodeData(Buffer::Instance& data, bool end_stream) {
+  content_length_ += data.length();
   if (end_stream || settings_->disabled()) {
+    // request_headers_ is initialized iff plugin is enabled.
+    if (request_headers_ != nullptr && request_headers_->ContentLength() == nullptr) {
+      ASSERT(!settings_->disabled());
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.buffer_filter_populate_content_length")) {
+        request_headers_->insertContentLength().value(content_length_);
+      }
+    }
     return Http::FilterDataStatus::Continue;
   }
 

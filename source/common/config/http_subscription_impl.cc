@@ -39,6 +39,7 @@ void HttpSubscriptionImpl::start(const std::set<std::string>& resource_names) {
   if (init_fetch_timeout_.count() > 0) {
     init_fetch_timeout_timer_ = dispatcher_.createTimer([this]() -> void {
       ENVOY_LOG(warn, "REST config: initial fetch timed out for", path_);
+      stats_.init_fetch_timeout_.inc();
       callbacks_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout,
                                       nullptr);
     });

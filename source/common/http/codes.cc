@@ -47,8 +47,7 @@ CodeStatsImpl::CodeStatsImpl(Stats::SymbolTable& symbol_table)
   upstreamRqStatName(Code::ServiceUnavailable);
 }
 
-void CodeStatsImpl::incCounter(Stats::Scope& scope,
-                               const std::vector<Stats::StatName>& names) const {
+void CodeStatsImpl::incCounter(Stats::Scope& scope, const Stats::StatNameVec& names) const {
   const Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join(names);
   scope.counterFromStatName(Stats::StatName(stat_name_storage.get())).inc();
 }
@@ -58,7 +57,7 @@ void CodeStatsImpl::incCounter(Stats::Scope& scope, Stats::StatName a, Stats::St
   scope.counterFromStatName(Stats::StatName(stat_name_storage.get())).inc();
 }
 
-void CodeStatsImpl::recordHistogram(Stats::Scope& scope, const std::vector<Stats::StatName>& names,
+void CodeStatsImpl::recordHistogram(Stats::Scope& scope, const Stats::StatNameVec& names,
                                     uint64_t count) const {
   const Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join(names);
   scope.histogramFromStatName(Stats::StatName(stat_name_storage.get())).recordValue(count);

@@ -1,14 +1,31 @@
 # Building Envoy with Bazel
 
+## Installing Bazelisk as Bazel
+
+It is recommended to use [Bazelisk](https://github.com/bazelbuild/bazelisk) installed as `bazel`, to avoid Bazel compatibility issues.
+On Linux, run the following commands:
+
+```
+sudo wget -O /usr/local/bin/bazel https://github.com/bazelbuild/bazelisk/releases/download/v0.0.8/bazelisk-linux-amd64
+sudo chmod +x /usr/local/bin/bazel
+```
+
+On macOS, run the follwing command:
+```
+brew install bazelbuild/tap/bazelisk
+```
+
+If you're building from an revision of Envoy prior to August 2019, which doesn't contains a `.bazelversion` file, run `ci/run_envoy_docker.sh "bazel version"`
+to find the right version of Bazel and set the version to `USE_BAZEL_VERSION` environment variable to build.
+
 ## Production environments
 
 To build Envoy with Bazel in a production environment, where the [Envoy
 dependencies](https://www.envoyproxy.io/docs/envoy/latest/install/building.html#requirements) are typically
 independently sourced, the following steps should be followed:
 
-1. Install the latest version of [Bazel](https://bazel.build/versions/master/docs/install.html) in your environment.
-2. Configure, build and/or install the [Envoy dependencies](https://www.envoyproxy.io/docs/envoy/latest/install/building.html#requirements).
-3. `bazel build //source/exe:envoy-static` from the repository root.
+1. Configure, build and/or install the [Envoy dependencies](https://www.envoyproxy.io/docs/envoy/latest/install/building.html#requirements).
+1. `bazel build -c opt //source/exe:envoy-static` from the repository root.
 
 ## Quick start Bazel build for developers
 
@@ -21,7 +38,6 @@ up-to-date with the latest security patches. See
 [this doc](https://github.com/envoyproxy/envoy/blob/master/bazel/EXTERNAL_DEPS.md#updating-an-external-dependency-version)
 for how to update or override dependencies.
 
-1. Install the latest version of [Bazel](https://bazel.build/versions/master/docs/install.html) in your environment.
 1. Install external dependencies libtool, cmake, ninja, realpath and curl libraries separately.
     On Ubuntu, run the following command:
     ```
@@ -109,7 +125,7 @@ accordingly.
 ## Building Envoy with Docker sandbox
 
 Building Envoy with Docker sandbox uses the same Docker image used in CI with fixed C++ toolchain configuration. It produces more consistent
-output which is depending on your local C++ toolchain. It can also help debugging issues with RBE. To build Envoy with Docker sandbox:
+output which is not depending on your local C++ toolchain. It can also help debugging issues with RBE. To build Envoy with Docker sandbox:
 
 ```
 bazel build //source/exe:envoy-static --config=docker-clang
@@ -490,7 +506,7 @@ have seen some issues with seeing the artifacts tab. If you can't see it, log ou
 then log back in and it should start working.
 
 The latest coverage report for master is available
-[here](https://s3.amazonaws.com/lyft-envoy/coverage/report-master/coverage.html).
+[here](https://s3.amazonaws.com/lyft-envoy/coverage/report-master/index.html).
 
 It's also possible to specialize the coverage build to a specified test or test dir. This is useful
 when doing things like exploring the coverage of a fuzzer over its corpus. This can be done by

@@ -90,6 +90,11 @@ uint32_t portFromUrl(const std::string& url, const std::string& scheme,
     throw EnvoyException(fmt::format("malformed url: {}", url));
   }
 
+  size_t rcolon_index = url.rfind(':');
+  if (colon_index != rcolon_index) {
+    throw EnvoyException(fmt::format("malformed url: {}", url));
+  }
+
   try {
     return std::stoi(url.substr(colon_index + 1));
   } catch (const std::invalid_argument& e) {
