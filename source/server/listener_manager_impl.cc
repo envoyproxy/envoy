@@ -19,6 +19,7 @@
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 
+#include "server/active_udp_listener_config.h"
 #include "server/configuration_impl.h"
 #include "server/drain_manager_impl.h"
 #include "server/filter_chain_manager_impl.h"
@@ -220,6 +221,16 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
     addListenSocketOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
     // Needed to return receive buffer overflown indicator.
     addListenSocketOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
+    std::string listener_name =
+        config.has_udp_listener_config() ? config.udp_listener_config().udp_listener_name() : "";
+    if (listener_name.empty()) {
+      listener_name = "raw_udp_listener";
+    }
+    udp_listener_factory_ =
+        Config::Utility::getAndCheckFactory<ActiveUdpListenerConfigFactory>(listener_name)
+            .createActiveUdpListenerFactory(config.has_udp_listener_config()
+                                                ? config.udp_listener_config()
+                                                : envoy::api::v2::listener::UdpListenerConfig());
   }
 
   if (!config.listener_filters().empty()) {

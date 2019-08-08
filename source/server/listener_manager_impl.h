@@ -274,6 +274,7 @@ public:
   Stats::Scope& listenerScope() override { return *listener_scope_; }
   uint64_t listenerTag() const override { return listener_tag_; }
   const std::string& name() const override { return name_; }
+  ActiveUdpListenerFactory* udpListenerFactory() override { return udp_listener_factory_.get(); }
 
   // Server::Configuration::ListenerFactoryContext
   AccessLog::AccessLogManager& accessLogManager() override {
@@ -369,6 +370,8 @@ private:
   const std::string version_info_;
   Network::Socket::OptionsSharedPtr listen_socket_options_;
   const std::chrono::milliseconds listener_filters_timeout_;
+  std::unique_ptr<Server::ActiveUdpListenerFactory> udp_listener_factory_;
+
   // to access ListenerManagerImpl::factory_.
   friend class ListenerFilterChainFactoryBuilder;
 };

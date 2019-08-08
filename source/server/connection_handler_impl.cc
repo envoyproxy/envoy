@@ -27,8 +27,7 @@ void ConnectionHandlerImpl::addListener(Network::ListenerConfig& config) {
   } else {
     ASSERT(socket_type == Network::Address::SocketType::Datagram,
            "Only datagram/stream listener supported");
-    ActiveUdpListenerPtr udp(new ActiveUdpListener(*this, config));
-    listener = std::move(udp);
+    listener = config.udpListenerFactory()->createActiveUdpListener(*this, config);
   }
 
   if (disable_listeners_) {

@@ -11,6 +11,12 @@ load(
 envoy_package()
 
 envoy_cc_library(
+    name = "active_udp_listener_config_interface",
+    hdrs = ["active_udp_listener_config.h"],
+    deps = [":connection_handler_lib"],
+)
+
+envoy_cc_library(
     name = "backtrace_lib",
     hdrs = ["backtrace.h"],
     external_deps = [
@@ -254,6 +260,7 @@ envoy_cc_library(
     srcs = ["listener_manager_impl.cc"],
     hdrs = ["listener_manager_impl.h"],
     deps = [
+        ":active_udp_listener_config_interface",
         ":configuration_lib",
         ":drain_manager_lib",
         ":filter_chain_manager_lib",

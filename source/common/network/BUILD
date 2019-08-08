@@ -10,6 +10,16 @@ load(
 envoy_package()
 
 envoy_cc_library(
+    name = "active_raw_udp_listener_config",
+    srcs = ["active_raw_udp_listener_config.cc"],
+    hdrs = ["active_raw_udp_listener_config.h"],
+    deps = [
+        "//include/envoy/registry",
+        "//source/server:active_udp_listener_config_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "address_lib",
     srcs = [
         "address_impl.cc",

@@ -51,6 +51,7 @@ envoy_cc_test(
     srcs = ["connection_handler_test.cc"],
     deps = [
         "//source/common/common:utility_lib",
+        "//source/common/network:active_raw_udp_listener_config",
         "//source/common/network:address_lib",
         "//source/common/stats:stats_lib",
         "//source/server:connection_handler_lib",

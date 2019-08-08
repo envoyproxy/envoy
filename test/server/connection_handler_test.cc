@@ -5,6 +5,7 @@
 #include "common/network/raw_buffer_socket.h"
 #include "common/network/utility.h"
 
+#include "server/active_udp_listener_config.h"
 #include "server/connection_handler_impl.h"
 
 #include "test/mocks/network/mocks.h"
@@ -42,6 +43,10 @@ public:
         : parent_(parent), tag_(tag), bind_to_port_(bind_to_port),
           hand_off_restored_destination_connections_(hand_off_restored_destination_connections),
           name_(name), listener_filters_timeout_(listener_filters_timeout) {
+      envoy::api::v2::Listener dummy;
+      udp_listener_factory_ =
+          Config::Utility::getAndCheckFactory<ActiveUdpListenerConfigFactory>("raw_udp_listener")
+              .createActiveUdpListenerFactory(dummy);
       EXPECT_CALL(socket_, socketType()).WillOnce(Return(socket_type));
     }
 
@@ -61,6 +66,7 @@ public:
     Stats::Scope& listenerScope() override { return parent_.stats_store_; }
     uint64_t listenerTag() const override { return tag_; }
     const std::string& name() const override { return name_; }
+    ActiveUdpListenerFactory* udpListenerFactory() override { return udp_listener_factory_.get(); }
 
     ConnectionHandlerTest& parent_;
     Network::MockListenSocket socket_;
@@ -69,6 +75,7 @@ public:
     const bool hand_off_restored_destination_connections_;
     const std::string name_;
     const std::chrono::milliseconds listener_filters_timeout_;
+    std::unique_ptr<ActiveUdpListenerFactory> udp_listener_factory_;
   };
 
   using TestListenerPtr = std::unique_ptr<TestListener>;
@@ -92,6 +99,7 @@ public:
   NiceMock<Network::MockFilterChainFactory> factory_;
   std::list<TestListenerPtr> listeners_;
   const Network::FilterChainSharedPtr filter_chain_;
+  std::unique_ptr<ActiveUdpListenerFactory> udp_listener_factory_;
 };
 
 TEST_F(ConnectionHandlerTest, RemoveListener) {

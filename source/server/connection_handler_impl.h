@@ -59,22 +59,13 @@ public:
 
   Network::Listener* findListenerByAddress(const Network::Address::Instance& address) override;
 
-private:
   struct ActiveListenerBase;
   using ActiveListenerBasePtr = std::unique_ptr<ActiveListenerBase>;
-
-  struct ActiveTcpListener;
-  using ActiveTcpListenerPtr = std::unique_ptr<ActiveTcpListener>;
 
   struct ActiveUdpListener;
   using ActiveUdpListenerPtr = std::unique_ptr<ActiveUdpListener>;
 
   ActiveListenerBase* findActiveListenerByAddress(const Network::Address::Instance& address);
-
-  struct ActiveConnection;
-  using ActiveConnectionPtr = std::unique_ptr<ActiveConnection>;
-  struct ActiveSocket;
-  using ActiveSocketPtr = std::unique_ptr<ActiveSocket>;
 
   /**
    * Wrapper for an active listener owned by this handler.
@@ -120,6 +111,14 @@ private:
     Network::UdpListener* udp_listener_;
     Network::UdpListenerReadFilterPtr read_filter_;
   };
+
+private:
+  struct ActiveTcpListener;
+  using ActiveTcpListenerPtr = std::unique_ptr<ActiveTcpListener>;
+  struct ActiveConnection;
+  using ActiveConnectionPtr = std::unique_ptr<ActiveConnection>;
+  struct ActiveSocket;
+  using ActiveSocketPtr = std::unique_ptr<ActiveSocket>;
 
   /**
    * Wrapper for an active tcp listener owned by this handler.
@@ -228,5 +227,19 @@ private:
   bool disable_listeners_;
 };
 
+class ActiveUdpListenerFactory {
+public:
+  virtual ~ActiveUdpListenerFactory() {}
+
+  virtual ConnectionHandlerImpl::ActiveListenerBasePtr
+  createActiveUdpListener(ConnectionHandlerImpl& parent, Network::ListenerConfig& config) PURE;
+};
+
+class ActiveRawUdpListenerFactory : public ActiveUdpListenerFactory {
+  ConnectionHandlerImpl::ActiveListenerBasePtr
+  createActiveUdpListener(ConnectionHandlerImpl& parent, Network::ListenerConfig& config) override {
+    return std::make_unique<ConnectionHandlerImpl::ActiveUdpListener>(parent, config);
+  }
+};
 } // namespace Server
 } // namespace Envoy

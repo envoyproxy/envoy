@@ -11,6 +11,11 @@
 #include "envoy/stats/scope.h"
 
 namespace Envoy {
+
+namespace Server {
+class ActiveUdpListenerFactory;
+} // namespace Server
+
 namespace Network {
 
 class UdpListenerFilterManager;
@@ -83,6 +88,12 @@ public:
    * @return const std::string& the listener's name.
    */
   virtual const std::string& name() const PURE;
+
+  /**
+   * @return factory pointer if socket_type is DATAGRAM, otherwise return
+   * nullptr.
+   */
+  virtual Server::ActiveUdpListenerFactory* udpListenerFactory() PURE;
 };
 
 /**
@@ -177,6 +188,7 @@ public:
   virtual void onReceiveError(const ErrorCode& error_code, Api::IoError::IoErrorCode err) PURE;
 };
 
+using UdpListenerCallbacksPtr = std::unique_ptr<UdpListenerCallbacks>;
 /**
  * An abstract socket listener. Free the listener to stop listening on the socket.
  */

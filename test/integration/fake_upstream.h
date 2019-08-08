@@ -10,7 +10,6 @@
 #include "envoy/grpc/status.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
-#include "envoy/network/connection_handler.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/configuration.h"
 #include "envoy/server/listener_manager.h"
@@ -27,6 +26,8 @@
 #include "common/network/filter_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/stats/isolated_store_impl.h"
+
+#include "server/connection_handler_impl.h"
 
 #include "test/test_common/printers.h"
 #include "test/test_common/test_time_system.h"
@@ -604,8 +605,12 @@ private:
     Stats::Scope& listenerScope() override { return parent_.stats_store_; }
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
+    Server::ActiveUdpListenerFactory* udpListenerFactory() override {
+      return udp_listener_factory_.get();
+    }
 
     FakeUpstream& parent_;
+    std::unique_ptr<Server::ActiveUdpListenerFactory> udp_listener_factory_;
     std::string name_;
   };
 

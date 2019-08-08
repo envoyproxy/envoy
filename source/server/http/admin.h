@@ -31,6 +31,7 @@
 #include "common/router/scoped_config_impl.h"
 #include "common/stats/isolated_store_impl.h"
 
+#include "server/connection_handler_impl.h"
 #include "server/http/config_tracker_impl.h"
 
 #include "absl/strings/string_view.h"
@@ -318,11 +319,15 @@ private:
     Stats::Scope& listenerScope() override { return *scope_; }
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
+    Server::ActiveUdpListenerFactory* udpListenerFactory() override {
+      return udp_listener_factory_.get();
+    }
 
     AdminImpl& parent_;
     const std::string name_;
     Stats::ScopePtr scope_;
     Http::ConnectionManagerListenerStats stats_;
+    std::unique_ptr<Server::ActiveUdpListenerFactory> udp_listener_factory_;
   };
   using AdminListenerPtr = std::unique_ptr<AdminListener>;
 

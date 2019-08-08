@@ -520,6 +520,7 @@ envoy_cc_test(
     ],
     deps = [
         ":integration_lib",
+        "//source/common/network:active_raw_udp_listener_config",
         "//source/common/network:listen_socket_lib",
         "//test/integration/filters:udp_listener_echo_filter_lib",
         "//test/server:utility_lib",
