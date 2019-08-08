@@ -124,6 +124,8 @@ public:
 
 private:
   DubboFilters::EncoderFilterSharedPtr handle_;
+
+  friend class ActiveMessage;
 };
 
 using ActiveMessageEncoderFilterPtr = std::unique_ptr<ActiveMessageEncoderFilter>;

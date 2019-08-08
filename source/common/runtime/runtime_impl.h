@@ -205,7 +205,8 @@ struct RtdsSubscription : Config::SubscriptionCallbacks, Logger::Loggable<Logger
                       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                       const std::string&) override;
 
-  void onConfigUpdateFailed(const EnvoyException* e) override;
+  void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
+                            const EnvoyException* e) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override {
     return MessageUtil::anyConvert<envoy::service::discovery::v2::Runtime>(resource,
                                                                            validation_visitor_)

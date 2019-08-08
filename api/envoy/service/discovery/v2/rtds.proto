@@ -14,7 +14,7 @@ import "google/protobuf/struct.proto";
 
 import "validate/validate.proto";
 
-// [#protodoc-title: runTime Discovery Service (RTDS)]
+// [#protodoc-title: Runtime Discovery Service (RTDS)]
 // RTDS :ref:`configuration overview <config_runtime_rtds>`
 
 // [#not-implemented-hide:] Not configuration. Workaround c++ protobuf issue with importing

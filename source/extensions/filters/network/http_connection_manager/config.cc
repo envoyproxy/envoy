@@ -170,7 +170,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 #else
                                                       0
 #endif
-                                                      ))) {
+                                                      ))),
+      merge_slashes_(config.merge_slashes()) {
   // If scoped RDS is enabled, avoid creating a route config provider. Route config providers will
   // be managed by the scoped routing logic instead.
   switch (config.route_specifier_case()) {
@@ -367,7 +368,7 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
   switch (codec_type_) {
   case CodecType::HTTP1:
     return std::make_unique<Http::Http1::ServerConnectionImpl>(
-        connection, callbacks, http1_settings_, maxRequestHeadersKb());
+        connection, context_.scope(), callbacks, http1_settings_, maxRequestHeadersKb());
   case CodecType::HTTP2:
     return std::make_unique<Http::Http2::ServerConnectionImpl>(
         connection, callbacks, context_.scope(), http2_settings_, maxRequestHeadersKb());

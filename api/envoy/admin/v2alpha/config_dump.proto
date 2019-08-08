@@ -33,7 +33,7 @@ message ConfigDump {
   // * *clusters*: :ref:`ClustersConfigDump <envoy_api_msg_admin.v2alpha.ClustersConfigDump>`
   // * *listeners*: :ref:`ListenersConfigDump <envoy_api_msg_admin.v2alpha.ListenersConfigDump>`
   // * *routes*:  :ref:`RoutesConfigDump <envoy_api_msg_admin.v2alpha.RoutesConfigDump>`
-  repeated google.protobuf.Any configs = 1 [(gogoproto.nullable) = false];
+  repeated google.protobuf.Any configs = 1;
 }
 
 // This message describes the bootstrap configuration that Envoy was started with. This includes
@@ -41,7 +41,7 @@ message ConfigDump {
 // the static portions of an Envoy configuration by reusing the output as the bootstrap
 // configuration for another Envoy.
 message BootstrapConfigDump {
-  envoy.config.bootstrap.v2.Bootstrap bootstrap = 1 [(gogoproto.nullable) = false];
+  envoy.config.bootstrap.v2.Bootstrap bootstrap = 1;
 
   // The timestamp when the BootstrapConfig was last updated.
   google.protobuf.Timestamp last_updated = 2;
@@ -81,23 +81,23 @@ message ListenersConfigDump {
   }
 
   // The statically loaded listener configs.
-  repeated StaticListener static_listeners = 2 [(gogoproto.nullable) = false];
+  repeated StaticListener static_listeners = 2;
 
   // The dynamically loaded active listeners. These are listeners that are available to service
   // data plane traffic.
-  repeated DynamicListener dynamic_active_listeners = 3 [(gogoproto.nullable) = false];
+  repeated DynamicListener dynamic_active_listeners = 3;
 
   // The dynamically loaded warming listeners. These are listeners that are currently undergoing
   // warming in preparation to service data plane traffic. Note that if attempting to recreate an
   // Envoy configuration from a configuration dump, the warming listeners should generally be
   // discarded.
-  repeated DynamicListener dynamic_warming_listeners = 4 [(gogoproto.nullable) = false];
+  repeated DynamicListener dynamic_warming_listeners = 4;
 
   // The dynamically loaded draining listeners. These are listeners that are currently undergoing
   // draining in preparation to stop servicing data plane traffic. Note that if attempting to
   // recreate an Envoy configuration from a configuration dump, the draining listeners should
   // generally be discarded.
-  repeated DynamicListener dynamic_draining_listeners = 5 [(gogoproto.nullable) = false];
+  repeated DynamicListener dynamic_draining_listeners = 5;
 }
 
 // Envoy's cluster manager fills this message with all currently known clusters. Cluster
@@ -134,17 +134,17 @@ message ClustersConfigDump {
   }
 
   // The statically loaded cluster configs.
-  repeated StaticCluster static_clusters = 2 [(gogoproto.nullable) = false];
+  repeated StaticCluster static_clusters = 2;
 
   // The dynamically loaded active clusters. These are clusters that are available to service
   // data plane traffic.
-  repeated DynamicCluster dynamic_active_clusters = 3 [(gogoproto.nullable) = false];
+  repeated DynamicCluster dynamic_active_clusters = 3;
 
   // The dynamically loaded warming clusters. These are clusters that are currently undergoing
   // warming in preparation to service data plane traffic. Note that if attempting to recreate an
   // Envoy configuration from a configuration dump, the warming clusters should generally be
   // discarded.
-  repeated DynamicCluster dynamic_warming_clusters = 4 [(gogoproto.nullable) = false];
+  repeated DynamicCluster dynamic_warming_clusters = 4;
 }
 
 // Envoy's RDS implementation fills this message with all currently loaded routes, as described by
@@ -175,10 +175,10 @@ message RoutesConfigDump {
   }
 
   // The statically loaded route configs.
-  repeated StaticRouteConfig static_route_configs = 2 [(gogoproto.nullable) = false];
+  repeated StaticRouteConfig static_route_configs = 2;
 
   // The dynamically loaded route configs.
-  repeated DynamicRouteConfig dynamic_route_configs = 3 [(gogoproto.nullable) = false];
+  repeated DynamicRouteConfig dynamic_route_configs = 3;
 }
 
 // Envoy's scoped RDS implementation fills this message with all currently loaded route
@@ -214,11 +214,10 @@ message ScopedRoutesConfigDump {
   }
 
   // The statically loaded scoped route configs.
-  repeated InlineScopedRouteConfigs inline_scoped_route_configs = 1 [(gogoproto.nullable) = false];
+  repeated InlineScopedRouteConfigs inline_scoped_route_configs = 1;
 
   // The dynamically loaded scoped route configs.
-  repeated DynamicScopedRouteConfigs dynamic_scoped_route_configs = 2
-      [(gogoproto.nullable) = false];
+  repeated DynamicScopedRouteConfigs dynamic_scoped_route_configs = 2;
 }
 
 // Envoys SDS implementation fills this message with all secrets fetched dynamically via SDS.

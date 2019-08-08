@@ -15,6 +15,7 @@ uint64_t JitteredBackOffStrategy::nextBackOffMs() {
   if (base_backoff <= max_interval_) {
     current_retry_++;
   }
+  ASSERT(base_backoff > 0);
   return std::min(random_.random() % base_backoff, max_interval_);
 }
 

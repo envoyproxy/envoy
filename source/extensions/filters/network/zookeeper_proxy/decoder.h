@@ -95,6 +95,11 @@ public:
   virtual void onCheckWatchesRequest(const std::string& path, int32_t type) PURE;
   virtual void onRemoveWatchesRequest(const std::string& path, int32_t type) PURE;
   virtual void onCloseRequest() PURE;
+  virtual void onResponseBytes(uint64_t bytes) PURE;
+  virtual void onConnectResponse(int32_t proto_version, int32_t timeout, bool readonly) PURE;
+  virtual void onResponse(OpCodes opcode, int32_t xid, int64_t zxid, int32_t error) PURE;
+  virtual void onWatchEvent(int32_t event_type, int32_t client_state, const std::string& path,
+                            int64_t zxid, int32_t error) PURE;
 };
 
 /**
@@ -105,6 +110,7 @@ public:
   virtual ~Decoder() = default;
 
   virtual void onData(Buffer::Instance& data) PURE;
+  virtual void onWrite(Buffer::Instance& data) PURE;
 };
 
 using DecoderPtr = std::unique_ptr<Decoder>;
@@ -116,9 +122,14 @@ public:
 
   // ZooKeeperProxy::Decoder
   void onData(Buffer::Instance& data) override;
+  void onWrite(Buffer::Instance& data) override;
 
 private:
-  void decode(Buffer::Instance& data, uint64_t& offset);
+  enum class DecodeType { READ, WRITE };
+
+  void decode(Buffer::Instance& data, DecodeType dtype);
+  void decodeOnData(Buffer::Instance& data, uint64_t& offset);
+  void decodeOnWrite(Buffer::Instance& data, uint64_t& offset);
   void parseConnect(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseAuthRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseGetDataRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
@@ -140,10 +151,15 @@ private:
   void ensureMinLength(int32_t len, int32_t minlen) const;
   void ensureMaxLength(int32_t len) const;
   std::string pathOnlyRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
+  void parseConnectResponse(Buffer::Instance& data, uint64_t& offset, uint32_t len);
+  void parseWatchEvent(Buffer::Instance& data, uint64_t& offset, uint32_t len, int64_t zxid,
+                       int32_t error);
+  bool maybeReadBool(Buffer::Instance& data, uint64_t& offset);
 
   DecoderCallbacks& callbacks_;
   const uint32_t max_packet_bytes_;
   BufferHelper helper_;
+  std::unordered_map<int32_t, OpCodes> requests_by_xid_;
 };
 
 } // namespace ZooKeeperProxy

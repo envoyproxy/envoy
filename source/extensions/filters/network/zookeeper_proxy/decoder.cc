@@ -2,6 +2,8 @@
 
 #include <string>
 
+#include "common/common/enum_to_int.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -16,6 +18,8 @@ constexpr uint32_t ZXID_LENGTH = 8;
 constexpr uint32_t TIMEOUT_LENGTH = 4;
 constexpr uint32_t SESSION_LENGTH = 8;
 constexpr uint32_t MULTI_HEADER_LENGTH = 9;
+constexpr uint32_t PROTOCOL_VERSION_LENGTH = 4;
+constexpr uint32_t SERVER_HEADER_LENGTH = 16;
 
 const char* createFlagsToString(CreateFlags flags) {
   switch (flags) {
@@ -38,17 +42,9 @@ const char* createFlagsToString(CreateFlags flags) {
   return "unknown";
 }
 
-void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
-  ENVOY_LOG(trace, "zookeeper_proxy: decoding {} bytes at offset {}", data.length(), offset);
-
-  // Reset the helper's cursor, to ensure the current message stays within the
-  // allowed max length, even when it's different than the declared length
-  // by the message.
-  //
-  // Note: we need to keep two cursors — offset and helper_'s internal one — because
-  //       a buffer may contain multiple messages, so offset is global and helper_'s
-  //       internal cursor is reset for each individual message.
-  helper_.reset();
+void DecoderImpl::decodeOnData(Buffer::Instance& data, uint64_t& offset) {
+  ENVOY_LOG(trace, "zookeeper_proxy: decoding request with {} bytes at offset {}", data.length(),
+            offset);
 
   // Check message length.
   const int32_t len = helper_.peekInt32(data, offset);
@@ -93,8 +89,8 @@ void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
   // for two cases: auth requests can happen at any time and ping requests
   // must happen every 1/3 of the negotiated session timeout, to keep
   // the session alive.
-  const int32_t opcode = helper_.peekInt32(data, offset);
-  switch (static_cast<OpCodes>(opcode)) {
+  const auto opcode = static_cast<OpCodes>(helper_.peekInt32(data, offset));
+  switch (opcode) {
   case OpCodes::GETDATA:
     parseGetDataRequest(data, offset, len);
     break;
@@ -156,8 +152,62 @@ void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
     callbacks_.onCloseRequest();
     break;
   default:
-    throw EnvoyException(fmt::format("Unknown opcode: {}", opcode));
+    throw EnvoyException(fmt::format("Unknown opcode: {}", enumToSignedInt(opcode)));
   }
+
+  requests_by_xid_[xid] = opcode;
+}
+
+void DecoderImpl::decodeOnWrite(Buffer::Instance& data, uint64_t& offset) {
+  ENVOY_LOG(trace, "zookeeper_proxy: decoding response with {} bytes at offset {}", data.length(),
+            offset);
+
+  // Check message length.
+  const int32_t len = helper_.peekInt32(data, offset);
+  ensureMinLength(len, INT_LENGTH + XID_LENGTH);
+  ensureMaxLength(len);
+
+  const auto xid = helper_.peekInt32(data, offset);
+  const auto xid_code = static_cast<XidCodes>(xid);
+
+  // Connect responses are special, they have no full reply header
+  // but just an XID with no zxid nor error fields like the ones
+  // available for all other server generated messages.
+  if (xid_code == XidCodes::CONNECT_XID) {
+    parseConnectResponse(data, offset, len);
+    return;
+  }
+
+  // Control responses that aren't connect, with XIDs <= 0.
+  const auto zxid = helper_.peekInt64(data, offset);
+  const auto error = helper_.peekInt32(data, offset);
+  switch (xid_code) {
+  case XidCodes::PING_XID:
+    callbacks_.onResponse(OpCodes::PING, xid, zxid, error);
+    return;
+  case XidCodes::AUTH_XID:
+    callbacks_.onResponse(OpCodes::SETAUTH, xid, zxid, error);
+    return;
+  case XidCodes::SET_WATCHES_XID:
+    callbacks_.onResponse(OpCodes::SETWATCHES, xid, zxid, error);
+    return;
+  case XidCodes::WATCH_XID:
+    parseWatchEvent(data, offset, len, zxid, error);
+    return;
+  default:
+    break;
+  }
+
+  // Find the corresponding request for this XID.
+  const auto it = requests_by_xid_.find(xid);
+
+  // If this fails, it's a server-side bug.
+  ASSERT(it != requests_by_xid_.end());
+
+  const auto opcode = it->second;
+  requests_by_xid_.erase(it);
+  offset += (len - (XID_LENGTH + ZXID_LENGTH + INT_LENGTH));
+  callbacks_.onResponse(opcode, xid, zxid, error);
 }
 
 void DecoderImpl::ensureMinLength(const int32_t len, const int32_t minlen) const {
@@ -181,11 +231,7 @@ void DecoderImpl::parseConnect(Buffer::Instance& data, uint64_t& offset, uint32_
   // Skip password.
   skipString(data, offset);
 
-  // Read readonly flag, if it's there.
-  bool readonly{};
-  if (data.length() >= offset + 1) {
-    readonly = helper_.peekBool(data, offset);
-  }
+  const bool readonly = maybeReadBool(data, offset);
 
   callbacks_.onConnect(readonly);
 }
@@ -397,18 +443,72 @@ void DecoderImpl::skipStrings(Buffer::Instance& data, uint64_t& offset) {
   }
 }
 
-void DecoderImpl::onData(Buffer::Instance& data) {
+void DecoderImpl::onData(Buffer::Instance& data) { decode(data, DecodeType::READ); }
+
+void DecoderImpl::onWrite(Buffer::Instance& data) { decode(data, DecodeType::WRITE); }
+
+void DecoderImpl::decode(Buffer::Instance& data, DecodeType dtype) {
   uint64_t offset = 0;
+
   try {
     while (offset < data.length()) {
+      // Reset the helper's cursor, to ensure the current message stays within the
+      // allowed max length, even when it's different than the declared length
+      // by the message.
+      //
+      // Note: we need to keep two cursors — offset and helper_'s internal one — because
+      //       a buffer may contain multiple messages, so offset is global while helper_'s
+      //       internal cursor gets reset for each individual message.
+      helper_.reset();
+
       const uint64_t current = offset;
-      decode(data, offset);
-      callbacks_.onRequestBytes(offset - current);
+      switch (dtype) {
+      case DecodeType::READ:
+        decodeOnData(data, offset);
+        callbacks_.onRequestBytes(offset - current);
+        break;
+      case DecodeType::WRITE:
+        decodeOnWrite(data, offset);
+        callbacks_.onResponseBytes(offset - current);
+        break;
+      }
     }
   } catch (const EnvoyException& e) {
     ENVOY_LOG(debug, "zookeeper_proxy: decoding exception {}", e.what());
     callbacks_.onDecodeError();
   }
+}
+
+void DecoderImpl::parseConnectResponse(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
+  ensureMinLength(len, PROTOCOL_VERSION_LENGTH + TIMEOUT_LENGTH + SESSION_LENGTH + INT_LENGTH);
+
+  const auto timeout = helper_.peekInt32(data, offset);
+
+  // Skip session id + password.
+  offset += SESSION_LENGTH;
+  skipString(data, offset);
+
+  const bool readonly = maybeReadBool(data, offset);
+
+  callbacks_.onConnectResponse(0, timeout, readonly);
+}
+
+void DecoderImpl::parseWatchEvent(Buffer::Instance& data, uint64_t& offset, const uint32_t len,
+                                  const int64_t zxid, const int32_t error) {
+  ensureMinLength(len, SERVER_HEADER_LENGTH + (3 * INT_LENGTH));
+
+  const auto event_type = helper_.peekInt32(data, offset);
+  const auto client_state = helper_.peekInt32(data, offset);
+  const auto path = helper_.peekString(data, offset);
+
+  callbacks_.onWatchEvent(event_type, client_state, path, zxid, error);
+}
+
+bool DecoderImpl::maybeReadBool(Buffer::Instance& data, uint64_t& offset) {
+  if (data.length() >= offset + 1) {
+    return helper_.peekBool(data, offset);
+  }
+  return false;
 }
 
 } // namespace ZooKeeperProxy
