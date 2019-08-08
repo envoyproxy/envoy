@@ -7,6 +7,6 @@ api_proto_library_internal(
     srcs = ["common.proto"],
     visibility = ["//visibility:public"],
     deps = [
-        "//envoy/api/v2/route",
+		    "//envoy/api/v2/route:route",
     ],
 )
