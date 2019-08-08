@@ -26,11 +26,3 @@ api_proto_library_internal(
         "//envoy/type:http_status",
     ],
 )
-
-api_cc_grpc_library(
-    name = "external_auth_service",
-    proto = ":external_auth",
-    deps = [
-        ":external_auth_cc",
-    ],
-)

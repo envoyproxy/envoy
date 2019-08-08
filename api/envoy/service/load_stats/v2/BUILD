@@ -11,12 +11,3 @@ api_proto_library_internal(
         "//envoy/api/v2/endpoint:load_report",
     ],
 )
-
-api_go_grpc_library(
-    name = "lrs",
-    proto = ":lrs",
-    deps = [
-        "//envoy/api/v2/core:base_go_proto",
-        "//envoy/api/v2/endpoint:load_report_go_proto",
-    ],
-)

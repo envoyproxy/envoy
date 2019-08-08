@@ -5,7 +5,7 @@ licenses(["notice"])  # Apache 2
 api_proto_library_internal(
     name = "trace_service",
     srcs = ["trace_service.proto"],
-    has_services = 1,
+    has_services = 0,  # A go-only service due to the external dependency @opencensus_proto//opencensus/proto/trace/v1:trace_proto_go
     require_py = 0,
     deps = [
         "//envoy/api/v2/core:base",

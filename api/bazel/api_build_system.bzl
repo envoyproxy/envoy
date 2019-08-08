@@ -20,12 +20,10 @@ def _LibrarySuffix(library_name, suffix):
         library_name += ":" + Label(library_name).name
     return _Suffix(library_name, suffix)
 
-# TODO(htuch): has_services is currently ignored but will in future support
-# gRPC stub generation.
 # TODO(htuch): Convert this to native py_proto_library once
 # https://github.com/bazelbuild/bazel/issues/3935 and/or
 # https://github.com/bazelbuild/bazel/issues/2626 are resolved.
-def api_py_proto_library(name, srcs = [], deps = [], has_services = 0):
+def api_py_proto_library(name, srcs = [], deps = []):
     py_proto_library(
         name = _Suffix(name, _PY_SUFFIX),
         srcs = srcs,
@@ -78,7 +76,7 @@ def api_go_grpc_library(name, proto, deps = []):
 
 def api_cc_grpc_library(name, proto, deps = []):
     cc_grpc_library(
-        name = _Suffix(name, _CC_GRPC_SUFFIX),
+        name = name,
         srcs = [proto],
         deps = deps,
         proto_only = False,
@@ -96,10 +94,6 @@ def api_proto_library_internal(visibility = ["//visibility:private"], **kwargs):
 
     api_proto_library(visibility = visibility, **kwargs)
 
-# TODO(htuch): has_services is currently ignored but will in future support
-# gRPC stub generation.
-# TODO(htuch): Automatically generate go_proto_library and go_grpc_library
-# from api_proto_library.
 def api_proto_library(
         name,
         visibility = ["//visibility:private"],
@@ -110,6 +104,7 @@ def api_proto_library(
         has_services = 0,
         linkstatic = None,
         require_py = 1):
+    this = ":" + name
     native.proto_library(
         name = name,
         srcs = srcs,
@@ -128,21 +123,32 @@ def api_proto_library(
         ],
         visibility = visibility,
     )
+    cc_proto_library_name = _Suffix(name, _CC_SUFFIX)
     pgv_cc_proto_library(
-        name = _Suffix(name, _CC_SUFFIX),
+        name = cc_proto_library_name,
         linkstatic = linkstatic,
         cc_deps = [_LibrarySuffix(d, _CC_SUFFIX) for d in deps] + external_cc_proto_deps + [
             "@com_github_gogo_protobuf//:gogo_proto_cc",
             "@googleapis//:http_api_protos",
             "@googleapis//:rpc_status_protos",
         ],
-        deps = [":" + name],
+        deps = [this],
         visibility = ["//visibility:public"],
     )
     py_export_suffixes = []
     if (require_py == 1):
-        api_py_proto_library(name, srcs, deps, has_services)
+        api_py_proto_library(name, srcs, deps)
         py_export_suffixes = ["_py", "_py_genproto"]
+
+    # Optionally define gRPC services
+    # TODO: when Python services are required, add to the below stub generations.
+    if (has_services == 1):
+        go_grpc_name = _Suffix(name, _GO_GRPC_SUFFIX)
+        go_proto_deps = [_Suffix(x, _GO_PROTO_SUFFIX) for x in deps]
+        api_go_grpc_library(name = go_grpc_name, proto = this, deps = go_proto_deps)
+        cc_grpc_name = _Suffix(name, _CC_GRPC_SUFFIX)
+        cc_proto_deps = [cc_proto_library_name] + [_Suffix(x, _CC_SUFFIX) for x in deps]
+        api_cc_grpc_library(name = cc_grpc_name, proto = this, deps = cc_proto_deps)
 
     # Allow unlimited visibility for consumers
     export_suffixes = ["", "_cc", "_cc_validate"] + py_export_suffixes

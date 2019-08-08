@@ -5,7 +5,7 @@ licenses(["notice"])  # Apache 2
 api_proto_library_internal(
     name = "metrics_service",
     srcs = ["metrics_service.proto"],
-    has_services = 1,
+    has_services = 0,  # A go-only service due to the external dependency "@prometheus_metrics_model//:client_model_go_proto"
     require_py = 0,
     deps = [
         "//envoy/api/v2/core:base",
