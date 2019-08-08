@@ -82,7 +82,7 @@ api_proto_library_internal(
         ":discovery",
         "//envoy/api/v2/core:base",
         "//envoy/api/v2/core:config_source",
-	"//envoy/api/v2/routei:route",
+	"//envoy/api/v2/route:route",
     ],
 )
 
