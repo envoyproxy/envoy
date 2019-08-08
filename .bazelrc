@@ -19,6 +19,11 @@ build --action_env=BAZEL_LINKOPTS=-lm:-static-libgcc
 build --host_javabase=@bazel_tools//tools/jdk:remote_jdk11
 build --javabase=@bazel_tools//tools/jdk:remote_jdk11
 
+# Pass PATH, CC and CXX variables from the environment.
+build --action_env=CC
+build --action_env=CXX
+build --action_env=PATH
+
 # Basic ASAN/UBSAN that works for gcc
 build:asan --action_env=BAZEL_LINKLIBS=
 build:asan --action_env=BAZEL_LINKOPTS=-lstdc++:-lm
@@ -73,12 +78,9 @@ build:clang-msan --copt -fsanitize-memory-track-origins=2
 # Clang with libc++
 # TODO(cmluciano) fix and re-enable _LIBCPP_VERSION testing for TCMALLOC in Envoy::Stats::TestUtil::hasDeterministicMallocStats
 # and update stats_integration_test with appropriate m_per_cluster value
-build:libc++ --action_env=CC
-build:libc++ --action_env=CXX
 build:libc++ --action_env=CXXFLAGS=-stdlib=libc++
 build:libc++ --action_env=BAZEL_CXXOPTS=-stdlib=libc++
 build:libc++ --action_env=BAZEL_LINKLIBS=-l%:libc++.a:-l%:libc++abi.a:-lm
-build:libc++ --action_env=PATH
 build:libc++ --host_linkopt=-fuse-ld=lld
 build:libc++ --define force_libcpp=enabled
 
