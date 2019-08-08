@@ -7,11 +7,11 @@ build \
   --define=tcmalloc=disabled \
   --ios_minimum_os=10.0 \
   --ios_simulator_device="iPhone X" \
-  --ios_simulator_version=12.2 \
+  --ios_simulator_version=12.4 \
   --spawn_strategy=standalone \
   --verbose_failures \
   --workspace_status_command=envoy/bazel/get_workspace_status \
-  --xcode_version=10.2.1 \
+  --xcode_version=10.3.0 \
   --incompatible_bzl_disallow_load_after_statement=false
 
 # Manual Stamping is necessary in order to get versioning information in the ios
