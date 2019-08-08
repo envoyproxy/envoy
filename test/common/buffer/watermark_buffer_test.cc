@@ -18,7 +18,6 @@ namespace {
 
 const char TEN_BYTES[] = "0123456789";
 
-// TODO(mergeconflict): add tests for overflow behavior
 class WatermarkBufferTest : public BufferImplementationParamTest {
 public:
   WatermarkBufferTest() {
@@ -59,6 +58,13 @@ TEST_P(WatermarkBufferTest, AddChar) {
   buffer_.add("a", 1);
   EXPECT_EQ(1, times_high_watermark_called_);
   EXPECT_EQ(11, buffer_.length());
+
+  buffer_.add("bcdefghij");
+  EXPECT_EQ(0, times_overflow_watermark_called_);
+  EXPECT_EQ(20, buffer_.length());
+  buffer_.add("k", 1);
+  EXPECT_EQ(1, times_overflow_watermark_called_);
+  EXPECT_EQ(21, buffer_.length());
 }
 
 TEST_P(WatermarkBufferTest, AddString) {
@@ -67,6 +73,10 @@ TEST_P(WatermarkBufferTest, AddString) {
   buffer_.add(std::string("a"));
   EXPECT_EQ(1, times_high_watermark_called_);
   EXPECT_EQ(11, buffer_.length());
+
+  buffer_.add(std::string(TEN_BYTES));
+  EXPECT_EQ(1, times_overflow_watermark_called_);
+  EXPECT_EQ(21, buffer_.length());
 }
 
 TEST_P(WatermarkBufferTest, AddBuffer) {
@@ -77,6 +87,11 @@ TEST_P(WatermarkBufferTest, AddBuffer) {
   buffer_.add(second);
   EXPECT_EQ(1, times_high_watermark_called_);
   EXPECT_EQ(11, buffer_.length());
+
+  OwnedImpl third(TEN_BYTES);
+  buffer_.add(third);
+  EXPECT_EQ(1, times_overflow_watermark_called_);
+  EXPECT_EQ(21, buffer_.length());
 }
 
 TEST_P(WatermarkBufferTest, Prepend) {
@@ -87,6 +102,9 @@ TEST_P(WatermarkBufferTest, Prepend) {
   buffer_.prepend(prefix);
   EXPECT_EQ(1, times_high_watermark_called_);
   EXPECT_EQ(suffix.size() + prefix.size(), buffer_.length());
+
+  buffer_.prepend(TEN_BYTES);
+  EXPECT_EQ(1, times_overflow_watermark_called_);
 }
 
 TEST_P(WatermarkBufferTest, PrependToEmptyBuffer) {
@@ -110,10 +128,9 @@ TEST_P(WatermarkBufferTest, PrependBuffer) {
 
   uint32_t prefix_buffer_low_watermark_hits{0};
   uint32_t prefix_buffer_high_watermark_hits{0};
-  uint32_t prefix_buffer_overflow_watermark_hits{0};
   WatermarkBuffer prefixBuffer{[&]() -> void { ++prefix_buffer_low_watermark_hits; },
                                [&]() -> void { ++prefix_buffer_high_watermark_hits; },
-                               [&]() -> void { ++prefix_buffer_overflow_watermark_hits; }};
+                               [&]() -> void { /* not interesting in this case */ }};
   prefixBuffer.setWatermarks(5, 10);
   prefixBuffer.add(prefix);
   prefixBuffer.add(suffix);
@@ -131,13 +148,22 @@ TEST_P(WatermarkBufferTest, PrependBuffer) {
 TEST_P(WatermarkBufferTest, Commit) {
   buffer_.add(TEN_BYTES, 10);
   EXPECT_EQ(0, times_high_watermark_called_);
-  RawSlice out;
-  buffer_.reserve(10, &out, 1);
-  memcpy(out.mem_, &TEN_BYTES[0], 10);
-  out.len_ = 10;
-  buffer_.commit(&out, 1);
+
+  const auto commit_ten_bytes = [this] {
+    RawSlice out;
+    buffer_.reserve(10, &out, 1);
+    memcpy(out.mem_, &TEN_BYTES[0], 10);
+    out.len_ = 10;
+    buffer_.commit(&out, 1);
+  };
+
+  commit_ten_bytes();
   EXPECT_EQ(1, times_high_watermark_called_);
   EXPECT_EQ(20, buffer_.length());
+
+  commit_ten_bytes();
+  EXPECT_EQ(1, times_overflow_watermark_called_);
+  EXPECT_EQ(30, buffer_.length());
 }
 
 TEST_P(WatermarkBufferTest, Drain) {
@@ -161,6 +187,14 @@ TEST_P(WatermarkBufferTest, Drain) {
   // Going back above should trigger the high again
   buffer_.add(TEN_BYTES, 10);
   EXPECT_EQ(2, times_high_watermark_called_);
+
+  // Draining doesn't reset the overflow bit, so overflow should only be called once.
+  buffer_.add(TEN_BYTES, 10);
+  EXPECT_EQ(1, times_overflow_watermark_called_);
+  buffer_.drain(20);
+  buffer_.add(TEN_BYTES, 10);
+  buffer_.add(TEN_BYTES, 10);
+  EXPECT_EQ(1, times_overflow_watermark_called_);
 }
 
 TEST_P(WatermarkBufferTest, MoveFullBuffer) {
@@ -171,6 +205,11 @@ TEST_P(WatermarkBufferTest, MoveFullBuffer) {
   buffer_.move(data);
   EXPECT_EQ(1, times_high_watermark_called_);
   EXPECT_EQ(11, buffer_.length());
+
+  OwnedImpl overflow_data(TEN_BYTES);
+  buffer_.move(overflow_data);
+  EXPECT_EQ(1, times_overflow_watermark_called_);
+  EXPECT_EQ(21, buffer_.length());
 }
 
 TEST_P(WatermarkBufferTest, MoveOneByte) {
@@ -184,6 +223,12 @@ TEST_P(WatermarkBufferTest, MoveOneByte) {
   buffer_.move(data, 1);
   EXPECT_EQ(1, times_high_watermark_called_);
   EXPECT_EQ(11, buffer_.length());
+
+  buffer_.add(TEN_BYTES, 9);
+  OwnedImpl overflow_data("ab");
+  buffer_.move(overflow_data, 1);
+  EXPECT_EQ(1, times_overflow_watermark_called_);
+  EXPECT_EQ(21, buffer_.length());
 }
 
 TEST_P(WatermarkBufferTest, WatermarkFdFunctions) {
@@ -220,17 +265,15 @@ TEST_P(WatermarkBufferTest, WatermarkFdFunctions) {
 }
 
 TEST_P(WatermarkBufferTest, MoveWatermarks) {
-  // Disable overflow watermark for this test.
-  // TODO(mergeconflict): enable for a subsequent test.
-  EXPECT_CALL(runtime_.snapshot(), getInteger("buffer.overflow.high_watermark_multiplier", _))
-      .WillRepeatedly(Return(0));
-
   buffer_.add(TEN_BYTES, 9);
   EXPECT_EQ(0, times_high_watermark_called_);
+  EXPECT_EQ(0, times_overflow_watermark_called_);
   buffer_.setWatermarks(1, 9);
   EXPECT_EQ(0, times_high_watermark_called_);
+  EXPECT_EQ(0, times_overflow_watermark_called_);
   buffer_.setWatermarks(1, 8);
   EXPECT_EQ(1, times_high_watermark_called_);
+  EXPECT_EQ(0, times_overflow_watermark_called_);
 
   buffer_.setWatermarks(9, 20);
   EXPECT_EQ(0, times_low_watermark_called_);
@@ -241,11 +284,15 @@ TEST_P(WatermarkBufferTest, MoveWatermarks) {
   EXPECT_EQ(1, times_low_watermark_called_);
 
   EXPECT_EQ(1, times_high_watermark_called_);
-  buffer_.setWatermarks(2);
+  buffer_.setWatermarks(5);
   EXPECT_EQ(2, times_high_watermark_called_);
   EXPECT_EQ(1, times_low_watermark_called_);
   buffer_.setWatermarks(0);
   EXPECT_EQ(2, times_low_watermark_called_);
+
+  buffer_.setWatermarks(4);
+  EXPECT_EQ(1, times_overflow_watermark_called_);
+  EXPECT_EQ(2, times_high_watermark_called_);
 }
 
 TEST_P(WatermarkBufferTest, GetRawSlices) {
@@ -296,6 +343,14 @@ TEST_P(WatermarkBufferTest, MoveBackWithWatermarks) {
   buffer_.move(buffer1);
   EXPECT_EQ(2, times_high_watermark_called_);
   EXPECT_EQ(1, low_watermark_buffer1);
+
+  // Stick 10 more bytes in the original buffer, which should trigger the overflow watermark.
+  buffer_.add(TEN_BYTES, 10);
+  EXPECT_EQ(1, times_overflow_watermark_called_);
+
+  // ... And finally move everything over to the new buffer, which should overflow there as well.
+  buffer1.move(buffer_, 30);
+  EXPECT_EQ(1, overflow_watermark_buffer1);
 }
 
 } // namespace
