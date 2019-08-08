@@ -500,9 +500,9 @@ public:
     return scope_.findHistogram(storage.statName());
   }
 
+  Stats::IsolatedStoreImpl scope_;
   ZooKeeperFilterConfigSharedPtr config_;
   std::unique_ptr<ZooKeeperFilter> filter_;
-  Stats::IsolatedStoreImpl scope_;
   std::string stat_prefix_{"test.zookeeper"};
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
