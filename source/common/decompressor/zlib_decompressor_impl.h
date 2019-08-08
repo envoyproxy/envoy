@@ -52,6 +52,7 @@ private:
 
   std::unique_ptr<unsigned char[]> chunk_char_ptr_;
   std::unique_ptr<z_stream, std::function<void(z_stream*)>> zstream_ptr_;
+  int decompression_error_{0};
 };
 
 } // namespace Decompressor

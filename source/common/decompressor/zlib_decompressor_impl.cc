@@ -68,7 +68,11 @@ bool ZlibDecompressorImpl::inflateNext() {
     return false; // This means that zlib needs more input, so stop here.
   }
 
-  RELEASE_ASSERT(result == Z_OK, "");
+  if (result < 0) {
+    decompression_error_ = result;
+    return false;
+  }
+
   return true;
 }
 
