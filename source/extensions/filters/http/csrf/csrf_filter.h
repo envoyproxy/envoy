@@ -39,7 +39,8 @@ public:
   CsrfPolicy(const envoy::config::filter::http::csrf::v2::CsrfPolicy& policy,
              Runtime::Loader& runtime) : policy_(policy), runtime_(runtime) {
     for (const auto& additional_origin : policy.additional_origins()) {
-      additional_origins_.emplace_back(Matchers::StringMatcher(additional_origin));
+      additional_origins_.emplace_back(
+          std::make_unique<Matchers::StringMatcher>(additional_origin));
     }
   }
 
@@ -58,14 +59,15 @@ public:
                                               shadow_enabled.default_value());
   }
 
-  const std::vector<Matchers::StringMatcher>& additional_origins() const { return additional_origins_; };
+  const std::vector<std::unique_ptr<Matchers::StringMatcher>>& additional_origins() const { return additional_origins_; };
 
 private:
   const envoy::config::filter::http::csrf::v2::CsrfPolicy policy_;
-  std::vector<Matchers::StringMatcher> additional_origins_;
+  std::vector<std::unique_ptr<Matchers::StringMatcher>> additional_origins_;
   Runtime::Loader& runtime_;
 
 };
+using CsrfPolicyPtr = std::unique_ptr<CsrfPolicy>;
 
 /**
  * Configuration for the CSRF filter.
@@ -77,11 +79,11 @@ public:
                    Runtime::Loader& runtime);
 
   CsrfStats& stats() { return stats_; }
-  const CsrfPolicy* policy() { return &policy_; }
+  const CsrfPolicy* policy() { return policy_.get(); }
 
 private:
   CsrfStats stats_;
-  const CsrfPolicy policy_;
+  const CsrfPolicyPtr policy_;
 };
 using CsrfFilterConfigSharedPtr = std::shared_ptr<CsrfFilterConfig>;
 
