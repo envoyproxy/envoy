@@ -217,13 +217,13 @@ protected:
   }
 
   /**
-   * Simple response for a single slot redis cluster with a master and slave.
+   * Simple response for a single slot redis cluster with a master and replica.
    * @param master the ip of the master node.
-   * @param slave the ip of the slave node.
+   * @param replica the ip of the replica node.
    * @return The cluster slot response.
    */
-  std::string singleSlotMasterSlave(const Network::Address::Ip* master,
-                                    const Network::Address::Ip* slave) {
+  std::string singleSlotMasterReplica(const Network::Address::Ip* master,
+                                      const Network::Address::Ip* replica) {
     int64_t start_slot = 0;
     int64_t end_slot = 16383;
 
@@ -233,7 +233,7 @@ protected:
          << ":" << start_slot << "\r\n"
          << ":" << end_slot << "\r\n"
          << makeIp(master->addressAsString(), master->port())
-         << makeIp(slave->addressAsString(), slave->port());
+         << makeIp(replica->addressAsString(), replica->port());
 
     return resp.str();
   }
@@ -286,16 +286,16 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, RedisClusterWithAuthIntegrationTest,
 
 // This test sends a simple "get foo" command from a fake
 // downstream client through the proxy to a fake upstream
-// Redis cluster with a single slot with master and slave.
+// Redis cluster with a single slot with master and replica.
 // The fake server sends a valid response back to the client.
 // The request and response should make it through the envoy
 // proxy server code unchanged.
 
-TEST_P(RedisClusterIntegrationTest, SingleSlotMasterSlave) {
+TEST_P(RedisClusterIntegrationTest, SingleSlotMasterReplica) {
   random_index_ = 0;
 
   on_server_init_function_ = [this]() {
-    std::string cluster_slot_response = singleSlotMasterSlave(
+    std::string cluster_slot_response = singleSlotMasterReplica(
         fake_upstreams_[0]->localAddress()->ip(), fake_upstreams_[1]->localAddress()->ip());
     expectCallClusterSlot(random_index_, cluster_slot_response);
   };
@@ -333,7 +333,7 @@ TEST_P(RedisClusterIntegrationTest, TwoSlot) {
 
 // This test sends a simple "get foo" command from a fake
 // downstream client through the proxy to a fake upstream
-// Redis cluster with a single slot with master and slave.
+// Redis cluster with a single slot with master and replica.
 // The fake server sends a valid response back to the client.
 // The request and response should make it through the envoy
 // proxy server code unchanged.
@@ -343,11 +343,11 @@ TEST_P(RedisClusterIntegrationTest, TwoSlot) {
 // "cluster slots" command), and one to authenticate the connection
 // that carries the "get foo" request.
 
-TEST_P(RedisClusterWithAuthIntegrationTest, SingleSlotMasterSlave) {
+TEST_P(RedisClusterWithAuthIntegrationTest, SingleSlotMasterReplica) {
   random_index_ = 0;
 
   on_server_init_function_ = [this]() {
-    std::string cluster_slot_response = singleSlotMasterSlave(
+    std::string cluster_slot_response = singleSlotMasterReplica(
         fake_upstreams_[0]->localAddress()->ip(), fake_upstreams_[1]->localAddress()->ip());
     expectCallClusterSlot(0, cluster_slot_response, "somepassword");
   };

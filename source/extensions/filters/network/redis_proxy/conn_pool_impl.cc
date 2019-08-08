@@ -207,7 +207,7 @@ InstanceImpl::ThreadLocalPool::threadLocalActiveClient(Upstream::HostConstShared
     // Also the READONLY command is a no-opt for the master.
     // We only need to send the READONLY command iff it's possible that the host is a replica.
     if (parent_.config_.readPolicy() != Common::Redis::Client::ReadPolicy::Master) {
-      client->redis_client_->makeRequest(Common::Redis::Utility::ReadOnlyRequest::instance_,
+      client->redis_client_->makeRequest(Common::Redis::Utility::ReadOnlyRequest::instance(),
                                          null_pool_callbacks);
     }
   }

@@ -81,8 +81,8 @@ void RedisCluster::onClusterSlotUpdate(ClusterSlotsPtr&& slots) {
 
   for (const ClusterSlot& slot : *slots) {
     new_hosts.emplace_back(new RedisHost(info(), "", slot.master(), *this, true));
-    for (auto const& slave : slot.slaves()) {
-      new_hosts.emplace_back(new RedisHost(info(), "", slave, *this, false));
+    for (auto const& replica : slot.replicas()) {
+      new_hosts.emplace_back(new RedisHost(info(), "", replica, *this, false));
     }
   }
 
@@ -269,13 +269,18 @@ void RedisCluster::RedisDiscoverySession::onResponse(
     NetworkFilters::Common::Redis::RespValuePtr&& value) {
   current_request_ = nullptr;
 
+  const uint32_t slot_range_start = 0;
+  const uint32_t slot_range_end = 1;
+  const uint32_t slot_master = 2;
+  const uint32_t slot_slave_start = 3;
+
   // Do nothing if the cluster is empty.
   if (value->type() != NetworkFilters::Common::Redis::RespType::Array || value->asArray().empty()) {
     onUnexpectedResponse(value);
     return;
   }
 
-  auto slots_ = std::make_unique<std::vector<ClusterSlot>>();
+  auto slots = std::make_unique<std::vector<ClusterSlot>>();
 
   // Loop through the cluster slot response and error checks for each field.
   for (const NetworkFilters::Common::Redis::RespValue& part : value->asArray()) {
@@ -285,34 +290,36 @@ void RedisCluster::RedisDiscoverySession::onResponse(
     }
     const std::vector<NetworkFilters::Common::Redis::RespValue>& slot_range = part.asArray();
     if (slot_range.size() < 3 ||
-        slot_range[0].type() !=
+        slot_range[slot_range_start].type() !=
             NetworkFilters::Common::Redis::RespType::Integer || // Start slot range is an integer.
-        slot_range[1].type() !=
+        slot_range[slot_range_end].type() !=
             NetworkFilters::Common::Redis::RespType::Integer) { // End slot range is an integer.
       onUnexpectedResponse(value);
       return;
     }
 
     // Field 2: Master address for slot range
-    auto master_address = ProcessCluster(slot_range[2]);
+    auto master_address = ProcessCluster(slot_range[slot_master]);
     if (!master_address) {
       onUnexpectedResponse(value);
       return;
     }
 
-    slots_->emplace_back(slot_range[0].asInteger(), slot_range[1].asInteger(), master_address);
+    slots->emplace_back(slot_range[slot_range_start].asInteger(),
+                        slot_range[slot_range_end].asInteger(), master_address);
 
-    for (auto slave = std::next(slot_range.begin(), 3); slave != slot_range.end(); ++slave) {
-      auto slave_address = ProcessCluster(*slave);
-      if (!slave_address) {
+    for (auto replica = std::next(slot_range.begin(), slot_slave_start);
+         replica != slot_range.end(); ++replica) {
+      auto replica_address = ProcessCluster(*replica);
+      if (!replica_address) {
         onUnexpectedResponse(value);
         return;
       }
-      slots_->back().addSlave(std::move(slave_address));
+      slots->back().addReplica(std::move(replica_address));
     }
   }
 
-  parent_.onClusterSlotUpdate(std::move(slots_));
+  parent_.onClusterSlotUpdate(std::move(slots));
   resolve_timer_->enableTimer(parent_.cluster_refresh_rate_);
 }
 

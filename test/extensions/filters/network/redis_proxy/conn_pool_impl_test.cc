@@ -183,7 +183,7 @@ public:
     EXPECT_CALL(*this, create_(_)).WillOnce(Return(client));
     EXPECT_CALL(
         *client,
-        makeRequest(Eq(NetworkFilters::Common::Redis::Utility::ReadOnlyRequest::instance_), _))
+        makeRequest(Eq(NetworkFilters::Common::Redis::Utility::ReadOnlyRequest::instance()), _))
         .WillOnce(Return(&readonly_request));
     EXPECT_CALL(*cm_.thread_local_cluster_.lb_.host_, address())
         .WillRepeatedly(Return(test_address_));

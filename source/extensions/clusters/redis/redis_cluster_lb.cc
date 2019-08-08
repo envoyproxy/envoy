@@ -7,7 +7,7 @@ namespace Redis {
 
 bool ClusterSlot::operator==(const Envoy::Extensions::Clusters::Redis::ClusterSlot& rhs) const {
   return start_ == rhs.start_ && end_ == rhs.end_ && master_ == rhs.master_ &&
-         slaves_ == rhs.slaves_;
+         replicas_ == rhs.replicas_;
 }
 
 // RedisClusterLoadBalancerFactory
@@ -41,12 +41,12 @@ bool RedisClusterLoadBalancerFactory::onClusterSlotUpdate(ClusterSlotsPtr&& slot
       Upstream::HostVectorSharedPtr replicas = std::make_shared<Upstream::HostVector>();
       master_and_replicas->push_back(master_host->second);
 
-      for (auto const& slave : slot.slaves()) {
-        auto slave_host = all_hosts.find(slave->asString());
-        ASSERT(slave_host != all_hosts.end(),
+      for (auto const& replica : slot.replicas()) {
+        auto replica_host = all_hosts.find(replica->asString());
+        ASSERT(replica_host != all_hosts.end(),
                "we expect all address to be found in the updated_hosts");
-        replicas->push_back(slave_host->second);
-        master_and_replicas->push_back(slave_host->second);
+        replicas->push_back(replica_host->second);
+        master_and_replicas->push_back(replica_host->second);
       }
 
       shard_vector->emplace_back(

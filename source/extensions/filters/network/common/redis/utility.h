@@ -16,7 +16,7 @@ Redis::RespValue makeAuthCommand(const std::string& password);
 class ReadOnlyRequest : public Redis::RespValue {
 public:
   ReadOnlyRequest();
-  static ReadOnlyRequest instance_;
+  static const ReadOnlyRequest& instance();
 };
 
 } // namespace Utility

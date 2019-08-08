@@ -142,8 +142,8 @@ TEST_F(RedisClusterLoadBalancerTest, ReadStrategiesHealthy) {
       ClusterSlot(0, 2000, hosts[0]->address()),
       ClusterSlot(2001, 16383, hosts[1]->address()),
   });
-  slots->at(0).addSlave(hosts[2]->address());
-  slots->at(1).addSlave(hosts[3]->address());
+  slots->at(0).addReplica(hosts[2]->address());
+  slots->at(1).addReplica(hosts[3]->address());
   Upstream::HostMap all_hosts;
   std::transform(hosts.begin(), hosts.end(), std::inserter(all_hosts, all_hosts.end()), makePair);
   init();
@@ -184,8 +184,8 @@ TEST_F(RedisClusterLoadBalancerTest, ReadStrategiesUnhealthyMaster) {
       ClusterSlot(0, 2000, hosts[0]->address()),
       ClusterSlot(2001, 16383, hosts[1]->address()),
   });
-  slots->at(0).addSlave(hosts[2]->address());
-  slots->at(1).addSlave(hosts[3]->address());
+  slots->at(0).addReplica(hosts[2]->address());
+  slots->at(1).addReplica(hosts[3]->address());
   Upstream::HostMap all_hosts;
   std::transform(hosts.begin(), hosts.end(), std::inserter(all_hosts, all_hosts.end()), makePair);
   init();
@@ -231,8 +231,8 @@ TEST_F(RedisClusterLoadBalancerTest, ReadStrategiesUnhealthyReplica) {
       ClusterSlot(0, 2000, hosts[0]->address()),
       ClusterSlot(2001, 16383, hosts[1]->address()),
   });
-  slots->at(0).addSlave(hosts[2]->address());
-  slots->at(1).addSlave(hosts[3]->address());
+  slots->at(0).addReplica(hosts[2]->address());
+  slots->at(1).addReplica(hosts[3]->address());
   Upstream::HostMap all_hosts;
   std::transform(hosts.begin(), hosts.end(), std::inserter(all_hosts, all_hosts.end()), makePair);
   init();

@@ -37,11 +37,11 @@ public:
   int64_t start() const { return start_; }
   int64_t end() const { return end_; }
   Network::Address::InstanceConstSharedPtr master() const { return master_; }
-  const absl::flat_hash_set<Network::Address::InstanceConstSharedPtr>& slaves() const {
-    return slaves_;
+  const absl::flat_hash_set<Network::Address::InstanceConstSharedPtr>& replicas() const {
+    return replicas_;
   }
-  void addSlave(Network::Address::InstanceConstSharedPtr slave_address) {
-    slaves_.insert(std::move(slave_address));
+  void addReplica(Network::Address::InstanceConstSharedPtr replica_address) {
+    replicas_.insert(std::move(replica_address));
   }
 
   bool operator==(const ClusterSlot& rhs) const;
@@ -50,7 +50,7 @@ private:
   int64_t start_;
   int64_t end_;
   Network::Address::InstanceConstSharedPtr master_;
-  absl::flat_hash_set<Network::Address::InstanceConstSharedPtr> slaves_;
+  absl::flat_hash_set<Network::Address::InstanceConstSharedPtr> replicas_;
 };
 
 using ClusterSlotsPtr = std::unique_ptr<std::vector<ClusterSlot>>;
