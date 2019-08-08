@@ -169,7 +169,7 @@ using testing::PrintToString;
 MATCHER_P2(ContainHeader, header, expected_value,
            "contains the header " + PrintToString(header) + " with value " +
                PrintToString(expected_value)) {
-  auto found_value = arg.get(Http::LowerCaseString(header));
+  const auto found_value = arg.get(Http::LowerCaseString(header));
   if (found_value == nullptr) {
     return false;
   }
@@ -178,7 +178,7 @@ MATCHER_P2(ContainHeader, header, expected_value,
 
 // Given incoming headers, test that trace context propagation works and generates all the expected
 // outgoing headers.
-void TestIncomingHeaders(
+void testIncomingHeaders(
     const std::initializer_list<std::pair<const char*, const char*>>& headers) {
   registerSpanCatcher();
   OpenCensusConfig oc_config;
@@ -249,26 +249,26 @@ void TestIncomingHeaders(
 } // namespace
 
 TEST(OpenCensusTracerTest, PropagateTraceParentContext) {
-  TestIncomingHeaders({{"traceparent", "00-404142434445464748494a4b4c4d4e4f-6162636465666768-01"}});
+  testIncomingHeaders({{"traceparent", "00-404142434445464748494a4b4c4d4e4f-6162636465666768-01"}});
 }
 
 TEST(OpenCensusTracerTest, PropagateGrpcTraceBinContext) {
-  TestIncomingHeaders({{"grpc-trace-bin", "AABAQUJDREVGR0hJSktMTU5PAWFiY2RlZmdoAgE"}});
+  testIncomingHeaders({{"grpc-trace-bin", "AABAQUJDREVGR0hJSktMTU5PAWFiY2RlZmdoAgE"}});
 }
 
 TEST(OpenCensusTracerTest, PropagateCloudTraceContext) {
-  TestIncomingHeaders(
+  testIncomingHeaders(
       {{"x-cloud-trace-context", "404142434445464748494a4b4c4d4e4f/7017280452245743464;o=1"}});
 }
 
 TEST(OpenCensusTracerTest, PropagateB3Context) {
-  TestIncomingHeaders({{"x-b3-traceid", "404142434445464748494a4b4c4d4e4f"},
+  testIncomingHeaders({{"x-b3-traceid", "404142434445464748494a4b4c4d4e4f"},
                        {"x-b3-spanid", "6162636465666768"},
                        {"x-b3-sampled", "1"}});
 }
 
 TEST(OpenCensusTracerTest, PropagateB3ContextWithDebugFlag) {
-  TestIncomingHeaders({{"x-b3-traceid", "404142434445464748494a4b4c4d4e4f"},
+  testIncomingHeaders({{"x-b3-traceid", "404142434445464748494a4b4c4d4e4f"},
                        {"x-b3-spanid", "6162636465666768"},
                        {"x-b3-flags", "1"}}); // Debug flag causes sampling.
 }
