@@ -3276,8 +3276,8 @@ TEST_F(ClusterManagerImplTest, ConnPoolsDrainedOnHostSetChange) {
           "type": "STATIC",
           "lb_policy": "ROUND_ROBIN",
            "common_lb_config": {
-							"close_connections_on_host_set_change": true
-		       }
+			  "close_connections_on_host_set_change": true
+		   }
         }
       ]
     }
