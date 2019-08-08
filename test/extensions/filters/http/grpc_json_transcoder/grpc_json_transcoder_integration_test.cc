@@ -539,16 +539,24 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, DeepStruct) {
 }
 
 std::string createLargeJson(int level) {
-  std::string json = R"({"k":["v"]})";
+  std::shared_ptr<ProtobufWkt::Value> cur = std::make_shared<ProtobufWkt::Value>();
   for (int i = 0; i < level - 1; ++i) {
-    json = absl::StrCat(R"({"k":[)", json, ",", json, "]}");
+    std::shared_ptr<ProtobufWkt::Value> next = std::make_shared<ProtobufWkt::Value>();
+    ProtobufWkt::Value val = ProtobufWkt::Value();
+    ProtobufWkt::Value left = ProtobufWkt::Value(*cur);
+    ProtobufWkt::Value right = ProtobufWkt::Value(*cur);
+    val.mutable_list_value()->add_values()->Swap(&left);
+    val.mutable_list_value()->add_values()->Swap(&right);
+    (*next->mutable_struct_value()->mutable_fields())["k"] = val;
+    cur = next;
   }
-  return json;
+  return MessageUtil::getJsonStringFromMessage(*cur, false, false);
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, LargeStruct) {
   HttpIntegrationTest::initialize();
   // Create a 40kB json payload.
+
   std::string largeJson = createLargeJson(12);
   std::string largeProto = "content {" + jsonStrToPbStrucStr(largeJson) + "}";
   testTranscoding<bookstore::EchoStructReqResp, bookstore::EchoStructReqResp>(
