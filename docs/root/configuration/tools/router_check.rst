@@ -179,6 +179,7 @@ aren't validated and later changed. For more comprehensive coverage you can add 
 fields that could be tested.
 
 .. code:: bash
+
   > bazel-bin/test/tools/router_check/router_check_tool --config-path ... --test-path ... --useproto --f 7 --covall
   Current route coverage: 6.2948%
   Failed to meet coverage requirement: 7%
