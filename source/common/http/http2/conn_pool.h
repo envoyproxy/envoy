@@ -151,8 +151,6 @@ protected:
   // Connections remain in this list till:
   //  - Connection is closed.
   std::list<ActiveClientPtr> to_close_clients_;
-  ActiveClientPtr primary_client_;
-  ActiveClientPtr draining_client_;
   std::list<DrainedCb> drained_callbacks_;
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
 };
