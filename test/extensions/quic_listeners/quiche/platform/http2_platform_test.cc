@@ -22,7 +22,6 @@
 #include "quiche/http2/platform/api/http2_optional.h"
 #include "quiche/http2/platform/api/http2_ptr_util.h"
 #include "quiche/http2/platform/api/http2_reconstruct_object.h"
-#include "quiche/http2/platform/api/http2_string.h"
 #include "quiche/http2/platform/api/http2_string_piece.h"
 #include "quiche/http2/test_tools/http2_random.h"
 
