@@ -101,7 +101,7 @@ private:
         : parent_(parent), iteration_state_(IterationState::Continue),
           iterate_from_current_filter_(false), headers_continued_(false),
           continue_headers_continued_(false), end_stream_(false), dual_filter_(dual_filter),
-          decode_headers_called_(false) {}
+          decode_headers_called_(false), encode_headers_called_(false) {}
 
     // Functions in the following block are called after the filter finishes processing
     // corresponding data. Those functions handle state updates and data storage (if needed)
@@ -131,7 +131,7 @@ private:
     virtual const HeaderMapPtr& trailers() PURE;
     virtual void doMetadata() PURE;
     // TODO(soya3129): make this pure when adding impl to encodefilter.
-    virtual void handleMetadataAfterHeadersCallback() {}
+    virtual void handleMetadataAfterHeadersCallback() PURE;
 
     // Http::StreamFilterCallbacks
     const Network::Connection* connection() override;
@@ -173,8 +173,8 @@ private:
     // either because [de|en]codeHeaders() of the current filter returns StopAllIteration or because
     // [de|en]codeHeaders() adds new metadata to [de|en]code, but we don't know
     // [de|en]codeHeaders()'s return value yet. The storage is created on demand.
-    std::unique_ptr<MetadataMapVector> saved_request_metadata_;
-    std::unique_ptr<MetadataMapVector> saved_response_metadata_;
+    std::unique_ptr<MetadataMapVector> saved_request_metadata_{nullptr};
+    std::unique_ptr<MetadataMapVector> saved_response_metadata_{nullptr};
     // The state of iteration.
     enum class IterationState {
       Continue,            // Iteration has not stopped for any frame type.
@@ -197,6 +197,7 @@ private:
     bool end_stream_ : 1;
     const bool dual_filter_ : 1;
     bool decode_headers_called_ : 1;
+    bool encode_headers_called_ : 1;
   };
 
   /**
@@ -346,6 +347,7 @@ private:
       }
       getSavedResponseMetadata()->clear();
     }
+    void handleMetadataAfterHeadersCallback() override;
 
     void doMetadata() override {
       if (saved_response_metadata_ != nullptr) {
@@ -359,6 +361,7 @@ private:
     void addEncodedData(Buffer::Instance& data, bool streaming) override;
     void injectEncodedDataToFilterChain(Buffer::Instance& data, bool end_stream) override;
     HeaderMap& addEncodedTrailers() override;
+    void addEncodedMetadata(MetadataMapPtr&& metadata_map) override;
     void onEncoderFilterAboveWriteBufferHighWatermark() override;
     void onEncoderFilterBelowWriteBufferLowWatermark() override;
     void setEncoderBufferLimit(uint32_t limit) override { parent_.setBufferLimit(limit); }

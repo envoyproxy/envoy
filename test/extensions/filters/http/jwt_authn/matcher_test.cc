@@ -6,16 +6,8 @@
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
 #include "test/test_common/utility.h"
 
-using ::envoy::api::v2::route::RouteMatch;
-using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider;
-using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtRequirement;
 using ::envoy::config::filter::http::jwt_authn::v2alpha::RequirementRule;
 using Envoy::Http::TestHeaderMapImpl;
-using ::testing::_;
-using ::testing::Invoke;
-using ::testing::NiceMock;
-
-using ::google::jwt_verify::Status;
 
 namespace Envoy {
 namespace Extensions {

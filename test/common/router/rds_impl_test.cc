@@ -256,7 +256,8 @@ TEST_F(RdsImplTest, FailureSubscription) {
   setup();
 
   EXPECT_CALL(init_watcher_, ready());
-  rds_callbacks_->onConfigUpdateFailed({});
+  rds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure,
+                                       {});
 }
 
 class RouteConfigProviderManagerImplTest : public RdsTestBase {

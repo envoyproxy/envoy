@@ -44,5 +44,7 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/http/dynamic_forward_proxy @mattklein123 @alyssawilk
 # omit_canary_hosts retry predicate
 /*/extensions/retry/host/omit_canary_hosts @sriduth @snowp
+# adaptive concurrency limit extension.
+/*/extensions/filters/http/adaptive_concurrency @tonya11en @mattklein123
 # http inspector
 /*/extensions/filters/listener/http_inspector @crazyxy @PiotrSikora @lizan

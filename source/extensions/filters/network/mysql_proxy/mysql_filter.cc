@@ -128,10 +128,10 @@ void MySQLFilter::onCommand(Command& command) {
     }
     hsql::TableAccessMap table_access_map;
     result.getStatement(i)->tablesAccessed(table_access_map);
-    for (auto it = table_access_map.begin(); it != table_access_map.end(); ++it) {
-      auto& operations = *fields[it->first].mutable_list_value();
-      for (auto ot = it->second.begin(); ot != it->second.end(); ++ot) {
-        operations.add_values()->set_string_value(*ot);
+    for (auto& it : table_access_map) {
+      auto& operations = *fields[it.first].mutable_list_value();
+      for (const auto& ot : it.second) {
+        operations.add_values()->set_string_value(ot);
       }
     }
   }

@@ -20,6 +20,21 @@ message Config {
   enum ValueType {
     STRING = 0;
     NUMBER = 1;
+
+    // The value is a serialized `protobuf.Value
+    // <https://github.com/protocolbuffers/protobuf/blob/master/src/google/protobuf/struct.proto#L62>`_.
+    PROTOBUF_VALUE = 2;
+  }
+
+  // ValueEncode defines the encoding algorithm.
+  enum ValueEncode {
+    // The value is not encoded.
+    NONE = 0;
+
+    // The value is encoded in `Base64 <https://tools.ietf.org/html/rfc4648#section-4>`_.
+    // Note: this is mostly used for STRING and PROTOBUF_VALUE to escape the
+    // non-ASCII characters in the header.
+    BASE64 = 1;
   }
 
   message KeyValuePair {
@@ -40,6 +55,10 @@ message Config {
 
     // The value's type — defaults to string.
     ValueType type = 4;
+
+    // How is the value encoded, default is NONE (not encoded).
+    // The value will be decoded accordingly before storing to metadata.
+    ValueEncode encode = 5;
   }
 
   // A Rule defines what metadata to apply when a header is present or missing.
