@@ -45,6 +45,7 @@ public:
   void markRedirectPathCovered(const Envoy::Router::RouteEntry& route);
   double report();
   double detailedReport();
+  void cleanup();
 
 private:
   RouteCoverage* coveredRoute(const Envoy::Router::RouteEntry& route);

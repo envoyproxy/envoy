@@ -71,6 +71,12 @@ double Coverage::detailedReport() {
   return 100 * cumulative_coverage / num_routes;
 }
 
+void Coverage::cleanup() {
+  for (auto& covered_route : covered_routes_) {
+    delete covered_route;
+  }
+}
+
 RouteCoverage* Coverage::coveredRoute(const Envoy::Router::RouteEntry& route) {
   for (auto& route_coverage : covered_routes_) {
     if (route_coverage->covers(&route)) {

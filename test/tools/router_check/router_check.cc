@@ -34,6 +34,7 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
       }
     }
+    checktool.cleanup();
   } catch (const Envoy::EnvoyException& ex) {
     std::cerr << ex.what() << std::endl;
     return EXIT_FAILURE;

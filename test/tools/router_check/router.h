@@ -93,6 +93,8 @@ public:
     return detailed ? coverage_.detailedReport() : coverage_.report();
   }
 
+  void cleanup() { coverage_.cleanup(); }
+
 private:
   RouterCheckTool(
       std::unique_ptr<NiceMock<Server::Configuration::MockFactoryContext>> factory_context,
