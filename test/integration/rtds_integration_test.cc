@@ -119,7 +119,7 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
   EXPECT_EQ("", getRuntimeKey("baz"));
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "", {"some_rtds_layer"},
-                                      {"some_rtds_layer"}, {}));
+                                      {"some_rtds_layer"}, {}, true));
   auto some_rtds_layer = TestUtility::parseYaml<envoy::service::discovery::v2::Runtime>(R"EOF(
     name: some_rtds_layer
     layer:

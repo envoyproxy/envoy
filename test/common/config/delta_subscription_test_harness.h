@@ -55,9 +55,10 @@ public:
     subscription_->start(cluster_names);
   }
 
-  void expectSendMessage(const std::set<std::string>& cluster_names,
-                         const std::string& version) override {
+  void expectSendMessage(const std::set<std::string>& cluster_names, const std::string& version,
+                         bool first_on_stream = false) override {
     UNREFERENCED_PARAMETER(version);
+    UNREFERENCED_PARAMETER(first_on_stream);
     expectSendMessage(cluster_names, {}, Grpc::Status::GrpcStatus::Ok, "", {});
   }
 

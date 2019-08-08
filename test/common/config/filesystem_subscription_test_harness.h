@@ -58,10 +58,11 @@ public:
     }
   }
 
-  void expectSendMessage(const std::set<std::string>& cluster_names,
-                         const std::string& version) override {
+  void expectSendMessage(const std::set<std::string>& cluster_names, const std::string& version,
+                         bool first_on_stream) override {
     UNREFERENCED_PARAMETER(cluster_names);
     UNREFERENCED_PARAMETER(version);
+    UNREFERENCED_PARAMETER(first_on_stream);
   }
 
   void deliverConfigUpdate(const std::vector<std::string>& cluster_names,

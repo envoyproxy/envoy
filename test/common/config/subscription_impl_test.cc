@@ -47,8 +47,9 @@ public:
     test_harness_->updateResources(cluster_names);
   }
 
-  void expectSendMessage(const std::set<std::string>& cluster_names, const std::string& version) {
-    test_harness_->expectSendMessage(cluster_names, version);
+  void expectSendMessage(const std::set<std::string>& cluster_names, const std::string& version,
+                         bool first_on_stream) {
+    test_harness_->expectSendMessage(cluster_names, version, first_on_stream);
   }
 
   AssertionResult statsAre(uint32_t attempt, uint32_t success, uint32_t rejected, uint32_t failure,
