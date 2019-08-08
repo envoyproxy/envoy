@@ -445,7 +445,7 @@ void StatNameSet::rememberBuiltin(absl::string_view str) {
 Stats::StatName StatNameSet::getStatName(absl::string_view token) {
   // If token was recorded as a built-in during initialization, we can
   // service this request lock-free.
-  auto iter = builtin_stat_names_.find(token);
+  const auto iter = builtin_stat_names_.find(token);
   if (iter != builtin_stat_names_.end()) {
     return iter->second;
   }

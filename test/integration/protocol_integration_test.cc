@@ -959,6 +959,9 @@ TEST_P(DownstreamProtocolIntegrationTest, testEncodeHeadersReturnsStopAll) {
   config_helper_.addFilter(R"EOF(
 name: encode-headers-return-stop-all-filter
 )EOF");
+  config_helper_.addConfigModifier(
+      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void { hcm.mutable_http2_protocol_options()->set_allow_metadata(true); });
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -988,6 +991,9 @@ TEST_P(DownstreamProtocolIntegrationTest, testEncodeHeadersReturnsStopAllWaterma
   config_helper_.addFilter(R"EOF(
 name: encode-headers-return-stop-all-filter
 )EOF");
+  config_helper_.addConfigModifier(
+      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void { hcm.mutable_http2_protocol_options()->set_allow_metadata(true); });
 
   // Sets initial stream window to min value to make the upstream sensitive to a low watermark.
   config_helper_.addConfigModifier(

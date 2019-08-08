@@ -21,14 +21,15 @@ ZooKeeperFilterConfig::ZooKeeperFilterConfig(const std::string& stat_prefix,
     : scope_(scope), max_packet_bytes_(max_packet_bytes), stats_(generateStats(stat_prefix, scope)),
       stat_name_set_(scope.symbolTable()), stat_prefix_(stat_name_set_.add(stat_prefix)),
       auth_(stat_name_set_.add("auth")) {
-  // https://zookeeper.apache.org/doc/r3.1.2/zookeeperProgrammers.html#sc_BuiltinACLSchemes
-  // lists commons schemes: "world", "auth", "digest", "host", and "ip". These are used in
-  // filter.cc by appending "_rq".
-  stat_name_set_.rememberBuiltin("world_rq");
+  // https://zookeeper.apache.org/doc/r3.5.4-beta/zookeeperProgrammers.html#sc_BuiltinACLSchemes
+  // lists commons schemes: "world", "auth", "digest", "host", "x509", and
+  // "ip". These are used in filter.cc by appending "_rq".
   stat_name_set_.rememberBuiltin("auth_rq");
   stat_name_set_.rememberBuiltin("digest_rq");
   stat_name_set_.rememberBuiltin("host_rq");
   stat_name_set_.rememberBuiltin("ip_rq");
+  stat_name_set_.rememberBuiltin("world_rq");
+  stat_name_set_.rememberBuiltin("x509_rq");
 }
 
 ZooKeeperFilter::ZooKeeperFilter(ZooKeeperFilterConfigSharedPtr config)

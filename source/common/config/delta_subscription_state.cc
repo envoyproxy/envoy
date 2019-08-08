@@ -24,6 +24,7 @@ DeltaSubscriptionState::DeltaSubscriptionState(const std::string& type_url,
 void DeltaSubscriptionState::setInitFetchTimeout(Event::Dispatcher& dispatcher) {
   if (init_fetch_timeout_.count() > 0 && !init_fetch_timeout_timer_) {
     init_fetch_timeout_timer_ = dispatcher.createTimer([this]() -> void {
+      stats_.init_fetch_timeout_.inc();
       ENVOY_LOG(warn, "delta config: initial fetch timed out for {}", type_url_);
       callbacks_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout,
                                       nullptr);

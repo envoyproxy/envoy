@@ -6,7 +6,6 @@
 #include "absl/strings/match.h"
 
 using ::envoy::api::v2::route::RouteMatch;
-using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider;
 using ::envoy::config::filter::http::jwt_authn::v2alpha::RequirementRule;
 using Envoy::Router::ConfigUtility;
 
