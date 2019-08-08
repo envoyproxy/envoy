@@ -394,6 +394,17 @@ TEST_P(AdsIntegrationTest, ClusterWarmingOnNamedResponse) {
   // i,e. no named EDS response.
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
 
+  // Disconnect and reconnect the stream.
+  xds_stream_->finishGrpcStream(Grpc::Status::Internal);
+
+  AssertionResult result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
+  RELEASE_ASSERT(result, result.message());
+  xds_stream_->startGrpcStream();
+
+  // Envoy will not finish warming of the second cluster because of the missing load assignments
+  // i,e. no named EDS response even after disconnect and reconnect.
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
+
   // Finish warming the second cluster.
   sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
       Config::TypeUrl::get().ClusterLoadAssignment,

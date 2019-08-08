@@ -164,6 +164,10 @@ void StreamEncoderImpl::encodeData(Buffer::Instance& data, bool end_stream) {
 
 void StreamEncoderImpl::encodeTrailers(const HeaderMap&) { endEncode(); }
 
+void StreamEncoderImpl::encodeMetadata(const MetadataMapVector&) {
+  connection_.stats().metadata_not_supported_error_.inc();
+}
+
 void StreamEncoderImpl::endEncode() {
   if (chunk_encoding_) {
     connection_.buffer().add(LAST_CHUNK);
@@ -321,10 +325,11 @@ const ToLowerTable& ConnectionImpl::toLowerTable() {
   return *table;
 }
 
-ConnectionImpl::ConnectionImpl(Network::Connection& connection, http_parser_type type,
-                               uint32_t max_headers_kb)
-    : connection_(connection), output_buffer_([&]() -> void { this->onBelowLowWatermark(); },
-                                              [&]() -> void { this->onAboveHighWatermark(); }),
+ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
+                               http_parser_type type, uint32_t max_headers_kb)
+    : connection_(connection), stats_{ALL_HTTP1_CODEC_STATS(POOL_COUNTER_PREFIX(stats, "http1."))},
+      output_buffer_([&]() -> void { this->onBelowLowWatermark(); },
+                     [&]() -> void { this->onAboveHighWatermark(); }),
       max_headers_kb_(max_headers_kb), strict_header_validation_(Runtime::runtimeFeatureEnabled(
                                            "envoy.reloadable_features.strict_header_validation")) {
   output_buffer_.setWatermarks(connection.bufferLimit());
@@ -506,11 +511,11 @@ void ConnectionImpl::onResetStreamBase(StreamResetReason reason) {
   onResetStream(reason);
 }
 
-ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection,
+ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
                                            ServerConnectionCallbacks& callbacks,
                                            Http1Settings settings, uint32_t max_request_headers_kb)
-    : ConnectionImpl(connection, HTTP_REQUEST, max_request_headers_kb), callbacks_(callbacks),
-      codec_settings_(settings) {}
+    : ConnectionImpl(connection, stats, HTTP_REQUEST, max_request_headers_kb),
+      callbacks_(callbacks), codec_settings_(settings) {}
 
 void ServerConnectionImpl::onEncodeComplete() {
   ASSERT(active_request_);
@@ -681,8 +686,9 @@ void ServerConnectionImpl::onBelowLowWatermark() {
   }
 }
 
-ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks&)
-    : ConnectionImpl(connection, HTTP_RESPONSE, MAX_RESPONSE_HEADERS_KB) {}
+ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
+                                           ConnectionCallbacks&)
+    : ConnectionImpl(connection, stats, HTTP_RESPONSE, MAX_RESPONSE_HEADERS_KB) {}
 
 bool ClientConnectionImpl::cannotHaveBody() {
   if ((!pending_responses_.empty() && pending_responses_.front().head_request_) ||

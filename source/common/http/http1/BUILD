@@ -18,6 +18,8 @@ envoy_cc_library(
         "//include/envoy/http:codec_interface",
         "//include/envoy/http:header_map_interface",
         "//include/envoy/network:connection_interface",
+        "//include/envoy/stats:stats_interface",
+        "//include/envoy/stats:stats_macros",
         "//source/common/buffer:buffer_lib",
         "//source/common/buffer:watermark_buffer_lib",
         "//source/common/common:assert_lib",
