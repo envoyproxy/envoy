@@ -319,7 +319,7 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
         if (close_connections_on_host_set_change) {
           for (const auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
             // this will drain all tcp and http connection pools
-            postThreadLocalHostRemoval(cluster, host_set->hosts());
+            postThreadLocalDrainConnections(cluster, host_set->hosts());
           }
           cm_stats_.upstream_connections_closed_on_host_set_change_.inc();
         } else {
@@ -330,7 +330,7 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
           // enabled, this case will be covered by first `if` statement, where all
           // connection pools are drained.
           if (!hosts_removed.empty()) {
-            postThreadLocalHostRemoval(cluster, hosts_removed);
+            postThreadLocalDrainConnections(cluster, hosts_removed);
           }
         }
       });
@@ -724,8 +724,8 @@ Tcp::ConnectionPool::Instance* ClusterManagerImpl::tcpConnPoolForCluster(
   return entry->second->tcpConnPool(priority, context, transport_socket_options);
 }
 
-void ClusterManagerImpl::postThreadLocalHostRemoval(const Cluster& cluster,
-                                                    const HostVector& hosts_removed) {
+void ClusterManagerImpl::postThreadLocalDrainConnections(const Cluster& cluster,
+                                                         const HostVector& hosts_removed) {
   tls_->runOnAllThreads([this, name = cluster.info()->name(), hosts_removed]() {
     ThreadLocalClusterManagerImpl::removeHosts(name, hosts_removed, *tls_);
   });

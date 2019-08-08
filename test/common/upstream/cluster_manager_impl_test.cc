@@ -198,7 +198,7 @@ protected:
     local_cluster_update_.post(priority, hosts_added, hosts_removed);
   }
 
-  void postThreadLocalHostRemoval(const Cluster&, const HostVector& hosts_removed) override {
+  void postThreadLocalDrainConnections(const Cluster&, const HostVector& hosts_removed) override {
     local_hosts_removed_.post(hosts_removed);
   }
 
