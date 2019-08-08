@@ -22,5 +22,7 @@ api_go_proto_library(
         "//envoy/api/v2/core:base_go_proto",
         "//envoy/type:percent_go_proto",
         "//envoy/type:range_go_proto",
+        "//envoy/type/matcher:regex_go_proto",
+        "//envoy/type/matcher:string_go_proto",
     ],
 )

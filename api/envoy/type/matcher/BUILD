@@ -48,6 +48,9 @@ api_proto_library_internal(
 api_go_proto_library(
     name = "string",
     proto = ":string",
+    deps = [
+        ":regex_go_proto",
+    ],
 )
 
 api_proto_library_internal(
@@ -73,4 +76,9 @@ api_proto_library_internal(
     name = "regex",
     srcs = ["regex.proto"],
     visibility = ["//visibility:public"],
+)
+
+api_go_proto_library(
+    name = "regex",
+    proto = ":regex",
 )
