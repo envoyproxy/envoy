@@ -37,8 +37,12 @@ SlotPtr InstanceImpl::allocateSlot() {
   return slot;
 }
 
+bool InstanceImpl::SlotImpl::currentThreadRegistered() {
+  return thread_local_data_.data_.size() > index_;
+}
+
 ThreadLocalObjectSharedPtr InstanceImpl::SlotImpl::get() {
-  ASSERT(thread_local_data_.data_.size() > index_);
+  ASSERT(currentThreadRegistered());
   return thread_local_data_.data_[index_];
 }
 

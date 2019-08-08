@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "envoy/common/exception.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 
 #include "common/common/utility.h"
 
@@ -109,6 +110,9 @@ TEST_F(OptionsImplTest, SetAll) {
   options->setBaseId(109876);
   options->setConcurrency(42);
   options->setConfigPath("foo");
+  envoy::config::bootstrap::v2::Bootstrap bootstrap_foo{};
+  bootstrap_foo.mutable_node()->set_id("foo");
+  options->setConfigProto(bootstrap_foo);
   options->setConfigYaml("bogus:");
   options->setAdminAddressPath("path");
   options->setLocalAddressIpVersion(Network::Address::IpVersion::v6);
@@ -130,6 +134,9 @@ TEST_F(OptionsImplTest, SetAll) {
   EXPECT_EQ(109876, options->baseId());
   EXPECT_EQ(42U, options->concurrency());
   EXPECT_EQ("foo", options->configPath());
+  envoy::config::bootstrap::v2::Bootstrap bootstrap_bar{};
+  bootstrap_bar.mutable_node()->set_id("foo");
+  EXPECT_TRUE(TestUtility::protoEqual(bootstrap_bar, options->configProto()));
   EXPECT_EQ("bogus:", options->configYaml());
   EXPECT_EQ("path", options->adminAddressPath());
   EXPECT_EQ(Network::Address::IpVersion::v6, options->localAddressIpVersion());
@@ -278,6 +285,8 @@ TEST_F(OptionsImplTest, SaneTestConstructor) {
 
   EXPECT_EQ(regular_options_impl->baseId(), test_options_impl.baseId());
   EXPECT_EQ(regular_options_impl->configPath(), test_options_impl.configPath());
+  EXPECT_TRUE(TestUtility::protoEqual(regular_options_impl->configProto(),
+                                      test_options_impl.configProto()));
   EXPECT_EQ(regular_options_impl->configYaml(), test_options_impl.configYaml());
   EXPECT_EQ(regular_options_impl->adminAddressPath(), test_options_impl.adminAddressPath());
   EXPECT_EQ(regular_options_impl->localAddressIpVersion(),

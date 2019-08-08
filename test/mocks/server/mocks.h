@@ -6,6 +6,7 @@
 #include <string>
 
 #include "envoy/common/mutex_tracer.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/server/admin.h"
 #include "envoy/server/configuration.h"
 #include "envoy/server/drain_manager.h"
@@ -59,6 +60,7 @@ public:
   MOCK_CONST_METHOD0(baseId, uint64_t());
   MOCK_CONST_METHOD0(concurrency, uint32_t());
   MOCK_CONST_METHOD0(configPath, const std::string&());
+  MOCK_CONST_METHOD0(configProto, const envoy::config::bootstrap::v2::Bootstrap&());
   MOCK_CONST_METHOD0(configYaml, const std::string&());
   MOCK_CONST_METHOD0(allowUnknownFields, bool());
   MOCK_CONST_METHOD0(adminAddressPath, const std::string&());
@@ -84,6 +86,7 @@ public:
   MOCK_CONST_METHOD0(toCommandLineOptions, Server::CommandLineOptionsPtr());
 
   std::string config_path_;
+  envoy::config::bootstrap::v2::Bootstrap config_proto_;
   std::string config_yaml_;
   std::string admin_address_path_;
   std::string service_cluster_name_;
@@ -381,7 +384,6 @@ public:
 
   TimeSource& timeSource() override { return time_system_; }
 
-  std::unique_ptr<Secret::SecretManager> secret_manager_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   std::shared_ptr<testing::NiceMock<Network::MockDnsResolver>> dns_resolver_{
@@ -389,6 +391,7 @@ public:
   testing::NiceMock<Api::MockApi> api_;
   testing::NiceMock<MockAdmin> admin_;
   Event::GlobalTimeSystem time_system_;
+  std::unique_ptr<Secret::SecretManager> secret_manager_;
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   Thread::MutexBasicLockable access_log_lock_;
   testing::NiceMock<Runtime::MockLoader> runtime_loader_;
@@ -455,6 +458,7 @@ public:
   MOCK_METHOD0(listenerScope, Stats::Scope&());
   MOCK_CONST_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_CONST_METHOD0(listenerMetadata, const envoy::api::v2::core::Metadata&());
+  MOCK_CONST_METHOD0(direction, envoy::api::v2::core::TrafficDirection());
   MOCK_METHOD0(timeSource, TimeSource&());
   Event::TestTimeSystem& timeSystem() { return time_system_; }
   Grpc::Context& grpcContext() override { return grpc_context_; }
@@ -508,8 +512,9 @@ public:
   MOCK_METHOD0(api, Api::Api&());
 
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
-  std::unique_ptr<Secret::SecretManager> secret_manager_;
   testing::NiceMock<Api::MockApi> api_;
+  testing::NiceMock<MockConfigTracker> config_tracker_;
+  std::unique_ptr<Secret::SecretManager> secret_manager_;
 };
 
 class MockListenerFactoryContext : public MockFactoryContext, public ListenerFactoryContext {

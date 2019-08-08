@@ -1,10 +1,13 @@
 #include "extensions/tracers/opencensus/opencensus_tracer_impl.h"
 
+#include <grpcpp/grpcpp.h>
+
 #include "envoy/http/header_map.h"
 
 #include "common/common/base64.h"
 
 #include "absl/strings/str_cat.h"
+#include "google/devtools/cloudtrace/v2/tracing.grpc.pb.h"
 #include "opencensus/exporters/trace/stackdriver/stackdriver_exporter.h"
 #include "opencensus/exporters/trace/stdout/stdout_exporter.h"
 #include "opencensus/exporters/trace/zipkin/zipkin_exporter.h"
@@ -135,9 +138,7 @@ Span::Span(const envoy::config::trace::v2::OpenCensusConfig& oc_config,
            ::opencensus::trace::Span&& span)
     : span_(std::move(span)), oc_config_(oc_config) {}
 
-void Span::setOperation(absl::string_view operation) {
-  span_.AddAnnotation("setOperation", {{"operation", operation}});
-}
+void Span::setOperation(absl::string_view operation) { span_.SetName(operation); }
 
 void Span::setTag(absl::string_view name, absl::string_view value) {
   span_.AddAttribute(name, value);
@@ -199,7 +200,12 @@ Driver::Driver(const envoy::config::trace::v2::OpenCensusConfig& oc_config,
   if (oc_config.stackdriver_exporter_enabled()) {
     ::opencensus::exporters::trace::StackdriverOptions opts;
     opts.project_id = oc_config.stackdriver_project_id();
-    ::opencensus::exporters::trace::StackdriverExporter::Register(opts);
+    if (!oc_config.stackdriver_address().empty()) {
+      auto channel =
+          grpc::CreateChannel(oc_config.stackdriver_address(), grpc::InsecureChannelCredentials());
+      opts.trace_service_stub = ::google::devtools::cloudtrace::v2::TraceService::NewStub(channel);
+    }
+    ::opencensus::exporters::trace::StackdriverExporter::Register(std::move(opts));
   }
   if (oc_config.zipkin_exporter_enabled()) {
     ::opencensus::exporters::trace::ZipkinExporterOptions opts(oc_config.zipkin_url());

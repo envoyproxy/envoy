@@ -107,7 +107,5 @@ Envoy automatically sends spans to tracing collectors. Depending on the tracing 
 multiple spans are stitched together using common information such as the globally unique
 request ID :ref:`config_http_conn_man_headers_x-request-id` (LightStep) or
 the trace ID configuration (Zipkin and Datadog). See
-
-* :ref:`v2 API reference <envoy_api_msg_config.trace.v2.Tracing>`
-
+:ref:`v2 API reference <envoy_api_msg_config.trace.v2.Tracing>`
 for more information on how to setup tracing in Envoy.
