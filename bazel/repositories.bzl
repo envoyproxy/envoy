@@ -599,6 +599,7 @@ def _com_github_grpc_grpc():
     _repository_impl(
         "com_github_grpc_grpc",
         patches = [
+            # Workaround for https://github.com/envoyproxy/envoy/issues/7863
             "@envoy//bazel:grpc-protoinfo-1.patch",
             "@envoy//bazel:grpc-protoinfo-2.patch",
         ],
