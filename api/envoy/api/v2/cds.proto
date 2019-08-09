@@ -160,7 +160,12 @@ message Cluster {
     // Refer to the :ref:`original destination load balancing
     // policy<arch_overview_load_balancing_types_original_destination>`
     // for an explanation.
-    ORIGINAL_DST_LB = 4;
+    //
+    // .. attention::
+    //
+    //   **This load balancing policy is deprecated**. Use CLUSTER_PROVIDED instead.
+    //
+    ORIGINAL_DST_LB = 4 [deprecated = true];
 
     // Refer to the :ref:`Maglev load balancing policy<arch_overview_load_balancing_types_maglev>`
     // for an explanation.
