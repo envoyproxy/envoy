@@ -33,34 +33,39 @@ constexpr absl::string_view Duration = "duration";
 // Symbols for traversing the response properties
 constexpr absl::string_view Response = "response";
 constexpr absl::string_view Code = "code";
+constexpr absl::string_view Trailers = "trailers";
 
 // Per-request or per-connection metadata
 constexpr absl::string_view Metadata = "metadata";
 
 // Connection properties
 constexpr absl::string_view Connection = "connection";
-constexpr absl::string_view LocalAddress = "local_address";
-constexpr absl::string_view LocalPort = "local_port";
-constexpr absl::string_view RemoteAddress = "remote_address";
-constexpr absl::string_view RemotePort = "remote_port";
 constexpr absl::string_view UpstreamAddress = "upstream_address";
 constexpr absl::string_view UpstreamPort = "upstream_port";
 constexpr absl::string_view MTLS = "mtls";
 constexpr absl::string_view RequestedServerName = "requested_server_name";
 
+// Source properties
+constexpr absl::string_view Source = "source";
+constexpr absl::string_view Address = "address";
+constexpr absl::string_view Port = "port";
+
+// Destination properties
+constexpr absl::string_view Destination = "destination";
+
 class RequestWrapper;
 
 class HeadersWrapper : public google::api::expr::runtime::CelMap {
 public:
-  HeadersWrapper(const Http::HeaderMap& headers) : headers_(headers) {}
+  HeadersWrapper(const Http::HeaderMap* value) : value_(value) {}
   absl::optional<CelValue> operator[](CelValue key) const override;
-  int size() const override { return headers_.size(); }
-  bool empty() const override { return headers_.empty(); }
+  int size() const override { return value_ == nullptr ? 0 : value_->size(); }
+  bool empty() const override { return value_ == nullptr ? true : value_->empty(); }
   const google::api::expr::runtime::CelList* ListKeys() const override { return nullptr; }
 
 private:
   friend class RequestWrapper;
-  const Http::HeaderMap& headers_;
+  const Http::HeaderMap* value_;
 };
 
 class BaseWrapper : public google::api::expr::runtime::CelMap {
@@ -72,21 +77,25 @@ public:
 
 class RequestWrapper : public BaseWrapper {
 public:
-  RequestWrapper(const Http::HeaderMap& headers, const StreamInfo::StreamInfo& info)
-      : wrapper_(headers), info_(info) {}
+  RequestWrapper(const Http::HeaderMap* headers, const StreamInfo::StreamInfo& info)
+      : headers_(headers), info_(info) {}
   absl::optional<CelValue> operator[](CelValue key) const override;
 
 private:
-  const HeadersWrapper wrapper_;
+  const HeadersWrapper headers_;
   const StreamInfo::StreamInfo& info_;
 };
 
 class ResponseWrapper : public BaseWrapper {
 public:
-  ResponseWrapper(const StreamInfo::StreamInfo& info) : info_(info) {}
+  ResponseWrapper(const Http::HeaderMap* headers, const Http::HeaderMap* trailers,
+                  const StreamInfo::StreamInfo& info)
+      : headers_(headers), trailers_(trailers), info_(info) {}
   absl::optional<CelValue> operator[](CelValue key) const override;
 
 private:
+  const HeadersWrapper headers_;
+  const HeadersWrapper trailers_;
   const StreamInfo::StreamInfo& info_;
 };
 
@@ -97,6 +106,16 @@ public:
 
 private:
   const StreamInfo::StreamInfo& info_;
+};
+
+class PeerWrapper : public BaseWrapper {
+public:
+  PeerWrapper(const StreamInfo::StreamInfo& info, bool local) : info_(info), local_(local) {}
+  absl::optional<CelValue> operator[](CelValue key) const override;
+
+private:
+  const StreamInfo::StreamInfo& info_;
+  const bool local_;
 };
 
 } // namespace Expr

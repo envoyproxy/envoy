@@ -31,7 +31,7 @@ TEST(Context, RequestAttributes) {
       {":authority", "kittens.com"}, {"referer", "dogs.com"},  {"user-agent", "envoy-mobile"},
       {"content-length", "10"},      {"x-request-id", "blah"},
   };
-  RequestWrapper request(header_map, info);
+  RequestWrapper request(&header_map, info);
 
   EXPECT_CALL(info, bytesReceived()).WillRepeatedly(Return(10));
   // "2018-04-03T23:06:09.123Z".
@@ -146,7 +146,7 @@ TEST(Context, RequestAttributes) {
 
 TEST(Context, ResponseAttributes) {
   NiceMock<StreamInfo::MockStreamInfo> info;
-  ResponseWrapper response(info);
+  ResponseWrapper response(nullptr, nullptr, info);
 
   EXPECT_CALL(info, responseCode()).WillRepeatedly(Return(404));
   EXPECT_CALL(info, bytesSent()).WillRepeatedly(Return(123));
@@ -177,6 +177,8 @@ TEST(Context, ConnectionAttributes) {
       new NiceMock<Envoy::Upstream::MockHostDescription>());
   NiceMock<Ssl::MockConnectionInfo> connection_info;
   ConnectionWrapper connection(info);
+  PeerWrapper source(info, false);
+  PeerWrapper destination(info, true);
 
   Network::Address::InstanceConstSharedPtr local =
       Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
@@ -199,28 +201,28 @@ TEST(Context, ConnectionAttributes) {
   }
 
   {
-    auto value = connection[CelValue::CreateString(LocalAddress)];
+    auto value = destination[CelValue::CreateString(Address)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsString());
     EXPECT_EQ("1.2.3.4:123", value.value().StringOrDie().value());
   }
 
   {
-    auto value = connection[CelValue::CreateString(LocalPort)];
+    auto value = destination[CelValue::CreateString(Port)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsInt64());
     EXPECT_EQ(123, value.value().Int64OrDie());
   }
 
   {
-    auto value = connection[CelValue::CreateString(RemoteAddress)];
+    auto value = source[CelValue::CreateString(Address)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsString());
     EXPECT_EQ("10.20.30.40:456", value.value().StringOrDie().value());
   }
 
   {
-    auto value = connection[CelValue::CreateString(RemotePort)];
+    auto value = source[CelValue::CreateString(Port)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsInt64());
     EXPECT_EQ(456, value.value().Int64OrDie());

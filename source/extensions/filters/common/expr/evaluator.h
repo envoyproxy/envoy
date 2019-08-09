@@ -34,7 +34,9 @@ ExpressionPtr createExpression(Builder& builder, const google::api::expr::v1alph
 // results and potentially the final value.
 absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena* arena,
                                   const StreamInfo::StreamInfo& info,
-                                  const Http::HeaderMap& headers);
+                                  const Http::HeaderMap* request_headers,
+                                  const Http::HeaderMap* response_headers,
+                                  const Http::HeaderMap* response_trailers);
 
 // Evaluates an expression and returns true if the expression evaluates to "true".
 // Returns false if the expression fails to evaluate.
