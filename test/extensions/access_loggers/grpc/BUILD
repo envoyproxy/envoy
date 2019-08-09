@@ -12,6 +12,21 @@ load(
 envoy_package()
 
 envoy_extension_cc_test(
+    name = "grpc_access_log_impl_test",
+    srcs = ["grpc_access_log_impl_test.cc"],
+    extension_name = "envoy.access_loggers.http_grpc",
+    deps = [
+        "//source/extensions/access_loggers/grpc:http_grpc_access_log_lib",
+        "//test/mocks/access_log:access_log_mocks",
+        "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "http_grpc_access_log_impl_test",
     srcs = ["http_grpc_access_log_impl_test.cc"],
     extension_name = "envoy.access_loggers.http_grpc",

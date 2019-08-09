@@ -23,7 +23,7 @@ public:
   std::string name() const override;
 };
 
-// TODO(mattklein123): Add TCP access log and refactor into base/concrete gRPC access logs.
+// TODO(mattklein123): Add TCP access log.
 
 } // namespace HttpGrpc
 } // namespace AccessLoggers
