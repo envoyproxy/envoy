@@ -141,7 +141,7 @@ message Listener {
   //
   // .. attention::
   //
-  //   Some of listener_filters, such as :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>`,
+  //   Some listener filters, such as :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>`,
   //   should not be used with this option. It will cause unexpected behavior when a connection is created.
   bool continue_on_listener_filters_timeout = 17;
 
