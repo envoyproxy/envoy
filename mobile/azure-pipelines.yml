@@ -278,17 +278,17 @@ stages:
             inputs:
               artifactName: 'Envoy.framework'
               targetPath: 'dist/Envoy.framework'
-      - job: swift_library_tests
-        timeoutInMinutes: 60
-        pool:
-          vmImage: 'macos-10.14'
-        steps:
-          - checkout: self
-            submodules: true
-          - script: ./ci/mac_ci_setup.sh
-            displayName: 'Install dependencies'
-          - script: ./bazelw test --test_output=all --build_tests_only --config=ios //library/swift/test/...
-            displayName: 'Run Swift library tests'
+      #- job: swift_library_tests
+      #  timeoutInMinutes: 60
+      #  pool:
+      #    vmImage: 'macos-10.14'
+      #  steps:
+      #    - checkout: self
+      #      submodules: true
+      #    - script: ./ci/mac_ci_setup.sh
+      #      displayName: 'Install dependencies'
+      #    - script: ./bazelw test --test_output=all --build_tests_only --config=ios //library/swift/test/...
+      #      displayName: 'Run Swift library tests'
       #- job: mac_objc_helloworld
       #  dependsOn: mac_dist
       #  timeoutInMinutes: 60
