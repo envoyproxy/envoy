@@ -57,8 +57,8 @@ FaultSettings::FaultSettings(const envoy::config::filter::http::fault::v2::HTTPF
         std::make_unique<Filters::Common::Fault::FaultDelayConfig>(fault.delay());
   }
 
-  for (const Http::HeaderUtility::HeaderData& header_map : fault.headers()) {
-    fault_filter_headers_.push_back(header_map);
+  for (const auto& header_map : fault.headers()) {
+    fault_filter_headers_.push_back(std::make_unique<Http::HeaderUtility::HeaderData>(header_map));
   }
 
   upstream_cluster_ = fault.upstream_cluster();

@@ -58,7 +58,7 @@ HeaderKeyMatcher::HeaderKeyMatcher(std::vector<Matchers::LowerCaseStringMatcher>
 
 bool HeaderKeyMatcher::matches(absl::string_view key) const {
   return std::any_of(matchers_.begin(), matchers_.end(),
-                     [&key](auto matcher) { return matcher.match(key); });
+                     [&key](auto& matcher) { return matcher.match(key); });
 }
 
 NotHeaderKeyMatcher::NotHeaderKeyMatcher(std::vector<Matchers::LowerCaseStringMatcher>&& list)

@@ -44,6 +44,8 @@ public:
     const bool invert_match_;
   };
 
+  using HeaderDataPtr = std::unique_ptr<HeaderData>;
+
   /**
    * See if the headers specified in the config are present in a request.
    * @param request_headers supplies the headers from the request.
@@ -52,7 +54,7 @@ public:
    *         request_headers. If no config_headers are specified, returns true.
    */
   static bool matchHeaders(const Http::HeaderMap& request_headers,
-                           const std::vector<HeaderData>& config_headers);
+                           const std::vector<HeaderDataPtr>& config_headers);
 
   static bool matchHeaders(const Http::HeaderMap& request_headers, const HeaderData& config_header);
 

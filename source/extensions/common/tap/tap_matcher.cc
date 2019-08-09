@@ -113,7 +113,7 @@ HttpHeaderMatcherBase::HttpHeaderMatcherBase(
     const std::vector<MatcherPtr>& matchers)
     : SimpleMatcher(matchers) {
   for (const auto& header_match : config.headers()) {
-    headers_to_match_.emplace_back(header_match);
+    headers_to_match_.emplace_back(std::make_unique<Http::HeaderUtility::HeaderData>(header_match));
   }
 }
 
