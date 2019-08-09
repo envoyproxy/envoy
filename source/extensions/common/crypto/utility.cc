@@ -1,7 +1,5 @@
 #include "common/crypto/utility.h"
 
-#include <iostream>
-
 #include "common/common/assert.h"
 #include "common/common/stack_array.h"
 
@@ -49,9 +47,14 @@ std::vector<uint8_t> getSha256Hmac(const std::vector<uint8_t>& key, absl::string
   return hmac;
 }
 
-const VerificationOutput verifySignature(absl::string_view hash, void* pubKey,
+const VerificationOutput verifySignature(absl::string_view hash, CryptoObjectPtr* pubKey,
                                          const std::vector<uint8_t>& signature,
                                          const std::vector<uint8_t>& text) {
+
+  if (pubKey == nullptr) {
+    return {false, "Failed to initialize digest verify."};
+  }
+
   // Step 1: initialize EVP_MD_CTX
   bssl::ScopedEVP_MD_CTX ctx;
 
@@ -63,8 +66,9 @@ const VerificationOutput verifySignature(absl::string_view hash, void* pubKey,
   }
 
   // Step 3: initialize EVP_DigestVerify
-  int ok =
-      EVP_DigestVerifyInit(ctx.get(), nullptr, md, nullptr, reinterpret_cast<EVP_PKEY*>(pubKey));
+  auto pkeyWrapper = Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyWrapper>(pubKey);
+  EVP_PKEY* pkey = pkeyWrapper->getEVP_PKEY();
+  int ok = EVP_DigestVerifyInit(ctx.get(), nullptr, md, nullptr, pkey);
   if (!ok) {
     return {false, "Failed to initialize digest verify."};
   }
@@ -80,7 +84,7 @@ const VerificationOutput verifySignature(absl::string_view hash, void* pubKey,
   return {false, absl::StrCat("Failed to verify digest. Error code: ", ok)};
 }
 
-CryptoObjectUniquePtr importPublicKey(const std::vector<uint8_t>& key) {
+CryptoObjectPtr importPublicKey(const std::vector<uint8_t>& key) {
   CBS cbs({key.data(), key.size()});
 
   EVP_PKEY* pkey(EVP_parse_public_key(&cbs));

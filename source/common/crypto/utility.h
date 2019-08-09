@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <iostream>
 #include <vector>
 
 #include "envoy/buffer/buffer.h"
@@ -52,7 +51,7 @@ std::vector<uint8_t> getSha256Hmac(const std::vector<uint8_t>& key, absl::string
  * @return If the result_ is true, the error_message_ is empty; otherwise,
  * the error_message_ stores the error message
  */
-const VerificationOutput verifySignature(absl::string_view hash, void* key,
+const VerificationOutput verifySignature(absl::string_view hash, CryptoObjectPtr* key,
                                          const std::vector<uint8_t>& signature,
                                          const std::vector<uint8_t>& text);
 
@@ -61,7 +60,7 @@ const VerificationOutput verifySignature(absl::string_view hash, void* key,
  * @param key key string
  * @return pointer to EVP_PKEY public key
  */
-CryptoObjectUniquePtr importPublicKey(const std::vector<uint8_t>& key);
+CryptoObjectPtr importPublicKey(const std::vector<uint8_t>& key);
 
 } // namespace Utility
 } // namespace Crypto

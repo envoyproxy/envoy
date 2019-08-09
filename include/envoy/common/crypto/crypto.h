@@ -2,7 +2,6 @@
 
 #include <cstdint>
 #include <functional>
-#include <iostream>
 #include <memory>
 
 #include "envoy/common/pure.h"
@@ -16,12 +15,12 @@ public:
   virtual ~CryptoObject() = default;
 };
 
-using CryptoObjectUniquePtr = std::unique_ptr<CryptoObject>;
+using CryptoObjectPtr = std::unique_ptr<CryptoObject>;
 
 namespace Access {
 
-template <class T> T* getTyped(CryptoObjectUniquePtr* cryptoPtr) {
-  return static_cast<T*>(cryptoPtr->get());
+template <class T> T* getTyped(CryptoObjectPtr* cryptoPtr) {
+  return dynamic_cast<T*>(cryptoPtr->get());
 }
 
 } // namespace Access
