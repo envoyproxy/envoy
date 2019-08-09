@@ -1,12 +1,14 @@
 #pragma once
 
 #include <chrono>
+#include <vector>
 
 #include "envoy/config/filter/http/adaptive_concurrency/v2alpha/adaptive_concurrency.pb.h"
 #include "envoy/config/filter/http/adaptive_concurrency/v2alpha/adaptive_concurrency.pb.validate.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/event/dispatcher.h"
 #include "extensions/filters/http/adaptive_concurrency/concurrency_controller/concurrency_controller.h"
+#include "envoy/stats/stats_macros.h"
 //@tallen
 //#include "include/envoy/stats/histogram.h"
 
@@ -18,6 +20,24 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AdaptiveConcurrency {
 namespace ConcurrencyController {
+
+/**
+ * All stats for the gradient controller.
+ *
+ * TODO (tonya11en): Add timers for how long minRTT window lasts, etc.
+ */
+// clang-format off
+#define ALL_GRADIENT_CONTROLLER_STATS(COUNTER, GAUGE) \
+  GAUGE(concurrency_limit, Accumulate)  \
+  GAUGE(rq_outstanding, Accumulate)
+// clang-format on
+
+/**
+ * Wrapper struct for gradient controller stats. @see stats_macros.h
+ */
+struct GradientControllerStats {
+  ALL_GRADIENT_CONTROLLER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
+};
 
 enum class SampleAggregatePercentile {
   P50,
@@ -37,6 +57,8 @@ public:
   std::chrono::milliseconds sample_rtt_calc_interval() const { return sample_rtt_calc_interval_; }
   uint64_t max_concurrency_limit() const { return max_concurrency_limit_; }
   int starting_concurrency_limit() const { return starting_concurrency_limit_; }
+  int min_rtt_aggregate_request_count() const { return min_rtt_aggregate_request_count_; }
+  double max_gradient() const { return max_gradient_; }
 
 private:
   // The measured request round-trip time under ideal conditions.
@@ -53,6 +75,12 @@ private:
 
   // The percentile considered when aggregating latency samples.
   SampleAggregatePercentile sample_aggregate_percentile_;
+
+  // The number of requests to aggregate/sample during the minRTT recalculation.
+  int min_rtt_aggregate_request_count_;
+
+  // The maximum value the gradient may take.
+  double max_gradient_;
 };
 typedef std::shared_ptr<GradientControllerConfig> GradientControllerConfigSharedPtr;
 
@@ -85,8 +113,7 @@ public:
                      Event::Dispatcher& dispatcher,
                      Runtime::Loader& runtime,
                      std::string stats_prefix,
-                     Stats::Scope& scope,
-                     TimeSource& time_source);
+                     Stats::Scope& scope);
 
   ~GradientController();
 
@@ -96,27 +123,34 @@ public:
 
 private:
   void recordLatencySampleForMinRTT(const std::chrono::nanoseconds& rq_latency);
-  void calculateMinRTT();
-  void updateConcurrencyLimit();
-  uint32_t processLatencySamples() ABSL_EXCLUSIVE_LOCKS_REQUIRED(min_rtt_calculation_mtx_, limit_mtx_);
+  void updateMinRTT() ABSL_EXCLUSIVE_LOCKS_REQUIRED(limit_mtx_);
+  void beginMinRTTRecalcWindow();
+  void resetSampleWindow();
+  std::chrono::microseconds processLatencySamplesAndClear() ABSL_EXCLUSIVE_LOCKS_REQUIRED(limit_mtx_);
+  int calculateNewLimit() ABSL_EXCLUSIVE_LOCKS_REQUIRED(limit_mtx_);
+
+  bool minRTTRequestThresholdReached() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(limit_mtx_) {
+    return static_cast<int>(latency_sample_hist_.size()) >= config_->min_rtt_aggregate_request_count();
+  }
 
   GradientControllerConfigSharedPtr config_;
   Event::Dispatcher& dispatcher_;
-  Runtime::Loader& runtime_;
-  const std::string stats_prefix_;
-  Stats::Scope& scope_;
-  TimeSource& time_source_;
+//  Runtime::Loader& runtime_;
+//  const std::string stats_prefix_;
+//  Stats::Scope& scope_;
 
-  std::chrono::nanoseconds min_rtt_ ABSL_GUARDED_BY(min_rtt_calculation_mtx_);
-  absl::Mutex min_rtt_calculation_mtx_;
+  std::chrono::nanoseconds min_rtt_ ABSL_GUARDED_BY(limit_mtx_);
+  std::atomic<bool> recalculating_min_rtt_;
+  absl::Mutex min_rtt_mtx_;
+
   absl::Mutex limit_mtx_;
-  std::chrono::nanoseconds sample_rtt_ ABSL_GUARDED_BY(/*min_rtt_calculation_mtx_,*/ limit_mtx_);
-  int num_rq_outstanding_ ABSL_GUARDED_BY(limit_mtx_);
-  int concurrency_limit_ ABSL_GUARDED_BY(limit_mtx_);
+  std::chrono::nanoseconds sample_rtt_ ABSL_GUARDED_BY(limit_mtx_);
+  std::atomic<int> num_rq_outstanding_;
+  std::atomic<int> concurrency_limit_;
 
   // TODO @tallen figure out the deal with this histogram and stats sinks.
   //Stats::Histogram latency_samples_;
-  std::vector<uint32_t> latency_sample_hist_;
+  std::vector<uint32_t> latency_sample_hist_ ABSL_GUARDED_BY(limit_mtx_);
 
   Event::TimerPtr min_rtt_calc_timer_;
   Event::TimerPtr sample_reset_timer_;

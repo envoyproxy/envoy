@@ -38,6 +38,10 @@ message GradientControllerConfig {
 
     // The period of time samples are taken to recalculate the concurrency limit.
     google.protobuf.Duration concurrency_update_interval = 3;
+
+    // The maximum value the gradient is allowed to take. This influences how aggressively the
+    // concurrency limit can increase. Defaults to 2.0.
+    google.protobuf.DoubleValue max_gradient = 4 [(validate.rules).double.gt = 1.0];
   }
   ConcurrencyLimitCalculationParams concurrency_limit_params = 2;
 
