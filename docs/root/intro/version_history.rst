@@ -18,7 +18,7 @@ Version history
 * tls: added verification of IP address SAN fields in certificates against configured SANs in the
   certificate validation context.
 * upstream: added network filter chains to upstream connections, see :ref:`filters<envoy_api_field_Cluster.filters>`.
-* api: omit the node identifier from the subsequent discovery requests on the same stream.
+* api: added ::ref:`skip_subsequent_node <envoy_api_field_core.ApiConfigSource.skip_subsequent_node>` option to omit the node identifier from the subsequent discovery requests on the same stream.
 
 1.11.0 (July 11, 2019)
 ======================

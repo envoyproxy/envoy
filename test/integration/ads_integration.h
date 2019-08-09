@@ -20,6 +20,7 @@ dynamic_resources:
   cds_config: {ads: {}}
   ads_config:
     api_type: GRPC
+    skip_subsequent_node: true
 static_resources:
   clusters:
     name: dummy_cluster
