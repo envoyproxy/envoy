@@ -141,11 +141,9 @@ def api_proto_library(
         py_export_suffixes = ["_py", "_py_genproto"]
 
     # Optionally define gRPC services
-    # TODO: when Python services are required, add to the below stub generations.
     if (has_services == 1):
-        go_grpc_name = _Suffix(name, _GO_GRPC_SUFFIX)
-        go_proto_deps = [_Suffix(x, _GO_PROTO_SUFFIX) for x in deps]
-        api_go_grpc_library(name = go_grpc_name, proto = this, deps = go_proto_deps)
+        # TODO: replace uses of api_go_grpc_library and add functionality here.
+        # TODO: when Python services are required, add to the below stub generations.
         cc_grpc_name = _Suffix(name, _CC_GRPC_SUFFIX)
         cc_proto_deps = [cc_proto_library_name] + [_Suffix(x, _CC_SUFFIX) for x in deps]
         api_cc_grpc_library(name = cc_grpc_name, proto = this, deps = cc_proto_deps)

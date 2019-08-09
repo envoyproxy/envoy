@@ -10,3 +10,11 @@ api_proto_library_internal(
         "//udpa/data/orca/v1:orca_load_report",
     ],
 )
+
+api_go_grpc_library(
+    name = "orca",
+    proto = ":orca",
+    deps = [
+        "//udpa/data/orca/v1:orca_load_report_go_proto",
+    ],
+)
