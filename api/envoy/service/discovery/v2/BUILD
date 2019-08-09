@@ -26,7 +26,7 @@ api_proto_library_internal(
     deps = [
         "//envoy/api/v2/core:base",
         "//envoy/api/v2/core:health_check",
-	"//envoy/api/v2/endpoint:endpoint",
+        "//envoy/api/v2/endpoint:endpoint",
     ],
 )
 
