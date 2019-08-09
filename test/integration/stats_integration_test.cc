@@ -176,7 +176,9 @@ private:
 class ClusterMemoryTestRunner : public testing::TestWithParam<Network::Address::IpVersion> {
 protected:
   ClusterMemoryTestRunner() : save_use_fakes_(Stats::SymbolTableCreator::useFakeSymbolTables()) {}
-  ~ClusterMemoryTestRunner() { Stats::SymbolTableCreator::setUseFakeSymbolTables(save_use_fakes_); }
+  ~ClusterMemoryTestRunner() override {
+    Stats::SymbolTableCreator::setUseFakeSymbolTables(save_use_fakes_);
+  }
 
 private:
   const bool save_use_fakes_;
