@@ -13,6 +13,10 @@ import "validate/validate.proto";
 
 // [#protodoc-title: Dynamic forward proxy cluster configuration]
 
+// [#not-implemented-hide:] Not configuration. Workaround for C++ issue with stripping proto files.
+message ClusterDummy {
+}
+
 // Configuration for the dynamic forward proxy cluster. See the :ref:`architecture overview
 // <arch_overview_http_dynamic_forward_proxy>` for more information.
 message ClusterConfig {
