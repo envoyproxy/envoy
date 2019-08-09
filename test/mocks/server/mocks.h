@@ -214,7 +214,7 @@ public:
   MOCK_METHOD0(statsAllocator, Stats::Allocator&());
 
 private:
-  Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
+  Stats::TestSymbolTable symbol_table_;
   Thread::MutexBasicLockable log_lock_;
   Thread::MutexBasicLockable access_log_lock_;
   Stats::AllocatorImpl stats_allocator_;

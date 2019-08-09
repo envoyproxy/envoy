@@ -7,6 +7,7 @@
 
 #include "common/config/well_known_names.h"
 #include "common/memory/stats.h"
+#include "common/stats/symbol_table_creator.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/config/utility.h"
@@ -172,13 +173,71 @@ private:
     return memory_test.consumedBytes();
   }
 };
-class ClusterMemoryTestRunner : public testing::TestWithParam<Network::Address::IpVersion> {};
+class ClusterMemoryTestRunner : public testing::TestWithParam<Network::Address::IpVersion> {
+protected:
+  ClusterMemoryTestRunner() : save_use_fakes_(Stats::SymbolTableCreator::useFakeSymbolTables()) {}
+  ~ClusterMemoryTestRunner() { Stats::SymbolTableCreator::setUseFakeSymbolTables(save_use_fakes_); }
+
+private:
+  const bool save_use_fakes_;
+};
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ClusterMemoryTestRunner,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithStats) {
+TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
+  Stats::SymbolTableCreator::setUseFakeSymbolTables(true);
+
+  // A unique instance of ClusterMemoryTest allows for multiple runs of Envoy with
+  // differing configuration. This is necessary for measuring the memory consumption
+  // between the different instances within the same test.
+  const size_t m1 = ClusterMemoryTestHelper::computeMemory(1);
+  const size_t m1001 = ClusterMemoryTestHelper::computeMemory(1001);
+  const size_t m_per_cluster = (m1001 - m1) / 1000;
+
+  // Note: if you are increasing this golden value because you are adding a
+  // stat, please confirm that this will be generally useful to most Envoy
+  // users. Otherwise you are adding to the per-cluster memory overhead, which
+  // will be significant for Envoy installations that are massively
+  // multi-tenant.
+  //
+  // History of golden values:
+  //
+  // Date        PR       Bytes Per Cluster   Notes
+  //                      exact upper-bound
+  // ----------  -----    -----------------   -----
+  // 2019/03/20  6329     59015               Initial version
+  // 2019/04/12  6477     59576               Implementing Endpoint lease...
+  // 2019/04/23  6659     59512               Reintroduce dispatcher stats...
+  // 2019/04/24  6161     49415               Pack tags and tag extracted names
+  // 2019/05/07  6794     49957               Stats for excluded hosts in cluster
+  // 2019/04/27  6733     50213               Use SymbolTable API for HTTP codes
+  // 2019/05/31  6866     50157               libstdc++ upgrade in CI
+  // 2019/06/03  7199     49393               absl update
+  // 2019/06/06  7208     49650               make memory targets approximate
+  // 2019/06/17  7243     49412       49700   macros for exact/upper-bound memory checks
+  // 2019/06/29  7364     45685       46000   combine 2 levels of stat ref-counting into 1
+  // 2019/06/30  7428     42742       43000   remove stats multiple inheritance, inline HeapStatData
+  // 2019/07/06  7477     42742       43000   fork gauge representation to drop pending_increment_
+  // 2019/07/15  7555     42806       43000   static link libstdc++ in tests
+  // 2019/07/24  7503     43030       44000   add upstream filters to clusters
+
+  // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
+  // 'release' builds, where we control the platform and tool-chain. So you
+  // will need to find the correct value only after failing CI and looking
+  // at the logs.
+  //
+  // On a local clang8/libstdc++/linux flow, the memory usage was observed in
+  // June 2019 to be 64 bytes higher than it is in CI/release. Your mileage may
+  // vary.
+  EXPECT_MEMORY_EQ(m_per_cluster, 43030); // 104 bytes higher than a debug build.
+  EXPECT_MEMORY_LE(m_per_cluster, 44000);
+}
+
+TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
+  Stats::SymbolTableCreator::setUseFakeSymbolTables(false);
+
   // A unique instance of ClusterMemoryTest allows for multiple runs of Envoy with
   // differing configuration. This is necessary for measuring the memory consumption
   // between the different instances within the same test.

@@ -106,8 +106,8 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
                                             "Use the original libevent buffer implementation",
                                             false, true, "bool", cmd);
   TCLAP::ValueArg<bool> use_fake_symbol_table("", "use-fake-symbol-table",
-                                            "Use fake symbol table implementation",
-                                            false, true, "bool", cmd);
+                                              "Use fake symbol table implementation", false, true,
+                                              "bool", cmd);
 
   cmd.setExceptionHandling(false);
   try {
