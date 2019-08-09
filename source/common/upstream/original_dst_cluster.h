@@ -20,6 +20,9 @@
 namespace Envoy {
 namespace Upstream {
 
+using HostMapSharedPtr = std::shared_ptr<HostMap>;
+using HostMapConstSharedPtr = std::shared_ptr<const HostMap>;
+
 /**
  * The OriginalDstCluster is a dynamic cluster that automatically adds hosts as needed based on the
  * original destination address of the downstream connection. These hosts are also automatically
@@ -48,66 +51,52 @@ public:
    */
   class LoadBalancer : public Upstream::LoadBalancer {
   public:
-    LoadBalancer(PrioritySet& priority_set, ClusterSharedPtr& parent,
-                 const absl::optional<envoy::api::v2::Cluster::OriginalDstLbConfig>& config);
+    LoadBalancer(const std::shared_ptr<OriginalDstCluster>& parent)
+        : parent_(parent), host_map_(parent->getCurrentHostMap()) {}
 
     // Upstream::LoadBalancer
     HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
 
   private:
-    /**
-     * Map from an host IP address/port to a HostSharedPtr. Due to races multiple distinct host
-     * objects with the same address can be created, so we need to use a multimap.
-     */
-    class HostMap {
-    public:
-      bool insert(const HostSharedPtr& host, bool check = true) {
-        if (check) {
-          auto range = map_.equal_range(host->address()->asString());
-          auto it = std::find_if(
-              range.first, range.second,
-              [&host](const decltype(map_)::value_type pair) { return pair.second == host; });
-          if (it != range.second) {
-            return false; // 'host' already in the map, no need to insert.
-          }
-        }
-        map_.emplace(host->address()->asString(), host);
-        return true;
-      }
-
-      void remove(const HostSharedPtr& host) {
-        auto range = map_.equal_range(host->address()->asString());
-        auto it =
-            std::find_if(range.first, range.second, [&host](const decltype(map_)::value_type pair) {
-              return pair.second == host;
-            });
-        ASSERT(it != range.second);
-        map_.erase(it);
-      }
-
-      HostSharedPtr find(const Network::Address::Instance& address) {
-        auto it = map_.find(address.asString());
-
-        if (it != map_.end()) {
-          return it->second;
-        }
-        return nullptr;
-      }
-
-    private:
-      std::unordered_multimap<std::string, HostSharedPtr> map_;
-    };
-
     Network::Address::InstanceConstSharedPtr requestOverrideHost(LoadBalancerContext* context);
 
-    PrioritySet& priority_set_;                // Thread local priority set.
-    std::weak_ptr<OriginalDstCluster> parent_; // Primary cluster managed by the main thread.
-    ClusterInfoConstSharedPtr info_;
-    const bool use_http_header_;
-    HostMap host_map_;
+    const std::shared_ptr<OriginalDstCluster> parent_;
+    HostMapConstSharedPtr host_map_;
   };
 
 private:
+  struct LoadBalancerFactory : public Upstream::LoadBalancerFactory {
+    LoadBalancerFactory(const std::shared_ptr<OriginalDstCluster>& cluster) : cluster_(cluster) {}
+
+    // Upstream::LoadBalancerFactory
+    Upstream::LoadBalancerPtr create() override { return std::make_unique<LoadBalancer>(cluster_); }
+
+    const std::shared_ptr<OriginalDstCluster> cluster_;
+  };
+
+  struct ThreadAwareLoadBalancer : public Upstream::ThreadAwareLoadBalancer {
+    ThreadAwareLoadBalancer(const std::shared_ptr<OriginalDstCluster>& cluster)
+        : cluster_(cluster) {}
+
+    // Upstream::ThreadAwareLoadBalancer
+    Upstream::LoadBalancerFactorySharedPtr factory() override {
+      return std::make_shared<LoadBalancerFactory>(cluster_);
+    }
+    void initialize() override {}
+
+    const std::shared_ptr<OriginalDstCluster> cluster_;
+  };
+
+  HostMapConstSharedPtr getCurrentHostMap() {
+    absl::ReaderMutexLock lock(&host_map_lock_);
+    return host_map_;
+  }
+
+  void setHostMap(const HostMapConstSharedPtr& new_host_map) {
+    absl::WriterMutexLock lock(&host_map_lock_);
+    host_map_ = new_host_map;
+  }
+
   void addHost(HostSharedPtr&);
   void cleanup();
 
@@ -117,7 +106,15 @@ private:
   Event::Dispatcher& dispatcher_;
   const std::chrono::milliseconds cleanup_interval_ms_;
   Event::TimerPtr cleanup_timer_;
+  const bool use_http_header_;
+
+  absl::Mutex host_map_lock_;
+  HostMapConstSharedPtr host_map_ ABSL_GUARDED_BY(host_map_lock_);
+
+  friend class OriginalDstClusterFactory;
 };
+
+using OriginalDstClusterSharedPtr = std::shared_ptr<OriginalDstCluster>;
 
 class OriginalDstClusterFactory : public ClusterFactoryImplBase {
 public:

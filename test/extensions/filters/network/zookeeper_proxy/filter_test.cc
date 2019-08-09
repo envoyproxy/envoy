@@ -491,9 +491,9 @@ public:
     EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
   }
 
+  Stats::IsolatedStoreImpl scope_;
   ZooKeeperFilterConfigSharedPtr config_;
   std::unique_ptr<ZooKeeperFilter> filter_;
-  Stats::IsolatedStoreImpl scope_;
   std::string stat_prefix_{"test.zookeeper"};
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
