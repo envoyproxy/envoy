@@ -133,7 +133,7 @@ message Listener {
 
   // The timeout to wait for all listener filters to complete operation. If the timeout is reached,
   // the accepted socket is closed without a connection being created unless
-   // `continue_on_listener_filters_timeout` is set to true. Specify 0 to disable the
+  // `continue_on_listener_filters_timeout` is set to true. Specify 0 to disable the
   // timeout. If not specified, a default timeout of 15s is used.
   google.protobuf.Duration listener_filters_timeout = 15 [(gogoproto.stdduration) = true];
 
