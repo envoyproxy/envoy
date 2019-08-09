@@ -72,7 +72,7 @@ public:
 
   /**
    * @return bool whether the listener should try to create a connection when listener filters
-   *         timed out.
+   *         time out.
    */
   virtual bool continueOnListenerFiltersTimeout() const PURE;
 
