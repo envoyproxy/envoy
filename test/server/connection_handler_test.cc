@@ -43,9 +43,11 @@ public:
         : parent_(parent), tag_(tag), bind_to_port_(bind_to_port),
           hand_off_restored_destination_connections_(hand_off_restored_destination_connections),
           name_(name), listener_filters_timeout_(listener_filters_timeout) {
-      envoy::api::v2::Listener dummy;
+      envoy::api::v2::listener::UdpListenerConfig dummy;
+      std::string listener_name("raw_udp_listener");
+      dummy.set_udp_listener_name(listener_name);
       udp_listener_factory_ =
-          Config::Utility::getAndCheckFactory<ActiveUdpListenerConfigFactory>("raw_udp_listener")
+          Config::Utility::getAndCheckFactory<ActiveUdpListenerConfigFactory>(listener_name)
               .createActiveUdpListenerFactory(dummy);
       EXPECT_CALL(socket_, socketType()).WillOnce(Return(socket_type));
     }
@@ -99,7 +101,6 @@ public:
   NiceMock<Network::MockFilterChainFactory> factory_;
   std::list<TestListenerPtr> listeners_;
   const Network::FilterChainSharedPtr filter_chain_;
-  std::unique_ptr<ActiveUdpListenerFactory> udp_listener_factory_;
 };
 
 TEST_F(ConnectionHandlerTest, RemoveListener) {

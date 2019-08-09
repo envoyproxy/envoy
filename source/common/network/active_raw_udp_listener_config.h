@@ -6,6 +6,9 @@
 namespace Envoy {
 namespace Network {
 
+// This class uses a protobuf config to create a UDP listener factory which
+// creates a Server::ConnectionHandlerImpl::ActieUdpListener.
+// This is the default UDP listener if not specified in config.
 class ActiveRawUdpListenerConfigFactory : public Server::ActiveUdpListenerConfigFactory {
 
   std::unique_ptr<Server::ActiveUdpListenerFactory>

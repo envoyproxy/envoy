@@ -90,7 +90,7 @@ public:
   virtual const std::string& name() const PURE;
 
   /**
-   * @return factory pointer if socket_type is DATAGRAM, otherwise return
+   * @return factory pointer if listening on UDP socket, otherwise return
    * nullptr.
    */
   virtual Server::ActiveUdpListenerFactory* udpListenerFactory() PURE;
@@ -188,7 +188,6 @@ public:
   virtual void onReceiveError(const ErrorCode& error_code, Api::IoError::IoErrorCode err) PURE;
 };
 
-using UdpListenerCallbacksPtr = std::unique_ptr<UdpListenerCallbacks>;
 /**
  * An abstract socket listener. Free the listener to stop listening on the socket.
  */

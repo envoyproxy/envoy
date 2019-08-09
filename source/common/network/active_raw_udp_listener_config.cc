@@ -4,7 +4,8 @@ namespace Envoy {
 namespace Network {
 
 std::unique_ptr<Server::ActiveUdpListenerFactory>
-ActiveRawUdpListenerConfigFactory::createActiveUdpListenerFactory(const Protobuf::Message&) {
+ActiveRawUdpListenerConfigFactory::createActiveUdpListenerFactory(
+    const Protobuf::Message& /*message*/) {
   return std::make_unique<Server::ActiveRawUdpListenerFactory>();
 }
 
