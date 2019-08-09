@@ -34,9 +34,6 @@ public:
                     ThreadLocal::SlotAllocator& tls,
                     GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache);
 
-  static void responseFlagsToAccessLogResponseFlags(
-      envoy::data::accesslog::v2::AccessLogCommon& common_access_log,
-      const StreamInfo::StreamInfo& stream_info);
 
 private:
   /**

@@ -24,11 +24,23 @@ envoy_cc_library(
         "//include/envoy/upstream:upstream_interface",
         "//source/common/grpc:async_client_lib",
         "//source/common/grpc:typed_async_client_lib",
-        "//source/common/network:utility_lib",
         "//source/extensions/access_loggers/common:access_log_base",
         "@envoy_api//envoy/config/accesslog/v2:als_cc",
         "@envoy_api//envoy/config/filter/accesslog/v2:accesslog_cc",
         "@envoy_api//envoy/service/accesslog/v2:als_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "grpc_access_log_utils",
+    srcs = ["grpc_access_log_utils.cc"],
+    hdrs = ["grpc_access_log_utils.h"],
+    deps = [
+        "//source/common/stream_info:stream_info_lib",
+        "//source/common/stream_info:utility_lib",
+        "//source/common/network:utility_lib",
+        "//include/envoy/upstream:upstream_interface",
+        "@envoy_api//envoy/data/accesslog/v2:accesslog_cc",
     ],
 )
 
@@ -38,6 +50,7 @@ envoy_cc_library(
     hdrs = ["http_grpc_access_log_impl.h"],
     deps = [
         ":grpc_access_log_lib",
+        ":grpc_access_log_utils",
     ],
 )
 
