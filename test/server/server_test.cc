@@ -455,8 +455,10 @@ TEST_P(ServerInstanceImplTest, ValidationDefault) {
   EXPECT_THAT_THROWS_MESSAGE(
       server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo"),
       EnvoyException, "Protobuf message (foo) has unknown fields");
+  EXPECT_EQ(0, TestUtility::findCounter(stats_store_, "server.static_unknown_fields")->value());
   EXPECT_NO_THROW(
       server_->messageValidationContext().dynamicValidationVisitor().onUnknownField("bar"));
+  EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "server.dynamic_unknown_fields")->value());
 }
 
 // Validation mode with --allow-unknown-fields
@@ -467,8 +469,10 @@ TEST_P(ServerInstanceImplTest, ValidationAllowStatic) {
   EXPECT_NO_THROW(initialize("test/server/empty_bootstrap.yaml"));
   EXPECT_NO_THROW(
       server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo"));
+  EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "server.static_unknown_fields")->value());
   EXPECT_NO_THROW(
       server_->messageValidationContext().dynamicValidationVisitor().onUnknownField("bar"));
+  EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "server.dynamic_unknown_fields")->value());
 }
 
 // Validation mode with --reject-unknown-fields-dynamic
@@ -480,9 +484,11 @@ TEST_P(ServerInstanceImplTest, ValidationRejectDynamic) {
   EXPECT_THAT_THROWS_MESSAGE(
       server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo"),
       EnvoyException, "Protobuf message (foo) has unknown fields");
+  EXPECT_EQ(0, TestUtility::findCounter(stats_store_, "server.static_unknown_fields")->value());
   EXPECT_THAT_THROWS_MESSAGE(
       server_->messageValidationContext().dynamicValidationVisitor().onUnknownField("bar"),
       EnvoyException, "Protobuf message (bar) has unknown fields");
+  EXPECT_EQ(0, TestUtility::findCounter(stats_store_, "server.dynamic_unknown_fields")->value());
 }
 
 // Validation mode with --allow-unknown-fields --reject-unknown-fields-dynamic
@@ -494,9 +500,11 @@ TEST_P(ServerInstanceImplTest, ValidationAllowStaticRejectDynamic) {
   EXPECT_NO_THROW(initialize("test/server/empty_bootstrap.yaml"));
   EXPECT_NO_THROW(
       server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo"));
+  EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "server.static_unknown_fields")->value());
   EXPECT_THAT_THROWS_MESSAGE(
       server_->messageValidationContext().dynamicValidationVisitor().onUnknownField("bar"),
       EnvoyException, "Protobuf message (bar) has unknown fields");
+  EXPECT_EQ(0, TestUtility::findCounter(stats_store_, "server.dynamic_unknown_fields")->value());
 }
 
 // Validate server localInfo() from bootstrap Node.

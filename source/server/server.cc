@@ -58,9 +58,9 @@ InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_syste
                            std::unique_ptr<ProcessContext> process_context)
     : workers_started_(false), shutdown_(false), options_(options),
       validation_context_(
-          options_.allowUnknownFields() ? ProtobufMessage::getNullValidationVisitor()
+          options_.allowUnknownFields() ? static_warning_validation_visitor_
                                         : ProtobufMessage::getStrictValidationVisitor(),
-          !options.rejectUnknownFieldsDynamic() ? ProtobufMessage::getNullValidationVisitor()
+          !options.rejectUnknownFieldsDynamic() ? dynamic_warning_validation_visitor_
                                                 : ProtobufMessage::getStrictValidationVisitor()),
       time_source_(time_system), restarter_(restarter), start_time_(time(nullptr)),
       original_start_time_(start_time_), stats_store_(store), thread_local_(tls),
@@ -295,6 +295,8 @@ void InstanceImpl::initialize(const Options& options,
       ServerStats{ALL_SERVER_STATS(POOL_COUNTER_PREFIX(stats_store_, server_stats_prefix),
                                    POOL_GAUGE_PREFIX(stats_store_, server_stats_prefix),
                                    POOL_HISTOGRAM_PREFIX(stats_store_, server_stats_prefix))});
+  static_warning_validation_visitor_.setCounter(server_stats_->static_unknown_fields_);
+  dynamic_warning_validation_visitor_.setCounter(server_stats_->dynamic_unknown_fields_);
 
   initialization_timer_ =
       std::make_unique<Stats::Timespan>(server_stats_->initialization_time_ms_, timeSource());

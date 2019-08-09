@@ -1,6 +1,9 @@
 #pragma once
 
 #include "envoy/protobuf/message_validator.h"
+#include "envoy/stats/stats.h"
+
+#include "absl/container/flat_hash_set.h"
 
 namespace Envoy {
 namespace ProtobufMessage {
@@ -12,6 +15,24 @@ public:
 };
 
 ValidationVisitor& getNullValidationVisitor();
+
+class WarningValidationVisitorImpl : public ValidationVisitor,
+                                     public Logger::Loggable<Logger::Id::config> {
+public:
+  void setCounter(Stats::Counter& counter);
+
+  // Envoy::ProtobufMessage::ValidationVisitor
+  void onUnknownField(absl::string_view description) override;
+
+private:
+  // Track hashes of descriptions we've seen, to avoid log spam. A hash is used here to avoid
+  // wasting memory with unused strings.
+  absl::flat_hash_set<uint64_t> descriptions_;
+  // This can be late initialized via setCounter(), enabling the server bootstrap loading which
+  // occurs prior to the initialization of the stats subsystem.
+  Stats::Counter* counter_{};
+  uint64_t prestats_count_{};
+};
 
 class StrictValidationVisitorImpl : public ValidationVisitor {
 public:

@@ -96,8 +96,10 @@ TEST_P(DynamicValidationIntegrationTest, CdsProtocolOptionsRejected) {
     EXPECT_EQ(0, test_server_->counter("cluster_manager.cds.update_success")->value());
     // CDS API parsing will reject due to unknown HCM field.
     EXPECT_EQ(1, test_server_->counter("cluster_manager.cds.update_rejected")->value());
+    EXPECT_EQ(0, test_server_->counter("server.dynamic_unknown_fields")->value());
   } else {
     EXPECT_EQ(1, test_server_->counter("cluster_manager.cds.update_success")->value());
+    EXPECT_EQ(1, test_server_->counter("server.dynamic_unknown_fields")->value());
   }
 }
 
@@ -117,9 +119,11 @@ TEST_P(DynamicValidationIntegrationTest, LdsFilterRejected) {
     // LDS API parsing will reject due to unknown HCM field.
     EXPECT_EQ(1, test_server_->counter("listener_manager.lds.update_rejected")->value());
     EXPECT_EQ(nullptr, test_server_->counter("http.router.rds.route_config_0.update_success"));
+    EXPECT_EQ(0, test_server_->counter("server.dynamic_unknown_fields")->value());
   } else {
     EXPECT_EQ(1, test_server_->counter("listener_manager.lds.update_success")->value());
     EXPECT_EQ(1, test_server_->counter("http.router.rds.route_config_0.update_success")->value());
+    EXPECT_EQ(1, test_server_->counter("server.dynamic_unknown_fields")->value());
   }
   EXPECT_EQ(1, test_server_->counter("cluster_manager.cds.update_success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.update_success")->value());
@@ -140,8 +144,10 @@ TEST_P(DynamicValidationIntegrationTest, RdsFailedBySubscription) {
     EXPECT_EQ(0, test_server_->counter("http.router.rds.route_config_0.update_success")->value());
     // FilesystemSubscriptionImpl will reject early at the ingestion level
     EXPECT_EQ(1, test_server_->counter("http.router.rds.route_config_0.update_failure")->value());
+    EXPECT_EQ(0, test_server_->counter("server.dynamic_unknown_fields")->value());
   } else {
     EXPECT_EQ(1, test_server_->counter("http.router.rds.route_config_0.update_success")->value());
+    EXPECT_EQ(1, test_server_->counter("server.dynamic_unknown_fields")->value());
   }
   EXPECT_EQ(1, test_server_->counter("cluster_manager.cds.update_success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.update_success")->value());
@@ -164,8 +170,10 @@ TEST_P(DynamicValidationIntegrationTest, EdsFailedBySubscription) {
     EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.update_success")->value());
     // FilesystemSubscriptionImpl will reject early at the ingestion level
     EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.update_failure")->value());
+    EXPECT_EQ(0, test_server_->counter("server.dynamic_unknown_fields")->value());
   } else {
     EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.update_success")->value());
+    EXPECT_EQ(1, test_server_->counter("server.dynamic_unknown_fields")->value());
   }
 }
 

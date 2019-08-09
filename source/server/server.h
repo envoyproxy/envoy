@@ -49,6 +49,8 @@ namespace Server {
  * All server wide stats. @see stats_macros.h
  */
 #define ALL_SERVER_STATS(COUNTER, GAUGE, HISTOGRAM)                                                \
+  COUNTER(static_unknown_fields)                                                                   \
+  COUNTER(dynamic_unknown_fields)                                                                  \
   COUNTER(debug_assertion_failures)                                                                \
   GAUGE(concurrency, NeverImport)                                                                  \
   GAUGE(days_until_first_cert_expiring, Accumulate)                                                \
@@ -235,6 +237,8 @@ private:
   bool workers_started_;
   bool shutdown_;
   const Options& options_;
+  ProtobufMessage::WarningValidationVisitorImpl static_warning_validation_visitor_;
+  ProtobufMessage::WarningValidationVisitorImpl dynamic_warning_validation_visitor_;
   ProtobufMessage::ValidationContextImpl validation_context_;
   TimeSource& time_source_;
   HotRestart& restarter_;
