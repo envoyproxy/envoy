@@ -186,8 +186,11 @@ message Listener {
   // Specifies the intended direction of the traffic relative to the local Envoy.
   core.TrafficDirection traffic_direction = 16;
 
-  // If address.socket is a UDP socket, this field specifies the actual
-  // udp listener to create, i.e. "raw_udp_listener" for creating an ActiveUdpListener.
-  // If not present, treat it as "raw_udp_listener".
+  // If the protocol in the listener socket address in :ref:`protocol
+  // <envoy_api_field_core.SocketAddress.protocol>` is :ref:`UDP
+  // <envoy_api_field_core.Protocol.UDP>`, this field specifies the actual udp listener to create,
+  // i.e. :ref:`udp_listener_name <envoy_api_field_listener.UdpListenerConfig.udp_listener_name>` =
+  // "raw_udp_listener" for creating an ActiveUdpListener. If not present, treat it as
+  // "raw_udp_listener".
   listener.UdpListenerConfig udp_listener_config = 17;
 }
