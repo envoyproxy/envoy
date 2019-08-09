@@ -87,7 +87,7 @@ def api_cc_grpc_library(name, proto, deps = []):
 def _ToCanonicalLabel(label):
     # //my/app and //my/app:app are the same label. In places we mutate the incoming label adding different suffixes
     # in order to generate multiple targets in a single rule. //my/app:app_grpc_cc.
-    # Skylark formatters and linters prefer the shorthand label whilst we need te latter.
+    # Skylark formatters and linters prefer the shorthand label whilst we need the latter.
     rel = Label("//" + native.package_name()).relative(label)
     return "//" + rel.package + ":" + rel.name
 
@@ -143,12 +143,12 @@ def api_proto_library(
         visibility = ["//visibility:public"],
     )
     py_export_suffixes = []
-    if (require_py == 1):
+    if require_py:
         api_py_proto_library(name, srcs, deps)
         py_export_suffixes = ["_py", "_py_genproto"]
 
     # Optionally define gRPC services
-    if (has_services == 1):
+    if has_services:
         # TODO: replace uses of api_go_grpc_library and add functionality here.
         # TODO: when Python services are required, add to the below stub generations.
         cc_grpc_name = _Suffix(name, _CC_GRPC_SUFFIX)
