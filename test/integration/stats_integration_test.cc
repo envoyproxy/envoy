@@ -256,21 +256,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // Date        PR       Bytes Per Cluster   Notes
   //                      exact upper-bound
   // ----------  -----    -----------------   -----
-  // 2019/03/20  6329     59015               Initial version
-  // 2019/04/12  6477     59576               Implementing Endpoint lease...
-  // 2019/04/23  6659     59512               Reintroduce dispatcher stats...
-  // 2019/04/24  6161     49415               Pack tags and tag extracted names
-  // 2019/05/07  6794     49957               Stats for excluded hosts in cluster
-  // 2019/04/27  6733     50213               Use SymbolTable API for HTTP codes
-  // 2019/05/31  6866     50157               libstdc++ upgrade in CI
-  // 2019/06/03  7199     49393               absl update
-  // 2019/06/06  7208     49650               make memory targets approximate
-  // 2019/06/17  7243     49412       49700   macros for exact/upper-bound memory checks
-  // 2019/06/29  7364     45685       46000   combine 2 levels of stat ref-counting into 1
-  // 2019/06/30  7428     42742       43000   remove stats multiple inheritance, inline HeapStatData
-  // 2019/07/06  7477     42742       43000   fork gauge representation to drop pending_increment_
-  // 2019/07/15  7555     42806       43000   static link libstdc++ in tests
-  // 2019/07/24  7503     43030       44000   add upstream filters to clusters
+  // 2019/08/09  7882     35681       36000   Initial version
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -280,8 +266,8 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // On a local clang8/libstdc++/linux flow, the memory usage was observed in
   // June 2019 to be 64 bytes higher than it is in CI/release. Your mileage may
   // vary.
-  EXPECT_MEMORY_EQ(m_per_cluster, 43030); // 104 bytes higher than a debug build.
-  EXPECT_MEMORY_LE(m_per_cluster, 44000);
+  EXPECT_MEMORY_EQ(m_per_cluster, 35681); // 104 bytes higher than a debug build.
+  EXPECT_MEMORY_LE(m_per_cluster, 36000);
 }
 
 } // namespace
