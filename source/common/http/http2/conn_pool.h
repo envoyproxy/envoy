@@ -34,10 +34,6 @@ public:
   void addDrainedCallback(DrainedCb cb) override;
   void drainConnections() override;
   bool hasActiveConnections() const override;
-  /*
-  ConnectionPool::Cancellable* newStream(Http::StreamDecoder& response_decoder,
-                                         ConnectionPool::Callbacks& callbacks) override;
-                                         */
   Upstream::HostDescriptionConstSharedPtr host() const override { return host_; };
   const Upstream::ResourcePriority& resourcePriority() const { return priority_; };
 
@@ -108,7 +104,7 @@ protected:
   void createNewConnection();
   void onUpstreamReady(ActiveClient& client);
   ConnectionPool::Cancellable* newStream(Http::StreamDecoder& response_decoder,
-                                         ConnectionPool::Callbacks& callbacks);
+                                         ConnectionPool::Callbacks& callbacks) override;
 
   void applyToEachClient(std::list<ActiveClientPtr>& client_list,
                          const std::function<void(const ActiveClientPtr&)>& fn);
