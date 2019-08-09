@@ -229,7 +229,7 @@ private:
 
 class ActiveUdpListenerFactory {
 public:
-  virtual ~ActiveUdpListenerFactory() {}
+  virtual ~ActiveUdpListenerFactory() = default;
 
   virtual ConnectionHandlerImpl::ActiveListenerBasePtr
   createActiveUdpListener(ConnectionHandlerImpl& parent, Network::ListenerConfig& config) PURE;

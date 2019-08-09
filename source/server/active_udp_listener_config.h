@@ -7,7 +7,7 @@ namespace Server {
 // envoy::api::v2::listener::UdpListenerConfig.udp_listener_name.
 class ActiveUdpListenerConfigFactory {
 public:
-  virtual ~ActiveUdpListenerConfigFactory(){};
+  virtual ~ActiveUdpListenerConfigFactory() = default;
 
   virtual std::unique_ptr<ActiveUdpListenerFactory>
   createActiveUdpListenerFactory(const Protobuf::Message&) PURE;
