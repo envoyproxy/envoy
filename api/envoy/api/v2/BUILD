@@ -40,7 +40,7 @@ api_proto_library_internal(
         "//envoy/api/v2/core:address",
         "//envoy/api/v2/core:base",
         "//envoy/api/v2/core:health_check",
-        "//envoy/api/v2/endpoint:endpoint",
+        "//envoy/api/v2/endpoint",
         "//envoy/type:percent",
     ],
 )
@@ -74,7 +74,7 @@ api_proto_library_internal(
         "//envoy/api/v2/core:config_source",
         "//envoy/api/v2/core:health_check",
         "//envoy/api/v2/core:protocol",
-        "//envoy/api/v2/endpoint:endpoint",
+        "//envoy/api/v2/endpoint",
         "//envoy/type:percent",
     ],
 )
@@ -107,7 +107,7 @@ api_proto_library_internal(
         ":discovery",
         "//envoy/api/v2/core:address",
         "//envoy/api/v2/core:base",
-        "//envoy/api/v2/listener:listener",
+        "//envoy/api/v2/listener",
     ],
 )
 
@@ -131,7 +131,7 @@ api_proto_library_internal(
         ":discovery",
         "//envoy/api/v2/core:base",
         "//envoy/api/v2/core:config_source",
-        "//envoy/api/v2/route:route",
+        "//envoy/api/v2/route",
     ],
 )
 
@@ -154,7 +154,7 @@ api_proto_library_internal(
     deps = [
         ":discovery",
         "//envoy/api/v2/core:base",
-        "//envoy/api/v2/route:route",
+        "//envoy/api/v2/route",
     ],
 )
 

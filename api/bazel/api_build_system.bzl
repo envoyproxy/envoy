@@ -84,6 +84,13 @@ def api_cc_grpc_library(name, proto, deps = []):
         visibility = ["//visibility:public"],
     )
 
+def _ToCanonicalLabel(label):
+    # //my/app and //my/app:app are the same label. In places we mutate the incoming label adding different suffixes
+    # in order to generate multiple targets in a single rule. //my/app:app_grpc_cc.
+    # Skylark formatters and linters prefer the shorthand label whilst we need te latter.
+    rel = Label("//" + native.package_name()).relative(label)
+    return "//" + rel.package + ":" + rel.name
+
 # This is api_proto_library plus some logic internal to //envoy/api.
 def api_proto_library_internal(visibility = ["//visibility:private"], **kwargs):
     # //envoy/docs/build.sh needs visibility in order to generate documents.
@@ -145,7 +152,7 @@ def api_proto_library(
         # TODO: replace uses of api_go_grpc_library and add functionality here.
         # TODO: when Python services are required, add to the below stub generations.
         cc_grpc_name = _Suffix(name, _CC_GRPC_SUFFIX)
-        cc_proto_deps = [cc_proto_library_name] + [_Suffix(x, _CC_SUFFIX) for x in deps]
+        cc_proto_deps = [cc_proto_library_name] + [_Suffix(_ToCanonicalLabel(x), _CC_SUFFIX) for x in deps]
         api_cc_grpc_library(name = cc_grpc_name, proto = this, deps = cc_proto_deps)
 
     # Allow unlimited visibility for consumers
