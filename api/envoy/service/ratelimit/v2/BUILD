@@ -9,7 +9,7 @@ api_proto_library_internal(
     deps = [
         "//envoy/api/v2/core:base",
         "//envoy/api/v2/core:grpc_service",
-        "//envoy/api/v2/ratelimit:ratelimit",
+        "//envoy/api/v2/ratelimit",
     ],
 )
 
