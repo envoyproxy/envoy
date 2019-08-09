@@ -14,10 +14,16 @@ envoy_package()
 
 envoy_cc_library(
     name = "concurrency_controller_lib",
-    srcs = [],
+    srcs = ["gradient_controller.cc"],
     hdrs = [
         "concurrency_controller.h",
+        "gradient_controller.h",
     ],
     deps = [
+        "//source/common/protobuf:protobuf",
+        "@envoy_api//envoy/config/filter/http/adaptive_concurrency/v2alpha:adaptive_concurrency_cc",
+        "//source/common/event:dispatcher_lib",
+        "//source/common/stats:stats_lib",
+        "//source/common/runtime:runtime_lib",
     ],
 )

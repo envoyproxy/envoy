@@ -7,7 +7,11 @@ option java_outer_classname = "AdaptiveConcurrencyProto";
 option java_multiple_files = true;
 option go_package = "v2alpha";
 
-import "envoy/type/percent.proto";
+import "google/protobuf/duration.proto";
+import "google/api/annotations.proto";
+import "google/protobuf/wrappers.proto";
+
+import "validate/validate.proto";
 
 message GradientControllerConfig {
   // The percentile to use when summarizing aggregated samples. This mirrors supported quantiles in
@@ -42,7 +46,7 @@ message GradientControllerConfig {
     google.protobuf.Duration interval = 1;
 
     // The number of requests to aggregate/sample during the minRTT recalculation window before updating
-    google.protobuf.Uint64Value request_count = 2;
+    google.protobuf.UInt64Value request_count = 2;
   };
   MinimumRTTCalculationParams min_rtt_calc_params = 3;
 }
