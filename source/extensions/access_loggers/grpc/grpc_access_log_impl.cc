@@ -11,12 +11,6 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace GrpcCommon {
 
-namespace {
-
-using namespace envoy::data::accesslog::v2;
-
-} // namespace
-
 void GrpcAccessLoggerImpl::LocalStream::onRemoteClose(Grpc::Status::GrpcStatus,
                                                       const std::string&) {
   ASSERT(parent_.stream_ != absl::nullopt);

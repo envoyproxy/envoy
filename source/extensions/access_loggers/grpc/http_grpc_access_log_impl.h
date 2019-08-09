@@ -34,7 +34,6 @@ public:
                     ThreadLocal::SlotAllocator& tls,
                     GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache);
 
-
 private:
   /**
    * Per-thread cached logger.

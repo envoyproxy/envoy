@@ -1,6 +1,7 @@
 #include "envoy/data/accesslog/v2/accesslog.pb.h"
 
 #include "extensions/access_loggers/grpc/grpc_access_log_utils.h"
+
 #include "test/mocks/stream_info/mocks.h"
 
 namespace Envoy {
@@ -9,8 +10,8 @@ namespace AccessLoggers {
 namespace GrpcCommon {
 namespace {
 
-using testing::Return;
 using testing::_;
+using testing::Return;
 
 TEST(UtilityResponseFlagsToAccessLogResponseFlagsTest, All) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;

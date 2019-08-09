@@ -113,10 +113,10 @@ void Utility::responseFlagsToAccessLogResponseFlags(
   }
 }
 
-void
-Utility::extractCommonAccessLogProperties(envoy::data::accesslog::v2::AccessLogCommon& common_access_log,
-                                          const StreamInfo::StreamInfo& stream_info) {
-    if (stream_info.downstreamRemoteAddress() != nullptr) {
+void Utility::extractCommonAccessLogProperties(
+    envoy::data::accesslog::v2::AccessLogCommon& common_access_log,
+    const StreamInfo::StreamInfo& stream_info) {
+  if (stream_info.downstreamRemoteAddress() != nullptr) {
     Network::Utility::addressToProtobufAddress(
         *stream_info.downstreamRemoteAddress(),
         *common_access_log.mutable_downstream_remote_address());
@@ -213,8 +213,8 @@ Utility::extractCommonAccessLogProperties(envoy::data::accesslog::v2::AccessLogC
   }
 
   if (stream_info.upstreamLocalAddress() != nullptr) {
-    Network::Utility::addressToProtobufAddress(
-        *stream_info.upstreamLocalAddress(), *common_access_log.mutable_upstream_local_address());
+    Network::Utility::addressToProtobufAddress(*stream_info.upstreamLocalAddress(),
+                                               *common_access_log.mutable_upstream_local_address());
   }
   responseFlagsToAccessLogResponseFlags(common_access_log, stream_info);
   if (!stream_info.upstreamTransportFailureReason().empty()) {

@@ -36,10 +36,10 @@ envoy_cc_library(
     srcs = ["grpc_access_log_utils.cc"],
     hdrs = ["grpc_access_log_utils.h"],
     deps = [
+        "//include/envoy/upstream:upstream_interface",
+        "//source/common/network:utility_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/stream_info:utility_lib",
-        "//source/common/network:utility_lib",
-        "//include/envoy/upstream:upstream_interface",
         "@envoy_api//envoy/data/accesslog/v2:accesslog_cc",
     ],
 )

@@ -3,18 +3,13 @@
 #include "common/common/assert.h"
 #include "common/network/utility.h"
 #include "common/stream_info/utility.h"
+
 #include "extensions/access_loggers/grpc/grpc_access_log_utils.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
 namespace HttpGrpc {
-
-namespace {
-
-using namespace envoy::data::accesslog::v2;
-
-} // namespace
 
 HttpGrpcAccessLog::ThreadLocalLogger::ThreadLocalLogger(
     GrpcCommon::GrpcAccessLoggerSharedPtr logger)
@@ -51,7 +46,8 @@ void HttpGrpcAccessLog::emitLog(const Http::HeaderMap& request_headers,
   // Common log properties.
   // TODO(mattklein123): Populate sample_rate field.
   envoy::data::accesslog::v2::HTTPAccessLogEntry log_entry;
-  GrpcCommon::Utility::extractCommonAccessLogProperties(*log_entry.mutable_common_properties(), stream_info);
+  GrpcCommon::Utility::extractCommonAccessLogProperties(*log_entry.mutable_common_properties(),
+                                                        stream_info);
 
   if (stream_info.protocol()) {
     switch (stream_info.protocol().value()) {

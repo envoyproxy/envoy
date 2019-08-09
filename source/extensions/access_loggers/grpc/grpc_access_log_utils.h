@@ -13,7 +13,7 @@ public:
   static void
   extractCommonAccessLogProperties(envoy::data::accesslog::v2::AccessLogCommon& common_access_log,
                                    const StreamInfo::StreamInfo& stream_info);
-  
+
   static void responseFlagsToAccessLogResponseFlags(
       envoy::data::accesslog::v2::AccessLogCommon& common_access_log,
       const StreamInfo::StreamInfo& stream_info);
