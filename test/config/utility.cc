@@ -172,7 +172,7 @@ dynamic_resources:
       grpc_services:
         envoy_grpc:
           cluster_name: my_cds_cluster
-      skip_subsequent_node: true
+      set_node_on_first_message_only: true
 static_resources:
   clusters:
   - name: my_cds_cluster

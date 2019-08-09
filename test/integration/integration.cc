@@ -532,12 +532,11 @@ AssertionResult BaseIntegrationTest::compareDiscoveryRequest(
     const std::string& expected_type_url, const std::string& expected_version,
     const std::vector<std::string>& expected_resource_names,
     const std::vector<std::string>& expected_resource_names_added,
-    const std::vector<std::string>& expected_resource_names_removed, bool first_on_stream,
+    const std::vector<std::string>& expected_resource_names_removed, bool expect_node,
     const Protobuf::int32 expected_error_code, const std::string& expected_error_message) {
   if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
     return compareSotwDiscoveryRequest(expected_type_url, expected_version, expected_resource_names,
-                                       first_on_stream, expected_error_code,
-                                       expected_error_message);
+                                       expect_node, expected_error_code, expected_error_message);
   } else {
     return compareDeltaDiscoveryRequest(expected_type_url, expected_resource_names_added,
                                         expected_resource_names_removed, expected_error_code,
@@ -547,12 +546,12 @@ AssertionResult BaseIntegrationTest::compareDiscoveryRequest(
 
 AssertionResult BaseIntegrationTest::compareSotwDiscoveryRequest(
     const std::string& expected_type_url, const std::string& expected_version,
-    const std::vector<std::string>& expected_resource_names, bool first_on_stream,
+    const std::vector<std::string>& expected_resource_names, bool expect_node,
     const Protobuf::int32 expected_error_code, const std::string& expected_error_message) {
   envoy::api::v2::DiscoveryRequest discovery_request;
   VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
 
-  if (first_on_stream) {
+  if (expect_node) {
     EXPECT_TRUE(discovery_request.has_node());
     EXPECT_FALSE(discovery_request.node().id().empty());
     EXPECT_FALSE(discovery_request.node().cluster().empty());

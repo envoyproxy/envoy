@@ -67,8 +67,7 @@ message ApiConfigSource {
   RateLimitSettings rate_limit_settings = 6;
 
   // Skip the node identifier in subsequent discovery requests for streaming gRPC config types.
-  // This will be enabled by default in the future.
-  bool skip_subsequent_node = 7;
+  bool set_node_on_first_message_only = 7;
 }
 
 // Aggregated Discovery Service (ADS) options. This is currently empty, but when

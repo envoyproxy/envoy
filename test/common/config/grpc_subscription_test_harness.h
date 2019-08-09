@@ -51,16 +51,16 @@ public:
   ~GrpcSubscriptionTestHarness() override { EXPECT_CALL(async_stream_, sendMessageRaw_(_, false)); }
 
   void expectSendMessage(const std::set<std::string>& cluster_names, const std::string& version,
-                         bool first_on_stream = false) override {
-    expectSendMessage(cluster_names, version, first_on_stream, Grpc::Status::GrpcStatus::Ok, "");
+                         bool expect_node = false) override {
+    expectSendMessage(cluster_names, version, expect_node, Grpc::Status::GrpcStatus::Ok, "");
   }
 
   void expectSendMessage(const std::set<std::string>& cluster_names, const std::string& version,
-                         bool first_on_stream, const Protobuf::int32 error_code,
+                         bool expect_node, const Protobuf::int32 error_code,
                          const std::string& error_message) {
-    UNREFERENCED_PARAMETER(first_on_stream);
+    UNREFERENCED_PARAMETER(expect_node);
     envoy::api::v2::DiscoveryRequest expected_request;
-    if (first_on_stream) {
+    if (expect_node) {
       expected_request.mutable_node()->CopyFrom(node_);
     }
     for (const auto& cluster : cluster_names) {

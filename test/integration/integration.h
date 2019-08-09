@@ -215,7 +215,7 @@ public:
                           const std::vector<std::string>& expected_resource_names,
                           const std::vector<std::string>& expected_resource_names_added,
                           const std::vector<std::string>& expected_resource_names_removed,
-                          bool first_on_stream = false,
+                          bool expect_node = false,
                           const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
                           const std::string& expected_error_message = "");
   template <class T>
@@ -248,7 +248,7 @@ public:
       const std::string& expected_error_message = "");
   AssertionResult compareSotwDiscoveryRequest(
       const std::string& expected_type_url, const std::string& expected_version,
-      const std::vector<std::string>& expected_resource_names, bool first_on_stream = false,
+      const std::vector<std::string>& expected_resource_names, bool expect_node = false,
       const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
       const std::string& expected_error_message = "");
 

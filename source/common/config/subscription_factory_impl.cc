@@ -57,7 +57,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
           dispatcher_, random_, sotwGrpcMethod(type_url), type_url, callbacks, stats, scope,
           Utility::parseRateLimitSettings(api_config_source),
           Utility::configSourceInitialFetchTimeout(config),
-          api_config_source.skip_subsequent_node());
+          api_config_source.set_node_on_first_message_only());
       break;
     case envoy::api::v2::core::ApiConfigSource::DELTA_GRPC: {
       Utility::checkApiConfigSourceSubscriptionBackingCluster(cm_.clusters(), api_config_source);
