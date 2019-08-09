@@ -1,4 +1,4 @@
-#include "extensions/access_loggers/http_grpc/grpc_access_log_impl.h"
+#include "extensions/access_loggers/grpc/http_grpc_access_log_impl.h"
 
 #include "envoy/upstream/upstream.h"
 

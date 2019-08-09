@@ -1,4 +1,4 @@
-#include "extensions/access_loggers/http_grpc/grpc_access_log_proto_descriptors.h"
+#include "extensions/access_loggers/grpc/grpc_access_log_proto_descriptors.h"
 
 #include "envoy/service/accesslog/v2/als.pb.h"
 

@@ -12,9 +12,9 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "grpc_access_log_lib",
-    srcs = ["grpc_access_log_impl.cc"],
-    hdrs = ["grpc_access_log_impl.h"],
+    name = "http_grpc_access_log_lib",
+    srcs = ["http_grpc_access_log_impl.cc"],
+    hdrs = ["http_grpc_access_log_impl.h"],
     deps = [
         "//include/envoy/grpc:async_client_interface",
         "//include/envoy/grpc:async_client_manager_interface",
@@ -44,16 +44,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "config",
-    srcs = ["config.cc"],
-    hdrs = ["config.h"],
+    name = "http_config",
+    srcs = ["http_config.cc"],
+    hdrs = ["http_config.h"],
     deps = [
         "//include/envoy/registry",
         "//include/envoy/server:access_log_config_interface",
         "//source/common/common:assert_lib",
         "//source/common/protobuf",
         "//source/extensions/access_loggers:well_known_names",
-        "//source/extensions/access_loggers/http_grpc:grpc_access_log_lib",
-        "//source/extensions/access_loggers/http_grpc:grpc_access_log_proto_descriptors_lib",
+        "//source/extensions/access_loggers/grpc:http_grpc_access_log_lib",
+        "//source/extensions/access_loggers/grpc:grpc_access_log_proto_descriptors_lib",
     ],
 )

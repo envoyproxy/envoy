@@ -3,7 +3,7 @@
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/network/address_impl.h"
 
-#include "extensions/access_loggers/http_grpc/grpc_access_log_impl.h"
+#include "extensions/access_loggers/grpc/http_grpc_access_log_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/grpc/mocks.h"
