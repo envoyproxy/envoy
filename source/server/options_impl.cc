@@ -23,8 +23,8 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
                          spdlog::level::level_enum default_log_level)
     : signal_handling_enabled_(true) {
   std::string log_levels_string = "Log levels: ";
-  for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_string_views); i++) {
-    log_levels_string += fmt::format("[{}]", spdlog::level::level_string_views[i]);
+  for (auto level_string_view : spdlog::level::level_string_views) {
+    log_levels_string += fmt::format("[{}]", level_string_view);
   }
   log_levels_string +=
       fmt::format("\nDefault is [{}]", spdlog::level::level_string_views[default_log_level]);

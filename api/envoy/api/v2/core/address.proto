@@ -83,8 +83,7 @@ message TcpKeepalive {
 
 message BindConfig {
   // The address to bind to when creating a socket.
-  SocketAddress source_address = 1
-      [(validate.rules).message.required = true, (gogoproto.nullable) = false];
+  SocketAddress source_address = 1 [(validate.rules).message.required = true];
 
   // Whether to set the *IP_FREEBIND* option when creating the socket. When this
   // flag is set to true, allows the :ref:`source_address

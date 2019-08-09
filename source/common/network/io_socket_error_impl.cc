@@ -26,7 +26,7 @@ Api::IoError::IoErrorCode IoSocketError::getErrorCode() const {
   case EADDRNOTAVAIL:
     return IoErrorCode::AddressNotAvailable;
   default:
-    ENVOY_LOG_MISC(error, "Unknown error code {} details {}", errno_, ::strerror(errno_));
+    ENVOY_LOG_MISC(debug, "Unknown error code {} details {}", errno_, ::strerror(errno_));
     return IoErrorCode::UnknownError;
   }
 }

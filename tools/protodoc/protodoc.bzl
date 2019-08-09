@@ -82,12 +82,12 @@ proto_doc_aspect = aspect(
         "_protoc": attr.label(
             default = Label("@com_google_protobuf//:protoc"),
             executable = True,
-            cfg = "host",
+            cfg = "exec",
         ),
         "_protodoc": attr.label(
             default = Label("//tools/protodoc"),
             executable = True,
-            cfg = "host",
+            cfg = "exec",
         ),
     },
     implementation = _proto_doc_aspect_impl,

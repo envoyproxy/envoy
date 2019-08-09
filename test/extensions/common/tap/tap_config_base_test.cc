@@ -96,15 +96,15 @@ TEST(TrimSlice, All) {
   }
 
   {
-    std::vector<Buffer::RawSlice> slices = {{0x0, 5}};
+    std::vector<Buffer::RawSlice> slices = {{nullptr, 5}};
     Utility::trimSlices(slices, 0, 100);
 
-    const std::vector<Buffer::RawSlice> expected{{0x0, 5}};
+    const std::vector<Buffer::RawSlice> expected{{nullptr, 5}};
     EXPECT_EQ(expected, slices);
   }
 
   {
-    std::vector<Buffer::RawSlice> slices = {{0x0, 5}};
+    std::vector<Buffer::RawSlice> slices = {{nullptr, 5}};
     Utility::trimSlices(slices, 3, 3);
 
     const std::vector<Buffer::RawSlice> expected{{reinterpret_cast<void*>(0x3), 2}};
@@ -112,7 +112,7 @@ TEST(TrimSlice, All) {
   }
 
   {
-    std::vector<Buffer::RawSlice> slices = {{0x0, 5}, {0x0, 4}};
+    std::vector<Buffer::RawSlice> slices = {{nullptr, 5}, {nullptr, 4}};
     Utility::trimSlices(slices, 3, 3);
 
     const std::vector<Buffer::RawSlice> expected{{reinterpret_cast<void*>(0x3), 2},
@@ -121,7 +121,7 @@ TEST(TrimSlice, All) {
   }
 
   {
-    std::vector<Buffer::RawSlice> slices = {{0x0, 5}, {0x0, 4}};
+    std::vector<Buffer::RawSlice> slices = {{nullptr, 5}, {nullptr, 4}};
     Utility::trimSlices(slices, 6, 3);
 
     const std::vector<Buffer::RawSlice> expected{{reinterpret_cast<void*>(0x5), 0},
@@ -130,7 +130,7 @@ TEST(TrimSlice, All) {
   }
 
   {
-    std::vector<Buffer::RawSlice> slices = {{0x0, 5}, {0x0, 4}};
+    std::vector<Buffer::RawSlice> slices = {{nullptr, 5}, {nullptr, 4}};
     Utility::trimSlices(slices, 0, 0);
 
     const std::vector<Buffer::RawSlice> expected{{reinterpret_cast<void*>(0x0), 0},
@@ -139,7 +139,7 @@ TEST(TrimSlice, All) {
   }
 
   {
-    std::vector<Buffer::RawSlice> slices = {{0x0, 5}, {0x0, 4}};
+    std::vector<Buffer::RawSlice> slices = {{nullptr, 5}, {nullptr, 4}};
     Utility::trimSlices(slices, 0, 3);
 
     const std::vector<Buffer::RawSlice> expected{{reinterpret_cast<void*>(0x0), 3},
@@ -148,7 +148,7 @@ TEST(TrimSlice, All) {
   }
 
   {
-    std::vector<Buffer::RawSlice> slices = {{0x0, 5}, {0x0, 4}};
+    std::vector<Buffer::RawSlice> slices = {{nullptr, 5}, {nullptr, 4}};
     Utility::trimSlices(slices, 1, 3);
 
     const std::vector<Buffer::RawSlice> expected{{reinterpret_cast<void*>(0x1), 3},

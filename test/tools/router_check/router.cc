@@ -74,15 +74,15 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_file) {
   auto config = std::make_unique<Router::ConfigImpl>(route_config, *factory_context, false);
 
   return RouterCheckTool(std::move(factory_context), std::move(config), std::move(stats),
-                         std::move(api));
+                         std::move(api), Coverage(route_config));
 }
 
 RouterCheckTool::RouterCheckTool(
     std::unique_ptr<NiceMock<Server::Configuration::MockFactoryContext>> factory_context,
     std::unique_ptr<Router::ConfigImpl> config, std::unique_ptr<Stats::IsolatedStoreImpl> stats,
-    Api::ApiPtr api)
+    Api::ApiPtr api, Coverage coverage)
     : factory_context_(std::move(factory_context)), config_(std::move(config)),
-      stats_(std::move(stats)), api_(std::move(api)) {
+      stats_(std::move(stats)), api_(std::move(api)), coverage_(std::move(coverage)) {
   ON_CALL(factory_context_->runtime_loader_.snapshot_,
           featureEnabled(_, testing::An<const envoy::type::FractionalPercent&>(),
                          testing::An<uint64_t>()))
@@ -281,7 +281,11 @@ bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config, const std::str
 
     actual = tool_config.headers_->get_(Http::Headers::get().Path);
   }
-  return compareResults(actual, expected, "path_rewrite");
+  const bool matches = compareResults(actual, expected, "path_rewrite");
+  if (matches) {
+    coverage_.markCovered(*tool_config.route_->routeEntry());
+  }
+  return matches;
 }
 
 bool RouterCheckTool::compareRewritePath(
@@ -415,6 +419,9 @@ Options::Options(int argc, char** argv) {
   TCLAP::CmdLine cmd("router_check_tool", ' ', "none", true);
   TCLAP::SwitchArg is_proto("p", "useproto", "Use Proto test file schema", cmd, false);
   TCLAP::SwitchArg is_detailed("d", "details", "Show detailed test execution results", cmd, false);
+  TCLAP::ValueArg<double> fail_under("f", "fail-under",
+                                     "Fail if test coverage is under a specified amount", false,
+                                     0.0, "float", cmd);
   TCLAP::ValueArg<std::string> config_path("c", "config-path", "Path to configuration file.", false,
                                            "", "string", cmd);
   TCLAP::ValueArg<std::string> test_path("t", "test-path", "Path to test file.", false, "",
@@ -430,6 +437,7 @@ Options::Options(int argc, char** argv) {
 
   is_proto_ = is_proto.getValue();
   is_detailed_ = is_detailed.getValue();
+  fail_under_ = fail_under.getValue();
 
   if (is_proto_) {
     config_path_ = config_path.getValue();

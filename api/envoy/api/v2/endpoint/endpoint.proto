@@ -94,7 +94,7 @@ message LocalityLbEndpoints {
   core.Locality locality = 1;
 
   // The group of endpoints belonging to the locality specified.
-  repeated LbEndpoint lb_endpoints = 2 [(gogoproto.nullable) = false];
+  repeated LbEndpoint lb_endpoints = 2;
 
   // Optional: Per priority/region/zone/sub_zone weight; at least 1. The load
   // balancing weight for a locality is divided by the sum of the weights of all
