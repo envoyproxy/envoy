@@ -30,7 +30,7 @@ envoy_status_t send_headers(envoy_stream_t stream_id, envoy_headers headers, boo
 
 // TODO: implement.
 envoy_status_t send_data(envoy_stream_t, envoy_data, bool) { return ENVOY_FAILURE; }
-envoy_status_t send_metadata(envoy_stream_t, envoy_headers, bool) { return ENVOY_FAILURE; }
+envoy_status_t send_metadata(envoy_stream_t, envoy_headers) { return ENVOY_FAILURE; }
 envoy_status_t send_trailers(envoy_stream_t, envoy_headers) { return ENVOY_FAILURE; }
 envoy_status_t locally_close_stream(envoy_stream_t) { return ENVOY_FAILURE; }
 envoy_status_t reset_stream(envoy_stream_t) { return ENVOY_FAILURE; }

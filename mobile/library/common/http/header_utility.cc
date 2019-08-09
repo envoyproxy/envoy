@@ -9,7 +9,7 @@ namespace Utility {
 static inline envoy_data copyEnvoyData(size_t length, const uint8_t* source) {
   uint8_t* destination = static_cast<uint8_t*>(malloc(sizeof(uint8_t) * length));
   memcpy(destination, source, length);
-  return {length, destination};
+  return {length, destination, nullptr, nullptr};
 }
 
 std::string convertToString(envoy_data s) {
@@ -18,7 +18,7 @@ std::string convertToString(envoy_data s) {
 
 HeaderMapPtr transformHeaders(envoy_headers headers) {
   Http::HeaderMapPtr transformed_headers = std::make_unique<HeaderMapImpl>();
-  for (uint64_t i = 0; i < headers.length; i++) {
+  for (envoy_header_size_t i = 0; i < headers.length; i++) {
     transformed_headers->addCopy(LowerCaseString(convertToString(headers.headers[i].key)),
                                  convertToString(headers.headers[i].value));
   }
