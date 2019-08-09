@@ -3,6 +3,9 @@ import Foundation
 /// Callback interface for receiving stream events.
 @objc
 public protocol ResponseHandler {
+  /// Dispatch queue upon which callbacks will be called.
+  var dispatchQueue: DispatchQueue { get }
+
   /// Called when response headers are received by the stream.
   ///
   /// - parameter headers:    The headers of the response.

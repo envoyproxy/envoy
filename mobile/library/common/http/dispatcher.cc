@@ -16,7 +16,7 @@ void Dispatcher::DirectStreamCallbacks::onHeaders(HeaderMapPtr&& headers, bool e
   if (end_stream) {
     http_dispatcher_.removeStream(stream_);
   }
-  observer_.on_headers_f(Utility::transformHeaders(*headers), end_stream, observer_.context);
+  observer_.on_headers(Utility::transformHeaders(*headers), end_stream, observer_.context);
 }
 
 void Dispatcher::DirectStreamCallbacks::onData(Buffer::Instance& data, bool end_stream) {
@@ -24,18 +24,18 @@ void Dispatcher::DirectStreamCallbacks::onData(Buffer::Instance& data, bool end_
   if (end_stream) {
     http_dispatcher_.removeStream(stream_);
   }
-  observer_.on_data_f(Envoy::Buffer::Utility::transformData(data), end_stream, observer_.context);
+  observer_.on_data(Envoy::Buffer::Utility::transformData(data), end_stream, observer_.context);
 }
 
 void Dispatcher::DirectStreamCallbacks::onTrailers(HeaderMapPtr&& trailers) {
   ENVOY_LOG(debug, "response trailers for stream:\n{}", *trailers);
   http_dispatcher_.removeStream(stream_);
-  observer_.on_trailers_f(Utility::transformHeaders(*trailers), observer_.context);
+  observer_.on_trailers(Utility::transformHeaders(*trailers), observer_.context);
 }
 
 void Dispatcher::DirectStreamCallbacks::onReset() {
   http_dispatcher_.removeStream(stream_);
-  observer_.on_error_f({ENVOY_STREAM_RESET, {0, nullptr}}, observer_.context);
+  observer_.on_error({ENVOY_STREAM_RESET, envoy_nodata}, observer_.context);
 }
 
 Dispatcher::DirectStream::DirectStream(AsyncClient::Stream& underlying_stream,

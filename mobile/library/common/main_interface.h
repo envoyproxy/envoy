@@ -41,10 +41,9 @@ envoy_status_t send_data(envoy_stream_t stream, envoy_data data, bool end_stream
  * Send metadata over an HTTP stream. This method can be invoked multiple times.
  * @param stream, the stream to send metadata over.
  * @param metadata, the metadata to send.
- * @param end_stream, supplies whether this is the last data in the stream.
  * @return envoy_status_t, the resulting status of the operation.
  */
-envoy_status_t send_metadata(envoy_stream_t stream, envoy_headers metadata, bool end_stream);
+envoy_status_t send_metadata(envoy_stream_t stream, envoy_headers metadata);
 
 /**
  * Send trailers over an open HTTP stream. This method can only be invoked once per stream.

@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 // NOLINT(namespace-envoy)
 
@@ -28,12 +29,31 @@ typedef enum { ENVOY_SUCCESS, ENVOY_FAILURE } envoy_status_t;
  */
 typedef enum { ENVOY_STREAM_RESET } envoy_error_code_t;
 
+#ifdef __cplusplus
+extern "C" { // release function
+#endif
+/**
+ * Callback indicating Envoy has drained the associated buffer.
+ */
+typedef void (*envoy_release_f)(void* context);
+
+/**
+ * No-op callback.
+ */
+void envoy_noop_release(void* context);
+
+#ifdef __cplusplus
+} // release function
+#endif
+
 /**
  * Holds raw binary data as an array of bytes.
  */
 typedef struct {
-  uint64_t length;
+  size_t length;
   const uint8_t* bytes;
+  envoy_release_f release;
+  void* context;
 } envoy_data;
 
 /**
@@ -57,18 +77,28 @@ typedef struct {
 } envoy_header;
 
 /**
+ * Consistent type for dealing with encodable/processable header counts.
+ */
+typedef int envoy_header_size_t;
+
+/**
  * Holds an HTTP header map as an array of envoy_header structs.
  */
 typedef struct {
   // Number of header elements in the array.
-  uint64_t length;
+  envoy_header_size_t length;
   // Array of headers.
   envoy_header* headers;
 } envoy_headers;
 
+/**
+ * Helper function to free/release memory associated with underlying headers.
+ */
+void release_envoy_headers(envoy_headers headers);
+
 // Convenience constant to pass to function calls with no data.
 // For example when sending a headers-only request.
-const envoy_data envoy_nodata = {0, NULL};
+extern const envoy_data envoy_nodata;
 
 /**
  * Error struct.
@@ -88,7 +118,7 @@ extern "C" { // function pointers
  * @param context, contains the necessary state to carry out platform-specific dispatch and
  * execution.
  */
-typedef void (*on_headers)(envoy_headers headers, bool end_stream, void* context);
+typedef void (*envoy_on_headers_f)(envoy_headers headers, bool end_stream, void* context);
 /**
  * Called when a data frame gets received on the async HTTP stream.
  * This callback can be invoked multiple times if the data gets streamed.
@@ -97,15 +127,15 @@ typedef void (*on_headers)(envoy_headers headers, bool end_stream, void* context
  * @param context, contains the necessary state to carry out platform-specific dispatch and
  * execution.
  */
-typedef void (*on_data)(envoy_data data, bool end_stream, void* context);
+typedef void (*envoy_on_data_f)(envoy_data data, bool end_stream, void* context);
 /**
- * Called when all metadata get received on the async HTTP stream.
- * Note that end stream is implied when on_metadata is called.
+ * Called when a metadata frame gets received on the async HTTP stream.
+ * Note that metadata frames are prohibited from ending a stream.
  * @param metadata, the metadata received.
  * @param context, contains the necessary state to carry out platform-specific dispatch and
  * execution.
  */
-typedef void (*on_metadata)(envoy_headers metadata, void* context);
+typedef void (*envoy_on_metadata_f)(envoy_headers metadata, void* context);
 /**
  * Called when all trailers get received on the async HTTP stream.
  * Note that end stream is implied when on_trailers is called.
@@ -113,14 +143,17 @@ typedef void (*on_metadata)(envoy_headers metadata, void* context);
  * @param context, contains the necessary state to carry out platform-specific dispatch and
  * execution.
  */
-typedef void (*on_trailers)(envoy_headers trailers, void* context);
+typedef void (*envoy_on_trailers_f)(envoy_headers trailers, void* context);
 /**
  * Called when the async HTTP stream has an error.
  * @param envoy_error, the error received/caused by the async HTTP stream.
  * @param context, contains the necessary state to carry out platform-specific dispatch and
  * execution.
  */
-typedef void (*on_error)(envoy_error error, void* context);
+typedef void (*envoy_on_error_f)(envoy_error error, void* context);
+
+// FIXME comments
+typedef void (*envoy_on_complete_f)(void* context);
 
 #ifdef __cplusplus
 } // function pointers
@@ -130,10 +163,11 @@ typedef void (*on_error)(envoy_error error, void* context);
  * Interface that can handle HTTP callbacks.
  */
 typedef struct {
-  on_headers on_headers_f;
-  on_data on_data_f;
-  on_metadata on_metadata_f;
-  on_trailers on_trailers_f;
-  on_error on_error_f;
+  envoy_on_headers_f on_headers;
+  envoy_on_data_f on_data;
+  envoy_on_metadata_f on_metadata;
+  envoy_on_trailers_f on_trailers;
+  envoy_on_complete_f on_complete;
+  envoy_on_error_f on_error;
   void* context; // Will be passed through to callbacks to provide dispatch and execution state.
 } envoy_observer;

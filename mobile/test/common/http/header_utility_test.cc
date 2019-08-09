@@ -8,7 +8,7 @@ namespace Envoy {
 namespace Http {
 
 envoy_data envoyString(std::string& s) {
-  return {s.size(), reinterpret_cast<const uint8_t*>(s.c_str())};
+  return {s.size(), reinterpret_cast<const uint8_t*>(s.c_str()), envoy_noop_release, nullptr};
 }
 
 TEST(HeaderDataConstructorTest, FromCToCppEmpty) {
@@ -35,13 +35,13 @@ TEST(HeaderDataConstructorTest, FromCToCpp) {
     };
   }
 
-  envoy_headers c_headers = {headers.size(), header_array};
+  envoy_headers c_headers = {static_cast<envoy_header_size_t>(headers.size()), header_array};
 
   HeaderMapPtr cpp_headers = Utility::transformHeaders(c_headers);
 
   ASSERT_EQ(cpp_headers->size(), c_headers.length);
 
-  for (uint64_t i = 0; i < c_headers.length; i++) {
+  for (envoy_header_size_t i = 0; i < c_headers.length; i++) {
     auto expected_key = LowerCaseString(Utility::convertToString(c_headers.headers[i].key));
     auto expected_value = Utility::convertToString(c_headers.headers[i].value);
 
@@ -68,9 +68,9 @@ TEST(HeaderDataConstructorTest, FromCppToC) {
 
   envoy_headers c_headers = Utility::transformHeaders(std::move(cpp_headers));
 
-  ASSERT_EQ(c_headers.length, cpp_headers.size());
+  ASSERT_EQ(c_headers.length, static_cast<envoy_header_size_t>(cpp_headers.size()));
 
-  for (uint64_t i = 0; i < c_headers.length; i++) {
+  for (envoy_header_size_t i = 0; i < c_headers.length; i++) {
     auto actual_key = LowerCaseString(Utility::convertToString(c_headers.headers[i].key));
     auto actual_value = Utility::convertToString(c_headers.headers[i].value);
 
