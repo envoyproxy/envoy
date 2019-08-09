@@ -100,6 +100,10 @@ absl::optional<CelValue> ResponseWrapper::operator[](CelValue key) const {
     }
   } else if (value == Size) {
     return CelValue::CreateInt64(info_.bytesSent());
+  } else if (value == Headers) {
+    return CelValue::CreateMap(&headers_);
+  } else if (value == Trailers) {
+    return CelValue::CreateMap(&trailers_);
   }
   return {};
 }

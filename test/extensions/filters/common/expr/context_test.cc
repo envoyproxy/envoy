@@ -146,7 +146,11 @@ TEST(Context, RequestAttributes) {
 
 TEST(Context, ResponseAttributes) {
   NiceMock<StreamInfo::MockStreamInfo> info;
-  ResponseWrapper response(nullptr, nullptr, info);
+  const std::string header_name = "test-header";
+  const std::string trailer_name = "test-trailer";
+  Http::TestHeaderMapImpl header_map{{header_name, "a"}};
+  Http::TestHeaderMapImpl trailer_map{{trailer_name, "b"}};
+  ResponseWrapper response(&header_map, &trailer_map, info);
 
   EXPECT_CALL(info, responseCode()).WillRepeatedly(Return(404));
   EXPECT_CALL(info, bytesSent()).WillRepeatedly(Return(123));
@@ -168,6 +172,34 @@ TEST(Context, ResponseAttributes) {
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsInt64());
     EXPECT_EQ(404, value.value().Int64OrDie());
+  }
+
+  {
+    auto value = response[CelValue::CreateString(Headers)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsMap());
+    auto& map = *value.value().MapOrDie();
+    EXPECT_FALSE(map.empty());
+    EXPECT_EQ(1, map.size());
+
+    auto header = map[CelValue::CreateString(header_name)];
+    EXPECT_TRUE(header.has_value());
+    ASSERT_TRUE(header.value().IsString());
+    EXPECT_EQ("a", header.value().StringOrDie().value());
+  }
+
+  {
+    auto value = response[CelValue::CreateString(Trailers)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsMap());
+    auto& map = *value.value().MapOrDie();
+    EXPECT_FALSE(map.empty());
+    EXPECT_EQ(1, map.size());
+
+    auto header = map[CelValue::CreateString(trailer_name)];
+    EXPECT_TRUE(header.has_value());
+    ASSERT_TRUE(header.value().IsString());
+    EXPECT_EQ("b", header.value().StringOrDie().value());
   }
 }
 
