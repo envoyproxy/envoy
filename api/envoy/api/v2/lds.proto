@@ -183,7 +183,7 @@ message Listener {
 
   // If address.socket is a UDP socket, this field specifies the actual
   // udp listener to create, i.e. "raw_udp_listener" for creating an ActiveUdpListener.
-  // If not present, treate it as "raw_udp_listener".
+  // If not present, treat it as "raw_udp_listener".
   listener.UdpListenerConfig udp_listener_config = 16;
 
   reserved 14;
