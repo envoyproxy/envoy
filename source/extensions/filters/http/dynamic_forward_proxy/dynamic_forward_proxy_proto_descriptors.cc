@@ -1,9 +1,9 @@
 #include "extensions/filters/http/dynamic_forward_proxy/dynamic_forward_proxy_proto_descriptors.h"
 
+#include "envoy/config/cluster/dynamic_forward_proxy/v2alpha/cluster.pb.h"
+
 #include "common/common/fmt.h"
 #include "common/protobuf/protobuf.h"
-
-#include "envoy/config/cluster/dynamic_forward_proxy/v2alpha/cluster.pb.h"
 
 namespace Envoy {
 namespace Extensions {

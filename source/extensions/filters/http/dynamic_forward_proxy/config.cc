@@ -1,10 +1,10 @@
 #include "extensions/filters/http/dynamic_forward_proxy/config.h"
-#include "extensions/filters/http/dynamic_forward_proxy/dynamic_forward_proxy_proto_descriptors.h"
-#include "extensions/filters/http/dynamic_forward_proxy/proxy_filter.h"
 
 #include "common/common/assert.h"
 
 #include "extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
+#include "extensions/filters/http/dynamic_forward_proxy/dynamic_forward_proxy_proto_descriptors.h"
+#include "extensions/filters/http/dynamic_forward_proxy/proxy_filter.h"
 
 namespace Envoy {
 namespace Extensions {
