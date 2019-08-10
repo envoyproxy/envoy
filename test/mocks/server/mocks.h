@@ -82,6 +82,7 @@ public:
   MOCK_CONST_METHOD0(signalHandlingEnabled, bool());
   MOCK_CONST_METHOD0(mutexTracingEnabled, bool());
   MOCK_CONST_METHOD0(libeventBufferEnabled, bool());
+  MOCK_CONST_METHOD0(fakeSymbolTableEnabled, bool());
   MOCK_CONST_METHOD0(cpusetThreadsEnabled, bool());
   MOCK_CONST_METHOD0(toCommandLineOptions, Server::CommandLineOptionsPtr());
 
@@ -213,7 +214,7 @@ public:
   MOCK_METHOD0(statsAllocator, Stats::Allocator&());
 
 private:
-  Test::Global<Stats::SymbolTableImpl> symbol_table_;
+  Stats::TestSymbolTable symbol_table_;
   Thread::MutexBasicLockable log_lock_;
   Thread::MutexBasicLockable access_log_lock_;
   Stats::AllocatorImpl stats_allocator_;

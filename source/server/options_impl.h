@@ -110,6 +110,7 @@ public:
   bool signalHandlingEnabled() const override { return signal_handling_enabled_; }
   bool mutexTracingEnabled() const override { return mutex_tracing_enabled_; }
   bool libeventBufferEnabled() const override { return libevent_buffer_enabled_; }
+  bool fakeSymbolTableEnabled() const override { return fake_symbol_table_enabled_; }
   Server::CommandLineOptionsPtr toCommandLineOptions() const override;
   void parseComponentLogLevels(const std::string& component_log_levels);
   bool cpusetThreadsEnabled() const override { return cpuset_threads_; }
@@ -144,6 +145,7 @@ private:
   bool mutex_tracing_enabled_;
   bool cpuset_threads_;
   bool libevent_buffer_enabled_;
+  bool fake_symbol_table_enabled_;
   uint32_t count_;
 };
 
