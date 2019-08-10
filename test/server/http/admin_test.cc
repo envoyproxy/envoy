@@ -51,8 +51,8 @@ namespace Server {
 
 class AdminStatsTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  AdminStatsTest() : symbol_table_(Stats::SymbolTableCreator::makeSymbolTable()),
-                     alloc_(*symbol_table_) {
+  AdminStatsTest()
+      : symbol_table_(Stats::SymbolTableCreator::makeSymbolTable()), alloc_(*symbol_table_) {
     store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(alloc_);
     store_->addSink(sink_);
   }
@@ -1453,8 +1453,8 @@ TEST_F(PrometheusStatsFormatterTest, MetricNameCollison) {
            {{"another_tag_name_4", "another_tag_4-value"}});
 
   Buffer::OwnedImpl response;
-  auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_,
-                                                          response, false, absl::nullopt);
+  auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response,
+                                                          false, absl::nullopt);
   EXPECT_EQ(2UL, size);
 }
 
@@ -1473,8 +1473,8 @@ TEST_F(PrometheusStatsFormatterTest, UniqueMetricName) {
            {{"another_tag_name_4", "another_tag_4-value"}});
 
   Buffer::OwnedImpl response;
-  auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_,
-                                                          response, false, absl::nullopt);
+  auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response,
+                                                          false, absl::nullopt);
   EXPECT_EQ(4UL, size);
 }
 
@@ -1487,13 +1487,13 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithNoValuesAndNoTags) {
   histogram->name_ = "histogram1";
   histogram->used_ = true;
   ON_CALL(*histogram, cumulativeStatistics())
-          .WillByDefault(testing::ReturnRef(h1_cumulative_statistics));
+      .WillByDefault(testing::ReturnRef(h1_cumulative_statistics));
 
   addHistogram(histogram);
 
   Buffer::OwnedImpl response;
-  auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_,
-                                                          response, false, absl::nullopt);
+  auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response,
+                                                          false, absl::nullopt);
   EXPECT_EQ(1UL, size);
 
   const std::string expected_output = R"EOF(# TYPE envoy_histogram1 histogram
@@ -1529,10 +1529,10 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithHighCounts) {
 
   // Force large counts to prove that the +Inf bucket doesn't overflow to scientific notation.
   h1_cumulative.setHistogramValuesWithCounts(std::vector<std::pair<uint64_t, uint64_t>>({
-        {1, 100000},
-        {100, 1000000},
-        {1000, 100000000},
-      }));
+      {1, 100000},
+      {100, 1000000},
+      {1000, 100000000},
+  }));
 
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
 
@@ -1540,13 +1540,13 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithHighCounts) {
   histogram->name_ = "histogram1";
   histogram->used_ = true;
   ON_CALL(*histogram, cumulativeStatistics())
-          .WillByDefault(testing::ReturnRef(h1_cumulative_statistics));
+      .WillByDefault(testing::ReturnRef(h1_cumulative_statistics));
 
   addHistogram(histogram);
 
   Buffer::OwnedImpl response;
-  auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_,
-                                                          response, false, absl::nullopt);
+  auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response,
+                                                          false, absl::nullopt);
   EXPECT_EQ(1UL, size);
 
   const std::string expected_output = R"EOF(# TYPE envoy_histogram1 histogram
@@ -1594,11 +1594,11 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithAllMetricTypes) {
   histogram1->setTags({Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}});
   addHistogram(histogram1);
   EXPECT_CALL(*histogram1, cumulativeStatistics())
-          .WillOnce(testing::ReturnRef(h1_cumulative_statistics));
+      .WillOnce(testing::ReturnRef(h1_cumulative_statistics));
 
   Buffer::OwnedImpl response;
-  auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_,
-                                                          response, false, absl::nullopt);
+  auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response,
+                                                          false, absl::nullopt);
   EXPECT_EQ(5UL, size);
 
   const std::string expected_output = R"EOF(# TYPE envoy_cluster_test_1_upstream_cx_total counter
@@ -1654,11 +1654,11 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnly) {
   histogram1->setTags({Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}});
   addHistogram(histogram1);
   EXPECT_CALL(*histogram1, cumulativeStatistics())
-          .WillOnce(testing::ReturnRef(h1_cumulative_statistics));
+      .WillOnce(testing::ReturnRef(h1_cumulative_statistics));
 
   Buffer::OwnedImpl response;
-  auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_,
-                                                          response, true, absl::nullopt);
+  auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response,
+                                                          true, absl::nullopt);
   EXPECT_EQ(1UL, size);
 
   const std::string expected_output = R"EOF(# TYPE envoy_cluster_test_1_upstream_rq_time histogram
@@ -1714,7 +1714,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnlyHistogram) {
   {
     const bool used_only = false;
     EXPECT_CALL(*histogram1, cumulativeStatistics())
-            .WillOnce(testing::ReturnRef(h1_cumulative_statistics));
+        .WillOnce(testing::ReturnRef(h1_cumulative_statistics));
 
     Buffer::OwnedImpl response;
     auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_,
@@ -1754,4 +1754,4 @@ envoy_cluster_test_1_upstream_cx_total{a_tag_name="a.tag-value"} 0
 }
 
 } // namespace Server
-} // namespace Server
+} // namespace Envoy
