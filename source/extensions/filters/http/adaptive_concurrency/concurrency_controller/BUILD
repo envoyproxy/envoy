@@ -22,6 +22,7 @@ envoy_cc_library(
     deps = [
         "//source/common/protobuf:protobuf",
         "@envoy_api//envoy/config/filter/http/adaptive_concurrency/v2alpha:adaptive_concurrency_cc",
+        "//source/common/stats:isolated_store_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/stats:stats_lib",
         "//source/common/runtime:runtime_lib",

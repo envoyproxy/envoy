@@ -6,11 +6,11 @@
 #include "envoy/config/filter/http/adaptive_concurrency/v2alpha/adaptive_concurrency.pb.h"
 #include "envoy/config/filter/http/adaptive_concurrency/v2alpha/adaptive_concurrency.pb.validate.h"
 #include "envoy/runtime/runtime.h"
+#include "common/stats/isolated_store_impl.h"
 #include "envoy/event/dispatcher.h"
 #include "extensions/filters/http/adaptive_concurrency/concurrency_controller/concurrency_controller.h"
 #include "envoy/stats/stats_macros.h"
-//@tallen
-//#include "include/envoy/stats/histogram.h"
+#include "source/common/stats/histogram_impl.h"
 
 #include "absl/synchronization/mutex.h"
 #include "absl/base/thread_annotations.h"
@@ -123,34 +123,39 @@ public:
 
 private:
   void recordLatencySampleForMinRTT(const std::chrono::nanoseconds& rq_latency);
-  void updateMinRTT() ABSL_EXCLUSIVE_LOCKS_REQUIRED(limit_mtx_);
-  void beginMinRTTRecalcWindow();
-  void resetSampleWindow();
-  std::chrono::microseconds processLatencySamplesAndClear() ABSL_EXCLUSIVE_LOCKS_REQUIRED(limit_mtx_);
-  int calculateNewLimit() ABSL_EXCLUSIVE_LOCKS_REQUIRED(limit_mtx_);
+  void updateMinRTT();
+  std::chrono::microseconds processLatencySamplesAndClear() ABSL_EXCLUSIVE_LOCKS_REQUIRED(latency_sample_mtx_);
+  int calculateNewLimit() ABSL_EXCLUSIVE_LOCKS_REQUIRED(update_window_mtx_);;
+  void setMinRTTSamplingWindow() ABSL_EXCLUSIVE_LOCKS_REQUIRED(update_window_mtx_);;
+  void resetSampleWindow() ABSL_EXCLUSIVE_LOCKS_REQUIRED(update_window_mtx_);
 
-  bool minRTTRequestThresholdReached() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(limit_mtx_) {
-    return static_cast<int>(latency_sample_hist_.size()) >= config_->min_rtt_aggregate_request_count();
+  bool minRTTRequestThresholdReached() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(latency_sample_mtx_) {
+    return
+      static_cast<int>(latency_sample_hist_.size()) >= config_->min_rtt_aggregate_request_count();
   }
 
   GradientControllerConfigSharedPtr config_;
   Event::Dispatcher& dispatcher_;
 //  Runtime::Loader& runtime_;
 //  const std::string stats_prefix_;
-//  Stats::Scope& scope_;
+  Stats::Scope& scope_;
 
-  std::chrono::nanoseconds min_rtt_ ABSL_GUARDED_BY(limit_mtx_);
+  absl::Mutex update_window_mtx_;
+  std::chrono::nanoseconds min_rtt_;
   std::atomic<bool> recalculating_min_rtt_;
-  absl::Mutex min_rtt_mtx_;
 
-  absl::Mutex limit_mtx_;
-  std::chrono::nanoseconds sample_rtt_ ABSL_GUARDED_BY(limit_mtx_);
+  // Protects the histogram storing request latency samples.
+  absl::Mutex latency_sample_mtx_ ABSL_ACQUIRED_AFTER(update_window_mtx_);
+
+  std::chrono::nanoseconds sample_rtt_ ABSL_GUARDED_BY(update_window_mtx_);
   std::atomic<int> num_rq_outstanding_;
   std::atomic<int> concurrency_limit_;
 
   // TODO @tallen figure out the deal with this histogram and stats sinks.
   //Stats::Histogram latency_samples_;
-  std::vector<uint32_t> latency_sample_hist_ ABSL_GUARDED_BY(limit_mtx_);
+  Stats::IsolatedStore store_;
+  Stats::Histogram latency_sample_hist_ ABSL_GUARDED_BY(latency_sample_mtx_);
+  int sample_count_ ABSL_GUARDED_BY(latency_sample_mtx_);
 
   Event::TimerPtr min_rtt_calc_timer_;
   Event::TimerPtr sample_reset_timer_;

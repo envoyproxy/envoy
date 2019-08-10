@@ -1,4 +1,5 @@
 #include <chrono>
+#include <atomic>
 
 #include "extensions/filters/http/adaptive_concurrency/concurrency_controller/concurrency_controller.h"
 #include "envoy/runtime/runtime.h"
@@ -57,22 +58,24 @@ GradientController::GradientController(GradientControllerConfigSharedPtr config,
                                        Event::Dispatcher& dispatcher,
                                        Runtime::Loader& ,
                                        std::string ,
-                                       Stats::Scope& ) :
+                                       Stats::Scope& scope) :
 
                                        config_(config),
                                        dispatcher_(dispatcher),
 //                                       runtime_(runtime),
 //                                       stats_prefix_(stats_prefix),
-//                                       scope_(scope),
+                                       scope_(scope),
                                        recalculating_min_rtt_(true),
                                        num_rq_outstanding_(0),
-                                       concurrency_limit_(config_->starting_concurrency_limit()) {
+                                       concurrency_limit_(1),
+                                       latency_sample_hist_(store_.histogram("latency_samples")) {
   min_rtt_calc_timer_ = dispatcher_.createTimer([this]() -> void {
-      absl::MutexLock ml(&limit_mtx_);
-      updateMinRTT();
+    absl::MutexLock ml(&update_window_mtx_);
+    setMinRTTSamplingWindow();
   });
 
   sample_reset_timer_= dispatcher_.createTimer([this]() -> void {
+    absl::MutexLock ml(&update_window_mtx_);
     resetSampleWindow();
   });
 
@@ -80,10 +83,6 @@ GradientController::GradientController(GradientControllerConfigSharedPtr config,
   auto defer_sample_reset_timer = Cleanup([this](){
     sample_reset_timer_->enableTimer(config_->sample_rtt_calc_interval());
   });
-
-  // There's no need to start the minRTT recalculation timer while it is in the recalculation
-  // window, the worker threads will trigger it upon reaching the request threshold.
-  beginMinRTTRecalcWindow();
 }
 
 GradientController::~GradientController() {
@@ -91,37 +90,30 @@ GradientController::~GradientController() {
   sample_reset_timer_.reset();
 }
 
+void GradientController::setMinRTTSamplingWindow() {
+  // Set the minRTT flag to indicate we're gathering samples to update the value. This will
+  // prevent the sample window from resetting until enough requests are gathered to complete the
+  // recalculation.
+  concurrency_limit_.store(1);
+  recalculating_min_rtt_.store(true);
+
+  // Throw away any latency samples from before the recalculation window as it may not represent
+  // the minRTT.
+  absl::MutexLock ml(&latency_sample_mtx_);
+  latency_sample_hist_.clear();
+}
+
 void GradientController::updateMinRTT() {
-  if (!recalculating_min_rtt_.load()) {
-    beginMinRTTRecalcWindow();
+  ASSERT(recalculating_min_rtt_.load());
 
-    // Throw away any latency samples from before the recalculation window as it may not represent
-    // the minRTT.
-    latency_sample_hist_.clear();
-  }
-
-  if (!minRTTRequestThresholdReached()) {
-    // There have not been enough requests accumulated for the calculation. The calculation will
-    // rely on a worker thread to reschedule this task once the desired request count threshold
-    // for the calculation has been reached.
-    return;
-  }
-
-  // Reset the timer upon leaving scope.
+  // Reset the timer to ensure the next minRTT sampling window upon leaving scope.
   auto defer = Cleanup([this](){
     min_rtt_calc_timer_->enableTimer(config_->min_rtt_calc_interval());
   });
 
+  absl::MutexLock ml(&latency_sample_mtx_);
   min_rtt_ = processLatencySamplesAndClear();
   recalculating_min_rtt_.store(false);
-}
-
-void GradientController::beginMinRTTRecalcWindow() {
-  // Set the minRTT flag to indicate we're gathering samples to update the value. This will
-  // prevent the sample window from resetting until enough requests are gathered to complete the
-  // recalculation.
-  concurrency_limit_ = 1;
-  recalculating_min_rtt_.store(true);
 }
 
 void GradientController::resetSampleWindow() {
@@ -130,11 +122,12 @@ void GradientController::resetSampleWindow() {
     sample_reset_timer_->enableTimer(config_->sample_rtt_calc_interval());
   });
 
+  // The sampling window must not be reset while sampling for the new minRTT value.
   if (recalculating_min_rtt_.load()) {
     return;
   }
 
-  absl::MutexLock ml(&limit_mtx_);
+  absl::MutexLock ml(&latency_sample_mtx_);
   if (latency_sample_hist_.empty()) {
     return;
   }
@@ -142,7 +135,7 @@ void GradientController::resetSampleWindow() {
   // TODO @tallen assuming the processing is just looking up in histogram. It's a vector for now and
   // it's unacceptable to perform quantile operations on a vector while holding locks.
   sample_rtt_ = processLatencySamplesAndClear();
-  concurrency_limit_ = calculateNewLimit();
+  concurrency_limit_.store(calculateNewLimit());
 }
 
 std::chrono::microseconds GradientController::processLatencySamplesAndClear() {
@@ -157,7 +150,7 @@ std::chrono::microseconds GradientController::processLatencySamplesAndClear() {
 int GradientController::calculateNewLimit() {
   const double gradient =
     std::min(config_->max_gradient(), double(min_rtt_.count()) / sample_rtt_.count());
-  const double limit = concurrency_limit_ * gradient;
+  const double limit = concurrency_limit_.load() * gradient;
   const double burst_headroom = sqrt(limit);
   const auto clamp = [](int min, int max, int val) {
     return std::max(min, std::min(max, val));
@@ -167,13 +160,13 @@ int GradientController::calculateNewLimit() {
 
 RequestForwardingAction GradientController::forwardingDecision() {
   while (true) {
-    const auto curr_outstanding = num_rq_outstanding_.load();
+    int curr_outstanding = num_rq_outstanding_.load();
     if (curr_outstanding < concurrency_limit_.load()) {
-      if (num_rq_outstanding.compare_exchange_weak(curr_outstanding, curr_outstanding + 1)) {
+      if (num_rq_outstanding_.compare_exchange_weak(curr_outstanding, curr_outstanding + 1)) {
         return RequestForwardingAction::Forward;
       }
 
-      // Another thread swooped in and modified num_rq_outstanding between the comparison and
+      // Another thread swooped in and modified num_rq_outstanding_ between the comparison and
       // attempt at the increment.
       continue;
     }
@@ -187,12 +180,15 @@ RequestForwardingAction GradientController::forwardingDecision() {
 
 void GradientController::recordLatencySample(const std::chrono::nanoseconds& rq_latency) {
   const uint32_t latency_usec = std::chrono::duration_cast<std::chrono::microseconds>(rq_latency).count();
-  num_rq_outstanding_--;
+  --num_rq_outstanding_;
 
-  absl::MutexLock ml(&limit_mtx_);
-  latency_sample_hist_.emplace_back(latency_usec);
+  {
+    absl::MutexLock ml(&latency_sample_mtx_);
+    latency_sample_hist_.recordValue(latency_usec);
+    ++sample_count_;
+  }
 
-  if (recalculating_min_rtt_.load() && minRTTRequestThresholdReached()) {
+  if (recalculating_min_rtt_.load() && num_samples >= config_->min_rtt_aggregate_request_count()) {
     // This sample has pushed the request count over the request count requirement for the minRTT
     // recalculation. It must now be finished.
     updateMinRTT();
