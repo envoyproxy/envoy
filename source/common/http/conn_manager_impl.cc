@@ -289,6 +289,19 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
     try {
       codec_->dispatch(data);
     } catch (const FrameFloodException& e) {
+      // TODO(mattklein123): This is an emergency substitute for the lack of connection level
+      // logging in the HCM. In a public follow up change we will add full support for connection
+      // level logging in the HCM, similar to what we have in tcp_proxy. This will allow abuse
+      // indicators to be stored in the connection level stream info, and then matched, sampled,
+      // etc. when logged.
+      const envoy::type::FractionalPercent default_value; // 0
+      if (runtime_.snapshot().featureEnabled("http.connection_manager.log_flood_exception",
+                                             default_value)) {
+        ENVOY_CONN_LOG(warn, "downstream HTTP flood from IP '{}': {}",
+                       read_callbacks_->connection(),
+                       read_callbacks_->connection().remoteAddress()->asString(), e.what());
+      }
+
       handleCodecException(e.what());
       return Network::FilterStatus::StopIteration;
     } catch (const CodecProtocolException& e) {
