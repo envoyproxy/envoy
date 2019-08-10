@@ -278,7 +278,7 @@ TEST_F(CodeUtilityTest, ResponseTimingTest) {
 class CodeStatsTest : public testing::Test {
 protected:
   CodeStatsTest()
-      : symbol_table_(Stats::SymbolTableCreator::makeSybolTable()), code_stats_(symbol_table_) {}
+      : symbol_table_(Stats::SymbolTableCreator::makeSymbolTable()), code_stats_(*symbol_table_) {}
 
   absl::string_view stripTrailingDot(absl::string_view prefix) {
     return CodeStatsImpl::stripTrailingDot(prefix);
