@@ -14,6 +14,7 @@
 #include "common/profiler/profiler.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
+#include "common/stats/symbol_table_creator.h"
 #include "common/stats/thread_local_store.h"
 
 #include "server/http/admin.h"
@@ -50,7 +51,7 @@ namespace Server {
 
 class AdminStatsTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  AdminStatsTest() : alloc_(symbol_table_) {
+  AdminStatsTest() : symbol_table_(SymbolTableCreator::makeSymbolTable()), alloc_(*symbol_table_) {
     store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(alloc_);
     store_->addSink(sink_);
   }
@@ -63,7 +64,7 @@ public:
                                   true /*pretty_print*/);
   }
 
-  Stats::FakeSymbolTableImpl symbol_table_;
+  Stats::SymbolTablePtr symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::AllocatorImpl alloc_;
@@ -1374,126 +1375,127 @@ private:
 
 class PrometheusStatsFormatterTest : public testing::Test {
 protected:
-  PrometheusStatsFormatterTest() : alloc_(symbol_table_) {}
+  PrometheusStatsFormatterTest()
+      : symbol_table_(SymbolTableCreator::makeSymbolTable()), alloc_(*symbol_table_) {
 
-  void addCounter(const std::string& name, std::vector<Stats::Tag> cluster_tags) {
-    Stats::StatNameManagedStorage storage(name, symbol_table_);
-    counters_.push_back(alloc_.makeCounter(storage.statName(), name, cluster_tags));
+    void addCounter(const std::string& name, std::vector<Stats::Tag> cluster_tags) {
+      Stats::StatNameManagedStorage storage(name, *symbol_table_);
+      counters_.push_back(alloc_.makeCounter(storage.statName(), name, cluster_tags));
+    }
+
+    void addGauge(const std::string& name, std::vector<Stats::Tag> cluster_tags) {
+      Stats::StatNameManagedStorage storage(name, *symbol_table_);
+      gauges_.push_back(alloc_.makeGauge(storage.statName(), name, cluster_tags,
+                                         Stats::Gauge::ImportMode::Accumulate));
+    }
+
+    void addHistogram(const Stats::ParentHistogramSharedPtr histogram) {
+      histograms_.push_back(histogram);
+    }
+
+    using MockHistogramSharedPtr = Stats::RefcountPtr<NiceMock<Stats::MockParentHistogram>>;
+    MockHistogramSharedPtr makeHistogram() {
+      return MockHistogramSharedPtr(new NiceMock<Stats::MockParentHistogram>());
+    }
+
+    Stats::SymbolTablePtr symbol_table_;
+    Stats::AllocatorImpl alloc_;
+    std::vector<Stats::CounterSharedPtr> counters_;
+    std::vector<Stats::GaugeSharedPtr> gauges_;
+    std::vector<Stats::ParentHistogramSharedPtr> histograms_;
+  };
+
+  TEST_F(PrometheusStatsFormatterTest, MetricName) {
+    std::string raw = "vulture.eats-liver";
+    std::string expected = "envoy_vulture_eats_liver";
+    auto actual = PrometheusStatsFormatter::metricName(raw);
+    EXPECT_EQ(expected, actual);
   }
 
-  void addGauge(const std::string& name, std::vector<Stats::Tag> cluster_tags) {
-    Stats::StatNameManagedStorage storage(name, symbol_table_);
-    gauges_.push_back(alloc_.makeGauge(storage.statName(), name, cluster_tags,
-                                       Stats::Gauge::ImportMode::Accumulate));
+  TEST_F(PrometheusStatsFormatterTest, SanitizeMetricName) {
+    std::string raw = "An.artist.plays-violin@019street";
+    std::string expected = "envoy_An_artist_plays_violin_019street";
+    auto actual = PrometheusStatsFormatter::metricName(raw);
+    EXPECT_EQ(expected, actual);
   }
 
-  void addHistogram(const Stats::ParentHistogramSharedPtr histogram) {
-    histograms_.push_back(histogram);
+  TEST_F(PrometheusStatsFormatterTest, SanitizeMetricNameDigitFirst) {
+    std::string raw = "3.artists.play-violin@019street";
+    std::string expected = "envoy_3_artists_play_violin_019street";
+    auto actual = PrometheusStatsFormatter::metricName(raw);
+    EXPECT_EQ(expected, actual);
   }
 
-  using MockHistogramSharedPtr = Stats::RefcountPtr<NiceMock<Stats::MockParentHistogram>>;
-  MockHistogramSharedPtr makeHistogram() {
-    return MockHistogramSharedPtr(new NiceMock<Stats::MockParentHistogram>());
+  TEST_F(PrometheusStatsFormatterTest, FormattedTags) {
+    std::vector<Stats::Tag> tags;
+    Stats::Tag tag1 = {"a.tag-name", "a.tag-value"};
+    Stats::Tag tag2 = {"another_tag_name", "another_tag-value"};
+    tags.push_back(tag1);
+    tags.push_back(tag2);
+    std::string expected = "a_tag_name=\"a.tag-value\",another_tag_name=\"another_tag-value\"";
+    auto actual = PrometheusStatsFormatter::formattedTags(tags);
+    EXPECT_EQ(expected, actual);
   }
 
-  Stats::FakeSymbolTableImpl symbol_table_;
-  Stats::AllocatorImpl alloc_;
-  std::vector<Stats::CounterSharedPtr> counters_;
-  std::vector<Stats::GaugeSharedPtr> gauges_;
-  std::vector<Stats::ParentHistogramSharedPtr> histograms_;
-};
+  TEST_F(PrometheusStatsFormatterTest, MetricNameCollison) {
 
-TEST_F(PrometheusStatsFormatterTest, MetricName) {
-  std::string raw = "vulture.eats-liver";
-  std::string expected = "envoy_vulture_eats_liver";
-  auto actual = PrometheusStatsFormatter::metricName(raw);
-  EXPECT_EQ(expected, actual);
-}
+    // Create two counters and two gauges with each pair having the same name,
+    // but having different tag names and values.
+    //`statsAsPrometheus()` should return two implying it found two unique stat names
 
-TEST_F(PrometheusStatsFormatterTest, SanitizeMetricName) {
-  std::string raw = "An.artist.plays-violin@019street";
-  std::string expected = "envoy_An_artist_plays_violin_019street";
-  auto actual = PrometheusStatsFormatter::metricName(raw);
-  EXPECT_EQ(expected, actual);
-}
+    addCounter("cluster.test_cluster_1.upstream_cx_total", {{"a.tag-name", "a.tag-value"}});
+    addCounter("cluster.test_cluster_1.upstream_cx_total",
+               {{"another_tag_name", "another_tag-value"}});
+    addGauge("cluster.test_cluster_2.upstream_cx_total",
+             {{"another_tag_name_3", "another_tag_3-value"}});
+    addGauge("cluster.test_cluster_2.upstream_cx_total",
+             {{"another_tag_name_4", "another_tag_4-value"}});
 
-TEST_F(PrometheusStatsFormatterTest, SanitizeMetricNameDigitFirst) {
-  std::string raw = "3.artists.play-violin@019street";
-  std::string expected = "envoy_3_artists_play_violin_019street";
-  auto actual = PrometheusStatsFormatter::metricName(raw);
-  EXPECT_EQ(expected, actual);
-}
+    Buffer::OwnedImpl response;
+    auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_,
+                                                            response, false, absl::nullopt);
+    EXPECT_EQ(2UL, size);
+  }
 
-TEST_F(PrometheusStatsFormatterTest, FormattedTags) {
-  std::vector<Stats::Tag> tags;
-  Stats::Tag tag1 = {"a.tag-name", "a.tag-value"};
-  Stats::Tag tag2 = {"another_tag_name", "another_tag-value"};
-  tags.push_back(tag1);
-  tags.push_back(tag2);
-  std::string expected = "a_tag_name=\"a.tag-value\",another_tag_name=\"another_tag-value\"";
-  auto actual = PrometheusStatsFormatter::formattedTags(tags);
-  EXPECT_EQ(expected, actual);
-}
+  TEST_F(PrometheusStatsFormatterTest, UniqueMetricName) {
 
-TEST_F(PrometheusStatsFormatterTest, MetricNameCollison) {
+    // Create two counters and two gauges, all with unique names.
+    // statsAsPrometheus() should return four implying it found
+    // four unique stat names.
 
-  // Create two counters and two gauges with each pair having the same name,
-  // but having different tag names and values.
-  //`statsAsPrometheus()` should return two implying it found two unique stat names
+    addCounter("cluster.test_cluster_1.upstream_cx_total", {{"a.tag-name", "a.tag-value"}});
+    addCounter("cluster.test_cluster_2.upstream_cx_total",
+               {{"another_tag_name", "another_tag-value"}});
+    addGauge("cluster.test_cluster_3.upstream_cx_total",
+             {{"another_tag_name_3", "another_tag_3-value"}});
+    addGauge("cluster.test_cluster_4.upstream_cx_total",
+             {{"another_tag_name_4", "another_tag_4-value"}});
 
-  addCounter("cluster.test_cluster_1.upstream_cx_total", {{"a.tag-name", "a.tag-value"}});
-  addCounter("cluster.test_cluster_1.upstream_cx_total",
-             {{"another_tag_name", "another_tag-value"}});
-  addGauge("cluster.test_cluster_2.upstream_cx_total",
-           {{"another_tag_name_3", "another_tag_3-value"}});
-  addGauge("cluster.test_cluster_2.upstream_cx_total",
-           {{"another_tag_name_4", "another_tag_4-value"}});
+    Buffer::OwnedImpl response;
+    auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_,
+                                                            response, false, absl::nullopt);
+    EXPECT_EQ(4UL, size);
+  }
 
-  Buffer::OwnedImpl response;
-  auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response,
-                                                          false, absl::nullopt);
-  EXPECT_EQ(2UL, size);
-}
+  TEST_F(PrometheusStatsFormatterTest, HistogramWithNoValuesAndNoTags) {
+    HistogramWrapper h1_cumulative;
+    h1_cumulative.setHistogramValues(std::vector<uint64_t>(0));
+    Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
 
-TEST_F(PrometheusStatsFormatterTest, UniqueMetricName) {
+    auto histogram = makeHistogram();
+    histogram->name_ = "histogram1";
+    histogram->used_ = true;
+    ON_CALL(*histogram, cumulativeStatistics())
+        .WillByDefault(testing::ReturnRef(h1_cumulative_statistics));
 
-  // Create two counters and two gauges, all with unique names.
-  // statsAsPrometheus() should return four implying it found
-  // four unique stat names.
+    addHistogram(histogram);
 
-  addCounter("cluster.test_cluster_1.upstream_cx_total", {{"a.tag-name", "a.tag-value"}});
-  addCounter("cluster.test_cluster_2.upstream_cx_total",
-             {{"another_tag_name", "another_tag-value"}});
-  addGauge("cluster.test_cluster_3.upstream_cx_total",
-           {{"another_tag_name_3", "another_tag_3-value"}});
-  addGauge("cluster.test_cluster_4.upstream_cx_total",
-           {{"another_tag_name_4", "another_tag_4-value"}});
+    Buffer::OwnedImpl response;
+    auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_,
+                                                            response, false, absl::nullopt);
+    EXPECT_EQ(1UL, size);
 
-  Buffer::OwnedImpl response;
-  auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response,
-                                                          false, absl::nullopt);
-  EXPECT_EQ(4UL, size);
-}
-
-TEST_F(PrometheusStatsFormatterTest, HistogramWithNoValuesAndNoTags) {
-  HistogramWrapper h1_cumulative;
-  h1_cumulative.setHistogramValues(std::vector<uint64_t>(0));
-  Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
-
-  auto histogram = makeHistogram();
-  histogram->name_ = "histogram1";
-  histogram->used_ = true;
-  ON_CALL(*histogram, cumulativeStatistics())
-      .WillByDefault(testing::ReturnRef(h1_cumulative_statistics));
-
-  addHistogram(histogram);
-
-  Buffer::OwnedImpl response;
-  auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response,
-                                                          false, absl::nullopt);
-  EXPECT_EQ(1UL, size);
-
-  const std::string expected_output = R"EOF(# TYPE envoy_histogram1 histogram
+    const std::string expected_output = R"EOF(# TYPE envoy_histogram1 histogram
 envoy_histogram1_bucket{le="0.5"} 0
 envoy_histogram1_bucket{le="1"} 0
 envoy_histogram1_bucket{le="5"} 0
@@ -1518,35 +1520,35 @@ envoy_histogram1_sum{} 0
 envoy_histogram1_count{} 0
 )EOF";
 
-  EXPECT_EQ(expected_output, response.toString());
-}
+    EXPECT_EQ(expected_output, response.toString());
+  }
 
-TEST_F(PrometheusStatsFormatterTest, HistogramWithHighCounts) {
-  HistogramWrapper h1_cumulative;
+  TEST_F(PrometheusStatsFormatterTest, HistogramWithHighCounts) {
+    HistogramWrapper h1_cumulative;
 
-  // Force large counts to prove that the +Inf bucket doesn't overflow to scientific notation.
-  h1_cumulative.setHistogramValuesWithCounts(std::vector<std::pair<uint64_t, uint64_t>>({
-      {1, 100000},
-      {100, 1000000},
-      {1000, 100000000},
-  }));
+    // Force large counts to prove that the +Inf bucket doesn't overflow to scientific notation.
+    h1_cumulative.setHistogramValuesWithCounts(std::vector<std::pair<uint64_t, uint64_t>>({
+        {1, 100000},
+        {100, 1000000},
+        {1000, 100000000},
+    }));
 
-  Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
+    Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
 
-  auto histogram = makeHistogram();
-  histogram->name_ = "histogram1";
-  histogram->used_ = true;
-  ON_CALL(*histogram, cumulativeStatistics())
-      .WillByDefault(testing::ReturnRef(h1_cumulative_statistics));
+    auto histogram = makeHistogram();
+    histogram->name_ = "histogram1";
+    histogram->used_ = true;
+    ON_CALL(*histogram, cumulativeStatistics())
+        .WillByDefault(testing::ReturnRef(h1_cumulative_statistics));
 
-  addHistogram(histogram);
+    addHistogram(histogram);
 
-  Buffer::OwnedImpl response;
-  auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response,
-                                                          false, absl::nullopt);
-  EXPECT_EQ(1UL, size);
+    Buffer::OwnedImpl response;
+    auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_,
+                                                            response, false, absl::nullopt);
+    EXPECT_EQ(1UL, size);
 
-  const std::string expected_output = R"EOF(# TYPE envoy_histogram1 histogram
+    const std::string expected_output = R"EOF(# TYPE envoy_histogram1 histogram
 envoy_histogram1_bucket{le="0.5"} 0
 envoy_histogram1_bucket{le="1"} 0
 envoy_histogram1_bucket{le="5"} 100000
@@ -1571,34 +1573,34 @@ envoy_histogram1_sum{} 105105105000
 envoy_histogram1_count{} 101100000
 )EOF";
 
-  EXPECT_EQ(expected_output, response.toString());
-}
+    EXPECT_EQ(expected_output, response.toString());
+  }
 
-TEST_F(PrometheusStatsFormatterTest, OutputWithAllMetricTypes) {
-  addCounter("cluster.test_1.upstream_cx_total", {{"a.tag-name", "a.tag-value"}});
-  addCounter("cluster.test_2.upstream_cx_total", {{"another_tag_name", "another_tag-value"}});
-  addGauge("cluster.test_3.upstream_cx_total", {{"another_tag_name_3", "another_tag_3-value"}});
-  addGauge("cluster.test_4.upstream_cx_total", {{"another_tag_name_4", "another_tag_4-value"}});
+  TEST_F(PrometheusStatsFormatterTest, OutputWithAllMetricTypes) {
+    addCounter("cluster.test_1.upstream_cx_total", {{"a.tag-name", "a.tag-value"}});
+    addCounter("cluster.test_2.upstream_cx_total", {{"another_tag_name", "another_tag-value"}});
+    addGauge("cluster.test_3.upstream_cx_total", {{"another_tag_name_3", "another_tag_3-value"}});
+    addGauge("cluster.test_4.upstream_cx_total", {{"another_tag_name_4", "another_tag_4-value"}});
 
-  const std::vector<uint64_t> h1_values = {50, 20, 30, 70, 100, 5000, 200};
-  HistogramWrapper h1_cumulative;
-  h1_cumulative.setHistogramValues(h1_values);
-  Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
+    const std::vector<uint64_t> h1_values = {50, 20, 30, 70, 100, 5000, 200};
+    HistogramWrapper h1_cumulative;
+    h1_cumulative.setHistogramValues(h1_values);
+    Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
 
-  auto histogram1 = makeHistogram();
-  histogram1->name_ = "cluster.test_1.upstream_rq_time";
-  histogram1->used_ = true;
-  histogram1->setTags({Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}});
-  addHistogram(histogram1);
-  EXPECT_CALL(*histogram1, cumulativeStatistics())
-      .WillOnce(testing::ReturnRef(h1_cumulative_statistics));
+    auto histogram1 = makeHistogram();
+    histogram1->name_ = "cluster.test_1.upstream_rq_time";
+    histogram1->used_ = true;
+    histogram1->setTags({Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}});
+    addHistogram(histogram1);
+    EXPECT_CALL(*histogram1, cumulativeStatistics())
+        .WillOnce(testing::ReturnRef(h1_cumulative_statistics));
 
-  Buffer::OwnedImpl response;
-  auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response,
-                                                          false, absl::nullopt);
-  EXPECT_EQ(5UL, size);
+    Buffer::OwnedImpl response;
+    auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_,
+                                                            response, false, absl::nullopt);
+    EXPECT_EQ(5UL, size);
 
-  const std::string expected_output = R"EOF(# TYPE envoy_cluster_test_1_upstream_cx_total counter
+    const std::string expected_output = R"EOF(# TYPE envoy_cluster_test_1_upstream_cx_total counter
 envoy_cluster_test_1_upstream_cx_total{a_tag_name="a.tag-value"} 0
 # TYPE envoy_cluster_test_2_upstream_cx_total counter
 envoy_cluster_test_2_upstream_cx_total{another_tag_name="another_tag-value"} 0
@@ -1631,34 +1633,34 @@ envoy_cluster_test_1_upstream_rq_time_sum{key1="value1",key2="value2"} 5532
 envoy_cluster_test_1_upstream_rq_time_count{key1="value1",key2="value2"} 7
 )EOF";
 
-  EXPECT_EQ(expected_output, response.toString());
-}
+    EXPECT_EQ(expected_output, response.toString());
+  }
 
-TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnly) {
-  addCounter("cluster.test_1.upstream_cx_total", {{"a.tag-name", "a.tag-value"}});
-  addCounter("cluster.test_2.upstream_cx_total", {{"another_tag_name", "another_tag-value"}});
-  addGauge("cluster.test_3.upstream_cx_total", {{"another_tag_name_3", "another_tag_3-value"}});
-  addGauge("cluster.test_4.upstream_cx_total", {{"another_tag_name_4", "another_tag_4-value"}});
+  TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnly) {
+    addCounter("cluster.test_1.upstream_cx_total", {{"a.tag-name", "a.tag-value"}});
+    addCounter("cluster.test_2.upstream_cx_total", {{"another_tag_name", "another_tag-value"}});
+    addGauge("cluster.test_3.upstream_cx_total", {{"another_tag_name_3", "another_tag_3-value"}});
+    addGauge("cluster.test_4.upstream_cx_total", {{"another_tag_name_4", "another_tag_4-value"}});
 
-  const std::vector<uint64_t> h1_values = {50, 20, 30, 70, 100, 5000, 200};
-  HistogramWrapper h1_cumulative;
-  h1_cumulative.setHistogramValues(h1_values);
-  Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
+    const std::vector<uint64_t> h1_values = {50, 20, 30, 70, 100, 5000, 200};
+    HistogramWrapper h1_cumulative;
+    h1_cumulative.setHistogramValues(h1_values);
+    Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
 
-  auto histogram1 = makeHistogram();
-  histogram1->name_ = "cluster.test_1.upstream_rq_time";
-  histogram1->used_ = true;
-  histogram1->setTags({Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}});
-  addHistogram(histogram1);
-  EXPECT_CALL(*histogram1, cumulativeStatistics())
-      .WillOnce(testing::ReturnRef(h1_cumulative_statistics));
+    auto histogram1 = makeHistogram();
+    histogram1->name_ = "cluster.test_1.upstream_rq_time";
+    histogram1->used_ = true;
+    histogram1->setTags({Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}});
+    addHistogram(histogram1);
+    EXPECT_CALL(*histogram1, cumulativeStatistics())
+        .WillOnce(testing::ReturnRef(h1_cumulative_statistics));
 
-  Buffer::OwnedImpl response;
-  auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response,
-                                                          true, absl::nullopt);
-  EXPECT_EQ(1UL, size);
+    Buffer::OwnedImpl response;
+    auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_,
+                                                            response, true, absl::nullopt);
+    EXPECT_EQ(1UL, size);
 
-  const std::string expected_output = R"EOF(# TYPE envoy_cluster_test_1_upstream_rq_time histogram
+    const std::string expected_output = R"EOF(# TYPE envoy_cluster_test_1_upstream_rq_time histogram
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="0.5"} 0
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="1"} 0
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="5"} 0
@@ -1683,72 +1685,72 @@ envoy_cluster_test_1_upstream_rq_time_sum{key1="value1",key2="value2"} 5532
 envoy_cluster_test_1_upstream_rq_time_count{key1="value1",key2="value2"} 7
 )EOF";
 
-  EXPECT_EQ(expected_output, response.toString());
-}
-
-TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnlyHistogram) {
-  const std::vector<uint64_t> h1_values = {};
-  HistogramWrapper h1_cumulative;
-  h1_cumulative.setHistogramValues(h1_values);
-  Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
-
-  auto histogram1 = makeHistogram();
-  histogram1->name_ = "cluster.test_1.upstream_rq_time";
-  histogram1->used_ = false;
-  histogram1->setTags({Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}});
-  addHistogram(histogram1);
-
-  {
-    const bool used_only = true;
-    EXPECT_CALL(*histogram1, cumulativeStatistics()).Times(0);
-
-    Buffer::OwnedImpl response;
-    auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_,
-                                                            response, used_only, absl::nullopt);
-    EXPECT_EQ(0UL, size);
+    EXPECT_EQ(expected_output, response.toString());
   }
 
-  {
-    const bool used_only = false;
-    EXPECT_CALL(*histogram1, cumulativeStatistics())
-        .WillOnce(testing::ReturnRef(h1_cumulative_statistics));
+  TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnlyHistogram) {
+    const std::vector<uint64_t> h1_values = {};
+    HistogramWrapper h1_cumulative;
+    h1_cumulative.setHistogramValues(h1_values);
+    Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
+
+    auto histogram1 = makeHistogram();
+    histogram1->name_ = "cluster.test_1.upstream_rq_time";
+    histogram1->used_ = false;
+    histogram1->setTags({Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}});
+    addHistogram(histogram1);
+
+    {
+      const bool used_only = true;
+      EXPECT_CALL(*histogram1, cumulativeStatistics()).Times(0);
+
+      Buffer::OwnedImpl response;
+      auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_,
+                                                              response, used_only, absl::nullopt);
+      EXPECT_EQ(0UL, size);
+    }
+
+    {
+      const bool used_only = false;
+      EXPECT_CALL(*histogram1, cumulativeStatistics())
+          .WillOnce(testing::ReturnRef(h1_cumulative_statistics));
+
+      Buffer::OwnedImpl response;
+      auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_,
+                                                              response, used_only, absl::nullopt);
+      EXPECT_EQ(1UL, size);
+    }
+  }
+
+  TEST_F(PrometheusStatsFormatterTest, OutputWithRegexp) {
+    addCounter("cluster.test_1.upstream_cx_total", {{"a.tag-name", "a.tag-value"}});
+    addCounter("cluster.test_2.upstream_cx_total", {{"another_tag_name", "another_tag-value"}});
+    addGauge("cluster.test_3.upstream_cx_total", {{"another_tag_name_3", "another_tag_3-value"}});
+    addGauge("cluster.test_4.upstream_cx_total", {{"another_tag_name_4", "another_tag_4-value"}});
+
+    const std::vector<uint64_t> h1_values = {50, 20, 30, 70, 100, 5000, 200};
+    HistogramWrapper h1_cumulative;
+    h1_cumulative.setHistogramValues(h1_values);
+    Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
+
+    auto histogram1 = makeHistogram();
+    histogram1->name_ = "cluster.test_1.upstream_rq_time";
+    histogram1->setTags({Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}});
+    addHistogram(histogram1);
 
     Buffer::OwnedImpl response;
-    auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_,
-                                                            response, used_only, absl::nullopt);
+    auto size = PrometheusStatsFormatter::statsAsPrometheus(
+        counters_, gauges_, histograms_, response, false,
+        absl::optional<std::regex>{std::regex("cluster.test_1.upstream_cx_total")});
     EXPECT_EQ(1UL, size);
-  }
-}
 
-TEST_F(PrometheusStatsFormatterTest, OutputWithRegexp) {
-  addCounter("cluster.test_1.upstream_cx_total", {{"a.tag-name", "a.tag-value"}});
-  addCounter("cluster.test_2.upstream_cx_total", {{"another_tag_name", "another_tag-value"}});
-  addGauge("cluster.test_3.upstream_cx_total", {{"another_tag_name_3", "another_tag_3-value"}});
-  addGauge("cluster.test_4.upstream_cx_total", {{"another_tag_name_4", "another_tag_4-value"}});
-
-  const std::vector<uint64_t> h1_values = {50, 20, 30, 70, 100, 5000, 200};
-  HistogramWrapper h1_cumulative;
-  h1_cumulative.setHistogramValues(h1_values);
-  Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
-
-  auto histogram1 = makeHistogram();
-  histogram1->name_ = "cluster.test_1.upstream_rq_time";
-  histogram1->setTags({Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}});
-  addHistogram(histogram1);
-
-  Buffer::OwnedImpl response;
-  auto size = PrometheusStatsFormatter::statsAsPrometheus(
-      counters_, gauges_, histograms_, response, false,
-      absl::optional<std::regex>{std::regex("cluster.test_1.upstream_cx_total")});
-  EXPECT_EQ(1UL, size);
-
-  const std::string expected_output =
-      R"EOF(# TYPE envoy_cluster_test_1_upstream_cx_total counter
+    const std::string expected_output =
+        R"EOF(# TYPE envoy_cluster_test_1_upstream_cx_total counter
 envoy_cluster_test_1_upstream_cx_total{a_tag_name="a.tag-value"} 0
 )EOF";
 
-  EXPECT_EQ(expected_output, response.toString());
-}
+    EXPECT_EQ(expected_output, response.toString());
+  }
 
 } // namespace Server
-} // namespace Envoy
+} // namespace Server
