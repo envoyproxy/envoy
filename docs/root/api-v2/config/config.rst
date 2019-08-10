@@ -13,3 +13,4 @@ Extensions
   resource_monitor/resource_monitor
   common/common
   cluster/cluster
+  grpc_credential/grpc_credential

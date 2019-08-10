@@ -315,6 +315,7 @@ private:
     std::chrono::milliseconds listenerFiltersTimeout() const override {
       return std::chrono::milliseconds();
     }
+    bool continueOnListenerFiltersTimeout() const override { return false; }
     Stats::Scope& listenerScope() override { return *scope_; }
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }

@@ -71,6 +71,7 @@ proto_library(
         "//envoy/config/filter/network/thrift_proxy/v2alpha1:thrift_proxy",
         "//envoy/config/filter/thrift/rate_limit/v2alpha1:rate_limit",
         "//envoy/config/filter/thrift/router/v2alpha1:router",
+        "//envoy/config/grpc_credential/v2alpha:aws_iam",
         "//envoy/config/grpc_credential/v2alpha:file_based_metadata",
         "//envoy/config/health_checker/redis/v2:redis",
         "//envoy/config/metrics/v2:metrics_service",
