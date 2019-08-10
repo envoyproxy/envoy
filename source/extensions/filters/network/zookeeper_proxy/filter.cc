@@ -18,8 +18,19 @@ namespace ZooKeeperProxy {
 
 ZooKeeperFilterConfig::ZooKeeperFilterConfig(const std::string& stat_prefix,
                                              const uint32_t max_packet_bytes, Stats::Scope& scope)
-    : scope_(scope), max_packet_bytes_(max_packet_bytes), stat_prefix_(stat_prefix),
-      stats_(generateStats(stat_prefix, scope)) {}
+    : scope_(scope), max_packet_bytes_(max_packet_bytes), stats_(generateStats(stat_prefix, scope)),
+      stat_name_set_(scope.symbolTable()), stat_prefix_(stat_name_set_.add(stat_prefix)),
+      auth_(stat_name_set_.add("auth")) {
+  // https://zookeeper.apache.org/doc/r3.5.4-beta/zookeeperProgrammers.html#sc_BuiltinACLSchemes
+  // lists commons schemes: "world", "auth", "digest", "host", "x509", and
+  // "ip". These are used in filter.cc by appending "_rq".
+  stat_name_set_.rememberBuiltin("auth_rq");
+  stat_name_set_.rememberBuiltin("digest_rq");
+  stat_name_set_.rememberBuiltin("host_rq");
+  stat_name_set_.rememberBuiltin("ip_rq");
+  stat_name_set_.rememberBuiltin("world_rq");
+  stat_name_set_.rememberBuiltin("x509_rq");
+}
 
 ZooKeeperFilter::ZooKeeperFilter(ZooKeeperFilterConfigSharedPtr config)
     : config_(std::move(config)), decoder_(createDecoder(*this)) {}
@@ -107,7 +118,10 @@ void ZooKeeperFilter::onPing() {
 }
 
 void ZooKeeperFilter::onAuthRequest(const std::string& scheme) {
-  config_->scope_.counter(fmt::format("{}.auth.{}_rq", config_->stat_prefix_, scheme)).inc();
+  Stats::SymbolTable::StoragePtr storage = config_->scope_.symbolTable().join(
+      {config_->stat_prefix_, config_->auth_,
+       config_->stat_name_set_.getStatName(absl::StrCat(scheme, "_rq"))});
+  config_->scope_.counterFromStatName(Stats::StatName(storage.get())).inc();
   setDynamicMetadata("opname", "auth");
 }
 
