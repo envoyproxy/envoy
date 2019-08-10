@@ -1,9 +1,6 @@
 #include "extensions/filters/http/dynamic_forward_proxy/config.h"
 
-#include "common/common/assert.h"
-
 #include "extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
-#include "extensions/filters/http/dynamic_forward_proxy/dynamic_forward_proxy_proto_descriptors.h"
 #include "extensions/filters/http/dynamic_forward_proxy/proxy_filter.h"
 
 namespace Envoy {
@@ -14,7 +11,6 @@ namespace DynamicForwardProxy {
 Http::FilterFactoryCb DynamicForwardProxyFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::http::dynamic_forward_proxy::v2alpha::FilterConfig& proto_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
-  RELEASE_ASSERT(validateProtoDescriptors(), "");
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl cache_manager_factory(
       context.singletonManager(), context.dispatcher(), context.threadLocal(), context.scope());
   ProxyFilterConfigSharedPtr filter_config(std::make_shared<ProxyFilterConfig>(
