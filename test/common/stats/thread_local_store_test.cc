@@ -857,7 +857,8 @@ protected:
     }
   }
 
-  void init() {
+  void init(bool use_fakes) {
+    Stats::SymbolTableCreator::setUseFakeSymbolTables(use_fakes);
     symbol_table_ = SymbolTableCreator::makeSymbolTable();
     alloc_ = std::make_unique<AllocatorImpl>(*symbol_table_);
     store_ = std::make_unique<ThreadLocalStoreImpl>(*alloc_);
@@ -873,6 +874,8 @@ protected:
     store_->initializeThreading(main_thread_dispatcher_, tls_);
   }
 
+  static constexpr size_t million_ = 1000 * 1000;
+
   MockSink sink_;
   SymbolTablePtr symbol_table_;
   std::unique_ptr<AllocatorImpl> alloc_;
@@ -885,50 +888,42 @@ protected:
 
 // Tests how much memory is consumed allocating 100k stats.
 TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTlsFakeSymbolTable) {
-  Stats::SymbolTableCreator::setUseFakeSymbolTables(true);
-  init();
+  init(true);
   TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(
       1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
-  const size_t million = 1000 * 1000;
   EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 15268336); // June 30, 2019
-  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 16 * million);
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 16 * million_);
 }
 
 TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithTlsFakeSymbolTable) {
-  Stats::SymbolTableCreator::setUseFakeSymbolTables(true);
-  init();
+  init(true);
   initThreading();
   TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(
       1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
-  const size_t million = 1000 * 1000;
   EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 17496848); // June 30, 2019
-  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 18 * million);
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 18 * million_);
 }
 
 // Tests how much memory is consumed allocating 100k stats.
 TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTlsRealSymbolTable) {
-  Stats::SymbolTableCreator::setUseFakeSymbolTables(false);
-  init();
+  init(false);
   TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(
       1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
-  const size_t million = 1000 * 1000;
   EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 9139120); // Aug 9, 2019
-  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 10 * million);
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 10 * million_);
 }
 
 TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithTlsRealSymbolTable) {
-  Stats::SymbolTableCreator::setUseFakeSymbolTables(false);
-  init();
+  init(false);
   initThreading();
   TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(
       1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
-  const size_t million = 1000 * 1000;
   EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 11367632); // Aug 9, 2019
-  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 12 * million);
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 12 * million_);
 }
 
 TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
