@@ -108,6 +108,7 @@ public:
   Stats::StatNameSet stat_name_set_;
   const Stats::StatName stat_prefix_;
   const Stats::StatName auth_;
+  const Stats::StatName connect_latency_;
 
 private:
   ZooKeeperProxyStats generateStats(const std::string& prefix, Stats::Scope& scope) {
