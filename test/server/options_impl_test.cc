@@ -95,7 +95,7 @@ TEST_F(OptionsImplTest, All) {
   EXPECT_EQ(std::chrono::seconds(90), options->parentShutdownTime());
   EXPECT_EQ(true, options->hotRestartDisabled());
   EXPECT_EQ(true, options->libeventBufferEnabled());
-  EXPECT_EQ(true, options->fakeSymbolTableEnabled());
+  EXPECT_EQ(false, options->fakeSymbolTableEnabled());
   EXPECT_EQ(true, options->cpusetThreadsEnabled());
 
   options = createOptionsImpl("envoy --mode init_only");
