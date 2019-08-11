@@ -28,7 +28,8 @@ namespace ConcurrencyController {
 // clang-format off
 #define ALL_GRADIENT_CONTROLLER_STATS(COUNTER, GAUGE) \
   GAUGE(concurrency_limit, Accumulate)  \
-  GAUGE(rq_outstanding, Accumulate)
+  GAUGE(rq_outstanding, Accumulate)  \
+  GAUGE(min_rtt_usecs, Accumulate)
 // clang-format on
 
 /**
@@ -114,6 +115,7 @@ public:
   void recordLatencySample(const std::chrono::nanoseconds& rq_latency) override;
 
 private:
+  static GradientControllerStats generateStats(Stats::Scope& scope, const std::string& stats_prefix);
   void recordLatencySampleForMinRTT(const std::chrono::nanoseconds& rq_latency);
   void updateMinRTT();
   std::chrono::microseconds processLatencySamplesAndClear() ABSL_EXCLUSIVE_LOCKS_REQUIRED(latency_sample_mtx_);
@@ -129,8 +131,8 @@ private:
   GradientControllerConfigSharedPtr config_;
   Event::Dispatcher& dispatcher_;
 //  Runtime::Loader& runtime_;
-//  const std::string stats_prefix_;
-//  Stats::Scope& scope_;
+  Stats::Scope& scope_;
+  GradientControllerStats stats_;
 
   absl::Mutex update_window_mtx_;
   std::chrono::nanoseconds min_rtt_;
@@ -147,7 +149,6 @@ private:
 
   Event::TimerPtr min_rtt_calc_timer_;
   Event::TimerPtr sample_reset_timer_;
-
 };
 
 } // namespace ConcurrencyController
