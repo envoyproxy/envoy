@@ -502,7 +502,7 @@ TEST_F(IntegrationAdminIpv4Ipv6Test, Ipv4Ipv6Listen) {
 // restrictions on their names.
 class StatsMatcherIntegrationTest
     : public testing::Test,
-      public Event::TestUsingSimulatedTime,
+      // public Event::TestUsingSimulatedTime,
       public HttpIntegrationTest,
       public testing::WithParamInterface<Network::Address::IpVersion> {
 public:
