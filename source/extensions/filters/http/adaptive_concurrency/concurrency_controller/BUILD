@@ -16,8 +16,11 @@ envoy_cc_library(
     name = "concurrency_controller_lib",
     srcs = ["gradient_controller.cc"],
     hdrs = [
-        "concurrency_controller.h",
-        "gradient_controller.h",
+      "concurrency_controller.h",
+      "gradient_controller.h",
+    ],
+    external_deps = [
+      "libcircllhist",
     ],
     deps = [
         "//source/common/protobuf:protobuf",

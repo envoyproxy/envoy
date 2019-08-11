@@ -6,14 +6,13 @@
 #include "envoy/config/filter/http/adaptive_concurrency/v2alpha/adaptive_concurrency.pb.h"
 #include "envoy/config/filter/http/adaptive_concurrency/v2alpha/adaptive_concurrency.pb.validate.h"
 #include "envoy/runtime/runtime.h"
-#include "common/stats/isolated_store_impl.h"
 #include "envoy/event/dispatcher.h"
 #include "extensions/filters/http/adaptive_concurrency/concurrency_controller/concurrency_controller.h"
 #include "envoy/stats/stats_macros.h"
-#include "source/common/stats/histogram_impl.h"
 
 #include "absl/synchronization/mutex.h"
 #include "absl/base/thread_annotations.h"
+#include "circllhist.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -39,14 +38,6 @@ struct GradientControllerStats {
   ALL_GRADIENT_CONTROLLER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
-enum class SampleAggregatePercentile {
-  P50,
-  P75,
-  P90,
-  P95,
-  P99
-};
-
 class GradientControllerConfig {
 public:
   GradientControllerConfig(
@@ -59,8 +50,12 @@ public:
   int starting_concurrency_limit() const { return starting_concurrency_limit_; }
   int min_rtt_aggregate_request_count() const { return min_rtt_aggregate_request_count_; }
   double max_gradient() const { return max_gradient_; }
+  double sample_aggregate_percentile() const;
 
 private:
+  const envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig&
+    proto_config_;
+
   // The measured request round-trip time under ideal conditions.
   std::chrono::milliseconds min_rtt_calc_interval_;
 
@@ -72,9 +67,6 @@ private:
 
   // Initial value for the concurrency limit.
   int starting_concurrency_limit_;
-
-  // The percentile considered when aggregating latency samples.
-  SampleAggregatePercentile sample_aggregate_percentile_;
 
   // The number of requests to aggregate/sample during the minRTT recalculation.
   int min_rtt_aggregate_request_count_;
@@ -131,14 +123,14 @@ private:
 
   bool minRTTRequestThresholdReached() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(latency_sample_mtx_) {
     return
-      static_cast<int>(latency_sample_hist_.size()) >= config_->min_rtt_aggregate_request_count();
+      static_cast<int>(hist_sample_count(latency_sample_hist_)) >= config_->min_rtt_aggregate_request_count();
   }
 
   GradientControllerConfigSharedPtr config_;
   Event::Dispatcher& dispatcher_;
 //  Runtime::Loader& runtime_;
 //  const std::string stats_prefix_;
-  Stats::Scope& scope_;
+//  Stats::Scope& scope_;
 
   absl::Mutex update_window_mtx_;
   std::chrono::nanoseconds min_rtt_;
@@ -151,11 +143,7 @@ private:
   std::atomic<int> num_rq_outstanding_;
   std::atomic<int> concurrency_limit_;
 
-  // TODO @tallen figure out the deal with this histogram and stats sinks.
-  //Stats::Histogram latency_samples_;
-  Stats::IsolatedStore store_;
-  Stats::Histogram latency_sample_hist_ ABSL_GUARDED_BY(latency_sample_mtx_);
-  int sample_count_ ABSL_GUARDED_BY(latency_sample_mtx_);
+  histogram_t* latency_sample_hist_ ABSL_GUARDED_BY(latency_sample_mtx_);
 
   Event::TimerPtr min_rtt_calc_timer_;
   Event::TimerPtr sample_reset_timer_;

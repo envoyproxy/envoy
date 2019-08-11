@@ -21,6 +21,7 @@ namespace ConcurrencyController {
 
 GradientControllerConfig::GradientControllerConfig(
   const envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig& proto_config) :
+  proto_config_(proto_config),
   min_rtt_calc_interval_(
       std::chrono::milliseconds(
         DurationUtil::durationToMilliseconds(
@@ -33,22 +34,20 @@ GradientControllerConfig::GradientControllerConfig(
   min_rtt_aggregate_request_count_(PROTOBUF_GET_WRAPPED_REQUIRED(proto_config.min_rtt_calc_params(), request_count)),
   max_gradient_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config.concurrency_limit_params(), max_gradient, 2.0)) {
 
- switch (proto_config.sample_aggregate_percentile()) {
+}
+
+double GradientControllerConfig::sample_aggregate_percentile() const {
+ switch (proto_config_.sample_aggregate_percentile()) {
    case envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig::P50:
-     sample_aggregate_percentile_ = SampleAggregatePercentile::P50;
-     break;
+     return 0.5;
    case envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig::P75:
-     sample_aggregate_percentile_ = SampleAggregatePercentile::P75;
-     break;
+     return 0.75;
    case envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig::P90:
-     sample_aggregate_percentile_ = SampleAggregatePercentile::P90;
-     break;
+     return 0.9;
    case envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig::P95:
-     sample_aggregate_percentile_ = SampleAggregatePercentile::P95;
-     break;
+     return 0.95;
    case envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig::P99:
-     sample_aggregate_percentile_ = SampleAggregatePercentile::P99;
-     break;
+     return 0.99;
    default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
@@ -58,17 +57,17 @@ GradientController::GradientController(GradientControllerConfigSharedPtr config,
                                        Event::Dispatcher& dispatcher,
                                        Runtime::Loader& ,
                                        std::string ,
-                                       Stats::Scope& scope) :
+                                       Stats::Scope&) :
 
                                        config_(config),
                                        dispatcher_(dispatcher),
 //                                       runtime_(runtime),
 //                                       stats_prefix_(stats_prefix),
-                                       scope_(scope),
+//                                       scope_(scope),
                                        recalculating_min_rtt_(true),
                                        num_rq_outstanding_(0),
                                        concurrency_limit_(1),
-                                       latency_sample_hist_(store_.histogram("latency_samples")) {
+                                       latency_sample_hist_(hist_fast_alloc()) {
   min_rtt_calc_timer_ = dispatcher_.createTimer([this]() -> void {
     absl::MutexLock ml(&update_window_mtx_);
     setMinRTTSamplingWindow();
@@ -88,6 +87,7 @@ GradientController::GradientController(GradientControllerConfigSharedPtr config,
 GradientController::~GradientController() {
   min_rtt_calc_timer_.reset();
   sample_reset_timer_.reset();
+  hist_free(latency_sample_hist_);
 }
 
 void GradientController::setMinRTTSamplingWindow() {
@@ -100,7 +100,7 @@ void GradientController::setMinRTTSamplingWindow() {
   // Throw away any latency samples from before the recalculation window as it may not represent
   // the minRTT.
   absl::MutexLock ml(&latency_sample_mtx_);
-  latency_sample_hist_.clear();
+  hist_clear(latency_sample_hist_);
 }
 
 void GradientController::updateMinRTT() {
@@ -128,23 +128,20 @@ void GradientController::resetSampleWindow() {
   }
 
   absl::MutexLock ml(&latency_sample_mtx_);
-  if (latency_sample_hist_.empty()) {
+  if (hist_sample_count(latency_sample_hist_) == 0) {
     return;
   }
 
-  // TODO @tallen assuming the processing is just looking up in histogram. It's a vector for now and
-  // it's unacceptable to perform quantile operations on a vector while holding locks.
   sample_rtt_ = processLatencySamplesAndClear();
   concurrency_limit_.store(calculateNewLimit());
 }
 
 std::chrono::microseconds GradientController::processLatencySamplesAndClear() {
-  // TODO @tallen
-  // this function MUST not stay. figure out the histogram situation.
-  std::sort(latency_sample_hist_.begin(), latency_sample_hist_.end());
-  const std::chrono::microseconds median = std::chrono::microseconds(latency_sample_hist_[latency_sample_hist_.size() / 2]);
-  latency_sample_hist_.clear();
-  return median;
+  const double quantile[1] = {config_->sample_aggregate_percentile()};
+  double ans[1];
+  hist_approx_quantile(latency_sample_hist_, quantile, 1, ans);
+  hist_clear(latency_sample_hist_);
+  return std::chrono::microseconds(static_cast<int>(ans[0]));
 }
 
 int GradientController::calculateNewLimit() {
@@ -182,13 +179,14 @@ void GradientController::recordLatencySample(const std::chrono::nanoseconds& rq_
   const uint32_t latency_usec = std::chrono::duration_cast<std::chrono::microseconds>(rq_latency).count();
   --num_rq_outstanding_;
 
+  int sample_count;
   {
     absl::MutexLock ml(&latency_sample_mtx_);
-    latency_sample_hist_.recordValue(latency_usec);
-    ++sample_count_;
+    hist_insert(latency_sample_hist_, latency_usec, 1);
+    sample_count = hist_sample_count(latency_sample_hist_);
   }
 
-  if (recalculating_min_rtt_.load() && num_samples >= config_->min_rtt_aggregate_request_count()) {
+  if (recalculating_min_rtt_.load() && sample_count >= config_->min_rtt_aggregate_request_count()) {
     // This sample has pushed the request count over the request count requirement for the minRTT
     // recalculation. It must now be finished.
     updateMinRTT();
