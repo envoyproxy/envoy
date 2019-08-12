@@ -271,6 +271,9 @@ public:
   std::chrono::milliseconds listenerFiltersTimeout() const override {
     return listener_filters_timeout_;
   }
+  bool continueOnListenerFiltersTimeout() const override {
+    return continue_on_listener_filters_timeout_;
+  }
   Stats::Scope& listenerScope() override { return *listener_scope_; }
   uint64_t listenerTag() const override { return listener_tag_; }
   const std::string& name() const override { return name_; }
@@ -373,8 +376,8 @@ private:
   const std::string version_info_;
   Network::Socket::OptionsSharedPtr listen_socket_options_;
   const std::chrono::milliseconds listener_filters_timeout_;
+  const bool continue_on_listener_filters_timeout_;
   std::unique_ptr<Server::ActiveUdpListenerFactory> udp_listener_factory_;
-
   // to access ListenerManagerImpl::factory_.
   friend class ListenerFilterChainFactoryBuilder;
 };
