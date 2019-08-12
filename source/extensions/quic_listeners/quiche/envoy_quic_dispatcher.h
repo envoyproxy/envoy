@@ -24,7 +24,7 @@ namespace Quic {
 // accepting new connection or not.
 class EnvoyQuicCryptoServerStreamHelper : public quic::QuicCryptoServerStream::Helper {
 public:
-  ~EnvoyQuicCryptoServerStreamHelper() override {}
+  ~EnvoyQuicCryptoServerStreamHelper() override = default;
 
   // quic::QuicCryptoServerStream::Helper
   quic::QuicConnectionId

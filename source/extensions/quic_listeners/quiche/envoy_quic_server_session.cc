@@ -36,14 +36,14 @@ quic::QuicSpdyStream* EnvoyQuicServerSession::CreateIncomingStream(quic::QuicStr
   if (!ShouldCreateIncomingStream(id)) {
     return nullptr;
   }
-  EnvoyQuicServerStream* stream = new EnvoyQuicServerStream(id, this, quic::BIDIRECTIONAL);
+  auto stream = new EnvoyQuicServerStream(id, this, quic::BIDIRECTIONAL);
   ActivateStream(absl::WrapUnique(stream));
   setUpRequestDecoder(*stream);
   return stream;
 }
 
 quic::QuicSpdyStream* EnvoyQuicServerSession::CreateIncomingStream(quic::PendingStream* pending) {
-  EnvoyQuicServerStream* stream = new EnvoyQuicServerStream(pending, this, quic::BIDIRECTIONAL);
+  auto stream = new EnvoyQuicServerStream(pending, this, quic::BIDIRECTIONAL);
   ActivateStream(absl::WrapUnique(stream));
   setUpRequestDecoder(*stream);
   return stream;
@@ -147,7 +147,7 @@ const Network::ConnectionSocket::OptionsSharedPtr& EnvoyQuicServerSession::socke
 }
 
 absl::string_view EnvoyQuicServerSession::requestedServerName() const {
-  return absl::string_view(GetCryptoStream()->crypto_negotiated_params().sni);
+  return {GetCryptoStream()->crypto_negotiated_params().sni};
 }
 
 const Network::Address::InstanceConstSharedPtr& EnvoyQuicServerSession::remoteAddress() const {

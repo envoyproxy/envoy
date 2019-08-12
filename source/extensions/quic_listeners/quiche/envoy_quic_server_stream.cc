@@ -48,7 +48,7 @@ void EnvoyQuicServerStream::readDisable(bool /*disable*/) { NOT_IMPLEMENTED_GCOV
 
 Http::HeaderMapImplPtr quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_list) {
   Http::HeaderMapImplPtr headers = std::make_unique<Http::HeaderMapImpl>();
-  for (auto entry : header_list) {
+  for (const auto& entry : header_list) {
     // TODO(danzh): Avoid copy by referencing entry as header_list is already validated by QUIC.
     headers->addCopy(Http::LowerCaseString(entry.first), entry.second);
   }

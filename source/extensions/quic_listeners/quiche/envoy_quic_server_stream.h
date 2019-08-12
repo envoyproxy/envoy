@@ -19,10 +19,10 @@ class EnvoyQuicServerStream : public quic::QuicSpdyServerStreamBase, public Envo
 public:
   EnvoyQuicServerStream(quic::QuicStreamId id, quic::QuicSpdySession* session,
                         quic::StreamType type)
-      : quic::QuicSpdyServerStreamBase(id, session, type), EnvoyQuicStream() {}
+      : quic::QuicSpdyServerStreamBase(id, session, type) {}
   EnvoyQuicServerStream(quic::PendingStream* pending, quic::QuicSpdySession* session,
                         quic::StreamType type)
-      : quic::QuicSpdyServerStreamBase(pending, session, type), EnvoyQuicStream(*this) {}
+      : quic::QuicSpdyServerStreamBase(pending, session, type) {}
 
   // Http::StreamEncoder
   void encode100ContinueHeaders(const Http::HeaderMap& headers) override;
