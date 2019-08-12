@@ -16,7 +16,8 @@ namespace Event {
 using TimerCb = std::function<void()>;
 
 /**
- * An abstract timer event. Free the timer to unregister any pending timeouts.
+ * An abstract timer event. Free the timer to unregister any pending timeouts. Must be freed before
+ * the dispatcher is torn down.
  */
 class Timer {
 public:

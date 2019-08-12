@@ -16,42 +16,39 @@ class ResponseMetadataStreamFilter : public Http::PassThroughFilter {
 public:
   // Inserts one new metadata_map.
   Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap&, bool) override {
-    Http::MetadataMap metadata_map = {
-        {"headers", "headers"}, {"duplicate", "duplicate"}, {"remove", "remove"}};
+    Http::MetadataMap metadata_map = {{"headers", "headers"}, {"duplicate", "duplicate"}};
     Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
-    decoder_callbacks_->encodeMetadata(std::move(metadata_map_ptr));
+    encoder_callbacks_->addEncodedMetadata(std::move(metadata_map_ptr));
     return Http::FilterHeadersStatus::Continue;
   }
 
   // Inserts one new metadata_map.
   Http::FilterDataStatus encodeData(Buffer::Instance&, bool) override {
-    Http::MetadataMap metadata_map = {
-        {"data", "data"}, {"duplicate", "duplicate"}, {"remove", "remove"}};
+    Http::MetadataMap metadata_map = {{"data", "data"}, {"duplicate", "duplicate"}};
     Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
-    decoder_callbacks_->encodeMetadata(std::move(metadata_map_ptr));
+    encoder_callbacks_->addEncodedMetadata(std::move(metadata_map_ptr));
     return Http::FilterDataStatus::Continue;
   }
 
   // Inserts two metadata_maps by calling decoder_callbacks_->encodeMetadata() twice.
   Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap&) override {
-    Http::MetadataMap metadata_map = {{"trailers", "trailers"}, {"remove", "remove"}};
+    Http::MetadataMap metadata_map = {{"trailers", "trailers"}};
     Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
-    decoder_callbacks_->encodeMetadata(std::move(metadata_map_ptr));
+    encoder_callbacks_->addEncodedMetadata(std::move(metadata_map_ptr));
     metadata_map = {{"duplicate", "duplicate"}};
     metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
-    decoder_callbacks_->encodeMetadata(std::move(metadata_map_ptr));
+    encoder_callbacks_->addEncodedMetadata(std::move(metadata_map_ptr));
     return Http::FilterTrailersStatus::Continue;
   }
 
   // Inserts two metadata_maps by calling decoder_callbacks_->encodeMetadata() twice.
   Http::FilterHeadersStatus encode100ContinueHeaders(Http::HeaderMap&) override {
-    Http::MetadataMap metadata_map = {
-        {"100-continue", "100-continue"}, {"duplicate", "duplicate"}, {"remove", "remove"}};
+    Http::MetadataMap metadata_map = {{"100-continue", "100-continue"}, {"duplicate", "duplicate"}};
     Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
-    decoder_callbacks_->encodeMetadata(std::move(metadata_map_ptr));
+    encoder_callbacks_->addEncodedMetadata(std::move(metadata_map_ptr));
     metadata_map = {{"duplicate", "duplicate"}};
     metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
-    decoder_callbacks_->encodeMetadata(std::move(metadata_map_ptr));
+    encoder_callbacks_->addEncodedMetadata(std::move(metadata_map_ptr));
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -65,10 +62,6 @@ public:
     if (it != metadata_map.end()) {
       metadata_map.erase("consume");
       metadata_map.emplace("replace", "replace");
-    }
-    it = metadata_map.find("remove");
-    if (it != metadata_map.end()) {
-      metadata_map.erase("remove");
     }
     it = metadata_map.find("metadata");
     if (it != metadata_map.end()) {

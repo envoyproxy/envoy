@@ -38,10 +38,12 @@ public:
     TestListener(ConnectionHandlerTest& parent, uint64_t tag, bool bind_to_port,
                  bool hand_off_restored_destination_connections, const std::string& name,
                  Network::Address::SocketType socket_type,
-                 std::chrono::milliseconds listener_filters_timeout)
+                 std::chrono::milliseconds listener_filters_timeout,
+                 bool continue_on_listener_filters_timeout)
         : parent_(parent), tag_(tag), bind_to_port_(bind_to_port),
           hand_off_restored_destination_connections_(hand_off_restored_destination_connections),
-          name_(name), listener_filters_timeout_(listener_filters_timeout) {
+          name_(name), listener_filters_timeout_(listener_filters_timeout),
+          continue_on_listener_filters_timeout_(continue_on_listener_filters_timeout) {
       EXPECT_CALL(socket_, socketType()).WillOnce(Return(socket_type));
     }
 
@@ -58,6 +60,9 @@ public:
     std::chrono::milliseconds listenerFiltersTimeout() const override {
       return listener_filters_timeout_;
     }
+    bool continueOnListenerFiltersTimeout() const override {
+      return continue_on_listener_filters_timeout_;
+    }
     Stats::Scope& listenerScope() override { return parent_.stats_store_; }
     uint64_t listenerTag() const override { return tag_; }
     const std::string& name() const override { return name_; }
@@ -69,18 +74,20 @@ public:
     const bool hand_off_restored_destination_connections_;
     const std::string name_;
     const std::chrono::milliseconds listener_filters_timeout_;
+    const bool continue_on_listener_filters_timeout_;
   };
 
   using TestListenerPtr = std::unique_ptr<TestListener>;
 
-  TestListener* addListener(
-      uint64_t tag, bool bind_to_port, bool hand_off_restored_destination_connections,
-      const std::string& name,
-      Network::Address::SocketType socket_type = Network::Address::SocketType::Stream,
-      std::chrono::milliseconds listener_filters_timeout = std::chrono::milliseconds(15000)) {
-    TestListener* listener =
-        new TestListener(*this, tag, bind_to_port, hand_off_restored_destination_connections, name,
-                         socket_type, listener_filters_timeout);
+  TestListener*
+  addListener(uint64_t tag, bool bind_to_port, bool hand_off_restored_destination_connections,
+              const std::string& name,
+              Network::Address::SocketType socket_type = Network::Address::SocketType::Stream,
+              std::chrono::milliseconds listener_filters_timeout = std::chrono::milliseconds(15000),
+              bool continue_on_listener_filters_timeout = false) {
+    TestListener* listener = new TestListener(
+        *this, tag, bind_to_port, hand_off_restored_destination_connections, name, socket_type,
+        listener_filters_timeout, continue_on_listener_filters_timeout);
     listener->moveIntoListBack(TestListenerPtr{listener}, listeners_);
     return listener;
   }
@@ -606,6 +613,58 @@ TEST_F(ConnectionHandlerTest, ListenerFilterTimeout) {
   dispatcher_.clearDeferredDeleteList();
   EXPECT_EQ(0UL, downstream_pre_cx_active.value());
   EXPECT_EQ(1UL, stats_store_.counter("downstream_pre_cx_timeout").value());
+
+  // Make sure we didn't continue to try create connection.
+  EXPECT_EQ(0UL, stats_store_.counter("no_filter_chain_match").value());
+
+  EXPECT_CALL(*listener, onDestroy());
+}
+
+// Continue on timeout during listener filter stop iteration.
+TEST_F(ConnectionHandlerTest, ContinueOnListenerFilterTimeout) {
+  InSequence s;
+
+  TestListener* test_listener =
+      addListener(1, true, false, "test_listener", Network::Address::SocketType::Stream,
+                  std::chrono::milliseconds(15000), true);
+  Network::MockListener* listener = new Network::MockListener();
+  Network::ListenerCallbacks* listener_callbacks;
+  EXPECT_CALL(dispatcher_, createListener_(_, _, _, false))
+      .WillOnce(Invoke(
+          [&](Network::Socket&, Network::ListenerCallbacks& cb, bool, bool) -> Network::Listener* {
+            listener_callbacks = &cb;
+            return listener;
+          }));
+  EXPECT_CALL(test_listener->socket_, localAddress());
+  handler_->addListener(*test_listener);
+
+  Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
+  EXPECT_CALL(factory_, createListenerFilterChain(_))
+      .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
+        manager.addAcceptFilter(Network::ListenerFilterPtr{test_filter});
+        return true;
+      }));
+  EXPECT_CALL(*test_filter, onAccept(_))
+      .WillOnce(Invoke([&](Network::ListenerFilterCallbacks&) -> Network::FilterStatus {
+        return Network::FilterStatus::StopIteration;
+      }));
+  Event::MockTimer* timeout = new Event::MockTimer(&dispatcher_);
+  EXPECT_CALL(*timeout, enableTimer(std::chrono::milliseconds(15000)));
+  Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
+  listener_callbacks->onAccept(Network::ConnectionSocketPtr{accepted_socket}, true);
+  Stats::Gauge& downstream_pre_cx_active =
+      stats_store_.gauge("downstream_pre_cx_active", Stats::Gauge::ImportMode::Accumulate);
+  EXPECT_EQ(1UL, downstream_pre_cx_active.value());
+
+  EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(nullptr));
+  EXPECT_CALL(*timeout, disableTimer());
+  timeout->callback_();
+  dispatcher_.clearDeferredDeleteList();
+  EXPECT_EQ(0UL, downstream_pre_cx_active.value());
+  EXPECT_EQ(1UL, stats_store_.counter("downstream_pre_cx_timeout").value());
+
+  // Make sure we continued to try create connection.
+  EXPECT_EQ(1UL, stats_store_.counter("no_filter_chain_match").value());
 
   EXPECT_CALL(*listener, onDestroy());
 }

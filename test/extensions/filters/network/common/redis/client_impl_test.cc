@@ -810,6 +810,64 @@ TEST_F(RedisClientImplTest, MovedRedirectionNotEnabled) {
   client_->close();
 }
 
+TEST_F(RedisClientImplTest, RemoveFailedHealthCheck) {
+  // This test simulates a health check response signaling traffic should be drained from the host.
+  // As a result, the health checker will close the client in the call back.
+  InSequence s;
+
+  setup();
+
+  Common::Redis::RespValue request1;
+  MockPoolCallbacks callbacks1;
+  EXPECT_CALL(*encoder_, encode(Ref(request1), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
+  EXPECT_NE(nullptr, handle1);
+
+  onConnected();
+
+  Common::Redis::RespValuePtr response1(new Common::Redis::RespValue());
+  // Each call should result in either onResponse or onFailure, never both.
+  EXPECT_CALL(callbacks1, onFailure()).Times(0);
+  EXPECT_CALL(callbacks1, onResponse_(Ref(response1)))
+      .WillOnce(Invoke([&](Common::Redis::RespValuePtr&) {
+        // The health checker might fail the active health check based on the response content, and
+        // result in removing the host and closing the client.
+        client_->close();
+      }));
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer()).Times(2);
+  EXPECT_CALL(host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::EXT_ORIGIN_REQUEST_SUCCESS, _));
+  callbacks_->onRespValue(std::move(response1));
+}
+
+TEST_F(RedisClientImplTest, RemoveFailedHost) {
+  // This test simulates a health check request failed due to remote host closing the connection.
+  // As a result the health checker will close the client in the call back.
+  InSequence s;
+
+  setup();
+
+  NiceMock<Network::MockConnectionCallbacks> connection_callbacks;
+  client_->addConnectionCallbacks(connection_callbacks);
+
+  Common::Redis::RespValue request1;
+  MockPoolCallbacks callbacks1;
+  EXPECT_CALL(*encoder_, encode(Ref(request1), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
+  EXPECT_NE(nullptr, handle1);
+
+  onConnected();
+
+  EXPECT_CALL(host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED, _));
+  EXPECT_CALL(callbacks1, onFailure()).WillOnce(Invoke([&]() { client_->close(); }));
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose));
+  upstream_connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
 TEST(RedisClientFactoryImplTest, Basic) {
   ClientFactoryImpl factory;
   Upstream::MockHost::MockCreateConnectionData conn_info;

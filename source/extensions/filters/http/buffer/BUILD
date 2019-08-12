@@ -26,6 +26,7 @@ envoy_cc_library(
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
+        "//source/common/runtime:runtime_lib",
         "//source/extensions/filters/http:well_known_names",
         "@envoy_api//envoy/config/filter/http/buffer/v2:buffer_cc",
     ],

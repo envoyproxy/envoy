@@ -85,19 +85,16 @@ StreamDecoderFilter::decodeMetadata(MetadataMap metadata\_map). New metadata can
 be added directly to metadata\_map.
 
 If users need to add new metadata for a response to downstream, a
-StreamFilter should be created. Users pass the metadata to be added to
-StreamDecoderFilterCallbacks::encodeMetadata(MetadataMapPtr&&
+StreamEncoderFilter should be created. Users pass the metadata to be added to
+StreamEncoderFilterCallbacks::addEncodedMetadata(MetadataMapPtr&&
 metadata\_map\_ptr). This function can be called in
-StreamFilter::encode100ContinueHeaders(HeaderMap& headers), StreamFilter::encodeHeaders(HeaderMap& headers, bool end\_stream),
-StreamFilter::encodeData(Buffer::Instance& data, bool end\_stream), StreamFilter::encodeTrailers(HeaderMap& trailers).
-Consequently, the new metadata will be passed through all the encoding filters. Note that, the added
-metadata should not share the same key as the metadata to be consumed. Otherwise, the added metadata
-will be consumed.
+StreamEncoderFilter::encode100ContinueHeaders(HeaderMap& headers), StreamEncoderFilter::encodeHeaders(HeaderMap& headers, bool end\_stream),
+StreamEncoderFilter::encodeData(Buffer::Instance& data, bool end\_stream), StreamEncoderFilter::encodeTrailers(HeaderMap& trailers).
+Consequently, the new metadata will be passed through all the encoding filters that follow the filter
+where the new metadata are added.
 
 If users receive metadata from upstream, new metadata can be added directly to
-the input argument metadata\_map in StreamFilter::encodeMetadata(MetadataMap& metadata\_map). Note that,
-users should never call StreamDecoderFilterCallbacks::encodeMetadata(MetadataMapPtr&&
-metadata\_map\_ptr) to add new metadata in StreamFilter::encodeMetadata(MetadataMap& metadata\_map).
+the input argument metadata\_map in StreamFilter::encodeMetadata(MetadataMap& metadata\_map).
 
 ### Metadata implementation
 

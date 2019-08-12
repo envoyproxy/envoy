@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "envoy/common/exception.h"
@@ -44,28 +45,24 @@ public:
       throw EnvoyException("HTTP IP Tagging Filter requires ip_tags to be specified.");
     }
 
-    // TODO(ccaraman): Reduce the amount of copies operations performed to build the
-    // IP tag data set and passing it to the LcTrie constructor.
     std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data;
+    tag_data.reserve(config.ip_tags().size());
     for (const auto& ip_tag : config.ip_tags()) {
-      std::pair<std::string, std::vector<Network::Address::CidrRange>> ip_tag_pair;
-      ip_tag_pair.first = ip_tag.ip_tag_name();
-
       std::vector<Network::Address::CidrRange> cidr_set;
+      cidr_set.reserve(ip_tag.ip_list().size());
       for (const envoy::api::v2::core::CidrRange& entry : ip_tag.ip_list()) {
 
         // Currently, CidrRange::create doesn't guarantee that the CidrRanges are valid.
         Network::Address::CidrRange cidr_entry = Network::Address::CidrRange::create(entry);
         if (cidr_entry.isValid()) {
-          cidr_set.emplace_back(cidr_entry);
+          cidr_set.emplace_back(std::move(cidr_entry));
         } else {
           throw EnvoyException(
               fmt::format("invalid ip/mask combo '{}/{}' (format is <ip>/<# mask bits>)",
                           entry.address_prefix(), entry.prefix_len().value()));
         }
       }
-      ip_tag_pair.second = cidr_set;
-      tag_data.emplace_back(ip_tag_pair);
+      tag_data.emplace_back(ip_tag.ip_tag_name(), cidr_set);
     }
     trie_ = std::make_unique<Network::LcTrie::LcTrie<std::string>>(tag_data);
   }

@@ -361,7 +361,7 @@ void StatNameStorageSet::free(SymbolTable& symbol_table) {
   }
 }
 
-SymbolTable::StoragePtr SymbolTableImpl::join(const std::vector<StatName>& stat_names) const {
+SymbolTable::StoragePtr SymbolTableImpl::join(const StatNameVec& stat_names) const {
   uint64_t num_bytes = 0;
   for (StatName stat_name : stat_names) {
     num_bytes += stat_name.dataSize();
@@ -427,6 +427,36 @@ void StatNameList::clear(SymbolTable& symbol_table) {
     return true;
   });
   storage_.reset();
+}
+
+StatNameSet::StatNameSet(SymbolTable& symbol_table) : pool_(symbol_table) {
+  builtin_stat_names_[""] = StatName();
+}
+
+void StatNameSet::rememberBuiltin(absl::string_view str) {
+  StatName stat_name;
+  {
+    absl::MutexLock lock(&mutex_);
+    stat_name = pool_.add(str);
+  }
+  builtin_stat_names_[str] = stat_name;
+}
+
+Stats::StatName StatNameSet::getStatName(absl::string_view token) {
+  // If token was recorded as a built-in during initialization, we can
+  // service this request lock-free.
+  const auto iter = builtin_stat_names_.find(token);
+  if (iter != builtin_stat_names_.end()) {
+    return iter->second;
+  }
+
+  // Other tokens require holding a lock for our local cache.
+  absl::MutexLock lock(&mutex_);
+  Stats::StatName& stat_name = dynamic_stat_names_[token];
+  if (stat_name.empty()) { // Note that builtin_stat_names_ already has one for "".
+    stat_name = pool_.add(token);
+  }
+  return stat_name;
 }
 
 } // namespace Stats
