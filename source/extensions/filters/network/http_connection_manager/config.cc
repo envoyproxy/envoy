@@ -311,6 +311,10 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     processFilter(filters[i], i, "http", filter_factories_, is_terminal);
     if (is_terminal && i != filters.size() - 1) {
       throw EnvoyException(fmt::format("Error: {} must be terminal filter.", filters[i].name()));
+    } else if (!is_terminal && i == filters.size() - 1) {
+      throw EnvoyException(
+          fmt::format("Error: non-terminal filter {} is the last filter in a http filter chain.",
+                      filters[i].name()));
     }
   }
 

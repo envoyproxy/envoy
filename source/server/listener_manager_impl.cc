@@ -68,6 +68,9 @@ std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetwor
     if (factory.isTerminalFilter() && i != filters.size() - 1) {
       throw EnvoyException(
           fmt::format("Error: {} must be the terminal network filter.", filters[i].name()));
+    } else if (!factory.isTerminalFilter() && i == filters.size() - 1) {
+      throw EnvoyException(fmt::format(
+          "Error: non-terminal filter {} is the last filter in a chain.", filters[i].name()));
     }
 
     Network::FilterFactoryCb callback;

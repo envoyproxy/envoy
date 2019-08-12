@@ -556,7 +556,7 @@ route_config:
 http_filters:
 - name: envoy.http_dynamo_filter
   config: {}
-
+- name: envoy.router
   )EOF";
 
   auto proto_config = parseHttpConnectionManagerFromV2Yaml(yaml_string);

@@ -504,6 +504,7 @@ public:
   }
 
   std::string name() override { return "stats_test"; }
+  bool isTerminalFilter() override { return true; }
 
 private:
   Network::FilterFactoryCb commonFilterFactory(Configuration::FactoryContext& context) {
