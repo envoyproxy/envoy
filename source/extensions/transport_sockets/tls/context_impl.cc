@@ -511,9 +511,9 @@ void ContextImpl::logHandshake(SSL* ssl) const {
 std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> ContextImpl::getPrivateKeyMethodProviders() {
   std::vector<Envoy::Ssl::PrivateKeyMethodProviderSharedPtr> providers;
 
-  for (uint i = 0; i < tls_contexts_.size(); i++) {
+  for (auto& tls_context : tls_contexts_) {
     Envoy::Ssl::PrivateKeyMethodProviderSharedPtr provider =
-        tls_contexts_[i].getPrivateKeyMethodProvider();
+        tls_context.getPrivateKeyMethodProvider();
     if (provider) {
       providers.push_back(provider);
     }
