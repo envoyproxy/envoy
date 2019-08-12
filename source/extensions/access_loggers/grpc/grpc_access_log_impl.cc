@@ -91,6 +91,7 @@ GrpcAccessLoggerSharedPtr GrpcAccessLoggerCacheImpl::getOrCreateLogger(
     const envoy::config::accesslog::v2::CommonGrpcAccessLogConfig& config) {
   // TODO(euroelessar): Consider cleaning up loggers.
   auto& cache = tls_slot_->getTyped<ThreadLocalCache>();
+  // TODO(lizan): Include logger type in the hash
   const std::size_t cache_key = MessageUtil::hash(config);
   const auto it = cache.access_loggers_.find(cache_key);
   if (it != cache.access_loggers_.end()) {
