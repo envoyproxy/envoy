@@ -7,6 +7,7 @@ api_proto_library_internal(
     srcs = ["accesslog.proto"],
     visibility = [
         "//envoy/service/accesslog/v2:__pkg__",
+        "//envoy/config/filter/network/http_connection_manager/v2:__pkg__",
     ],
     deps = [
         "//envoy/api/v2/core:address",

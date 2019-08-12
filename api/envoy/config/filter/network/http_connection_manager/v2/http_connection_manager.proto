@@ -12,7 +12,9 @@ import "envoy/api/v2/core/protocol.proto";
 import "envoy/api/v2/rds.proto";
 import "envoy/api/v2/srds.proto";
 import "envoy/config/filter/accesslog/v2/accesslog.proto";
+import "envoy/data/accesslog/v2/accesslog.proto";
 import "envoy/type/percent.proto";
+import "envoy/type/matcher/string.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
@@ -432,6 +434,35 @@ message HttpConnectionManager {
   // with `prefix` match set to `/dir`. Defaults to `false`. Note that slash merging is not part of
   // `HTTP spec <https://tools.ietf.org/html/rfc3986>` and is provided for convenience.
   bool merge_slashes = 33;
+
+  // Configuration of local reply send by envoy for http responses. Allows to define custom rules
+  // which maps response attribute returned by envoy to different one. Currently mapping of
+  // status code is implemented.
+  message SendLocalReplyConfig {
+    // Configuration which allows to define custom rules for matching local response.
+    // It works like and operator e.g: if you define status code 404 and body pattern
+    // then response must match both
+    message Match {
+      // Definition of status codes to match.
+      repeated uint32 status_codes = 1;
+      // Definition of body pattern to match.
+      envoy.type.matcher.StringMatcher body_pattern = 2;
+      // Definition of response flags to match.
+      envoy.data.accesslog.v2.ResponseFlags response_flags = 3;
+    };
+
+    // Configuration which allows to define custom mapping for matched response.
+    message Rewrite {
+      // Definition of status code to which matched one will be mapped.
+      uint32 status = 1 [(validate.rules).uint32 = {gte: 100, lt: 600}];
+    };
+
+    Match match = 1;
+    Rewrite rewrite = 2;
+  };
+
+  repeated SendLocalReplyConfig send_local_reply_config = 34;
+
 }
 
 message Rds {
