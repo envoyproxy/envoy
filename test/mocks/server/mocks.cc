@@ -21,6 +21,7 @@ namespace Server {
 MockOptions::MockOptions(const std::string& config_path) : config_path_(config_path) {
   ON_CALL(*this, concurrency()).WillByDefault(ReturnPointee(&concurrency_));
   ON_CALL(*this, configPath()).WillByDefault(ReturnRef(config_path_));
+  ON_CALL(*this, configProto()).WillByDefault(ReturnRef(config_proto_));
   ON_CALL(*this, configYaml()).WillByDefault(ReturnRef(config_yaml_));
   ON_CALL(*this, adminAddressPath()).WillByDefault(ReturnRef(admin_address_path_));
   ON_CALL(*this, serviceClusterName()).WillByDefault(ReturnRef(service_cluster_name_));
@@ -124,8 +125,8 @@ MockWorker::MockWorker() {
 MockWorker::~MockWorker() = default;
 
 MockInstance::MockInstance()
-    : secret_manager_(new Secret::SecretManagerImpl()), cluster_manager_(timeSource()),
-      ssl_context_manager_(timeSource()),
+    : secret_manager_(std::make_unique<Secret::SecretManagerImpl>(admin_.getConfigTracker())),
+      cluster_manager_(timeSource()), ssl_context_manager_(timeSource()),
       singleton_manager_(new Singleton::ManagerImpl(Thread::threadFactoryForTest())),
       grpc_context_(stats_store_.symbolTable()), http_context_(stats_store_.symbolTable()) {
   ON_CALL(*this, threadLocal()).WillByDefault(ReturnRef(thread_local_));
@@ -197,7 +198,7 @@ MockFactoryContext::MockFactoryContext()
 MockFactoryContext::~MockFactoryContext() = default;
 
 MockTransportSocketFactoryContext::MockTransportSocketFactoryContext()
-    : secret_manager_(new Secret::SecretManagerImpl()) {
+    : secret_manager_(std::make_unique<Secret::SecretManagerImpl>(config_tracker_)) {
   ON_CALL(*this, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
   ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
   ON_CALL(*this, messageValidationVisitor())

@@ -118,7 +118,7 @@ public:
   /**
    * Default constructor. Creates an empty annotation.
    */
-  Annotation() : timestamp_(0) {}
+  Annotation() = default;
 
   /**
    * Constructor that creates an annotation based on the given parameters.
@@ -187,7 +187,7 @@ public:
   const std::string toJson() override;
 
 private:
-  uint64_t timestamp_;
+  uint64_t timestamp_{0};
   std::string value_;
   absl::optional<Endpoint> endpoint_;
 };

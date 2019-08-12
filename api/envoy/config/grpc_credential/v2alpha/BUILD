@@ -15,3 +15,13 @@ api_go_proto_library(
         "//envoy/api/v2/core:base_go_proto",
     ],
 )
+
+api_proto_library_internal(
+    name = "aws_iam",
+    srcs = ["aws_iam.proto"],
+)
+
+api_go_proto_library(
+    name = "aws_iam",
+    proto = ":aws_iam",
+)

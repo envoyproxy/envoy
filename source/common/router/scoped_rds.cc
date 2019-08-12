@@ -68,7 +68,7 @@ InlineScopedRoutesConfigProvider::InlineScopedRoutesConfigProvider(
                                                  ConfigProviderInstanceType::Inline,
                                                  ConfigProvider::ApiType::Delta),
       name_(std::move(name)),
-      config_(std::make_shared<ThreadLocalScopedConfigImpl>(std::move(scope_key_builder))),
+      config_(std::make_shared<ScopedConfigImpl>(std::move(scope_key_builder))),
       config_protos_(std::make_move_iterator(config_protos.begin()),
                      std::make_move_iterator(config_protos.end())),
       rds_config_source_(std::move(rds_config_source)) {}
@@ -76,12 +76,13 @@ InlineScopedRoutesConfigProvider::InlineScopedRoutesConfigProvider(
 ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
     const envoy::config::filter::network::http_connection_manager::v2::ScopedRds& scoped_rds,
     const uint64_t manager_identifier, const std::string& name,
+    const envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::
+        ScopeKeyBuilder& scope_key_builder,
     Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
     ScopedRoutesConfigProviderManager& config_provider_manager)
-    : DeltaConfigSubscriptionInstance(
-          "SRDS", manager_identifier, config_provider_manager, factory_context.timeSource(),
-          factory_context.timeSource().systemTime(), factory_context.localInfo()),
-      name_(name),
+    : DeltaConfigSubscriptionInstance("SRDS", manager_identifier, config_provider_manager,
+                                      factory_context),
+      name_(name), scope_key_builder_(scope_key_builder),
       scope_(factory_context.scope().createScope(stat_prefix + "scoped_rds." + name + ".")),
       stats_({ALL_SCOPED_RDS_STATS(POOL_COUNTER(*scope_))}),
       validation_visitor_(factory_context.messageValidationVisitor()) {
@@ -91,6 +92,12 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
           Grpc::Common::typeUrl(
               envoy::api::v2::ScopedRouteConfiguration().GetDescriptor()->full_name()),
           *scope_, *this);
+
+  initialize([scope_key_builder]() -> Envoy::Config::ConfigProvider::ConfigConstSharedPtr {
+    return std::make_shared<ScopedConfigImpl>(
+        envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::ScopeKeyBuilder(
+            scope_key_builder));
+  });
 }
 
 void ScopedRdsConfigSubscription::onConfigUpdate(
@@ -124,10 +131,12 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
     ScopedRouteInfoConstSharedPtr scoped_route_info =
         scoped_config_manager_.addOrUpdateRoutingScope(scoped_route, version_info);
     ENVOY_LOG(debug, "srds: add/update scoped_route '{}'", scoped_route_name);
-    applyDeltaConfigUpdate([scoped_route_info](const ConfigProvider::ConfigConstSharedPtr& config) {
-      auto* thread_local_scoped_config = const_cast<ThreadLocalScopedConfigImpl*>(
-          static_cast<const ThreadLocalScopedConfigImpl*>(config.get()));
+    applyConfigUpdate([scoped_route_info](const ConfigProvider::ConfigConstSharedPtr& config)
+                          -> ConfigProvider::ConfigConstSharedPtr {
+      auto* thread_local_scoped_config =
+          const_cast<ScopedConfigImpl*>(static_cast<const ScopedConfigImpl*>(config.get()));
       thread_local_scoped_config->addOrUpdateRoutingScope(scoped_route_info);
+      return config;
     });
   }
 
@@ -135,35 +144,28 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
     const std::string scoped_route_name = scoped_route.first;
     ENVOY_LOG(debug, "srds: remove scoped route '{}'", scoped_route_name);
     scoped_config_manager_.removeRoutingScope(scoped_route_name);
-    applyDeltaConfigUpdate([scoped_route_name](const ConfigProvider::ConfigConstSharedPtr& config) {
-      auto* thread_local_scoped_config = const_cast<ThreadLocalScopedConfigImpl*>(
-          static_cast<const ThreadLocalScopedConfigImpl*>(config.get()));
+    applyConfigUpdate([scoped_route_name](const ConfigProvider::ConfigConstSharedPtr& config)
+                          -> ConfigProvider::ConfigConstSharedPtr {
+      // In place update.
+      auto* thread_local_scoped_config =
+          const_cast<ScopedConfigImpl*>(static_cast<const ScopedConfigImpl*>(config.get()));
       thread_local_scoped_config->removeRoutingScope(scoped_route_name);
+      return config;
     });
   }
 
-  ConfigSubscriptionCommonBase::onConfigUpdate();
+  DeltaConfigSubscriptionInstance::onConfigUpdate();
   setLastConfigInfo(absl::optional<LastConfigInfo>({absl::nullopt, version_info}));
   stats_.config_reload_.inc();
 }
 
 ScopedRdsConfigProvider::ScopedRdsConfigProvider(
     ScopedRdsConfigSubscriptionSharedPtr&& subscription,
-    Server::Configuration::FactoryContext& factory_context,
-    envoy::api::v2::core::ConfigSource rds_config_source,
-    const envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::
-        ScopeKeyBuilder& scope_key_builder)
-    : DeltaMutableConfigProviderBase(std::move(subscription), factory_context,
-                                     ConfigProvider::ApiType::Delta),
+    envoy::api::v2::core::ConfigSource rds_config_source)
+    : MutableConfigProviderCommonBase(std::move(subscription), ConfigProvider::ApiType::Delta),
       subscription_(static_cast<ScopedRdsConfigSubscription*>(
           MutableConfigProviderCommonBase::subscription_.get())),
-      rds_config_source_(std::move(rds_config_source)) {
-  initialize([scope_key_builder](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    return std::make_shared<ThreadLocalScopedConfigImpl>(
-        envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::ScopeKeyBuilder(
-            scope_key_builder));
-  });
-}
+      rds_config_source_(std::move(rds_config_source)) {}
 
 ProtobufTypes::MessagePtr ScopedRoutesConfigProviderManager::dumpConfigs() const {
   auto config_dump = std::make_unique<envoy::admin::v2alpha::ScopedRoutesConfigDump>();
@@ -207,28 +209,25 @@ ConfigProviderPtr ScopedRoutesConfigProviderManager::createXdsConfigProvider(
     const Protobuf::Message& config_source_proto,
     Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
     const ConfigProviderManager::OptionalArg& optarg) {
+  const auto& typed_optarg = static_cast<const ScopedRoutesConfigProviderManagerOptArg&>(optarg);
   ScopedRdsConfigSubscriptionSharedPtr subscription =
       ConfigProviderManagerImplBase::getSubscription<ScopedRdsConfigSubscription>(
           config_source_proto, factory_context.initManager(),
           [&config_source_proto, &factory_context, &stat_prefix,
-           &optarg](const uint64_t manager_identifier,
-                    ConfigProviderManagerImplBase& config_provider_manager)
+           &typed_optarg](const uint64_t manager_identifier,
+                          ConfigProviderManagerImplBase& config_provider_manager)
               -> Envoy::Config::ConfigSubscriptionCommonBaseSharedPtr {
             const auto& scoped_rds_config_source = dynamic_cast<
                 const envoy::config::filter::network::http_connection_manager::v2::ScopedRds&>(
                 config_source_proto);
             return std::make_shared<ScopedRdsConfigSubscription>(
-                scoped_rds_config_source, manager_identifier,
-                static_cast<const ScopedRoutesConfigProviderManagerOptArg&>(optarg)
-                    .scoped_routes_name_,
-                factory_context, stat_prefix,
+                scoped_rds_config_source, manager_identifier, typed_optarg.scoped_routes_name_,
+                typed_optarg.scope_key_builder_, factory_context, stat_prefix,
                 static_cast<ScopedRoutesConfigProviderManager&>(config_provider_manager));
           });
 
-  const auto& typed_optarg = static_cast<const ScopedRoutesConfigProviderManagerOptArg&>(optarg);
-  return std::make_unique<ScopedRdsConfigProvider>(std::move(subscription), factory_context,
-                                                   typed_optarg.rds_config_source_,
-                                                   typed_optarg.scope_key_builder_);
+  return std::make_unique<ScopedRdsConfigProvider>(std::move(subscription),
+                                                   typed_optarg.rds_config_source_);
 }
 
 ConfigProviderPtr ScopedRoutesConfigProviderManager::createStaticConfigProvider(

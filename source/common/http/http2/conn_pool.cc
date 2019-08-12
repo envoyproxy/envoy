@@ -304,7 +304,7 @@ ConnPoolImpl::ActiveClient::~ActiveClient() {
 
 CodecClientPtr ProdConnPoolImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {
   CodecClientPtr codec{new CodecClientProd(CodecClient::Type::HTTP2, std::move(data.connection_),
-                                           data.host_description_, dispatcher_, false)};
+                                           data.host_description_, dispatcher_)};
   return codec;
 }
 

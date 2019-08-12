@@ -307,6 +307,7 @@ public:
   MOCK_CONST_METHOD0(handOffRestoredDestinationConnections, bool());
   MOCK_CONST_METHOD0(perConnectionBufferLimitBytes, uint32_t());
   MOCK_CONST_METHOD0(listenerFiltersTimeout, std::chrono::milliseconds());
+  MOCK_CONST_METHOD0(continueOnListenerFiltersTimeout, bool());
   MOCK_METHOD0(listenerScope, Stats::Scope&());
   MOCK_CONST_METHOD0(listenerTag, uint64_t());
   MOCK_CONST_METHOD0(name, const std::string&());
@@ -376,6 +377,7 @@ public:
   MOCK_CONST_METHOD0(sockAddrLen, socklen_t());
 
   const std::string& asString() const override { return physical_; }
+  absl::string_view asStringView() const override { return physical_; }
   const std::string& logicalName() const override { return logical_; }
 
   const std::string logical_;
