@@ -86,7 +86,9 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
     ScopedRoutesConfigProviderManager& config_provider_manager)
     : DeltaConfigSubscriptionInstance("SRDS", manager_identifier, config_provider_manager,
                                       factory_context),
-      factory_context_(factory_context), name_(name), scope_key_builder_(scope_key_builder),
+      factory_context_(factory_context), cleanup_timer_(factory_context.dispatcher().createTimer(
+                                             [this]() -> void { cleanupDefferedDeletes(); })),
+      name_(name), scope_key_builder_(scope_key_builder),
       scope_(factory_context.scope().createScope(stat_prefix + "scoped_rds." + name + ".")),
       stats_({ALL_SCOPED_RDS_STATS(POOL_COUNTER(*scope_))}),
       rds_config_source_(std::move(rds_config_source)),
@@ -104,6 +106,20 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
         envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::ScopeKeyBuilder(
             scope_key_builder));
   });
+}
+
+void ScopedRdsConfigSubscription::cleanupDefferedDeletes() {
+  for (auto iter = deffered_to_be_deleted_.begin(); iter != deffered_to_be_deleted_.end();) {
+    if (iter->use_count() == 1) {
+      iter = deffered_to_be_deleted_.erase(iter);
+    } else {
+      iter++;
+    }
+  }
+  if (!deffered_to_be_deleted_.empty()) {
+    // Cleanup as fast as possible.
+    cleanup_timer_->enableTimer(std::chrono::milliseconds(0));
+  }
 }
 
 void ScopedRdsConfigSubscription::onConfigUpdate(
@@ -128,6 +144,7 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
         std::make_unique<Init::ManagerImpl>(fmt::format("SRDS {}:{}", name_, version_info));
   }
 
+  std::list<ScopedRouteInfoConstSharedPtr> to_be_deleted;
   for (const auto& resource : added_resources) {
     envoy::api::v2::ScopedRouteConfiguration scoped_route_config;
     try {
@@ -146,7 +163,6 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
               (overriding_init_manager == nullptr ? factory_context_.initManager()
                                                   : *overriding_init_manager)));
       // Detect if there is key conflict between two scopes.
-      ScopedRouteInfoConstSharedPtr prev_scoped_route_info;
       auto iter = scope_name_by_hash_.find(scoped_route_info->scopeKey().hash());
       if (iter != scope_name_by_hash_.end()) {
         if (iter->second != scoped_route_info->scopeName()) {
@@ -154,23 +170,17 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
               fmt::format("scope key conflict found, first scope is '{}', second scope is '{}'",
                           iter->second, scoped_route_info->scopeName()));
         }
-        prev_scoped_route_info = scoped_route_map_[scoped_route_info->scopeName()];
+        to_be_deleted.push_back(scoped_route_map_[scoped_route_info->scopeName()]);
       }
       scope_name_by_hash_[scoped_route_info->scopeKey().hash()] = scoped_route_info->scopeName();
       scoped_route_map_[scoped_route_info->scopeName()] = scoped_route_info;
-      applyConfigUpdate(
-          [scoped_route_info](
-              ConfigProvider::ConfigConstSharedPtr config) -> ConfigProvider::ConfigConstSharedPtr {
-            auto* thread_local_scoped_config =
-                const_cast<ScopedConfigImpl*>(static_cast<const ScopedConfigImpl*>(config.get()));
-
-            thread_local_scoped_config->addOrUpdateRoutingScope(scoped_route_info);
-            return config;
-          },
-          [prev_scoped_route_info]() {
-            /*Make sure previous route_config_info is destructed in main thread, as it holds a
-             * RouteConfigProvider instance which is supposed to be destructed on main thread.*/
-          });
+      applyConfigUpdate([scoped_route_info](ConfigProvider::ConfigConstSharedPtr config)
+                            -> ConfigProvider::ConfigConstSharedPtr {
+        auto* thread_local_scoped_config =
+            const_cast<ScopedConfigImpl*>(static_cast<const ScopedConfigImpl*>(config.get()));
+        thread_local_scoped_config->addOrUpdateRoutingScope(scoped_route_info);
+        return config;
+      });
       any_applied = true;
       ENVOY_LOG(debug, "srds: add/update scoped_route '{}'", scoped_route_info->scopeName());
     } catch (const EnvoyException& e) {
@@ -193,18 +203,16 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   for (const auto& scope_name : removed_resources) {
     auto iter = scoped_route_map_.find(scope_name);
     if (iter != scoped_route_map_.end()) {
-      ScopedRouteInfoConstSharedPtr to_be_deleted = iter->second;
+      to_be_deleted.push_back(iter->second);
       scope_name_by_hash_.erase(iter->second->scopeKey().hash());
       scoped_route_map_.erase(iter);
-      applyConfigUpdate(
-          [scope_name](
-              ConfigProvider::ConfigConstSharedPtr config) -> ConfigProvider::ConfigConstSharedPtr {
-            auto* thread_local_scoped_config =
-                const_cast<ScopedConfigImpl*>(static_cast<const ScopedConfigImpl*>(config.get()));
-            thread_local_scoped_config->removeRoutingScope(scope_name);
-            return config;
-          },
-          [to_be_deleted]() { /*to_be_deleted will be destructed in main thread.*/ });
+      applyConfigUpdate([scope_name](ConfigProvider::ConfigConstSharedPtr config)
+                            -> ConfigProvider::ConfigConstSharedPtr {
+        auto* thread_local_scoped_config =
+            const_cast<ScopedConfigImpl*>(static_cast<const ScopedConfigImpl*>(config.get()));
+        thread_local_scoped_config->removeRoutingScope(scope_name);
+        return config;
+      });
       any_applied = true;
       ENVOY_LOG(debug, "srds: remove scoped route '{}'", scope_name);
     }
@@ -212,6 +220,11 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   ConfigSubscriptionCommonBase::onConfigUpdate();
   if (any_applied) {
     setLastConfigInfo(absl::optional<LastConfigInfo>({absl::nullopt, version_info}));
+  }
+  if (!to_be_deleted.empty()) {
+    deffered_to_be_deleted_.insert(deffered_to_be_deleted_.begin(), to_be_deleted.begin(),
+                                   to_be_deleted.end());
+    cleanup_timer_->enableTimer(std::chrono::milliseconds(0));
   }
   stats_.config_reload_.inc();
   if (!exception_msgs.empty()) {
@@ -240,7 +253,7 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
     }
     const envoy::api::v2::ScopedRouteConfiguration& scoped_route_config =
         scope_config_inserted.first->second;
-    uint64_t key_fingerprint = MessageUtil::hash(scoped_route_config.key());
+    const uint64_t key_fingerprint = MessageUtil::hash(scoped_route_config.key());
     if (!scope_name_by_key_hash.try_emplace(key_fingerprint, scope_name).second) {
       throw EnvoyException(
           fmt::format("scope key conflict found, first scope is '{}', second scope is '{}'",

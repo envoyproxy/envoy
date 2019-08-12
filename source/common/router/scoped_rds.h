@@ -102,6 +102,9 @@ public:
   const ScopedRouteMap& scopedRouteMap() const { return scoped_route_map_; }
 
 private:
+  // Cleanup stale ScopedRouteInfo instances.
+  void cleanupDefferedDeletes();
+
   // Envoy::Config::DeltaConfigSubscriptionInstance
   void start() override { subscription_->start({}); }
 
@@ -132,6 +135,13 @@ private:
   absl::flat_hash_map<uint64_t, std::string> scope_name_by_hash_;
   // For creating RDS subscriptions.
   Server::Configuration::FactoryContext& factory_context_;
+  // Deferred to be deleted ScopedRouteInfo.
+  // As RdsRouteConfigProvider instance (which contains a tls slot) can only be destructed in main
+  // thread, we need to make sure the shared ScopedRouteInfo is deleted in main thread.
+  std::list<ScopedRouteInfoConstSharedPtr> deffered_to_be_deleted_;
+  Envoy::Event::TimerPtr cleanup_timer_;
+  const std::chrono::milliseconds cleanup_interval_{3000}; // Clean up every 3s.
+
   const std::string name_;
   std::unique_ptr<Envoy::Config::Subscription> subscription_;
   const envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::ScopeKeyBuilder

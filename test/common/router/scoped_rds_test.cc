@@ -27,6 +27,8 @@ namespace Envoy {
 namespace Router {
 namespace {
 
+using ::Envoy::Http::TestHeaderMapImpl;
+
 envoy::api::v2::ScopedRouteConfiguration
 parseScopedRouteConfigurationFromYaml(const std::string& yaml) {
   envoy::api::v2::ScopedRouteConfiguration scoped_route_config;
@@ -125,6 +127,14 @@ scope_key_builder:
     subscription_callbacks_ = factory_context_.cluster_manager_.subscription_factory_.callbacks_;
   }
 
+  ScopedRdsConfigProvider* getScopedRdsProvider() const {
+    return dynamic_cast<ScopedRdsConfigProvider*>(provider_.get());
+  }
+  // Helper function which returns the ScopedRouteMap of the subscription.
+  const ScopedRouteMap& getScopedRouteMap() const {
+    return getScopedRdsProvider()->subscription().scopedRouteMap();
+  }
+
   Envoy::Config::SubscriptionCallbacks* subscription_callbacks_{};
   Envoy::Config::ConfigProviderPtr provider_;
 };
@@ -212,44 +222,54 @@ key:
   EXPECT_EQ(
       2UL,
       factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload").value());
+  EXPECT_EQ(getScopedRouteMap().size(), 2);
 
-  EXPECT_EQ(dynamic_cast<ScopedRdsConfigProvider*>(provider_.get())
-                ->subscription()
-                .scopedRouteMap()
-                .size(),
-            2);
+  // Verify the config is a ScopedConfigImpl instance, both scopes point to foo_routes.
+  EXPECT_NE(getScopedRdsProvider(), nullptr);
+  EXPECT_NE(getScopedRdsProvider()->config<ScopedConfigImpl>(), nullptr);
+  EXPECT_EQ(getScopedRdsProvider()
+                ->config<ScopedConfigImpl>()
+                ->getRouteConfig(TestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->name(),
+            "foo_routes");
+  EXPECT_EQ(getScopedRdsProvider()
+                ->config<ScopedConfigImpl>()
+                ->getRouteConfig(TestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})
+                ->name(),
+            "foo_routes");
 
   // Delete foo_scope2.
   resources.RemoveLast();
 
   EXPECT_NO_THROW(subscription_callbacks_->onConfigUpdate(resources, "3"));
-  EXPECT_EQ(dynamic_cast<ScopedRdsConfigProvider*>(provider_.get())
-                ->subscription()
-                .scopedRouteMap()
-                .size(),
-            1);
-  EXPECT_EQ(dynamic_cast<ScopedRdsConfigProvider*>(provider_.get())
-                ->subscription()
-                .scopedRouteMap()
-                .count("foo_scope"),
-            1);
+  EXPECT_EQ(getScopedRouteMap().size(), 1);
+  EXPECT_EQ(getScopedRouteMap().count("foo_scope"), 1);
   EXPECT_EQ(
       3UL,
       factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload").value());
+  // now scope key "x-bar-key" points to nowhere.
+  EXPECT_EQ(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+                TestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}),
+            nullptr);
+  EXPECT_EQ(getScopedRdsProvider()
+                ->config<ScopedConfigImpl>()
+                ->getRouteConfig(TestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->name(),
+            "foo_routes");
   // Delete foo_scope via Delta API.
   Protobuf::RepeatedPtrField<std::string> deletes;
   *deletes.Add() = "foo_scope";
   resources.RemoveLast();
   EXPECT_NO_THROW(
       subscription_callbacks_->onConfigUpdate(anyToResource(resources, "4"), deletes, "4"));
-  EXPECT_EQ(dynamic_cast<ScopedRdsConfigProvider*>(provider_.get())
-                ->subscription()
-                .scopedRouteMap()
-                .size(),
-            0);
+  EXPECT_EQ(getScopedRouteMap().size(), 0);
   EXPECT_EQ(
       4UL,
       factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload").value());
+  // Now scope key "x-foo-key" points to nowhere as well.
+  EXPECT_EQ(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+                TestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}),
+            nullptr);
 }
 
 // Tests that conflict resources are detected.
@@ -280,6 +300,12 @@ key:
       // Fully rejected.
       0UL,
       factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload").value());
+  // Scope key "x-foo-key" points to nowhere.
+  EXPECT_NE(getScopedRdsProvider(), nullptr);
+  EXPECT_NE(getScopedRdsProvider()->config<ScopedConfigImpl>(), nullptr);
+  EXPECT_EQ(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+                TestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}),
+            nullptr);
 
   // Delta API.
   EXPECT_THROW_WITH_REGEX(
@@ -291,16 +317,14 @@ key:
       1UL,
       factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload").value());
   // foo_scope update is applied.
-  EXPECT_EQ(dynamic_cast<ScopedRdsConfigProvider*>(provider_.get())
-                ->subscription()
-                .scopedRouteMap()
-                .size(),
-            1UL);
-  EXPECT_EQ(dynamic_cast<ScopedRdsConfigProvider*>(provider_.get())
-                ->subscription()
-                .scopedRouteMap()
-                .count("foo_scope"),
-            1);
+  EXPECT_EQ(getScopedRouteMap().size(), 1UL);
+  EXPECT_EQ(getScopedRouteMap().count("foo_scope"), 1);
+  // Scope key "x-foo-key" points to foo_routes due to partial rejection.
+  EXPECT_EQ(getScopedRdsProvider()
+                ->config<ScopedConfigImpl>()
+                ->getRouteConfig(TestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->name(),
+            "foo_routes");
 }
 
 // Tests that only one resource is provided during a config update.

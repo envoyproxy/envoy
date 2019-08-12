@@ -460,6 +460,7 @@ public:
   std::unique_ptr<ScopedConfigImpl> scoped_config_impl_;
 };
 
+// Test a ScopedConfigImpl returns the correct route Config.
 TEST_F(ScopedConfigImplTest, PickRoute) {
   scoped_config_impl_ = std::make_unique<ScopedConfigImpl>(std::move(key_builder_config_));
   scoped_config_impl_->addOrUpdateRoutingScope(scope_info_a_);
@@ -487,6 +488,7 @@ TEST_F(ScopedConfigImplTest, PickRoute) {
   EXPECT_EQ(route_config, nullptr);
 }
 
+// Test a ScopedConfigImpl returns the correct route Config before and after scope config update.
 TEST_F(ScopedConfigImplTest, Update) {
   scoped_config_impl_ = std::make_unique<ScopedConfigImpl>(std::move(key_builder_config_));
 
