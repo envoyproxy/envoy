@@ -126,7 +126,8 @@ public:
 
   Extensions::NetworkFilters::Common::Redis::Client::ClientPtr
   create(Upstream::HostConstSharedPtr, Event::Dispatcher&,
-         const Extensions::NetworkFilters::Common::Redis::Client::Config&, Extensions::NetworkFilters::Common::Redis::Client::RedisClusterStats&) override {
+         const Extensions::NetworkFilters::Common::Redis::Client::Config&,
+         Extensions::NetworkFilters::Common::Redis::Client::RedisClusterStats&) override {
     return Extensions::NetworkFilters::Common::Redis::Client::ClientPtr{create_()};
   }
 
