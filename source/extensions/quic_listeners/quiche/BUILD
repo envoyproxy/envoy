@@ -187,28 +187,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "active_quic_listener_lib",
-    srcs = [
-        "active_quic_listener.cc",
-    ],
-    hdrs = [
-        "active_quic_listener.h",
-    ],
-    tags = ["nofips"],
-    deps = [
-        ":envoy_quic_alarm_factory_lib",
-        ":envoy_quic_connection_helper_lib",
-        ":envoy_quic_dispatcher_lib",
-        ":envoy_quic_packet_writer_lib",
-        ":envoy_quic_proof_source_lib",
-        ":envoy_quic_utils_lib",
-        "//include/envoy/network:listener_interface",
-        "//source/common/network:listener_lib",
-        "//source/server:connection_handler_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "envoy_quic_utils_lib",
     hdrs = ["envoy_quic_utils.h"],
     external_deps = ["quiche_quic_platform"],

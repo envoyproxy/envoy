@@ -89,7 +89,7 @@ public:
   }
 
   std::unique_ptr<quic::QuicReceivedPacket>
-  createFullChloPacket(quic::QuicConnectionId connection_id,
+  createFullChloPacket(const quic::QuicConnectionId& connection_id,
                        quic::QuicSocketAddress client_address) {
     EnvoyQuicClock clock(*dispatcher_);
     quic::CryptoHandshakeMessage chlo = quic::test::crypto_test_utils::GenerateDefaultInchoateCHLO(

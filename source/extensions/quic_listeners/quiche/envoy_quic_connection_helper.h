@@ -25,7 +25,7 @@ public:
   EnvoyQuicConnectionHelper(Event::Dispatcher& dispatcher)
       : clock_(dispatcher), random_generator_(quic::QuicRandom::GetInstance()) {}
 
-  ~EnvoyQuicConnectionHelper() override {}
+  ~EnvoyQuicConnectionHelper() override = default;
 
   // QuicConnectionHelperInterface
   const quic::QuicClock* GetClock() const override { return &clock_; }

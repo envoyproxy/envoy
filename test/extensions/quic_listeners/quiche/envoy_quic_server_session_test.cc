@@ -158,7 +158,7 @@ TEST_P(EnvoyQuicServerSessionTest, NewStream) {
       .WillOnce(testing::ReturnRef(request_decoder));
   quic::QuicStreamId stream_id =
       quic_version_[0].transport_version == quic::QUIC_VERSION_99 ? 4u : 5u;
-  quic::QuicSpdyStream* stream =
+  auto stream =
       reinterpret_cast<quic::QuicSpdyStream*>(envoy_quic_session_.GetOrCreateStream(stream_id));
   // Receive a GET request on created stream.
   quic::QuicHeaderList headers;

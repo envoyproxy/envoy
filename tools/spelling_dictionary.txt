@@ -198,8 +198,9 @@ POSTs
 PREBIND
 PRNG
 PROT
-QOS
+ProcessBufferedChlos
 QPS
+QoS
 QUIC
 RAII
 RANLUX

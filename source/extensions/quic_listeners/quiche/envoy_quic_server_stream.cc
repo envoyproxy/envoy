@@ -48,7 +48,7 @@ void EnvoyQuicServerStream::readDisable(bool /*disable*/) { NOT_IMPLEMENTED_GCOV
 
 Http::HeaderMapImplPtr quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_list) {
   Http::HeaderMapImplPtr headers = std::make_unique<Http::HeaderMapImpl>();
-  for (auto entry : header_list) {
+  for (const auto& entry : header_list) {
     // TODO(danzh): Avoid copy by referencing entry as header_list is already validated by QUIC.
     headers->addCopy(Http::LowerCaseString(entry.first), entry.second);
   }
@@ -76,6 +76,7 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
 }
 
 void EnvoyQuicServerStream::OnBodyAvailable() {
+  std::cerr << "======== OnBodyAvailable\n";
   Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
   // TODO(danzh): check Envoy per stream buffer limit.
   // Currently read out all the data.
@@ -87,7 +88,9 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
     }
     size_t bytes_read = iov.iov_len;
     Buffer::RawSlice slice;
-    ASSERT(buffer->reserve(bytes_read, &slice, 1) == 1);
+    buffer->reserve(bytes_read, &slice, 1);
+    ASSERT(slice.len_ >= bytes_read);
+    slice.len_ = bytes_read;
     memcpy(slice.mem_, iov.iov_base, iov.iov_len);
     buffer->commit(&slice, 1);
     MarkConsumed(bytes_read);

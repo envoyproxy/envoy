@@ -150,7 +150,7 @@ TEST_P(EnvoyQuicServerStreamTest, DecodeHeadersAndBody) {
     quic::QuicStringPiece data_frame_header(data_buffer.get(), data_frame_header_length);
     data = absl::StrCat(data_frame_header, request_body_);
   }
-  quic::QuicStreamFrame frame = quic::QuicStreamFrame(stream_id_, true, 0, data);
+  quic::QuicStreamFrame frame(stream_id_, true, 0, data);
   quic_stream_.OnStreamFrame(frame);
 }
 

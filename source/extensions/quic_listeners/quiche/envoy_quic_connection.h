@@ -24,7 +24,7 @@ namespace Quic {
 class EnvoyQuicConnection : public quic::QuicConnection,
                             protected Logger::Loggable<Logger::Id::connection> {
 public:
-  EnvoyQuicConnection(quic::QuicConnectionId server_connection_id,
+  EnvoyQuicConnection(const quic::QuicConnectionId& server_connection_id,
                       quic::QuicSocketAddress initial_peer_address,
                       quic::QuicConnectionHelperInterface* helper,
                       quic::QuicAlarmFactory* alarm_factory, quic::QuicPacketWriter* writer,
@@ -33,7 +33,7 @@ public:
                       Network::ListenerConfig& listener_config,
                       Server::ListenerStats& listener_stats);
 
-  ~EnvoyQuicConnection() override {}
+  ~EnvoyQuicConnection() override = default;
 
   // Called by EnvoyQuicSession::setConnectionStats().
   void setConnectionStats(const Network::Connection::ConnectionStats& stats) {
