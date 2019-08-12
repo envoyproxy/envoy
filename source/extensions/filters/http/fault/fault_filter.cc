@@ -192,7 +192,7 @@ void FaultFilter::maybeSetupResponseRateLimit(const Http::HeaderMap& request_hea
         encoder_callbacks_->injectEncodedDataToFilterChain(data, end_stream);
       },
       [this] { encoder_callbacks_->continueEncoding(); }, config_->timeSource(),
-      decoder_callbacks_->dispatcher(), &decoder_callbacks_->scope());
+      decoder_callbacks_->dispatcher(), decoder_callbacks_->scope());
 }
 
 bool FaultFilter::faultOverflow() {
@@ -424,7 +424,7 @@ StreamRateLimiter::StreamRateLimiter(uint64_t max_kbps, uint64_t max_buffered_da
                                      std::function<void()> resume_data_cb,
                                      std::function<void(Buffer::Instance&, bool)> write_data_cb,
                                      std::function<void()> continue_cb, TimeSource& time_source,
-                                     Event::Dispatcher& dispatcher, const ScopeTrackedObject* scope)
+                                     Event::Dispatcher& dispatcher, const ScopeTrackedObject& scope)
     : // bytes_per_time_slice is KiB converted to bytes divided by the number of ticks per second.
       bytes_per_time_slice_((max_kbps * 1024) / SecondDivisor), write_data_cb_(write_data_cb),
       continue_cb_(continue_cb), dispatcher_(dispatcher),
@@ -440,7 +440,7 @@ StreamRateLimiter::StreamRateLimiter(uint64_t max_kbps, uint64_t max_buffered_da
 }
 
 void StreamRateLimiter::onTokenTimer() {
-  ScopeTrackerScopeState scope(scope_, dispatcher_);
+  ScopeTrackerScopeState scope(&scope_, dispatcher_);
   ENVOY_LOG(trace, "limiter: timer wakeup: buffered={}", buffer_.length());
   Buffer::OwnedImpl data_to_write;
 

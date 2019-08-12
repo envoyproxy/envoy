@@ -519,6 +519,8 @@ void ConnectionManagerImpl::ActiveStream::onIdleTimeout() {
 }
 
 void ConnectionManagerImpl::ActiveStream::onRequestTimeout() {
+  ScopeTrackerScopeState scope(this,
+                               connection_manager_.read_callbacks_->connection().dispatcher());
   connection_manager_.stats_.named_.downstream_rq_timeout_.inc();
   sendLocalReply(request_headers_ != nullptr && Grpc::Common::hasGrpcContentType(*request_headers_),
                  Http::Code::RequestTimeout, "request timeout", nullptr, is_head_request_,

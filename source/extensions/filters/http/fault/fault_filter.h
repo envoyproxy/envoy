@@ -151,7 +151,7 @@ public:
                     std::function<void()> pause_data_cb, std::function<void()> resume_data_cb,
                     std::function<void(Buffer::Instance&, bool)> write_data_cb,
                     std::function<void()> continue_cb, TimeSource& time_source,
-                    Event::Dispatcher& dispatcher, const ScopeTrackedObject* scope = nullptr);
+                    Event::Dispatcher& dispatcher, const ScopeTrackedObject& scope);
 
   /**
    * Called by the stream to write data. All data writes happen asynchronously, the stream should
@@ -189,7 +189,7 @@ private:
   bool saw_end_stream_{};
   bool saw_trailers_{};
   Buffer::WatermarkBuffer buffer_;
-  const ScopeTrackedObject* scope_;
+  const ScopeTrackedObject& scope_;
 };
 
 /**
