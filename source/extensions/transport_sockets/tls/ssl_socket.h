@@ -39,6 +39,7 @@ struct SslSocketFactoryStats {
 };
 
 enum class InitialState { Client, Server };
+enum class SocketState { PreHandshake, HandshakeInProgress, HandShakeComplete, ShutdownSent };
 
 class SslSocket : public Network::TransportSocket,
                   public Envoy::Ssl::ConnectionInfo,
@@ -72,7 +73,7 @@ public:
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
   std::string protocol() const override;
   absl::string_view failureReason() const override;
-  bool canFlushClose() override { return handshake_complete_; }
+  bool canFlushClose() override { return state_ == SocketState::HandShakeComplete; }
   void closeSocket(Network::ConnectionEvent close_type) override;
   Network::IoResult doRead(Buffer::Instance& read_buffer) override;
   Network::IoResult doWrite(Buffer::Instance& write_buffer, bool end_stream) override;
@@ -102,14 +103,12 @@ private:
   Network::TransportSocketCallbacks* callbacks_{};
   ContextImplSharedPtr ctx_;
   bssl::UniquePtr<SSL> ssl_;
-  bool handshake_complete_{};
-  bool shutdown_sent_{};
   uint64_t bytes_to_retry_{};
   std::string failure_reason_;
   mutable std::string cached_sha_256_peer_certificate_digest_;
   mutable std::string cached_url_encoded_pem_encoded_peer_certificate_;
   mutable std::string cached_url_encoded_pem_encoded_peer_cert_chain_;
-  bool async_handshake_in_progress_{};
+  SocketState state_;
 };
 
 class ClientSslSocketFactory : public Network::TransportSocketFactory,
