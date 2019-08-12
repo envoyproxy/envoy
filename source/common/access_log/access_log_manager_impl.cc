@@ -41,8 +41,16 @@ AccessLogFileImpl::AccessLogFileImpl(Filesystem::FilePtr&& file, Event::Dispatch
   open();
 }
 
+Filesystem::FlagSet AccessLogFileImpl::defaultFlags() {
+  static constexpr Filesystem::FlagSet default_flags{
+      1 << Filesystem::File::Operation::Read | 1 << Filesystem::File::Operation::Write |
+      1 << Filesystem::File::Operation::Create | 1 << Filesystem::File::Operation::Append};
+
+  return default_flags;
+}
+
 void AccessLogFileImpl::open() {
-  const Api::IoCallBoolResult result = file_->open();
+  const Api::IoCallBoolResult result = file_->open(defaultFlags());
   if (!result.rc_) {
     throw EnvoyException(
         fmt::format("unable to open file '{}': {}", file_->path(), result.err_->getErrorDetails()));

@@ -143,7 +143,8 @@ void RdsRouteConfigSubscription::onConfigUpdate(
   }
 }
 
-void RdsRouteConfigSubscription::onConfigUpdateFailed(const EnvoyException*) {
+void RdsRouteConfigSubscription::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason,
+                                                      const EnvoyException*) {
   // We need to allow server startup to continue, even if we have a bad
   // config.
   init_target_.ready();

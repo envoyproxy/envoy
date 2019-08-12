@@ -136,7 +136,7 @@ It's beyond the scope of this document how the file system data is deployed, gar
 
 .. _config_runtime_rtds:
 
-runTime Discovery Service (RTDS)
+Runtime Discovery Service (RTDS)
 ++++++++++++++++++++++++++++++++
 
 One or more runtime layers may be specified and delivered by specifying a :ref:`rtds_layer

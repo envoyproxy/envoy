@@ -221,7 +221,8 @@ FakeHttpConnection::FakeHttpConnection(SharedConnectionWrapper& shared_connectio
     : FakeConnectionBase(shared_connection, time_system) {
   if (type == Type::HTTP1) {
     codec_ = std::make_unique<Http::Http1::ServerConnectionImpl>(
-        shared_connection_.connection(), *this, Http::Http1Settings(), max_request_headers_kb);
+        shared_connection_.connection(), store, *this, Http::Http1Settings(),
+        max_request_headers_kb);
   } else {
     auto settings = Http::Http2Settings();
     settings.allow_connect_ = true;
@@ -486,8 +487,8 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
   Event::TestTimeSystem& time_system = upstreams[0]->timeSystem();
   auto end_time = time_system.monotonicTime() + timeout;
   while (time_system.monotonicTime() < end_time) {
-    for (auto it = upstreams.begin(); it != upstreams.end(); ++it) {
-      FakeUpstream& upstream = **it;
+    for (auto& it : upstreams) {
+      FakeUpstream& upstream = *it;
       Thread::ReleasableLockGuard lock(upstream.lock_);
       if (upstream.new_connections_.empty()) {
         time_system.waitFor(upstream.lock_, upstream.new_connection_event_, 5ms);

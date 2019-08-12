@@ -9,10 +9,6 @@ using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider;
 using Envoy::Http::TestHeaderMapImpl;
 
-using ::testing::_;
-using ::testing::Invoke;
-using ::testing::NiceMock;
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {

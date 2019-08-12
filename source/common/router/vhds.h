@@ -56,7 +56,8 @@ private:
   }
   void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>&,
                       const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override;
-  void onConfigUpdateFailed(const EnvoyException* e) override;
+  void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
+                            const EnvoyException* e) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override {
     return MessageUtil::anyConvert<envoy::api::v2::route::VirtualHost>(resource,
                                                                        validation_visitor_)

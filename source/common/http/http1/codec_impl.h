@@ -10,6 +10,7 @@
 
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
+#include "envoy/stats/scope.h"
 
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/assert.h"
@@ -21,6 +22,21 @@
 namespace Envoy {
 namespace Http {
 namespace Http1 {
+
+/**
+ * All stats for the HTTP/1 codec. @see stats_macros.h
+ */
+// clang-format off
+#define ALL_HTTP1_CODEC_STATS(COUNTER)                                                             \
+  COUNTER(metadata_not_supported_error)                                                            \
+// clang-format on
+
+/**
+ * Wrapper struct for the HTTP/1 codec stats. @see stats_macros.h
+ */
+struct CodecStats {
+  ALL_HTTP1_CODEC_STATS(GENERATE_COUNTER_STRUCT)
+};
 
 class ConnectionImpl;
 
@@ -37,7 +53,7 @@ public:
   void encodeHeaders(const HeaderMap& headers, bool end_stream) override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeTrailers(const HeaderMap& trailers) override;
-  void encodeMetadata(const MetadataMapVector&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void encodeMetadata(const MetadataMapVector&) override;
   Stream& getStream() override { return *this; }
 
   // Http::Stream
@@ -171,13 +187,16 @@ public:
 
   bool maybeDirectDispatch(Buffer::Instance& data);
 
+  CodecStats& stats() { return stats_; }
+
 protected:
-  ConnectionImpl(Network::Connection& connection, http_parser_type type,
+  ConnectionImpl(Network::Connection& connection, Stats::Scope& stats, http_parser_type type,
                  uint32_t max_request_headers_kb);
 
   bool resetStreamCalled() { return reset_stream_called_; }
 
   Network::Connection& connection_;
+  CodecStats stats_;
   http_parser parser_;
   HeaderMapPtr deferred_end_stream_headers_;
   Http::Code error_code_{Http::Code::BadRequest};
@@ -291,8 +310,9 @@ private:
  */
 class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
 public:
-  ServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks,
-                       Http1Settings settings, uint32_t max_request_headers_kb);
+  ServerConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
+                       ServerConnectionCallbacks& callbacks, Http1Settings settings,
+                       uint32_t max_request_headers_kb);
 
   ServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks,
                        Http1Settings settings, uint32_t max_request_headers_kb,
@@ -346,7 +366,8 @@ private:
  */
 class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
-  ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks& callbacks);
+  ClientConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
+                       ConnectionCallbacks& callbacks);
 
   // Http::ClientConnection
   StreamEncoder& newStream(StreamDecoder& response_decoder) override;

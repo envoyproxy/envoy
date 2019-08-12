@@ -50,7 +50,8 @@ public:
                                    const std::string& version, bool accept) PURE;
 
   virtual testing::AssertionResult statsAre(uint32_t attempt, uint32_t success, uint32_t rejected,
-                                            uint32_t failure, uint64_t version) {
+                                            uint32_t failure, uint32_t init_fetch_timeout,
+                                            uint64_t version) {
     // TODO(fredlas) rework update_success_ to make sense across all xDS carriers. Its value in
     // statsAre() calls in many tests will probably have to be changed.
     UNREFERENCED_PARAMETER(attempt);
@@ -65,6 +66,10 @@ public:
     if (failure != stats_.update_failure_.value()) {
       return testing::AssertionFailure() << "update_failure: expected " << failure << ", got "
                                          << stats_.update_failure_.value();
+    }
+    if (init_fetch_timeout != stats_.init_fetch_timeout_.value()) {
+      return testing::AssertionFailure() << "init_fetch_timeout: expected " << init_fetch_timeout
+                                         << ", got " << stats_.init_fetch_timeout_.value();
     }
     if (version != stats_.version_.value()) {
       return testing::AssertionFailure()

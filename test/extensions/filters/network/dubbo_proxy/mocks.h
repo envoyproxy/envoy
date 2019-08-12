@@ -154,6 +154,14 @@ class MockRoute;
 
 namespace DubboFilters {
 
+class MockFilterChainFactory : public FilterChainFactory {
+public:
+  MockFilterChainFactory();
+  ~MockFilterChainFactory() override;
+
+  MOCK_METHOD1(createFilterChain, void(DubboFilters::FilterChainFactoryCallbacks& callbacks));
+};
+
 class MockFilterChainFactoryCallbacks : public FilterChainFactoryCallbacks {
 public:
   MockFilterChainFactoryCallbacks();
@@ -173,6 +181,8 @@ public:
   MOCK_METHOD0(onDestroy, void());
   MOCK_METHOD1(setDecoderFilterCallbacks, void(DecoderFilterCallbacks& callbacks));
   MOCK_METHOD2(onMessageDecoded, FilterStatus(MessageMetadataSharedPtr, ContextSharedPtr));
+
+  DecoderFilterCallbacks* callbacks_{};
 };
 
 class MockDecoderFilterCallbacks : public DecoderFilterCallbacks {
@@ -212,6 +222,8 @@ public:
   MOCK_METHOD0(onDestroy, void());
   MOCK_METHOD1(setEncoderFilterCallbacks, void(EncoderFilterCallbacks& callbacks));
   MOCK_METHOD2(onMessageEncoded, FilterStatus(MessageMetadataSharedPtr, ContextSharedPtr));
+
+  EncoderFilterCallbacks* callbacks_{};
 };
 
 class MockEncoderFilterCallbacks : public EncoderFilterCallbacks {
@@ -249,6 +261,9 @@ public:
   MOCK_METHOD2(onMessageEncoded, FilterStatus(MessageMetadataSharedPtr, ContextSharedPtr));
   MOCK_METHOD1(setDecoderFilterCallbacks, void(DecoderFilterCallbacks& callbacks));
   MOCK_METHOD2(onMessageDecoded, FilterStatus(MessageMetadataSharedPtr, ContextSharedPtr));
+
+  DecoderFilterCallbacks* decoder_callbacks_{};
+  EncoderFilterCallbacks* encoder_callbacks_{};
 };
 
 class MockDirectResponse : public DirectResponse {

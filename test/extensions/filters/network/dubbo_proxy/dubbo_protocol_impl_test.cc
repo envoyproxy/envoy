@@ -148,6 +148,8 @@ TEST(DubboProtocolImplTest, encode) {
       body_buffer, content, RpcResponseType::ResponseWithValue);
   auto context = result.first;
   EXPECT_EQ(context->body_size(), serialized_body_size);
+  EXPECT_EQ(false, context->hasAttachments());
+  EXPECT_EQ(0, context->attachments().size());
 
   buffer.drain(context->header_size());
   EXPECT_TRUE(dubbo_protocol.decodeData(buffer, context, output_metadata));

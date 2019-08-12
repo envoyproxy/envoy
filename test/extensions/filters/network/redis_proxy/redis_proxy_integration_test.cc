@@ -264,9 +264,9 @@ std::string makeBulkStringArray(std::vector<std::string>&& command_strings) {
   std::stringstream result;
 
   result << "*" << command_strings.size() << "\r\n";
-  for (uint64_t i = 0; i < command_strings.size(); i++) {
-    result << "$" << command_strings[i].size() << "\r\n";
-    result << command_strings[i] << "\r\n";
+  for (auto& command_string : command_strings) {
+    result << "$" << command_string.size() << "\r\n";
+    result << command_string << "\r\n";
   }
 
   return result.str();
