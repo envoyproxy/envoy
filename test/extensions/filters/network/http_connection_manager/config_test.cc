@@ -176,6 +176,35 @@ http_filters:
       EnvoyException, "Error: envoy.router must be terminal filter.");
 }
 
+TEST_F(HttpConnectionManagerConfigTest, NonTerminalFilter) {
+  const std::string yaml_string = R"EOF(
+codec_type: http1
+server_name: foo
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+http_filters:
+- name: envoy.health_check
+  config:
+      pass_through_mode: false
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                  date_provider_, route_config_provider_manager_,
+                                  scoped_routes_config_provider_manager_),
+      EnvoyException,
+      "Error: non-terminal filter envoy.health_check is the last filter in a http filter chain.");
+}
+
 TEST_F(HttpConnectionManagerConfigTest, MiscConfig) {
   const std::string yaml_string = R"EOF(
 codec_type: http1
