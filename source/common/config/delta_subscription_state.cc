@@ -16,7 +16,7 @@ DeltaSubscriptionState::DeltaSubscriptionState(const std::string& type_url,
   if (init_fetch_timeout_.count() > 0 && !init_fetch_timeout_timer_) {
     init_fetch_timeout_timer_ = dispatcher.createTimer([this]() -> void {
       ENVOY_LOG(warn, "delta config: initial fetch timed out for {}", type_url_);
-      callbacks_.onConfigUpdateFailed(nullptr);
+      callbacks_.onConfigUpdateFailed(ConfigUpdateFailureReason::FetchTimedout, nullptr);
     });
     init_fetch_timeout_timer_->enableTimer(init_fetch_timeout_);
   }
@@ -114,13 +114,14 @@ void DeltaSubscriptionState::handleBadResponse(const EnvoyException& e, UpdateAc
   ack.error_detail_.set_message(e.what());
   disableInitFetchTimeoutTimer();
   ENVOY_LOG(warn, "delta config for {} rejected: {}", type_url_, e.what());
-  callbacks_.onConfigUpdateFailed(&e);
+  callbacks_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &e);
 }
 
 void DeltaSubscriptionState::handleEstablishmentFailure() {
   disableInitFetchTimeoutTimer();
   ENVOY_LOG(debug, "gRPC update for {} failed", type_url_);
-  callbacks_.onConfigUpdateFailed(nullptr);
+  callbacks_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure,
+                                  nullptr);
 }
 
 envoy::api::v2::DeltaDiscoveryRequest DeltaSubscriptionState::getNextRequestAckless() {

@@ -90,7 +90,7 @@ class Context {
 public:
   using AttachmentMap = std::unordered_map<std::string, std::string>;
 
-  bool hasAttachments() const { return attachments_.empty(); }
+  bool hasAttachments() const { return !attachments_.empty(); }
   const AttachmentMap& attachments() const { return attachments_; }
 
   Buffer::Instance& message_origin_data() { return message_origin_buffer_; }

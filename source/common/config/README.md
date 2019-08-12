@@ -2,7 +2,7 @@
 
 xDS stands for [fill in the blank] Discovery Service. It provides dynamic config discovery/updates.
 
-tldr: xDS can be filesystem, REST, or gRPC. gRPC xDS comes in four flavors.
+tldr: xDS can use the filesystem, REST, or gRPC. gRPC xDS comes in four flavors.
 However, Envoy code uses all of that via the same Subscription interface.
 If you are an Envoy developer with your hands on a valid Subscription object,
 you can mostly forget the filesystem/REST/gRPC distinction, and you can

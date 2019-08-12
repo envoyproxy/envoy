@@ -272,6 +272,9 @@ public:
   std::chrono::milliseconds listenerFiltersTimeout() const override {
     return listener_filters_timeout_;
   }
+  bool continueOnListenerFiltersTimeout() const override {
+    return continue_on_listener_filters_timeout_;
+  }
   Stats::Scope& listenerScope() override { return *listener_scope_; }
   uint64_t listenerTag() const override { return listener_tag_; }
   const std::string& name() const override { return name_; }
@@ -298,6 +301,9 @@ public:
   Admin& admin() override { return parent_.server_.admin(); }
   const envoy::api::v2::core::Metadata& listenerMetadata() const override {
     return config_.metadata();
+  };
+  envoy::api::v2::core::TrafficDirection direction() const override {
+    return config_.traffic_direction();
   };
   TimeSource& timeSource() override { return api().timeSource(); }
   void ensureSocketOptions() {
@@ -370,6 +376,7 @@ private:
   const std::string version_info_;
   Network::Socket::OptionsSharedPtr listen_socket_options_;
   const std::chrono::milliseconds listener_filters_timeout_;
+  const bool continue_on_listener_filters_timeout_;
   // to access ListenerManagerImpl::factory_.
   friend class ListenerFilterChainFactoryBuilder;
 };

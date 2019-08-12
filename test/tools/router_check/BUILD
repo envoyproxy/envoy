@@ -19,6 +19,8 @@ envoy_cc_test_binary(
 envoy_cc_test_library(
     name = "router_check_main_lib",
     srcs = [
+        "coverage.cc",
+        "coverage.h",
         "router.cc",
         "router.h",
     ],

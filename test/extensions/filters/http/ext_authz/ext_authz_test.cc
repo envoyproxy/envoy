@@ -63,6 +63,7 @@ public:
     addr_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
   }
 
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   FilterConfigSharedPtr config_;
   Filters::Common::ExtAuthz::MockClient* client_;
   std::unique_ptr<Filter> filter_;
@@ -70,7 +71,6 @@ public:
   Filters::Common::ExtAuthz::RequestCallbacks* request_callbacks_;
   Http::TestHeaderMapImpl request_headers_;
   Buffer::OwnedImpl data_;
-  NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;

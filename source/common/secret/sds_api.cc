@@ -59,7 +59,7 @@ void SdsApi::onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Res
   onConfigUpdate(unwrapped_resource, resources[0].version());
 }
 
-void SdsApi::onConfigUpdateFailed(const EnvoyException*) {
+void SdsApi::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason, const EnvoyException*) {
   // We need to allow server startup to continue, even if we have a bad config.
   init_target_.ready();
 }

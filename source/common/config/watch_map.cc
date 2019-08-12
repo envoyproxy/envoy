@@ -41,7 +41,6 @@ AddedRemoved WatchMap::updateWatchInterest(Watch* watch,
 }
 
 absl::flat_hash_set<Watch*> WatchMap::watchesInterestedIn(const std::string& resource_name) {
-  // Note that std::set_union needs sorted sets. Better to do it ourselves with insert().
   absl::flat_hash_set<Watch*> ret = wildcard_watches_;
   auto watches_interested = watch_interest_.find(resource_name);
   if (watches_interested != watch_interest_.end()) {
@@ -128,9 +127,9 @@ void WatchMap::onConfigUpdate(
   }
 }
 
-void WatchMap::onConfigUpdateFailed(const EnvoyException* e) {
+void WatchMap::onConfigUpdateFailed(ConfigUpdateFailureReason reason, const EnvoyException* e) {
   for (auto& watch : watches_) {
-    watch->callbacks_.onConfigUpdateFailed(e);
+    watch->callbacks_.onConfigUpdateFailed(reason, e);
   }
 }
 

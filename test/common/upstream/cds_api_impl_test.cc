@@ -355,7 +355,8 @@ TEST_F(CdsApiImplTest, FailureSubscription) {
   setup();
 
   EXPECT_CALL(initialized_, ready());
-  cds_callbacks_->onConfigUpdateFailed({});
+  cds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure,
+                                       {});
   EXPECT_EQ("", cds_->versionInfo());
 }
 

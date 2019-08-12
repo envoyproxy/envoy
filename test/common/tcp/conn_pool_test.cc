@@ -126,8 +126,8 @@ public:
 
 protected:
   void onConnReleased(ConnPoolImpl::ActiveConn& conn) override {
-    for (auto i = test_conns_.begin(); i != test_conns_.end(); i++) {
-      if (conn.conn_.get() == i->connection_) {
+    for (auto& test_conn : test_conns_) {
+      if (conn.conn_.get() == test_conn.connection_) {
         onConnReleasedForTest();
         break;
       }

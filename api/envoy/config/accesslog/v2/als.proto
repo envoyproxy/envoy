@@ -9,6 +9,9 @@ option go_package = "v2";
 
 import "envoy/api/v2/core/grpc_service.proto";
 
+import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: gRPC Access Log Service (ALS)]
@@ -49,4 +52,14 @@ message CommonGrpcAccessLogConfig {
 
   // The gRPC service for the access log service.
   envoy.api.v2.core.GrpcService grpc_service = 2 [(validate.rules).message.required = true];
+
+  // Interval for flushing access logs to the gRPC stream. Logger will flush requests every time
+  // this interval is elapsed, or when batch size limit is hit, whichever comes first. Defaults to
+  // 1 second.
+  google.protobuf.Duration buffer_flush_interval = 3 [(validate.rules).duration.gt = {}];
+
+  // Soft size limit in bytes for access log entries buffer. Logger will buffer requests until
+  // this limit it hit, or every time flush interval is elapsed, whichever comes first. Setting it
+  // to zero effectively disables the batching. Defaults to 16384.
+  google.protobuf.UInt32Value buffer_size_bytes = 4;
 }

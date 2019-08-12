@@ -55,7 +55,8 @@ void DeltaSubscriptionImpl::onConfigUpdate(
   stats_.update_attempt_.inc();
   stats_.version_.set(HashUtil::xxHash64(system_version_info));
 }
-void DeltaSubscriptionImpl::onConfigUpdateFailed(const EnvoyException* e) {
+void DeltaSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason reason,
+                                                 const EnvoyException* e) {
   stats_.update_attempt_.inc();
   // TODO(htuch): Less fragile signal that this is failure vs. reject.
   if (e == nullptr) {
@@ -63,7 +64,10 @@ void DeltaSubscriptionImpl::onConfigUpdateFailed(const EnvoyException* e) {
   } else {
     stats_.update_rejected_.inc();
   }
-  callbacks_.onConfigUpdateFailed(e);
+  if (reason == ConfigUpdateFailureReason::FetchTimedout) {
+    stats_.init_fetch_timeout_.inc();
+  }
+  callbacks_.onConfigUpdateFailed(reason, e);
 }
 std::string DeltaSubscriptionImpl::resourceName(const ProtobufWkt::Any& resource) {
   return callbacks_.resourceName(resource);

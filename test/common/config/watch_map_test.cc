@@ -379,16 +379,17 @@ TEST(WatchMapTest, DeltaOnConfigUpdate) {
 
 TEST(WatchMapTest, OnConfigUpdateFailed) {
   WatchMap watch_map;
-  watch_map.onConfigUpdateFailed(nullptr); // calling on empty map doesn't break
+  // calling on empty map doesn't break
+  watch_map.onConfigUpdateFailed(ConfigUpdateFailureReason::UpdateRejected, nullptr);
 
   NamedMockSubscriptionCallbacks callbacks1;
   NamedMockSubscriptionCallbacks callbacks2;
   watch_map.addWatch(callbacks1);
   watch_map.addWatch(callbacks2);
 
-  EXPECT_CALL(callbacks1, onConfigUpdateFailed(nullptr));
-  EXPECT_CALL(callbacks2, onConfigUpdateFailed(nullptr));
-  watch_map.onConfigUpdateFailed(nullptr);
+  EXPECT_CALL(callbacks1, onConfigUpdateFailed(ConfigUpdateFailureReason::UpdateRejected, nullptr));
+  EXPECT_CALL(callbacks2, onConfigUpdateFailed(ConfigUpdateFailureReason::UpdateRejected, nullptr));
+  watch_map.onConfigUpdateFailed(ConfigUpdateFailureReason::UpdateRejected, nullptr);
 }
 
 } // namespace

@@ -526,7 +526,8 @@ void RtdsSubscription::onConfigUpdate(
   onConfigUpdate(unwrapped_resource, resources[0].version());
 }
 
-void RtdsSubscription::onConfigUpdateFailed(const EnvoyException*) {
+void RtdsSubscription::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason,
+                                            const EnvoyException*) {
   // We need to allow server startup to continue, even if we have a bad
   // config.
   init_target_.ready();

@@ -828,7 +828,8 @@ TEST_F(RtdsLoaderImplTest, FailureSubscription) {
   setup();
 
   EXPECT_CALL(init_watcher_, ready());
-  rtds_callbacks_[0]->onConfigUpdateFailed({});
+  rtds_callbacks_[0]->onConfigUpdateFailed(
+      Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, {});
 
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(1, store_.counter("runtime.load_success").value());

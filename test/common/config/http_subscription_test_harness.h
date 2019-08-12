@@ -139,7 +139,8 @@ public:
           .WillOnce(ThrowOnRejectedConfig(accept));
     }
     if (!accept) {
-      EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
+      EXPECT_CALL(callbacks_, onConfigUpdateFailed(
+                                  Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, _));
     }
     EXPECT_CALL(random_gen_, random()).WillOnce(Return(0));
     EXPECT_CALL(*timer_, enableTimer(_));
@@ -152,8 +153,7 @@ public:
   }
 
   void expectConfigUpdateFailed() override {
-    EXPECT_CALL(callbacks_, onConfigUpdateFailed(nullptr))
-        .WillOnce(Invoke([this](const EnvoyException*) { stats_.update_failure_.inc(); }));
+    EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, nullptr));
   }
 
   void expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds timeout) override {

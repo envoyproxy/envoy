@@ -315,6 +315,7 @@ TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
   server_thread->join();
   // Validate that initialization_time histogram value has been set.
   EXPECT_TRUE(stats_store_.histogram("server.initialization_time").used());
+  EXPECT_EQ(0L, TestUtility::findGauge(stats_store_, "server.state")->value());
 }
 
 TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
@@ -527,6 +528,12 @@ TEST_P(ServerInstanceImplTest, InvalidLayeredBootstrapMissingName) {
 TEST_P(ServerInstanceImplTest, InvalidLayeredBootstrapDuplicateName) {
   EXPECT_THROW_WITH_REGEX(initialize("test/server/invalid_layered_runtime_duplicate_name.yaml"),
                           EnvoyException, "Duplicate layer name: some_static_laye");
+}
+
+// Validate invalid layered runtime with no layer specifier is rejected.
+TEST_P(ServerInstanceImplTest, InvalidLayeredBootstrapNoLayerSpecifier) {
+  EXPECT_THROW_WITH_REGEX(initialize("test/server/invalid_layered_runtime_no_layer_specifier.yaml"),
+                          EnvoyException, "BootstrapValidationError.LayeredRuntime");
 }
 
 // Regression test for segfault when server initialization fails prior to

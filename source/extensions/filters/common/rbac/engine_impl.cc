@@ -23,11 +23,11 @@ bool RoleBasedAccessControlEngineImpl::allowed(const Network::Connection& connec
                                                std::string* effective_policy_id) const {
   bool matched = false;
 
-  for (auto it = policies_.begin(); it != policies_.end(); it++) {
-    if (it->second.matches(connection, headers, metadata)) {
+  for (const auto& policy : policies_) {
+    if (policy.second.matches(connection, headers, metadata)) {
       matched = true;
       if (effective_policy_id != nullptr) {
-        *effective_policy_id = it->first;
+        *effective_policy_id = policy.first;
       }
       break;
     }

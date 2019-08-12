@@ -12,6 +12,7 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "common/common/logger.h"
+#include "common/stats/symbol_table_impl.h"
 
 #include "extensions/filters/network/zookeeper_proxy/decoder.h"
 
@@ -39,7 +40,7 @@ namespace ZooKeeperProxy {
   COUNTER(getchildren2_rq)                                              \
   COUNTER(getephemerals_rq)                                             \
   COUNTER(getallchildrennumber_rq)                                      \
-  COUNTER(remove_rq)                                                    \
+  COUNTER(delete_rq)                                                    \
   COUNTER(exists_rq)                                                    \
   COUNTER(getacl_rq)                                                    \
   COUNTER(setacl_rq)                                                    \
@@ -52,7 +53,35 @@ namespace ZooKeeperProxy {
   COUNTER(setwatches_rq)                                                \
   COUNTER(checkwatches_rq)                                              \
   COUNTER(removewatches_rq)                                             \
-  COUNTER(check_rq)
+  COUNTER(check_rq)                                                     \
+  COUNTER(response_bytes)                                               \
+  COUNTER(connect_resp)                                                 \
+  COUNTER(ping_resp)                                                    \
+  COUNTER(auth_resp)                                                    \
+  COUNTER(getdata_resp)                                                 \
+  COUNTER(create_resp)                                                  \
+  COUNTER(create2_resp)                                                 \
+  COUNTER(createcontainer_resp)                                         \
+  COUNTER(createttl_resp)                                               \
+  COUNTER(setdata_resp)                                                 \
+  COUNTER(getchildren_resp)                                             \
+  COUNTER(getchildren2_resp)                                            \
+  COUNTER(getephemerals_resp)                                           \
+  COUNTER(getallchildrennumber_resp)                                    \
+  COUNTER(delete_resp)                                                  \
+  COUNTER(exists_resp)                                                  \
+  COUNTER(getacl_resp)                                                  \
+  COUNTER(setacl_resp)                                                  \
+  COUNTER(sync_resp)                                                    \
+  COUNTER(multi_resp)                                                   \
+  COUNTER(reconfig_resp)                                                \
+  COUNTER(close_resp)                                                   \
+  COUNTER(setauth_resp)                                                 \
+  COUNTER(setwatches_resp)                                              \
+  COUNTER(checkwatches_resp)                                            \
+  COUNTER(removewatches_resp)                                           \
+  COUNTER(check_resp)                                                   \
+  COUNTER(watch_event)
 // clang-format on
 
 /**
@@ -75,8 +104,10 @@ public:
 
   Stats::Scope& scope_;
   const uint32_t max_packet_bytes_;
-  const std::string stat_prefix_;
   ZooKeeperProxyStats stats_;
+  Stats::StatNameSet stat_name_set_;
+  const Stats::StatName stat_prefix_;
+  const Stats::StatName auth_;
 
 private:
   ZooKeeperProxyStats generateStats(const std::string& prefix, Stats::Scope& scope) {
@@ -127,8 +158,12 @@ public:
   void onGetEphemeralsRequest(const std::string& path) override;
   void onGetAllChildrenNumberRequest(const std::string& path) override;
   void onCloseRequest() override;
+  void onResponseBytes(uint64_t bytes) override;
+  void onConnectResponse(int32_t proto_version, int32_t timeout, bool readonly) override;
+  void onResponse(OpCodes opcode, int32_t xid, int64_t zxid, int32_t error) override;
+  void onWatchEvent(int32_t event_type, int32_t client_state, const std::string& path, int64_t zxid,
+                    int32_t error) override;
 
-  void doDecode(Buffer::Instance& buffer);
   DecoderPtr createDecoder(DecoderCallbacks& callbacks);
   void setDynamicMetadata(const std::string& key, const std::string& value);
   void setDynamicMetadata(const std::vector<std::pair<const std::string, const std::string>>& data);

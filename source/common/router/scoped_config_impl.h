@@ -141,9 +141,9 @@ private:
  * ConnectionManagerImpl::refreshCachedRoute() will call getRouterConfig() to obtain the
  * Router::ConfigConstSharedPtr to use for route selection.
  */
-class ThreadLocalScopedConfigImpl : public ScopedConfig, public ThreadLocal::ThreadLocalObject {
+class ScopedConfigImpl : public ScopedConfig {
 public:
-  ThreadLocalScopedConfigImpl(ScopedRoutes::ScopeKeyBuilder&& scope_key_builder)
+  ScopedConfigImpl(ScopedRoutes::ScopeKeyBuilder&& scope_key_builder)
       : scope_key_builder_(std::move(scope_key_builder)) {}
 
   void addOrUpdateRoutingScope(const ScopedRouteInfoConstSharedPtr& scoped_route_info);
