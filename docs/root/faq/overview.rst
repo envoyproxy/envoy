@@ -8,6 +8,7 @@ FAQ
 
   how_fast_is_envoy
   binaries
+  edge
   sni
   zone_aware_routing
   zipkin_tracing
