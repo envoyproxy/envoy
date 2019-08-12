@@ -15,10 +15,13 @@ envoy_package()
 envoy_extension_cc_test(
     name = "gradient_controller_test",
     srcs = ["gradient_controller_test.cc"],
-    extension_name = "envoy.filters.http.adaptive_concurrency.concurrency_controller",
+    extension_name = "envoy.filters.http.adaptive_concurrency",
     deps = [
-        "//test/mocks/event:event_mocks",
+        "//source/common/stats:isolated_store_lib",
+        "//source/extensions/filters/http/adaptive_concurrency:adaptive_concurrency_filter_lib",
         "//source/extensions/filters/http/adaptive_concurrency/concurrency_controller:concurrency_controller_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
     ],

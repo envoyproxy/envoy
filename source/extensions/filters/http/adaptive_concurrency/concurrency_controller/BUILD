@@ -16,18 +16,18 @@ envoy_cc_library(
     name = "concurrency_controller_lib",
     srcs = ["gradient_controller.cc"],
     hdrs = [
-      "concurrency_controller.h",
-      "gradient_controller.h",
+        "concurrency_controller.h",
+        "gradient_controller.h",
     ],
     external_deps = [
-      "libcircllhist",
+        "libcircllhist",
     ],
     deps = [
-        "//source/common/protobuf:protobuf",
-        "@envoy_api//envoy/config/filter/http/adaptive_concurrency/v2alpha:adaptive_concurrency_cc",
-        "//source/common/stats:isolated_store_lib",
         "//source/common/event:dispatcher_lib",
-        "//source/common/stats:stats_lib",
+        "//source/common/protobuf",
         "//source/common/runtime:runtime_lib",
+        "//source/common/stats:isolated_store_lib",
+        "//source/common/stats:stats_lib",
+        "@envoy_api//envoy/config/filter/http/adaptive_concurrency/v2alpha:adaptive_concurrency_cc",
     ],
 )

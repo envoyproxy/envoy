@@ -5,13 +5,14 @@
 
 #include "envoy/config/filter/http/adaptive_concurrency/v2alpha/adaptive_concurrency.pb.h"
 #include "envoy/config/filter/http/adaptive_concurrency/v2alpha/adaptive_concurrency.pb.validate.h"
-#include "envoy/runtime/runtime.h"
 #include "envoy/event/dispatcher.h"
-#include "extensions/filters/http/adaptive_concurrency/concurrency_controller/concurrency_controller.h"
+#include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "absl/synchronization/mutex.h"
+#include "extensions/filters/http/adaptive_concurrency/concurrency_controller/concurrency_controller.h"
+
 #include "absl/base/thread_annotations.h"
+#include "absl/synchronization/mutex.h"
 #include "circllhist.h"
 
 namespace Envoy {
@@ -42,21 +43,17 @@ struct GradientControllerStats {
 class GradientControllerConfig {
 public:
   GradientControllerConfig(
-    const envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig&
-      proto_config);
+      const envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig&
+          proto_config);
 
   std::chrono::milliseconds min_rtt_calc_interval() const { return min_rtt_calc_interval_; }
   std::chrono::milliseconds sample_rtt_calc_interval() const { return sample_rtt_calc_interval_; }
   uint64_t max_concurrency_limit() const { return max_concurrency_limit_; }
-  int starting_concurrency_limit() const { return starting_concurrency_limit_; }
   int min_rtt_aggregate_request_count() const { return min_rtt_aggregate_request_count_; }
   double max_gradient() const { return max_gradient_; }
-  double sample_aggregate_percentile() const;
+  double sample_aggregate_percentile() const { return sample_aggregate_percentile_; }
 
 private:
-  const envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig&
-    proto_config_;
-
   // The measured request round-trip time under ideal conditions.
   std::chrono::milliseconds min_rtt_calc_interval_;
 
@@ -66,14 +63,14 @@ private:
   // The maximum allowed concurrency value.
   uint64_t max_concurrency_limit_;
 
-  // Initial value for the concurrency limit.
-  int starting_concurrency_limit_;
-
   // The number of requests to aggregate/sample during the minRTT recalculation.
   int min_rtt_aggregate_request_count_;
 
   // The maximum value the gradient may take.
   double max_gradient_;
+
+  // The percentile value considered when processing samples.
+  double sample_aggregate_percentile_;
 };
 typedef std::shared_ptr<GradientControllerConfig> GradientControllerConfigSharedPtr;
 
@@ -102,11 +99,8 @@ typedef std::shared_ptr<GradientControllerConfig> GradientControllerConfigShared
  */
 class GradientController : public ConcurrencyController {
 public:
-  GradientController(GradientControllerConfigSharedPtr config,
-                     Event::Dispatcher& dispatcher,
-                     Runtime::Loader& runtime,
-                     std::string stats_prefix,
-                     Stats::Scope& scope);
+  GradientController(GradientControllerConfigSharedPtr config, Event::Dispatcher& dispatcher,
+                     Runtime::Loader& runtime, std::string stats_prefix, Stats::Scope& scope);
 
   ~GradientController();
 
@@ -115,22 +109,26 @@ public:
   void recordLatencySample(const std::chrono::nanoseconds& rq_latency) override;
 
 private:
-  static GradientControllerStats generateStats(Stats::Scope& scope, const std::string& stats_prefix);
+  static GradientControllerStats generateStats(Stats::Scope& scope,
+                                               const std::string& stats_prefix);
   void recordLatencySampleForMinRTT(const std::chrono::nanoseconds& rq_latency);
   void updateMinRTT();
-  std::chrono::microseconds processLatencySamplesAndClear() ABSL_EXCLUSIVE_LOCKS_REQUIRED(latency_sample_mtx_);
-  int calculateNewLimit() ABSL_EXCLUSIVE_LOCKS_REQUIRED(update_window_mtx_);;
-  void setMinRTTSamplingWindow() ABSL_EXCLUSIVE_LOCKS_REQUIRED(update_window_mtx_);;
+  std::chrono::microseconds processLatencySamplesAndClear()
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(latency_sample_mtx_);
+  int calculateNewLimit() ABSL_EXCLUSIVE_LOCKS_REQUIRED(update_window_mtx_);
+  ;
+  void setMinRTTSamplingWindow() ABSL_EXCLUSIVE_LOCKS_REQUIRED(update_window_mtx_);
+  ;
   void resetSampleWindow() ABSL_EXCLUSIVE_LOCKS_REQUIRED(update_window_mtx_);
 
   bool minRTTRequestThresholdReached() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(latency_sample_mtx_) {
-    return
-      static_cast<int>(hist_sample_count(latency_sample_hist_)) >= config_->min_rtt_aggregate_request_count();
+    return static_cast<int>(hist_sample_count(latency_sample_hist_)) >=
+           config_->min_rtt_aggregate_request_count();
   }
 
   GradientControllerConfigSharedPtr config_;
   Event::Dispatcher& dispatcher_;
-//  Runtime::Loader& runtime_;
+  //  Runtime::Loader& runtime_;
   Stats::Scope& scope_;
   GradientControllerStats stats_;
 

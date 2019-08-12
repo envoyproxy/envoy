@@ -14,34 +14,20 @@ import "google/protobuf/wrappers.proto";
 import "validate/validate.proto";
 
 message GradientControllerConfig {
-  // The percentile to use when summarizing aggregated samples. This mirrors supported quantiles in
-  // histogram_impl.h.
-  //
-  // TODO @tallen: add unit test that ensures these percentiles exist in histogram_impl as
-  // supported.
-  enum SampleAggregatePercentile {
-    P50 = 0;
-    P75 = 1;
-    P90 = 2;
-    P95 = 3;
-    P99 = 4;
-  }
-  SampleAggregatePercentile sample_aggregate_percentile = 1;
+  // The percentile to use when summarizing aggregated samples.
+  google.protobuf.DoubleValue sample_aggregate_percentile = 1
+      [(validate.rules).double = {gte: 0.0, lte: 1.0}];
 
   message ConcurrencyLimitCalculationParams {
-    // The concurrency limit the gradient controller will start with before any samples have been
-    // taken.
-    google.protobuf.UInt64Value starting_concurrency_limit = 1;
+    // The maximum value the gradient is allowed to take. This influences how aggressively the
+    // concurrency limit can increase. Defaults to 2.0.
+    google.protobuf.DoubleValue max_gradient = 1 [(validate.rules).double.gt = 1.0];
 
     // The allowed upper-bound on the calculated concurrency limit.
-    google.protobuf.UInt64Value max_concurrency_limit = 2;
+    google.protobuf.UInt64Value max_concurrency_limit = 2 [(validate.rules).uint64.gt = 0];
 
     // The period of time samples are taken to recalculate the concurrency limit.
     google.protobuf.Duration concurrency_update_interval = 3;
-
-    // The maximum value the gradient is allowed to take. This influences how aggressively the
-    // concurrency limit can increase. Defaults to 2.0.
-    google.protobuf.DoubleValue max_gradient = 4 [(validate.rules).double.gt = 1.0];
   }
   ConcurrencyLimitCalculationParams concurrency_limit_params = 2;
 
@@ -49,7 +35,8 @@ message GradientControllerConfig {
     // The time interval between recalculating the minimum request round-trip time.
     google.protobuf.Duration interval = 1;
 
-    // The number of requests to aggregate/sample during the minRTT recalculation window before updating
+    // The number of requests to aggregate/sample during the minRTT recalculation window before
+    // updating
     google.protobuf.UInt64Value request_count = 2;
   };
   MinimumRTTCalculationParams min_rtt_calc_params = 3;
