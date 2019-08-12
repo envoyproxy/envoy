@@ -59,10 +59,11 @@ private:
                           Dispatcher& http_dispatcher);
 
     // AsyncClient::StreamCallbacks
-    void onHeaders(HeaderMapPtr&& headers, bool end_stream);
-    void onData(Buffer::Instance& data, bool end_stream);
-    void onTrailers(HeaderMapPtr&& trailers);
-    void onReset();
+    void onHeaders(HeaderMapPtr&& headers, bool end_stream) override;
+    void onData(Buffer::Instance& data, bool end_stream) override;
+    void onTrailers(HeaderMapPtr&& trailers) override;
+    void onComplete() override;
+    void onReset() override;
 
   private:
     const envoy_stream_t stream_;
