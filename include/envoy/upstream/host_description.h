@@ -1,10 +1,12 @@
 #pragma once
 
+#include <map>
 #include <memory>
 #include <string>
 
 #include "envoy/api/v2/core/base.pb.h"
 #include "envoy/network/address.h"
+#include "envoy/stats/primitive_stats_macros.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/health_check_host_monitor.h"
 #include "envoy/upstream/outlier_detection.h"
@@ -26,14 +28,24 @@ namespace Upstream {
   COUNTER(rq_success)                                                                              \
   COUNTER(rq_timeout)                                                                              \
   COUNTER(rq_total)                                                                                \
-  GAUGE(cx_active, Accumulate)                                                                     \
-  GAUGE(rq_active, Accumulate)
+  GAUGE(cx_active)                                                                                 \
+  GAUGE(rq_active)
 
 /**
  * All per host stats defined. @see stats_macros.h
  */
 struct HostStats {
-  ALL_HOST_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
+  ALL_HOST_STATS(GENERATE_PRIMITIVE_COUNTER_STRUCT, GENERATE_PRIMITIVE_GAUGE_STRUCT);
+
+  // Provide access to counters as a map.
+  std::map<std::string, std::reference_wrapper<const Stats::PrimitiveCounter>> counters() const {
+    return {ALL_HOST_STATS(PRIMITIVE_COUNTER_NAME_AND_REFERENCE, IGNORE_PRIMITIVE_GAUGE)};
+  }
+
+  // Provide access to gauges as a map.
+  std::map<std::string, std::reference_wrapper<const Stats::PrimitiveGauge>> gauges() const {
+    return {ALL_HOST_STATS(IGNORE_PRIMITIVE_COUNTER, PRIMITIVE_GAUGE_NAME_AND_REFERENCE)};
+  }
 };
 
 class ClusterInfo;
@@ -94,7 +106,7 @@ public:
   /**
    * @return host specific stats.
    */
-  virtual const HostStats& stats() const PURE;
+  virtual HostStats& stats() const PURE;
 
   /**
    * @return the locality of the host (deployment specific). This will be the default instance if

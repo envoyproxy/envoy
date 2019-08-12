@@ -491,6 +491,8 @@ public:
    * @return bool indicating that passed gauges not matching the omitted regex have a value of 0.
    */
   static bool gaugesZeroed(const std::vector<Stats::GaugeSharedPtr>& gauges);
+  static bool gaugesZeroed(
+      const std::map<std::string, std::reference_wrapper<const Stats::PrimitiveGauge>>& gauges);
 
   // Strict variants of Protobuf::MessageUtil
   static void loadFromJson(const std::string& json, Protobuf::Message& message) {

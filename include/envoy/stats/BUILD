@@ -37,6 +37,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "primitive_stats_interface",
+    hdrs = [
+        "primitive_stats.h",
+    ],
+    deps = [
+        "//source/common/common:assert_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "symbol_table_interface",
     hdrs = ["symbol_table.h"],
     deps = [
@@ -57,4 +67,10 @@ envoy_cc_library(
     name = "stats_macros",
     hdrs = ["stats_macros.h"],
     deps = [":stats_interface"],
+)
+
+envoy_cc_library(
+    name = "primitive_stats_macros",
+    hdrs = ["primitive_stats_macros.h"],
+    deps = [":primitive_stats_interface"],
 )
