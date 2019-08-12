@@ -261,7 +261,7 @@ tls_certificate:
   init_target_handle->initialize(init_watcher);
   secret_context.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(secret_resources,
                                                                                    "keycert-v1");
-  Ssl::TlsCertificateConfigImpl tls_config(*secret_provider->secret(), *api_);
+  Ssl::TlsCertificateConfigImpl tls_config(*secret_provider->secret(), nullptr, *api_);
   EXPECT_EQ("DUMMY_INLINE_BYTES_FOR_CERT_CHAIN", tls_config.certificateChain());
   EXPECT_EQ("DUMMY_INLINE_BYTES_FOR_PRIVATE_KEY", tls_config.privateKey());
   EXPECT_EQ("DUMMY_PASSWORD", tls_config.password());
