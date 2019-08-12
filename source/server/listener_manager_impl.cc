@@ -65,14 +65,8 @@ std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetwor
         Config::Utility::getAndCheckFactory<Configuration::NamedNetworkFilterConfigFactory>(
             string_name);
 
-    if (factory.isTerminalFilter() && i != filters.size() - 1) {
-      throw EnvoyException(
-          fmt::format("Error: {} must be the terminal network filter.", filters[i].name()));
-    } else if (!factory.isTerminalFilter() && i == filters.size() - 1) {
-      throw EnvoyException(
-          fmt::format("Error: non-terminal filter {} is the last filter in a network filter chain.",
-                      filters[i].name()));
-    }
+    Config::Utility::validateTerminalFilters(filters[i].name(), "network",
+                                             factory.isTerminalFilter(), i == filters.size() - 1);
 
     Network::FilterFactoryCb callback;
     if (Config::Utility::allowDeprecatedV1Config(context.runtime(), *filter_config)) {

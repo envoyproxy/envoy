@@ -309,13 +309,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   for (int32_t i = 0; i < filters.size(); i++) {
     bool is_terminal = false;
     processFilter(filters[i], i, "http", filter_factories_, is_terminal);
-    if (is_terminal && i != filters.size() - 1) {
-      throw EnvoyException(fmt::format("Error: {} must be terminal filter.", filters[i].name()));
-    } else if (!is_terminal && i == filters.size() - 1) {
-      throw EnvoyException(
-          fmt::format("Error: non-terminal filter {} is the last filter in a http filter chain.",
-                      filters[i].name()));
-    }
+    Config::Utility::validateTerminalFilters(filters[i].name(), "http", is_terminal,
+                                             i == filters.size() - 1);
   }
 
   for (const auto& upgrade_config : config.upgrade_configs()) {
@@ -328,14 +323,12 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     }
     if (!upgrade_config.filters().empty()) {
       std::unique_ptr<FilterFactoriesList> factories = std::make_unique<FilterFactoriesList>();
-      for (int32_t i = 0; i < upgrade_config.filters().size(); i++) {
+      for (int32_t j = 0; j < upgrade_config.filters().size(); j++) {
         bool is_terminal = false;
-        processFilter(upgrade_config.filters(i), i, name, *factories, is_terminal);
-        if (is_terminal && i != upgrade_config.filters().size() - 1) {
-          throw EnvoyException(
-              fmt::format("Error: {} must be terminal filter in {} upgrade filter chain.",
-                          upgrade_config.filters(i).name(), name));
-        }
+        processFilter(upgrade_config.filters(j), j, name, *factories, is_terminal);
+        Config::Utility::validateTerminalFilters(upgrade_config.filters(j).name(), "http upgrade",
+                                                 is_terminal,
+                                                 j == upgrade_config.filters().size() - 1);
       }
       upgrade_filter_factories_.emplace(
           std::make_pair(name, FilterConfig{std::move(factories), enabled}));

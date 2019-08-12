@@ -173,7 +173,7 @@ http_filters:
       HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                   date_provider_, route_config_provider_manager_,
                                   scoped_routes_config_provider_manager_),
-      EnvoyException, "Error: envoy.router must be terminal filter.");
+      EnvoyException, "Error: envoy.router must be the terminal http filter.");
 }
 
 TEST_F(HttpConnectionManagerConfigTest, NonTerminalFilter) {
@@ -892,11 +892,11 @@ TEST_F(FilterChainTest, createCustomUpgradeFilterChainWithRouterNotLast) {
                                              "\x18"
                                              "envoy.http_dynamo_filter");
 
-  EXPECT_THROW_WITH_MESSAGE(
-      HttpConnectionManagerConfig(hcm_config, context_, date_provider_,
-                                  route_config_provider_manager_,
-                                  scoped_routes_config_provider_manager_),
-      EnvoyException, "Error: envoy.router must be terminal filter in foo upgrade filter chain.");
+  EXPECT_THROW_WITH_MESSAGE(HttpConnectionManagerConfig(hcm_config, context_, date_provider_,
+                                                        route_config_provider_manager_,
+                                                        scoped_routes_config_provider_manager_),
+                            EnvoyException,
+                            "Error: envoy.router must be the terminal http upgrade filter.");
 }
 
 TEST_F(FilterChainTest, invalidConfig) {
