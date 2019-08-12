@@ -87,6 +87,7 @@ public:
 
   /**
    * Wrapper for an active udp listener owned by this handler.
+   * TODO(danzh): rename to ActiveRawUdpListener.
    */
   struct ActiveUdpListener : public Network::UdpListenerCallbacks,
                              public ActiveListenerBase,

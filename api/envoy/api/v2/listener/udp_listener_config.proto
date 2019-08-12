@@ -21,7 +21,7 @@ message UdpListenerConfig {
   // If not specified, treat as "raw_udp_listener".
   string udp_listener_name = 1;
 
-  // Used to create a specific listener factory. To some factory, i.e.
+  // Used to create a specific listener factory. To some factory, e.g.
   // Server::ActiveRawUdpListenerFactory, config is not needed.
   oneof config_type {
     google.protobuf.Struct config = 2;
