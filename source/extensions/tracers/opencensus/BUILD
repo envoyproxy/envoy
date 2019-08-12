@@ -28,6 +28,7 @@ envoy_cc_library(
     copts = ["-Wno-unused-parameter"],
     external_deps = [
         "opencensus_trace",
+        "opencensus_trace_b3",
         "opencensus_trace_cloud_trace_context",
         "opencensus_trace_grpc_trace_bin",
         "opencensus_trace_trace_context",
