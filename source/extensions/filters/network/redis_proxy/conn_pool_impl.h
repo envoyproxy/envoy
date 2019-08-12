@@ -37,14 +37,6 @@ namespace ConnPool {
 // TODO(mattklein123): Circuit breaking
 // TODO(rshriram): Fault injection
 
-#define REDIS_CLUSTER_STATS(COUNTER)                                                               \
-  COUNTER(upstream_cx_drained)                                                                     \
-  COUNTER(max_upstream_unknown_connections_reached)
-
-struct RedisClusterStats {
-  REDIS_CLUSTER_STATS(GENERATE_COUNTER_STRUCT)
-};
-
 class InstanceImpl : public Instance {
 public:
   InstanceImpl(
@@ -131,7 +123,7 @@ private:
   Common::Redis::Client::ConfigImpl config_;
   Api::Api& api_;
   Stats::ScopePtr stats_scope_;
-  RedisClusterStats redis_cluster_stats_;
+  Common::Redis::Client::RedisClusterStats redis_cluster_stats_;
 };
 
 } // namespace ConnPool

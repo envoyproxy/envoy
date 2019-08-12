@@ -27,7 +27,7 @@ InstanceImpl::InstanceImpl(
     Api::Api& api, Stats::ScopePtr&& stats_scope)
     : cm_(cm), client_factory_(client_factory), tls_(tls.allocateSlot()), config_(config),
       api_(api), stats_scope_(std::move(stats_scope)), redis_cluster_stats_{REDIS_CLUSTER_STATS(
-                                                           POOL_COUNTER(*stats_scope_))} {
+                                                           POOL_COUNTER(*stats_scope_), POOL_HISTOGRAM(*stats_scope_))} {
   tls_->set([this, cluster_name](
                 Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<ThreadLocalPool>(*this, dispatcher, cluster_name);
@@ -196,7 +196,7 @@ InstanceImpl::ThreadLocalPool::threadLocalActiveClient(Upstream::HostConstShared
   if (!client) {
     client = std::make_unique<ThreadLocalActiveClient>(*this);
     client->host_ = host;
-    client->redis_client_ = parent_.client_factory_.create(host, dispatcher_, parent_.config_);
+    client->redis_client_ = parent_.client_factory_.create(host, dispatcher_, parent_.config_, parent_.redis_cluster_stats_);
     client->redis_client_->addConnectionCallbacks(*client);
     if (!auth_password_.empty()) {
       // Send an AUTH command to the upstream server.

@@ -13,6 +13,15 @@ namespace Common {
 namespace Redis {
 namespace Client {
 
+#define REDIS_CLUSTER_STATS(COUNTER, HISTOGRAM)                                                    \
+  COUNTER(upstream_cx_drained)                                                                     \
+  COUNTER(max_upstream_unknown_connections_reached)                                                \
+  HISTOGRAM(upstream_rq_time)
+
+struct RedisClusterStats {
+  REDIS_CLUSTER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_HISTOGRAM_STRUCT)
+};
+
 /**
  * A handle to an outbound request.
  */
@@ -174,7 +183,7 @@ public:
    * @return ClientPtr a new connection pool client.
    */
   virtual ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
-                           const Config& config) PURE;
+                           const Config& config, RedisClusterStats& redis_cluster_stats) PURE;
 };
 
 } // namespace Client

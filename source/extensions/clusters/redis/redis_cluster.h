@@ -251,6 +251,7 @@ private:
 
   envoy::api::v2::core::DataSource auth_password_datasource_;
   Api::Api& api_;
+  Extensions::NetworkFilters::Common::Redis::Client::RedisClusterStats redis_cluster_stats_;
 };
 
 class RedisClusterFactory : public Upstream::ConfigurableClusterFactoryBase<

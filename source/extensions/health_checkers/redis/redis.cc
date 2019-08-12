@@ -12,8 +12,9 @@ RedisHealthChecker::RedisHealthChecker(
     Upstream::HealthCheckEventLoggerPtr&& event_logger,
     Extensions::NetworkFilters::Common::Redis::Client::ClientFactory& client_factory)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger)),
-      client_factory_(client_factory), key_(redis_config.key()) {
-  if (!key_.empty()) {
+      client_factory_(client_factory), key_(redis_config.key()),
+      redis_cluster_stats_{REDIS_CLUSTER_STATS(POOL_COUNTER(cluster.info()->statsScope()), POOL_HISTOGRAM(cluster.info()->statsScope()))} {
+    if (!key_.empty()) {
     type_ = Type::Exists;
   } else {
     type_ = Type::Ping;
@@ -51,7 +52,7 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onEvent(Network::Connect
 
 void RedisHealthChecker::RedisActiveHealthCheckSession::onInterval() {
   if (!client_) {
-    client_ = parent_.client_factory_.create(host_, parent_.dispatcher_, *this);
+    client_ = parent_.client_factory_.create(host_, parent_.dispatcher_, *this, parent_.redis_cluster_stats_);
     client_->addConnectionCallbacks(*this);
   }
 

@@ -43,6 +43,8 @@ public:
     return Common::Redis::DecoderPtr{decoder_};
   }
 
+  RedisClientImplTest() : redis_cluster_stats_(RedisClusterStats{REDIS_CLUSTER_STATS(POOL_COUNTER(fake_stats_), POOL_HISTOGRAM(fake_stats_))}) {}
+
   ~RedisClientImplTest() override {
     client_.reset();
 
@@ -77,7 +79,7 @@ public:
     EXPECT_CALL(*upstream_connection_, noDelay(true));
 
     client_ = ClientImpl::create(host_, dispatcher_, Common::Redis::EncoderPtr{encoder_}, *this,
-                                 *config_);
+                                 *config_, redis_cluster_stats_);
     EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_cx_total_.value());
     EXPECT_EQ(1UL, host_->stats_.cx_total_.value());
     EXPECT_EQ(false, client_->active());
@@ -114,6 +116,8 @@ public:
   Network::ReadFilterSharedPtr upstream_read_filter_;
   std::unique_ptr<Config> config_;
   ClientPtr client_;
+  Stats::IsolatedStoreImpl fake_stats_;
+  RedisClusterStats redis_cluster_stats_;
 };
 
 TEST_F(RedisClientImplTest, BatchWithZeroBufferAndTimeout) {
@@ -278,6 +282,7 @@ TEST_F(RedisClientImplTest, Basic) {
   EXPECT_EQ(2UL, host_->cluster_.stats_.upstream_rq_active_.value());
   EXPECT_EQ(2UL, host_->stats_.rq_total_.value());
   EXPECT_EQ(2UL, host_->stats_.rq_active_.value());
+  
 
   Buffer::OwnedImpl fake_data;
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
@@ -876,7 +881,12 @@ TEST(RedisClientFactoryImplTest, Basic) {
   EXPECT_CALL(*host, createConnection_(_, _)).WillOnce(Return(conn_info));
   NiceMock<Event::MockDispatcher> dispatcher;
   ConfigImpl config(createConnPoolSettings());
-  ClientPtr client = factory.create(host, dispatcher, config);
+
+  // Cluster stats
+  Stats::IsolatedStoreImpl fake_stats;
+  RedisClusterStats redis_cluster_stats = RedisClusterStats{REDIS_CLUSTER_STATS(POOL_COUNTER(fake_stats), POOL_HISTOGRAM(fake_stats))};
+
+  ClientPtr client = factory.create(host, dispatcher, config, redis_cluster_stats);
   client->close();
 }
 

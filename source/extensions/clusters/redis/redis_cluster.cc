@@ -34,7 +34,8 @@ RedisCluster::RedisCluster(
                            : Config::Utility::translateClusterHosts(cluster.hosts())),
       local_info_(factory_context.localInfo()), random_(factory_context.random()),
       redis_discovery_session_(*this, redis_client_factory), lb_factory_(std::move(lb_factory)),
-      api_(api) {
+      api_(api),
+      redis_cluster_stats_{REDIS_CLUSTER_STATS(POOL_COUNTER(info()->statsScope()), POOL_HISTOGRAM(info()->statsScope()))} {
   const auto& locality_lb_endpoints = load_assignment_.endpoints();
   for (const auto& locality_lb_endpoint : locality_lb_endpoints) {
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
@@ -240,7 +241,7 @@ void RedisCluster::RedisDiscoverySession::startResolveRedis() {
   if (!client) {
     client = std::make_unique<RedisDiscoveryClient>(*this);
     client->host_ = current_host_address_;
-    client->client_ = client_factory_.create(host, dispatcher_, *this);
+    client->client_ = client_factory_.create(host, dispatcher_, *this, parent_.redis_cluster_stats_);
     client->client_->addConnectionCallbacks(*client);
     std::string auth_password =
         Envoy::Config::DataSource::read(parent_.auth_password_datasource_, true, parent_.api_);

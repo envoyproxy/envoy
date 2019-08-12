@@ -23,10 +23,10 @@ ConfigImpl::ConfigImpl(
 
 ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                              EncoderPtr&& encoder, DecoderFactory& decoder_factory,
-                             const Config& config) {
+                             const Config& config, RedisClusterStats& redis_cluster_stats) {
 
   std::unique_ptr<ClientImpl> client(
-      new ClientImpl(host, dispatcher, std::move(encoder), decoder_factory, config));
+      new ClientImpl(host, dispatcher, std::move(encoder), decoder_factory, config, redis_cluster_stats));
   client->connection_ = host->createConnection(dispatcher, nullptr, nullptr).connection_;
   client->connection_->addConnectionCallbacks(*client);
   client->connection_->addReadFilter(Network::ReadFilterSharedPtr{new UpstreamReadFilter(*client)});
@@ -36,11 +36,13 @@ ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatche
 }
 
 ClientImpl::ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
-                       EncoderPtr&& encoder, DecoderFactory& decoder_factory, const Config& config)
+                       EncoderPtr&& encoder, DecoderFactory& decoder_factory, const Config& config, RedisClusterStats& redis_cluster_stats)
     : host_(host), encoder_(std::move(encoder)), decoder_(decoder_factory.create(*this)),
       config_(config),
       connect_or_op_timer_(dispatcher.createTimer([this]() -> void { onConnectOrOpTimeout(); })),
-      flush_timer_(dispatcher.createTimer([this]() -> void { flushBufferAndResetTimer(); })) {
+      flush_timer_(dispatcher.createTimer([this]() -> void { flushBufferAndResetTimer(); })),
+      redis_cluster_stats_(redis_cluster_stats),
+      time_source_(dispatcher.timeSource()) {
   host->cluster().stats().upstream_cx_total_.inc();
   host->stats().cx_total_.inc();
   host->cluster().stats().upstream_cx_active_.inc();
@@ -161,6 +163,7 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
   ASSERT(!pending_requests_.empty());
   PendingRequest& request = pending_requests_.front();
   const bool canceled = request.canceled_;
+  request.request_timer_->complete();
   PoolCallbacks& callbacks = request.callbacks_;
 
   // We need to ensure the request is popped before calling the callback, since the callback might
@@ -201,7 +204,7 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
 }
 
 ClientImpl::PendingRequest::PendingRequest(ClientImpl& parent, PoolCallbacks& callbacks)
-    : parent_(parent), callbacks_(callbacks) {
+    : parent_(parent), callbacks_(callbacks), request_timer_(std::make_unique<Stats::Timespan>(parent_.redis_cluster_stats_.upstream_rq_time_, parent_.time_source_))  {
   parent.host_->cluster().stats().upstream_rq_total_.inc();
   parent.host_->stats().rq_total_.inc();
   parent.host_->cluster().stats().upstream_rq_active_.inc();
@@ -223,9 +226,9 @@ void ClientImpl::PendingRequest::cancel() {
 ClientFactoryImpl ClientFactoryImpl::instance_;
 
 ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
-                                    Event::Dispatcher& dispatcher, const Config& config) {
+                                    Event::Dispatcher& dispatcher, const Config& config, RedisClusterStats& redis_cluster_stats) {
   return ClientImpl::create(host, dispatcher, EncoderPtr{new EncoderImpl()}, decoder_factory_,
-                            config);
+                            config, redis_cluster_stats);
 }
 
 } // namespace Client
