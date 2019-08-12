@@ -11,6 +11,8 @@ option java_generic_services = true;
 import "google/protobuf/struct.proto";
 import "google/protobuf/any.proto";
 
+// [#protodoc-title: Udp Listener Config]
+
 message UdpListenerConfig {
   // Used to look up UDP listener factory, matches one of the implementation of
   // Server::ActiveUdpListenerConfigFactory::name().
