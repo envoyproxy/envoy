@@ -2634,6 +2634,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, Metadata) {
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     metadata: { filter_metadata: { com.bar.foo: { baz: test_value } } }
+    traffic_direction: INBOUND
     filter_chains:
     - filter_chain_match:
       filters:
@@ -2655,6 +2656,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, Metadata) {
   EXPECT_EQ("test_value",
             Config::Metadata::metadataValue(context->listenerMetadata(), "com.bar.foo", "baz")
                 .string_value());
+  EXPECT_EQ(envoy::api::v2::core::TrafficDirection::INBOUND, context->direction());
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {

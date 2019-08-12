@@ -45,3 +45,4 @@ jobs:
     inputs:
       pathtoPublish: "$(Build.StagingDirectory)/envoy"
       artifactName: $(CI_TARGET)
+    condition: always()

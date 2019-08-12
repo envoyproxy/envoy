@@ -170,7 +170,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 #else
                                                       0
 #endif
-                                                      ))) {
+                                                      ))),
+      merge_slashes_(config.merge_slashes()) {
   // If scoped RDS is enabled, avoid creating a route config provider. Route config providers will
   // be managed by the scoped routing logic instead.
   switch (config.route_specifier_case()) {
