@@ -882,8 +882,6 @@ TEST(RedisClientFactoryImplTest, Basic) {
   EXPECT_CALL(*host, createConnection_(_, _)).WillOnce(Return(conn_info));
   NiceMock<Event::MockDispatcher> dispatcher;
   ConfigImpl config(createConnPoolSettings());
-
-  // Cluster stats
   Stats::IsolatedStoreImpl fake_stats;
   RedisClusterStats redis_cluster_stats =
       RedisClusterStats{REDIS_CLUSTER_STATS(POOL_COUNTER(fake_stats), POOL_HISTOGRAM(fake_stats))};
