@@ -326,12 +326,13 @@ const ToLowerTable& ConnectionImpl::toLowerTable() {
 }
 
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
-                               http_parser_type type, uint32_t max_headers_kb)
+                               http_parser_type type, uint32_t max_request_headers_kb)
     : connection_(connection), stats_{ALL_HTTP1_CODEC_STATS(POOL_COUNTER_PREFIX(stats, "http1."))},
       output_buffer_([&]() -> void { this->onBelowLowWatermark(); },
                      [&]() -> void { this->onAboveHighWatermark(); }),
-      max_headers_kb_(max_headers_kb), strict_header_validation_(Runtime::runtimeFeatureEnabled(
-                                           "envoy.reloadable_features.strict_header_validation")) {
+      max_request_headers_kb_(max_request_headers_kb),
+      strict_header_validation_(
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_header_validation")) {
   output_buffer_.setWatermarks(connection.bufferLimit());
   http_parser_init(&parser_, type);
   parser_.data = this;
@@ -452,7 +453,7 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
 
   const uint32_t total =
       current_header_field_.size() + current_header_value_.size() + current_header_map_->byteSize();
-  if (total > (max_headers_kb_ * 1024)) {
+  if (total > (max_request_headers_kb_ * 1024)) {
     error_code_ = Http::Code::RequestHeaderFieldsTooLarge;
     sendProtocolError();
     throw CodecProtocolException("headers size exceeds limit");

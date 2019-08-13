@@ -39,6 +39,7 @@
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/test_time.h"
 
@@ -55,6 +56,7 @@ using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
+using testing::Matcher;
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
@@ -2314,6 +2316,58 @@ TEST_F(HttpConnectionManagerImplTest, DownstreamProtocolError) {
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
+}
+
+// Verify that FrameFloodException causes connection to be closed abortively.
+TEST_F(HttpConnectionManagerImplTest, FrameFloodError) {
+  InSequence s;
+  setup(false, "");
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    conn_manager_->newStream(response_encoder_);
+    throw FrameFloodException("too many outbound frames.");
+  }));
+
+  EXPECT_CALL(response_encoder_.stream_, removeCallbacks(_));
+  EXPECT_CALL(filter_factory_, createFilterChain(_)).Times(0);
+
+  // FrameFloodException should result in reset of the streams followed by abortive close.
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWriteAndDelay));
+
+  // Kick off the incoming data.
+  Buffer::OwnedImpl fake_input("1234");
+  EXPECT_LOG_NOT_CONTAINS("warning", "downstream HTTP flood",
+                          conn_manager_->onData(fake_input, false));
+}
+
+// Verify that FrameFloodException causes connection to be closed abortively as well as logged
+// if runtime indicates to do so.
+TEST_F(HttpConnectionManagerImplTest, FrameFloodErrorWithLog) {
+  InSequence s;
+  setup(false, "");
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    conn_manager_->newStream(response_encoder_);
+    throw FrameFloodException("too many outbound frames.");
+  }));
+
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("http.connection_manager.log_flood_exception",
+                                                 Matcher<const envoy::type::FractionalPercent&>(_)))
+      .WillOnce(Return(true));
+
+  EXPECT_CALL(response_encoder_.stream_, removeCallbacks(_));
+  EXPECT_CALL(filter_factory_, createFilterChain(_)).Times(0);
+
+  // FrameFloodException should result in reset of the streams followed by abortive close.
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWriteAndDelay));
+
+  // Kick off the incoming data.
+  Buffer::OwnedImpl fake_input("1234");
+  EXPECT_LOG_CONTAINS("warning",
+                      "downstream HTTP flood from IP '0.0.0.0:0': too many outbound frames.",
+                      conn_manager_->onData(fake_input, false));
 }
 
 TEST_F(HttpConnectionManagerImplTest, IdleTimeoutNoCodec) {

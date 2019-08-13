@@ -4,6 +4,7 @@
 #include "extensions/filters/network/zookeeper_proxy/filter.h"
 
 #include "test/mocks/network/mocks.h"
+#include "test/test_common/simulated_time_system.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -31,7 +32,7 @@ public:
 
   void initialize() {
     config_ = std::make_shared<ZooKeeperFilterConfig>(stat_prefix_, 1048576, scope_);
-    filter_ = std::make_unique<ZooKeeperFilter>(config_);
+    filter_ = std::make_unique<ZooKeeperFilter>(config_, time_system_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
   }
 
@@ -489,6 +490,14 @@ public:
     EXPECT_EQ(1UL, stat.value());
     EXPECT_EQ(20UL, config_->stats().response_bytes_.value());
     EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+    const auto histogram_name =
+        fmt::format("test.zookeeper.{}_latency", metadata_values[0].find("opname")->second);
+    EXPECT_NE(absl::nullopt, findHistogram(histogram_name));
+  }
+
+  Stats::OptionalHistogram findHistogram(const std::string& name) {
+    Stats::StatNameManagedStorage storage(name, scope_.symbolTable());
+    return scope_.findHistogram(storage.statName());
   }
 
   Stats::IsolatedStoreImpl scope_;
@@ -497,6 +506,7 @@ public:
   std::string stat_prefix_{"test.zookeeper"};
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
+  Event::SimulatedTimeSystem time_system_;
 };
 
 TEST_F(ZooKeeperFilterTest, Connect) {
@@ -516,6 +526,7 @@ TEST_F(ZooKeeperFilterTest, Connect) {
   EXPECT_EQ(1UL, config_->stats().connect_resp_.value());
   EXPECT_EQ(24UL, config_->stats().response_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+  EXPECT_NE(absl::nullopt, findHistogram("test.zookeeper.connect_response_latency"));
 }
 
 TEST_F(ZooKeeperFilterTest, ConnectReadonly) {
@@ -536,6 +547,7 @@ TEST_F(ZooKeeperFilterTest, ConnectReadonly) {
   EXPECT_EQ(1UL, config_->stats().connect_resp_.value());
   EXPECT_EQ(25UL, config_->stats().response_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+  EXPECT_NE(absl::nullopt, findHistogram("test.zookeeper.connect_response_latency"));
 }
 
 TEST_F(ZooKeeperFilterTest, Fallback) {

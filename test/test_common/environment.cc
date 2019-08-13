@@ -352,7 +352,6 @@ void TestEnvironment::setEnvVar(const std::string& name, const std::string& valu
   ASSERT_EQ(0, rc);
 #endif
 }
-
 void TestEnvironment::unsetEnvVar(const std::string& name) {
 #ifdef WIN32
   const int rc = ::_putenv_s(name.c_str(), "");

@@ -530,6 +530,12 @@ TEST_P(ServerInstanceImplTest, InvalidLayeredBootstrapDuplicateName) {
                           EnvoyException, "Duplicate layer name: some_static_laye");
 }
 
+// Validate invalid layered runtime with no layer specifier is rejected.
+TEST_P(ServerInstanceImplTest, InvalidLayeredBootstrapNoLayerSpecifier) {
+  EXPECT_THROW_WITH_REGEX(initialize("test/server/invalid_layered_runtime_no_layer_specifier.yaml"),
+                          EnvoyException, "BootstrapValidationError.LayeredRuntime");
+}
+
 // Regression test for segfault when server initialization fails prior to
 // ClusterManager initialization.
 TEST_P(ServerInstanceImplTest, BootstrapClusterManagerInitializationFail) {
