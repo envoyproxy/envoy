@@ -222,7 +222,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithStats) {
   // On a local clang8/libstdc++/linux flow, the memory usage was observed in
   // June 2019 to be 64 bytes higher than it is in CI/release. Your mileage may
   // vary.
-  EXPECT_MEMORY_EQ(m_per_cluster, 43030); // 104 bytes higher than a debug build.
+  EXPECT_MEMORY_EQ(m_per_cluster, 42838); // 104 bytes higher than a debug build.
   EXPECT_MEMORY_LE(m_per_cluster, 44000);
 }
 

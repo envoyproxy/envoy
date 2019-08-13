@@ -51,11 +51,11 @@ std::pair<int32_t, size_t> distributeLoad(PriorityLoad& per_priority_load,
 }
 
 // Returns true if the weights of all the hosts in the HostVector are equal.
-bool originalHostWeightsAreEqual(const HostVector& hosts) {
+bool hostWeightsAreEqual(const HostVector& hosts) {
   if (hosts.size() <= 1) {
     return true;
   }
-  uint32_t weight = hosts[0]->weight();
+  const uint32_t weight = hosts[0]->weight();
   for (size_t i = 1; i < hosts.size(); ++i) {
     if (hosts[i]->weight() != weight) {
       return false;
@@ -646,7 +646,7 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
     // Check if the original host weights are equal and skip EDF creation if they are. When all
     // original weights are equal we can rely on unweighted host pick to do optimal round robin and
     // least-loaded host selection with lower memory and CPU overhead.
-    if (originalHostWeightsAreEqual(hosts)) {
+    if (hostWeightsAreEqual(hosts)) {
       // Skip edf creation.
       return;
     }
