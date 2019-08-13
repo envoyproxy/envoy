@@ -109,9 +109,7 @@ public:
   // ConcurrencyController.
   RequestForwardingAction forwardingDecision() override;
   void recordLatencySample(const std::chrono::nanoseconds& rq_latency) override;
-  int concurrencyLimit() const override {
-    return concurrency_limit_.load();
-  }
+  int concurrencyLimit() const override { return concurrency_limit_.load(); }
 
 private:
   static GradientControllerStats generateStats(Stats::Scope& scope,

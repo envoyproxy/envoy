@@ -29,7 +29,8 @@ GradientControllerConfig::GradientControllerConfig(
           DurationUtil::durationToMilliseconds(proto_config.min_rtt_calc_params().interval()))),
       sample_rtt_calc_interval_(std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
           proto_config.concurrency_limit_params().concurrency_update_interval()))),
-      max_concurrency_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config.concurrency_limit_params(), max_concurrency_limit, 1000)),
+      max_concurrency_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          proto_config.concurrency_limit_params(), max_concurrency_limit, 1000)),
       min_rtt_aggregate_request_count_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config.min_rtt_calc_params(), request_count, 50)),
       max_gradient_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config.concurrency_limit_params(),
@@ -42,8 +43,8 @@ GradientController::GradientController(GradientControllerConfigSharedPtr config,
                                        std::string stats_prefix, Stats::Scope& scope)
     :
 
-      config_(config), dispatcher_(dispatcher),
-      scope_(scope), stats_(generateStats(scope_, stats_prefix)), recalculating_min_rtt_(true),
+      config_(config), dispatcher_(dispatcher), scope_(scope),
+      stats_(generateStats(scope_, stats_prefix)), recalculating_min_rtt_(true),
       num_rq_outstanding_(0), concurrency_limit_(1), latency_sample_hist_(hist_fast_alloc()) {
   min_rtt_calc_timer_ = dispatcher_.createTimer([this]() -> void {
     absl::MutexLock ml(&update_window_mtx_);

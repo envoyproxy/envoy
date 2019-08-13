@@ -1,5 +1,5 @@
-#include <iostream>
 #include <chrono>
+#include <iostream>
 
 #include "envoy/config/filter/http/adaptive_concurrency/v2alpha/adaptive_concurrency.pb.h"
 #include "envoy/config/filter/http/adaptive_concurrency/v2alpha/adaptive_concurrency.pb.validate.h"
@@ -18,11 +18,11 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::AllOf;
+using testing::Ge;
+using testing::Le;
 using testing::NiceMock;
 using testing::Return;
-using testing::Le;
-using testing::Ge;
-using testing::AllOf;
 
 namespace Envoy {
 namespace Extensions {
@@ -38,24 +38,28 @@ public:
 
 class GradientControllerTest : public testing::Test {
 public:
-  GradientControllerTest() : api_(Api::createApiForTest(time_system_)), dispatcher_(api_->allocateDispatcher()) {}
+  GradientControllerTest()
+      : api_(Api::createApiForTest(time_system_)), dispatcher_(api_->allocateDispatcher()) {}
 
   std::shared_ptr<GradientController> makeController(const std::string& yaml_config) {
-    return std::make_shared<GradientController>(makeConfig(yaml_config), *dispatcher_, runtime_, "test_prefix.", stats_);
+    return std::make_shared<GradientController>(makeConfig(yaml_config), *dispatcher_, runtime_,
+                                                "test_prefix.", stats_);
   }
 
   // Helper function that will attempt to pull forwarding decisions.
-  void tryForward(std::shared_ptr<GradientController> controller, const bool expect_forward_response) {
-    const auto expected_resp = expect_forward_response ?
-      RequestForwardingAction::Forward : RequestForwardingAction::Block;
-      EXPECT_EQ(expected_resp, controller->forwardingDecision());
+  void tryForward(std::shared_ptr<GradientController> controller,
+                  const bool expect_forward_response) {
+    const auto expected_resp =
+        expect_forward_response ? RequestForwardingAction::Forward : RequestForwardingAction::Block;
+    EXPECT_EQ(expected_resp, controller->forwardingDecision());
   }
 
 protected:
   GradientControllerConfigSharedPtr makeConfig(const std::string& yaml_config) {
     envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig proto =
         TestUtility::parseYaml<
-            envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig>(yaml_config);
+            envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig>(
+            yaml_config);
     return std::make_shared<GradientControllerConfig>(proto);
   }
 
@@ -134,7 +138,7 @@ min_rtt_calc_params:
 
   auto controller = makeController(yaml);
   const auto min_rtt = std::chrono::milliseconds(13);
-  
+
   // The controller should be measuring minRTT upon creation, so the concurrency window is 1.
   EXPECT_EQ(controller->concurrencyLimit(), 1);
   tryForward(controller, true);
@@ -151,7 +155,8 @@ min_rtt_calc_params:
   }
 
   // Verify the minRTT value measured is accurate.
-  EXPECT_EQ(13, stats_.gauge("test_prefix.min_rtt_msecs", Stats::Gauge::ImportMode::Accumulate).value());
+  EXPECT_EQ(
+      13, stats_.gauge("test_prefix.min_rtt_msecs", Stats::Gauge::ImportMode::Accumulate).value());
 }
 
 TEST_F(GradientControllerTest, SamplePercentileProcessTest) {
@@ -174,7 +179,8 @@ min_rtt_calc_params:
     tryForward(controller, true);
     controller->recordLatencySample(std::chrono::milliseconds(ii));
   }
-  EXPECT_EQ(3, stats_.gauge("test_prefix.min_rtt_msecs", Stats::Gauge::ImportMode::Accumulate).value());
+  EXPECT_EQ(
+      3, stats_.gauge("test_prefix.min_rtt_msecs", Stats::Gauge::ImportMode::Accumulate).value());
 }
 
 TEST_F(GradientControllerTest, ConcurrencyLimitBehaviorTestBasic) {
@@ -199,7 +205,8 @@ min_rtt_calc_params:
     tryForward(controller, true);
     controller->recordLatencySample(std::chrono::milliseconds(5));
   }
-  EXPECT_EQ(5, stats_.gauge("test_prefix.min_rtt_msecs", Stats::Gauge::ImportMode::Accumulate).value());
+  EXPECT_EQ(
+      5, stats_.gauge("test_prefix.min_rtt_msecs", Stats::Gauge::ImportMode::Accumulate).value());
 
   // Ensure that the concurrency window increases on its own due to the headroom calculation.
   time_system_.sleep(std::chrono::milliseconds(101));
@@ -256,8 +263,9 @@ min_rtt_calc_params:
   }
 
   // circllhist approximates the percentiles, so we can expect it to be within a certain range.
-  EXPECT_THAT(stats_.gauge("test_prefix.min_rtt_msecs", Stats::Gauge::ImportMode::Accumulate).value(),
-      AllOf(Ge(4950),Le(5050)));
+  EXPECT_THAT(
+      stats_.gauge("test_prefix.min_rtt_msecs", Stats::Gauge::ImportMode::Accumulate).value(),
+      AllOf(Ge(4950), Le(5050)));
 
   // Now verify max gradient value by forcing dramatically faster latency measurements..
   for (int ii = 1; ii <= 5; ++ii) {
@@ -266,7 +274,62 @@ min_rtt_calc_params:
   }
   time_system_.sleep(std::chrono::milliseconds(101));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
-  EXPECT_EQ(3.0, stats_.gauge("test_prefix.gradient", Stats::Gauge::ImportMode::Accumulate).value());
+  EXPECT_EQ(3.0,
+            stats_.gauge("test_prefix.gradient", Stats::Gauge::ImportMode::Accumulate).value());
+}
+
+TEST_F(GradientControllerTest, OutstandingRequestTest) {
+  const std::string yaml = R"EOF(
+sample_aggregate_percentile: 0.5
+concurrency_limit_params:
+  max_gradient: 3.0
+  max_concurrency_limit: 
+  concurrency_update_interval: 
+    nanos: 100000000 # 100ms
+min_rtt_calc_params:
+  interval:
+    seconds: 30
+  request_count: 5
+)EOF";
+
+  auto controller = makeController(yaml);
+  EXPECT_EQ(controller->concurrencyLimit(), 1);
+
+  // Get minRTT measurement out of the way.
+  for (int ii = 1; ii <= 6; ++ii) {
+    tryForward(controller, true);
+    controller->recordLatencySample(std::chrono::milliseconds(5));
+  }
+
+  // Force the limit calculation to run a few times from some measurements.
+  for (int sample_iters = 0; sample_iters < 5; ++sample_iters) {
+    const auto last_concurrency = controller->concurrencyLimit();
+    for (int ii = 1; ii <= 5; ++ii) {
+      tryForward(controller, true);
+      controller->recordLatencySample(std::chrono::milliseconds(4));
+    }
+    time_system_.sleep(std::chrono::milliseconds(101));
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+    // Verify the value is growing.
+    EXPECT_GT(controller->concurrencyLimit(), last_concurrency);
+  }
+
+  const auto rq_outstanding = [this]() {
+    return stats_.gauge("test_prefix.rq_outstanding", Stats::Gauge::ImportMode::Accumulate).value();
+  };
+
+  // Verify the outstanding requests make sense.
+  for (int ii = 0; ii < controller->concurrencyLimit(); ++ii) {
+    EXPECT_EQ(ii, rq_outstanding());
+    tryForward(controller, true);
+    EXPECT_EQ(ii + 1, rq_outstanding());
+  }
+
+  // The outstanding requests should never exceed the concurrency limit.
+  tryForward(controller, false);
+  EXPECT_EQ(controller->concurrencyLimit(), rq_outstanding());
+  tryForward(controller, false);
+  EXPECT_EQ(controller->concurrencyLimit(), rq_outstanding());
 }
 
 TEST_F(GradientControllerTest, NoSamplesTest) {
@@ -327,16 +390,20 @@ min_rtt_calc_params:
     seconds: 45
   request_count: 5
 )EOF";
-  
+
   // Verify the configuration affects the timers that are kicked off.
   NiceMock<Event::MockDispatcher> fake_dispatcher;
   NiceMock<Event::MockTimer>* sample_timer = new NiceMock<Event::MockTimer>;
   NiceMock<Event::MockTimer>* rtt_timer = new NiceMock<Event::MockTimer>;
 
   // Expect the sample timer to trigger start immediately upon controller creation.
-  EXPECT_CALL(fake_dispatcher, createTimer_(_)).Times(2).WillOnce(Return(rtt_timer)).WillOnce(Return(sample_timer));
+  EXPECT_CALL(fake_dispatcher, createTimer_(_))
+      .Times(2)
+      .WillOnce(Return(rtt_timer))
+      .WillOnce(Return(sample_timer));
   EXPECT_CALL(*sample_timer, enableTimer(std::chrono::milliseconds(123)));
-  auto controller = std::make_shared<GradientController>(makeConfig(yaml), fake_dispatcher, runtime_, "test_prefix.", stats_);
+  auto controller = std::make_shared<GradientController>(makeConfig(yaml), fake_dispatcher,
+                                                         runtime_, "test_prefix.", stats_);
 
   // Set the minRTT- this will trigger the timer for the next minRTT calculation.
   EXPECT_CALL(*rtt_timer, enableTimer(std::chrono::milliseconds(45000)));
