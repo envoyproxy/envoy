@@ -14,12 +14,13 @@ public:
   // Network::TransportSocket
   void setTransportSocketCallbacks(TransportSocketCallbacks& callbacks) override;
   std::string protocol() const override;
+  absl::string_view failureReason() const override;
   bool canFlushClose() override { return true; }
   void closeSocket(Network::ConnectionEvent) override {}
   void onConnected() override;
   IoResult doRead(Buffer::Instance& buffer) override;
   IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
-  const Ssl::Connection* ssl() const override { return nullptr; }
+  const Ssl::ConnectionInfo* ssl() const override { return nullptr; }
 
 private:
   TransportSocketCallbacks* callbacks_{};
@@ -29,7 +30,7 @@ private:
 class RawBufferSocketFactory : public TransportSocketFactory {
 public:
   // Network::TransportSocketFactory
-  TransportSocketPtr createTransportSocket() const override;
+  TransportSocketPtr createTransportSocket(TransportSocketOptionsSharedPtr options) const override;
   bool implementsSecureTransport() const override;
 };
 

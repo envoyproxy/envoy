@@ -4,7 +4,7 @@ headers_to_add {
     value: "%UPSTREAM_METADATA([\"ns\", \"key\"])%"
   }
 }
-request_info {
+stream_info {
   start_time: 1522796769123
   upstream_metadata {
     filter_metadata {

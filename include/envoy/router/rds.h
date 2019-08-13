@@ -23,7 +23,7 @@ public:
     std::string version_;
   };
 
-  virtual ~RouteConfigProvider() {}
+  virtual ~RouteConfigProvider() = default;
 
   /**
    * @return Router::ConfigConstSharedPtr a route configuration for use during a single request. The
@@ -43,9 +43,14 @@ public:
    * @return the last time this RouteConfigProvider was updated. Used for config dumps.
    */
   virtual SystemTime lastUpdated() const PURE;
+
+  /**
+   * Callback used to notify RouteConfigProvider about configuration changes.
+   */
+  virtual void onConfigUpdate() PURE;
 };
 
-typedef std::unique_ptr<RouteConfigProvider> RouteConfigProviderPtr;
+using RouteConfigProviderPtr = std::unique_ptr<RouteConfigProvider>;
 
 } // namespace Router
 } // namespace Envoy

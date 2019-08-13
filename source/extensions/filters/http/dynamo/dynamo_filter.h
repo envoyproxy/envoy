@@ -10,6 +10,7 @@
 #include "common/json/json_loader.h"
 
 #include "extensions/filters/http/dynamo/dynamo_request_parser.h"
+#include "extensions/filters/http/dynamo/dynamo_stats.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -24,8 +25,8 @@ namespace Dynamo {
  */
 class DynamoFilter : public Http::StreamFilter {
 public:
-  DynamoFilter(Runtime::Loader& runtime, const std::string& stat_prefix, Stats::Scope& scope)
-      : runtime_(runtime), stat_prefix_(stat_prefix + "dynamodb."), scope_(scope) {
+  DynamoFilter(Runtime::Loader& runtime, const DynamoStatsSharedPtr& stats, TimeSource& time_source)
+      : runtime_(runtime), stats_(stats), time_source_(time_source) {
     enabled_ = runtime_.snapshot().featureEnabled("dynamodb.filter_enabled", 100);
   }
 
@@ -47,6 +48,9 @@ public:
   Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap&, bool) override;
   Http::FilterDataStatus encodeData(Buffer::Instance&, bool) override;
   Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap&) override;
+  Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap&) override {
+    return Http::FilterMetadataStatus::Continue;
+  }
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override {
     encoder_callbacks_ = &callbacks;
   }
@@ -63,8 +67,7 @@ private:
   void chargeTablePartitionIdStats(const Json::Object& json_body);
 
   Runtime::Loader& runtime_;
-  std::string stat_prefix_;
-  Stats::Scope& scope_;
+  const DynamoStatsSharedPtr stats_;
 
   bool enabled_{};
   std::string operation_{};
@@ -74,6 +77,7 @@ private:
   Http::HeaderMap* response_headers_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
+  TimeSource& time_source_;
 };
 
 } // namespace Dynamo

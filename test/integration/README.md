@@ -68,14 +68,16 @@ added, so one could, for example, modify the default `HttpConnectionManager`, du
 config, and then change the first `HttpConnectionManager` to be different from the second.
 
 An example of modifying the bootstrap proto to overwrite runtime defaults:
+
 ```c++
-TestEnvironment::writeStringToFileForTest("runtime/ssl.alt_alpn", "100");
+TestEnvironment::writeStringToFileForTest("runtime/ratelimit.tcp_filter_enabled", "100");
 config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
   bootstrap.mutable_runtime()->set_symlink_root(TestEnvironment::temporaryPath("runtime");
 });
 ```
 
 An example of modifying `HttpConnectionManager` to change Envoy’s HTTP/1.1 processing:
+
 ```c++
 config_helper_.addConfigModifier([&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) -> void {
   envoy::api::v2::core::Http1ProtocolOptions options;
@@ -83,8 +85,10 @@ config_helper_.addConfigModifier([&](envoy::config::filter::network::http_connec
   hcm.mutable_http_protocol_options()->CopyFrom(options);
 };);
 ```
+
 An example of modifying `HttpConnectionManager` to add an additional upstream
 cluster:
+
 ```c++
    config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       bootstrap.mutable_rate_limit_service()->set_cluster_name("ratelimit");
@@ -107,6 +111,19 @@ reused in other integration tests. If it's likely be reused, please add the
 appropriate functions to existing utilities or add new test utilities. If it's
 likely a one-off change, it can be scoped to the existing test file.
 
+# Debugging integration tests
+
+The Envoy integration test framework is generally designed to fast-fail when
+things go wrong, with an explanatory message such as
+"Timed out waiting for new connection."
+but it's not always clear what the underlying cause is. Because there are many
+Envoy components under test, often the best tool for debugging is to try to get
+a run of the test with `--test_arg="-l debug"`, or `--test_arg="-l trace"` ideally
+with a clean run (if it's a code change which caused test breakage) or a comparable
+test (if it's a new test failing). Looking at the conn_manager_impl.cc
+logs, router.cc logs, and fake_upstream.cc logs, can often give you a feel for
+what unexpected event is occurring. If that doesn't help, following the GDB
+instructions to run the test in a debugger or sprinkling cerrs around are both often helpful.
 
 # Deflaking tests
 
@@ -145,7 +162,7 @@ The full command might look something like
 ```
 bazel test //test/integration:http2_upstream_integration_test \
 --test_arg=--gtest_filter="IpVersions/Http2UpstreamIntegrationTest.RouterRequestAndResponseWithBodyNoBuffer/IPv6" \
---jobs 60 --local_resources 100000000000,100000000000,10000000 --test_arg="-l trace"
+--jobs 60 --local_resources 100000000000,100000000000,10000000 --runs_per_test=1000 --test_arg="-l trace"
 ```
 
 ## Debugging test flakes

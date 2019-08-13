@@ -1,4 +1,4 @@
-load("//bazel:api_build_system.bzl", "api_cc_test", "api_go_test")
+load("@envoy_api//bazel:api_build_system.bzl", "api_cc_test", "api_go_test")
 
 licenses(["notice"])  # Apache 2
 
@@ -13,6 +13,7 @@ api_cc_test(
         "//envoy/service/accesslog/v2:als",
         "//envoy/service/discovery/v2:ads",
         "//envoy/service/discovery/v2:hds",
+        "//envoy/service/discovery/v2:rtds",
         "//envoy/service/metrics/v2:metrics_service",
         "//envoy/service/ratelimit/v2:rls",
     ],

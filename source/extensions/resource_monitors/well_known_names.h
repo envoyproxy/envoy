@@ -1,4 +1,5 @@
 #pragma once
+#include <string>
 
 #include "common/singleton/const_singleton.h"
 
@@ -7,7 +8,7 @@ namespace Extensions {
 namespace ResourceMonitors {
 
 /**
- * Well-known resource monior names.
+ * Well-known resource monitor names.
  * NOTE: New resource monitors should use the well known name: envoy.resource_monitors.name.
  */
 class ResourceMonitorNameValues {
@@ -19,7 +20,7 @@ public:
   const std::string InjectedResource = "envoy.resource_monitors.injected_resource";
 };
 
-typedef ConstSingleton<ResourceMonitorNameValues> ResourceMonitorNames;
+using ResourceMonitorNames = ConstSingleton<ResourceMonitorNameValues>;
 
 } // namespace ResourceMonitors
 } // namespace Extensions

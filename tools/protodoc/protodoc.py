@@ -1,7 +1,7 @@
 # protoc plugin to map from FileDescriptorProtos to Envoy doc style RST.
 # See https://github.com/google/protobuf/blob/master/src/google/protobuf/descriptor.proto
 # for the underlying protos mentioned in this file. See
-# http://www.sphinx-doc.org/en/stable/rest.html for Sphinx RST syntax.
+# https://www.sphinx-doc.org/en/master/usage/restructuredtext/basics.html for Sphinx RST syntax.
 
 from collections import defaultdict
 import cProfile
@@ -9,8 +9,8 @@ import functools
 import os
 import pstats
 import StringIO
-import sys
 import re
+import sys
 
 from google.protobuf.compiler import plugin_pb2
 from validate import validate_pb2
@@ -68,9 +68,8 @@ INHERITED_ANNOTATIONS = set([
 ])
 
 # Template for data plane API URLs.
-# TODO(htuch): Add the ability to build a permalink by feeding a hash
-# to the tool or inferring from local tree (only really make sense in CI).
-DATA_PLANE_API_URL_FMT = 'https://github.com/envoyproxy/envoy/blob/master/api/%s#L%d'
+DATA_PLANE_API_URL_FMT = 'https://github.com/envoyproxy/envoy/blob/{}/api/%s#L%d'.format(
+    os.environ['ENVOY_BLOB_SHA'])
 
 
 class ProtodocError(Exception):
@@ -104,9 +103,7 @@ def ExtractAnnotations(s, inherited_annotations=None, type_name='file'):
     Pair of string with with annotations stripped and annotation map.
   """
   annotations = {
-      k: v
-      for k, v in (inherited_annotations or {}).items()
-      if k in INHERITED_ANNOTATIONS
+      k: v for k, v in (inherited_annotations or {}).items() if k in INHERITED_ANNOTATIONS
   }
   # Extract annotations.
   groups = re.findall(ANNOTATION_REGEX, s)
@@ -117,8 +114,7 @@ def ExtractAnnotations(s, inherited_annotations=None, type_name='file'):
     if annotation not in VALID_ANNOTATIONS:
       raise ProtodocError('Unknown annotation: %s' % annotation)
     annotations[group[0]] = group[1].lstrip()
-  return FormatCommentWithAnnotations(without_annotations, annotations,
-                                      type_name), annotations
+  return FormatCommentWithAnnotations(without_annotations, annotations, type_name), annotations
 
 
 class SourceCodeInfo(object):
@@ -127,7 +123,9 @@ class SourceCodeInfo(object):
   def __init__(self, name, source_code_info):
     self._name = name
     self._proto = source_code_info
-    self._leading_comments = {str(location.path): location.leading_comments for location in self._proto.location}
+    self._leading_comments = {
+        str(location.path): location.leading_comments for location in self._proto.location
+    }
     self._file_level_comment = None
 
   @property
@@ -136,12 +134,10 @@ class SourceCodeInfo(object):
     if self._file_level_comment:
       return self._file_level_comment
     comment = ''
-    earliest_detached_comment = max(
-        max(location.span) for location in self._proto.location)
+    earliest_detached_comment = max(max(location.span) for location in self._proto.location)
     for location in self._proto.location:
       if location.leading_detached_comments and location.span[0] < earliest_detached_comment:
-        comment = StripLeadingSpace(''.join(
-            location.leading_detached_comments)) + '\n'
+        comment = StripLeadingSpace(''.join(location.leading_detached_comments)) + '\n'
         earliest_detached_comment = location.span[0]
     self._file_level_comment = comment
     return comment
@@ -162,8 +158,7 @@ class SourceCodeInfo(object):
     if leading_comment is not None:
       _, file_annotations = ExtractAnnotations(self.file_level_comment)
       return ExtractAnnotations(
-          StripLeadingSpace(leading_comment) + '\n', file_annotations,
-          type_name)
+          StripLeadingSpace(leading_comment) + '\n', file_annotations, type_name)
     return '', []
 
   def GithubUrl(self, path):
@@ -204,6 +199,8 @@ class TypeContext(object):
     self.map_typenames = {}
     # Map from a message's oneof index to the fields sharing a oneof.
     self.oneof_fields = {}
+    # Map from a message's oneof index to the name of oneof.
+    self.oneof_names = {}
     # Map from a message's oneof index to the "required" bool property.
     self.oneof_required = {}
     self.type_name = 'file'
@@ -218,6 +215,7 @@ class TypeContext(object):
     extended.type_name = type_name
     extended.map_typenames = self.map_typenames.copy()
     extended.oneof_fields = self.oneof_fields.copy()
+    extended.oneof_names = self.oneof_names.copy()
     extended.oneof_required = self.oneof_required.copy()
     return extended
 
@@ -275,9 +273,17 @@ class TypeContext(object):
     """
     return self._Extend([2, index], 'enum_value', name)
 
+  def ExtendOneof(self, index, name):
+    """Extend type context with an oneof declaration.
+
+    Args:
+      index: oneof index in oneof_decl.
+      name: oneof name.
+    """
+    return self._Extend([8, index], "oneof", name)
+
   def LeadingCommentPathLookup(self):
-    return self.source_code_info.LeadingCommentPathLookup(
-        self.path, self.type_name)
+    return self.source_code_info.LeadingCommentPathLookup(self.path, self.type_name)
 
   def GithubUrl(self):
     return self.source_code_info.GithubUrl(self.path)
@@ -339,8 +345,7 @@ def FormatHeaderFromFile(style, file_level_comment, alt):
   anchor = FormatAnchor(FileCrossRefLabel(alt))
   stripped_comment, annotations = ExtractAnnotations(file_level_comment)
   if DOC_TITLE_ANNOTATION in annotations:
-    return anchor + FormatHeader(
-        style, annotations[DOC_TITLE_ANNOTATION]), stripped_comment
+    return anchor + FormatHeader(style, annotations[DOC_TITLE_ANNOTATION]), stripped_comment
   return anchor + FormatHeader(style, alt), stripped_comment
 
 
@@ -374,16 +379,13 @@ def FormatMessageAsJson(type_context, msg):
   lines = []
   for index, field in enumerate(msg.field):
     field_type_context = type_context.ExtendField(index, field.name)
-    leading_comment, comment_annotations = field_type_context.LeadingCommentPathLookup(
-    )
+    leading_comment, comment_annotations = field_type_context.LeadingCommentPathLookup()
     if NOT_IMPLEMENTED_HIDE_ANNOTATION in comment_annotations:
       continue
-    lines.append('"%s": %s' % (field.name,
-                               FormatFieldTypeAsJson(type_context, field)))
+    lines.append('"%s": %s' % (field.name, FormatFieldTypeAsJson(type_context, field)))
 
   if lines:
-    return '.. code-block:: json\n\n  {\n' + ',\n'.join(IndentLines(
-        4, lines)) + '\n  }\n\n'
+    return '.. code-block:: json\n\n  {\n' + ',\n'.join(IndentLines(4, lines)) + '\n  }\n\n'
   else:
     return '.. code-block:: json\n\n  {}\n\n'
 
@@ -422,7 +424,8 @@ def FormatFieldType(type_context, field):
   Return:
     RST formatted field type.
   """
-  if field.type_name.startswith(ENVOY_API_NAMESPACE_PREFIX) or field.type_name.startswith(ENVOY_PREFIX):
+  if field.type_name.startswith(ENVOY_API_NAMESPACE_PREFIX) or field.type_name.startswith(
+      ENVOY_PREFIX):
     type_name = NormalizeFQN(field.type_name)
     if field.type == field.TYPE_MESSAGE:
       if type_context.map_typenames and type_name in type_context.map_typenames:
@@ -433,15 +436,13 @@ def FormatFieldType(type_context, field):
   elif field.type_name.startswith(WKT_NAMESPACE_PREFIX):
     wkt = field.type_name[len(WKT_NAMESPACE_PREFIX):]
     return FormatExternalLink(
-        wkt,
-        'https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#%s'
-        % wkt.lower())
+        wkt, 'https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#%s' %
+        wkt.lower())
   elif field.type_name.startswith(RPC_NAMESPACE_PREFIX):
     rpc = field.type_name[len(RPC_NAMESPACE_PREFIX):]
     return FormatExternalLink(
         rpc,
-        'https://cloud.google.com/natural-language/docs/reference/rpc/google.rpc#%s'
-        % rpc.lower())
+        'https://cloud.google.com/natural-language/docs/reference/rpc/google.rpc#%s' % rpc.lower())
   elif field.type_name:
     return field.type_name
 
@@ -463,9 +464,8 @@ def FormatFieldType(type_context, field):
       field.TYPE_BYTES: 'bytes',
   }
   if field.type in pretty_type_names:
-    return FormatExternalLink(
-        pretty_type_names[field.type],
-        'https://developers.google.com/protocol-buffers/docs/proto#scalar')
+    return FormatExternalLink(pretty_type_names[field.type],
+                              'https://developers.google.com/protocol-buffers/docs/proto#scalar')
   raise ProtodocError('Unknown field type ' + str(field.type))
 
 
@@ -514,28 +514,44 @@ def FormatFieldAsDefinitionListItem(outer_type_context, type_context, field):
   Returns:
     RST formatted definition list item.
   """
-  if field.HasField('oneof_index'):
-    oneof_template = '\nPrecisely one of %s must be set.\n' if type_context.oneof_required[
-        field.oneof_index] else '\nOnly one of %s may be set.\n'
-    oneof_comment = oneof_template % ', '.join(
-        FormatInternalLink(
-            f, FieldCrossRefLabel(outer_type_context.ExtendField(0, f).name))
-        for f in type_context.oneof_fields[field.oneof_index])
-  else:
-    oneof_comment = ''
-  anchor = FormatAnchor(FieldCrossRefLabel(type_context.name))
   annotations = []
+
+  anchor = FormatAnchor(FieldCrossRefLabel(type_context.name))
   if field.options.HasExtension(validate_pb2.rules):
     rule = field.options.Extensions[validate_pb2.rules]
     if ((rule.HasField('message') and rule.message.required) or
         (rule.HasField('string') and rule.string.min_bytes > 0) or
         (rule.HasField('repeated') and rule.repeated.min_items > 0)):
-      annotations.append('*REQUIRED*')
+      annotations = ['*REQUIRED*']
   leading_comment, comment_annotations = type_context.LeadingCommentPathLookup()
   if NOT_IMPLEMENTED_HIDE_ANNOTATION in comment_annotations:
     return ''
-  comment = '(%s) ' % ', '.join(
-      [FormatFieldType(type_context, field)] + annotations) + leading_comment
+
+  if field.HasField('oneof_index'):
+    oneof_context = outer_type_context.ExtendOneof(field.oneof_index,
+                                                   type_context.oneof_names[field.oneof_index])
+    oneof_comment, oneof_comment_annotations = oneof_context.LeadingCommentPathLookup()
+    if NOT_IMPLEMENTED_HIDE_ANNOTATION in oneof_comment_annotations:
+      return ''
+
+    # If the oneof only has one field and marked required, mark the field as required.
+    if len(type_context.oneof_fields[field.oneof_index]) == 1 and type_context.oneof_required[
+        field.oneof_index]:
+      annotations = ['*REQUIRED*']
+
+    if len(type_context.oneof_fields[field.oneof_index]) > 1:
+      # Fields in oneof shouldn't be marked as required when we have oneof comment below it.
+      annotations = []
+      oneof_template = '\nPrecisely one of %s must be set.\n' if type_context.oneof_required[
+          field.oneof_index] else '\nOnly one of %s may be set.\n'
+      oneof_comment += oneof_template % ', '.join(
+          FormatInternalLink(f, FieldCrossRefLabel(outer_type_context.ExtendField(i, f).name))
+          for i, f in type_context.oneof_fields[field.oneof_index])
+  else:
+    oneof_comment = ''
+
+  comment = '(%s) ' % ', '.join([FormatFieldType(type_context, field)] +
+                                annotations) + leading_comment
   return anchor + field.name + '\n' + MapLines(
       functools.partial(Indent, 2), comment + oneof_comment)
 
@@ -551,21 +567,21 @@ def FormatMessageAsDefinitionList(type_context, msg):
   """
   type_context.oneof_fields = defaultdict(list)
   type_context.oneof_required = defaultdict(bool)
+  type_context.oneof_names = defaultdict(list)
   for index, field in enumerate(msg.field):
     if field.HasField('oneof_index'):
-      _, comment_annotations = type_context.ExtendField(
-          index, field.name).LeadingCommentPathLookup()
+      _, comment_annotations = type_context.ExtendField(index,
+                                                        field.name).LeadingCommentPathLookup()
       if NOT_IMPLEMENTED_HIDE_ANNOTATION in comment_annotations:
         continue
-      type_context.oneof_fields[field.oneof_index].append(field.name)
+      type_context.oneof_fields[field.oneof_index].append((index, field.name))
   for index, oneof_decl in enumerate(msg.oneof_decl):
     if oneof_decl.options.HasExtension(validate_pb2.required):
-      type_context.oneof_required[index] = oneof_decl.options.Extensions[
-          validate_pb2.required]
+      type_context.oneof_required[index] = oneof_decl.options.Extensions[validate_pb2.required]
+    type_context.oneof_names[index] = oneof_decl.name
   return '\n'.join(
-      FormatFieldAsDefinitionListItem(
-          type_context, type_context.ExtendField(index, field.name), field)
-      for index, field in enumerate(msg.field)) + '\n'
+      FormatFieldAsDefinitionListItem(type_context, type_context.ExtendField(index, field.name),
+                                      field) for index, field in enumerate(msg.field)) + '\n'
 
 
 def FormatMessage(type_context, msg):
@@ -584,19 +600,15 @@ def FormatMessage(type_context, msg):
   # synthesized messages.
   type_context.map_typenames = {
       '%s.%s' % (type_context.name, nested_msg.name): 'map<%s, %s>' % tuple(
-          map(
-              functools.partial(FormatFieldType, type_context),
-              nested_msg.field))
+          map(functools.partial(FormatFieldType, type_context), nested_msg.field))
       for nested_msg in msg.nested_type
       if nested_msg.options.map_entry
   }
   nested_msgs = '\n'.join(
-      FormatMessage(
-          type_context.ExtendNestedMessage(index, nested_msg.name), nested_msg)
+      FormatMessage(type_context.ExtendNestedMessage(index, nested_msg.name), nested_msg)
       for index, nested_msg in enumerate(msg.nested_type))
   nested_enums = '\n'.join(
-      FormatEnum(
-          type_context.ExtendNestedEnum(index, nested_enum.name), nested_enum)
+      FormatEnum(type_context.ExtendNestedEnum(index, nested_enum.name), nested_enum)
       for index, nested_enum in enumerate(msg.enum_type))
   anchor = FormatAnchor(MessageCrossRefLabel(type_context.name))
   header = FormatHeader('-', type_context.name)
@@ -606,8 +618,8 @@ def FormatMessage(type_context, msg):
   if NOT_IMPLEMENTED_HIDE_ANNOTATION in annotations:
     return ''
   return anchor + header + proto_link + leading_comment + FormatMessageAsJson(
-      type_context, msg) + FormatMessageAsDefinitionList(
-          type_context, msg) + nested_msgs + '\n' + nested_enums
+      type_context, msg) + FormatMessageAsDefinitionList(type_context,
+                                                         msg) + nested_msgs + '\n' + nested_enums
 
 
 def FormatEnumValueAsDefinitionListItem(type_context, enum_value):
@@ -625,8 +637,7 @@ def FormatEnumValueAsDefinitionListItem(type_context, enum_value):
   if NOT_IMPLEMENTED_HIDE_ANNOTATION in annotations:
     return ''
   comment = default_comment + UNICODE_INVISIBLE_SEPARATOR + leading_comment
-  return anchor + enum_value.name + '\n' + MapLines(
-      functools.partial(Indent, 2), comment)
+  return anchor + enum_value.name + '\n' + MapLines(functools.partial(Indent, 2), comment)
 
 
 def FormatEnumAsDefinitionList(type_context, enum):
@@ -669,18 +680,15 @@ def FormatProtoAsBlockComment(proto):
 
   Useful in debugging, not usually referenced.
   """
-  return '\n\nproto::\n\n' + MapLines(functools.partial(Indent, 2),
-                                      str(proto)) + '\n'
+  return '\n\nproto::\n\n' + MapLines(functools.partial(Indent, 2), str(proto)) + '\n'
 
 
 def GenerateRst(proto_file):
   """Generate a RST representation from a FileDescriptor proto."""
-  source_code_info = SourceCodeInfo(proto_file.name,
-                                    proto_file.source_code_info)
+  source_code_info = SourceCodeInfo(proto_file.name, proto_file.source_code_info)
   # Find the earliest detached comment, attribute it to file level.
   # Also extract file level titles if any.
-  header, comment = FormatHeaderFromFile(
-      '=', source_code_info.file_level_comment, proto_file.name)
+  header, comment = FormatHeaderFromFile('=', source_code_info.file_level_comment, proto_file.name)
   package_prefix = NormalizeFQN('.' + proto_file.package + '.')[:-1]
   package_type_context = TypeContext(source_code_info, package_prefix)
   msgs = '\n'.join(
@@ -691,6 +699,7 @@ def GenerateRst(proto_file):
       for index, enum in enumerate(proto_file.enum_type))
   debug_proto = FormatProtoAsBlockComment(proto_file)
   return header + comment + msgs + enums  # + debug_proto
+
 
 def Main():
   # http://www.expobrain.net/2015/09/13/create-a-plugin-for-google-protocol-buffer/
@@ -711,12 +720,14 @@ def Main():
     if cprofile_enabled:
       pr.disable()
       stats_stream = StringIO.StringIO()
-      ps = pstats.Stats(pr, stream=stats_stream).sort_stats(os.getenv('CPROFILE_SORTBY', 'cumulative'))
+      ps = pstats.Stats(
+          pr, stream=stats_stream).sort_stats(os.getenv('CPROFILE_SORTBY', 'cumulative'))
       stats_file = response.file.add()
       stats_file.name = proto_file.name + '.rst.profile'
       ps.print_stats()
       stats_file.content = stats_stream.getvalue()
   sys.stdout.write(response.SerializeToString())
+
 
 if __name__ == '__main__':
   Main()

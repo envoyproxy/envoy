@@ -1,0 +1,11 @@
+--- lightstep-tracer-common/BUILD	2019-05-29 13:04:55.651083767 -0700
++++ lightstep-tracer-common/BUILD	2019-05-29 13:04:59.711080560 -0700
+@@ -2,7 +2,7 @@
+     name = "collector_proto",
+     srcs = ["collector.proto"],
+     deps = [
+-        "@lightstep_vendored_googleapis//:googleapis_proto",
++        "@com_google_googleapis//google/api:annotations_proto",
+         "@com_google_protobuf//:timestamp_proto",
+     ],
+     visibility = ["//visibility:public"],

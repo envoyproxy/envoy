@@ -16,7 +16,6 @@
 
 #include "extensions/transport_sockets/well_known_names.h"
 
-#include "openssl/bytestring.h"
 #include "openssl/ssl.h"
 
 namespace Envoy {
@@ -75,7 +74,7 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   ASSERT(file_event_ == nullptr);
 
   file_event_ = cb.dispatcher().createFileEvent(
-      socket.fd(),
+      socket.ioHandle().fd(),
       [this](uint32_t events) {
         if (events & Event::FileReadyType::Closed) {
           config_->stats().connection_closed_.inc();
@@ -87,13 +86,6 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
         onRead();
       },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Closed);
-
-  // TODO(PiotrSikora): make this configurable.
-  timer_ = cb.dispatcher().createTimer([this]() -> void { onTimeout(); });
-  timer_->enableTimer(std::chrono::milliseconds(15000));
-
-  // TODO(ggreenway): Move timeout and close-detection to the filter manager
-  // so that it applies to all listener filters.
 
   cb_ = &cb;
   return Network::FilterStatus::StopIteration;
@@ -139,13 +131,13 @@ void Filter::onRead() {
   // even if previous data has not been read, which is always the case due to MSG_PEEK. When
   // the TlsInspector completes and passes the socket along, a new FileEvent is created for the
   // socket, so that new event is immediately signalled as readable because it is new and the socket
-  // is readable, even though no new events have ocurred.
+  // is readable, even though no new events have occurred.
   //
   // TODO(ggreenway): write an integration test to ensure the events work as expected on all
   // platforms.
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  const Api::SysCallSizeResult result =
-      os_syscalls.recv(cb_->socket().fd(), buf_, config_->maxClientHelloSize(), MSG_PEEK);
+  const Api::SysCallSizeResult result = os_syscalls.recv(cb_->socket().ioHandle().fd(), buf_,
+                                                         config_->maxClientHelloSize(), MSG_PEEK);
   ENVOY_LOG(trace, "tls inspector: recv: {}", result.rc_);
 
   if (result.rc_ == -1 && result.errno_ == EAGAIN) {
@@ -166,15 +158,8 @@ void Filter::onRead() {
   }
 }
 
-void Filter::onTimeout() {
-  ENVOY_LOG(trace, "tls inspector: timeout");
-  config_->stats().read_timeout_.inc();
-  done(false);
-}
-
 void Filter::done(bool success) {
   ENVOY_LOG(trace, "tls inspector: done: {}", success);
-  timer_.reset();
   file_event_.reset();
   cb_->continueFilterChain(success);
 }

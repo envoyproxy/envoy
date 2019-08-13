@@ -1,15 +1,14 @@
 #include "test/integration/autonomous_upstream.h"
 
 namespace Envoy {
-
 namespace {
 
 void HeaderToInt(const char header_name[], int32_t& return_int, Http::TestHeaderMapImpl& headers) {
-  std::string header_value = headers.get_(header_name);
+  const std::string header_value(headers.get_(header_name));
   if (!header_value.empty()) {
     uint64_t parsed_value;
-    RELEASE_ASSERT(StringUtil::atoul(header_value.c_str(), parsed_value, 10) &&
-                       parsed_value < std::numeric_limits<int32_t>::max(),
+    RELEASE_ASSERT(absl::SimpleAtoi(header_value, &parsed_value) &&
+                       parsed_value < static_cast<uint32_t>(std::numeric_limits<int32_t>::max()),
                    "");
     return_int = parsed_value;
   }
@@ -20,6 +19,10 @@ void HeaderToInt(const char header_name[], int32_t& return_int, Http::TestHeader
 const char AutonomousStream::RESPONSE_SIZE_BYTES[] = "response_size_bytes";
 const char AutonomousStream::EXPECT_REQUEST_SIZE_BYTES[] = "expect_request_size_bytes";
 const char AutonomousStream::RESET_AFTER_REQUEST[] = "reset_after_request";
+
+AutonomousStream::AutonomousStream(FakeHttpConnection& parent, Http::StreamEncoder& encoder,
+                                   AutonomousUpstream& upstream)
+    : FakeStream(parent, encoder, upstream.timeSystem()), upstream_(upstream) {}
 
 // For now, assert all streams which are started are completed.
 // Support for incomplete streams can be added when needed.
@@ -56,7 +59,15 @@ void AutonomousStream::sendResponse() {
   encodeData(response_body_length, true);
 }
 
-Http::StreamDecoder& AutonomousHttpConnection::newStream(Http::StreamEncoder& response_encoder) {
+AutonomousHttpConnection::AutonomousHttpConnection(SharedConnectionWrapper& shared_connection,
+                                                   Stats::Store& store, Type type,
+                                                   AutonomousUpstream& upstream)
+    : FakeHttpConnection(shared_connection, store, type, upstream.timeSystem(),
+                         Http::DEFAULT_MAX_REQUEST_HEADERS_KB),
+      upstream_(upstream) {}
+
+Http::StreamDecoder& AutonomousHttpConnection::newStream(Http::StreamEncoder& response_encoder,
+                                                         bool) {
   auto stream = new AutonomousStream(*this, response_encoder, upstream_);
   streams_.push_back(FakeStreamPtr{stream});
   return *(stream);
@@ -80,6 +91,11 @@ bool AutonomousUpstream::createNetworkFilterChain(Network::Connection& connectio
 }
 
 bool AutonomousUpstream::createListenerFilterChain(Network::ListenerFilterManager&) { return true; }
+
+bool AutonomousUpstream::createUdpListenerFilterChain(Network::UdpListenerFilterManager&,
+                                                      Network::UdpReadFilterCallbacks&) {
+  return true;
+}
 
 void AutonomousUpstream::setLastRequestHeaders(const Http::HeaderMap& headers) {
   Thread::LockGuard lock(headers_lock_);

@@ -17,13 +17,13 @@ namespace Filesystem {
 
 WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher)
     : inotify_fd_(inotify_init1(IN_NONBLOCK)),
-      inotify_event_(dispatcher.createFileEvent(inotify_fd_,
-                                                [this](uint32_t events) -> void {
-                                                  ASSERT(events == Event::FileReadyType::Read);
-                                                  onInotifyEvent();
-                                                },
-                                                Event::FileTriggerType::Edge,
-                                                Event::FileReadyType::Read)) {
+      inotify_event_(dispatcher.createFileEvent(
+          inotify_fd_,
+          [this](uint32_t events) -> void {
+            ASSERT(events == Event::FileReadyType::Read);
+            onInotifyEvent();
+          },
+          Event::FileTriggerType::Edge, Event::FileReadyType::Read)) {
   RELEASE_ASSERT(inotify_fd_ >= 0, "");
 }
 
@@ -40,7 +40,8 @@ void WatcherImpl::addWatch(const std::string& path, uint32_t events, OnChangedCb
   std::string directory = last_slash != 0 ? path.substr(0, last_slash) : "/";
   std::string file = StringUtil::subspan(path, last_slash + 1, path.size());
 
-  int watch_fd = inotify_add_watch(inotify_fd_, directory.c_str(), IN_ALL_EVENTS);
+  const uint32_t watch_mask = IN_MODIFY | IN_MOVED_TO;
+  int watch_fd = inotify_add_watch(inotify_fd_, directory.c_str(), watch_mask);
   if (watch_fd == -1) {
     throw EnvoyException(
         fmt::format("unable to add filesystem watch for file {}: {}", path, strerror(errno)));
@@ -62,7 +63,7 @@ void WatcherImpl::onInotifyEvent() {
     const size_t event_count = rc;
     size_t index = 0;
     while (index < event_count) {
-      inotify_event* file_event = reinterpret_cast<inotify_event*>(&buffer[index]);
+      auto* file_event = reinterpret_cast<inotify_event*>(&buffer[index]);
       ASSERT(callback_map_.count(file_event->wd) == 1);
 
       std::string file;
@@ -74,6 +75,9 @@ void WatcherImpl::onInotifyEvent() {
                 file);
 
       uint32_t events = 0;
+      if (file_event->mask & IN_MODIFY) {
+        events |= Events::Modified;
+      }
       if (file_event->mask & IN_MOVED_TO) {
         events |= Events::MovedTo;
       }

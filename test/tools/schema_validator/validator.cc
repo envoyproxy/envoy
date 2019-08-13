@@ -1,17 +1,23 @@
 #include "test/tools/schema_validator/validator.h"
 
-#include "common/router/config_impl.h"
+#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/api/v2/discovery.pb.validate.h"
+#include "envoy/api/v2/rds.pb.h"
+#include "envoy/api/v2/rds.pb.validate.h"
 
-#include "test/test_common/printers.h"
+#include "common/protobuf/utility.h"
 
 #include "tclap/CmdLine.h"
 
 namespace Envoy {
 
+const std::string Schema::DISCOVERY_RESPONSE = "discovery_response";
 const std::string Schema::ROUTE = "route";
 
 const std::string& Schema::toString(Type type) {
   switch (type) {
+  case Type::DiscoveryResponse:
+    return DISCOVERY_RESPONSE;
   case Type::Route:
     return ROUTE;
   }
@@ -21,12 +27,12 @@ const std::string& Schema::toString(Type type) {
 
 Options::Options(int argc, char** argv) {
   TCLAP::CmdLine cmd("schema_validator_tool", ' ', "none", false);
-  TCLAP::ValueArg<std::string> json_path("j", "json-path", "Path to JSON file.", true, "", "string",
-                                         cmd);
+  TCLAP::ValueArg<std::string> config_path("c", "config-path", "Path to configuration file.", true,
+                                           "", "string", cmd);
   TCLAP::ValueArg<std::string> schema_type(
       "t", "schema-type",
-      "Type of schema to validate the JSON against. Supported schema is: 'route'.", true, "",
-      "string", cmd);
+      "Type of schema to validate the configuration against. Supported schema is: 'route'.", true,
+      "", "string", cmd);
 
   try {
     cmd.parse(argc, argv);
@@ -37,28 +43,29 @@ Options::Options(int argc, char** argv) {
 
   if (schema_type.getValue() == Schema::toString(Schema::Type::Route)) {
     schema_type_ = Schema::Type::Route;
+  } else if (schema_type.getValue() == Schema::toString(Schema::Type::DiscoveryResponse)) {
+    schema_type_ = Schema::Type::DiscoveryResponse;
   } else {
     std::cerr << "error: unknown schema type '" << schema_type.getValue() << "'" << std::endl;
     exit(EXIT_FAILURE);
   }
 
-  json_path_ = json_path.getValue();
+  config_path_ = config_path.getValue();
 }
 
-void Validator::validate(const std::string& json_path, Schema::Type schema_type) {
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromFile(json_path);
+void Validator::validate(const std::string& config_path, Schema::Type schema_type) {
 
   switch (schema_type) {
+  case Schema::Type::DiscoveryResponse: {
+    envoy::api::v2::DiscoveryResponse discovery_response_config;
+    TestUtility::loadFromFile(config_path, discovery_response_config, *api_);
+    MessageUtil::validate(discovery_response_config);
+    break;
+  }
   case Schema::Type::Route: {
-    Runtime::MockLoader runtime;
-    Upstream::MockClusterManager cm;
-    // Construct a envoy::api::v2::RouteConfiguration to validate the Route configuration and
-    // ignore the output since nothing will consume it.
     envoy::api::v2::RouteConfiguration route_config;
-    // TODO(ambuc): Add a CLI option to the schema_validator to allow for a maxStatNameLength
-    // constraint
-    Stats::StatsOptionsImpl stats_options;
-    Config::RdsJson::translateRouteConfiguration(*loader, route_config, stats_options);
+    TestUtility::loadFromFile(config_path, route_config, *api_);
+    MessageUtil::validate(route_config);
     break;
   }
   default:

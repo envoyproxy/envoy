@@ -1,5 +1,9 @@
 #pragma once
 
+#include "envoy/common/pure.h"
+#include "envoy/upstream/load_balancer.h"
+#include "envoy/upstream/upstream.h"
+
 namespace Envoy {
 namespace Upstream {
 
@@ -11,7 +15,7 @@ namespace Upstream {
  */
 class ThreadLocalCluster {
 public:
-  virtual ~ThreadLocalCluster() {}
+  virtual ~ThreadLocalCluster() = default;
 
   /**
    * @return const PrioritySet& the backing priority set.
@@ -20,8 +24,7 @@ public:
 
   /**
    * @return ClusterInfoConstSharedPtr the info for this cluster. The info is safe to store beyond
-   * the
-   *         lifetime of the ThreadLocalCluster instance itself.
+   * the lifetime of the ThreadLocalCluster instance itself.
    */
   virtual ClusterInfoConstSharedPtr info() PURE;
 

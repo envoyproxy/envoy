@@ -13,16 +13,33 @@ namespace Tcp {
 namespace ConnectionPool {
 
 /**
+ * Controls the behavior of a canceled connection request.
+ */
+enum class CancelPolicy {
+  // By default, canceled connection requests allow a pending connection to complete and become
+  // available for a future connection request.
+  Default,
+  // When a connection request is canceled, closes a pending connection if there are more pending
+  // connections than pending connection requests. CloseExcess is useful for callers that never
+  // re-use connections (e.g. by closing rather than releasing connections). Using CloseExcess in
+  // this situation guarantees that no idle connections will be held open by the conn pool awaiting
+  // a connection request.
+  CloseExcess,
+};
+
+/**
  * Handle that allows a pending connection request to be canceled before it is completed.
  */
 class Cancellable {
 public:
-  virtual ~Cancellable() {}
+  virtual ~Cancellable() = default;
 
   /**
-   * Cancel the pending request.
+   * Cancel the pending connection request.
+   * @param cancel_policy a CancelPolicy that controls the behavior of this connection request
+   *        cancellation.
    */
-  virtual void cancel() PURE;
+  virtual void cancel(CancelPolicy cancel_policy) PURE;
 };
 
 /**
@@ -46,7 +63,7 @@ enum class PoolFailureReason {
  */
 class UpstreamCallbacks : public Network::ConnectionCallbacks {
 public:
-  virtual ~UpstreamCallbacks() {}
+  ~UpstreamCallbacks() override = default;
 
   /*
    * Invoked when data is delivered from the upstream connection while the connection is owned by a
@@ -68,10 +85,10 @@ public:
  */
 class ConnectionState {
 public:
-  virtual ~ConnectionState() {}
+  virtual ~ConnectionState() = default;
 };
 
-typedef std::unique_ptr<ConnectionState> ConnectionStatePtr;
+using ConnectionStatePtr = std::unique_ptr<ConnectionState>;
 
 /*
  * ConnectionData wraps a ClientConnection allocated to a caller. Open ClientConnections are
@@ -79,7 +96,7 @@ typedef std::unique_ptr<ConnectionState> ConnectionStatePtr;
  */
 class ConnectionData {
 public:
-  virtual ~ConnectionData() {}
+  virtual ~ConnectionData() = default;
 
   /**
    * @return the ClientConnection for the connection.
@@ -113,7 +130,7 @@ protected:
   virtual ConnectionState* connectionState() PURE;
 };
 
-typedef std::unique_ptr<ConnectionData> ConnectionDataPtr;
+using ConnectionDataPtr = std::unique_ptr<ConnectionData>;
 
 /**
  * Pool callbacks invoked in the context of a newConnection() call, either synchronously or
@@ -121,7 +138,7 @@ typedef std::unique_ptr<ConnectionData> ConnectionDataPtr;
  */
 class Callbacks {
 public:
-  virtual ~Callbacks() {}
+  virtual ~Callbacks() = default;
 
   /**
    * Called when a pool error occurred and no connection could be acquired for making the request.
@@ -151,13 +168,13 @@ public:
  */
 class Instance : public Event::DeferredDeletable {
 public:
-  virtual ~Instance() {}
+  ~Instance() override = default;
 
   /**
    * Called when a connection pool has been drained of pending requests, busy connections, and
    * ready connections.
    */
-  typedef std::function<void()> DrainedCb;
+  using DrainedCb = std::function<void()>;
 
   /**
    * Register a callback that gets called when the connection pool is fully drained. No actual
@@ -188,7 +205,7 @@ public:
   virtual Cancellable* newConnection(Callbacks& callbacks) PURE;
 };
 
-typedef std::unique_ptr<Instance> InstancePtr;
+using InstancePtr = std::unique_ptr<Instance>;
 
 } // namespace ConnectionPool
 } // namespace Tcp

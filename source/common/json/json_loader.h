@@ -3,6 +3,7 @@
 #include <list>
 #include <string>
 
+#include "envoy/api/api.h"
 #include "envoy/json/json_object.h"
 
 namespace Envoy {
@@ -13,7 +14,7 @@ public:
   /**
    * Constructs a Json Object from a file.
    */
-  static ObjectSharedPtr loadFromFile(const std::string& file_path);
+  static ObjectSharedPtr loadFromFile(const std::string& file_path, Api::Api& api);
 
   /**
    * Constructs a Json Object from a string.

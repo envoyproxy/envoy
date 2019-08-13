@@ -8,9 +8,10 @@
 
 int main(int argc, char** argv) {
   Envoy::Options options(argc, argv);
+  Envoy::Validator v;
 
   try {
-    Envoy::Validator::validate(options.jsonPath(), options.schemaType());
+    v.validate(options.configPath(), options.schemaType());
   } catch (const Envoy::EnvoyException& ex) {
     std::cerr << ex.what() << std::endl;
     return EXIT_FAILURE;

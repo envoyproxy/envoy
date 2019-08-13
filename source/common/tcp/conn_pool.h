@@ -22,9 +22,10 @@ class ConnPoolImpl : Logger::Loggable<Logger::Id::pool>, public ConnectionPool::
 public:
   ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                Upstream::ResourcePriority priority,
-               const Network::ConnectionSocket::OptionsSharedPtr& options);
+               const Network::ConnectionSocket::OptionsSharedPtr& options,
+               Network::TransportSocketOptionsSharedPtr transport_socket_options);
 
-  ~ConnPoolImpl();
+  ~ConnPoolImpl() override;
 
   // ConnectionPool::Instance
   void addDrainedCallback(DrainedCb cb) override;
@@ -54,11 +55,11 @@ protected:
     bool conn_valid_{true};
   };
 
-  typedef std::shared_ptr<ConnectionWrapper> ConnectionWrapperSharedPtr;
+  using ConnectionWrapperSharedPtr = std::shared_ptr<ConnectionWrapper>;
 
   struct ConnectionDataImpl : public ConnectionPool::ConnectionData {
-    ConnectionDataImpl(ConnectionWrapperSharedPtr wrapper) : wrapper_(wrapper) {}
-    ~ConnectionDataImpl() { wrapper_->release(false); }
+    ConnectionDataImpl(ConnectionWrapperSharedPtr wrapper) : wrapper_(std::move(wrapper)) {}
+    ~ConnectionDataImpl() override { wrapper_->release(false); }
 
     // ConnectionPool::ConnectionData
     Network::ClientConnection& connection() override { return wrapper_->connection(); }
@@ -79,7 +80,7 @@ protected:
     ConnReadFilter(ActiveConn& parent) : parent_(parent) {}
 
     // Network::ReadFilter
-    Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) {
+    Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override {
       parent_.onUpstreamData(data, end_stream);
       return Network::FilterStatus::StopIteration;
     }
@@ -91,7 +92,7 @@ protected:
                       public Network::ConnectionCallbacks,
                       public Event::DeferredDeletable {
     ActiveConn(ConnPoolImpl& parent);
-    ~ActiveConn();
+    ~ActiveConn() override;
 
     void onConnectTimeout();
     void onUpstreamData(Buffer::Instance& data, bool end_stream);
@@ -117,38 +118,42 @@ protected:
     bool timed_out_;
   };
 
-  typedef std::unique_ptr<ActiveConn> ActiveConnPtr;
+  using ActiveConnPtr = std::unique_ptr<ActiveConn>;
 
   struct PendingRequest : LinkedObject<PendingRequest>, public ConnectionPool::Cancellable {
     PendingRequest(ConnPoolImpl& parent, ConnectionPool::Callbacks& callbacks);
-    ~PendingRequest();
+    ~PendingRequest() override;
 
     // ConnectionPool::Cancellable
-    void cancel() override { parent_.onPendingRequestCancel(*this); }
+    void cancel(ConnectionPool::CancelPolicy cancel_policy) override {
+      parent_.onPendingRequestCancel(*this, cancel_policy);
+    }
 
     ConnPoolImpl& parent_;
     ConnectionPool::Callbacks& callbacks_;
   };
 
-  typedef std::unique_ptr<PendingRequest> PendingRequestPtr;
+  using PendingRequestPtr = std::unique_ptr<PendingRequest>;
 
   void assignConnection(ActiveConn& conn, ConnectionPool::Callbacks& callbacks);
   void createNewConnection();
   void onConnectionEvent(ActiveConn& conn, Network::ConnectionEvent event);
-  void onPendingRequestCancel(PendingRequest& request);
+  void onPendingRequestCancel(PendingRequest& request, ConnectionPool::CancelPolicy cancel_policy);
   virtual void onConnReleased(ActiveConn& conn);
   virtual void onConnDestroyed(ActiveConn& conn);
   void onUpstreamReady();
-  void processIdleConnection(ActiveConn& conn, bool delay);
+  void processIdleConnection(ActiveConn& conn, bool new_connection, bool delay);
   void checkForDrained();
 
   Event::Dispatcher& dispatcher_;
   Upstream::HostConstSharedPtr host_;
   Upstream::ResourcePriority priority_;
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
+  Network::TransportSocketOptionsSharedPtr transport_socket_options_;
 
-  std::list<ActiveConnPtr> ready_conns_;
-  std::list<ActiveConnPtr> busy_conns_;
+  std::list<ActiveConnPtr> pending_conns_; // conns awaiting connected event
+  std::list<ActiveConnPtr> ready_conns_;   // conns ready for assignment
+  std::list<ActiveConnPtr> busy_conns_;    // conns assigned
   std::list<PendingRequestPtr> pending_requests_;
   std::list<DrainedCb> drained_callbacks_;
   Stats::TimespanPtr conn_connect_ms_;

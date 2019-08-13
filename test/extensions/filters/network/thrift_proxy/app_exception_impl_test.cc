@@ -53,7 +53,7 @@ TEST(AppExceptionImplTest, TestEncode) {
   EXPECT_CALL(proto, writeStructEnd(Ref(buffer)));
   EXPECT_CALL(proto, writeMessageEnd(Ref(buffer)));
 
-  app_ex.encode(metadata, proto, buffer);
+  EXPECT_EQ(DirectResponse::ResponseType::Exception, app_ex.encode(metadata, proto, buffer));
 }
 
 TEST(AppExceptionImplTest, TestEncodeEmptyMetadata) {
@@ -81,7 +81,7 @@ TEST(AppExceptionImplTest, TestEncodeEmptyMetadata) {
   EXPECT_CALL(proto, writeStructEnd(Ref(buffer)));
   EXPECT_CALL(proto, writeMessageEnd(Ref(buffer)));
 
-  app_ex.encode(metadata, proto, buffer);
+  EXPECT_EQ(DirectResponse::ResponseType::Exception, app_ex.encode(metadata, proto, buffer));
 }
 
 } // namespace ThriftProxy

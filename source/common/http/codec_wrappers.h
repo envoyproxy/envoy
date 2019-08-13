@@ -45,6 +45,10 @@ public:
     onDecodeComplete();
   }
 
+  void decodeMetadata(MetadataMapPtr&& metadata_map) override {
+    inner_.decodeMetadata(std::move(metadata_map));
+  }
+
 protected:
   StreamDecoderWrapper(StreamDecoder& inner) : inner_(inner) {}
 
@@ -85,6 +89,10 @@ public:
   void encodeTrailers(const HeaderMap& trailers) override {
     inner_.encodeTrailers(trailers);
     onEncodeComplete();
+  }
+
+  void encodeMetadata(const MetadataMapVector& metadata_map_vector) override {
+    inner_.encodeMetadata(metadata_map_vector);
   }
 
   Stream& getStream() override { return inner_.getStream(); }

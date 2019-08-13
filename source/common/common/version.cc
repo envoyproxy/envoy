@@ -4,6 +4,7 @@
 
 #include "common/common/fmt.h"
 #include "common/common/macros.h"
+#include "common/common/version_linkstamp.h"
 
 extern const char build_scm_revision[];
 extern const char build_scm_status[];
@@ -17,11 +18,16 @@ const std::string& VersionInfo::revisionStatus() {
 }
 
 std::string VersionInfo::version() {
-  return fmt::format("{}/{}/{}/{}", revision(), BUILD_VERSION_NUMBER, revisionStatus(),
+  return fmt::format("{}/{}/{}/{}/{}", revision(), BUILD_VERSION_NUMBER, revisionStatus(),
 #ifdef NDEBUG
-                     "RELEASE"
+                     "RELEASE",
 #else
-                     "DEBUG"
+                     "DEBUG",
+#endif
+#ifdef ENVOY_SSL_VERSION
+                     ENVOY_SSL_VERSION
+#else
+                     "no-ssl"
 #endif
   );
 }

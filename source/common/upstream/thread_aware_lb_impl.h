@@ -1,11 +1,13 @@
 #pragma once
 
-#include <shared_mutex>
-
 #include "common/upstream/load_balancer_impl.h"
+
+#include "absl/synchronization/mutex.h"
 
 namespace Envoy {
 namespace Upstream {
+
+using NormalizedHostWeightVector = std::vector<std::pair<HostConstSharedPtr, double>>;
 
 class ThreadAwareLoadBalancerBase : public LoadBalancerBase, public ThreadAwareLoadBalancer {
 public:
@@ -19,10 +21,10 @@ public:
    */
   class HashingLoadBalancer {
   public:
-    virtual ~HashingLoadBalancer() {}
+    virtual ~HashingLoadBalancer() = default;
     virtual HostConstSharedPtr chooseHost(uint64_t hash) const PURE;
   };
-  typedef std::shared_ptr<HashingLoadBalancer> HashingLoadBalancerSharedPtr;
+  using HashingLoadBalancerSharedPtr = std::shared_ptr<HashingLoadBalancer>;
 
   // Upstream::ThreadAwareLoadBalancer
   LoadBalancerFactorySharedPtr factory() override { return factory_; }
@@ -45,7 +47,7 @@ private:
     std::shared_ptr<HashingLoadBalancer> current_lb_;
     bool global_panic_{};
   };
-  typedef std::unique_ptr<PerPriorityState> PerPriorityStatePtr;
+  using PerPriorityStatePtr = std::unique_ptr<PerPriorityState>;
 
   struct LoadBalancerImpl : public LoadBalancer {
     LoadBalancerImpl(ClusterStats& stats, Runtime::RandomGenerator& random)
@@ -57,7 +59,8 @@ private:
     ClusterStats& stats_;
     Runtime::RandomGenerator& random_;
     std::shared_ptr<std::vector<PerPriorityStatePtr>> per_priority_state_;
-    std::shared_ptr<std::vector<uint32_t>> per_priority_load_;
+    std::shared_ptr<HealthyLoad> healthy_per_priority_load_;
+    std::shared_ptr<DegradedLoad> degraded_per_priority_load_;
   };
 
   struct LoadBalancerFactoryImpl : public LoadBalancerFactory {
@@ -69,16 +72,16 @@ private:
 
     ClusterStats& stats_;
     Runtime::RandomGenerator& random_;
-    std::shared_timed_mutex mutex_;
-    // TOOD(mattklein123): Added GUARDED_BY(mutex_) to to the following variables. OSX clang
-    // seems to not like them with shared mutexes so we need to ifdef them out on OSX. I don't
-    // have time to do this right now.
-    std::shared_ptr<std::vector<PerPriorityStatePtr>> per_priority_state_;
-    // This is split out of PerPriorityState so LoadBalancerBase::ChoosePriorirty can be reused.
-    std::shared_ptr<std::vector<uint32_t>> per_priority_load_;
+    absl::Mutex mutex_;
+    std::shared_ptr<std::vector<PerPriorityStatePtr>> per_priority_state_ GUARDED_BY(mutex_);
+    // This is split out of PerPriorityState so LoadBalancerBase::ChoosePriority can be reused.
+    std::shared_ptr<HealthyLoad> healthy_per_priority_load_ GUARDED_BY(mutex_);
+    std::shared_ptr<DegradedLoad> degraded_per_priority_load_ GUARDED_BY(mutex_);
   };
 
-  virtual HashingLoadBalancerSharedPtr createLoadBalancer(const HostSet& host_set) PURE;
+  virtual HashingLoadBalancerSharedPtr
+  createLoadBalancer(const NormalizedHostWeightVector& normalized_host_weights,
+                     double min_normalized_weight, double max_normalized_weight) PURE;
   void refresh();
 
   std::shared_ptr<LoadBalancerFactoryImpl> factory_;

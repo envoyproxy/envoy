@@ -1,7 +1,7 @@
 #include "common/network/cidr_range.h"
 
 #include <arpa/inet.h>
-#include <netinet/ip.h>
+#include <netinet/in.h>
 #include <sys/socket.h>
 
 #include <array>
@@ -34,13 +34,9 @@ CidrRange::CidrRange(InstanceConstSharedPtr address, int length)
   }
 }
 
-CidrRange::CidrRange(const CidrRange& other) : address_(other.address_), length_(other.length_) {}
+CidrRange::CidrRange(const CidrRange& other) = default;
 
-CidrRange& CidrRange::operator=(const CidrRange& other) {
-  address_ = other.address_;
-  length_ = other.length_;
-  return *this;
-}
+CidrRange& CidrRange::operator=(const CidrRange& other) = default;
 
 bool CidrRange::operator==(const CidrRange& other) const {
   // Lengths must be the same, and must be valid (i.e. not -1).
@@ -128,8 +124,7 @@ CidrRange CidrRange::create(const std::string& range) {
     InstanceConstSharedPtr ptr = Utility::parseInternetAddress(std::string{parts[0]});
     if (ptr->type() == Type::Ip) {
       uint64_t length64;
-      const std::string part{parts[1]};
-      if (StringUtil::atoul(part.c_str(), length64, 10)) {
+      if (absl::SimpleAtoi(parts[1], &length64)) {
         if ((ptr->ip()->version() == IpVersion::v6 && length64 <= 128) ||
             (ptr->ip()->version() == IpVersion::v4 && length64 <= 32)) {
           return create(std::move(ptr), static_cast<uint32_t>(length64));

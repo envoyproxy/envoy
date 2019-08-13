@@ -8,10 +8,11 @@ namespace Envoy {
 namespace Extensions {
 namespace ResourceMonitors {
 namespace FixedHeapMonitor {
+namespace {
 
 class MockMemoryStatsReader : public MemoryStatsReader {
 public:
-  MockMemoryStatsReader() {}
+  MockMemoryStatsReader() = default;
 
   MOCK_METHOD0(reservedHeapBytes, uint64_t());
   MOCK_METHOD0(unmappedHeapBytes, uint64_t());
@@ -50,6 +51,7 @@ TEST(FixedHeapMonitorTest, ComputesCorrectUsage) {
   EXPECT_EQ(resource.pressure(), 0.7);
 }
 
+} // namespace
 } // namespace FixedHeapMonitor
 } // namespace ResourceMonitors
 } // namespace Extensions

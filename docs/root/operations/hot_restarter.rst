@@ -27,7 +27,7 @@ to the :option:`--restart-epoch` option.
 
 The restarter handles the following signals:
 
-* **SIGTERM**: Will cleanly terminate all child processes and exit.
+* **SIGTERM** or **SIGINT** (Ctrl-C): Will cleanly terminate all child processes and exit.
 * **SIGHUP**: Will hot restart by re-invoking whatever is passed as the first argument to the
   hot restart script.
 * **SIGCHLD**: If any of the child processes shut down unexpectedly, the restart script will shut

@@ -12,7 +12,7 @@
 if [[ ! "$1" =~ (@[a-zA-Z0-9_-]+)?//.*:[a-zA-Z0-9_-]+ ]]
 then
   echo "First argument to $0 must be a [@repo]//test/foo:bar label identifying a single test to run"
-  echo "$1 does not mach this pattern"
+  echo "$1 does not match this pattern"
   exit 1
 fi
 

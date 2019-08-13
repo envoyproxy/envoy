@@ -3,12 +3,29 @@
 #include <vector>
 
 #include "envoy/runtime/runtime.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
 
 #include "common/common/logger.h"
 #include "common/upstream/thread_aware_lb_impl.h"
 
 namespace Envoy {
 namespace Upstream {
+
+/**
+ * All ring hash load balancer stats. @see stats_macros.h
+ */
+#define ALL_RING_HASH_LOAD_BALANCER_STATS(GAUGE)                                                   \
+  GAUGE(max_hashes_per_host, Accumulate)                                                           \
+  GAUGE(min_hashes_per_host, Accumulate)                                                           \
+  GAUGE(size, Accumulate)
+
+/**
+ * Struct definition for all ring hash load balancer stats. @see stats_macros.h
+ */
+struct RingHashLoadBalancerStats {
+  ALL_RING_HASH_LOAD_BALANCER_STATS(GENERATE_GAUGE_STRUCT)
+};
 
 /**
  * A load balancer that implements consistent modulo hashing ("ketama"). Currently, zone aware
@@ -22,41 +39,53 @@ namespace Upstream {
 class RingHashLoadBalancer : public ThreadAwareLoadBalancerBase,
                              Logger::Loggable<Logger::Id::upstream> {
 public:
-  RingHashLoadBalancer(PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
-                       Runtime::RandomGenerator& random,
+  RingHashLoadBalancer(const PrioritySet& priority_set, ClusterStats& stats, Stats::Scope& scope,
+                       Runtime::Loader& runtime, Runtime::RandomGenerator& random,
                        const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>& config,
                        const envoy::api::v2::Cluster::CommonLbConfig& common_config);
 
+  const RingHashLoadBalancerStats& stats() const { return stats_; }
+
 private:
+  using HashFunction = envoy::api::v2::Cluster_RingHashLbConfig_HashFunction;
+
   struct RingEntry {
     uint64_t hash_;
     HostConstSharedPtr host_;
   };
 
   struct Ring : public HashingLoadBalancer {
-    Ring(const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>& config,
-         const HostVector& hosts);
+    Ring(const NormalizedHostWeightVector& normalized_host_weights, double min_normalized_weight,
+         uint64_t min_ring_size, uint64_t max_ring_size, HashFunction hash_function,
+         RingHashLoadBalancerStats& stats);
 
     // ThreadAwareLoadBalancerBase::HashingLoadBalancer
     HostConstSharedPtr chooseHost(uint64_t hash) const override;
 
     std::vector<RingEntry> ring_;
+
+    RingHashLoadBalancerStats& stats_;
   };
-  typedef std::shared_ptr<const Ring> RingConstSharedPtr;
+  using RingConstSharedPtr = std::shared_ptr<const Ring>;
 
   // ThreadAwareLoadBalancerBase
-  HashingLoadBalancerSharedPtr createLoadBalancer(const HostSet& host_set) override {
-    // Note that we only compute global panic on host set refresh. Given that the runtime setting
-    // will rarely change, this is a reasonable compromise to avoid creating extra LBs when we only
-    // need to create one per priority level.
-    if (isGlobalPanic(host_set)) {
-      return std::make_shared<Ring>(config_, host_set.hosts());
-    } else {
-      return std::make_shared<Ring>(config_, host_set.healthyHosts());
-    }
+  HashingLoadBalancerSharedPtr
+  createLoadBalancer(const NormalizedHostWeightVector& normalized_host_weights,
+                     double min_normalized_weight, double /* max_normalized_weight */) override {
+    return std::make_shared<Ring>(normalized_host_weights, min_normalized_weight, min_ring_size_,
+                                  max_ring_size_, hash_function_, stats_);
   }
 
-  const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>& config_;
+  static RingHashLoadBalancerStats generateStats(Stats::Scope& scope);
+
+  Stats::ScopePtr scope_;
+  RingHashLoadBalancerStats stats_;
+
+  static const uint64_t DefaultMinRingSize = 1024;
+  static const uint64_t DefaultMaxRingSize = 1024 * 1024 * 8;
+  const uint64_t min_ring_size_;
+  const uint64_t max_ring_size_;
+  const HashFunction hash_function_;
 };
 
 } // namespace Upstream

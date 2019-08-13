@@ -3,14 +3,20 @@
 #include <algorithm>
 #include <cstdint>
 #include <fstream>
+#include <regex>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
 
+#include "envoy/admin/v2alpha/certs.pb.h"
 #include "envoy/admin/v2alpha/clusters.pb.h"
 #include "envoy/admin/v2alpha/config_dump.pb.h"
+#include "envoy/admin/v2alpha/listeners.pb.h"
+#include "envoy/admin/v2alpha/memory.pb.h"
+#include "envoy/admin/v2alpha/mutex_stats.pb.h"
+#include "envoy/admin/v2alpha/server_info.pb.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/hot_restart.h"
@@ -25,16 +31,19 @@
 #include "common/access_log/access_log_impl.h"
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
+#include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
+#include "common/common/mutex_tracer_impl.h"
 #include "common/common/utility.h"
 #include "common/common/version.h"
 #include "common/html/utility.h"
 #include "common/http/codes.h"
+#include "common/http/conn_manager_utility.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
-#include "common/http/http1/codec_impl.h"
 #include "common/json/json_loader.h"
+#include "common/memory/stats.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/utility.h"
 #include "common/profiler/profiler.h"
@@ -129,6 +138,8 @@ const char AdminHtmlEnd[] = R"(
 </body>
 )";
 
+const std::regex PromRegex("[^a-zA-Z0-9_]");
+
 void populateFallbackResponseHeaders(Http::Code code, Http::HeaderMap& header_map) {
   header_map.insertStatus().value(std::to_string(enumToInt(code)));
   const auto& headers = Http::Headers::get();
@@ -145,6 +156,56 @@ void populateFallbackResponseHeaders(Http::Code code, Http::HeaderMap& header_ma
   header_map.addReference(headers.XContentTypeOptions, headers.XContentTypeOptionValues.Nosniff);
 }
 
+// Helper method to get filter parameter
+absl::optional<std::regex> filterParam(Http::Utility::QueryParams params) {
+  return (params.find("filter") != params.end())
+             ? absl::optional<std::regex>{std::regex(params.at("filter"))}
+             : absl::nullopt;
+}
+
+// Helper method to get the format parameter
+absl::optional<std::string> formatParam(Http::Utility::QueryParams params) {
+  return (params.find("format") != params.end()) ? absl::optional<std::string>{params.at("format")}
+                                                 : absl::nullopt;
+}
+
+// Helper method that ensures that we've setting flags based on all the health flag values on the
+// host.
+void setHealthFlag(Upstream::Host::HealthFlag flag, const Upstream::Host& host,
+                   envoy::admin::v2alpha::HostHealthStatus& health_status) {
+  switch (flag) {
+  case Upstream::Host::HealthFlag::FAILED_ACTIVE_HC:
+    health_status.set_failed_active_health_check(
+        host.healthFlagGet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC));
+    break;
+  case Upstream::Host::HealthFlag::FAILED_OUTLIER_CHECK:
+    health_status.set_failed_outlier_check(
+        host.healthFlagGet(Upstream::Host::HealthFlag::FAILED_OUTLIER_CHECK));
+    break;
+  case Upstream::Host::HealthFlag::FAILED_EDS_HEALTH:
+  case Upstream::Host::HealthFlag::DEGRADED_EDS_HEALTH:
+    if (host.healthFlagGet(Upstream::Host::HealthFlag::FAILED_EDS_HEALTH)) {
+      health_status.set_eds_health_status(envoy::api::v2::core::HealthStatus::UNHEALTHY);
+    } else if (host.healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_EDS_HEALTH)) {
+      health_status.set_eds_health_status(envoy::api::v2::core::HealthStatus::DEGRADED);
+    } else {
+      health_status.set_eds_health_status(envoy::api::v2::core::HealthStatus::HEALTHY);
+    }
+    break;
+  case Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC:
+    health_status.set_failed_active_degraded_check(
+        host.healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC));
+    break;
+  case Upstream::Host::HealthFlag::PENDING_DYNAMIC_REMOVAL:
+    health_status.set_pending_dynamic_removal(
+        host.healthFlagGet(Upstream::Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
+    break;
+  case Upstream::Host::HealthFlag::PENDING_ACTIVE_HC:
+    health_status.set_pending_active_hc(
+        host.healthFlagGet(Upstream::Host::HealthFlag::PENDING_ACTIVE_HC));
+    break;
+  }
+}
 } // namespace
 
 AdminFilter::AdminFilter(AdminImpl& parent) : parent_(parent) {}
@@ -158,7 +219,13 @@ Http::FilterHeadersStatus AdminFilter::decodeHeaders(Http::HeaderMap& headers, b
   return Http::FilterHeadersStatus::StopIteration;
 }
 
-Http::FilterDataStatus AdminFilter::decodeData(Buffer::Instance&, bool end_stream) {
+Http::FilterDataStatus AdminFilter::decodeData(Buffer::Instance& data, bool end_stream) {
+  // Currently we generically buffer all admin request data in case a handler wants to use it.
+  // If we ever support streaming admin requests we may need to revisit this. Note, we must use
+  // addDecodedData() here since we might need to perform onComplete() processing if end_stream is
+  // true.
+  callbacks_->addDecodedData(data, false);
+
   if (end_stream) {
     onComplete();
   }
@@ -186,6 +253,8 @@ Http::StreamDecoderFilterCallbacks& AdminFilter::getDecoderFilterCallbacks() con
   return *callbacks_;
 }
 
+const Buffer::Instance* AdminFilter::getRequestBody() const { return callbacks_->decodingBuffer(); }
+
 const Http::HeaderMap& AdminFilter::getRequestHeaders() const {
   ASSERT(request_headers_ != nullptr);
   return *request_headers_;
@@ -201,8 +270,8 @@ bool AdminImpl::changeLogLevel(const Http::Utility::QueryParams& params) {
 
   // First see if the level is valid.
   size_t level_to_use = std::numeric_limits<size_t>::max();
-  for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_names); i++) {
-    if (level == spdlog::level::level_names[i]) {
+  for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_string_views); i++) {
+    if (level == spdlog::level::level_string_views[i]) {
       level_to_use = i;
       break;
     }
@@ -242,10 +311,22 @@ void AdminImpl::addOutlierInfo(const std::string& cluster_name,
                                const Upstream::Outlier::Detector* outlier_detector,
                                Buffer::Instance& response) {
   if (outlier_detector) {
-    response.add(fmt::format("{}::outlier::success_rate_average::{}\n", cluster_name,
-                             outlier_detector->successRateAverage()));
-    response.add(fmt::format("{}::outlier::success_rate_ejection_threshold::{}\n", cluster_name,
-                             outlier_detector->successRateEjectionThreshold()));
+    response.add(fmt::format(
+        "{}::outlier::success_rate_average::{}\n", cluster_name,
+        outlier_detector->successRateAverage(
+            Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin)));
+    response.add(fmt::format(
+        "{}::outlier::success_rate_ejection_threshold::{}\n", cluster_name,
+        outlier_detector->successRateEjectionThreshold(
+            Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin)));
+    response.add(fmt::format(
+        "{}::outlier::local_origin_success_rate_average::{}\n", cluster_name,
+        outlier_detector->successRateAverage(
+            Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin)));
+    response.add(fmt::format(
+        "{}::outlier::local_origin_success_rate_ejection_threshold::{}\n", cluster_name,
+        outlier_detector->successRateEjectionThreshold(
+            Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin)));
   }
 }
 
@@ -272,9 +353,19 @@ void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
     cluster_status.set_name(cluster_info->name());
 
     const Upstream::Outlier::Detector* outlier_detector = cluster.outlierDetector();
-    if (outlier_detector != nullptr && outlier_detector->successRateEjectionThreshold() > 0.0) {
+    if (outlier_detector != nullptr &&
+        outlier_detector->successRateEjectionThreshold(
+            Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin) > 0.0) {
       cluster_status.mutable_success_rate_ejection_threshold()->set_value(
-          outlier_detector->successRateEjectionThreshold());
+          outlier_detector->successRateEjectionThreshold(
+              Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin));
+    }
+    if (outlier_detector != nullptr &&
+        outlier_detector->successRateEjectionThreshold(
+            Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin) > 0.0) {
+      cluster_status.mutable_local_origin_success_rate_ejection_threshold()->set_value(
+          outlier_detector->successRateEjectionThreshold(
+              Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin));
     }
 
     cluster_status.set_added_via_api(cluster_info->addedViaApi());
@@ -284,6 +375,7 @@ void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
         envoy::admin::v2alpha::HostStatus& host_status = *cluster_status.add_host_statuses();
         Network::Utility::addressToProtobufAddress(*host->address(),
                                                    *host_status.mutable_address());
+        host_status.set_hostname(host->hostname());
         std::vector<Stats::CounterSharedPtr> sorted_counters;
         for (const Stats::CounterSharedPtr& counter : host->counters()) {
           sorted_counters.push_back(counter);
@@ -319,17 +411,26 @@ void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
 
         envoy::admin::v2alpha::HostHealthStatus& health_status =
             *host_status.mutable_health_status();
-        health_status.set_failed_active_health_check(
-            host->healthFlagGet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC));
-        health_status.set_failed_outlier_check(
-            host->healthFlagGet(Upstream::Host::HealthFlag::FAILED_OUTLIER_CHECK));
-        health_status.set_eds_health_status(
-            host->healthFlagGet(Upstream::Host::HealthFlag::FAILED_EDS_HEALTH)
-                ? envoy::api::v2::core::HealthStatus::UNHEALTHY
-                : envoy::api::v2::core::HealthStatus::HEALTHY);
-        double success_rate = host->outlierDetector().successRate();
+
+// Invokes setHealthFlag for each health flag.
+#define SET_HEALTH_FLAG(name, notused)                                                             \
+  setHealthFlag(Upstream::Host::HealthFlag::name, *host, health_status);
+        HEALTH_FLAG_ENUM_VALUES(SET_HEALTH_FLAG)
+#undef SET_HEALTH_FLAG
+
+        double success_rate = host->outlierDetector().successRate(
+            Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin);
         if (success_rate >= 0.0) {
           host_status.mutable_success_rate()->set_value(success_rate);
+        }
+
+        host_status.set_weight(host->weight());
+
+        host_status.set_priority(host->priority());
+        success_rate = host->outlierDetector().successRate(
+            Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin);
+        if (success_rate >= 0.0) {
+          host_status.mutable_local_origin_success_rate()->set_value(success_rate);
         }
       }
     }
@@ -363,11 +464,13 @@ void AdminImpl::writeClustersAsText(Buffer::Instance& response) {
           all_stats[gauge->name()] = gauge->value();
         }
 
-        for (auto stat : all_stats) {
+        for (const auto& stat : all_stats) {
           response.add(fmt::format("{}::{}::{}::{}\n", cluster.second.get().info()->name(),
                                    host->address()->asString(), stat.first, stat.second));
         }
 
+        response.add(fmt::format("{}::{}::hostname::{}\n", cluster.second.get().info()->name(),
+                                 host->address()->asString(), host->hostname()));
         response.add(fmt::format("{}::{}::health_flags::{}\n", cluster.second.get().info()->name(),
                                  host->address()->asString(),
                                  Upstream::HostUtility::healthFlagsToString(*host)));
@@ -381,20 +484,47 @@ void AdminImpl::writeClustersAsText(Buffer::Instance& response) {
                                  host->address()->asString(), host->locality().sub_zone()));
         response.add(fmt::format("{}::{}::canary::{}\n", cluster.second.get().info()->name(),
                                  host->address()->asString(), host->canary()));
-        response.add(fmt::format("{}::{}::success_rate::{}\n", cluster.second.get().info()->name(),
-                                 host->address()->asString(),
-                                 host->outlierDetector().successRate()));
+        response.add(fmt::format("{}::{}::priority::{}\n", cluster.second.get().info()->name(),
+                                 host->address()->asString(), host->priority()));
+        response.add(fmt::format(
+            "{}::{}::success_rate::{}\n", cluster.second.get().info()->name(),
+            host->address()->asString(),
+            host->outlierDetector().successRate(
+                Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin)));
+        response.add(fmt::format(
+            "{}::{}::local_origin_success_rate::{}\n", cluster.second.get().info()->name(),
+            host->address()->asString(),
+            host->outlierDetector().successRate(
+                Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin)));
       }
     }
+  }
+}
+
+void AdminImpl::writeListenersAsJson(Buffer::Instance& response) {
+  envoy::admin::v2alpha::Listeners listeners;
+  for (const auto& listener : server_.listenerManager().listeners()) {
+    envoy::admin::v2alpha::ListenerStatus& listener_status = *listeners.add_listener_statuses();
+    listener_status.set_name(listener.get().name());
+    Network::Utility::addressToProtobufAddress(*listener.get().socket().localAddress(),
+                                               *listener_status.mutable_local_address());
+  }
+  response.add(MessageUtil::getJsonStringFromMessage(listeners, true)); // pretty-print
+}
+
+void AdminImpl::writeListenersAsText(Buffer::Instance& response) {
+  for (const auto& listener : server_.listenerManager().listeners()) {
+    response.add(fmt::format("{}::{}\n", listener.get().name(),
+                             listener.get().socket().localAddress()->asString()));
   }
 }
 
 Http::Code AdminImpl::handlerClusters(absl::string_view url, Http::HeaderMap& response_headers,
                                       Buffer::Instance& response, AdminStream&) {
   Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
-  auto it = query_params.find("format");
+  const auto format_value = formatParam(query_params);
 
-  if (it != query_params.end() && it->second == "json") {
+  if (format_value.has_value() && format_value.value() == "json") {
     writeClustersAsJson(response);
     response_headers.insertContentType().value().setReference(
         Http::Headers::get().ContentTypeValues.Json);
@@ -422,6 +552,26 @@ Http::Code AdminImpl::handlerConfigDump(absl::string_view, Http::HeaderMap& resp
   return Http::Code::OK;
 }
 
+// TODO(ambuc) Export this as a server (?) stat for monitoring.
+Http::Code AdminImpl::handlerContention(absl::string_view, Http::HeaderMap& response_headers,
+                                        Buffer::Instance& response, AdminStream&) {
+
+  if (server_.options().mutexTracingEnabled() && server_.mutexTracer() != nullptr) {
+    response_headers.insertContentType().value().setReference(
+        Http::Headers::get().ContentTypeValues.Json);
+
+    envoy::admin::v2alpha::MutexStats mutex_stats;
+    mutex_stats.set_num_contentions(server_.mutexTracer()->numContentions());
+    mutex_stats.set_current_wait_cycles(server_.mutexTracer()->currentWaitCycles());
+    mutex_stats.set_lifetime_wait_cycles(server_.mutexTracer()->lifetimeWaitCycles());
+    response.add(MessageUtil::getJsonStringFromMessage(mutex_stats, true, true));
+  } else {
+    response.add("Mutex contention tracing is not enabled. To enable, run Envoy with flag "
+                 "--enable-mutex-tracing.");
+  }
+  return Http::Code::OK;
+}
+
 Http::Code AdminImpl::handlerCpuProfiler(absl::string_view url, Http::HeaderMap&,
                                          Buffer::Instance& response, AdminStream&) {
   Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
@@ -444,6 +594,53 @@ Http::Code AdminImpl::handlerCpuProfiler(absl::string_view url, Http::HeaderMap&
 
   response.add("OK\n");
   return Http::Code::OK;
+}
+
+Http::Code AdminImpl::handlerHeapProfiler(absl::string_view url, Http::HeaderMap&,
+                                          Buffer::Instance& response, AdminStream&) {
+  if (!Profiler::Heap::profilerEnabled()) {
+    response.add("The current build does not support heap profiler");
+    return Http::Code::NotImplemented;
+  }
+
+  Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
+  if (query_params.size() != 1 || query_params.begin()->first != "enable" ||
+      (query_params.begin()->second != "y" && query_params.begin()->second != "n")) {
+    response.add("?enable=<y|n>\n");
+    return Http::Code::BadRequest;
+  }
+
+  Http::Code res = Http::Code::OK;
+  bool enable = query_params.begin()->second == "y";
+  if (enable) {
+    if (Profiler::Heap::isProfilerStarted()) {
+      response.add("Fail to start heap profiler: already started");
+      res = Http::Code::BadRequest;
+    } else if (!Profiler::Heap::startProfiler(profile_path_)) {
+      // GCOVR_EXCL_START
+      // TODO(silentdai) remove the GCOVR when startProfiler is better implemented
+      response.add("Fail to start the heap profiler");
+      res = Http::Code::InternalServerError;
+      // GCOVR_EXCL_STOP
+    } else {
+      response.add("Starting heap profiler");
+      res = Http::Code::OK;
+    }
+  } else {
+    // !enable
+    if (!Profiler::Heap::isProfilerStarted()) {
+      response.add("Fail to stop heap profiler: not started");
+      res = Http::Code::BadRequest;
+    } else {
+      Profiler::Heap::stopProfiler();
+      response.add(
+          fmt::format("Heap profiler stopped and data written to {}. See "
+                      "http://goog-perftools.sourceforge.net/doc/heap_profiler.html for details.",
+                      profile_path_));
+      res = Http::Code::OK;
+    }
+  }
+  return res;
 }
 
 Http::Code AdminImpl::handlerHealthcheckFail(absl::string_view, Http::HeaderMap&,
@@ -471,12 +668,12 @@ Http::Code AdminImpl::handlerLogging(absl::string_view url, Http::HeaderMap&,
   Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
 
   Http::Code rc = Http::Code::OK;
-  if (!changeLogLevel(query_params)) {
+  if (!query_params.empty() && !changeLogLevel(query_params)) {
     response.add("usage: /logging?<name>=<level> (change single level)\n");
     response.add("usage: /logging?level=<level> (change all levels)\n");
     response.add("levels: ");
-    for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_names); i++) {
-      response.add(fmt::format("{} ", spdlog::level::level_names[i]));
+    for (auto level_string_view : spdlog::level::level_string_views) {
+      response.add(fmt::format("{} ", level_string_view));
     }
 
     response.add("\n");
@@ -492,6 +689,21 @@ Http::Code AdminImpl::handlerLogging(absl::string_view url, Http::HeaderMap&,
   return rc;
 }
 
+// TODO(ambuc): Add more tcmalloc stats, export proto details based on allocator.
+Http::Code AdminImpl::handlerMemory(absl::string_view, Http::HeaderMap& response_headers,
+                                    Buffer::Instance& response, AdminStream&) {
+  response_headers.insertContentType().value().setReference(
+      Http::Headers::get().ContentTypeValues.Json);
+  envoy::admin::v2alpha::Memory memory;
+  memory.set_allocated(Memory::Stats::totalCurrentlyAllocated());
+  memory.set_heap_size(Memory::Stats::totalCurrentlyReserved());
+  memory.set_total_thread_cache(Memory::Stats::totalThreadCacheBytes());
+  memory.set_pageheap_unmapped(Memory::Stats::totalPageHeapUnmapped());
+  memory.set_pageheap_free(Memory::Stats::totalPageHeapFree());
+  response.add(MessageUtil::getJsonStringFromMessage(memory, true, true)); // pretty-print
+  return Http::Code::OK;
+}
+
 Http::Code AdminImpl::handlerResetCounters(absl::string_view, Http::HeaderMap&,
                                            Buffer::Instance& response, AdminStream&) {
   for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
@@ -502,15 +714,36 @@ Http::Code AdminImpl::handlerResetCounters(absl::string_view, Http::HeaderMap&,
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap&,
+Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap& headers,
                                         Buffer::Instance& response, AdminStream&) {
   time_t current_time = time(nullptr);
-  response.add(fmt::format("envoy {} {} {} {} {}\n", VersionInfo::version(),
-                           server_.healthCheckFailed() ? "draining" : "live",
-                           current_time - server_.startTimeCurrentEpoch(),
-                           current_time - server_.startTimeFirstEpoch(),
-                           server_.options().restartEpoch()));
+  envoy::admin::v2alpha::ServerInfo server_info;
+  server_info.set_version(VersionInfo::version());
+  server_info.set_state(
+      Utility::serverState(server_.initManager().state(), server_.healthCheckFailed()));
+
+  server_info.mutable_uptime_current_epoch()->set_seconds(current_time -
+                                                          server_.startTimeCurrentEpoch());
+  server_info.mutable_uptime_all_epochs()->set_seconds(current_time -
+                                                       server_.startTimeFirstEpoch());
+  envoy::admin::v2alpha::CommandLineOptions* command_line_options =
+      server_info.mutable_command_line_options();
+  *command_line_options = *server_.options().toCommandLineOptions();
+  response.add(MessageUtil::getJsonStringFromMessage(server_info, true, true));
+  headers.insertContentType().value().setReference(Http::Headers::get().ContentTypeValues.Json);
   return Http::Code::OK;
+}
+
+Http::Code AdminImpl::handlerReady(absl::string_view, Http::HeaderMap&, Buffer::Instance& response,
+                                   AdminStream&) {
+  const envoy::admin::v2alpha::ServerInfo::State state =
+      Utility::serverState(server_.initManager().state(), server_.healthCheckFailed());
+
+  response.add(envoy::admin::v2alpha::ServerInfo_State_Name(state) + "\n");
+  Http::Code code = state == envoy::admin::v2alpha::ServerInfo_State_LIVE
+                        ? Http::Code::OK
+                        : Http::Code::ServiceUnavailable;
+  return code;
 }
 
 Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& response_headers,
@@ -518,29 +751,30 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
   Http::Code rc = Http::Code::OK;
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
 
-  const bool show_all = params.find("usedonly") == params.end();
-  const bool has_format = !(params.find("format") == params.end());
+  const bool used_only = params.find("usedonly") != params.end();
+  const absl::optional<std::regex> regex = filterParam(params);
 
   std::map<std::string, uint64_t> all_stats;
   for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
-    if (show_all || counter->used()) {
+    if (shouldShowMetric(*counter, used_only, regex)) {
       all_stats.emplace(counter->name(), counter->value());
     }
   }
 
   for (const Stats::GaugeSharedPtr& gauge : server_.stats().gauges()) {
-    if (show_all || gauge->used()) {
+    if (shouldShowMetric(*gauge, used_only, regex)) {
+      ASSERT(gauge->importMode() != Stats::Gauge::ImportMode::Uninitialized);
       all_stats.emplace(gauge->name(), gauge->value());
     }
   }
 
-  if (has_format) {
-    const std::string format_value = params.at("format");
-    if (format_value == "json") {
+  if (const auto format_value = formatParam(params)) {
+    if (format_value.value() == "json") {
       response_headers.insertContentType().value().setReference(
           Http::Headers::get().ContentTypeValues.Json);
-      response.add(AdminImpl::statsAsJson(all_stats, server_.stats().histograms(), show_all));
-    } else if (format_value == "prometheus") {
+      response.add(
+          AdminImpl::statsAsJson(all_stats, server_.stats().histograms(), used_only, regex));
+    } else if (format_value.value() == "prometheus") {
       return handlerPrometheusStats(url, response_headers, response, admin_stream);
     } else {
       response.add("usage: /stats?format=json  or /stats?format=prometheus \n");
@@ -548,41 +782,50 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
       rc = Http::Code::NotFound;
     }
   } else { // Display plain stats if format query param is not there.
-    for (auto stat : all_stats) {
+    for (const auto& stat : all_stats) {
       response.add(fmt::format("{}: {}\n", stat.first, stat.second));
     }
-    // TOOD(ramaraochavali): See the comment in ThreadLocalStoreImpl::histograms() for why we use a
+    // TODO(ramaraochavali): See the comment in ThreadLocalStoreImpl::histograms() for why we use a
     // multimap here. This makes sure that duplicate histograms get output. When shared storage is
     // implemented this can be switched back to a normal map.
     std::multimap<std::string, std::string> all_histograms;
     for (const Stats::ParentHistogramSharedPtr& histogram : server_.stats().histograms()) {
-      if (show_all || histogram->used()) {
-        all_histograms.emplace(histogram->name(), histogram->summary());
+      if (shouldShowMetric(*histogram, used_only, regex)) {
+        all_histograms.emplace(histogram->name(), histogram->quantileSummary());
       }
     }
-    for (auto histogram : all_histograms) {
+    for (const auto& histogram : all_histograms) {
       response.add(fmt::format("{}: {}\n", histogram.first, histogram.second));
     }
   }
   return rc;
 }
 
-Http::Code AdminImpl::handlerPrometheusStats(absl::string_view, Http::HeaderMap&,
+Http::Code AdminImpl::handlerPrometheusStats(absl::string_view path_and_query, Http::HeaderMap&,
                                              Buffer::Instance& response, AdminStream&) {
+  const Http::Utility::QueryParams params = Http::Utility::parseQueryString(path_and_query);
+  const bool used_only = params.find("usedonly") != params.end();
+  const absl::optional<std::regex> regex = filterParam(params);
   PrometheusStatsFormatter::statsAsPrometheus(server_.stats().counters(), server_.stats().gauges(),
-                                              response);
+                                              server_.stats().histograms(), response, used_only,
+                                              regex);
   return Http::Code::OK;
 }
 
 std::string PrometheusStatsFormatter::sanitizeName(const std::string& name) {
-  std::string stats_name = name;
-  std::replace(stats_name.begin(), stats_name.end(), '.', '_');
-  std::replace(stats_name.begin(), stats_name.end(), '-', '_');
-  return stats_name;
+  // The name must match the regex [a-zA-Z_][a-zA-Z0-9_]* as required by
+  // prometheus. Refer to https://prometheus.io/docs/concepts/data_model/.
+  std::string stats_name = std::regex_replace(name, PromRegex, "_");
+  if (stats_name[0] >= '0' && stats_name[0] <= '9') {
+    return fmt::format("_{}", stats_name);
+  } else {
+    return stats_name;
+  }
 }
 
 std::string PrometheusStatsFormatter::formattedTags(const std::vector<Stats::Tag>& tags) {
   std::vector<std::string> buf;
+  buf.reserve(tags.size());
   for (const Stats::Tag& tag : tags) {
     buf.push_back(fmt::format("{}=\"{}\"", sanitizeName(tag.name_), tag.value_));
   }
@@ -593,16 +836,20 @@ std::string PrometheusStatsFormatter::metricName(const std::string& extractedNam
   // Add namespacing prefix to avoid conflicts, as per best practice:
   // https://prometheus.io/docs/practices/naming/#metric-names
   // Also, naming conventions on https://prometheus.io/docs/concepts/data_model/
-  return fmt::format("envoy_{0}", sanitizeName(extractedName));
+  return sanitizeName(fmt::format("envoy_{0}", extractedName));
 }
 
-// TODO(ramaraochavali): Add summary histogram output for Prometheus.
-uint64_t
-PrometheusStatsFormatter::statsAsPrometheus(const std::vector<Stats::CounterSharedPtr>& counters,
-                                            const std::vector<Stats::GaugeSharedPtr>& gauges,
-                                            Buffer::Instance& response) {
+uint64_t PrometheusStatsFormatter::statsAsPrometheus(
+    const std::vector<Stats::CounterSharedPtr>& counters,
+    const std::vector<Stats::GaugeSharedPtr>& gauges,
+    const std::vector<Stats::ParentHistogramSharedPtr>& histograms, Buffer::Instance& response,
+    const bool used_only, const absl::optional<std::regex>& regex) {
   std::unordered_set<std::string> metric_type_tracker;
   for (const auto& counter : counters) {
+    if (!shouldShowMetric(*counter, used_only, regex)) {
+      continue;
+    }
+
     const std::string tags = formattedTags(counter->tags());
     const std::string metric_name = metricName(counter->tagExtractedName());
     if (metric_type_tracker.find(metric_name) == metric_type_tracker.end()) {
@@ -613,6 +860,10 @@ PrometheusStatsFormatter::statsAsPrometheus(const std::vector<Stats::CounterShar
   }
 
   for (const auto& gauge : gauges) {
+    if (!shouldShowMetric(*gauge, used_only, regex)) {
+      continue;
+    }
+
     const std::string tags = formattedTags(gauge->tags());
     const std::string metric_name = metricName(gauge->tagExtractedName());
     if (metric_type_tracker.find(metric_name) == metric_type_tracker.end()) {
@@ -621,18 +872,55 @@ PrometheusStatsFormatter::statsAsPrometheus(const std::vector<Stats::CounterShar
     }
     response.add(fmt::format("{0}{{{1}}} {2}\n", metric_name, tags, gauge->value()));
   }
+
+  for (const auto& histogram : histograms) {
+    if (!shouldShowMetric(*histogram, used_only, regex)) {
+      continue;
+    }
+
+    const std::string tags = formattedTags(histogram->tags());
+    const std::string hist_tags = histogram->tags().empty() ? EMPTY_STRING : (tags + ",");
+
+    const std::string metric_name = metricName(histogram->tagExtractedName());
+    if (metric_type_tracker.find(metric_name) == metric_type_tracker.end()) {
+      metric_type_tracker.insert(metric_name);
+      response.add(fmt::format("# TYPE {0} histogram\n", metric_name));
+    }
+
+    const Stats::HistogramStatistics& stats = histogram->cumulativeStatistics();
+    const std::vector<double>& supported_buckets = stats.supportedBuckets();
+    const std::vector<uint64_t>& computed_buckets = stats.computedBuckets();
+    for (size_t i = 0; i < supported_buckets.size(); ++i) {
+      double bucket = supported_buckets[i];
+      uint64_t value = computed_buckets[i];
+      // We want to print the bucket in a fixed point (non-scientific) format. The fmt library
+      // doesn't have a specific modifier to format as a fixed-point value only so we use the
+      // 'g' operator which prints the number in general fixed point format or scientific format
+      // with precision 50 to round the number up to 32 significant digits in fixed point format
+      // which should cover pretty much all cases
+      response.add(fmt::format("{0}_bucket{{{1}le=\"{2:.32g}\"}} {3}\n", metric_name, hist_tags,
+                               bucket, value));
+    }
+
+    response.add(fmt::format("{0}_bucket{{{1}le=\"+Inf\"}} {2}\n", metric_name, hist_tags,
+                             stats.sampleCount()));
+    response.add(fmt::format("{0}_sum{{{1}}} {2:.32g}\n", metric_name, tags, stats.sampleSum()));
+    response.add(fmt::format("{0}_count{{{1}}} {2}\n", metric_name, tags, stats.sampleCount()));
+  }
+
   return metric_type_tracker.size();
 }
 
 std::string
 AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
                        const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
-                       const bool show_all, const bool pretty_print) {
+                       const bool used_only, const absl::optional<std::regex> regex,
+                       const bool pretty_print) {
   rapidjson::Document document;
   document.SetObject();
   rapidjson::Value stats_array(rapidjson::kArrayType);
   rapidjson::Document::AllocatorType& allocator = document.GetAllocator();
-  for (auto stat : all_stats) {
+  for (const auto& stat : all_stats) {
     Value stat_obj;
     stat_obj.SetObject();
     Value stat_name;
@@ -654,7 +942,7 @@ AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
   rapidjson::Value histogram_array(rapidjson::kArrayType);
 
   for (const Stats::ParentHistogramSharedPtr& histogram : all_histograms) {
-    if (show_all || histogram->used()) {
+    if (shouldShowMetric(*histogram, used_only, regex)) {
       if (!found_used_histogram) {
         // It is not possible for the supported quantiles to differ across histograms, so it is ok
         // to send them once.
@@ -720,34 +1008,40 @@ Http::Code AdminImpl::handlerQuitQuitQuit(absl::string_view, Http::HeaderMap&,
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerListenerInfo(absl::string_view, Http::HeaderMap& response_headers,
+Http::Code AdminImpl::handlerListenerInfo(absl::string_view url, Http::HeaderMap& response_headers,
                                           Buffer::Instance& response, AdminStream&) {
-  response_headers.insertContentType().value().setReference(
-      Http::Headers::get().ContentTypeValues.Json);
-  std::list<std::string> listeners;
-  for (auto listener : server_.listenerManager().listeners()) {
-    listeners.push_back(listener.get().socket().localAddress()->asString());
+  const Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
+  const auto format_value = formatParam(query_params);
+
+  if (format_value.has_value() && format_value.value() == "json") {
+    writeListenersAsJson(response);
+    response_headers.insertContentType().value().setReference(
+        Http::Headers::get().ContentTypeValues.Json);
+  } else {
+    writeListenersAsText(response);
   }
-  response.add(Json::Factory::listAsJsonString(listeners));
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerCerts(absl::string_view, Http::HeaderMap&, Buffer::Instance& response,
-                                   AdminStream&) {
+Http::Code AdminImpl::handlerCerts(absl::string_view, Http::HeaderMap& response_headers,
+                                   Buffer::Instance& response, AdminStream&) {
   // This set is used to track distinct certificates. We may have multiple listeners, upstreams, etc
   // using the same cert.
-  std::unordered_set<std::string> context_info_set;
-  std::string context_format = "{{\n\t\"ca_cert\": \"{}\",\n\t\"cert_chain\": \"{}\"\n}}\n";
+  response_headers.insertContentType().value().setReference(
+      Http::Headers::get().ContentTypeValues.Json);
+  envoy::admin::v2alpha::Certificates certificates;
   server_.sslContextManager().iterateContexts([&](const Ssl::Context& context) -> void {
-    context_info_set.insert(fmt::format(context_format, context.getCaCertInformation(),
-                                        context.getCertChainInformation()));
+    envoy::admin::v2alpha::Certificate& certificate = *certificates.add_certificates();
+    if (context.getCaCertInformation() != nullptr) {
+      envoy::admin::v2alpha::CertificateDetails* ca_certificate = certificate.add_ca_cert();
+      *ca_certificate = *context.getCaCertInformation();
+    }
+    for (const auto& cert_details : context.getCertChainInformation()) {
+      envoy::admin::v2alpha::CertificateDetails* cert_chain = certificate.add_cert_chain();
+      *cert_chain = *cert_details;
+    }
   });
-
-  std::string cert_result_string;
-  for (const std::string& context_info : context_info_set) {
-    cert_result_string += context_info;
-  }
-  response.add(cert_result_string);
+  response.add(MessageUtil::getJsonStringFromMessage(certificates, true, true));
   return Http::Code::OK;
 }
 
@@ -785,7 +1079,7 @@ Http::Code AdminImpl::handlerRuntime(absl::string_view url, Http::HeaderMap& res
   for (const auto& layer : layers) {
     for (auto& kv : entry_objects) {
       const auto it = layer->values().find(kv.first);
-      const auto& entry_value = it == layer->values().end() ? "" : it->second.string_value_;
+      const auto& entry_value = it == layer->values().end() ? "" : it->second.raw_string_value_;
       rapidjson::Value entry_value_object;
       entry_value_object.SetString(entry_value.c_str(), allocator);
       if (!entry_value.empty()) {
@@ -810,46 +1104,40 @@ Http::Code AdminImpl::handlerRuntime(absl::string_view url, Http::HeaderMap& res
   return Http::Code::OK;
 }
 
-std::string AdminImpl::runtimeAsJson(
-    const std::vector<std::pair<std::string, Runtime::Snapshot::Entry>>& entries) {
-  rapidjson::Document document;
-  document.SetObject();
-  rapidjson::Value entries_array(rapidjson::kArrayType);
-  rapidjson::Document::AllocatorType& allocator = document.GetAllocator();
-  for (const auto& entry : entries) {
-    Value entry_obj;
-    entry_obj.SetObject();
-
-    entry_obj.AddMember("name", {entry.first.c_str(), allocator}, allocator);
-
-    Value entry_value;
-    if (entry.second.uint_value_) {
-      entry_value.SetUint64(entry.second.uint_value_.value());
-    } else {
-      entry_value.SetString(entry.second.string_value_.c_str(), allocator);
-    }
-    entry_obj.AddMember("value", entry_value, allocator);
-
-    entries_array.PushBack(entry_obj, allocator);
+bool AdminImpl::isFormUrlEncoded(const Http::HeaderEntry* content_type) const {
+  if (content_type == nullptr) {
+    return false;
   }
-  document.AddMember("runtime", entries_array, allocator);
-  rapidjson::StringBuffer strbuf;
-  rapidjson::PrettyWriter<StringBuffer> writer(strbuf);
-  document.Accept(writer);
-  return strbuf.GetString();
+
+  return content_type->value().getStringView() ==
+         Http::Headers::get().ContentTypeValues.FormUrlEncoded;
 }
 
 Http::Code AdminImpl::handlerRuntimeModify(absl::string_view url, Http::HeaderMap&,
-                                           Buffer::Instance& response, AdminStream&) {
-  const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
+                                           Buffer::Instance& response, AdminStream& admin_stream) {
+  Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
   if (params.empty()) {
-    response.add("usage: /runtime_modify?key1=value1&key2=value2&keyN=valueN\n");
-    response.add("use an empty value to remove a previously added override");
-    return Http::Code::BadRequest;
+    // Check if the params are in the request's body.
+    if (admin_stream.getRequestBody() != nullptr &&
+        isFormUrlEncoded(admin_stream.getRequestHeaders().ContentType())) {
+      params = Http::Utility::parseFromBody(admin_stream.getRequestBody()->toString());
+    }
+
+    if (params.empty()) {
+      response.add("usage: /runtime_modify?key1=value1&key2=value2&keyN=valueN\n");
+      response.add("       or send the parameters as form values\n");
+      response.add("use an empty value to remove a previously added override");
+      return Http::Code::BadRequest;
+    }
   }
   std::unordered_map<std::string, std::string> overrides;
   overrides.insert(params.begin(), params.end());
-  server_.runtime().mergeValues(overrides);
+  try {
+    server_.runtime().mergeValues(overrides);
+  } catch (const EnvoyException& e) {
+    response.add(e.what());
+    return Http::Code::ServiceUnavailable;
+  }
   response.add("OK\n");
   return Http::Code::OK;
 }
@@ -876,16 +1164,37 @@ void AdminFilter::onComplete() {
 AdminImpl::NullRouteConfigProvider::NullRouteConfigProvider(TimeSource& time_source)
     : config_(new Router::NullConfigImpl()), time_source_(time_source) {}
 
-AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& profile_path,
-                     const std::string& address_out_path,
-                     Network::Address::InstanceConstSharedPtr address, Server::Instance& server,
-                     Stats::ScopePtr&& listener_scope)
+void AdminImpl::startHttpListener(const std::string& access_log_path,
+                                  const std::string& address_out_path,
+                                  Network::Address::InstanceConstSharedPtr address,
+                                  const Network::Socket::OptionsSharedPtr& socket_options,
+                                  Stats::ScopePtr&& listener_scope) {
+  // TODO(mattklein123): Allow admin to use normal access logger extension loading and avoid the
+  // hard dependency here.
+  access_logs_.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
+      access_log_path, {}, AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter(),
+      server_.accessLogManager()));
+  socket_ = std::make_unique<Network::TcpListenSocket>(address, socket_options, true);
+  listener_ = std::make_unique<AdminListener>(*this, std::move(listener_scope));
+  if (!address_out_path.empty()) {
+    std::ofstream address_out_file(address_out_path);
+    if (!address_out_file) {
+      ENVOY_LOG(critical, "cannot open admin address output file {} for writing.",
+                address_out_path);
+    } else {
+      address_out_file << socket_->localAddress()->asString();
+    }
+  }
+}
+
+AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
     : server_(server), profile_path_(profile_path),
-      socket_(new Network::TcpListenSocket(address, nullptr, true)),
       stats_(Http::ConnectionManagerImpl::generateStats("http.admin.", server_.stats())),
       tracing_stats_(
           Http::ConnectionManagerImpl::generateTracingStats("http.admin.", no_op_store_)),
       route_config_provider_(server.timeSource()),
+      scoped_route_config_provider_(server.timeSource()),
+      // TODO(jsedgwick) add /runtime_reset endpoint that removes all admin-set values
       handlers_{
           {"/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false, false},
           {"/certs", "print certs on machine", MAKE_ADMIN_HANDLER(handlerCerts), false, false},
@@ -893,8 +1202,12 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
            false},
           {"/config_dump", "dump current Envoy configs (experimental)",
            MAKE_ADMIN_HANDLER(handlerConfigDump), false, false},
+          {"/contention", "dump current Envoy mutex contention stats (if enabled)",
+           MAKE_ADMIN_HANDLER(handlerContention), false, false},
           {"/cpuprofiler", "enable/disable the CPU profiler",
            MAKE_ADMIN_HANDLER(handlerCpuProfiler), false, true},
+          {"/heapprofiler", "enable/disable the heap profiler",
+           MAKE_ADMIN_HANDLER(handlerHeapProfiler), false, true},
           {"/healthcheck/fail", "cause the server to fail health checks",
            MAKE_ADMIN_HANDLER(handlerHealthcheckFail), false, true},
           {"/healthcheck/ok", "cause the server to pass health checks",
@@ -905,55 +1218,43 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
            MAKE_ADMIN_HANDLER(handlerHotRestartVersion), false, false},
           {"/logging", "query/change logging levels", MAKE_ADMIN_HANDLER(handlerLogging), false,
            true},
+          {"/memory", "print current allocation/heap usage", MAKE_ADMIN_HANDLER(handlerMemory),
+           false, false},
           {"/quitquitquit", "exit the server", MAKE_ADMIN_HANDLER(handlerQuitQuitQuit), false,
            true},
           {"/reset_counters", "reset all counters to zero",
            MAKE_ADMIN_HANDLER(handlerResetCounters), false, true},
           {"/server_info", "print server version/status information",
            MAKE_ADMIN_HANDLER(handlerServerInfo), false, false},
+          {"/ready", "print server state, return 200 if LIVE, otherwise return 503",
+           MAKE_ADMIN_HANDLER(handlerReady), false, false},
           {"/stats", "print server stats", MAKE_ADMIN_HANDLER(handlerStats), false, false},
           {"/stats/prometheus", "print server stats in prometheus format",
            MAKE_ADMIN_HANDLER(handlerPrometheusStats), false, false},
-          {"/listeners", "print listener addresses", MAKE_ADMIN_HANDLER(handlerListenerInfo), false,
+          {"/listeners", "print listener info", MAKE_ADMIN_HANDLER(handlerListenerInfo), false,
            false},
           {"/runtime", "print runtime values", MAKE_ADMIN_HANDLER(handlerRuntime), false, false},
           {"/runtime_modify", "modify runtime values", MAKE_ADMIN_HANDLER(handlerRuntimeModify),
            false, true},
       },
-
-      // TODO(jsedgwick) add /runtime_reset endpoint that removes all admin-set values
-      listener_(*this, std::move(listener_scope)),
-      admin_filter_chain_(std::make_shared<AdminFilterChain>()) {
-
-  if (!address_out_path.empty()) {
-    std::ofstream address_out_file(address_out_path);
-    if (!address_out_file) {
-      ENVOY_LOG(critical, "cannot open admin address output file {} for writing.",
-                address_out_path);
-    } else {
-      address_out_file << socket_->localAddress()->asString();
-    }
-  }
-
-  // TODO(mattklein123): Allow admin to use normal access logger extension loading and avoid the
-  // hard dependency here.
-  access_logs_.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
-      access_log_path, {}, AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter(),
-      server.accessLogManager()));
-}
+      date_provider_(server.dispatcher().timeSource()),
+      admin_filter_chain_(std::make_shared<AdminFilterChain>()) {}
 
 Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection,
-                                                 const Buffer::Instance&,
+                                                 const Buffer::Instance& data,
                                                  Http::ServerConnectionCallbacks& callbacks) {
-  return Http::ServerConnectionPtr{
-      new Http::Http1::ServerConnectionImpl(connection, callbacks, Http::Http1Settings())};
+  return Http::ConnectionManagerUtility::autoCreateCodec(
+      connection, data, callbacks, server_.stats(), Http::Http1Settings(), Http::Http2Settings(),
+      maxRequestHeadersKb());
 }
 
 bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
                                          const std::vector<Network::FilterFactoryCb>&) {
+  // Don't pass in the overload manager so that the admin interface is accessible even when
+  // the envoy is overloaded.
   connection.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
-      *this, server_.drainManager(), server_.random(), server_.httpTracer(), server_.runtime(),
-      server_.localInfo(), server_.clusterManager())});
+      *this, server_.drainManager(), server_.random(), server_.httpContext(), server_.runtime(),
+      server_.localInfo(), server_.clusterManager(), nullptr, server_.timeSource())});
   return true;
 }
 
@@ -981,8 +1282,8 @@ Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
         if (method != Http::Headers::get().MethodValues.Post) {
           ENVOY_LOG(error, "admin path \"{}\" mutates state, method={} rather than POST",
                     handler.prefix_, method);
-          code = Http::Code::BadRequest;
-          response.add("Invalid request; POST required");
+          code = Http::Code::MethodNotAllowed;
+          response.add(fmt::format("Method {} not allowed, POST required.", method));
           break;
         }
       }
@@ -1122,6 +1423,32 @@ Http::Code AdminImpl::request(absl::string_view path_and_query, absl::string_vie
   populateFallbackResponseHeaders(code, response_headers);
   body = response.toString();
   return code;
+}
+
+void AdminImpl::closeSocket() {
+  if (socket_) {
+    socket_->close();
+  }
+}
+
+void AdminImpl::addListenerToHandler(Network::ConnectionHandler* handler) {
+  if (listener_) {
+    handler->addListener(*listener_);
+  }
+}
+
+envoy::admin::v2alpha::ServerInfo::State Utility::serverState(Init::Manager::State state,
+                                                              bool health_check_failed) {
+  switch (state) {
+  case Init::Manager::State::Uninitialized:
+    return envoy::admin::v2alpha::ServerInfo::PRE_INITIALIZING;
+  case Init::Manager::State::Initializing:
+    return envoy::admin::v2alpha::ServerInfo::INITIALIZING;
+  case Init::Manager::State::Initialized:
+    return health_check_failed ? envoy::admin::v2alpha::ServerInfo::DRAINING
+                               : envoy::admin::v2alpha::ServerInfo::LIVE;
+  }
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 } // namespace Server

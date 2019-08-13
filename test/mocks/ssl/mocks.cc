@@ -3,14 +3,20 @@
 namespace Envoy {
 namespace Ssl {
 
-MockContextManager::MockContextManager() {}
-MockContextManager::~MockContextManager() {}
+MockContextManager::MockContextManager() = default;
+MockContextManager::~MockContextManager() = default;
 
-MockConnection::MockConnection() {}
-MockConnection::~MockConnection() {}
+MockConnectionInfo::MockConnectionInfo() = default;
+MockConnectionInfo::~MockConnectionInfo() = default;
 
-MockClientContext::MockClientContext() {}
-MockClientContext::~MockClientContext() {}
+MockClientContext::MockClientContext() = default;
+MockClientContext::~MockClientContext() = default;
+
+MockClientContextConfig::MockClientContextConfig() = default;
+MockClientContextConfig::~MockClientContextConfig() = default;
+
+MockServerContextConfig::MockServerContextConfig() = default;
+MockServerContextConfig::~MockServerContextConfig() = default;
 
 } // namespace Ssl
 } // namespace Envoy

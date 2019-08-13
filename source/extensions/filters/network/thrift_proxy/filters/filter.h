@@ -6,6 +6,7 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/network/connection.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "extensions/filters/network/thrift_proxy/decoder_events.h"
 #include "extensions/filters/network/thrift_proxy/protocol.h"
@@ -19,12 +20,18 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 namespace ThriftFilters {
 
+enum class ResponseStatus {
+  MoreData = 0, // The upstream response requires more data.
+  Complete = 1, // The upstream response is complete.
+  Reset = 2,    // The upstream response is invalid and its connection must be reset.
+};
+
 /**
  * Decoder filter callbacks add additional callbacks.
  */
 class DecoderFilterCallbacks {
 public:
-  virtual ~DecoderFilterCallbacks() {}
+  virtual ~DecoderFilterCallbacks() = default;
 
   /**
    * @return uint64_t the ID of the originating stream for logging purposes.
@@ -63,8 +70,9 @@ public:
   /**
    * Create a locally generated response using the provided response object.
    * @param response DirectResponse the response to send to the downstream client
+   * @param end_stream if true, the downstream connection should be closed after this response
    */
-  virtual void sendLocalReply(const ThriftProxy::DirectResponse& response) PURE;
+  virtual void sendLocalReply(const ThriftProxy::DirectResponse& response, bool end_stream) PURE;
 
   /**
    * Indicates the start of an upstream response. May only be called once.
@@ -76,14 +84,20 @@ public:
   /**
    * Called with upstream response data.
    * @param data supplies the upstream's data
-   * @return true if the upstream response is complete; false if more data is expected
+   * @return ResponseStatus indicating if the upstream response requires more data, is complete,
+   *         or if an error occurred requiring the upstream connection to be reset.
    */
-  virtual bool upstreamData(Buffer::Instance& data) PURE;
+  virtual ResponseStatus upstreamData(Buffer::Instance& data) PURE;
 
   /**
    * Reset the downstream connection.
    */
   virtual void resetDownstreamConnection() PURE;
+
+  /**
+   * @return StreamInfo for logging purposes.
+   */
+  virtual StreamInfo::StreamInfo& streamInfo() PURE;
 };
 
 /**
@@ -91,7 +105,7 @@ public:
  */
 class DecoderFilter : public virtual DecoderEventHandler {
 public:
-  virtual ~DecoderFilter() {}
+  ~DecoderFilter() override = default;
 
   /**
    * This routine is called prior to a filter being destroyed. This may happen after normal stream
@@ -109,14 +123,9 @@ public:
    * filter should use. Callbacks will not be invoked by the filter after onDestroy() is called.
    */
   virtual void setDecoderFilterCallbacks(DecoderFilterCallbacks& callbacks) PURE;
-
-  /**
-   * Resets the upstream connection.
-   */
-  virtual void resetUpstreamConnection() PURE;
 };
 
-typedef std::shared_ptr<DecoderFilter> DecoderFilterSharedPtr;
+using DecoderFilterSharedPtr = std::shared_ptr<DecoderFilter>;
 
 /**
  * These callbacks are provided by the connection manager to the factory so that the factory can
@@ -124,7 +133,7 @@ typedef std::shared_ptr<DecoderFilter> DecoderFilterSharedPtr;
  */
 class FilterChainFactoryCallbacks {
 public:
-  virtual ~FilterChainFactoryCallbacks() {}
+  virtual ~FilterChainFactoryCallbacks() = default;
 
   /**
    * Add a decoder filter that is used when reading connection data.
@@ -141,7 +150,7 @@ public:
  * function will install a single filter, but it's technically possibly to install more than one
  * if desired.
  */
-typedef std::function<void(FilterChainFactoryCallbacks& callbacks)> FilterFactoryCb;
+using FilterFactoryCb = std::function<void(FilterChainFactoryCallbacks& callbacks)>;
 
 /**
  * A FilterChainFactory is used by a connection manager to create a Thrift level filter chain when
@@ -151,7 +160,7 @@ typedef std::function<void(FilterChainFactoryCallbacks& callbacks)> FilterFactor
  */
 class FilterChainFactory {
 public:
-  virtual ~FilterChainFactory() {}
+  virtual ~FilterChainFactory() = default;
 
   /**
    * Called when a new Thrift stream is created on the connection.

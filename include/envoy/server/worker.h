@@ -3,6 +3,7 @@
 #include <functional>
 
 #include "envoy/server/guarddog.h"
+#include "envoy/server/overload_manager.h"
 
 namespace Envoy {
 namespace Server {
@@ -12,7 +13,7 @@ namespace Server {
  */
 class Worker {
 public:
-  virtual ~Worker() {}
+  virtual ~Worker() = default;
 
   /**
    * Completion called when a listener has been added on a worker and is listening for new
@@ -20,7 +21,7 @@ public:
    * @param success supplies whether the addition was successful or not. FALSE can be returned
    *                when there is a race condition between bind() and listen().
    */
-  typedef std::function<void(bool success)> AddListenerCompletion;
+  using AddListenerCompletion = std::function<void(bool success)>;
 
   /**
    * Add a listener to the worker.
@@ -41,6 +42,14 @@ public:
    * @param guard_dog supplies the guard dog to use for thread watching.
    */
   virtual void start(GuardDog& guard_dog) PURE;
+
+  /**
+   * Initialize stats for this worker's dispatcher, if available. The worker will output
+   * thread-specific stats under the given scope.
+   * @param scope the scope to contain the new per-dispatcher stats created here.
+   * @param prefix the stats prefix to identify this dispatcher.
+   */
+  virtual void initializeStats(Stats::Scope& scope, const std::string& prefix) PURE;
 
   /**
    * Stop the worker thread.
@@ -72,19 +81,19 @@ public:
   virtual void stopListeners() PURE;
 };
 
-typedef std::unique_ptr<Worker> WorkerPtr;
+using WorkerPtr = std::unique_ptr<Worker>;
 
 /**
  * Factory for creating workers.
  */
 class WorkerFactory {
 public:
-  virtual ~WorkerFactory() {}
+  virtual ~WorkerFactory() = default;
 
   /**
    * @return WorkerPtr a new worker.
    */
-  virtual WorkerPtr createWorker() PURE;
+  virtual WorkerPtr createWorker(OverloadManager& overload_manager) PURE;
 };
 
 } // namespace Server

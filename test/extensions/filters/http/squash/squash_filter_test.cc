@@ -10,6 +10,7 @@
 
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
 #include "fmt/format.h"
@@ -17,6 +18,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Eq;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
@@ -27,8 +29,8 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Squash {
-
 namespace {
+
 SquashFilterConfig constructSquashFilterConfigFromJson(
     const Envoy::Json::Object& json,
     NiceMock<Envoy::Server::Configuration::MockFactoryContext>& context) {
@@ -39,10 +41,10 @@ SquashFilterConfig constructSquashFilterConfigFromJson(
 
 void EXPECT_JSON_EQ(const std::string& expected, const std::string& actual) {
   ProtobufWkt::Struct actualjson;
-  MessageUtil::loadFromJson(actual, actualjson);
+  TestUtility::loadFromJson(actual, actualjson);
 
   ProtobufWkt::Struct expectedjson;
-  MessageUtil::loadFromJson(expected, expectedjson);
+  TestUtility::loadFromJson(expected, expectedjson);
 
   EXPECT_TRUE(MessageDifferencer::Equals(expectedjson, actualjson));
 }
@@ -62,7 +64,7 @@ TEST(SoloFilterConfigTest, V1ApiConversion) {
 
   Envoy::Json::ObjectSharedPtr json_config = Envoy::Json::Factory::loadFromString(json);
   NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
-  EXPECT_CALL(factory_context.cluster_manager_, get("fake_cluster")).Times(1);
+  EXPECT_CALL(factory_context.cluster_manager_, get(Eq("fake_cluster"))).Times(1);
 
   auto config = constructSquashFilterConfigFromJson(*json_config, factory_context);
   EXPECT_EQ("fake_cluster", config.clusterName());
@@ -83,7 +85,7 @@ TEST(SoloFilterConfigTest, NoCluster) {
   Envoy::Json::ObjectSharedPtr config = Envoy::Json::Factory::loadFromString(json);
   NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
 
-  EXPECT_CALL(factory_context.cluster_manager_, get("fake_cluster")).WillOnce(Return(nullptr));
+  EXPECT_CALL(factory_context.cluster_manager_, get(Eq("fake_cluster"))).WillOnce(Return(nullptr));
 
   EXPECT_THROW_WITH_MESSAGE(constructSquashFilterConfigFromJson(*config, factory_context),
                             Envoy::EnvoyException,
@@ -101,14 +103,14 @@ TEST(SoloFilterConfigTest, ParsesEnvironment) {
 
   Envoy::Json::ObjectSharedPtr json_config = Envoy::Json::Factory::loadFromString(json);
   NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
-  EXPECT_CALL(factory_context.cluster_manager_, get("squash")).Times(1);
+  EXPECT_CALL(factory_context.cluster_manager_, get(Eq("squash"))).Times(1);
 
   auto config = constructSquashFilterConfigFromJson(*json_config, factory_context);
   EXPECT_JSON_EQ(expected_json, config.attachmentJson());
 }
 
 TEST(SoloFilterConfigTest, ParsesAndEscapesEnvironment) {
-  ::setenv("ESCAPE_ENV", "\"", 1);
+  TestEnvironment::setEnvVar("ESCAPE_ENV", "\"", 1);
 
   std::string json = R"EOF(
     {
@@ -121,13 +123,13 @@ TEST(SoloFilterConfigTest, ParsesAndEscapesEnvironment) {
 
   Envoy::Json::ObjectSharedPtr json_config = Envoy::Json::Factory::loadFromString(json);
   NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
-  EXPECT_CALL(factory_context.cluster_manager_, get("squash")).Times(1);
+  EXPECT_CALL(factory_context.cluster_manager_, get(Eq("squash"))).Times(1);
   auto config = constructSquashFilterConfigFromJson(*json_config, factory_context);
   EXPECT_JSON_EQ(expected_json, config.attachmentJson());
 }
 TEST(SoloFilterConfigTest, TwoEnvironmentVariables) {
-  ::setenv("ENV1", "1", 1);
-  ::setenv("ENV2", "2", 1);
+  TestEnvironment::setEnvVar("ENV1", "1", 1);
+  TestEnvironment::setEnvVar("ENV2", "2", 1);
 
   std::string json = R"EOF(
     {
@@ -145,7 +147,7 @@ TEST(SoloFilterConfigTest, TwoEnvironmentVariables) {
 }
 
 TEST(SoloFilterConfigTest, ParsesEnvironmentInComplexTemplate) {
-  ::setenv("CONF_ENV", "some-config-value", 1);
+  TestEnvironment::setEnvVar("CONF_ENV", "some-config-value", 1);
 
   std::string json = R"EOF(
     {
@@ -158,7 +160,7 @@ TEST(SoloFilterConfigTest, ParsesEnvironmentInComplexTemplate) {
 
   Envoy::Json::ObjectSharedPtr json_config = Envoy::Json::Factory::loadFromString(json);
   NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
-  EXPECT_CALL(factory_context.cluster_manager_, get("squash")).Times(1);
+  EXPECT_CALL(factory_context.cluster_manager_, get(Eq("squash"))).Times(1);
   auto config = constructSquashFilterConfigFromJson(*json_config, factory_context);
   EXPECT_JSON_EQ(expected_json, config.attachmentJson());
 }
@@ -207,6 +209,8 @@ protected:
   void doDownstreamRequest() {
     startDownstreamRequest();
 
+    Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+    EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
     Envoy::Http::TestHeaderMapImpl trailers{};
     // Complete a full request cycle
     Envoy::Buffer::OwnedImpl buffer("nothing here");
@@ -217,18 +221,18 @@ protected:
 
   void expectAsyncClientSend() {
     EXPECT_CALL(cm_.async_client_, send_(_, _, _))
-        .WillOnce(Invoke([&](Envoy::Http::MessagePtr&, Envoy::Http::AsyncClient::Callbacks& cb,
-                             const absl::optional<std::chrono::milliseconds>&)
-                             -> Envoy::Http::AsyncClient::Request* {
-          callbacks_.push_back(&cb);
-          return &request_;
-        }));
+        .WillOnce(Invoke(
+            [&](Envoy::Http::MessagePtr&, Envoy::Http::AsyncClient::Callbacks& cb,
+                const Http::AsyncClient::RequestOptions&) -> Envoy::Http::AsyncClient::Request* {
+              callbacks_.push_back(&cb);
+              return &request_;
+            }));
   }
 
   void completeRequest(const std::string& status, const std::string& body) {
     Http::MessagePtr msg(new Http::ResponseMessageImpl(
         Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", status}}}));
-    msg->body().reset(new Buffer::OwnedImpl(body));
+    msg->body() = std::make_unique<Buffer::OwnedImpl>(body);
     popPendingCallback()->onSuccess(std::move(msg));
   }
 
@@ -242,7 +246,7 @@ protected:
   }
 
   Envoy::Http::AsyncClient::Callbacks* popPendingCallback() {
-    if (0 == callbacks_.size()) {
+    if (callbacks_.empty()) {
       // Can't use ASSERT_* as this is not a test function
       throw std::underflow_error("empty deque");
     }
@@ -268,12 +272,12 @@ TEST_F(SquashFilterTest, DecodeHeaderContinuesOnClientFail) {
   EXPECT_CALL(cm_, httpAsyncClientForCluster("squash")).WillOnce(ReturnRef(cm_.async_client_));
 
   EXPECT_CALL(cm_.async_client_, send_(_, _, _))
-      .WillOnce(Invoke([&](Envoy::Http::MessagePtr&, Envoy::Http::AsyncClient::Callbacks& callbacks,
-                           const absl::optional<std::chrono::milliseconds>&)
-                           -> Envoy::Http::AsyncClient::Request* {
-        callbacks.onFailure(Envoy::Http::AsyncClient::FailureReason::Reset);
-        return nullptr;
-      }));
+      .WillOnce(Invoke(
+          [&](Envoy::Http::MessagePtr&, Envoy::Http::AsyncClient::Callbacks& callbacks,
+              const Http::AsyncClient::RequestOptions&) -> Envoy::Http::AsyncClient::Request* {
+            callbacks.onFailure(Envoy::Http::AsyncClient::FailureReason::Reset);
+            return nullptr;
+          }));
 
   Envoy::Http::TestHeaderMapImpl headers{{":method", "GET"},
                                          {":authority", "www.solo.io"},
@@ -434,7 +438,7 @@ TEST_F(SquashFilterTest, TimerExpiresInline) {
 
   EXPECT_CALL(cm_.async_client_, send_(_, _, _))
       .WillOnce(Invoke([&](Envoy::Http::MessagePtr&, Envoy::Http::AsyncClient::Callbacks&,
-                           const absl::optional<std::chrono::milliseconds>&)
+                           const Http::AsyncClient::RequestOptions&)
                            -> Envoy::Http::AsyncClient::Request* { return &request_; }));
 
   EXPECT_CALL(request_, cancel());

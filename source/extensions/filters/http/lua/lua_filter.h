@@ -31,7 +31,7 @@ const ProtobufWkt::Struct& getMetadata(Http::StreamFilterCallbacks* callbacks) {
  */
 class FilterCallbacks {
 public:
-  virtual ~FilterCallbacks() {}
+  virtual ~FilterCallbacks() = default;
 
   /**
    * Add data to the connection manager buffer.
@@ -70,13 +70,13 @@ public:
   virtual const ProtobufWkt::Struct& metadata() const PURE;
 
   /**
-   * @return RequestInfo::RequestInfo& the current request info handle. This handle is mutable to
-   * accomodate write API e.g. setDynamicMetadata().
+   * @return StreamInfo::StreamInfo& the current stream info handle. This handle is mutable to
+   * accommodate write API e.g. setDynamicMetadata().
    */
-  virtual RequestInfo::RequestInfo& requestInfo() PURE;
+  virtual StreamInfo::StreamInfo& streamInfo() PURE;
 
   /**
-   * @return const const Network::Connection* the current network connection handle.
+   * @return const Network::Connection* the current network connection handle.
    */
   virtual const Network::Connection* connection() const PURE;
 };
@@ -127,14 +127,23 @@ public:
   }
 
   static ExportedFunctions exportedFunctions() {
-    return {{"headers", static_luaHeaders},         {"body", static_luaBody},
-            {"bodyChunks", static_luaBodyChunks},   {"trailers", static_luaTrailers},
-            {"metadata", static_luaMetadata},       {"logTrace", static_luaLogTrace},
-            {"logDebug", static_luaLogDebug},       {"logInfo", static_luaLogInfo},
-            {"logWarn", static_luaLogWarn},         {"logErr", static_luaLogErr},
-            {"logCritical", static_luaLogCritical}, {"httpCall", static_luaHttpCall},
-            {"respond", static_luaRespond},         {"requestInfo", static_luaRequestInfo},
-            {"connection", static_luaConnection}};
+    return {{"headers", static_luaHeaders},
+            {"body", static_luaBody},
+            {"bodyChunks", static_luaBodyChunks},
+            {"trailers", static_luaTrailers},
+            {"metadata", static_luaMetadata},
+            {"logTrace", static_luaLogTrace},
+            {"logDebug", static_luaLogDebug},
+            {"logInfo", static_luaLogInfo},
+            {"logWarn", static_luaLogWarn},
+            {"logErr", static_luaLogErr},
+            {"logCritical", static_luaLogCritical},
+            {"httpCall", static_luaHttpCall},
+            {"respond", static_luaRespond},
+            {"streamInfo", static_luaStreamInfo},
+            {"connection", static_luaConnection},
+            {"importPublicKey", static_luaImportPublicKey},
+            {"verifySignature", static_luaVerifySignature}};
   }
 
 private:
@@ -189,9 +198,9 @@ private:
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaMetadata);
 
   /**
-   * @return a handle to the request info.
+   * @return a handle to the stream info.
    */
-  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaRequestInfo);
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaStreamInfo);
 
   /**
    * @return a handle to the network connection.
@@ -210,6 +219,27 @@ private:
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaLogCritical);
 
   /**
+   * Verify cryptographic signatures.
+   * @param 1 (string) hash function(including SHA1, SHA224, SHA256, SHA384, SHA512)
+   * @param 2 (void*)  pointer to public key
+   * @param 3 (string) signature
+   * @param 4 (int)    length of signature
+   * @param 5 (string) clear text
+   * @param 6 (int)    length of clear text
+   * @return (bool, string) If the first element is true, the second element is empty; otherwise,
+   * the second element stores the error message
+   */
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaVerifySignature);
+
+  /**
+   * Import public key.
+   * @param 1 (string) keyder string
+   * @param 2 (int)    length of keyder string
+   * @return pointer to public key
+   */
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaImportPublicKey);
+
+  /**
    * This is the closure/iterator returned by luaBodyChunks() above.
    */
   DECLARE_LUA_CLOSURE(StreamHandleWrapper, luaBodyIterator);
@@ -224,8 +254,9 @@ private:
     body_wrapper_.reset();
     trailers_wrapper_.reset();
     metadata_wrapper_.reset();
-    request_info_wrapper_.reset();
+    stream_info_wrapper_.reset();
     connection_wrapper_.reset();
+    public_key_wrapper_.reset();
   }
 
   // Http::AsyncClient::Callbacks
@@ -245,8 +276,9 @@ private:
   Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::BufferWrapper> body_wrapper_;
   Filters::Common::Lua::LuaDeathRef<HeaderMapWrapper> trailers_wrapper_;
   Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::MetadataMapWrapper> metadata_wrapper_;
-  Filters::Common::Lua::LuaDeathRef<RequestInfoWrapper> request_info_wrapper_;
+  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> stream_info_wrapper_;
   Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::ConnectionWrapper> connection_wrapper_;
+  Filters::Common::Lua::LuaDeathRef<PublicKeyWrapper> public_key_wrapper_;
   State state_{State::Running};
   std::function<void()> yield_callback_;
   Http::AsyncClient::Request* http_request_{};
@@ -273,7 +305,7 @@ private:
   uint64_t response_function_slot_;
 };
 
-typedef std::shared_ptr<FilterConfig> FilterConfigConstSharedPtr;
+using FilterConfigConstSharedPtr = std::shared_ptr<FilterConfig>;
 
 // TODO(mattklein123): Filter stats.
 
@@ -320,6 +352,9 @@ public:
   Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap& trailers) override {
     return doTrailers(response_stream_wrapper_, trailers);
   };
+  Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap&) override {
+    return Http::FilterMetadataStatus::Continue;
+  }
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override {
     encoder_callbacks_.callbacks_ = &callbacks;
   };
@@ -338,7 +373,7 @@ private:
     void respond(Http::HeaderMapPtr&& headers, Buffer::Instance* body, lua_State* state) override;
 
     const ProtobufWkt::Struct& metadata() const override { return getMetadata(callbacks_); }
-    RequestInfo::RequestInfo& requestInfo() override { return callbacks_->requestInfo(); }
+    StreamInfo::StreamInfo& streamInfo() override { return callbacks_->streamInfo(); }
     const Network::Connection* connection() const override { return callbacks_->connection(); }
 
     Filter& parent_;
@@ -358,14 +393,14 @@ private:
     void respond(Http::HeaderMapPtr&& headers, Buffer::Instance* body, lua_State* state) override;
 
     const ProtobufWkt::Struct& metadata() const override { return getMetadata(callbacks_); }
-    RequestInfo::RequestInfo& requestInfo() override { return callbacks_->requestInfo(); }
+    StreamInfo::StreamInfo& streamInfo() override { return callbacks_->streamInfo(); }
     const Network::Connection* connection() const override { return callbacks_->connection(); }
 
     Filter& parent_;
     Http::StreamEncoderFilterCallbacks* callbacks_{};
   };
 
-  typedef Filters::Common::Lua::LuaDeathRef<StreamHandleWrapper> StreamHandleRef;
+  using StreamHandleRef = Filters::Common::Lua::LuaDeathRef<StreamHandleWrapper>;
 
   Http::FilterHeadersStatus doHeaders(StreamHandleRef& handle,
                                       Filters::Common::Lua::CoroutinePtr& coroutine,

@@ -20,9 +20,7 @@ Server::ResourceMonitorPtr FixedHeapMonitorFactory::createResourceMonitorFromPro
 /**
  * Static registration for the fixed heap resource monitor factory. @see RegistryFactory.
  */
-static Registry::RegisterFactory<FixedHeapMonitorFactory,
-                                 Server::Configuration::ResourceMonitorFactory>
-    registered_;
+REGISTER_FACTORY(FixedHeapMonitorFactory, Server::Configuration::ResourceMonitorFactory);
 
 } // namespace FixedHeapMonitor
 } // namespace ResourceMonitors

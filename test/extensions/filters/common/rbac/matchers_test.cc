@@ -31,8 +31,8 @@ void checkMatcher(
 TEST(AlwaysMatcher, AlwaysMatches) { checkMatcher(RBAC::AlwaysMatcher(), true); }
 
 TEST(AndMatcher, Permission_Set) {
-  envoy::config::rbac::v2alpha::Permission_Set set;
-  envoy::config::rbac::v2alpha::Permission* perm = set.add_rules();
+  envoy::config::rbac::v2::Permission_Set set;
+  envoy::config::rbac::v2::Permission* perm = set.add_rules();
   perm->set_any(true);
 
   checkMatcher(RBAC::AndMatcher(set), true);
@@ -54,8 +54,8 @@ TEST(AndMatcher, Permission_Set) {
 }
 
 TEST(AndMatcher, Principal_Set) {
-  envoy::config::rbac::v2alpha::Principal_Set set;
-  envoy::config::rbac::v2alpha::Principal* principal = set.add_ids();
+  envoy::config::rbac::v2::Principal_Set set;
+  envoy::config::rbac::v2::Principal* principal = set.add_ids();
   principal->set_any(true);
 
   checkMatcher(RBAC::AndMatcher(set), true);
@@ -79,8 +79,8 @@ TEST(AndMatcher, Principal_Set) {
 }
 
 TEST(OrMatcher, Permission_Set) {
-  envoy::config::rbac::v2alpha::Permission_Set set;
-  envoy::config::rbac::v2alpha::Permission* perm = set.add_rules();
+  envoy::config::rbac::v2::Permission_Set set;
+  envoy::config::rbac::v2::Permission* perm = set.add_rules();
   perm->set_destination_port(123);
 
   Envoy::Network::MockConnection conn;
@@ -97,8 +97,8 @@ TEST(OrMatcher, Permission_Set) {
 }
 
 TEST(OrMatcher, Principal_Set) {
-  envoy::config::rbac::v2alpha::Principal_Set set;
-  envoy::config::rbac::v2alpha::Principal* id = set.add_ids();
+  envoy::config::rbac::v2::Principal_Set set;
+  envoy::config::rbac::v2::Principal* id = set.add_ids();
   auto* cidr = id->mutable_source_ip();
   cidr->set_address_prefix("1.2.3.0");
   cidr->mutable_prefix_len()->set_value(24);
@@ -117,14 +117,14 @@ TEST(OrMatcher, Principal_Set) {
 }
 
 TEST(NotMatcher, Permission) {
-  envoy::config::rbac::v2alpha::Permission perm;
+  envoy::config::rbac::v2::Permission perm;
   perm.set_any(true);
 
   checkMatcher(RBAC::NotMatcher(perm), false, Envoy::Network::MockConnection());
 }
 
 TEST(NotMatcher, Principal) {
-  envoy::config::rbac::v2alpha::Principal principal;
+  envoy::config::rbac::v2::Principal principal;
   principal.set_any(true);
 
   checkMatcher(RBAC::NotMatcher(principal), false, Envoy::Network::MockConnection());
@@ -190,12 +190,14 @@ TEST(PortMatcher, PortMatcher) {
 
 TEST(AuthenticatedMatcher, uriSanPeerCertificate) {
   Envoy::Network::MockConnection conn;
-  Envoy::Ssl::MockConnection ssl;
+  Envoy::Ssl::MockConnectionInfo ssl;
 
-  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return("foo"));
+  const std::vector<std::string> sans{"foo", "baz"};
+  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return(sans));
   EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(&ssl));
 
-  envoy::config::rbac::v2alpha::Principal_Authenticated auth;
+  // We should get the first URI SAN.
+  envoy::config::rbac::v2::Principal_Authenticated auth;
   auth.mutable_principal_name()->set_exact("foo");
   checkMatcher(AuthenticatedMatcher(auth), true, conn);
 
@@ -205,13 +207,14 @@ TEST(AuthenticatedMatcher, uriSanPeerCertificate) {
 
 TEST(AuthenticatedMatcher, subjectPeerCertificate) {
   Envoy::Network::MockConnection conn;
-  Envoy::Ssl::MockConnection ssl;
+  Envoy::Ssl::MockConnectionInfo ssl;
 
-  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return(""));
+  const std::vector<std::string> sans;
+  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return(sans));
   EXPECT_CALL(ssl, subjectPeerCertificate()).WillRepeatedly(Return("bar"));
   EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(&ssl));
 
-  envoy::config::rbac::v2alpha::Principal_Authenticated auth;
+  envoy::config::rbac::v2::Principal_Authenticated auth;
   auth.mutable_principal_name()->set_exact("bar");
   checkMatcher(AuthenticatedMatcher(auth), true, conn);
 
@@ -221,11 +224,12 @@ TEST(AuthenticatedMatcher, subjectPeerCertificate) {
 
 TEST(AuthenticatedMatcher, AnySSLSubject) {
   Envoy::Network::MockConnection conn;
-  Envoy::Ssl::MockConnection ssl;
-  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return("foo"));
+  Envoy::Ssl::MockConnectionInfo ssl;
+  const std::vector<std::string> sans{"foo", "baz"};
+  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return(sans));
   EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(&ssl));
 
-  envoy::config::rbac::v2alpha::Principal_Authenticated auth;
+  envoy::config::rbac::v2::Principal_Authenticated auth;
   checkMatcher(AuthenticatedMatcher(auth), true, conn);
 
   auth.mutable_principal_name()->set_regex(".*");
@@ -245,9 +249,9 @@ TEST(MetadataMatcher, MetadataMatcher) {
   auto label = MessageUtil::keyValueStruct("label", "prod");
   envoy::api::v2::core::Metadata metadata;
   metadata.mutable_filter_metadata()->insert(
-      Protobuf::MapPair<Envoy::ProtobufTypes::String, ProtobufWkt::Struct>("other", label));
+      Protobuf::MapPair<std::string, ProtobufWkt::Struct>("other", label));
   metadata.mutable_filter_metadata()->insert(
-      Protobuf::MapPair<Envoy::ProtobufTypes::String, ProtobufWkt::Struct>("rbac", label));
+      Protobuf::MapPair<std::string, ProtobufWkt::Struct>("rbac", label));
 
   envoy::type::matcher::MetadataMatcher matcher;
   matcher.set_filter("rbac");
@@ -260,7 +264,7 @@ TEST(MetadataMatcher, MetadataMatcher) {
 }
 
 TEST(PolicyMatcher, PolicyMatcher) {
-  envoy::config::rbac::v2alpha::Policy policy;
+  envoy::config::rbac::v2::Policy policy;
   policy.add_permissions()->set_destination_port(123);
   policy.add_permissions()->set_destination_port(456);
   policy.add_principals()->mutable_authenticated()->mutable_principal_name()->set_exact("foo");
@@ -269,11 +273,12 @@ TEST(PolicyMatcher, PolicyMatcher) {
   RBAC::PolicyMatcher matcher(policy);
 
   Envoy::Network::MockConnection conn;
-  Envoy::Ssl::MockConnection ssl;
+  Envoy::Ssl::MockConnectionInfo ssl;
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
 
-  EXPECT_CALL(ssl, uriSanPeerCertificate()).Times(2).WillRepeatedly(Return("bar"));
+  const std::vector<std::string> sans{"bar", "baz"};
+  EXPECT_CALL(ssl, uriSanPeerCertificate()).Times(2).WillRepeatedly(Return(sans));
   EXPECT_CALL(Const(conn), ssl()).Times(2).WillRepeatedly(Return(&ssl));
   EXPECT_CALL(conn, localAddress()).Times(2).WillRepeatedly(ReturnRef(addr));
 
@@ -288,6 +293,39 @@ TEST(PolicyMatcher, PolicyMatcher) {
   EXPECT_CALL(conn, localAddress()).Times(2).WillRepeatedly(ReturnRef(addr));
 
   checkMatcher(matcher, false, conn);
+}
+
+TEST(RequestedServerNameMatcher, ValidRequestedServerName) {
+  Envoy::Network::MockConnection conn;
+  EXPECT_CALL(conn, requestedServerName())
+      .Times(9)
+      .WillRepeatedly(Return(absl::string_view("www.cncf.io")));
+
+  checkMatcher(RequestedServerNameMatcher(TestUtility::createRegexMatcher(".*cncf.io")), true,
+               conn);
+  checkMatcher(RequestedServerNameMatcher(TestUtility::createRegexMatcher(".*cncf.*")), true, conn);
+  checkMatcher(RequestedServerNameMatcher(TestUtility::createRegexMatcher("www.*")), true, conn);
+  checkMatcher(RequestedServerNameMatcher(TestUtility::createRegexMatcher(".*io")), true, conn);
+  checkMatcher(RequestedServerNameMatcher(TestUtility::createRegexMatcher(".*")), true, conn);
+
+  checkMatcher(RequestedServerNameMatcher(TestUtility::createExactMatcher("")), false, conn);
+  checkMatcher(RequestedServerNameMatcher(TestUtility::createExactMatcher("www.cncf.io")), true,
+               conn);
+  checkMatcher(RequestedServerNameMatcher(TestUtility::createExactMatcher("xyz.cncf.io")), false,
+               conn);
+  checkMatcher(RequestedServerNameMatcher(TestUtility::createExactMatcher("example.com")), false,
+               conn);
+}
+
+TEST(RequestedServerNameMatcher, EmptyRequestedServerName) {
+  Envoy::Network::MockConnection conn;
+  EXPECT_CALL(conn, requestedServerName()).Times(3).WillRepeatedly(Return(absl::string_view("")));
+
+  checkMatcher(RequestedServerNameMatcher(TestUtility::createRegexMatcher(".*")), true, conn);
+
+  checkMatcher(RequestedServerNameMatcher(TestUtility::createExactMatcher("")), true, conn);
+  checkMatcher(RequestedServerNameMatcher(TestUtility::createExactMatcher("example.com")), false,
+               conn);
 }
 
 } // namespace

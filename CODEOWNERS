@@ -1,12 +1,53 @@
-# TODO(zuercher): determine how we want to deal deal with auto-assignment
+# TODO(zuercher): determine how we want to deal with auto-assignment
 # By default, @envoyproxy/maintainers own everything.
 #*       @envoyproxy/maintainers
 
+# api
+/api/ @envoyproxy/api-shepherds
+# access loggers
+/*/extensions/access_loggers/common @auni53 @zuercher
+# csrf extension
+/*/extensions/filters/http/csrf @dschaller @mattklein123
+# original_src http filter extension
+/*/extensions/filters/http/original_src @snowp @klarose
+# original_src listener filter extension
+/*/extensions/filters/listener/original_src @snowp @klarose
+# original_src common extension
+extensions/filters/common/original_src @snowp @klarose
+# dubbo_proxy extension
+/*/extensions/filters/network/dubbo_proxy @zyfjeff @lizan
 # thrift_proxy extension
 /*/extensions/filters/network/thrift_proxy @zuercher @brian-pane
 # jwt_authn http filter extension
 /*/extensions/filters/http/jwt_authn @qiwzhang @lizan
+# grpc_http1_reverse_bridge http filter extension
+/*/extensions/filters/http/grpc_http1_reverse_bridge @snowp @zuercher
 # header_to_metadata extension
 /*/extensions/filters/http/header_to_metadata @rgs1 @zuercher
 # alts transport socket extension
-/*/extensions/transport_sockets/alts @lizan @yangminzhu
+/*/extensions/transport_sockets/alts @htuch @yangminzhu
+# sni_cluster extension
+/*/extensions/filters/network/sni_cluster @rshriram @lizan
+# tracers.datadog extension
+/*/extensions/tracers/datadog @cgilmour @palazzem
+# mysql_proxy extension
+/*/extensions/filters/network/mysql_proxy @rshriram @venilnoronha @mattklein123
+# quic extension
+/*/extensions/quic_listeners/ @alyssawilk @danzh2010 @mattklein123 @mpwarres @wu-bin
+# zookeeper_proxy extension
+/*/extensions/filters/network/zookeeper_proxy @rgs1 @snowp
+# redis cluster extension
+/*/extensions/clusters/redis @msukalski @henryyyang @mattklein123
+# dynamic forward proxy
+/*/extensions/clusters/dynamic_forward_proxy @mattklein123 @alyssawilk
+/*/extensions/common/dynamic_forward_proxy @mattklein123 @alyssawilk
+/*/extensions/filters/http/dynamic_forward_proxy @mattklein123 @alyssawilk
+# omit_canary_hosts retry predicate
+/*/extensions/retry/host/omit_canary_hosts @sriduth @snowp
+# aws_iam grpc credentials
+/*/extensions/grpc_credentials/aws_iam @lavignes @mattklein123
+/*/extensions/filters/http/common/aws @lavignes @mattklein123
+# adaptive concurrency limit extension.
+/*/extensions/filters/http/adaptive_concurrency @tonya11en @mattklein123
+# http inspector
+/*/extensions/filters/listener/http_inspector @crazyxy @PiotrSikora @lizan

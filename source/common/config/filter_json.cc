@@ -1,7 +1,6 @@
 #include "common/config/filter_json.h"
 
 #include "envoy/config/accesslog/v2/file.pb.h"
-#include "envoy/stats/stats_options.h"
 
 #include "common/common/assert.h"
 #include "common/common/utility.h"
@@ -127,8 +126,7 @@ void FilterJson::translateAccessLog(const Json::Object& json_config,
 void FilterJson::translateHttpConnectionManager(
     const Json::Object& json_config,
     envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
-        proto_config,
-    const Stats::StatsOptions& stats_options) {
+        proto_config) {
   json_config.validateSchema(Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA);
 
   envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::CodecType
@@ -140,8 +138,7 @@ void FilterJson::translateHttpConnectionManager(
   JSON_UTIL_SET_STRING(json_config, proto_config, stat_prefix);
 
   if (json_config.hasObject("rds")) {
-    Utility::translateRdsConfig(*json_config.getObject("rds"), *proto_config.mutable_rds(),
-                                stats_options);
+    Utility::translateRdsConfig(*json_config.getObject("rds"), *proto_config.mutable_rds());
   }
   if (json_config.hasObject("route_config")) {
     if (json_config.hasObject("rds")) {
@@ -149,7 +146,7 @@ void FilterJson::translateHttpConnectionManager(
           "http connection manager must have either rds or route_config but not both");
     }
     RdsJson::translateRouteConfiguration(*json_config.getObject("route_config"),
-                                         *proto_config.mutable_route_config(), stats_options);
+                                         *proto_config.mutable_route_config());
   }
 
   for (const auto& json_filter : json_config.getObjectArray("filters", true)) {
@@ -159,16 +156,13 @@ void FilterJson::translateHttpConnectionManager(
     // Translate v1 name to v2 name.
     filter->set_name(Extensions::HttpFilters::HttpFilterNames::get().v1_converter_.getV2Name(
         json_filter->getString("name")));
-    JSON_UTIL_SET_STRING(*json_filter, *filter->mutable_deprecated_v1(), type);
 
     const std::string deprecated_config =
         "{\"deprecated_v1\": true, \"value\": " + json_filter->getObject("config")->asJsonString() +
         "}";
 
-    const auto status =
-        Protobuf::util::JsonStringToMessage(deprecated_config, filter->mutable_config());
     // JSON schema has already validated that this is a valid JSON object.
-    ASSERT(status.ok());
+    MessageUtil::loadFromJson(deprecated_config, *filter->mutable_config());
   }
 
   JSON_UTIL_SET_BOOL(json_config, proto_config, add_user_agent);
@@ -253,9 +247,10 @@ void FilterJson::translateMongoProxy(
   if (json_config.hasObject("fault")) {
     const auto json_fault = json_config.getObject("fault")->getObject("fixed_delay");
     auto* delay = proto_config.mutable_delay();
+    auto* percentage = delay->mutable_percentage();
 
-    delay->set_type(envoy::config::filter::fault::v2::FaultDelay::FIXED);
-    delay->set_percent(static_cast<uint32_t>(json_fault->getInteger("percent")));
+    percentage->set_numerator(static_cast<uint32_t>(json_fault->getInteger("percent")));
+    percentage->set_denominator(envoy::type::FractionalPercent::HUNDRED);
     JSON_UTIL_SET_DURATION_FROM_FIELD(*json_fault, *delay, fixed_delay, duration);
   }
 }
@@ -270,7 +265,10 @@ void FilterJson::translateFaultFilter(
 
   if (!json_config_abort->empty()) {
     auto* abort_fault = proto_config.mutable_abort();
-    abort_fault->set_percent(static_cast<uint32_t>(json_config_abort->getInteger("abort_percent")));
+    auto* percentage = abort_fault->mutable_percentage();
+    percentage->set_numerator(
+        static_cast<uint32_t>(json_config_abort->getInteger("abort_percent")));
+    percentage->set_denominator(envoy::type::FractionalPercent::HUNDRED);
 
     // TODO(mattklein123): Throw error if invalid return code is provided
     abort_fault->set_http_status(
@@ -279,19 +277,21 @@ void FilterJson::translateFaultFilter(
 
   if (!json_config_delay->empty()) {
     auto* delay = proto_config.mutable_delay();
-    delay->set_type(envoy::config::filter::fault::v2::FaultDelay::FIXED);
-    delay->set_percent(static_cast<uint32_t>(json_config_delay->getInteger("fixed_delay_percent")));
+    auto* percentage = delay->mutable_percentage();
+    percentage->set_numerator(
+        static_cast<uint32_t>(json_config_delay->getInteger("fixed_delay_percent")));
+    percentage->set_denominator(envoy::type::FractionalPercent::HUNDRED);
     JSON_UTIL_SET_DURATION_FROM_FIELD(*json_config_delay, *delay, fixed_delay, fixed_duration);
   }
 
-  for (const auto json_header_matcher : json_config.getObjectArray("headers", true)) {
+  for (const auto& json_header_matcher : json_config.getObjectArray("headers", true)) {
     auto* header_matcher = proto_config.mutable_headers()->Add();
     RdsJson::translateHeaderMatcher(*json_header_matcher, *header_matcher);
   }
 
   JSON_UTIL_SET_STRING(json_config, proto_config, upstream_cluster);
 
-  for (auto json_downstream_node : json_config.getStringArray("downstream_nodes", true)) {
+  for (const auto& json_downstream_node : json_config.getStringArray("downstream_nodes", true)) {
     auto* downstream_node = proto_config.mutable_downstream_nodes()->Add();
     *downstream_node = json_downstream_node;
   }
@@ -363,7 +363,6 @@ void FilterJson::translateBufferFilter(
   json_config.validateSchema(Json::Schema::BUFFER_HTTP_FILTER_SCHEMA);
 
   JSON_UTIL_SET_INTEGER(json_config, proto_config, max_request_bytes);
-  JSON_UTIL_SET_DURATION_SECONDS(json_config, proto_config, max_request_time);
 }
 
 void FilterJson::translateLuaFilter(const Json::Object& json_config,
@@ -375,6 +374,9 @@ void FilterJson::translateLuaFilter(const Json::Object& json_config,
 void FilterJson::translateTcpProxy(
     const Json::Object& json_config,
     envoy::config::filter::network::tcp_proxy::v2::TcpProxy& proto_config) {
+  if (json_config.empty()) {
+    throw EnvoyException("tcp proxy config with deprecated_v1 requires a value field");
+  }
   json_config.validateSchema(Json::Schema::TCP_PROXY_NETWORK_FILTER_SCHEMA);
 
   JSON_UTIL_SET_STRING(json_config, proto_config, stat_prefix);
@@ -392,26 +394,6 @@ void FilterJson::translateTcpProxy(
                                         *route->mutable_source_ip_list());
     AddressJson::translateCidrRangeList(route_desc->getStringArray("destination_ip_list", true),
                                         *route->mutable_destination_ip_list());
-  }
-}
-
-void FilterJson::translateTcpRateLimitFilter(
-    const Json::Object& json_config,
-    envoy::config::filter::network::rate_limit::v2::RateLimit& proto_config) {
-  json_config.validateSchema(Json::Schema::RATELIMIT_NETWORK_FILTER_SCHEMA);
-
-  JSON_UTIL_SET_STRING(json_config, proto_config, stat_prefix);
-  JSON_UTIL_SET_STRING(json_config, proto_config, domain);
-  JSON_UTIL_SET_DURATION(json_config, proto_config, timeout);
-
-  auto* descriptors = proto_config.mutable_descriptors();
-  for (const auto& json_descriptor : json_config.getObjectArray("descriptors", false)) {
-    auto* entries = descriptors->Add()->mutable_entries();
-    for (const auto& json_entry : json_descriptor->asObjectArray()) {
-      auto* entry = entries->Add();
-      JSON_UTIL_SET_STRING(*json_entry, *entry, key);
-      JSON_UTIL_SET_STRING(*json_entry, *entry, value);
-    }
   }
 }
 

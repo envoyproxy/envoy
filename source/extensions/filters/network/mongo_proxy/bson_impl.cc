@@ -165,7 +165,8 @@ int32_t FieldImpl::byteSize() const {
     return total + 8;
   }
 
-  case Type::STRING: {
+  case Type::STRING:
+  case Type::SYMBOL: {
     return total + 4 + value_.string_value_.size() + 1;
   }
 
@@ -211,7 +212,8 @@ void FieldImpl::encode(Buffer::Instance& output) const {
     return BufferHelper::writeDouble(output, value_.double_value_);
   }
 
-  case Type::STRING: {
+  case Type::STRING:
+  case Type::SYMBOL: {
     return BufferHelper::writeString(output, value_.string_value_);
   }
 
@@ -269,6 +271,10 @@ bool FieldImpl::operator==(const Field& rhs) const {
     return asString() == rhs.asString();
   }
 
+  case Type::SYMBOL: {
+    return asSymbol() == rhs.asSymbol();
+  }
+
   case Type::DOCUMENT: {
     return asDocument() == rhs.asDocument();
   }
@@ -324,6 +330,7 @@ std::string FieldImpl::toString() const {
   }
 
   case Type::STRING:
+  case Type::SYMBOL:
   case Type::BINARY: {
     return fmt::format("\"{}\"", StringUtil::escape(value_.string_value_));
   }
@@ -402,6 +409,13 @@ void DocumentImpl::fromBuffer(Buffer::Instance& data) {
       std::string value = BufferHelper::removeString(data);
       ENVOY_LOG(trace, "BSON string: {}", value);
       addString(key, std::move(value));
+      break;
+    }
+
+    case Field::Type::SYMBOL: {
+      std::string value = BufferHelper::removeString(data);
+      ENVOY_LOG(trace, "BSON symbol: {}", value);
+      addSymbol(key, std::move(value));
       break;
     }
 

@@ -60,7 +60,7 @@ requests based on path, authority, content type, :ref:`runtime <arch_overview_ru
 This functionality is most useful when using Envoy as a front/edge proxy but is also leveraged when
 building a service to service mesh.
 
-**gRPC support:** `gRPC <http://www.grpc.io/>`_ is an RPC framework from Google that uses HTTP/2
+**gRPC support:** `gRPC <https://www.grpc.io/>`_ is an RPC framework from Google that uses HTTP/2
 as the underlying multiplexed transport. Envoy :ref:`supports <arch_overview_grpc>` all of the
 HTTP/2 features required to be used as the routing and load balancing substrate for gRPC requests
 and responses. The two systems are very complementary.
@@ -73,10 +73,15 @@ and logging for MongoDB connections.
 NOSQL datastore. Envoy :ref:`supports <arch_overview_dynamo>` L7 sniffing and statistics production
 for DynamoDB connections.
 
-**Service discovery:** :ref:`Service discovery <arch_overview_service_discovery>` is a critical
-component of service oriented architectures. Envoy supports multiple service discovery methods
-including asynchronous DNS resolution and REST based lookup via a :ref:`service discovery service
-<arch_overview_service_discovery_types_sds>`.
+**Service discovery and dynamic configuration:** Envoy optionally consumes a layered set of
+:ref:`dynamic configuration APIs <arch_overview_dynamic_config>` for centralized management.
+The layers provide an Envoy with dynamic updates about: hosts within a backend cluster, the
+backend clusters themselves, HTTP routing, listening sockets, and cryptographic material.
+For a simpler deployment, backend host discovery can be
+:ref:`done through DNS resolution <arch_overview_service_discovery_types_strict_dns>`
+(or even
+:ref:`skipped entirely <arch_overview_service_discovery_types_static>`),
+with the further layers replaced by static config files.
 
 **Health checking:** The :ref:`recommended <arch_overview_service_discovery_eventually_consistent>`
 way of building an Envoy mesh is to treat service discovery as an eventually consistent process.
@@ -92,7 +97,7 @@ instead of a library, it is able to implement advanced load balancing techniques
 and have them be accessible to any application. Currently Envoy includes support for :ref:`automatic
 retries <arch_overview_http_routing_retry>`, :ref:`circuit breaking <arch_overview_circuit_break>`,
 :ref:`global rate limiting <arch_overview_rate_limit>` via an external rate limiting service,
-:ref:`request shadowing <config_http_conn_man_route_table_route_shadow>`, and
+:ref:`request shadowing <envoy_api_msg_route.RouteAction.RequestMirrorPolicy>`, and
 :ref:`outlier detection <arch_overview_outlier_detection>`. Future support is planned for request
 racing.
 
@@ -110,10 +115,6 @@ includes robust :ref:`statistics <arch_overview_statistics>` support for all sub
 sink, though plugging in a different one would not be difficult. Statistics are also viewable via
 the :ref:`administration <operations_admin_interface>` port. Envoy also supports distributed
 :ref:`tracing <arch_overview_tracing>` via thirdparty providers.
-
-**Dynamic configuration:** Envoy optionally consumes a layered set of :ref:`dynamic configuration
-APIs <arch_overview_dynamic_config>`. Implementors can use these APIs to build complex centrally
-managed deployments if desired.
 
 Design goals
 ^^^^^^^^^^^^

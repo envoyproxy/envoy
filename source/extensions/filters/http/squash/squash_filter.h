@@ -26,14 +26,14 @@ public:
   const std::chrono::milliseconds& requestTimeout() { return request_timeout_; }
 
 private:
-  // Get the attachment body, and returns a JSON representations with envrionment variables
+  // Get the attachment body, and returns a JSON representations with environment variables
   // interpolated.
   static std::string getAttachment(const ProtobufWkt::Struct& attachment_template);
-  // Recursively interpolates envrionment variables inline in the struct.
+  // Recursively interpolates environment variables inline in the struct.
   static void updateTemplateInStruct(ProtobufWkt::Struct& attachment_template);
-  // Recursively interpolates envrionment variables inline in the value.
+  // Recursively interpolates environment variables inline in the value.
   static void updateTemplateInValue(ProtobufWkt::Value& curvalue);
-  // Interpolates envrionment variables in a string, and returns the new interpolated string.
+  // Interpolates environment variables in a string, and returns the new interpolated string.
   static std::string replaceEnv(const std::string& attachment_template);
 
   // The name of the squash server cluster.
@@ -47,11 +47,11 @@ private:
   // The timeout for individual requests to the squash server.
   std::chrono::milliseconds request_timeout_;
 
-  // Defines the pattern for interpolating envrionment variables in to the attachment.
+  // Defines the pattern for interpolating environment variables in to the attachment.
   const static std::regex ENV_REGEX;
 };
 
-typedef std::shared_ptr<SquashFilterConfig> SquashFilterConfigSharedPtr;
+using SquashFilterConfigSharedPtr = std::shared_ptr<SquashFilterConfig>;
 
 class AsyncClientCallbackShim : public Http::AsyncClient::Callbacks {
 public:
@@ -71,7 +71,7 @@ class SquashFilter : public Http::StreamDecoderFilter,
                      protected Logger::Loggable<Logger::Id::filter> {
 public:
   SquashFilter(SquashFilterConfigSharedPtr config, Upstream::ClusterManager& cm);
-  ~SquashFilter();
+  ~SquashFilter() override;
 
   // Http::StreamFilterBase
   void onDestroy() override;
@@ -103,7 +103,7 @@ private:
   const SquashFilterConfigSharedPtr config_;
 
   // Current state of the squash filter. If is_squashing_ is true, Hold the request while we
-  // communicate with the squash server to attach a debugger. If it is false, let the the request
+  // communicate with the squash server to attach a debugger. If it is false, let the request
   // pass-through.
   bool is_squashing_;
   // The API path of the created debug attachment (used for polling its state).
@@ -130,7 +130,7 @@ private:
   const static std::string SERVER_AUTHORITY;
   // The state of a debug attachment object when a debugger is successfully attached.
   const static std::string ATTACHED_STATE;
-  // The state of a debug attachment object when an error has occured.
+  // The state of a debug attachment object when an error has occurred.
   const static std::string ERROR_STATE;
 };
 

@@ -13,22 +13,25 @@ namespace Tracing {
 class MockConfig : public Config {
 public:
   MockConfig();
-  ~MockConfig();
+  ~MockConfig() override;
 
   MOCK_CONST_METHOD0(operationName, OperationName());
   MOCK_CONST_METHOD0(requestHeadersForTags, const std::vector<Http::LowerCaseString>&());
+  MOCK_CONST_METHOD0(verbose, bool());
 
   OperationName operation_name_{OperationName::Ingress};
   std::vector<Http::LowerCaseString> headers_;
+  bool verbose_{false};
 };
 
 class MockSpan : public Span {
 public:
   MockSpan();
-  ~MockSpan();
+  ~MockSpan() override;
 
-  MOCK_METHOD1(setOperation, void(const std::string& operation));
-  MOCK_METHOD2(setTag, void(const std::string& name, const std::string& value));
+  MOCK_METHOD1(setOperation, void(absl::string_view operation));
+  MOCK_METHOD2(setTag, void(absl::string_view name, absl::string_view value));
+  MOCK_METHOD2(log, void(SystemTime timestamp, const std::string& event));
   MOCK_METHOD0(finishSpan, void());
   MOCK_METHOD1(injectContext, void(Http::HeaderMap& request_headers));
   MOCK_METHOD1(setSampled, void(const bool sampled));
@@ -45,23 +48,23 @@ public:
 class MockHttpTracer : public HttpTracer {
 public:
   MockHttpTracer();
-  ~MockHttpTracer();
+  ~MockHttpTracer() override;
 
   SpanPtr startSpan(const Config& config, Http::HeaderMap& request_headers,
-                    const RequestInfo::RequestInfo& request_info,
+                    const StreamInfo::StreamInfo& stream_info,
                     const Tracing::Decision tracing_decision) override {
-    return SpanPtr{startSpan_(config, request_headers, request_info, tracing_decision)};
+    return SpanPtr{startSpan_(config, request_headers, stream_info, tracing_decision)};
   }
 
   MOCK_METHOD4(startSpan_, Span*(const Config& config, Http::HeaderMap& request_headers,
-                                 const RequestInfo::RequestInfo& request_info,
+                                 const StreamInfo::StreamInfo& stream_info,
                                  const Tracing::Decision tracing_decision));
 };
 
 class MockDriver : public Driver {
 public:
   MockDriver();
-  ~MockDriver();
+  ~MockDriver() override;
 
   SpanPtr startSpan(const Config& config, Http::HeaderMap& request_headers,
                     const std::string& operation_name, SystemTime start_time,

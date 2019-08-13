@@ -4,7 +4,6 @@
 
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/init/init.h"
 #include "envoy/json/json_object.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/router/rds.h"
@@ -23,7 +22,7 @@ namespace Router {
  */
 class RouteConfigProviderManager {
 public:
-  virtual ~RouteConfigProviderManager() {}
+  virtual ~RouteConfigProviderManager() = default;
 
   /**
    * Get a RouteConfigProviderPtr for a route from RDS. Ownership of the RouteConfigProvider is the

@@ -18,6 +18,8 @@ envoy_cc_library(
         "//include/envoy/http:codec_interface",
         "//include/envoy/http:header_map_interface",
         "//include/envoy/network:connection_interface",
+        "//include/envoy/stats:stats_interface",
+        "//include/envoy/stats:stats_macros",
         "//source/common/buffer:buffer_lib",
         "//source/common/buffer:watermark_buffer_lib",
         "//source/common/common:assert_lib",
@@ -27,8 +29,10 @@ envoy_cc_library(
         "//source/common/http:codes_lib",
         "//source/common/http:exception_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
+        "//source/common/runtime:runtime_lib",
     ],
 )
 
@@ -52,8 +56,10 @@ envoy_cc_library(
         "//source/common/http:codec_client_lib",
         "//source/common/http:codec_wrappers_lib",
         "//source/common/http:codes_lib",
+        "//source/common/http:conn_pool_base_lib",
         "//source/common/http:headers_lib",
         "//source/common/network:utility_lib",
+        "//source/common/runtime:runtime_lib",
         "//source/common/upstream:upstream_lib",
     ],
 )

@@ -1,3 +1,5 @@
+#include "common/protobuf/utility.h"
+
 #include "extensions/filters/http/well_known_names.h"
 
 #include "test/integration/http_protocol_integration.h"
@@ -17,11 +19,23 @@ config:
           - any: true
 )EOF";
 
-typedef HttpProtocolIntegrationTest RBACIntegrationTest;
+const std::string RBAC_CONFIG_WITH_PREFIX_MATCH = R"EOF(
+name: envoy.filters.http.rbac
+config:
+  rules:
+    policies:
+      foo:
+        permissions:
+          - header: { name: ":path", prefix_match: "/foo" }
+        principals:
+          - any: true
+)EOF";
 
-INSTANTIATE_TEST_CASE_P(Protocols, RBACIntegrationTest,
-                        testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
-                        HttpProtocolIntegrationTest::protocolTestParamsToString);
+using RBACIntegrationTest = HttpProtocolIntegrationTest;
+
+INSTANTIATE_TEST_SUITE_P(Protocols, RBACIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(RBACIntegrationTest, Allowed) {
   config_helper_.addFilter(RBAC_CONFIG);
@@ -43,7 +57,7 @@ TEST_P(RBACIntegrationTest, Allowed) {
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
 
 TEST_P(RBACIntegrationTest, Denied) {
@@ -63,7 +77,59 @@ TEST_P(RBACIntegrationTest, Denied) {
       1024);
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("403", response->headers().Status()->value().c_str());
+  EXPECT_EQ("403", response->headers().Status()->value().getStringView());
+}
+
+TEST_P(RBACIntegrationTest, DeniedWithPrefixRule) {
+  config_helper_.addConfigModifier(
+      [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& cfg) {
+        cfg.mutable_normalize_path()->set_value(false);
+      });
+  config_helper_.addFilter(RBAC_CONFIG_WITH_PREFIX_MATCH);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestHeaderMapImpl{
+          {":method", "POST"},
+          {":path", "/foo/../bar"},
+          {":scheme", "http"},
+          {":authority", "host"},
+          {"x-forwarded-for", "10.0.0.1"},
+      },
+      1024);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+}
+
+TEST_P(RBACIntegrationTest, RbacPrefixRuleUseNormalizePath) {
+  config_helper_.addConfigModifier(
+      [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& cfg) {
+        cfg.mutable_normalize_path()->set_value(true);
+      });
+  config_helper_.addFilter(RBAC_CONFIG_WITH_PREFIX_MATCH);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestHeaderMapImpl{
+          {":method", "POST"},
+          {":path", "/foo/../bar"},
+          {":scheme", "http"},
+          {":authority", "host"},
+          {"x-forwarded-for", "10.0.0.1"},
+      },
+      1024);
+
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("403", response->headers().Status()->value().getStringView());
 }
 
 TEST_P(RBACIntegrationTest, DeniedHeadReply) {
@@ -83,17 +149,17 @@ TEST_P(RBACIntegrationTest, DeniedHeadReply) {
       1024);
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("403", response->headers().Status()->value().c_str());
+  EXPECT_EQ("403", response->headers().Status()->value().getStringView());
   ASSERT_TRUE(response->headers().ContentLength());
-  EXPECT_STRNE("0", response->headers().ContentLength()->value().c_str());
-  EXPECT_STREQ("", response->body().c_str());
+  EXPECT_NE("0", response->headers().ContentLength()->value().getStringView());
+  EXPECT_THAT(response->body(), ::testing::IsEmpty());
 }
 
 TEST_P(RBACIntegrationTest, RouteOverride) {
   config_helper_.addConfigModifier(
       [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& cfg) {
         ProtobufWkt::Struct pfc;
-        ASSERT_TRUE(Protobuf::util::JsonStringToMessage("{}", &pfc).ok());
+        TestUtility::loadFromJson("{}", pfc);
 
         auto* config = cfg.mutable_route_config()
                            ->mutable_virtual_hosts()
@@ -122,7 +188,7 @@ TEST_P(RBACIntegrationTest, RouteOverride) {
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
 
 } // namespace

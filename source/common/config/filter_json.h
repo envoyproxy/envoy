@@ -11,11 +11,9 @@
 #include "envoy/config/filter/network/client_ssl_auth/v2/client_ssl_auth.pb.h"
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/config/filter/network/mongo_proxy/v2/mongo_proxy.pb.h"
-#include "envoy/config/filter/network/rate_limit/v2/rate_limit.pb.h"
 #include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.h"
 #include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.h"
 #include "envoy/json/json_object.h"
-#include "envoy/stats/stats_options.h"
 
 namespace Envoy {
 namespace Config {
@@ -50,8 +48,7 @@ public:
   static void translateHttpConnectionManager(
       const Json::Object& json_config,
       envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
-          proto_config,
-      const Stats::StatsOptions& stats_options);
+          proto_config);
 
   /**
    * Translate a v1 JSON Redis proxy object to v2
@@ -142,16 +139,6 @@ public:
   static void
   translateTcpProxy(const Json::Object& json_config,
                     envoy::config::filter::network::tcp_proxy::v2::TcpProxy& proto_config);
-
-  /**
-   * Translate a v1 JSON TCP Rate Limit filter object to v2
-   * envoy::config::filter::network::rate_limit::v2::RateLimit.
-   * @param json_config source v1 JSON Tcp Rate Limit Filter object.
-   * @param proto_config destination v2 envoy::config::filter::network::rate_limit::v2::RateLimit.
-   */
-  static void translateTcpRateLimitFilter(
-      const Json::Object& json_config,
-      envoy::config::filter::network::rate_limit::v2::RateLimit& proto_config);
 
   /**
    * Translate a v1 JSON HTTP Rate Limit filter object to v2

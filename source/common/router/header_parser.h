@@ -14,12 +14,12 @@ namespace Envoy {
 namespace Router {
 
 class HeaderParser;
-typedef std::unique_ptr<HeaderParser> HeaderParserPtr;
+using HeaderParserPtr = std::unique_ptr<HeaderParser>;
 
 /**
  * HeaderParser manipulates Http::HeaderMap instances. Headers to be added are pre-parsed to select
  * between a constant value implementation and a dynamic value implementation based on
- * RequestInfo::RequestInfo fields.
+ * StreamInfo::StreamInfo fields.
  */
 class HeaderParser {
 public:
@@ -37,13 +37,12 @@ public:
    */
   static HeaderParserPtr configure(
       const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption>& headers_to_add,
-      const Protobuf::RepeatedPtrField<ProtobufTypes::String>& headers_to_remove);
+      const Protobuf::RepeatedPtrField<std::string>& headers_to_remove);
 
-  void evaluateHeaders(Http::HeaderMap& headers,
-                       const RequestInfo::RequestInfo& request_info) const;
+  void evaluateHeaders(Http::HeaderMap& headers, const StreamInfo::StreamInfo& stream_info) const;
 
 protected:
-  HeaderParser() {}
+  HeaderParser() = default;
 
 private:
   std::vector<std::pair<Http::LowerCaseString, HeaderFormatterPtr>> headers_to_add_;

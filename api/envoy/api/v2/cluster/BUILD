@@ -1,4 +1,4 @@
-load("//bazel:api_build_system.bzl", "api_go_proto_library", "api_proto_library_internal")
+load("@envoy_api//bazel:api_build_system.bzl", "api_go_proto_library", "api_proto_library_internal")
 
 licenses(["notice"])  # Apache 2
 
@@ -32,4 +32,17 @@ api_proto_library_internal(
 api_go_proto_library(
     name = "outlier_detection",
     proto = ":outlier_detection",
+)
+
+api_proto_library_internal(
+    name = "filter",
+    srcs = ["filter.proto"],
+    visibility = [
+        "//envoy/api/v2:__pkg__",
+    ],
+)
+
+api_go_proto_library(
+    name = "filter",
+    proto = ":filter",
 )

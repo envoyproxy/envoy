@@ -27,6 +27,7 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.network.rbac",
     deps = [
         "//source/extensions/filters/common/rbac:utility_lib",
+        "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/rbac:rbac_filter",
         "//test/mocks/network:network_mocks",
     ],
@@ -37,6 +38,7 @@ envoy_extension_cc_test(
     srcs = ["integration_test.cc"],
     extension_name = "envoy.filters.network.rbac",
     deps = [
+        "//source/extensions/filters/network/echo:config",
         "//source/extensions/filters/network/rbac:config",
         "//test/integration:integration_lib",
         "//test/test_common:environment_lib",

@@ -2,6 +2,10 @@ syntax = "proto3";
 
 package envoy.api.v2;
 
+option java_outer_classname = "LdsProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.api.v2";
+
 option java_generic_services = true;
 
 import "envoy/api/v2/core/address.proto";
@@ -10,6 +14,7 @@ import "envoy/api/v2/discovery.proto";
 import "envoy/api/v2/listener/listener.proto";
 
 import "google/api/annotations.proto";
+import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
@@ -25,6 +30,9 @@ option (gogoproto.equal_all) = true;
 // consist of a complete update of all listeners. Existing connections will be
 // allowed to drain from listeners that are no longer present.
 service ListenerDiscoveryService {
+  rpc DeltaListeners(stream DeltaDiscoveryRequest) returns (stream DeltaDiscoveryResponse) {
+  }
+
   rpc StreamListeners(stream DiscoveryRequest) returns (stream DiscoveryResponse) {
   }
 
@@ -36,19 +44,17 @@ service ListenerDiscoveryService {
   }
 }
 
+// [#comment:next free field: 18]
 message Listener {
   // The unique name by which this listener is known. If no name is provided,
   // Envoy will allocate an internal UUID for the listener. If the listener is to be dynamically
   // updated or removed via :ref:`LDS <config_listeners_lds>` a unique name must be provided.
-  // By default, the maximum length of a listener's name is limited to 60 characters. This limit can
-  // be increased by setting the :option:`--max-obj-name-len` command line argument to the desired
-  // value.
   string name = 1;
 
   // The address that the listener should listen on. In general, the address must be unique, though
   // that is governed by the bind rules of the OS. E.g., multiple listeners can listen on port 0 on
   // Linux as the actual port will be allocated by the OS.
-  core.Address address = 2 [(validate.rules).message.required = true, (gogoproto.nullable) = false];
+  core.Address address = 2 [(validate.rules).message.required = true];
 
   // A list of filter chains to consider for this listener. The
   // :ref:`FilterChain <envoy_api_msg_listener.FilterChain>` with the most specific
@@ -57,8 +63,7 @@ message Listener {
   //
   // Example using SNI for filter chain selection can be found in the
   // :ref:`FAQ entry <faq_how_to_setup_sni>`.
-  repeated listener.FilterChain filter_chains = 3
-      [(validate.rules).repeated .min_items = 1, (gogoproto.nullable) = false];
+  repeated listener.FilterChain filter_chains = 3;
 
   // If a connection is redirected using *iptables*, the port on which the proxy
   // receives it might be different from the original destination address. When this flag is set to
@@ -86,7 +91,7 @@ message Listener {
 
   // [#not-implemented-hide:]
   message DeprecatedV1 {
-    // Whether the listener should bind to the port. A listener that doesn’t
+    // Whether the listener should bind to the port. A listener that doesn't
     // bind can only receive connections redirected from other listeners that
     // set use_original_dst parameter to true. Default is true.
     //
@@ -94,6 +99,8 @@ message Listener {
     // port. An additional filter chain must be created for every original
     // destination port this listener may redirect to in v2, with the original
     // port specified in the FilterChainMatch destination_port field.
+    //
+    // [#comment:TODO(PiotrSikora): Remove this once verified that we no longer need it.]
     google.protobuf.BoolValue bind_to_port = 1;
   }
 
@@ -118,7 +125,26 @@ message Listener {
   // :ref:`filter_chains <envoy_api_field_Listener.filter_chains>`. Order matters as the
   // filters are processed sequentially right after a socket has been accepted by the listener, and
   // before a connection is created.
-  repeated listener.ListenerFilter listener_filters = 9 [(gogoproto.nullable) = false];
+  // UDP Listener filters can be specified when the protocol in the listener socket address in
+  // :ref:`protocol <envoy_api_field_core.SocketAddress.protocol>` is :ref:'UDP
+  // <envoy_api_field_core.Protocol.UDP>`.
+  // UDP listeners currently support a single filter.
+  repeated listener.ListenerFilter listener_filters = 9;
+
+  // The timeout to wait for all listener filters to complete operation. If the timeout is reached,
+  // the accepted socket is closed without a connection being created unless
+  // `continue_on_listener_filters_timeout` is set to true. Specify 0 to disable the
+  // timeout. If not specified, a default timeout of 15s is used.
+  google.protobuf.Duration listener_filters_timeout = 15 [(gogoproto.stdduration) = true];
+
+  // Whether a connection should be created when listener filters timeout. Default is false.
+  //
+  // .. attention::
+  //
+  //   Some listener filters, such as :ref:`Proxy Protocol filter
+  //   <config_listener_filters_proxy_protocol>`, should not be used with this option. It will cause
+  //   unexpected behavior when a connection is created.
+  bool continue_on_listener_filters_timeout = 17;
 
   // Whether the listener should be set as a transparent socket.
   // When this flag is set to true, connections can be redirected to the listener using an
@@ -163,4 +189,9 @@ message Listener {
   // On macOS, only values of 0, 1, and unset are valid; other values may result in an error.
   // To set the queue length on macOS, set the net.inet.tcp.fastopen_backlog kernel parameter.
   google.protobuf.UInt32Value tcp_fast_open_queue_length = 12;
+
+  reserved 14;
+
+  // Specifies the intended direction of the traffic relative to the local Envoy.
+  core.TrafficDirection traffic_direction = 16;
 }

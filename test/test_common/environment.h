@@ -15,9 +15,9 @@
 namespace Envoy {
 class TestEnvironment {
 public:
-  typedef std::unordered_map<std::string, uint32_t> PortMap;
+  using PortMap = std::unordered_map<std::string, uint32_t>;
 
-  typedef std::unordered_map<std::string, std::string> ParamMap;
+  using ParamMap = std::unordered_map<std::string, std::string>;
 
   /**
    * Initialize command-line options for later access by tests in getOptions().
@@ -120,7 +120,7 @@ public:
              Network::Address::IpVersion version = Network::Address::IpVersion::v4);
 
   /**
-   * Substitute ports, paths, and IP loopback addressses in a JSON file in the
+   * Substitute ports, paths, and IP loopback addresses in a JSON file in the
    * private writable test temporary directory.
    * @param path path prefix for the input file with port and path templates.
    * @param port_map map from port name to port number.
@@ -130,7 +130,7 @@ public:
   static std::string temporaryFileSubstitute(const std::string& path, const PortMap& port_map,
                                              Network::Address::IpVersion version);
   /**
-   * Substitute ports, paths, and IP loopback addressses in a JSON file in the
+   * Substitute ports, paths, and IP loopback addresses in a JSON file in the
    * private writable test temporary directory.
    * @param path path prefix for the input file with port and path templates.
    * @param param_map map from parameter name to values.
@@ -164,17 +164,22 @@ public:
    *
    * @param filename: the name of the file to use
    * @param contents: the data to go in the file.
+   * @param fully_qualified_path: if true, will write to filename without prepending the tempdir.
    * @return the fully qualified path of the output file.
    */
   static std::string writeStringToFileForTest(const std::string& filename,
-                                              const std::string& contents);
+                                              const std::string& contents,
+                                              bool fully_qualified_path = false);
   /**
    * Dumps the contents of the file into the string.
    *
    * @param filename: the fully qualified name of the file to use
+   * @param require_existence if true, RELEASE_ASSERT if the file does not exist.
+   *   If false, an empty string will be returned if the file is not present.
    * @return string the contents of the file.
    */
-  static std::string readFileToStringForTest(const std::string& filename);
+  static std::string readFileToStringForTest(const std::string& filename,
+                                             bool require_existence = true);
 
   /**
    * Create a path on the filesystem (mkdir -p ... equivalent).
@@ -193,5 +198,16 @@ public:
    * @param path.
    */
   static void removePath(const std::string& path);
+
+  /**
+   * Set environment variable. Same args as setenv(2).
+   */
+  static void setEnvVar(const std::string& name, const std::string& value, int overwrite);
+
+  /**
+   * Removes environment variable. Same args as unsetenv(3).
+   */
+  static void unsetEnvVar(const std::string& name);
 };
+
 } // namespace Envoy

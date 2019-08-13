@@ -19,6 +19,8 @@ envoy_extension_cc_test(
         "//source/extensions/health_checkers/redis",
         "//source/extensions/health_checkers/redis:utility",
         "//test/common/upstream:utility_lib",
+        "//test/extensions/filters/network/common/redis:redis_mocks",
+        "//test/extensions/filters/network/common/redis:test_utils_lib",
         "//test/extensions/filters/network/redis_proxy:redis_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",

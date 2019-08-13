@@ -3,11 +3,11 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/utility.h"
-#include "common/config/cds_json.h"
 #include "common/json/json_loader.h"
 #include "common/network/utility.h"
-#include "common/stats/stats_options_impl.h"
 #include "common/upstream/upstream_impl.h"
+
+#include "test/test_common/utility.h"
 
 #include "fmt/printf.h"
 
@@ -15,63 +15,47 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
-inline std::string defaultSdsClusterJson(const std::string& name) {
-  return fmt::sprintf(R"EOF(
-  {
-    "name": "%s",
-    "connect_timeout_ms": 250,
-    "type": "sds",
-    "lb_type": "round_robin"
-  }
-  )EOF",
-                      name);
-}
-
 inline std::string defaultStaticClusterJson(const std::string& name) {
   return fmt::sprintf(R"EOF(
   {
     "name": "%s",
-    "connect_timeout_ms": 250,
+    "connect_timeout": "0.250s",
     "type": "static",
-    "lb_type": "round_robin",
-    "hosts": [{"url": "tcp://127.0.0.1:11001"}]
+    "lb_policy": "round_robin",
+    "hosts": [
+      {
+        "socket_address": {
+          "address": "127.0.0.1",
+          "port_value": 11001
+        }
+      }
+    ]
   }
   )EOF",
                       name);
 }
 
-inline std::string clustersJson(const std::vector<std::string>& clusters) {
-  return fmt::sprintf("\"clusters\": [%s]", StringUtil::join(clusters, ","));
+inline envoy::config::bootstrap::v2::Bootstrap
+parseBootstrapFromV2Json(const std::string& json_string) {
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  TestUtility::loadFromJson(json_string, bootstrap);
+  return bootstrap;
 }
 
-inline envoy::api::v2::Cluster parseClusterFromJson(const std::string& json_string) {
+inline envoy::api::v2::Cluster parseClusterFromV2Json(const std::string& json_string) {
   envoy::api::v2::Cluster cluster;
-  auto json_object_ptr = Json::Factory::loadFromString(json_string);
-  Stats::StatsOptionsImpl stats_options;
-  Config::CdsJson::translateCluster(*json_object_ptr,
-                                    absl::optional<envoy::api::v2::core::ConfigSource>(), cluster,
-                                    stats_options);
+  TestUtility::loadFromJson(json_string, cluster);
   return cluster;
 }
 
 inline envoy::api::v2::Cluster parseClusterFromV2Yaml(const std::string& yaml) {
   envoy::api::v2::Cluster cluster;
-  MessageUtil::loadFromYaml(yaml, cluster);
+  TestUtility::loadFromYaml(yaml, cluster);
   return cluster;
 }
 
 inline envoy::api::v2::Cluster defaultStaticCluster(const std::string& name) {
-  return parseClusterFromJson(defaultStaticClusterJson(name));
-}
-
-inline envoy::api::v2::Cluster
-parseSdsClusterFromJson(const std::string& json_string,
-                        const envoy::api::v2::core::ConfigSource eds_config) {
-  envoy::api::v2::Cluster cluster;
-  auto json_object_ptr = Json::Factory::loadFromString(json_string);
-  Stats::StatsOptionsImpl stats_options;
-  Config::CdsJson::translateCluster(*json_object_ptr, eds_config, cluster, stats_options);
-  return cluster;
+  return parseClusterFromV2Json(defaultStaticClusterJson(name));
 }
 
 inline HostSharedPtr makeTestHost(ClusterInfoConstSharedPtr cluster, const std::string& url,
@@ -79,7 +63,8 @@ inline HostSharedPtr makeTestHost(ClusterInfoConstSharedPtr cluster, const std::
   return HostSharedPtr{new HostImpl(
       cluster, "", Network::Utility::resolveUrl(url),
       envoy::api::v2::core::Metadata::default_instance(), weight, envoy::api::v2::core::Locality(),
-      envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance())};
+      envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance(), 0,
+      envoy::api::v2::core::HealthStatus::UNKNOWN)};
 }
 
 inline HostSharedPtr makeTestHost(ClusterInfoConstSharedPtr cluster, const std::string& url,
@@ -88,7 +73,8 @@ inline HostSharedPtr makeTestHost(ClusterInfoConstSharedPtr cluster, const std::
   return HostSharedPtr{
       new HostImpl(cluster, "", Network::Utility::resolveUrl(url), metadata, weight,
                    envoy::api::v2::core::Locality(),
-                   envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance())};
+                   envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance(), 0,
+                   envoy::api::v2::core::HealthStatus::UNKNOWN)};
 }
 
 inline HostSharedPtr
@@ -97,7 +83,8 @@ makeTestHost(ClusterInfoConstSharedPtr cluster, const std::string& url,
              uint32_t weight = 1) {
   return HostSharedPtr{new HostImpl(cluster, "", Network::Utility::resolveUrl(url),
                                     envoy::api::v2::core::Metadata::default_instance(), weight,
-                                    envoy::api::v2::core::Locality(), health_check_config)};
+                                    envoy::api::v2::core::Locality(), health_check_config, 0,
+                                    envoy::api::v2::core::HealthStatus::UNKNOWN)};
 }
 
 inline HostDescriptionConstSharedPtr makeTestHostDescription(ClusterInfoConstSharedPtr cluster,
@@ -106,7 +93,7 @@ inline HostDescriptionConstSharedPtr makeTestHostDescription(ClusterInfoConstSha
       cluster, "", Network::Utility::resolveUrl(url),
       envoy::api::v2::core::Metadata::default_instance(),
       envoy::api::v2::core::Locality().default_instance(),
-      envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance())};
+      envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance(), 0)};
 }
 
 inline HostsPerLocalitySharedPtr makeHostsPerLocality(std::vector<HostVector>&& locality_hosts,
@@ -115,19 +102,34 @@ inline HostsPerLocalitySharedPtr makeHostsPerLocality(std::vector<HostVector>&& 
       std::move(locality_hosts), !force_no_local_locality && !locality_hosts.empty());
 }
 
-inline envoy::api::v2::core::HealthCheck
-parseHealthCheckFromV2Yaml(const std::string& yaml_string) {
-  envoy::api::v2::core::HealthCheck health_check;
-  MessageUtil::loadFromYaml(yaml_string, health_check);
-  return health_check;
+inline LocalityWeightsSharedPtr
+makeLocalityWeights(std::initializer_list<uint32_t> locality_weights) {
+  return std::make_shared<LocalityWeights>(locality_weights);
 }
 
 inline envoy::api::v2::core::HealthCheck
-parseHealthCheckFromV1Json(const std::string& json_string) {
+parseHealthCheckFromV2Yaml(const std::string& yaml_string) {
   envoy::api::v2::core::HealthCheck health_check;
-  auto json_object_ptr = Json::Factory::loadFromString(json_string);
-  Config::CdsJson::translateHealthCheck(*json_object_ptr, health_check);
+  TestUtility::loadFromYaml(yaml_string, health_check);
   return health_check;
+}
+
+inline PrioritySet::UpdateHostsParams
+updateHostsParams(HostVectorConstSharedPtr hosts, HostsPerLocalityConstSharedPtr hosts_per_locality,
+                  HealthyHostVectorConstSharedPtr healthy_hosts,
+                  HostsPerLocalityConstSharedPtr healthy_hosts_per_locality) {
+  return HostSetImpl::updateHostsParams(
+      hosts, hosts_per_locality, std::move(healthy_hosts), std::move(healthy_hosts_per_locality),
+      std::make_shared<const DegradedHostVector>(), HostsPerLocalityImpl::empty(),
+      std::make_shared<const ExcludedHostVector>(), HostsPerLocalityImpl::empty());
+}
+
+inline PrioritySet::UpdateHostsParams
+updateHostsParams(HostVectorConstSharedPtr hosts,
+                  HostsPerLocalityConstSharedPtr hosts_per_locality) {
+  return updateHostsParams(std::move(hosts), std::move(hosts_per_locality),
+                           std::make_shared<const HealthyHostVector>(),
+                           HostsPerLocalityImpl::empty());
 }
 
 } // namespace

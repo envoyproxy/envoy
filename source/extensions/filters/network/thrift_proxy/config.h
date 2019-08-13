@@ -43,7 +43,7 @@ class ThriftProxyFilterConfigFactory
           envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy,
           envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProtocolOptions> {
 public:
-  ThriftProxyFilterConfigFactory() : FactoryBase(NetworkFilterNames::get().ThriftProxy) {}
+  ThriftProxyFilterConfigFactory() : FactoryBase(NetworkFilterNames::get().ThriftProxy, true) {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
@@ -69,8 +69,9 @@ public:
   void createFilterChain(ThriftFilters::FilterChainFactoryCallbacks& callbacks) override;
 
   // Router::Config
-  Router::RouteConstSharedPtr route(const MessageMetadata& metadata) const override {
-    return route_matcher_->route(metadata);
+  Router::RouteConstSharedPtr route(const MessageMetadata& metadata,
+                                    uint64_t random_value) const override {
+    return route_matcher_->route(metadata, random_value);
   }
 
   // Config
@@ -81,6 +82,9 @@ public:
   Router::Config& routerConfig() override { return *this; }
 
 private:
+  void processFilter(
+      const envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftFilter& proto_config);
+
   Server::Configuration::FactoryContext& context_;
   const std::string stats_prefix_;
   ThriftFilterStats stats_;

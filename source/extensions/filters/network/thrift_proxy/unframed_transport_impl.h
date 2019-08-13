@@ -17,14 +17,16 @@ namespace ThriftProxy {
  */
 class UnframedTransportImpl : public Transport {
 public:
-  UnframedTransportImpl() {}
+  UnframedTransportImpl() = default;
 
   // Transport
   const std::string& name() const override { return TransportNames::get().UNFRAMED; }
   TransportType type() const override { return TransportType::Unframed; }
-  bool decodeFrameStart(Buffer::Instance&, MessageMetadata& metadata) override {
+  bool decodeFrameStart(Buffer::Instance& buffer, MessageMetadata& metadata) override {
     UNREFERENCED_PARAMETER(metadata);
-    return true;
+
+    // Don't start a frame if there's no data at all.
+    return buffer.length() > 0;
   }
   bool decodeFrameEnd(Buffer::Instance&) override { return true; }
   void encodeFrame(Buffer::Instance& buffer, const MessageMetadata& metadata,

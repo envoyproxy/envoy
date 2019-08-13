@@ -20,10 +20,9 @@ namespace Alts {
  * @param local_address the local address of the connection.
  * @param remote_address the remote address of the connection.
  */
-typedef std::function<TsiHandshakerPtr(
+using HandshakerFactory = std::function<TsiHandshakerPtr(
     Event::Dispatcher& dispatcher, const Network::Address::InstanceConstSharedPtr& local_address,
-    const Network::Address::InstanceConstSharedPtr& remote_address)>
-    HandshakerFactory;
+    const Network::Address::InstanceConstSharedPtr& remote_address)>;
 
 /**
  * A function to validate the peer of the connection.
@@ -32,7 +31,7 @@ typedef std::function<TsiHandshakerPtr(
  * output param that should be populated by the function implementation.
  * @return true if the peer is valid or false if the peer is invalid.
  */
-typedef std::function<bool(const tsi_peer& peer, std::string& err)> HandshakeValidator;
+using HandshakeValidator = std::function<bool(const tsi_peer& peer, std::string& err)>;
 
 /**
  * A implementation of Network::TransportSocket based on gRPC TSI
@@ -52,13 +51,14 @@ public:
    * The connection will be closed immediately if it returns false.
    */
   TsiSocket(HandshakerFactory handshaker_factory, HandshakeValidator handshake_validator);
-  virtual ~TsiSocket();
+  ~TsiSocket() override;
 
   // Network::TransportSocket
   void setTransportSocketCallbacks(Envoy::Network::TransportSocketCallbacks& callbacks) override;
   std::string protocol() const override;
+  absl::string_view failureReason() const override;
   bool canFlushClose() override { return handshake_complete_; }
-  const Envoy::Ssl::Connection* ssl() const override { return nullptr; }
+  const Envoy::Ssl::ConnectionInfo* ssl() const override { return nullptr; }
   Network::IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
   void closeSocket(Network::ConnectionEvent event) override;
   Network::IoResult doRead(Buffer::Instance& buffer) override;
@@ -98,7 +98,8 @@ public:
   TsiSocketFactory(HandshakerFactory handshaker_factory, HandshakeValidator handshake_validator);
 
   bool implementsSecureTransport() const override;
-  Network::TransportSocketPtr createTransportSocket() const override;
+  Network::TransportSocketPtr
+  createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
 
 private:
   HandshakerFactory handshaker_factory_;

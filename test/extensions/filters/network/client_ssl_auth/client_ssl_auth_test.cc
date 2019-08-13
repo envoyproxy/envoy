@@ -3,7 +3,6 @@
 #include <string>
 
 #include "common/config/filter_json.h"
-#include "common/filesystem/filesystem_impl.h"
 #include "common/http/message_impl.h"
 #include "common/network/address_impl.h"
 
@@ -22,6 +21,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
@@ -41,43 +41,40 @@ TEST(ClientSslAuthAllowedPrincipalsTest, EmptyString) {
 }
 
 TEST(ClientSslAuthConfigTest, BadClientSslAuthConfig) {
-  std::string json = R"EOF(
-  {
-    "stat_prefix": "my_stat_prefix",
-    "auth_api_cluster" : "fake_cluster",
-    "ip_white_list": ["192.168.3.0/24"],
-    "test" : "a"
-  }
+  std::string yaml = R"EOF(
+stat_prefix: my_stat_prefix
+auth_api_cluster: fake_cluster
+ip_white_list:
+- address_prefix: 192.168.3.0
+  prefix_len: 24
+test: a
   )EOF";
 
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json);
   envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth proto_config{};
-  EXPECT_THROW(Envoy::Config::FilterJson::translateClientSslAuthFilter(*json_config, proto_config),
-               Json::Exception);
+  EXPECT_THROW(TestUtility::loadFromYaml(yaml, proto_config), EnvoyException);
 }
 
 class ClientSslAuthFilterTest : public testing::Test {
-public:
+protected:
   ClientSslAuthFilterTest()
-      : request_(&cm_.async_client_), interval_timer_(new Event::MockTimer(&dispatcher_)) {}
-  ~ClientSslAuthFilterTest() { tls_.shutdownThread(); }
+      : request_(&cm_.async_client_), interval_timer_(new Event::MockTimer(&dispatcher_)),
+        api_(Api::createApiForTest(stats_store_)) {}
+  ~ClientSslAuthFilterTest() override { tls_.shutdownThread(); }
 
   void setup() {
-    std::string json = R"EOF(
-    {
-      "auth_api_cluster": "vpn",
-      "stat_prefix": "vpn",
-      "ip_white_list":
-        [ "1.2.3.4/32",
-          "2001:abcd::/64"
-        ]
-    }
+    std::string yaml = R"EOF(
+auth_api_cluster: vpn
+stat_prefix: vpn
+ip_white_list:
+- address_prefix: 1.2.3.4
+  prefix_len: 32
+- address_prefix: '2001:abcd::'
+  prefix_len: 64
     )EOF";
 
-    Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json);
     envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth proto_config{};
-    Envoy::Config::FilterJson::translateClientSslAuthFilter(*json_config, proto_config);
-    EXPECT_CALL(cm_, get("vpn"));
+    TestUtility::loadFromYaml(yaml, proto_config);
+    EXPECT_CALL(cm_, get(Eq("vpn")));
     setupRequest();
     config_ =
         ClientSslAuthConfig::create(proto_config, tls_, cm_, dispatcher_, stats_store_, random_);
@@ -87,7 +84,7 @@ public:
 
   void createAuthFilter() {
     filter_callbacks_.connection_.callbacks_.clear();
-    instance_.reset(new ClientSslAuthFilter(config_));
+    instance_ = std::make_unique<ClientSslAuthFilter>(config_);
     instance_->initializeReadFilterCallbacks(filter_callbacks_);
 
     // NOP currently.
@@ -98,9 +95,9 @@ public:
   void setupRequest() {
     EXPECT_CALL(cm_, httpAsyncClientForCluster("vpn")).WillOnce(ReturnRef(cm_.async_client_));
     EXPECT_CALL(cm_.async_client_, send_(_, _, _))
-        .WillOnce(Invoke(
-            [this](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                   absl::optional<std::chrono::milliseconds>) -> Http::AsyncClient::Request* {
+        .WillOnce(
+            Invoke([this](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                          const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
               callbacks_ = &callbacks;
               return &request_;
             }));
@@ -115,23 +112,21 @@ public:
   std::unique_ptr<ClientSslAuthFilter> instance_;
   Event::MockTimer* interval_timer_;
   Http::AsyncClient::Callbacks* callbacks_;
-  Ssl::MockConnection ssl_;
+  Ssl::MockConnectionInfo ssl_;
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Runtime::MockRandomGenerator> random_;
+  Api::ApiPtr api_;
 };
 
 TEST_F(ClientSslAuthFilterTest, NoCluster) {
-  std::string json = R"EOF(
-  {
-    "auth_api_cluster": "bad_cluster",
-    "stat_prefix": "bad_cluster"
-  }
+  std::string yaml = R"EOF(
+auth_api_cluster: bad_cluster
+stat_prefix: bad_cluster
   )EOF";
 
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json);
   envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth proto_config{};
-  Envoy::Config::FilterJson::translateClientSslAuthFilter(*json_config, proto_config);
-  EXPECT_CALL(cm_, get("bad_cluster")).WillOnce(Return(nullptr));
+  TestUtility::loadFromYaml(yaml, proto_config);
+  EXPECT_CALL(cm_, get(Eq("bad_cluster"))).WillOnce(Return(nullptr));
   EXPECT_THROW(
       ClientSslAuthConfig::create(proto_config, tls_, cm_, dispatcher_, stats_store_, random_),
       EnvoyException);
@@ -141,7 +136,7 @@ TEST_F(ClientSslAuthFilterTest, NoSsl) {
   setup();
   Buffer::OwnedImpl dummy("hello");
 
-  // Check no SSL case, mulitple iterations.
+  // Check no SSL case, multiple iterations.
   EXPECT_CALL(filter_callbacks_.connection_, ssl()).WillOnce(Return(nullptr));
   EXPECT_EQ(Network::FilterStatus::Continue, instance_->onNewConnection());
   EXPECT_EQ(Network::FilterStatus::Continue, instance_->onData(dummy, false));
@@ -175,11 +170,14 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body().reset(
-      new Buffer::OwnedImpl(Filesystem::fileReadToEnd(TestEnvironment::runfilesPath(
-          "test/extensions/filters/network/client_ssl_auth/test_data/vpn_response_1.json"))));
+  message->body() = std::make_unique<Buffer::OwnedImpl>(
+      api_->fileSystem().fileReadToEnd(TestEnvironment::runfilesPath(
+          "test/extensions/filters/network/client_ssl_auth/test_data/vpn_response_1.json")));
   callbacks_->onSuccess(std::move(message));
-  EXPECT_EQ(1U, stats_store_.gauge("auth.clientssl.vpn.total_principals").value());
+  EXPECT_EQ(1U,
+            stats_store_
+                .gauge("auth.clientssl.vpn.total_principals", Stats::Gauge::ImportMode::NeverImport)
+                .value());
 
   // Create a new filter for an SSL connection with an authorized cert.
   createAuthFilter();
@@ -227,8 +225,8 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
 
   // Error response.
   EXPECT_CALL(*interval_timer_, enableTimer(_));
-  message.reset(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "503"}}}));
+  message = std::make_unique<Http::ResponseMessageImpl>(
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "503"}}});
   callbacks_->onSuccess(std::move(message));
 
   // Interval timer fires.
@@ -237,9 +235,9 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
 
   // Parsing error
   EXPECT_CALL(*interval_timer_, enableTimer(_));
-  message.reset(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body().reset(new Buffer::OwnedImpl("bad_json"));
+  message = std::make_unique<Http::ResponseMessageImpl>(
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}});
+  message->body() = std::make_unique<Buffer::OwnedImpl>("bad_json");
   callbacks_->onSuccess(std::move(message));
 
   // Interval timer fires.
@@ -253,9 +251,9 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
   // Interval timer fires, cannot obtain async client.
   EXPECT_CALL(cm_, httpAsyncClientForCluster("vpn")).WillOnce(ReturnRef(cm_.async_client_));
   EXPECT_CALL(cm_.async_client_, send_(_, _, _))
-      .WillOnce(Invoke(
-          [&](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-              const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+      .WillOnce(
+          Invoke([&](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
             callbacks.onSuccess(Http::MessagePtr{new Http::ResponseMessageImpl(
                 Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "503"}}})});
             return nullptr;

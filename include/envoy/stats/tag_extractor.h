@@ -18,7 +18,7 @@ namespace Stats {
  */
 class TagExtractor {
 public:
-  virtual ~TagExtractor() {}
+  virtual ~TagExtractor() = default;
 
   /**
    * Identifier for the tag extracted by this object.
@@ -40,7 +40,7 @@ public:
    * @param remove_characters set of intervals of character-indices to be removed from name.
    * @return bool indicates whether a tag was found in the name.
    */
-  virtual bool extractTag(const std::string& stat_name, std::vector<Tag>& tags,
+  virtual bool extractTag(absl::string_view stat_name, std::vector<Tag>& tags,
                           IntervalSet<size_t>& remove_characters) const PURE;
 
   /**
@@ -58,7 +58,7 @@ public:
   virtual absl::string_view prefixToken() const PURE;
 };
 
-typedef std::unique_ptr<const TagExtractor> TagExtractorPtr;
+using TagExtractorPtr = std::unique_ptr<const TagExtractor>;
 
 } // namespace Stats
 } // namespace Envoy

@@ -7,24 +7,21 @@
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 
-#include "common/event/libevent.h"
-
 namespace Envoy {
 namespace Event {
-
-class TimerCB;
 
 /**
  * Callback invoked when a timer event fires.
  */
-typedef std::function<void()> TimerCb;
+using TimerCb = std::function<void()>;
 
 /**
- * An abstract timer event. Free the timer to unregister any pending timeouts.
+ * An abstract timer event. Free the timer to unregister any pending timeouts. Must be freed before
+ * the dispatcher is torn down.
  */
 class Timer {
 public:
-  virtual ~Timer() {}
+  virtual ~Timer() = default;
 
   /**
    * Disable a pending timeout without destroying the underlying timer.
@@ -35,13 +32,18 @@ public:
    * Enable a pending timeout. If a timeout is already pending, it will be reset to the new timeout.
    */
   virtual void enableTimer(const std::chrono::milliseconds& d) PURE;
+
+  /**
+   * Return whether the timer is currently armed.
+   */
+  virtual bool enabled() PURE;
 };
 
-typedef std::unique_ptr<Timer> TimerPtr;
+using TimerPtr = std::unique_ptr<Timer>;
 
 class Scheduler {
 public:
-  virtual ~Scheduler() {}
+  virtual ~Scheduler() = default;
 
   /**
    * Creates a timer.
@@ -49,7 +51,7 @@ public:
   virtual TimerPtr createTimer(const TimerCb& cb) PURE;
 };
 
-typedef std::unique_ptr<Scheduler> SchedulerPtr;
+using SchedulerPtr = std::unique_ptr<Scheduler>;
 
 /**
  * Interface providing a mechanism to measure time and set timers that run callbacks
@@ -57,13 +59,15 @@ typedef std::unique_ptr<Scheduler> SchedulerPtr;
  */
 class TimeSystem : public TimeSource {
 public:
-  virtual ~TimeSystem() {}
+  ~TimeSystem() override = default;
+
+  using Duration = MonotonicTime::duration;
 
   /**
    * Creates a timer factory. This indirection enables thread-local timer-queue management,
    * so servers can have a separate timer-factory in each thread.
    */
-  virtual SchedulerPtr createScheduler(Libevent::BasePtr&) PURE;
+  virtual SchedulerPtr createScheduler(Scheduler& base_scheduler) PURE;
 };
 
 } // namespace Event

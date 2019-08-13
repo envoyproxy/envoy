@@ -2,6 +2,10 @@ syntax = "proto3";
 
 package envoy.service.discovery.v2;
 
+option java_outer_classname = "SdsProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.service.discovery.v2";
+
 import "envoy/api/v2/discovery.proto";
 
 import "google/api/annotations.proto";
@@ -12,6 +16,10 @@ message SdsDummy {
 }
 
 service SecretDiscoveryService {
+  rpc DeltaSecrets(stream envoy.api.v2.DeltaDiscoveryRequest)
+      returns (stream envoy.api.v2.DeltaDiscoveryResponse) {
+  }
+
   rpc StreamSecrets(stream envoy.api.v2.DiscoveryRequest)
       returns (stream envoy.api.v2.DiscoveryResponse) {
   }

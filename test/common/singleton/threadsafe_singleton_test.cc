@@ -1,8 +1,12 @@
+#include <memory>
+
 #include "common/common/lock_guard.h"
 #include "common/common/thread.h"
 #include "common/singleton/threadsafe_singleton.h"
+#include "common/stats/isolated_store_impl.h"
 
 #include "test/test_common/threadsafe_singleton_injector.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -10,7 +14,7 @@ namespace Envoy {
 
 class TestSingleton {
 public:
-  virtual ~TestSingleton() {}
+  virtual ~TestSingleton() = default;
 
   virtual void addOne() {
     Thread::LockGuard lock(lock_);
@@ -30,7 +34,7 @@ protected:
 class EvilMathSingleton : public TestSingleton {
 public:
   EvilMathSingleton() { value_ = -50; }
-  virtual void addOne() {
+  void addOne() override {
     Thread::LockGuard lock(lock_);
     ++value_;
     ++value_;
@@ -40,7 +44,7 @@ public:
 class AddTen {
 public:
   AddTen() {
-    thread_.reset(new Thread::Thread([this]() -> void { threadRoutine(); }));
+    thread_ = Thread::threadFactoryForTest().createThread([this]() -> void { threadRoutine(); });
   }
   ~AddTen() {
     thread_->join();
