@@ -103,7 +103,7 @@ message RedisProxy {
       // Read from replica nodes. If multiple replica nodes are present within a shard, a random
       // node is selected. Healthy nodes have precedent over unhealthy nodes.
       REPLICA = 2;
-      // Read from the replica nodes(similar to REPLICA), but if all replicas are unavailable(not
+      // Read from the replica nodes (similar to REPLICA), but if all replicas are unavailable (not
       // present or unhealthy), read from the master.
       PREFER_REPLICA = 3;
       // Read from any node of the cluster. A random node is selected among the master and replicas,
