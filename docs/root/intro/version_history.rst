@@ -25,6 +25,7 @@ Version history
   certificate validation context.
 * upstream: added network filter chains to upstream connections, see :ref:`filters<envoy_api_field_Cluster.filters>`.
 * upstream: use p2c to select hosts for least-requests load balancers if all host weights are the same, even in cases where weights are not equal to 1.
+* zookeeper: parse responses and emit latency stats.
 
 1.11.0 (July 11, 2019)
 ======================
