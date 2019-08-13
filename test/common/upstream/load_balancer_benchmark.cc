@@ -78,8 +78,7 @@ void BM_RoundRobinLoadBalancerBuild(benchmark::State& state) {
     const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
     state.counters["memory"] = end_mem - start_mem;
     state.counters["memory_per_host"] = (end_mem - start_mem) / num_hosts;
-
-    // Exclude destructors from timing.
+    state.ResumeTiming();
   }
 }
 BENCHMARK(BM_RoundRobinLoadBalancerBuild)
@@ -136,19 +135,10 @@ void BM_RingHashLoadBalancerBuildRing(benchmark::State& state) {
     const uint64_t num_hosts = state.range(0);
     const uint64_t min_ring_size = state.range(1);
     RingHashTester tester(num_hosts, min_ring_size);
-
-    const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
+    state.ResumeTiming();
 
     // We are only interested in timing the initial ring build.
-    state.ResumeTiming();
     tester.ring_hash_lb_->initialize();
-    state.PauseTiming();
-
-    const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
-    state.counters["memory"] = end_mem - start_mem;
-    state.counters["memory_per_host"] = (end_mem - start_mem) / num_hosts;
-
-    // Exclude destructors from timing.
   }
 }
 BENCHMARK(BM_RingHashLoadBalancerBuildRing)
@@ -165,18 +155,10 @@ void BM_MaglevLoadBalancerBuildTable(benchmark::State& state) {
     state.PauseTiming();
     const uint64_t num_hosts = state.range(0);
     MaglevTester tester(num_hosts);
-
-    const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
+    state.ResumeTiming();
 
     // We are only interested in timing the initial table build.
-    state.ResumeTiming();
     tester.maglev_lb_->initialize();
-    state.PauseTiming();
-
-    const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
-    state.counters["memory"] = end_mem - start_mem;
-    state.counters["memory_per_host"] = (end_mem - start_mem) / num_hosts;
-    // Exclude destructors from timing.
   }
 }
 BENCHMARK(BM_MaglevLoadBalancerBuildTable)
@@ -213,56 +195,6 @@ void computeHitStats(benchmark::State& state,
   state.counters["relative_stddev_hits"] = (stddev / mean);
 }
 
-void BM_RoundRobinChooseHost(benchmark::State& state) {
-  const uint64_t keys_to_simulate = 100000;
-
-  for (auto _ : state) {
-    // Do not time the creation.
-    state.PauseTiming();
-    const uint64_t num_hosts = state.range(0);
-    const uint64_t weighted_subset_percent = state.range(1);
-    const uint64_t weight = state.range(2);
-    RoundRobinTester tester(num_hosts, weighted_subset_percent, weight);
-    tester.initialize();
-
-    std::unordered_map<std::string, uint64_t> hit_counter;
-    TestLoadBalancerContext context;
-    state.ResumeTiming();
-
-    for (uint64_t i = 0; i < keys_to_simulate; i++) {
-      // Note: To a certain extent this is benchmarking the performance of
-      // std::unordered_map.
-      // TODO(antoniovicente): Consider removing the hit counter to avoid polluting the benchmark
-      //                       numbers.
-      hit_counter[tester.lb_->chooseHost(&context)->address()->asString()] += 1;
-    }
-
-    // Do not time computation of mean, standard deviation, and relative standard deviation.
-    state.PauseTiming();
-    computeHitStats(state, hit_counter);
-
-    // Exclude destructors from timing.
-  }
-}
-BENCHMARK(BM_RoundRobinChooseHost)
-    ->Args({500, 0, 1})
-    ->Args({500, 5, 2})
-    ->Args({500, 50, 75})
-    ->Args({500, 100, 75})
-    ->Args({2500, 0, 1})
-    ->Args({2500, 5, 2})
-    ->Args({2500, 50, 75})
-    ->Args({2500, 100, 75})
-    ->Args({10000, 0, 1})
-    ->Args({10000, 5, 2})
-    ->Args({10000, 50, 75})
-    ->Args({10000, 100, 75})
-    ->Args({50000, 0, 1})
-    ->Args({50000, 5, 2})
-    ->Args({50000, 50, 75})
-    ->Args({50000, 100, 75})
-    ->Unit(benchmark::kMillisecond);
-
 void BM_RingHashLoadBalancerChooseHost(benchmark::State& state) {
   for (auto _ : state) {
     // Do not time the creation of the ring.
@@ -290,8 +222,7 @@ void BM_RingHashLoadBalancerChooseHost(benchmark::State& state) {
     // Do not time computation of mean, standard deviation, and relative standard deviation.
     state.PauseTiming();
     computeHitStats(state, hit_counter);
-
-    // Exclude destructors from timing.
+    state.ResumeTiming();
   }
 }
 BENCHMARK(BM_RingHashLoadBalancerChooseHost)
@@ -327,8 +258,7 @@ void BM_MaglevLoadBalancerChooseHost(benchmark::State& state) {
     // Do not time computation of mean, standard deviation, and relative standard deviation.
     state.PauseTiming();
     computeHitStats(state, hit_counter);
-
-    // Exclude destructors from timing.
+    state.ResumeTiming();
   }
 }
 BENCHMARK(BM_MaglevLoadBalancerChooseHost)
@@ -375,9 +305,6 @@ void BM_RingHashLoadBalancerHostLoss(benchmark::State& state) {
         (static_cast<double>(num_different_hosts) / hosts.size()) * 100;
     state.counters["host_loss_over_N_optimal"] =
         (static_cast<double>(hosts_to_lose) / num_hosts) * 100;
-
-    // Exclude destructors from timing.
-    state.PauseTiming();
   }
 }
 BENCHMARK(BM_RingHashLoadBalancerHostLoss)
@@ -423,9 +350,6 @@ void BM_MaglevLoadBalancerHostLoss(benchmark::State& state) {
         (static_cast<double>(num_different_hosts) / hosts.size()) * 100;
     state.counters["host_loss_over_N_optimal"] =
         (static_cast<double>(hosts_to_lose) / num_hosts) * 100;
-
-    // Exclude destructors from timing.
-    state.PauseTiming();
   }
 }
 BENCHMARK(BM_MaglevLoadBalancerHostLoss)
@@ -479,9 +403,6 @@ void BM_MaglevLoadBalancerWeighted(benchmark::State& state) {
     };
     state.counters["optimal_percent_different"] =
         std::abs(weighted_hosts_percent(before_weight) - weighted_hosts_percent(after_weight));
-
-    // Exclude destructors from timing.
-    state.PauseTiming();
   }
 }
 BENCHMARK(BM_MaglevLoadBalancerWeighted)
