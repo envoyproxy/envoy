@@ -314,10 +314,6 @@ public:
                        ServerConnectionCallbacks& callbacks, Http1Settings settings,
                        uint32_t max_request_headers_kb);
 
-  ServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks,
-                       Http1Settings settings, uint32_t max_request_headers_kb,
-                       bool strict_header_validation);
-
   bool supports_http_10() override { return codec_settings_.accept_http_10_; }
 
 private:
