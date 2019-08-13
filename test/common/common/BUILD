@@ -55,6 +55,13 @@ envoy_cc_fuzz_test(
     deps = ["//source/common/common:utility_lib"],
 )
 
+envoy_cc_fuzz_test(
+    name = "hash_fuzz_test",
+    srcs = ["hash_fuzz_test.cc"],
+    corpus = "hash_corpus",
+    deps = ["//source/common/common:hash_lib"],
+)
+
 envoy_cc_test(
     name = "cleanup_test",
     srcs = ["cleanup_test.cc"],

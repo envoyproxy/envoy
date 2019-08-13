@@ -2,6 +2,8 @@
 
 #include <memory>
 
+#include "common/common/assert.h"
+
 #include "absl/base/call_once.h"
 
 namespace Envoy {
