@@ -46,6 +46,7 @@ public:
       const envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig&
           proto_config);
 
+  // Accessors.
   std::chrono::milliseconds min_rtt_calc_interval() const { return min_rtt_calc_interval_; }
   std::chrono::milliseconds sample_rtt_calc_interval() const { return sample_rtt_calc_interval_; }
   uint64_t max_concurrency_limit() const { return max_concurrency_limit_; }
@@ -78,22 +79,25 @@ typedef std::shared_ptr<GradientControllerConfig> GradientControllerConfigShared
  * A concurrency controller that implements the a variation of the Gradient algorithm to control the
  * allowed concurrency window.
  *
- * An ideal round-trip time (minRTT) is measured periodically (every min_rtt_calc_period_) by only
- * allowing a single outstanding request at a time and measuring the latency values. This is then
- * used in the calculation of a gradient value when the concurrency value is not fixed at 1, using
- * time-sampled latencies (sampleRTT):
+ * An ideal round-trip time (minRTT) is measured periodically by only allowing a single outstanding
+ * request at a time and measuring the round-trip time to the listener. This information is then
+ * used in the calculation of a number called the gradient, using time-sampled latencies
+ * (sampleRTT):
  *
  *     gradient = minRTT / sampleRTT
  *
- * This gradient value is then used to periodically update the concurrency limit via:
+ * This gradient value has a useful property, such that it decreases as the sampled latencies
+ * increase. The value is then used to periodically update the concurrency limit via:
  *
  *     limit = old_limit * gradient
  *     new_limit = limit + headroom
  *
- * The headroom value allows for request bursts and is configurable. This value must be present,
- * since it forces the concurrency limit to increase until there is a deviation from the minRTT
- * latency. In its absence, the concurrency limit could remain at an unnecessarily small number. The
- * headroom value is unconfigurable and takes the form of sqrt(limit).
+ * The headroom value allows for request bursts and is also the driving factor behind increasing the
+ * concurrency limit when the sampleRTT is in the same ballpark as the minRTT. This value must be
+ * present in the calculation, since it forces the concurrency limit to increase until there is a
+ * deviation from the minRTT latency. In its absence, the concurrency limit could remain stagnant at
+ * an unnecessarily small value if sampleRTT ~= minRTT. Therefore, the headroom value is
+ * unconfigurable and takes the form of sqrt(limit).
  */
 class GradientController : public ConcurrencyController {
 public:
@@ -125,11 +129,9 @@ private:
   absl::Mutex update_window_mtx_;
   std::chrono::nanoseconds min_rtt_;
   std::atomic<bool> recalculating_min_rtt_;
-
-  // Protects the histogram storing request latency samples.
   absl::Mutex latency_sample_mtx_ ABSL_ACQUIRED_AFTER(update_window_mtx_);
-
   std::chrono::nanoseconds sample_rtt_ ABSL_GUARDED_BY(update_window_mtx_);
+
   std::atomic<int> num_rq_outstanding_;
   std::atomic<int> concurrency_limit_;
 

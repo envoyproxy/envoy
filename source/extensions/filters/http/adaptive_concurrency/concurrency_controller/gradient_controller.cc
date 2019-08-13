@@ -41,9 +41,7 @@ GradientControllerConfig::GradientControllerConfig(
 GradientController::GradientController(GradientControllerConfigSharedPtr config,
                                        Event::Dispatcher& dispatcher, Runtime::Loader&,
                                        std::string stats_prefix, Stats::Scope& scope)
-    :
-
-      config_(config), dispatcher_(dispatcher), scope_(scope),
+    : config_(config), dispatcher_(dispatcher), scope_(scope),
       stats_(generateStats(scope_, stats_prefix)), recalculating_min_rtt_(true),
       num_rq_outstanding_(0), concurrency_limit_(1), latency_sample_hist_(hist_fast_alloc()) {
   min_rtt_calc_timer_ = dispatcher_.createTimer([this]() -> void {
@@ -137,6 +135,7 @@ int GradientController::calculateNewLimit() {
   const double limit = concurrency_limit_.load() * gradient;
   const double burst_headroom = sqrt(limit);
   stats_.burst_queue_size_.set(burst_headroom);
+
   const auto clamp = [](int min, int max, int val) { return std::max(min, std::min(max, val)); };
   return clamp(1, config_->max_concurrency_limit(), limit + burst_headroom);
 }
@@ -145,9 +144,11 @@ RequestForwardingAction GradientController::forwardingDecision() {
   while (true) {
     int curr_outstanding = num_rq_outstanding_.load();
     if (curr_outstanding < concurrency_limit_.load()) {
+      // Using the weak compare/exhange for improved performance at the cost of spurious failures.
+      // This is not a problem since there are no side effects when retrying. A legitimate failure
+      // implies that another thread swooped in and modified num_rq_outstanding_ between the
+      // comparison and attempt at the increment.
       if (!num_rq_outstanding_.compare_exchange_weak(curr_outstanding, curr_outstanding + 1)) {
-        // Another thread swooped in and modified num_rq_outstanding_ between the comparison and
-        // attempt at the increment.
         continue;
       }
 
