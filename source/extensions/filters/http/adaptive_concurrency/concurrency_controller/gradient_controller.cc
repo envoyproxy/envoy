@@ -62,6 +62,8 @@ GradientController::GradientController(GradientControllerConfigSharedPtr config,
 }
 
 GradientController::~GradientController() {
+  sample_reset_timer_->disableTimer();
+  min_rtt_calc_timer_->disableTimer();
   hist_free(latency_sample_hist_);
 }
 

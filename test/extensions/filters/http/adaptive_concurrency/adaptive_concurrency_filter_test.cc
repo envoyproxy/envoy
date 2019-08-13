@@ -25,6 +25,8 @@ class MockConcurrencyController : public ConcurrencyController::ConcurrencyContr
 public:
   MOCK_METHOD0(forwardingDecision, RequestForwardingAction());
   MOCK_METHOD1(recordLatencySample, void(const std::chrono::nanoseconds&));
+
+  int concurrencyLimit() const { return 0; }
 };
 
 class AdaptiveConcurrencyFilterTest : public testing::Test {
