@@ -183,6 +183,14 @@ struct StreamInfoImpl : public StreamInfo {
     return downstream_ssl_info_;
   }
 
+  void setUpstreamSslConnection(const Ssl::ConnectionInfo* connection_info) override {
+    upstream_ssl_info_ = connection_info;
+  }
+
+  const Ssl::ConnectionInfo* upstreamSslConnection() const override {
+    return upstream_ssl_info_;
+  }
+
   const Router::RouteEntry* routeEntry() const override { return route_entry_; }
 
   envoy::api::v2::core::Metadata& dynamicMetadata() override { return metadata_; };
@@ -244,6 +252,7 @@ private:
   Network::Address::InstanceConstSharedPtr downstream_direct_remote_address_;
   Network::Address::InstanceConstSharedPtr downstream_remote_address_;
   const Ssl::ConnectionInfo* downstream_ssl_info_{};
+  const Ssl::ConnectionInfo* upstream_ssl_info_{};
   std::string requested_server_name_;
   UpstreamTiming upstream_timing_;
   std::string upstream_transport_failure_reason_;

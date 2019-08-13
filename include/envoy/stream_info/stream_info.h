@@ -431,6 +431,17 @@ public:
   virtual const Ssl::ConnectionInfo* downstreamSslConnection() const PURE;
 
   /**
+   * @param connection_info sets the upstream ssl connection.
+   */
+  virtual void setUpstreamSslConnection(const Ssl::ConnectionInfo* ssl_connection_info) PURE;
+
+  /**
+   * @return the upstream SSL connection. This will be nullptr if the upstream
+   * connection does not use SSL.
+   */
+  virtual const Ssl::ConnectionInfo* upstreamSslConnection() const PURE;
+
+  /**
    * @return const Router::RouteEntry* Get the route entry selected for this request. Note: this
    * will be nullptr if no route was selected.
    */
