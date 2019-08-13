@@ -68,7 +68,7 @@ public:
                                             POOL_HISTOGRAM(listener_config_.listenerScope()))}),
         quic_connection_(quic::test::TestConnectionId(),
                          quic::QuicSocketAddress(quic::QuicIpAddress::Any6(), 12345),
-                         &connection_helper_, &alarm_factory_, &writer_,
+                         connection_helper_, alarm_factory_, writer_,
                          /*owns_writer=*/false, quic::Perspective::IS_SERVER, {quic_version_},
                          listener_config_, listener_stats_),
         quic_session_(quic_config_, {quic_version_}, &quic_connection_, /*visitor=*/nullptr,

@@ -316,6 +316,9 @@ void HttpGrpcAccessLog::emitLog(const Http::HeaderMap& request_headers,
     case Http::Protocol::Http2:
       log_entry->set_protocol_version(envoy::data::accesslog::v2::HTTPAccessLogEntry::HTTP2);
       break;
+    case Http::Protocol::Quic:
+      log_entry->set_protocol_version(envoy::data::accesslog::v2::HTTPAccessLogEntry::QUIC);
+      break;
     }
   }
 

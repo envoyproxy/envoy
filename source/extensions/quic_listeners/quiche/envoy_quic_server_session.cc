@@ -103,8 +103,8 @@ void EnvoyQuicServerSession::addConnectionCallbacks(Network::ConnectionCallbacks
 }
 
 void EnvoyQuicServerSession::addBytesSentCallback(Network::Connection::BytesSentCb /*cb*/) {
-  // Proxy is not supported.
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  // TODO(danzh): implement to support proxy.
+  ASSERT(false, "addBytesSentCallback is not implemented for QUIC");
 }
 
 void EnvoyQuicServerSession::enableHalfClose(bool enabled) {

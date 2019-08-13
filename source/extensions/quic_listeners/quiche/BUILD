@@ -107,6 +107,7 @@ envoy_cc_library(
     tags = ["nofips"],
     deps = [
         ":envoy_quic_stream_lib",
+        ":envoy_quic_utils_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/http:header_map_lib",
@@ -190,5 +191,10 @@ envoy_cc_library(
     name = "envoy_quic_utils_lib",
     hdrs = ["envoy_quic_utils.h"],
     external_deps = ["quiche_quic_platform"],
-    deps = ["//source/common/network:address_lib"],
+    deps = [
+        "//include/envoy/http:codec_interface",
+        "//source/common/http:header_map_lib",
+        "//source/common/network:address_lib",
+        "@com_googlesource_quiche//:quic_core_http_header_list_lib",
+    ],
 )

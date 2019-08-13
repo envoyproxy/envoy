@@ -37,7 +37,7 @@ quic::QuicSession* EnvoyQuicDispatcher::CreateQuicSession(
     quic::QuicConnectionId server_connection_id, const quic::QuicSocketAddress& peer_address,
     quic::QuicStringPiece /*alpn*/, const quic::ParsedQuicVersion& version) {
   auto quic_connection = new EnvoyQuicConnection(
-      server_connection_id, peer_address, helper(), alarm_factory(), writer(),
+      server_connection_id, peer_address, *helper(), *alarm_factory(), *writer(),
       /*owns_writer=*/false, quic::Perspective::IS_SERVER, quic::ParsedQuicVersionVector{version},
       listener_config_, listener_stats_);
   auto quic_session = new EnvoyQuicServerSession(

@@ -26,8 +26,8 @@ class EnvoyQuicConnection : public quic::QuicConnection,
 public:
   EnvoyQuicConnection(const quic::QuicConnectionId& server_connection_id,
                       quic::QuicSocketAddress initial_peer_address,
-                      quic::QuicConnectionHelperInterface* helper,
-                      quic::QuicAlarmFactory* alarm_factory, quic::QuicPacketWriter* writer,
+                      quic::QuicConnectionHelperInterface& helper,
+                      quic::QuicAlarmFactory& alarm_factory, quic::QuicPacketWriter& writer,
                       bool owns_writer, quic::Perspective perspective,
                       const quic::ParsedQuicVersionVector& supported_versions,
                       Network::ListenerConfig& listener_config,
@@ -61,7 +61,7 @@ private:
   Network::Connection* envoy_connection_;
   Network::ListenerConfig& listener_config_;
   Server::ListenerStats& listener_stats_;
-  // Lashed to the corresponding quic FilterChain after connection_socket_ is
+  // Latched to the corresponding quic FilterChain after connection_socket_ is
   // initialized.
   const Network::FilterChain* filter_chain_{nullptr};
 };

@@ -66,9 +66,8 @@ public:
   }
   void setDelayedCloseTimeout(std::chrono::milliseconds timeout) override;
   std::chrono::milliseconds delayedCloseTimeout() const override;
-  void readDisable(bool /*disable*/) override {
-    // Quic connection should be able to read through out its life time.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  void readDisable(bool disable) override {
+    ASSERT(!disable, "Quic connection should be able to read through out its life time.");
   }
   void detectEarlyCloseWhenReadDisabled(bool /*value*/) override { NOT_REACHED_GCOVR_EXCL_LINE; }
   bool readEnabled() const override { return true; }
@@ -76,8 +75,8 @@ public:
   const Network::Address::InstanceConstSharedPtr& localAddress() const override;
   absl::optional<Network::Connection::UnixDomainSocketPeerCredentials>
   unixSocketPeerCredentials() const override {
-    // Unix domain socket is not supported.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    ASSERT(false, "Unix domain socket is not supported.");
+    return absl::nullopt;
   }
   void setConnectionStats(const Network::Connection::ConnectionStats& stats) override {
     stats_ = std::make_unique<Network::Connection::ConnectionStats>(stats);
@@ -156,6 +155,8 @@ private:
   std::string transport_failure_reason_;
   // TODO(danzh): populate stats.
   std::unique_ptr<Network::Connection::ConnectionStats> stats_;
+  // These callbacks are owned by network filters and quic session should out live
+  // them.
   Http::ServerConnectionCallbacks* http_connection_callbacks_{nullptr};
   std::list<Network::ConnectionCallbacks*> network_connection_callbacks_;
 };

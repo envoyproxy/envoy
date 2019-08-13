@@ -1,8 +1,12 @@
 #include <sys/socket.h>
 
+#include "envoy/http/codec.h"
+
 #include "common/common/assert.h"
+#include "common/http/header_map_impl.h"
 #include "common/network/address_impl.h"
 
+#include "quiche/quic/core/http/quic_header_list.h"
 #include "quiche/quic/platform/api/quic_ip_address.h"
 #include "quiche/quic/platform/api/quic_socket_address.h"
 
@@ -44,6 +48,41 @@ inline quic::QuicSocketAddress envoyAddressInstanceToQuicSocketAddress(
         envoy_address->ip()->ipv6()->address();
   }
   return quic::QuicSocketAddress(ss);
+}
+
+inline Http::HeaderMapImplPtr quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_list) {
+  Http::HeaderMapImplPtr headers = std::make_unique<Http::HeaderMapImpl>();
+  for (const auto& entry : header_list) {
+    // TODO(danzh): Avoid copy by referencing entry as header_list is already validated by QUIC.
+    headers->addCopy(Http::LowerCaseString(entry.first), entry.second);
+  }
+  return headers;
+}
+
+inline Http::HeaderMapImplPtr
+spdyHeaderBlockToEnvoyHeaders(const spdy::SpdyHeaderBlock& header_block) {
+  Http::HeaderMapImplPtr headers = std::make_unique<Http::HeaderMapImpl>();
+  for (auto entry : header_block) {
+    // TODO(danzh): Avoid temporary strings and addCopy() with std::string_view.
+    std::string key(entry.first);
+    std::string value(entry.second);
+    headers->addCopy(Http::LowerCaseString(key), value);
+  }
+  return headers;
+}
+
+inline Http::StreamResetReason
+quicRstErrorToEnvoyResetReason(quic::QuicRstStreamErrorCode quic_rst) {
+  switch (quic_rst) {
+  case quic::QUIC_REFUSED_STREAM:
+    return Http::StreamResetReason::RemoteRefusedStreamReset;
+  case quic::QUIC_STREAM_NO_ERROR:
+    return Http::StreamResetReason::ConnectionTermination;
+  case quic::QUIC_STREAM_CONNECTION_ERROR:
+    return Http::StreamResetReason::ConnectionFailure;
+  default:
+    return Http::StreamResetReason::RemoteReset;
+  }
 }
 
 } // namespace Quic

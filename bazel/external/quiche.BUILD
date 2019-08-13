@@ -1947,6 +1947,7 @@ envoy_cc_library(
     copts = quiche_copt,
     repository = "@envoy",
     tags = ["nofips"],
+    visibility = ["//visibility:public"],
     deps = [
         ":quic_core_packets_lib",
         ":quic_platform_base",

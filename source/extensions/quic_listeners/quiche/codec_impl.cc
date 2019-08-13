@@ -7,11 +7,7 @@ void QuicHttpConnectionImplBase::goAway() {
   quic_session_.SendGoAway(quic::QUIC_PEER_GOING_AWAY, "server shutdown imminent");
 }
 
-bool QuicHttpConnectionImplBase::wantsToWrite() {
-  // Returns true if the session has data to send but queued in connection or
-  // stream send buffer.
-  return quic_session_.HasDataToWrite();
-}
+bool QuicHttpConnectionImplBase::wantsToWrite() { return quic_session_.HasDataToWrite(); }
 
 // TODO(danzh): modify QUIC stack to react based on aggregated bytes across all
 // the streams. And call StreamCallbackHelper::runHighWatermarkCallbacks() for each stream.

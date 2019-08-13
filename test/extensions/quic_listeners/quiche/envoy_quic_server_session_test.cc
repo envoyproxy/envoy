@@ -44,8 +44,8 @@ namespace Quic {
 
 class TestEnvoyQuicConnection : public EnvoyQuicConnection {
 public:
-  TestEnvoyQuicConnection(quic::QuicConnectionHelperInterface* helper,
-                          quic::QuicAlarmFactory* alarm_factory, quic::QuicPacketWriter* writer,
+  TestEnvoyQuicConnection(quic::QuicConnectionHelperInterface& helper,
+                          quic::QuicAlarmFactory& alarm_factory, quic::QuicPacketWriter& writer,
                           const quic::ParsedQuicVersionVector& supported_versions,
                           Network::ListenerConfig& listener_config, Server::ListenerStats& stats)
       : EnvoyQuicConnection(quic::test::TestConnectionId(),
@@ -73,7 +73,7 @@ public:
         listener_stats_({ALL_LISTENER_STATS(POOL_COUNTER(listener_config_.listenerScope()),
                                             POOL_GAUGE(listener_config_.listenerScope()),
                                             POOL_HISTOGRAM(listener_config_.listenerScope()))}),
-        quic_connection_(new TestEnvoyQuicConnection(&connection_helper_, &alarm_factory_, &writer_,
+        quic_connection_(new TestEnvoyQuicConnection(connection_helper_, alarm_factory_, writer_,
                                                      quic_version_, listener_config_,
                                                      listener_stats_)),
         crypto_config_(quic::QuicCryptoServerConfig::TESTING, quic::QuicRandom::GetInstance(),
