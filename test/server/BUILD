@@ -252,6 +252,7 @@ envoy_cc_test(
         ":invalid_bootstrap.yaml",
         ":invalid_layered_runtime_duplicate_name.yaml",
         ":invalid_layered_runtime_missing_name.yaml",
+        ":invalid_layered_runtime_no_layer_specifier.yaml",
         ":invalid_runtime_bootstrap.yaml",
         ":node_bootstrap.yaml",
         ":node_bootstrap_no_admin_port.yaml",
