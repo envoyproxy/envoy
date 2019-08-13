@@ -14,8 +14,6 @@
 #include "extensions/filters/http/adaptive_concurrency/concurrency_controller/concurrency_controller.h"
 #include "extensions/filters/http/common/pass_through_filter.h"
 
-#include "circllhist.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
