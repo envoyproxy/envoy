@@ -145,7 +145,7 @@ void AdsIntegrationTest::initializeAds(const bool rate_limiting) {
 
 void AdsIntegrationTest::testBasicFlow() {
   // Send initial configuration, validate we can process a request.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
   sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
                                                  {buildCluster("cluster_0")},
                                                  {buildCluster("cluster_0")}, {}, "1");
