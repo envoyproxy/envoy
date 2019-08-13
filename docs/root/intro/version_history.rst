@@ -24,6 +24,7 @@ Version history
 * tls: added verification of IP address SAN fields in certificates against configured SANs in the
   certificate validation context.
 * upstream: added network filter chains to upstream connections, see :ref:`filters<envoy_api_field_Cluster.filters>`.
+* zookeeper: parse responses and emit latency stats.
 
 1.11.0 (July 11, 2019)
 ======================

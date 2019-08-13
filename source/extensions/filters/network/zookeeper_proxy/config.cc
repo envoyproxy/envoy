@@ -30,8 +30,10 @@ Network::FilterFactoryCb ZooKeeperConfigFactory::createFilterFactoryFromProtoTyp
 
   ZooKeeperFilterConfigSharedPtr filter_config(
       std::make_shared<ZooKeeperFilterConfig>(stat_prefix, max_packet_bytes, context.scope()));
-  return [filter_config](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addFilter(std::make_shared<ZooKeeperFilter>(filter_config));
+  auto& time_source = context.dispatcher().timeSource();
+
+  return [filter_config, &time_source](Network::FilterManager& filter_manager) -> void {
+    filter_manager.addFilter(std::make_shared<ZooKeeperFilter>(filter_config, time_source));
   };
 }
 
