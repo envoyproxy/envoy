@@ -45,7 +45,7 @@ public:
                     body:
                       inline_string: METADATA_VALUE_WITH_AUTH
                   match:
-                    prefix: "/"
+                    prefix: "/v2/metadata"
                     headers:
                       - name: Authorization
                         exact_match: AUTH_TOKEN
@@ -55,7 +55,7 @@ public:
                     body:
                       inline_string: METADATA_VALUE
                   match:
-                    prefix: "/"
+                    prefix: "/v2/metadata"
               domains: "*"
             name: route_config_0
       )EOF",
@@ -78,7 +78,7 @@ public:
 TEST_F(AwsMetadataIntegrationTestSuccess, Success) {
   const auto endpoint = fmt::format("{}:{}", Network::Test::getLoopbackAddressUrlString(version_),
                                     lookupPort("listener_0"));
-  const auto response = Utility::metadataFetcher(endpoint, "", "");
+  const auto response = Utility::metadataFetcher(endpoint, "/v2/metadata", "");
 
   ASSERT_TRUE(response.has_value());
   EXPECT_EQ("METADATA_VALUE", *response);
@@ -90,7 +90,7 @@ TEST_F(AwsMetadataIntegrationTestSuccess, Success) {
 TEST_F(AwsMetadataIntegrationTestSuccess, AuthToken) {
   const auto endpoint = fmt::format("{}:{}", Network::Test::getLoopbackAddressUrlString(version_),
                                     lookupPort("listener_0"));
-  const auto response = Utility::metadataFetcher(endpoint, "", "AUTH_TOKEN");
+  const auto response = Utility::metadataFetcher(endpoint, "/v2/metadata", "AUTH_TOKEN");
 
   ASSERT_TRUE(response.has_value());
   EXPECT_EQ("METADATA_VALUE_WITH_AUTH", *response);
@@ -109,7 +109,7 @@ TEST_F(AwsMetadataIntegrationTestFailure, Failure) {
                                     lookupPort("listener_0"));
 
   const auto start_time = timeSystem().monotonicTime();
-  const auto response = Utility::metadataFetcher(endpoint, "", "");
+  const auto response = Utility::metadataFetcher(endpoint, "/v2/metadata", "");
   const auto end_time = timeSystem().monotonicTime();
 
   EXPECT_FALSE(response.has_value());
@@ -133,7 +133,7 @@ TEST_F(AwsMetadataIntegrationTestTimeout, Timeout) {
                                     lookupPort("listener_0"));
 
   const auto start_time = timeSystem().monotonicTime();
-  const auto response = Utility::metadataFetcher(endpoint, "", "");
+  const auto response = Utility::metadataFetcher(endpoint, "/v2/metadata", "");
   const auto end_time = timeSystem().monotonicTime();
 
   EXPECT_FALSE(response.has_value());

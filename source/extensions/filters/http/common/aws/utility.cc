@@ -90,6 +90,8 @@ Utility::joinCanonicalHeaderNames(const std::map<std::string, std::string>& cano
 
 static size_t curlCallback(char* ptr, size_t, size_t nmemb, void* data) {
   auto buf = static_cast<std::string*>(data);
+  ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::aws), trace,
+                      "Appending {} bytes to metadata", nmemb);
   buf->append(ptr, nmemb);
   return nmemb;
 }
@@ -97,16 +99,19 @@ static size_t curlCallback(char* ptr, size_t, size_t nmemb, void* data) {
 absl::optional<std::string> Utility::metadataFetcher(const std::string& host,
                                                      const std::string& path,
                                                      const std::string& auth_token) {
+  // TODO(lavignes): Replace this CURL-based metadata fetcher with something using Http::AsyncClient
   static const size_t MAX_RETRIES = 4;
   static const std::chrono::milliseconds RETRY_DELAY{1000};
   static const std::chrono::seconds TIMEOUT{5};
+  auto& logger = Envoy::Logger::Registry::getLog(Envoy::Logger::Id::aws);
 
   CURL* const curl = curl_easy_init();
   if (!curl) {
+    ENVOY_LOG_TO_LOGGER(logger, critical, "Could not fetch AWS metadata. Error initializing CURL");
     return absl::nullopt;
-  };
+  }
 
-  const std::string url = fmt::format("http://{}/{}", host, path);
+  const std::string url = fmt::format("http://{}{}", host, path);
   curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
   curl_easy_setopt(curl, CURLOPT_TIMEOUT, TIMEOUT.count());
   curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
@@ -123,11 +128,12 @@ absl::optional<std::string> Utility::metadataFetcher(const std::string& host,
   }
 
   for (size_t retry = 0; retry < MAX_RETRIES; retry++) {
+    ENVOY_LOG_TO_LOGGER(logger, debug, "Fetching AWS metadata from {}", url);
     const CURLcode res = curl_easy_perform(curl);
     if (res == CURLE_OK) {
       break;
     }
-    ENVOY_LOG_MISC(debug, "Could not fetch AWS metadata: {}", curl_easy_strerror(res));
+    ENVOY_LOG_TO_LOGGER(logger, warn, "Could not fetch AWS metadata: {}", curl_easy_strerror(res));
     buffer.clear();
     std::this_thread::sleep_for(RETRY_DELAY);
   }
