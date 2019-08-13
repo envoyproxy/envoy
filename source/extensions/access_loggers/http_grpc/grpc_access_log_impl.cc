@@ -190,7 +190,7 @@ void HttpGrpcAccessLog::emitLog(const Http::HeaderMap& request_headers,
                                 const Http::HeaderMap& response_trailers,
                                 const StreamInfo::StreamInfo& stream_info) {
   envoy::service::accesslog::v2::StreamAccessLogsMessage message;
-  auto* log_entry = message.mutable_http_logs()->add_log_entry();
+  auto log_entry = message.mutable_http_logs()->add_log_entry();
 
   // Common log properties.
   // TODO(mattklein123): Populate sample_rate field.
