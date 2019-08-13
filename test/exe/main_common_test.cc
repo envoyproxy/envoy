@@ -147,11 +147,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, MainCommonTest,
 
 class AdminRequestTest : public MainCommonTest {
 protected:
-  AdminRequestTest()
-      : envoy_return_(false), envoy_started_(false), envoy_finished_(false),
-        pause_before_run_(false), pause_after_run_(false) {
-    addArg("--disable-hot-restart");
-  }
+  AdminRequestTest() { addArg("--disable-hot-restart"); }
 
   // Runs an admin request specified in path, blocking until completion, and
   // returning the response body.
@@ -234,11 +230,11 @@ protected:
   absl::Notification finished_;
   absl::Notification resume_;
   absl::Notification pause_point_;
-  bool envoy_return_;
-  bool envoy_started_;
-  bool envoy_finished_;
-  bool pause_before_run_;
-  bool pause_after_run_;
+  bool envoy_return_{false};
+  bool envoy_started_{false};
+  bool envoy_finished_{false};
+  bool pause_before_run_{false};
+  bool pause_after_run_{false};
 };
 
 TEST_P(AdminRequestTest, AdminRequestGetStatsAndQuit) {

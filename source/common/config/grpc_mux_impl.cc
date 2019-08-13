@@ -192,7 +192,8 @@ void GrpcMuxImpl::onDiscoveryResponse(
     api_state_[type_url].request_.set_version_info(message->version_info());
   } catch (const EnvoyException& e) {
     for (auto watch : api_state_[type_url].watches_) {
-      watch->callbacks_.onConfigUpdateFailed(&e);
+      watch->callbacks_.onConfigUpdateFailed(
+          Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &e);
     }
     ::google::rpc::Status* error_detail = api_state_[type_url].request_.mutable_error_detail();
     error_detail->set_code(Grpc::Status::GrpcStatus::Internal);
@@ -213,7 +214,8 @@ void GrpcMuxImpl::onStreamEstablished() {
 void GrpcMuxImpl::onEstablishmentFailure() {
   for (const auto& api_state : api_state_) {
     for (auto watch : api_state.second.watches_) {
-      watch->callbacks_.onConfigUpdateFailed(nullptr);
+      watch->callbacks_.onConfigUpdateFailed(
+          Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, nullptr);
     }
   }
 }

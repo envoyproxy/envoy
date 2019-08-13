@@ -400,10 +400,10 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalActiveHealthSkipped) {
     const auto& hosts = cluster.prioritySet().hostSetsPerPriority()[0]->hosts();
     EXPECT_EQ(2UL, hosts.size());
 
-    for (size_t i = 0; i < hosts.size(); ++i) {
-      EXPECT_TRUE(hosts[i]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
-      hosts[i]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
-      hosts[i]->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
+    for (const auto& host : hosts) {
+      EXPECT_TRUE(host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+      host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+      host->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
     }
   }
 
@@ -918,6 +918,34 @@ TEST_F(StrictDnsClusterImplTest, RecordTtlAsDnsRefreshRate) {
   EXPECT_CALL(*resolver.timer_, enableTimer(std::chrono::milliseconds(5000)));
   resolver.dns_callback_(
       TestUtility::makeDnsResponse({"192.168.1.1", "192.168.1.2"}, std::chrono::seconds(5)));
+}
+
+TEST_F(StrictDnsClusterImplTest, DefaultTtlAsDnsRefreshRateWhenResponseEmpty) {
+  ResolverData resolver(*dns_resolver_, dispatcher_);
+
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    dns_refresh_rate: 4s
+    respect_dns_ttl: true
+    hosts: [{ socket_address: { address: localhost1, port_value: 11001 }}]
+  )EOF";
+
+  envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+  Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
+  Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+      admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_,
+      singleton_manager_, tls_, validation_visitor_, *api_);
+  StrictDnsClusterImpl cluster(cluster_config, runtime_, dns_resolver_, factory_context,
+                               std::move(scope), false);
+  cluster.initialize([] {});
+
+  EXPECT_CALL(*resolver.timer_, enableTimer(std::chrono::milliseconds(4000)));
+  resolver.dns_callback_(TestUtility::makeDnsResponse({}, std::chrono::seconds(5)));
 }
 
 TEST(HostImplTest, HostCluster) {

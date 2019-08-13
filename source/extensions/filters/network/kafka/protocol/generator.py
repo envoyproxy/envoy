@@ -246,7 +246,7 @@ class FieldSpec:
 
   def is_nullable_in_version(self, version):
     """
-    Whether thie field is nullable in given version.
+    Whether the field is nullable in given version.
     Fields can be non-nullable in earlier versions.
     See https://github.com/apache/kafka/tree/2.2.0-rc0/clients/src/main/resources/common/message#nullable-fields
     """
@@ -435,7 +435,7 @@ class Complex(TypeSpecification):
 
   def __compute_declaration_chain(self):
     """
-    Computes all dependendencies, what means all non-primitive types used by this type.
+    Computes all dependencies, what means all non-primitive types used by this type.
     They need to be declared before this struct is declared.
     """
     result = []

@@ -170,7 +170,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 #else
                                                       0
 #endif
-                                                      ))) {
+                                                      ))),
+      merge_slashes_(config.merge_slashes()) {
   // If scoped RDS is enabled, avoid creating a route config provider. Route config providers will
   // be managed by the scoped routing logic instead.
   switch (config.route_specifier_case()) {
@@ -306,7 +307,10 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
   const auto& filters = config.http_filters();
   for (int32_t i = 0; i < filters.size(); i++) {
-    processFilter(filters[i], i, "http", filter_factories_);
+    bool is_terminal = false;
+    processFilter(filters[i], i, "http", filter_factories_, is_terminal);
+    Config::Utility::validateTerminalFilters(filters[i].name(), "http", is_terminal,
+                                             i == filters.size() - 1);
   }
 
   for (const auto& upgrade_config : config.upgrade_configs()) {
@@ -319,8 +323,12 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     }
     if (!upgrade_config.filters().empty()) {
       std::unique_ptr<FilterFactoriesList> factories = std::make_unique<FilterFactoriesList>();
-      for (int32_t i = 0; i < upgrade_config.filters().size(); i++) {
-        processFilter(upgrade_config.filters(i), i, name, *factories);
+      for (int32_t j = 0; j < upgrade_config.filters().size(); j++) {
+        bool is_terminal = false;
+        processFilter(upgrade_config.filters(j), j, name, *factories, is_terminal);
+        Config::Utility::validateTerminalFilters(upgrade_config.filters(j).name(), "http upgrade",
+                                                 is_terminal,
+                                                 j == upgrade_config.filters().size() - 1);
       }
       upgrade_filter_factories_.emplace(
           std::make_pair(name, FilterConfig{std::move(factories), enabled}));
@@ -334,7 +342,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
 void HttpConnectionManagerConfig::processFilter(
     const envoy::config::filter::network::http_connection_manager::v2::HttpFilter& proto_config,
-    int i, absl::string_view prefix, std::list<Http::FilterFactoryCb>& filter_factories) {
+    int i, absl::string_view prefix, std::list<Http::FilterFactoryCb>& filter_factories,
+    bool& is_terminal) {
   const std::string& string_name = proto_config.name();
 
   ENVOY_LOG(debug, "    {} filter #{}", prefix, i);
@@ -357,23 +366,25 @@ void HttpConnectionManagerConfig::processFilter(
         proto_config, context_.messageValidationVisitor(), factory);
     callback = factory.createFilterFactoryFromProto(*message, stats_prefix_, context_);
   }
+  is_terminal = factory.isTerminalFilter();
   filter_factories.push_back(callback);
 }
 
-Http::ServerConnectionPtr HttpConnectionManagerConfig::createCodec(
-    Network::Connection& connection, const Buffer::Instance& data,
-    Http::ServerConnectionCallbacks& callbacks, const bool strict_header_validation) {
+Http::ServerConnectionPtr
+HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
+                                         const Buffer::Instance& data,
+                                         Http::ServerConnectionCallbacks& callbacks) {
   switch (codec_type_) {
   case CodecType::HTTP1:
     return std::make_unique<Http::Http1::ServerConnectionImpl>(
-        connection, callbacks, http1_settings_, maxRequestHeadersKb(), strict_header_validation);
+        connection, context_.scope(), callbacks, http1_settings_, maxRequestHeadersKb());
   case CodecType::HTTP2:
     return std::make_unique<Http::Http2::ServerConnectionImpl>(
         connection, callbacks, context_.scope(), http2_settings_, maxRequestHeadersKb());
   case CodecType::AUTO:
-    return Http::ConnectionManagerUtility::autoCreateCodec(
-        connection, data, callbacks, context_.scope(), http1_settings_, http2_settings_,
-        maxRequestHeadersKb(), strict_header_validation);
+    return Http::ConnectionManagerUtility::autoCreateCodec(connection, data, callbacks,
+                                                           context_.scope(), http1_settings_,
+                                                           http2_settings_, maxRequestHeadersKb());
   }
 
   NOT_REACHED_GCOVR_EXCL_LINE;

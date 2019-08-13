@@ -8,7 +8,9 @@ import subprocess
 
 def generateCompilationDatabase(args):
   if args.run_bazel_build:
-    subprocess.check_call(["bazel", "build"] + args.bazel_targets)
+    subprocess.check_call(
+        ["bazel", "build", "--build_tag_filters=-manual", "--jobs=" + os.environ.get('NUM_CPUS')] +
+        args.bazel_targets)
 
   gen_compilation_database_sh = os.path.join(
       os.path.realpath(os.path.dirname(__file__)), "../bazel/gen_compilation_database.sh")
