@@ -95,7 +95,7 @@ public:
       RouteConfigProviderManager& route_config_provider_manager,
       ScopedRoutesConfigProviderManager& config_provider_manager);
 
-  ~ScopedRdsConfigSubscription() override = default;
+  ~ScopedRdsConfigSubscription() override;
 
   const std::string& name() const { return name_; }
 

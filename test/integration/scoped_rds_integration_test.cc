@@ -210,12 +210,15 @@ key:
     - string_key: x-baz-key
 )EOF";
   sendScopedRdsResponse({scope_route3}, "2");
-  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_attempt", 3);
-  sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1", "cluster_foo_3"), "3");
   test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_success", 2);
   test_server_->waitForGaugeEq("http.config_test.scoped_rds.foo-scoped-routes.version",
                                6927017134761466251UL);
-
+  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_attempt", 3);
+  sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1", "cluster_foo_3"), "3");
+  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 3);
+  // RDS updates won't affect SRDS.
+  test_server_->waitForGaugeEq("http.config_test.scoped_rds.foo-scoped-routes.version",
+                               6927017134761466251UL);
   // TODO(AndresGuedez): test actual scoped routing logic; only the config handling is implemented
   // at this point.
 }

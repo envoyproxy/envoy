@@ -108,6 +108,8 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
   });
 }
 
+ScopedRdsConfigSubscription::~ScopedRdsConfigSubscription() { cleanup_timer_->disableTimer(); }
+
 void ScopedRdsConfigSubscription::cleanupDefferedDeletes() {
   for (auto iter = deffered_to_be_deleted_.begin(); iter != deffered_to_be_deleted_.end();) {
     if (iter->use_count() == 1) {
@@ -118,7 +120,7 @@ void ScopedRdsConfigSubscription::cleanupDefferedDeletes() {
   }
   if (!deffered_to_be_deleted_.empty()) {
     // Cleanup as fast as possible.
-    cleanup_timer_->enableTimer(std::chrono::milliseconds(0));
+    cleanup_timer_->enableTimer(std::chrono::milliseconds(100));
   }
 }
 
@@ -224,7 +226,7 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   if (!to_be_deleted.empty()) {
     deffered_to_be_deleted_.insert(deffered_to_be_deleted_.begin(), to_be_deleted.begin(),
                                    to_be_deleted.end());
-    cleanup_timer_->enableTimer(std::chrono::milliseconds(0));
+    cleanup_timer_->enableTimer(std::chrono::milliseconds(100));
   }
   stats_.config_reload_.inc();
   if (!exception_msgs.empty()) {
