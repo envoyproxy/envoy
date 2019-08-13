@@ -97,7 +97,7 @@ typedef std::shared_ptr<GradientControllerConfig> GradientControllerConfigShared
  * present in the calculation, since it forces the concurrency limit to increase until there is a
  * deviation from the minRTT latency. In its absence, the concurrency limit could remain stagnant at
  * an unnecessarily small value if sampleRTT ~= minRTT. Therefore, the headroom value is
- * unconfigurable and takes the form of sqrt(limit).
+ * unconfigurable and is set to the square-root of the new limit.
  */
 class GradientController : public ConcurrencyController {
 public:

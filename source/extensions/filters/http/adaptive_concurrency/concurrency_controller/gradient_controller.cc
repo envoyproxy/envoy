@@ -144,7 +144,7 @@ RequestForwardingAction GradientController::forwardingDecision() {
   while (true) {
     int curr_outstanding = num_rq_outstanding_.load();
     if (curr_outstanding < concurrency_limit_.load()) {
-      // Using the weak compare/exhange for improved performance at the cost of spurious failures.
+      // Using the weak compare/exchange for improved performance at the cost of spurious failures.
       // This is not a problem since there are no side effects when retrying. A legitimate failure
       // implies that another thread swooped in and modified num_rq_outstanding_ between the
       // comparison and attempt at the increment.
