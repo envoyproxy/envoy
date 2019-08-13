@@ -14,17 +14,6 @@ fetch its own route configuration via the API.
 Statistics
 ----------
 
-RDS has a statistics tree rooted at *http.<stat_prefix>.rds.<route_config_name>.*.
+RDS has a :ref:`statistics <subscription_statistics>` tree rooted at *http.<stat_prefix>.rds.<route_config_name>.*.
 Any ``:`` character in the ``route_config_name`` name gets replaced with ``_`` in the
-stats tree. The stats tree contains the following statistics:
-
-.. csv-table::
-  :header: Name, Type, Description
-  :widths: 1, 1, 2
-
-  config_reload, Counter, Total API fetches that resulted in a config reload due to a different config
-  update_attempt, Counter, Total API fetches attempted
-  update_success, Counter, Total API fetches completed successfully
-  update_failure, Counter, Total API fetches that failed because of network errors
-  update_rejected, Counter, Total API fetches that failed because of schema/validation errors
-  version, Gauge, Hash of the contents from the last successful API fetch
+stats tree.

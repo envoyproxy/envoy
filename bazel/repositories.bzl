@@ -529,6 +529,10 @@ def _io_opencensus_cpp():
         actual = "@io_opencensus_cpp//opencensus/trace",
     )
     native.bind(
+        name = "opencensus_trace_b3",
+        actual = "@io_opencensus_cpp//opencensus/trace:b3",
+    )
+    native.bind(
         name = "opencensus_trace_cloud_trace_context",
         actual = "@io_opencensus_cpp//opencensus/trace:cloud_trace_context",
     )

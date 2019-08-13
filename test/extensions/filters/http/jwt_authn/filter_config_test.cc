@@ -9,7 +9,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using ::envoy::api::v2::core::Metadata;
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
 
 namespace Envoy {
