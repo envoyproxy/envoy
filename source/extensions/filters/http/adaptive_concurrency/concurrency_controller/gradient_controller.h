@@ -29,8 +29,10 @@ namespace ConcurrencyController {
 // clang-format off
 #define ALL_GRADIENT_CONTROLLER_STATS(COUNTER, GAUGE) \
   GAUGE(concurrency_limit, Accumulate)  \
+  GAUGE(gradient, Accumulate)  \
+  GAUGE(burst_queue_size, Accumulate)  \
   GAUGE(rq_outstanding, Accumulate)  \
-  GAUGE(min_rtt_usecs, Accumulate)
+  GAUGE(min_rtt_msecs, Accumulate)
 // clang-format on
 
 /**
@@ -107,6 +109,9 @@ public:
   // ConcurrencyController.
   RequestForwardingAction forwardingDecision() override;
   void recordLatencySample(const std::chrono::nanoseconds& rq_latency) override;
+  int concurrencyLimit() const override {
+    return concurrency_limit_.load();
+  }
 
 private:
   static GradientControllerStats generateStats(Stats::Scope& scope,

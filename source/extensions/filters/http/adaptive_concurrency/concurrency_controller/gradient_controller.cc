@@ -29,10 +29,9 @@ GradientControllerConfig::GradientControllerConfig(
           DurationUtil::durationToMilliseconds(proto_config.min_rtt_calc_params().interval()))),
       sample_rtt_calc_interval_(std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
           proto_config.concurrency_limit_params().concurrency_update_interval()))),
-      max_concurrency_limit_(PROTOBUF_GET_WRAPPED_REQUIRED(proto_config.concurrency_limit_params(),
-                                                           max_concurrency_limit)),
+      max_concurrency_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config.concurrency_limit_params(), max_concurrency_limit, 1000)),
       min_rtt_aggregate_request_count_(
-          PROTOBUF_GET_WRAPPED_REQUIRED(proto_config.min_rtt_calc_params(), request_count)),
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config.min_rtt_calc_params(), request_count, 50)),
       max_gradient_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config.concurrency_limit_params(),
                                                     max_gradient, 2.0)),
       sample_aggregate_percentile_(
@@ -44,7 +43,6 @@ GradientController::GradientController(GradientControllerConfigSharedPtr config,
     :
 
       config_(config), dispatcher_(dispatcher),
-      //                                       runtime_(runtime),
       scope_(scope), stats_(generateStats(scope_, stats_prefix)), recalculating_min_rtt_(true),
       num_rq_outstanding_(0), concurrency_limit_(1), latency_sample_hist_(hist_fast_alloc()) {
   min_rtt_calc_timer_ = dispatcher_.createTimer([this]() -> void {
@@ -64,8 +62,6 @@ GradientController::GradientController(GradientControllerConfigSharedPtr config,
 }
 
 GradientController::~GradientController() {
-  min_rtt_calc_timer_.reset();
-  sample_reset_timer_.reset();
   hist_free(latency_sample_hist_);
 }
 
@@ -98,8 +94,8 @@ void GradientController::updateMinRTT() {
 
   absl::MutexLock ml(&latency_sample_mtx_);
   min_rtt_ = processLatencySamplesAndClear();
-  stats_.min_rtt_usecs_.set(
-      std::chrono::duration_cast<std::chrono::microseconds>(min_rtt_).count());
+  stats_.min_rtt_msecs_.set(
+      std::chrono::duration_cast<std::chrono::milliseconds>(min_rtt_).count());
   recalculating_min_rtt_.store(false);
 }
 
@@ -134,8 +130,10 @@ std::chrono::microseconds GradientController::processLatencySamplesAndClear() {
 int GradientController::calculateNewLimit() {
   const double gradient =
       std::min(config_->max_gradient(), double(min_rtt_.count()) / sample_rtt_.count());
+  stats_.gradient_.set(gradient);
   const double limit = concurrency_limit_.load() * gradient;
   const double burst_headroom = sqrt(limit);
+  stats_.burst_queue_size_.set(burst_headroom);
   const auto clamp = [](int min, int max, int val) { return std::max(min, std::min(max, val)); };
   return clamp(1, config_->max_concurrency_limit(), limit + burst_headroom);
 }
