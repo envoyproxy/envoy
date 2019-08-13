@@ -41,10 +41,11 @@ public:
         timer_(new Event::MockTimer()), http_request_(&cm_.async_client_) {
     node_.set_id("fo0");
     EXPECT_CALL(local_info_, node()).WillOnce(testing::ReturnRef(node_));
-    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
-      timer_cb_ = timer_cb;
-      return timer_;
-    }));
+    EXPECT_CALL(dispatcher_, createTimer_(_, _))
+        .WillOnce(Invoke([this](Event::TimerCb timer_cb, const ScopeTrackedObject*) {
+          timer_cb_ = timer_cb;
+          return timer_;
+        }));
     subscription_ = std::make_unique<HttpSubscriptionImpl>(
         local_info_, cm_, "eds_cluster", dispatcher_, random_gen_, std::chrono::milliseconds(1),
         std::chrono::milliseconds(1000), *method_descriptor_, callbacks_, stats_,

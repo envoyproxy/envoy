@@ -145,11 +145,13 @@ Network::ListenerPtr DispatcherImpl::createUdpListener(Network::Socket& socket,
   return Network::ListenerPtr{new Network::UdpListenerImpl(*this, socket, cb, timeSource())};
 }
 
-TimerPtr DispatcherImpl::createTimer(TimerCb cb) { return createTimerInternal(cb); }
+TimerPtr DispatcherImpl::createTimer(TimerCb cb, const ScopeTrackedObject* object) {
+  return createTimerInternal(cb, object);
+}
 
-TimerPtr DispatcherImpl::createTimerInternal(TimerCb cb) {
+TimerPtr DispatcherImpl::createTimerInternal(TimerCb cb, const ScopeTrackedObject* object) {
   ASSERT(isThreadSafe());
-  return scheduler_->createTimer(cb);
+  return scheduler_->createTimer(cb, *this, object);
 }
 
 void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {

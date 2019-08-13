@@ -186,7 +186,7 @@ TEST_F(MongoProxyFilterTest, DelayFaultsRuntimeDisabled) {
   setupDelayFault(false);
   initializeFilter();
 
-  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(0);
+  EXPECT_CALL(dispatcher_, createTimer_(_, _)).Times(0);
   EXPECT_CALL(*file_, write(_)).Times(AtLeast(1));
 
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {

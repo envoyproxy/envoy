@@ -31,7 +31,7 @@ public:
         async_client_(new Grpc::MockAsyncClient()) {
     node_.set_id("fo0");
     EXPECT_CALL(local_info_, node()).WillRepeatedly(testing::ReturnRef(node_));
-    EXPECT_CALL(dispatcher_, createTimer_(_));
+    EXPECT_CALL(dispatcher_, createTimer_(_, _));
     subscription_ = std::make_unique<DeltaSubscriptionImpl>(
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *method_descriptor_, Config::TypeUrl::get().ClusterLoadAssignment, random_, stats_store_,

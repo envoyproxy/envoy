@@ -853,7 +853,7 @@ TEST(DnsImplUnitTest, PendingTimerEnable) {
   InSequence s;
   Event::MockDispatcher dispatcher;
   Event::MockTimer* timer = new NiceMock<Event::MockTimer>();
-  EXPECT_CALL(dispatcher, createTimer_(_)).WillOnce(Return(timer));
+  EXPECT_CALL(dispatcher, createTimer_(_, _)).WillOnce(Return(timer));
   DnsResolverImpl resolver(dispatcher, {});
   Event::FileEvent* file_event = new NiceMock<Event::MockFileEvent>();
   EXPECT_CALL(dispatcher, createFileEvent_(_, _, _, _)).WillOnce(Return(file_event));

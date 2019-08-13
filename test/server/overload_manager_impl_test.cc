@@ -79,10 +79,11 @@ protected:
 
   void setDispatcherExpectation() {
     timer_ = new NiceMock<Event::MockTimer>();
-    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([&](Event::TimerCb cb) {
-      timer_cb_ = cb;
-      return timer_;
-    }));
+    EXPECT_CALL(dispatcher_, createTimer_(_, _))
+        .WillOnce(Invoke([&](Event::TimerCb cb, const ScopeTrackedObject*) {
+          timer_cb_ = cb;
+          return timer_;
+        }));
   }
 
   envoy::config::overload::v2alpha::OverloadManager parseConfig(const std::string& config) {

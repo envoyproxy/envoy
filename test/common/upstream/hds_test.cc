@@ -55,13 +55,14 @@ protected:
   // Creates an HdsDelegate
   void createHdsDelegate() {
     InSequence s;
-    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
-      retry_timer_cb_ = timer_cb;
-      return retry_timer_;
-    }));
-    EXPECT_CALL(dispatcher_, createTimer_(_))
+    EXPECT_CALL(dispatcher_, createTimer_(_, _))
+        .WillOnce(Invoke([this](Event::TimerCb timer_cb, const ScopeTrackedObject*) {
+          retry_timer_cb_ = timer_cb;
+          return retry_timer_;
+        }));
+    EXPECT_CALL(dispatcher_, createTimer_(_, _))
         .Times(AtLeast(1))
-        .WillOnce(Invoke([this](Event::TimerCb timer_cb) {
+        .WillOnce(Invoke([this](Event::TimerCb timer_cb, const ScopeTrackedObject*) {
           server_response_timer_cb_ = timer_cb;
           return server_response_timer_;
         }));

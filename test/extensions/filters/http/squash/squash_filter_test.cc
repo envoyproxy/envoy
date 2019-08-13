@@ -331,7 +331,7 @@ TEST_F(SquashFilterTest, Timeout) {
   EXPECT_CALL(filter_callbacks_, continueDecoding());
 
   EXPECT_CALL(filter_callbacks_.dispatcher_, setTrackedObject(_)).Times(2);
-  attachmentTimeout_timer_->callback_();
+  attachmentTimeout_timer_->invokeCallback();
 
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(buffer, false));
 }
@@ -361,7 +361,7 @@ TEST_F(SquashFilterTest, CheckRetryPollingAttachment) {
   // Expect the second get attachment request
   expectAsyncClientSend();
   EXPECT_CALL(filter_callbacks_.dispatcher_, setTrackedObject(_)).Times(2);
-  retry_timer->callback_();
+  retry_timer->invokeCallback();
   EXPECT_CALL(filter_callbacks_, continueDecoding());
   completeGetStatusRequest("attached");
 }
@@ -381,7 +381,7 @@ TEST_F(SquashFilterTest, CheckRetryPollingAttachmentOnFailure) {
   expectAsyncClientSend();
 
   EXPECT_CALL(filter_callbacks_.dispatcher_, setTrackedObject(_)).Times(2);
-  retry_timer->callback_();
+  retry_timer->invokeCallback();
 
   EXPECT_CALL(filter_callbacks_, continueDecoding());
   completeGetStatusRequest("attached");
@@ -435,9 +435,10 @@ TEST_F(SquashFilterTest, TimerExpiresInline) {
   attachmentTimeout_timer_ = new NiceMock<Envoy::Event::MockTimer>(&filter_callbacks_.dispatcher_);
   EXPECT_CALL(*attachmentTimeout_timer_, enableTimer(config_->attachmentTimeout()))
       .WillOnce(Invoke([&](const std::chrono::milliseconds&) {
+        attachmentTimeout_timer_->enabled_ = true;
         // timer expires inline
         EXPECT_CALL(filter_callbacks_.dispatcher_, setTrackedObject(_)).Times(2);
-        attachmentTimeout_timer_->callback_();
+        attachmentTimeout_timer_->invokeCallback();
       }));
 
   EXPECT_CALL(cm_.async_client_, send_(_, _, _))

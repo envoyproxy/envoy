@@ -1675,14 +1675,15 @@ TEST_F(EdsTest, MalformedIP) {
 class EdsAssignmentTimeoutTest : public EdsTest {
 public:
   EdsAssignmentTimeoutTest() {
-    EXPECT_CALL(dispatcher_, createTimer_(_))
-        .WillOnce(Invoke([this](Event::TimerCb cb) {
+    EXPECT_CALL(dispatcher_, createTimer_(_, _))
+        .WillOnce(Invoke([this](Event::TimerCb cb, const ScopeTrackedObject*) {
           timer_cb_ = cb;
           EXPECT_EQ(nullptr, interval_timer_);
           interval_timer_ = new Event::MockTimer();
           return interval_timer_;
         }))
-        .WillRepeatedly(Invoke([](Event::TimerCb) { return new Event::MockTimer(); }));
+        .WillRepeatedly(Invoke(
+            [](Event::TimerCb, const ScopeTrackedObject*) { return new Event::MockTimer(); }));
 
     resetCluster();
   }

@@ -8,7 +8,12 @@
 #include "envoy/common/time.h"
 
 namespace Envoy {
+
+class ScopeTrackedObject;
+
 namespace Event {
+
+class Dispatcher;
 
 /**
  * Callback invoked when a timer event fires.
@@ -48,7 +53,8 @@ public:
   /**
    * Creates a timer.
    */
-  virtual TimerPtr createTimer(const TimerCb& cb) PURE;
+  virtual TimerPtr createTimer(const TimerCb& cb, Dispatcher& dispatcher,
+                               const ScopeTrackedObject* object = nullptr) PURE;
 };
 
 using SchedulerPtr = std::unique_ptr<Scheduler>;

@@ -1376,7 +1376,7 @@ TEST_F(HttpConnectionManagerImplTest, NoPath) {
 TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutNotConfigured) {
   setup(false, "");
 
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, createTimer_(_)).Times(0);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, createTimer_(_, _)).Times(0);
   EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
     StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
 

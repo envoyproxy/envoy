@@ -38,10 +38,11 @@ public:
         async_client_(new NiceMock<Grpc::MockAsyncClient>()), timer_(new Event::MockTimer()) {
     node_.set_id("fo0");
     EXPECT_CALL(local_info_, node()).WillOnce(testing::ReturnRef(node_));
-    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
-      timer_cb_ = timer_cb;
-      return timer_;
-    }));
+    EXPECT_CALL(dispatcher_, createTimer_(_, _))
+        .WillOnce(Invoke([this](Event::TimerCb timer_cb, const ScopeTrackedObject*) {
+          timer_cb_ = timer_cb;
+          return timer_;
+        }));
     subscription_ = std::make_unique<GrpcSubscriptionImpl>(
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, random_,
         *method_descriptor_, Config::TypeUrl::get().ClusterLoadAssignment, callbacks_, stats_,

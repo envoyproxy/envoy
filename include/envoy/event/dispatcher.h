@@ -149,8 +149,9 @@ public:
   /**
    * Allocate a timer. @see Timer for docs on how to use the timer.
    * @param cb supplies the callback to invoke when the timer fires.
+   * @param cb supplies an optional scope for the duration of the alarm.
    */
-  virtual Event::TimerPtr createTimer(TimerCb cb) PURE;
+  virtual Event::TimerPtr createTimer(TimerCb cb, const ScopeTrackedObject* object = nullptr) PURE;
 
   /**
    * Submit an item for deferred delete. @see DeferredDeletable.

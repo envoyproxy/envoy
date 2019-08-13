@@ -48,7 +48,7 @@ protected:
 };
 
 TEST_F(AccessLogManagerImplTest, BadFile) {
-  EXPECT_CALL(dispatcher_, createTimer_(_));
+  EXPECT_CALL(dispatcher_, createTimer_(_, _));
   EXPECT_CALL(*file_, open_()).WillOnce(Return(ByMove(Filesystem::resultFailure<bool>(false, 0))));
   EXPECT_THROW(access_log_manager_.createAccessLog("foo"), EnvoyException);
 }
@@ -302,7 +302,8 @@ TEST_F(AccessLogManagerImplTest, bigDataChunkShouldBeFlushedWithoutTimer) {
 }
 
 TEST_F(AccessLogManagerImplTest, reopenAllFiles) {
-  EXPECT_CALL(dispatcher_, createTimer_(_)).WillRepeatedly(ReturnNew<NiceMock<Event::MockTimer>>());
+  EXPECT_CALL(dispatcher_, createTimer_(_, _))
+      .WillRepeatedly(ReturnNew<NiceMock<Event::MockTimer>>());
 
   Sequence sq;
   EXPECT_CALL(*file_, open_())

@@ -14,7 +14,6 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "common/buffer/watermark_buffer.h"
-#include "common/common/scope_tracker.h"
 #include "common/common/token_bucket_impl.h"
 #include "common/http/header_utility.h"
 
@@ -182,14 +181,12 @@ private:
   const uint64_t bytes_per_time_slice_;
   const std::function<void(Buffer::Instance&, bool)> write_data_cb_;
   const std::function<void()> continue_cb_;
-  Event::Dispatcher& dispatcher_;
   TokenBucketImpl token_bucket_;
   Event::TimerPtr token_timer_;
   bool saw_data_{};
   bool saw_end_stream_{};
   bool saw_trailers_{};
   Buffer::WatermarkBuffer buffer_;
-  const ScopeTrackedObject& scope_;
 };
 
 /**

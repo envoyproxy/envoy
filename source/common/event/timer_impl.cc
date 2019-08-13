@@ -17,11 +17,25 @@ void TimerUtils::millisecondsToTimeval(const std::chrono::milliseconds& d, timev
   tv.tv_usec = usecs.count();
 }
 
-TimerImpl::TimerImpl(Libevent::BasePtr& libevent, TimerCb cb) : cb_(cb) {
+TimerImpl::TimerImpl(Libevent::BasePtr& libevent, TimerCb cb, Dispatcher& dispatcher,
+                     const ScopeTrackedObject* object)
+    : cb_(cb), dispatcher_(dispatcher), object_(object) {
   ASSERT(cb_);
-  evtimer_assign(
-      &raw_event_, libevent.get(),
-      [](evutil_socket_t, short, void* arg) -> void { static_cast<TimerImpl*>(arg)->cb_(); }, this);
+  if (object != nullptr) {
+    evtimer_assign(
+        &raw_event_, libevent.get(),
+        [](evutil_socket_t, short, void* arg) -> void {
+          TimerImpl* timer = static_cast<TimerImpl*>(arg);
+          ScopeTrackerScopeState scope(timer->object_, timer->dispatcher_);
+          timer->cb_();
+        },
+        this);
+  } else {
+    evtimer_assign(
+        &raw_event_, libevent.get(),
+        [](evutil_socket_t, short, void* arg) -> void { static_cast<TimerImpl*>(arg)->cb_(); },
+        this);
+  }
 }
 
 void TimerImpl::disableTimer() { event_del(&raw_event_); }

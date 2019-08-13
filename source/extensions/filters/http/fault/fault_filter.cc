@@ -145,8 +145,8 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::HeaderMap& headers, b
 
   absl::optional<std::chrono::milliseconds> duration = delayDuration(headers);
   if (duration.has_value()) {
-    delay_timer_ =
-        decoder_callbacks_->dispatcher().createTimer([this]() -> void { postDelayInjection(); });
+    delay_timer_ = decoder_callbacks_->dispatcher().createTimer(
+        [this]() -> void { postDelayInjection(); }, &decoder_callbacks_->scope());
     ENVOY_LOG(debug, "fault: delaying request {}ms", duration.value().count());
     delay_timer_->enableTimer(duration.value());
     recordDelaysInjectedStats();
@@ -348,7 +348,6 @@ void FaultFilter::onDestroy() {
 }
 
 void FaultFilter::postDelayInjection() {
-  ScopeTrackerScopeState scope(&decoder_callbacks_->scope(), decoder_callbacks_->dispatcher());
   resetTimerState();
 
   // Delays can be followed by aborts
@@ -427,20 +426,19 @@ StreamRateLimiter::StreamRateLimiter(uint64_t max_kbps, uint64_t max_buffered_da
                                      Event::Dispatcher& dispatcher, const ScopeTrackedObject& scope)
     : // bytes_per_time_slice is KiB converted to bytes divided by the number of ticks per second.
       bytes_per_time_slice_((max_kbps * 1024) / SecondDivisor), write_data_cb_(write_data_cb),
-      continue_cb_(continue_cb), dispatcher_(dispatcher),
+      continue_cb_(continue_cb),
       // The token bucket is configured with a max token count of the number of ticks per second,
       // and refills at the same rate, so that we have a per second limit which refills gradually in
       // ~63ms intervals.
       token_bucket_(SecondDivisor, time_source, SecondDivisor),
-      token_timer_(dispatcher.createTimer([this] { onTokenTimer(); })),
-      buffer_(resume_data_cb, pause_data_cb), scope_(scope) {
+      token_timer_(dispatcher.createTimer([this] { onTokenTimer(); }, &scope)),
+      buffer_(resume_data_cb, pause_data_cb) {
   ASSERT(bytes_per_time_slice_ > 0);
   ASSERT(max_buffered_data > 0);
   buffer_.setWatermarks(max_buffered_data);
 }
 
 void StreamRateLimiter::onTokenTimer() {
-  ScopeTrackerScopeState scope(&scope_, dispatcher_);
   ENVOY_LOG(trace, "limiter: timer wakeup: buffered={}", buffer_.length());
   Buffer::OwnedImpl data_to_write;
 

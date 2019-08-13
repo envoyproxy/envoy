@@ -4,6 +4,7 @@
 
 #include "envoy/event/timer.h"
 
+#include "common/common/scope_tracker.h"
 #include "common/event/event_impl_base.h"
 #include "common/event/libevent.h"
 
@@ -23,7 +24,8 @@ public:
  */
 class TimerImpl : public Timer, ImplBase {
 public:
-  TimerImpl(Libevent::BasePtr& libevent, TimerCb cb);
+  TimerImpl(Libevent::BasePtr& libevent, TimerCb cb, Event::Dispatcher& dispatcher,
+            const ScopeTrackedObject* object = nullptr);
 
   // Timer
   void disableTimer() override;
@@ -32,6 +34,8 @@ public:
 
 private:
   TimerCb cb_;
+  Dispatcher& dispatcher_;
+  const ScopeTrackedObject* object_{};
 };
 
 } // namespace Event

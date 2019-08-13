@@ -20,7 +20,7 @@ MockDispatcher::MockDispatcher() {
   ON_CALL(*this, clearDeferredDeleteList()).WillByDefault(Invoke([this]() -> void {
     to_delete_.clear();
   }));
-  ON_CALL(*this, createTimer_(_)).WillByDefault(ReturnNew<NiceMock<Event::MockTimer>>());
+  ON_CALL(*this, createTimer_(_, _)).WillByDefault(ReturnNew<NiceMock<Event::MockTimer>>());
   ON_CALL(*this, post(_)).WillByDefault(Invoke([](PostCb cb) -> void { cb(); }));
 }
 
@@ -36,8 +36,9 @@ MockTimer::MockTimer() {
 // createTimer_(), so to avoid destructing it twice, the MockTimer must have been dynamically
 // allocated and must not be deleted by it's creator.
 MockTimer::MockTimer(MockDispatcher* dispatcher) : MockTimer() {
-  EXPECT_CALL(*dispatcher, createTimer_(_))
-      .WillOnce(DoAll(SaveArg<0>(&callback_), Return(this)))
+  dispatcher_ = dispatcher;
+  EXPECT_CALL(*dispatcher, createTimer_(_, _))
+      .WillOnce(DoAll(SaveArg<0>(&callback_), SaveArg<1>(&object_), Return(this)))
       .RetiresOnSaturation();
 }
 

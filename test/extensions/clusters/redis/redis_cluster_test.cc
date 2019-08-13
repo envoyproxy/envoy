@@ -397,7 +397,7 @@ protected:
   }
 
   void exerciseStubs() {
-    EXPECT_CALL(dispatcher_, createTimer_(_));
+    EXPECT_CALL(dispatcher_, createTimer_(_, _));
     RedisCluster::RedisDiscoverySession discovery_session(*cluster_, *this);
     EXPECT_FALSE(discovery_session.enableHashtagging());
     EXPECT_EQ(discovery_session.bufferFlushTimeoutInMs(), std::chrono::milliseconds(0));

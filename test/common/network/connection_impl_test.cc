@@ -1181,7 +1181,7 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayConfigDisabledTest) {
   // Ensure the delayed close timer is not created when the delayedCloseTimeout config value is set
   // to 0.
   server_connection->setDelayedCloseTimeout(std::chrono::milliseconds(0));
-  EXPECT_CALL(dispatcher, createTimer_(_)).Times(0);
+  EXPECT_CALL(dispatcher, createTimer_(_, _)).Times(0);
 
   NiceMockConnectionStats stats;
   server_connection->setConnectionStats(stats.toBufferStats());
@@ -1735,7 +1735,7 @@ TEST_F(PostCloseConnectionImplTest, ReadAfterCloseFlushWriteDelayIgnored) {
   initialize();
 
   // Delayed connection close.
-  EXPECT_CALL(dispatcher_, createTimer_(_));
+  EXPECT_CALL(dispatcher_, createTimer_(_, _));
   connection_->close(ConnectionCloseType::FlushWriteAndDelay);
 
   // Read event, doRead() happens on connection but no filter onData().
@@ -1759,7 +1759,7 @@ TEST_F(PostCloseConnectionImplTest, ReadAfterCloseFlushWriteDelayIgnoredWithWrit
   writeSomeData();
 
   // Delayed connection close.
-  EXPECT_CALL(dispatcher_, createTimer_(_));
+  EXPECT_CALL(dispatcher_, createTimer_(_, _));
   connection_->close(ConnectionCloseType::FlushWriteAndDelay);
 
   // Read event, doRead() happens on connection but no filter onData().
@@ -1790,7 +1790,7 @@ TEST_F(PostCloseConnectionImplTest, ReadAfterCloseFlushWriteDelayIgnoredCanFlush
   ON_CALL(*transport_socket_, canFlushClose()).WillByDefault(Return(true));
 
   // Delayed connection close.
-  EXPECT_CALL(dispatcher_, createTimer_(_));
+  EXPECT_CALL(dispatcher_, createTimer_(_, _));
   EXPECT_CALL(*file_event_, setEnabled(Event::FileReadyType::Write | Event::FileReadyType::Closed));
   connection_->close(ConnectionCloseType::FlushWriteAndDelay);
 

@@ -198,7 +198,7 @@ public:
 
   void sendRequest(bool end_stream = true) {
     if (end_stream) {
-      EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(1);
+      EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_, _)).Times(1);
     }
     EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
         .WillOnce(Invoke(
@@ -3114,7 +3114,7 @@ TEST_F(RouterTest, AltStatName) {
   // Also test no upstream timeout here.
   EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
       .WillOnce(Return(std::chrono::milliseconds(0)));
-  EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(0);
+  EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_, _)).Times(0);
 
   NiceMock<Http::MockStreamEncoder> encoder;
   Http::StreamDecoder* response_decoder = nullptr;
@@ -3881,7 +3881,7 @@ TEST(RouterFilterUtilityTest, ShouldShadow) {
 TEST_F(RouterTest, CanaryStatusTrue) {
   EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
       .WillOnce(Return(std::chrono::milliseconds(0)));
-  EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(0);
+  EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_, _)).Times(0);
 
   NiceMock<Http::MockStreamEncoder> encoder;
   Http::StreamDecoder* response_decoder = nullptr;
@@ -3914,7 +3914,7 @@ TEST_F(RouterTest, CanaryStatusTrue) {
 TEST_F(RouterTest, CanaryStatusFalse) {
   EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
       .WillOnce(Return(std::chrono::milliseconds(0)));
-  EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(0);
+  EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_, _)).Times(0);
 
   NiceMock<Http::MockStreamEncoder> encoder;
   Http::StreamDecoder* response_decoder = nullptr;
@@ -4040,7 +4040,7 @@ public:
   void sendRequest(bool header_only_request = true, bool pool_ready = true) {
     EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
         .WillOnce(Return(std::chrono::milliseconds(0)));
-    EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(0);
+    EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_, _)).Times(0);
 
     EXPECT_CALL(stream_, addCallbacks(_)).WillOnce(Invoke([&](Http::StreamCallbacks& callbacks) {
       stream_callbacks_ = &callbacks;
@@ -4200,7 +4200,7 @@ public:
 TEST_F(RouterTestChildSpan, BasicFlow) {
   EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
       .WillOnce(Return(std::chrono::milliseconds(0)));
-  EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(0);
+  EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_, _)).Times(0);
 
   NiceMock<Http::MockStreamEncoder> encoder;
   Http::StreamDecoder* response_decoder = nullptr;
@@ -4232,7 +4232,7 @@ TEST_F(RouterTestChildSpan, BasicFlow) {
 TEST_F(RouterTestChildSpan, ResetFlow) {
   EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
       .WillOnce(Return(std::chrono::milliseconds(0)));
-  EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(0);
+  EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_, _)).Times(0);
 
   NiceMock<Http::MockStreamEncoder> encoder;
   Http::StreamDecoder* response_decoder = nullptr;

@@ -50,8 +50,9 @@ private:
 // mechanism used in RealTimeSystem timers is employed for simulated alarms.
 class SimulatedTimeSystemHelper::Alarm : public Timer {
 public:
-  Alarm(SimulatedTimeSystemHelper& time_system, Scheduler& base_scheduler, TimerCb cb)
-      : base_timer_(base_scheduler.createTimer([this, cb] { runAlarm(cb); })),
+  Alarm(SimulatedTimeSystemHelper& time_system, Scheduler& base_scheduler, TimerCb cb,
+        Dispatcher& dispatcher, const ScopeTrackedObject* object)
+      : base_timer_(base_scheduler.createTimer([this, cb] { runAlarm(cb); }, dispatcher, object)),
         time_system_(time_system), index_(time_system.nextIndex()), armed_(false), pending_(false) {
   }
 
@@ -146,8 +147,10 @@ class SimulatedTimeSystemHelper::SimulatedScheduler : public Scheduler {
 public:
   SimulatedScheduler(SimulatedTimeSystemHelper& time_system, Scheduler& base_scheduler)
       : time_system_(time_system), base_scheduler_(base_scheduler) {}
-  TimerPtr createTimer(const TimerCb& cb) override {
-    return std::make_unique<SimulatedTimeSystemHelper::Alarm>(time_system_, base_scheduler_, cb);
+  TimerPtr createTimer(const TimerCb& cb, Dispatcher& dispatcher,
+                       const ScopeTrackedObject* scope) override {
+    return std::make_unique<SimulatedTimeSystemHelper::Alarm>(time_system_, base_scheduler_, cb,
+                                                              dispatcher, scope);
   };
 
 private:
