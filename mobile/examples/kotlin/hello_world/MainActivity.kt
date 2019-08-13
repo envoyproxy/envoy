@@ -74,6 +74,7 @@ class MainActivity : Activity() {
       val url = URL(ENDPOINT)
       // Open connection to the envoy thread listening locally on port 9001
       val connection = url.openConnection() as HttpURLConnection
+      connection.setRequestProperty("host", "s3.amazonaws.com")
       val status = connection.responseCode
       if (status == 200) {
         val serverHeaderField = connection.headerFields[ENVOY_SERVER_HEADER]

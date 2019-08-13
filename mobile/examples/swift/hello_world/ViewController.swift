@@ -36,7 +36,8 @@ final class ViewController: UITableViewController {
   private func performRequest() {
     self.requestCount += 1
     let requestID = self.requestCount
-    let request = URLRequest(url: kURL)
+    var request = URLRequest(url: kURL)
+    request.addValue("s3.amazonaws.com", forHTTPHeaderField: "host")
 
     // Note that the request is sent to the envoy thread listening locally on port 9001.
     NSLog("Starting request to '\(kURL.path)'")

@@ -89,6 +89,7 @@ public class MainActivity extends Activity {
       URL url = new URL(ENDPOINT);
       // Open connection to the envoy thread listening locally on port 9001.
       HttpURLConnection connection = (HttpURLConnection)url.openConnection();
+      connection.setRequestProperty("host", "s3.amazonaws.com");
       int status = connection.getResponseCode();
       if (status == 200) {
         List<String> serverHeaderField = connection.getHeaderFields().get(ENVOY_SERVER_HEADER);

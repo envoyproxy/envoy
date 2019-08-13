@@ -6,6 +6,8 @@
 
 #include "exe/main_common.h"
 
+#include "extensions/clusters/dynamic_forward_proxy/cluster.h"
+#include "extensions/filters/http/dynamic_forward_proxy/config.h"
 #include "extensions/filters/http/router/config.h"
 #include "extensions/filters/network/http_connection_manager/config.h"
 #include "extensions/transport_sockets/raw_buffer/config.h"
@@ -57,6 +59,9 @@ envoy_status_t run_engine(const char* config, const char* log_level) {
   // The following calls ensure that registration happens before the entities are needed.
   // Note that as more registrations are needed, explicit initialization calls will need to be added
   // here.
+  Envoy::Extensions::Clusters::DynamicForwardProxy::forceRegisterClusterFactory();
+  Envoy::Extensions::HttpFilters::DynamicForwardProxy::
+      forceRegisterDynamicForwardProxyFilterFactory();
   Envoy::Extensions::HttpFilters::RouterFilter::forceRegisterRouterFilterConfig();
   Envoy::Extensions::NetworkFilters::HttpConnectionManager::
       forceRegisterHttpConnectionManagerFilterConfigFactory();
