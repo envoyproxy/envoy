@@ -25,7 +25,10 @@ ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSha
 
 void ConnPoolImpl::applyToEachClient(std::list<ActiveClientPtr>& client_list,
                                      const std::function<void(const ActiveClientPtr&)>& fn) {
-  for_each(client_list.begin(), client_list.end(), fn);
+  for (auto it = client_list.begin(); it != client_list.end();) {
+    auto const& client = *it++;
+    fn(client);
+  }
 }
 
 ConnPoolImpl::~ConnPoolImpl() {
@@ -145,23 +148,28 @@ ConnectionPool::Cancellable* ConnPoolImpl::newStream(Http::StreamDecoder& respon
     ENVOY_CONN_LOG(debug, "using existing connection", *client->client_);
     attachRequestToClient(*client, response_decoder, callbacks);
 
-    ENVOY_LOG(debug, "cluster: {}", host_->cluster().name());
-    ENVOY_LOG(debug, "max requests per connection for cluster {}",
+    ENVOY_LOG(debug, "max requests per connection for cluster {}: {}", host_->cluster().name(),
               host_->cluster().maxRequestsPerConnection());
 
     const auto state = host_->cluster().connectionPolicy().onNewStream(*client);
     switch (state) {
     case ConnectionRequestPolicy::State::Active:
-      ENVOY_CONN_LOG(debug, "moving to active list after attaching request", *client->client_);
-      client->moveBetweenLists(*client_list, busy_clients_);
+      if (client->state_ != ConnectionRequestPolicy::State::Active) {
+        ENVOY_CONN_LOG(debug, "moving to active list after attaching request", *client->client_);
+        client->moveBetweenLists(*client_list, busy_clients_);
+      }
       break;
     case ConnectionRequestPolicy::State::Overflow:
-      ENVOY_CONN_LOG(debug, "moving to overflow list after attaching request", *client->client_);
-      client->moveBetweenLists(*client_list, overflow_clients_);
+      if (client->state_ != ConnectionRequestPolicy::State::Overflow) {
+        ENVOY_CONN_LOG(debug, "moving to overflow list after attaching request", *client->client_);
+        client->moveBetweenLists(*client_list, overflow_clients_);
+      }
       break;
     case ConnectionRequestPolicy::State::Drain:
-      ENVOY_CONN_LOG(debug, "moving to drain list after attaching request", *client->client_);
-      client->moveBetweenLists(*client_list, drain_clients_);
+      if (client->state_ != ConnectionRequestPolicy::State::Drain) {
+        ENVOY_CONN_LOG(debug, "moving to drain list after attaching request", *client->client_);
+        client->moveBetweenLists(*client_list, drain_clients_);
+      }
       break;
     default:
       ASSERT(false);

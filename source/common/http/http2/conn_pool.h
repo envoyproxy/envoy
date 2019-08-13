@@ -36,6 +36,8 @@ public:
   bool hasActiveConnections() const override;
   Upstream::HostDescriptionConstSharedPtr host() const override { return host_; };
   const Upstream::ResourcePriority& resourcePriority() const { return priority_; };
+  ConnectionPool::Cancellable* newStream(Http::StreamDecoder& response_decoder,
+                                         ConnectionPool::Callbacks& callbacks) override;
 
 protected:
   struct ActiveClient : LinkedObject<ActiveClient>,
@@ -103,9 +105,6 @@ protected:
                              ConnectionPool::Callbacks& callbacks);
   void createNewConnection();
   void onUpstreamReady(ActiveClient& client);
-  ConnectionPool::Cancellable* newStream(Http::StreamDecoder& response_decoder,
-                                         ConnectionPool::Callbacks& callbacks) override;
-
   void applyToEachClient(std::list<ActiveClientPtr>& client_list,
                          const std::function<void(const ActiveClientPtr&)>& fn);
   Stats::TimespanPtr conn_connect_ms_;

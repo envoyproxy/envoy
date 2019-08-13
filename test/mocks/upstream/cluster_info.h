@@ -106,6 +106,7 @@ public:
   MOCK_CONST_METHOD0(warmHosts, bool());
   MOCK_CONST_METHOD0(eds_service_name, absl::optional<std::string>());
   MOCK_CONST_METHOD1(createNetworkFilterChain, void(Network::Connection&));
+  MOCK_CONST_METHOD0(connectionPolicy, const ConnectionRequestPolicy&());
 
   std::string name_{"fake_cluster"};
   absl::optional<std::string> eds_service_name_;
@@ -131,6 +132,7 @@ public:
   envoy::api::v2::Cluster::CommonLbConfig lb_config_;
   envoy::api::v2::core::Metadata metadata_;
   std::unique_ptr<Envoy::Config::TypedMetadata> typed_metadata_;
+  AggregateRequestsConnectionPolicy connection_policy_;
 };
 
 class MockIdleTimeEnabledClusterInfo : public MockClusterInfo {
