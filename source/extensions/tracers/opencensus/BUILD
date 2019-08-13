@@ -25,6 +25,7 @@ envoy_cc_library(
     name = "opencensus_tracer_impl",
     srcs = ["opencensus_tracer_impl.cc"],
     hdrs = ["opencensus_tracer_impl.h"],
+    copts = ["-Wno-unused-parameter"],
     external_deps = [
         "opencensus_trace",
         "opencensus_trace_cloud_trace_context",

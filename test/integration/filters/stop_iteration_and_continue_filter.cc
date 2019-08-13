@@ -9,22 +9,59 @@
 
 namespace Envoy {
 
-// A test filter that does StopIterationNoBuffer then continues after a 0ms alarm.
+// A test filter that does StopIterationNoBuffer on end stream, then continues after a 0ms alarm.
 class StopIterationAndContinueFilter : public Http::PassThroughFilter {
 public:
-  Http::FilterDataStatus decodeData(Buffer::Instance&, bool end_stream) override {
-    RELEASE_ASSERT(!end_stream_seen_, "end stream seen twice");
+  void setEndStreamAndDecodeTimer() {
+    decode_end_stream_seen_ = true;
+    decode_delay_timer_ = decoder_callbacks_->dispatcher().createTimer(
+        [this]() -> void { decoder_callbacks_->continueDecoding(); });
+    decode_delay_timer_->enableTimer(std::chrono::seconds(0));
+  }
+
+  void setEndStreamAndEncodeTimer() {
+    encode_end_stream_seen_ = true;
+    encode_delay_timer_ = decoder_callbacks_->dispatcher().createTimer(
+        [this]() -> void { encoder_callbacks_->continueEncoding(); });
+    encode_delay_timer_->enableTimer(std::chrono::seconds(0));
+  }
+
+  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap&, bool end_stream) override {
     if (end_stream) {
-      end_stream_seen_ = true;
-      delay_timer_ = decoder_callbacks_->dispatcher().createTimer(
-          [this]() -> void { decoder_callbacks_->continueDecoding(); });
-      delay_timer_->enableTimer(std::chrono::seconds(0));
+      setEndStreamAndDecodeTimer();
+      return Http::FilterHeadersStatus::StopIteration;
+    }
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  Http::FilterDataStatus decodeData(Buffer::Instance&, bool end_stream) override {
+    RELEASE_ASSERT(!decode_end_stream_seen_, "end stream seen twice");
+    if (end_stream) {
+      setEndStreamAndDecodeTimer();
     }
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
-  Event::TimerPtr delay_timer_;
-  bool end_stream_seen_{};
+  Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap&, bool end_stream) override {
+    if (end_stream) {
+      setEndStreamAndEncodeTimer();
+      return Http::FilterHeadersStatus::StopIteration;
+    }
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  Http::FilterDataStatus encodeData(Buffer::Instance&, bool end_stream) override {
+    RELEASE_ASSERT(!encode_end_stream_seen_, "end stream seen twice");
+    if (end_stream) {
+      setEndStreamAndEncodeTimer();
+    }
+    return Http::FilterDataStatus::StopIterationNoBuffer;
+  }
+
+  Event::TimerPtr decode_delay_timer_;
+  bool decode_end_stream_seen_{};
+  Event::TimerPtr encode_delay_timer_;
+  bool encode_end_stream_seen_{};
 };
 
 class StopIterationAndContinueFilterConfig

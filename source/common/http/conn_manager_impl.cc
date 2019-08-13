@@ -860,7 +860,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
 
     const bool new_metadata_added = processNewlyAddedMetadata();
-
     // If end_stream is set in headers, and a filter adds new metadata, we need to delay end_stream
     // in headers by inserting an empty data frame with end_stream set. The empty data frame is sent
     // after the new metadata.
@@ -1312,6 +1311,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
     ENVOY_STREAM_LOG(trace, "encode headers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
 
+    (*entry)->encode_headers_called_ = true;
     const auto continue_iteration =
         (*entry)->commonHandleAfterHeadersCallback(status, encoding_headers_only_);
 
@@ -1441,10 +1441,19 @@ void ConnectionManagerImpl::ActiveStream::encodeMetadata(ActiveStreamEncoderFilt
                                                          MetadataMapPtr&& metadata_map_ptr) {
   resetIdleTimer();
 
-  // Metadata currently go through all filters.
-  ASSERT(filter == nullptr);
-  std::list<ActiveStreamEncoderFilterPtr>::iterator entry = encoder_filters_.begin();
+  std::list<ActiveStreamEncoderFilterPtr>::iterator entry =
+      commonEncodePrefix(filter, false, FilterIterationStartState::CanStartFromCurrent);
+
   for (; entry != encoder_filters_.end(); entry++) {
+    // If the filter pointed by entry has stopped for all frame type, stores metadata and returns.
+    // If the filter pointed by entry hasn't returned from encodeHeaders, stores newly added
+    // metadata in case encodeHeaders returns StopAllIteration. The latter can happen when headers
+    // callbacks generate new metadata.
+    if (!(*entry)->encode_headers_called_ || (*entry)->stoppedAll()) {
+      (*entry)->getSavedResponseMetadata()->emplace_back(std::move(metadata_map_ptr));
+      return;
+    }
+
     FilterMetadataStatus status = (*entry)->handle_->encodeMetadata(*metadata_map_ptr);
     ENVOY_STREAM_LOG(trace, "encode metadata called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
@@ -1770,16 +1779,8 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {
 
   doMetadata();
 
-  // Make sure we handle filters returning StopIterationNoBuffer and then commonContinue by flushing
-  // the terminal fin.
-  const bool end_stream_with_data = complete() && !trailers();
-  if (bufferedData() || end_stream_with_data) {
-    if (end_stream_with_data && !bufferedData()) {
-      // In the StopIterationNoBuffer case the ConnectionManagerImpl will not have created a
-      // buffer but encode/decodeData expects the buffer to exist, so create one.
-      bufferedData() = createBuffer();
-    }
-    doData(end_stream_with_data);
+  if (bufferedData()) {
+    doData(complete() && !trailers());
   }
 
   if (trailers()) {
@@ -1869,6 +1870,12 @@ bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfterDataCallbac
         status == FilterDataStatus::StopIterationAndWatermark) {
       buffer_was_streaming = status == FilterDataStatus::StopIterationAndWatermark;
       commonHandleBufferData(provided_data);
+    } else if (complete() && !trailers() && !bufferedData()) {
+      // If this filter is doing StopIterationNoBuffer and this stream is terminated with a zero
+      // byte data frame, we need to create an empty buffer to make sure that when commonContinue
+      // is called, the pipeline resumes with an empty data frame with end_stream = true
+      ASSERT(end_stream_);
+      bufferedData() = createBuffer();
     }
 
     return false;
@@ -2091,6 +2098,19 @@ Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamEncoderFilter::cre
   return Buffer::WatermarkBufferPtr{buffer};
 }
 
+void ConnectionManagerImpl::ActiveStreamEncoderFilter::handleMetadataAfterHeadersCallback() {
+  // If we drain accumulated metadata, the iteration must start with the current filter.
+  const bool saved_state = iterate_from_current_filter_;
+  iterate_from_current_filter_ = true;
+  // If encodeHeaders() returns StopAllIteration, we should skip draining metadata, and wait
+  // for doMetadata() to drain the metadata after iteration continues.
+  if (!stoppedAll() && saved_response_metadata_ != nullptr &&
+      !getSavedResponseMetadata()->empty()) {
+    drainSavedResponseMetadata();
+  }
+  // Restores the original value of iterate_from_current_filter_.
+  iterate_from_current_filter_ = saved_state;
+}
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedData(Buffer::Instance& data,
                                                                       bool streaming) {
   return parent_.addEncodedData(*this, data, streaming);
@@ -2104,6 +2124,11 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::injectEncodedDataToFilter
 
 HeaderMap& ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedTrailers() {
   return parent_.addEncodedTrailers();
+}
+
+void ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedMetadata(
+    MetadataMapPtr&& metadata_map_ptr) {
+  return parent_.encodeMetadata(this, std::move(metadata_map_ptr));
 }
 
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::
