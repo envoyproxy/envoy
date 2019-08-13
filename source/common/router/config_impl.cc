@@ -441,8 +441,9 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     }
   }
 
+  // fixfix dedup
   for (const auto& header_map : route.match().headers()) {
-    config_headers_.push_back(header_map);
+    config_headers_.push_back(std::make_unique<Http::HeaderUtility::HeaderData>(header_map));
   }
 
   for (const auto& query_parameter : route.match().query_parameters()) {

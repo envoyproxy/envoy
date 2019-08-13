@@ -190,7 +190,7 @@ bool NotHealthCheckFilter::evaluate(const StreamInfo::StreamInfo& info, const Ht
 }
 
 HeaderFilter::HeaderFilter(const envoy::config::filter::accesslog::v2::HeaderFilter& config) {
-  header_data_.push_back(Http::HeaderUtility::HeaderData(config.header()));
+  header_data_.push_back(std::make_unique<Http::HeaderUtility::HeaderData>(config.header()));
 }
 
 bool HeaderFilter::evaluate(const StreamInfo::StreamInfo&, const Http::HeaderMap& request_headers,

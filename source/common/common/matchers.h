@@ -100,6 +100,8 @@ private:
   const StringMatcher matcher_;
 };
 
+using LowerCaseStringMatcherPtr = std::unique_ptr<LowerCaseStringMatcher>;
+
 class ListMatcher : public ValueMatcher {
 public:
   ListMatcher(const envoy::type::matcher::ListMatcher& matcher);

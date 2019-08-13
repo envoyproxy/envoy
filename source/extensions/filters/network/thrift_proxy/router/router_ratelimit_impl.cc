@@ -71,8 +71,9 @@ HeaderValueMatchAction::HeaderValueMatchAction(
     const envoy::api::v2::route::RateLimit::Action::HeaderValueMatch& action)
     : descriptor_value_(action.descriptor_value()),
       expect_match_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(action, expect_match, true)) {
+  // fixfix dedup
   for (const auto& header_matcher : action.headers()) {
-    action_headers_.push_back(header_matcher);
+    action_headers_.push_back(std::make_unique<Http::HeaderUtility::HeaderData>(header_matcher));
   }
 }
 

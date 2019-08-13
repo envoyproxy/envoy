@@ -23,8 +23,9 @@ namespace Router {
 RouteEntryImplBase::RouteEntryImplBase(
     const envoy::config::filter::network::thrift_proxy::v2alpha1::Route& route)
     : cluster_name_(route.route().cluster()), rate_limit_policy_(route.route().rate_limits()) {
+  // fixfix dedup
   for (const auto& header_map : route.match().headers()) {
-    config_headers_.push_back(header_map);
+    config_headers_.push_back(std::make_unique<Http::HeaderUtility::HeaderData>(header_map));
   }
 
   if (route.route().has_metadata_match()) {

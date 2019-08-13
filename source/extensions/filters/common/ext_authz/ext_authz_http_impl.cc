@@ -86,7 +86,7 @@ ClientConfig::toRequestMatchers(const envoy::type::matcher::ListStringMatcher& l
       {Http::Headers::get().Authorization, Http::Headers::get().Method, Http::Headers::get().Path,
        Http::Headers::get().Host}};
 
-  std::vector<Matchers::LowerCaseStringMatcher> matchers{list.patterns().begin(),
+  std::vector<Matchers::LowerCaseStringMatcherPtr> matchers{list.patterns().begin(),
                                                          list.patterns().end()};
   for (const auto& key : keys) {
     envoy::type::matcher::StringMatcher matcher;

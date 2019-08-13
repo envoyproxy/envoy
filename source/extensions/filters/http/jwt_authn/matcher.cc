@@ -52,7 +52,7 @@ protected:
   const bool case_sensitive_;
 
 private:
-  std::vector<Http::HeaderUtility::HeaderData> config_headers_;
+  std::vector<Http::HeaderUtility::HeaderDataPtr> config_headers_;
   std::vector<std::unique_ptr<Router::ConfigUtility::QueryParameterMatcher>>
       config_query_parameters_;
 };

@@ -21,11 +21,11 @@ Http::FilterFactoryCb HealthCheckFilterConfig::createFilterFactoryFromProtoTyped
   const bool pass_through_mode = proto_config.pass_through_mode().value();
   const int64_t cache_time_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config, cache_time, 0);
 
-  auto header_match_data = std::make_shared<std::vector<Http::HeaderUtility::HeaderData>>();
+  auto header_match_data = std::make_shared<std::vector<Http::HeaderUtility::HeaderDataPtr>>();
 
+  // fixfix dedup
   for (const envoy::api::v2::route::HeaderMatcher& matcher : proto_config.headers()) {
-    Http::HeaderUtility::HeaderData single_header_match(matcher);
-    header_match_data->push_back(std::move(single_header_match));
+    header_match_data->push_back(std::make_unique<Http::HeaderUtility::HeaderData>(matcher));
   }
 
   if (!pass_through_mode && cache_time_ms) {

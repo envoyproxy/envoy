@@ -112,6 +112,7 @@ HttpHeaderMatcherBase::HttpHeaderMatcherBase(
     const envoy::service::tap::v2alpha::HttpHeadersMatch& config,
     const std::vector<MatcherPtr>& matchers)
     : SimpleMatcher(matchers) {
+  // fixfix dedup
   for (const auto& header_match : config.headers()) {
     headers_to_match_.emplace_back(std::make_unique<Http::HeaderUtility::HeaderData>(header_match));
   }
