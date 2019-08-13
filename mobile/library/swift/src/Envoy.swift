@@ -33,7 +33,7 @@ public final class Envoy: NSObject {
     }
 
     override func main() {
-      EnvoyEngine.run(withConfig: self.config, logLevel: self.logLevel.stringValue)
+      EnvoyEngineImpl.run(withConfig: self.config, logLevel: self.logLevel.stringValue)
     }
   }
 }
