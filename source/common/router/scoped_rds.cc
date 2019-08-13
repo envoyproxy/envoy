@@ -136,7 +136,7 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
 
   // If new route config sources come after the factory_context_.initManager()'s initialize() been
   // called, that initManager can't accept new targets. Instead we use a local override which will
-  // start new subscriptions but not wait on them to be ready (to not block on main thread).
+  // start new subscriptions but not wait on them to be ready.
   std::unique_ptr<Init::ManagerImpl> overriding_init_manager;
   if (factory_context_.initManager().state() == Init::Manager::State::Initialized) {
     // Pause RDS to not send a burst of RDS requests until we start all the new subscriptions.
