@@ -27,7 +27,7 @@ std::string Hex::encode(const uint8_t* data, size_t length) {
 }
 
 std::vector<uint8_t> Hex::decode(const std::string& hex_string) {
-  if (hex_string.size() == 0 || hex_string.size() % 2 != 0) {
+  if (hex_string.empty() || hex_string.size() % 2 != 0) {
     return {};
   }
 
@@ -35,7 +35,7 @@ std::vector<uint8_t> Hex::decode(const std::string& hex_string) {
   for (size_t i = 0; i < hex_string.size(); i += 2) {
     std::string hex_byte = hex_string.substr(i, 2);
     uint64_t out;
-    if (!StringUtil::atoul(hex_byte.c_str(), out, 16)) {
+    if (!StringUtil::atoull(hex_byte.c_str(), out, 16)) {
       return {};
     }
 

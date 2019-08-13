@@ -11,4 +11,14 @@ envoy_package()
 envoy_cc_library(
     name = "filesystem_interface",
     hdrs = ["filesystem.h"],
+    deps = [
+        "//include/envoy/api:io_error_interface",
+        "//include/envoy/api:os_sys_calls_interface",
+        "//include/envoy/event:dispatcher_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "watcher_interface",
+    hdrs = ["watcher.h"],
 )

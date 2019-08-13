@@ -10,6 +10,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Eq;
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
@@ -25,14 +26,14 @@ public:
       : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")) {
     envoy::api::v2::core::GrpcService config;
     config.mutable_envoy_grpc()->set_cluster_name("test_cluster");
-    grpc_client_ = std::make_unique<AsyncClientImpl>(cm_, config, test_time_.timeSource());
+    grpc_client_ = std::make_unique<AsyncClientImpl>(cm_, config, test_time_.timeSystem());
     ON_CALL(cm_, httpAsyncClientForCluster("test_cluster")).WillByDefault(ReturnRef(http_client_));
   }
 
   const Protobuf::MethodDescriptor* method_descriptor_;
   NiceMock<Http::MockAsyncClient> http_client_;
   NiceMock<Upstream::MockClusterManager> cm_;
-  std::unique_ptr<AsyncClientImpl> grpc_client_;
+  AsyncClient<helloworld::HelloRequest, helloworld::HelloReply> grpc_client_;
   DangerousDeprecatedTestTime test_time_;
 };
 
@@ -40,17 +41,17 @@ public:
 // UNAVAILABLE.
 TEST_F(EnvoyAsyncClientImplTest, StreamHttpStartFail) {
   MockAsyncStreamCallbacks<helloworld::HelloReply> grpc_callbacks;
-  ON_CALL(http_client_, start(_, _, false)).WillByDefault(Return(nullptr));
+  ON_CALL(http_client_, start(_, _)).WillByDefault(Return(nullptr));
   EXPECT_CALL(grpc_callbacks, onRemoteClose(Status::GrpcStatus::Unavailable, ""));
-  auto* grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks);
-  EXPECT_EQ(grpc_stream, nullptr);
+  auto grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks);
+  EXPECT_TRUE(grpc_stream == nullptr);
 }
 
 // Validate that a failure in the HTTP client returns immediately with status
 // UNAVAILABLE.
 TEST_F(EnvoyAsyncClientImplTest, RequestHttpStartFail) {
   MockAsyncRequestCallbacks<helloworld::HelloReply> grpc_callbacks;
-  ON_CALL(http_client_, start(_, _, true)).WillByDefault(Return(nullptr));
+  ON_CALL(http_client_, start(_, _)).WillByDefault(Return(nullptr));
   EXPECT_CALL(grpc_callbacks, onFailure(Status::GrpcStatus::Unavailable, "", _));
   helloworld::HelloRequest request_msg;
 
@@ -58,10 +59,11 @@ TEST_F(EnvoyAsyncClientImplTest, RequestHttpStartFail) {
   Tracing::MockSpan* child_span{new Tracing::MockSpan()};
   EXPECT_CALL(active_span, spawnChild_(_, "async test_cluster egress", _))
       .WillOnce(Return(child_span));
-  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().COMPONENT, Tracing::Tags::get().PROXY));
-  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().UPSTREAM_CLUSTER, "test_cluster"));
-  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().GRPC_STATUS_CODE, "14"));
-  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().ERROR, Tracing::Tags::get().TRUE));
+  EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("test_cluster")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("14")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
   EXPECT_CALL(*child_span, finishSpan());
   EXPECT_CALL(*child_span, injectContext(_)).Times(0);
 
@@ -76,10 +78,10 @@ TEST_F(EnvoyAsyncClientImplTest, StreamHttpSendHeadersFail) {
   MockAsyncStreamCallbacks<helloworld::HelloReply> grpc_callbacks;
   Http::AsyncClient::StreamCallbacks* http_callbacks;
   Http::MockAsyncClientStream http_stream;
-  EXPECT_CALL(http_client_, start(_, _, false))
-      .WillOnce(Invoke(
-          [&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
-                                          const absl::optional<std::chrono::milliseconds>&, bool) {
+  EXPECT_CALL(http_client_, start(_, _))
+      .WillOnce(
+          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                 const Http::AsyncClient::StreamOptions&) {
             http_callbacks = &callbacks;
             return &http_stream;
           }));
@@ -92,8 +94,8 @@ TEST_F(EnvoyAsyncClientImplTest, StreamHttpSendHeadersFail) {
       }));
   EXPECT_CALL(grpc_callbacks, onReceiveTrailingMetadata_(_));
   EXPECT_CALL(grpc_callbacks, onRemoteClose(Status::GrpcStatus::Internal, ""));
-  auto* grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks);
-  EXPECT_EQ(grpc_stream, nullptr);
+  auto grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks);
+  EXPECT_TRUE(grpc_stream == nullptr);
 }
 
 // Validate that a failure to sendHeaders() in the HTTP client returns
@@ -102,10 +104,10 @@ TEST_F(EnvoyAsyncClientImplTest, RequestHttpSendHeadersFail) {
   MockAsyncRequestCallbacks<helloworld::HelloReply> grpc_callbacks;
   Http::AsyncClient::StreamCallbacks* http_callbacks;
   Http::MockAsyncClientStream http_stream;
-  EXPECT_CALL(http_client_, start(_, _, true))
-      .WillOnce(Invoke(
-          [&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
-                                          const absl::optional<std::chrono::milliseconds>&, bool) {
+  EXPECT_CALL(http_client_, start(_, _))
+      .WillOnce(
+          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                 const Http::AsyncClient::StreamOptions&) {
             http_callbacks = &callbacks;
             return &http_stream;
           }));
@@ -123,11 +125,12 @@ TEST_F(EnvoyAsyncClientImplTest, RequestHttpSendHeadersFail) {
   Tracing::MockSpan* child_span{new Tracing::MockSpan()};
   EXPECT_CALL(active_span, spawnChild_(_, "async test_cluster egress", _))
       .WillOnce(Return(child_span));
-  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().COMPONENT, Tracing::Tags::get().PROXY));
-  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().UPSTREAM_CLUSTER, "test_cluster"));
+  EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("test_cluster")));
   EXPECT_CALL(*child_span, injectContext(_));
-  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().GRPC_STATUS_CODE, "13"));
-  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().ERROR, Tracing::Tags::get().TRUE));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("13")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
   EXPECT_CALL(*child_span, finishSpan());
 
   auto* grpc_request = grpc_client_->send(*method_descriptor_, request_msg, grpc_callbacks,
@@ -142,8 +145,8 @@ TEST_F(EnvoyAsyncClientImplTest, StreamHttpClientException) {
   ON_CALL(cm_, get(_)).WillByDefault(Return(nullptr));
   EXPECT_CALL(grpc_callbacks,
               onRemoteClose(Status::GrpcStatus::Unavailable, "Cluster not available"));
-  auto* grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks);
-  EXPECT_EQ(grpc_stream, nullptr);
+  auto grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks);
+  EXPECT_TRUE(grpc_stream == nullptr);
 }
 
 } // namespace

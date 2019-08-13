@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Enforce header order in a a given file. This will only reorder in the first sequence of contiguous
+# Enforce header order in a given file. This will only reorder in the first sequence of contiguous
 # #include statements, so it will not play well with #ifdef.
 #
 # This attempts to enforce the guidelines at
@@ -12,6 +12,9 @@
 # enough to handle block splitting and correctly detecting the main header subject to the Envoy
 # canonical paths.
 
+from __future__ import print_function
+
+import argparse
 import common
 import re
 import sys
@@ -29,7 +32,7 @@ def ReorderHeaders(path):
   # Collect all the lines prior to the first #include in before_includes_lines.
   try:
     while True:
-      line = all_lines.next()
+      line = next(all_lines)
       if line.startswith('#include'):
         includes_lines.append(line)
         break
@@ -40,7 +43,7 @@ def ReorderHeaders(path):
   # Collect all the #include and whitespace lines in includes_lines.
   try:
     while True:
-      line = all_lines.next()
+      line = next(all_lines)
       if not line:
         continue
       if not line.startswith('#include'):
@@ -68,7 +71,7 @@ def ReorderHeaders(path):
       regex_filter('<.*\.h>'),
       regex_filter('<.*>'),
   ]
-  for subdir in common.includeDirOrder():
+  for subdir in include_dir_order:
     block_filters.append(regex_filter('"' + subdir + '/.*"'))
 
   blocks = []
@@ -88,8 +91,7 @@ def ReorderHeaders(path):
   if len(misc_headers) > 0:
     blocks.append(misc_headers)
 
-  reordered_includes_lines = '\n\n'.join(
-      ['\n'.join(sorted(block)) for block in blocks])
+  reordered_includes_lines = '\n\n'.join(['\n'.join(sorted(block)) for block in blocks])
 
   if reordered_includes_lines:
     reordered_includes_lines += '\n'
@@ -103,14 +105,20 @@ def ReorderHeaders(path):
 
 
 if __name__ == '__main__':
-  if len(sys.argv) == 2:
-    sys.stdout.write(ReorderHeaders(sys.argv[1]))
-    sys.exit(0)
-  elif len(sys.argv) == 3 and sys.argv[1] == '--rewrite':
-    path = sys.argv[2]
-    reorderd_source = ReorderHeaders(path)
-    with open(path, 'w') as f:
+  parser = argparse.ArgumentParser(description='Header reordering.')
+  parser.add_argument('--path', type=str, help='specify the path to the header file')
+  parser.add_argument('--rewrite', action='store_true', help='rewrite header file in-place')
+  parser.add_argument(
+      '--include_dir_order',
+      type=str,
+      default=','.join(common.includeDirOrder()),
+      help='specify the header block include directory order')
+  args = parser.parse_args()
+  target_path = args.path
+  include_dir_order = args.include_dir_order.split(',')
+  reorderd_source = ReorderHeaders(target_path)
+  if args.rewrite:
+    with open(target_path, 'w') as f:
       f.write(reorderd_source)
-    sys.exit(0)
-  print 'Usage: %s [--rewrite] <source file path>' % sys.argv[0]
-  sys.exit(1)
+  else:
+    sys.stdout.write(reorderd_source)

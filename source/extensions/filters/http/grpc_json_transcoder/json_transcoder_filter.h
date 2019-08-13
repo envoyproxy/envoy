@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/api/api.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/config/filter/http/transcoder/v2/transcoder.pb.h"
 #include "envoy/http/filter.h"
@@ -34,9 +35,9 @@ struct VariableBinding {
   // The location of the field in the protobuf message, where the value
   // needs to be inserted, e.g. "shelf.theme" would mean the "theme" field
   // of the nested "shelf" message of the request protobuf message.
-  std::vector<ProtobufTypes::String> field_path;
+  std::vector<std::string> field_path;
   // The value to be inserted.
-  ProtobufTypes::String value;
+  std::string value;
 };
 
 /**
@@ -49,7 +50,8 @@ public:
    * and construct a path matcher for HTTP path bindings.
    */
   JsonTranscoderConfig(
-      const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder& proto_config);
+      const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder& proto_config,
+      Api::Api& api);
 
   /**
    * Create an instance of Transcoder interface based on incoming request
@@ -87,9 +89,10 @@ private:
   Protobuf::util::JsonPrintOptions print_options_;
 
   bool match_incoming_request_route_{false};
+  bool ignore_unknown_query_parameters_{false};
 };
 
-typedef std::shared_ptr<JsonTranscoderConfig> JsonTranscoderConfigSharedPtr;
+using JsonTranscoderConfigSharedPtr = std::shared_ptr<JsonTranscoderConfig>;
 
 /**
  * The filter instance for gRPC JSON transcoder.
@@ -111,6 +114,9 @@ public:
   Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap& trailers) override;
+  Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap&) override {
+    return Http::FilterMetadataStatus::Continue;
+  }
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override;
 
   // Http::StreamFilterBase

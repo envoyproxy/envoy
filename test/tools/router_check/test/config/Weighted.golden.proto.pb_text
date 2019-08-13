@@ -1,0 +1,26 @@
+tests {
+  test_name: "Test_1"
+  input: {
+    authority: "www1.lyft.com"
+    path: "/foo"
+    ssl: true
+    internal: true
+    method: "GET"
+  }
+  validate: {
+    path_redirect: ""
+  }
+}
+
+tests {
+  test_name: "Test_2"
+  input: {
+    authority: "www1.lyft.com"
+    path: "/foo"
+    method: "GET"
+    random_value: 115
+  }
+  validate: {
+    cluster_name: "cluster1"
+  }
+}

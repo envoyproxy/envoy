@@ -1,9 +1,11 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/stats/refcount_ptr.h"
 #include "envoy/stats/stats.h"
 
 namespace Envoy {
@@ -14,12 +16,17 @@ namespace Stats {
  */
 class HistogramStatistics {
 public:
-  virtual ~HistogramStatistics() {}
+  virtual ~HistogramStatistics() = default;
 
   /**
-   * Returns summary representation of the histogram.
+   * Returns quantile summary representation of the histogram.
    */
-  virtual std::string summary() const PURE;
+  virtual std::string quantileSummary() const PURE;
+
+  /**
+   * Returns bucket summary representation of the histogram.
+   */
+  virtual std::string bucketSummary() const PURE;
 
   /**
    * Returns supported quantiles.
@@ -30,6 +37,32 @@ public:
    * Returns computed quantile values during the period.
    */
   virtual const std::vector<double>& computedQuantiles() const PURE;
+
+  /**
+   * Returns supported buckets. Each value is the upper bound of the bucket
+   * with 0 as the implicit lower bound. For timers, these bucket thresholds
+   * are in milliseconds but the thresholds are applicable to all types of data.
+   */
+  virtual const std::vector<double>& supportedBuckets() const PURE;
+
+  /**
+   * Returns computed bucket values during the period. The vector contains an approximation
+   * of samples below each quantile bucket defined in supportedBuckets(). This vector is
+   * guaranteed to be the same length as supportedBuckets().
+   */
+  virtual const std::vector<uint64_t>& computedBuckets() const PURE;
+
+  /**
+   * Returns number of values during the period. This number may be an approximation
+   * of the number of samples in the histogram, it is not guaranteed that this will be
+   * 100% the number of samples observed.
+   */
+  virtual uint64_t sampleCount() const PURE;
+
+  /**
+   * Returns sum of all values during the period.
+   */
+  virtual double sampleSum() const PURE;
 };
 
 /**
@@ -39,9 +72,9 @@ public:
  * class (Sinks, in particular) will need to explicitly differentiate between histograms
  * representing durations and histograms representing other types of data.
  */
-class Histogram : public virtual Metric {
+class Histogram : public Metric {
 public:
-  virtual ~Histogram() {}
+  ~Histogram() override = default;
 
   /**
    * Records an unsigned value. If a timer, values are in units of milliseconds.
@@ -49,14 +82,14 @@ public:
   virtual void recordValue(uint64_t value) PURE;
 };
 
-typedef std::shared_ptr<Histogram> HistogramSharedPtr;
+using HistogramSharedPtr = RefcountPtr<Histogram>;
 
 /**
  * A histogram that is stored in main thread and provides summary view of the histogram.
  */
-class ParentHistogram : public virtual Histogram {
+class ParentHistogram : public Histogram {
 public:
-  virtual ~ParentHistogram() {}
+  ~ParentHistogram() override = default;
 
   /**
    * This method is called during the main stats flush process for each of the histograms and used
@@ -75,12 +108,17 @@ public:
   virtual const HistogramStatistics& cumulativeStatistics() const PURE;
 
   /**
-   * Returns the summary representation.
+   * Returns the quantile summary representation.
    */
-  virtual const std::string summary() const PURE;
+  virtual const std::string quantileSummary() const PURE;
+
+  /**
+   * Returns the bucket summary representation.
+   */
+  virtual const std::string bucketSummary() const PURE;
 };
 
-typedef std::shared_ptr<ParentHistogram> ParentHistogramSharedPtr;
+using ParentHistogramSharedPtr = RefcountPtr<ParentHistogram>;
 
 } // namespace Stats
 } // namespace Envoy

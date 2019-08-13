@@ -1,0 +1,2 @@
+GitPython==2.1.9
+PyGithub==1.38

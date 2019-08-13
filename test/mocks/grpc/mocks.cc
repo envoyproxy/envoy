@@ -3,14 +3,17 @@
 namespace Envoy {
 namespace Grpc {
 
-MockAsyncRequest::MockAsyncRequest() {}
-MockAsyncRequest::~MockAsyncRequest() {}
+MockAsyncRequest::MockAsyncRequest() = default;
+MockAsyncRequest::~MockAsyncRequest() = default;
 
-MockAsyncClientFactory::MockAsyncClientFactory() {}
-MockAsyncClientFactory::~MockAsyncClientFactory() {}
+MockAsyncStream::MockAsyncStream() = default;
+MockAsyncStream::~MockAsyncStream() = default;
 
-MockAsyncClientManager::MockAsyncClientManager() {}
-MockAsyncClientManager::~MockAsyncClientManager() {}
+MockAsyncClientFactory::MockAsyncClientFactory() = default;
+MockAsyncClientFactory::~MockAsyncClientFactory() = default;
+
+MockAsyncClientManager::MockAsyncClientManager() = default;
+MockAsyncClientManager::~MockAsyncClientManager() = default;
 
 } // namespace Grpc
 } // namespace Envoy

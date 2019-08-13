@@ -2,6 +2,7 @@
 
 #include <functional>
 
+#include "envoy/common/time.h"
 #include "envoy/ssl/context.h"
 #include "envoy/ssl/context_config.h"
 #include "envoy/stats/scope.h"
@@ -14,7 +15,7 @@ namespace Ssl {
  */
 class ContextManager {
 public:
-  virtual ~ContextManager() {}
+  virtual ~ContextManager() = default;
 
   /**
    * Builds a ClientContext from a ClientContextConfig.
@@ -38,6 +39,17 @@ public:
    * Iterate through all currently allocated contexts.
    */
   virtual void iterateContexts(std::function<void(const Context&)> callback) PURE;
+};
+
+using ContextManagerPtr = std::unique_ptr<ContextManager>;
+
+class ContextManagerFactory {
+public:
+  virtual ~ContextManagerFactory() = default;
+  virtual ContextManagerPtr createContextManager(TimeSource& time_source) PURE;
+
+  // There could be only one factory thus the name is static.
+  static std::string name() { return "ssl_context_manager"; }
 };
 
 } // namespace Ssl

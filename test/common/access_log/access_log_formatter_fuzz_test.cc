@@ -6,16 +6,18 @@
 
 namespace Envoy {
 namespace Fuzz {
+namespace {
 
 DEFINE_PROTO_FUZZER(const test::common::access_log::TestCase& input) {
   try {
-    std::vector<AccessLog::FormatterPtr> formatters =
+    NiceMock<Ssl::MockConnectionInfo> connection_info;
+    std::vector<AccessLog::FormatterProviderPtr> formatters =
         AccessLog::AccessLogFormatParser::parse(input.format());
     for (const auto& it : formatters) {
       it->format(Fuzz::fromHeaders(input.request_headers()),
                  Fuzz::fromHeaders(input.response_headers()),
                  Fuzz::fromHeaders(input.response_trailers()),
-                 Fuzz::fromRequestInfo(input.request_info()));
+                 Fuzz::fromStreamInfo(input.stream_info(), &connection_info));
     }
     ENVOY_LOG_MISC(trace, "Success");
   } catch (const EnvoyException& e) {
@@ -23,5 +25,6 @@ DEFINE_PROTO_FUZZER(const test::common::access_log::TestCase& input) {
   }
 }
 
+} // namespace
 } // namespace Fuzz
 } // namespace Envoy

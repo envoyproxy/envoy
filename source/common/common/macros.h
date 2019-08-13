@@ -21,7 +21,9 @@ namespace Envoy {
 /**
  * Stop the compiler from complaining about an unreferenced parameter.
  */
+#ifndef WIN32
 #define UNREFERENCED_PARAMETER(X) ((void)(X))
+#endif
 
 /**
  * Construct On First Use idiom.
@@ -29,6 +31,10 @@ namespace Envoy {
  */
 #define CONSTRUCT_ON_FIRST_USE(type, ...)                                                          \
   static const type* objectptr = new type{__VA_ARGS__};                                            \
+  return *objectptr;
+
+#define MUTABLE_CONSTRUCT_ON_FIRST_USE(type, ...)                                                  \
+  static type* objectptr = new type{__VA_ARGS__};                                                  \
   return *objectptr;
 
 /**

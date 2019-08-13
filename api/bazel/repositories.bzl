@@ -1,188 +1,41 @@
-GOOGLEAPIS_SHA = "d642131a6e6582fc226caf9893cb7fe7885b3411"  # May 23, 2018
-GOGOPROTO_SHA = "1adfc126b41513cc696b209667c8656ea7aac67c"  # v1.0.0
-PROMETHEUS_SHA = "99fa1f4be8e564e8a6b613da7fa6f46c9edafc6c"  # Nov 17, 2017
-OPENCENSUS_SHA = "ab82e5fdec8267dc2a726544b10af97675970847"  # May 23, 2018
-
-PGV_GIT_SHA = "f9d2b11e44149635b23a002693b76512b01ae515"
-
-load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+load(":envoy_http_archive.bzl", "envoy_http_archive")
+load(":repository_locations.bzl", "REPOSITORY_LOCATIONS")
 
 def api_dependencies():
-    git_repository(
-        name = "com_lyft_protoc_gen_validate",
-        remote = "https://github.com/lyft/protoc-gen-validate.git",
-        commit = PGV_GIT_SHA,
+    envoy_http_archive(
+        "bazel_skylib",
+        locations = REPOSITORY_LOCATIONS,
     )
-    native.new_http_archive(
-        name = "googleapis",
-        strip_prefix = "googleapis-" + GOOGLEAPIS_SHA,
-        url = "https://github.com/googleapis/googleapis/archive/" + GOOGLEAPIS_SHA + ".tar.gz",
-        # TODO(dio): Consider writing a Skylark macro for importing Google API proto.
-        build_file_content = """
-load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library", "py_proto_library")
-load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
-
-filegroup(
-    name = "api_httpbody_protos_src",
-    srcs = [
-        "google/api/httpbody.proto",
-    ],
-    visibility = ["//visibility:public"],
-)
-
-proto_library(
-    name = "api_httpbody_protos_proto",
-    srcs = [":api_httpbody_protos_src"],
-    deps = ["@com_google_protobuf//:descriptor_proto"],
-    visibility = ["//visibility:public"],
-)
-
-cc_proto_library(
-    name = "api_httpbody_protos",
-    srcs = [
-        "google/api/httpbody.proto",
-    ],
-    default_runtime = "@com_google_protobuf//:protobuf",
-    protoc = "@com_google_protobuf//:protoc",
-    deps = ["@com_google_protobuf//:cc_wkt_protos"],
-    visibility = ["//visibility:public"],
-)
-
-py_proto_library(
-    name = "api_httpbody_protos_py",
-    srcs = [
-        "google/api/httpbody.proto",
-    ],
-    include = ".",
-    default_runtime = "@com_google_protobuf//:protobuf_python",
-    protoc = "@com_google_protobuf//:protoc",
-    visibility = ["//visibility:public"],
-    deps = ["@com_google_protobuf//:protobuf_python"],
-)
-
-go_proto_library(
-    name = "api_httpbody_go_proto",
-    importpath = "google.golang.org/genproto/googleapis/api/httpbody",
-    proto = ":api_httpbody_protos_proto",
-    visibility = ["//visibility:public"],
-    deps = [
-      ":descriptor_go_proto",
-    ],
-)
-
-filegroup(
-    name = "http_api_protos_src",
-    srcs = [
-        "google/api/annotations.proto",
-        "google/api/http.proto",
-    ],
-    visibility = ["//visibility:public"],
-)
-
-go_proto_library(
-    name = "descriptor_go_proto",
-    importpath = "github.com/golang/protobuf/protoc-gen-go/descriptor",
-    proto = "@com_google_protobuf//:descriptor_proto",
-    visibility = ["//visibility:public"],
-)
-
-proto_library(
-    name = "http_api_protos_proto",
-    srcs = [":http_api_protos_src"],
-    deps = ["@com_google_protobuf//:descriptor_proto"],
-    visibility = ["//visibility:public"],
-)
-
-cc_proto_library(
-    name = "http_api_protos",
-    srcs = [
-        "google/api/annotations.proto",
-        "google/api/http.proto",
-    ],
-    default_runtime = "@com_google_protobuf//:protobuf",
-    protoc = "@com_google_protobuf//:protoc",
-    deps = ["@com_google_protobuf//:cc_wkt_protos"],
-    visibility = ["//visibility:public"],
-)
-
-py_proto_library(
-    name = "http_api_protos_py",
-    srcs = [
-        "google/api/annotations.proto",
-        "google/api/http.proto",
-    ],
-    include = ".",
-    default_runtime = "@com_google_protobuf//:protobuf_python",
-    protoc = "@com_google_protobuf//:protoc",
-    visibility = ["//visibility:public"],
-    deps = ["@com_google_protobuf//:protobuf_python"],
-)
-
-go_proto_library(
-    name = "http_api_go_proto",
-    importpath = "google.golang.org/genproto/googleapis/api/annotations",
-    proto = ":http_api_protos_proto",
-    visibility = ["//visibility:public"],
-    deps = [
-      ":descriptor_go_proto",
-    ],
-)
-
-filegroup(
-     name = "rpc_status_protos_src",
-     srcs = [
-         "google/rpc/status.proto",
-     ],
-     visibility = ["//visibility:public"],
-)
-
-proto_library(
-     name = "rpc_status_protos_lib",
-     srcs = [":rpc_status_protos_src"],
-     deps = ["@com_google_protobuf//:any_proto"],
-     visibility = ["//visibility:public"],
-)
-
-cc_proto_library(
-     name = "rpc_status_protos",
-     srcs = ["google/rpc/status.proto"],
-     default_runtime = "@com_google_protobuf//:protobuf",
-     protoc = "@com_google_protobuf//:protoc",
-     deps = [
-         "@com_google_protobuf//:cc_wkt_protos"
-     ],
-     visibility = ["//visibility:public"],
-)
-
-go_proto_library(
-    name = "rpc_status_go_proto",
-    importpath = "google.golang.org/genproto/googleapis/rpc/status",
-    proto = ":rpc_status_protos_lib",
-    visibility = ["//visibility:public"],
-    deps = [
-      "@com_github_golang_protobuf//ptypes/any:go_default_library",
-    ],
-)
-
-py_proto_library(
-     name = "rpc_status_protos_py",
-     srcs = [
-         "google/rpc/status.proto",
-     ],
-     include = ".",
-     default_runtime = "@com_google_protobuf//:protobuf_python",
-     protoc = "@com_google_protobuf//:protoc",
-     visibility = ["//visibility:public"],
-     deps = ["@com_google_protobuf//:protobuf_python"],
-)
-""",
+    envoy_http_archive(
+        "com_envoyproxy_protoc_gen_validate",
+        locations = REPOSITORY_LOCATIONS,
     )
-
-    native.new_http_archive(
+    envoy_http_archive(
+        name = "com_google_googleapis",
+        locations = REPOSITORY_LOCATIONS,
+    )
+    envoy_http_archive(
         name = "com_github_gogo_protobuf",
-        strip_prefix = "protobuf-" + GOGOPROTO_SHA,
-        url = "https://github.com/gogo/protobuf/archive/" + GOGOPROTO_SHA + ".tar.gz",
-        build_file_content = """
+        locations = REPOSITORY_LOCATIONS,
+        build_file_content = GOGOPROTO_BUILD_CONTENT,
+    )
+    envoy_http_archive(
+        name = "prometheus_metrics_model",
+        locations = REPOSITORY_LOCATIONS,
+        build_file_content = PROMETHEUSMETRICS_BUILD_CONTENT,
+    )
+    envoy_http_archive(
+        name = "opencensus_proto",
+        locations = REPOSITORY_LOCATIONS,
+    )
+    envoy_http_archive(
+        name = "kafka_source",
+        locations = REPOSITORY_LOCATIONS,
+        build_file_content = KAFKASOURCE_BUILD_CONTENT,
+    )
+
+GOGOPROTO_BUILD_CONTENT = """
 load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library", "py_proto_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
 
@@ -235,14 +88,9 @@ py_proto_library(
     visibility = ["//visibility:public"],
     deps = ["@com_google_protobuf//:protobuf_python"],
 )
-        """,
-    )
+"""
 
-    native.new_http_archive(
-        name = "prometheus_metrics_model",
-        strip_prefix = "client_model-" + PROMETHEUS_SHA,
-        url = "https://github.com/prometheus/client_model/archive/" + PROMETHEUS_SHA + ".tar.gz",
-        build_file_content = """
+PROMETHEUSMETRICS_BUILD_CONTENT = """
 load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
 
@@ -260,14 +108,9 @@ go_proto_library(
     proto = ":client_model",
     visibility = ["//visibility:public"],
 )
-        """,
-    )
+"""
 
-    native.new_http_archive(
-        name = "io_opencensus_trace",
-        strip_prefix = "opencensus-proto-" + OPENCENSUS_SHA + "/opencensus/proto/trace",
-        url = "https://github.com/census-instrumentation/opencensus-proto/archive/" + OPENCENSUS_SHA + ".tar.gz",
-        build_file_content = """
+OPENCENSUSTRACE_BUILD_CONTENT = """
 load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
 
@@ -285,5 +128,24 @@ go_proto_library(
     proto = ":trace_model",
     visibility = ["//visibility:public"],
 )
-        """,
-    )
+"""
+
+KAFKASOURCE_BUILD_CONTENT = """
+
+filegroup(
+    name = "request_protocol_files",
+    srcs = glob([
+        "*Request.json",
+    ]),
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "response_protocol_files",
+    srcs = glob([
+        "*Response.json",
+    ]),
+    visibility = ["//visibility:public"],
+)
+
+"""

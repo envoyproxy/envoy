@@ -17,7 +17,7 @@ namespace Network {
  */
 class ConnectionHandler {
 public:
-  virtual ~ConnectionHandler() {}
+  virtual ~ConnectionHandler() = default;
 
   /**
    * @return uint64_t the number of active connections owned by the handler.
@@ -25,7 +25,7 @@ public:
   virtual uint64_t numConnections() PURE;
 
   /**
-   * Adds listener to the handler.
+   * Adds a listener to the handler.
    * @param config listener configuration options.
    */
   virtual void addListener(ListenerConfig& config) PURE;
@@ -56,9 +56,21 @@ public:
    * Stop all listeners. This will not close any connections and is used for draining.
    */
   virtual void stopListeners() PURE;
+
+  /**
+   * Disable all listeners. This will not close any connections and is used to temporarily
+   * stop accepting connections on all listeners.
+   */
+  virtual void disableListeners() PURE;
+
+  /**
+   * Enable all listeners. This is used to re-enable accepting connections on all listeners
+   * after they have been temporarily disabled.
+   */
+  virtual void enableListeners() PURE;
 };
 
-typedef std::unique_ptr<ConnectionHandler> ConnectionHandlerPtr;
+using ConnectionHandlerPtr = std::unique_ptr<ConnectionHandler>;
 
 } // namespace Network
 } // namespace Envoy

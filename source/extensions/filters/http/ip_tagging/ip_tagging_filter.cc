@@ -12,7 +12,7 @@ namespace IpTagging {
 
 IpTaggingFilter::IpTaggingFilter(IpTaggingFilterConfigSharedPtr config) : config_(config) {}
 
-IpTaggingFilter::~IpTaggingFilter() {}
+IpTaggingFilter::~IpTaggingFilter() = default;
 
 void IpTaggingFilter::onDestroy() {}
 
@@ -28,7 +28,7 @@ Http::FilterHeadersStatus IpTaggingFilter::decodeHeaders(Http::HeaderMap& header
   }
 
   std::vector<std::string> tags =
-      config_->trie().getData(callbacks_->requestInfo().downstreamRemoteAddress());
+      config_->trie().getData(callbacks_->streamInfo().downstreamRemoteAddress());
 
   if (!tags.empty()) {
     const std::string tags_join = absl::StrJoin(tags, ",");

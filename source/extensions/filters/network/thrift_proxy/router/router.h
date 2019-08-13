@@ -3,6 +3,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/router/router.h"
+
 #include "extensions/filters/network/thrift_proxy/metadata.h"
 
 namespace Envoy {
@@ -11,17 +13,30 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 namespace Router {
 
+class RateLimitPolicy;
+
 /**
  * RouteEntry is an individual resolved route entry.
  */
 class RouteEntry {
 public:
-  virtual ~RouteEntry() {}
+  virtual ~RouteEntry() = default;
 
   /**
    * @return const std::string& the upstream cluster that owns the route.
    */
   virtual const std::string& clusterName() const PURE;
+
+  /**
+   * @return MetadataMatchCriteria* the metadata that a subset load balancer should match when
+   * selecting an upstream host
+   */
+  virtual const Envoy::Router::MetadataMatchCriteria* metadataMatchCriteria() const PURE;
+
+  /**
+   * @return const RateLimitPolicy& the rate limit policy for the route.
+   */
+  virtual const RateLimitPolicy& rateLimitPolicy() const PURE;
 };
 
 /**
@@ -29,7 +44,7 @@ public:
  */
 class Route {
 public:
-  virtual ~Route() {}
+  virtual ~Route() = default;
 
   /**
    * @return the route entry or nullptr if there is no matching route for the request.
@@ -37,25 +52,27 @@ public:
   virtual const RouteEntry* routeEntry() const PURE;
 };
 
-typedef std::shared_ptr<const Route> RouteConstSharedPtr;
+using RouteConstSharedPtr = std::shared_ptr<const Route>;
 
 /**
  * The router configuration.
  */
 class Config {
 public:
-  virtual ~Config() {}
+  virtual ~Config() = default;
 
   /**
    * Based on the incoming Thrift request transport and/or protocol data, determine the target
    * route for the request.
    * @param metadata MessageMetadata for the message to route
+   * @param random_value uint64_t used to select cluster affinity
    * @return the route or nullptr if there is no matching route for the request.
    */
-  virtual RouteConstSharedPtr route(const MessageMetadata& metadata) const PURE;
+  virtual RouteConstSharedPtr route(const MessageMetadata& metadata,
+                                    uint64_t random_value) const PURE;
 };
 
-typedef std::shared_ptr<const Config> ConfigConstSharedPtr;
+using ConfigConstSharedPtr = std::shared_ptr<const Config>;
 
 } // namespace Router
 } // namespace ThriftProxy

@@ -17,14 +17,15 @@ using testing::AssertionResult;
 namespace Envoy {
 namespace {
 
-class AccessLogIntegrationTest : public HttpIntegrationTest,
-                                 public Grpc::GrpcClientIntegrationParamTest {
+class AccessLogIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
+                                 public HttpIntegrationTest {
 public:
   AccessLogIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_));
+    fake_upstreams_.emplace_back(
+        new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
   }
 
   void initialize() override {
@@ -46,7 +47,7 @@ public:
           common_config->set_log_name("foo");
           setGrpcService(*common_config->mutable_grpc_service(), "accesslog",
                          fake_upstreams_.back()->localAddress());
-          MessageUtil::jsonConvert(config, *access_log->mutable_config());
+          TestUtility::jsonConvert(config, *access_log->mutable_config());
         });
 
     HttpIntegrationTest::initialize();
@@ -66,13 +67,14 @@ public:
   AssertionResult waitForAccessLogRequest(const std::string& expected_request_msg_yaml) {
     envoy::service::accesslog::v2::StreamAccessLogsMessage request_msg;
     VERIFY_ASSERTION(access_log_request_->waitForGrpcMessage(*dispatcher_, request_msg));
-    EXPECT_STREQ("POST", access_log_request_->headers().Method()->value().c_str());
-    EXPECT_STREQ("/envoy.service.accesslog.v2.AccessLogService/StreamAccessLogs",
-                 access_log_request_->headers().Path()->value().c_str());
-    EXPECT_STREQ("application/grpc", access_log_request_->headers().ContentType()->value().c_str());
+    EXPECT_EQ("POST", access_log_request_->headers().Method()->value().getStringView());
+    EXPECT_EQ("/envoy.service.accesslog.v2.AccessLogService/StreamAccessLogs",
+              access_log_request_->headers().Path()->value().getStringView());
+    EXPECT_EQ("application/grpc",
+              access_log_request_->headers().ContentType()->value().getStringView());
 
     envoy::service::accesslog::v2::StreamAccessLogsMessage expected_request_msg;
-    MessageUtil::loadFromYaml(expected_request_msg_yaml, expected_request_msg);
+    TestUtility::loadFromYaml(expected_request_msg_yaml, expected_request_msg);
 
     // Clear fields which are not deterministic.
     auto* log_entry = request_msg.mutable_http_logs()->mutable_log_entry(0);
@@ -101,8 +103,8 @@ public:
   FakeStreamPtr access_log_request_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersionsCientType, AccessLogIntegrationTest,
-                        GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsCientType, AccessLogIntegrationTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Test a basic full access logging flow.
 TEST_P(AccessLogIntegrationTest, BasicAccessLogFlow) {
@@ -132,6 +134,7 @@ http_logs:
     response:
       response_code:
         value: 404
+      response_code_details: "route_not_found"
       response_headers_bytes: 54
 )EOF",
                                                   VersionInfo::version())));
@@ -139,7 +142,7 @@ http_logs:
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "GET", "/notfound", "", downstream_protocol_, version_);
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("404", response->headers().Status()->value().c_str());
+  EXPECT_EQ("404", response->headers().Status()->value().getStringView());
   ASSERT_TRUE(waitForAccessLogRequest(R"EOF(
 http_logs:
   log_entry:
@@ -155,6 +158,7 @@ http_logs:
     response:
       response_code:
         value: 404
+      response_code_details: "route_not_found"
       response_headers_bytes: 54
 )EOF"));
 
@@ -177,7 +181,7 @@ http_logs:
   response = IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", "/notfound", "",
                                                 downstream_protocol_, version_);
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("404", response->headers().Status()->value().c_str());
+  EXPECT_EQ("404", response->headers().Status()->value().getStringView());
   ASSERT_TRUE(waitForAccessLogStream());
   ASSERT_TRUE(waitForAccessLogRequest(fmt::format(R"EOF(
 identifier:
@@ -202,6 +206,7 @@ http_logs:
     response:
       response_code:
         value: 404
+      response_code_details: "route_not_found"
       response_headers_bytes: 54
 )EOF",
                                                   VersionInfo::version())));

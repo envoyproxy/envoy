@@ -1,0 +1,191 @@
+static_resources {
+  listeners {
+    name: "$"
+    address {
+      pipe {
+        path: "."
+      }
+    }
+    filter_chains {
+    }
+  }
+  listeners {
+    address {
+      pipe {
+        path: "="
+      }
+    }
+    filter_chains {
+    }
+  }
+  listeners {
+    name: "\000$&$`%n&#000;NaN0"
+    address {
+      socket_address {
+        address: "0.0.1.0"
+        port_value: 32768
+        resolver_name: "@q"
+      }
+    }
+  }
+  listeners {
+    address {
+      pipe {
+        path: "="
+      }
+    }
+    filter_chains {
+      use_proxy_proto {
+        value: true
+      }
+    }
+  }
+  listeners {
+    address {
+      pipe {
+        path: "="
+      }
+    }
+    filter_chains {
+      use_proxy_proto {
+        value: true
+      }
+    }
+    listener_filters_timeout {
+    }
+  }
+  listeners {
+    name: "@"
+    address {
+      socket_address {
+        address: "2147483648.0.1.0"
+        named_port: "L"
+      }
+    }
+    filter_chains {
+    }
+  }
+  listeners {
+    name: "$"
+    address {
+      pipe {
+        path: "."
+      }
+    }
+    filter_chains {
+    }
+  }
+  listeners {
+    name: "@"
+    address {
+      socket_address {
+        address: "0.0.1.0"
+        port_value: 32768
+      }
+    }
+    filter_chains {
+    }
+  }
+  listeners {
+    name: "\000$&$`%n&#000;NaN0"
+    address {
+      pipe {
+        path: "1"
+      }
+    }
+    filter_chains {
+      use_proxy_proto {
+        value: true
+      }
+    }
+    use_original_dst {
+    }
+  }
+  listeners {
+    address {
+      pipe {
+        path: "="
+      }
+    }
+    filter_chains {
+      use_proxy_proto {
+        value: true
+      }
+    }
+  }
+  listeners {
+    name: "@"
+    address {
+      socket_address {
+        address: "@"
+        port_value: 32768
+      }
+    }
+    filter_chains {
+    }
+  }
+  listeners {
+    address {
+      pipe {
+        path: "="
+      }
+    }
+    filter_chains {
+      use_proxy_proto {
+        value: true
+      }
+    }
+    use_original_dst {
+    }
+  }
+  listeners {
+    name: "\000$&$`%n&#000;NaN0"
+    address {
+      pipe {
+        path: "@"
+      }
+    }
+    filter_chains {
+      use_proxy_proto {
+      }
+    }
+    use_original_dst {
+    }
+  }
+  listeners {
+    name: "@"
+    address {
+      socket_address {
+        address: "0.0.1.0"
+        port_value: 32768
+      }
+    }
+    filter_chains {
+    }
+  }
+  listeners {
+    address {
+      pipe {
+        path: "="
+      }
+    }
+    filter_chains {
+      use_proxy_proto {
+        value: true
+      }
+    }
+  }
+}
+admin {
+  access_log_path: "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+  address {
+    pipe {
+      path: "$"
+    }
+  }
+}
+layered_runtime {
+  layers {
+    name: "preserveExt"
+  }
+}

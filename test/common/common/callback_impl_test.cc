@@ -1,6 +1,7 @@
 #include "common/common/callback_impl.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::InSequence;
 

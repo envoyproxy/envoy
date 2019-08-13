@@ -1,4 +1,4 @@
-#include "envoy/config/filter/http/ext_authz/v2alpha/ext_authz.pb.validate.h"
+#include "envoy/config/filter/http/ext_authz/v2/ext_authz.pb.validate.h"
 #include "envoy/stats/scope.h"
 
 #include "extensions/filters/http/ext_authz/config.h"
@@ -15,6 +15,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace ExtAuthz {
+namespace {
 
 TEST(HttpExtAuthzConfigTest, CorrectProtoGrpc) {
   std::string yaml = R"EOF(
@@ -27,11 +28,11 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoGrpc) {
 
   ExtAuthzFilterConfig factory;
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
-  MessageUtil::loadFromYaml(yaml, *proto_config);
+  TestUtility::loadFromYaml(yaml, *proto_config);
 
   testing::StrictMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_CALL(context, localInfo()).Times(1);
-  EXPECT_CALL(context, clusterManager()).Times(2);
+  EXPECT_CALL(context, clusterManager()).Times(1);
   EXPECT_CALL(context, runtime()).Times(1);
   EXPECT_CALL(context, scope()).Times(2);
   EXPECT_CALL(context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
@@ -51,17 +52,38 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
       uri: "ext_authz:9000"
       cluster: "ext_authz"
       timeout: 0.25s
-    path_prefix: "/test"
-    allowed_authorization_headers:
-      - foo_header_key
-    allowed_request_headers:
-      - bar_header_key
+   
+    authorization_request: 
+      allowed_headers: 
+        patterns: 
+        - exact: baz
+        - prefix: x-
+      headers_to_add:
+      - key: foo
+        value: bar
+      - key: bar
+        value: foo
+    
+    authorization_response: 
+      allowed_upstream_headers: 
+        patterns: 
+        - exact: baz
+        - prefix: x-success
+      allowed_client_headers: 
+        patterns: 
+        - exact: baz
+        - prefix: x-fail
+
+    path_prefix: /extauth
+    
   failure_mode_allow: true
+  with_request_body:
+    max_request_bytes: 100
   )EOF";
 
   ExtAuthzFilterConfig factory;
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
-  MessageUtil::loadFromYaml(yaml, *proto_config);
+  TestUtility::loadFromYaml(yaml, *proto_config);
   testing::StrictMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_CALL(context, localInfo()).Times(1);
   EXPECT_CALL(context, clusterManager()).Times(1);
@@ -73,6 +95,7 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
   cb(filter_callback);
 }
 
+} // namespace
 } // namespace ExtAuthz
 } // namespace HttpFilters
 } // namespace Extensions

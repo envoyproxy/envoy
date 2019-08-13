@@ -18,6 +18,7 @@ namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
 namespace HttpGrpc {
+namespace {
 
 class HttpGrpcAccessLogConfigTest : public testing::Test {
 public:
@@ -38,7 +39,7 @@ public:
     auto* common_config = http_grpc_access_log_.mutable_common_config();
     common_config->set_log_name("foo");
     common_config->mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("bar");
-    MessageUtil::jsonConvert(http_grpc_access_log_, *message_);
+    TestUtility::jsonConvert(http_grpc_access_log_, *message_);
   }
 
   AccessLog::FilterPtr filter_;
@@ -56,6 +57,7 @@ TEST_F(HttpGrpcAccessLogConfigTest, Ok) {
   EXPECT_NE(nullptr, dynamic_cast<HttpGrpcAccessLog*>(instance.get()));
 }
 
+} // namespace
 } // namespace HttpGrpc
 } // namespace AccessLoggers
 } // namespace Extensions

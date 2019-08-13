@@ -13,6 +13,8 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
+#include "extensions/filters/common/ratelimit/ratelimit.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -21,16 +23,14 @@ namespace RateLimitFilter {
 /**
  * All tcp rate limit stats. @see stats_macros.h
  */
-// clang-format off
 #define ALL_TCP_RATE_LIMIT_STATS(COUNTER, GAUGE)                                                   \
-  COUNTER(total)                                                                                   \
-  COUNTER(error)                                                                                   \
-  COUNTER(over_limit)                                                                              \
-  COUNTER(ok)                                                                                      \
-  COUNTER(failure_mode_allowed)                                                                    \
   COUNTER(cx_closed)                                                                               \
-  GAUGE  (active)
-// clang-format on
+  COUNTER(error)                                                                                   \
+  COUNTER(failure_mode_allowed)                                                                    \
+  COUNTER(ok)                                                                                      \
+  COUNTER(over_limit)                                                                              \
+  COUNTER(total)                                                                                   \
+  GAUGE(active, Accumulate)
 
 /**
  * Struct definition for all tcp rate limit stats. @see stats_macros.h
@@ -62,7 +62,7 @@ private:
   const bool failure_mode_deny_;
 };
 
-typedef std::shared_ptr<Config> ConfigSharedPtr;
+using ConfigSharedPtr = std::shared_ptr<Config>;
 
 /**
  * TCP rate limit filter instance. This filter will call the rate limit service with the given
@@ -72,9 +72,9 @@ typedef std::shared_ptr<Config> ConfigSharedPtr;
  */
 class Filter : public Network::ReadFilter,
                public Network::ConnectionCallbacks,
-               public RateLimit::RequestCallbacks {
+               public Filters::Common::RateLimit::RequestCallbacks {
 public:
-  Filter(ConfigSharedPtr config, RateLimit::ClientPtr&& client)
+  Filter(ConfigSharedPtr config, Filters::Common::RateLimit::ClientPtr&& client)
       : config_(config), client_(std::move(client)) {}
 
   // Network::ReadFilter
@@ -91,13 +91,14 @@ public:
   void onBelowWriteBufferLowWatermark() override {}
 
   // RateLimit::RequestCallbacks
-  void complete(RateLimit::LimitStatus status, Http::HeaderMapPtr&& headers) override;
+  void complete(Filters::Common::RateLimit::LimitStatus status,
+                Http::HeaderMapPtr&& headers) override;
 
 private:
   enum class Status { NotStarted, Calling, Complete };
 
   ConfigSharedPtr config_;
-  RateLimit::ClientPtr client_;
+  Filters::Common::RateLimit::ClientPtr client_;
   Network::ReadFilterCallbacks* filter_callbacks_{};
   Status status_{Status::NotStarted};
   bool calling_limit_{};

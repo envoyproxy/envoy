@@ -1,16 +1,10 @@
 #include "test/mocks/common.h"
 
 namespace Envoy {
-ReadyWatcher::ReadyWatcher() {}
-ReadyWatcher::~ReadyWatcher() {}
+ReadyWatcher::ReadyWatcher() = default;
+ReadyWatcher::~ReadyWatcher() = default;
 
-MockTimeSource::MockTimeSource() {}
-MockTimeSource::~MockTimeSource() {}
-
-MockTimeSystem::MockTimeSystem() {}
-MockTimeSystem::~MockTimeSystem() {}
-
-MockTokenBucket::MockTokenBucket() {}
-MockTokenBucket::~MockTokenBucket() {}
+MockTimeSystem::MockTimeSystem() = default;
+MockTimeSystem::~MockTimeSystem() = default;
 
 } // namespace Envoy

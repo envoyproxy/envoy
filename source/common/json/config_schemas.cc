@@ -139,7 +139,6 @@ const std::string Json::Schema::LISTENER_SCHEMA(R"EOF(
           "cert_chain_file" : {"type" : "string"},
           "private_key_file": {"type" : "string"},
           "alpn_protocols" : {"type" : "string"},
-          "alt_alpn_protocols": {"type" : "string"},
           "ca_cert_file" : {"type" : "string"},
           "require_client_certificate" : {"type" : "boolean"},
           "verify_certificate_hash" : {"type" : "string"},
@@ -165,7 +164,6 @@ const std::string Json::Schema::LISTENER_SCHEMA(R"EOF(
       "filters" : {
         "type" : "object",
         "properties" : {
-          "type": {"type" : "string", "enum" : ["read", "write", "both"] },
           "name" : {
             "type": "string"
           },
@@ -241,7 +239,7 @@ const std::string Json::Schema::RDS_CONFIGURATION_SCHEMA(R"EOF(
       },
       "api_type" : {
         "type" : "string",
-        "enum" : ["REST_LEGACY", "REST", "GRPC"]
+        "enum" : ["REST", "GRPC"]
       }
     },
     "required" : ["cluster", "route_config_name"],
@@ -272,10 +270,6 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
       "filters" : {
         "type" : "object",
         "properties" : {
-          "type": {
-            "type" : "string",
-            "enum" : ["encoder", "decoder", "both"]
-          },
           "name" : {"type": "string"},
           "config": {"type" : "object"}
         },
@@ -358,7 +352,8 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
               "enum" : ["Subject", "SAN"]
           }
       },
-      "generate_request_id" : {"type" : "boolean"}
+      "generate_request_id" : {"type" : "boolean"},
+      "preserve_external_request_id" : {"type" : "boolean"}
     },
     "required" : ["codec_type", "stat_prefix", "filters"],
     "additionalProperties" : false
@@ -677,7 +672,6 @@ const std::string Json::Schema::ROUTE_ENTRY_CONFIGURATION_SCHEMA(R"EOF(
       "prefix_rewrite" : {"type" : "string"},
       "host_rewrite" : {"type" : "string"},
       "auto_host_rewrite" : {"type" : "boolean"},
-      "use_websocket" : {"type" : "boolean"},
       "case_sensitive" : {"type" : "boolean"},
       "timeout_ms" : {"type" : "integer"},
       "runtime" : {
@@ -940,10 +934,9 @@ const std::string Json::Schema::BUFFER_HTTP_FILTER_SCHEMA(R"EOF(
     "$schema": "http://json-schema.org/schema#",
     "type" : "object",
     "properties" : {
-      "max_request_bytes" : {"type" : "integer"},
-      "max_request_time_s" : {"type" : "integer"}
+      "max_request_bytes" : {"type" : "integer"}
     },
-    "required" : ["max_request_bytes", "max_request_time_s"],
+    "required" : ["max_request_bytes"],
     "additionalProperties" : false
   }
   )EOF");
@@ -1131,97 +1124,6 @@ const std::string Json::Schema::ROUTER_HTTP_FILTER_SCHEMA(R"EOF(
       "dynamic_stats" : {"type" : "boolean"},
       "start_child_span" : {"type" : "boolean"}
     },
-    "additionalProperties" : false
-  }
-  )EOF");
-
-const std::string Json::Schema::CLUSTER_MANAGER_SCHEMA(R"EOF(
-  {
-    "$schema": "http://json-schema.org/schema#",
-    "definitions" : {
-      "sds" : {
-        "type" : "object",
-        "properties" : {
-          "cluster" : {"type" : "object"},
-          "refresh_delay_ms" : {
-            "type" : "integer",
-            "minimum" : 0,
-            "exclusiveMinimum" : true
-          }
-        },
-        "required" : ["cluster", "refresh_delay_ms"],
-        "additionalProperties" : false
-      },
-      "cds" : {
-        "type" : "object",
-        "properties" : {
-          "cluster" : {"type" : "object"},
-          "refresh_delay_ms" : {
-            "type" : "integer",
-            "minimum" : 0,
-            "exclusiveMinimum" : true
-          },
-          "api_type" : {
-            "type" : "string",
-            "enum" : ["REST_LEGACY", "REST", "GRPC"]
-          }
-        },
-        "required" : ["cluster"],
-        "additionalProperties" : false
-      }
-    },
-    "type" : "object",
-    "properties" : {
-      "clusters" : {
-        "type" : "array",
-        "items" : {"type": "object"}
-      },
-      "sds" : {"$ref" : "#/definitions/sds"},
-      "local_cluster_name" : {"type" : "string"},
-      "outlier_detection" : {
-        "type" : "object",
-        "properties" : {
-          "event_log_path" : {"type" : "string"}
-        },
-        "additionalProperties" : false
-      },
-      "cds" : {"$ref" : "#/definitions/cds"}
-    },
-    "required" : ["clusters"],
-    "additionalProperties" : false
-  }
-  )EOF");
-
-const std::string Json::Schema::LDS_SCHEMA(R"EOF(
-  {
-    "$schema": "http://json-schema.org/schema#",
-    "type" : "object",
-    "properties" : {
-      "listeners" : {
-        "type" : "array",
-        "items" : {"type" : "object"}
-      }
-    },
-    "required" : ["listeners"],
-    "additionalProperties" : false
-  }
-  )EOF");
-
-const std::string Json::Schema::LDS_CONFIG_SCHEMA(R"EOF(
-  {
-    "$schema": "http://json-schema.org/schema#",
-    "type" : "object",
-    "properties" : {
-      "cluster" : {
-        "type" : "string"
-      },
-      "refresh_delay_ms" : {
-        "type" : "integer",
-        "minimum" : 0,
-        "exclusiveMinimum" : true
-      }
-    },
-    "required" : ["cluster"],
     "additionalProperties" : false
   }
   )EOF");
@@ -1477,9 +1379,6 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
           "minimum_ring_size" : {
             "type" : "integer",
             "minimum" : 0
-          },
-          "use_std_hash" : {
-            "type" : "boolean"
           }
         }
       },
@@ -1625,57 +1524,6 @@ const std::string Json::Schema::CLUSTER_SCHEMA(R"EOF(
     },
     "required" : ["name", "type", "connect_timeout_ms", "lb_type"],
     "additionalProperties" : false
-  }
-  )EOF");
-
-const std::string Json::Schema::CDS_SCHEMA(R"EOF(
-  {
-    "$schema": "http://json-schema.org/schema#",
-    "type" : "object",
-    "properties" : {
-      "clusters" : {
-        "type" : "array",
-        "items" : {"type" : "object"}
-      }
-    },
-    "required" : ["clusters"],
-    "additionalProperties" : false
-  }
-  )EOF");
-
-const std::string Json::Schema::SDS_SCHEMA(R"EOF(
-  {
-    "$schema": "http://json-schema.org/schema#",
-    "definitions" : {
-      "host" : {
-        "type" : "object",
-        "properties" : {
-          "ip_address" : {"type" : "string"},
-          "port" : {"type" : "integer"},
-          "tags" : {
-            "type" : "object",
-            "properties" : {
-              "az" : {"type" : "string"},
-              "canary" : {"type" : "boolean"},
-              "load_balancing_weight": {
-                "type" : "integer",
-                "minimum" : 1,
-                "maximum" : 100
-              }
-            }
-          }
-        },
-        "required" : ["ip_address", "port"]
-      }
-    },
-    "type" : "object",
-    "properties" : {
-      "hosts" : {
-        "type" : "array",
-        "items" : {"$ref" : "#/definitions/host"}
-      }
-    },
-    "required" : ["hosts"]
   }
   )EOF");
 } // namespace Envoy

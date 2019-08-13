@@ -88,6 +88,11 @@ public:
     return value_.string_value_;
   }
 
+  const std::string& asSymbol() const override {
+    checkType(Type::SYMBOL);
+    return value_.string_value_;
+  }
+
   const Document& asDocument() const override {
     checkType(Type::DOCUMENT);
     return *value_.document_value_;
@@ -194,6 +199,11 @@ public:
     return shared_from_this();
   }
 
+  DocumentSharedPtr addSymbol(const std::string& key, std::string&& value) override {
+    fields_.emplace_back(new FieldImpl(Field::Type::SYMBOL, key, std::move(value)));
+    return shared_from_this();
+  }
+
   DocumentSharedPtr addDocument(const std::string& key, DocumentSharedPtr value) override {
     fields_.emplace_back(new FieldImpl(Field::Type::DOCUMENT, key, value));
     return shared_from_this();
@@ -258,7 +268,7 @@ public:
   const std::list<FieldPtr>& values() const override { return fields_; }
 
 private:
-  DocumentImpl() {}
+  DocumentImpl() = default;
 
   void fromBuffer(Buffer::Instance& data);
 

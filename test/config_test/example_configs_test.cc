@@ -16,14 +16,13 @@ TEST(ExampleConfigsTest, All) {
   RELEASE_ASSERT(::chdir(directory.c_str()) == 0, "");
 
 #ifdef __APPLE__
-  // freebind/freebind.yaml is not supported on OS X and disabled via Bazel.
-  EXPECT_EQ(27UL, ConfigTest::run(directory));
+  // freebind/freebind.yaml is not supported on macOS and disabled via Bazel.
+  EXPECT_EQ(20UL, ConfigTest::run(directory));
 #else
-  EXPECT_EQ(28UL, ConfigTest::run(directory));
+  EXPECT_EQ(21UL, ConfigTest::run(directory));
 #endif
 
   ConfigTest::testMerge();
-  ConfigTest::testIncompatibleMerge();
 
   // Return to the original working directory, otherwise "bazel.coverage" breaks (...but why?).
   RELEASE_ASSERT(::chdir(cwd) == 0, "");

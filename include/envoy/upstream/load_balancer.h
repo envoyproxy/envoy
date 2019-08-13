@@ -5,17 +5,11 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/router/router.h"
+#include "envoy/upstream/types.h"
 #include "envoy/upstream/upstream.h"
 
 namespace Envoy {
 namespace Upstream {
-
-// Mapping from a priority to how much of the total traffic load should be directed to this
-// priority. For example, {50, 30, 20} means that 50% of traffic should go to P0, 30% to P1
-// and 20% to P2.
-//
-// This should either sum to 100 or consist of all zeros.
-typedef std::vector<uint32_t> PriorityLoad;
 
 /**
  * Context information passed to a load balancer to use when choosing a host. Not all load
@@ -23,7 +17,7 @@ typedef std::vector<uint32_t> PriorityLoad;
  */
 class LoadBalancerContext {
 public:
-  virtual ~LoadBalancerContext() {}
+  virtual ~LoadBalancerContext() = default;
 
   /**
    * Compute and return an optional hash key to use during load balancing. This
@@ -61,9 +55,9 @@ public:
    * @return a reference to the priority load data that should be used to select a priority.
    *
    */
-  virtual const PriorityLoad&
+  virtual const HealthyAndDegradedLoad&
   determinePriorityLoad(const PrioritySet& priority_set,
-                        const PriorityLoad& original_priority_load) PURE;
+                        const HealthyAndDegradedLoad& original_priority_load) PURE;
 
   /**
    * Called to determine whether we should reperform host selection. The load balancer
@@ -77,6 +71,11 @@ public:
    * ignored.
    */
   virtual uint32_t hostSelectionRetryCount() const PURE;
+
+  /**
+   * Returns the set of socket options which should be applied on upstream connections
+   */
+  virtual Network::Socket::OptionsSharedPtr upstreamSocketOptions() const PURE;
 };
 
 /**
@@ -84,7 +83,7 @@ public:
  */
 class LoadBalancer {
 public:
-  virtual ~LoadBalancer() {}
+  virtual ~LoadBalancer() = default;
 
   /**
    * Ask the load balancer for the next host to use depending on the underlying LB algorithm.
@@ -95,14 +94,14 @@ public:
   virtual HostConstSharedPtr chooseHost(LoadBalancerContext* context) PURE;
 };
 
-typedef std::unique_ptr<LoadBalancer> LoadBalancerPtr;
+using LoadBalancerPtr = std::unique_ptr<LoadBalancer>;
 
 /**
  * Factory for load balancers.
  */
 class LoadBalancerFactory {
 public:
-  virtual ~LoadBalancerFactory() {}
+  virtual ~LoadBalancerFactory() = default;
 
   /**
    * @return LoadBalancerPtr a new load balancer.
@@ -110,7 +109,7 @@ public:
   virtual LoadBalancerPtr create() PURE;
 };
 
-typedef std::shared_ptr<LoadBalancerFactory> LoadBalancerFactorySharedPtr;
+using LoadBalancerFactorySharedPtr = std::shared_ptr<LoadBalancerFactory>;
 
 /**
  * A thread aware load balancer is a load balancer that is global to all workers on behalf of a
@@ -140,7 +139,7 @@ typedef std::shared_ptr<LoadBalancerFactory> LoadBalancerFactorySharedPtr;
  */
 class ThreadAwareLoadBalancer {
 public:
-  virtual ~ThreadAwareLoadBalancer() {}
+  virtual ~ThreadAwareLoadBalancer() = default;
 
   /**
    * @return LoadBalancerFactorySharedPtr the shared factory to use for creating new worker local
@@ -157,7 +156,7 @@ public:
   virtual void initialize() PURE;
 };
 
-typedef std::unique_ptr<ThreadAwareLoadBalancer> ThreadAwareLoadBalancerPtr;
+using ThreadAwareLoadBalancerPtr = std::unique_ptr<ThreadAwareLoadBalancer>;
 
 } // namespace Upstream
 } // namespace Envoy

@@ -25,7 +25,7 @@ public:
   /**
    * Destructor.
    */
-  virtual ~Reporter() {}
+  virtual ~Reporter() = default;
 
   /**
    * Method that a concrete Reporter class must implement to handle finished spans.
@@ -36,7 +36,7 @@ public:
   virtual void reportSpan(const Span& span) PURE;
 };
 
-typedef std::unique_ptr<Reporter> ReporterPtr;
+using ReporterPtr = std::unique_ptr<Reporter>;
 
 /**
  * This class implements the Zipkin tracer. It has methods to create the appropriate Zipkin span
@@ -57,13 +57,14 @@ public:
    * in all annotations' endpoints of the spans created by the Tracer.
    * @param random_generator Reference to the random-number generator to be used by the Tracer.
    * @param trace_id_128bit Whether 128bit ids should be used.
+   * @param shared_span_context Whether shared span id should be used.
    */
   Tracer(const std::string& service_name, Network::Address::InstanceConstSharedPtr address,
          Runtime::RandomGenerator& random_generator, const bool trace_id_128bit,
-         TimeSource& time_source)
+         const bool shared_span_context, TimeSource& time_source)
       : service_name_(service_name), address_(address), reporter_(nullptr),
         random_generator_(random_generator), trace_id_128bit_(trace_id_128bit),
-        time_source_(time_source) {}
+        shared_span_context_(shared_span_context), time_source_(time_source) {}
 
   /**
    * Creates a "root" Zipkin span.
@@ -116,10 +117,11 @@ private:
   ReporterPtr reporter_;
   Runtime::RandomGenerator& random_generator_;
   const bool trace_id_128bit_;
+  const bool shared_span_context_;
   TimeSource& time_source_;
 };
 
-typedef std::unique_ptr<Tracer> TracerPtr;
+using TracerPtr = std::unique_ptr<Tracer>;
 
 } // namespace Zipkin
 } // namespace Tracers

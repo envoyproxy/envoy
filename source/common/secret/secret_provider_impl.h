@@ -14,12 +14,14 @@ class TlsCertificateConfigProviderImpl : public TlsCertificateConfigProvider {
 public:
   TlsCertificateConfigProviderImpl(const envoy::api::v2::auth::TlsCertificate& tls_certificate);
 
-  const Ssl::TlsCertificateConfig* secret() const override { return tls_certificate_.get(); }
+  const envoy::api::v2::auth::TlsCertificate* secret() const override {
+    return tls_certificate_.get();
+  }
 
   Common::CallbackHandle* addUpdateCallback(std::function<void()>) override { return nullptr; }
 
 private:
-  Ssl::TlsCertificateConfigPtr tls_certificate_;
+  Secret::TlsCertificatePtr tls_certificate_;
 };
 
 class CertificateValidationContextConfigProviderImpl
@@ -28,14 +30,14 @@ public:
   CertificateValidationContextConfigProviderImpl(
       const envoy::api::v2::auth::CertificateValidationContext& certificate_validation_context);
 
-  const Ssl::CertificateValidationContextConfig* secret() const override {
+  const envoy::api::v2::auth::CertificateValidationContext* secret() const override {
     return certificate_validation_context_.get();
   }
 
   Common::CallbackHandle* addUpdateCallback(std::function<void()>) override { return nullptr; }
 
 private:
-  Ssl::CertificateValidationContextConfigPtr certificate_validation_context_;
+  Secret::CertificateValidationContextPtr certificate_validation_context_;
 };
 
 } // namespace Secret

@@ -10,10 +10,11 @@
 
 #include "common/access_log/access_log_manager_impl.h"
 #include "common/common/assert.h"
+#include "common/grpc/common.h"
+#include "common/protobuf/message_validator_impl.h"
 #include "common/router/rds_impl.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/secret/secret_manager_impl.h"
-#include "common/ssl/context_manager_impl.h"
 #include "common/thread_local/thread_local_impl.h"
 
 #include "server/config_validation/admin.h"
@@ -33,8 +34,9 @@ namespace Server {
  * validateConfig() takes over from main() for a config-validation run of Envoy. It returns true if
  * the config is valid, false if invalid.
  */
-bool validateConfig(Options& options, Network::Address::InstanceConstSharedPtr local_address,
-                    ComponentFactory& component_factory);
+bool validateConfig(const Options& options, Network::Address::InstanceConstSharedPtr local_address,
+                    ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory,
+                    Filesystem::Instance& file_system);
 
 /**
  * ValidationInstance does the bulk of the work for config-validation runs of Envoy. It implements
@@ -51,17 +53,19 @@ bool validateConfig(Options& options, Network::Address::InstanceConstSharedPtr l
 class ValidationInstance : Logger::Loggable<Logger::Id::main>,
                            public Instance,
                            public ListenerComponentFactory,
+                           public ServerLifecycleNotifier,
                            public WorkerFactory {
 public:
-  ValidationInstance(Options& options, Event::TimeSystem& time_system,
+  ValidationInstance(const Options& options, Event::TimeSystem& time_system,
                      Network::Address::InstanceConstSharedPtr local_address,
                      Stats::IsolatedStoreImpl& store, Thread::BasicLockable& access_log_lock,
-                     ComponentFactory& component_factory);
+                     ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory,
+                     Filesystem::Instance& file_system);
 
   // Server::Instance
   Admin& admin() override { return admin_; }
   Api::Api& api() override { return *api_; }
-  Upstream::ClusterManager& clusterManager() override { return *config_->clusterManager(); }
+  Upstream::ClusterManager& clusterManager() override { return *config_.clusterManager(); }
   Ssl::ContextManager& sslContextManager() override { return *ssl_context_manager_; }
   Event::Dispatcher& dispatcher() override { return *dispatcher_; }
   Network::DnsResolverSharedPtr dnsResolver() override {
@@ -71,39 +75,44 @@ public:
   DrainManager& drainManager() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   AccessLog::AccessLogManager& accessLogManager() override { return access_log_manager_; }
   void failHealthcheck(bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  void getParentStats(HotRestart::GetParentStatsInfo&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   HotRestart& hotRestart() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   Init::Manager& initManager() override { return init_manager_; }
-  ListenerManager& listenerManager() override { return listener_manager_; }
+  ServerLifecycleNotifier& lifecycleNotifier() override { return *this; }
+  ListenerManager& listenerManager() override { return *listener_manager_; }
   Secret::SecretManager& secretManager() override { return *secret_manager_; }
   Runtime::RandomGenerator& random() override { return random_generator_; }
-  RateLimit::ClientPtr
-  rateLimitClient(const absl::optional<std::chrono::milliseconds>& timeout) override {
-    return config_->rateLimitClientFactory().create(timeout);
-  }
   Runtime::Loader& runtime() override { return *runtime_loader_; }
   void shutdown() override;
+  bool isShutdown() override { return false; }
   void shutdownAdmin() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   Singleton::Manager& singletonManager() override { return *singleton_manager_; }
-  OverloadManager& overloadManager() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  OverloadManager& overloadManager() override { return *overload_manager_; }
   bool healthCheckFailed() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  Options& options() override { return options_; }
+  const Options& options() override { return options_; }
   time_t startTimeCurrentEpoch() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   time_t startTimeFirstEpoch() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   Stats::Store& stats() override { return stats_store_; }
-  Tracing::HttpTracer& httpTracer() override { return config_->httpTracer(); }
+  Grpc::Context& grpcContext() override { return grpc_context_; }
+  Http::Context& httpContext() override { return http_context_; }
+  ProcessContext& processContext() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
-  Event::TimeSystem& timeSource() override { return time_system_; }
+  TimeSource& timeSource() override { return api_->timeSource(); }
+  Envoy::MutexTracer* mutexTracer() override { return mutex_tracer_; }
 
   std::chrono::milliseconds statsFlushInterval() const override {
-    return config_->statsFlushInterval();
+    return config_.statsFlushInterval();
+  }
+
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
+    return options_.allowUnknownFields() ? ProtobufMessage::getStrictValidationVisitor()
+                                         : ProtobufMessage::getNullValidationVisitor();
   }
 
   // Server::ListenerComponentFactory
   LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config) override {
-    return std::make_unique<LdsApiImpl>(lds_config, clusterManager(), dispatcher(), random(),
-                                        initManager(), localInfo(), stats(), listenerManager());
+    return std::make_unique<LdsApiImpl>(lds_config, clusterManager(), initManager(), stats(),
+                                        listenerManager(), messageValidationVisitor());
   }
   std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
@@ -115,7 +124,13 @@ public:
       Configuration::ListenerFactoryContext& context) override {
     return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters, context);
   }
+  std::vector<Network::UdpListenerFilterFactoryCb> createUdpListenerFilterFactoryList(
+      const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
+      Configuration::ListenerFactoryContext& context) override {
+    return ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(filters, context);
+  }
   Network::SocketSharedPtr createListenSocket(Network::Address::InstanceConstSharedPtr,
+                                              Network::Address::SocketType,
                                               const Network::Socket::OptionsSharedPtr&,
                                               bool) override {
     // Returned sockets are not currently used so we can return nothing here safely vs. a
@@ -128,18 +143,36 @@ public:
   uint64_t nextListenerTag() override { return 0; }
 
   // Server::WorkerFactory
-  WorkerPtr createWorker() override {
+  WorkerPtr createWorker(OverloadManager&) override {
     // Returned workers are not currently used so we can return nothing here safely vs. a
     // validation mock.
     return nullptr;
   }
 
+  // ServerLifecycleNotifier
+  ServerLifecycleNotifier::HandlePtr registerCallback(Stage, StageCallback) override {
+    return nullptr;
+  }
+  ServerLifecycleNotifier::HandlePtr registerCallback(Stage, StageCallbackWithCompletion) override {
+    return nullptr;
+  }
+
 private:
-  void initialize(Options& options, Network::Address::InstanceConstSharedPtr local_address,
+  void initialize(const Options& options, Network::Address::InstanceConstSharedPtr local_address,
                   ComponentFactory& component_factory);
 
-  Options& options_;
-  Event::TimeSystem& time_system_;
+  // init_manager_ must come before any member that participates in initialization, and destructed
+  // only after referencing members are gone, since initialization continuation can potentially
+  // occur at any point during member lifetime.
+  Init::ManagerImpl init_manager_{"Validation server"};
+  Init::WatcherImpl init_watcher_{"(no-op)", []() {}};
+  // secret_manager_ must come before listener_manager_, config_ and dispatcher_, and destructed
+  // only after these members can no longer reference it, since:
+  // - There may be active filter chains referencing it in listener_manager_.
+  // - There may be active clusters referencing it in config_.cluster_manager_.
+  // - There may be active connections referencing it.
+  std::unique_ptr<Secret::SecretManager> secret_manager_;
+  const Options& options_;
   Stats::IsolatedStoreImpl& stats_store_;
   ThreadLocal::InstanceImpl thread_local_;
   Api::ApiPtr api_;
@@ -148,14 +181,17 @@ private:
   Singleton::ManagerPtr singleton_manager_;
   Runtime::LoaderPtr runtime_loader_;
   Runtime::RandomGeneratorImpl random_generator_;
-  std::unique_ptr<Ssl::ContextManagerImpl> ssl_context_manager_;
-  std::unique_ptr<Configuration::Main> config_;
+  std::unique_ptr<Ssl::ContextManager> ssl_context_manager_;
+  Configuration::MainImpl config_;
   LocalInfo::LocalInfoPtr local_info_;
   AccessLog::AccessLogManagerImpl access_log_manager_;
   std::unique_ptr<Upstream::ValidationClusterManagerFactory> cluster_manager_factory_;
-  InitManagerImpl init_manager_;
-  ListenerManagerImpl listener_manager_;
-  std::unique_ptr<Secret::SecretManager> secret_manager_;
+  std::unique_ptr<ListenerManagerImpl> listener_manager_;
+  std::unique_ptr<OverloadManager> overload_manager_;
+  MutexTracer* mutex_tracer_;
+  Grpc::ContextImpl grpc_context_;
+  Http::ContextImpl http_context_;
+  Event::TimeSystem& time_system_;
 };
 
 } // namespace Server

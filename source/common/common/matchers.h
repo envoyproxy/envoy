@@ -15,11 +15,11 @@ namespace Envoy {
 namespace Matchers {
 
 class ValueMatcher;
-typedef std::shared_ptr<const ValueMatcher> ValueMatcherConstSharedPtr;
+using ValueMatcherConstSharedPtr = std::shared_ptr<const ValueMatcher>;
 
 class ValueMatcher {
 public:
-  virtual ~ValueMatcher() {}
+  virtual ~ValueMatcher() = default;
 
   /**
    * Check whether the value is matched to the matcher.
@@ -78,7 +78,7 @@ public:
     }
   }
 
-  bool match(const std::string& value) const;
+  bool match(const absl::string_view value) const;
 
   bool match(const ProtobufWkt::Value& value) const override;
 
@@ -87,11 +87,27 @@ private:
   std::regex regex_;
 };
 
+class LowerCaseStringMatcher : public ValueMatcher {
+public:
+  LowerCaseStringMatcher(const envoy::type::matcher::StringMatcher& matcher)
+      : matcher_(toLowerCase(matcher)) {}
+
+  bool match(const absl::string_view value) const;
+
+  bool match(const ProtobufWkt::Value& value) const override;
+
+private:
+  envoy::type::matcher::StringMatcher
+  toLowerCase(const envoy::type::matcher::StringMatcher& matcher);
+
+  const StringMatcher matcher_;
+};
+
 class ListMatcher : public ValueMatcher {
 public:
   ListMatcher(const envoy::type::matcher::ListMatcher& matcher);
 
-  bool match(const ProtobufWkt::Value& value) const;
+  bool match(const ProtobufWkt::Value& value) const override;
 
 private:
   const envoy::type::matcher::ListMatcher matcher_;

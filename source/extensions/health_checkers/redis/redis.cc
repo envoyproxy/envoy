@@ -10,7 +10,7 @@ RedisHealthChecker::RedisHealthChecker(
     const envoy::config::health_checker::redis::v2::Redis& redis_config,
     Event::Dispatcher& dispatcher, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
     Upstream::HealthCheckEventLoggerPtr&& event_logger,
-    Extensions::NetworkFilters::RedisProxy::ConnPool::ClientFactory& client_factory)
+    Extensions::NetworkFilters::Common::Redis::Client::ClientFactory& client_factory)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger)),
       client_factory_(client_factory), key_(redis_config.key()) {
   if (!key_.empty()) {
@@ -25,6 +25,11 @@ RedisHealthChecker::RedisActiveHealthCheckSession::RedisActiveHealthCheckSession
     : ActiveHealthCheckSession(parent, host), parent_(parent) {}
 
 RedisHealthChecker::RedisActiveHealthCheckSession::~RedisActiveHealthCheckSession() {
+  ASSERT(current_request_ == nullptr);
+  ASSERT(client_ == nullptr);
+}
+
+void RedisHealthChecker::RedisActiveHealthCheckSession::onDeferredDelete() {
   if (current_request_) {
     current_request_->cancel();
     current_request_ = nullptr;
@@ -65,12 +70,12 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onInterval() {
 }
 
 void RedisHealthChecker::RedisActiveHealthCheckSession::onResponse(
-    Extensions::NetworkFilters::RedisProxy::RespValuePtr&& value) {
+    NetworkFilters::Common::Redis::RespValuePtr&& value) {
   current_request_ = nullptr;
 
   switch (parent_.type_) {
   case Type::Exists:
-    if (value->type() == Extensions::NetworkFilters::RedisProxy::RespType::Integer &&
+    if (value->type() == NetworkFilters::Common::Redis::RespType::Integer &&
         value->asInteger() == 0) {
       handleSuccess();
     } else {
@@ -78,7 +83,7 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onResponse(
     }
     break;
   case Type::Ping:
-    if (value->type() == Extensions::NetworkFilters::RedisProxy::RespType::SimpleString &&
+    if (value->type() == NetworkFilters::Common::Redis::RespType::SimpleString &&
         value->asString() == "PONG") {
       handleSuccess();
     } else {
@@ -99,6 +104,14 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onFailure() {
   handleFailure(envoy::data::core::v2alpha::HealthCheckFailureType::NETWORK);
 }
 
+bool RedisHealthChecker::RedisActiveHealthCheckSession::onRedirection(
+    const NetworkFilters::Common::Redis::RespValue&) {
+  // Treat any redirection error response from a Redis server as success.
+  current_request_ = nullptr;
+  handleSuccess();
+  return true;
+}
+
 void RedisHealthChecker::RedisActiveHealthCheckSession::onTimeout() {
   current_request_->cancel();
   current_request_ = nullptr;
@@ -106,20 +119,20 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onTimeout() {
 }
 
 RedisHealthChecker::HealthCheckRequest::HealthCheckRequest(const std::string& key) {
-  std::vector<Extensions::NetworkFilters::RedisProxy::RespValue> values(2);
-  values[0].type(Extensions::NetworkFilters::RedisProxy::RespType::BulkString);
+  std::vector<NetworkFilters::Common::Redis::RespValue> values(2);
+  values[0].type(NetworkFilters::Common::Redis::RespType::BulkString);
   values[0].asString() = "EXISTS";
-  values[1].type(Extensions::NetworkFilters::RedisProxy::RespType::BulkString);
+  values[1].type(NetworkFilters::Common::Redis::RespType::BulkString);
   values[1].asString() = key;
-  request_.type(Extensions::NetworkFilters::RedisProxy::RespType::Array);
+  request_.type(NetworkFilters::Common::Redis::RespType::Array);
   request_.asArray().swap(values);
 }
 
 RedisHealthChecker::HealthCheckRequest::HealthCheckRequest() {
-  std::vector<Extensions::NetworkFilters::RedisProxy::RespValue> values(1);
-  values[0].type(Extensions::NetworkFilters::RedisProxy::RespType::BulkString);
+  std::vector<NetworkFilters::Common::Redis::RespValue> values(1);
+  values[0].type(NetworkFilters::Common::Redis::RespType::BulkString);
   values[0].asString() = "PING";
-  request_.type(Extensions::NetworkFilters::RedisProxy::RespType::Array);
+  request_.type(NetworkFilters::Common::Redis::RespType::Array);
   request_.asArray().swap(values);
 }
 

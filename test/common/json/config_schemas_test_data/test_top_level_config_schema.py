@@ -2,17 +2,15 @@ from util import get_blob
 from util import true, false
 
 TOP_LEVEL_CONFIG_BLOB = {
-    "listeners": [
-        {
-            "address": "tcp://127.0.0.1:1234",
-            "filters": []
-        }
-    ],
+    "listeners": [{
+        "address": "tcp://127.0.0.1:1234",
+        "filters": []
+    }],
     "cluster_manager": {
         "clusters": []
     },
     "admin": {
-        "access_log_path": "/var/log/envoy/admin_access.log", 
+        "access_log_path": "/var/log/envoy/admin_access.log",
         "address": "tcp://0.0.0.0:9901"
     },
     "watchdog_miss_timeout_ms": 100,
@@ -34,19 +32,18 @@ TOP_LEVEL_CONFIG_BLOB = {
 
 
 def test(writer):
-    writer.write_test_file(
-        'Valid',
-        schema='TOP_LEVEL_CONFIG_SCHEMA',
-        data=get_blob(TOP_LEVEL_CONFIG_BLOB),
-        throws=False,
-    )
+  writer.write_test_file(
+      'Valid',
+      schema='TOP_LEVEL_CONFIG_SCHEMA',
+      data=get_blob(TOP_LEVEL_CONFIG_BLOB),
+      throws=False,
+  )
 
-    blob = get_blob(TOP_LEVEL_CONFIG_BLOB)
-    blob['tracing']['http']['driver']['type'] = 'unknown'
-    writer.write_test_file(
-        'UnsupportedTracingDriver',
-        schema='TOP_LEVEL_CONFIG_SCHEMA',
-        data=blob,
-        throws=True,
-    )
-
+  blob = get_blob(TOP_LEVEL_CONFIG_BLOB)
+  blob['tracing']['http']['driver']['type'] = 'unknown'
+  writer.write_test_file(
+      'UnsupportedTracingDriver',
+      schema='TOP_LEVEL_CONFIG_SCHEMA',
+      data=blob,
+      throws=True,
+  )

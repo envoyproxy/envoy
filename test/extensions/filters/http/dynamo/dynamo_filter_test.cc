@@ -25,6 +25,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Dynamo {
+namespace {
 
 class DynamoFilterTest : public testing::Test {
 public:
@@ -33,18 +34,20 @@ public:
         .WillByDefault(Return(enabled));
     EXPECT_CALL(loader_.snapshot_, featureEnabled("dynamodb.filter_enabled", 100));
 
-    filter_.reset(new DynamoFilter(loader_, stat_prefix_, stats_));
+    auto stats = std::make_shared<DynamoStats>(stats_, "prefix.");
+    filter_ = std::make_unique<DynamoFilter>(loader_, stats,
+                                             decoder_callbacks_.dispatcher().timeSource());
 
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
-  ~DynamoFilterTest() { filter_->onDestroy(); }
+  ~DynamoFilterTest() override { filter_->onDestroy(); }
 
+  NiceMock<Stats::MockStore> stats_;
   std::unique_ptr<DynamoFilter> filter_;
   NiceMock<Runtime::MockLoader> loader_;
   std::string stat_prefix_{"prefix."};
-  NiceMock<Stats::MockStore> stats_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
 };
@@ -56,6 +59,9 @@ TEST_F(DynamoFilterTest, operatorPresent) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, true));
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata_map));
 
   Http::TestHeaderMapImpl continue_headers{{":status", "100"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
@@ -791,6 +797,7 @@ TEST_F(DynamoFilterTest, PartitionIdStatsForSingleTableBatchOperation) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(empty_data, true));
 }
 
+} // namespace
 } // namespace Dynamo
 } // namespace HttpFilters
 } // namespace Extensions

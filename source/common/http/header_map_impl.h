@@ -61,6 +61,7 @@ public:
    * comparison (order matters).
    */
   bool operator==(const HeaderMapImpl& rhs) const;
+  bool operator!=(const HeaderMapImpl& rhs) const;
 
   // Http::HeaderMap
   void addReference(const LowerCaseString& key, const std::string& value) override;
@@ -79,6 +80,8 @@ public:
   void remove(const LowerCaseString& key) override;
   void removePrefix(const LowerCaseString& key) override;
   size_t size() const override { return headers_.size(); }
+  bool empty() const override { return headers_.empty(); }
+  void dumpState(std::ostream& os, int indent_level = 0) const override;
 
 protected:
   // For tests only, unoptimized, they aren't intended for regular HeaderMapImpl users.
@@ -93,7 +96,7 @@ protected:
     // HeaderEntry
     const HeaderString& key() const override { return key_; }
     void value(const char* value, uint32_t size) override;
-    void value(const std::string& value) override;
+    void value(absl::string_view value) override;
     void value(uint64_t value) override;
     void value(const HeaderEntry& header) override;
     const HeaderString& value() const override { return value_; }
@@ -109,24 +112,13 @@ protected:
     const LowerCaseString* key_;
   };
 
-  struct StaticLookupEntry {
-    typedef StaticLookupResponse (*EntryCb)(HeaderMapImpl&);
-
-    EntryCb cb_{};
-    std::array<std::unique_ptr<StaticLookupEntry>, 256> entries_;
-  };
+  using EntryCb = StaticLookupResponse (*)(HeaderMapImpl&);
 
   /**
    * This is the static lookup table that is used to determine whether a header is one of the O(1)
    * headers. This uses a trie for lookup time at most equal to the size of the incoming string.
    */
-  struct StaticLookupTable {
-    StaticLookupTable();
-    void add(const char* key, StaticLookupEntry::EntryCb cb);
-    StaticLookupEntry::EntryCb find(const char* key) const;
-
-    StaticLookupEntry root_;
-  };
+  struct StaticLookupTable; // Defined in header_map_impl.cc.
 
   struct AllInlineHeaders {
     ALL_INLINE_HEADERS(DEFINE_INLINE_HEADER_STRUCT)
@@ -138,7 +130,7 @@ protected:
    *
    * Note: the internal iterators held in fields make this unsafe to copy and move, since the
    * reference to end() is not preserved across a move (see Notes in
-   * https://en.cppreference.com/w/cpp/container/list/list). The NonCopyable will supress both copy
+   * https://en.cppreference.com/w/cpp/container/list/list). The NonCopyable will suppress both copy
    * and move constructors/assignment.
    * TODO(htuch): Maybe we want this to movable one day; for now, our header map moves happen on
    * HeaderMapPtr, so the performance impact should not be evident.
@@ -147,7 +139,9 @@ protected:
   public:
     HeaderList() : pseudo_headers_end_(headers_.end()) {}
 
-    template <class Key> bool isPseudoHeader(const Key& key) { return key.c_str()[0] == ':'; }
+    template <class Key> bool isPseudoHeader(const Key& key) {
+      return !key.getStringView().empty() && key.getStringView()[0] == ':';
+    }
 
     template <class Key, class... Value>
     std::list<HeaderEntryImpl>::iterator insert(Key&& key, Value&&... value) {
@@ -187,6 +181,7 @@ protected:
     std::list<HeaderEntryImpl>::const_reverse_iterator rbegin() const { return headers_.rbegin(); }
     std::list<HeaderEntryImpl>::const_reverse_iterator rend() const { return headers_.rend(); }
     size_t size() const { return headers_.size(); }
+    bool empty() const { return headers_.empty(); }
 
   private:
     std::list<HeaderEntryImpl> headers_;
@@ -197,7 +192,7 @@ protected:
   HeaderEntryImpl& maybeCreateInline(HeaderEntryImpl** entry, const LowerCaseString& key);
   HeaderEntryImpl& maybeCreateInline(HeaderEntryImpl** entry, const LowerCaseString& key,
                                      HeaderString&& value);
-  HeaderEntryImpl* getExistingInline(const char* key);
+  HeaderEntryImpl* getExistingInline(absl::string_view key);
 
   void removeInline(HeaderEntryImpl** entry);
 
@@ -207,7 +202,7 @@ protected:
   ALL_INLINE_HEADERS(DEFINE_INLINE_HEADER_FUNCS)
 };
 
-typedef std::unique_ptr<HeaderMapImpl> HeaderMapImplPtr;
+using HeaderMapImplPtr = std::unique_ptr<HeaderMapImpl>;
 
 } // namespace Http
 } // namespace Envoy

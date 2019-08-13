@@ -1,7 +1,6 @@
 #include "extensions/filters/http/router/config.h"
 
 #include "envoy/config/filter/http/router/v2/router.pb.validate.h"
-#include "envoy/registry/registry.h"
 
 #include "common/config/filter_json.h"
 #include "common/json/config_schemas.h"
@@ -37,9 +36,7 @@ RouterFilterConfig::createFilterFactory(const Json::Object& json_config,
 /**
  * Static registration for the router filter. @see RegisterFactory.
  */
-static Registry::RegisterFactory<RouterFilterConfig,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
-    register_;
+REGISTER_FACTORY(RouterFilterConfig, Server::Configuration::NamedHttpFilterConfigFactory);
 
 } // namespace RouterFilter
 } // namespace HttpFilters

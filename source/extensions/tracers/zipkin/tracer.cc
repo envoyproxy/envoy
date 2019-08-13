@@ -66,7 +66,7 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
 
   span_ptr->setName(span_name);
 
-  if (config.operationName() == Tracing::OperationName::Egress) {
+  if (config.operationName() == Tracing::OperationName::Egress || !shared_span_context_) {
     // We need to create a new span that is a child of the previous span; no shared context
 
     // Create a new span id

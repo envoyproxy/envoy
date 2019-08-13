@@ -17,6 +17,29 @@ namespace Http {
 class ConnectionManagerUtility {
 public:
   /**
+   * Determine the next protocol to used based both on ALPN as well as protocol inspection.
+   * @param connection supplies the connection to determine a protocol for.
+   * @param data supplies the currently available read data on the connection.
+   */
+  static std::string determineNextProtocol(Network::Connection& connection,
+                                           const Buffer::Instance& data);
+
+  /**
+   * Create an HTTP codec given the connection and the beginning of the incoming data.
+   * @param connection supplies the connection.
+   * @param data supplies the initial data supplied by the client.
+   * @param callbacks supplies the codec callbacks.
+   * @param scope supplies the stats scope for codec stats.
+   * @param http1_settings supplies the HTTP/1 settings to use if HTTP/1 is chosen.
+   * @param http2_settings supplies the HTTP/2 settings to use if HTTP/2 is chosen.
+   */
+  static ServerConnectionPtr
+  autoCreateCodec(Network::Connection& connection, const Buffer::Instance& data,
+                  ServerConnectionCallbacks& callbacks, Stats::Scope& scope,
+                  const Http1Settings& http1_settings, const Http2Settings& http2_settings,
+                  const uint32_t max_request_headers_kb);
+
+  /**
    * Mutates request headers in various ways. This functionality is broken out because of its
    * complexity for ease of testing. See the method itself for detailed comments on what
    * mutations are performed.
@@ -28,23 +51,27 @@ public:
    *         existence of the x-forwarded-for header. Again see the method for more details.
    */
   static Network::Address::InstanceConstSharedPtr
-  mutateRequestHeaders(Http::HeaderMap& request_headers, Network::Connection& connection,
+  mutateRequestHeaders(HeaderMap& request_headers, Network::Connection& connection,
                        ConnectionManagerConfig& config, const Router::Config& route_config,
-                       Runtime::RandomGenerator& random, Runtime::Loader& runtime,
-                       const LocalInfo::LocalInfo& local_info);
+                       Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info);
 
-  static void mutateResponseHeaders(Http::HeaderMap& response_headers,
-                                    const Http::HeaderMap* request_headers, const std::string& via);
+  static void mutateResponseHeaders(HeaderMap& response_headers, const HeaderMap* request_headers,
+                                    const std::string& via);
 
-private:
+  // Sanitize the path in the header map if forced by config.
+  // Side affect: the string view of Path header is invalidated.
+  // Return false if error happens during the sanitization.
+  static bool maybeNormalizePath(HeaderMap& request_headers, const ConnectionManagerConfig& config);
+
   /**
    * Mutate request headers if request needs to be traced.
    */
-  static void mutateTracingRequestHeader(Http::HeaderMap& request_headers, Runtime::Loader& runtime,
-                                         ConnectionManagerConfig& config);
+  static void mutateTracingRequestHeader(HeaderMap& request_headers, Runtime::Loader& runtime,
+                                         ConnectionManagerConfig& config,
+                                         const Router::Route* route);
 
-  static void mutateXfccRequestHeader(Http::HeaderMap& request_headers,
-                                      Network::Connection& connection,
+private:
+  static void mutateXfccRequestHeader(HeaderMap& request_headers, Network::Connection& connection,
                                       ConnectionManagerConfig& config);
 };
 

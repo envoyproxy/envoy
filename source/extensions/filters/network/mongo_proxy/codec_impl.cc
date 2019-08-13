@@ -306,11 +306,11 @@ void CommandReplyMessageImpl::fromBuffer(uint32_t message_length, Buffer::Instan
 }
 
 std::string CommandReplyMessageImpl::toString(bool full) const {
-  return fmt::format(
-      R"EOF({{"opcode": "OP_COMMANDREPLY", "id": {}, "response_to": {}, )EOF"
-      R"EOF("metadata": {}, "commandReply": {}, "outputDocs":{}}} )EOF",
-      request_id_, response_to_, metadata_->toString(), command_reply_->toString(),
-      full ? documentListToString(output_docs_) : std::to_string(output_docs_.size()));
+  return fmt::format(R"EOF({{"opcode": "OP_COMMANDREPLY", "id": {}, "response_to": {}, )EOF"
+                     R"EOF("metadata": {}, "commandReply": {}, "outputDocs":{}}} )EOF",
+                     request_id_, response_to_, metadata_->toString(), command_reply_->toString(),
+                     full ? documentListToString(output_docs_)
+                          : std::to_string(output_docs_.size()));
 }
 
 bool CommandReplyMessageImpl::operator==(const CommandReplyMessage& rhs) const {
@@ -426,8 +426,8 @@ bool DecoderImpl::decode(Buffer::Instance& data) {
 }
 
 void DecoderImpl::onData(Buffer::Instance& data) {
-  while (data.length() > 0 && decode(data))
-    ;
+  while (data.length() > 0 && decode(data)) {
+  }
 }
 
 void EncoderImpl::encodeCommonHeader(int32_t total_size, const Message& message,

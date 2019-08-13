@@ -28,12 +28,10 @@ namespace Event {
 class MockDispatcher : public Dispatcher {
 public:
   MockDispatcher();
-  ~MockDispatcher();
-
-  void setTimeSystem(TimeSystem& time_system) { time_system_ = &time_system; }
+  ~MockDispatcher() override;
 
   // Dispatcher
-  TimeSystem& timeSource() override { return *time_system_; }
+  TimeSource& timeSource() override { return time_system_; }
   Network::ConnectionPtr
   createServerConnection(Network::ConnectionSocketPtr&& socket,
                          Network::TransportSocketPtr&& transport_socket) override {
@@ -65,6 +63,11 @@ public:
         createListener_(socket, cb, bind_to_port, hand_off_restored_destination_connections)};
   }
 
+  Network::ListenerPtr createUdpListener(Network::Socket& socket,
+                                         Network::UdpListenerCallbacks& cb) override {
+    return Network::ListenerPtr{createUdpListener_(socket, cb)};
+  }
+
   Event::TimerPtr createTimer(Event::TimerCb cb) override {
     return Event::TimerPtr{createTimer_(cb)};
   }
@@ -81,6 +84,7 @@ public:
   }
 
   // Event::Dispatcher
+  MOCK_METHOD2(initializeStats, void(Stats::Scope&, const std::string&));
   MOCK_METHOD0(clearDeferredDeleteList, void());
   MOCK_METHOD2(createServerConnection_,
                Network::Connection*(Network::ConnectionSocket* socket,
@@ -101,18 +105,19 @@ public:
                Network::Listener*(Network::Socket& socket, Network::ListenerCallbacks& cb,
                                   bool bind_to_port,
                                   bool hand_off_restored_destination_connections));
+  MOCK_METHOD2(createUdpListener_,
+               Network::Listener*(Network::Socket& socket, Network::UdpListenerCallbacks& cb));
   MOCK_METHOD1(createTimer_, Timer*(Event::TimerCb cb));
   MOCK_METHOD1(deferredDelete_, void(DeferredDeletable* to_delete));
   MOCK_METHOD0(exit, void());
   MOCK_METHOD2(listenForSignal_, SignalEvent*(int signal_num, SignalCb cb));
   MOCK_METHOD1(post, void(std::function<void()> callback));
   MOCK_METHOD1(run, void(RunType type));
+  MOCK_METHOD1(setTrackedObject, const ScopeTrackedObject*(const ScopeTrackedObject* object));
+  MOCK_CONST_METHOD0(isThreadSafe, bool());
   Buffer::WatermarkFactory& getWatermarkFactory() override { return buffer_factory_; }
 
-  // TODO(jmarantz): Switch these to using mock-time.
-  DangerousDeprecatedTestTime test_time_;
-  TimeSystem* time_system_;
-
+  GlobalTimeSystem time_system_;
   std::list<DeferredDeletablePtr> to_delete_;
   MockBufferFactory buffer_factory_;
 };
@@ -121,19 +126,29 @@ class MockTimer : public Timer {
 public:
   MockTimer();
   MockTimer(MockDispatcher* dispatcher);
-  ~MockTimer();
+  ~MockTimer() override;
+
+  void invokeCallback() {
+    EXPECT_TRUE(enabled_);
+    enabled_ = false;
+    callback_();
+  }
 
   // Timer
   MOCK_METHOD0(disableTimer, void());
   MOCK_METHOD1(enableTimer, void(const std::chrono::milliseconds&));
+  MOCK_METHOD0(enabled, bool());
 
-  Event::TimerCb callback_;
+  bool enabled_{};
+  Event::TimerCb callback_; // TODO(mattklein123): This should be private and only called via
+                            // invoke callback to clear enabled_, but that will break too many
+                            // tests and can be done later.
 };
 
 class MockSignalEvent : public SignalEvent {
 public:
   MockSignalEvent(MockDispatcher* dispatcher);
-  ~MockSignalEvent();
+  ~MockSignalEvent() override;
 
   SignalCb callback_;
 };
@@ -141,7 +156,7 @@ public:
 class MockFileEvent : public FileEvent {
 public:
   MockFileEvent();
-  ~MockFileEvent();
+  ~MockFileEvent() override;
 
   MOCK_METHOD1(activate, void(uint32_t events));
   MOCK_METHOD1(setEnabled, void(uint32_t events));

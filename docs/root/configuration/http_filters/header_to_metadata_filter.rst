@@ -3,6 +3,7 @@
 Envoy Header-To-Metadata Filter
 ===============================
 * :ref:`v2 API reference <envoy_api_msg_config.filter.http.header_to_metadata.v2.Config>`
+* This filter should be configured with the name *envoy.filters.http.header_to_metadata*.
 
 This filter is configured with rules that will be matched against requests and responses.
 Each rule has a header and can be triggered either when the header is present or missing. When

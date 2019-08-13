@@ -3,6 +3,8 @@
 #include "envoy/http/filter.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/grpc/context_impl.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -12,7 +14,7 @@ namespace GrpcHttp1Bridge {
  */
 class Http1BridgeFilter : public Http::StreamFilter {
 public:
-  Http1BridgeFilter(Upstream::ClusterManager& cm) : cm_(cm) {}
+  explicit Http1BridgeFilter(Grpc::Context& context) : context_(context) {}
 
   // Http::StreamFilterBase
   void onDestroy() override {}
@@ -36,23 +38,26 @@ public:
   Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap& trailers) override;
+  Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap&) override {
+    return Http::FilterMetadataStatus::Continue;
+  }
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override {
     encoder_callbacks_ = &callbacks;
   }
+
+  bool doStatTracking() const { return request_names_.has_value(); }
 
 private:
   void chargeStat(const Http::HeaderMap& headers);
   void setupStatTracking(const Http::HeaderMap& headers);
 
-  Upstream::ClusterManager& cm_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   Http::HeaderMap* response_headers_{};
   bool do_bridging_{};
-  bool do_stat_tracking_{};
   Upstream::ClusterInfoConstSharedPtr cluster_;
-  std::string grpc_service_;
-  std::string grpc_method_;
+  absl::optional<Grpc::Context::RequestNames> request_names_;
+  Grpc::Context& context_;
 };
 
 } // namespace GrpcHttp1Bridge

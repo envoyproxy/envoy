@@ -10,8 +10,10 @@
 
 #include "envoy/api/os_sys_calls.h"
 #include "envoy/common/pure.h"
+#include "envoy/network/io_handle.h"
 
 #include "absl/numeric/int128.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Network {
@@ -22,7 +24,7 @@ namespace Address {
  */
 class Ipv4 {
 public:
-  virtual ~Ipv4() {}
+  virtual ~Ipv4() = default;
 
   /**
    * @return the 32-bit IPv4 address in network byte order.
@@ -35,7 +37,7 @@ public:
  */
 class Ipv6 {
 public:
-  virtual ~Ipv6() {}
+  virtual ~Ipv6() = default;
 
   /**
    * @return the absl::uint128 IPv6 address in network byte order.
@@ -50,7 +52,7 @@ enum class IpVersion { v4, v6 };
  */
 class Ip {
 public:
-  virtual ~Ip() {}
+  virtual ~Ip() = default;
 
   /**
    * @return the address as a string. E.g., "1.2.3.4" for an IPv4 address.
@@ -99,7 +101,7 @@ enum class SocketType { Stream, Datagram };
  */
 class Instance {
 public:
-  virtual ~Instance() {}
+  virtual ~Instance() = default;
 
   virtual bool operator==(const Instance& rhs) const PURE;
   bool operator!=(const Instance& rhs) const { return !operator==(rhs); }
@@ -115,6 +117,11 @@ public:
    * For pipe addresses: "/foo"
    */
   virtual const std::string& asString() const PURE;
+
+  /**
+   * @return Similar to asString but returns a string view.
+   */
+  virtual absl::string_view asStringView() const PURE;
 
   /**
    * @return a human readable string for the address that represents the
@@ -151,10 +158,10 @@ public:
   /**
    * Create a socket for this address.
    * @param type supplies the socket type to create.
-   * @return the file descriptor naming the socket. In case of a failure, the program would be
+   * @return the IoHandlePtr naming the socket. In case of a failure, the program would be
    *   aborted.
    */
-  virtual int socket(SocketType type) const PURE;
+  virtual IoHandlePtr socket(SocketType type) const PURE;
 
   /**
    * @return the type of address.
@@ -162,7 +169,7 @@ public:
   virtual Type type() const PURE;
 };
 
-typedef std::shared_ptr<const Instance> InstanceConstSharedPtr;
+using InstanceConstSharedPtr = std::shared_ptr<const Instance>;
 
 } // namespace Address
 } // namespace Network

@@ -1,6 +1,10 @@
 syntax = "proto3";
 
 package envoy.api.v2.endpoint;
+
+option java_outer_classname = "EndpointProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.api.v2.endpoint";
 option go_package = "endpoint";
 
 import "envoy/api/v2/core/address.proto";
@@ -52,8 +56,11 @@ message Endpoint {
 
 // An Endpoint that Envoy can route traffic to.
 message LbEndpoint {
-  // Upstream host identifier
-  Endpoint endpoint = 1;
+  // Upstream host identifier or a named reference.
+  oneof host_identifier {
+    Endpoint endpoint = 1;
+    string endpoint_name = 5;
+  }
 
   // Optional health status when known and supplied by EDS server.
   core.HealthStatus health_status = 2;
@@ -67,22 +74,15 @@ message LbEndpoint {
   // to subset the endpoints considered in cluster load balancing.
   core.Metadata metadata = 3;
 
-  // The optional load balancing weight of the upstream host, in the range 1 -
-  // 128. Envoy uses the load balancing weight in some of the built in load
+  // The optional load balancing weight of the upstream host; at least 1.
+  // Envoy uses the load balancing weight in some of the built in load
   // balancers. The load balancing weight for an endpoint is divided by the sum
   // of the weights of all endpoints in the endpoint's locality to produce a
   // percentage of traffic for the endpoint. This percentage is then further
   // weighted by the endpoint's locality's load balancing weight from
   // LocalityLbEndpoints. If unspecified, each host is presumed to have equal
   // weight in a locality.
-  //
-  // .. attention::
-  //
-  //   The limit of 128 is somewhat arbitrary, but is applied due to performance
-  //   concerns with the current implementation and can be removed when
-  //   `this issue <https://github.com/envoyproxy/envoy/issues/1285>`_ is fixed.
-  google.protobuf.UInt32Value load_balancing_weight = 4
-      [(validate.rules).uint32 = {gte: 1, lte: 128}];
+  google.protobuf.UInt32Value load_balancing_weight = 4 [(validate.rules).uint32 = {gte: 1}];
 }
 
 // A group of endpoints belonging to a Locality.
@@ -94,9 +94,9 @@ message LocalityLbEndpoints {
   core.Locality locality = 1;
 
   // The group of endpoints belonging to the locality specified.
-  repeated LbEndpoint lb_endpoints = 2 [(gogoproto.nullable) = false];
+  repeated LbEndpoint lb_endpoints = 2;
 
-  // Optional: Per priority/region/zone/sub_zone weight - range 1-128. The load
+  // Optional: Per priority/region/zone/sub_zone weight; at least 1. The load
   // balancing weight for a locality is divided by the sum of the weights of all
   // localities  at the same priority level to produce the effective percentage
   // of traffic for the locality.
@@ -104,16 +104,9 @@ message LocalityLbEndpoints {
   // Locality weights are only considered when :ref:`locality weighted load
   // balancing <arch_overview_load_balancing_locality_weighted_lb>` is
   // configured. These weights are ignored otherwise. If no weights are
-  // specificed when locality weighted load balancing is enabled, the cluster is
-  // assumed to have a weight of 1.
-  //
-  // .. attention::
-  //
-  //   The limit of 128 is somewhat arbitrary, but is applied due to performance
-  //   concerns with the current implementation and can be removed when
-  //   `this issue <https://github.com/envoyproxy/envoy/issues/1285>`_ is fixed.
-  google.protobuf.UInt32Value load_balancing_weight = 3
-      [(validate.rules).uint32 = {gte: 1, lte: 128}];
+  // specified when locality weighted load balancing is enabled, the locality is
+  // assigned no load.
+  google.protobuf.UInt32Value load_balancing_weight = 3 [(validate.rules).uint32 = {gte: 1}];
 
   // Optional: the priority for this LocalityLbEndpoints. If unspecified this will
   // default to the highest priority (0).
@@ -125,4 +118,12 @@ message LocalityLbEndpoints {
   //
   // Priorities should range from 0 (highest) to N (lowest) without skipping.
   uint32 priority = 5 [(validate.rules).uint32 = {lte: 128}];
+
+  // Optional: Per locality proximity value which indicates how close this
+  // locality is from the source locality. This value only provides ordering
+  // information (lower the value, closer it is to the source locality).
+  // This will be consumed by load balancing schemes that need proximity order
+  // to determine where to route the requests.
+  // [#not-implemented-hide:]
+  google.protobuf.UInt32Value proximity = 6;
 }

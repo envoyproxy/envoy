@@ -10,7 +10,7 @@ specific place yourself.
 
 Static linking is already available (because of a `HeapProfilerDump()` call
 inside
-[`Envoy::Profiler::Heap::forceLink()`](https://github.com/envoyproxy/envoy/blob/master/source/common/profiler/profiler.cc#L21-L26)).
+[`Envoy::Profiler::Heap::stopProfiler())`](https://github.com/envoyproxy/envoy/blob/master/source/common/profiler/profiler.cc#L32-L39)).
 
 ### Compiling a statically-linked Envoy
 
@@ -83,7 +83,7 @@ instantiation of `MainCommonBase::MainCommonBase`:
 
 Once these changes have been made in your working directory, it might make sense to
 save the diff as a patch (`git diff > file`), which can then be quickly
-applied/unapplied for testing and commiting. (`git apply`, `git apply -R`)
+applied/unapplied for testing and committing. (`git apply`, `git apply -R`)
 
 Build the binary using bazel, and run the binary without any environment variables:
 
@@ -91,6 +91,26 @@ Build the binary using bazel, and run the binary without any environment variabl
     $ bazel-bin/source/exe/envoy <args>
 
 This will dump your profiler output to the working directory.
+
+## Memory Profiling in Tests
+To support memory leaks detection, tests are built with gperftools dependencies enabled by default.
+
+### Enabling Memory Profiling in Tests
+Use `HeapProfilerStart()`, `HeapProfilerStop()`, and `HeapProfilerDump()` to start, stop, and persist
+memory dumps, respectively. Please see [above](#adding-tcmalloc_dep-to-envoy) for more details.
+
+### Bazel Configuration
+By default, bazel executes tests in a sandbox, which will be deleted together with memory dumps
+after the test run. To preserve memory dumps, bazel can be forced to run tests without
+sandboxing, by setting the ```TestRunner``` parameter to ```local```:
+```
+bazel test --strategy=TestRunner=local ...
+```
+
+An alternative is to set ```HEAPPROFILE``` environment variable for the test runner:
+```
+bazel test --test_env=HEAPPROFILE=/tmp/testprofile ...
+```
 
 # Methodology
 

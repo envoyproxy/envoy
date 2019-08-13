@@ -1,6 +1,6 @@
 licenses(["notice"])  # Apache 2
 
-load("//bazel:api_build_system.bzl", "api_go_proto_library", "api_proto_library_internal")
+load("@envoy_api//bazel:api_build_system.bzl", "api_go_proto_library", "api_proto_library_internal")
 
 api_proto_library_internal(
     name = "file_based_metadata",
@@ -14,4 +14,14 @@ api_go_proto_library(
     deps = [
         "//envoy/api/v2/core:base_go_proto",
     ],
+)
+
+api_proto_library_internal(
+    name = "aws_iam",
+    srcs = ["aws_iam.proto"],
+)
+
+api_go_proto_library(
+    name = "aws_iam",
+    proto = ":aws_iam",
 )

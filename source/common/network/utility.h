@@ -26,7 +26,7 @@ private:
   const uint32_t max_;
 };
 
-typedef std::list<PortRange> PortRangeList;
+using PortRangeList = std::list<PortRange>;
 
 /**
  * Common network utility routines.
@@ -34,6 +34,7 @@ typedef std::list<PortRange> PortRangeList;
 class Utility {
 public:
   static const std::string TCP_SCHEME;
+  static const std::string UDP_SCHEME;
   static const std::string UNIX_SCHEME;
 
   /**
@@ -49,6 +50,13 @@ public:
    * @return bool true if the URL matches the TCP scheme, false otherwise.
    */
   static bool urlIsTcpScheme(const std::string& url);
+
+  /**
+   * Match a URL to the UDP scheme
+   * @param url supplies the URL to match.
+   * @return bool true if the URL matches the UDP scheme, false otherwise.
+   */
+  static bool urlIsUdpScheme(const std::string& url);
 
   /**
    * Match a URL to the Unix scheme
@@ -70,6 +78,20 @@ public:
    * @return uint32_t the parsed port
    */
   static uint32_t portFromTcpUrl(const std::string& url);
+
+  /**
+   * Parses the host from a UDP URL
+   * @param the URL to parse host from
+   * @return std::string the parsed host
+   */
+  static std::string hostFromUdpUrl(const std::string& url);
+
+  /**
+   * Parses the port from a UDP URL
+   * @param the URL to parse port from
+   * @return uint32_t the parsed port
+   */
+  static uint32_t portFromUdpUrl(const std::string& url);
 
   /**
    * Parse an internet host address (IPv4 or IPv6) and create an Instance from it. The address must
@@ -112,6 +134,12 @@ public:
   static Address::InstanceConstSharedPtr getLocalAddress(const Address::IpVersion version);
 
   /**
+   * Determine whether this is a local connection.
+   * @return bool the address is a local connection.
+   */
+  static bool isLocalConnection(const Network::ConnectionSocket& socket);
+
+  /**
    * Determine whether this is an internal (RFC1918) address.
    * @return bool the address is an RFC1918 address.
    */
@@ -150,6 +178,16 @@ public:
    *         IPv6 address are to be accepted.
    */
   static Address::InstanceConstSharedPtr getIpv6AnyAddress();
+
+  /**
+   * @return the IPv4 CIDR catch-all address (0.0.0.0/0).
+   */
+  static const std::string& getIpv4CidrCatchAllAddress();
+
+  /**
+   * @return the IPv6 CIDR catch-all address (::/0).
+   */
+  static const std::string& getIpv6CidrCatchAllAddress();
 
   /**
    * @param address IP address instance.
@@ -210,6 +248,15 @@ public:
    */
   static void addressToProtobufAddress(const Address::Instance& address,
                                        envoy::api::v2::core::Address& proto_address);
+
+  /**
+   * Returns socket type corresponding to SocketAddress.protocol value of the
+   * given address, or SocketType::Stream if the address is a pipe address.
+   * @param proto_address the address protobuf
+   * @return socket type
+   */
+  static Address::SocketType
+  protobufAddressSocketType(const envoy::api::v2::core::Address& proto_address);
 
 private:
   static void throwWithMalformedIp(const std::string& ip_address);

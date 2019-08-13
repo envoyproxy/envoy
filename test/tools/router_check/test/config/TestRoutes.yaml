@@ -93,10 +93,10 @@ virtual_hosts:
         route:
           cluster: ats
           host_rewrite: new_host
-          request_headers_to_add:
-            - header:
-                key: X-Client-IP
-                value: '%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%'
+        request_headers_to_add:
+          - header:
+              key: X-Client-IP
+              value: '%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%'
       - match:
           prefix: /
         route:

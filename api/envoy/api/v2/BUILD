@@ -1,4 +1,4 @@
-load("//bazel:api_build_system.bzl", "api_go_grpc_library", "api_go_proto_library", "api_proto_library_internal")
+load("@envoy_api//bazel:api_build_system.bzl", "api_go_grpc_library", "api_go_proto_library", "api_proto_library_internal")
 
 licenses(["notice"])  # Apache 2
 
@@ -67,6 +67,7 @@ api_proto_library_internal(
         ":eds",
         "//envoy/api/v2/auth:cert",
         "//envoy/api/v2/cluster:circuit_breaker",
+        "//envoy/api/v2/cluster:filter",
         "//envoy/api/v2/cluster:outlier_detection",
         "//envoy/api/v2/core:address",
         "//envoy/api/v2/core:base",
@@ -86,6 +87,7 @@ api_go_grpc_library(
         ":eds_go_grpc",
         "//envoy/api/v2/auth:cert_go_proto",
         "//envoy/api/v2/cluster:circuit_breaker_go_proto",
+        "//envoy/api/v2/cluster:filter_go_proto",
         "//envoy/api/v2/cluster:outlier_detection_go_proto",
         "//envoy/api/v2/core:address_go_proto",
         "//envoy/api/v2/core:base_go_proto",
@@ -129,6 +131,7 @@ api_proto_library_internal(
     deps = [
         ":discovery",
         "//envoy/api/v2/core:base",
+        "//envoy/api/v2/core:config_source",
         "//envoy/api/v2/route",
     ],
 )
@@ -139,6 +142,28 @@ api_go_grpc_library(
     deps = [
         ":discovery_go_proto",
         "//envoy/api/v2/core:base_go_proto",
+        "//envoy/api/v2/core:config_source_go_proto",
         "//envoy/api/v2/route:route_go_proto",
+    ],
+)
+
+api_proto_library_internal(
+    name = "srds",
+    srcs = ["srds.proto"],
+    has_services = 1,
+    visibility = [":friends"],
+    deps = [
+        ":discovery",
+        "//envoy/api/v2/core:base",
+        "//envoy/api/v2/route",
+    ],
+)
+
+api_go_grpc_library(
+    name = "srds",
+    proto = ":srds",
+    deps = [
+        ":discovery_go_proto",
+        "//envoy/api/v2/core:base_go_proto",
     ],
 )

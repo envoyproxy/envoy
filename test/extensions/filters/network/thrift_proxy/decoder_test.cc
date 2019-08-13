@@ -26,9 +26,7 @@ using testing::Return;
 using testing::ReturnRef;
 using testing::SetArgReferee;
 using testing::StrictMock;
-using testing::Test;
-using testing::TestParamInfo;
-using testing::TestWithParam;
+using ::testing::TestParamInfo;
 using testing::Values;
 
 namespace Envoy {
@@ -91,6 +89,9 @@ ExpectationSet expectValue(MockProtocol& proto, MockDecoderEventHandler& handler
 
 ExpectationSet expectContainerStart(MockProtocol& proto, MockDecoderEventHandler& handler,
                                     FieldType field_type, FieldType inner_type) {
+  int16_t field_id = 1;
+  uint32_t size = 1;
+
   ExpectationSet s;
   switch (field_type) {
   case FieldType::Struct:
@@ -98,26 +99,46 @@ ExpectationSet expectContainerStart(MockProtocol& proto, MockDecoderEventHandler
     s += EXPECT_CALL(handler, structBegin(absl::string_view()))
              .WillOnce(Return(FilterStatus::Continue));
     s += EXPECT_CALL(proto, readFieldBegin(_, _, _, _))
-             .WillOnce(DoAll(SetArgReferee<2>(inner_type), SetArgReferee<3>(1), Return(true)));
-    s += EXPECT_CALL(handler, fieldBegin(absl::string_view(), inner_type, 1))
-             .WillOnce(Return(FilterStatus::Continue));
+             .WillOnce(
+                 DoAll(SetArgReferee<2>(inner_type), SetArgReferee<3>(field_id), Return(true)));
+    s += EXPECT_CALL(handler, fieldBegin(absl::string_view(), _, _))
+             .WillOnce(Invoke([=](absl::string_view, FieldType& ft, int16_t& id) -> FilterStatus {
+               EXPECT_EQ(inner_type, ft);
+               EXPECT_EQ(field_id, id);
+               return FilterStatus::Continue;
+             }));
     break;
   case FieldType::List:
     s += EXPECT_CALL(proto, readListBegin(_, _, _))
-             .WillOnce(DoAll(SetArgReferee<1>(inner_type), SetArgReferee<2>(1), Return(true)));
-    s += EXPECT_CALL(handler, listBegin(inner_type, 1)).WillOnce(Return(FilterStatus::Continue));
+             .WillOnce(DoAll(SetArgReferee<1>(inner_type), SetArgReferee<2>(size), Return(true)));
+    s += EXPECT_CALL(handler, listBegin(_, _))
+             .WillOnce(Invoke([=](FieldType& t, uint32_t& s) -> FilterStatus {
+               EXPECT_EQ(inner_type, t);
+               EXPECT_EQ(size, s);
+               return FilterStatus::Continue;
+             }));
     break;
   case FieldType::Map:
     s += EXPECT_CALL(proto, readMapBegin(_, _, _, _))
              .WillOnce(DoAll(SetArgReferee<1>(inner_type), SetArgReferee<2>(inner_type),
-                             SetArgReferee<3>(1), Return(true)));
-    s += EXPECT_CALL(handler, mapBegin(inner_type, inner_type, 1))
-             .WillOnce(Return(FilterStatus::Continue));
+                             SetArgReferee<3>(size), Return(true)));
+    s += EXPECT_CALL(handler, mapBegin(_, _, _))
+             .WillOnce(Invoke([=](FieldType& kt, FieldType& vt, uint32_t& s) -> FilterStatus {
+               EXPECT_EQ(inner_type, kt);
+               EXPECT_EQ(inner_type, vt);
+               EXPECT_EQ(size, s);
+               return FilterStatus::Continue;
+             }));
     break;
   case FieldType::Set:
     s += EXPECT_CALL(proto, readSetBegin(_, _, _))
-             .WillOnce(DoAll(SetArgReferee<1>(inner_type), SetArgReferee<2>(1), Return(true)));
-    s += EXPECT_CALL(handler, setBegin(inner_type, 1)).WillOnce(Return(FilterStatus::Continue));
+             .WillOnce(DoAll(SetArgReferee<1>(inner_type), SetArgReferee<2>(size), Return(true)));
+    s += EXPECT_CALL(handler, setBegin(_, _))
+             .WillOnce(Invoke([=](FieldType& t, uint32_t& s) -> FilterStatus {
+               EXPECT_EQ(inner_type, t);
+               EXPECT_EQ(size, s);
+               return FilterStatus::Continue;
+             }));
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -155,12 +176,12 @@ ExpectationSet expectContainerEnd(MockProtocol& proto, MockDecoderEventHandler& 
   return s;
 }
 
-} // end namespace
+} // namespace
 
 class DecoderStateMachineTestBase {
 public:
   DecoderStateMachineTestBase() : metadata_(std::make_shared<MessageMetadata>()) {}
-  virtual ~DecoderStateMachineTestBase() {}
+  virtual ~DecoderStateMachineTestBase() = default;
 
   NiceMock<MockProtocol> proto_;
   MessageMetadataSharedPtr metadata_;
@@ -168,34 +189,33 @@ public:
 };
 
 class DecoderStateMachineNonValueTest : public DecoderStateMachineTestBase,
-                                        public TestWithParam<ProtocolState> {};
+                                        public testing::TestWithParam<ProtocolState> {};
 
 static std::string protoStateParamToString(const TestParamInfo<ProtocolState>& params) {
   return ProtocolStateNameValues::name(params.param);
 }
 
-INSTANTIATE_TEST_CASE_P(NonValueProtocolStates, DecoderStateMachineNonValueTest,
-                        Values(ProtocolState::MessageBegin, ProtocolState::MessageEnd,
-                               ProtocolState::StructBegin, ProtocolState::StructEnd,
-                               ProtocolState::FieldBegin, ProtocolState::FieldEnd,
-                               ProtocolState::MapBegin, ProtocolState::MapEnd,
-                               ProtocolState::ListBegin, ProtocolState::ListEnd,
-                               ProtocolState::SetBegin, ProtocolState::SetEnd),
-                        protoStateParamToString);
+INSTANTIATE_TEST_SUITE_P(NonValueProtocolStates, DecoderStateMachineNonValueTest,
+                         Values(ProtocolState::MessageBegin, ProtocolState::MessageEnd,
+                                ProtocolState::StructBegin, ProtocolState::StructEnd,
+                                ProtocolState::FieldBegin, ProtocolState::FieldEnd,
+                                ProtocolState::MapBegin, ProtocolState::MapEnd,
+                                ProtocolState::ListBegin, ProtocolState::ListEnd,
+                                ProtocolState::SetBegin, ProtocolState::SetEnd),
+                         protoStateParamToString);
 
-class DecoderStateMachineTest : public DecoderStateMachineTestBase, public Test {};
-
+class DecoderStateMachineTest : public testing::Test, public DecoderStateMachineTestBase {};
 class DecoderStateMachineValueTest : public DecoderStateMachineTestBase,
-                                     public TestWithParam<FieldType> {};
+                                     public testing::TestWithParam<FieldType> {};
 
-INSTANTIATE_TEST_CASE_P(PrimitiveFieldTypes, DecoderStateMachineValueTest,
-                        Values(FieldType::Bool, FieldType::Byte, FieldType::Double, FieldType::I16,
-                               FieldType::I32, FieldType::I64, FieldType::String),
-                        fieldTypeParamToString);
+INSTANTIATE_TEST_SUITE_P(PrimitiveFieldTypes, DecoderStateMachineValueTest,
+                         Values(FieldType::Bool, FieldType::Byte, FieldType::Double, FieldType::I16,
+                                FieldType::I32, FieldType::I64, FieldType::String),
+                         fieldTypeParamToString);
 
 class DecoderStateMachineNestingTest
     : public DecoderStateMachineTestBase,
-      public TestWithParam<std::tuple<FieldType, FieldType, FieldType>> {};
+      public testing::TestWithParam<std::tuple<FieldType, FieldType, FieldType>> {};
 
 static std::string nestedFieldTypesParamToString(
     const TestParamInfo<std::tuple<FieldType, FieldType, FieldType>>& params) {
@@ -205,7 +225,7 @@ static std::string nestedFieldTypesParamToString(
                      fieldTypeToString(inner_type), fieldTypeToString(value_type));
 }
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     NestedTypes, DecoderStateMachineNestingTest,
     Combine(Values(FieldType::Struct, FieldType::List, FieldType::Map, FieldType::Set),
             Values(FieldType::Struct, FieldType::List, FieldType::Map, FieldType::Set),
@@ -571,10 +591,15 @@ TEST_P(DecoderStateMachineValueTest, SingleFieldStruct) {
   EXPECT_CALL(proto_, readStructBegin(Ref(buffer), _)).WillOnce(Return(true));
   EXPECT_CALL(handler_, structBegin(absl::string_view())).WillOnce(Return(FilterStatus::Continue));
 
+  int16_t field_id = 1;
   EXPECT_CALL(proto_, readFieldBegin(Ref(buffer), _, _, _))
-      .WillOnce(DoAll(SetArgReferee<2>(field_type), SetArgReferee<3>(1), Return(true)));
-  EXPECT_CALL(handler_, fieldBegin(absl::string_view(), field_type, 1))
-      .WillOnce(Return(FilterStatus::Continue));
+      .WillOnce(DoAll(SetArgReferee<2>(field_type), SetArgReferee<3>(field_id), Return(true)));
+  EXPECT_CALL(handler_, fieldBegin(absl::string_view(), _, _))
+      .WillOnce(Invoke([&](absl::string_view, FieldType& ft, int16_t& id) -> FilterStatus {
+        EXPECT_EQ(field_type, ft);
+        EXPECT_EQ(field_id, id);
+        return FilterStatus::Continue;
+      }));
 
   expectValue(proto_, handler_, field_type);
 
@@ -629,8 +654,12 @@ TEST_F(DecoderStateMachineTest, MultiFieldStruct) {
   for (FieldType field_type : field_types) {
     EXPECT_CALL(proto_, readFieldBegin(Ref(buffer), _, _, _))
         .WillOnce(DoAll(SetArgReferee<2>(field_type), SetArgReferee<3>(field_id), Return(true)));
-    EXPECT_CALL(handler_, fieldBegin(absl::string_view(), field_type, field_id))
-        .WillOnce(Return(FilterStatus::Continue));
+    EXPECT_CALL(handler_, fieldBegin(absl::string_view(), _, _))
+        .WillOnce(Invoke([=](absl::string_view, FieldType& ft, int16_t& id) -> FilterStatus {
+          EXPECT_EQ(field_type, ft);
+          EXPECT_EQ(field_id, id);
+          return FilterStatus::Continue;
+        }));
     field_id++;
 
     expectValue(proto_, handler_, field_type);
@@ -1067,10 +1096,16 @@ TEST(DecoderTest, OnDataHandlesStopIterationAndResumes) {
   EXPECT_EQ(FilterStatus::StopIteration, decoder.onData(buffer, underflow));
   EXPECT_FALSE(underflow);
 
+  FieldType field_type = FieldType::I32;
+  int16_t field_id = 1;
   EXPECT_CALL(proto, readFieldBegin(Ref(buffer), _, _, _))
-      .WillOnce(DoAll(SetArgReferee<2>(FieldType::I32), SetArgReferee<3>(1), Return(true)));
-  EXPECT_CALL(handler, fieldBegin(absl::string_view(), FieldType::I32, 1))
-      .WillOnce(Return(FilterStatus::StopIteration));
+      .WillOnce(DoAll(SetArgReferee<2>(field_type), SetArgReferee<3>(field_id), Return(true)));
+  EXPECT_CALL(handler, fieldBegin(absl::string_view(), _, _))
+      .WillOnce(Invoke([&](absl::string_view, FieldType& ft, int16_t& id) -> FilterStatus {
+        EXPECT_EQ(field_type, ft);
+        EXPECT_EQ(field_id, id);
+        return FilterStatus::StopIteration;
+      }));
   EXPECT_EQ(FilterStatus::StopIteration, decoder.onData(buffer, underflow));
   EXPECT_FALSE(underflow);
 

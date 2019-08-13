@@ -6,6 +6,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/stats/scope.h"
+#include "envoy/stats/stats_matcher.h"
 #include "envoy/stats/tag_producer.h"
 
 namespace Envoy {
@@ -21,7 +22,6 @@ class Instance;
 namespace Stats {
 
 class Sink;
-class Source;
 
 /**
  * A store for all known counters, gauges, and timers.
@@ -44,12 +44,12 @@ public:
   virtual std::vector<ParentHistogramSharedPtr> histograms() const PURE;
 };
 
-typedef std::unique_ptr<Store> StorePtr;
+using StorePtr = std::unique_ptr<Store>;
 
 /**
  * Callback invoked when a store's mergeHistogram() runs.
  */
-typedef std::function<void()> PostMergeCb;
+using PostMergeCb = std::function<void()>;
 
 /**
  * The root of the stat store.
@@ -65,6 +65,13 @@ public:
    * Set the given tag producer to control tags.
    */
   virtual void setTagProducer(TagProducerPtr&& tag_producer) PURE;
+
+  /**
+   * Attach a StatsMatcher to this StoreRoot to prevent the initialization of stats according to
+   * some ruleset.
+   * @param stats_matcher a StatsMatcher to attach to this StoreRoot.
+   */
+  virtual void setStatsMatcher(StatsMatcherPtr&& stats_matcher) PURE;
 
   /**
    * Initialize the store for threading. This will be called once after all worker threads have
@@ -87,15 +94,9 @@ public:
    * method would be asserted.
    */
   virtual void mergeHistograms(PostMergeCb merge_complete_cb) PURE;
-
-  /**
-   * Returns the Source to provide cached metrics.
-   * @return Source& the source.
-   */
-  virtual Source& source() PURE;
 };
 
-typedef std::unique_ptr<StoreRoot> StoreRootPtr;
+using StoreRootPtr = std::unique_ptr<StoreRoot>;
 
 } // namespace Stats
 } // namespace Envoy

@@ -31,36 +31,83 @@ public:
   void refresh(const histogram_t* new_histogram_ptr);
 
   // HistogramStatistics
-  std::string summary() const override;
+  std::string quantileSummary() const override;
+  std::string bucketSummary() const override;
   const std::vector<double>& supportedQuantiles() const override;
   const std::vector<double>& computedQuantiles() const override { return computed_quantiles_; }
+  const std::vector<double>& supportedBuckets() const override;
+  const std::vector<uint64_t>& computedBuckets() const override { return computed_buckets_; }
+  uint64_t sampleCount() const override { return sample_count_; }
+  double sampleSum() const override { return sample_sum_; }
 
 private:
   std::vector<double> computed_quantiles_;
+  std::vector<uint64_t> computed_buckets_;
+  uint64_t sample_count_;
+  double sample_sum_;
+};
+
+class HistogramImplHelper : public MetricImpl<Histogram> {
+public:
+  HistogramImplHelper(StatName name, const std::string& tag_extracted_name,
+                      const std::vector<Tag>& tags, SymbolTable& symbol_table)
+      : MetricImpl<Histogram>(name, tag_extracted_name, tags, symbol_table) {}
+  HistogramImplHelper(SymbolTable& symbol_table) : MetricImpl<Histogram>(symbol_table) {}
+
+  // RefcountInterface
+  void incRefCount() override { refcount_helper_.incRefCount(); }
+  bool decRefCount() override { return refcount_helper_.decRefCount(); }
+  uint32_t use_count() const override { return refcount_helper_.use_count(); }
+
+private:
+  RefcountHelper refcount_helper_;
 };
 
 /**
  * Histogram implementation for the heap.
  */
-class HistogramImpl : public Histogram, public MetricImpl {
+class HistogramImpl : public HistogramImplHelper {
 public:
-  HistogramImpl(const std::string& name, Store& parent, std::string&& tag_extracted_name,
-                std::vector<Tag>&& tags)
-      : MetricImpl(std::move(tag_extracted_name), std::move(tags)), parent_(parent), name_(name) {}
-
-  // Stats:;Metric
-  const std::string name() const override { return name_; }
+  HistogramImpl(StatName name, Store& parent, const std::string& tag_extracted_name,
+                const std::vector<Tag>& tags)
+      : HistogramImplHelper(name, tag_extracted_name, tags, parent.symbolTable()), parent_(parent) {
+  }
+  ~HistogramImpl() override {
+    // We must explicitly free the StatName here in order to supply the
+    // SymbolTable reference. An RAII alternative would be to store a
+    // reference to the SymbolTable in MetricImpl, which would cost 8 bytes
+    // per stat.
+    MetricImpl::clear(symbolTable());
+  }
 
   // Stats::Histogram
   void recordValue(uint64_t value) override { parent_.deliverHistogramToSinks(*this, value); }
 
   bool used() const override { return true; }
+  SymbolTable& symbolTable() override { return parent_.symbolTable(); }
 
 private:
   // This is used for delivering the histogram data to sinks.
   Store& parent_;
+};
 
-  const std::string name_;
+/**
+ * Null histogram implementation.
+ * No-ops on all calls and requires no underlying metric or data.
+ */
+class NullHistogramImpl : public HistogramImplHelper {
+public:
+  explicit NullHistogramImpl(SymbolTable& symbol_table)
+      : HistogramImplHelper(symbol_table), symbol_table_(symbol_table) {}
+  ~NullHistogramImpl() override { MetricImpl::clear(symbol_table_); }
+
+  bool used() const override { return false; }
+  SymbolTable& symbolTable() override { return symbol_table_; }
+
+  void recordValue(uint64_t) override {}
+
+private:
+  SymbolTable& symbol_table_;
 };
 
 } // namespace Stats

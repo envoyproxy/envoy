@@ -22,7 +22,7 @@ public:
   // Override all functions from Instance which can result in changing the size
   // of the underlying buffer.
   void add(const void* data, uint64_t size) override;
-  void add(const std::string& data) override;
+  void add(absl::string_view data) override;
   void add(const Instance& data) override;
   void prepend(absl::string_view data) override;
   void prepend(Instance& data) override;
@@ -30,9 +30,9 @@ public:
   void drain(uint64_t size) override;
   void move(Instance& rhs) override;
   void move(Instance& rhs, uint64_t length) override;
-  Api::SysCallIntResult read(int fd, uint64_t max_length) override;
+  Api::IoCallUint64Result read(Network::IoHandle& io_handle, uint64_t max_length) override;
   uint64_t reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) override;
-  Api::SysCallIntResult write(int fd) override;
+  Api::IoCallUint64Result write(Network::IoHandle& io_handle) override;
   void postProcess() override { checkLowWatermark(); }
 
   void setWatermarks(uint32_t watermark) { setWatermarks(watermark / 2, watermark); }
@@ -56,7 +56,7 @@ private:
   bool above_high_watermark_called_{false};
 };
 
-typedef std::unique_ptr<WatermarkBuffer> WatermarkBufferPtr;
+using WatermarkBufferPtr = std::unique_ptr<WatermarkBuffer>;
 
 class WatermarkBufferFactory : public WatermarkFactory {
 public:

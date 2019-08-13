@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/api/api.h"
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/server/resource_monitor.h"
@@ -12,13 +13,18 @@ namespace Configuration {
 
 class ResourceMonitorFactoryContext {
 public:
-  virtual ~ResourceMonitorFactoryContext() {}
+  virtual ~ResourceMonitorFactoryContext() = default;
 
   /**
    * @return Event::Dispatcher& the main thread's dispatcher. This dispatcher should be used
    *         for all singleton processing.
    */
   virtual Event::Dispatcher& dispatcher() PURE;
+
+  /**
+   * @return reference to the Api object
+   */
+  virtual Api::Api& api() PURE;
 };
 
 /**
@@ -27,7 +33,7 @@ public:
  */
 class ResourceMonitorFactory {
 public:
-  virtual ~ResourceMonitorFactory() {}
+  virtual ~ResourceMonitorFactory() = default;
 
   /**
    * Create a particular resource monitor implementation.

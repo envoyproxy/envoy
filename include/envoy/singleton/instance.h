@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 namespace Envoy {
 namespace Singleton {
 
@@ -8,10 +10,10 @@ namespace Singleton {
  */
 class Instance {
 public:
-  virtual ~Instance() {}
+  virtual ~Instance() = default;
 };
 
-typedef std::shared_ptr<Instance> InstanceSharedPtr;
+using InstanceSharedPtr = std::shared_ptr<Instance>;
 
 } // namespace Singleton
 } // namespace Envoy

@@ -29,7 +29,7 @@ public:
    */
   class Callbacks {
   public:
-    virtual ~Callbacks() {}
+    virtual ~Callbacks() = default;
 
     /**
      * Called when the async HTTP request succeeds.
@@ -52,7 +52,7 @@ public:
    */
   class StreamCallbacks {
   public:
-    virtual ~StreamCallbacks() {}
+    virtual ~StreamCallbacks() = default;
 
     /**
      * Called when all headers get received on the async HTTP stream.
@@ -76,6 +76,13 @@ public:
     virtual void onTrailers(HeaderMapPtr&& trailers) PURE;
 
     /**
+     * Called when both the local and remote have gracefully closed the stream.
+     * Useful for asymmetric cases where end_stream may not be bidirectionally observable.
+     * Note this is NOT called on stream reset.
+     */
+    virtual void onComplete() PURE;
+
+    /**
      * Called when the async HTTP stream is reset.
      */
     virtual void onReset() PURE;
@@ -86,7 +93,7 @@ public:
    */
   class Request {
   public:
-    virtual ~Request() {}
+    virtual ~Request() = default;
 
     /**
      * Signals that the request should be cancelled.
@@ -99,7 +106,7 @@ public:
    */
   class Stream {
   public:
-    virtual ~Stream() {}
+    virtual ~Stream() = default;
 
     /***
      * Send headers to the stream. This method cannot be invoked more than once and
@@ -129,36 +136,96 @@ public:
     virtual void reset() PURE;
   };
 
-  virtual ~AsyncClient() {}
+  virtual ~AsyncClient() = default;
+
+  /**
+   * A structure to hold the options for AsyncStream object.
+   */
+  struct StreamOptions {
+    StreamOptions& setTimeout(const absl::optional<std::chrono::milliseconds>& v) {
+      timeout = v;
+      return *this;
+    }
+    StreamOptions& setTimeout(const std::chrono::milliseconds& v) {
+      timeout = v;
+      return *this;
+    }
+    StreamOptions& setBufferBodyForRetry(bool v) {
+      buffer_body_for_retry = v;
+      return *this;
+    }
+    StreamOptions& setSendXff(bool v) {
+      send_xff = v;
+      return *this;
+    }
+
+    // For gmock test
+    bool operator==(const StreamOptions& src) const {
+      return timeout == src.timeout && buffer_body_for_retry == src.buffer_body_for_retry &&
+             send_xff == src.send_xff;
+    }
+
+    // The timeout supplies the stream timeout, measured since when the frame with
+    // end_stream flag is sent until when the first frame is received.
+    absl::optional<std::chrono::milliseconds> timeout;
+
+    // The buffer_body_for_retry specifies whether the streamed body will be buffered so that
+    // it can be retried. In general, this should be set to false for a true stream. However,
+    // streaming is also used in certain cases such as gRPC unary calls, where retry can
+    // still be useful.
+    bool buffer_body_for_retry{false};
+
+    // If true, x-forwarded-for header will be added.
+    bool send_xff{true};
+  };
+
+  /**
+   * A structure to hold the options for AsyncRequest object.
+   */
+  struct RequestOptions : public StreamOptions {
+    RequestOptions& setTimeout(const absl::optional<std::chrono::milliseconds>& v) {
+      StreamOptions::setTimeout(v);
+      return *this;
+    }
+    RequestOptions& setTimeout(const std::chrono::milliseconds& v) {
+      StreamOptions::setTimeout(v);
+      return *this;
+    }
+    RequestOptions& setBufferBodyForRetry(bool v) {
+      StreamOptions::setBufferBodyForRetry(v);
+      return *this;
+    }
+    RequestOptions& setSendXff(bool v) {
+      StreamOptions::setSendXff(v);
+      return *this;
+    }
+
+    // For gmock test
+    bool operator==(const RequestOptions& src) const { return StreamOptions::operator==(src); }
+  };
 
   /**
    * Send an HTTP request asynchronously
    * @param request the request to send.
    * @param callbacks the callbacks to be notified of request status.
-   * @param timeout supplies the request timeout
+   * @param options the data struct to control the request sending.
    * @return a request handle or nullptr if no request could be created. NOTE: In this case
    *         onFailure() has already been called inline. The client owns the request and the
    *         handle should just be used to cancel.
    */
+
   virtual Request* send(MessagePtr&& request, Callbacks& callbacks,
-                        const absl::optional<std::chrono::milliseconds>& timeout) PURE;
+                        const RequestOptions& options) PURE;
 
   /**
    * Start an HTTP stream asynchronously.
    * @param callbacks the callbacks to be notified of stream status.
-   * @param timeout supplies the stream timeout, measured since when the frame with end_stream
-   *        flag is sent until when the first frame is received.
-   * @param buffer_body_for_retry specifies whether the streamed body will be buffered so that
-   *        it can be retried. In general, this should be set to false for a true stream. However,
-   *        streaming is also used in certain cases such as gRPC unary calls, where retry can
-   *        still be useful.
+   * @param options the data struct to control the stream.
    * @return a stream handle or nullptr if no stream could be started. NOTE: In this case
    *         onResetStream() has already been called inline. The client owns the stream and
    *         the handle can be used to send more messages or close the stream.
    */
-  virtual Stream* start(StreamCallbacks& callbacks,
-                        const absl::optional<std::chrono::milliseconds>& timeout,
-                        bool buffer_body_for_retry) PURE;
+  virtual Stream* start(StreamCallbacks& callbacks, const StreamOptions& options) PURE;
 
   /**
    * @return Event::Dispatcher& the dispatcher backing this client.
@@ -166,7 +233,7 @@ public:
   virtual Event::Dispatcher& dispatcher() PURE;
 };
 
-typedef std::unique_ptr<AsyncClient> AsyncClientPtr;
+using AsyncClientPtr = std::unique_ptr<AsyncClient>;
 
 } // namespace Http
 } // namespace Envoy

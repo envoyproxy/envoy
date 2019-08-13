@@ -11,15 +11,15 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RBACFilter {
 
-static void validateFail(const std::string& header, const std::string& metadata) {
-  throw EnvoyException(fmt::format("Found header({}) or metadata({}) rule,"
+static void validateFail(const std::string& header) {
+  throw EnvoyException(fmt::format("Found header({}) rule,"
                                    "not supported by RBAC network filter",
-                                   header, metadata));
+                                   header));
 }
 
-static void validatePermission(const envoy::config::rbac::v2alpha::Permission& permission) {
-  if (permission.has_header() || permission.has_metadata()) {
-    validateFail(permission.header().DebugString(), permission.metadata().DebugString());
+static void validatePermission(const envoy::config::rbac::v2::Permission& permission) {
+  if (permission.has_header()) {
+    validateFail(permission.header().DebugString());
   }
   if (permission.has_and_rules()) {
     for (const auto& r : permission.and_rules().rules()) {
@@ -36,9 +36,9 @@ static void validatePermission(const envoy::config::rbac::v2alpha::Permission& p
   }
 }
 
-static void validatePrincipal(const envoy::config::rbac::v2alpha::Principal& principal) {
-  if (principal.has_header() || principal.has_metadata()) {
-    validateFail(principal.header().DebugString(), principal.metadata().DebugString());
+static void validatePrincipal(const envoy::config::rbac::v2::Principal& principal) {
+  if (principal.has_header()) {
+    validateFail(principal.header().DebugString());
   }
   if (principal.has_and_ids()) {
     for (const auto& r : principal.and_ids().ids()) {
@@ -58,7 +58,7 @@ static void validatePrincipal(const envoy::config::rbac::v2alpha::Principal& pri
 /**
  * Validate the RBAC rules doesn't include any header or metadata rule.
  */
-static void validateRbacRules(const envoy::config::rbac::v2alpha::RBAC& rules) {
+static void validateRbacRules(const envoy::config::rbac::v2::RBAC& rules) {
   for (const auto& policy : rules.policies()) {
     for (const auto& permission : policy.second.permissions()) {
       validatePermission(permission);
@@ -85,9 +85,8 @@ RoleBasedAccessControlNetworkFilterConfigFactory::createFilterFactoryFromProtoTy
 /**
  * Static registration for the RBAC network filter. @see RegisterFactory.
  */
-static Registry::RegisterFactory<RoleBasedAccessControlNetworkFilterConfigFactory,
-                                 Server::Configuration::NamedNetworkFilterConfigFactory>
-    registered_;
+REGISTER_FACTORY(RoleBasedAccessControlNetworkFilterConfigFactory,
+                 Server::Configuration::NamedNetworkFilterConfigFactory);
 
 } // namespace RBACFilter
 } // namespace NetworkFilters

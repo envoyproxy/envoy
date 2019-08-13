@@ -16,14 +16,11 @@ namespace Http {
  */
 class RestApiFetcher : public Http::AsyncClient::Callbacks {
 protected:
-  RestApiFetcher(Upstream::ClusterManager& cm,
-                 const envoy::api::v2::core::ApiConfigSource& api_config_source,
-                 Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random);
   RestApiFetcher(Upstream::ClusterManager& cm, const std::string& remote_cluster_name,
                  Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
                  std::chrono::milliseconds refresh_interval,
                  std::chrono::milliseconds request_timeout);
-  ~RestApiFetcher();
+  ~RestApiFetcher() override;
 
   /**
    * Start the fetch sequence. This should be called once.

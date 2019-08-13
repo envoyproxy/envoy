@@ -7,13 +7,13 @@ namespace Envoy {
 
 std::string echo_config;
 
-class EchoIntegrationTest : public BaseIntegrationTest,
-                            public testing::TestWithParam<Network::Address::IpVersion> {
+class EchoIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                            public BaseIntegrationTest {
 public:
   EchoIntegrationTest() : BaseIntegrationTest(GetParam(), echo_config) {}
 
   // Called once by the gtest framework before any EchoIntegrationTests are run.
-  static void SetUpTestCase() {
+  static void SetUpTestSuite() {
     echo_config = ConfigHelper::BASE_CONFIG + R"EOF(
     filter_chains:
       filters:
@@ -42,9 +42,9 @@ public:
   }
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, EchoIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, EchoIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(EchoIntegrationTest, Hello) {
   Buffer::OwnedImpl buffer("hello");
@@ -63,13 +63,14 @@ TEST_P(EchoIntegrationTest, Hello) {
 
 TEST_P(EchoIntegrationTest, AddRemoveListener) {
   const std::string json = TestEnvironment::substitute(R"EOF(
-  {
-    "name": "new_listener",
-    "address": "tcp://{{ ip_loopback_address }}:0",
-    "filters": [
-      { "name": "echo", "config": {} }
-    ]
-  }
+name: new_listener
+address:
+  socket_address:
+    address: "{{ ip_loopback_address }}"
+    port_value: 0
+filter_chains:
+- filters:
+  - name: envoy.echo
   )EOF",
                                                        GetParam());
 
@@ -80,7 +81,7 @@ TEST_P(EchoIntegrationTest, AddRemoveListener) {
       [&listener_added_by_worker]() -> void { listener_added_by_worker.setReady(); });
   test_server_->server().dispatcher().post([this, json, &listener_added_by_manager]() -> void {
     EXPECT_TRUE(test_server_->server().listenerManager().addOrUpdateListener(
-        Server::parseListenerFromJson(json), "", true));
+        Server::parseListenerFromV2Yaml(json), "", true));
     listener_added_by_manager.setReady();
   });
   listener_added_by_worker.waitReady();
@@ -131,8 +132,8 @@ TEST_P(EchoIntegrationTest, AddRemoveListener) {
         new_listener_port, buffer,
         [&](Network::ClientConnection&, const Buffer::Instance&) -> void { FAIL(); }, version_);
     while (connection2.connecting()) {
-      // Don't busy loop, but OS X often needs a moment to decide this connection isn't happening.
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      // Don't busy loop, but macOS often needs a moment to decide this connection isn't happening.
+      timeSystem().sleep(std::chrono::milliseconds(10));
 
       connection2.run(Event::Dispatcher::RunType::NonBlock);
     }
