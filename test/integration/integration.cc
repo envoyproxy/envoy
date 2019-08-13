@@ -180,6 +180,15 @@ void IntegrationTcpClient::waitForData(const std::string& data, bool exact_match
   connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
 }
 
+void IntegrationTcpClient::waitForData(size_t length) {
+  if (payload_reader_->data().size() >= length) {
+    return;
+  }
+
+  payload_reader_->setLengthToWaitFor(length);
+  connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
+}
+
 void IntegrationTcpClient::waitForDisconnect(bool ignore_spurious_events) {
   if (ignore_spurious_events) {
     while (!disconnected_) {

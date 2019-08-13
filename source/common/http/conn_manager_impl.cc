@@ -258,6 +258,18 @@ StreamDecoder& ConnectionManagerImpl::newStream(StreamEncoder& response_encoder,
   return **streams_.begin();
 }
 
+void ConnectionManagerImpl::handleCodecException(const char* error) {
+  ENVOY_CONN_LOG(debug, "dispatch error: {}", read_callbacks_->connection(), error);
+
+  // In the protocol error case, we need to reset all streams now. The connection might stick around
+  // long enough for a pending stream to come back and try to encode.
+  resetAllStreams();
+
+  // HTTP/1.1 codec has already sent a 400 response if possible. HTTP/2 codec has already sent
+  // GOAWAY.
+  read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWriteAndDelay);
+}
+
 Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool) {
   if (!codec_) {
     codec_ = config_.createCodec(read_callbacks_->connection(), data, *this);
@@ -276,18 +288,25 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
 
     try {
       codec_->dispatch(data);
+    } catch (const FrameFloodException& e) {
+      // TODO(mattklein123): This is an emergency substitute for the lack of connection level
+      // logging in the HCM. In a public follow up change we will add full support for connection
+      // level logging in the HCM, similar to what we have in tcp_proxy. This will allow abuse
+      // indicators to be stored in the connection level stream info, and then matched, sampled,
+      // etc. when logged.
+      const envoy::type::FractionalPercent default_value; // 0
+      if (runtime_.snapshot().featureEnabled("http.connection_manager.log_flood_exception",
+                                             default_value)) {
+        ENVOY_CONN_LOG(warn, "downstream HTTP flood from IP '{}': {}",
+                       read_callbacks_->connection(),
+                       read_callbacks_->connection().remoteAddress()->asString(), e.what());
+      }
+
+      handleCodecException(e.what());
+      return Network::FilterStatus::StopIteration;
     } catch (const CodecProtocolException& e) {
-      // HTTP/1.1 codec has already sent a 400 response if possible. HTTP/2 codec has already sent
-      // GOAWAY.
-      ENVOY_CONN_LOG(debug, "dispatch error: {}", read_callbacks_->connection(), e.what());
       stats_.named_.downstream_cx_protocol_error_.inc();
-
-      // In the protocol error case, we need to reset all streams now. Since we do a flush write and
-      // delayed close, the connection might stick around long enough for a pending stream to come
-      // back and try to encode.
-      resetAllStreams();
-
-      read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWriteAndDelay);
+      handleCodecException(e.what());
       return Network::FilterStatus::StopIteration;
     }
 
