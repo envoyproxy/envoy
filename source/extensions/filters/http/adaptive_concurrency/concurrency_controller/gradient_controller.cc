@@ -145,14 +145,14 @@ RequestForwardingAction GradientController::forwardingDecision() {
   while (true) {
     int curr_outstanding = num_rq_outstanding_.load();
     if (curr_outstanding < concurrency_limit_.load()) {
-      if (num_rq_outstanding_.compare_exchange_weak(curr_outstanding, curr_outstanding + 1)) {
-        stats_.rq_outstanding_.inc();
-        return RequestForwardingAction::Forward;
+      if (!num_rq_outstanding_.compare_exchange_weak(curr_outstanding, curr_outstanding + 1)) {
+        // Another thread swooped in and modified num_rq_outstanding_ between the comparison and
+        // attempt at the increment.
+        continue;
       }
 
-      // Another thread swooped in and modified num_rq_outstanding_ between the comparison and
-      // attempt at the increment.
-      continue;
+      stats_.rq_outstanding_.inc();
+      return RequestForwardingAction::Forward;
     }
 
     // Concurrency limit is reached.
@@ -181,9 +181,6 @@ void GradientController::recordLatencySample(const std::chrono::nanoseconds& rq_
     updateMinRTT();
   }
 }
-
-void GradientController::recordLatencySampleForMinRTT(
-    const std::chrono::nanoseconds& /*rq_latency*/) {}
 
 } // namespace ConcurrencyController
 } // namespace AdaptiveConcurrency

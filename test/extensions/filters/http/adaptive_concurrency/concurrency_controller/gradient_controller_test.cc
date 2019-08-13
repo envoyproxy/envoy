@@ -41,17 +41,9 @@ public:
   GradientControllerTest()
       : api_(Api::createApiForTest(time_system_)), dispatcher_(api_->allocateDispatcher()) {}
 
-  std::shared_ptr<GradientController> makeController(const std::string& yaml_config) {
+  GradientControllerSharedPtr makeController(const std::string& yaml_config) {
     return std::make_shared<GradientController>(makeConfig(yaml_config), *dispatcher_, runtime_,
                                                 "test_prefix.", stats_);
-  }
-
-  // Helper function that will attempt to pull forwarding decisions.
-  void tryForward(std::shared_ptr<GradientController> controller,
-                  const bool expect_forward_response) {
-    const auto expected_resp =
-        expect_forward_response ? RequestForwardingAction::Forward : RequestForwardingAction::Block;
-    EXPECT_EQ(expected_resp, controller->forwardingDecision());
   }
 
 protected:
@@ -61,6 +53,24 @@ protected:
             envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig>(
             yaml_config);
     return std::make_shared<GradientControllerConfig>(proto);
+  }
+
+  // Helper function that will attempt to pull forwarding decisions.
+  void tryForward(GradientControllerSharedPtr controller, const bool expect_forward_response) {
+    const auto expected_resp =
+        expect_forward_response ? RequestForwardingAction::Forward : RequestForwardingAction::Block;
+    EXPECT_EQ(expected_resp, controller->forwardingDecision());
+  }
+
+  // Gets the controller past the initial minRTT stage.
+  void advancePastMinRTTStage(GradientControllerSharedPtr controller,
+                              const std::string& yaml_config,
+                              std::chrono::milliseconds latency = std::chrono::milliseconds(5)) {
+    const auto config = makeConfig(yaml_config);
+    for (int ii = 1; ii <= config->min_rtt_aggregate_request_count() + 1; ++ii) {
+      tryForward(controller, true);
+      controller->recordLatencySample(latency);
+    }
   }
 
   Event::SimulatedTimeSystem time_system_;
@@ -201,10 +211,7 @@ min_rtt_calc_params:
   EXPECT_EQ(controller->concurrencyLimit(), 1);
 
   // Force a minRTT of 5ms.
-  for (int ii = 1; ii <= 6; ++ii) {
-    tryForward(controller, true);
-    controller->recordLatencySample(std::chrono::milliseconds(5));
-  }
+  advancePastMinRTTStage(controller, yaml, std::chrono::milliseconds(5));
   EXPECT_EQ(
       5, stats_.gauge("test_prefix.min_rtt_msecs", Stats::Gauge::ImportMode::Accumulate).value());
 
@@ -257,10 +264,7 @@ min_rtt_calc_params:
   EXPECT_EQ(controller->concurrencyLimit(), 1);
 
   // Force a minRTT of 5 seconds.
-  for (int ii = 1; ii <= 6; ++ii) {
-    tryForward(controller, true);
-    controller->recordLatencySample(std::chrono::seconds(5));
-  }
+  advancePastMinRTTStage(controller, yaml, std::chrono::seconds(5));
 
   // circllhist approximates the percentiles, so we can expect it to be within a certain range.
   EXPECT_THAT(
@@ -296,10 +300,7 @@ min_rtt_calc_params:
   EXPECT_EQ(controller->concurrencyLimit(), 1);
 
   // Get minRTT measurement out of the way.
-  for (int ii = 1; ii <= 6; ++ii) {
-    tryForward(controller, true);
-    controller->recordLatencySample(std::chrono::milliseconds(5));
-  }
+  advancePastMinRTTStage(controller, yaml, std::chrono::milliseconds(5));
 
   // Force the limit calculation to run a few times from some measurements.
   for (int sample_iters = 0; sample_iters < 5; ++sample_iters) {
@@ -332,6 +333,50 @@ min_rtt_calc_params:
   EXPECT_EQ(controller->concurrencyLimit(), rq_outstanding());
 }
 
+TEST_F(GradientControllerTest, MinRTTRescheduleTest) {
+  const std::string yaml = R"EOF(
+sample_aggregate_percentile: 0.5
+concurrency_limit_params:
+  max_gradient: 3.0
+  max_concurrency_limit: 
+  concurrency_update_interval: 
+    nanos: 100000000 # 100ms
+min_rtt_calc_params:
+  interval:
+    seconds: 30
+  request_count: 5
+)EOF";
+
+  auto controller = makeController(yaml);
+  EXPECT_EQ(controller->concurrencyLimit(), 1);
+
+  // Get initial minRTT measurement out of the way.
+  advancePastMinRTTStage(controller, yaml, std::chrono::milliseconds(5));
+
+  // Force the limit calculation to run a few times from some measurements.
+  for (int sample_iters = 0; sample_iters < 5; ++sample_iters) {
+    const auto last_concurrency = controller->concurrencyLimit();
+    for (int ii = 1; ii <= 5; ++ii) {
+      tryForward(controller, true);
+      controller->recordLatencySample(std::chrono::milliseconds(4));
+    }
+    time_system_.sleep(std::chrono::milliseconds(101));
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+    // Verify the value is growing.
+    EXPECT_GT(controller->concurrencyLimit(), last_concurrency);
+  }
+
+  // Wait until the minRTT recalculation is triggered again and verify the limit drops.
+  time_system_.sleep(std::chrono::seconds(31));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  EXPECT_EQ(controller->concurrencyLimit(), 1);
+
+  // Verify sample recalculation doesn't occur during the minRTT window.
+  time_system_.sleep(std::chrono::milliseconds(101));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  EXPECT_EQ(controller->concurrencyLimit(), 1);
+}
+
 TEST_F(GradientControllerTest, NoSamplesTest) {
   const std::string yaml = R"EOF(
 sample_aggregate_percentile: 0.5
@@ -350,10 +395,7 @@ min_rtt_calc_params:
   EXPECT_EQ(controller->concurrencyLimit(), 1);
 
   // Get minRTT measurement out of the way.
-  for (int ii = 1; ii <= 6; ++ii) {
-    tryForward(controller, true);
-    controller->recordLatencySample(std::chrono::milliseconds(5));
-  }
+  advancePastMinRTTStage(controller, yaml, std::chrono::milliseconds(5));
 
   // Force the limit calculation to run a few times from some measurements.
   for (int sample_iters = 0; sample_iters < 5; ++sample_iters) {

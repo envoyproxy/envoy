@@ -23,8 +23,6 @@ namespace ConcurrencyController {
 
 /**
  * All stats for the gradient controller.
- *
- * TODO (tonya11en): Add timers for how long minRTT window lasts, etc.
  */
 // clang-format off
 #define ALL_GRADIENT_CONTROLLER_STATS(COUNTER, GAUGE) \
@@ -92,12 +90,10 @@ typedef std::shared_ptr<GradientControllerConfig> GradientControllerConfigShared
  *     limit = old_limit * gradient
  *     new_limit = limit + headroom
  *
- * The headroom value allows for request bursts and is configurable. The default is set to
- * sqrt(limit).
- *
- * TODO (tonya11en) when implemented, mention:
- *   - What is runtime configurable.
- *   - Pinning headroom to specific values.
+ * The headroom value allows for request bursts and is configurable. This value must be present,
+ * since it forces the concurrency limit to increase until there is a deviation from the minRTT
+ * latency. In its absence, the concurrency limit could remain at an unnecessarily small number. The
+ * headroom value is unconfigurable and takes the form of sqrt(limit).
  */
 class GradientController : public ConcurrencyController {
 public:
@@ -114,24 +110,15 @@ public:
 private:
   static GradientControllerStats generateStats(Stats::Scope& scope,
                                                const std::string& stats_prefix);
-  void recordLatencySampleForMinRTT(const std::chrono::nanoseconds& rq_latency);
   void updateMinRTT();
   std::chrono::microseconds processLatencySamplesAndClear()
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(latency_sample_mtx_);
   int calculateNewLimit() ABSL_EXCLUSIVE_LOCKS_REQUIRED(update_window_mtx_);
-  ;
   void setMinRTTSamplingWindow() ABSL_EXCLUSIVE_LOCKS_REQUIRED(update_window_mtx_);
-  ;
   void resetSampleWindow() ABSL_EXCLUSIVE_LOCKS_REQUIRED(update_window_mtx_);
-
-  bool minRTTRequestThresholdReached() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(latency_sample_mtx_) {
-    return static_cast<int>(hist_sample_count(latency_sample_hist_)) >=
-           config_->min_rtt_aggregate_request_count();
-  }
 
   GradientControllerConfigSharedPtr config_;
   Event::Dispatcher& dispatcher_;
-  //  Runtime::Loader& runtime_;
   Stats::Scope& scope_;
   GradientControllerStats stats_;
 
@@ -151,6 +138,7 @@ private:
   Event::TimerPtr min_rtt_calc_timer_;
   Event::TimerPtr sample_reset_timer_;
 };
+typedef std::shared_ptr<GradientController> GradientControllerSharedPtr;
 
 } // namespace ConcurrencyController
 } // namespace AdaptiveConcurrency
