@@ -124,8 +124,10 @@ uint32_t EnvoyQuicServerSession::bufferLimit() const {
 }
 
 void EnvoyQuicServerSession::close(Network::ConnectionCloseType type) {
-  // TODO(danzh): Implement FlushWrite and FlushWriteAndDelay mode.
-  ASSERT(type == Network::ConnectionCloseType::NoFlush);
+  if (type != Network::ConnectionCloseType::NoFlush) {
+    // TODO(danzh): Implement FlushWrite and FlushWriteAndDelay mode.
+    ENVOY_CONN_LOG(error, "Flush write is not implemented for QUIC.", *this);
+  }
   connection()->CloseConnection(quic::QUIC_NO_ERROR, "Closed by application",
                                 quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
 }
