@@ -45,7 +45,7 @@ private:
 
 CompiledMatcherPtr Utility::parseRegex(const envoy::type::matcher::RegexMatcher& matcher) {
   // Google Re is the only currently supported engine.
-  ASSERT(matcher.has_google_re_engine());
+  ASSERT(matcher.has_google_re2());
   return std::make_unique<CompiledGoogleReMatcher>(matcher.regex());
 }
 

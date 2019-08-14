@@ -176,7 +176,7 @@ virtual_hosts:
       cluster: clock
   - match:
       safe_regex:
-        google_re_engine: {}
+        google_re2: {}
         regex: "/baa+"
     route:
       cluster: sheep
@@ -298,7 +298,7 @@ virtual_hosts:
     method: PUT
     name: update_user
   - regex:
-      google_re_engine: {}
+      google_re2: {}
       regex: "^/users/\\d+/location$"
     method: POST
     name: ulu
@@ -4271,7 +4271,7 @@ virtual_hosts:
       allow_origin_regex:
       - .*\.envoyproxy\.io
       allow_origin_safe_regex:
-      - google_re_engine: {}
+      - google_re2: {}
         regex: .*\.envoyproxy\.io
       allow_methods: "test-methods"
       allow_headers: "test-headers"

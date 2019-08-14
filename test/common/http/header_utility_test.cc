@@ -278,7 +278,7 @@ TEST(MatchHeadersTest, HeaderSafeRegexMatch) {
   const std::string yaml = R"EOF(
 name: match-header
 safe_regex_match:
-  google_re_engine: {}
+  google_re2: {}
   regex: \d{3}
   )EOF";
 

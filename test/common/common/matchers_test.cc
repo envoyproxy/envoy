@@ -259,7 +259,7 @@ TEST(MetadataTest, MatchDoubleListValue) {
 
 TEST(StringMatcher, SafeRegexValue) {
   envoy::type::matcher::StringMatcher matcher;
-  matcher.mutable_safe_regex()->mutable_google_re_engine();
+  matcher.mutable_safe_regex()->mutable_google_re2();
   matcher.mutable_safe_regex()->set_regex("foo.*");
   EXPECT_TRUE(Matchers::StringMatcher(matcher).match("foo"));
   EXPECT_TRUE(Matchers::StringMatcher(matcher).match("foobar"));

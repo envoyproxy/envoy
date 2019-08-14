@@ -1,5 +1,7 @@
 #include "common/http/header_map_impl.h"
 
+#include "common/common/regex.h"
+
 #include "extensions/filters/http/cors/cors_filter.h"
 
 #include "test/mocks/buffer/mocks.h"
@@ -648,7 +650,8 @@ TEST_F(CorsFilterTest, OptionsRequestMatchingOriginByRegex) {
   };
 
   cors_policy_->allow_origin_.clear();
-  cors_policy_->allow_origin_regex_.emplace_back(std::regex(".*"));
+  cors_policy_->allow_origin_regex_.emplace_back(
+      Regex::Utility::parseStdRegexAsCompiledMatcher(".*"));
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
 
@@ -671,7 +674,8 @@ TEST_F(CorsFilterTest, OptionsRequestNotMatchingOriginByRegex) {
                                           {"access-control-request-method", "GET"}};
 
   cors_policy_->allow_origin_.clear();
-  cors_policy_->allow_origin_regex_.emplace_back(std::regex(".*.envoyproxy.io"));
+  cors_policy_->allow_origin_regex_.emplace_back(
+      Regex::Utility::parseStdRegexAsCompiledMatcher(".*.envoyproxy.io"));
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, false)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));

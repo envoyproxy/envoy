@@ -29,7 +29,7 @@ TEST(Utility, ParseStdRegex) {
 TEST(Utility, ParseRegex) {
   {
     envoy::type::matcher::RegexMatcher matcher;
-    matcher.mutable_google_re_engine();
+    matcher.mutable_google_re2();
     matcher.set_regex("(+invalid)");
     EXPECT_THROW_WITH_MESSAGE(Utility::parseRegex(matcher), EnvoyException,
                               "no argument for repetition operator: +");
@@ -38,7 +38,7 @@ TEST(Utility, ParseRegex) {
   // Regression test for https://github.com/envoyproxy/envoy/issues/7728
   {
     envoy::type::matcher::RegexMatcher matcher;
-    matcher.mutable_google_re_engine();
+    matcher.mutable_google_re2();
     matcher.set_regex("/asdf/.*");
     const auto compiled_matcher = Utility::parseRegex(matcher);
     const std::string long_string = "/asdf/" + std::string(50 * 1024, 'a');

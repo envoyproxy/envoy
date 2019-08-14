@@ -73,7 +73,7 @@ private:
 
 class StringMatcher : public ValueMatcher {
 public:
-  StringMatcher(const envoy::type::matcher::StringMatcher& matcher);
+  explicit StringMatcher(const envoy::type::matcher::StringMatcher& matcher);
 
   bool match(const absl::string_view value) const;
 

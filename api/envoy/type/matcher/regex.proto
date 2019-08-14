@@ -7,24 +7,26 @@ option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.type.matcher";
 option go_package = "matcher";
 
+import "google/protobuf/wrappers.proto";
 import "validate/validate.proto";
 
 // [#protodoc-title: RegexMatcher]
 
 // A regex matcher designed for safety when used with untrusted input.
 message RegexMatcher {
-  // Google's `re2 <https://github.com/google/re2>`_ regex engine. The regex string must adhere to
+  // Google's `RE2 <https://github.com/google/re2>`_ regex engine. The regex string must adhere to
   // the documented `syntax <https://github.com/google/re2/wiki/Syntax>`_. The engine is designed
-  // to complete execution in linear time as well as limit the amount of memory used. In the future
-  // different aspects of the engine may be made configurable.
-  message GoogleReEngine {
+  // to complete execution in linear time as well as limit the amount of memory used.
+  message GoogleRE2 {
+    // fixfix
+    google.protobuf.UInt32Value max_program_size = 1;
   }
 
   oneof engine_type {
     option (validate.required) = true;
 
-    // Google's re2 regex engine.
-    GoogleReEngine google_re_engine = 1 [(validate.rules).message.required = true];
+    // Google's RE2 regex engine.
+    GoogleRE2 google_re2 = 1 [(validate.rules).message.required = true];
   }
 
   // The regex match string. The string must be supported by the configured engine.
