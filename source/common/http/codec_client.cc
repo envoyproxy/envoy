@@ -62,6 +62,9 @@ StreamEncoder& CodecClient::newStream(StreamDecoder& response_decoder) {
 void CodecClient::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::Connected) {
     ENVOY_CONN_LOG(debug, "connected", *connection_);
+    connection_->streamInfo().setDownstreamLocalAddress(connection_->localAddress());
+    connection_->streamInfo().setDownstreamRemoteAddress(connection_->remoteAddress());
+    connection_->streamInfo().setDownstreamSslConnection(connection_->ssl());
     connected_ = true;
   }
 
