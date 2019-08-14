@@ -86,7 +86,6 @@ jobs:
            command:
              ci/do_circle_ci.sh bazel.coverage
            no_output_timeout: 60m
-       - run: ci/coverage_publish.sh
        - persist_to_workspace:
            root: /build/envoy/generated
            paths:
