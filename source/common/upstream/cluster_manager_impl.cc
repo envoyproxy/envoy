@@ -313,10 +313,7 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
   // Now setup for cross-thread updates.
   cluster.prioritySet().addMemberUpdateCb(
       [&cluster, this](const HostVector&, const HostVector& hosts_removed) -> void {
-        const bool close_connections_on_host_set_change =
-            cluster.info()->lbConfig().close_connections_on_host_set_change();
-
-        if (close_connections_on_host_set_change) {
+        if (cluster.info()->lbConfig().close_connections_on_host_set_change()) {
           for (const auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
             // This will drain all tcp and http connection pools.
             postThreadLocalDrainConnections(cluster, host_set->hosts());

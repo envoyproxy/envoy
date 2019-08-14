@@ -149,9 +149,9 @@ private:
   COUNTER(cluster_removed)                                                                         \
   COUNTER(cluster_updated)                                                                         \
   COUNTER(cluster_updated_via_merge)                                                               \
-  COUNTER(upstream_connections_closed_on_host_set_change)                                          \
   COUNTER(update_merge_cancelled)                                                                  \
   COUNTER(update_out_of_merge_window)                                                              \
+  COUNTER(upstream_connections_closed_on_host_set_change)                                          \
   GAUGE(active_clusters, NeverImport)                                                              \
   GAUGE(warming_clusters, NeverImport)
 

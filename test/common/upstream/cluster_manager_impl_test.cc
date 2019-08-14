@@ -3267,21 +3267,14 @@ TEST_F(TcpKeepaliveTest, TcpKeepaliveWithAllOptions) {
 
 TEST_F(ClusterManagerImplTest, ConnPoolsDrainedOnHostSetChange) {
   const std::string yaml = R"EOF(
-  {
-    "static_resources": {
-      "clusters": [
-        {
-          "name": "cluster_1",
-          "connect_timeout": "0.250s",
-          "type": "STATIC",
-          "lb_policy": "ROUND_ROBIN",
-           "common_lb_config": {
-			  "close_connections_on_host_set_change": true
-		   }
-        }
-      ]
-    }
-  }
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      common_lb_config:
+        close_connections_on_host_set_change: true
   )EOF";
 
   ReadyWatcher initialized;
@@ -3411,18 +3404,12 @@ TEST_F(ClusterManagerImplTest, ConnPoolsDrainedOnHostSetChange) {
 
 TEST_F(ClusterManagerImplTest, ConnPoolsNotDrainedOnHostSetChange) {
   const std::string yaml = R"EOF(
-  {
-    "static_resources": {
-      "clusters": [
-        {
-          "name": "cluster_1",
-          "connect_timeout": "0.250s",
-          "type": "STATIC",
-          "lb_policy": "ROUND_ROBIN"
-        }
-      ]
-    }
-  }
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
   )EOF";
 
   ReadyWatcher initialized;
