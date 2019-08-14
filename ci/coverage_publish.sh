@@ -26,7 +26,7 @@ then
   GCS_LOCATION="envoy-coverage/report-${BRANCH_NAME}"
 
   echo ${GCP_SERVICE_ACCOUNT_KEY} | base64 --decode | gcloud auth activate-service-account --key-file=-
-  gsutil rsync -dr ${COVERAGE_DIR} gs://${GCS_LOCATION}
+  gsutil -m rsync -dr ${COVERAGE_DIR} gs://${GCS_LOCATION}
   echo "Coverage report for branch '${BRANCH_NAME}': https://storage.googleapis.com/${GCS_LOCATION}/index.html"
 else
   echo "Coverage report will not be uploaded for this build."
