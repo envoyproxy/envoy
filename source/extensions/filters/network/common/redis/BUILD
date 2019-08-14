@@ -55,9 +55,9 @@ envoy_cc_library(
     srcs = ["client_impl.cc"],
     hdrs = ["client_impl.h"],
     deps = [
-        ":redis_command_stats_lib",
         ":client_interface",
         ":codec_lib",
+        ":redis_command_stats_lib",
         "//include/envoy/router:router_interface",
         "//include/envoy/stats:timespan",
         "//include/envoy/thread_local:thread_local_interface",

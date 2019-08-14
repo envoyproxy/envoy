@@ -4,6 +4,7 @@
 #include <string>
 
 #include "envoy/stats/scope.h"
+
 #include "common/stats/symbol_table_impl.h"
 
 namespace Envoy {
@@ -11,7 +12,6 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Common {
 namespace Redis {
-
 
 class RedisCommandStats {
 public:
@@ -22,11 +22,10 @@ public:
 
 private:
   Stats::SymbolTable::StoragePtr addPrefix(const Stats::StatNameVec& names);
-  
+
   Stats::Scope& scope_;
   Stats::StatNameSet stat_name_set_;
   const Stats::StatName prefix_;
-
 };
 using RedisCommandStatsPtr = std::shared_ptr<RedisCommandStats>;
 
