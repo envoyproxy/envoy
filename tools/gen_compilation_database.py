@@ -12,8 +12,8 @@ def generateCompilationDatabase(args):
         ["bazel", "build", "--build_tag_filters=-manual", "--jobs=" + os.environ.get('NUM_CPUS')] +
         args.bazel_targets)
 
-  gen_compilation_database_sh = os.path.join(
-      os.path.realpath(os.path.dirname(__file__)), "../bazel/gen_compilation_database.sh")
+  gen_compilation_database_sh = os.path.join(os.path.realpath(os.path.dirname(__file__)),
+                                             "../bazel/gen_compilation_database.sh")
   subprocess.check_call([gen_compilation_database_sh] + args.bazel_targets)
 
 
@@ -80,8 +80,9 @@ if __name__ == "__main__":
   parser.add_argument('--include_genfiles', action='store_true')
   parser.add_argument('--include_headers', action='store_true')
   parser.add_argument('--vscode', action='store_true')
-  parser.add_argument(
-      'bazel_targets', nargs='*', default=["//source/...", "//test/...", "//tools/..."])
+  parser.add_argument('bazel_targets',
+                      nargs='*',
+                      default=["//source/...", "//test/...", "//tools/..."])
   args = parser.parse_args()
   generateCompilationDatabase(args)
   fixCompilationDatabase(args)
