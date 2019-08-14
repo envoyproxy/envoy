@@ -744,7 +744,8 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
         {
           [":method"] = "POST",
           [":path"] = "/",
-          [":authority"] = "foo"
+          [":authority"] = "foo",
+          ["set-cookie"] = { "flavor=chocolate; Path=/", "variant=chewy; Path=/" }
         },
         "hello world",
         5000)
@@ -770,6 +771,8 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
             EXPECT_EQ((Http::TestHeaderMapImpl{{":path", "/"},
                                                {":method", "POST"},
                                                {":authority", "foo"},
+                                               {"set-cookie", "flavor=chocolate; Path=/"},
+                                               {"set-cookie", "variant=chewy; Path=/"},
                                                {"content-length", "11"}}),
                       message->headers());
             callbacks = &cb;
@@ -959,7 +962,10 @@ TEST_F(LuaHttpFilterTest, HttpCallImmediateResponse) {
         nil,
         5000)
       request_handle:respond(
-        {[":status"] = "403"},
+        {
+          [":status"] = "403",
+          ["set-cookie"] = { "flavor=chocolate; Path=/", "variant=chewy; Path=/" }
+        },
         nil)
     end
   )EOF"};
@@ -988,7 +994,9 @@ TEST_F(LuaHttpFilterTest, HttpCallImmediateResponse) {
 
   Http::MessagePtr response_message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  Http::TestHeaderMapImpl expected_headers{{":status", "403"}};
+  Http::TestHeaderMapImpl expected_headers{{":status", "403"},
+                                           {"set-cookie", "flavor=chocolate; Path=/"},
+                                           {"set-cookie", "variant=chewy; Path=/"}};
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
   callbacks->onSuccess(std::move(response_message));
 }
@@ -1668,28 +1676,28 @@ TEST_F(LuaHttpFilterTest, SignatureVerify) {
 
       rawsig = signature:fromhex()
 
-      ok, error = request_handle:verifySignature(hashFunc, pubkey, rawsig, string.len(rawsig), data, string.len(data)) 
+      ok, error = request_handle:verifySignature(hashFunc, pubkey, rawsig, string.len(rawsig), data, string.len(data))
       if ok then
         request_handle:logTrace("signature is valid")
       else
         request_handle:logTrace(error)
       end
 
-      ok, error = request_handle:verifySignature("unknown", pubkey, rawsig, string.len(rawsig), data, string.len(data)) 
+      ok, error = request_handle:verifySignature("unknown", pubkey, rawsig, string.len(rawsig), data, string.len(data))
       if ok then
         request_handle:logTrace("signature is valid")
       else
         request_handle:logTrace(error)
       end
 
-      ok, error = request_handle:verifySignature(hashFunc, pubkey, "0000", 4, data, string.len(data)) 
+      ok, error = request_handle:verifySignature(hashFunc, pubkey, "0000", 4, data, string.len(data))
       if ok then
         request_handle:logTrace("signature is valid")
       else
         request_handle:logTrace(error)
       end
 
-      ok, error = request_handle:verifySignature(hashFunc, pubkey, rawsig, string.len(rawsig), "xxxx", 4) 
+      ok, error = request_handle:verifySignature(hashFunc, pubkey, rawsig, string.len(rawsig), "xxxx", 4)
       if ok then
         request_handle:logTrace("signature is valid")
       else
