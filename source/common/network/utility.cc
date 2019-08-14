@@ -287,7 +287,7 @@ bool Utility::isLocalConnection(const Network::ConnectionSocket& socket) {
       const auto local_address = Address::addressFromSockAddr(
           *addr, (af_look_up == AF_INET) ? sizeof(sockaddr_in) : sizeof(sockaddr_in6));
 
-      if (remote_address == local_address) {
+      if (*remote_address == *local_address) {
         return true;
       }
     }
