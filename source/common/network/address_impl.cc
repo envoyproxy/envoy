@@ -220,11 +220,6 @@ bool Ipv4Instance::operator==(const Instance& rhs) const {
           (ip_.port() == rhs_casted->ip_.port()));
 }
 
-bool Ipv4Instance::equalsExceptPort(const Instance& rhs) const {
-  const Ipv4Instance* rhs_casted = dynamic_cast<const Ipv4Instance*>(&rhs);
-  return (rhs_casted && (ip_.ipv4_.address() == rhs_casted->ip_.ipv4_.address()));
-}
-
 Api::SysCallIntResult Ipv4Instance::bind(int fd) const {
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
   return os_syscalls.bind(fd, sockAddr(), sockAddrLen());
@@ -314,11 +309,6 @@ bool Ipv6Instance::operator==(const Instance& rhs) const {
           (ip_.port() == rhs_casted->ip_.port()));
 }
 
-bool Ipv6Instance::equalsExceptPort(const Instance& rhs) const {
-  const auto* rhs_casted = dynamic_cast<const Ipv6Instance*>(&rhs);
-  return (rhs_casted && (ip_.ipv6_.address() == rhs_casted->ip_.ipv6_.address()));
-}
-
 Api::SysCallIntResult Ipv6Instance::bind(int fd) const {
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
   return os_syscalls.bind(fd, sockAddr(), sockAddrLen());
@@ -377,9 +367,6 @@ PipeInstance::PipeInstance(const std::string& pipe_path) : InstanceBase(Type::Pi
 }
 
 bool PipeInstance::operator==(const Instance& rhs) const { return asString() == rhs.asString(); }
-
-// No port for pipe
-bool PipeInstance::equalsExceptPort(const Instance& rhs) const { return this->operator==(rhs); }
 
 Api::SysCallIntResult PipeInstance::bind(int fd) const {
   if (!abstract_namespace_) {

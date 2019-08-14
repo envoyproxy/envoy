@@ -368,9 +368,6 @@ public:
   bool operator==(const Address::Instance& rhs) const override {
     return asString() == rhs.asString();
   }
-  bool equalsExceptPort(const Address::Instance& rhs) const override {
-    return asString() == rhs.asString();
-  }
   const std::string& asString() const override { return antagonistic_name_; }
   absl::string_view asStringView() const override { return antagonistic_name_; }
   const std::string& logicalName() const override { return antagonistic_name_; }

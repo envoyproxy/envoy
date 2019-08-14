@@ -240,17 +240,32 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersio
 
 bool Utility::isLocalConnection(const Network::ConnectionSocket& socket) {
   const auto& remote_address = socket.remoteAddress();
-  // Before calling getifaddrs, verify the obvious checks.
-  // Note that there are corner cases, where remote and local address will be the same
-  // while the client is not actually local. Example could be an iptables intercepted
-  // connection. However, this is a rare exception and such assumption results in big
-  // performance optimization.
+  // Before calling getifaddrs, verify the obvious checks. These are local:
+  // - Pipes
+  // - Sockets to a loopback address
+  // - Sockets where the local and remote address (ignoring port) are the same
   if (remote_address->type() == Envoy::Network::Address::Type::Pipe ||
-      remote_address->equalsExceptPort(*socket.localAddress()) ||
       isLoopbackAddress(*remote_address)) {
     return true;
   }
+  const auto local_ip = socket.localAddress()->ip();
+  const auto remote_ip = remote_address->ip();
+  if (remote_ip != nullptr && local_ip != nullptr) {
+    switch (remote_ip->version()) {
+    case Network::Address::IpVersion::v4:
+      if (local_ip->ipv4() && local_ip->ipv4()->address() == remote_ip->ipv4()->address()) {
+        return true;
+      }
+      break;
+    case Network::Address::IpVersion::v6:
+      if (local_ip->ipv6() && local_ip->ipv6()->address() == remote_ip->ipv6()->address()) {
+        return true;
+      }
+      break;
+    }
+  }
 
+  // If not obviously local, check if remote addr matches an interface address
   struct ifaddrs* ifaddr;
   const int rc = getifaddrs(&ifaddr);
   Cleanup ifaddr_cleanup([ifaddr] {
@@ -260,8 +275,7 @@ bool Utility::isLocalConnection(const Network::ConnectionSocket& socket) {
   });
   RELEASE_ASSERT(rc == 0, "");
 
-  const auto af_look_up =
-      (remote_address->ip()->version() == Address::IpVersion::v4) ? AF_INET : AF_INET6;
+  const auto af_look_up = (remote_ip->version() == Address::IpVersion::v4) ? AF_INET : AF_INET6;
 
   for (struct ifaddrs* ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
     if (ifa->ifa_addr == nullptr) {

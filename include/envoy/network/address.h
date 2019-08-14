@@ -104,7 +104,6 @@ public:
   virtual ~Instance() = default;
 
   virtual bool operator==(const Instance& rhs) const PURE;
-  virtual bool equalsExceptPort(const Instance& rhs) const PURE;
   bool operator!=(const Instance& rhs) const { return !operator==(rhs); }
 
   /**
