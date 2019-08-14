@@ -7,17 +7,22 @@ option java_outer_classname = "AdaptiveConcurrencyProto";
 option java_multiple_files = true;
 option go_package = "v2alpha";
 
+import "envoy/type/percent.proto";
+
 import "google/protobuf/duration.proto";
 import "google/api/annotations.proto";
 import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
 
+// Configuration parameters for the gradient controller.
 message GradientControllerConfig {
   // The percentile to use when summarizing aggregated samples. Defaults to p50.
   google.protobuf.DoubleValue sample_aggregate_percentile = 1
       [(validate.rules).double = {gte: 0.0, lte: 1.0}];
 
+  // Parameters controlling the periodic recalculation of the concurrency limit from sampled request
+  // latencies.
   message ConcurrencyLimitCalculationParams {
     // The maximum value the gradient is allowed to take. This influences how aggressively the
     // concurrency limit can increase. Defaults to 2.0.
@@ -33,6 +38,7 @@ message GradientControllerConfig {
   ConcurrencyLimitCalculationParams concurrency_limit_params = 2
       [(validate.rules).message.required = true];
 
+  // Parameters controlling the periodic minRTT recalculation.
   message MinimumRTTCalculationParams {
     // The time interval between recalculating the minimum request round-trip time.
     google.protobuf.Duration interval = 1 [(validate.rules).duration.required = true];
@@ -49,7 +55,4 @@ message AdaptiveConcurrency {
     // Gradient concurrency control will be used.
     GradientControllerConfig gradient_controller_config = 1;
   }
-
-  // If set to true, the filter becomes a pass-through and forwards all requests.
-  bool disabled = 2;
 }

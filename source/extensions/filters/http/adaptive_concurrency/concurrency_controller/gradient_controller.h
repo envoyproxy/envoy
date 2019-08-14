@@ -73,7 +73,7 @@ private:
   // The percentile value considered when processing samples.
   double sample_aggregate_percentile_;
 };
-typedef std::shared_ptr<GradientControllerConfig> GradientControllerConfigSharedPtr;
+using GradientControllerConfigSharedPtr = std::shared_ptr<GradientControllerConfig>;
 
 /**
  * A concurrency controller that implements the a variation of the Gradient algorithm to control the
@@ -102,9 +102,10 @@ typedef std::shared_ptr<GradientControllerConfig> GradientControllerConfigShared
 class GradientController : public ConcurrencyController {
 public:
   GradientController(GradientControllerConfigSharedPtr config, Event::Dispatcher& dispatcher,
-                     Runtime::Loader& runtime, std::string stats_prefix, Stats::Scope& scope);
+                     Runtime::Loader& runtime, const std::string& stats_prefix,
+                     Stats::Scope& scope);
 
-  ~GradientController();
+  ~GradientController() override;
 
   // ConcurrencyController.
   RequestForwardingAction forwardingDecision() override;
@@ -140,7 +141,7 @@ private:
   Event::TimerPtr min_rtt_calc_timer_;
   Event::TimerPtr sample_reset_timer_;
 };
-typedef std::shared_ptr<GradientController> GradientControllerSharedPtr;
+using GradientControllerSharedPtr = std::shared_ptr<GradientController>;
 
 } // namespace ConcurrencyController
 } // namespace AdaptiveConcurrency

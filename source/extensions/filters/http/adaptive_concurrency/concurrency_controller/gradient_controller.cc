@@ -40,8 +40,8 @@ GradientControllerConfig::GradientControllerConfig(
 
 GradientController::GradientController(GradientControllerConfigSharedPtr config,
                                        Event::Dispatcher& dispatcher, Runtime::Loader&,
-                                       std::string stats_prefix, Stats::Scope& scope)
-    : config_(config), dispatcher_(dispatcher), scope_(scope),
+                                       const std::string& stats_prefix, Stats::Scope& scope)
+    : config_(std::move(config)), dispatcher_(dispatcher), scope_(scope),
       stats_(generateStats(scope_, stats_prefix)), recalculating_min_rtt_(true),
       num_rq_outstanding_(0), concurrency_limit_(1), latency_sample_hist_(hist_fast_alloc()) {
   min_rtt_calc_timer_ = dispatcher_.createTimer([this]() -> void {
@@ -121,9 +121,9 @@ void GradientController::resetSampleWindow() {
 }
 
 std::chrono::microseconds GradientController::processLatencySamplesAndClear() {
-  const double quantile[1] = {config_->sample_aggregate_percentile()};
-  double ans[1];
-  hist_approx_quantile(latency_sample_hist_, quantile, 1, ans);
+  const std::array<double, 1> quantile{config_->sample_aggregate_percentile()};
+  std::array<double, 1> ans;
+  hist_approx_quantile(latency_sample_hist_, quantile.data(), 1, ans.data());
   hist_clear(latency_sample_hist_);
   return std::chrono::microseconds(static_cast<int>(ans[0]));
 }
@@ -137,7 +137,7 @@ int GradientController::calculateNewLimit() {
   stats_.burst_queue_size_.set(burst_headroom);
 
   const auto clamp = [](int min, int max, int val) { return std::max(min, std::min(max, val)); };
-  return clamp(1, config_->max_concurrency_limit(), limit + burst_headroom);
+  return clamp(1, config_->max_concurrency_limit(), static_cast<int>(limit + burst_headroom));
 }
 
 RequestForwardingAction GradientController::forwardingDecision() {

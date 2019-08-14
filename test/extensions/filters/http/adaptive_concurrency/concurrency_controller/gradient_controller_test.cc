@@ -33,7 +33,7 @@ namespace {
 
 class GradientControllerConfigTest : public testing::Test {
 public:
-  GradientControllerConfigTest() {}
+  GradientControllerConfigTest() = default;
 };
 
 class GradientControllerTest : public testing::Test {
@@ -56,14 +56,15 @@ protected:
   }
 
   // Helper function that will attempt to pull forwarding decisions.
-  void tryForward(GradientControllerSharedPtr controller, const bool expect_forward_response) {
+  void tryForward(const GradientControllerSharedPtr& controller,
+                  const bool expect_forward_response) {
     const auto expected_resp =
         expect_forward_response ? RequestForwardingAction::Forward : RequestForwardingAction::Block;
     EXPECT_EQ(expected_resp, controller->forwardingDecision());
   }
 
   // Gets the controller past the initial minRTT stage.
-  void advancePastMinRTTStage(GradientControllerSharedPtr controller,
+  void advancePastMinRTTStage(const GradientControllerSharedPtr& controller,
                               const std::string& yaml_config,
                               std::chrono::milliseconds latency = std::chrono::milliseconds(5)) {
     const auto config = makeConfig(yaml_config);
@@ -435,8 +436,8 @@ min_rtt_calc_params:
 
   // Verify the configuration affects the timers that are kicked off.
   NiceMock<Event::MockDispatcher> fake_dispatcher;
-  NiceMock<Event::MockTimer>* sample_timer = new NiceMock<Event::MockTimer>;
-  NiceMock<Event::MockTimer>* rtt_timer = new NiceMock<Event::MockTimer>;
+  auto sample_timer = new NiceMock<Event::MockTimer>;
+  auto rtt_timer = new NiceMock<Event::MockTimer>;
 
   // Expect the sample timer to trigger start immediately upon controller creation.
   EXPECT_CALL(fake_dispatcher, createTimer_(_))
