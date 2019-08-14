@@ -18,7 +18,7 @@ public:
   RedisCommandStats(Stats::Scope& scope, const std::string& prefix);
 
   Stats::Counter& counter(std::string name);
-  Stats::Histogram& histogram(std::string name);
+  // Could add histogram timer for each command in future
 
 private:
   Stats::SymbolTable::StoragePtr addPrefix(const Stats::StatNameVec& names);

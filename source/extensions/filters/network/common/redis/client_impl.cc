@@ -75,6 +75,11 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, PoolCallbacks& ca
   pending_requests_.emplace_back(*this, callbacks);
   encoder_->encode(request, encoder_buffer_);
 
+  // TODO: Clean up this part
+  std::vector<RespValue> command_array = request.asArray();
+  std::string command_name = command_array.front().asString();
+  redis_command_stats_->counter(command_name);
+
   // If buffer is full, flush. If the buffer was empty before the request, start the timer.
   if (encoder_buffer_.length() >= config_.maxBufferSizeBeforeFlush()) {
     flushBufferAndResetTimer();

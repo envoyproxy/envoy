@@ -29,10 +29,6 @@ Stats::Counter& RedisCommandStats::counter(std::string name) {
   return scope_.counterFromStatName(stat_name_set_.getStatName(name));
 }
 
-Stats::Histogram& RedisCommandStats::histogram(std::string name) {
-  return scope_.histogramFromStatName(stat_name_set_.getStatName(name));
-}
-
 } // namespace Redis
 } // namespace Common
 } // namespace NetworkFilters
