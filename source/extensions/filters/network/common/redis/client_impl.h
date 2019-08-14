@@ -16,6 +16,7 @@
 #include "common/upstream/upstream_impl.h"
 
 #include "extensions/filters/network/common/redis/client.h"
+#include "extensions/filters/network/common/redis/redis_command_stats.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -132,6 +133,7 @@ private:
   Event::TimerPtr flush_timer_;
   RedisClusterStats redis_cluster_stats_;
   Envoy::TimeSource& time_source_;
+  const RedisCommandStatsPtr& redis_command_stats_;
 };
 
 class ClientFactoryImpl : public ClientFactory {

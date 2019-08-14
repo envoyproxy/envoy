@@ -42,7 +42,8 @@ ClientImpl::ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dis
       config_(config),
       connect_or_op_timer_(dispatcher.createTimer([this]() -> void { onConnectOrOpTimeout(); })),
       flush_timer_(dispatcher.createTimer([this]() -> void { flushBufferAndResetTimer(); })),
-      redis_cluster_stats_(redis_cluster_stats), time_source_(dispatcher.timeSource()) {
+      redis_cluster_stats_(redis_cluster_stats), time_source_(dispatcher.timeSource()),
+      redis_command_stats_(std::move(std::make_shared<RedisCommandStats>(host->cluster().statsScope(), "foo"))) {
   host->cluster().stats().upstream_cx_total_.inc();
   host->stats().cx_total_.inc();
   host->cluster().stats().upstream_cx_active_.inc();
