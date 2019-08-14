@@ -66,3 +66,13 @@ envoy_cc_library(
         "@envoy_api//envoy/config/cluster/redis:redis_cluster_cc",
     ],
 )
+
+envoy_cc_library(
+    name = "redis_cluster_stats_lib",
+    srcs = ["redis_cluster_stats.cc"],
+    hdrs = ["redis_cluster_stats.h"],
+    deps = [
+        "//include/envoy/stats:stats_interface",
+        "//source/common/stats:symbol_table_lib",
+    ],
+)
