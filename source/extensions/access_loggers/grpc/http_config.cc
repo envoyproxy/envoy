@@ -1,4 +1,4 @@
-#include "extensions/access_loggers/http_grpc/config.h"
+#include "extensions/access_loggers/grpc/http_config.h"
 
 #include "envoy/config/accesslog/v2/als.pb.validate.h"
 #include "envoy/config/filter/accesslog/v2/accesslog.pb.validate.h"
@@ -10,8 +10,8 @@
 #include "common/grpc/async_client_impl.h"
 #include "common/protobuf/protobuf.h"
 
-#include "extensions/access_loggers/http_grpc/grpc_access_log_impl.h"
-#include "extensions/access_loggers/http_grpc/grpc_access_log_proto_descriptors.h"
+#include "extensions/access_loggers/grpc/grpc_access_log_proto_descriptors.h"
+#include "extensions/access_loggers/grpc/http_grpc_access_log_impl.h"
 #include "extensions/access_loggers/well_known_names.h"
 
 namespace Envoy {
@@ -30,10 +30,10 @@ HttpGrpcAccessLogFactory::createAccessLogInstance(const Protobuf::Message& confi
 
   const auto& proto_config = MessageUtil::downcastAndValidate<
       const envoy::config::accesslog::v2::HttpGrpcAccessLogConfig&>(config);
-  std::shared_ptr<GrpcAccessLoggerCache> grpc_access_logger_cache =
-      context.singletonManager().getTyped<GrpcAccessLoggerCache>(
+  std::shared_ptr<GrpcCommon::GrpcAccessLoggerCache> grpc_access_logger_cache =
+      context.singletonManager().getTyped<GrpcCommon::GrpcAccessLoggerCache>(
           SINGLETON_MANAGER_REGISTERED_NAME(grpc_access_logger_cache), [&context] {
-            return std::make_shared<GrpcAccessLoggerCacheImpl>(
+            return std::make_shared<GrpcCommon::GrpcAccessLoggerCacheImpl>(
                 context.clusterManager().grpcAsyncClientManager(), context.scope(),
                 context.threadLocal(), context.localInfo());
           });

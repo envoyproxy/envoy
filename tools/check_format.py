@@ -136,7 +136,7 @@ UNOWNED_EXTENSIONS = {
   "extensions/stat_sinks/common",
   "extensions/stat_sinks/common/statsd",
   "extensions/health_checkers/redis",
-  "extensions/access_loggers/http_grpc",
+  "extensions/access_loggers/grpc",
   "extensions/access_loggers/file",
   "extensions/common/tap",
   "extensions/transport_sockets/raw_buffer",
