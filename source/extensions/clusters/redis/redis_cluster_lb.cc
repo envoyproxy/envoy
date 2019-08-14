@@ -15,9 +15,10 @@ bool RedisClusterLoadBalancerFactory::onClusterSlotUpdate(ClusterSlotsPtr&& slot
                                                           Envoy::Upstream::HostMap all_hosts) {
   // The slots is sorted, allowing for a quick comparison to make sure we need to update the slot
   // array sort based on start and end to enable efficient comparison
-  sort(slots->begin(), slots->end(), [](const ClusterSlot& lhs, const ClusterSlot& rhs) -> bool {
-    return lhs.start() < rhs.start() || (!(lhs.start() < rhs.start()) && lhs.end() < rhs.end());
-  });
+  std::sort(
+      slots->begin(), slots->end(), [](const ClusterSlot& lhs, const ClusterSlot& rhs) -> bool {
+        return lhs.start() < rhs.start() || (!(lhs.start() < rhs.start()) && lhs.end() < rhs.end());
+      });
 
   if (current_cluster_slot_ && *current_cluster_slot_ == *slots) {
     return false;

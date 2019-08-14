@@ -77,6 +77,8 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random_;
 };
 
+class RedisLoadBalancerContextImplTest : public testing::Test {};
+
 // Works correctly without any hosts.
 TEST_F(RedisClusterLoadBalancerTest, NoHost) {
   init();
@@ -362,6 +364,62 @@ TEST_F(RedisClusterLoadBalancerTest, ClusterSlotNoUpdate) {
   EXPECT_EQ(false, factory_->onClusterSlotUpdate(
                        std::make_unique<std::vector<ClusterSlot>>(updated_slot), all_hosts));
   validateAssignment(hosts, expected_assignments);
+}
+
+TEST_F(RedisLoadBalancerContextImplTest, Basic) {
+  // Simple read command
+  std::vector<NetworkFilters::Common::Redis::RespValue> get_foo(2);
+  get_foo[0].type(NetworkFilters::Common::Redis::RespType::BulkString);
+  get_foo[0].asString() = "get";
+  get_foo[1].type(NetworkFilters::Common::Redis::RespType::BulkString);
+  get_foo[1].asString() = "foo";
+
+  NetworkFilters::Common::Redis::RespValue get_request;
+  get_request.type(NetworkFilters::Common::Redis::RespType::Array);
+  get_request.asArray().swap(get_foo);
+
+  RedisLoadBalancerContextImpl context1("foo", true, true, get_request,
+                                        NetworkFilters::Common::Redis::Client::ReadPolicy::Master);
+
+  EXPECT_EQ(absl::optional<uint64_t>(44950), context1.computeHashKey());
+  EXPECT_EQ(true, context1.isReadCommand());
+  EXPECT_EQ(NetworkFilters::Common::Redis::Client::ReadPolicy::Master, context1.readPolicy());
+
+  // Simple write command
+  std::vector<NetworkFilters::Common::Redis::RespValue> set_foo(3);
+  set_foo[0].type(NetworkFilters::Common::Redis::RespType::BulkString);
+  set_foo[0].asString() = "set";
+  set_foo[1].type(NetworkFilters::Common::Redis::RespType::BulkString);
+  set_foo[1].asString() = "foo";
+  set_foo[2].type(NetworkFilters::Common::Redis::RespType::BulkString);
+  set_foo[2].asString() = "bar";
+
+  NetworkFilters::Common::Redis::RespValue set_request;
+  set_request.type(NetworkFilters::Common::Redis::RespType::Array);
+  set_request.asArray().swap(set_foo);
+
+  RedisLoadBalancerContextImpl context2("foo", true, true, set_request,
+                                        NetworkFilters::Common::Redis::Client::ReadPolicy::Master);
+
+  EXPECT_EQ(absl::optional<uint64_t>(44950), context2.computeHashKey());
+  EXPECT_EQ(false, context2.isReadCommand());
+  EXPECT_EQ(NetworkFilters::Common::Redis::Client::ReadPolicy::Master, context2.readPolicy());
+}
+
+TEST_F(RedisLoadBalancerContextImplTest, UnsupportedCommand) {
+  std::vector<NetworkFilters::Common::Redis::RespValue> unknown(1);
+  unknown[0].type(NetworkFilters::Common::Redis::RespType::Integer);
+  unknown[0].asInteger() = 1;
+  NetworkFilters::Common::Redis::RespValue unknown_request;
+  unknown_request.type(NetworkFilters::Common::Redis::RespType::Array);
+  unknown_request.asArray().swap(unknown);
+
+  RedisLoadBalancerContextImpl context3("foo", true, true, unknown_request,
+                                        NetworkFilters::Common::Redis::Client::ReadPolicy::Master);
+
+  EXPECT_EQ(absl::optional<uint64_t>(44950), context3.computeHashKey());
+  EXPECT_EQ(false, context3.isReadCommand());
+  EXPECT_EQ(NetworkFilters::Common::Redis::Client::ReadPolicy::Master, context3.readPolicy());
 }
 
 } // namespace Redis

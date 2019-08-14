@@ -269,10 +269,10 @@ void RedisCluster::RedisDiscoverySession::onResponse(
     NetworkFilters::Common::Redis::RespValuePtr&& value) {
   current_request_ = nullptr;
 
-  const uint32_t slot_range_start = 0;
-  const uint32_t slot_range_end = 1;
-  const uint32_t slot_master = 2;
-  const uint32_t slot_slave_start = 3;
+  const uint32_t SlotRangeStart = 0;
+  const uint32_t SlotRangeEnd = 1;
+  const uint32_t SlotMaster = 2;
+  const uint32_t SlotSlaveStart = 3;
 
   // Do nothing if the cluster is empty.
   if (value->type() != NetworkFilters::Common::Redis::RespType::Array || value->asArray().empty()) {
@@ -290,26 +290,26 @@ void RedisCluster::RedisDiscoverySession::onResponse(
     }
     const std::vector<NetworkFilters::Common::Redis::RespValue>& slot_range = part.asArray();
     if (slot_range.size() < 3 ||
-        slot_range[slot_range_start].type() !=
+        slot_range[SlotRangeStart].type() !=
             NetworkFilters::Common::Redis::RespType::Integer || // Start slot range is an integer.
-        slot_range[slot_range_end].type() !=
+        slot_range[SlotRangeEnd].type() !=
             NetworkFilters::Common::Redis::RespType::Integer) { // End slot range is an integer.
       onUnexpectedResponse(value);
       return;
     }
 
     // Field 2: Master address for slot range
-    auto master_address = ProcessCluster(slot_range[slot_master]);
+    auto master_address = ProcessCluster(slot_range[SlotMaster]);
     if (!master_address) {
       onUnexpectedResponse(value);
       return;
     }
 
-    slots->emplace_back(slot_range[slot_range_start].asInteger(),
-                        slot_range[slot_range_end].asInteger(), master_address);
+    slots->emplace_back(slot_range[SlotRangeStart].asInteger(),
+                        slot_range[SlotRangeEnd].asInteger(), master_address);
 
-    for (auto replica = std::next(slot_range.begin(), slot_slave_start);
-         replica != slot_range.end(); ++replica) {
+    for (auto replica = std::next(slot_range.begin(), SlotSlaveStart); replica != slot_range.end();
+         ++replica) {
       auto replica_address = ProcessCluster(*replica);
       if (!replica_address) {
         onUnexpectedResponse(value);

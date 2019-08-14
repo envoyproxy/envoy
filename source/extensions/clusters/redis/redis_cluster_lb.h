@@ -139,12 +139,12 @@ private:
                                  std::move(all_hosts), Upstream::HostsPerLocalityImpl::empty()),
                              nullptr, {}, {});
     }
-    Upstream::HostConstSharedPtr master() const { return master_; }
+    const Upstream::HostConstSharedPtr master() const { return master_; }
     const Upstream::HostSetImpl& replicas() const { return replicas_; }
     const Upstream::HostSetImpl& allHosts() const { return all_hosts_; }
 
   private:
-    Upstream::HostConstSharedPtr master_;
+    const Upstream::HostConstSharedPtr master_;
     Upstream::HostSetImpl replicas_{0, absl::nullopt};
     Upstream::HostSetImpl all_hosts_{0, absl::nullopt};
   };
@@ -177,8 +177,8 @@ private:
     Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext*) override;
 
   private:
-    SlotArraySharedPtr slot_array_;
-    ShardVectorSharedPtr shard_vector_;
+    const SlotArraySharedPtr slot_array_;
+    const ShardVectorSharedPtr shard_vector_;
     Runtime::RandomGenerator& random_;
   };
 
