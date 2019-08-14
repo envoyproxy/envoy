@@ -375,14 +375,14 @@ protected:
     // Add new host.
     expectRedisResolve();
     EXPECT_CALL(membership_updated_, ready());
-    resolve_timer_->callback_();
+    resolve_timer_->invokeCallback();
     EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(1);
     expectClusterSlotResponse(twoSlotsMasters());
     expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120", "127.0.0.2:22120"}));
 
     // No change.
     expectRedisResolve();
-    resolve_timer_->callback_();
+    resolve_timer_->invokeCallback();
     EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(1).WillOnce(Return(false));
     expectClusterSlotResponse(twoSlotsMasters());
     expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120", "127.0.0.2:22120"}));
@@ -390,7 +390,7 @@ protected:
     // Remove host.
     expectRedisResolve();
     EXPECT_CALL(membership_updated_, ready());
-    resolve_timer_->callback_();
+    resolve_timer_->invokeCallback();
     EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(1);
     expectClusterSlotResponse(singleSlotMasterSlave("127.0.0.1", "127.0.0.2", 22120));
     expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
@@ -607,7 +607,7 @@ TEST_F(RedisClusterTest, RedisResolveFailure) {
   EXPECT_EQ(1U, cluster_->info()->stats().update_failure_.value());
 
   expectRedisResolve(true);
-  resolve_timer_->callback_();
+  resolve_timer_->invokeCallback();
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(1);
@@ -616,7 +616,7 @@ TEST_F(RedisClusterTest, RedisResolveFailure) {
 
   // Expect no change if resolve failed.
   expectRedisResolve();
-  resolve_timer_->callback_();
+  resolve_timer_->invokeCallback();
   expectClusterSlotFailure();
   expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
   EXPECT_EQ(3U, cluster_->info()->stats().update_attempt_.value());
@@ -675,7 +675,7 @@ TEST_F(RedisClusterTest, RedisErrorResponse) {
   EXPECT_EQ(1U, cluster_->info()->stats().update_failure_.value());
 
   expectRedisResolve();
-  resolve_timer_->callback_();
+  resolve_timer_->invokeCallback();
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(1);
@@ -689,7 +689,7 @@ TEST_F(RedisClusterTest, RedisErrorResponse) {
   for (uint64_t i = 0; i < (1 << 10); i++) {
     std::bitset<10> flags(i);
     expectRedisResolve();
-    resolve_timer_->callback_();
+    resolve_timer_->invokeCallback();
     if (flags.all()) {
       EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(1).WillOnce(Return(false));
     }
