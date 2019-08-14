@@ -8,14 +8,14 @@
 namespace Envoy {
 namespace Config {
 
-// DeltaSubscriptionImpl provides a top-level interface to the Envoy's communication with an xDS
-// server, for use by the various xDS users within Envoy. It is built around a (shared)
+// DeltaSubscriptionImpl provides a top-level interface to the Envoy's gRPC communication with
+// an xDS server, for use by the various xDS users within Envoy. It is built around a (shared)
 // NewGrpcMuxImpl, and the further machinery underlying that. An xDS user indicates interest in
 // various resources via start() and updateResourceInterest(). It receives updates to those
 // resources via the SubscriptionCallbacks it provides. Multiple users can each have their own
 // Subscription object for the same type_url; NewGrpcMuxImpl maintains a subscription to the
-// union of interested resources, and delivers to the users just the resource updates that they are
-// "watching" for.
+// union of interested resources, and delivers to the users just the resource updates that they
+// are "watching" for.
 //
 // DeltaSubscriptionImpl and NewGrpcMuxImpl are both built to provide both regular xDS and ADS,
 // distinguished by whether multiple DeltaSubscriptionImpls are sharing a single

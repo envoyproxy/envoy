@@ -72,9 +72,10 @@ public:
     subscription_->start(cluster_names);
   }
 
-  void expectSendMessage(const std::set<std::string>& cluster_names,
-                         const std::string& version) override {
+  void expectSendMessage(const std::set<std::string>& cluster_names, const std::string& version,
+                         bool expect_node = false) override {
     UNREFERENCED_PARAMETER(version);
+    UNREFERENCED_PARAMETER(expect_node);
     expectSendMessage(cluster_names, {}, Grpc::Status::GrpcStatus::Ok, "", {});
   }
 
@@ -173,7 +174,7 @@ public:
 
   void expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds timeout) override {
     init_timeout_timer_ = new Event::MockTimer(&dispatcher_);
-    EXPECT_CALL(*init_timeout_timer_, enableTimer(std::chrono::milliseconds(timeout)));
+    EXPECT_CALL(*init_timeout_timer_, enableTimer(timeout));
   }
 
   void expectDisableInitFetchTimeoutTimer() override {

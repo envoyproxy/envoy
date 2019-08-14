@@ -50,22 +50,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "filesystem_subscription_lib",
-    srcs = ["filesystem_subscription_impl.cc"],
-    hdrs = ["filesystem_subscription_impl.h"],
-    deps = [
-        "//include/envoy/config:subscription_interface",
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/filesystem:filesystem_interface",
-        "//source/common/common:minimal_logger_lib",
-        "//source/common/config:utility_lib",
-        "//source/common/protobuf",
-        "//source/common/protobuf:message_validator_lib",
-        "//source/common/protobuf:utility_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "datasource_lib",
     srcs = ["datasource.cc"],
     hdrs = ["datasource.h"],
@@ -116,6 +100,22 @@ envoy_cc_library(
         "//source/common/grpc:common_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/api/v2:discovery_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "filesystem_subscription_lib",
+    srcs = ["filesystem_subscription_impl.cc"],
+    hdrs = ["filesystem_subscription_impl.h"],
+    deps = [
+        "//include/envoy/config:subscription_interface",
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/filesystem:filesystem_interface",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/config:utility_lib",
+        "//source/common/protobuf",
+        "//source/common/protobuf:message_validator_lib",
+        "//source/common/protobuf:utility_lib",
     ],
 )
 

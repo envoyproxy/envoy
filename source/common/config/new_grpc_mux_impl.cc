@@ -87,7 +87,7 @@ void NewGrpcMuxImpl::onEstablishmentFailure() {
       all_subscribed[sub.first] = &sub.second->sub_state_;
     }
     for (auto& sub : all_subscribed) {
-      if (already_called.insert(sub).second) { // insert succeeded --> not already called
+      if (already_called.insert(sub).second) { // insert succeeded ==> not already called
         sub.second->handleEstablishmentFailure();
       }
     }

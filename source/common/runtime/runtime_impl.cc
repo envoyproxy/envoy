@@ -35,6 +35,17 @@ bool runtimeFeatureEnabled(absl::string_view feature) {
   return RuntimeFeaturesDefaults::get().enabledByDefault(feature);
 }
 
+uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
+  ASSERT(absl::StartsWith(feature, "envoy.reloadable_features"));
+  if (Runtime::LoaderSingleton::getExisting()) {
+    return Runtime::LoaderSingleton::getExisting()->threadsafeSnapshot()->getInteger(
+        std::string(feature), default_value);
+  }
+  ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::runtime), warn,
+                      "Unable to use runtime singleton for feature {}", feature);
+  return default_value;
+}
+
 const size_t RandomGeneratorImpl::UUID_LENGTH = 36;
 
 uint64_t RandomGeneratorImpl::random() {

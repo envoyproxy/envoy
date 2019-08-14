@@ -23,6 +23,7 @@ dynamic_resources:
     ads: {{}}
   ads_config:
     api_type: {}
+    set_node_on_first_message_only: true
 static_resources:
   clusters:
     name: dummy_cluster

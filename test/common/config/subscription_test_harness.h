@@ -36,9 +36,10 @@ public:
    * Expect that an update request is sent by the Subscription implementation.
    * @param cluster_names cluster names to expect in the request.
    * @param version version_info to expect in the request.
+   * @param expect_node whether the node information should be expected
    */
   virtual void expectSendMessage(const std::set<std::string>& cluster_names,
-                                 const std::string& version) PURE;
+                                 const std::string& version, bool expect_node) PURE;
 
   /**
    * Deliver a response to the Subscription implementation and validate.

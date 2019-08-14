@@ -49,15 +49,17 @@ TEST_P(AdsIntegrationTest, Failure) {
 
   // Send initial configuration, failing each xDS once (via a type mismatch), validate we can
   // process a request.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
   sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
       Config::TypeUrl::get().Cluster, {buildClusterLoadAssignment("cluster_0")},
       {buildClusterLoadAssignment("cluster_0")}, {}, "1");
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}, {}, {}));
 
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {},
-                                      Grpc::Status::GrpcStatus::Internal, "does not match"));
+  EXPECT_TRUE(compareDiscoveryRequest(
+      Config::TypeUrl::get().Cluster, "", {}, {}, {}, false, Grpc::Status::GrpcStatus::Internal,
+      fmt::format("{} does not match {}", Config::TypeUrl::get().ClusterLoadAssignment,
+                  Config::TypeUrl::get().Cluster)));
   sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
                                                  {buildCluster("cluster_0")},
                                                  {buildCluster("cluster_0")}, {}, "1");
@@ -69,9 +71,11 @@ TEST_P(AdsIntegrationTest, Failure) {
                                                  {buildCluster("cluster_0")}, {}, "1");
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}, {}, {}));
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",
-                                      {"cluster_0"}, {}, {}, Grpc::Status::GrpcStatus::Internal,
-                                      "does not match"));
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "", {"cluster_0"}, {},
+                              {}, false, Grpc::Status::GrpcStatus::Internal,
+                              fmt::format("{} does not match {}", Config::TypeUrl::get().Cluster,
+                                          Config::TypeUrl::get().ClusterLoadAssignment)));
   sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
       Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")},
       {buildClusterLoadAssignment("cluster_0")}, {}, "1");
@@ -82,8 +86,10 @@ TEST_P(AdsIntegrationTest, Failure) {
       Config::TypeUrl::get().Listener, {buildRouteConfig("listener_0", "route_config_0")},
       {buildRouteConfig("listener_0", "route_config_0")}, {}, "1");
 
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}, {}, {},
-                                      Grpc::Status::GrpcStatus::Internal, "does not match"));
+  EXPECT_TRUE(compareDiscoveryRequest(
+      Config::TypeUrl::get().Listener, "", {}, {}, {}, false, Grpc::Status::GrpcStatus::Internal,
+      fmt::format("{} does not match {}", Config::TypeUrl::get().RouteConfiguration,
+                  Config::TypeUrl::get().Listener)));
   sendDiscoveryResponse<envoy::api::v2::Listener>(
       Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")},
       {buildListener("listener_0", "route_config_0")}, {}, "1");
@@ -95,9 +101,11 @@ TEST_P(AdsIntegrationTest, Failure) {
       {buildListener("route_config_0", "cluster_0")}, {}, "1");
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "1", {}, {}, {}));
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "",
-                                      {"route_config_0"}, {}, {},
-                                      Grpc::Status::GrpcStatus::Internal, "does not match"));
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "", {"route_config_0"}, {},
+                              {}, false, Grpc::Status::GrpcStatus::Internal,
+                              fmt::format("{} does not match {}", Config::TypeUrl::get().Listener,
+                                          Config::TypeUrl::get().RouteConfiguration)));
   sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
       Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig("route_config_0", "cluster_0")},
       {buildRouteConfig("route_config_0", "cluster_0")}, {}, "1");
@@ -115,7 +123,7 @@ TEST_P(AdsIntegrationTest, DuplicateWarmingListeners) {
   initialize();
 
   // Send initial configuration, validate we can process a request.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
   sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
                                                  {buildCluster("cluster_0")},
                                                  {buildCluster("cluster_0")}, {}, "1");
@@ -184,7 +192,7 @@ TEST_P(AdsIntegrationTest, DuplicateInitialClusters) {
 
   // Send initial configuration, failing each xDS once (via a type mismatch), validate we can
   // process a request.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
   sendDiscoveryResponse<envoy::api::v2::Cluster>(
       Config::TypeUrl::get().Cluster,
       {buildCluster("duplicate_cluster"), buildCluster("duplicate_cluster")},
@@ -199,7 +207,7 @@ TEST_P(AdsIntegrationTest, DuplicateWarmingClusters) {
   initialize();
 
   // Send initial configuration, validate we can process a request.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
   sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
                                                  {buildCluster("cluster_0")},
                                                  {buildCluster("cluster_0")}, {}, "1");
@@ -244,7 +252,7 @@ TEST_P(AdsIntegrationTest, CdsPausedDuringWarming) {
   initialize();
 
   // Send initial configuration, validate we can process a request.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
   sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
                                                  {buildCluster("cluster_0")},
                                                  {buildCluster("cluster_0")}, {}, "1");
@@ -328,7 +336,7 @@ TEST_P(AdsIntegrationTest, ClusterWarmingOnNamedResponse) {
   initialize();
 
   // Send initial configuration, validate we can process a request.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
   sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
                                                  {buildCluster("cluster_0")},
                                                  {buildCluster("cluster_0")}, {}, "1");
@@ -463,7 +471,7 @@ TEST_P(AdsIntegrationTest, RdsAfterLdsInvalidated) {
   // ---------------------
 
   // Initial request for any cluster, respond with cluster_0 version 1
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
   sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
                                                  {buildCluster("cluster_0")},
                                                  {buildCluster("cluster_0")}, {}, "1");
@@ -655,7 +663,7 @@ TEST_P(AdsIntegrationTest, XdsBatching) {
 
     EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",
                                         {"eds_cluster2", "eds_cluster"},
-                                        {"eds_cluster2", "eds_cluster"}, {}));
+                                        {"eds_cluster2", "eds_cluster"}, {}, true));
     sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
         Config::TypeUrl::get().ClusterLoadAssignment,
         {buildClusterLoadAssignment("eds_cluster"), buildClusterLoadAssignment("eds_cluster2")},
@@ -682,7 +690,7 @@ TEST_P(AdsIntegrationTest, ListenerDrainBeforeServerStart) {
   initialize();
 
   // Initial request for cluster, response for cluster_0.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
   sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
                                                  {buildCluster("cluster_0")},
                                                  {buildCluster("cluster_0")}, {}, "1");

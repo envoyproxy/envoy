@@ -58,14 +58,12 @@ void DeltaSubscriptionImpl::onConfigUpdate(
 void DeltaSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason reason,
                                                  const EnvoyException* e) {
   stats_.update_attempt_.inc();
-  // TODO(htuch): Less fragile signal that this is failure vs. reject.
-  if (e == nullptr) {
+  if (reason == ConfigUpdateFailureReason::FetchTimedout) {
+    stats_.init_fetch_timeout_.inc();
+  } else if (e == nullptr) {
     stats_.update_failure_.inc();
   } else {
     stats_.update_rejected_.inc();
-  }
-  if (reason == ConfigUpdateFailureReason::FetchTimedout) {
-    stats_.init_fetch_timeout_.inc();
   }
   callbacks_.onConfigUpdateFailed(reason, e);
 }

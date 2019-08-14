@@ -49,8 +49,9 @@ public:
     test_harness_->updateResourceInterest(cluster_names);
   }
 
-  void expectSendMessage(const std::set<std::string>& cluster_names, const std::string& version) {
-    test_harness_->expectSendMessage(cluster_names, version);
+  void expectSendMessage(const std::set<std::string>& cluster_names, const std::string& version,
+                         bool expect_node) {
+    test_harness_->expectSendMessage(cluster_names, version, expect_node);
   }
 
   AssertionResult statsAre(uint32_t attempt, uint32_t success, uint32_t rejected, uint32_t failure,
@@ -146,6 +147,9 @@ TEST_P(SubscriptionImplTest, UpdateResources) {
 
 // Validate that initial fetch timer is created and calls callback on timeout
 TEST_P(SubscriptionImplInitFetchTimeoutTest, InitialFetchTimeout) {
+  if (GetParam() == SubscriptionType::Filesystem) {
+    return; // initial_fetch_timeout not implemented for filesystem.
+  }
   InSequence s;
   expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds(1000));
   startSubscription({"cluster0", "cluster1"});

@@ -33,7 +33,7 @@ class HttpConnectionManagerFilterConfigFactory
           envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager> {
 public:
   HttpConnectionManagerFilterConfigFactory()
-      : FactoryBase(NetworkFilterNames::get().HttpConnectionManager) {}
+      : FactoryBase(NetworkFilterNames::get().HttpConnectionManager, true) {}
 
   // NamedNetworkFilterConfigFactory
   Network::FilterFactoryCb
@@ -145,7 +145,7 @@ private:
   enum class CodecType { HTTP1, HTTP2, AUTO };
   void processFilter(
       const envoy::config::filter::network::http_connection_manager::v2::HttpFilter& proto_config,
-      int i, absl::string_view prefix, FilterFactoriesList& filter_factories);
+      int i, absl::string_view prefix, FilterFactoriesList& filter_factories, bool& is_terminal);
 
   Server::Configuration::FactoryContext& context_;
   FilterFactoriesList filter_factories_;

@@ -627,6 +627,7 @@ params
 paren
 parentid
 parsers
+passthroughs
 pausable
 pcall
 pcap

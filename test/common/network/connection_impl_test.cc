@@ -1736,6 +1736,7 @@ TEST_F(PostCloseConnectionImplTest, ReadAfterCloseFlushWriteDelayIgnored) {
 
   // Delayed connection close.
   EXPECT_CALL(dispatcher_, createTimer_(_));
+  EXPECT_CALL(*file_event_, setEnabled(Event::FileReadyType::Closed));
   connection_->close(ConnectionCloseType::FlushWriteAndDelay);
 
   // Read event, doRead() happens on connection but no filter onData().
@@ -1760,6 +1761,10 @@ TEST_F(PostCloseConnectionImplTest, ReadAfterCloseFlushWriteDelayIgnoredWithWrit
 
   // Delayed connection close.
   EXPECT_CALL(dispatcher_, createTimer_(_));
+  // With half-close semantics enabled we will not wait for early close notification.
+  // See the `Envoy::Network::ConnectionImpl::readDisable()' method for more details.
+  EXPECT_CALL(*file_event_, setEnabled(0));
+  connection_->enableHalfClose(true);
   connection_->close(ConnectionCloseType::FlushWriteAndDelay);
 
   // Read event, doRead() happens on connection but no filter onData().
