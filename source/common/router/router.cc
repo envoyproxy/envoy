@@ -1538,7 +1538,8 @@ void Filter::UpstreamRequest::onPoolFailure(Http::ConnectionPool::PoolFailureRea
 }
 
 void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
-                                          Upstream::HostDescriptionConstSharedPtr host) {
+                                          Upstream::HostDescriptionConstSharedPtr host,
+                                          const StreamInfo::StreamInfo& info) {
   ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks_);
 
   host->outlierDetector().putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS);
@@ -1546,6 +1547,9 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
   // TODO(ggreenway): set upstream local address in the StreamInfo.
   onUpstreamHostSelected(host);
   request_encoder.getStream().addCallbacks(*this);
+
+  stream_info_.setUpstreamSslConnection(info.downstreamSslConnection());
+  parent_.callbacks_->streamInfo().setUpstreamSslConnection(info.downstreamSslConnection());
 
   if (parent_.downstream_end_stream_) {
     setupPerTryTimeout();

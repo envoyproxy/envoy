@@ -187,9 +187,7 @@ struct StreamInfoImpl : public StreamInfo {
     upstream_ssl_info_ = connection_info;
   }
 
-  const Ssl::ConnectionInfo* upstreamSslConnection() const override {
-    return upstream_ssl_info_;
-  }
+  const Ssl::ConnectionInfo* upstreamSslConnection() const override { return upstream_ssl_info_; }
 
   const Router::RouteEntry* routeEntry() const override { return route_entry_; }
 
