@@ -176,8 +176,8 @@ public:
     xds_stream_->startGrpcStream();
     fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
-    EXPECT_TRUE(
-        compareSotwDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "", {"my_route"}));
+    EXPECT_TRUE(compareSotwDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "",
+                                            {"my_route"}, true));
     sendSotwDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
         Config::TypeUrl::get().RouteConfiguration, {rdsConfig()}, "1");
 

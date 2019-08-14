@@ -88,6 +88,7 @@ public:
 
 protected:
   bool remoteClosed() { return remote_closed_; }
+  void closeLocal(bool end_stream);
 
   AsyncClientImpl& parent_;
 
@@ -281,7 +282,6 @@ private:
   };
 
   void cleanup();
-  void closeLocal(bool end_stream);
   void closeRemote(bool end_stream);
   bool complete() { return local_closed_ && remote_closed_; }
 
@@ -383,12 +383,12 @@ public:
 
 private:
   void initialize();
-  void onComplete();
 
   // AsyncClient::StreamCallbacks
   void onHeaders(HeaderMapPtr&& headers, bool end_stream) override;
   void onData(Buffer::Instance& data, bool end_stream) override;
   void onTrailers(HeaderMapPtr&& trailers) override;
+  void onComplete() override;
   void onReset() override;
 
   // Http::StreamDecoderFilterCallbacks

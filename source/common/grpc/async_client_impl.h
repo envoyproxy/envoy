@@ -55,6 +55,7 @@ public:
   void onHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
   void onData(Buffer::Instance& data, bool end_stream) override;
   void onTrailers(Http::HeaderMapPtr&& trailers) override;
+  void onComplete() override;
   void onReset() override;
 
   // Grpc::AsyncStream

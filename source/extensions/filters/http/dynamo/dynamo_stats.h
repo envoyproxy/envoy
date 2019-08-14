@@ -16,8 +16,8 @@ class DynamoStats {
 public:
   DynamoStats(Stats::Scope& scope, const std::string& prefix);
 
-  Stats::Counter& counter(const std::vector<Stats::StatName>& names);
-  Stats::Histogram& histogram(const std::vector<Stats::StatName>& names);
+  Stats::Counter& counter(const Stats::StatNameVec& names);
+  Stats::Histogram& histogram(const Stats::StatNameVec& names);
 
   /**
    * Creates the partition id stats string. The stats format is
@@ -31,18 +31,20 @@ public:
 
   static size_t groupIndex(uint64_t status);
 
-  Stats::StatName getStatName(const std::string& str);
+  /**
+   * Finds or creates a StatName by string, taking a global lock if needed.
+   *
+   * TODO(jmarantz): Potential perf issue here with mutex contention for names
+   * that have not been remembered as builtins in the constructor.
+   */
+  Stats::StatName getStatName(const std::string& str) { return stat_name_set_.getStatName(str); }
 
 private:
-  Stats::SymbolTable::StoragePtr addPrefix(const std::vector<Stats::StatName>& names);
+  Stats::SymbolTable::StoragePtr addPrefix(const Stats::StatNameVec& names);
 
   Stats::Scope& scope_;
-  Stats::StatNamePool pool_ GUARDED_BY(mutex_);
+  Stats::StatNameSet stat_name_set_;
   const Stats::StatName prefix_;
-  absl::Mutex mutex_;
-  using StringStatNameMap = absl::flat_hash_map<std::string, Stats::StatName>;
-  StringStatNameMap builtin_stat_names_;
-  StringStatNameMap dynamic_stat_names_ GUARDED_BY(mutex_);
 
 public:
   const Stats::StatName batch_failure_unprocessed_keys_;

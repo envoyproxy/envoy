@@ -3,9 +3,11 @@
 Route table check tool
 ======================
 
-**NOTE: The following configuration is for the route table check tool only and is not part of the Envoy binary.
-The route table check tool is a standalone binary that can be used to verify Envoy's routing for a given configuration
-file.**
+.. note::
+
+  The following configuration is for the route table check tool only and is not part of the Envoy binary.
+  The route table check tool is a standalone binary that can be used to verify Envoy's routing for a given configuration
+  file.
 
 The following specifies input to the route table check tool. The route table check tool checks if
 the route returned by a :ref:`router <envoy_api_msg_RouteConfiguration>` matches what is expected.
@@ -148,3 +150,36 @@ validate
 
     value
       *(required, string)* The value of the header field to match.
+
+Coverage
+--------
+
+The router check tool will report route coverage at the end of a successful test run.
+
+.. code:: bash
+
+  > bazel-bin/test/tools/router_check/router_check_tool --config-path ... --test-path ... --useproto
+  Current route coverage: 0.0744863
+
+This reporting can be leveraged to enforce a minimum coverage percentage by using
+the `-f` or `--fail-under` flag. If coverage falls below this percentage the test
+run will fail.
+
+.. code:: bash
+
+  > bazel-bin/test/tools/router_check/router_check_tool --config-path ... --test-path ... --useproto --fail-under 8
+  Current route coverage: 7.44863%
+  Failed to meet coverage requirement: 8%
+
+
+By default the coverage report measures test coverage by checking that at least one field is
+verified for every route. However, this can leave holes in the tests where fields
+aren't validated and later changed. For more comprehensive coverage you can add a flag,
+`--covall`, which will calculate coverage taking into account all of the possible
+fields that could be tested.
+
+.. code:: bash
+
+  > bazel-bin/test/tools/router_check/router_check_tool --config-path ... --test-path ... --useproto --f 7 --covall
+  Current route coverage: 6.2948%
+  Failed to meet coverage requirement: 7%

@@ -58,8 +58,9 @@ public:
     }
   }
 
-  void expectSendMessage(const std::set<std::string>& cluster_names,
-                         const std::string& version) override {
+  void expectSendMessage(const std::set<std::string>& cluster_names, const std::string& version,
+                         bool expect_node = false) override {
+    UNREFERENCED_PARAMETER(expect_node);
     EXPECT_CALL(cm_, httpAsyncClientForCluster("eds_cluster"));
     EXPECT_CALL(cm_.async_client_, send_(_, _, _))
         .WillOnce(Invoke([this, cluster_names, version](Http::MessagePtr& request,
@@ -139,7 +140,8 @@ public:
           .WillOnce(ThrowOnRejectedConfig(accept));
     }
     if (!accept) {
-      EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
+      EXPECT_CALL(callbacks_, onConfigUpdateFailed(
+                                  Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, _));
     }
     EXPECT_CALL(random_gen_, random()).WillOnce(Return(0));
     EXPECT_CALL(*timer_, enableTimer(_));
@@ -152,7 +154,7 @@ public:
   }
 
   void expectConfigUpdateFailed() override {
-    EXPECT_CALL(callbacks_, onConfigUpdateFailed(nullptr));
+    EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, nullptr));
   }
 
   void expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds timeout) override {
