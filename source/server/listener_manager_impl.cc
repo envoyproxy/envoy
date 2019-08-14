@@ -64,6 +64,10 @@ std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetwor
     auto& factory =
         Config::Utility::getAndCheckFactory<Configuration::NamedNetworkFilterConfigFactory>(
             string_name);
+
+    Config::Utility::validateTerminalFilters(filters[i].name(), "network",
+                                             factory.isTerminalFilter(), i == filters.size() - 1);
+
     Network::FilterFactoryCb callback;
     if (Config::Utility::allowDeprecatedV1Config(context.runtime(), *filter_config)) {
       callback = factory.createFilterFactory(*filter_config->getObject("value", true), context);
@@ -204,7 +208,8 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
       local_drain_manager_(parent.factory_.createDrainManager(config.drain_type())),
       config_(config), version_info_(version_info),
       listener_filters_timeout_(
-          PROTOBUF_GET_MS_OR_DEFAULT(config, listener_filters_timeout, 15000)) {
+          PROTOBUF_GET_MS_OR_DEFAULT(config, listener_filters_timeout, 15000)),
+      continue_on_listener_filters_timeout_(config.continue_on_listener_filters_timeout()) {
   if (config.has_transparent()) {
     addListenSocketOptions(Network::SocketOptionFactory::buildIpTransparentOptions());
   }
