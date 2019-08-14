@@ -16,7 +16,7 @@ public:
   CompiledStdMatcher(std::regex&& regex) : regex_(std::move(regex)) {}
 
   // CompiledMatcher
-  bool match(absl::string_view value) const {
+  bool match(absl::string_view value) const override {
     return std::regex_match(value.begin(), value.end(), regex_);
   }
 
@@ -33,7 +33,7 @@ public:
   }
 
   // CompiledMatcher
-  bool match(absl::string_view value) const {
+  bool match(absl::string_view value) const override {
     return re2::RE2::FullMatch(re2::StringPiece(value.data(), value.size()), regex_);
   }
 

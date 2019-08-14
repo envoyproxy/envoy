@@ -34,6 +34,8 @@ maybeCreateStringMatcher(const envoy::api::v2::route::QueryParameterMatcher& con
     return Matchers::StringMatcher(matcher_config);
   }
   }
+
+  NOT_REACHED_GCOVR_EXCL_LINE; // Needed for gcc
 }
 
 } // namespace
