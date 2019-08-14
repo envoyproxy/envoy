@@ -85,6 +85,7 @@ EVAL
 EVLOOP
 EVP
 EWOULDBLOCK
+EXPECTs
 EXPR
 FAQ
 FDs
@@ -468,6 +469,7 @@ evthread
 evwatch
 exe
 execlp
+expectDeltaAndSotwUpdate
 facto
 favicon
 fd
@@ -624,6 +626,7 @@ params
 paren
 parentid
 parsers
+passthroughs
 pcall
 pcap
 pclose

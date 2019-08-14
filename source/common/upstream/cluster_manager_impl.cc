@@ -228,7 +228,8 @@ ClusterManagerImpl::ClusterManagerImpl(
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
         random_, stats_,
-        Envoy::Config::Utility::parseRateLimitSettings(bootstrap.dynamic_resources().ads_config()));
+        Envoy::Config::Utility::parseRateLimitSettings(bootstrap.dynamic_resources().ads_config()),
+        bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only());
   } else {
     ads_mux_ = std::make_unique<Config::NullGrpcMuxImpl>();
   }
