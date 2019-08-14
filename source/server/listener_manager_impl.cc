@@ -65,11 +65,8 @@ std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetwor
         Config::Utility::getAndCheckFactory<Configuration::NamedNetworkFilterConfigFactory>(
             string_name);
 
-    // TODO(alyssar) replace this block and reinstate TerminalNotLast test once echo2 is updated
-    if (factory.isTerminalFilter() && i != filters.size() - 1) {
-      throw EnvoyException(
-          fmt::format("Error: {} must be the terminal network filter.", filters[i].name()));
-    }
+    Config::Utility::validateTerminalFilters(filters[i].name(), "network",
+                                             factory.isTerminalFilter(), i == filters.size() - 1);
 
     Network::FilterFactoryCb callback;
     if (Config::Utility::allowDeprecatedV1Config(context.runtime(), *filter_config)) {
