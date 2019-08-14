@@ -318,7 +318,7 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
 
         if (close_connections_on_host_set_change) {
           for (const auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
-            // this will drain all tcp and http connection pools
+            // This will drain all tcp and http connection pools.
             postThreadLocalDrainConnections(cluster, host_set->hosts());
           }
           cm_stats_.upstream_connections_closed_on_host_set_change_.inc();
