@@ -24,8 +24,9 @@ public:
   BaseMatcherImpl(const RequirementRule& rule)
       : case_sensitive_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(rule.match(), case_sensitive, true)) {
 
+    // fixfix dup
     for (const auto& header_map : rule.match().headers()) {
-      config_headers_.push_back(header_map);
+      config_headers_.push_back(std::make_unique<Http::HeaderUtility::HeaderData>(header_map));
     }
 
     for (const auto& query_parameter : rule.match().query_parameters()) {

@@ -77,7 +77,7 @@ private:
 
   uint64_t total_cluster_weight_;
   const std::string cluster_name_;
-  std::vector<Http::HeaderUtility::HeaderData> config_headers_;
+  std::vector<Http::HeaderUtility::HeaderDataPtr> config_headers_;
   std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
 
   // TODO(gengleilei) Implement it.

@@ -16,8 +16,9 @@ namespace Router {
 RouteEntryImplBase::RouteEntryImplBase(
     const envoy::config::filter::network::dubbo_proxy::v2alpha1::Route& route)
     : cluster_name_(route.route().cluster()) {
+  // fixfix dup
   for (const auto& header_map : route.match().headers()) {
-    config_headers_.emplace_back(header_map);
+    config_headers_.emplace_back(std::make_unique<Http::HeaderUtility::HeaderData>(header_map));
   }
 
   if (route.route().cluster_specifier_case() ==
