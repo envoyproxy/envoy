@@ -24,7 +24,7 @@ class DubboProxyFilterConfigFactory
     : public Common::FactoryBase<
           envoy::config::filter::network::dubbo_proxy::v2alpha1::DubboProxy> {
 public:
-  DubboProxyFilterConfigFactory() : FactoryBase(NetworkFilterNames::get().DubboProxy) {}
+  DubboProxyFilterConfigFactory() : FactoryBase(NetworkFilterNames::get().DubboProxy, true) {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(

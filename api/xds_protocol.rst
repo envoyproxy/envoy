@@ -135,6 +135,13 @@ versioning across resource types. When ADS is not used, even each
 resource of a given resource type may have a distinct version, since the
 Envoy API allows distinct EDS/RDS resources to point at different :ref:`ConfigSources <envoy_api_msg_core.ConfigSource>`.
 
+Only the first request on a stream is guaranteed to carry the node identifier.
+The subsequent discovery requests on the same stream may carry an empty node
+identifier. This holds true regardless of the acceptance of the discovery
+responses on the same stream. The node identifier should always be identical if
+present more than once on the stream. It is sufficient to only check the first
+message for the node identifier as a result.
+
 .. _xds_protocol_resource_update:
 
 Resource Update
