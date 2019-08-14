@@ -137,7 +137,7 @@ std::set<std::string> WatchMap::findAdditions(const std::vector<std::string>& ne
                                               Watch* watch) {
   std::set<std::string> newly_added_to_subscription;
   for (const auto& name : newly_added_to_watch) {
-    const auto entry = watch_interest_.find(name);
+    auto entry = watch_interest_.find(name);
     if (entry == watch_interest_.end()) {
       newly_added_to_subscription.insert(name);
       watch_interest_[name] = {watch};
@@ -152,7 +152,7 @@ std::set<std::string>
 WatchMap::findRemovals(const std::vector<std::string>& newly_removed_from_watch, Watch* watch) {
   std::set<std::string> newly_removed_from_subscription;
   for (const auto& name : newly_removed_from_watch) {
-    const auto entry = watch_interest_.find(name);
+    auto entry = watch_interest_.find(name);
     RELEASE_ASSERT(
         entry != watch_interest_.end(),
         fmt::format("WatchMap: tried to remove a watch from untracked resource {}", name));
