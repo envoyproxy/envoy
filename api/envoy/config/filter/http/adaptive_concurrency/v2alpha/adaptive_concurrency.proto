@@ -7,8 +7,6 @@ option java_outer_classname = "AdaptiveConcurrencyProto";
 option java_multiple_files = true;
 option go_package = "v2alpha";
 
-import "envoy/type/percent.proto";
-
 import "google/protobuf/duration.proto";
 import "google/api/annotations.proto";
 import "google/protobuf/wrappers.proto";
