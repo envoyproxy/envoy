@@ -16,27 +16,27 @@ double RouteCoverage::report() {
 }
 
 void Coverage::markClusterCovered(const Envoy::Router::RouteEntry& route) {
-  coveredRoute(route)->setClusterCovered();
+  coveredRoute(route).setClusterCovered();
 }
 
 void Coverage::markVirtualClusterCovered(const Envoy::Router::RouteEntry& route) {
-  coveredRoute(route)->setVirtualClusterCovered();
+  coveredRoute(route).setVirtualClusterCovered();
 }
 
 void Coverage::markVirtualHostCovered(const Envoy::Router::RouteEntry& route) {
-  coveredRoute(route)->setVirtualHostCovered();
+  coveredRoute(route).setVirtualHostCovered();
 }
 
 void Coverage::markPathRewriteCovered(const Envoy::Router::RouteEntry& route) {
-  coveredRoute(route)->setPathRewriteCovered();
+  coveredRoute(route).setPathRewriteCovered();
 }
 
 void Coverage::markHostRewriteCovered(const Envoy::Router::RouteEntry& route) {
-  coveredRoute(route)->setHostRewriteCovered();
+  coveredRoute(route).setHostRewriteCovered();
 }
 
 void Coverage::markRedirectPathCovered(const Envoy::Router::RouteEntry& route) {
-  coveredRoute(route)->setRedirectPathCovered();
+  coveredRoute(route).setRedirectPathCovered();
 }
 
 double Coverage::report() {
@@ -71,20 +71,14 @@ double Coverage::detailedReport() {
   return 100 * cumulative_coverage / num_routes;
 }
 
-void Coverage::cleanup() {
-  for (auto& covered_route : covered_routes_) {
-    delete covered_route;
-  }
-}
-
-RouteCoverage* Coverage::coveredRoute(const Envoy::Router::RouteEntry& route) {
+RouteCoverage& Coverage::coveredRoute(const Envoy::Router::RouteEntry& route) {
   for (auto& route_coverage : covered_routes_) {
     if (route_coverage->covers(&route)) {
-      return route_coverage;
+      return *route_coverage;
     }
   }
-  RouteCoverage* new_coverage = new RouteCoverage(&route);
-  covered_routes_.push_back(new_coverage);
-  return new_coverage;
+  std::unique_ptr<RouteCoverage> new_coverage = std::make_unique<RouteCoverage>(&route);
+  covered_routes_.push_back(std::move(new_coverage));
+  return coveredRoute(route);
 };
 } // namespace Envoy

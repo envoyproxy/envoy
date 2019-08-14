@@ -7,7 +7,7 @@
 namespace Envoy {
 class RouteCoverage : Logger::Loggable<Logger::Id::testing> {
 public:
-  RouteCoverage(const Envoy::Router::RouteEntry* route) : route_(route){};
+  RouteCoverage(const Envoy::Router::RouteEntry* route) : route_(*route){};
 
   double report();
   void setClusterCovered() { cluster_covered_ = true; }
@@ -16,10 +16,10 @@ public:
   void setPathRewriteCovered() { path_rewrite_covered_ = true; }
   void setHostRewriteCovered() { host_rewrite_covered_ = true; }
   void setRedirectPathCovered() { redirect_path_covered_ = true; }
-  bool covers(const Envoy::Router::RouteEntry* route) { return route_ == route; }
+  bool covers(const Envoy::Router::RouteEntry* route) { return &route_ == route; }
 
 private:
-  const Envoy::Router::RouteEntry* route_;
+  const Envoy::Router::RouteEntry& route_;
   bool cluster_covered_{false};
   bool virtual_cluster_covered_{false};
   bool virtual_host_covered_{false};
@@ -45,12 +45,11 @@ public:
   void markRedirectPathCovered(const Envoy::Router::RouteEntry& route);
   double report();
   double detailedReport();
-  void cleanup();
 
 private:
-  RouteCoverage* coveredRoute(const Envoy::Router::RouteEntry& route);
+  RouteCoverage& coveredRoute(const Envoy::Router::RouteEntry& route);
 
-  std::vector<RouteCoverage*> covered_routes_;
+  std::vector<std::unique_ptr<RouteCoverage>> covered_routes_;
   const envoy::api::v2::RouteConfiguration route_config_;
 };
 } // namespace Envoy

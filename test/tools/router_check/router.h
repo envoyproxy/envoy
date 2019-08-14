@@ -89,11 +89,9 @@ public:
    */
   void setShowDetails() { details_ = true; }
 
-  float coverage(const bool detailed) {
+  float coverage(bool detailed) {
     return detailed ? coverage_.detailedReport() : coverage_.report();
   }
-
-  void cleanup() { coverage_.cleanup(); }
 
 private:
   RouterCheckTool(
