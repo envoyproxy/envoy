@@ -581,7 +581,7 @@ message Cluster {
     // contribute to the calculation when deciding whether panic mode is enabled or not.
     bool ignore_new_hosts_until_first_hc = 5;
 
-    // If field is set to `true`, tls cluster managers will close all existing
+    // If set to `true`, the cluster manager will close all existing
     // connections to upstream hosts whenever hosts are added or removed from cluster.
     bool close_connections_on_host_set_change = 6;
   }
