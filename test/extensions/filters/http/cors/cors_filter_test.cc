@@ -1,6 +1,5 @@
-#include "common/http/header_map_impl.h"
-
 #include "common/common/regex.h"
+#include "common/http/header_map_impl.h"
 
 #include "extensions/filters/http/cors/cors_filter.h"
 

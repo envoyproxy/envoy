@@ -51,8 +51,8 @@ struct SuccessResponse {
   ResponsePtr response_;
 };
 
-std::vector<Matchers::LowerCaseStringMatcherPtr> createLowerCaseMatchers(
-    const envoy::type::matcher::ListStringMatcher& list) {
+std::vector<Matchers::LowerCaseStringMatcherPtr>
+createLowerCaseMatchers(const envoy::type::matcher::ListStringMatcher& list) {
   std::vector<Matchers::LowerCaseStringMatcherPtr> matchers;
   for (const auto& matcher : list.patterns()) {
     matchers.push_back(std::make_unique<Matchers::LowerCaseStringMatcher>(matcher));
