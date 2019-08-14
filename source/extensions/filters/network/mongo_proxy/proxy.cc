@@ -180,15 +180,16 @@ void ProxyFilter::decodeQuery(QueryMessagePtr&& message) {
 
 void ProxyFilter::chargeQueryStats(Stats::StatNameVec& names,
                                    QueryMessageInfo::QueryType query_type) {
+  ASSERT(names.capacity() - names.size() >= 2); // Ensures the caller has reserved() enough memory.
   names.push_back(mongo_stats_->query_);
   names.push_back(mongo_stats_->total_);
   mongo_stats_->incCounter(names);
 
   if (query_type == QueryMessageInfo::QueryType::ScatterGet) {
-    names[names.size() - 1] = mongo_stats_->scatter_get_;
+    names.back() = mongo_stats_->scatter_get_;
     mongo_stats_->incCounter(names);
   } else if (query_type == QueryMessageInfo::QueryType::MultiGet) {
-    names[names.size() - 1] = mongo_stats_->multi_get_;
+    names.back() = mongo_stats_->multi_get_;
     mongo_stats_->incCounter(names);
   }
   names.resize(names.size() - 2);
@@ -228,7 +229,10 @@ void ProxyFilter::decodeReply(ReplyMessagePtr&& message) {
 
       // Callsite stats if we have it.
       if (!active_query.query_info_.callsite().empty()) {
-        names[2] = mongo_stats_->callsite_; // Replaces "query".
+        // Currently, names == {"collection", collection, "query"} and we are going
+        // to mutate the array to {"collection{", collection, "callsite", callsite, "query"}.
+        ASSERT(names.size() == 3);
+        names.back() = mongo_stats_->callsite_; // Replaces "query".
         names.push_back(mongo_stats_->getStatName(active_query.query_info_.callsite()));
         names.push_back(mongo_stats_->query_);
         chargeReplyStats(active_query, names, *message);
@@ -289,7 +293,7 @@ void ProxyFilter::chargeReplyStats(ActiveQuery& active_query, Stats::StatNameVec
   // Write 3 different histograms; appending 3 different suffixes to the name
   // that was passed in. Here we overwrite the passed-in names, but we restore
   // names to its original state upon return.
-  size_t orig_size = names.size();
+  const size_t orig_size = names.size();
   names.push_back(mongo_stats_->reply_num_docs_);
   mongo_stats_->recordHistogram(names, message.documents().size());
   names[orig_size] = mongo_stats_->reply_size_;

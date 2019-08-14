@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "envoy/stats/scope.h"
 
@@ -24,7 +25,7 @@ MongoStats::MongoStats(Stats::Scope& scope, const std::string& prefix)
 
 Stats::SymbolTable::StoragePtr MongoStats::addPrefix(const std::vector<Stats::StatName>& names) {
   std::vector<Stats::StatName> names_with_prefix;
-  names_with_prefix.reserve(1 + names.end() - names.begin());
+  names_with_prefix.reserve(1 + names.size());
   names_with_prefix.push_back(prefix_);
   names_with_prefix.insert(names_with_prefix.end(), names.begin(), names.end());
   return scope_.symbolTable().join(names_with_prefix);
