@@ -1199,6 +1199,31 @@ TEST_F(RouterTest, GrpcAlreadyExistsTrailersOnly) {
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 }
 
+// Validate outlier detections records failure when gRPC response status is Unavailable.
+TEST_F(RouterTest, GrpcOutlierDetectionUnavailableStatusCode) {
+  NiceMock<Http::MockStreamEncoder> encoder1;
+  Http::StreamDecoder* response_decoder = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
+  expectResponseTimerCreate();
+
+  Http::TestHeaderMapImpl headers{{"content-type", "application/grpc"}, {"grpc-timeout", "20S"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+
+  Http::HeaderMapPtr response_headers(
+      new Http::TestHeaderMapImpl{{":status", "200"}, {"grpc-status", "14"}});
+  // Outlier detector will use the gRPC response status code.
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(503));
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+}
+
 // Validate gRPC Internal response stats are sane when response is trailers only.
 TEST_F(RouterTest, GrpcInternalTrailersOnly) {
   NiceMock<Http::MockStreamEncoder> encoder1;
@@ -1218,7 +1243,7 @@ TEST_F(RouterTest, GrpcInternalTrailersOnly) {
 
   Http::HeaderMapPtr response_headers(
       new Http::TestHeaderMapImpl{{":status", "200"}, {"grpc-status", "13"}});
-  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(500));
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
@@ -1326,10 +1351,10 @@ TEST_F(RouterTest, GrpcInternal) {
   router_.decodeHeaders(headers, true);
 
   Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
-  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
   response_decoder->decodeHeaders(std::move(response_headers), false);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   Http::HeaderMapPtr response_trailers(new Http::TestHeaderMapImpl{{"grpc-status", "13"}});
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(500));
   response_decoder->decodeTrailers(std::move(response_trailers));
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }

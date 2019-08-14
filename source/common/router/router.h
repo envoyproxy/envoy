@@ -233,7 +233,8 @@ public:
   Filter(FilterConfig& config)
       : config_(config), final_upstream_request_(nullptr), downstream_response_started_(false),
         downstream_end_stream_(false), do_shadowing_(false), is_retry_(false),
-        attempting_internal_redirect_with_complete_stream_(false) {}
+        attempting_internal_redirect_with_complete_stream_(false),
+        grpc_status_code_received_(false) {}
 
   ~Filter() override;
 
@@ -512,6 +513,8 @@ private:
   // downstream if appropriate.
   void onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_flag,
                        absl::string_view body, bool dropped, absl::string_view details);
+  void maybeSetGrpcStatusToOutlierDetection(UpstreamRequest& upstream_request,
+                                            absl::optional<Grpc::Status::GrpcStatus> grpc_status);
   void onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& headers,
                          UpstreamRequest& upstream_request, bool end_stream);
   void onUpstreamData(Buffer::Instance& data, UpstreamRequest& upstream_request, bool end_stream);
@@ -572,6 +575,8 @@ private:
   bool is_retry_ : 1;
   bool include_attempt_count_ : 1;
   bool attempting_internal_redirect_with_complete_stream_ : 1;
+  bool grpc_status_code_received_ : 1;
+  uint64_t http_status_code_{200};
   uint32_t attempt_count_{1};
   uint32_t pending_retries_{0};
 };
