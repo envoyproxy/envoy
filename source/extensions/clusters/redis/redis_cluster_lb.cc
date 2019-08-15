@@ -151,8 +151,6 @@ Upstream::HostConstSharedPtr RedisClusterLoadBalancerFactory::RedisClusterLoadBa
       }
     case NetworkFilters::Common::Redis::Client::ReadPolicy::Any:
       return chooseRandomHost(shard->allHosts(), random_);
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
     }
   }
   return shard->master();
