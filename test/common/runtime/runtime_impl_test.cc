@@ -497,11 +497,6 @@ TEST_F(StaticLoaderImplTest, All) {
   testNewOverrides(*loader_, store_);
 }
 
-// Validate that Static Layer does not log as unsupported.
-TEST_F(StaticLoaderImplTest, NoUnsupportedStaticLog) {
-  EXPECT_LOG_NOT_CONTAINS("warning", "Skipping unsupported runtime layer", setup());
-}
-
 // Validate proto parsing sanity.
 TEST_F(StaticLoaderImplTest, ProtoParsing) {
   base_ = TestUtility::parseYaml<ProtobufWkt::Struct>(R"EOF(
