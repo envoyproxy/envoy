@@ -14,7 +14,7 @@ Server related statistics are rooted at *server.* with following statistics:
 
   uptime, Gauge, Current server uptime in seconds
   concurrency, Gauge, Number of worker threads
-  memory_allocated, Gauge, Current amount of allocated memory in bytes. Total of both new and old Envoy processes on hot restart. 
+  memory_allocated, Gauge, Current amount of allocated memory in bytes. Total of both new and old Envoy processes on hot restart.
   memory_heap_size, Gauge, Current reserved heap size in bytes. New Envoy process heap size on hot restart.
   live, Gauge, "1 if the server is not currently draining, 0 otherwise"
   state, Gauge, Current :ref:`State <envoy_api_enum_admin.v2alpha.ServerInfo.state>` of the Server.
@@ -26,6 +26,8 @@ Server related statistics are rooted at *server.* with following statistics:
   initialization_time_ms, Histogram, Total time taken for Envoy initialization in milliseconds. This is the time from server start-up until the worker threads are ready to accept new connections
   debug_assertion_failures, Counter, Number of debug assertion failures detected in a release build if compiled with `--define log_debug_assert_in_release=enabled` or zero otherwise
 
+.. _filesystem_stats:
+
 File system
 -----------
 
@@ -36,7 +38,8 @@ Statistics related to file system are emitted in the *filesystem.* namespace.
   :widths: 1, 1, 2
 
   write_buffered, Counter, Total number of times file data is moved to Envoy's internal flush buffer
-  write_completed, Counter, Total number of times a file was written
+  write_completed, Counter, Total number of times a file was successfully written
+  write_failed, Counter, Total number of times an error occurred during a file write operation
   flushed_by_timer, Counter, Total number of times internal flush buffers are written to a file due to flush timeout
   reopen_failed, Counter, Total number of times a file was failed to be opened
   write_total_buffered, Gauge, Current total size of internal flush buffer in bytes

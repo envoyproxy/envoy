@@ -100,8 +100,12 @@ void AccessLogFileImpl::doWrite(Buffer::Instance& buffer) {
     for (const Buffer::RawSlice& slice : slices) {
       absl::string_view data(static_cast<char*>(slice.mem_), slice.len_);
       const Api::IoCallSizeResult result = file_->write(data);
-      ASSERT(result.rc_ == static_cast<ssize_t>(slice.len_));
-      stats_.write_completed_.inc();
+      if (result.ok() && result.rc_ == static_cast<ssize_t>(slice.len_)) {
+        stats_.write_completed_.inc();
+      } else {
+        // Probably disk full.
+        stats_.write_failed_.inc();
+      }
     }
   }
 
