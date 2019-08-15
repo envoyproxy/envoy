@@ -8,24 +8,24 @@ namespace NetworkFilters {
 namespace Common {
 namespace Redis {
 
-RedisCommandStats::RedisCommandStats(Stats::Scope& scope, const std::string& prefix, bool enableCommandCounts)
-    : scope_(scope), stat_name_set_(scope.symbolTable()),
-      prefix_(stat_name_set_.add(prefix)),
+RedisCommandStats::RedisCommandStats(Stats::Scope& scope, const std::string& prefix,
+                                     bool enableCommandCounts)
+    : scope_(scope), stat_name_set_(scope.symbolTable()), prefix_(stat_name_set_.add(prefix)),
       upstream_rq_time_(stat_name_set_.add("upstream_rq_time")) {
-  
-  // Note: Even if enableCommandCounts is disabled, we track the upstrea_rq_time.
+
+  // Note: Even if this is disabled, we track the upstream_rq_time.
   if (enableCommandCounts) {
     // Create StatName for each Redis command. Note that we don't include Auth or Ping.
     for (const std::string& command :
-        Extensions::NetworkFilters::Common::Redis::SupportedCommands::simpleCommands()) {
+         Extensions::NetworkFilters::Common::Redis::SupportedCommands::simpleCommands()) {
       stat_name_set_.add(command);
     }
     for (const std::string& command :
-        Extensions::NetworkFilters::Common::Redis::SupportedCommands::evalCommands()) {
+         Extensions::NetworkFilters::Common::Redis::SupportedCommands::evalCommands()) {
       stat_name_set_.add(command);
     }
     for (const std::string& command : Extensions::NetworkFilters::Common::Redis::SupportedCommands::
-            hashMultipleSumResultCommands()) {
+             hashMultipleSumResultCommands()) {
       stat_name_set_.add(command);
     }
     stat_name_set_.add(Extensions::NetworkFilters::Common::Redis::SupportedCommands::mget());
