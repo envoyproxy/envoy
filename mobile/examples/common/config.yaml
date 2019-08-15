@@ -4,6 +4,22 @@
 static_resources:
   listeners:
   - address:
+      socket_address: {address: 0.0.0.0, port_value: 9000, protocol: TCP}
+    filter_chains:
+    - filters:
+      - name: envoy.http_connection_manager
+        config:
+          stat_prefix: base
+          route_config:
+            virtual_hosts:
+            - name: all
+              domains: ["*"]
+              routes:
+                - match: {prefix: "/"}
+                  route: {cluster: base}
+          http_filters:
+          - name: envoy.router
+  - address:
       socket_address:
         protocol: TCP
         address: 0.0.0.0
@@ -34,7 +50,22 @@ static_resources:
                 dns_lookup_family: AUTO
           - name: envoy.router
   clusters:
-  - name: dynamic_forward_proxy_cluster
+  - name: base
+    connect_timeout: 30s
+    dns_lookup_family: V4_ONLY
+    dns_refresh_rate: 60s
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: base
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address: {address: example.com, port_value: 443}
+    tls_context:
+      sni: example.com
+    type: LOGICAL_DNS
+  - name: default_egress
     connect_timeout: 30s
     dns_refresh_rate: 60s
     lb_policy: CLUSTER_PROVIDED
