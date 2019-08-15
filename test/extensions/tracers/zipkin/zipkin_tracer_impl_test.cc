@@ -57,7 +57,7 @@ public:
   }
 
   void setupValidDriver(const std::string& version) {
-    EXPECT_CALL(cm_, get("fake_cluster")).WillRepeatedly(Return(&cm_.thread_local_cluster_));
+    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
 
     const std::string yaml_string = fmt::format(R"EOF(
     collector_cluster: fake_cluster

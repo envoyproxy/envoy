@@ -2,6 +2,7 @@
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
+#include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
 
 #include "extensions/tracers/zipkin/zipkin_core_constants.h"
@@ -33,7 +34,8 @@ serviceName: {}
 )EOF",
       version, ip, port, endpoint.serviceName());
   zipkin::proto3::Endpoint expected_msg;
-  MessageUtil::loadFromYaml(expected_yaml, expected_msg);
+  MessageUtil::loadFromYaml(expected_yaml, expected_msg,
+                            ProtobufMessage::getStrictValidationVisitor());
   EXPECT_EQ(endpoint.toProtoEndpoint().DebugString(), expected_msg.DebugString());
 }
 
@@ -351,7 +353,7 @@ id: {}
       Base64::encode(span.idAsByteString().c_str(), span.idAsByteString().size()));
 
   zipkin::proto3::Span expected_msg;
-  MessageUtil::loadFromYaml(expected_yaml, expected_msg);
+  MessageUtil::loadFromYaml(expected_yaml, expected_msg, ProtobufMessage::getStrictValidationVisitor());
   EXPECT_EQ(span.toProtoSpan().DebugString(), expected_msg.DebugString());
 
   uint64_t id = Util::generateRandom64(test_time.timeSystem());
@@ -463,7 +465,7 @@ tags:
       Base64::encode(span.idAsByteString().c_str(), span.idAsByteString().size()), span.timestamp(),
       /* duration= */ 3000, /* localEndpoint.ipv4= */ Base64::encode("192.168.1.2", 11));
 
-  MessageUtil::loadFromYaml(expected_yaml, expected_msg);
+  MessageUtil::loadFromYaml(expected_yaml, expected_msg, ProtobufMessage::getStrictValidationVisitor());
   EXPECT_EQ(span.toProtoSpan().DebugString(), expected_msg.DebugString());
 
   // Test the copy-semantics flavor of addAnnotation and addBinaryAnnotation
@@ -539,7 +541,7 @@ tags:
       Base64::encode(span.idAsByteString().c_str(), span.idAsByteString().size()), span.timestamp(),
       /* duration= */ 3000, /* localEndpoint.ipv4= */ Base64::encode("192.168.1.2", 11));
 
-  MessageUtil::loadFromYaml(expected_yaml, expected_msg);
+  MessageUtil::loadFromYaml(expected_yaml, expected_msg, ProtobufMessage::getStrictValidationVisitor());
   EXPECT_EQ(span.toProtoSpan().DebugString(), expected_msg.DebugString());
 
   // Test setSourceServiceName and setDestinationServiceName
@@ -602,7 +604,7 @@ tags:
       Base64::encode(span.idAsByteString().c_str(), span.idAsByteString().size()), span.timestamp(),
       /* duration= */ 3000, /* localEndpoint.ipv4= */ Base64::encode("192.168.1.2", 11));
 
-  MessageUtil::loadFromYaml(expected_yaml, expected_msg);
+  MessageUtil::loadFromYaml(expected_yaml, expected_msg, ProtobufMessage::getStrictValidationVisitor());
   EXPECT_EQ(span.toProtoSpan().DebugString(), expected_msg.DebugString());
 }
 

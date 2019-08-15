@@ -1,4 +1,5 @@
 #include "common/common/base64.h"
+#include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
 
 #include "extensions/tracers/zipkin/span_buffer.h"
@@ -30,7 +31,7 @@ void expectValidBufferedProtoListOfSpans(const SpanBuffer& buffer) {
     expected_yaml += expected_span_yaml;
   }
   zipkin::proto3::ListOfSpans expected_msg;
-  MessageUtil::loadFromYaml(expected_yaml, expected_msg);
+  MessageUtil::loadFromYaml(expected_yaml, expected_msg, ProtobufMessage::getStrictValidationVisitor());
   EXPECT_EQ(buffer.toProtoListOfSpans().DebugString(), expected_msg.DebugString());
 }
 
