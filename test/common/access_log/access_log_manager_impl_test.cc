@@ -84,7 +84,7 @@ TEST_F(AccessLogManagerImplTest, flushToLogFilePeriodically) {
   // make sure timer is re-enabled on callback call
   log_file->write("test2");
   EXPECT_CALL(*timer, enableTimer(timeout_40ms_));
-  timer->callback_();
+  timer->invokeCallback();
 
   {
     Thread::LockGuard lock(file_->write_mutex_);
@@ -147,7 +147,7 @@ TEST_F(AccessLogManagerImplTest, flushToLogFileOnDemand) {
   // make sure timer is re-enabled on callback call
   log_file->write("test2");
   EXPECT_CALL(*timer, enableTimer(timeout_40ms_));
-  timer->callback_();
+  timer->invokeCallback();
   expected_writes++;
 
   {
@@ -176,7 +176,7 @@ TEST_F(AccessLogManagerImplTest, reopenFile) {
       }));
 
   log_file->write("before");
-  timer->callback_();
+  timer->invokeCallback();
 
   {
     Thread::LockGuard lock(file_->write_mutex_);
@@ -205,7 +205,7 @@ TEST_F(AccessLogManagerImplTest, reopenFile) {
 
   log_file->reopen();
   log_file->write("reopened");
-  timer->callback_();
+  timer->invokeCallback();
 
   {
     Thread::LockGuard lock(file_->write_mutex_);
@@ -237,7 +237,7 @@ TEST_F(AccessLogManagerImplTest, reopenThrows) {
       .WillOnce(Return(ByMove(Filesystem::resultFailure<bool>(false, 0))));
 
   log_file->write("test write");
-  timer->callback_();
+  timer->invokeCallback();
   {
     Thread::LockGuard lock(file_->write_mutex_);
     while (file_->num_writes_ != 1) {
@@ -247,7 +247,7 @@ TEST_F(AccessLogManagerImplTest, reopenThrows) {
   log_file->reopen();
 
   log_file->write("this is to force reopen");
-  timer->callback_();
+  timer->invokeCallback();
 
   {
     Thread::LockGuard lock(file_->open_mutex_);
@@ -258,7 +258,7 @@ TEST_F(AccessLogManagerImplTest, reopenThrows) {
 
   // write call should not cause any exceptions
   log_file->write("random data");
-  timer->callback_();
+  timer->invokeCallback();
 }
 
 TEST_F(AccessLogManagerImplTest, bigDataChunkShouldBeFlushedWithoutTimer) {

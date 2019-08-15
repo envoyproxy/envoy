@@ -27,12 +27,16 @@ be:
 .. code-block:: yaml
 
   layers:
-  - static_layer:
+  - name: static_layer_0
+    static_layer:
       health_check:
         min_interval: 5
-  - disk_layer: { symlink_root: /srv/runtime/current, subdirectory: envoy }
-  - disk_layer: { symlink_root: /srv/runtime/current, subdirectory: envoy_override, append_service_cluster: true }
-  - admin_layer: {}
+  - name: disk_layer_0
+    disk_layer: { symlink_root: /srv/runtime/current, subdirectory: envoy }
+  - name: disk_layer_1
+    disk_layer: { symlink_root: /srv/runtime/current, subdirectory: envoy_override, append_service_cluster: true }
+  - name: admin_layer_0
+    admin_layer: {}
 
 In the deprecated :ref:`runtime <envoy_api_msg_config.bootstrap.v2.Runtime>` bootstrap
 configuration, the layering was implicit and fixed:

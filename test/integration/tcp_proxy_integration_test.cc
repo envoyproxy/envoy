@@ -43,6 +43,15 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
   // Make sure inexact matches work also on data already received.
   tcp_client->waitForData("ello", false);
 
+  // Make sure length based wait works for the data already received
+  tcp_client->waitForData(5);
+  tcp_client->waitForData(4);
+
+  // Drain part of the received message
+  tcp_client->clearData(2);
+  tcp_client->waitForData("llo");
+  tcp_client->waitForData(3);
+
   tcp_client->write("hello");
   ASSERT_TRUE(fake_upstream_connection->waitForData(5));
 

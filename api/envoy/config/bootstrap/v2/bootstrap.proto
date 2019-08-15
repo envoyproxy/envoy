@@ -295,6 +295,8 @@ message RuntimeLayer {
     // This follows the :ref:`runtime protobuf JSON representation encoding
     // <config_runtime_proto_json>`. Unlike static xDS resources, this static
     // layer is overridable by later layers in the runtime virtual filesystem.
+    option (validate.required) = true;
+
     google.protobuf.Struct static_layer = 2;
     DiskLayer disk_layer = 3;
     AdminLayer admin_layer = 4;

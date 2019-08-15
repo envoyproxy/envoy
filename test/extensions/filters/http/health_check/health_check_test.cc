@@ -360,7 +360,7 @@ TEST_F(HealthCheckFilterCachingTest, All) {
 
   // Fire the timer, this should result in the next request going through.
   EXPECT_CALL(*cache_timer_, enableTimer(_));
-  cache_timer_->callback_();
+  cache_timer_->invokeCallback();
   prepareFilter(true);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
 }
@@ -394,7 +394,7 @@ TEST_F(HealthCheckFilterCachingTest, DegradedHeader) {
 
   // Fire the timer, this should result in the next request going through.
   EXPECT_CALL(*cache_timer_, enableTimer(_));
-  cache_timer_->callback_();
+  cache_timer_->invokeCallback();
   prepareFilter(true);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
 }

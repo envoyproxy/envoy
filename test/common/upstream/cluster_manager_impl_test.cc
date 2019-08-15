@@ -1796,7 +1796,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   EXPECT_CALL(*tcp1_high, addDrainedCallback(_)).WillOnce(SaveArg<0>(&tcp_drained_cb_high));
 
   // Remove the first host, this should lead to the first cp being drained.
-  dns_timer_->callback_();
+  dns_timer_->invokeCallback();
   dns_callback(TestUtility::makeDnsResponse({"127.0.0.2"}));
   drained_cb();
   drained_cb = nullptr;
@@ -1829,7 +1829,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
 
   // Now add and remove a host that we never have a conn pool to. This should not lead to any
   // drain callbacks, etc.
-  dns_timer_->callback_();
+  dns_timer_->invokeCallback();
   dns_callback(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.3"}));
   factory_.tls_.shutdownThread();
 }
@@ -2012,7 +2012,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   EXPECT_CALL(*tcp1_ibm_com, addDrainedCallback(_)).WillOnce(SaveArg<0>(&tcp_drained_cb_ibm_com));
 
   // Remove the first host, this should lead to the first cp being drained.
-  dns_timer_->callback_();
+  dns_timer_->invokeCallback();
   dns_callback(TestUtility::makeDnsResponse({"127.0.0.2"}));
   drained_cb();
   drained_cb = nullptr;
@@ -2059,7 +2059,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
 
   // Now add and remove a host that we never have a conn pool to. This should not lead to any
   // drain callbacks, etc.
-  dns_timer_->callback_();
+  dns_timer_->invokeCallback();
   dns_callback(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.3"}));
   factory_.tls_.shutdownThread();
 }
@@ -2126,7 +2126,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
 
   // Remove the first host, this should lead to the cp being drained, without
   // crash.
-  dns_timer_->callback_();
+  dns_timer_->invokeCallback();
   dns_callback(TestUtility::makeDnsResponse({}));
 
   factory_.tls_.shutdownThread();
@@ -2202,7 +2202,7 @@ TEST_F(ClusterManagerImplTest, ConnPoolDestroyWithDraining) {
   EXPECT_CALL(*cp, addDrainedCallback(_)).WillOnce(SaveArg<0>(&drained_cb));
   Tcp::ConnectionPool::Instance::DrainedCb tcp_drained_cb;
   EXPECT_CALL(*tcp, addDrainedCallback(_)).WillOnce(SaveArg<0>(&tcp_drained_cb));
-  dns_timer_->callback_();
+  dns_timer_->invokeCallback();
   dns_callback(TestUtility::makeDnsResponse({}));
 
   // The drained callback might get called when the CP is being destroyed.
@@ -2330,7 +2330,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
 
   // Ensure the merged updates were applied.
-  timer->callback_();
+  timer->invokeCallback();
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());

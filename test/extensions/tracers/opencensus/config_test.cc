@@ -50,6 +50,7 @@ TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracerWithTypedConfig) {
       stackdriver_project_id: test_project_id
       zipkin_exporter_enabled: true
       zipkin_url: http://127.0.0.1:9411/api/v2/spans
+      incoming_trace_context: b3
       incoming_trace_context: trace_context
       incoming_trace_context: grpc_trace_bin
       incoming_trace_context: cloud_trace_context

@@ -12,11 +12,11 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info,
                          Grpc::RawAsyncClientPtr async_client, Event::Dispatcher& dispatcher,
                          const Protobuf::MethodDescriptor& service_method,
                          Runtime::RandomGenerator& random, Stats::Scope& scope,
-                         const RateLimitSettings& rate_limit_settings)
+                         const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node)
     : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings),
-
-      local_info_(local_info) {
+      local_info_(local_info), skip_subsequent_node_(skip_subsequent_node),
+      first_stream_request_(true) {
   Config::Utility::checkLocalInfo("ads", local_info);
 }
 
@@ -57,8 +57,12 @@ void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
     }
   }
 
+  if (skip_subsequent_node_ && !first_stream_request_) {
+    request.clear_node();
+  }
   ENVOY_LOG(trace, "Sending DiscoveryRequest for {}: {}", type_url, request.DebugString());
   grpc_stream_.sendMessage(request);
+  first_stream_request_ = false;
 
   // clear error_detail after the request is sent if it exists.
   if (api_state_[type_url].request_.has_error_detail()) {
@@ -206,6 +210,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
 void GrpcMuxImpl::onWriteable() { drainRequests(); }
 
 void GrpcMuxImpl::onStreamEstablished() {
+  first_stream_request_ = true;
   for (const auto& type_url : subscriptions_) {
     queueDiscoveryRequest(type_url);
   }

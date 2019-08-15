@@ -95,7 +95,7 @@ TEST_F(OptionsImplTest, All) {
   EXPECT_EQ(std::chrono::seconds(60), options->drainTime());
   EXPECT_EQ(std::chrono::seconds(90), options->parentShutdownTime());
   EXPECT_TRUE(options->hotRestartDisabled());
-  EXPECT_TRUE(options->libeventBufferEnabled());
+  EXPECT_FALSE(options->libeventBufferEnabled());
   EXPECT_TRUE(options->cpusetThreadsEnabled());
   EXPECT_TRUE(options->allowUnknownFields());
   EXPECT_TRUE(options->rejectUnknownFieldsDynamic());
