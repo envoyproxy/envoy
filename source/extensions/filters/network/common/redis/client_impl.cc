@@ -23,14 +23,13 @@ ConfigImpl::ConfigImpl(
 
 ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                              EncoderPtr&& encoder, DecoderFactory& decoder_factory,
-                             const Config& config, RedisClusterStats& redis_cluster_stats) {
+                             const Config& config) {
 
   // TODO: Maybe this should take a boolean not to create the stats?
   auto redis_command_stats =
       std::make_shared<RedisCommandStats>(host->cluster().statsScope(), "fml");
   std::unique_ptr<ClientImpl> client(new ClientImpl(host, dispatcher, std::move(encoder),
-                                                    decoder_factory, config, redis_cluster_stats,
-                                                    redis_command_stats));
+                                                    decoder_factory, config, redis_command_stats));
   client->connection_ = host->createConnection(dispatcher, nullptr, nullptr).connection_;
   client->connection_->addConnectionCallbacks(*client);
   client->connection_->addReadFilter(Network::ReadFilterSharedPtr{new UpstreamReadFilter(*client)});
@@ -41,14 +40,12 @@ ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatche
 
 ClientImpl::ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                        EncoderPtr&& encoder, DecoderFactory& decoder_factory, const Config& config,
-                       RedisClusterStats& redis_cluster_stats,
                        RedisCommandStatsPtr& redis_command_stats)
     : host_(host), encoder_(std::move(encoder)), decoder_(decoder_factory.create(*this)),
       config_(config),
       connect_or_op_timer_(dispatcher.createTimer([this]() -> void { onConnectOrOpTimeout(); })),
       flush_timer_(dispatcher.createTimer([this]() -> void { flushBufferAndResetTimer(); })),
-      redis_cluster_stats_(redis_cluster_stats), time_source_(dispatcher.timeSource()),
-      redis_command_stats_(redis_command_stats) {
+      time_source_(dispatcher.timeSource()), redis_command_stats_(redis_command_stats) {
   host->cluster().stats().upstream_cx_total_.inc();
   host->stats().cx_total_.inc();
   host->cluster().stats().upstream_cx_active_.inc();
@@ -241,10 +238,9 @@ void ClientImpl::PendingRequest::cancel() {
 ClientFactoryImpl ClientFactoryImpl::instance_;
 
 ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
-                                    Event::Dispatcher& dispatcher, const Config& config,
-                                    RedisClusterStats& redis_cluster_stats) {
+                                    Event::Dispatcher& dispatcher, const Config& config) {
   return ClientImpl::create(host, dispatcher, EncoderPtr{new EncoderImpl()}, decoder_factory_,
-                            config, redis_cluster_stats);
+                            config);
 }
 
 } // namespace Client

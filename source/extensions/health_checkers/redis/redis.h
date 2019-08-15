@@ -113,7 +113,6 @@ private:
   Extensions::NetworkFilters::Common::Redis::Client::ClientFactory& client_factory_;
   Type type_;
   const std::string key_;
-  Extensions::NetworkFilters::Common::Redis::Client::RedisClusterStats redis_cluster_stats_;
 };
 
 } // namespace RedisHealthChecker
