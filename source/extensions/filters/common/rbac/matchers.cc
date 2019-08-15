@@ -142,10 +142,17 @@ bool AuthenticatedMatcher::matches(const Network::Connection& connection,
 
   const auto uriSans = ssl->uriSanPeerCertificate();
   std::string principal;
-  if (uriSans.empty()) {
-    principal = ssl->subjectPeerCertificate();
-  } else {
+  // If set, The URI SAN  or DNS SAN in that order is used as Principal, otherwise the subject field
+  // is used.
+  if (!uriSans.empty()) {
     principal = uriSans[0];
+  } else {
+    const auto dnsSans = ssl->dnsSansPeerCertificate();
+    if (!dnsSans.empty()) {
+      principal = dnsSans[0];
+    } else {
+      principal = ssl->subjectPeerCertificate();
+    }
   }
 
   return matcher_.value().match(principal);
