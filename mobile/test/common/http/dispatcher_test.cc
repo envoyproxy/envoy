@@ -59,6 +59,7 @@ public:
 };
 
 TEST_F(DispatcherTest, BasicStreamHeadersOnly) {
+  envoy_stream_t stream = 1;
   // Setup observer to handle the response headers.
   envoy_observer observer;
   callbacks_called cc = {false, false, false};
@@ -97,7 +98,7 @@ TEST_F(DispatcherTest, BasicStreamHeadersOnly) {
           WithArg<0>(Invoke([&](AsyncClient::StreamCallbacks& callbacks) -> AsyncClient::Stream* {
             return client_.start(callbacks, AsyncClient::StreamOptions());
           })));
-  envoy_stream_t stream = http_dispatcher_.startStream(observer);
+  EXPECT_EQ(http_dispatcher_.startStream(stream, observer), ENVOY_SUCCESS);
 
   // Send request headers.
   Event::PostCb post_cb;
@@ -130,6 +131,7 @@ TEST_F(DispatcherTest, BasicStreamHeadersOnly) {
 }
 
 TEST_F(DispatcherTest, ResetStream) {
+  envoy_stream_t stream = 1;
   envoy_observer observer;
   callbacks_called cc = {false, false, false};
   observer.context = &cc;
@@ -151,7 +153,7 @@ TEST_F(DispatcherTest, ResetStream) {
           WithArg<0>(Invoke([&](AsyncClient::StreamCallbacks& callbacks) -> AsyncClient::Stream* {
             return client_.start(callbacks, AsyncClient::StreamOptions());
           })));
-  envoy_stream_t stream = http_dispatcher_.startStream(observer);
+  EXPECT_EQ(http_dispatcher_.startStream(stream, observer), ENVOY_SUCCESS);
 
   Event::PostCb post_cb;
   EXPECT_CALL(event_dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
@@ -166,6 +168,8 @@ TEST_F(DispatcherTest, ResetStream) {
 }
 
 TEST_F(DispatcherTest, MultipleStreams) {
+  envoy_stream_t stream1 = 1;
+  envoy_stream_t stream2 = 2;
   // Start stream1.
   // Setup observer to handle the response headers.
   envoy_observer observer;
@@ -205,12 +209,12 @@ TEST_F(DispatcherTest, MultipleStreams) {
           WithArg<0>(Invoke([&](AsyncClient::StreamCallbacks& callbacks) -> AsyncClient::Stream* {
             return client_.start(callbacks, AsyncClient::StreamOptions());
           })));
-  envoy_stream_t stream = http_dispatcher_.startStream(observer);
+  EXPECT_EQ(http_dispatcher_.startStream(stream1, observer), ENVOY_SUCCESS);
 
   // Send request headers.
   Event::PostCb post_cb;
   EXPECT_CALL(event_dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
-  http_dispatcher_.sendHeaders(stream, c_headers, true);
+  http_dispatcher_.sendHeaders(stream1, c_headers, true);
 
   EXPECT_CALL(event_dispatcher_, isThreadSafe()).Times(1).WillRepeatedly(Return(true));
   EXPECT_CALL(stream_encoder_, encodeHeaders(_, true));
@@ -258,7 +262,7 @@ TEST_F(DispatcherTest, MultipleStreams) {
             return client_.start(callbacks, AsyncClient::StreamOptions());
           })));
   EXPECT_CALL(event_dispatcher_, post(_));
-  envoy_stream_t stream2 = http_dispatcher_.startStream(observer2);
+  EXPECT_EQ(http_dispatcher_.startStream(stream2, observer2), ENVOY_SUCCESS);
 
   // Send request headers.
   Event::PostCb post_cb2;
@@ -286,6 +290,7 @@ TEST_F(DispatcherTest, MultipleStreams) {
 }
 
 TEST_F(DispatcherTest, LocalResetAfterStreamStart) {
+  envoy_stream_t stream = 1;
   envoy_observer observer;
   callbacks_called cc = {false, false, false};
   observer.context = &cc;
@@ -330,7 +335,7 @@ TEST_F(DispatcherTest, LocalResetAfterStreamStart) {
           WithArg<0>(Invoke([&](AsyncClient::StreamCallbacks& callbacks) -> AsyncClient::Stream* {
             return client_.start(callbacks, AsyncClient::StreamOptions());
           })));
-  envoy_stream_t stream = http_dispatcher_.startStream(observer);
+  EXPECT_EQ(http_dispatcher_.startStream(stream, observer), ENVOY_SUCCESS);
 
   // Send request headers.
   Event::PostCb send_headers_post_cb;
@@ -358,6 +363,7 @@ TEST_F(DispatcherTest, LocalResetAfterStreamStart) {
 }
 
 TEST_F(DispatcherTest, RemoteResetAfterStreamStart) {
+  envoy_stream_t stream = 1;
   envoy_observer observer;
   callbacks_called cc = {false, false, false};
   observer.context = &cc;
@@ -402,7 +408,7 @@ TEST_F(DispatcherTest, RemoteResetAfterStreamStart) {
           WithArg<0>(Invoke([&](AsyncClient::StreamCallbacks& callbacks) -> AsyncClient::Stream* {
             return client_.start(callbacks, AsyncClient::StreamOptions());
           })));
-  envoy_stream_t stream = http_dispatcher_.startStream(observer);
+  EXPECT_EQ(http_dispatcher_.startStream(stream, observer), ENVOY_SUCCESS);
 
   // Send request headers.
   Event::PostCb send_headers_post_cb;
@@ -424,6 +430,7 @@ TEST_F(DispatcherTest, RemoteResetAfterStreamStart) {
 }
 
 TEST_F(DispatcherTest, DestroyWithActiveStream) {
+  envoy_stream_t stream = 1;
   // Grab the response decoder in order to dispatch responses on the stream.
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](StreamDecoder& decoder,
@@ -443,7 +450,7 @@ TEST_F(DispatcherTest, DestroyWithActiveStream) {
       .WillOnce(ReturnRef(cm_.async_client_));
   EXPECT_CALL(cm_.async_client_, start(_, _))
       .WillOnce(Return(client_.start(stream_callbacks_, AsyncClient::StreamOptions())));
-  envoy_stream_t stream = http_dispatcher_.startStream(observer_);
+  EXPECT_EQ(http_dispatcher_.startStream(stream, observer_), ENVOY_SUCCESS);
 
   // Send request headers.
   EXPECT_CALL(stream_encoder_, encodeHeaders(_, false));
@@ -454,6 +461,7 @@ TEST_F(DispatcherTest, DestroyWithActiveStream) {
 }
 
 TEST_F(DispatcherTest, ResetInOnHeaders) {
+  envoy_stream_t stream = 1;
   // Grab the response decoder in order to dispatch responses on the stream.
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](StreamDecoder& decoder,
@@ -473,7 +481,7 @@ TEST_F(DispatcherTest, ResetInOnHeaders) {
       .WillOnce(ReturnRef(cm_.async_client_));
   EXPECT_CALL(cm_.async_client_, start(_, _))
       .WillOnce(Return(client_.start(stream_callbacks_, AsyncClient::StreamOptions())));
-  envoy_stream_t stream = http_dispatcher_.startStream(observer_);
+  EXPECT_EQ(http_dispatcher_.startStream(stream, observer_), ENVOY_SUCCESS);
 
   // Send request headers.
   Event::PostCb send_headers_post_cb;
@@ -498,6 +506,7 @@ TEST_F(DispatcherTest, ResetInOnHeaders) {
 }
 
 TEST_F(DispatcherTest, StreamTimeout) {
+  envoy_stream_t stream = 1;
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](StreamDecoder&,
                            ConnectionPool::Callbacks& callbacks) -> ConnectionPool::Cancellable* {
@@ -515,7 +524,7 @@ TEST_F(DispatcherTest, StreamTimeout) {
   EXPECT_CALL(cm_.async_client_, start(_, _))
       .WillOnce(Return(client_.start(stream_callbacks_, AsyncClient::StreamOptions().setTimeout(
                                                             std::chrono::milliseconds(40)))));
-  envoy_stream_t stream = http_dispatcher_.startStream(observer_);
+  EXPECT_EQ(http_dispatcher_.startStream(stream, observer_), ENVOY_SUCCESS);
 
   // Send request headers.
   Event::PostCb send_headers_post_cb;
@@ -546,6 +555,7 @@ TEST_F(DispatcherTest, StreamTimeout) {
 }
 
 TEST_F(DispatcherTest, StreamTimeoutHeadReply) {
+  envoy_stream_t stream = 1;
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](StreamDecoder&,
                            ConnectionPool::Callbacks& callbacks) -> ConnectionPool::Cancellable* {
@@ -563,7 +573,7 @@ TEST_F(DispatcherTest, StreamTimeoutHeadReply) {
   EXPECT_CALL(cm_.async_client_, start(_, _))
       .WillOnce(Return(client_.start(stream_callbacks_, AsyncClient::StreamOptions().setTimeout(
                                                             std::chrono::milliseconds(40)))));
-  envoy_stream_t stream = http_dispatcher_.startStream(observer_);
+  EXPECT_EQ(http_dispatcher_.startStream(stream, observer_), ENVOY_SUCCESS);
 
   // Send request headers.
   Event::PostCb send_headers_post_cb;
@@ -585,6 +595,7 @@ TEST_F(DispatcherTest, StreamTimeoutHeadReply) {
 }
 
 TEST_F(DispatcherTest, DisableTimerWithStream) {
+  envoy_stream_t stream = 1;
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](StreamDecoder&,
                            ConnectionPool::Callbacks& callbacks) -> ConnectionPool::Cancellable* {
@@ -601,7 +612,7 @@ TEST_F(DispatcherTest, DisableTimerWithStream) {
   EXPECT_CALL(cm_.async_client_, start(_, _))
       .WillOnce(Return(client_.start(stream_callbacks_, AsyncClient::StreamOptions().setTimeout(
                                                             std::chrono::milliseconds(40)))));
-  envoy_stream_t stream = http_dispatcher_.startStream(observer_);
+  EXPECT_EQ(http_dispatcher_.startStream(stream, observer_), ENVOY_SUCCESS);
 
   // Send request headers and reset stream.
   Event::PostCb send_headers_post_cb;

@@ -12,11 +12,20 @@ extern "C" { // functions
 #endif
 
 /**
- * Open an underlying HTTP stream.
+ * Initialize an underlying HTTP stream.
+ * @param engine, handle to the engine that will manage this stream.
+ * @return envoy_stream_t, handle to the underlying stream.
+ */
+envoy_stream_t init_stream(envoy_engine_t);
+
+/**
+ * Open an underlying HTTP stream. Note: Streams must be started before other other interaction can
+ * can occur.
+ * @param stream, handle to the stream to be started.
  * @param observer, the observer that will run the stream callbacks.
  * @return envoy_stream, with a stream handle and a success status, or a failure status.
  */
-envoy_stream start_stream(envoy_observer observer);
+envoy_status_t start_stream(envoy_stream_t, envoy_observer observer);
 
 /**
  * Send headers over an open HTTP stream. This method can be invoked once and needs to be called
@@ -60,6 +69,12 @@ envoy_status_t send_trailers(envoy_stream_t stream, envoy_headers trailers);
  * @return envoy_status_t, the resulting status of the operation.
  */
 envoy_status_t reset_stream(envoy_stream_t stream);
+
+/**
+ * Initialize an engine for handling network streams.
+ * @return envoy_engine_t, handle to the underlying engine.
+ */
+envoy_engine_t init_engine();
 
 /**
  * External entry point for library.

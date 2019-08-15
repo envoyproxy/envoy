@@ -17,7 +17,7 @@
   if (!self) {
     return nil;
   }
-  _engineHandle = 0;
+  _engineHandle = init_engine();
   return self;
 }
 
@@ -42,7 +42,7 @@
 }
 
 - (EnvoyHttpStream *)openHttpStreamWithObserver:(EnvoyObserver *)observer {
-  return [[EnvoyHttpStream alloc] initWithHandle:0 observer:observer];
+  return [[EnvoyHttpStream alloc] initWithHandle:init_stream(_engineHandle) observer:observer];
 }
 
 @end
@@ -229,8 +229,8 @@ static void ios_on_error(envoy_error error, void *context) {
   memcpy(native_obs, &native_init, sizeof(envoy_observer));
   _nativeObserver = native_obs;
 
-  envoy_stream result = start_stream(*native_obs);
-  if (result.status != ENVOY_SUCCESS) {
+  envoy_status_t result = start_stream(_streamHandle, *native_obs);
+  if (result != ENVOY_SUCCESS) {
     return nil;
   }
 

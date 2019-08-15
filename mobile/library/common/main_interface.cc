@@ -1,5 +1,6 @@
 #include "library/common/main_interface.h"
 
+#include <atomic>
 #include <unordered_map>
 
 #include "common/upstream/logical_dns_cluster.h"
@@ -21,9 +22,13 @@
 
 static std::unique_ptr<Envoy::MainCommon> main_common_;
 static std::unique_ptr<Envoy::Http::Dispatcher> http_dispatcher_;
+static std::atomic<envoy_stream_t> current_stream_handle_{0};
 
-envoy_stream start_stream(envoy_observer observer) {
-  return {ENVOY_SUCCESS, http_dispatcher_->startStream(observer)};
+envoy_stream_t init_stream(envoy_engine_t) { return current_stream_handle_++; }
+
+envoy_status_t start_stream(envoy_stream_t stream, envoy_observer observer) {
+  http_dispatcher_->startStream(stream, observer);
+  return ENVOY_SUCCESS;
 }
 
 envoy_status_t send_headers(envoy_stream_t stream, envoy_headers headers, bool end_stream) {
@@ -36,6 +41,12 @@ envoy_status_t send_metadata(envoy_stream_t, envoy_headers) { return ENVOY_FAILU
 envoy_status_t send_trailers(envoy_stream_t, envoy_headers) { return ENVOY_FAILURE; }
 
 envoy_status_t reset_stream(envoy_stream_t stream) { return http_dispatcher_->resetStream(stream); }
+
+envoy_engine_t init_engine() {
+  // TODO(goaway): return new handle once multiple engine support is in place.
+  // https://github.com/lyft/envoy-mobile/issues/332
+  return 1;
+}
 
 /*
  * Setup envoy for interaction via the main interface.

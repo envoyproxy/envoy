@@ -31,7 +31,7 @@ public:
    * @param observer wrapper for callbacks for events on this stream.
    * @return envoy_stream_t handle to the stream being created.
    */
-  envoy_stream_t startStream(envoy_observer observer);
+  envoy_status_t startStream(envoy_stream_t stream, envoy_observer observer);
   envoy_status_t sendHeaders(envoy_stream_t stream, envoy_headers headers, bool end_stream);
   envoy_status_t sendData(envoy_stream_t stream, envoy_headers headers, bool end_stream);
   envoy_status_t sendMetadata(envoy_stream_t stream, envoy_headers headers, bool end_stream);
@@ -102,7 +102,6 @@ private:
   void cleanup(envoy_stream_t stream_handle);
 
   std::unordered_map<envoy_stream_t, DirectStreamPtr> streams_;
-  std::atomic<envoy_stream_t> current_stream_handle_;
   // The event_dispatcher is the only member state that may be accessed from a thread other than
   // the event_dispatcher's own thread.
   Event::Dispatcher& event_dispatcher_;
