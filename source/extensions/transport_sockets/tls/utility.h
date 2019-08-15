@@ -27,7 +27,7 @@ std::string getSerialNumberFromCertificate(X509& cert);
  * @param type type of subject alternate name either GEN_DNS or GEN_URI
  * @return std::vector returns the list of subject alternate names.
  */
-std::vector<std::string> getSubjectAltNames(X509& cert, int type);
+std::vector<absl::string_view> getSubjectAltNames(X509& cert, int type);
 
 /**
  * Retrieves the issuer from certificate.

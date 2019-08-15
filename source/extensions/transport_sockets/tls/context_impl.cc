@@ -654,12 +654,12 @@ Envoy::Ssl::CertificateDetailsPtr ContextImpl::certificateDetails(X509* cert,
   for (auto& dns_san : Utility::getSubjectAltNames(*cert, GEN_DNS)) {
     envoy::admin::v2alpha::SubjectAlternateName& subject_alt_name =
         *certificate_details->add_subject_alt_names();
-    subject_alt_name.set_dns(dns_san);
+    subject_alt_name.set_dns(std::string(dns_san));
   }
   for (auto& uri_san : Utility::getSubjectAltNames(*cert, GEN_URI)) {
     envoy::admin::v2alpha::SubjectAlternateName& subject_alt_name =
         *certificate_details->add_subject_alt_names();
-    subject_alt_name.set_uri(uri_san);
+    subject_alt_name.set_uri(std::string(uri_san));
   }
   return certificate_details;
 }

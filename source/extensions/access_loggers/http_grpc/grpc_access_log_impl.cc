@@ -17,7 +17,7 @@ using namespace envoy::data::accesslog::v2;
 
 // Helper function to convert from a BoringSSL textual representation of the
 // TLS version to the corresponding enum value used in gRPC access logs.
-TLSProperties_TLSVersion tlsVersionStringToEnum(const std::string& tls_version) {
+TLSProperties_TLSVersion tlsVersionStringToEnum(absl::string_view tls_version) {
   if (tls_version == "TLSv1") {
     return TLSProperties_TLSVersion_TLSv1;
   } else if (tls_version == "TLSv1.1") {
@@ -256,27 +256,28 @@ void HttpGrpcAccessLog::emitLog(const Http::HeaderMap& request_headers,
         *stream_info.downstreamLocalAddress(),
         *common_properties->mutable_downstream_local_address());
   }
-  if (stream_info.downstreamSslConnection() != nullptr) {
+  const auto& downstream_ssl_connection = stream_info.downstreamSslConnection();
+  if (downstream_ssl_connection != nullptr) {
     auto* tls_properties = common_properties->mutable_tls_properties();
-    const auto* downstream_ssl_connection = stream_info.downstreamSslConnection();
 
     tls_properties->set_tls_sni_hostname(stream_info.requestedServerName());
 
     auto* local_properties = tls_properties->mutable_local_certificate_properties();
     for (const auto& uri_san : downstream_ssl_connection->uriSanLocalCertificate()) {
       auto* local_san = local_properties->add_subject_alt_name();
-      local_san->set_uri(uri_san);
+      local_san->set_uri(std::string(uri_san));
     }
-    local_properties->set_subject(downstream_ssl_connection->subjectLocalCertificate());
+    local_properties->set_subject(
+        std::string(downstream_ssl_connection->subjectLocalCertificate()));
 
     auto* peer_properties = tls_properties->mutable_peer_certificate_properties();
     for (const auto& uri_san : downstream_ssl_connection->uriSanPeerCertificate()) {
       auto* peer_san = peer_properties->add_subject_alt_name();
-      peer_san->set_uri(uri_san);
+      peer_san->set_uri(std::string(uri_san));
     }
 
-    peer_properties->set_subject(downstream_ssl_connection->subjectPeerCertificate());
-    tls_properties->set_tls_session_id(downstream_ssl_connection->sessionId());
+    peer_properties->set_subject(std::string(downstream_ssl_connection->subjectPeerCertificate()));
+    tls_properties->set_tls_session_id(std::string(downstream_ssl_connection->sessionId()));
     tls_properties->set_tls_version(
         tlsVersionStringToEnum(downstream_ssl_connection->tlsVersion()));
 

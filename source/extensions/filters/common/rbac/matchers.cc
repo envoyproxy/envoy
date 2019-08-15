@@ -133,7 +133,7 @@ bool PortMatcher::matches(const Network::Connection& connection, const Envoy::Ht
 bool AuthenticatedMatcher::matches(const Network::Connection& connection,
                                    const Envoy::Http::HeaderMap&,
                                    const envoy::api::v2::core::Metadata&) const {
-  const auto* ssl = connection.ssl();
+  const auto& ssl = connection.ssl();
   if (!ssl) { // connection was not authenticated
     return false;
   } else if (!matcher_.has_value()) { // matcher allows any subject
@@ -141,7 +141,7 @@ bool AuthenticatedMatcher::matches(const Network::Connection& connection,
   }
 
   const auto uriSans = ssl->uriSanPeerCertificate();
-  std::string principal;
+  absl::string_view principal;
   if (uriSans.empty()) {
     principal = ssl->subjectPeerCertificate();
   } else {

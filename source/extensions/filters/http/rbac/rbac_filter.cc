@@ -62,10 +62,11 @@ Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::Head
             callbacks_->connection()->remoteAddress()->asString(),
             callbacks_->connection()->localAddress()->asString(),
             callbacks_->connection()->ssl()
-                ? "uriSanPeerCertificate: " +
-                      absl::StrJoin(callbacks_->connection()->ssl()->uriSanPeerCertificate(), ",") +
-                      ", subjectPeerCertificate: " +
-                      callbacks_->connection()->ssl()->subjectPeerCertificate()
+                ? absl::StrCat(
+                      "uriSanPeerCertificate: ",
+                      absl::StrJoin(callbacks_->connection()->ssl()->uriSanPeerCertificate(), ","),
+                      ", subjectPeerCertificate: ",
+                      callbacks_->connection()->ssl()->subjectPeerCertificate())
                 : "none",
             headers, callbacks_->streamInfo().dynamicMetadata().DebugString());
 

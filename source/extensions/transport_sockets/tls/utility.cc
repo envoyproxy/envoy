@@ -82,18 +82,19 @@ std::string Utility::getSerialNumberFromCertificate(X509& cert) {
   return "";
 }
 
-std::vector<std::string> Utility::getSubjectAltNames(X509& cert, int type) {
-  std::vector<std::string> subject_alt_names;
-  bssl::UniquePtr<GENERAL_NAMES> san_names(
-      static_cast<GENERAL_NAMES*>(X509_get_ext_d2i(&cert, NID_subject_alt_name, nullptr, nullptr)));
+std::vector<absl::string_view> Utility::getSubjectAltNames(X509& cert, int type) {
+  std::vector<absl::string_view> subject_alt_names;
+  GENERAL_NAMES* san_names =
+      static_cast<GENERAL_NAMES*>(X509_get_ext_d2i(&cert, NID_subject_alt_name, nullptr, nullptr));
   if (san_names == nullptr) {
     return subject_alt_names;
   }
-  for (const GENERAL_NAME* san : san_names.get()) {
+  for (size_t j = 0; j < sk_GENERAL_NAME_num(san_names); j++) {
+    const GENERAL_NAME* san = sk_GENERAL_NAME_value(san_names, j);
     if (san->type == type) {
       ASN1_STRING* str = san->d.dNSName;
       const char* dns_name = reinterpret_cast<const char*>(ASN1_STRING_data(str));
-      subject_alt_names.push_back(std::string(dns_name));
+      subject_alt_names.push_back(absl::string_view(dns_name, ASN1_STRING_length(str)));
     }
   }
   return subject_alt_names;
