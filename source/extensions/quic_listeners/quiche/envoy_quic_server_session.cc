@@ -16,14 +16,13 @@ namespace Quic {
 
 EnvoyQuicServerSession::EnvoyQuicServerSession(
     const quic::QuicConfig& config, const quic::ParsedQuicVersionVector& supported_versions,
-    quic::QuicConnection* connection, quic::QuicSession::Visitor* visitor,
+    std::unique_ptr<EnvoyQuicConnection> connection, quic::QuicSession::Visitor* visitor,
     quic::QuicCryptoServerStream::Helper* helper, const quic::QuicCryptoServerConfig* crypto_config,
     quic::QuicCompressedCertsCache* compressed_certs_cache, Event::Dispatcher& dispatcher)
-    : quic::QuicServerSessionBase(config, supported_versions, connection, visitor, helper,
+    : quic::QuicServerSessionBase(config, supported_versions, connection.get(), visitor, helper,
                                   crypto_config, compressed_certs_cache),
-      filter_manager_(*this), dispatcher_(dispatcher), stream_info_(dispatcher.timeSource()) {}
-
-EnvoyQuicServerSession::~EnvoyQuicServerSession() { delete connection(); }
+      quic_connection_(std::move(connection)), filter_manager_(*this), dispatcher_(dispatcher),
+      stream_info_(dispatcher.timeSource()) {}
 
 quic::QuicCryptoServerStreamBase* EnvoyQuicServerSession::CreateQuicCryptoServerStream(
     const quic::QuicCryptoServerConfig* crypto_config,
@@ -79,7 +78,7 @@ void EnvoyQuicServerSession::OnConnectionClosed(const quic::QuicConnectionCloseF
 
 void EnvoyQuicServerSession::Initialize() {
   quic::QuicServerSessionBase::Initialize();
-  reinterpret_cast<EnvoyQuicConnection*>(connection())->setEnvoyConnection(*this);
+  quic_connection_->setEnvoyConnection(*this);
 }
 
 void EnvoyQuicServerSession::addWriteFilter(Network::WriteFilterSharedPtr filter) {
@@ -145,7 +144,7 @@ std::chrono::milliseconds EnvoyQuicServerSession::delayedCloseTimeout() const {
 
 const Network::ConnectionSocket::OptionsSharedPtr& EnvoyQuicServerSession::socketOptions() const {
   ENVOY_CONN_LOG(error, "QUIC does not support connection pooling", *this);
-  return dynamic_cast<const EnvoyQuicConnection*>(connection())->connectionSocket()->options();
+  return quic_connection_->connectionSocket()->options();
 }
 
 absl::string_view EnvoyQuicServerSession::requestedServerName() const {
@@ -153,17 +152,15 @@ absl::string_view EnvoyQuicServerSession::requestedServerName() const {
 }
 
 const Network::Address::InstanceConstSharedPtr& EnvoyQuicServerSession::remoteAddress() const {
-  auto quic_connection = dynamic_cast<const EnvoyQuicConnection*>(connection());
-  ASSERT(quic_connection->connectionSocket() != nullptr,
+  ASSERT(quic_connection_->connectionSocket() != nullptr,
          "remoteAddress() should only be called after OnPacketHeader");
-  return quic_connection->connectionSocket()->remoteAddress();
+  return quic_connection_->connectionSocket()->remoteAddress();
 }
 
 const Network::Address::InstanceConstSharedPtr& EnvoyQuicServerSession::localAddress() const {
-  auto quic_connection = dynamic_cast<const EnvoyQuicConnection*>(connection());
-  ASSERT(quic_connection->connectionSocket() != nullptr,
+  ASSERT(quic_connection_->connectionSocket() != nullptr,
          "localAddress() should only be called after OnPacketHeader");
-  return quic_connection->connectionSocket()->localAddress();
+  return quic_connection_->connectionSocket()->localAddress();
 }
 
 const Ssl::ConnectionInfo* EnvoyQuicServerSession::ssl() const {

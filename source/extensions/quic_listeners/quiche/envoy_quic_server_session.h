@@ -33,14 +33,12 @@ public:
   // Owns connection.
   EnvoyQuicServerSession(const quic::QuicConfig& config,
                          const quic::ParsedQuicVersionVector& supported_versions,
-                         quic::QuicConnection* connection, quic::QuicSession::Visitor* visitor,
+                         std::unique_ptr<EnvoyQuicConnection> connection,
+                         quic::QuicSession::Visitor* visitor,
                          quic::QuicCryptoServerStream::Helper* helper,
                          const quic::QuicCryptoServerConfig* crypto_config,
                          quic::QuicCompressedCertsCache* compressed_certs_cache,
                          Event::Dispatcher& dispatcher);
-
-  // Overridden to delete connection object.
-  ~EnvoyQuicServerSession() override;
 
   // Network::FilterManager
   // Overridden to delegate calls to filter_manager_.
@@ -145,6 +143,7 @@ protected:
 private:
   void setUpRequestDecoder(EnvoyQuicStream& stream);
 
+  std::unique_ptr<EnvoyQuicConnection> quic_connection_;
   // Currently ConnectionManagerImpl is the one and only filter. If more network
   // filters are added, ConnectionManagerImpl should always be the last one.
   // Its onRead() is only called once to trigger ReadFilter::onNewConnection()

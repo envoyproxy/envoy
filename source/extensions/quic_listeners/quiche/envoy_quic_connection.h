@@ -20,7 +20,8 @@
 namespace Envoy {
 namespace Quic {
 
-// Derived for network filter chain, stats and QoS.
+// Derived for network filter chain, stats and QoS. This is used on both client
+// and server side.
 class EnvoyQuicConnection : public quic::QuicConnection,
                             protected Logger::Loggable<Logger::Id::connection> {
 public:
@@ -58,7 +59,7 @@ private:
   // Only initialized after self address is known. Must not own the underlying
   // socket because UDP socket is shared among all connections.
   Network::ConnectionSocketPtr connection_socket_;
-  Network::Connection* envoy_connection_;
+  Network::Connection* envoy_connection_{nullptr};
   Network::ListenerConfig& listener_config_;
   Server::ListenerStats& listener_stats_;
   // Latched to the corresponding quic FilterChain after connection_socket_ is

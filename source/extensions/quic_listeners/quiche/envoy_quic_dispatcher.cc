@@ -36,13 +36,13 @@ void EnvoyQuicDispatcher::OnConnectionClosed(quic::QuicConnectionId connection_i
 quic::QuicSession* EnvoyQuicDispatcher::CreateQuicSession(
     quic::QuicConnectionId server_connection_id, const quic::QuicSocketAddress& peer_address,
     quic::QuicStringPiece /*alpn*/, const quic::ParsedQuicVersion& version) {
-  auto quic_connection = new EnvoyQuicConnection(
+  auto quic_connection = std::make_unique<EnvoyQuicConnection>(
       server_connection_id, peer_address, *helper(), *alarm_factory(), *writer(),
       /*owns_writer=*/false, quic::Perspective::IS_SERVER, quic::ParsedQuicVersionVector{version},
       listener_config_, listener_stats_);
   auto quic_session = new EnvoyQuicServerSession(
-      config(), quic::ParsedQuicVersionVector{version}, quic_connection, this, session_helper(),
-      crypto_config(), compressed_certs_cache(), connection_handler_.dispatcher_);
+      config(), quic::ParsedQuicVersionVector{version}, std::move(quic_connection), this,
+      session_helper(), crypto_config(), compressed_certs_cache(), connection_handler_.dispatcher_);
   quic_session->Initialize();
   // Filter chain can't be retrieved here as self address is unknown at this
   // point.
