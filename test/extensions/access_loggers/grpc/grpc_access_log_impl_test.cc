@@ -275,7 +275,7 @@ TEST_F(GrpcAccessLoggerCacheImplTest, Deduplication) {
       logger_cache_->getOrCreateLogger(config, GrpcAccessLoggerType::HTTP);
   EXPECT_EQ(logger1, logger_cache_->getOrCreateLogger(config, GrpcAccessLoggerType::HTTP));
 
-  // Do not dedpulicate different types of logger
+  // Do not deduplicate different types of logger
   EXPECT_NE(logger1, logger_cache_->getOrCreateLogger(config, GrpcAccessLoggerType::TCP));
 
   // Changing log name leads to another logger.
