@@ -61,7 +61,9 @@ public:
   absl::optional<CelValue> operator[](CelValue key) const override;
   int size() const override { return value_ == nullptr ? 0 : value_->size(); }
   bool empty() const override { return value_ == nullptr ? true : value_->empty(); }
-  const google::api::expr::runtime::CelList* ListKeys() const override { return nullptr; }
+  const google::api::expr::runtime::CelList* ListKeys() const override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
 
 private:
   friend class RequestWrapper;
@@ -72,7 +74,9 @@ class BaseWrapper : public google::api::expr::runtime::CelMap {
 public:
   int size() const override { return 0; }
   bool empty() const override { return false; }
-  const google::api::expr::runtime::CelList* ListKeys() const override { return nullptr; }
+  const google::api::expr::runtime::CelList* ListKeys() const override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
 };
 
 class RequestWrapper : public BaseWrapper {

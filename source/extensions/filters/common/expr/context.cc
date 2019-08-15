@@ -21,7 +21,7 @@ absl::optional<CelValue> convertHeaderEntry(const Http::HeaderEntry* header) {
 } // namespace
 
 absl::optional<CelValue> HeadersWrapper::operator[](CelValue key) const {
-  if (!key.IsString()) {
+  if (value_ == nullptr || !key.IsString()) {
     return {};
   }
   auto out = value_->get(Http::LowerCaseString(std::string(key.StringOrDie().value())));
@@ -41,13 +41,10 @@ absl::optional<CelValue> RequestWrapper::operator[](CelValue key) const {
   } else if (value == Size) {
     // it is important to make a choice whether to rely on content-length vs stream info
     // (which is not available at the time of the request headers)
-    if (headers_.value_ != nullptr) {
-      auto length_header = headers_.value_->ContentLength();
-      if (length_header != nullptr) {
-        int64_t length;
-        if (absl::SimpleAtoi(length_header->value().getStringView(), &length)) {
-          return CelValue::CreateInt64(length);
-        }
+    if (headers_.value_ != nullptr && headers_.value_->ContentLength() != nullptr) {
+      int64_t length;
+      if (absl::SimpleAtoi(headers_.value_->ContentLength()->value().getStringView(), &length)) {
+        return CelValue::CreateInt64(length);
       }
     } else {
       return CelValue::CreateInt64(info_.bytesReceived());

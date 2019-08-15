@@ -24,6 +24,14 @@ namespace {
 
 constexpr absl::string_view Undefined = "undefined";
 
+TEST(Context, EmptyHeadersAttributes) {
+  HeadersWrapper headers(nullptr);
+  auto header = headers[CelValue::CreateString(Referer)];
+  EXPECT_FALSE(header.has_value());
+  EXPECT_EQ(0, headers.size());
+  EXPECT_TRUE(headers.empty());
+}
+
 TEST(Context, RequestAttributes) {
   NiceMock<StreamInfo::MockStreamInfo> info;
   Http::TestHeaderMapImpl header_map{
@@ -40,8 +48,17 @@ TEST(Context, RequestAttributes) {
   absl::optional<std::chrono::nanoseconds> dur = std::chrono::nanoseconds(15000000);
   EXPECT_CALL(info, requestComplete()).WillRepeatedly(Return(dur));
 
+  // stub methods
+  EXPECT_EQ(0, request.size());
+  EXPECT_FALSE(request.empty());
+
   {
     auto value = request[CelValue::CreateString(Undefined)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    auto value = request[CelValue::CreateInt64(13)];
     EXPECT_FALSE(value.has_value());
   }
 
@@ -144,6 +161,32 @@ TEST(Context, RequestAttributes) {
   }
 }
 
+TEST(Context, RequestFallbackAttributes) {
+  NiceMock<StreamInfo::MockStreamInfo> info;
+  Http::TestHeaderMapImpl header_map{
+      {":method", "POST"},
+      {":scheme", "http"},
+      {":path", "/meow?yes=1"},
+  };
+  RequestWrapper request(&header_map, info);
+
+  EXPECT_CALL(info, bytesReceived()).WillRepeatedly(Return(10));
+
+  {
+    auto value = request[CelValue::CreateString(Size)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsInt64());
+    EXPECT_EQ(10, value.value().Int64OrDie());
+  }
+
+  {
+    auto value = request[CelValue::CreateString(UrlPath)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ("/meow", value.value().StringOrDie().value());
+  }
+}
+
 TEST(Context, ResponseAttributes) {
   NiceMock<StreamInfo::MockStreamInfo> info;
   const std::string header_name = "test-header";
@@ -157,6 +200,11 @@ TEST(Context, ResponseAttributes) {
 
   {
     auto value = response[CelValue::CreateString(Undefined)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    auto value = response[CelValue::CreateInt64(13)];
     EXPECT_FALSE(value.has_value());
   }
 
@@ -186,6 +234,9 @@ TEST(Context, ResponseAttributes) {
     EXPECT_TRUE(header.has_value());
     ASSERT_TRUE(header.value().IsString());
     EXPECT_EQ("a", header.value().StringOrDie().value());
+
+    auto missing = map[CelValue::CreateString(Undefined)];
+    EXPECT_FALSE(missing.has_value());
   }
 
   {
@@ -229,6 +280,21 @@ TEST(Context, ConnectionAttributes) {
 
   {
     auto value = connection[CelValue::CreateString(Undefined)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    auto value = connection[CelValue::CreateInt64(13)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    auto value = source[CelValue::CreateString(Undefined)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    auto value = source[CelValue::CreateInt64(13)];
     EXPECT_FALSE(value.has_value());
   }
 

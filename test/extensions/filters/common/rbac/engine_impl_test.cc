@@ -100,6 +100,69 @@ TEST(RoleBasedAccessControlEngineImpl, BasicCondition) {
   checkEngine(engine, false);
 }
 
+TEST(RoleBasedAccessControlEngineImpl, MalformedCondition) {
+  envoy::config::rbac::v2::Policy policy;
+  policy.add_permissions()->set_any(true);
+  policy.add_principals()->set_any(true);
+  policy.mutable_condition()->MergeFrom(
+      TestUtility::parseYaml<google::api::expr::v1alpha1::Expr>(R"EOF(
+    call_expr:
+      function: undefined_extent
+      args:
+      - const_expr:
+          bool_value: false
+  )EOF"));
+
+  envoy::config::rbac::v2::RBAC rbac;
+  rbac.set_action(envoy::config::rbac::v2::RBAC_Action::RBAC_Action_ALLOW);
+  (*rbac.mutable_policies())["foo"] = policy;
+
+  EXPECT_THROW_WITH_REGEX(RBAC::RoleBasedAccessControlEngineImpl engine(rbac), EnvoyException,
+                          "failed to create an expression: .*");
+}
+
+TEST(RoleBasedAccessControlEngineImpl, MistypedCondition) {
+  envoy::config::rbac::v2::Policy policy;
+  policy.add_permissions()->set_any(true);
+  policy.add_principals()->set_any(true);
+  policy.mutable_condition()->MergeFrom(
+      TestUtility::parseYaml<google::api::expr::v1alpha1::Expr>(R"EOF(
+    const_expr:
+      int64_value: 13
+  )EOF"));
+
+  envoy::config::rbac::v2::RBAC rbac;
+  rbac.set_action(envoy::config::rbac::v2::RBAC_Action::RBAC_Action_ALLOW);
+  (*rbac.mutable_policies())["foo"] = policy;
+  RBAC::RoleBasedAccessControlEngineImpl engine(rbac);
+  checkEngine(engine, false);
+}
+
+TEST(RoleBasedAccessControlEngineImpl, ErrorCondition) {
+  envoy::config::rbac::v2::Policy policy;
+  policy.add_permissions()->set_any(true);
+  policy.add_principals()->set_any(true);
+  policy.mutable_condition()->MergeFrom(
+      TestUtility::parseYaml<google::api::expr::v1alpha1::Expr>(R"EOF(
+    call_expr:
+      function: _[_]
+      args:
+      - select_expr:
+          operand:
+            ident_expr:
+              name: request
+          field: undefined
+      - const_expr:
+          string_value: foo
+  )EOF"));
+
+  envoy::config::rbac::v2::RBAC rbac;
+  rbac.set_action(envoy::config::rbac::v2::RBAC_Action::RBAC_Action_ALLOW);
+  (*rbac.mutable_policies())["foo"] = policy;
+  RBAC::RoleBasedAccessControlEngineImpl engine(rbac);
+  checkEngine(engine, false, Envoy::Network::MockConnection());
+}
+
 TEST(RoleBasedAccessControlEngineImpl, HeaderCondition) {
   envoy::config::rbac::v2::Policy policy;
   policy.add_permissions()->set_any(true);
