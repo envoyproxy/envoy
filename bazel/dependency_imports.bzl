@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_depe
 load("@envoy//bazel/toolchains:rbe_toolchains_config.bzl", "rbe_toolchains_config")
 
 # go version for rules_go
-GO_VERSION = "1.12.5"
+GO_VERSION = "1.12.8"
 
 def envoy_dependency_imports(go_version = GO_VERSION):
     rules_foreign_cc_dependencies()
