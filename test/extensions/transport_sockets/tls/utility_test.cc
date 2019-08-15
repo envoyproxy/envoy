@@ -44,8 +44,7 @@ TEST(UtilityTest, TestGetSubjectAlternateNamesWithUri) {
 TEST(UtilityTest, TestGetSubjectAlternateNamesWithNoSAN) {
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"));
-  const auto& uri_subject_alt_names =
-      Utility::getSubjectAltNames(*cert, GEN_URI);
+  const auto& uri_subject_alt_names = Utility::getSubjectAltNames(*cert, GEN_URI);
   EXPECT_EQ(0, uri_subject_alt_names.size());
 }
 

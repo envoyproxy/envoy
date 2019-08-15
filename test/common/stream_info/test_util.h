@@ -85,7 +85,8 @@ public:
     return downstream_remote_address_;
   }
 
-  void setDownstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& connection_info) override {
+  void
+  setDownstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& connection_info) override {
     downstream_connection_info_ = connection_info;
   }
 

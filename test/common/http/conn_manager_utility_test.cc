@@ -928,7 +928,8 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCertPeerSanEmpty) {
   EXPECT_CALL(*ssl, sha256PeerCertificateDigest()).WillOnce(Return(expected_sha));
   EXPECT_CALL(*ssl, subjectPeerCertificate())
       .WillOnce(Return("/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=test.lyft.com"));
-  EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(std::vector<absl::string_view>()));
+  EXPECT_CALL(*ssl, uriSanPeerCertificate())
+      .WillRepeatedly(Return(std::vector<absl::string_view>()));
   ON_CALL(connection_, ssl()).WillByDefault(Return(ssl));
   ON_CALL(config_, forwardClientCert())
       .WillByDefault(Return(Http::ForwardClientCertType::SanitizeSet));

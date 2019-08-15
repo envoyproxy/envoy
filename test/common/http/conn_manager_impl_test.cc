@@ -100,8 +100,7 @@ public:
 
     server_name_ = server_name;
     ON_CALL(filter_callbacks_.connection_, ssl()).WillByDefault(Return(ssl_connection_));
-    ON_CALL(Const(filter_callbacks_.connection_), ssl())
-        .WillByDefault(Return(ssl_connection_));
+    ON_CALL(Const(filter_callbacks_.connection_), ssl()).WillByDefault(Return(ssl_connection_));
     filter_callbacks_.connection_.local_address_ =
         std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1");
     filter_callbacks_.connection_.remote_address_ =
@@ -3990,7 +3989,8 @@ TEST_F(HttpConnectionManagerImplTest, MultipleFilters) {
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         EXPECT_EQ(route_config_provider_.route_config_->route_,
                   decoder_filters_[0]->callbacks_->route());
-        EXPECT_EQ(ssl_connection_.get(), decoder_filters_[0]->callbacks_->connection()->ssl().get());
+        EXPECT_EQ(ssl_connection_.get(),
+                  decoder_filters_[0]->callbacks_->connection()->ssl().get());
         return FilterHeadersStatus::StopIteration;
       }));
 
@@ -4010,7 +4010,8 @@ TEST_F(HttpConnectionManagerImplTest, MultipleFilters) {
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         EXPECT_EQ(route_config_provider_.route_config_->route_,
                   decoder_filters_[1]->callbacks_->route());
-        EXPECT_EQ(ssl_connection_.get(), decoder_filters_[1]->callbacks_->connection()->ssl().get());
+        EXPECT_EQ(ssl_connection_.get(),
+                  decoder_filters_[1]->callbacks_->connection()->ssl().get());
         return FilterHeadersStatus::StopIteration;
       }));
   EXPECT_CALL(*decoder_filters_[1], decodeData(_, true))

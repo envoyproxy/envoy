@@ -270,7 +270,8 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerFingerprintNoT
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerSerial) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
-  ON_CALL(*connection_info, serialNumberPeerCertificate()).WillByDefault(Return("b8b5ecc898f2124a"));
+  ON_CALL(*connection_info, serialNumberPeerCertificate())
+      .WillByDefault(Return("b8b5ecc898f2124a"));
   EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
   testFormatting(stream_info, "DOWNSTREAM_PEER_SERIAL", "b8b5ecc898f2124a");
 }

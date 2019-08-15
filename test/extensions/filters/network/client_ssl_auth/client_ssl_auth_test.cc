@@ -58,7 +58,8 @@ class ClientSslAuthFilterTest : public testing::Test {
 protected:
   ClientSslAuthFilterTest()
       : request_(&cm_.async_client_), interval_timer_(new Event::MockTimer(&dispatcher_)),
-        api_(Api::createApiForTest(stats_store_)), ssl_(std::make_shared<Ssl::MockConnectionInfo>()) {}
+        api_(Api::createApiForTest(stats_store_)),
+        ssl_(std::make_shared<Ssl::MockConnectionInfo>()) {}
   ~ClientSslAuthFilterTest() override { tls_.shutdownThread(); }
 
   void setup() {

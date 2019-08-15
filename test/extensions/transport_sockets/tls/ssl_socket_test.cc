@@ -342,7 +342,8 @@ void testUtil(const TestUtilOptions& options) {
         EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->sha256PeerCertificateDigest());
         EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->urlEncodedPemEncodedPeerCertificate());
         EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->subjectPeerCertificate());
-        EXPECT_EQ(std::vector<absl::string_view>{}, server_connection->ssl()->dnsSansPeerCertificate());
+        EXPECT_EQ(std::vector<absl::string_view>{},
+                  server_connection->ssl()->dnsSansPeerCertificate());
       }
       if (options.expectNoCertChain()) {
         EXPECT_EQ(EMPTY_STRING,
@@ -542,12 +543,14 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
       std::make_unique<ClientContextConfigImpl>(options.clientCtxProto(), client_factory_context);
   ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager,
                                                    client_stats_store);
+  auto transport_socket =
+      client_ssl_socket_factory.createTransportSocket(options.transportSocketOptions());
+  const SslSocket* ssl_socket = dynamic_cast<const SslSocket*>(transport_socket.get());
   Network::ClientConnectionPtr client_connection = dispatcher->createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
-      client_ssl_socket_factory.createTransportSocket(options.transportSocketOptions()), nullptr);
+      std::move(transport_socket), nullptr);
 
   if (!options.clientSession().empty()) {
-    const SslSocket* ssl_socket = dynamic_cast<const SslSocket*>(client_connection->ssl());
     SSL* client_ssl_socket = ssl_socket->rawSslForTest();
     SSL_CTX* client_ssl_context = SSL_get_SSL_CTX(client_ssl_socket);
     SSL_SESSION* client_ssl_session =
@@ -560,6 +563,7 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
 
   Network::ConnectionPtr server_connection;
   Network::MockConnectionCallbacks server_connection_callbacks;
+  const SslSocket* server_ssl_socket;
   EXPECT_CALL(callbacks, onAccept_(_, _))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
         std::string sni = options.transportSocketOptions() != nullptr &&
@@ -567,6 +571,7 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
                               ? options.transportSocketOptions()->serverNameOverride().value()
                               : options.clientCtxProto().sni();
         socket->setRequestedServerName(sni);
+        server_ssl_socket = dynamic_cast<const SslSocket*>(socket.get());
         Network::ConnectionPtr new_connection = dispatcher->createServerConnection(
             std::move(socket), server_ssl_socket_factory.createTransportSocket(nullptr));
         callbacks.onNewConnection(std::move(new_connection));
@@ -592,7 +597,6 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
         EXPECT_EQ(options.expectedALPNProtocol(), client_connection->nextProtocol());
       }
       EXPECT_EQ(options.expectedClientCertUri(), server_connection->ssl()->uriSanPeerCertificate());
-      const SslSocket* ssl_socket = dynamic_cast<const SslSocket*>(client_connection->ssl());
       SSL* client_ssl_socket = ssl_socket->rawSslForTest();
       if (!options.expectedProtocolVersion().empty()) {
         EXPECT_EQ(options.expectedProtocolVersion(), client_connection->ssl()->tlsVersion());
@@ -606,7 +610,6 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
       }
 
       absl::optional<std::string> server_ssl_requested_server_name;
-      const SslSocket* server_ssl_socket = dynamic_cast<const SslSocket*>(server_connection->ssl());
       SSL* server_ssl = server_ssl_socket->rawSslForTest();
       auto requested_server_name = SSL_get_servername(server_ssl, TLSEXT_NAMETYPE_host_name);
       if (requested_server_name != nullptr) {
@@ -2298,12 +2301,13 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
   auto client_cfg = std::make_unique<ClientContextConfigImpl>(tls_context, factory_context_);
   Stats::IsolatedStoreImpl client_stats_store;
   ClientSslSocketFactory ssl_socket_factory(std::move(client_cfg), manager, client_stats_store);
+  auto transport_socket = ssl_socket_factory.createTransportSocket(nullptr);
+  const SslSocket* ssl_socket = dynamic_cast<const SslSocket*>(transport_socket.get());
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
-      ssl_socket_factory.createTransportSocket(nullptr), nullptr);
+      std::move(transport_socket), nullptr);
 
   // Verify that server sent list with 2 acceptable client certificate CA names.
-  const SslSocket* ssl_socket = dynamic_cast<const SslSocket*>(client_connection->ssl());
   SSL_set_cert_cb(
       ssl_socket->rawSslForTest(),
       [](SSL* ssl, void*) -> int {
@@ -2397,9 +2401,11 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
   auto client_cfg =
       std::make_unique<ClientContextConfigImpl>(client_tls_context, client_factory_context);
   ClientSslSocketFactory ssl_socket_factory(std::move(client_cfg), manager, client_stats_store);
+  auto transport_socket = ssl_socket_factory.createTransportSocket(nullptr);
+  const SslSocket* ssl_socket = dynamic_cast<const SslSocket*>(transport_socket.get());
   Network::ClientConnectionPtr client_connection = dispatcher->createClientConnection(
       socket1.localAddress(), Network::Address::InstanceConstSharedPtr(),
-      ssl_socket_factory.createTransportSocket(nullptr), nullptr);
+      std::move(transport_socket), nullptr);
 
   Network::MockConnectionCallbacks client_connection_callbacks;
   client_connection->addConnectionCallbacks(client_connection_callbacks);
@@ -2422,7 +2428,6 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
 
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
-        const SslSocket* ssl_socket = dynamic_cast<const SslSocket*>(client_connection->ssl());
         ssl_session = SSL_get1_session(ssl_socket->rawSslForTest());
         EXPECT_TRUE(SSL_SESSION_is_resumable(ssl_session));
         client_connection->close(Network::ConnectionCloseType::NoFlush);
@@ -2436,12 +2441,13 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
   EXPECT_EQ(0UL, server_stats_store.counter("ssl.session_reused").value());
   EXPECT_EQ(0UL, client_stats_store.counter("ssl.session_reused").value());
 
-  client_connection = dispatcher->createClientConnection(
-      socket2.localAddress(), Network::Address::InstanceConstSharedPtr(),
-      ssl_socket_factory.createTransportSocket(nullptr), nullptr);
+  auto transport_socket2 = ssl_socket_factory.createTransportSocket(nullptr);
+  const SslSocket* ssl_socket2 = dynamic_cast<const SslSocket*>(transport_socket2.get());
+  client_connection = dispatcher->createClientConnection(socket2.localAddress(),
+                                                         Network::Address::InstanceConstSharedPtr(),
+                                                         std::move(transport_socket2), nullptr);
   client_connection->addConnectionCallbacks(client_connection_callbacks);
-  const SslSocket* ssl_socket = dynamic_cast<const SslSocket*>(client_connection->ssl());
-  SSL_set_session(ssl_socket->rawSslForTest(), ssl_session);
+  SSL_set_session(ssl_socket2->rawSslForTest(), ssl_session);
   SSL_SESSION_free(ssl_session);
 
   client_connection->connect();
@@ -2814,9 +2820,11 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   auto client_cfg = std::make_unique<ClientContextConfigImpl>(tls_context, factory_context_);
   Stats::IsolatedStoreImpl client_stats_store;
   ClientSslSocketFactory ssl_socket_factory(std::move(client_cfg), manager, client_stats_store);
+  auto transport_socket = ssl_socket_factory.createTransportSocket(nullptr);
+  const SslSocket* ssl_socket = dynamic_cast<const SslSocket*>(transport_socket.get());
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
-      ssl_socket_factory.createTransportSocket(nullptr), nullptr);
+      std::move(transport_socket), nullptr);
 
   Network::MockConnectionCallbacks client_connection_callbacks;
   client_connection->addConnectionCallbacks(client_connection_callbacks);
@@ -2845,7 +2853,6 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
-        const SslSocket* ssl_socket = dynamic_cast<const SslSocket*>(client_connection->ssl());
         ssl_session = SSL_get1_session(ssl_socket->rawSslForTest());
         EXPECT_TRUE(SSL_SESSION_is_resumable(ssl_session));
         server_connection->close(Network::ConnectionCloseType::NoFlush);
@@ -2859,12 +2866,13 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   EXPECT_EQ(1UL, server_stats_store.counter("ssl.handshake").value());
   EXPECT_EQ(1UL, client_stats_store.counter("ssl.handshake").value());
 
+  auto transport_socket2 = ssl_socket_factory.createTransportSocket(nullptr);
+  const SslSocket* ssl_socket2 = dynamic_cast<const SslSocket*>(transport_socket2.get());
   client_connection = dispatcher_->createClientConnection(
       socket2.localAddress(), Network::Address::InstanceConstSharedPtr(),
-      ssl_socket_factory.createTransportSocket(nullptr), nullptr);
+      std::move(transport_socket2), nullptr);
   client_connection->addConnectionCallbacks(client_connection_callbacks);
-  const SslSocket* ssl_socket = dynamic_cast<const SslSocket*>(client_connection->ssl());
-  SSL_set_session(ssl_socket->rawSslForTest(), ssl_session);
+  SSL_set_session(ssl_socket2->rawSslForTest(), ssl_session);
   SSL_SESSION_free(ssl_session);
 
   client_connection->connect();
