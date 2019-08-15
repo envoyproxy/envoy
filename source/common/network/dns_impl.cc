@@ -67,8 +67,8 @@ void DnsResolverImpl::initializeChannel(ares_options* options, int optmask) {
   ares_init_options(&channel_, options, optmask | ARES_OPT_SOCK_STATE_CB);
 }
 
-void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, int timeouts,
-                                                            hostent* hostent) {
+void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, int timeouts,
+                                                                   ares_addrinfo* addrinfo) {
   // We receive ARES_EDESTRUCTION when destructing with pending queries.
   if (status == ARES_EDESTRUCTION) {
     ASSERT(owned_);
@@ -79,32 +79,41 @@ void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, int time
     completed_ = true;
   }
 
-  std::list<Address::InstanceConstSharedPtr> address_list;
+  std::list<DnsResponse> address_list;
   if (status == ARES_SUCCESS) {
-    if (hostent->h_addrtype == AF_INET) {
-      for (int i = 0; hostent->h_addr_list[i] != nullptr; ++i) {
-        ASSERT(hostent->h_length == sizeof(in_addr));
-        sockaddr_in address;
-        memset(&address, 0, sizeof(address));
-        address.sin_family = AF_INET;
-        address.sin_port = 0;
-        address.sin_addr = *reinterpret_cast<in_addr*>(hostent->h_addr_list[i]);
-        address_list.emplace_back(new Address::Ipv4Instance(&address));
-      }
-    } else if (hostent->h_addrtype == AF_INET6) {
-      for (int i = 0; hostent->h_addr_list[i] != nullptr; ++i) {
-        ASSERT(hostent->h_length == sizeof(in6_addr));
-        sockaddr_in6 address;
-        memset(&address, 0, sizeof(address));
-        address.sin6_family = AF_INET6;
-        address.sin6_port = 0;
-        address.sin6_addr = *reinterpret_cast<in6_addr*>(hostent->h_addr_list[i]);
-        address_list.emplace_back(new Address::Ipv6Instance(address));
+    if (addrinfo != nullptr && addrinfo->nodes != nullptr) {
+      if (addrinfo->nodes->ai_family == AF_INET) {
+        for (const ares_addrinfo_node* ai = addrinfo->nodes; ai != nullptr; ai = ai->ai_next) {
+          sockaddr_in address;
+          memset(&address, 0, sizeof(address));
+          address.sin_family = AF_INET;
+          address.sin_port = 0;
+          address.sin_addr = reinterpret_cast<sockaddr_in*>(ai->ai_addr)->sin_addr;
+
+          address_list.emplace_back(
+              DnsResponse(std::make_shared<const Address::Ipv4Instance>(&address),
+                          std::chrono::seconds(ai->ai_ttl)));
+        }
+      } else if (addrinfo->nodes->ai_family == AF_INET6) {
+        for (const ares_addrinfo_node* ai = addrinfo->nodes; ai != nullptr; ai = ai->ai_next) {
+          sockaddr_in6 address;
+          memset(&address, 0, sizeof(address));
+          address.sin6_family = AF_INET6;
+          address.sin6_port = 0;
+          address.sin6_addr = reinterpret_cast<sockaddr_in6*>(ai->ai_addr)->sin6_addr;
+          address_list.emplace_back(
+              DnsResponse(std::make_shared<const Address::Ipv6Instance>(address),
+                          std::chrono::seconds(ai->ai_ttl)));
+        }
       }
     }
+
     if (!address_list.empty()) {
       completed_ = true;
     }
+
+    ASSERT(addrinfo != nullptr);
+    ares_freeaddrinfo(addrinfo);
   }
 
   if (timeouts > 0) {
@@ -134,7 +143,7 @@ void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, int time
 
   if (!completed_ && fallback_if_failed_) {
     fallback_if_failed_ = false;
-    getHostByName(AF_INET);
+    getAddrInfo(AF_INET);
     // Note: Nothing can follow this call to getHostByName due to deletion of this
     // object upon synchronous resolution.
     return;
@@ -148,7 +157,7 @@ void DnsResolverImpl::updateAresTimer() {
   if (timeout_result != nullptr) {
     const auto ms =
         std::chrono::milliseconds(timeout_result->tv_sec * 1000 + timeout_result->tv_usec / 1000);
-    ENVOY_LOG(debug, "Setting DNS resolution timer for {} milliseconds", ms.count());
+    ENVOY_LOG(trace, "Setting DNS resolution timer for {} milliseconds", ms.count());
     timer_->enableTimer(ms);
   } else {
     timer_->disableTimer();
@@ -195,9 +204,9 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
   }
 
   if (dns_lookup_family == DnsLookupFamily::V4Only) {
-    pending_resolution->getHostByName(AF_INET);
+    pending_resolution->getAddrInfo(AF_INET);
   } else {
-    pending_resolution->getHostByName(AF_INET6);
+    pending_resolution->getAddrInfo(AF_INET6);
   }
 
   if (pending_resolution->completed_) {
@@ -215,11 +224,20 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
   }
 }
 
-void DnsResolverImpl::PendingResolution::getHostByName(int family) {
-  ares_gethostbyname(
-      channel_, dns_name_.c_str(), family,
-      [](void* arg, int status, int timeouts, hostent* hostent) {
-        static_cast<PendingResolution*>(arg)->onAresHostCallback(status, timeouts, hostent);
+void DnsResolverImpl::PendingResolution::getAddrInfo(int family) {
+  struct ares_addrinfo_hints hints = {};
+  hints.ai_family = family;
+
+  /**
+   * ARES_AI_NOSORT result addresses will not be sorted and no connections to resolved addresses
+   * will be attempted
+   */
+  hints.ai_flags = ARES_AI_NOSORT;
+
+  ares_getaddrinfo(
+      channel_, dns_name_.c_str(), /* service */ nullptr, &hints,
+      [](void* arg, int status, int timeouts, ares_addrinfo* addrinfo) {
+        static_cast<PendingResolution*>(arg)->onAresGetAddrInfoCallback(status, timeouts, addrinfo);
       },
       this);
 }

@@ -15,10 +15,10 @@ namespace Envoy {
 namespace Upstream {
 
 class Host;
-typedef std::shared_ptr<Host> HostSharedPtr;
+using HostSharedPtr = std::shared_ptr<Host>;
 
 class HostDescription;
-typedef std::shared_ptr<const HostDescription> HostDescriptionConstSharedPtr;
+using HostDescriptionConstSharedPtr = std::shared_ptr<const HostDescription>;
 
 namespace Outlier {
 
@@ -26,15 +26,25 @@ namespace Outlier {
  * Non-HTTP result of requests/operations.
  */
 enum class Result {
-  SUCCESS,        // Successfully established a connection or completed a request.
-  TIMEOUT,        // Timed out while connecting or executing a request.
-  CONNECT_FAILED, // Remote host rejected the connection.
+  // Local origin errors detected by Envoy.
+  LOCAL_ORIGIN_TIMEOUT,               // Timed out while connecting or executing a request.
+  LOCAL_ORIGIN_CONNECT_FAILED,        // Remote host rejected the connection.
+  LOCAL_ORIGIN_CONNECT_SUCCESS,       // Successfully established a connection to upstream host.
+                                      // Use this code when there is another protocol on top of
+                                      // transport protocol. For example HTTP runs on top of tcp.
+                                      // The same for redis. It first establishes TCP and then runs
+                                      // a transaction.
+  LOCAL_ORIGIN_CONNECT_SUCCESS_FINAL, // Successfully established a connection to upstream host
+                                      // Use this code when there is no other protocol on top of the
+                                      // protocol used by a filter. For example tcp_proxy filter
+                                      // serves only tcp level. There is no other protocol on top of
+                                      // tcp which the tcp_proxy filter is aware of.
 
   // The entries below only make sense when Envoy understands requests/responses for the
   // protocol being proxied. They do not make sense for TcpProxy, for example.
-
-  REQUEST_FAILED, // Request was not completed successfully.
-  SERVER_FAILURE, // The server indicated it cannot process a request.
+  // External origin errors.
+  EXT_ORIGIN_REQUEST_FAILED, // The server indicated it cannot process a request
+  EXT_ORIGIN_REQUEST_SUCCESS // Request was completed successfully.
 };
 
 /**
@@ -42,7 +52,10 @@ enum class Result {
  */
 class DetectorHostMonitor {
 public:
-  virtual ~DetectorHostMonitor() {}
+  // Types of Success Rate monitors.
+  enum class SuccessRateMonitorType { ExternalOrigin, LocalOrigin };
+
+  virtual ~DetectorHostMonitor() = default;
 
   /**
    * @return the number of times this host has been ejected.
@@ -56,8 +69,16 @@ public:
 
   /**
    * Add a non-HTTP result for a host.
+   * Some non-HTTP codes like TIMEOUT may require special mapping to HTTP code
+   * and such code may be passed as optional parameter.
    */
-  virtual void putResult(Result result) PURE;
+  virtual void putResult(Result result, absl::optional<uint64_t> code) PURE;
+
+  /**
+   * Wrapper around putResult with 2 params when mapping to HTTP code is not
+   * required.
+   */
+  void putResult(Result result) { putResult(result, absl::nullopt); }
 
   /**
    * Add a response time for a host (in this case response time is generic and might be used for
@@ -81,11 +102,17 @@ public:
    * @return the success rate of the host in the last calculated interval, in the range 0-100.
    *         -1 means that the host did not have enough request volume to calculate success rate
    *         or the cluster did not have enough hosts to run through success rate outlier ejection.
+   * @param type specifies for which Success Rate Monitor the success rate value should be returned.
+   *         If the outlier detector is configured not to split external and local origin errors,
+   *         ExternalOrigin type returns success rate for all types of errors: external and local
+   * origin and LocalOrigin type returns -1. If the outlier detector is configured to split external
+   * and local origin errors, ExternalOrigin type returns success rate for external origin errors
+   * and LocalOrigin type returns success rate for local origin errors.
    */
-  virtual double successRate() const PURE;
+  virtual double successRate(SuccessRateMonitorType type) const PURE;
 };
 
-typedef std::unique_ptr<DetectorHostMonitor> DetectorHostMonitorPtr;
+using DetectorHostMonitorPtr = std::unique_ptr<DetectorHostMonitor>;
 
 /**
  * Interface for an outlier detection engine. Uses per host data to determine which hosts in a
@@ -93,12 +120,12 @@ typedef std::unique_ptr<DetectorHostMonitor> DetectorHostMonitorPtr;
  */
 class Detector {
 public:
-  virtual ~Detector() {}
+  virtual ~Detector() = default;
 
   /**
    * Outlier detection change state callback.
    */
-  typedef std::function<void(const HostSharedPtr& host)> ChangeStateCb;
+  using ChangeStateCb = std::function<void(const HostSharedPtr& host)>;
 
   /**
    * Add a changed state callback to the detector. The callback will be called whenever any host
@@ -111,8 +138,9 @@ public:
    * interval.
    * @return the average success rate, or -1 if there were not enough hosts with enough request
    *         volume to proceed with success rate based outlier ejection.
+   * @param type - see DetectorHostMonitor::successRate.
    */
-  virtual double successRateAverage() const PURE;
+  virtual double successRateAverage(DetectorHostMonitor::SuccessRateMonitorType) const PURE;
 
   /**
    * Returns the success rate threshold used in the last interval. The threshold is used to eject
@@ -120,19 +148,18 @@ public:
    * @return the threshold, or -1 if there were not enough hosts with enough request volume to
    *         proceed with success rate based outlier ejection.
    */
-  virtual double successRateEjectionThreshold() const PURE;
+  virtual double
+      successRateEjectionThreshold(DetectorHostMonitor::SuccessRateMonitorType) const PURE;
 };
 
-typedef std::shared_ptr<Detector> DetectorSharedPtr;
-
-enum class EjectionType { Consecutive5xx, SuccessRate, ConsecutiveGatewayFailure };
+using DetectorSharedPtr = std::shared_ptr<Detector>;
 
 /**
  * Sink for outlier detection event logs.
  */
 class EventLogger {
 public:
-  virtual ~EventLogger() {}
+  virtual ~EventLogger() = default;
 
   /**
    * Log an ejection event.
@@ -152,7 +179,7 @@ public:
   virtual void logUneject(const HostDescriptionConstSharedPtr& host) PURE;
 };
 
-typedef std::shared_ptr<EventLogger> EventLoggerSharedPtr;
+using EventLoggerSharedPtr = std::shared_ptr<EventLogger>;
 
 } // namespace Outlier
 } // namespace Upstream

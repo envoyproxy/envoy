@@ -8,6 +8,7 @@
 #include <string>
 
 #include "common/buffer/buffer_impl.h"
+#include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
@@ -48,70 +49,23 @@ bool Common::isGrpcResponseHeader(const Http::HeaderMap& headers, bool end_strea
   return hasGrpcContentType(headers);
 }
 
-void Common::chargeStat(const Upstream::ClusterInfo& cluster, const std::string& protocol,
-                        const std::string& grpc_service, const std::string& grpc_method,
-                        const Http::HeaderEntry* grpc_status) {
-  if (!grpc_status) {
-    return;
-  }
-  cluster.statsScope()
-      .counter(fmt::format("{}.{}.{}.{}", protocol, grpc_service, grpc_method,
-                           grpc_status->value().getStringView()))
-      .inc();
-  uint64_t grpc_status_code;
-  const bool success = absl::SimpleAtoi(grpc_status->value().getStringView(), &grpc_status_code) &&
-                       grpc_status_code == 0;
-  chargeStat(cluster, protocol, grpc_service, grpc_method, success);
-}
-
-void Common::chargeStat(const Upstream::ClusterInfo& cluster, const std::string& protocol,
-                        const std::string& grpc_service, const std::string& grpc_method,
-                        bool success) {
-  cluster.statsScope()
-      .counter(fmt::format("{}.{}.{}.{}", protocol, grpc_service, grpc_method,
-                           success ? "success" : "failure"))
-      .inc();
-  cluster.statsScope()
-      .counter(fmt::format("{}.{}.{}.total", protocol, grpc_service, grpc_method))
-      .inc();
-}
-
-void Common::chargeStat(const Upstream::ClusterInfo& cluster, const std::string& grpc_service,
-                        const std::string& grpc_method, bool success) {
-  chargeStat(cluster, "grpc", grpc_service, grpc_method, success);
-}
-
 absl::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap& trailers) {
   const Http::HeaderEntry* grpc_status_header = trailers.GrpcStatus();
 
   uint64_t grpc_status_code;
   if (!grpc_status_header || grpc_status_header->value().empty()) {
-    return absl::optional<Status::GrpcStatus>();
+    return {};
   }
   if (!absl::SimpleAtoi(grpc_status_header->value().getStringView(), &grpc_status_code) ||
       grpc_status_code > Status::GrpcStatus::MaximumValid) {
-    return absl::optional<Status::GrpcStatus>(Status::GrpcStatus::InvalidCode);
+    return {Status::GrpcStatus::InvalidCode};
   }
-  return absl::optional<Status::GrpcStatus>(static_cast<Status::GrpcStatus>(grpc_status_code));
+  return {static_cast<Status::GrpcStatus>(grpc_status_code)};
 }
 
 std::string Common::getGrpcMessage(const Http::HeaderMap& trailers) {
   const auto entry = trailers.GrpcMessage();
   return entry ? std::string(entry->value().getStringView()) : EMPTY_STRING;
-}
-
-bool Common::resolveServiceAndMethod(const Http::HeaderEntry* path, std::string* service,
-                                     std::string* method) {
-  if (path == nullptr) {
-    return false;
-  }
-  const auto parts = StringUtil::splitToken(path->value().getStringView(), "/");
-  if (parts.size() != 2) {
-    return false;
-  }
-  service->assign(parts[0].data(), parts[0].size());
-  method->assign(parts[1].data(), parts[1].size());
-  return true;
 }
 
 Buffer::InstancePtr Common::serializeToGrpcFrame(const Protobuf::Message& message) {
@@ -292,6 +246,11 @@ void Common::prependGrpcFrameHeader(Buffer::Instance& buffer) {
   const uint32_t nsize = htonl(buffer.length());
   std::memcpy(&header[1], reinterpret_cast<const void*>(&nsize), sizeof(uint32_t));
   buffer.prepend(absl::string_view(&header[0], 5));
+}
+
+bool Common::parseBufferInstance(Buffer::InstancePtr&& buffer, Protobuf::Message& proto) {
+  Buffer::ZeroCopyInputStreamImpl stream(std::move(buffer));
+  return proto.ParseFromZeroCopyStream(&stream);
 }
 
 } // namespace Grpc

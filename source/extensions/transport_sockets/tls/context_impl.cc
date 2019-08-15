@@ -1,5 +1,7 @@
 #include "extensions/transport_sockets/tls/context_impl.h"
 
+#include <netinet/in.h>
+
 #include <algorithm>
 #include <memory>
 #include <string>
@@ -13,6 +15,7 @@
 #include "common/common/fmt.h"
 #include "common/common/hex.h"
 #include "common/common/utility.h"
+#include "common/network/address_impl.h"
 #include "common/protobuf/utility.h"
 
 #include "extensions/transport_sockets/tls/utility.h"
@@ -191,7 +194,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
 
   if (config.certificateValidationContext() != nullptr &&
       !config.certificateValidationContext()->verifyCertificateSpkiList().empty()) {
-    for (auto hash : config.certificateValidationContext()->verifyCertificateSpkiList()) {
+    for (const auto& hash : config.certificateValidationContext()->verifyCertificateSpkiList()) {
       const auto decoded = Base64::decode(hash);
       if (decoded.size() != SHA256_DIGEST_LENGTH) {
         throw EnvoyException(fmt::format("Invalid base64-encoded SHA-256 {}", hash));
@@ -387,7 +390,7 @@ std::vector<uint8_t> ContextImpl::parseAlpnProtocols(const std::string& alpn_pro
   return out;
 }
 
-bssl::UniquePtr<SSL> ContextImpl::newSsl(absl::optional<std::string>) {
+bssl::UniquePtr<SSL> ContextImpl::newSsl(const Network::TransportSocketOptions*) {
   // We use the first certificate for a new SSL object, later in the
   // SSL_CTX_set_select_certificate_cb() callback following ClientHello, we replace with the
   // selected certificate via SSL_set_SSL_CTX().
@@ -419,12 +422,18 @@ int ContextImpl::verifyCallback(X509_STORE_CTX* store_ctx, void* arg) {
   SSL* ssl = reinterpret_cast<SSL*>(
       X509_STORE_CTX_get_ex_data(store_ctx, SSL_get_ex_data_X509_STORE_CTX_idx()));
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
-  return impl->verifyCertificate(cert.get());
+
+  const Network::TransportSocketOptions* transport_socket_options =
+      static_cast<const Network::TransportSocketOptions*>(SSL_get_app_data(ssl));
+  return impl->verifyCertificate(
+      cert.get(), transport_socket_options &&
+                          !transport_socket_options->verifySubjectAltNameListOverride().empty()
+                      ? transport_socket_options->verifySubjectAltNameListOverride()
+                      : impl->verify_subject_alt_name_list_);
 }
 
-int ContextImpl::verifyCertificate(X509* cert) {
-  if (!verify_subject_alt_name_list_.empty() &&
-      !verifySubjectAltName(cert, verify_subject_alt_name_list_)) {
+int ContextImpl::verifyCertificate(X509* cert, const std::vector<std::string>& verify_san_list) {
+  if (!verify_san_list.empty() && !verifySubjectAltName(cert, verify_san_list)) {
     stats_.fail_verify_san_.inc();
     return 0;
   }
@@ -485,7 +494,8 @@ bool ContextImpl::verifySubjectAltName(X509* cert,
     return false;
   }
   for (const GENERAL_NAME* san : san_names.get()) {
-    if (san->type == GEN_DNS) {
+    switch (san->type) {
+    case GEN_DNS: {
       ASN1_STRING* str = san->d.dNSName;
       const char* dns_name = reinterpret_cast<const char*>(ASN1_STRING_data(str));
       for (auto& config_san : subject_alt_names) {
@@ -493,7 +503,9 @@ bool ContextImpl::verifySubjectAltName(X509* cert,
           return true;
         }
       }
-    } else if (san->type == GEN_URI) {
+      break;
+    }
+    case GEN_URI: {
       ASN1_STRING* str = san->d.uniformResourceIdentifier;
       const char* uri = reinterpret_cast<const char*>(ASN1_STRING_data(str));
       for (auto& config_san : subject_alt_names) {
@@ -501,6 +513,34 @@ bool ContextImpl::verifySubjectAltName(X509* cert,
           return true;
         }
       }
+      break;
+    }
+    case GEN_IPADD: {
+      if (san->d.ip->length == 4) {
+        sockaddr_in sin;
+        sin.sin_port = 0;
+        sin.sin_family = AF_INET;
+        memcpy(&sin.sin_addr, san->d.ip->data, sizeof(sin.sin_addr));
+        Network::Address::Ipv4Instance addr(&sin);
+        for (auto& config_san : subject_alt_names) {
+          if (config_san == addr.ip()->addressAsString()) {
+            return true;
+          }
+        }
+      } else if (san->d.ip->length == 16) {
+        sockaddr_in6 sin6;
+        sin6.sin6_port = 0;
+        sin6.sin6_family = AF_INET6;
+        memcpy(&sin6.sin6_addr, san->d.ip->data, sizeof(sin6.sin6_addr));
+        Network::Address::Ipv6Instance addr(sin6);
+        for (auto& config_san : subject_alt_names) {
+          if (config_san == addr.ip()->addressAsString()) {
+            return true;
+          }
+        }
+      }
+      break;
+    }
     }
   }
   return false;
@@ -664,15 +704,21 @@ ClientContextImpl::ClientContextImpl(Stats::Scope& scope,
   }
 }
 
-bssl::UniquePtr<SSL> ClientContextImpl::newSsl(absl::optional<std::string> override_server_name) {
-  bssl::UniquePtr<SSL> ssl_con(ContextImpl::newSsl(absl::nullopt));
+bssl::UniquePtr<SSL> ClientContextImpl::newSsl(const Network::TransportSocketOptions* options) {
+  bssl::UniquePtr<SSL> ssl_con(ContextImpl::newSsl(options));
 
-  std::string server_name_indication =
-      override_server_name.has_value() ? override_server_name.value() : server_name_indication_;
+  const std::string server_name_indication = options && options->serverNameOverride().has_value()
+                                                 ? options->serverNameOverride().value()
+                                                 : server_name_indication_;
 
   if (!server_name_indication.empty()) {
     int rc = SSL_set_tlsext_host_name(ssl_con.get(), server_name_indication.c_str());
     RELEASE_ASSERT(rc, "");
+  }
+
+  if (options && !options->verifySubjectAltNameListOverride().empty()) {
+    SSL_set_app_data(ssl_con.get(), options);
+    SSL_set_verify(ssl_con.get(), SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, nullptr);
   }
 
   if (allow_renegotiation_) {
@@ -895,7 +941,7 @@ int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv
 
   if (encrypt == 1) {
     // Encrypt
-    RELEASE_ASSERT(session_ticket_keys_.size() >= 1, "");
+    RELEASE_ASSERT(!session_ticket_keys_.empty(), "");
     // TODO(ggreenway): validate in SDS that session_ticket_keys_ cannot be empty,
     // or if we allow it to be emptied, reconfigure the context so this callback
     // isn't set.

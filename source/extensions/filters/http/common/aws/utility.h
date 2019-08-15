@@ -39,6 +39,22 @@ public:
    */
   static std::string
   joinCanonicalHeaderNames(const std::map<std::string, std::string>& canonical_headers);
+
+  /**
+   * Fetch AWS instance or task metadata.
+   *
+   * @param host host or ip address of the metadata endpoint.
+   * @param path path of the metadata document.
+   * @auth_token authentication token to pass in the request, empty string indicates no auth.
+   * @return Metadata document or nullopt in case if unable to fetch it.
+   *
+   * @note In case of an error, function will log ENVOY_LOG_MISC(debug) message.
+   *
+   * @note This is not main loop safe method as it is blocking. It is intended to be used from the
+   * gRPC auth plugins that are able to schedule blocking plugins on a different thread.
+   */
+  static absl::optional<std::string>
+  metadataFetcher(const std::string& host, const std::string& path, const std::string& auth_token);
 };
 
 } // namespace Aws

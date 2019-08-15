@@ -59,14 +59,14 @@ struct JwtAuthnFilterStats {
 /**
  * The filter config object to hold config and relevant objects.
  */
-class FilterConfig : public Logger::Loggable<Logger::Id::config>, public AuthFactory {
+class FilterConfig : public Logger::Loggable<Logger::Id::jwt>, public AuthFactory {
 public:
-  virtual ~FilterConfig() {}
+  ~FilterConfig() override = default;
 
-  FilterConfig(
-      const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication& proto_config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context)
-      : proto_config_(proto_config), stats_(generateStats(stats_prefix, context.scope())),
+  FilterConfig(::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication proto_config,
+               const std::string& stats_prefix, Server::Configuration::FactoryContext& context)
+      : proto_config_(std::move(proto_config)),
+        stats_(generateStats(stats_prefix, context.scope())),
         tls_(context.threadLocal().allocateSlot()), cm_(context.clusterManager()),
         time_source_(context.dispatcher().timeSource()), api_(context.api()) {
     ENVOY_LOG(info, "Loaded JwtAuthConfig: {}", proto_config_.DebugString());
@@ -92,12 +92,6 @@ public:
   }
 
   JwtAuthnFilterStats& stats() { return stats_; }
-
-  // Get the Config.
-  const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication&
-  getProtoConfig() const {
-    return proto_config_;
-  }
 
   // Get per-thread cache object.
   ThreadLocalCache& getCache() const { return tls_->getTyped<ThreadLocalCache>(); }
@@ -168,7 +162,7 @@ private:
   TimeSource& time_source_;
   Api::Api& api_;
 };
-typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;
+using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
 } // namespace JwtAuthn
 } // namespace HttpFilters

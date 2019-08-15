@@ -132,6 +132,9 @@ void OwnedImpl::commit(RawSlice* iovecs, uint64_t num_iovecs) {
     if (slice_index < 0) {
       // There was no slice containing any data, so rewind the iterator at the first slice.
       slice_index = 0;
+      if (!slices_[0]) {
+        return;
+      }
     }
 
     // Next, scan forward and attempt to match the slices against iovecs.

@@ -76,7 +76,7 @@ public:
 
 class MockWatermarkBuffer : public MockBufferBase<Buffer::WatermarkBuffer> {
 public:
-  typedef MockBufferBase<Buffer::WatermarkBuffer> BaseClass;
+  using BaseClass = MockBufferBase<Buffer::WatermarkBuffer>;
 
   MockWatermarkBuffer(std::function<void()> below_low, std::function<void()> above_high)
       : BaseClass(below_low, above_high) {
@@ -90,7 +90,7 @@ public:
 class MockBufferFactory : public Buffer::WatermarkFactory {
 public:
   MockBufferFactory();
-  ~MockBufferFactory();
+  ~MockBufferFactory() override;
 
   Buffer::InstancePtr create(std::function<void()> below_low,
                              std::function<void()> above_high) override {

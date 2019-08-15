@@ -27,7 +27,7 @@ public:
   ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                Upstream::ResourcePriority priority,
                const Network::ConnectionSocket::OptionsSharedPtr& options);
-  ~ConnPoolImpl();
+  ~ConnPoolImpl() override;
 
   // Http::ConnectionPool::Instance
   Http::Protocol protocol() const override { return Http::Protocol::Http2; }
@@ -36,6 +36,7 @@ public:
   bool hasActiveConnections() const override;
   ConnectionPool::Cancellable* newStream(Http::StreamDecoder& response_decoder,
                                          ConnectionPool::Callbacks& callbacks) override;
+  Upstream::HostDescriptionConstSharedPtr host() const override { return host_; };
 
 protected:
   struct ActiveClient : public Network::ConnectionCallbacks,
@@ -43,7 +44,7 @@ protected:
                         public Event::DeferredDeletable,
                         public Http::ConnectionCallbacks {
     ActiveClient(ConnPoolImpl& parent);
-    ~ActiveClient();
+    ~ActiveClient() override;
 
     void onConnectTimeout() { parent_.onConnectTimeout(*this); }
 
@@ -73,7 +74,7 @@ protected:
     bool closed_with_active_rq_{};
   };
 
-  typedef std::unique_ptr<ActiveClient> ActiveClientPtr;
+  using ActiveClientPtr = std::unique_ptr<ActiveClient>;
 
   // Http::ConnPoolImplBase
   void checkForDrained() override;

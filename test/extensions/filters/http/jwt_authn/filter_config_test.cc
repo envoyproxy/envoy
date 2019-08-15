@@ -9,7 +9,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using ::envoy::api::v2::core::Metadata;
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
 
 namespace Envoy {
@@ -33,7 +32,7 @@ rules:
 )";
 
   JwtAuthentication proto_config;
-  MessageUtil::loadFromYaml(config, proto_config);
+  TestUtility::loadFromYaml(config, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   FilterConfig filter_conf(proto_config, "", context);
@@ -75,7 +74,7 @@ filter_state_rules:
 )";
 
   JwtAuthentication proto_config;
-  MessageUtil::loadFromYaml(config, proto_config);
+  TestUtility::loadFromYaml(config, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   FilterConfig filter_conf(proto_config, "", context);

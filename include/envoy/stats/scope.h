@@ -19,8 +19,11 @@ class Histogram;
 class Scope;
 class NullGaugeImpl;
 
-typedef std::unique_ptr<Scope> ScopePtr;
-typedef std::shared_ptr<Scope> ScopeSharedPtr;
+using OptionalCounter = absl::optional<std::reference_wrapper<const Counter>>;
+using OptionalGauge = absl::optional<std::reference_wrapper<const Gauge>>;
+using OptionalHistogram = absl::optional<std::reference_wrapper<const Histogram>>;
+using ScopePtr = std::unique_ptr<Scope>;
+using ScopeSharedPtr = std::shared_ptr<Scope>;
 
 /**
  * A named scope for stats. Scopes are a grouping of stats that can be acted on as a unit if needed
@@ -28,7 +31,7 @@ typedef std::shared_ptr<Scope> ScopeSharedPtr;
  */
 class Scope {
 public:
-  virtual ~Scope() {}
+  virtual ~Scope() = default;
 
   /**
    * Allocate a new scope. NOTE: The implementation should correctly handle overlapping scopes
@@ -58,16 +61,18 @@ public:
 
   /**
    * @param name The name of the stat, obtained from the SymbolTable.
+   * @param import_mode Whether hot-restart should accumulate this value.
    * @return a gauge within the scope's namespace.
    */
-  virtual Gauge& gaugeFromStatName(StatName name) PURE;
+  virtual Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) PURE;
 
   /**
    * TODO(#6667): this variant is deprecated: use gaugeFromStatName.
    * @param name The name, expressed as a string.
+   * @param import_mode Whether hot-restart should accumulate this value.
    * @return a gauge within the scope's namespace.
    */
-  virtual Gauge& gauge(const std::string& name) PURE;
+  virtual Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) PURE;
 
   /**
    * @return a null gauge within the scope's namespace.
@@ -91,22 +96,20 @@ public:
    * @param The name of the stat, obtained from the SymbolTable.
    * @return a reference to a counter within the scope's namespace, if it exists.
    */
-  virtual absl::optional<std::reference_wrapper<const Counter>>
-  findCounter(StatName name) const PURE;
+  virtual OptionalCounter findCounter(StatName name) const PURE;
 
   /**
    * @param The name of the stat, obtained from the SymbolTable.
    * @return a reference to a gauge within the scope's namespace, if it exists.
    */
-  virtual absl::optional<std::reference_wrapper<const Gauge>> findGauge(StatName name) const PURE;
+  virtual OptionalGauge findGauge(StatName name) const PURE;
 
   /**
    * @param The name of the stat, obtained from the SymbolTable.
    * @return a reference to a histogram within the scope's namespace, if it
    * exists.
    */
-  virtual absl::optional<std::reference_wrapper<const Histogram>>
-  findHistogram(StatName name) const PURE;
+  virtual OptionalHistogram findHistogram(StatName name) const PURE;
 
   /**
    * @return a reference to the symbol table.

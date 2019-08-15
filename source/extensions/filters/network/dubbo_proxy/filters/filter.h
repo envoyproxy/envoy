@@ -9,11 +9,11 @@
 #include "envoy/stream_info/stream_info.h"
 
 #include "extensions/filters/network/dubbo_proxy/decoder_event_handler.h"
-#include "extensions/filters/network/dubbo_proxy/deserializer.h"
 #include "extensions/filters/network/dubbo_proxy/message.h"
 #include "extensions/filters/network/dubbo_proxy/metadata.h"
 #include "extensions/filters/network/dubbo_proxy/protocol.h"
 #include "extensions/filters/network/dubbo_proxy/router/router.h"
+#include "extensions/filters/network/dubbo_proxy/serializer.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -25,6 +25,7 @@ enum class UpstreamResponseStatus : uint8_t {
   MoreData = 0, // The upstream response requires more data.
   Complete = 1, // The upstream response is complete.
   Reset = 2,    // The upstream response is invalid and its connection must be reset.
+  Retry = 3,    // The upstream response is failure need to retry.
 };
 
 class DirectResponse {
@@ -51,17 +52,17 @@ public:
    *         exception
    */
   virtual ResponseType encode(MessageMetadata& metadata, Protocol& protocol,
-                              Deserializer& deserializer, Buffer::Instance& buffer) const PURE;
+                              Buffer::Instance& buffer) const PURE;
 };
 
-typedef std::unique_ptr<DirectResponse> DirectResponsePtr;
+using DirectResponsePtr = std::unique_ptr<DirectResponse>;
 
 /**
  * Decoder filter callbacks add additional callbacks.
  */
-class DecoderFilterCallbacks {
+class FilterCallbacksBase {
 public:
-  virtual ~DecoderFilterCallbacks() = default;
+  virtual ~FilterCallbacksBase() = default;
 
   /**
    * @return uint64_t the ID of the originating request for logging purposes.
@@ -79,15 +80,6 @@ public:
   virtual const Network::Connection* connection() const PURE;
 
   /**
-   * Continue iterating through the filter chain with buffered data. This routine can only be
-   * called if the filter has previously returned StopIteration from one of the DecoderFilter
-   * methods. The connection manager will callbacks to the next filter in the chain. Further note
-   * that if the request is not complete, the calling filter may receive further callbacks and must
-   * return an appropriate status code depending on what the filter needs to do.
-   */
-  virtual void continueDecoding() PURE;
-
-  /**
    * @return RouteConstSharedPtr the route for the current request.
    */
   virtual DubboProxy::Router::RouteConstSharedPtr route() PURE;
@@ -95,12 +87,44 @@ public:
   /**
    * @return SerializationType the originating protocol.
    */
-  virtual SerializationType downstreamSerializationType() const PURE;
+  virtual SerializationType serializationType() const PURE;
 
   /**
    * @return ProtocolType the originating protocol.
    */
-  virtual ProtocolType downstreamProtocolType() const PURE;
+  virtual ProtocolType protocolType() const PURE;
+
+  /**
+   * @return StreamInfo for logging purposes.
+   */
+  virtual StreamInfo::StreamInfo& streamInfo() PURE;
+
+  /**
+   * @return Event::Dispatcher& the thread local dispatcher for allocating timers, etc.
+   */
+  virtual Event::Dispatcher& dispatcher() PURE;
+
+  /**
+   * Reset the underlying stream.
+   */
+  virtual void resetStream() PURE;
+};
+
+/**
+ * Decoder filter callbacks add additional callbacks.
+ */
+class DecoderFilterCallbacks : public virtual FilterCallbacksBase {
+public:
+  ~DecoderFilterCallbacks() override = default;
+
+  /**
+   * Continue iterating through the filter chain with buffered data. This routine can only be
+   * called if the filter has previously returned StopIteration from one of the DecoderFilter
+   * methods. The connection manager will callbacks to the next filter in the chain. Further note
+   * that if the request is not complete, the calling filter may receive further callbacks and must
+   * return an appropriate status code depending on what the filter needs to do.
+   */
+  virtual void continueDecoding() PURE;
 
   /**
    * Create a locally generated response using the provided response object.
@@ -113,7 +137,7 @@ public:
    * @param transport_type TransportType the upstream is using
    * @param protocol_type ProtocolType the upstream is using
    */
-  virtual void startUpstreamResponse(Deserializer& deserializer, Protocol& protocol) PURE;
+  virtual void startUpstreamResponse() PURE;
 
   /**
    * Called with upstream response data.
@@ -127,24 +151,31 @@ public:
    * Reset the downstream connection.
    */
   virtual void resetDownstreamConnection() PURE;
-
-  /**
-   * @return StreamInfo for logging purposes.
-   */
-  virtual StreamInfo::StreamInfo& streamInfo() PURE;
-
-  /**
-   * Reset the underlying stream.
-   */
-  virtual void resetStream() PURE;
 };
 
 /**
- * Decoder filter interface.
+ * Encoder filter callbacks add additional callbacks.
  */
-class DecoderFilter : public DecoderEventHandler {
+class EncoderFilterCallbacks : public virtual FilterCallbacksBase {
 public:
-  virtual ~DecoderFilter() = default;
+  ~EncoderFilterCallbacks() override = default;
+
+  /**
+   * Continue iterating through the filter chain with buffered data. This routine can only be
+   * called if the filter has previously returned StopIteration from one of the DecoderFilter
+   * methods. The connection manager will callbacks to the next filter in the chain. Further note
+   * that if the request is not complete, the calling filter may receive further callbacks and must
+   * return an appropriate status code depending on what the filter needs to do.
+   */
+  virtual void continueEncoding() PURE;
+};
+
+/**
+ * Common base class for both decoder and encoder filters.
+ */
+class FilterBase {
+public:
+  virtual ~FilterBase() = default;
 
   /**
    * This routine is called prior to a filter being destroyed. This may happen after normal stream
@@ -156,6 +187,14 @@ public:
    * onDestroy() invoked.
    */
   virtual void onDestroy() PURE;
+};
+
+/**
+ * Decoder filter interface.
+ */
+class DecoderFilter : public StreamDecoder, public FilterBase {
+public:
+  ~DecoderFilter() override = default;
 
   /**
    * Called by the connection manager once to initialize the filter decoder callbacks that the
@@ -164,7 +203,30 @@ public:
   virtual void setDecoderFilterCallbacks(DecoderFilterCallbacks& callbacks) PURE;
 };
 
-typedef std::shared_ptr<DecoderFilter> DecoderFilterSharedPtr;
+using DecoderFilterSharedPtr = std::shared_ptr<DecoderFilter>;
+
+/**
+ * Encoder filter interface.
+ */
+class EncoderFilter : public StreamEncoder, public FilterBase {
+public:
+  ~EncoderFilter() override = default;
+
+  /**
+   * Called by the connection manager once to initialize the filter encoder callbacks that the
+   * filter should use. Callbacks will not be invoked by the filter after onDestroy() is called.
+   */
+  virtual void setEncoderFilterCallbacks(EncoderFilterCallbacks& callbacks) PURE;
+};
+
+using EncoderFilterSharedPtr = std::shared_ptr<EncoderFilter>;
+
+/**
+ * A filter that handles both encoding and decoding.
+ */
+class CodecFilter : public virtual DecoderFilter, public virtual EncoderFilter {};
+
+using CodecFilterSharedPtr = std::shared_ptr<CodecFilter>;
 
 /**
  * These callbacks are provided by the connection manager to the factory so that the factory can
@@ -179,6 +241,18 @@ public:
    * @param filter supplies the filter to add.
    */
   virtual void addDecoderFilter(DecoderFilterSharedPtr filter) PURE;
+
+  /**
+   * Add a encoder filter that is used when writing connection data.
+   * @param filter supplies the filter to add.
+   */
+  virtual void addEncoderFilter(EncoderFilterSharedPtr filter) PURE;
+
+  /**
+   * Add a decoder/encoder filter that is used both when reading and writing connection data.
+   * @param filter supplies the filter to add.
+   */
+  virtual void addFilter(CodecFilterSharedPtr filter) PURE;
 };
 
 /**
@@ -189,7 +263,7 @@ public:
  * function will install a single filter, but it's technically possibly to install more than one
  * if desired.
  */
-typedef std::function<void(FilterChainFactoryCallbacks& callbacks)> FilterFactoryCb;
+using FilterFactoryCb = std::function<void(FilterChainFactoryCallbacks& callbacks)>;
 
 /**
  * A FilterChainFactory is used by a connection manager to create a Dubbo level filter chain when

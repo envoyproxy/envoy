@@ -26,6 +26,7 @@
 #include "envoy/api/v2/route/route.pb.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/http/codec.h"
+#include "envoy/service/discovery/v2/rtds.pb.h"
 
 #include "common/api/api_impl.h"
 #include "common/common/empty_string.h"
@@ -152,11 +153,40 @@ Stats::GaugeSharedPtr TestUtility::findGauge(Stats::Store& store, const std::str
   return findByName(store.gauges(), name);
 }
 
-std::list<Network::Address::InstanceConstSharedPtr>
-TestUtility::makeDnsResponse(const std::list<std::string>& addresses) {
-  std::list<Network::Address::InstanceConstSharedPtr> ret;
+void TestUtility::waitForCounterEq(Stats::Store& store, const std::string& name, uint64_t value,
+                                   Event::TestTimeSystem& time_system) {
+  while (findCounter(store, name) == nullptr || findCounter(store, name)->value() != value) {
+    time_system.sleep(std::chrono::milliseconds(10));
+  }
+}
+
+void TestUtility::waitForCounterGe(Stats::Store& store, const std::string& name, uint64_t value,
+                                   Event::TestTimeSystem& time_system) {
+  while (findCounter(store, name) == nullptr || findCounter(store, name)->value() < value) {
+    time_system.sleep(std::chrono::milliseconds(10));
+  }
+}
+
+void TestUtility::waitForGaugeGe(Stats::Store& store, const std::string& name, uint64_t value,
+                                 Event::TestTimeSystem& time_system) {
+  while (findGauge(store, name) == nullptr || findGauge(store, name)->value() < value) {
+    time_system.sleep(std::chrono::milliseconds(10));
+  }
+}
+
+void TestUtility::waitForGaugeEq(Stats::Store& store, const std::string& name, uint64_t value,
+                                 Event::TestTimeSystem& time_system) {
+  while (findGauge(store, name) == nullptr || findGauge(store, name)->value() != value) {
+    time_system.sleep(std::chrono::milliseconds(10));
+  }
+}
+
+std::list<Network::DnsResponse>
+TestUtility::makeDnsResponse(const std::list<std::string>& addresses, std::chrono::seconds ttl) {
+  std::list<Network::DnsResponse> ret;
   for (const auto& address : addresses) {
-    ret.emplace_back(Network::Utility::parseInternetAddress(address));
+
+    ret.emplace_back(Network::DnsResponse(Network::Utility::parseInternetAddress(address), ttl));
   }
   return ret;
 }
@@ -180,19 +210,22 @@ std::vector<std::string> TestUtility::listFiles(const std::string& path, bool re
 
 std::string TestUtility::xdsResourceName(const ProtobufWkt::Any& resource) {
   if (resource.type_url() == Config::TypeUrl::get().Listener) {
-    return MessageUtil::anyConvert<envoy::api::v2::Listener>(resource).name();
+    return TestUtility::anyConvert<envoy::api::v2::Listener>(resource).name();
   }
   if (resource.type_url() == Config::TypeUrl::get().RouteConfiguration) {
-    return MessageUtil::anyConvert<envoy::api::v2::RouteConfiguration>(resource).name();
+    return TestUtility::anyConvert<envoy::api::v2::RouteConfiguration>(resource).name();
   }
   if (resource.type_url() == Config::TypeUrl::get().Cluster) {
-    return MessageUtil::anyConvert<envoy::api::v2::Cluster>(resource).name();
+    return TestUtility::anyConvert<envoy::api::v2::Cluster>(resource).name();
   }
   if (resource.type_url() == Config::TypeUrl::get().ClusterLoadAssignment) {
-    return MessageUtil::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resource).cluster_name();
+    return TestUtility::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resource).cluster_name();
   }
   if (resource.type_url() == Config::TypeUrl::get().VirtualHost) {
-    return MessageUtil::anyConvert<envoy::api::v2::route::VirtualHost>(resource).name();
+    return TestUtility::anyConvert<envoy::api::v2::route::VirtualHost>(resource).name();
+  }
+  if (resource.type_url() == Config::TypeUrl::get().Runtime) {
+    return TestUtility::anyConvert<envoy::service::discovery::v2::Runtime>(resource).name();
   }
   throw EnvoyException(
       fmt::format("xdsResourceName does not know about type URL {}", resource.type_url()));
@@ -283,7 +316,7 @@ std::string TestUtility::convertTime(const std::string& input, const std::string
 }
 
 // static
-bool TestUtility::gaugesZeroed(const std::vector<Stats::GaugeSharedPtr> gauges) {
+bool TestUtility::gaugesZeroed(const std::vector<Stats::GaugeSharedPtr>& gauges) {
   // Returns true if all gauges are 0 except the circuit_breaker remaining resource
   // gauges which default to the resource max.
   std::regex omitted(".*circuit_breakers\\..*\\.remaining.*");
@@ -352,12 +385,16 @@ const uint32_t Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS;
 const uint32_t Http2Settings::DEFAULT_INITIAL_STREAM_WINDOW_SIZE;
 const uint32_t Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE;
 const uint32_t Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE;
+const uint32_t Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES;
+const uint32_t Http2Settings::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES;
+const uint32_t Http2Settings::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD;
+const uint32_t Http2Settings::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM;
+const uint32_t Http2Settings::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT;
 
-TestHeaderMapImpl::TestHeaderMapImpl() : HeaderMapImpl() {}
+TestHeaderMapImpl::TestHeaderMapImpl() = default;
 
 TestHeaderMapImpl::TestHeaderMapImpl(
-    const std::initializer_list<std::pair<std::string, std::string>>& values)
-    : HeaderMapImpl() {
+    const std::initializer_list<std::pair<std::string, std::string>>& values) {
   for (auto& value : values) {
     addCopy(value.first, value.second);
   }

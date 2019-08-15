@@ -30,7 +30,7 @@ public:
     }
   }
 
-  virtual envoy::api::v2::core::GrpcService createGoogleGrpcConfig() override {
+  envoy::api::v2::core::GrpcService createGoogleGrpcConfig() override {
     auto config = GrpcClientIntegrationTest::createGoogleGrpcConfig();
     auto* google_grpc = config.mutable_google_grpc();
     google_grpc->set_credentials_factory_name(credentials_factory_name_);
@@ -48,7 +48,7 @@ header_prefix: {}
       auto* plugin_config = google_grpc->add_call_credentials()->mutable_from_plugin();
       plugin_config->set_name(credentials_factory_name_);
       envoy::config::grpc_credential::v2alpha::FileBasedMetadataConfig metadata_config;
-      MessageUtil::loadFromYaml(yaml1, *plugin_config->mutable_config());
+      Envoy::TestUtility::loadFromYaml(yaml1, *plugin_config->mutable_config());
     }
     if (!header_value_2_.empty()) {
       // uses default key/prefix
@@ -60,7 +60,7 @@ secret_data:
       envoy::config::grpc_credential::v2alpha::FileBasedMetadataConfig metadata_config2;
       auto* plugin_config2 = google_grpc->add_call_credentials()->mutable_from_plugin();
       plugin_config2->set_name(credentials_factory_name_);
-      MessageUtil::loadFromYaml(yaml2, *plugin_config2->mutable_config());
+      Envoy::TestUtility::loadFromYaml(yaml2, *plugin_config2->mutable_config());
     }
     if (!access_token_value_.empty()) {
       google_grpc->add_call_credentials()->set_access_token(access_token_value_);

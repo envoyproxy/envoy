@@ -52,19 +52,22 @@ namespace Upstream {
 class ClusterFactoryContextImpl : public ClusterFactoryContext {
 
 public:
-  ClusterFactoryContextImpl(
-      ClusterManager& cluster_manager, Stats::Store& stats, ThreadLocal::SlotAllocator& tls,
-      Network::DnsResolverSharedPtr dns_resolver, Ssl::ContextManager& ssl_context_manager,
-      Runtime::Loader& runtime, Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
-      AccessLog::AccessLogManager& log_manager, const LocalInfo::LocalInfo& local_info,
-      Server::Admin& admin, Singleton::Manager& singleton_manager,
-      Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api, Api::Api& api)
+  ClusterFactoryContextImpl(ClusterManager& cluster_manager, Stats::Store& stats,
+                            ThreadLocal::SlotAllocator& tls,
+                            Network::DnsResolverSharedPtr dns_resolver,
+                            Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
+                            Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
+                            AccessLog::AccessLogManager& log_manager,
+                            const LocalInfo::LocalInfo& local_info, Server::Admin& admin,
+                            Singleton::Manager& singleton_manager,
+                            Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api,
+                            ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
       : cluster_manager_(cluster_manager), stats_(stats), tls_(tls),
         dns_resolver_(std::move(dns_resolver)), ssl_context_manager_(ssl_context_manager),
         runtime_(runtime), random_(random), dispatcher_(dispatcher), log_manager_(log_manager),
         local_info_(local_info), admin_(admin), singleton_manager_(singleton_manager),
         outlier_event_logger_(std::move(outlier_event_logger)), added_via_api_(added_via_api),
-        api_(api) {}
+        validation_visitor_(validation_visitor), api_(api) {}
 
   ClusterManager& clusterManager() override { return cluster_manager_; }
   Stats::Store& stats() override { return stats_; }
@@ -80,6 +83,9 @@ public:
   Singleton::Manager& singletonManager() override { return singleton_manager_; }
   Outlier::EventLoggerSharedPtr outlierEventLogger() override { return outlier_event_logger_; }
   bool addedViaApi() override { return added_via_api_; }
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
+    return validation_visitor_;
+  }
   Api::Api& api() override { return api_; }
 
 private:
@@ -97,6 +103,7 @@ private:
   Singleton::Manager& singleton_manager_;
   Outlier::EventLoggerSharedPtr outlier_event_logger_;
   const bool added_via_api_;
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
   Api::Api& api_;
 };
 
@@ -110,14 +117,15 @@ public:
   /**
    * Static method to get the registered cluster factory and create an instance of cluster.
    */
-  static ClusterSharedPtr
+  static std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
   create(const envoy::api::v2::Cluster& cluster, ClusterManager& cluster_manager,
          Stats::Store& stats, ThreadLocal::Instance& tls,
          Network::DnsResolverSharedPtr dns_resolver, Ssl::ContextManager& ssl_context_manager,
          Runtime::Loader& runtime, Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
          AccessLog::AccessLogManager& log_manager, const LocalInfo::LocalInfo& local_info,
          Server::Admin& admin, Singleton::Manager& singleton_manager,
-         Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api, Api::Api& api);
+         Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api,
+         ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 
   /**
    * Create a dns resolver to be used by the cluster.
@@ -126,8 +134,8 @@ public:
                                                   ClusterFactoryContext& context);
 
   // Upstream::ClusterFactory
-  ClusterSharedPtr create(const envoy::api::v2::Cluster& cluster,
-                          ClusterFactoryContext& context) override;
+  std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
+  create(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context) override;
   std::string name() override { return name_; }
 
 protected:
@@ -137,7 +145,7 @@ private:
   /**
    * Create an instance of ClusterImplBase.
    */
-  virtual ClusterImplBaseSharedPtr
+  virtual std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
   createClusterImpl(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
                     Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
                     Stats::ScopePtr&& stats_scope) PURE;
@@ -161,19 +169,20 @@ protected:
   ConfigurableClusterFactoryBase(const std::string& name) : ClusterFactoryImplBase(name) {}
 
 private:
-  virtual ClusterImplBaseSharedPtr
+  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
   createClusterImpl(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
                     Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
                     Stats::ScopePtr&& stats_scope) override {
     ProtobufTypes::MessagePtr config = createEmptyConfigProto();
-    Config::Utility::translateOpaqueConfig(cluster.cluster_type().typed_config(),
-                                           ProtobufWkt::Struct::default_instance(), *config);
+    Config::Utility::translateOpaqueConfig(
+        cluster.cluster_type().typed_config(), ProtobufWkt::Struct::default_instance(),
+        socket_factory_context.messageValidationVisitor(), *config);
     return createClusterWithConfig(cluster,
                                    MessageUtil::downcastAndValidate<const ConfigProto&>(*config),
                                    context, socket_factory_context, std::move(stats_scope));
   }
 
-  virtual ClusterImplBaseSharedPtr createClusterWithConfig(
+  virtual std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> createClusterWithConfig(
       const envoy::api::v2::Cluster& cluster, const ConfigProto& proto_config,
       ClusterFactoryContext& context,
       Server::Configuration::TransportSocketFactoryContext& socket_factory_context,

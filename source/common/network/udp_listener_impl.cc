@@ -2,6 +2,10 @@
 
 #include <sys/un.h>
 
+#include <cerrno>
+#include <csetjmp>
+#include <cstring>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/exception.h"
 
@@ -9,17 +13,26 @@
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
+#include "common/common/stack_array.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/network/address_impl.h"
+#include "common/network/io_socket_error_impl.h"
 
 #include "event2/listener.h"
+
+#define ENVOY_UDP_LOG(LEVEL, FORMAT, ...)                                                          \
+  ENVOY_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, "Listener at {} :" FORMAT,                            \
+                      this->localAddress()->asString(), ##__VA_ARGS__)
 
 namespace Envoy {
 namespace Network {
 
+// Max UDP payload.
+static const uint64_t MAX_UDP_PACKET_SIZE = 1500;
+
 UdpListenerImpl::UdpListenerImpl(Event::DispatcherImpl& dispatcher, Socket& socket,
-                                 UdpListenerCallbacks& cb)
-    : BaseListenerImpl(dispatcher, socket), cb_(cb) {
+                                 UdpListenerCallbacks& cb, TimeSource& time_source)
+    : BaseListenerImpl(dispatcher, socket), cb_(cb), time_source_(time_source) {
   file_event_ = dispatcher_.createFileEvent(
       socket.ioHandle().fd(), [this](uint32_t events) -> void { onSocketEvent(events); },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Write);
@@ -44,36 +57,9 @@ void UdpListenerImpl::enable() {
   file_event_->setEnabled(Event::FileReadyType::Read | Event::FileReadyType::Write);
 }
 
-UdpListenerImpl::ReceiveResult UdpListenerImpl::doRecvFrom(sockaddr_storage& peer_addr,
-                                                           socklen_t& addr_len) {
-  constexpr uint64_t const read_length = 16384;
-
-  Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
-
-  addr_len = sizeof(sockaddr_storage);
-  memset(&peer_addr, 0, addr_len);
-
-  Buffer::RawSlice slice;
-  const uint64_t num_slices = buffer->reserve(read_length, &slice, 1);
-
-  ASSERT(num_slices == 1);
-
-  auto& os_sys_calls = Api::OsSysCallsSingleton::get();
-  const Api::SysCallSizeResult result =
-      os_sys_calls.recvfrom(socket_.ioHandle().fd(), slice.mem_, read_length, 0,
-                            reinterpret_cast<struct sockaddr*>(&peer_addr), &addr_len);
-  if (result.rc_ < 0) {
-    return ReceiveResult{Api::SysCallIntResult{static_cast<int>(result.rc_), result.errno_},
-                         nullptr};
-  }
-  slice.len_ = std::min(slice.len_, static_cast<size_t>(result.rc_));
-  buffer->commit(&slice, 1);
-
-  return ReceiveResult{Api::SysCallIntResult{static_cast<int>(result.rc_), 0}, std::move(buffer)};
-}
-
 void UdpListenerImpl::onSocketEvent(short flags) {
   ASSERT((flags & (Event::FileReadyType::Read | Event::FileReadyType::Write)));
+  ENVOY_UDP_LOG(trace, "socket event: {}", flags);
 
   if (flags & Event::FileReadyType::Read) {
     handleReadCallback();
@@ -85,83 +71,118 @@ void UdpListenerImpl::onSocketEvent(short flags) {
 }
 
 void UdpListenerImpl::handleReadCallback() {
-  sockaddr_storage addr;
-  socklen_t addr_len = 0;
-
+  ENVOY_UDP_LOG(trace, "handleReadCallback");
+  // TODO(danzh) make this variable configurable to support jumbo frames.
+  const uint64_t read_buffer_length = MAX_UDP_PACKET_SIZE;
   do {
-    ReceiveResult recv_result = doRecvFrom(addr, addr_len);
-    if ((recv_result.result_.rc_ < 0)) {
-      if (recv_result.result_.errno_ != EAGAIN) {
-        cb_.onError(UdpListenerCallbacks::ErrorCode::SyscallError, recv_result.result_.errno_);
+    Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
+    Buffer::RawSlice slice;
+    const uint64_t num_slices = buffer->reserve(read_buffer_length, &slice, 1);
+    ASSERT(num_slices == 1);
+
+    IoHandle::RecvMsgOutput output(&packets_dropped_);
+    uint32_t old_packets_dropped = packets_dropped_;
+    MonotonicTime receive_time = time_source_.monotonicTime();
+    Api::IoCallUint64Result result = socket_.ioHandle().recvmsg(
+        &slice, num_slices, socket_.localAddress()->ip()->port(), output);
+
+    if (!result.ok()) {
+      // No more to read or encountered a system error.
+      if (result.err_->getErrorCode() != Api::IoError::IoErrorCode::Again) {
+        ENVOY_UDP_LOG(error, "recvmsg result {}: {}", static_cast<int>(result.err_->getErrorCode()),
+                      result.err_->getErrorDetails());
+        cb_.onReceiveError(UdpListenerCallbacks::ErrorCode::SyscallError,
+                           result.err_->getErrorCode());
       }
+      // Stop reading.
       return;
     }
 
-    if (recv_result.result_.rc_ == 0) {
-      // TODO(conqerAtapple): Is zero length packet interesting?
-      return;
+    if (result.rc_ == 0) {
+      // TODO(conqerAtapple): Is zero length packet interesting? If so add stats
+      // for it. Otherwise remove the warning log below.
+      ENVOY_UDP_LOG(trace, "received 0-length packet");
     }
 
-    Address::InstanceConstSharedPtr local_address = socket_.localAddress();
+    RELEASE_ASSERT(output.local_address_ != nullptr, "fail to get local address from IP header");
 
-    RELEASE_ASSERT(
-        addr_len > 0,
-        fmt::format(
-            "Unable to get remote address for fd: {}, local address: {}. address length is 0 ",
-            socket_.ioHandle().fd(), local_address->asString()));
-
-    Address::InstanceConstSharedPtr peer_address;
-
-    // TODO(conqerAtApple): Current implementation of Address::addressFromSockAddr
-    // cannot be used here unfortunately. This should belong in Address namespace.
-    switch (addr.ss_family) {
-    case AF_INET: {
-      const struct sockaddr_in* sin = reinterpret_cast<const struct sockaddr_in*>(&addr);
-      ASSERT(AF_INET == sin->sin_family);
-      peer_address = std::make_shared<Address::Ipv4Instance>(sin);
-
-      break;
-    }
-    case AF_INET6: {
-      const struct sockaddr_in6* sin6 = reinterpret_cast<const struct sockaddr_in6*>(&addr);
-      ASSERT(AF_INET6 == sin6->sin6_family);
-      if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
-#if defined(__APPLE__)
-        struct sockaddr_in sin = {
-            {}, AF_INET, sin6->sin6_port, {sin6->sin6_addr.__u6_addr.__u6_addr32[3]}, {}};
-#else
-        struct sockaddr_in sin = {AF_INET, sin6->sin6_port, {sin6->sin6_addr.s6_addr32[3]}, {}};
-#endif
-        peer_address = std::make_shared<Address::Ipv4Instance>(&sin);
-      } else {
-        peer_address = std::make_shared<Address::Ipv6Instance>(*sin6, true);
-      }
-
-      break;
+    if (packets_dropped_ != old_packets_dropped) {
+      // The kernel tracks SO_RXQ_OVFL as a uint32 which can overflow to a smaller
+      // value. So as long as this count differs from previously recorded value,
+      // more packets are dropped by kernel.
+      uint32_t delta = (packets_dropped_ > old_packets_dropped)
+                           ? (packets_dropped_ - old_packets_dropped)
+                           : (packets_dropped_ +
+                              (std::numeric_limits<uint32_t>::max() - old_packets_dropped) + 1);
+      // TODO(danzh) add stats for this.
+      ENVOY_UDP_LOG(debug, "Kernel dropped {} more packets. Consider increase receive buffer size.",
+                    delta);
     }
 
-    default:
-      RELEASE_ASSERT(false,
-                     fmt::format("Unsupported address family: {}, local address: {}, receive size: "
-                                 "{}, address length: {}",
-                                 addr.ss_family, local_address->asString(), recv_result.result_.rc_,
-                                 addr_len));
-      break;
-    }
+    // Adjust used memory length.
+    slice.len_ = std::min(slice.len_, static_cast<size_t>(result.rc_));
+    buffer->commit(&slice, 1);
 
-    RELEASE_ASSERT((peer_address != nullptr),
+    ENVOY_UDP_LOG(trace, "recvmsg bytes {}", result.rc_);
+
+    RELEASE_ASSERT(output.peer_address_ != nullptr,
                    fmt::format("Unable to get remote address for fd: {}, local address: {} ",
-                               socket_.ioHandle().fd(), local_address->asString()));
+                               socket_.ioHandle().fd(), socket_.localAddress()->asString()));
 
-    RELEASE_ASSERT((local_address != nullptr),
-                   fmt::format("Unable to get local address for fd: {}", socket_.ioHandle().fd()));
+    // Unix domain sockets are not supported
+    RELEASE_ASSERT(output.peer_address_->type() == Address::Type::Ip,
+                   fmt::format("Unsupported remote address: {} local address: {}, receive size: "
+                               "{}",
+                               output.peer_address_->asString(), socket_.localAddress()->asString(),
+                               result.rc_));
 
-    cb_.onData(UdpData{local_address, peer_address, std::move(recv_result.buffer_)});
-
+    UdpRecvData recvData{std::move(output.local_address_), std::move(output.peer_address_),
+                         std::move(buffer), receive_time};
+    cb_.onData(recvData);
   } while (true);
 }
 
-void UdpListenerImpl::handleWriteCallback() { cb_.onWriteReady(socket_); }
+void UdpListenerImpl::handleWriteCallback() {
+  ENVOY_UDP_LOG(trace, "handleWriteCallback");
+  cb_.onWriteReady(socket_);
+}
+
+Event::Dispatcher& UdpListenerImpl::dispatcher() { return dispatcher_; }
+
+const Address::InstanceConstSharedPtr& UdpListenerImpl::localAddress() const {
+  return socket_.localAddress();
+}
+
+Api::IoCallUint64Result UdpListenerImpl::send(const UdpSendData& send_data) {
+  ENVOY_UDP_LOG(trace, "send");
+  Buffer::Instance& buffer = send_data.buffer_;
+  uint64_t num_slices = buffer.getRawSlices(nullptr, 0);
+  STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
+  buffer.getRawSlices(slices.begin(), num_slices);
+  Api::IoCallUint64Result send_result(
+      /*rc=*/0, /*err=*/Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError));
+  do {
+    send_result = socket_.ioHandle().sendmsg(slices.begin(), num_slices, 0, send_data.local_ip_,
+                                             send_data.peer_address_);
+  } while (!send_result.ok() &&
+           // Send again if interrupted.
+           send_result.err_->getErrorCode() == Api::IoError::IoErrorCode::Interrupt);
+
+  if (send_result.ok()) {
+    ASSERT(send_result.rc_ == buffer.length());
+    ENVOY_UDP_LOG(trace, "sendmsg sent:{} bytes", send_result.rc_);
+  } else {
+    ENVOY_UDP_LOG(debug, "sendmsg failed with error code {}: {}",
+                  static_cast<int>(send_result.err_->getErrorCode()),
+                  send_result.err_->getErrorDetails());
+  }
+
+  // The send_result normalizes the rc_ value to 0 in error conditions.
+  // The drain call is hence 'safe' in success and failure cases.
+  buffer.drain(send_result.rc_);
+
+  return send_result;
+}
 
 } // namespace Network
 } // namespace Envoy

@@ -5,8 +5,6 @@
 #include "envoy/stats/stats.h"
 
 #include "common/buffer/buffer_impl.h"
-#include "common/config/filter_json.h"
-#include "common/json/json_loader.h"
 
 #include "extensions/filters/network/ratelimit/ratelimit.h"
 
@@ -41,7 +39,7 @@ public:
         .WillByDefault(Return(true));
 
     envoy::config::filter::network::rate_limit::v2::RateLimit proto_config{};
-    MessageUtil::loadFromYaml(yaml, proto_config);
+    TestUtility::loadFromYaml(yaml, proto_config);
     config_.reset(new Config(proto_config, stats_store_, runtime_));
     client_ = new Filters::Common::RateLimit::MockClient();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::RateLimit::ClientPtr{client_});
@@ -52,7 +50,7 @@ public:
     filter_->onBelowWriteBufferLowWatermark();
   }
 
-  ~RateLimitFilterTest() {
+  ~RateLimitFilterTest() override {
     for (const Stats::GaugeSharedPtr& gauge : stats_store_.gauges()) {
       EXPECT_EQ(0U, gauge->value());
     }
@@ -95,23 +93,6 @@ failure_mode_deny: true
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   Filters::Common::RateLimit::RequestCallbacks* request_callbacks_{};
 };
-
-TEST_F(RateLimitFilterTest, BadRatelimitConfig) {
-  std::string json_string = R"EOF(
-  {
-    "stat_prefix": "my_stat_prefix",
-    "domain" : "fake_domain",
-    "descriptors": [[{ "key" : "my_key",  "value" : "my_value" }]],
-    "ip_white_list": "12"
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  envoy::config::filter::network::rate_limit::v2::RateLimit proto_config{};
-
-  EXPECT_THROW(Envoy::Config::FilterJson::translateTcpRateLimitFilter(*json_config, proto_config),
-               Json::Exception);
-}
 
 TEST_F(RateLimitFilterTest, OK) {
   InSequence s;

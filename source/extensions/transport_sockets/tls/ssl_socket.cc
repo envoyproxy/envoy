@@ -43,11 +43,10 @@ public:
 } // namespace
 
 SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
-                     Network::TransportSocketOptionsSharedPtr transport_socket_options)
-    : ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)),
-      ssl_(ctx_->newSsl(transport_socket_options != nullptr
-                            ? transport_socket_options->serverNameOverride()
-                            : absl::nullopt)) {
+                     const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
+    : transport_socket_options_(transport_socket_options),
+      ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)),
+      ssl_(ctx_->newSsl(transport_socket_options_.get())) {
   if (state == InitialState::Client) {
     SSL_set_connect_state(ssl_.get());
   } else {
@@ -397,6 +396,29 @@ std::string SslSocket::protocol() const {
   return std::string(reinterpret_cast<const char*>(proto), proto_len);
 }
 
+uint16_t SslSocket::ciphersuiteId() const {
+  const SSL_CIPHER* cipher = SSL_get_current_cipher(ssl_.get());
+  if (cipher == nullptr) {
+    return 0xffff;
+  }
+
+  // From the OpenSSL docs:
+  //    SSL_CIPHER_get_id returns |cipher|'s id. It may be cast to a |uint16_t| to
+  //    get the cipher suite value.
+  return static_cast<uint16_t>(SSL_CIPHER_get_id(cipher));
+}
+
+std::string SslSocket::ciphersuiteString() const {
+  const SSL_CIPHER* cipher = SSL_get_current_cipher(ssl_.get());
+  if (cipher == nullptr) {
+    return std::string();
+  }
+
+  return std::string(SSL_CIPHER_get_name(cipher));
+}
+
+std::string SslSocket::tlsVersion() const { return std::string(SSL_get_version(ssl_.get())); }
+
 absl::string_view SslSocket::failureReason() const { return failure_reason_; }
 
 std::string SslSocket::serialNumberPeerCertificate() const {
@@ -405,6 +427,14 @@ std::string SslSocket::serialNumberPeerCertificate() const {
     return "";
   }
   return Utility::getSerialNumberFromCertificate(*cert.get());
+}
+
+std::string SslSocket::issuerPeerCertificate() const {
+  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
+  if (!cert) {
+    return "";
+  }
+  return Utility::getIssuerFromCertificate(*cert);
 }
 
 std::string SslSocket::subjectPeerCertificate() const {

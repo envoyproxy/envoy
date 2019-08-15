@@ -2,6 +2,7 @@
 #include <string>
 
 #include "common/http/header_map_impl.h"
+#include "common/http/header_utility.h"
 
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
@@ -484,7 +485,7 @@ TEST(HeaderMapImplTest, SetRemovesAllValues) {
   headers.addReference(key1, ref_value3);
   headers.addReference(key1, ref_value4);
 
-  typedef testing::MockFunction<void(const std::string&, const std::string&)> MockCb;
+  using MockCb = testing::MockFunction<void(const std::string&, const std::string&)>;
 
   {
     MockCb cb;
@@ -555,6 +556,24 @@ TEST(HeaderMapImplTest, DoubleInlineAdd) {
     EXPECT_EQ("foo,6", headers.ContentLength()->value().getStringView());
     EXPECT_EQ(1UL, headers.size());
   }
+}
+
+// Per https://github.com/envoyproxy/envoy/issues/7488 make sure we don't
+// combine set-cookie headers
+TEST(HeaderMapImplTest, DoubleCookieAdd) {
+  HeaderMapImpl headers;
+  const std::string foo("foo");
+  const std::string bar("bar");
+  const LowerCaseString& set_cookie = Http::Headers::get().SetCookie;
+  headers.addReference(set_cookie, foo);
+  headers.addReference(set_cookie, bar);
+  EXPECT_EQ(2UL, headers.size());
+
+  std::vector<absl::string_view> out;
+  Http::HeaderUtility::getAllOfHeader(headers, "set-cookie", out);
+  ASSERT_EQ(out.size(), 2);
+  ASSERT_EQ(out[0], "foo");
+  ASSERT_EQ(out[1], "bar");
 }
 
 TEST(HeaderMapImplTest, DoubleInlineSet) {
@@ -682,7 +701,7 @@ TEST(HeaderMapImplTest, Iterate) {
   LowerCaseString foo_key("foo");
   headers.setReferenceKey(foo_key, "bar"); // set moves key to end
 
-  typedef testing::MockFunction<void(const std::string&, const std::string&)> MockCb;
+  using MockCb = testing::MockFunction<void(const std::string&, const std::string&)>;
   MockCb cb;
 
   InSequence seq;
@@ -705,7 +724,7 @@ TEST(HeaderMapImplTest, IterateReverse) {
   LowerCaseString world_key("world");
   headers.setReferenceKey(world_key, "hello");
 
-  typedef testing::MockFunction<void(const std::string&, const std::string&)> MockCb;
+  using MockCb = testing::MockFunction<void(const std::string&, const std::string&)>;
   MockCb cb;
 
   InSequence seq;
@@ -819,7 +838,7 @@ TEST(HeaderMapImplDeathTest, TestHeaderLengthChecks) {
 }
 
 TEST(HeaderMapImplTest, PseudoHeaderOrder) {
-  typedef testing::MockFunction<void(const std::string&, const std::string&)> MockCb;
+  using MockCb = testing::MockFunction<void(const std::string&, const std::string&)>;
   MockCb cb;
 
   {

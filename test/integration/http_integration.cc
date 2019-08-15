@@ -132,6 +132,15 @@ void IntegrationCodecClient::sendReset(Http::StreamEncoder& encoder) {
   flushWrite();
 }
 
+void IntegrationCodecClient::sendMetadata(Http::StreamEncoder& encoder,
+                                          Http::MetadataMap metadata_map) {
+  Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
+  Http::MetadataMapVector metadata_map_vector;
+  metadata_map_vector.push_back(std::move(metadata_map_ptr));
+  encoder.encodeMetadata(metadata_map_vector);
+  flushWrite();
+}
+
 std::pair<Http::StreamEncoder&, IntegrationStreamDecoderPtr>
 IntegrationCodecClient::startRequest(const Http::HeaderMap& headers) {
   auto response = std::make_unique<IntegrationStreamDecoder>(dispatcher_);
@@ -300,6 +309,7 @@ HttpIntegrationTest::waitForNextUpstreamRequest(const std::vector<uint64_t>& ups
   uint64_t upstream_with_request;
   // If there is no upstream connection, wait for it to be established.
   if (!fake_upstream_connection_) {
+
     AssertionResult result = AssertionFailure();
     for (auto upstream_index : upstream_indices) {
       result = fake_upstreams_[upstream_index]->waitForHttpConnection(
@@ -325,12 +335,6 @@ HttpIntegrationTest::waitForNextUpstreamRequest(const std::vector<uint64_t>& ups
 
 void HttpIntegrationTest::waitForNextUpstreamRequest(uint64_t upstream_index) {
   waitForNextUpstreamRequest(std::vector<uint64_t>({upstream_index}));
-}
-
-void HttpIntegrationTest::addFilters(std::vector<std::string> filters) {
-  for (const auto filter : filters) {
-    config_helper_.addFilter(filter);
-  }
 }
 
 void HttpIntegrationTest::checkSimpleRequestSuccess(uint64_t expected_request_size,

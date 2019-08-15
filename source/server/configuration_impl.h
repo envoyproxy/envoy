@@ -31,7 +31,7 @@ namespace Configuration {
  */
 class StatsSinkFactory {
 public:
-  virtual ~StatsSinkFactory() {}
+  virtual ~StatsSinkFactory() = default;
 
   /**
    * Create a particular Stats::Sink implementation. If the implementation is unable to produce a
@@ -71,9 +71,20 @@ public:
   /**
    * Given a ListenerFilterManager and a list of factories, create a new filter chain. Chain
    * creation will exit early if any filters immediately close the connection.
+   *
+   * TODO(sumukhs): Coalesce with the above as they are very similar
    */
   static bool buildFilterChain(Network::ListenerFilterManager& filter_manager,
                                const std::vector<Network::ListenerFilterFactoryCb>& factories);
+
+  /**
+   * Given a UdpListenerFilterManager and a list of factories, create a new filter chain. Chain
+   * creation will exit early if any filters immediately close the connection.
+   */
+  static bool
+  buildUdpFilterChain(Network::UdpListenerFilterManager& filter_manager,
+                      Network::UdpReadFilterCallbacks& callbacks,
+                      const std::vector<Network::UdpListenerFilterFactoryCb>& factories);
 };
 
 /**
@@ -138,8 +149,9 @@ public:
   // Server::Configuration::Initial
   Admin& admin() override { return admin_; }
   absl::optional<std::string> flagsPath() override { return flags_path_; }
-  const ProtobufWkt::Struct& baseRuntime() override { return base_runtime_; }
-  DiskRuntime* diskRuntime() override { return disk_runtime_.get(); }
+  const envoy::config::bootstrap::v2::LayeredRuntime& runtime() override {
+    return layered_runtime_;
+  }
 
 private:
   struct AdminImpl : public Admin {
@@ -147,27 +159,17 @@ private:
     const std::string& accessLogPath() override { return access_log_path_; }
     const std::string& profilePath() override { return profile_path_; }
     Network::Address::InstanceConstSharedPtr address() override { return address_; }
+    Network::Socket::OptionsSharedPtr socketOptions() override { return socket_options_; }
 
     std::string access_log_path_;
     std::string profile_path_;
     Network::Address::InstanceConstSharedPtr address_;
-  };
-
-  struct DiskRuntimeImpl : public DiskRuntime {
-    // Server::Configuration::DiskRuntime
-    const std::string& symlinkRoot() override { return symlink_root_; }
-    const std::string& subdirectory() override { return subdirectory_; }
-    const std::string& overrideSubdirectory() override { return override_subdirectory_; }
-
-    std::string symlink_root_;
-    std::string subdirectory_;
-    std::string override_subdirectory_;
+    Network::Socket::OptionsSharedPtr socket_options_;
   };
 
   AdminImpl admin_;
   absl::optional<std::string> flags_path_;
-  ProtobufWkt::Struct base_runtime_;
-  std::unique_ptr<DiskRuntimeImpl> disk_runtime_;
+  envoy::config::bootstrap::v2::LayeredRuntime layered_runtime_;
 };
 
 } // namespace Configuration

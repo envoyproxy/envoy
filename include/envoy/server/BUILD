@@ -119,6 +119,7 @@ envoy_cc_library(
         "//include/envoy/network:address_interface",
         "//include/envoy/stats:stats_interface",
         "@envoy_api//envoy/admin/v2alpha:server_info_cc",
+        "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
     ],
 )
 
@@ -150,6 +151,7 @@ envoy_cc_library(
         ":process_context_interface",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/api:api_interface",
+        "//include/envoy/grpc:context_interface",
         "//include/envoy/http:codes_interface",
         "//include/envoy/http:context_interface",
         "//include/envoy/http:filter_interface",

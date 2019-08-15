@@ -3,7 +3,6 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/stack_array.h"
 
-#include "extensions/filters/network/kafka/request_codec.h"
 #include "extensions/filters/network/kafka/serialization.h"
 
 #include "absl/strings/string_view.h"
@@ -114,30 +113,31 @@ template <typename BT, typename AT> void serializeThenDeserializeAndCheckEqualit
 }
 
 /**
- * Request callback that captures the messages.
+ * Message callback that captures the messages.
  */
-class CapturingRequestCallback : public RequestCallback {
+template <typename Base, typename Message, typename Failure> class CapturingCallback : public Base {
 public:
   /**
    * Stores the message.
    */
-  virtual void onMessage(AbstractRequestSharedPtr request) override;
+  void onMessage(Message message) override { captured_messages_.push_back(message); }
 
   /**
    * Returns the stored messages.
    */
-  const std::vector<AbstractRequestSharedPtr>& getCaptured() const;
+  const std::vector<Message>& getCapturedMessages() const { return captured_messages_; }
 
-  virtual void onFailedParse(RequestParseFailureSharedPtr failure_data) override;
+  void onFailedParse(Failure failure_data) override { parse_failures_.push_back(failure_data); }
 
-  const std::vector<RequestParseFailureSharedPtr>& getParseFailures() const;
+  const std::vector<Failure>& getParseFailures() const { return parse_failures_; }
 
 private:
-  std::vector<AbstractRequestSharedPtr> captured_;
-  std::vector<RequestParseFailureSharedPtr> parse_failures_;
+  std::vector<Message> captured_messages_;
+  std::vector<Failure> parse_failures_;
 };
 
-typedef std::shared_ptr<CapturingRequestCallback> CapturingRequestCallbackSharedPtr;
+template <typename Base, typename Message, typename Failure>
+using CapturingCallbackSharedPtr = std::shared_ptr<CapturingCallback<Base, Message, Failure>>;
 
 } // namespace Kafka
 } // namespace NetworkFilters

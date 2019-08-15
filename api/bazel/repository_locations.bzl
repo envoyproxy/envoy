@@ -4,14 +4,14 @@ BAZEL_SKYLIB_SHA256 = "2ef429f5d7ce7111263289644d233707dba35e39696377ebab8b0bc70
 GOGOPROTO_RELEASE = "1.2.1"
 GOGOPROTO_SHA256 = "99e423905ba8921e86817607a5294ffeedb66fdd4a85efce5eb2848f715fdb3a"
 
-OPENCENSUS_RELEASE = "0.1.0"
-OPENCENSUS_SHA256 = "4fd21cc6de63d7cb979fd749d8101ff425905aa0826fed26019d1c311fcf19a7"
+OPENCENSUS_PROTO_RELEASE = "0.2.1"
+OPENCENSUS_PROTO_SHA256 = "bfcefa6093fc2ecdf5c9effea86e6982d0d6f9a5178b17fcf73a62e0f3fb43d0"
 
-PGV_RELEASE = "0.0.14"
-PGV_SHA256 = "c45e629e8c174886a73ec251b94d5470526c7c1e2596cf17755065aed15b9254"
+PGV_GIT_SHA = "2feaabb13a5d697b80fcb938c0ce37b24c9381ee"  # Jul 26, 2018
+PGV_SHA256 = "ddefe3dcbb25d68a2e5dfea67d19c060959c2aecc782802bd4c1a5811d44dd45"
 
-GOOGLEAPIS_GIT_SHA = "d642131a6e6582fc226caf9893cb7fe7885b3411"  # May 23, 2018
-GOOGLEAPIS_SHA = "16f5b2e8bf1e747a32f9a62e211f8f33c94645492e9bbd72458061d9a9de1f63"
+GOOGLEAPIS_GIT_SHA = "be480e391cc88a75cf2a81960ef79c80d5012068"  # Jul 24, 2019
+GOOGLEAPIS_SHA = "c1969e5b72eab6d9b6cfcff748e45ba57294aeea1d96fd04cd081995de0605c2"
 
 PROMETHEUS_GIT_SHA = "99fa1f4be8e564e8a6b613da7fa6f46c9edafc6c"  # Nov 17, 2017
 PROMETHEUS_SHA = "783bdaf8ee0464b35ec0c8704871e1e72afa0005c3f3587f65d9d6694bf3911b"
@@ -26,12 +26,12 @@ REPOSITORY_LOCATIONS = dict(
         sha256 = BAZEL_SKYLIB_SHA256,
         urls = ["https://github.com/bazelbuild/bazel-skylib/releases/download/" + BAZEL_SKYLIB_RELEASE + "/bazel-skylib." + BAZEL_SKYLIB_RELEASE + ".tar.gz"],
     ),
-    com_lyft_protoc_gen_validate = dict(
+    com_envoyproxy_protoc_gen_validate = dict(
         sha256 = PGV_SHA256,
-        strip_prefix = "protoc-gen-validate-" + PGV_RELEASE,
-        urls = ["https://github.com/envoyproxy/protoc-gen-validate/archive/v" + PGV_RELEASE + ".tar.gz"],
+        strip_prefix = "protoc-gen-validate-" + PGV_GIT_SHA,
+        urls = ["https://github.com/envoyproxy/protoc-gen-validate/archive/" + PGV_GIT_SHA + ".tar.gz"],
     ),
-    googleapis = dict(
+    com_google_googleapis = dict(
         # TODO(dio): Consider writing a Skylark macro for importing Google API proto.
         sha256 = GOOGLEAPIS_SHA,
         strip_prefix = "googleapis-" + GOOGLEAPIS_GIT_SHA,
@@ -47,10 +47,10 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "client_model-" + PROMETHEUS_GIT_SHA,
         urls = ["https://github.com/prometheus/client_model/archive/" + PROMETHEUS_GIT_SHA + ".tar.gz"],
     ),
-    io_opencensus_trace = dict(
-        sha256 = OPENCENSUS_SHA256,
-        strip_prefix = "opencensus-proto-" + OPENCENSUS_RELEASE + "/src/opencensus/proto/trace/v1",
-        urls = ["https://github.com/census-instrumentation/opencensus-proto/archive/v" + OPENCENSUS_RELEASE + ".tar.gz"],
+    opencensus_proto = dict(
+        sha256 = OPENCENSUS_PROTO_SHA256,
+        strip_prefix = "opencensus-proto-" + OPENCENSUS_PROTO_RELEASE + "/src",
+        urls = ["https://github.com/census-instrumentation/opencensus-proto/archive/v" + OPENCENSUS_PROTO_RELEASE + ".tar.gz"],
     ),
     kafka_source = dict(
         sha256 = KAFKA_SOURCE_SHA,

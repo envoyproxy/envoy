@@ -27,7 +27,7 @@ struct StructNameValues {
   const std::string endpointStruct = "Endpoint";
   const std::string upgradeReplyStruct = "UpgradeReply";
 };
-typedef ConstSingleton<StructNameValues> StructNames;
+using StructNames = ConstSingleton<StructNameValues>;
 
 struct RequestHeaderFieldNameValues {
   const std::string traceIdField = "trace_id";
@@ -41,30 +41,30 @@ struct RequestHeaderFieldNameValues {
   const std::string delegationsField = "delegations";
   const std::string traceIdHighField = "trace_id_high";
 };
-typedef ConstSingleton<RequestHeaderFieldNameValues> RequestHeaderFieldNames;
+using RequestHeaderFieldNames = ConstSingleton<RequestHeaderFieldNameValues>;
 
 struct ClientIdFieldNameValues {
   const std::string nameField = "name";
 };
-typedef ConstSingleton<ClientIdFieldNameValues> ClientIdFieldNames;
+using ClientIdFieldNames = ConstSingleton<ClientIdFieldNameValues>;
 
 struct DelegationFieldNameValues {
   const std::string srcField = "src";
   const std::string dstField = "dst";
 };
-typedef ConstSingleton<DelegationFieldNameValues> DelegationFieldNames;
+using DelegationFieldNames = ConstSingleton<DelegationFieldNameValues>;
 
 struct RequestContextFieldNameValues {
   const std::string keyField = "key";
   const std::string valueField = "value";
 };
-typedef ConstSingleton<RequestContextFieldNameValues> RequestContextFieldNames;
+using RequestContextFieldNames = ConstSingleton<RequestContextFieldNameValues>;
 
 struct ResponseHeaderFieldNameValues {
   const std::string spansField = "spans";
   const std::string contextsField = "contexts";
 };
-typedef ConstSingleton<ResponseHeaderFieldNameValues> ResponseHeaderFieldNames;
+using ResponseHeaderFieldNames = ConstSingleton<ResponseHeaderFieldNameValues>;
 
 struct SpanFieldNameValues {
   const std::string traceIdField = "trace_id";
@@ -75,14 +75,14 @@ struct SpanFieldNameValues {
   const std::string binaryAnnotationsField = "binary_annotations";
   const std::string debugField = "debug";
 };
-typedef ConstSingleton<SpanFieldNameValues> SpanFieldNames;
+using SpanFieldNames = ConstSingleton<SpanFieldNameValues>;
 
 struct AnnotationFieldNameValues {
   const std::string timestampField = "timestamp";
   const std::string valueField = "value";
   const std::string hostField = "host";
 };
-typedef ConstSingleton<AnnotationFieldNameValues> AnnotationFieldNames;
+using AnnotationFieldNames = ConstSingleton<AnnotationFieldNameValues>;
 
 struct BinaryAnnotationFieldNameValues {
   const std::string keyField = "key";
@@ -90,14 +90,14 @@ struct BinaryAnnotationFieldNameValues {
   const std::string annotationTypeField = "annotation_type";
   const std::string hostField = "host";
 };
-typedef ConstSingleton<BinaryAnnotationFieldNameValues> BinaryAnnotationFieldNames;
+using BinaryAnnotationFieldNames = ConstSingleton<BinaryAnnotationFieldNameValues>;
 
 struct EndpointFieldNameValues {
   const std::string ipv4Field = "ipv4";
   const std::string portField = "port";
   const std::string serviceNameField = "service_name";
 };
-typedef ConstSingleton<EndpointFieldNameValues> EndpointFieldNames;
+using EndpointFieldNames = ConstSingleton<EndpointFieldNameValues>;
 
 const std::string& emptyString() { CONSTRUCT_ON_FIRST_USE(std::string, ""); }
 
@@ -166,7 +166,7 @@ public:
  */
 class UpgradeReply : public DirectResponse, public ThriftObject {
 public:
-  UpgradeReply() {}
+  UpgradeReply() = default;
   UpgradeReply(Transport& transport)
       : thrift_obj_(std::make_unique<ThriftObjectImpl>(transport, protocol_)) {}
 
@@ -262,7 +262,7 @@ public:
   std::string key_;
   std::string value_;
 };
-typedef std::list<RequestContext> RequestContextList;
+using RequestContextList = std::list<RequestContext>;
 
 /**
  * Delegation is Twitter protocol delegation table entry.
@@ -312,7 +312,7 @@ public:
   std::string src_;
   std::string dst_;
 };
-typedef std::list<Delegation> DelegationList;
+using DelegationList = std::list<Delegation>;
 
 /**
  * RequestHeader is a Twitter protocol request header, inserted between the transport start and

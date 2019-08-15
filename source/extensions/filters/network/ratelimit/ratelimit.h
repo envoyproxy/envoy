@@ -23,16 +23,14 @@ namespace RateLimitFilter {
 /**
  * All tcp rate limit stats. @see stats_macros.h
  */
-// clang-format off
 #define ALL_TCP_RATE_LIMIT_STATS(COUNTER, GAUGE)                                                   \
-  COUNTER(total)                                                                                   \
-  COUNTER(error)                                                                                   \
-  COUNTER(over_limit)                                                                              \
-  COUNTER(ok)                                                                                      \
-  COUNTER(failure_mode_allowed)                                                                    \
   COUNTER(cx_closed)                                                                               \
-  GAUGE  (active)
-// clang-format on
+  COUNTER(error)                                                                                   \
+  COUNTER(failure_mode_allowed)                                                                    \
+  COUNTER(ok)                                                                                      \
+  COUNTER(over_limit)                                                                              \
+  COUNTER(total)                                                                                   \
+  GAUGE(active, Accumulate)
 
 /**
  * Struct definition for all tcp rate limit stats. @see stats_macros.h
@@ -64,7 +62,7 @@ private:
   const bool failure_mode_deny_;
 };
 
-typedef std::shared_ptr<Config> ConfigSharedPtr;
+using ConfigSharedPtr = std::shared_ptr<Config>;
 
 /**
  * TCP rate limit filter instance. This filter will call the rate limit service with the given

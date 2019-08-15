@@ -2,6 +2,7 @@
 
 #include "envoy/config/filter/http/router/v2/router.pb.h"
 #include "envoy/config/filter/http/router/v2/router.pb.validate.h"
+#include "envoy/registry/registry.h"
 
 #include "common/protobuf/protobuf.h"
 
@@ -25,11 +26,15 @@ public:
   createFilterFactory(const Json::Object& json_config, const std::string& stat_prefix,
                       Server::Configuration::FactoryContext& context) override;
 
+  bool isTerminalFilter() override { return true; }
+
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::config::filter::http::router::v2::Router& proto_config,
       const std::string& stat_prefix, Server::Configuration::FactoryContext& context) override;
 };
+
+DECLARE_FACTORY(RouterFilterConfig);
 
 } // namespace RouterFilter
 } // namespace HttpFilters

@@ -44,13 +44,14 @@ class SslSocket : public Network::TransportSocket,
                   protected Logger::Loggable<Logger::Id::connection> {
 public:
   SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
-            Network::TransportSocketOptionsSharedPtr transport_socket_options);
+            const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
 
   // Ssl::ConnectionInfo
   bool peerCertificatePresented() const override;
   std::vector<std::string> uriSanLocalCertificate() const override;
   const std::string& sha256PeerCertificateDigest() const override;
   std::string serialNumberPeerCertificate() const override;
+  std::string issuerPeerCertificate() const override;
   std::string subjectPeerCertificate() const override;
   std::string subjectLocalCertificate() const override;
   std::vector<std::string> uriSanPeerCertificate() const override;
@@ -61,6 +62,9 @@ public:
   absl::optional<SystemTime> validFromPeerCertificate() const override;
   absl::optional<SystemTime> expirationPeerCertificate() const override;
   std::string sessionId() const override;
+  uint16_t ciphersuiteId() const override;
+  std::string ciphersuiteString() const override;
+  std::string tlsVersion() const override;
 
   // Network::TransportSocket
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
@@ -86,6 +90,7 @@ private:
   void drainErrorQueue();
   void shutdownSsl();
 
+  const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
   Network::TransportSocketCallbacks* callbacks_{};
   ContextImplSharedPtr ctx_;
   bssl::UniquePtr<SSL> ssl_;

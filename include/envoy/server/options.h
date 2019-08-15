@@ -6,6 +6,7 @@
 
 #include "envoy/admin/v2alpha/server_info.pb.h"
 #include "envoy/common/pure.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/network/address.h"
 
 #include "spdlog/spdlog.h"
@@ -40,14 +41,14 @@ enum class Mode {
   // to be validated in a non-prod environment.
 };
 
-typedef std::unique_ptr<envoy::admin::v2alpha::CommandLineOptions> CommandLineOptionsPtr;
+using CommandLineOptionsPtr = std::unique_ptr<envoy::admin::v2alpha::CommandLineOptions>;
 
 /**
  * General options for the server.
  */
 class Options {
 public:
-  virtual ~Options() {}
+  virtual ~Options() = default;
 
   /**
    * @return uint64_t the base ID for the server. This is required for system-wide things like
@@ -77,6 +78,17 @@ public:
    *                            into the config loaded in configPath().
    */
   virtual const std::string& configYaml() const PURE;
+
+  /**
+   * @return const envoy::config::bootstrap::v2::Bootstrap& a bootstrap proto object
+   * that merges into the config last, after configYaml and configPath.
+   */
+  virtual const envoy::config::bootstrap::v2::Bootstrap& configProto() const PURE;
+
+  /**
+   * @return bool allow unknown fields in the configuration?
+   */
+  virtual bool allowUnknownFields() const PURE;
 
   /**
    * @return const std::string& the admin address output file.

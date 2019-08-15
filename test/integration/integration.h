@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/server/process_context.h"
+
 #include "common/http/codec_client.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
@@ -20,6 +22,7 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_time.h"
 
+#include "absl/types/optional.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -80,7 +83,7 @@ private:
   Http::StreamResetReason reset_reason_{};
 };
 
-typedef std::unique_ptr<IntegrationStreamDecoder> IntegrationStreamDecoderPtr;
+using IntegrationStreamDecoderPtr = std::unique_ptr<IntegrationStreamDecoder>;
 
 /**
  * TCP client used during integration testing.
@@ -92,13 +95,16 @@ public:
 
   void close();
   void waitForData(const std::string& data, bool exact_match = true);
+  // wait for at least `length` bytes to be received
+  void waitForData(size_t length);
   void waitForDisconnect(bool ignore_spurious_events = false);
   void waitForHalfClose();
   void readDisable(bool disabled);
   void write(const std::string& data, bool end_stream = false, bool verify = true);
   const std::string& data() { return payload_reader_->data(); }
   bool connected() const { return !disconnected_; }
-  void clearData() { payload_reader_->clearData(); }
+  // clear up to the `count` number of bytes of received data
+  void clearData(size_t count = std::string::npos) { payload_reader_->clearData(count); }
 
 private:
   struct ConnectionCallbacks : public Network::ConnectionCallbacks {
@@ -119,7 +125,7 @@ private:
   MockWatermarkBuffer* client_write_buffer_;
 };
 
-typedef std::unique_ptr<IntegrationTcpClient> IntegrationTcpClientPtr;
+using IntegrationTcpClientPtr = std::unique_ptr<IntegrationTcpClient>;
 
 struct ApiFilesystemConfig {
   std::string bootstrap_path_;
@@ -150,7 +156,7 @@ public:
                       Network::Address::IpVersion version,
                       const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
 
-  virtual ~BaseIntegrationTest() {}
+  virtual ~BaseIntegrationTest() = default;
 
   // TODO(jmarantz): Remove this once
   // https://github.com/envoyproxy/envoy-filter-example/pull/69 is reverted.
@@ -212,6 +218,7 @@ public:
                           const std::vector<std::string>& expected_resource_names,
                           const std::vector<std::string>& expected_resource_names_added,
                           const std::vector<std::string>& expected_resource_names_removed,
+                          bool expect_node = false,
                           const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
                           const std::string& expected_error_message = "");
   template <class T>
@@ -244,7 +251,7 @@ public:
       const std::string& expected_error_message = "");
   AssertionResult compareSotwDiscoveryRequest(
       const std::string& expected_type_url, const std::string& expected_version,
-      const std::vector<std::string>& expected_resource_names,
+      const std::vector<std::string>& expected_resource_names, bool expect_node = false,
       const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
       const std::string& expected_error_message = "");
 
@@ -322,6 +329,8 @@ protected:
   InstanceConstSharedPtrFn upstream_address_fn_;
   // The config for envoy start-up.
   ConfigHelper config_helper_;
+  // The ProcessObject to use when constructing the envoy server.
+  absl::optional<std::reference_wrapper<ProcessObject>> process_object_{absl::nullopt};
 
   // Steps that should be done in parallel with the envoy server starting. E.g., xDS
   // pre-init, control plane synchronization needed for server start.

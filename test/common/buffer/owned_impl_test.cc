@@ -36,8 +36,8 @@ protected:
   }
 };
 
-INSTANTIATE_TEST_CASE_P(OwnedImplTest, OwnedImplTest,
-                        testing::ValuesIn({BufferImplementation::Old, BufferImplementation::New}));
+INSTANTIATE_TEST_SUITE_P(OwnedImplTest, OwnedImplTest,
+                         testing::ValuesIn({BufferImplementation::Old, BufferImplementation::New}));
 
 TEST_P(OwnedImplTest, AddBufferFragmentNoCleanup) {
   char input[] = "hello world";
@@ -92,6 +92,57 @@ TEST_P(OwnedImplTest, AddBufferFragmentDynamicAllocation) {
   EXPECT_FALSE(release_callback_called_);
 
   buffer.drain(6);
+  EXPECT_EQ(0, buffer.length());
+  EXPECT_TRUE(release_callback_called_);
+}
+
+TEST_P(OwnedImplTest, AddOwnedBufferFragmentWithCleanup) {
+  char input[] = "hello world";
+  const size_t expected_length = sizeof(input) - 1;
+  auto frag = OwnedBufferFragmentImpl::create(
+      {input, expected_length},
+      [this](const OwnedBufferFragmentImpl*) { release_callback_called_ = true; });
+  Buffer::OwnedImpl buffer;
+  verifyImplementation(buffer);
+  buffer.addBufferFragment(*frag);
+  EXPECT_EQ(expected_length, buffer.length());
+
+  const uint64_t partial_drain_size = 5;
+  buffer.drain(partial_drain_size);
+  EXPECT_EQ(expected_length - partial_drain_size, buffer.length());
+  EXPECT_FALSE(release_callback_called_);
+
+  buffer.drain(expected_length - partial_drain_size);
+  EXPECT_EQ(0, buffer.length());
+  EXPECT_TRUE(release_callback_called_);
+}
+
+// Verify that OwnedBufferFragment work correctly when input buffer is allocated on the heap.
+TEST_P(OwnedImplTest, AddOwnedBufferFragmentDynamicAllocation) {
+  char input_stack[] = "hello world";
+  const size_t expected_length = sizeof(input_stack) - 1;
+  char* input = new char[expected_length];
+  std::copy(input_stack, input_stack + expected_length, input);
+
+  auto* frag = OwnedBufferFragmentImpl::create({input, expected_length},
+                                               [this, input](const OwnedBufferFragmentImpl* frag) {
+                                                 release_callback_called_ = true;
+                                                 delete[] input;
+                                                 delete frag;
+                                               })
+                   .release();
+
+  Buffer::OwnedImpl buffer;
+  verifyImplementation(buffer);
+  buffer.addBufferFragment(*frag);
+  EXPECT_EQ(expected_length, buffer.length());
+
+  const uint64_t partial_drain_size = 5;
+  buffer.drain(partial_drain_size);
+  EXPECT_EQ(expected_length - partial_drain_size, buffer.length());
+  EXPECT_FALSE(release_callback_called_);
+
+  buffer.drain(expected_length - partial_drain_size);
   EXPECT_EQ(0, buffer.length());
   EXPECT_TRUE(release_callback_called_);
 }
@@ -338,6 +389,69 @@ TEST_P(OwnedImplTest, ReserveCommit) {
     commitReservation(iovecs, num_reserved, buffer);
     EXPECT_EQ(14, buffer.length());
   }
+}
+
+TEST_P(OwnedImplTest, ReserveCommitReuse) {
+  Buffer::OwnedImpl buffer;
+  verifyImplementation(buffer);
+
+  static constexpr uint64_t NumIovecs = 2;
+  Buffer::RawSlice iovecs[NumIovecs];
+
+  // Reserve 8KB and commit all but a few bytes of it, to ensure that
+  // the last slice of the buffer can hold part but not all of the
+  // next reservation. Note that the buffer implementation might
+  // allocate more than the requested 8KB. In case the implementation
+  // uses a power-of-two allocator, the subsequent reservations all
+  // request 16KB.
+  uint64_t num_reserved = buffer.reserve(8192, iovecs, NumIovecs);
+  EXPECT_EQ(1, num_reserved);
+  iovecs[0].len_ = 8000;
+  buffer.commit(iovecs, 1);
+  EXPECT_EQ(8000, buffer.length());
+
+  // Reserve 16KB. The resulting reservation should span 2 slices.
+  // Commit part of the first slice and none of the second slice.
+  num_reserved = buffer.reserve(16384, iovecs, NumIovecs);
+  EXPECT_EQ(2, num_reserved);
+  const void* first_slice = iovecs[0].mem_;
+  const void* second_slice = iovecs[1].mem_;
+  iovecs[0].len_ = 1;
+  buffer.commit(iovecs, 1);
+  EXPECT_EQ(8001, buffer.length());
+
+  // Reserve 16KB again, and check whether we get back the uncommitted
+  // second slice from the previous reservation.
+  num_reserved = buffer.reserve(16384, iovecs, NumIovecs);
+  EXPECT_EQ(2, num_reserved);
+  EXPECT_EQ(static_cast<const uint8_t*>(first_slice) + 1,
+            static_cast<const uint8_t*>(iovecs[0].mem_));
+  EXPECT_EQ(second_slice, iovecs[1].mem_);
+}
+
+TEST_P(OwnedImplTest, ReserveReuse) {
+  Buffer::OwnedImpl buffer;
+  verifyImplementation(buffer);
+
+  static constexpr uint64_t NumIovecs = 2;
+  Buffer::RawSlice iovecs[NumIovecs];
+
+  // Reserve some space and leave it uncommitted.
+  uint64_t num_reserved = buffer.reserve(8192, iovecs, NumIovecs);
+  EXPECT_EQ(1, num_reserved);
+  const void* first_slice = iovecs[0].mem_;
+
+  // Reserve more space and verify that it begins with the same slice from the last reservation.
+  num_reserved = buffer.reserve(16384, iovecs, NumIovecs);
+  EXPECT_EQ(2, num_reserved);
+  EXPECT_EQ(first_slice, iovecs[0].mem_);
+  const void* second_slice = iovecs[1].mem_;
+
+  // Repeat the last reservation and verify that it yields the same slices.
+  num_reserved = buffer.reserve(16384, iovecs, NumIovecs);
+  EXPECT_EQ(2, num_reserved);
+  EXPECT_EQ(first_slice, iovecs[0].mem_);
+  EXPECT_EQ(second_slice, iovecs[1].mem_);
 }
 
 TEST_P(OwnedImplTest, Search) {

@@ -31,6 +31,15 @@ dynamic_resources:
   lds_config:
     path: /dev/null
 static_resources:
+  secrets:
+  - name: "secret_static_0"
+    tls_certificate:
+      certificate_chain:
+        inline_string: "DUMMY_INLINE_BYTES"
+      private_key:
+        inline_string: "DUMMY_INLINE_BYTES"
+      password:
+        inline_string: "DUMMY_INLINE_BYTES"
   clusters:
     name: cluster_0
     hosts:
@@ -43,6 +52,29 @@ static_resources:
       socket_address:
         address: 127.0.0.1
         port_value: 0
+)EOF";
+
+const std::string ConfigHelper::BASE_UDP_LISTENER_CONFIG = R"EOF(
+admin:
+  access_log_path: /dev/null
+  address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 0
+static_resources:
+  clusters:
+    name: cluster_0
+    hosts:
+      socket_address:
+        address: 127.0.0.1
+        port_value: 0
+  listeners:
+    name: listener_0
+    address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 0
+        protocol: udp
 )EOF";
 
 const std::string ConfigHelper::TCP_PROXY_CONFIG = BASE_CONFIG + R"EOF(
@@ -140,6 +172,7 @@ dynamic_resources:
       grpc_services:
         envoy_grpc:
           cluster_name: my_cds_cluster
+      set_node_on_first_message_only: true
 static_resources:
   clusters:
   - name: my_cds_cluster
@@ -206,7 +239,7 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& 
                            const std::string& config) {
   RELEASE_ASSERT(!finalized_, "");
   std::string filename = TestEnvironment::writeStringToFileForTest("basic_config.yaml", config);
-  MessageUtil::loadFromFile(filename, bootstrap_, api);
+  TestUtility::loadFromFile(filename, bootstrap_, api);
 
   // Fix up all the socket addresses with the correct version.
   auto* admin = bootstrap_.mutable_admin();
@@ -217,7 +250,11 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& 
   for (int i = 0; i < static_resources->listeners_size(); ++i) {
     auto* listener = static_resources->mutable_listeners(i);
     auto* listener_socket_addr = listener->mutable_address()->mutable_socket_address();
-    listener_socket_addr->set_address(Network::Test::getLoopbackAddressString(version));
+    if (listener_socket_addr->address() == "0.0.0.0" || listener_socket_addr->address() == "::") {
+      listener_socket_addr->set_address(Network::Test::getAnyAddressString(version));
+    } else {
+      listener_socket_addr->set_address(Network::Test::getLoopbackAddressString(version));
+    }
   }
 
   for (int i = 0; i < static_resources->clusters_size(); ++i) {
@@ -244,7 +281,7 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& 
 }
 
 void ConfigHelper::applyConfigModifiers() {
-  for (auto config_modifier : config_modifiers_) {
+  for (const auto& config_modifier : config_modifiers_) {
     config_modifier(bootstrap_);
   }
   config_modifiers_.clear();
@@ -258,6 +295,7 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
   uint32_t port_idx = 0;
   bool eds_hosts = false;
   bool custom_cluster = false;
+  bool original_dst_cluster = false;
   auto* static_resources = bootstrap_.mutable_static_resources();
   const auto tap_path = TestEnvironment::getOptionalEnvVar("TAP_PATH");
   if (tap_path) {
@@ -274,7 +312,7 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
         absl::optional<ProtobufWkt::Struct> tls_config;
         if (has_tls) {
           tls_config = ProtobufWkt::Struct();
-          MessageUtil::jsonConvert(filter_chain->tls_context(), tls_config.value());
+          TestUtility::jsonConvert(filter_chain->tls_context(), tls_config.value());
           filter_chain->clear_tls_context();
         }
         setTapTransportSocket(tap_path.value(), fmt::format("listener_{}_{}", i, j),
@@ -286,6 +324,8 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
     auto* cluster = static_resources->mutable_clusters(i);
     if (cluster->type() == envoy::api::v2::Cluster::EDS) {
       eds_hosts = true;
+    } else if (cluster->type() == envoy::api::v2::Cluster::ORIGINAL_DST) {
+      original_dst_cluster = true;
     } else if (cluster->has_cluster_type()) {
       custom_cluster = true;
     } else {
@@ -318,14 +358,14 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
       absl::optional<ProtobufWkt::Struct> tls_config;
       if (has_tls) {
         tls_config = ProtobufWkt::Struct();
-        MessageUtil::jsonConvert(cluster->tls_context(), tls_config.value());
+        TestUtility::jsonConvert(cluster->tls_context(), tls_config.value());
         cluster->clear_tls_context();
       }
       setTapTransportSocket(tap_path.value(), fmt::format("cluster_{}", i),
                             *cluster->mutable_transport_socket(), tls_config);
     }
   }
-  ASSERT(port_idx == ports.size() || eds_hosts || custom_cluster ||
+  ASSERT(port_idx == ports.size() || eds_hosts || original_dst_cluster || custom_cluster ||
          bootstrap_.dynamic_resources().has_cds_config());
 
   if (!connect_timeout_set_) {
@@ -475,7 +515,7 @@ void ConfigHelper::addFilter(const std::string& config) {
 
   auto* filter_list_back = hcm_config.add_http_filters();
   const std::string json = Json::Factory::loadFromYamlString(config)->asJsonString();
-  MessageUtil::loadFromJson(json, *filter_list_back);
+  TestUtility::loadFromJson(json, *filter_list_back);
 
   // Now move it to the front.
   for (int i = hcm_config.http_filters_size() - 1; i > 0; --i) {
@@ -512,7 +552,7 @@ bool ConfigHelper::setAccessLog(const std::string& filename) {
   loadHttpConnectionManager(hcm_config);
   envoy::config::accesslog::v2::FileAccessLog access_log_config;
   access_log_config.set_path(filename);
-  MessageUtil::jsonConvert(access_log_config, *hcm_config.mutable_access_log(0)->mutable_config());
+  TestUtility::jsonConvert(access_log_config, *hcm_config.mutable_access_log(0)->mutable_config());
   storeHttpConnectionManager(hcm_config);
   return true;
 }
@@ -579,7 +619,7 @@ bool ConfigHelper::loadHttpConnectionManager(
   RELEASE_ASSERT(!finalized_, "");
   auto* hcm_filter = getFilterFromListener("envoy.http_connection_manager");
   if (hcm_filter) {
-    MessageUtil::jsonConvert(*hcm_filter->mutable_config(), hcm);
+    TestUtility::jsonConvert(*hcm_filter->mutable_config(), hcm);
     return true;
   }
   return false;
@@ -591,7 +631,7 @@ void ConfigHelper::storeHttpConnectionManager(
   auto* hcm_config_struct =
       getFilterFromListener("envoy.http_connection_manager")->mutable_config();
 
-  MessageUtil::jsonConvert(hcm, *hcm_config_struct);
+  TestUtility::jsonConvert(hcm, *hcm_config_struct);
 }
 
 void ConfigHelper::addConfigModifier(ConfigModifierFunction function) {
@@ -622,6 +662,21 @@ void ConfigHelper::setLds(absl::string_view version_info) {
   std::string file = TestEnvironment::writeStringToFileForTest(
       "new_lds_file", MessageUtil::getJsonStringFromMessage(lds));
   TestUtility::renameFile(file, lds_filename);
+}
+
+void ConfigHelper::setOutboundFramesLimits(uint32_t max_all_frames, uint32_t max_control_frames) {
+  auto filter = getFilterFromListener("envoy.http_connection_manager");
+  if (filter) {
+    envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager hcm_config;
+    loadHttpConnectionManager(hcm_config);
+    if (hcm_config.codec_type() ==
+        envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::HTTP2) {
+      auto* options = hcm_config.mutable_http2_protocol_options();
+      options->mutable_max_outbound_frames()->set_value(max_all_frames);
+      options->mutable_max_outbound_control_frames()->set_value(max_control_frames);
+      storeHttpConnectionManager(hcm_config);
+    }
+  }
 }
 
 CdsHelper::CdsHelper() : cds_path_(TestEnvironment::writeStringToFileForTest("cds.pb_text", "")) {}
@@ -673,4 +728,5 @@ void EdsHelper::setEdsAndWait(
   RELEASE_ASSERT(
       update_successes_ == server_stats.counter("cluster.cluster_0.update_success")->value(), "");
 }
+
 } // namespace Envoy

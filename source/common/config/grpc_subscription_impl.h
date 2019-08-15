@@ -14,21 +14,22 @@ namespace Config {
 
 class GrpcSubscriptionImpl : public Config::Subscription {
 public:
-  GrpcSubscriptionImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
+  GrpcSubscriptionImpl(const LocalInfo::LocalInfo& local_info, Grpc::RawAsyncClientPtr async_client,
                        Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
                        const Protobuf::MethodDescriptor& service_method, absl::string_view type_url,
-                       SubscriptionStats stats, Stats::Scope& scope,
-                       const RateLimitSettings& rate_limit_settings,
-                       std::chrono::milliseconds init_fetch_timeout)
-      : grpc_mux_(local_info, std::move(async_client), dispatcher, service_method, random, scope,
-                  rate_limit_settings),
-        grpc_mux_subscription_(grpc_mux_, stats, type_url, dispatcher, init_fetch_timeout) {}
+                       SubscriptionCallbacks& callbacks, SubscriptionStats stats,
+                       Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
+                       std::chrono::milliseconds init_fetch_timeout, bool skip_subsequent_node)
+      : callbacks_(callbacks),
+        grpc_mux_(local_info, std::move(async_client), dispatcher, service_method, random, scope,
+                  rate_limit_settings, skip_subsequent_node),
+        grpc_mux_subscription_(grpc_mux_, callbacks_, stats, type_url, dispatcher,
+                               init_fetch_timeout) {}
 
   // Config::Subscription
-  void start(const std::set<std::string>& resources,
-             Config::SubscriptionCallbacks& callbacks) override {
+  void start(const std::set<std::string>& resource_names) override {
     // Subscribe first, so we get failure callbacks if grpc_mux_.start() fails.
-    grpc_mux_subscription_.start(resources, callbacks);
+    grpc_mux_subscription_.start(resource_names);
     grpc_mux_.start();
   }
 
@@ -39,6 +40,7 @@ public:
   GrpcMuxImpl& grpcMux() { return grpc_mux_; }
 
 private:
+  Config::SubscriptionCallbacks& callbacks_;
   GrpcMuxImpl grpc_mux_;
   GrpcMuxSubscriptionImpl grpc_mux_subscription_;
 };

@@ -20,23 +20,25 @@ namespace Config {
  * Manages the logic of a (non-aggregated) delta xDS subscription.
  * TODO(fredlas) add aggregation support. The plan is for that to happen in XdsGrpcContext,
  *               which this class will then "have a" rather than "be a".
+ * TODO(kyessenov) implement skip_subsequent_node for delta xDS subscription.
  */
 class DeltaSubscriptionImpl : public Subscription,
                               public GrpcStreamCallbacks<envoy::api::v2::DeltaDiscoveryResponse>,
                               public Logger::Loggable<Logger::Id::config> {
 public:
-  DeltaSubscriptionImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
-                        Event::Dispatcher& dispatcher,
+  DeltaSubscriptionImpl(const LocalInfo::LocalInfo& local_info,
+                        Grpc::RawAsyncClientPtr async_client, Event::Dispatcher& dispatcher,
                         const Protobuf::MethodDescriptor& service_method,
                         absl::string_view type_url, Runtime::RandomGenerator& random,
                         Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
-                        SubscriptionStats stats, std::chrono::milliseconds init_fetch_timeout);
+                        SubscriptionCallbacks& callbacks, SubscriptionStats stats,
+                        std::chrono::milliseconds init_fetch_timeout);
 
   void pause();
   void resume();
 
   // Config::Subscription
-  void start(const std::set<std::string>& resources, SubscriptionCallbacks& callbacks) override;
+  void start(const std::set<std::string>& resource_names) override;
   void updateResources(const std::set<std::string>& update_to_these_names) override;
 
   // Config::GrpcStreamCallbacks
@@ -80,6 +82,7 @@ private:
   std::queue<UpdateAck> ack_queue_;
 
   const LocalInfo::LocalInfo& local_info_;
+  SubscriptionCallbacks& callbacks_;
   SubscriptionStats stats_;
   Event::Dispatcher& dispatcher_;
   std::chrono::milliseconds init_fetch_timeout_;

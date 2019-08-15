@@ -16,7 +16,7 @@ namespace Http {
 
 envoy::api::v2::route::HeaderMatcher parseHeaderMatcherFromYaml(const std::string& yaml) {
   envoy::api::v2::route::HeaderMatcher header_matcher;
-  MessageUtil::loadFromYaml(yaml, header_matcher);
+  TestUtility::loadFromYaml(yaml, header_matcher);
   return header_matcher;
 }
 
@@ -145,6 +145,26 @@ invert_match: true
   EXPECT_EQ(HeaderUtility::HeaderMatchType::Value, header_data.header_match_type_);
   EXPECT_EQ("value", header_data.value_);
   EXPECT_EQ(true, header_data.invert_match_);
+}
+
+TEST(HeaderDataConstructorTest, GetAllOfHeader) {
+  TestHeaderMapImpl headers{{"foo", "val1"}, {"bar", "bar2"}, {"foo", "eep, bar"}, {"foo", ""}};
+
+  std::vector<absl::string_view> foo_out;
+  Http::HeaderUtility::getAllOfHeader(headers, "foo", foo_out);
+  ASSERT_EQ(foo_out.size(), 3);
+  ASSERT_EQ(foo_out[0], "val1");
+  ASSERT_EQ(foo_out[1], "eep, bar");
+  ASSERT_EQ(foo_out[2], "");
+
+  std::vector<absl::string_view> bar_out;
+  Http::HeaderUtility::getAllOfHeader(headers, "bar", bar_out);
+  ASSERT_EQ(bar_out.size(), 1);
+  ASSERT_EQ(bar_out[0], "bar2");
+
+  std::vector<absl::string_view> eep_out;
+  Http::HeaderUtility::getAllOfHeader(headers, "eep", eep_out);
+  ASSERT_EQ(eep_out.size(), 0);
 }
 
 TEST(MatchHeadersTest, MayMatchOneOrMoreRequestHeader) {
@@ -401,6 +421,25 @@ invert_match: true
   header_data.push_back(HeaderUtility::HeaderData(parseHeaderMatcherFromYaml(yaml)));
   EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
+}
+
+TEST(HeaderIsValidTest, InvalidHeaderValuesAreRejected) {
+  // ASCII values 1-31 are control characters (with the exception of ASCII
+  // values 9, 10, and 13 which are a horizontal tab, line feed, and carriage
+  // return, respectively), and are not valid in an HTTP header, per
+  // RFC 7230, section 3.2
+  for (uint i = 0; i < 32; i++) {
+    if (i == 9) {
+      continue;
+    }
+
+    EXPECT_FALSE(HeaderUtility::headerIsValid(std::string(1, i)));
+  }
+}
+
+TEST(HeaderIsValidTest, ValidHeaderValuesAreAccepted) {
+  EXPECT_TRUE(HeaderUtility::headerIsValid("some-value"));
+  EXPECT_TRUE(HeaderUtility::headerIsValid("Some Other Value"));
 }
 
 TEST(HeaderAddTest, HeaderAdd) {

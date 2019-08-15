@@ -284,14 +284,14 @@ void FilterJson::translateFaultFilter(
     JSON_UTIL_SET_DURATION_FROM_FIELD(*json_config_delay, *delay, fixed_delay, fixed_duration);
   }
 
-  for (const auto json_header_matcher : json_config.getObjectArray("headers", true)) {
+  for (const auto& json_header_matcher : json_config.getObjectArray("headers", true)) {
     auto* header_matcher = proto_config.mutable_headers()->Add();
     RdsJson::translateHeaderMatcher(*json_header_matcher, *header_matcher);
   }
 
   JSON_UTIL_SET_STRING(json_config, proto_config, upstream_cluster);
 
-  for (auto json_downstream_node : json_config.getStringArray("downstream_nodes", true)) {
+  for (const auto& json_downstream_node : json_config.getStringArray("downstream_nodes", true)) {
     auto* downstream_node = proto_config.mutable_downstream_nodes()->Add();
     *downstream_node = json_downstream_node;
   }
@@ -394,26 +394,6 @@ void FilterJson::translateTcpProxy(
                                         *route->mutable_source_ip_list());
     AddressJson::translateCidrRangeList(route_desc->getStringArray("destination_ip_list", true),
                                         *route->mutable_destination_ip_list());
-  }
-}
-
-void FilterJson::translateTcpRateLimitFilter(
-    const Json::Object& json_config,
-    envoy::config::filter::network::rate_limit::v2::RateLimit& proto_config) {
-  json_config.validateSchema(Json::Schema::RATELIMIT_NETWORK_FILTER_SCHEMA);
-
-  JSON_UTIL_SET_STRING(json_config, proto_config, stat_prefix);
-  JSON_UTIL_SET_STRING(json_config, proto_config, domain);
-  JSON_UTIL_SET_DURATION(json_config, proto_config, timeout);
-
-  auto* descriptors = proto_config.mutable_descriptors();
-  for (const auto& json_descriptor : json_config.getObjectArray("descriptors", false)) {
-    auto* entries = descriptors->Add()->mutable_entries();
-    for (const auto& json_entry : json_descriptor->asObjectArray()) {
-      auto* entry = entries->Add();
-      JSON_UTIL_SET_STRING(*json_entry, *entry, key);
-      JSON_UTIL_SET_STRING(*json_entry, *entry, value);
-    }
   }
 }
 

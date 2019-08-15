@@ -41,7 +41,7 @@ private:
   const BufferFilterSettings settings_;
 };
 
-typedef std::shared_ptr<BufferFilterConfig> BufferFilterConfigSharedPtr;
+using BufferFilterConfigSharedPtr = std::shared_ptr<BufferFilterConfig>;
 
 /**
  * A filter that is capable of buffering an entire request before dispatching it upstream.
@@ -65,6 +65,8 @@ private:
   BufferFilterConfigSharedPtr config_;
   const BufferFilterSettings* settings_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
+  Http::HeaderMap* request_headers_{};
+  uint64_t content_length_{};
   bool config_initialized_{};
 };
 

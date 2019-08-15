@@ -162,7 +162,7 @@ protected:
                             ClusterStats& stats, Runtime::Loader& runtime,
                             Runtime::RandomGenerator& random,
                             const envoy::api::v2::Cluster::CommonLbConfig& common_config);
-  ~ZoneAwareLoadBalancerBase();
+  ~ZoneAwareLoadBalancerBase() override;
 
   // When deciding which hosts to use on an LB decision, we need to know how to index into the
   // priority_set. This priority_set cursor is used by ZoneAwareLoadBalancerBase subclasses, e.g.
@@ -182,7 +182,7 @@ protected:
       LocalityDegradedHosts,
     };
 
-    HostsSource() {}
+    HostsSource() = default;
 
     HostsSource(uint32_t priority, SourceType source_type)
         : priority_(priority), source_type_(source_type) {
@@ -311,7 +311,7 @@ private:
     // routed where.
     std::vector<uint64_t> residual_capacity_;
   };
-  typedef std::unique_ptr<PerPriorityState> PerPriorityStatePtr;
+  using PerPriorityStatePtr = std::unique_ptr<PerPriorityState>;
   // Routing state broken out for each priority level in priority_set_.
   std::vector<PerPriorityStatePtr> per_priority_state_;
   Common::CallbackHandle* local_priority_set_member_update_cb_handle_{};
@@ -485,11 +485,12 @@ public:
         default_subset_(subset_config.default_subset()),
         locality_weight_aware_(subset_config.locality_weight_aware()),
         scale_locality_weight_(subset_config.scale_locality_weight()),
-        panic_mode_any_(subset_config.panic_mode_any()) {
+        panic_mode_any_(subset_config.panic_mode_any()), list_as_any_(subset_config.list_as_any()) {
     for (const auto& subset : subset_config.subset_selectors()) {
       if (!subset.keys().empty()) {
-        subset_keys_.emplace_back(
-            std::set<std::string>(subset.keys().begin(), subset.keys().end()));
+        subset_selectors_.emplace_back(std::make_shared<SubsetSelector>(
+            SubsetSelector{std::set<std::string>(subset.keys().begin(), subset.keys().end()),
+                           subset.fallback_policy()}));
       }
     }
   }
@@ -500,19 +501,23 @@ public:
     return fallback_policy_;
   }
   const ProtobufWkt::Struct& defaultSubset() const override { return default_subset_; }
-  const std::vector<std::set<std::string>>& subsetKeys() const override { return subset_keys_; }
+  const std::vector<SubsetSelectorPtr>& subsetSelectors() const override {
+    return subset_selectors_;
+  }
   bool localityWeightAware() const override { return locality_weight_aware_; }
   bool scaleLocalityWeight() const override { return scale_locality_weight_; }
   bool panicModeAny() const override { return panic_mode_any_; }
+  bool listAsAny() const override { return list_as_any_; }
 
 private:
   const bool enabled_;
   const envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy fallback_policy_;
   const ProtobufWkt::Struct default_subset_;
-  std::vector<std::set<std::string>> subset_keys_;
+  std::vector<SubsetSelectorPtr> subset_selectors_;
   const bool locality_weight_aware_;
   const bool scale_locality_weight_;
   const bool panic_mode_any_;
+  const bool list_as_any_;
 };
 
 } // namespace Upstream

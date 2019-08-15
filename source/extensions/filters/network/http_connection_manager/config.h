@@ -7,6 +7,7 @@
 #include <map>
 #include <string>
 
+#include "envoy/config/config_provider_manager.h"
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.validate.h"
 #include "envoy/http/filter.h"
 #include "envoy/router/route_config_provider_manager.h"
@@ -32,7 +33,7 @@ class HttpConnectionManagerFilterConfigFactory
           envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager> {
 public:
   HttpConnectionManagerFilterConfigFactory()
-      : FactoryBase(NetworkFilterNames::get().HttpConnectionManager) {}
+      : FactoryBase(NetworkFilterNames::get().HttpConnectionManager, true) {}
 
   // NamedNetworkFilterConfigFactory
   Network::FilterFactoryCb
@@ -45,6 +46,8 @@ private:
           proto_config,
       Server::Configuration::FactoryContext& context) override;
 };
+
+DECLARE_FACTORY(HttpConnectionManagerFilterConfigFactory);
 
 /**
  * Determines if an address is internal based on user provided config.
@@ -78,11 +81,12 @@ public:
       const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
           config,
       Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
-      Router::RouteConfigProviderManager& route_config_provider_manager);
+      Router::RouteConfigProviderManager& route_config_provider_manager,
+      Config::ConfigProviderManager& scoped_routes_config_provider_manager);
 
   // Http::FilterChainFactory
   void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
-  typedef std::list<Http::FilterFactoryCb> FilterFactoriesList;
+  using FilterFactoriesList = std::list<Http::FilterFactoryCb>;
   struct FilterConfig {
     std::unique_ptr<FilterFactoriesList> filter_factories;
     bool allow_upgrade;
@@ -100,11 +104,17 @@ public:
   std::chrono::milliseconds drainTimeout() override { return drain_timeout_; }
   FilterChainFactory& filterFactory() override { return *this; }
   bool generateRequestId() override { return generate_request_id_; }
+  bool preserveExternalRequestId() const override { return preserve_external_request_id_; }
   uint32_t maxRequestHeadersKb() const override { return max_request_headers_kb_; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
   std::chrono::milliseconds requestTimeout() const override { return request_timeout_; }
-  Router::RouteConfigProvider& routeConfigProvider() override { return *route_config_provider_; }
+  Router::RouteConfigProvider* routeConfigProvider() override {
+    return route_config_provider_.get();
+  }
+  Config::ConfigProvider* scopedRouteConfigProvider() override {
+    return scoped_routes_config_provider_.get();
+  }
   const std::string& serverName() override { return server_name_; }
   Http::ConnectionManagerStats& stats() override { return stats_; }
   Http::ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
@@ -128,13 +138,14 @@ public:
   bool proxy100Continue() const override { return proxy_100_continue_; }
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   bool shouldNormalizePath() const override { return normalize_path_; }
+  bool shouldMergeSlashes() const override { return merge_slashes_; }
   std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
 
 private:
   enum class CodecType { HTTP1, HTTP2, AUTO };
   void processFilter(
       const envoy::config::filter::network::http_connection_manager::v2::HttpFilter& proto_config,
-      int i, absl::string_view prefix, FilterFactoriesList& filter_factories);
+      int i, absl::string_view prefix, FilterFactoriesList& filter_factories, bool& is_terminal);
 
   Server::Configuration::FactoryContext& context_;
   FilterFactoriesList filter_factories_;
@@ -151,6 +162,7 @@ private:
   Http::ForwardClientCertType forward_client_cert_;
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
   Router::RouteConfigProviderManager& route_config_provider_manager_;
+  Config::ConfigProviderManager& scoped_routes_config_provider_manager_;
   CodecType codec_type_;
   const Http::Http2Settings http2_settings_;
   const Http::Http1Settings http1_settings_;
@@ -162,13 +174,16 @@ private:
   std::chrono::milliseconds stream_idle_timeout_;
   std::chrono::milliseconds request_timeout_;
   Router::RouteConfigProviderPtr route_config_provider_;
+  Config::ConfigProviderPtr scoped_routes_config_provider_;
   std::chrono::milliseconds drain_timeout_;
   bool generate_request_id_;
+  const bool preserve_external_request_id_;
   Http::DateProvider& date_provider_;
   Http::ConnectionManagerListenerStats listener_stats_;
   const bool proxy_100_continue_;
   std::chrono::milliseconds delayed_close_timeout_;
   const bool normalize_path_;
+  const bool merge_slashes_;
 
   // Default idle timeout is 5 minutes if nothing is specified in the HCM config.
   static const uint64_t StreamIdleTimeoutMs = 5 * 60 * 1000;

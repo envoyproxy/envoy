@@ -13,8 +13,10 @@
 #include "common/common/stack_array.h"
 #include "common/common/utility.h"
 #include "common/http/exception.h"
+#include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
+#include "common/runtime/runtime_impl.h"
 
 namespace Envoy {
 namespace Http {
@@ -161,6 +163,10 @@ void StreamEncoderImpl::encodeData(Buffer::Instance& data, bool end_stream) {
 }
 
 void StreamEncoderImpl::encodeTrailers(const HeaderMap&) { endEncode(); }
+
+void StreamEncoderImpl::encodeMetadata(const MetadataMapVector&) {
+  connection_.stats().metadata_not_supported_error_.inc();
+}
 
 void StreamEncoderImpl::endEncode() {
   if (chunk_encoding_) {
@@ -315,15 +321,18 @@ http_parser_settings ConnectionImpl::settings_{
 };
 
 const ToLowerTable& ConnectionImpl::toLowerTable() {
-  static ToLowerTable* table = new ToLowerTable();
+  static auto* table = new ToLowerTable();
   return *table;
 }
 
-ConnectionImpl::ConnectionImpl(Network::Connection& connection, http_parser_type type,
-                               uint32_t max_headers_kb)
-    : connection_(connection), output_buffer_([&]() -> void { this->onBelowLowWatermark(); },
-                                              [&]() -> void { this->onAboveHighWatermark(); }),
-      max_headers_kb_(max_headers_kb) {
+ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
+                               http_parser_type type, uint32_t max_request_headers_kb)
+    : connection_(connection), stats_{ALL_HTTP1_CODEC_STATS(POOL_COUNTER_PREFIX(stats, "http1."))},
+      output_buffer_([&]() -> void { this->onBelowLowWatermark(); },
+                     [&]() -> void { this->onAboveHighWatermark(); }),
+      max_request_headers_kb_(max_request_headers_kb),
+      strict_header_validation_(
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_header_validation")) {
   output_buffer_.setWatermarks(connection.bufferLimit());
   http_parser_init(&parser_, type);
   parser_.data = this;
@@ -421,11 +430,21 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
     // Ignore trailers.
     return;
   }
-  // http-parser should filter for this
-  // (https://tools.ietf.org/html/rfc7230#section-3.2.6), but it doesn't today. HeaderStrings
-  // have an invariant that they must not contain embedded zero characters
-  // (NUL, ASCII 0x0).
-  if (absl::string_view(data, length).find('\0') != absl::string_view::npos) {
+
+  const absl::string_view header_value = absl::string_view(data, length);
+
+  if (strict_header_validation_) {
+    if (!Http::HeaderUtility::headerIsValid(header_value)) {
+      ENVOY_CONN_LOG(debug, "invalid header value: {}", connection_, header_value);
+      error_code_ = Http::Code::BadRequest;
+      sendProtocolError();
+      throw CodecProtocolException("http/1.1 protocol error: header value contains invalid chars");
+    }
+  } else if (header_value.find('\0') != absl::string_view::npos) {
+    // http-parser should filter for this
+    // (https://tools.ietf.org/html/rfc7230#section-3.2.6), but it doesn't today. HeaderStrings
+    // have an invariant that they must not contain embedded zero characters
+    // (NUL, ASCII 0x0).
     throw CodecProtocolException("http/1.1 protocol error: header value contains NUL");
   }
 
@@ -434,7 +453,7 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
 
   const uint32_t total =
       current_header_field_.size() + current_header_value_.size() + current_header_map_->byteSize();
-  if (total > (max_headers_kb_ * 1024)) {
+  if (total > (max_request_headers_kb_ * 1024)) {
     error_code_ = Http::Code::RequestHeaderFieldsTooLarge;
     sendProtocolError();
     throw CodecProtocolException("headers size exceeds limit");
@@ -477,6 +496,10 @@ void ConnectionImpl::onMessageCompleteBase() {
 
 void ConnectionImpl::onMessageBeginBase() {
   ENVOY_CONN_LOG(trace, "message begin", connection_);
+  // Make sure that if HTTP/1.0 and HTTP/1.1 requests share a connection Envoy correctly sets
+  // protocol for each request. Envoy defaults to 1.1 but sets the protocol to 1.0 where applicable
+  // in onHeadersCompleteBase
+  protocol_ = Protocol::Http11;
   ASSERT(!current_header_map_);
   current_header_map_ = std::make_unique<HeaderMapImpl>();
   header_parsing_state_ = HeaderParsingState::Field;
@@ -489,11 +512,11 @@ void ConnectionImpl::onResetStreamBase(StreamResetReason reason) {
   onResetStream(reason);
 }
 
-ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection,
+ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
                                            ServerConnectionCallbacks& callbacks,
                                            Http1Settings settings, uint32_t max_request_headers_kb)
-    : ConnectionImpl(connection, HTTP_REQUEST, max_request_headers_kb), callbacks_(callbacks),
-      codec_settings_(settings) {}
+    : ConnectionImpl(connection, stats, HTTP_REQUEST, max_request_headers_kb),
+      callbacks_(callbacks), codec_settings_(settings) {}
 
 void ServerConnectionImpl::onEncodeComplete() {
   ASSERT(active_request_);
@@ -664,8 +687,9 @@ void ServerConnectionImpl::onBelowLowWatermark() {
   }
 }
 
-ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks&)
-    : ConnectionImpl(connection, HTTP_RESPONSE, MAX_RESPONSE_HEADERS_KB) {}
+ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
+                                           ConnectionCallbacks&)
+    : ConnectionImpl(connection, stats, HTTP_RESPONSE, MAX_RESPONSE_HEADERS_KB) {}
 
 bool ClientConnectionImpl::cannotHaveBody() {
   if ((!pending_responses_.empty() && pending_responses_.front().head_request_) ||

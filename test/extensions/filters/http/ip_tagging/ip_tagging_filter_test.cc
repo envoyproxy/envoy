@@ -44,13 +44,13 @@ ip_tags:
 
   void initializeFilter(const std::string& yaml) {
     envoy::config::filter::http::ip_tagging::v2::IPTagging config;
-    MessageUtil::loadFromYaml(yaml, config);
+    TestUtility::loadFromYaml(yaml, config);
     config_.reset(new IpTaggingFilterConfig(config, "prefix.", stats_, runtime_));
     filter_ = std::make_unique<IpTaggingFilter>(config_);
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
   }
 
-  ~IpTaggingFilterTest() { filter_->onDestroy(); }
+  ~IpTaggingFilterTest() override { filter_->onDestroy(); }
 
   IpTaggingFilterConfigSharedPtr config_;
   std::unique_ptr<IpTaggingFilter> filter_;

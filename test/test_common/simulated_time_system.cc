@@ -55,14 +55,14 @@ public:
         time_system_(time_system), index_(time_system.nextIndex()), armed_(false), pending_(false) {
   }
 
-  virtual ~Alarm();
+  ~Alarm() override;
 
   // Timer
   void disableTimer() override;
   void enableTimer(const std::chrono::milliseconds& duration) override;
   bool enabled() override {
     Thread::LockGuard lock(time_system_.mutex_);
-    return armed_;
+    return armed_ || base_timer_->enabled();
   }
 
   void disableTimerLockHeld() EXCLUSIVE_LOCKS_REQUIRED(time_system_.mutex_);

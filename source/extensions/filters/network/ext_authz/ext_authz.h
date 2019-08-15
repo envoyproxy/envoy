@@ -24,16 +24,14 @@ namespace ExtAuthz {
 /**
  * All tcp external authorization stats. @see stats_macros.h
  */
-// clang-format off
-#define ALL_TCP_EXT_AUTHZ_STATS(COUNTER, GAUGE)         \
-  COUNTER(total)                                        \
-  COUNTER(error)                                        \
-  COUNTER(denied)                                       \
-  COUNTER(failure_mode_allowed)                         \
-  COUNTER(ok)                                           \
-  COUNTER(cx_closed)                                    \
-  GAUGE  (active)
-// clang-format on
+#define ALL_TCP_EXT_AUTHZ_STATS(COUNTER, GAUGE)                                                    \
+  COUNTER(cx_closed)                                                                               \
+  COUNTER(denied)                                                                                  \
+  COUNTER(error)                                                                                   \
+  COUNTER(failure_mode_allowed)                                                                    \
+  COUNTER(ok)                                                                                      \
+  COUNTER(total)                                                                                   \
+  GAUGE(active, Accumulate)
 
 /**
  * Struct definition for all external authorization stats. @see stats_macros.h
@@ -61,7 +59,7 @@ private:
   bool failure_mode_allow_;
 };
 
-typedef std::shared_ptr<Config> ConfigSharedPtr;
+using ConfigSharedPtr = std::shared_ptr<Config>;
 
 /**
  * ExtAuthz filter instance. This filter will call the Authorization service with the given
@@ -75,7 +73,7 @@ class Filter : public Network::ReadFilter,
 public:
   Filter(ConfigSharedPtr config, Filters::Common::ExtAuthz::ClientPtr&& client)
       : config_(config), client_(std::move(client)) {}
-  ~Filter() {}
+  ~Filter() override = default;
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;

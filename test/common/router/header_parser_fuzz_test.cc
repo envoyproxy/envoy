@@ -12,10 +12,17 @@ namespace {
 DEFINE_PROTO_FUZZER(const test::common::router::TestCase& input) {
   try {
     MessageUtil::validate(input);
+    auto headers_to_add = replaceInvalidHeaders(input.headers_to_add());
+    Protobuf::RepeatedPtrField<std::string> headers_to_remove;
+    for (const auto& s : input.headers_to_remove()) {
+      headers_to_remove.Add(replaceInvalidCharacters(s));
+    }
     Router::HeaderParserPtr parser =
-        Router::HeaderParser::configure(input.headers_to_add(), input.headers_to_remove());
+        Router::HeaderParser::configure(headers_to_add, headers_to_remove);
     Http::HeaderMapImpl header_map;
-    parser->evaluateHeaders(header_map, fromStreamInfo(input.stream_info()));
+    NiceMock<Ssl::MockConnectionInfo> connection_info;
+    TestStreamInfo test_stream_info = fromStreamInfo(input.stream_info(), &connection_info);
+    parser->evaluateHeaders(header_map, test_stream_info);
     ENVOY_LOG_MISC(trace, "Success");
   } catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());

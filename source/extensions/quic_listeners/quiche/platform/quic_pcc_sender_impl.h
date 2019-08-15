@@ -13,7 +13,7 @@
 namespace quic {
 
 class QuicClock;
-class QuicConnectionStats;
+struct QuicConnectionStats;
 class QuicRandom;
 class QuicUnackedPacketMap;
 class RttStats;

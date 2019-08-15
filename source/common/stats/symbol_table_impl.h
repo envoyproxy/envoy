@@ -45,7 +45,7 @@ using SymbolVec = std::vector<Symbol>;
  * reference-counted so that no-longer-used symbols can be reclaimed.
  *
  * We use a uint8_t array to encode a "."-deliminated stat-name into arrays of
- * integer symbol symbol IDs in order to conserve space, as in practice the
+ * integer symbol IDs in order to conserve space, as in practice the
  * majority of token instances in stat names draw from a fairly small set of
  * common names, typically less than 100. The format is somewhat similar to
  * UTF-8, with a variable-length array of uint8_t. See the implementation for
@@ -132,7 +132,7 @@ public:
   bool lessThan(const StatName& a, const StatName& b) const override;
   void free(const StatName& stat_name) override;
   void incRefCount(const StatName& stat_name) override;
-  StoragePtr join(const std::vector<StatName>& stat_names) const override;
+  StoragePtr join(const StatNameVec& stat_names) const override;
   void populateList(const absl::string_view* names, uint32_t num_names,
                     StatNameList& list) override;
   StoragePtr encode(absl::string_view name) override;
@@ -230,7 +230,7 @@ private:
   // The encode map stores both the symbol and the ref count of that symbol.
   // Using absl::string_view lets us only store the complete string once, in the decode map.
   using EncodeMap = absl::flat_hash_map<absl::string_view, SharedSymbol, StringViewHash>;
-  using DecodeMap = absl::flat_hash_map<Symbol, std::unique_ptr<std::string>>;
+  using DecodeMap = absl::flat_hash_map<Symbol, InlineStringPtr>;
   EncodeMap encode_map_ GUARDED_BY(lock_);
   DecodeMap decode_map_ GUARDED_BY(lock_);
 
@@ -261,7 +261,7 @@ public:
 
   // Move constructor; needed for using StatNameStorage as an
   // absl::flat_hash_map value.
-  StatNameStorage(StatNameStorage&& src) : bytes_(std::move(src.bytes_)) {}
+  StatNameStorage(StatNameStorage&& src) noexcept : bytes_(std::move(src.bytes_)) {}
 
   // Obtains new backing storage for an already existing StatName. Used to
   // record a computed StatName held in a temp into a more persistent data
@@ -310,7 +310,7 @@ public:
   explicit StatName(const SymbolTable::Storage size_and_data) : size_and_data_(size_and_data) {}
 
   // Constructs an empty StatName object.
-  StatName() : size_and_data_(nullptr) {}
+  StatName() = default;
 
   // Constructs a StatName object with new storage, which must be of size
   // src.size(). This is used in the a flow where we first construct a StatName
@@ -365,7 +365,7 @@ public:
   bool empty() const { return size_and_data_ == nullptr || dataSize() == 0; }
 
 private:
-  const uint8_t* size_and_data_;
+  const uint8_t* size_and_data_{nullptr};
 };
 
 StatName StatNameStorage::statName() const { return StatName(bytes_.get()); }
@@ -628,6 +628,52 @@ public:
 
 private:
   HashSet hash_set_;
+};
+
+// Captures StatNames for lookup by string, keeping two maps: a map of
+// 'built-ins' that is expected to be populated during initialization, and a map
+// of dynamically discovered names. The latter map is protected by a mutex, and
+// can be mutated at runtime.
+//
+// Ideally, builtins should be added during process initialization, in the
+// outermost relevant context. And as the builtins map is not mutex protected,
+// builtins must *not* be added in the request-path.
+class StatNameSet {
+public:
+  explicit StatNameSet(SymbolTable& symbol_table);
+
+  /**
+   * Adds a string to the builtin map, which is not mutex protected. This map is
+   * always consulted first as a hit there means no lock is required.
+   *
+   * Builtins can only be added immediately after construction, as the builtins
+   * map is not mutex-protected.
+   */
+  void rememberBuiltin(absl::string_view str);
+
+  /**
+   * Finds a StatName by name. If 'token' has been remembered as a built-in, then
+   * no lock is required. Otherwise we first consult dynamic_stat_names_ under a
+   * lock that's private to the StatNameSet. If that's empty, we need to create
+   * the StatName in the pool, which requires taking a global lock.
+   *
+   * TODO(jmarantz): Potential perf issue here with contention, both on this
+   * set's mutex and also the SymbolTable mutex which must be taken during
+   * StatNamePool::add().
+   */
+  StatName getStatName(absl::string_view token);
+
+  /**
+   * Adds a StatName using the pool, but without remembering it in any maps.
+   */
+  StatName add(absl::string_view str) { return pool_.add(str); }
+
+private:
+  Stats::StatNamePool pool_;
+  absl::Mutex mutex_;
+  using StringStatNameMap = absl::flat_hash_map<std::string, Stats::StatName>;
+  StringStatNameMap builtin_stat_names_;
+  StringStatNameMap dynamic_stat_names_ GUARDED_BY(mutex_);
 };
 
 } // namespace Stats

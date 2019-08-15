@@ -5,6 +5,7 @@
 #include "common/api/api_impl.h"
 #include "common/common/lock_guard.h"
 #include "common/event/dispatcher_impl.h"
+#include "common/event/timer_impl.h"
 #include "common/stats/isolated_store_impl.h"
 
 #include "test/mocks/common.h"
@@ -27,7 +28,7 @@ namespace {
 class TestDeferredDeletable : public DeferredDeletable {
 public:
   TestDeferredDeletable(std::function<void()> on_destroy) : on_destroy_(on_destroy) {}
-  ~TestDeferredDeletable() { on_destroy_(); }
+  ~TestDeferredDeletable() override { on_destroy_(); }
 
 private:
   std::function<void()> on_destroy_;
@@ -66,9 +67,7 @@ TEST(DeferredDeleteTest, DeferredDelete) {
 
 class DispatcherImplTest : public testing::Test {
 protected:
-  DispatcherImplTest()
-      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()),
-        work_finished_(false) {
+  DispatcherImplTest() : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()) {
     dispatcher_thread_ = api_->threadFactory().createThread([this]() {
       // Must create a keepalive timer to keep the dispatcher from exiting.
       std::chrono::milliseconds time_interval(500);
@@ -92,7 +91,7 @@ protected:
   Thread::MutexBasicLockable mu_;
   Thread::CondVar cv_;
 
-  bool work_finished_;
+  bool work_finished_{false};
   TimerPtr keepalive_timer_;
 };
 
@@ -186,6 +185,40 @@ TEST_F(DispatcherImplTest, Timer) {
   }
 }
 
+TEST_F(DispatcherImplTest, IsThreadSafe) {
+  dispatcher_->post([this]() {
+    {
+      Thread::LockGuard lock(mu_);
+      // Thread safe because it is called within the dispatcher thread's context.
+      EXPECT_TRUE(dispatcher_->isThreadSafe());
+      work_finished_ = true;
+    }
+    cv_.notifyOne();
+  });
+
+  Thread::LockGuard lock(mu_);
+  while (!work_finished_) {
+    cv_.wait(mu_);
+  }
+  // Not thread safe because it is not called within the dispatcher thread's context.
+  EXPECT_FALSE(dispatcher_->isThreadSafe());
+}
+
+class NotStartedDispatcherImplTest : public testing::Test {
+protected:
+  NotStartedDispatcherImplTest()
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()) {}
+
+  Api::ApiPtr api_;
+  DispatcherPtr dispatcher_;
+};
+
+TEST_F(NotStartedDispatcherImplTest, IsThreadSafe) {
+  // Thread safe because the dispatcher has not started.
+  // Therefore, no thread id has been assigned.
+  EXPECT_TRUE(dispatcher_->isThreadSafe());
+}
+
 TEST(TimerImplTest, TimerEnabledDisabled) {
   Api::ApiPtr api = Api::createApiForTest();
   DispatcherPtr dispatcher(api->allocateDispatcher());
@@ -195,6 +228,29 @@ TEST(TimerImplTest, TimerEnabledDisabled) {
   EXPECT_TRUE(timer->enabled());
   dispatcher->run(Dispatcher::RunType::NonBlock);
   EXPECT_FALSE(timer->enabled());
+}
+
+TEST(TimerImplTest, TimerValueConversion) {
+  timeval tv;
+  std::chrono::milliseconds msecs;
+
+  // Basic test with zero milliseconds.
+  msecs = std::chrono::milliseconds(0);
+  TimerUtils::millisecondsToTimeval(msecs, tv);
+  EXPECT_EQ(tv.tv_sec, 0);
+  EXPECT_EQ(tv.tv_usec, 0);
+
+  // 2050 milliseconds is 2 seconds and 50000 microseconds.
+  msecs = std::chrono::milliseconds(2050);
+  TimerUtils::millisecondsToTimeval(msecs, tv);
+  EXPECT_EQ(tv.tv_sec, 2);
+  EXPECT_EQ(tv.tv_usec, 50000);
+
+  // Check maximum value conversion.
+  msecs = std::chrono::milliseconds::duration::max();
+  TimerUtils::millisecondsToTimeval(msecs, tv);
+  EXPECT_EQ(tv.tv_sec, msecs.count() / 1000);
+  EXPECT_EQ(tv.tv_usec, (msecs.count() % tv.tv_sec) * 1000);
 }
 
 } // namespace

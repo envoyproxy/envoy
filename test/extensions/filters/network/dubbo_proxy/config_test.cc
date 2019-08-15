@@ -24,7 +24,7 @@ namespace {
 
 DubboProxyProto parseDubboProxyFromV2Yaml(const std::string& yaml) {
   DubboProxyProto dubbo_proxy;
-  MessageUtil::loadFromYaml(yaml, dubbo_proxy);
+  TestUtility::loadFromYaml(yaml, dubbo_proxy);
   return dubbo_proxy;
 }
 
@@ -62,6 +62,7 @@ TEST_F(DubboFilterConfigTest, ValidProtoConfiguration) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   DubboProxyFilterConfigFactory factory;
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
+  EXPECT_TRUE(factory.isTerminalFilter());
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);

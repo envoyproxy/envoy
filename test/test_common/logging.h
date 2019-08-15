@@ -49,7 +49,7 @@ private:
 class LogRecordingSink : public Logger::SinkDelegate {
 public:
   explicit LogRecordingSink(Logger::DelegatingLogSinkPtr log_sink);
-  virtual ~LogRecordingSink();
+  ~LogRecordingSink() override;
 
   // Logger::SinkDelegate
   void log(absl::string_view msg) override;
@@ -61,9 +61,9 @@ private:
   std::vector<std::string> messages_;
 };
 
-typedef std::pair<std::string, std::string> StringPair;
+using StringPair = std::pair<std::string, std::string>;
 
-typedef std::vector<StringPair> ExpectedLogMessages;
+using ExpectedLogMessages = std::vector<StringPair>;
 
 // Below macros specify Envoy:: before class names so that the macro can be used outside of
 // namespace Envoy.
@@ -160,7 +160,7 @@ typedef std::vector<StringPair> ExpectedLogMessages;
     Envoy::LogLevelSetter save_levels(spdlog::level::trace);                                       \
     Envoy::LogRecordingSink log_recorder(Envoy::Logger::Registry::getSink());                      \
     stmt;                                                                                          \
-    const std::vector<std::string> logs = log_recorder.messages();                                 \
+    const std::vector<std::string>& logs = log_recorder.messages();                                \
     ASSERT_EQ(0, logs.size()) << " Logs:\n   " << absl::StrJoin(logs, "   ");                      \
   } while (false)
 

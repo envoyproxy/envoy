@@ -5,6 +5,7 @@
 #include <string>
 
 #include "envoy/common/exception.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/server/options.h"
 
 #include "common/common/logger.h"
@@ -20,7 +21,7 @@ public:
   /**
    * Parameters are max_stat_name_len, hot_restart_enabled
    */
-  typedef std::function<std::string(bool)> HotRestartVersionCb;
+  using HotRestartVersionCb = std::function<std::string(bool)>;
 
   /**
    * @throw NoServingException if Envoy has already done everything specified by the argv (e.g.
@@ -40,6 +41,9 @@ public:
   void setBaseId(uint64_t base_id) { base_id_ = base_id; };
   void setConcurrency(uint32_t concurrency) { concurrency_ = concurrency; }
   void setConfigPath(const std::string& config_path) { config_path_ = config_path; }
+  void setConfigProto(const envoy::config::bootstrap::v2::Bootstrap& config_proto) {
+    config_proto_ = config_proto;
+  }
   void setConfigYaml(const std::string& config_yaml) { config_yaml_ = config_yaml; }
   void setAdminAddressPath(const std::string& admin_address_path) {
     admin_address_path_ = admin_address_path;
@@ -76,7 +80,11 @@ public:
   uint64_t baseId() const override { return base_id_; }
   uint32_t concurrency() const override { return concurrency_; }
   const std::string& configPath() const override { return config_path_; }
+  const envoy::config::bootstrap::v2::Bootstrap& configProto() const override {
+    return config_proto_;
+  }
   const std::string& configYaml() const override { return config_yaml_; }
+  bool allowUnknownFields() const override { return allow_unknown_fields_; }
   const std::string& adminAddressPath() const override { return admin_address_path_; }
   Network::Address::IpVersion localAddressIpVersion() const override {
     return local_address_ip_version_;
@@ -102,7 +110,7 @@ public:
   bool signalHandlingEnabled() const override { return signal_handling_enabled_; }
   bool mutexTracingEnabled() const override { return mutex_tracing_enabled_; }
   bool libeventBufferEnabled() const override { return libevent_buffer_enabled_; }
-  virtual Server::CommandLineOptionsPtr toCommandLineOptions() const override;
+  Server::CommandLineOptionsPtr toCommandLineOptions() const override;
   void parseComponentLogLevels(const std::string& component_log_levels);
   bool cpusetThreadsEnabled() const override { return cpuset_threads_; }
   uint32_t count() const;
@@ -113,6 +121,7 @@ private:
   uint64_t base_id_;
   uint32_t concurrency_;
   std::string config_path_;
+  envoy::config::bootstrap::v2::Bootstrap config_proto_;
   std::string config_yaml_;
   bool allow_unknown_fields_{false};
   std::string admin_address_path_;

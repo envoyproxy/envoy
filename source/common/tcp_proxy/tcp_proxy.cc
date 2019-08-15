@@ -14,6 +14,7 @@
 #include "common/access_log/access_log_impl.h"
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
+#include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/common/macros.h"
 #include "common/common/utility.h"
@@ -447,7 +448,8 @@ void Filter::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
 
 void Filter::onConnectTimeout() {
   ENVOY_CONN_LOG(debug, "connect timeout", read_callbacks_->connection());
-  read_callbacks_->upstreamHost()->outlierDetector().putResult(Upstream::Outlier::Result::TIMEOUT);
+  read_callbacks_->upstreamHost()->outlierDetector().putResult(
+      Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT);
   getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamConnectionFailure);
 
   // Raise LocalClose, which will trigger a reconnect if needed/configured.
@@ -520,7 +522,7 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
       if (event == Network::ConnectionEvent::RemoteClose) {
         getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamConnectionFailure);
         read_callbacks_->upstreamHost()->outlierDetector().putResult(
-            Upstream::Outlier::Result::CONNECT_FAILED);
+            Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED);
       }
 
       initializeUpstreamConnection();
@@ -535,7 +537,7 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
     read_callbacks_->connection().readDisable(false);
 
     read_callbacks_->upstreamHost()->outlierDetector().putResult(
-        Upstream::Outlier::Result::SUCCESS);
+        Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS_FINAL);
 
     getStreamInfo().setRequestedServerName(read_callbacks_->connection().requestedServerName());
     ENVOY_LOG(debug, "TCP:onUpstreamEvent(), requestedServerName: {}",

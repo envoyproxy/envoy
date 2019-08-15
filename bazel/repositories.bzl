@@ -2,19 +2,18 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load(":genrule_repository.bzl", "genrule_repository")
 load("@envoy_api//bazel:envoy_http_archive.bzl", "envoy_http_archive")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS")
-load(
-    "@bazel_tools//tools/cpp:windows_cc_configure.bzl",
-    "find_vc_path",
-    "setup_vc_env_vars",
-)
-load("@bazel_tools//tools/cpp:lib_cc_configure.bzl", "get_env_var")
-load("@envoy_api//bazel:repositories.bzl", "api_dependencies")
+load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_language")
 
 # dict of {build recipe name: longform extension name,}
 PPC_SKIP_TARGETS = {"luajit": "envoy.filters.http.lua"}
+NOBORINGSSL_SKIP_TARGETS = {
+    # The lua filter depends on BoringSSL
+    "lua": "envoy.filters.http.lua",
 
-# go version for rules_go
-GO_VERSION = "1.12.5"
+    # These two extensions are supposed to be replaced with alternative extensions.
+    "tls": "envoy.transport_sockets.tls",
+    "tls_inspector": "envoy.filters.listener.tls_inspector",
+}
 
 # Make all contents of an external repository accessible under a filegroup.  Used for external HTTP
 # archives, e.g. cares.
@@ -132,7 +131,6 @@ def envoy_dependencies(skip_targets = []):
     _com_github_envoyproxy_sqlparser()
     _com_github_fmtlib_fmt()
     _com_github_gabime_spdlog()
-    _com_github_gcovr_gcovr()
     _com_github_google_benchmark()
     _com_github_google_jwt_verify()
     _com_github_google_libprotobuf_mutator()
@@ -148,18 +146,28 @@ def envoy_dependencies(skip_targets = []):
     _com_google_absl()
     _com_google_googletest()
     _com_google_protobuf()
+    _io_opencensus_cpp()
+    _com_github_curl()
+    _com_github_envoyproxy_sqlparser()
     _com_googlesource_quiche()
     _com_lightstep_tracer_cpp()
     _io_opentracing_cpp()
     _net_zlib()
-
-    # Used for bundling gcovr into a relocatable .par file.
-    _repository_impl("subpar")
+    _repository_impl("bazel_toolchains")
 
     _python_deps()
     _cc_deps()
     _go_deps(skip_targets)
-    api_dependencies()
+
+    switched_rules_by_language(
+        name = "com_google_googleapis_imports",
+        cc = True,
+        go = True,
+        grpc = True,
+        rules_override = {
+            "py_proto_library": "@envoy_api//bazel:api_build_system.bzl",
+        },
+    )
 
 def _boringssl():
     _repository_impl("boringssl")
@@ -246,16 +254,6 @@ def _com_github_gabime_spdlog():
         actual = "@com_github_gabime_spdlog//:spdlog",
     )
 
-def _com_github_gcovr_gcovr():
-    _repository_impl(
-        name = "com_github_gcovr_gcovr",
-        build_file = "@envoy//bazel/external:gcovr.BUILD",
-    )
-    native.bind(
-        name = "gcovr",
-        actual = "@com_github_gcovr_gcovr//:gcovr",
-    )
-
 def _com_github_google_benchmark():
     location = REPOSITORY_LOCATIONS["com_github_google_benchmark"]
     http_archive(
@@ -339,10 +337,13 @@ def _io_opentracing_cpp():
     )
 
 def _com_lightstep_tracer_cpp():
+    location = REPOSITORY_LOCATIONS["com_lightstep_tracer_cpp"]
     _repository_impl("com_lightstep_tracer_cpp")
-    _repository_impl(
-        name = "lightstep_vendored_googleapis",
-        build_file = "@com_lightstep_tracer_cpp//:lightstep-tracer-common/third_party/googleapis/BUILD",
+    http_archive(
+        name = "com_lightstep_tracer_cpp",
+        patch_args = ["-p0"],
+        patches = ["@envoy//bazel/foreign_cc:com_lightstep_tracer_cpp.patch"],
+        **location
     )
     native.bind(
         name = "lightstep",
@@ -414,6 +415,10 @@ def _com_google_absl():
         actual = "@com_google_absl//absl/hash:hash",
     )
     native.bind(
+        name = "abseil_hash_testing",
+        actual = "@com_google_absl//absl/hash:hash_testing",
+    )
+    native.bind(
         name = "abseil_inlined_vector",
         actual = "@com_google_absl//absl/container:inlined_vector",
     )
@@ -468,9 +473,10 @@ def _com_google_absl():
 def _com_google_protobuf():
     _repository_impl(
         "com_google_protobuf",
-        # The patch is only needed until
-        # https://github.com/protocolbuffers/protobuf/pull/5901 is available.
-        # TODO(htuch): remove this when > protobuf 3.7.1 is released.
+        # The patch includes
+        # https://github.com/protocolbuffers/protobuf/pull/6333 and also uses
+        # foreign_cc build for zlib as its dependency.
+        # TODO(asraa): remove this when > protobuf 3.8.0 is released.
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:protobuf.patch"],
     )
@@ -481,9 +487,10 @@ def _com_google_protobuf():
     _repository_impl(
         "com_google_protobuf_cc",
         repository_key = "com_google_protobuf",
-        # The patch is only needed until
-        # https://github.com/protocolbuffers/protobuf/pull/5901 is available.
-        # TODO(htuch): remove this when > protobuf 3.7.1 is released.
+        # The patch includes
+        # https://github.com/protocolbuffers/protobuf/pull/6333 and also uses
+        # foreign_cc build for zlib as its dependency.
+        # TODO(asraa): remove this when > protobuf 3.8.0 is released.
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:protobuf.patch"],
     )
@@ -509,6 +516,60 @@ def _com_google_protobuf():
     native.bind(
         name = "python_headers",
         actual = "@com_google_protobuf//util/python:python_headers",
+    )
+
+def _io_opencensus_cpp():
+    location = REPOSITORY_LOCATIONS["io_opencensus_cpp"]
+    http_archive(
+        name = "io_opencensus_cpp",
+        **location
+    )
+    native.bind(
+        name = "opencensus_trace",
+        actual = "@io_opencensus_cpp//opencensus/trace",
+    )
+    native.bind(
+        name = "opencensus_trace_b3",
+        actual = "@io_opencensus_cpp//opencensus/trace:b3",
+    )
+    native.bind(
+        name = "opencensus_trace_cloud_trace_context",
+        actual = "@io_opencensus_cpp//opencensus/trace:cloud_trace_context",
+    )
+    native.bind(
+        name = "opencensus_trace_grpc_trace_bin",
+        actual = "@io_opencensus_cpp//opencensus/trace:grpc_trace_bin",
+    )
+    native.bind(
+        name = "opencensus_trace_trace_context",
+        actual = "@io_opencensus_cpp//opencensus/trace:trace_context",
+    )
+    native.bind(
+        name = "opencensus_exporter_stdout",
+        actual = "@io_opencensus_cpp//opencensus/exporters/trace/stdout:stdout_exporter",
+    )
+    native.bind(
+        name = "opencensus_exporter_stackdriver",
+        actual = "@io_opencensus_cpp//opencensus/exporters/trace/stackdriver:stackdriver_exporter",
+    )
+    native.bind(
+        name = "opencensus_exporter_zipkin",
+        actual = "@io_opencensus_cpp//opencensus/exporters/trace/zipkin:zipkin_exporter",
+    )
+
+def _com_github_curl():
+    # Used by OpenCensus Zipkin exporter.
+    location = REPOSITORY_LOCATIONS["com_github_curl"]
+    http_archive(
+        name = "com_github_curl",
+        build_file_content = BUILD_ALL_CONTENT + """
+cc_library(name = "curl", visibility = ["//visibility:public"], deps = ["@envoy//bazel/foreign_cc:curl"])
+""",
+        **location
+    )
+    native.bind(
+        name = "curl",
+        actual = "@envoy//bazel/foreign_cc:curl",
     )
 
 def _com_googlesource_quiche():
@@ -539,7 +600,17 @@ def _com_googlesource_quiche():
     )
 
 def _com_github_grpc_grpc():
-    _repository_impl("com_github_grpc_grpc")
+    _repository_impl(
+        "com_github_grpc_grpc",
+        patches = [
+            # Workaround for https://github.com/envoyproxy/envoy/issues/7863
+            "@envoy//bazel:grpc-protoinfo-1.patch",
+            "@envoy//bazel:grpc-protoinfo-2.patch",
+            # Pre-integration of https://github.com/grpc/grpc/pull/19860
+            "@envoy//bazel:grpc-protoinfo-3.patch",
+        ],
+        patch_args = ["-p1"],
+    )
 
     # Rebind some stuff to match what the gRPC Bazel is expecting.
     native.bind(

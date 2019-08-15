@@ -3,14 +3,17 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/base64.h"
 #include "common/common/utility.h"
+#include "common/grpc/common.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
+#include "common/stats/fake_symbol_table_impl.h"
 
 #include "extensions/filters/http/grpc_web/grpc_web_filter.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/global.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
@@ -47,7 +50,7 @@ const size_t TRAILERS_SIZE = sizeof(TRAILERS) - 1;
 
 class GrpcWebFilterTest : public testing::TestWithParam<std::tuple<std::string, std::string>> {
 public:
-  GrpcWebFilterTest() {
+  GrpcWebFilterTest() : grpc_context_(*symbol_table_), filter_(grpc_context_) {
     filter_.setDecoderFilterCallbacks(decoder_callbacks_);
     filter_.setEncoderFilterCallbacks(encoder_callbacks_);
   }
@@ -78,7 +81,7 @@ public:
            request_accept() == Http::Headers::get().ContentTypeValues.GrpcWebProto;
   }
 
-  bool doStatTracking() const { return filter_.do_stat_tracking_; }
+  bool doStatTracking() const { return filter_.doStatTracking(); }
 
   void expectErrorResponse(const Http::Code& expected_code, const std::string& expected_message) {
     EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
@@ -103,6 +106,8 @@ public:
               request_headers.GrpcAcceptEncoding()->value().getStringView());
   }
 
+  Envoy::Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
+  Grpc::ContextImpl grpc_context_;
   GrpcWebFilter filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
@@ -118,6 +123,8 @@ TEST_F(GrpcWebFilterTest, SupportedContentTypes) {
     Http::TestHeaderMapImpl request_headers;
     request_headers.addCopy(Http::Headers::get().ContentType, content_type);
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+    Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+    EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.decodeMetadata(metadata_map));
     EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc,
               request_headers.ContentType()->value().getStringView());
   }

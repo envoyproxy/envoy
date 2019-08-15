@@ -7,9 +7,9 @@ namespace Envoy {
 namespace Filesystem {
 
 MockFile::MockFile() : num_opens_(0), num_writes_(0), is_open_(false) {}
-MockFile::~MockFile() {}
+MockFile::~MockFile() = default;
 
-Api::IoCallBoolResult MockFile::open() {
+Api::IoCallBoolResult MockFile::open(FlagSet) {
   Thread::LockGuard lock(open_mutex_);
 
   Api::IoCallBoolResult result = open_();
@@ -40,11 +40,11 @@ Api::IoCallBoolResult MockFile::close() {
   return result;
 }
 
-MockInstance::MockInstance() {}
-MockInstance::~MockInstance() {}
+MockInstance::MockInstance() = default;
+MockInstance::~MockInstance() = default;
 
-MockWatcher::MockWatcher() {}
-MockWatcher::~MockWatcher() {}
+MockWatcher::MockWatcher() = default;
+MockWatcher::~MockWatcher() = default;
 
 } // namespace Filesystem
 } // namespace Envoy

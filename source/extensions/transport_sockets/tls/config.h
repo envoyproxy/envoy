@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/registry/registry.h"
 #include "envoy/server/transport_socket_config.h"
 
 #include "extensions/transport_sockets/well_known_names.h"
@@ -15,7 +16,7 @@ namespace Tls {
  */
 class SslSocketConfigFactory : public virtual Server::Configuration::TransportSocketConfigFactory {
 public:
-  virtual ~SslSocketConfigFactory() {}
+  ~SslSocketConfigFactory() override = default;
   std::string name() const override { return TransportSocketNames::get().Tls; }
 };
 
@@ -28,6 +29,8 @@ public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 };
 
+DECLARE_FACTORY(UpstreamSslSocketFactory);
+
 class DownstreamSslSocketFactory
     : public Server::Configuration::DownstreamTransportSocketConfigFactory,
       public SslSocketConfigFactory {
@@ -38,6 +41,15 @@ public:
                                const std::vector<std::string>& server_names) override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 };
+
+DECLARE_FACTORY(DownstreamSslSocketFactory);
+
+class SslContextManagerFactory : public Ssl::ContextManagerFactory {
+public:
+  Ssl::ContextManagerPtr createContextManager(TimeSource& time_source) override;
+};
+
+DECLARE_FACTORY(SslContextManagerFactory);
 
 } // namespace Tls
 } // namespace TransportSockets

@@ -53,10 +53,12 @@ public:
             foo.bar:
               foo: bar
               baz: bat
+            keyset:
+              foo: MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAp0cSZtAdFgMI1zQJwG8ujTXFMcRY0+SA6fMZGEfQYuxcz/e8UelJ1fLDVAwYmk7KHoYzpizy0JIxAcJ+OAE+cd6a6RpwSEm/9/vizlv0vWZv2XMRAqUxk/5amlpQZE/4sRg/qJdkZZjKrSKjf5VEUQg2NytExYyYWG+3FEYpzYyUeVktmW0y/205XAuEQuxaoe+AUVKeoON1iDzvxywE42C0749XYGUFicqBSRj2eO7jm4hNWvgTapYwpswM3hV9yOAPOVQGKNXzNbLDbFTHyLw3OKayGs/4FUBa+ijlGD9VDawZq88RRaf5ztmH22gOSiKcrHXe40fsnrzh/D27uwIDAQAB
           )EOF";
 
           ProtobufWkt::Struct value;
-          MessageUtil::loadFromYaml(yaml, value);
+          TestUtility::loadFromYaml(yaml, value);
 
           // Sets the route's metadata.
           hcm.mutable_route_config()
@@ -383,6 +385,104 @@ config:
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   }
+
+  cleanup();
+}
+
+// Basic test for verifying signature.
+TEST_P(LuaIntegrationTest, SignatureVerification) {
+  const std::string FILTER_AND_CODE =
+      R"EOF(
+name: envoy.lua
+config:
+  inline_code: |
+    function string.fromhex(str)
+      return (str:gsub('..', function (cc)
+        return string.char(tonumber(cc, 16))
+      end))
+    end
+
+    -- decoding
+    function dec(data)
+      local b='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+      data = string.gsub(data, '[^'..b..'=]', '')
+      return (data:gsub('.', function(x)
+        if (x == '=') then return '' end
+        local r,f='',(b:find(x)-1)
+        for i=6,1,-1 do r=r..(f%2^i-f%2^(i-1)>0 and '1' or '0') end
+        return r;
+      end):gsub('%d%d%d?%d?%d?%d?%d?%d?', function(x)
+        if (#x ~= 8) then return '' end
+        local c=0
+        for i=1,8 do c=c+(x:sub(i,i)=='1' and 2^(8-i) or 0) end
+        return string.char(c)
+      end))
+    end
+
+    function envoy_on_request(request_handle)
+      local metadata = request_handle:metadata():get("keyset")
+      local keyder = metadata[request_handle:headers():get("keyid")]
+
+      local rawkeyder = dec(keyder)
+      local pubkey = request_handle:importPublicKey(rawkeyder, string.len(rawkeyder)):get()
+
+      if pubkey == nil then
+        request_handle:logErr("log test")
+        request_handle:headers():add("signature_verification", "rejected")
+        return
+      end
+
+      local hash = request_handle:headers():get("hash")
+      local sig = request_handle:headers():get("signature")
+      local rawsig = sig:fromhex()
+      local data = request_handle:headers():get("message")
+      local ok, error = request_handle:verifySignature(hash, pubkey, rawsig, string.len(rawsig), data, string.len(data)) 
+
+      if ok then
+        request_handle:headers():add("signature_verification", "approved")
+      else
+        request_handle:logErr(error)
+        request_handle:headers():add("signature_verification", "rejected")
+      end
+
+      request_handle:headers():add("verification", "done")
+    end
+)EOF";
+
+  initializeFilter(FILTER_AND_CODE);
+
+  auto signature =
+      "345ac3a167558f4f387a81c2d64234d901a7ceaa544db779d2f797b0ea4ef851b740905a63e2f4d5af42cee093a2"
+      "9c7155db9a63d3d483e0ef948f5ac51ce4e10a3a6606fd93ef68ee47b30c37491103039459122f78e1c7ea71a1a5"
+      "ea24bb6519bca02c8c9915fe8be24927c91812a13db72dbcb500103a79e8f67ff8cb9e2a631974e0668ab3977bf5"
+      "70a91b67d1b6bcd5dce84055f21427d64f4256a042ab1dc8e925d53a769f6681a873f5859693a7728fcbe95beace"
+      "1563b5ffbcd7c93b898aeba31421dafbfadeea50229c49fd6c445449314460f3d19150bd29a91333beaced557ed6"
+      "295234f7c14fa46303b7e977d2c89ba8a39a46a35f33eb07a332";
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestHeaderMapImpl request_headers{
+      {":method", "POST"},    {":path", "/test/long/url"},     {":scheme", "https"},
+      {":authority", "host"}, {"x-forwarded-for", "10.0.0.1"}, {"message", "hello"},
+      {"keyid", "foo"},       {"signature", signature},        {"hash", "sha256"}};
+
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest();
+
+  EXPECT_EQ("approved", upstream_request_->headers()
+                            .get(Http::LowerCaseString("signature_verification"))
+                            ->value()
+                            .getStringView());
+
+  EXPECT_EQ("done", upstream_request_->headers()
+                        .get(Http::LowerCaseString("verification"))
+                        ->value()
+                        .getStringView());
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  response->waitForEndStream();
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 
   cleanup();
 }

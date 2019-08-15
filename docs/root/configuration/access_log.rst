@@ -218,6 +218,8 @@ The following command operators are supported:
     * **RL**: The request was ratelimited locally by the :ref:`HTTP rate limit filter <config_http_filters_rate_limit>` in addition to 429 response code.
     * **UAEX**: The request was denied by the external authorization service.
     * **RLSE**: The request was rejected because there was an error in rate limit service.
+    * **IH**: The request was rejected because it set an invalid value for a
+      :ref:`strictly-checked header <envoy_api_field_config.filter.http.router.v2.Router.strict_check_headers>` in addition to 400 response code.
     * **SI**: Stream idle timeout in addition to 408 response code.
 
 %RESPONSE_TX_DURATION%
@@ -360,9 +362,57 @@ The following command operators are supported:
   TCP
     The subject present in the peer certificate used to establish the downstream TLS connection.
 
+%DOWNSTREAM_PEER_ISSUER%
+  HTTP
+    The issuer present in the peer certificate used to establish the downstream TLS connection.
+  TCP
+    The issuer present in the peer certificate used to establish the downstream TLS connection.
+
 %DOWNSTREAM_TLS_SESSION_ID%
   HTTP
     The session ID for the established downstream TLS connection.
   TCP
     The session ID for the established downstream TLS connection.
+
+%DOWNSTREAM_TLS_CIPHER%
+  HTTP
+    The OpenSSL name for the set of ciphers used to establish the downstream TLS connection.
+  TCP
+    The OpenSSL name for the set of ciphers used to establish the downstream TLS connection.
+
+%DOWNSTREAM_TLS_VERSION%
+  HTTP
+    The TLS version (e.g., ``TLSv1.2``, ``TLSv1.3``) used to establish the downstream TLS connection.
+  TCP
+    The TLS version (e.g., ``TLSv1.2``, ``TLSv1.3``) used to establish the downstream TLS connection.
+
+%DOWNSTREAM_PEER_FINGERPRINT_256%
+  HTTP
+    The hex-encoded SHA256 fingerprint of the client certificate used to establish the downstream TLS connection.
+  TCP
+    The hex-encoded SHA256 fingerprint of the client certificate used to establish the downstream TLS connection.
+
+%DOWNSTREAM_PEER_SERIAL%
+  HTTP
+    The serial number of the client certificate used to establish the downstream TLS connection.
+  TCP
+    The serial number of the client certificate used to establish the downstream TLS connection.
+
+%DOWNSTREAM_PEER_CERT%
+  HTTP
+    The client certificate in the URL-encoded PEM format used to establish the downstream TLS connection.
+  TCP
+    The client certificate in the URL-encoded PEM format used to establish the downstream TLS connection.
+
+%DOWNSTREAM_PEER_CERT_V_START%
+  HTTP
+    The validity start date of the client certificate used to establish the downstream TLS connection.
+  TCP
+    The validity start date of the client certificate used to establish the downstream TLS connection.
+
+%DOWNSTREAM_PEER_CERT_V_END%
+  HTTP
+    The validity end date of the client certificate used to establish the downstream TLS connection.
+  TCP
+    The validity end date of the client certificate used to establish the downstream TLS connection.
 

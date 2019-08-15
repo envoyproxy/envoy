@@ -1335,22 +1335,24 @@ TEST_P(ConnectionImplTest, DelayedCloseTimeoutNullStats) {
 
 class FakeReadFilter : public Network::ReadFilter {
 public:
-  FakeReadFilter() {}
-  ~FakeReadFilter() {
+  FakeReadFilter() = default;
+  ~FakeReadFilter() override {
     EXPECT_TRUE(callbacks_ != nullptr);
     // The purpose is to verify that when FilterManger is destructed, ConnectionSocketImpl is not
     // destructed, and ConnectionSocketImpl can still be accessed via ReadFilterCallbacks.
     EXPECT_TRUE(callbacks_->connection().state() != Network::Connection::State::Open);
   }
 
-  Network::FilterStatus onData(Buffer::Instance& data, bool) {
+  Network::FilterStatus onData(Buffer::Instance& data, bool) override {
     data.drain(data.length());
     return Network::FilterStatus::Continue;
   }
 
-  Network::FilterStatus onNewConnection() { return Network::FilterStatus::Continue; }
+  Network::FilterStatus onNewConnection() override { return Network::FilterStatus::Continue; }
 
-  void initializeReadFilterCallbacks(ReadFilterCallbacks& callbacks) { callbacks_ = &callbacks; }
+  void initializeReadFilterCallbacks(ReadFilterCallbacks& callbacks) override {
+    callbacks_ = &callbacks;
+  }
 
 private:
   ReadFilterCallbacks* callbacks_{nullptr};
@@ -1380,7 +1382,7 @@ public:
     connection_->addConnectionCallbacks(callbacks_);
   }
 
-  ~MockTransportConnectionImplTest() { connection_->close(ConnectionCloseType::NoFlush); }
+  ~MockTransportConnectionImplTest() override { connection_->close(ConnectionCloseType::NoFlush); }
 
   // This may be invoked for doWrite() on the transport to simulate all the data
   // being written.
@@ -1734,6 +1736,7 @@ TEST_F(PostCloseConnectionImplTest, ReadAfterCloseFlushWriteDelayIgnored) {
 
   // Delayed connection close.
   EXPECT_CALL(dispatcher_, createTimer_(_));
+  EXPECT_CALL(*file_event_, setEnabled(Event::FileReadyType::Closed));
   connection_->close(ConnectionCloseType::FlushWriteAndDelay);
 
   // Read event, doRead() happens on connection but no filter onData().
@@ -1758,6 +1761,10 @@ TEST_F(PostCloseConnectionImplTest, ReadAfterCloseFlushWriteDelayIgnoredWithWrit
 
   // Delayed connection close.
   EXPECT_CALL(dispatcher_, createTimer_(_));
+  // With half-close semantics enabled we will not wait for early close notification.
+  // See the `Envoy::Network::ConnectionImpl::readDisable()' method for more details.
+  EXPECT_CALL(*file_event_, setEnabled(0));
+  connection_->enableHalfClose(true);
   connection_->close(ConnectionCloseType::FlushWriteAndDelay);
 
   // Read event, doRead() happens on connection but no filter onData().

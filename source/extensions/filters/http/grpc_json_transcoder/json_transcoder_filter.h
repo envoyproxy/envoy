@@ -89,9 +89,10 @@ private:
   Protobuf::util::JsonPrintOptions print_options_;
 
   bool match_incoming_request_route_{false};
+  bool ignore_unknown_query_parameters_{false};
 };
 
-typedef std::shared_ptr<JsonTranscoderConfig> JsonTranscoderConfigSharedPtr;
+using JsonTranscoderConfigSharedPtr = std::shared_ptr<JsonTranscoderConfig>;
 
 /**
  * The filter instance for gRPC JSON transcoder.

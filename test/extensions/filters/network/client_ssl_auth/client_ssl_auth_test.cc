@@ -21,6 +21,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
@@ -40,19 +41,17 @@ TEST(ClientSslAuthAllowedPrincipalsTest, EmptyString) {
 }
 
 TEST(ClientSslAuthConfigTest, BadClientSslAuthConfig) {
-  std::string json = R"EOF(
-  {
-    "stat_prefix": "my_stat_prefix",
-    "auth_api_cluster" : "fake_cluster",
-    "ip_white_list": ["192.168.3.0/24"],
-    "test" : "a"
-  }
+  std::string yaml = R"EOF(
+stat_prefix: my_stat_prefix
+auth_api_cluster: fake_cluster
+ip_white_list:
+- address_prefix: 192.168.3.0
+  prefix_len: 24
+test: a
   )EOF";
 
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json);
   envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth proto_config{};
-  EXPECT_THROW(Envoy::Config::FilterJson::translateClientSslAuthFilter(*json_config, proto_config),
-               Json::Exception);
+  EXPECT_THROW(TestUtility::loadFromYaml(yaml, proto_config), EnvoyException);
 }
 
 class ClientSslAuthFilterTest : public testing::Test {
@@ -60,24 +59,22 @@ protected:
   ClientSslAuthFilterTest()
       : request_(&cm_.async_client_), interval_timer_(new Event::MockTimer(&dispatcher_)),
         api_(Api::createApiForTest(stats_store_)) {}
-  ~ClientSslAuthFilterTest() { tls_.shutdownThread(); }
+  ~ClientSslAuthFilterTest() override { tls_.shutdownThread(); }
 
   void setup() {
-    std::string json = R"EOF(
-    {
-      "auth_api_cluster": "vpn",
-      "stat_prefix": "vpn",
-      "ip_white_list":
-        [ "1.2.3.4/32",
-          "2001:abcd::/64"
-        ]
-    }
+    std::string yaml = R"EOF(
+auth_api_cluster: vpn
+stat_prefix: vpn
+ip_white_list:
+- address_prefix: 1.2.3.4
+  prefix_len: 32
+- address_prefix: '2001:abcd::'
+  prefix_len: 64
     )EOF";
 
-    Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json);
     envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth proto_config{};
-    Envoy::Config::FilterJson::translateClientSslAuthFilter(*json_config, proto_config);
-    EXPECT_CALL(cm_, get("vpn"));
+    TestUtility::loadFromYaml(yaml, proto_config);
+    EXPECT_CALL(cm_, get(Eq("vpn")));
     setupRequest();
     config_ =
         ClientSslAuthConfig::create(proto_config, tls_, cm_, dispatcher_, stats_store_, random_);
@@ -122,17 +119,14 @@ protected:
 };
 
 TEST_F(ClientSslAuthFilterTest, NoCluster) {
-  std::string json = R"EOF(
-  {
-    "auth_api_cluster": "bad_cluster",
-    "stat_prefix": "bad_cluster"
-  }
+  std::string yaml = R"EOF(
+auth_api_cluster: bad_cluster
+stat_prefix: bad_cluster
   )EOF";
 
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json);
   envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth proto_config{};
-  Envoy::Config::FilterJson::translateClientSslAuthFilter(*json_config, proto_config);
-  EXPECT_CALL(cm_, get("bad_cluster")).WillOnce(Return(nullptr));
+  TestUtility::loadFromYaml(yaml, proto_config);
+  EXPECT_CALL(cm_, get(Eq("bad_cluster"))).WillOnce(Return(nullptr));
   EXPECT_THROW(
       ClientSslAuthConfig::create(proto_config, tls_, cm_, dispatcher_, stats_store_, random_),
       EnvoyException);
@@ -180,7 +174,10 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
       api_->fileSystem().fileReadToEnd(TestEnvironment::runfilesPath(
           "test/extensions/filters/network/client_ssl_auth/test_data/vpn_response_1.json")));
   callbacks_->onSuccess(std::move(message));
-  EXPECT_EQ(1U, stats_store_.gauge("auth.clientssl.vpn.total_principals").value());
+  EXPECT_EQ(1U,
+            stats_store_
+                .gauge("auth.clientssl.vpn.total_principals", Stats::Gauge::ImportMode::NeverImport)
+                .value());
 
   // Create a new filter for an SSL connection with an authorized cert.
   createAuthFilter();

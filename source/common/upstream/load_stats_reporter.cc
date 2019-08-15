@@ -9,7 +9,7 @@ namespace Upstream {
 
 LoadStatsReporter::LoadStatsReporter(const LocalInfo::LocalInfo& local_info,
                                      ClusterManager& cluster_manager, Stats::Scope& scope,
-                                     Grpc::AsyncClientPtr async_client,
+                                     Grpc::RawAsyncClientPtr async_client,
                                      Event::Dispatcher& dispatcher)
     : cm_(cluster_manager), stats_{ALL_LOAD_REPORTER_STATS(
                                 POOL_COUNTER_PREFIX(scope, "load_reporter."))},
@@ -64,7 +64,7 @@ void LoadStatsReporter::sendLoadStatsRequest() {
         uint64_t rq_error = 0;
         uint64_t rq_active = 0;
         uint64_t rq_issued = 0;
-        for (auto host : hosts) {
+        for (const auto& host : hosts) {
           rq_success += host->stats().rq_success_.latch();
           rq_error += host->stats().rq_error_.latch();
           rq_active += host->stats().rq_active_.value();
@@ -154,7 +154,7 @@ void LoadStatsReporter::startLoadReportPeriod() {
     }
     auto& cluster = it->second.get();
     for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
-      for (auto host : host_set->hosts()) {
+      for (const auto& host : host_set->hosts()) {
         host->stats().rq_success_.latch();
         host->stats().rq_error_.latch();
         host->stats().rq_total_.latch();

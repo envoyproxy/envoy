@@ -16,8 +16,8 @@ namespace Extensions {
 namespace StatSinks {
 namespace Hystrix {
 
-typedef std::vector<uint64_t> RollingWindow;
-typedef std::map<const std::string, RollingWindow> RollingStatsMap;
+using RollingWindow = std::vector<uint64_t>;
+using RollingStatsMap = std::map<const std::string, RollingWindow>;
 
 using QuantileLatencyMap = std::unordered_map<double, double>;
 static const std::vector<double> hystrix_quantiles = {0,    0.25, 0.5,   0.75, 0.90,
@@ -43,7 +43,7 @@ struct ClusterStatsCache {
   RollingWindow rejected_;
 };
 
-typedef std::unique_ptr<ClusterStatsCache> ClusterStatsCachePtr;
+using ClusterStatsCachePtr = std::unique_ptr<ClusterStatsCache>;
 
 class HystrixSink : public Stats::Sink, public Logger::Loggable<Logger::Id::hystrix> {
 public:
@@ -159,11 +159,17 @@ private:
 
   // Saved StatNames for fast comparisons in loop.
   Stats::StatNamePool stat_name_pool_;
-  Stats::StatName cluster_name_;
-  Stats::StatName cluster_upstream_rq_time_;
+  const Stats::StatName cluster_name_;
+  const Stats::StatName cluster_upstream_rq_time_;
+  const Stats::StatName membership_total_;
+  const Stats::StatName retry_upstream_rq_4xx_;
+  const Stats::StatName retry_upstream_rq_5xx_;
+  const Stats::StatName upstream_rq_2xx_;
+  const Stats::StatName upstream_rq_4xx_;
+  const Stats::StatName upstream_rq_5xx_;
 };
 
-typedef std::unique_ptr<HystrixSink> HystrixSinkPtr;
+using HystrixSinkPtr = std::unique_ptr<HystrixSink>;
 
 } // namespace Hystrix
 } // namespace StatSinks

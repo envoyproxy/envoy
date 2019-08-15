@@ -83,7 +83,7 @@ protected:
 
 // Tests for ProtocolIntegrationTest will be run with the full mesh of H1/H2
 // downstream and H1/H2 upstreams.
-typedef HttpProtocolIntegrationTest ProtocolIntegrationTest;
+using ProtocolIntegrationTest = HttpProtocolIntegrationTest;
 
 TEST_P(ProtocolIntegrationTest, ShutdownWithActiveConnPoolConnections) {
   auto response = makeHeaderOnlyRequest(nullptr, 0);
@@ -520,7 +520,7 @@ TEST_P(ProtocolIntegrationTest, HittingEncoderFilterLimit) {
   auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
   auto downstream_request = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
-  Buffer::OwnedImpl data("{\"TableName\":\"locations\"}");
+  Buffer::OwnedImpl data(R"({"TableName":"locations"})");
   codec_client_->sendData(*downstream_request, data, true);
   waitForNextUpstreamRequest();
 
@@ -592,6 +592,36 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLength) {
                                                           {"content-length", "-1"}});
   auto response = std::move(encoder_decoder.second);
 
+  codec_client_->waitForDisconnect();
+
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("400", response->headers().Status()->value().getStringView());
+  } else {
+    ASSERT_TRUE(response->reset());
+    EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->reset_reason());
+  }
+}
+
+// TODO(PiotrSikora): move this HTTP/2 only variant to http2_integration_test.cc.
+TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLengthAllowed) {
+  config_helper_.addConfigModifier(
+      [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void {
+        hcm.mutable_http2_protocol_options()->set_stream_error_on_invalid_http_messaging(true);
+      });
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                          {":path", "/test/long/url"},
+                                                          {":authority", "host"},
+                                                          {"content-length", "-1"}});
+  auto response = std::move(encoder_decoder.second);
+
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     codec_client_->waitForDisconnect();
   } else {
@@ -609,6 +639,34 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLength) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengths) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                          {":path", "/test/long/url"},
+                                                          {":authority", "host"},
+                                                          {"content-length", "3,2"}});
+  auto response = std::move(encoder_decoder.second);
+
+  codec_client_->waitForDisconnect();
+
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("400", response->headers().Status()->value().getStringView());
+  } else {
+    ASSERT_TRUE(response->reset());
+    EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->reset_reason());
+  }
+}
+
+// TODO(PiotrSikora): move this HTTP/2 only variant to http2_integration_test.cc.
+TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengthsAllowed) {
+  config_helper_.addConfigModifier(
+      [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void {
+        hcm.mutable_http2_protocol_options()->set_stream_error_on_invalid_http_messaging(true);
+      });
+
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto encoder_decoder =
@@ -959,6 +1017,9 @@ TEST_P(DownstreamProtocolIntegrationTest, testEncodeHeadersReturnsStopAll) {
   config_helper_.addFilter(R"EOF(
 name: encode-headers-return-stop-all-filter
 )EOF");
+  config_helper_.addConfigModifier(
+      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void { hcm.mutable_http2_protocol_options()->set_allow_metadata(true); });
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -988,6 +1049,9 @@ TEST_P(DownstreamProtocolIntegrationTest, testEncodeHeadersReturnsStopAllWaterma
   config_helper_.addFilter(R"EOF(
 name: encode-headers-return-stop-all-filter
 )EOF");
+  config_helper_.addConfigModifier(
+      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void { hcm.mutable_http2_protocol_options()->set_allow_metadata(true); });
 
   // Sets initial stream window to min value to make the upstream sensitive to a low watermark.
   config_helper_.addConfigModifier(
@@ -1018,6 +1082,28 @@ name: encode-headers-return-stop-all-filter
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
   EXPECT_EQ(count_ * size_ + added_decoded_data_size_, response->body().size());
+}
+
+// Per https://github.com/envoyproxy/envoy/issues/7488 make sure we don't
+// combine set-cookie headers
+TEST_P(ProtocolIntegrationTest, MultipleSetCookies) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestHeaderMapImpl response_headers{
+      {":status", "200"}, {"set-cookie", "foo"}, {"set-cookie", "bar"}};
+
+  auto response = sendRequestAndWaitForResponse(default_request_headers_, 0, response_headers, 0);
+
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+
+  std::vector<absl::string_view> out;
+  Http::HeaderUtility::getAllOfHeader(response->headers(), "set-cookie", out);
+  ASSERT_EQ(out.size(), 2);
+  ASSERT_EQ(out[0], "foo");
+  ASSERT_EQ(out[1], "bar");
 }
 
 // For tests which focus on downstream-to-Envoy behavior, and don't need to be

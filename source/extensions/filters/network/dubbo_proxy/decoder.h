@@ -6,8 +6,8 @@
 #include "common/common/logger.h"
 
 #include "extensions/filters/network/dubbo_proxy/decoder_event_handler.h"
-#include "extensions/filters/network/dubbo_proxy/deserializer.h"
 #include "extensions/filters/network/dubbo_proxy/protocol.h"
+#include "extensions/filters/network/dubbo_proxy/serializer.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -17,12 +17,8 @@ namespace DubboProxy {
 #define ALL_PROTOCOL_STATES(FUNCTION)                                                              \
   FUNCTION(StopIteration)                                                                          \
   FUNCTION(WaitForData)                                                                            \
-  FUNCTION(OnTransportBegin)                                                                       \
-  FUNCTION(OnTransportEnd)                                                                         \
-  FUNCTION(OnMessageBegin)                                                                         \
-  FUNCTION(OnMessageEnd)                                                                           \
-  FUNCTION(OnTransferHeaderTo)                                                                     \
-  FUNCTION(OnTransferBodyTo)                                                                       \
+  FUNCTION(OnDecodeStreamHeader)                                                                   \
+  FUNCTION(OnDecodeStreamData)                                                                     \
   FUNCTION(Done)
 
 /**
@@ -45,12 +41,38 @@ private:
   }
 };
 
+struct ActiveStream {
+  ActiveStream(StreamHandler& handler, MessageMetadataSharedPtr metadata, ContextSharedPtr context)
+      : handler_(handler), metadata_(metadata), context_(context) {}
+  ~ActiveStream() {
+    metadata_.reset();
+    context_.reset();
+  }
+
+  void onStreamDecoded() {
+    ASSERT(metadata_ && context_);
+    handler_.onStreamDecoded(metadata_, context_);
+  }
+
+  StreamHandler& handler_;
+  MessageMetadataSharedPtr metadata_;
+  ContextSharedPtr context_;
+};
+
+using ActiveStreamPtr = std::unique_ptr<ActiveStream>;
+
 class DecoderStateMachine : public Logger::Loggable<Logger::Id::dubbo> {
 public:
-  DecoderStateMachine(Protocol& protocol, Deserializer& deserializer,
-                      MessageMetadataSharedPtr& metadata, DecoderCallbacks& decoder_callbacks)
-      : protocol_(protocol), deserializer_(deserializer), metadata_(metadata),
-        decoder_callbacks_(decoder_callbacks), state_(ProtocolState::OnTransportBegin) {}
+  class Delegate {
+  public:
+    virtual ~Delegate() = default;
+    virtual ActiveStream* newStream(MessageMetadataSharedPtr metadata,
+                                    ContextSharedPtr context) PURE;
+    virtual void onHeartbeat(MessageMetadataSharedPtr metadata) PURE;
+  };
+
+  DecoderStateMachine(Protocol& protocol, Delegate& delegate)
+      : protocol_(protocol), delegate_(delegate), state_(ProtocolState::OnDecodeStreamHeader) {}
 
   /**
    * Consumes as much data from the configured Buffer as possible and executes the decoding state
@@ -77,45 +99,36 @@ public:
 private:
   struct DecoderStatus {
     DecoderStatus() = default;
-    DecoderStatus(ProtocolState next_state) : next_state_(next_state), filter_status_{} {};
-    DecoderStatus(ProtocolState next_state, Network::FilterStatus filter_status)
+    DecoderStatus(ProtocolState next_state) : next_state_(next_state){};
+    DecoderStatus(ProtocolState next_state, FilterStatus filter_status)
         : next_state_(next_state), filter_status_(filter_status){};
 
     ProtocolState next_state_;
-    absl::optional<Network::FilterStatus> filter_status_;
+    absl::optional<FilterStatus> filter_status_;
   };
 
   // These functions map directly to the matching ProtocolState values. Each returns the next state
   // or ProtocolState::WaitForData if more data is required.
-  DecoderStatus onTransportBegin(Buffer::Instance& buffer, Protocol::Context& context);
-  DecoderStatus onTransportEnd();
-  DecoderStatus onTransferHeaderTo(Buffer::Instance& buffer, size_t length);
-  DecoderStatus onTransferBodyTo(Buffer::Instance& buffer, int32_t length);
-  DecoderStatus onMessageBegin();
-  DecoderStatus onMessageEnd(Buffer::Instance& buffer, int32_t message_size);
+  DecoderStatus onDecodeStreamHeader(Buffer::Instance& buffer);
+  DecoderStatus onDecodeStreamData(Buffer::Instance& buffer);
 
   // handleState delegates to the appropriate method based on state_.
   DecoderStatus handleState(Buffer::Instance& buffer);
 
   Protocol& protocol_;
-  Deserializer& deserializer_;
-  MessageMetadataSharedPtr metadata_;
-  DecoderCallbacks& decoder_callbacks_;
+  Delegate& delegate_;
 
   ProtocolState state_;
-  Protocol::Context context_;
-
-  DecoderEventHandler* handler_;
+  ActiveStream* active_stream_{nullptr};
 };
 
-typedef std::unique_ptr<DecoderStateMachine> DecoderStateMachinePtr;
+using DecoderStateMachinePtr = std::unique_ptr<DecoderStateMachine>;
 
-/**
- * Decoder encapsulates a configured and ProtocolPtr and SerializationPtr.
- */
-class Decoder : public Logger::Loggable<Logger::Id::dubbo> {
+class DecoderBase : public DecoderStateMachine::Delegate,
+                    public Logger::Loggable<Logger::Id::dubbo> {
 public:
-  Decoder(Protocol& protocol, Deserializer& deserializer, DecoderCallbacks& decoder_callbacks);
+  DecoderBase(Protocol& protocol);
+  ~DecoderBase() override;
 
   /**
    * Drains data from the given buffer
@@ -123,24 +136,60 @@ public:
    * @param data a Buffer containing Dubbo protocol data
    * @throw EnvoyException on Dubbo protocol errors
    */
-  Network::FilterStatus onData(Buffer::Instance& data, bool& buffer_underflow);
+  FilterStatus onData(Buffer::Instance& data, bool& buffer_underflow);
 
-  const Deserializer& serializer() { return deserializer_; }
   const Protocol& protocol() { return protocol_; }
 
-private:
+  // It is assumed that all of the protocol parsing are stateless,
+  // if there is a state of the need to provide the reset interface call here.
+  void reset();
+
+protected:
   void start();
   void complete();
 
-  MessageMetadataSharedPtr metadata_;
-  Deserializer& deserializer_;
   Protocol& protocol_;
+
+  ActiveStreamPtr stream_;
   DecoderStateMachinePtr state_machine_;
-  bool decode_started_ = false;
-  DecoderCallbacks& decoder_callbacks_;
+
+  bool decode_started_{false};
 };
 
-typedef std::unique_ptr<Decoder> DecoderPtr;
+/**
+ * Decoder encapsulates a configured and ProtocolPtr and SerializationPtr.
+ */
+template <typename T> class Decoder : public DecoderBase {
+public:
+  Decoder(Protocol& protocol, T& callbacks) : DecoderBase(protocol), callbacks_(callbacks) {}
+
+  ActiveStream* newStream(MessageMetadataSharedPtr metadata, ContextSharedPtr context) override {
+    ASSERT(!stream_);
+    stream_ = std::make_unique<ActiveStream>(callbacks_.newStream(), metadata, context);
+    return stream_.get();
+  }
+
+  void onHeartbeat(MessageMetadataSharedPtr metadata) override { callbacks_.onHeartbeat(metadata); }
+
+private:
+  T& callbacks_;
+};
+
+class RequestDecoder : public Decoder<RequestDecoderCallbacks> {
+public:
+  RequestDecoder(Protocol& protocol, RequestDecoderCallbacks& callbacks)
+      : Decoder(protocol, callbacks) {}
+};
+
+using RequestDecoderPtr = std::unique_ptr<RequestDecoder>;
+
+class ResponseDecoder : public Decoder<ResponseDecoderCallbacks> {
+public:
+  ResponseDecoder(Protocol& protocol, ResponseDecoderCallbacks& callbacks)
+      : Decoder(protocol, callbacks) {}
+};
+
+using ResponseDecoderPtr = std::unique_ptr<ResponseDecoder>;
 
 } // namespace DubboProxy
 } // namespace NetworkFilters

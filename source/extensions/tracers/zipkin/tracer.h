@@ -25,7 +25,7 @@ public:
   /**
    * Destructor.
    */
-  virtual ~Reporter() {}
+  virtual ~Reporter() = default;
 
   /**
    * Method that a concrete Reporter class must implement to handle finished spans.
@@ -36,7 +36,7 @@ public:
   virtual void reportSpan(const Span& span) PURE;
 };
 
-typedef std::unique_ptr<Reporter> ReporterPtr;
+using ReporterPtr = std::unique_ptr<Reporter>;
 
 /**
  * This class implements the Zipkin tracer. It has methods to create the appropriate Zipkin span
@@ -121,7 +121,7 @@ private:
   TimeSource& time_source_;
 };
 
-typedef std::unique_ptr<Tracer> TracerPtr;
+using TracerPtr = std::unique_ptr<Tracer>;
 
 } // namespace Zipkin
 } // namespace Tracers

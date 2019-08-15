@@ -17,9 +17,12 @@
 #include "test/test_common/global.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
+#include "test/tools/router_check/coverage.h"
 #include "test/tools/router_check/json/tool_config_schemas.h"
 #include "test/tools/router_check/validation.pb.h"
 #include "test/tools/router_check/validation.pb.validate.h"
+
+#include "tclap/CmdLine.h"
 
 namespace Envoy {
 /**
@@ -27,7 +30,7 @@ namespace Envoy {
  * input file.
  */
 struct ToolConfig {
-  ToolConfig() : random_value_(0){};
+  ToolConfig() = default;
 
   /**
    * @param check_config tool config json object pointer.
@@ -47,7 +50,7 @@ struct ToolConfig {
 
   std::unique_ptr<Http::TestHeaderMapImpl> headers_;
   Router::RouteConstSharedPtr route_;
-  int random_value_;
+  int random_value_{0};
 
 private:
   ToolConfig(std::unique_ptr<Http::TestHeaderMapImpl> headers, int random_value);
@@ -86,11 +89,15 @@ public:
    */
   void setShowDetails() { details_ = true; }
 
+  float coverage(bool detailed) {
+    return detailed ? coverage_.detailedReport() : coverage_.report();
+  }
+
 private:
   RouterCheckTool(
       std::unique_ptr<NiceMock<Server::Configuration::MockFactoryContext>> factory_context,
       std::unique_ptr<Router::ConfigImpl> config, std::unique_ptr<Stats::IsolatedStoreImpl> stats,
-      Api::ApiPtr api);
+      Api::ApiPtr api, Coverage coverage);
 
   bool compareCluster(ToolConfig& tool_config, const std::string& expected);
   bool compareCluster(ToolConfig& tool_config,
@@ -117,7 +124,7 @@ private:
   bool compareCustomHeaderField(ToolConfig& tool_config, const std::string& field,
                                 const std::string& expected);
   bool compareCustomHeaderField(ToolConfig& tool_config,
-                                const envoy::RouterCheckToolSchema::ValidationAssert& expecte);
+                                const envoy::RouterCheckToolSchema::ValidationAssert& expected);
   /**
    * Compare the expected and actual route parameter values. Print out match details if details_
    * flag is set.
@@ -128,6 +135,11 @@ private:
   bool compareResults(const std::string& actual, const std::string& expected,
                       const std::string& test_type);
 
+  bool runtimeMock(const std::string& key, const envoy::type::FractionalPercent& default_value,
+                   uint64_t random_value);
+
+  bool headers_finalized_{false};
+
   bool details_{false};
 
   // TODO(hennna): Switch away from mocks following work done by @rlazarus in github issue #499.
@@ -135,5 +147,65 @@ private:
   std::unique_ptr<Router::ConfigImpl> config_;
   std::unique_ptr<Stats::IsolatedStoreImpl> stats_;
   Api::ApiPtr api_;
+  std::string active_runtime;
+  Coverage coverage_;
+};
+
+/**
+ * Parses command line arguments for Router Check Tool.
+ */
+class Options {
+public:
+  Options(int argc, char** argv);
+
+  /**
+   * @return the path to configuration file.
+   */
+  const std::string& configPath() const { return config_path_; }
+
+  /**
+   * @return the path to test file.
+   */
+  const std::string& testPath() const { return test_path_; }
+
+  /**
+   * @return the path to json schema configuration file.
+   */
+  const std::string& unlabelledConfigPath() const { return unlabelled_config_path_; }
+
+  /**
+   * @return the path to json schema test file.
+   */
+  const std::string& unlabelledTestPath() const { return unlabelled_test_path_; }
+
+  /**
+   * @return the minimum required percentage of routes coverage.
+   */
+  double failUnder() const { return fail_under_; }
+
+  /**
+   * @return true if test coverage should be comprehensive.
+   */
+  bool comprehensiveCoverage() const { return comprehensive_coverage_; }
+
+  /**
+   * @return true if proto schema test is used.
+   */
+  bool isProto() const { return is_proto_; }
+
+  /**
+   * @return true is detailed test execution results are displayed.
+   */
+  bool isDetailed() const { return is_detailed_; }
+
+private:
+  std::string test_path_;
+  std::string config_path_;
+  std::string unlabelled_test_path_;
+  std::string unlabelled_config_path_;
+  float fail_under_;
+  bool comprehensive_coverage_;
+  bool is_proto_;
+  bool is_detailed_;
 };
 } // namespace Envoy

@@ -1,6 +1,9 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/api/v2/core/protocol.pb.h"
+#include "envoy/api/v2/core/protocol.pb.validate.h"
+
 #include "common/common/fmt.h"
 #include "common/config/protocol_json.h"
 #include "common/http/exception.h"
@@ -244,11 +247,9 @@ TEST(HttpUtility, createSslRedirectPath) {
 
 namespace {
 
-Http2Settings parseHttp2SettingsFromJson(const std::string& json_string) {
+Http2Settings parseHttp2SettingsFromV2Yaml(const std::string& yaml) {
   envoy::api::v2::core::Http2ProtocolOptions http2_protocol_options;
-  auto json_object_ptr = Json::Factory::loadFromString(json_string);
-  Config::ProtocolJson::translateHttp2ProtocolOptions(
-      *json_object_ptr->getObject("http2_settings", true), http2_protocol_options);
+  TestUtility::loadFromYamlAndValidate(yaml, http2_protocol_options);
   return Utility::parseHttp2Settings(http2_protocol_options);
 }
 
@@ -256,7 +257,7 @@ Http2Settings parseHttp2SettingsFromJson(const std::string& json_string) {
 
 TEST(HttpUtility, parseHttp2Settings) {
   {
-    auto http2_settings = parseHttp2SettingsFromJson("{}");
+    auto http2_settings = parseHttp2SettingsFromV2Yaml("{}");
     EXPECT_EQ(Http2Settings::DEFAULT_HPACK_TABLE_SIZE, http2_settings.hpack_table_size_);
     EXPECT_EQ(Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS,
               http2_settings.max_concurrent_streams_);
@@ -264,21 +265,29 @@ TEST(HttpUtility, parseHttp2Settings) {
               http2_settings.initial_stream_window_size_);
     EXPECT_EQ(Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE,
               http2_settings.initial_connection_window_size_);
+    EXPECT_EQ(Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES, http2_settings.max_outbound_frames_);
+    EXPECT_EQ(Http2Settings::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES,
+              http2_settings.max_outbound_control_frames_);
+    EXPECT_EQ(Http2Settings::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD,
+              http2_settings.max_consecutive_inbound_frames_with_empty_payload_);
+    EXPECT_EQ(Http2Settings::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM,
+              http2_settings.max_inbound_priority_frames_per_stream_);
+    EXPECT_EQ(Http2Settings::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT,
+              http2_settings.max_inbound_window_update_frames_per_data_frame_sent_);
   }
 
   {
-    auto http2_settings = parseHttp2SettingsFromJson(R"raw({
-                                          "http2_settings" : {
-                                            "hpack_table_size": 1,
-                                            "max_concurrent_streams": 2,
-                                            "initial_stream_window_size": 3,
-                                            "initial_connection_window_size": 4
-                                          }
-                                        })raw");
+    const std::string yaml = R"EOF(
+hpack_table_size: 1
+max_concurrent_streams: 2
+initial_stream_window_size: 65535
+initial_connection_window_size: 65535
+    )EOF";
+    auto http2_settings = parseHttp2SettingsFromV2Yaml(yaml);
     EXPECT_EQ(1U, http2_settings.hpack_table_size_);
     EXPECT_EQ(2U, http2_settings.max_concurrent_streams_);
-    EXPECT_EQ(3U, http2_settings.initial_stream_window_size_);
-    EXPECT_EQ(4U, http2_settings.initial_connection_window_size_);
+    EXPECT_EQ(65535U, http2_settings.initial_stream_window_size_);
+    EXPECT_EQ(65535U, http2_settings.initial_connection_window_size_);
   }
 }
 
@@ -410,27 +419,6 @@ TEST(HttpUtility, TestParseCookieWithQuotes) {
   EXPECT_EQ(Utility::parseCookieValue(headers, "leadingdquote"), "\"foobar");
 }
 
-TEST(HttpUtility, TestHasSetCookie) {
-  TestHeaderMapImpl headers{{"someheader", "10.0.0.1"},
-                            {"set-cookie", "somekey=somevalue"},
-                            {"set-cookie", "abc=def; Expires=Wed, 09 Jun 2021 10:18:14 GMT"},
-                            {"set-cookie", "key2=value2; Secure"}};
-
-  EXPECT_TRUE(Utility::hasSetCookie(headers, "abc"));
-  EXPECT_TRUE(Utility::hasSetCookie(headers, "somekey"));
-  EXPECT_FALSE(Utility::hasSetCookie(headers, "ghi"));
-}
-
-TEST(HttpUtility, TestHasSetCookieBadValues) {
-  TestHeaderMapImpl headers{{"someheader", "10.0.0.1"},
-                            {"set-cookie", "somekey =somevalue"},
-                            {"set-cookie", "abc"},
-                            {"set-cookie", "key2=value2; Secure"}};
-
-  EXPECT_FALSE(Utility::hasSetCookie(headers, "abc"));
-  EXPECT_TRUE(Utility::hasSetCookie(headers, "key2"));
-}
-
 TEST(HttpUtility, TestMakeSetCookieValue) {
   EXPECT_EQ("name=\"value\"; Max-Age=10",
             Utility::makeSetCookieValue("name", "value", "", std::chrono::seconds(10), false));
@@ -476,6 +464,33 @@ TEST(HttpUtility, SendLocalGrpcReply) {
       }));
   Utility::sendLocalReply(true, callbacks, is_reset, Http::Code::PayloadTooLarge, "large",
                           absl::nullopt, false);
+}
+
+TEST(HttpUtility, SendLocalGrpcReplyWithUpstreamJsonPayload) {
+  MockStreamDecoderFilterCallbacks callbacks;
+  bool is_reset = false;
+
+  std::string json = R"EOF(
+{
+    "error": {
+        "code": 401,
+        "message": "Unauthorized"
+    }
+}
+  )EOF";
+
+  EXPECT_CALL(callbacks, encodeHeaders_(_, true))
+      .WillOnce(Invoke([&](const HeaderMap& headers, bool) -> void {
+        EXPECT_EQ(headers.Status()->value().getStringView(), "200");
+        EXPECT_NE(headers.GrpcStatus(), nullptr);
+        EXPECT_EQ(headers.GrpcStatus()->value().getStringView(),
+                  std::to_string(enumToInt(Grpc::Status::GrpcStatus::Unauthenticated)));
+        EXPECT_NE(headers.GrpcMessage(), nullptr);
+        const auto& encoded = Utility::PercentEncoding::encode(json);
+        EXPECT_EQ(headers.GrpcMessage()->value().getStringView(), encoded);
+      }));
+  Utility::sendLocalReply(true, callbacks, is_reset, Http::Code::Unauthorized, json, absl::nullopt,
+                          false);
 }
 
 TEST(HttpUtility, RateLimitedGrpcStatus) {
@@ -808,6 +823,33 @@ TEST(Url, ParsingTest) {
               "www.host.com:80", "/path?query=param&query2=param2#fragment");
   ValidateUrl("http://www.host.com/path?query=param&query2=param2#fragment", "http", "www.host.com",
               "/path?query=param&query2=param2#fragment");
+}
+
+void validatePercentEncodingEncodeDecode(absl::string_view source,
+                                         absl::string_view expected_encoded) {
+  EXPECT_EQ(Utility::PercentEncoding::encode(source), expected_encoded);
+  EXPECT_EQ(Utility::PercentEncoding::decode(expected_encoded), source);
+}
+
+TEST(PercentEncoding, EncodeDecode) {
+  const std::string json = R"EOF(
+{
+    "error": {
+        "code": 401,
+        "message": "Unauthorized"
+    }
+}
+  )EOF";
+  validatePercentEncodingEncodeDecode(json, "%0A{%0A    \"error\": {%0A        \"code\": 401,%0A   "
+                                            "     \"message\": \"Unauthorized\"%0A    }%0A}%0A  ");
+  validatePercentEncodingEncodeDecode("too large", "too large");
+  validatePercentEncodingEncodeDecode("_-ok-_", "_-ok-_");
+}
+
+TEST(PercentEncoding, Trailing) {
+  EXPECT_EQ(Utility::PercentEncoding::decode("too%20lar%20"), "too lar ");
+  EXPECT_EQ(Utility::PercentEncoding::decode("too%20larg%e"), "too larg%e");
+  EXPECT_EQ(Utility::PercentEncoding::decode("too%20large%"), "too large%");
 }
 
 } // namespace Http

@@ -11,8 +11,6 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/compressor/zlib_compressor_impl.h"
 #include "common/http/header_map_impl.h"
-#include "common/json/config_schemas.h"
-#include "common/json/json_validator.h"
 #include "common/protobuf/protobuf.h"
 
 namespace Envoy {
@@ -107,7 +105,7 @@ private:
   GzipStats stats_;
   Runtime::Loader& runtime_;
 };
-typedef std::shared_ptr<GzipFilterConfig> GzipFilterConfigSharedPtr;
+using GzipFilterConfigSharedPtr = std::shared_ptr<GzipFilterConfig>;
 
 /**
  * A filter that compresses data dispatched from the upstream upon client request.

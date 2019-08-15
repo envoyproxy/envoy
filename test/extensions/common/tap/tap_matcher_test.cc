@@ -26,7 +26,7 @@ TEST_F(TapMatcherTest, Any) {
 any_match: true
 )EOF";
 
-  MessageUtil::loadFromYaml(matcher_yaml, config_);
+  TestUtility::loadFromYaml(matcher_yaml, config_);
   buildMatcher(config_, matchers_);
   EXPECT_EQ(1, matchers_.size());
   statuses_.resize(matchers_.size());
@@ -49,7 +49,7 @@ not_match:
   any_match: true
 )EOF";
 
-  MessageUtil::loadFromYaml(matcher_yaml, config_);
+  TestUtility::loadFromYaml(matcher_yaml, config_);
   buildMatcher(config_, matchers_);
   EXPECT_EQ(2, matchers_.size());
   statuses_.resize(matchers_.size());
@@ -76,7 +76,7 @@ and_match:
             exact_match: baz
 )EOF";
 
-  MessageUtil::loadFromYaml(matcher_yaml, config_);
+  TestUtility::loadFromYaml(matcher_yaml, config_);
   buildMatcher(config_, matchers_);
   EXPECT_EQ(2, matchers_.size());
   statuses_.resize(matchers_.size());

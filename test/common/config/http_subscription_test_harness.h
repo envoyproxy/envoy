@@ -16,6 +16,7 @@
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/local_info/mocks.h"
+#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
@@ -46,18 +47,20 @@ public:
     }));
     subscription_ = std::make_unique<HttpSubscriptionImpl>(
         local_info_, cm_, "eds_cluster", dispatcher_, random_gen_, std::chrono::milliseconds(1),
-        std::chrono::milliseconds(1000), *method_descriptor_, stats_, init_fetch_timeout);
+        std::chrono::milliseconds(1000), *method_descriptor_, callbacks_, stats_,
+        init_fetch_timeout, validation_visitor_);
   }
 
-  ~HttpSubscriptionTestHarness() {
+  ~HttpSubscriptionTestHarness() override {
     // Stop subscribing on the way out.
     if (request_in_progress_) {
       EXPECT_CALL(http_request_, cancel());
     }
   }
 
-  void expectSendMessage(const std::set<std::string>& cluster_names,
-                         const std::string& version) override {
+  void expectSendMessage(const std::set<std::string>& cluster_names, const std::string& version,
+                         bool expect_node = false) override {
+    UNREFERENCED_PARAMETER(expect_node);
     EXPECT_CALL(cm_, httpAsyncClientForCluster("eds_cluster"));
     EXPECT_CALL(cm_.async_client_, send_(_, _, _))
         .WillOnce(Invoke([this, cluster_names, version](Http::MessagePtr& request,
@@ -100,7 +103,7 @@ public:
     version_ = "";
     cluster_names_ = cluster_names;
     expectSendMessage(cluster_names, "");
-    subscription_->start(cluster_names, callbacks_);
+    subscription_->start(cluster_names);
   }
 
   void updateResources(const std::set<std::string>& cluster_names) override {
@@ -112,6 +115,12 @@ public:
 
   void deliverConfigUpdate(const std::vector<std::string>& cluster_names,
                            const std::string& version, bool accept) override {
+    deliverConfigUpdate(cluster_names, version, accept, true, "200");
+  }
+
+  void deliverConfigUpdate(const std::vector<std::string>& cluster_names,
+                           const std::string& version, bool accept, bool modify,
+                           const std::string& response_code) {
     std::string response_json = "{\"version_info\":\"" + version + "\",\"resources\":[";
     for (const auto& cluster : cluster_names) {
       response_json += "{\"@type\":\"type.googleapis.com/"
@@ -121,14 +130,18 @@ public:
     response_json.pop_back();
     response_json += "]}";
     envoy::api::v2::DiscoveryResponse response_pb;
-    MessageUtil::loadFromJson(response_json, response_pb);
-    Http::HeaderMapPtr response_headers{new Http::TestHeaderMapImpl{{":status", "200"}}};
+    TestUtility::loadFromJson(response_json, response_pb);
+    Http::HeaderMapPtr response_headers{new Http::TestHeaderMapImpl{{":status", response_code}}};
     Http::MessagePtr message{new Http::ResponseMessageImpl(std::move(response_headers))};
     message->body() = std::make_unique<Buffer::OwnedImpl>(response_json);
-    EXPECT_CALL(callbacks_, onConfigUpdate(RepeatedProtoEq(response_pb.resources()), version))
-        .WillOnce(ThrowOnRejectedConfig(accept));
+
+    if (modify) {
+      EXPECT_CALL(callbacks_, onConfigUpdate(RepeatedProtoEq(response_pb.resources()), version))
+          .WillOnce(ThrowOnRejectedConfig(accept));
+    }
     if (!accept) {
-      EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
+      EXPECT_CALL(callbacks_, onConfigUpdateFailed(
+                                  Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, _));
     }
     EXPECT_CALL(random_gen_, random()).WillOnce(Return(0));
     EXPECT_CALL(*timer_, enableTimer(_));
@@ -141,7 +154,7 @@ public:
   }
 
   void expectConfigUpdateFailed() override {
-    EXPECT_CALL(callbacks_, onConfigUpdateFailed(nullptr));
+    EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, nullptr));
   }
 
   void expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds timeout) override {
@@ -176,6 +189,7 @@ public:
   std::unique_ptr<HttpSubscriptionImpl> subscription_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Event::MockTimer* init_timeout_timer_;
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
 };
 
 } // namespace Config

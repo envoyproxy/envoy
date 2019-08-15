@@ -5,7 +5,7 @@
 #include "envoy/server/hot_restart.h"
 
 #include "common/common/thread.h"
-#include "common/stats/heap_stat_data.h"
+#include "common/stats/allocator_impl.h"
 
 namespace Envoy {
 namespace Server {
@@ -21,9 +21,7 @@ public:
   void initialize(Event::Dispatcher&, Server::Instance&) override {}
   void sendParentAdminShutdownRequest(time_t&) override {}
   void sendParentTerminateRequest() override {}
-  ServerStatsFromParent mergeParentStatsIfAny(Stats::StoreRoot&) override {
-    return ServerStatsFromParent();
-  }
+  ServerStatsFromParent mergeParentStatsIfAny(Stats::StoreRoot&) override { return {}; }
   void shutdown() override {}
   std::string version() override { return "disabled"; }
   Thread::BasicLockable& logLock() override { return log_lock_; }

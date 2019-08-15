@@ -162,12 +162,32 @@ modify different aspects of the server:
 
   See :option:`--hot-restart-version`.
 
+.. _operations_admin_interface_listeners:
+
+.. http:get:: /listeners
+
+  List out all configured :ref:`listeners <arch_overview_listeners>`. This information includes the names of listeners as well as
+  the addresses that they are listening on. If a listener is configured to listen on port 0, then the output will contain the actual
+  port that was allocated by the OS.
+
+.. http:get:: /listeners?format=json
+
+  Dump the */listeners* output in a JSON-serialized proto. See the
+  :ref:`definition <envoy_api_msg_admin.v2alpha.Listeners>` for more information.
+
 .. _operations_admin_interface_logging:
 
 .. http:post:: /logging
 
-  Enable/disable different logging levels on different subcomponents. Generally only used during
-  development.
+  Enable/disable different logging levels on a particular logger or all loggers.
+
+  - To change the logging level across all loggers, set the query parameter as level=<desired_level>.
+  - To change a particular logger's level, set the query parameter like so, <logger_name>=<desired_level>.
+  - To list the loggers, send a POST request to the /logging endpoint without a query parameter.
+
+  .. note::
+
+    Generally only used during development.
 
 .. http:post:: /memory
 

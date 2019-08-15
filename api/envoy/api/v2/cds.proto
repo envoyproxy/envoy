@@ -16,6 +16,7 @@ import "envoy/api/v2/discovery.proto";
 import "envoy/api/v2/core/health_check.proto";
 import "envoy/api/v2/core/protocol.proto";
 import "envoy/api/v2/cluster/circuit_breaker.proto";
+import "envoy/api/v2/cluster/filter.proto";
 import "envoy/api/v2/cluster/outlier_detection.proto";
 import "envoy/api/v2/eds.proto";
 import "envoy/type/percent.proto";
@@ -51,7 +52,7 @@ service ClusterDiscoveryService {
 // [#protodoc-title: Clusters]
 
 // Configuration for a single upstream cluster.
-// [#comment:next free field: 39]
+// [#comment:next free field: 41]
 message Cluster {
   // Supplies the name of the cluster which must be unique across all clusters.
   // The cluster name is used when emitting
@@ -126,11 +127,8 @@ message Cluster {
   EdsClusterConfig eds_cluster_config = 3;
 
   // The timeout for new network connections to hosts in the cluster.
-  google.protobuf.Duration connect_timeout = 4 [
-    (validate.rules).duration.gt = {},
-    (gogoproto.stdduration) = true,
-    (gogoproto.nullable) = false
-  ];
+  google.protobuf.Duration connect_timeout = 4
+      [(validate.rules).duration.gt = {}, (gogoproto.stdduration) = true];
 
   // Soft limit on size of the cluster’s connections read and write buffers. If
   // unspecified, an implementation defined default is applied (1MiB).
@@ -139,7 +137,6 @@ message Cluster {
   // Refer to :ref:`load balancer type <arch_overview_load_balancing_types>` architecture
   // overview section for information on each type.
   enum LbPolicy {
-
     // Refer to the :ref:`round robin load balancing
     // policy<arch_overview_load_balancing_types_round_robin>`
     // for an explanation.
@@ -163,11 +160,21 @@ message Cluster {
     // Refer to the :ref:`original destination load balancing
     // policy<arch_overview_load_balancing_types_original_destination>`
     // for an explanation.
-    ORIGINAL_DST_LB = 4;
+    //
+    // .. attention::
+    //
+    //   **This load balancing policy is deprecated**. Use CLUSTER_PROVIDED instead.
+    //
+    ORIGINAL_DST_LB = 4 [deprecated = true];
 
     // Refer to the :ref:`Maglev load balancing policy<arch_overview_load_balancing_types_maglev>`
     // for an explanation.
     MAGLEV = 5;
+
+    // This load balancer type must be specified if the configured cluster provides a cluster
+    // specific load balancer. Consult the configured cluster's documentation for whether to set
+    // this option or not.
+    CLUSTER_PROVIDED = 6;
   }
   // The :ref:`load balancer type <arch_overview_load_balancing_types>` to use
   // when picking a host in the cluster.
@@ -184,7 +191,7 @@ message Cluster {
   //   **This field is deprecated**. Set the
   //   :ref:`load_assignment<envoy_api_field_Cluster.load_assignment>` field instead.
   //
-  repeated core.Address hosts = 7 [deprecated = true];
+  repeated core.Address hosts = 7;
 
   // Setting this is required for specifying members of
   // :ref:`STATIC<envoy_api_enum_value_Cluster.DiscoveryType.STATIC>`,
@@ -269,6 +276,11 @@ message Cluster {
   // this setting is ignored.
   google.protobuf.Duration dns_refresh_rate = 16
       [(validate.rules).duration.gt = {}, (gogoproto.stdduration) = true];
+
+  // Optional configuration for setting cluster's DNS refresh rate. If the value is set to true,
+  // cluster's DNS refresh rate will be set to resource record's TTL which comes from DNS
+  // resolution.
+  bool respect_dns_ttl = 39;
 
   // When V4_ONLY is selected, the DNS resolver will only perform a lookup for
   // addresses in the IPv4 family. If V6_ONLY is selected, the DNS resolver will
@@ -363,6 +375,24 @@ message Cluster {
     message LbSubsetSelector {
       // List of keys to match with the weighted cluster metadata.
       repeated string keys = 1;
+      // The behavior used when no endpoint subset matches the selected route's
+      // metadata.
+      LbSubsetSelectorFallbackPolicy fallback_policy = 2
+          [(validate.rules).enum.defined_only = true];
+
+      // Allows to override top level fallback policy per selector.
+      enum LbSubsetSelectorFallbackPolicy {
+        // If NOT_DEFINED top level config fallback policy is used instead.
+        NOT_DEFINED = 0;
+        // If NO_FALLBACK is selected, a result equivalent to no healthy hosts is reported.
+        NO_FALLBACK = 1;
+        // If ANY_ENDPOINT is selected, any cluster endpoint may be returned
+        // (subject to policy, health checks, etc).
+        ANY_ENDPOINT = 2;
+        // If DEFAULT_SUBSET is selected, load balancing is performed over the
+        // endpoints matching the values from the default_subset field.
+        DEFAULT_SUBSET = 3;
+      }
     }
 
     // For each entry, LbEndpoint.Metadata's
@@ -406,6 +436,11 @@ message Cluster {
     // subset might become empty. With this option enabled, if that happens the LB will attempt
     // to select a host from the entire cluster.
     bool panic_mode_any = 6;
+
+    // If true, metadata specified for a metadata key will be matched against the corresponding
+    // endpoint metadata if the endpoint metadata matches the value exactly OR it is a list value
+    // and any of the elements in the list matches the criteria.
+    bool list_as_any = 7;
   }
 
   // Configuration for load balancing subsetting.
@@ -485,6 +520,7 @@ message Cluster {
   message CommonLbConfig {
     // Configures the :ref:`healthy panic threshold <arch_overview_load_balancing_panic_threshold>`.
     // If not specified, the default is 50%.
+    // To disable panic mode, set to 0%.
     //
     // .. note::
     //   The specified percent will be truncated to the nearest 1%.
@@ -599,6 +635,11 @@ message Cluster {
   // If this flag is not set to true, Envoy will wait until the hosts fail active health
   // checking before removing it from the cluster.
   bool drain_connections_on_host_removal = 32;
+
+  // An optional list of network filters that make up the filter chain for
+  // outgoing connections made by the cluster. Order matters as the filters are
+  // processed sequentially as connection events happen.
+  repeated cluster.Filter filters = 40;
 }
 
 // An extensible structure containing the address Envoy should bind to when

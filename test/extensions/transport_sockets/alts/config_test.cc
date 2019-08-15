@@ -24,7 +24,7 @@ namespace {
 
 TEST(UpstreamAltsConfigTest, CreateSocketFactory) {
   MockTransportSocketFactoryContext factory_context;
-  Singleton::ManagerImpl singleton_manager{Thread::threadFactoryForTest().currentThreadId()};
+  Singleton::ManagerImpl singleton_manager{Thread::threadFactoryForTest()};
   EXPECT_CALL(factory_context, singletonManager()).WillRepeatedly(ReturnRef(singleton_manager));
   UpstreamAltsTransportSocketConfigFactory factory;
 
@@ -34,7 +34,7 @@ TEST(UpstreamAltsConfigTest, CreateSocketFactory) {
   handshaker_service: 169.254.169.254:8080
   peer_service_accounts: ["server-sa"]
   )EOF";
-  MessageUtil::loadFromYaml(yaml, *config);
+  TestUtility::loadFromYaml(yaml, *config);
 
   auto socket_factory = factory.createTransportSocketFactory(*config, factory_context);
 
@@ -44,7 +44,7 @@ TEST(UpstreamAltsConfigTest, CreateSocketFactory) {
 
 TEST(DownstreamAltsConfigTest, CreateSocketFactory) {
   MockTransportSocketFactoryContext factory_context;
-  Singleton::ManagerImpl singleton_manager{Thread::threadFactoryForTest().currentThreadId()};
+  Singleton::ManagerImpl singleton_manager{Thread::threadFactoryForTest()};
   EXPECT_CALL(factory_context, singletonManager()).WillRepeatedly(ReturnRef(singleton_manager));
   DownstreamAltsTransportSocketConfigFactory factory;
 
@@ -54,7 +54,7 @@ TEST(DownstreamAltsConfigTest, CreateSocketFactory) {
   handshaker_service: 169.254.169.254:8080
   peer_service_accounts: ["server-sa"]
   )EOF";
-  MessageUtil::loadFromYaml(yaml, *config);
+  TestUtility::loadFromYaml(yaml, *config);
 
   auto socket_factory = factory.createTransportSocketFactory(*config, factory_context, {});
 

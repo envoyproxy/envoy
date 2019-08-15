@@ -12,6 +12,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/network/address_impl.h"
 #include "common/router/router.h"
+#include "common/runtime/runtime_impl.h"
 #include "common/upstream/host_utility.h"
 
 // TODO(dio): Remove dependency to extension health checkers when redis_health_check is removed.
@@ -27,14 +28,18 @@ public:
   HealthCheckerFactoryContextImpl(Upstream::Cluster& cluster, Envoy::Runtime::Loader& runtime,
                                   Envoy::Runtime::RandomGenerator& random,
                                   Event::Dispatcher& dispatcher,
-                                  HealthCheckEventLoggerPtr&& event_logger)
+                                  HealthCheckEventLoggerPtr&& event_logger,
+                                  ProtobufMessage::ValidationVisitor& validation_visitor)
       : cluster_(cluster), runtime_(runtime), random_(random), dispatcher_(dispatcher),
-        event_logger_(std::move(event_logger)) {}
+        event_logger_(std::move(event_logger)), validation_visitor_(validation_visitor) {}
   Upstream::Cluster& cluster() override { return cluster_; }
   Envoy::Runtime::Loader& runtime() override { return runtime_; }
   Envoy::Runtime::RandomGenerator& random() override { return random_; }
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
   HealthCheckEventLoggerPtr eventLogger() override { return std::move(event_logger_); }
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
+    return validation_visitor_;
+  }
 
 private:
   Upstream::Cluster& cluster_;
@@ -42,13 +47,15 @@ private:
   Envoy::Runtime::RandomGenerator& random_;
   Event::Dispatcher& dispatcher_;
   HealthCheckEventLoggerPtr event_logger_;
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
 };
 
 HealthCheckerSharedPtr
 HealthCheckerFactory::create(const envoy::api::v2::core::HealthCheck& health_check_config,
                              Upstream::Cluster& cluster, Runtime::Loader& runtime,
                              Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
-                             AccessLog::AccessLogManager& log_manager) {
+                             AccessLog::AccessLogManager& log_manager,
+                             ProtobufMessage::ValidationVisitor& validation_visitor) {
   HealthCheckEventLoggerPtr event_logger;
   if (!health_check_config.event_log_path().empty()) {
     event_logger = std::make_unique<HealthCheckEventLoggerImpl>(
@@ -74,7 +81,7 @@ HealthCheckerFactory::create(const envoy::api::v2::core::HealthCheck& health_che
             health_check_config.custom_health_check().name());
     std::unique_ptr<Server::Configuration::HealthCheckerFactoryContext> context(
         new HealthCheckerFactoryContextImpl(cluster, runtime, random, dispatcher,
-                                            std::move(event_logger)));
+                                            std::move(event_logger), validation_visitor));
     return factory.createCustomHealthChecker(health_check_config, *context);
   }
   default:
@@ -180,6 +187,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onEvent(Network::Conne
     // For the raw disconnect event, we are either between intervals in which case we already have
     // a timer setup, or we did the close or got a reset, in which case we already setup a new
     // timer. There is nothing to do here other than blow away the client.
+    response_headers_.reset();
     parent_.dispatcher_.deferredDelete(std::move(client_));
   }
 }
@@ -243,7 +251,7 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
                   response_headers_->EnvoyUpstreamHealthCheckedCluster()->value().getStringView())
             : EMPTY_STRING;
 
-    if (service_cluster_healthchecked.find(parent_.service_name_.value()) == 0) {
+    if (absl::StartsWith(service_cluster_healthchecked, parent_.service_name_.value())) {
       return degraded ? HealthCheckResult::Degraded : HealthCheckResult::Succeeded;
     } else {
       return HealthCheckResult::Failed;

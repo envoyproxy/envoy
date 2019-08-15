@@ -18,6 +18,7 @@ CB
 CBs
 CDS
 CHACHA
+CHLO
 CIDR
 CLA
 CLI
@@ -50,6 +51,7 @@ DER
 DESC
 DFATAL
 DGRAM
+DHE
 DLOG
 DNS
 DRYs
@@ -68,6 +70,7 @@ ECONNREFUSED
 EDESTRUCTION
 EDF
 EDS
+EINVAL
 EIP
 ELB
 ENOTSUP
@@ -82,6 +85,7 @@ EVAL
 EVLOOP
 EVP
 EWOULDBLOCK
+EXPECTs
 EXPR
 FAQ
 FDs
@@ -90,6 +94,7 @@ FIN
 FIPS
 FQDN
 FUZZER
+FUZZERS
 GB
 GC
 GCC
@@ -102,6 +107,7 @@ GOAWAY
 GRPC
 GTEST
 GiB
+GURL
 HC
 HCM
 HDS
@@ -149,6 +155,7 @@ MGET
 MSET
 MSVC
 MTLS
+MTU
 MiB
 NACK
 NACKs
@@ -161,6 +168,7 @@ NOAUTH
 NOLINT
 NOLINTNEXTLINE
 NONCES
+NOSORT
 NS
 NUL
 Nilsson
@@ -176,6 +184,7 @@ OSS
 OSX
 OT
 OU
+OVFL
 PB
 PC
 PCC
@@ -195,6 +204,8 @@ QUIC
 RAII
 RANLUX
 RBAC
+RECVDSTADDR
+RECVPKTINFO
 RCU
 RDN
 RDS
@@ -210,15 +221,19 @@ RNG
 RPC
 RSA
 RST
+RTDS
 RTTI
 RW
 RX
+RXQ
 Runn
 SA
 SAN
 SANs
+SCT
 SDK
 SDS
+SENDSRCADDR
 SHA
 SHM
 SIBABRT
@@ -230,6 +245,7 @@ SIGSEGV
 SIGTERM
 SimpleAtoi
 SNI
+SPD
 SPDY
 SPIFFE
 SPKI
@@ -257,6 +273,7 @@ TPROXY
 TSAN
 TSI
 TTL
+TTLs
 TX
 TXT
 UA
@@ -280,6 +297,11 @@ WS
 Welford's
 Werror
 XDS
+decRefCount
+getaddrinfo
+sendto
+ssize
+upcasts
 vip
 xDSes
 XFCC
@@ -298,6 +320,7 @@ accessors
 acls
 addr
 agg
+alignas
 alignof
 alloc
 alloca
@@ -315,6 +338,7 @@ argv
 artisanal
 ary
 async
+atomicity
 atomicly
 atomics
 atoull
@@ -348,6 +372,7 @@ casted
 chrono
 chroot
 chunked
+ci
 circllhist
 cmd
 codec
@@ -378,6 +403,7 @@ cstring
 ctor
 ctrl
 customizations
+darwin
 dbg
 de
 dechunking
@@ -443,6 +469,7 @@ evthread
 evwatch
 exe
 execlp
+expectDeltaAndSotwUpdate
 facto
 favicon
 fd
@@ -526,6 +553,7 @@ keepalives
 ketama
 kqueue
 kubernetes
+kv
 kvs
 lala
 latencies
@@ -586,6 +614,7 @@ optimizations
 ostream
 outlier
 outliers
+offsetof
 overridable
 param
 parameterizable
@@ -597,6 +626,7 @@ params
 paren
 parentid
 parsers
+passthroughs
 pcall
 pcap
 pclose
@@ -624,6 +654,7 @@ pthreads
 pton
 ptr
 ptrs
+pts
 pwd
 py
 qps
@@ -709,7 +740,9 @@ strtoull
 struct
 structs
 subexpr
+subdirs
 symlink
+symlinks
 symlinked
 sync
 sys
@@ -818,3 +851,5 @@ zag
 zig
 zlib
 zxid
+xmodem
+citt

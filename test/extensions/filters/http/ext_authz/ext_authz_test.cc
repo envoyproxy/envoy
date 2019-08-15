@@ -53,7 +53,7 @@ public:
   void initialize(std::string&& yaml) {
     envoy::config::filter::http::ext_authz::v2::ExtAuthz proto_config{};
     if (!yaml.empty()) {
-      MessageUtil::loadFromYaml(yaml, proto_config);
+      TestUtility::loadFromYaml(yaml, proto_config);
     }
     config_.reset(
         new FilterConfig(proto_config, local_info_, stats_store_, runtime_, http_context_));
@@ -63,6 +63,7 @@ public:
     addr_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
   }
 
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   FilterConfigSharedPtr config_;
   Filters::Common::ExtAuthz::MockClient* client_;
   std::unique_ptr<Filter> filter_;
@@ -70,7 +71,6 @@ public:
   Filters::Common::ExtAuthz::RequestCallbacks* request_callbacks_;
   Http::TestHeaderMapImpl request_headers_;
   Buffer::OwnedImpl data_;
-  NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
@@ -115,7 +115,7 @@ envoy::config::filter::http::ext_authz::v2::ExtAuthz GetFilterConfig() {
   )EOF";
 
   envoy::config::filter::http::ext_authz::v2::ExtAuthz proto_config{};
-  MessageUtil::loadFromYaml(http_client ? http_config : grpc_config, proto_config);
+  TestUtility::loadFromYaml(http_client ? http_config : grpc_config, proto_config);
   proto_config.set_failure_mode_allow(failure_mode_allow_value);
   return proto_config;
 }
@@ -304,7 +304,7 @@ TEST_F(HttpFilterTest, BadConfig) {
   failure_mode_allow: true
   )EOF";
   envoy::config::filter::http::ext_authz::v2::ExtAuthz proto_config{};
-  MessageUtil::loadFromYaml(filter_config, proto_config);
+  TestUtility::loadFromYaml(filter_config, proto_config);
   EXPECT_THROW(
       MessageUtil::downcastAndValidate<const envoy::config::filter::http::ext_authz::v2::ExtAuthz&>(
           proto_config),
@@ -806,6 +806,8 @@ TEST_F(HttpFilterTestParam, ContextExtensions) {
 
   // Engage the filter so that check is called.
   filter_->decodeHeaders(request_headers_, false);
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
 
   // Make sure that the extensions appear in the check request issued by the filter.
   EXPECT_EQ("value_vhost", check_request.attributes().context_extensions().at("key_vhost"));

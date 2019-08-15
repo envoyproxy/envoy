@@ -20,15 +20,15 @@ Stats::ScopePtr generateStatsScope(const envoy::api::v2::Cluster& config, Stats:
 
 } // namespace
 
-ClusterSharedPtr ClusterFactoryImplBase::create(
+std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ClusterFactoryImplBase::create(
     const envoy::api::v2::Cluster& cluster, ClusterManager& cluster_manager, Stats::Store& stats,
     ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
     Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
     Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
     AccessLog::AccessLogManager& log_manager, const LocalInfo::LocalInfo& local_info,
     Server::Admin& admin, Singleton::Manager& singleton_manager,
-    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api, Api::Api& api) {
-
+    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api,
+    ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api) {
   std::string cluster_type;
 
   if (!cluster.has_cluster_type()) {
@@ -61,10 +61,10 @@ ClusterSharedPtr ClusterFactoryImplBase::create(
         "Didn't find a registered cluster factory implementation for name: '{}'", cluster_type));
   }
 
-  ClusterFactoryContextImpl context(cluster_manager, stats, tls, std::move(dns_resolver),
-                                    ssl_context_manager, runtime, random, dispatcher, log_manager,
-                                    local_info, admin, singleton_manager,
-                                    std::move(outlier_event_logger), added_via_api, api);
+  ClusterFactoryContextImpl context(
+      cluster_manager, stats, tls, std::move(dns_resolver), ssl_context_manager, runtime, random,
+      dispatcher, log_manager, local_info, admin, singleton_manager,
+      std::move(outlier_event_logger), added_via_api, validation_visitor, api);
   return factory->create(cluster, context);
 }
 
@@ -90,16 +90,16 @@ ClusterFactoryImplBase::selectDnsResolver(const envoy::api::v2::Cluster& cluster
   return context.dnsResolver();
 }
 
-ClusterSharedPtr ClusterFactoryImplBase::create(const envoy::api::v2::Cluster& cluster,
-                                                ClusterFactoryContext& context) {
-
+std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
+ClusterFactoryImplBase::create(const envoy::api::v2::Cluster& cluster,
+                               ClusterFactoryContext& context) {
   auto stats_scope = generateStatsScope(cluster, context.stats());
   Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       context.admin(), context.sslContextManager(), *stats_scope, context.clusterManager(),
       context.localInfo(), context.dispatcher(), context.random(), context.stats(),
-      context.singletonManager(), context.tls(), context.api());
+      context.singletonManager(), context.tls(), context.messageValidationVisitor(), context.api());
 
-  ClusterImplBaseSharedPtr new_cluster =
+  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> new_cluster_pair =
       createClusterImpl(cluster, context, factory_context, std::move(stats_scope));
 
   if (!cluster.health_checks().empty()) {
@@ -107,16 +107,16 @@ ClusterSharedPtr ClusterFactoryImplBase::create(const envoy::api::v2::Cluster& c
     if (cluster.health_checks().size() != 1) {
       throw EnvoyException("Multiple health checks not supported");
     } else {
-      new_cluster->setHealthChecker(HealthCheckerFactory::create(
-          cluster.health_checks()[0], *new_cluster, context.runtime(), context.random(),
-          context.dispatcher(), context.logManager()));
+      new_cluster_pair.first->setHealthChecker(HealthCheckerFactory::create(
+          cluster.health_checks()[0], *new_cluster_pair.first, context.runtime(), context.random(),
+          context.dispatcher(), context.logManager(), context.messageValidationVisitor()));
     }
   }
 
-  new_cluster->setOutlierDetector(Outlier::DetectorImplFactory::createForCluster(
-      *new_cluster, cluster, context.dispatcher(), context.runtime(),
+  new_cluster_pair.first->setOutlierDetector(Outlier::DetectorImplFactory::createForCluster(
+      *new_cluster_pair.first, cluster, context.dispatcher(), context.runtime(),
       context.outlierEventLogger()));
-  return new_cluster;
+  return new_cluster_pair;
 }
 
 } // namespace Upstream

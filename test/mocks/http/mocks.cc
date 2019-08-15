@@ -19,26 +19,26 @@ using testing::SaveArg;
 namespace Envoy {
 namespace Http {
 
-MockConnectionCallbacks::MockConnectionCallbacks() {}
-MockConnectionCallbacks::~MockConnectionCallbacks() {}
+MockConnectionCallbacks::MockConnectionCallbacks() = default;
+MockConnectionCallbacks::~MockConnectionCallbacks() = default;
 
-MockServerConnectionCallbacks::MockServerConnectionCallbacks() {}
-MockServerConnectionCallbacks::~MockServerConnectionCallbacks() {}
+MockServerConnectionCallbacks::MockServerConnectionCallbacks() = default;
+MockServerConnectionCallbacks::~MockServerConnectionCallbacks() = default;
 
-MockStreamCallbacks::MockStreamCallbacks() {}
-MockStreamCallbacks::~MockStreamCallbacks() {}
+MockStreamCallbacks::MockStreamCallbacks() = default;
+MockStreamCallbacks::~MockStreamCallbacks() = default;
 
 MockServerConnection::MockServerConnection() {
   ON_CALL(*this, protocol()).WillByDefault(Return(protocol_));
 }
 
-MockServerConnection::~MockServerConnection() {}
+MockServerConnection::~MockServerConnection() = default;
 
-MockClientConnection::MockClientConnection() {}
-MockClientConnection::~MockClientConnection() {}
+MockClientConnection::MockClientConnection() = default;
+MockClientConnection::~MockClientConnection() = default;
 
-MockFilterChainFactory::MockFilterChainFactory() {}
-MockFilterChainFactory::~MockFilterChainFactory() {}
+MockFilterChainFactory::MockFilterChainFactory() = default;
+MockFilterChainFactory::~MockFilterChainFactory() = default;
 
 template <class T> static void initializeMockStreamFilterCallbacks(T& callbacks) {
   callbacks.cluster_info_.reset(new NiceMock<Upstream::MockClusterInfo>());
@@ -65,18 +65,43 @@ MockStreamDecoderFilterCallbacks::MockStreamDecoderFilterCallbacks() {
 
   ON_CALL(*this, activeSpan()).WillByDefault(ReturnRef(active_span_));
   ON_CALL(*this, tracingConfig()).WillByDefault(ReturnRef(tracing_config_));
+  ON_CALL(*this, scope()).WillByDefault(ReturnRef(scope_));
+  ON_CALL(*this, sendLocalReply(_, _, _, _, _))
+      .WillByDefault(Invoke([this](Code code, absl::string_view body,
+                                   std::function<void(HeaderMap & headers)> modify_headers,
+                                   const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                                   absl::string_view details) {
+        sendLocalReply_(code, body, modify_headers, grpc_status, details);
+      }));
 }
 
-MockStreamDecoderFilterCallbacks::~MockStreamDecoderFilterCallbacks() {}
+MockStreamDecoderFilterCallbacks::~MockStreamDecoderFilterCallbacks() = default;
+
+void MockStreamDecoderFilterCallbacks::sendLocalReply_(
+    Code code, absl::string_view body, std::function<void(HeaderMap& headers)> modify_headers,
+    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
+  details_ = std::string(details);
+  Utility::sendLocalReply(
+      is_grpc_request_,
+      [this, modify_headers](HeaderMapPtr&& headers, bool end_stream) -> void {
+        if (modify_headers != nullptr) {
+          modify_headers(*headers);
+        }
+        encodeHeaders(std::move(headers), end_stream);
+      },
+      [this](Buffer::Instance& data, bool end_stream) -> void { encodeData(data, end_stream); },
+      stream_destroyed_, code, body, grpc_status, is_head_request_);
+}
 
 MockStreamEncoderFilterCallbacks::MockStreamEncoderFilterCallbacks() {
   initializeMockStreamFilterCallbacks(*this);
   ON_CALL(*this, encodingBuffer()).WillByDefault(Invoke(&buffer_, &Buffer::InstancePtr::get));
   ON_CALL(*this, activeSpan()).WillByDefault(ReturnRef(active_span_));
   ON_CALL(*this, tracingConfig()).WillByDefault(ReturnRef(tracing_config_));
+  ON_CALL(*this, scope()).WillByDefault(ReturnRef(scope_));
 }
 
-MockStreamEncoderFilterCallbacks::~MockStreamEncoderFilterCallbacks() {}
+MockStreamEncoderFilterCallbacks::~MockStreamEncoderFilterCallbacks() = default;
 
 MockStreamDecoderFilter::MockStreamDecoderFilter() {
   ON_CALL(*this, setDecoderFilterCallbacks(_))
@@ -84,7 +109,7 @@ MockStreamDecoderFilter::MockStreamDecoderFilter() {
           [this](StreamDecoderFilterCallbacks& callbacks) -> void { callbacks_ = &callbacks; }));
 }
 
-MockStreamDecoderFilter::~MockStreamDecoderFilter() {}
+MockStreamDecoderFilter::~MockStreamDecoderFilter() = default;
 
 MockStreamEncoderFilter::MockStreamEncoderFilter() {
   ON_CALL(*this, setEncoderFilterCallbacks(_))
@@ -92,7 +117,7 @@ MockStreamEncoderFilter::MockStreamEncoderFilter() {
           [this](StreamEncoderFilterCallbacks& callbacks) -> void { callbacks_ = &callbacks; }));
 }
 
-MockStreamEncoderFilter::~MockStreamEncoderFilter() {}
+MockStreamEncoderFilter::~MockStreamEncoderFilter() = default;
 
 MockStreamFilter::MockStreamFilter() {
   ON_CALL(*this, setDecoderFilterCallbacks(_))
@@ -105,27 +130,27 @@ MockStreamFilter::MockStreamFilter() {
       }));
 }
 
-MockStreamFilter::~MockStreamFilter() {}
+MockStreamFilter::~MockStreamFilter() = default;
 
 MockAsyncClient::MockAsyncClient() {
   ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
 }
-MockAsyncClient::~MockAsyncClient() {}
+MockAsyncClient::~MockAsyncClient() = default;
 
-MockAsyncClientCallbacks::MockAsyncClientCallbacks() {}
-MockAsyncClientCallbacks::~MockAsyncClientCallbacks() {}
+MockAsyncClientCallbacks::MockAsyncClientCallbacks() = default;
+MockAsyncClientCallbacks::~MockAsyncClientCallbacks() = default;
 
-MockAsyncClientStreamCallbacks::MockAsyncClientStreamCallbacks() {}
-MockAsyncClientStreamCallbacks::~MockAsyncClientStreamCallbacks() {}
+MockAsyncClientStreamCallbacks::MockAsyncClientStreamCallbacks() = default;
+MockAsyncClientStreamCallbacks::~MockAsyncClientStreamCallbacks() = default;
 
 MockAsyncClientRequest::MockAsyncClientRequest(MockAsyncClient* client) : client_(client) {}
 MockAsyncClientRequest::~MockAsyncClientRequest() { client_->onRequestDestroy(); }
 
-MockAsyncClientStream::MockAsyncClientStream() {}
-MockAsyncClientStream::~MockAsyncClientStream() {}
+MockAsyncClientStream::MockAsyncClientStream() = default;
+MockAsyncClientStream::~MockAsyncClientStream() = default;
 
-MockFilterChainFactoryCallbacks::MockFilterChainFactoryCallbacks() {}
-MockFilterChainFactoryCallbacks::~MockFilterChainFactoryCallbacks() {}
+MockFilterChainFactoryCallbacks::MockFilterChainFactoryCallbacks() = default;
+MockFilterChainFactoryCallbacks::~MockFilterChainFactoryCallbacks() = default;
 
 } // namespace Http
 

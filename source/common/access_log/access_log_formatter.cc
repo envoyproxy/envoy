@@ -23,6 +23,11 @@ static const std::string UnspecifiedValueString = "-";
 
 namespace {
 
+// Matches newline pattern in a StartTimeFormatter format string.
+const std::regex& getStartTimeNewlinePattern(){
+    CONSTRUCT_ON_FIRST_USE(std::regex, "%[-_0^#]*[1-9]*n")};
+const std::regex& getNewlinePattern(){CONSTRUCT_ON_FIRST_USE(std::regex, "\n")};
+
 // Helper that handles the case when the ConnectionInfo is missing or if the desired value is
 // empty.
 StreamInfoFormatter::FieldExtractor sslConnectionInfoStringExtractor(
@@ -40,6 +45,22 @@ StreamInfoFormatter::FieldExtractor sslConnectionInfoStringExtractor(
     }
   };
 }
+
+// Helper that handles the case when the desired time field is empty.
+StreamInfoFormatter::FieldExtractor sslConnectionInfoStringTimeExtractor(
+    std::function<absl::optional<SystemTime>(const Ssl::ConnectionInfo& connection_info)>
+        time_extractor) {
+  return sslConnectionInfoStringExtractor(
+      [time_extractor](const Ssl::ConnectionInfo& connection_info) {
+        absl::optional<SystemTime> time = time_extractor(connection_info);
+        if (!time.has_value()) {
+          return UnspecifiedValueString;
+        }
+
+        return AccessLogDateTimeFormatter::fromTime(time.value());
+      });
+}
+
 } // namespace
 
 const std::string AccessLogFormatUtils::DEFAULT_FORMAT =
@@ -150,6 +171,11 @@ void AccessLogFormatParser::parseCommandHeader(const std::string& token, const s
   } else {
     alternative_header = "";
   }
+  // The main and alternative header should not contain invalid characters {NUL, LR, CF}.
+  if (std::regex_search(main_header, getNewlinePattern()) ||
+      std::regex_search(alternative_header, getNewlinePattern())) {
+    throw EnvoyException("Invalid header configuration. Format string contains newline.");
+  }
 }
 
 void AccessLogFormatParser::parseCommand(const std::string& token, const size_t start,
@@ -219,7 +245,7 @@ std::vector<FormatterProviderPtr> AccessLogFormatParser::parse(const std::string
       pos += 1;
       int command_end_position = pos + token.length();
 
-      if (token.find("REQ(") == 0) {
+      if (absl::StartsWith(token, "REQ(")) {
         std::string main_header, alternative_header;
         absl::optional<size_t> max_length;
 
@@ -227,7 +253,7 @@ std::vector<FormatterProviderPtr> AccessLogFormatParser::parse(const std::string
 
         formatters.emplace_back(FormatterProviderPtr{
             new RequestHeaderFormatter(main_header, alternative_header, max_length)});
-      } else if (token.find("RESP(") == 0) {
+      } else if (absl::StartsWith(token, "RESP(")) {
         std::string main_header, alternative_header;
         absl::optional<size_t> max_length;
 
@@ -235,7 +261,7 @@ std::vector<FormatterProviderPtr> AccessLogFormatParser::parse(const std::string
 
         formatters.emplace_back(FormatterProviderPtr{
             new ResponseHeaderFormatter(main_header, alternative_header, max_length)});
-      } else if (token.find("TRAILER(") == 0) {
+      } else if (absl::StartsWith(token, "TRAILER(")) {
         std::string main_header, alternative_header;
         absl::optional<size_t> max_length;
 
@@ -243,7 +269,7 @@ std::vector<FormatterProviderPtr> AccessLogFormatParser::parse(const std::string
 
         formatters.emplace_back(FormatterProviderPtr{
             new ResponseTrailerFormatter(main_header, alternative_header, max_length)});
-      } else if (token.find(DYNAMIC_META_TOKEN) == 0) {
+      } else if (absl::StartsWith(token, DYNAMIC_META_TOKEN)) {
         std::string filter_namespace;
         absl::optional<size_t> max_length;
         std::vector<std::string> path;
@@ -252,13 +278,18 @@ std::vector<FormatterProviderPtr> AccessLogFormatParser::parse(const std::string
         parseCommand(token, start, ":", filter_namespace, path, max_length);
         formatters.emplace_back(
             FormatterProviderPtr{new DynamicMetadataFormatter(filter_namespace, path, max_length)});
-      } else if (token.find("START_TIME") == 0) {
+      } else if (absl::StartsWith(token, "START_TIME")) {
         const size_t parameters_length = pos + StartTimeParamStart + 1;
         const size_t parameters_end = command_end_position - parameters_length;
 
         const std::string args = token[StartTimeParamStart - 1] == '('
                                      ? token.substr(StartTimeParamStart, parameters_end)
                                      : "";
+        // Validate the input specifier here. The formatted string may be destined for a header, and
+        // should not contain invalid characters {NUL, LR, CF}.
+        if (std::regex_search(args, getStartTimeNewlinePattern())) {
+          throw EnvoyException("Invalid header configuration. Format string contains newline.");
+        }
         formatters.emplace_back(FormatterProviderPtr{new StartTimeFormatter(args)});
       } else {
         formatters.emplace_back(FormatterProviderPtr{new StreamInfoFormatter(token)});
@@ -405,6 +436,49 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
   } else if (field_name == "DOWNSTREAM_TLS_SESSION_ID") {
     field_extractor_ = sslConnectionInfoStringExtractor(
         [](const Ssl::ConnectionInfo& connection_info) { return connection_info.sessionId(); });
+  } else if (field_name == "DOWNSTREAM_TLS_CIPHER") {
+    field_extractor_ =
+        sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
+          return connection_info.ciphersuiteString();
+        });
+  } else if (field_name == "DOWNSTREAM_TLS_VERSION") {
+    field_extractor_ = sslConnectionInfoStringExtractor(
+        [](const Ssl::ConnectionInfo& connection_info) { return connection_info.tlsVersion(); });
+  } else if (field_name == "DOWNSTREAM_PEER_FINGERPRINT_256") {
+    field_extractor_ =
+        sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
+          return connection_info.sha256PeerCertificateDigest();
+        });
+  } else if (field_name == "DOWNSTREAM_PEER_SERIAL") {
+    field_extractor_ =
+        sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
+          return connection_info.serialNumberPeerCertificate();
+        });
+  } else if (field_name == "DOWNSTREAM_PEER_ISSUER") {
+    field_extractor_ =
+        sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
+          return connection_info.issuerPeerCertificate();
+        });
+  } else if (field_name == "DOWNSTREAM_PEER_SUBJECT") {
+    field_extractor_ =
+        sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
+          return connection_info.subjectPeerCertificate();
+        });
+  } else if (field_name == "DOWNSTREAM_PEER_CERT") {
+    field_extractor_ =
+        sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
+          return connection_info.urlEncodedPemEncodedPeerCertificate();
+        });
+  } else if (field_name == "DOWNSTREAM_PEER_CERT_V_START") {
+    field_extractor_ =
+        sslConnectionInfoStringTimeExtractor([](const Ssl::ConnectionInfo& connection_info) {
+          return connection_info.validFromPeerCertificate();
+        });
+  } else if (field_name == "DOWNSTREAM_PEER_CERT_V_END") {
+    field_extractor_ =
+        sslConnectionInfoStringTimeExtractor([](const Ssl::ConnectionInfo& connection_info) {
+          return connection_info.expirationPeerCertificate();
+        });
   } else if (field_name == "UPSTREAM_TRANSPORT_FAILURE_REASON") {
     field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
       if (!stream_info.upstreamTransportFailureReason().empty()) {

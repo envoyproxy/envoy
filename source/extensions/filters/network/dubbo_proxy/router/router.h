@@ -32,6 +32,8 @@ public:
   virtual const Envoy::Router::MetadataMatchCriteria* metadataMatchCriteria() const PURE;
 };
 
+using RouteEntryPtr = std::shared_ptr<RouteEntry>;
+
 /**
  * Route holds the RouteEntry for a request.
  */
@@ -45,7 +47,8 @@ public:
   virtual const RouteEntry* routeEntry() const PURE;
 };
 
-typedef std::shared_ptr<const Route> RouteConstSharedPtr;
+using RouteConstSharedPtr = std::shared_ptr<const Route>;
+using RouteSharedPtr = std::shared_ptr<Route>;
 
 /**
  * The router configuration.
@@ -65,7 +68,7 @@ public:
                                     uint64_t random_value) const PURE;
 };
 
-typedef std::shared_ptr<const Config> ConfigConstSharedPtr;
+using ConfigConstSharedPtr = std::shared_ptr<const Config>;
 
 } // namespace Router
 } // namespace DubboProxy

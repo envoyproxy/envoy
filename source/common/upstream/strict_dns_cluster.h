@@ -40,7 +40,7 @@ private:
     HostMap all_hosts_;
   };
 
-  typedef std::unique_ptr<ResolveTarget> ResolveTargetPtr;
+  using ResolveTargetPtr = std::unique_ptr<ResolveTarget>;
 
   void updateAllHosts(const HostVector& hosts_added, const HostVector& hosts_removed,
                       uint32_t priority);
@@ -52,6 +52,7 @@ private:
   Network::DnsResolverSharedPtr dns_resolver_;
   std::list<ResolveTargetPtr> resolve_targets_;
   const std::chrono::milliseconds dns_refresh_rate_ms_;
+  const bool respect_dns_ttl_;
   Network::DnsLookupFamily dns_lookup_family_;
   uint32_t overprovisioning_factor_;
 };
@@ -65,7 +66,7 @@ public:
       : ClusterFactoryImplBase(Extensions::Clusters::ClusterTypes::get().StrictDns) {}
 
 private:
-  ClusterImplBaseSharedPtr
+  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
   createClusterImpl(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
                     Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
                     Stats::ScopePtr&& stats_scope) override;

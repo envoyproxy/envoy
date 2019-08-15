@@ -31,8 +31,8 @@ bool ipFamilySupported(int domain);
  * @param v6only disable IPv4-IPv6 mapping for IPv6 addresses?
  * @return InstanceConstSharedPtr the address.
  */
-Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, socklen_t len,
-                                                    bool v6only = true);
+InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, socklen_t len,
+                                           bool v6only = true);
 
 /**
  * Obtain an address from a bound file descriptor. Raises an EnvoyException on failure.
@@ -56,9 +56,13 @@ class InstanceBase : public Instance {
 public:
   // Network::Address::Instance
   const std::string& asString() const override { return friendly_name_; }
+  absl::string_view asStringView() const override { return friendly_name_; }
   // Default logical name is the human-readable name.
   const std::string& logicalName() const override { return asString(); }
   Type type() const override { return type_; }
+
+  virtual const sockaddr* sockAddr() const PURE;
+  virtual socklen_t sockAddrLen() const PURE;
 
 protected:
   InstanceBase(Type type) : type_(type) {}
@@ -102,6 +106,12 @@ public:
   Api::SysCallIntResult connect(int fd) const override;
   const Ip* ip() const override { return &ip_; }
   IoHandlePtr socket(SocketType type) const override;
+
+  // Network::Address::InstanceBase
+  const sockaddr* sockAddr() const override {
+    return reinterpret_cast<const sockaddr*>(&ip_.ipv4_.address_);
+  }
+  socklen_t sockAddrLen() const override { return sizeof(sockaddr_in); }
 
   /**
    * Convenience function to convert an IPv4 address to canonical string format.
@@ -171,6 +181,12 @@ public:
   const Ip* ip() const override { return &ip_; }
   IoHandlePtr socket(SocketType type) const override;
 
+  // Network::Address::InstanceBase
+  const sockaddr* sockAddr() const override {
+    return reinterpret_cast<const sockaddr*>(&ip_.ipv6_.address_);
+  }
+  socklen_t sockAddrLen() const override { return sizeof(sockaddr_in6); }
+
 private:
   struct Ipv6Helper : public Ipv6 {
     Ipv6Helper() { memset(&address_, 0, sizeof(address_)); }
@@ -227,6 +243,15 @@ public:
   Api::SysCallIntResult connect(int fd) const override;
   const Ip* ip() const override { return nullptr; }
   IoHandlePtr socket(SocketType type) const override;
+
+  // Network::Address::InstanceBase
+  const sockaddr* sockAddr() const override { return reinterpret_cast<const sockaddr*>(&address_); }
+  socklen_t sockAddrLen() const override {
+    if (abstract_namespace_) {
+      return offsetof(struct sockaddr_un, sun_path) + address_length_;
+    }
+    return sizeof(address_);
+  }
 
 private:
   sockaddr_un address_;

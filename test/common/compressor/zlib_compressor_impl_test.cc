@@ -70,7 +70,7 @@ protected:
 
 class ZlibCompressorImplTester : public ZlibCompressorImpl {
 public:
-  ZlibCompressorImplTester() : ZlibCompressorImpl() {}
+  ZlibCompressorImplTester() = default;
   ZlibCompressorImplTester(uint64_t chunk_size) : ZlibCompressorImpl(chunk_size) {}
   void compressThenFlush(Buffer::OwnedImpl& buffer) { compress(buffer, State::Flush); }
   void finish(Buffer::OwnedImpl& buffer) { compress(buffer, State::Finish); }

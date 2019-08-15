@@ -15,11 +15,11 @@ namespace Envoy {
 namespace Matchers {
 
 class ValueMatcher;
-typedef std::shared_ptr<const ValueMatcher> ValueMatcherConstSharedPtr;
+using ValueMatcherConstSharedPtr = std::shared_ptr<const ValueMatcher>;
 
 class ValueMatcher {
 public:
-  virtual ~ValueMatcher() {}
+  virtual ~ValueMatcher() = default;
 
   /**
    * Check whether the value is matched to the matcher.
@@ -107,7 +107,7 @@ class ListMatcher : public ValueMatcher {
 public:
   ListMatcher(const envoy::type::matcher::ListMatcher& matcher);
 
-  bool match(const ProtobufWkt::Value& value) const;
+  bool match(const ProtobufWkt::Value& value) const override;
 
 private:
   const envoy::type::matcher::ListMatcher matcher_;

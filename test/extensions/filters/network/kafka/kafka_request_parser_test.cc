@@ -1,5 +1,6 @@
 #include "extensions/filters/network/kafka/kafka_request_parser.h"
 
+#include "test/extensions/filters/network/kafka/buffer_based_test.h"
 #include "test/extensions/filters/network/kafka/serialization_utilities.h"
 #include "test/mocks/server/mocks.h"
 
@@ -16,32 +17,11 @@ namespace KafkaRequestParserTest {
 
 const int32_t FAILED_DESERIALIZER_STEP = 13;
 
-class KafkaRequestParserTest : public testing::Test {
-public:
-  const char* getBytes() {
-    uint64_t num_slices = buffer_.getRawSlices(nullptr, 0);
-    STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
-    buffer_.getRawSlices(slices.begin(), num_slices);
-    return reinterpret_cast<const char*>((slices[0]).mem_);
-  }
-
-  template <typename T> uint32_t putIntoBuffer(const T arg) {
-    EncodingContext encoder_{-1}; // Context's api_version is not used when serializing primitives.
-    return encoder_.encode(arg, buffer_);
-  }
-
-  absl::string_view putGarbageIntoBuffer(uint32_t size = 10000) {
-    putIntoBuffer(Bytes(size));
-    return {getBytes(), size};
-  }
-
-protected:
-  Buffer::OwnedImpl buffer_;
-};
+class KafkaRequestParserTest : public testing::Test, public BufferBasedTest {};
 
 class MockRequestParserResolver : public RequestParserResolver {
 public:
-  MockRequestParserResolver(){};
+  MockRequestParserResolver() = default;
   MOCK_CONST_METHOD3(createParser,
                      RequestParserSharedPtr(int16_t, int16_t, RequestContextSharedPtr));
 };

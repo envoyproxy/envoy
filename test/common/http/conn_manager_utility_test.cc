@@ -19,6 +19,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::An;
 using testing::InSequence;
 using testing::Matcher;
 using testing::NiceMock;
@@ -35,7 +36,10 @@ public:
 
 class MockConnectionManagerConfig : public ConnectionManagerConfig {
 public:
-  MockConnectionManagerConfig() { ON_CALL(*this, generateRequestId()).WillByDefault(Return(true)); }
+  MockConnectionManagerConfig() {
+    ON_CALL(*this, generateRequestId()).WillByDefault(Return(true));
+    ON_CALL(*this, preserveExternalRequestId()).WillByDefault(Return(false));
+  }
 
   // Http::ConnectionManagerConfig
   ServerConnectionPtr createCodec(Network::Connection& connection, const Buffer::Instance& instance,
@@ -50,12 +54,14 @@ public:
   MOCK_METHOD0(drainTimeout, std::chrono::milliseconds());
   MOCK_METHOD0(filterFactory, FilterChainFactory&());
   MOCK_METHOD0(generateRequestId, bool());
+  MOCK_CONST_METHOD0(preserveExternalRequestId, bool());
   MOCK_CONST_METHOD0(maxRequestHeadersKb, uint32_t());
   MOCK_CONST_METHOD0(idleTimeout, absl::optional<std::chrono::milliseconds>());
   MOCK_CONST_METHOD0(streamIdleTimeout, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(requestTimeout, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(delayedCloseTimeout, std::chrono::milliseconds());
-  MOCK_METHOD0(routeConfigProvider, Router::RouteConfigProvider&());
+  MOCK_METHOD0(routeConfigProvider, Router::RouteConfigProvider*());
+  MOCK_METHOD0(scopedRouteConfigProvider, Config::ConfigProvider*());
   MOCK_METHOD0(serverName, const std::string&());
   MOCK_METHOD0(stats, ConnectionManagerStats&());
   MOCK_METHOD0(tracingStats, ConnectionManagerTracingStats&());
@@ -77,6 +83,7 @@ public:
   MOCK_CONST_METHOD0(proxy100Continue, bool());
   MOCK_CONST_METHOD0(http1Settings, const Http::Http1Settings&());
   MOCK_CONST_METHOD0(shouldNormalizePath, bool());
+  MOCK_CONST_METHOD0(shouldMergeSlashes, bool());
 
   std::unique_ptr<Http::InternalAddressConfig> internal_address_config_ =
       std::make_unique<DefaultInternalAddressConfig>();
@@ -87,7 +94,12 @@ public:
   ConnectionManagerUtilityTest() {
     ON_CALL(config_, userAgent()).WillByDefault(ReturnRef(user_agent_));
 
-    tracing_config_ = {Tracing::OperationName::Ingress, {}, 100, 10000, 100, false};
+    envoy::type::FractionalPercent percent1;
+    percent1.set_numerator(100);
+    envoy::type::FractionalPercent percent2;
+    percent2.set_numerator(10000);
+    percent2.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);
+    tracing_config_ = {Tracing::OperationName::Ingress, {}, percent1, percent2, percent1, false};
     ON_CALL(config_, tracingConfig()).WillByDefault(Return(&tracing_config_));
 
     ON_CALL(config_, via()).WillByDefault(ReturnRef(via_));
@@ -109,8 +121,9 @@ public:
     MutateRequestRet ret;
     ret.downstream_address_ =
         ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
-                                                       random_, runtime_, local_info_)
+                                                       random_, local_info_)
             ->asString();
+    ConnectionManagerUtility::mutateTracingRequestHeader(headers, runtime_, config_, &route_);
     ret.internal_ = headers.EnvoyInternalRequest() != nullptr;
     return ret;
   }
@@ -119,6 +132,7 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<MockConnectionManagerConfig> config_;
   NiceMock<Router::MockConfig> route_config_;
+  NiceMock<Router::MockRoute> route_;
   absl::optional<std::string> user_agent_;
   NiceMock<Runtime::MockLoader> runtime_;
   Http::TracingConnectionManagerConfig tracing_config_;
@@ -338,7 +352,8 @@ TEST_F(ConnectionManagerUtilityTest, InternalServiceForceTrace) {
     TestHeaderMapImpl headers{
         {"x-forwarded-for", "10.0.0.1"}, {"x-request-id", uuid}, {"x-envoy-force-trace", "true"}};
     EXPECT_CALL(random_, uuid()).Times(0);
-    EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+    EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled",
+                                                   An<const envoy::type::FractionalPercent&>(), _))
         .WillOnce(Return(true));
 
     EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
@@ -352,7 +367,11 @@ TEST_F(ConnectionManagerUtilityTest, InternalServiceForceTrace) {
     TestHeaderMapImpl headers{
         {"x-forwarded-for", "34.0.0.1"}, {"x-request-id", uuid}, {"x-envoy-force-trace", "true"}};
     EXPECT_CALL(random_, uuid()).Times(0);
-    EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+    EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.random_sampling",
+                                                   An<const envoy::type::FractionalPercent&>(), _))
+        .WillOnce(Return(false));
+    EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled",
+                                                   An<const envoy::type::FractionalPercent&>(), _))
         .WillOnce(Return(true));
 
     EXPECT_EQ((MutateRequestRet{"34.0.0.1:0", false}),
@@ -366,7 +385,8 @@ TEST_F(ConnectionManagerUtilityTest, InternalServiceForceTrace) {
 TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownstream) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("34.0.0.1");
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
-  ON_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+  ON_CALL(runtime_.snapshot_,
+          featureEnabled("tracing.global_enabled", An<const envoy::type::FractionalPercent&>(), _))
       .WillByDefault(Return(true));
 
   {
@@ -390,7 +410,8 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
                               {"x-request-id", "will_be_regenerated"},
                               {"x-client-trace-id", "trace-id"}};
     EXPECT_CALL(random_, uuid());
-    EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.client_enabled", 100))
+    EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.client_enabled",
+                                                   An<const envoy::type::FractionalPercent&>()))
         .WillOnce(Return(false));
 
     EXPECT_EQ((MutateRequestRet{"34.0.0.1:0", false}),
@@ -405,7 +426,8 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
                               {"x-request-id", "will_be_regenerated"},
                               {"x-client-trace-id", "trace-id"}};
     EXPECT_CALL(random_, uuid());
-    EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.client_enabled", 100))
+    EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.client_enabled",
+                                                   An<const envoy::type::FractionalPercent&>()))
         .WillOnce(Return(true));
 
     EXPECT_EQ((MutateRequestRet{"34.0.0.1:0", false}),
@@ -752,6 +774,9 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSetForwardClientCert) {
   EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return(peer_uri_sans));
   std::string expected_pem("%3D%3Dabc%0Ade%3D");
   EXPECT_CALL(ssl, urlEncodedPemEncodedPeerCertificate()).WillOnce(ReturnRef(expected_pem));
+  std::string expected_chain_pem(expected_pem + "%3D%3Dlmn%0Aop%3D");
+  EXPECT_CALL(ssl, urlEncodedPemEncodedPeerCertificateChain())
+      .WillOnce(ReturnRef(expected_chain_pem));
   std::vector<std::string> expected_dns = {"www.example.com"};
   EXPECT_CALL(ssl, dnsSansPeerCertificate()).WillOnce(Return(expected_dns));
   ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
@@ -760,6 +785,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSetForwardClientCert) {
   std::vector<Http::ClientCertDetailsType> details = std::vector<Http::ClientCertDetailsType>();
   details.push_back(Http::ClientCertDetailsType::URI);
   details.push_back(Http::ClientCertDetailsType::Cert);
+  details.push_back(Http::ClientCertDetailsType::Chain);
   details.push_back(Http::ClientCertDetailsType::DNS);
   ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
   TestHeaderMapImpl headers;
@@ -771,6 +797,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSetForwardClientCert) {
             "Hash=abcdefg;"
             "URI=test://foo.com/fe;"
             "Cert=\"%3D%3Dabc%0Ade%3D\";"
+            "Chain=\"%3D%3Dabc%0Ade%3D%3D%3Dlmn%0Aop%3D\";"
             "DNS=www.example.com",
             headers.get_("x-forwarded-client-cert"));
 }
@@ -790,6 +817,9 @@ TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCert) {
   EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return(peer_uri_sans));
   std::string expected_pem("%3D%3Dabc%0Ade%3D");
   EXPECT_CALL(ssl, urlEncodedPemEncodedPeerCertificate()).WillOnce(ReturnRef(expected_pem));
+  std::string expected_chain_pem(expected_pem + "%3D%3Dlmn%0Aop%3D");
+  EXPECT_CALL(ssl, urlEncodedPemEncodedPeerCertificateChain())
+      .WillOnce(ReturnRef(expected_chain_pem));
   std::vector<std::string> expected_dns = {"www.example.com"};
   EXPECT_CALL(ssl, dnsSansPeerCertificate()).WillOnce(Return(expected_dns));
   ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
@@ -798,6 +828,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCert) {
   std::vector<Http::ClientCertDetailsType> details = std::vector<Http::ClientCertDetailsType>();
   details.push_back(Http::ClientCertDetailsType::URI);
   details.push_back(Http::ClientCertDetailsType::Cert);
+  details.push_back(Http::ClientCertDetailsType::Chain);
   details.push_back(Http::ClientCertDetailsType::DNS);
   ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
   TestHeaderMapImpl headers{{"x-forwarded-client-cert", "By=test://foo.com/fe;"
@@ -807,10 +838,11 @@ TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCert) {
   EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
-  EXPECT_EQ("By=test://foo.com/fe;URI=test://bar.com/be;DNS=test.com;DNS=test.com,"
-            "By=test://foo.com/be;Hash=abcdefg;URI=test://foo.com/fe;"
-            "Cert=\"%3D%3Dabc%0Ade%3D\";DNS=www.example.com",
-            headers.get_("x-forwarded-client-cert"));
+  EXPECT_EQ(
+      "By=test://foo.com/fe;URI=test://bar.com/be;DNS=test.com;DNS=test.com,"
+      "By=test://foo.com/be;Hash=abcdefg;URI=test://foo.com/fe;"
+      "Cert=\"%3D%3Dabc%0Ade%3D\";Chain=\"%3D%3Dabc%0Ade%3D%3D%3Dlmn%0Aop%3D\";DNS=www.example.com",
+      headers.get_("x-forwarded-client-cert"));
 }
 
 // This test assumes the following scenario:
@@ -859,6 +891,9 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCert) {
   EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return(peer_uri_sans));
   std::string expected_pem("abcde=");
   EXPECT_CALL(ssl, urlEncodedPemEncodedPeerCertificate()).WillOnce(ReturnRef(expected_pem));
+  std::string expected_chain_pem(expected_pem + "lmnop=");
+  EXPECT_CALL(ssl, urlEncodedPemEncodedPeerCertificateChain())
+      .WillOnce(ReturnRef(expected_chain_pem));
   ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
   ON_CALL(config_, forwardClientCert())
       .WillByDefault(Return(Http::ForwardClientCertType::SanitizeSet));
@@ -866,6 +901,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCert) {
   details.push_back(Http::ClientCertDetailsType::Subject);
   details.push_back(Http::ClientCertDetailsType::URI);
   details.push_back(Http::ClientCertDetailsType::Cert);
+  details.push_back(Http::ClientCertDetailsType::Chain);
   ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
   TestHeaderMapImpl headers{
       {"x-forwarded-client-cert", "By=test://foo.com/fe;URI=test://bar.com/be"}};
@@ -875,7 +911,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCert) {
   EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
   EXPECT_EQ("By=test://foo.com/be;Hash=abcdefg;Subject=\"/C=US/ST=CA/L=San "
             "Francisco/OU=Lyft/CN=test.lyft.com\";URI=test://foo.com/"
-            "fe;Cert=\"abcde=\"",
+            "fe;Cert=\"abcde=\";Chain=\"abcde=lmnop=\"",
             headers.get_("x-forwarded-client-cert"));
 }
 
@@ -977,9 +1013,11 @@ TEST_F(ConnectionManagerUtilityTest, NonTlsAlwaysForwardClientCert) {
 
 // Sampling, global on.
 TEST_F(ConnectionManagerUtilityTest, RandomSamplingWhenGlobalSet) {
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.random_sampling", 10000, _, 10000))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.random_sampling",
+                                                 An<const envoy::type::FractionalPercent&>(), _))
       .WillOnce(Return(true));
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled",
+                                                 An<const envoy::type::FractionalPercent&>(), _))
       .WillOnce(Return(true));
 
   Http::TestHeaderMapImpl request_headers{{"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
@@ -989,11 +1027,50 @@ TEST_F(ConnectionManagerUtilityTest, RandomSamplingWhenGlobalSet) {
             UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
 }
 
+TEST_F(ConnectionManagerUtilityTest, SamplingWithoutRouteOverride) {
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.random_sampling",
+                                                 An<const envoy::type::FractionalPercent&>(), _))
+      .WillOnce(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled",
+                                                 An<const envoy::type::FractionalPercent&>(), _))
+      .WillOnce(Return(true));
+
+  Http::TestHeaderMapImpl request_headers{{"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
+  callMutateRequestHeaders(request_headers, Protocol::Http2);
+
+  EXPECT_EQ(UuidTraceStatus::Sampled,
+            UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
+}
+
+TEST_F(ConnectionManagerUtilityTest, SamplingWithRouteOverride) {
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.random_sampling",
+                                                 An<const envoy::type::FractionalPercent&>(), _))
+      .WillOnce(Return(false));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled",
+                                                 An<const envoy::type::FractionalPercent&>(), _))
+      .WillOnce(Return(false));
+
+  NiceMock<Router::MockRouteTracing> tracingConfig;
+  EXPECT_CALL(route_, tracingConfig()).WillRepeatedly(Return(&tracingConfig));
+  const envoy::type::FractionalPercent percent;
+  EXPECT_CALL(tracingConfig, getClientSampling()).WillRepeatedly(ReturnRef(percent));
+  EXPECT_CALL(tracingConfig, getRandomSampling()).WillRepeatedly(ReturnRef(percent));
+  EXPECT_CALL(tracingConfig, getOverallSampling()).WillRepeatedly(ReturnRef(percent));
+
+  Http::TestHeaderMapImpl request_headers{{"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
+  callMutateRequestHeaders(request_headers, Protocol::Http2);
+
+  EXPECT_EQ(UuidTraceStatus::NoTrace,
+            UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
+}
+
 // Sampling must not be done on client traced.
 TEST_F(ConnectionManagerUtilityTest, SamplingMustNotBeDoneOnClientTraced) {
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.random_sampling", 10000, _, 10000))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.random_sampling",
+                                                 An<const envoy::type::FractionalPercent&>(), _))
       .Times(0);
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled",
+                                                 An<const envoy::type::FractionalPercent&>(), _))
       .WillOnce(Return(true));
 
   // The x_request_id has TRACE_FORCED(a) set in the TRACE_BYTE_POSITION(14) character.
@@ -1006,9 +1083,11 @@ TEST_F(ConnectionManagerUtilityTest, SamplingMustNotBeDoneOnClientTraced) {
 
 // Sampling, global off.
 TEST_F(ConnectionManagerUtilityTest, NoTraceWhenSamplingSetButGlobalNotSet) {
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.random_sampling", 10000, _, 10000))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.random_sampling",
+                                                 An<const envoy::type::FractionalPercent&>(), _))
       .WillOnce(Return(true));
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled",
+                                                 An<const envoy::type::FractionalPercent&>(), _))
       .WillOnce(Return(false));
 
   Http::TestHeaderMapImpl request_headers{{"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
@@ -1020,9 +1099,11 @@ TEST_F(ConnectionManagerUtilityTest, NoTraceWhenSamplingSetButGlobalNotSet) {
 
 // Client, client enabled, global on.
 TEST_F(ConnectionManagerUtilityTest, ClientSamplingWhenGlobalSet) {
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.client_enabled", 100))
+  EXPECT_CALL(runtime_.snapshot_,
+              featureEnabled("tracing.client_enabled", An<const envoy::type::FractionalPercent&>()))
       .WillOnce(Return(true));
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled",
+                                                 An<const envoy::type::FractionalPercent&>(), _))
       .WillOnce(Return(true));
 
   Http::TestHeaderMapImpl request_headers{
@@ -1036,9 +1117,14 @@ TEST_F(ConnectionManagerUtilityTest, ClientSamplingWhenGlobalSet) {
 
 // Client, client disabled, global on.
 TEST_F(ConnectionManagerUtilityTest, NoTraceWhenClientSamplingNotSetAndGlobalSet) {
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.client_enabled", 100))
+  EXPECT_CALL(runtime_.snapshot_,
+              featureEnabled("tracing.client_enabled", An<const envoy::type::FractionalPercent&>()))
       .WillOnce(Return(false));
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.random_sampling",
+                                                 An<const envoy::type::FractionalPercent&>(), _))
+      .WillOnce(Return(false));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled",
+                                                 An<const envoy::type::FractionalPercent&>(), _))
       .WillOnce(Return(true));
 
   Http::TestHeaderMapImpl request_headers{
@@ -1058,7 +1144,8 @@ TEST_F(ConnectionManagerUtilityTest, ForcedTracedWhenGlobalSet) {
                             {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"},
                             {"x-envoy-force-trace", "true"}};
   EXPECT_CALL(random_, uuid()).Times(0);
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled",
+                                                 An<const envoy::type::FractionalPercent&>(), _))
       .WillOnce(Return(true));
 
   EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
@@ -1074,7 +1161,8 @@ TEST_F(ConnectionManagerUtilityTest, NoTraceWhenForcedTracedButGlobalNotSet) {
                             {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"},
                             {"x-envoy-force-trace", "true"}};
   EXPECT_CALL(random_, uuid()).Times(0);
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled",
+                                                 An<const envoy::type::FractionalPercent&>(), _))
       .WillOnce(Return(false));
 
   EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
@@ -1137,5 +1225,123 @@ TEST_F(ConnectionManagerUtilityTest, SanitizePathRelativePAth) {
   EXPECT_EQ(header_map.Path()->value().getStringView(), "/abc");
 }
 
+// maybeNormalizePath() does not touch adjacent slashes by default.
+TEST_F(ConnectionManagerUtilityTest, MergeSlashesDefaultOff) {
+  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
+  ON_CALL(config_, shouldMergeSlashes()).WillByDefault(Return(false));
+  HeaderMapImpl original_headers;
+  original_headers.insertPath().value(std::string("/xyz///abc"));
+
+  HeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
+  ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
+  EXPECT_EQ(header_map.Path()->value().getStringView(), "/xyz///abc");
+}
+
+// maybeNormalizePath() merges adjacent slashes.
+TEST_F(ConnectionManagerUtilityTest, MergeSlashes) {
+  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
+  ON_CALL(config_, shouldMergeSlashes()).WillByDefault(Return(true));
+  HeaderMapImpl original_headers;
+  original_headers.insertPath().value(std::string("/xyz///abc"));
+
+  HeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
+  ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
+  EXPECT_EQ(header_map.Path()->value().getStringView(), "/xyz/abc");
+}
+
+// maybeNormalizePath() merges adjacent slashes if normalization if off.
+TEST_F(ConnectionManagerUtilityTest, MergeSlashesWithoutNormalization) {
+  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(false));
+  ON_CALL(config_, shouldMergeSlashes()).WillByDefault(Return(true));
+  HeaderMapImpl original_headers;
+  original_headers.insertPath().value(std::string("/xyz/..//abc"));
+
+  HeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
+  ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
+  EXPECT_EQ(header_map.Path()->value().getStringView(), "/xyz/../abc");
+}
+
+// test preserve_external_request_id true does not reset the passed requestId if passed
+TEST_F(ConnectionManagerUtilityTest, PreserveExternalRequestId) {
+  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("134.2.2.11");
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, preserveExternalRequestId()).WillByDefault(Return(true));
+  TestHeaderMapImpl headers{{"x-request-id", "my-request-id"}, {"x-forwarded-for", "198.51.100.1"}};
+  EXPECT_EQ((MutateRequestRet{"134.2.2.11:0", false}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_CALL(random_, uuid()).Times(0);
+  EXPECT_EQ("my-request-id", headers.get_("x-request-id"));
+}
+
+// test preserve_external_request_id true but generates new request id when not passed
+TEST_F(ConnectionManagerUtilityTest, PreseverExternalRequestIdNoReqId) {
+  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("134.2.2.11");
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, preserveExternalRequestId()).WillByDefault(Return(true));
+  TestHeaderMapImpl headers{{"x-forwarded-for", "198.51.100.1"}};
+  EXPECT_EQ((MutateRequestRet{"134.2.2.11:0", false}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_EQ(random_.uuid_, headers.get_(Headers::get().RequestId));
+}
+
+// test preserve_external_request_id true and no edge_request passing requestId should keep the
+// requestID
+TEST_F(ConnectionManagerUtilityTest, PreserveExternalRequestIdNoEdgeRequestKeepRequestId) {
+  ON_CALL(config_, preserveExternalRequestId()).WillByDefault(Return(true));
+  TestHeaderMapImpl headers{{"x-request-id", "myReqId"}};
+  EXPECT_EQ("myReqId", headers.get_(Headers::get().RequestId));
+}
+
+// test preserve_external_request_id true and no edge_request not passing requestId should generate
+// new request id
+TEST_F(ConnectionManagerUtilityTest, PreserveExternalRequestIdNoEdgeRequestGenerateNewRequestId) {
+  ON_CALL(config_, preserveExternalRequestId()).WillByDefault(Return(true));
+  TestHeaderMapImpl headers;
+  callMutateRequestHeaders(headers, Protocol::Http2);
+  EXPECT_EQ(random_.uuid_, headers.get_(Headers::get().RequestId));
+}
+
+// test preserve_external_request_id false edge request generates new request id
+TEST_F(ConnectionManagerUtilityTest, NoPreserveExternalRequestIdEdgeRequestGenerateRequestId) {
+  ON_CALL(config_, preserveExternalRequestId()).WillByDefault(Return(false));
+  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("134.2.2.11");
+  // with request id
+  {
+
+    ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+    TestHeaderMapImpl headers{{"x-forwarded-for", "198.51.100.1"},
+                              {"x-request-id", "my-request-id"}};
+    EXPECT_EQ((MutateRequestRet{"134.2.2.11:0", false}),
+              callMutateRequestHeaders(headers, Protocol::Http2));
+    EXPECT_EQ(random_.uuid_, headers.get_(Headers::get().RequestId));
+  }
+
+  // with no request id
+  {
+    TestHeaderMapImpl headers{{"x-forwarded-for", "198.51.100.1"}};
+    EXPECT_EQ((MutateRequestRet{"134.2.2.11:0", false}),
+              callMutateRequestHeaders(headers, Protocol::Http2));
+    EXPECT_EQ(random_.uuid_, headers.get_(Headers::get().RequestId));
+  }
+}
+
+// test preserve_external_request_id false not edge request
+TEST_F(ConnectionManagerUtilityTest, NoPreserveExternalRequestIdNoEdgeRequest) {
+  ON_CALL(config_, preserveExternalRequestId()).WillByDefault(Return(false));
+
+  // with no request id
+  {
+    TestHeaderMapImpl headers;
+    callMutateRequestHeaders(headers, Protocol::Http2);
+    EXPECT_EQ(random_.uuid_, headers.get_(Headers::get().RequestId));
+  }
+
+  // with request id
+  {
+    TestHeaderMapImpl headers{{"x-request-id", "my-request-id"}};
+    callMutateRequestHeaders(headers, Protocol::Http2);
+    EXPECT_EQ("my-request-id", headers.get_(Headers::get().RequestId));
+  }
+}
 } // namespace Http
 } // namespace Envoy

@@ -42,37 +42,35 @@ public:
   const std::string DrainCloseEnabled{"mongo.drain_close_enabled"};
 };
 
-typedef ConstSingleton<MongoRuntimeConfigKeys> MongoRuntimeConfig;
+using MongoRuntimeConfig = ConstSingleton<MongoRuntimeConfigKeys>;
 
 /**
  * All mongo proxy stats. @see stats_macros.h
  */
-// clang-format off
 #define ALL_MONGO_PROXY_STATS(COUNTER, GAUGE, HISTOGRAM)                                           \
+  COUNTER(cx_destroy_local_with_active_rq)                                                         \
+  COUNTER(cx_destroy_remote_with_active_rq)                                                        \
+  COUNTER(cx_drain_close)                                                                          \
   COUNTER(decoding_error)                                                                          \
   COUNTER(delays_injected)                                                                         \
+  COUNTER(op_command)                                                                              \
+  COUNTER(op_command_reply)                                                                        \
   COUNTER(op_get_more)                                                                             \
   COUNTER(op_insert)                                                                               \
   COUNTER(op_kill_cursors)                                                                         \
   COUNTER(op_query)                                                                                \
-  COUNTER(op_query_tailable_cursor)                                                                \
-  COUNTER(op_query_no_cursor_timeout)                                                              \
   COUNTER(op_query_await_data)                                                                     \
   COUNTER(op_query_exhaust)                                                                        \
+  COUNTER(op_query_multi_get)                                                                      \
+  COUNTER(op_query_no_cursor_timeout)                                                              \
   COUNTER(op_query_no_max_time)                                                                    \
   COUNTER(op_query_scatter_get)                                                                    \
-  COUNTER(op_query_multi_get)                                                                      \
-  GAUGE  (op_query_active)                                                                         \
+  COUNTER(op_query_tailable_cursor)                                                                \
   COUNTER(op_reply)                                                                                \
   COUNTER(op_reply_cursor_not_found)                                                               \
   COUNTER(op_reply_query_failure)                                                                  \
   COUNTER(op_reply_valid_cursor)                                                                   \
-  COUNTER(cx_destroy_local_with_active_rq)                                                         \
-  COUNTER(cx_destroy_remote_with_active_rq)                                                        \
-  COUNTER(cx_drain_close)                                                                          \
-  COUNTER(op_command)                                                                              \
-  COUNTER(op_command_reply)
-// clang-format on
+  GAUGE(op_query_active, Accumulate)
 
 /**
  * Struct definition for all mongo proxy stats. @see stats_macros.h
@@ -97,7 +95,7 @@ private:
   Envoy::AccessLog::AccessLogFileSharedPtr file_;
 };
 
-typedef std::shared_ptr<AccessLog> AccessLogSharedPtr;
+using AccessLogSharedPtr = std::shared_ptr<AccessLog>;
 
 /**
  * A sniffing filter for mongo traffic. The current implementation makes a copy of read/written
@@ -113,7 +111,7 @@ public:
               const Filters::Common::Fault::FaultDelayConfigSharedPtr& fault_config,
               const Network::DrainDecision& drain_decision, TimeSource& time_system,
               bool emit_dynamic_metadata);
-  ~ProxyFilter();
+  ~ProxyFilter() override;
 
   virtual DecoderPtr createDecoder(DecoderCallbacks& callbacks) PURE;
 
@@ -158,7 +156,7 @@ private:
     MonotonicTime start_time_;
   };
 
-  typedef std::unique_ptr<ActiveQuery> ActiveQueryPtr;
+  using ActiveQueryPtr = std::unique_ptr<ActiveQuery>;
 
   MongoProxyStats generateStats(const std::string& prefix, Stats::Scope& scope) {
     return MongoProxyStats{ALL_MONGO_PROXY_STATS(POOL_COUNTER_PREFIX(scope, prefix),

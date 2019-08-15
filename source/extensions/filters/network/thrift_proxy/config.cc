@@ -25,9 +25,8 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 namespace {
 
-typedef std::map<envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType,
-                 TransportType>
-    TransportTypeMap;
+using TransportTypeMap =
+    std::map<envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType, TransportType>;
 
 static const TransportTypeMap& transportTypeMap() {
   CONSTRUCT_ON_FIRST_USE(
@@ -44,8 +43,8 @@ static const TransportTypeMap& transportTypeMap() {
       });
 }
 
-typedef std::map<envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType, ProtocolType>
-    ProtocolTypeMap;
+using ProtocolTypeMap =
+    std::map<envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType, ProtocolType>;
 
 static const ProtocolTypeMap& protocolTypeMap() {
   CONSTRUCT_ON_FIRST_USE(
@@ -169,8 +168,8 @@ void ConfigImpl::processFilter(
       Envoy::Config::Utility::getAndCheckFactory<ThriftFilters::NamedThriftFilterConfigFactory>(
           string_name);
 
-  ProtobufTypes::MessagePtr message =
-      Envoy::Config::Utility::translateToFactoryConfig(proto_config, factory);
+  ProtobufTypes::MessagePtr message = Envoy::Config::Utility::translateToFactoryConfig(
+      proto_config, context_.messageValidationVisitor(), factory);
   ThriftFilters::FilterFactoryCb callback =
       factory.createFilterFactoryFromProto(*message, stats_prefix_, context_);
 

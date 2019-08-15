@@ -173,14 +173,14 @@ public:
       return;
     }
 
-    const auto local_cluster_stats = local_loadstats_request.cluster_stats(0);
+    const auto& local_cluster_stats = local_loadstats_request.cluster_stats(0);
     auto* cluster_stats = loadstats_request.mutable_cluster_stats(0);
 
     cluster_stats->set_total_dropped_requests(cluster_stats->total_dropped_requests() +
                                               local_cluster_stats.total_dropped_requests());
 
     for (int i = 0; i < local_cluster_stats.upstream_locality_stats_size(); ++i) {
-      auto local_upstream_locality_stats = local_cluster_stats.upstream_locality_stats(i);
+      const auto& local_upstream_locality_stats = local_cluster_stats.upstream_locality_stats(i);
       bool copied = false;
       for (int j = 0; j < cluster_stats->upstream_locality_stats_size(); ++j) {
         auto* upstream_locality_stats = cluster_stats->mutable_upstream_locality_stats(j);
@@ -191,21 +191,38 @@ public:
           upstream_locality_stats->set_total_successful_requests(
               upstream_locality_stats->total_successful_requests() +
               local_upstream_locality_stats.total_successful_requests());
-          upstream_locality_stats->set_total_requests_in_progress(
-              upstream_locality_stats->total_requests_in_progress() +
-              local_upstream_locality_stats.total_requests_in_progress());
           upstream_locality_stats->set_total_error_requests(
               upstream_locality_stats->total_error_requests() +
               local_upstream_locality_stats.total_error_requests());
           upstream_locality_stats->set_total_issued_requests(
               upstream_locality_stats->total_issued_requests() +
               local_upstream_locality_stats.total_issued_requests());
+          // Unlike most stats, current requests in progress replaces old requests in progress.
           break;
         }
       }
       if (!copied) {
         auto* upstream_locality_stats = cluster_stats->add_upstream_locality_stats();
         upstream_locality_stats->CopyFrom(local_upstream_locality_stats);
+      }
+    }
+
+    // Unfortunately because we don't issue an update when total_requests_in_progress goes from
+    // non-zero to zero, we have to go through and zero it out for any locality stats we didn't see.
+    for (int i = 0; i < cluster_stats->upstream_locality_stats_size(); ++i) {
+      auto upstream_locality_stats = cluster_stats->mutable_upstream_locality_stats(i);
+      bool found = false;
+      for (int j = 0; j < local_cluster_stats.upstream_locality_stats_size(); ++j) {
+        auto& local_upstream_locality_stats = local_cluster_stats.upstream_locality_stats(j);
+        if (TestUtility::protoEqual(upstream_locality_stats->locality(),
+                                    local_upstream_locality_stats.locality()) &&
+            upstream_locality_stats->priority() == local_upstream_locality_stats.priority()) {
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        upstream_locality_stats->set_total_requests_in_progress(0);
       }
     }
   }
@@ -257,7 +274,7 @@ public:
       EXPECT_EQ("application/grpc",
                 loadstats_stream_->headers().ContentType()->value().getStringView());
     } while (!TestUtility::assertRepeatedPtrFieldEqual(expected_cluster_stats,
-                                                       loadstats_request.cluster_stats()));
+                                                       loadstats_request.cluster_stats(), true));
   }
 
   void waitForUpstreamResponse(uint32_t endpoint_index, uint32_t response_code = 200) {
@@ -460,23 +477,16 @@ TEST_P(LoadStatsIntegrationTest, LocalityWeighted) {
   locality_weighted_lb_ = true;
   initialize();
 
-  // Debug logs for #6874
-  std::cerr << "Waiting for load stats stream." << std::endl;
   waitForLoadStatsStream();
-  std::cerr << "Waiting for load stats request." << std::endl;
   waitForLoadStatsRequest({});
 
-  std::cerr << "Done waiting." << std::endl;
   loadstats_stream_->startGrpcStream();
-  std::cerr << "Starting response." << std::endl;
   requestLoadStatsResponse({"cluster_0"});
-  std::cerr << "Updating assignments." << std::endl;
 
   // Simple 33%/67% split between dragon/winter localities.
   // Even though there are more endpoints in the dragon locality, the winter locality gets the
   // expected weighting in the WRR locality schedule.
   updateClusterLoadAssignment({{0}, 2}, {{1, 2}, 1}, {}, {});
-  std::cerr << "Sending traffic." << std::endl;
 
   sendAndReceiveUpstream(0);
   sendAndReceiveUpstream(1);
@@ -486,10 +496,8 @@ TEST_P(LoadStatsIntegrationTest, LocalityWeighted) {
   sendAndReceiveUpstream(0);
 
   // Verify we get the expect request distribution.
-  std::cerr << "Waiting for load stats request 2." << std::endl;
   waitForLoadStatsRequest(
       {localityStats("winter", 4, 0, 0, 4), localityStats("dragon", 2, 0, 0, 2)});
-  std::cerr << "Done waiting." << std::endl;
 
   EXPECT_EQ(1, test_server_->counter("load_reporter.requests")->value());
   // On slow machines, more than one load stats response may be pushed while we are simulating load.

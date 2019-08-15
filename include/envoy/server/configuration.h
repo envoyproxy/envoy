@@ -18,35 +18,11 @@ namespace Server {
 namespace Configuration {
 
 /**
- * Configuration for local disk runtime support.
- */
-class DiskRuntime {
-public:
-  virtual ~DiskRuntime() {}
-
-  /**
-   * @return const std::string& the root symlink to watch for swapping.
-   */
-  virtual const std::string& symlinkRoot() PURE;
-
-  /**
-   * @return const std::string& the subdirectory to load with runtime data.
-   */
-  virtual const std::string& subdirectory() PURE;
-
-  /**
-   * @return const std::string& the override subdirectory.
-   * Read runtime values from subdirectory and overrideSubdirectory, overrideSubdirectory wins.
-   */
-  virtual const std::string& overrideSubdirectory() PURE;
-};
-
-/**
  * The main server configuration.
  */
 class Main {
 public:
-  virtual ~Main() {}
+  virtual ~Main() = default;
 
   /**
    * @return Upstream::ClusterManager* singleton for use by the entire server.
@@ -100,7 +76,7 @@ public:
  */
 class Admin {
 public:
-  virtual ~Admin() {}
+  virtual ~Admin() = default;
 
   /**
    * @return const std::string& the admin access log path.
@@ -116,6 +92,11 @@ public:
    * @return Network::Address::InstanceConstSharedPtr the server address.
    */
   virtual Network::Address::InstanceConstSharedPtr address() PURE;
+
+  /**
+   * @return Network::Address::OptionsSharedPtr the list of listener socket options.
+   */
+  virtual Network::Socket::OptionsSharedPtr socketOptions() PURE;
 };
 
 /**
@@ -123,7 +104,7 @@ public:
  */
 class Initial {
 public:
-  virtual ~Initial() {}
+  virtual ~Initial() = default;
 
   /**
    * @return Admin& the admin config.
@@ -136,15 +117,10 @@ public:
   virtual absl::optional<std::string> flagsPath() PURE;
 
   /**
-   * @return const ProtobufWkt::Struct& base runtime snapshot.
+   * @return const envoy::config::bootstrap::v2::LayeredRuntime& runtime
+   *         configuration.
    */
-  virtual const ProtobufWkt::Struct& baseRuntime() PURE;
-
-  /**
-   * @return DiskRuntime* the local disk runtime configuration or nullptr if there is no
-   * configuration.
-   */
-  virtual DiskRuntime* diskRuntime() PURE;
+  virtual const envoy::config::bootstrap::v2::LayeredRuntime& runtime() PURE;
 };
 
 } // namespace Configuration

@@ -4,6 +4,7 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/v2/core/base.pb.h"
+#include "envoy/grpc/context.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/context.h"
 #include "envoy/http/filter.h"
@@ -31,18 +32,11 @@ namespace Server {
 namespace Configuration {
 
 /**
- * Context passed to network and HTTP filters to access server resources.
- * TODO(mattklein123): When we lock down visibility of the rest of the code, filters should only
- * access the rest of the server via interfaces exposed here.
+ * Common interface for downstream and upstream network filters.
  */
-class FactoryContext {
+class CommonFactoryContext {
 public:
-  virtual ~FactoryContext() {}
-
-  /**
-   * @return AccessLogManager for use by the entire server.
-   */
-  virtual AccessLog::AccessLogManager& accessLogManager() PURE;
+  virtual ~CommonFactoryContext() = default;
 
   /**
    * @return Upstream::ClusterManager& singleton for use by the entire server.
@@ -54,37 +48,6 @@ public:
    *         for all singleton processing.
    */
   virtual Event::Dispatcher& dispatcher() PURE;
-
-  /**
-   * @return const Network::DrainDecision& a drain decision that filters can use to determine if
-   *         they should be doing graceful closes on connections when possible.
-   */
-  virtual const Network::DrainDecision& drainDecision() PURE;
-
-  /**
-   * @return whether external healthchecks are currently failed or not.
-   */
-  virtual bool healthCheckFailed() PURE;
-
-  /**
-   * @return the server-wide http tracer.
-   */
-  virtual Tracing::HttpTracer& httpTracer() PURE;
-
-  /**
-   * @return the server's init manager. This can be used for extensions that need to initialize
-   *         after cluster manager init but before the server starts listening. All extensions
-   *         should register themselves during configuration load. initialize() will be called on
-   *         each registered target after cluster manager init but before the server starts
-   *         listening. Once all targets have initialized and invoked their callbacks, the server
-   *         will start listening.
-   */
-  virtual Init::Manager& initManager() PURE;
-
-  /**
-   * @return ServerLifecycleNotifier& the lifecycle notifier for the server.
-   */
-  virtual ServerLifecycleNotifier& lifecycleNotifier() PURE;
 
   /**
    * @return information about the local environment the server is running in.
@@ -123,6 +86,74 @@ public:
   virtual Server::Admin& admin() PURE;
 
   /**
+   * @return TimeSource& a reference to the time source.
+   */
+  virtual TimeSource& timeSource() PURE;
+
+  /**
+   * @return ProtobufMessage::ValidationVisitor& validation visitor for filter configuration
+   *         messages.
+   */
+  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
+
+  /**
+   * @return Api::Api& a reference to the api object.
+   */
+  virtual Api::Api& api() PURE;
+};
+
+/**
+ * Context passed to network and HTTP filters to access server resources.
+ * TODO(mattklein123): When we lock down visibility of the rest of the code, filters should only
+ * access the rest of the server via interfaces exposed here.
+ */
+class FactoryContext : public virtual CommonFactoryContext {
+public:
+  ~FactoryContext() override = default;
+
+  /**
+   * @return AccessLogManager for use by the entire server.
+   */
+  virtual AccessLog::AccessLogManager& accessLogManager() PURE;
+
+  /**
+   * @return envoy::api::v2::core::TrafficDirection the direction of the traffic relative to the
+   * local proxy.
+   */
+  virtual envoy::api::v2::core::TrafficDirection direction() const PURE;
+
+  /**
+   * @return const Network::DrainDecision& a drain decision that filters can use to determine if
+   *         they should be doing graceful closes on connections when possible.
+   */
+  virtual const Network::DrainDecision& drainDecision() PURE;
+
+  /**
+   * @return whether external healthchecks are currently failed or not.
+   */
+  virtual bool healthCheckFailed() PURE;
+
+  /**
+   * @return the server-wide http tracer.
+   */
+  virtual Tracing::HttpTracer& httpTracer() PURE;
+
+  /**
+   * @return the server's init manager. This can be used for extensions that need to initialize
+   *         after cluster manager init but before the server starts listening. All extensions
+   *         should register themselves during configuration load. initialize() will be called on
+   *         each registered target after cluster manager init but before the server starts
+   *         listening. Once all targets have initialized and invoked their callbacks, the server
+   *         will start listening.
+   */
+  virtual Init::Manager& initManager() PURE;
+
+  /**
+   * @return ServerLifecycleNotifier& the lifecycle notifier for the server.
+   */
+  virtual ServerLifecycleNotifier& lifecycleNotifier() PURE;
+
+  /**
    * @return Stats::Scope& the listener's stats scope.
    */
   virtual Stats::Scope& listenerScope() PURE;
@@ -132,11 +163,6 @@ public:
    * listener.
    */
   virtual const envoy::api::v2::core::Metadata& listenerMetadata() const PURE;
-
-  /**
-   * @return TimeSource& a reference to the time source.
-   */
-  virtual TimeSource& timeSource() PURE;
 
   /**
    * @return OverloadManager& the overload manager for the server.
@@ -149,25 +175,18 @@ public:
   virtual Http::Context& httpContext() PURE;
 
   /**
+   * @return Grpc::Context& a reference to the grpc context.
+   */
+  virtual Grpc::Context& grpcContext() PURE;
+
+  /**
    * @return ProcessContext& a reference to the process context.
    */
   virtual ProcessContext& processContext() PURE;
-
-  /**
-   * @return Api::Api& a reference to the api object.
-   */
-  virtual Api::Api& api() PURE;
 };
 
 class ListenerFactoryContext : public virtual FactoryContext {
 public:
-  /**
-   * Store socket options to be set on the listen socket before listening.
-   */
-  virtual void addListenSocketOption(const Network::Socket::OptionConstSharedPtr& option) PURE;
-
-  virtual void addListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) PURE;
-
   /**
    * Give access to the listener configuration
    */
@@ -175,12 +194,32 @@ public:
 };
 
 /**
+ * Common interface for listener filters and UDP listener filters
+ */
+class ListenerFilterConfigFactoryBase {
+public:
+  virtual ~ListenerFilterConfigFactoryBase() = default;
+
+  /**
+   * @return ProtobufTypes::MessagePtr create empty config proto message. The filter
+   *         config, which arrives in an opaque message, will be parsed into this empty proto.
+   */
+  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
+
+  /**
+   * @return std::string the identifying name for a particular implementation of a listener filter
+   * produced by the factory.
+   */
+  virtual std::string name() PURE;
+};
+
+/**
  * Implemented by each listener filter and registered via Registry::registerFactory()
  * or the convenience class RegisterFactory.
  */
-class NamedListenerFilterConfigFactory {
+class NamedListenerFilterConfigFactory : public ListenerFilterConfigFactoryBase {
 public:
-  virtual ~NamedListenerFilterConfigFactory() {}
+  ~NamedListenerFilterConfigFactory() override = default;
 
   /**
    * Create a particular listener filter factory implementation. If the implementation is unable to
@@ -194,19 +233,27 @@ public:
   virtual Network::ListenerFilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& config,
                                ListenerFactoryContext& context) PURE;
+};
+
+/**
+ * Implemented by each UDP listener filter and registered via Registry::registerFactory()
+ * or the convenience class RegisterFactory.
+ */
+class NamedUdpListenerFilterConfigFactory : public ListenerFilterConfigFactoryBase {
+public:
+  ~NamedUdpListenerFilterConfigFactory() override = default;
 
   /**
-   * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The filter
-   *         config, which arrives in an opaque message, will be parsed into this empty proto.
-   *         Optional today, will be compulsory when v1 is deprecated.
+   * Create a particular UDP listener filter factory implementation. If the implementation is unable
+   * to produce a factory with the provided parameters, it should throw an EnvoyException.
+   * The returned callback should always be initialized.
+   * @param config supplies the general protobuf configuration for the filter
+   * @param context supplies the filter's context.
+   * @return Network::UdpListenerFilterFactoryCb the factory creation function.
    */
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
-
-  /**
-   * @return std::string the identifying name for a particular implementation of a listener filter
-   * produced by the factory.
-   */
-  virtual std::string name() PURE;
+  virtual Network::UdpListenerFilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message& config,
+                               ListenerFactoryContext& context) PURE;
 };
 
 /**
@@ -215,7 +262,7 @@ public:
  */
 class ProtocolOptionsFactory {
 public:
-  virtual ~ProtocolOptionsFactory() {}
+  virtual ~ProtocolOptionsFactory() = default;
 
   /**
    * Create a particular filter's protocol specific options implementation. If the factory
@@ -243,7 +290,7 @@ public:
  */
 class NamedNetworkFilterConfigFactory : public ProtocolOptionsFactory {
 public:
-  virtual ~NamedNetworkFilterConfigFactory() {}
+  ~NamedNetworkFilterConfigFactory() override = default;
 
   /**
    * Create a particular network filter factory implementation. If the implementation is unable to
@@ -281,6 +328,39 @@ public:
    * produced by the factory.
    */
   virtual std::string name() PURE;
+
+  /**
+   * @return bool true if this filter must be the last filter in a filter chain, false otherwise.
+   */
+  virtual bool isTerminalFilter() { return false; }
+};
+
+/**
+ * Implemented by each upstream cluster network filter and registered via
+ * Registry::registerFactory() or the convenience class RegisterFactory.
+ */
+class NamedUpstreamNetworkFilterConfigFactory : public ProtocolOptionsFactory {
+public:
+  ~NamedUpstreamNetworkFilterConfigFactory() override = default;
+
+  /**
+   * Create a particular upstream network filter factory implementation. If the implementation is
+   * unable to produce a factory with the provided parameters, it should throw an EnvoyException in
+   * the case of general error. The returned callback should always be initialized.
+   */
+  virtual Network::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
+                                                                CommonFactoryContext& context) PURE;
+
+  /**
+   * @return ProtobufTypes::MessagePtr create empty config proto message for v2.
+   */
+  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
+
+  /**
+   * @return std::string the identifying name for a particular implementation of a network filter
+   * produced by the factory.
+   */
+  virtual std::string name() PURE;
 };
 
 /**
@@ -289,7 +369,7 @@ public:
  */
 class NamedHttpFilterConfigFactory : public ProtocolOptionsFactory {
 public:
-  virtual ~NamedHttpFilterConfigFactory() {}
+  ~NamedHttpFilterConfigFactory() override = default;
 
   /**
    * Create a particular http filter factory implementation. If the implementation is unable to
@@ -353,6 +433,11 @@ public:
    * produced by the factory.
    */
   virtual std::string name() PURE;
+
+  /**
+   * @return bool true if this filter must be the last filter in a filter chain, false otherwise.
+   */
+  virtual bool isTerminalFilter() { return false; }
 };
 
 } // namespace Configuration

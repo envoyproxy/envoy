@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/scope_tracker.h"
 #include "envoy/common/time.h"
 #include "envoy/event/file_event.h"
 #include "envoy/event/signal.h"
@@ -43,14 +44,14 @@ struct DispatcherStats {
 /**
  * Callback invoked when a dispatcher post() runs.
  */
-typedef std::function<void()> PostCb;
+using PostCb = std::function<void()>;
 
 /**
  * Abstract event dispatching loop.
  */
 class Dispatcher {
 public:
-  virtual ~Dispatcher() {}
+  virtual ~Dispatcher() = default;
 
   /**
    * Returns a time-source to use with this dispatcher.
@@ -199,9 +200,26 @@ public:
    * @return the watermark buffer factory for this dispatcher.
    */
   virtual Buffer::WatermarkFactory& getWatermarkFactory() PURE;
+
+  /**
+   * Sets a tracked object, which is currently operating in this Dispatcher.
+   * This should be cleared with another call to setTrackedObject() when the object is done doing
+   * work. Calling setTrackedObject(nullptr) results in no object being tracked.
+   *
+   * This is optimized for performance, to avoid allocation where we do scoped object tracking.
+   *
+   * @return The previously tracked object or nullptr if there was none.
+   */
+  virtual const ScopeTrackedObject* setTrackedObject(const ScopeTrackedObject* object) PURE;
+
+  /**
+   * Validates that an operation is thread-safe with respect to this dispatcher; i.e. that the
+   * current thread of execution is on the same thread upon which the dispatcher loop is running.
+   */
+  virtual bool isThreadSafe() const PURE;
 };
 
-typedef std::unique_ptr<Dispatcher> DispatcherPtr;
+using DispatcherPtr = std::unique_ptr<Dispatcher>;
 
 } // namespace Event
 } // namespace Envoy

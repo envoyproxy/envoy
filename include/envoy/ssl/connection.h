@@ -16,7 +16,7 @@ namespace Ssl {
  */
 class ConnectionInfo {
 public:
-  virtual ~ConnectionInfo() {}
+  virtual ~ConnectionInfo() = default;
 
   /**
    * @return bool whether the peer certificate is presented.
@@ -46,6 +46,12 @@ public:
    *         there is no peer certificate, or no serial number.
    **/
   virtual std::string serialNumberPeerCertificate() const PURE;
+
+  /**
+   * @return std::string the issuer field of the peer certificate in RFC 2253 format. Returns "" if
+   *         there is no peer certificate, or no issuer.
+   **/
+  virtual std::string issuerPeerCertificate() const PURE;
 
   /**
    * @return std::string the subject field of the peer certificate in RFC 2253 format. Returns "" if
@@ -100,6 +106,24 @@ public:
    * @return std::string the hex-encoded TLS session ID as defined in rfc5246.
    **/
   virtual std::string sessionId() const PURE;
+
+  /**
+   * @return uint16_t the standard ID for the ciphers used in the established TLS connection.
+   *         Returns 0xffff if there is no current negotiated ciphersuite.
+   **/
+  virtual uint16_t ciphersuiteId() const PURE;
+
+  /**
+   * @return std::string the OpenSSL name for the set of ciphers used in the established TLS
+   *         connection. Returns "" if there is no current negotiated ciphersuite.
+   **/
+  virtual std::string ciphersuiteString() const PURE;
+
+  /**
+   * @return std::string the TLS version (e.g., TLSv1.2, TLSv1.3) used in the established TLS
+   *         connection.
+   **/
+  virtual std::string tlsVersion() const PURE;
 };
 
 } // namespace Ssl

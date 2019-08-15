@@ -22,11 +22,21 @@ using RequestParserSharedPtr = std::shared_ptr<RequestParser>;
  * Context that is shared between parsers that are handling the same single message.
  */
 struct RequestContext {
-  int32_t remaining_request_size_{0};
+  uint32_t remaining_request_size_{0};
   RequestHeader request_header_{};
+
+  /**
+   * Bytes left to consume.
+   */
+  uint32_t& remaining() { return remaining_request_size_; }
+
+  /**
+   * Returns data needed for construction of parse failure message.
+   */
+  const RequestHeader asFailureData() const { return request_header_; }
 };
 
-typedef std::shared_ptr<RequestContext> RequestContextSharedPtr;
+using RequestContextSharedPtr = std::shared_ptr<RequestContext>;
 
 /**
  * Request decoder configuration object.
@@ -86,7 +96,7 @@ class RequestHeaderDeserializer
                                                  Int16Deserializer, Int32Deserializer,
                                                  NullableStringDeserializer> {};
 
-typedef std::unique_ptr<RequestHeaderDeserializer> RequestHeaderDeserializerPtr;
+using RequestHeaderDeserializerPtr = std::unique_ptr<RequestHeaderDeserializer>;
 
 /**
  * Parser responsible for extracting the request header and putting it into context.
@@ -126,19 +136,14 @@ private:
  * api_key & api_version. It does not attempt to capture any data, just throws it away until end of
  * message.
  */
-class SentinelParser : public RequestParser {
+class SentinelParser : public AbstractSentinelParser<RequestContextSharedPtr, RequestParseResponse>,
+                       public RequestParser {
 public:
-  SentinelParser(RequestContextSharedPtr context) : context_{context} {};
+  SentinelParser(RequestContextSharedPtr context) : AbstractSentinelParser{context} {};
 
-  /**
-   * Returns failed parse data. Ignores (jumps over) the data provided.
-   */
-  RequestParseResponse parse(absl::string_view& data) override;
-
-  const RequestContextSharedPtr contextForTest() const { return context_; }
-
-private:
-  const RequestContextSharedPtr context_;
+  RequestParseResponse parse(absl::string_view& data) override {
+    return AbstractSentinelParser::parse(data);
+  }
 };
 
 /**

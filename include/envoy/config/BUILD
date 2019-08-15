@@ -33,8 +33,18 @@ envoy_cc_library(
     name = "grpc_mux_interface",
     hdrs = ["grpc_mux.h"],
     deps = [
+        ":subscription_interface",
         "//include/envoy/stats:stats_macros",
         "//source/common/protobuf",
+    ],
+)
+
+envoy_cc_library(
+    name = "subscription_factory_interface",
+    hdrs = ["subscription_factory.h"],
+    deps = [
+        ":subscription_interface",
+        "@envoy_api//envoy/api/v2/core:config_source_cc",
     ],
 )
 
@@ -53,6 +63,14 @@ envoy_cc_library(
     hdrs = ["typed_metadata.h"],
     deps = [
         "//source/common/protobuf",
+    ],
+)
+
+envoy_cc_library(
+    name = "watch_map_interface",
+    hdrs = ["watch_map.h"],
+    deps = [
+        ":subscription_interface",
     ],
 )
 

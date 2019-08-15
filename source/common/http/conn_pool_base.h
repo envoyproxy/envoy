@@ -19,7 +19,7 @@ protected:
   struct PendingRequest : LinkedObject<PendingRequest>, public ConnectionPool::Cancellable {
     PendingRequest(ConnPoolImplBase& parent, StreamDecoder& decoder,
                    ConnectionPool::Callbacks& callbacks);
-    ~PendingRequest();
+    ~PendingRequest() override;
 
     // ConnectionPool::Cancellable
     void cancel() override { parent_.onPendingRequestCancel(*this); }
@@ -29,7 +29,7 @@ protected:
     ConnectionPool::Callbacks& callbacks_;
   };
 
-  typedef std::unique_ptr<PendingRequest> PendingRequestPtr;
+  using PendingRequestPtr = std::unique_ptr<PendingRequest>;
 
   // Creates a new PendingRequest and enqueues it into the request queue.
   ConnectionPool::Cancellable* newPendingRequest(StreamDecoder& decoder,
@@ -48,6 +48,9 @@ protected:
   const Upstream::HostConstSharedPtr host_;
   const Upstream::ResourcePriority priority_;
   std::list<PendingRequestPtr> pending_requests_;
+  // When calling purgePendingRequests, this list will be used to hold the requests we are about
+  // to purge. We need this if one cancelled requests cancels a different pending request
+  std::list<PendingRequestPtr> pending_requests_to_purge_;
 };
 } // namespace Http
 } // namespace Envoy

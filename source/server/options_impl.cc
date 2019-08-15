@@ -23,8 +23,8 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
                          spdlog::level::level_enum default_log_level)
     : signal_handling_enabled_(true) {
   std::string log_levels_string = "Log levels: ";
-  for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_string_views); i++) {
-    log_levels_string += fmt::format("[{}]", spdlog::level::level_string_views[i]);
+  for (auto level_string_view : spdlog::level::level_string_views) {
+    log_levels_string += fmt::format("[{}]", level_string_view);
   }
   log_levels_string +=
       fmt::format("\nDefault is [{}]", spdlog::level::level_string_views[default_log_level]);
@@ -104,7 +104,7 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
 
   TCLAP::ValueArg<bool> use_libevent_buffer("", "use-libevent-buffers",
                                             "Use the original libevent buffer implementation",
-                                            false, true, "bool", cmd);
+                                            false, false, "bool", cmd);
 
   cmd.setExceptionHandling(false);
   try {
@@ -182,9 +182,6 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   config_path_ = config_path.getValue();
   config_yaml_ = config_yaml.getValue();
   allow_unknown_fields_ = allow_unknown_fields.getValue();
-  if (allow_unknown_fields_) {
-    MessageUtil::proto_unknown_fields = ProtoUnknownFieldsMode::Allow;
-  }
   admin_address_path_ = admin_address_path.getValue();
   log_path_ = log_path.getValue();
   restart_epoch_ = restart_epoch.getValue();

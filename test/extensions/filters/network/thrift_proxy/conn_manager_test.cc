@@ -83,14 +83,14 @@ public:
     // Destroy any existing filter first.
     filter_ = nullptr;
 
-    for (auto counter : store_.counters()) {
+    for (const auto& counter : store_.counters()) {
       counter->reset();
     }
 
     if (yaml.empty()) {
       proto_config_.set_stat_prefix("test");
     } else {
-      MessageUtil::loadFromYaml(yaml, proto_config_);
+      TestUtility::loadFromYaml(yaml, proto_config_);
       MessageUtil::validate(proto_config_);
     }
 
@@ -320,7 +320,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesThriftCall) {
   EXPECT_EQ(0U, store_.counter("test.request_oneway").value());
   EXPECT_EQ(0U, store_.counter("test.request_invalid_type").value());
   EXPECT_EQ(0U, store_.counter("test.request_decoding_error").value());
-  EXPECT_EQ(1U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(1U, stats_.request_active_.value());
   EXPECT_EQ(0U, store_.counter("test.response").value());
 }
 
@@ -338,7 +338,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesThriftOneWay) {
   EXPECT_EQ(1U, store_.counter("test.request_oneway").value());
   EXPECT_EQ(0U, store_.counter("test.request_invalid_type").value());
   EXPECT_EQ(0U, store_.counter("test.request_decoding_error").value());
-  EXPECT_EQ(0U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(0U, stats_.request_active_.value());
   EXPECT_EQ(0U, store_.counter("test.response").value());
 }
 
@@ -355,7 +355,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesStopIterationAndResume) {
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(0U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(1U, stats_.request_active_.value());
 
   // Nothing further happens: we're stopped.
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
@@ -374,11 +374,11 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesStopIterationAndResume) {
   EXPECT_EQ(1U, store_.counter("test.request_oneway").value());
   EXPECT_EQ(0U, store_.counter("test.request_invalid_type").value());
   EXPECT_EQ(0U, store_.counter("test.request_decoding_error").value());
-  EXPECT_EQ(1U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(1U, stats_.request_active_.value());
   EXPECT_EQ(0U, store_.counter("test.response").value());
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
-  EXPECT_EQ(0U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(0U, stats_.request_active_.value());
 }
 
 TEST_F(ThriftConnectionManagerTest, OnDataHandlesFrameSplitAcrossBuffers) {
@@ -406,7 +406,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesInvalidMsgType) {
   EXPECT_EQ(0U, store_.counter("test.request_call").value());
   EXPECT_EQ(0U, store_.counter("test.request_oneway").value());
   EXPECT_EQ(1U, store_.counter("test.request_invalid_type").value());
-  EXPECT_EQ(1U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(1U, stats_.request_active_.value());
   EXPECT_EQ(0U, store_.counter("test.response").value());
 }
 
@@ -445,10 +445,10 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesProtocolError) {
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(1U, store_.counter("test.request_decoding_error").value());
-  EXPECT_EQ(1U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(1U, stats_.request_active_.value());
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
-  EXPECT_EQ(0U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(0U, stats_.request_active_.value());
 }
 
 TEST_F(ThriftConnectionManagerTest, OnDataHandlesProtocolErrorDuringMessageBegin) {
@@ -506,7 +506,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesTransportApplicationException) 
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(1U, store_.counter("test.request_decoding_error").value());
-  EXPECT_EQ(0U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(0U, stats_.request_active_.value());
 }
 
 TEST_F(ThriftConnectionManagerTest, OnEvent) {
@@ -617,7 +617,7 @@ route_config:
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(0U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(1U, stats_.request_active_.value());
 
   Router::RouteConstSharedPtr route = callbacks->route();
   EXPECT_NE(nullptr, route);
@@ -655,7 +655,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndResponse) {
 
   EXPECT_EQ(1U, store_.counter("test.request").value());
   EXPECT_EQ(1U, store_.counter("test.request_call").value());
-  EXPECT_EQ(0U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(0U, stats_.request_active_.value());
   EXPECT_EQ(1U, store_.counter("test.response").value());
   EXPECT_EQ(1U, store_.counter("test.response_reply").value());
   EXPECT_EQ(0U, store_.counter("test.response_exception").value());
@@ -697,7 +697,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndResponseSequenceIdHandling) {
 
   EXPECT_EQ(1U, store_.counter("test.request").value());
   EXPECT_EQ(1U, store_.counter("test.request_call").value());
-  EXPECT_EQ(0U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(0U, stats_.request_active_.value());
   EXPECT_EQ(1U, store_.counter("test.response").value());
   EXPECT_EQ(1U, store_.counter("test.response_reply").value());
   EXPECT_EQ(0U, store_.counter("test.response_exception").value());
@@ -731,7 +731,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndExceptionResponse) {
 
   EXPECT_EQ(1U, store_.counter("test.request").value());
   EXPECT_EQ(1U, store_.counter("test.request_call").value());
-  EXPECT_EQ(0U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(0U, stats_.request_active_.value());
   EXPECT_EQ(1U, store_.counter("test.response").value());
   EXPECT_EQ(0U, store_.counter("test.response_reply").value());
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
@@ -766,7 +766,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndErrorResponse) {
 
   EXPECT_EQ(1U, store_.counter("test.request").value());
   EXPECT_EQ(1U, store_.counter("test.request_call").value());
-  EXPECT_EQ(0U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(0U, stats_.request_active_.value());
   EXPECT_EQ(1U, store_.counter("test.response").value());
   EXPECT_EQ(1U, store_.counter("test.response_reply").value());
   EXPECT_EQ(0U, store_.counter("test.response_exception").value());
@@ -801,7 +801,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndInvalidResponse) {
 
   EXPECT_EQ(1U, store_.counter("test.request").value());
   EXPECT_EQ(1U, store_.counter("test.request_call").value());
-  EXPECT_EQ(0U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(0U, stats_.request_active_.value());
   EXPECT_EQ(1U, store_.counter("test.response").value());
   EXPECT_EQ(0U, store_.counter("test.response_reply").value());
   EXPECT_EQ(0U, store_.counter("test.response_exception").value());
@@ -843,7 +843,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndResponseProtocolError) {
 
   EXPECT_EQ(1U, store_.counter("test.request").value());
   EXPECT_EQ(1U, store_.counter("test.request_call").value());
-  EXPECT_EQ(0U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(0U, stats_.request_active_.value());
   EXPECT_EQ(0U, store_.counter("test.response").value());
   EXPECT_EQ(0U, store_.counter("test.response_reply").value());
   EXPECT_EQ(1U, store_.counter("test.response_exception").value());
@@ -885,7 +885,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndTransportApplicationException) {
 
   EXPECT_EQ(1U, store_.counter("test.request").value());
   EXPECT_EQ(1U, store_.counter("test.request_call").value());
-  EXPECT_EQ(0U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(0U, stats_.request_active_.value());
   EXPECT_EQ(0U, store_.counter("test.response").value());
   EXPECT_EQ(0U, store_.counter("test.response_reply").value());
   EXPECT_EQ(1U, store_.counter("test.response_exception").value());
@@ -907,7 +907,7 @@ TEST_F(ThriftConnectionManagerTest, PipelinedRequestAndResponse) {
           [&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks.push_back(&cb); }));
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
-  EXPECT_EQ(2U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(2U, stats_.request_active_.value());
   EXPECT_EQ(2U, store_.counter("test.request").value());
   EXPECT_EQ(2U, store_.counter("test.request_call").value());
 
@@ -934,7 +934,7 @@ TEST_F(ThriftConnectionManagerTest, PipelinedRequestAndResponse) {
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(0U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(0U, stats_.request_active_.value());
 }
 
 TEST_F(ThriftConnectionManagerTest, ResetDownstreamConnection) {
@@ -948,14 +948,14 @@ TEST_F(ThriftConnectionManagerTest, ResetDownstreamConnection) {
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(1U, store_.counter("test.request_call").value());
-  EXPECT_EQ(1U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(1U, stats_.request_active_.value());
 
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   callbacks->resetDownstreamConnection();
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
-  EXPECT_EQ(0U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(0U, stats_.request_active_.value());
 }
 
 TEST_F(ThriftConnectionManagerTest, DownstreamProtocolUpgrade) {
@@ -1040,7 +1040,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesThriftCallWithMultipleFilters) 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(1U, store_.counter("test.request").value());
   EXPECT_EQ(1U, store_.counter("test.request_call").value());
-  EXPECT_EQ(1U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(1U, stats_.request_active_.value());
 }
 
 // Tests stop iteration/resume with multiple filters.
@@ -1062,7 +1062,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataResumesWithNextFilter) {
     EXPECT_CALL(*filter, messageBegin(_)).WillOnce(Return(FilterStatus::StopIteration));
     EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
     EXPECT_EQ(0U, store_.counter("test.request").value());
-    EXPECT_EQ(1U, store_.gauge("test.request_active").value());
+    EXPECT_EQ(1U, stats_.request_active_.value());
   }
 
   // Resume processing.
@@ -1076,7 +1076,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataResumesWithNextFilter) {
 
   EXPECT_EQ(1U, store_.counter("test.request").value());
   EXPECT_EQ(1U, store_.counter("test.request_call").value());
-  EXPECT_EQ(1U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(1U, stats_.request_active_.value());
 }
 
 // Tests stop iteration/resume with multiple filters when iteration is stopped during transportEnd.
@@ -1101,7 +1101,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataResumesWithNextFilterOnTransportEnd) {
     EXPECT_CALL(*filter, transportEnd()).WillOnce(Return(FilterStatus::StopIteration));
     EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
     EXPECT_EQ(0U, store_.counter("test.request").value());
-    EXPECT_EQ(1U, store_.gauge("test.request_active").value());
+    EXPECT_EQ(1U, stats_.request_active_.value());
   }
 
   // Resume processing.
@@ -1113,7 +1113,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataResumesWithNextFilterOnTransportEnd) {
 
   EXPECT_EQ(1U, store_.counter("test.request").value());
   EXPECT_EQ(1U, store_.counter("test.request_call").value());
-  EXPECT_EQ(1U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(1U, stats_.request_active_.value());
 }
 
 // Tests multiple filters where one invokes sendLocalReply with a successful reply.
@@ -1156,7 +1156,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendsLocalReply) {
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   EXPECT_EQ(1U, store_.counter("test.request").value());
   EXPECT_EQ(1U, store_.counter("test.request_call").value());
-  EXPECT_EQ(0U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(0U, stats_.request_active_.value());
   EXPECT_EQ(1U, store_.counter("test.response_success").value());
 }
 
@@ -1200,7 +1200,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendsLocalErrorReply) {
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   EXPECT_EQ(1U, store_.counter("test.request").value());
   EXPECT_EQ(1U, store_.counter("test.request_call").value());
-  EXPECT_EQ(0U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(0U, stats_.request_active_.value());
   EXPECT_EQ(1U, store_.counter("test.response_error").value());
 }
 
@@ -1237,7 +1237,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendLocalReplyRemoteClosedCo
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   EXPECT_EQ(1U, store_.counter("test.request").value());
   EXPECT_EQ(1U, store_.counter("test.request_call").value());
-  EXPECT_EQ(0U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(0U, stats_.request_active_.value());
   EXPECT_EQ(0U, store_.counter("test.response").value());
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
 }
@@ -1287,7 +1287,7 @@ TEST_F(ThriftConnectionManagerTest, DecoderFiltersModifyRequests) {
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(1U, store_.counter("test.request").value());
   EXPECT_EQ(1U, store_.counter("test.request_call").value());
-  EXPECT_EQ(1U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(1U, stats_.request_active_.value());
 }
 
 TEST_F(ThriftConnectionManagerTest, transportEndWhenRemoteClose) {

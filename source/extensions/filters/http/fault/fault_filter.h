@@ -27,14 +27,12 @@ namespace Fault {
 /**
  * All stats for the fault filter. @see stats_macros.h
  */
-// clang-format off
 #define ALL_FAULT_FILTER_STATS(COUNTER, GAUGE)                                                     \
-  COUNTER(delays_injected)                                                                         \
   COUNTER(aborts_injected)                                                                         \
-  COUNTER(response_rl_injected)                                                                    \
+  COUNTER(delays_injected)                                                                         \
   COUNTER(faults_overflow)                                                                         \
-  GAUGE  (active_faults)
-// clang-format on
+  COUNTER(response_rl_injected)                                                                    \
+  GAUGE(active_faults, Accumulate)
 
 /**
  * Wrapper struct for connection manager stats. @see stats_macros.h
@@ -64,8 +62,28 @@ public:
   const Filters::Common::Fault::FaultRateLimitConfig* responseRateLimit() const {
     return response_rate_limit_.get();
   }
+  const std::string& abortPercentRuntime() const { return abort_percent_runtime_; }
+  const std::string& delayPercentRuntime() const { return delay_percent_runtime_; }
+  const std::string& abortHttpStatusRuntime() const { return abort_http_status_runtime_; }
+  const std::string& delayDurationRuntime() const { return delay_duration_runtime_; }
+  const std::string& maxActiveFaultsRuntime() const { return max_active_faults_runtime_; }
+  const std::string& responseRateLimitPercentRuntime() const {
+    return response_rate_limit_percent_runtime_;
+  }
 
 private:
+  class RuntimeKeyValues {
+  public:
+    const std::string DelayPercentKey = "fault.http.delay.fixed_delay_percent";
+    const std::string AbortPercentKey = "fault.http.abort.abort_percent";
+    const std::string DelayDurationKey = "fault.http.delay.fixed_duration_ms";
+    const std::string AbortHttpStatusKey = "fault.http.abort.http_status";
+    const std::string MaxActiveFaultsKey = "fault.http.max_active_faults";
+    const std::string ResponseRateLimitPercentKey = "fault.http.rate_limit.response_percent";
+  };
+
+  using RuntimeKeys = ConstSingleton<RuntimeKeyValues>;
+
   envoy::type::FractionalPercent abort_percentage_;
   uint64_t http_status_{}; // HTTP or gRPC return codes
   Filters::Common::Fault::FaultDelayConfigPtr request_delay_config_;
@@ -74,6 +92,12 @@ private:
   absl::flat_hash_set<std::string> downstream_nodes_{}; // Inject failures for specific downstream
   absl::optional<uint64_t> max_active_faults_;
   Filters::Common::Fault::FaultRateLimitConfigPtr response_rate_limit_;
+  const std::string delay_percent_runtime_;
+  const std::string abort_percent_runtime_;
+  const std::string delay_duration_runtime_;
+  const std::string abort_http_status_runtime_;
+  const std::string max_active_faults_runtime_;
+  const std::string response_rate_limit_percent_runtime_;
 };
 
 /**
@@ -103,7 +127,7 @@ private:
   TimeSource& time_source_;
 };
 
-typedef std::shared_ptr<FaultFilterConfig> FaultFilterConfigSharedPtr;
+using FaultFilterConfigSharedPtr = std::shared_ptr<FaultFilterConfig>;
 
 /**
  * An HTTP stream rate limiter. Split out for ease of testing and potential code reuse elsewhere.
@@ -138,6 +162,13 @@ public:
    */
   Http::FilterTrailersStatus onTrailers();
 
+  /**
+   * Like the owning filter, we must handle inline destruction, so we have a destroy() method which
+   * kills any callbacks.
+   */
+  void destroy() { token_timer_.reset(); }
+  bool destroyed() { return token_timer_ == nullptr; }
+
 private:
   void onTokenTimer();
 
@@ -163,7 +194,7 @@ private:
 class FaultFilter : public Http::StreamFilter, Logger::Loggable<Logger::Id::filter> {
 public:
   FaultFilter(FaultFilterConfigSharedPtr config);
-  ~FaultFilter();
+  ~FaultFilter() override;
 
   // Http::StreamFilterBase
   void onDestroy() override;
@@ -193,18 +224,6 @@ public:
   }
 
 private:
-  class RuntimeKeyValues {
-  public:
-    const std::string DelayPercentKey = "fault.http.delay.fixed_delay_percent";
-    const std::string AbortPercentKey = "fault.http.abort.abort_percent";
-    const std::string DelayDurationKey = "fault.http.delay.fixed_duration_ms";
-    const std::string AbortHttpStatusKey = "fault.http.abort.http_status";
-    const std::string MaxActiveFaultsKey = "fault.http.max_active_faults";
-    const std::string ResponseRateLimitPercentKey = "fault.http.rate_limit.response_percent";
-  };
-
-  using RuntimeKeys = ConstSingleton<RuntimeKeyValues>;
-
   bool faultOverflow();
   void recordAbortsInjectedStats();
   void recordDelaysInjectedStats();

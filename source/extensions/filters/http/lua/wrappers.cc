@@ -174,6 +174,15 @@ int DynamicMetadataMapWrapper::luaPairs(lua_State* state) {
   return 1;
 }
 
+int PublicKeyWrapper::luaGet(lua_State* state) {
+  if (public_key_ == nullptr || public_key_.get() == nullptr) {
+    lua_pushnil(state);
+  } else {
+    lua_pushlightuserdata(state, public_key_.get());
+  }
+  return 1;
+}
+
 } // namespace Lua
 } // namespace HttpFilters
 } // namespace Extensions

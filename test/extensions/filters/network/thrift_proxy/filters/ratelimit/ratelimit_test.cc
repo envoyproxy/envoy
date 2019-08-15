@@ -52,7 +52,7 @@ public:
 
   void SetUpTest(const std::string& yaml) {
     envoy::config::filter::thrift::rate_limit::v2alpha1::RateLimit proto_config{};
-    MessageUtil::loadFromYaml(yaml, proto_config);
+    TestUtility::loadFromYaml(yaml, proto_config);
 
     config_.reset(new Config(proto_config, local_info_, stats_store_, runtime_, cm_));
 
@@ -75,6 +75,7 @@ public:
   domain: foo
   )EOF";
 
+  Stats::IsolatedStoreImpl stats_store_;
   ConfigSharedPtr config_;
   Filters::Common::RateLimit::MockClient* client_;
   std::unique_ptr<Filter> filter_;
@@ -84,7 +85,6 @@ public:
   Http::TestHeaderMapImpl response_headers_;
   Buffer::OwnedImpl data_;
   Buffer::OwnedImpl response_data_;
-  Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<ThriftProxy::Router::MockRateLimitPolicyEntry> route_rate_limit_;

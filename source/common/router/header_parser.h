@@ -14,7 +14,7 @@ namespace Envoy {
 namespace Router {
 
 class HeaderParser;
-typedef std::unique_ptr<HeaderParser> HeaderParserPtr;
+using HeaderParserPtr = std::unique_ptr<HeaderParser>;
 
 /**
  * HeaderParser manipulates Http::HeaderMap instances. Headers to be added are pre-parsed to select
@@ -42,7 +42,7 @@ public:
   void evaluateHeaders(Http::HeaderMap& headers, const StreamInfo::StreamInfo& stream_info) const;
 
 protected:
-  HeaderParser() {}
+  HeaderParser() = default;
 
 private:
   std::vector<std::pair<Http::LowerCaseString, HeaderFormatterPtr>> headers_to_add_;

@@ -477,7 +477,7 @@ public:
 
 // For the tests which mutate primary and failover host sets explicitly, only
 // run once.
-typedef RoundRobinLoadBalancerTest FailoverTest;
+using FailoverTest = RoundRobinLoadBalancerTest;
 
 // Ensure if all the hosts with priority 0 unhealthy, the next priority hosts are used.
 TEST_P(FailoverTest, BasicFailover) {
@@ -829,6 +829,20 @@ TEST_P(RoundRobinLoadBalancerTest, MaxUnhealthyPanic) {
   EXPECT_EQ(3UL, stats_.lb_healthy_panic_.value());
 }
 
+// Ensure if the panic threshold is 0%, panic mode is disabled.
+TEST_P(RoundRobinLoadBalancerTest, DisablePanicMode) {
+  hostSet().healthy_hosts_ = {};
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
+
+  common_config_.mutable_healthy_panic_threshold()->set_value(0);
+
+  init(false);
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
+      .WillRepeatedly(Return(0));
+  EXPECT_EQ(nullptr, lb_->chooseHost(nullptr));
+  EXPECT_EQ(0UL, stats_.lb_healthy_panic_.value());
+}
+
 // Test of host set selection with host filter
 TEST_P(RoundRobinLoadBalancerTest, HostSelectionWithFilter) {
   NiceMock<Upstream::MockLoadBalancerContext> context;
@@ -1144,6 +1158,7 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingLocalEmpty) {
   HostsPerLocalitySharedPtr local_hosts_per_locality = makeHostsPerLocality({{}, {}});
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
+      .WillOnce(Return(50))
       .WillOnce(Return(50));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
       .WillOnce(Return(true));
@@ -1175,7 +1190,7 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingNoLocalLocality) {
   HostsPerLocalitySharedPtr upstream_hosts_per_locality = makeHostsPerLocality(
       {{makeTestHost(info_, "tcp://127.0.0.1:80")}, {makeTestHost(info_, "tcp://127.0.0.1:81")}},
       true);
-  HostsPerLocalitySharedPtr local_hosts_per_locality = upstream_hosts_per_locality;
+  const HostsPerLocalitySharedPtr& local_hosts_per_locality = upstream_hosts_per_locality;
 
   hostSet().healthy_hosts_ = *upstream_hosts;
   hostSet().hosts_ = *upstream_hosts;
@@ -1398,7 +1413,7 @@ TEST(LoadBalancerSubsetInfoImplTest, DefaultConfigIsDiabled) {
   EXPECT_FALSE(subset_info.isEnabled());
   EXPECT_TRUE(subset_info.fallbackPolicy() == envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK);
   EXPECT_EQ(subset_info.defaultSubset().fields_size(), 0);
-  EXPECT_EQ(subset_info.subsetKeys().size(), 0);
+  EXPECT_EQ(subset_info.subsetSelectors().size(), 0);
 }
 
 TEST(LoadBalancerSubsetInfoImplTest, SubsetConfig) {
@@ -1408,8 +1423,12 @@ TEST(LoadBalancerSubsetInfoImplTest, SubsetConfig) {
   auto subset_config = envoy::api::v2::Cluster::LbSubsetConfig::default_instance();
   subset_config.set_fallback_policy(envoy::api::v2::Cluster::LbSubsetConfig::DEFAULT_SUBSET);
   subset_config.mutable_default_subset()->mutable_fields()->insert({"key", subset_value});
-  auto subset_selector = subset_config.mutable_subset_selectors()->Add();
-  subset_selector->add_keys("selector_key");
+  auto subset_selector1 = subset_config.mutable_subset_selectors()->Add();
+  subset_selector1->add_keys("selector_key1");
+  auto subset_selector2 = subset_config.mutable_subset_selectors()->Add();
+  subset_selector2->add_keys("selector_key2");
+  subset_selector2->set_fallback_policy(
+      envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::ANY_ENDPOINT);
 
   auto subset_info = LoadBalancerSubsetInfoImpl(subset_config);
 
@@ -1419,8 +1438,15 @@ TEST(LoadBalancerSubsetInfoImplTest, SubsetConfig) {
   EXPECT_EQ(subset_info.defaultSubset().fields_size(), 1);
   EXPECT_EQ(subset_info.defaultSubset().fields().at("key").string_value(),
             std::string("the value"));
-  EXPECT_EQ(subset_info.subsetKeys().size(), 1);
-  EXPECT_EQ(subset_info.subsetKeys()[0], std::set<std::string>({"selector_key"}));
+  EXPECT_EQ(subset_info.subsetSelectors().size(), 2);
+  EXPECT_EQ(subset_info.subsetSelectors()[0]->selector_keys_,
+            std::set<std::string>({"selector_key1"}));
+  EXPECT_EQ(subset_info.subsetSelectors()[0]->fallback_policy_,
+            envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED);
+  EXPECT_EQ(subset_info.subsetSelectors()[1]->selector_keys_,
+            std::set<std::string>({"selector_key2"}));
+  EXPECT_EQ(subset_info.subsetSelectors()[1]->fallback_policy_,
+            envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::ANY_ENDPOINT);
 }
 
 } // namespace

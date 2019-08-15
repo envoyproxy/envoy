@@ -15,17 +15,15 @@ namespace Upstream {
 /**
  * All health checker stats. @see stats_macros.h
  */
-// clang-format off
 #define ALL_HEALTH_CHECKER_STATS(COUNTER, GAUGE)                                                   \
   COUNTER(attempt)                                                                                 \
-  COUNTER(success)                                                                                 \
   COUNTER(failure)                                                                                 \
-  COUNTER(passive_failure)                                                                         \
   COUNTER(network_failure)                                                                         \
+  COUNTER(passive_failure)                                                                         \
+  COUNTER(success)                                                                                 \
   COUNTER(verify_cluster)                                                                          \
-  GAUGE  (healthy)                                                                                 \
-  GAUGE  (degraded)
-// clang-format on
+  GAUGE(degraded, Accumulate)                                                                      \
+  GAUGE(healthy, Accumulate)
 
 /**
  * Definition of all health checker stats. @see stats_macros.h
@@ -48,7 +46,7 @@ public:
 protected:
   class ActiveHealthCheckSession : public Event::DeferredDeletable {
   public:
-    virtual ~ActiveHealthCheckSession();
+    ~ActiveHealthCheckSession() override;
     HealthTransition setUnhealthy(envoy::data::core::v2alpha::HealthCheckFailureType type);
     void onDeferredDeleteBase();
     void start() { onInitialInterval(); }
@@ -82,12 +80,12 @@ protected:
     bool first_check_{true};
   };
 
-  typedef std::unique_ptr<ActiveHealthCheckSession> ActiveHealthCheckSessionPtr;
+  using ActiveHealthCheckSessionPtr = std::unique_ptr<ActiveHealthCheckSession>;
 
   HealthCheckerImplBase(const Cluster& cluster, const envoy::api::v2::core::HealthCheck& config,
                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                         Runtime::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
-  ~HealthCheckerImplBase();
+  ~HealthCheckerImplBase() override;
 
   virtual ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) PURE;
   virtual envoy::data::core::v2alpha::HealthCheckerType healthCheckerType() const PURE;

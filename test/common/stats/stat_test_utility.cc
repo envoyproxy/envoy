@@ -1,29 +1,11 @@
 #include "test/common/stats/stat_test_utility.h"
 
+#include "common/common/assert.h"
 #include "common/memory/stats.h"
 
 namespace Envoy {
 namespace Stats {
 namespace TestUtil {
-
-bool hasDeterministicMallocStats() {
-  // We can only test absolute memory usage if the malloc library is a known
-  // quantity. This decision is centralized here. As the preferred malloc
-  // library for Envoy is TCMALLOC that's what we test for here. If we switch
-  // to a different malloc library than we'd have to re-evaluate all the
-  // thresholds in the tests referencing hasDeterministicMallocStats().
-  // TODO(cmluciano) Enable LIBCPP testing once stabilized
-#ifdef _LIBCPP_VERSION
-  return false;
-#elif defined(TCMALLOC) && !defined(ENVOY_MEMORY_DEBUG_ENABLED)
-  const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
-  std::unique_ptr<char[]> data(new char[10000]);
-  const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
-  return end_mem - start_mem >= 10000; // actually 10240
-#else
-  return false;
-#endif
-}
 
 void forEachSampleStat(int num_clusters, std::function<void(absl::string_view)> fn) {
   // These are stats that are repeated for each cluster as of Oct 2018, with a
@@ -116,6 +98,40 @@ void forEachSampleStat(int num_clusters, std::function<void(absl::string_view)> 
   for (const auto& other_stat : other_stats) {
     fn(other_stat);
   }
+}
+
+MemoryTest::Mode MemoryTest::mode() {
+#if !defined(TCMALLOC) || defined(ENVOY_MEMORY_DEBUG_ENABLED)
+  // We can only test absolute memory usage if the malloc library is a known
+  // quantity. This decision is centralized here. As the preferred malloc
+  // library for Envoy is TCMALLOC that's what we test for here. If we switch
+  // to a different malloc library than we'd have to re-evaluate all the
+  // thresholds in the tests referencing MemoryTest.
+  return Mode::Disabled;
+#else
+  // Even when using TCMALLOC is defined, it appears that
+  // Memory::Stats::totalCurrentlyAllocated() does not work as expected
+  // on some platforms, so try to force-allocate some heap memory
+  // and determine whether we can measure it.
+  const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
+  volatile std::string long_string("more than 22 chars to exceed libc++ short-string optimization");
+  const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
+  bool can_measure_memory = end_mem > start_mem;
+
+  if (getenv("ENVOY_MEMORY_TEST_EXACT") != nullptr) { // Set in "ci/do_ci.sh" for 'release' tests.
+    RELEASE_ASSERT(can_measure_memory,
+                   "$ENVOY_MEMORY_TEST_EXACT is set for canonical memory measurements, "
+                   "but memory measurement looks broken");
+    return Mode::Canonical;
+  } else {
+    // Different versions of STL and other compiler/architecture differences may
+    // also impact memory usage, so when not compiling with MEMORY_TEST_EXACT,
+    // memory comparisons must be given some slack. There have recently emerged
+    // some memory-allocation differences between development and Envoy CI and
+    // Bazel CI (which compiles Envoy as a test of Bazel).
+    return can_measure_memory ? Mode::Approximate : Mode::Disabled;
+  }
+#endif
 }
 
 } // namespace TestUtil

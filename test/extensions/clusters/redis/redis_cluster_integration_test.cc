@@ -1,6 +1,8 @@
 #include <sstream>
 #include <vector>
 
+#include "common/common/macros.h"
+
 #include "extensions/filters/network/redis_proxy/command_splitter_impl.h"
 
 #include "test/integration/integration.h"
@@ -14,7 +16,8 @@ namespace {
 // in the cluster. The load balancing policy must be set
 // to random for proper test operation.
 
-const std::string CONFIG = R"EOF(
+const std::string& testConfig() {
+  CONSTRUCT_ON_FIRST_USE(std::string, R"EOF(
 admin:
   access_log_path: /dev/null
   address:
@@ -38,7 +41,7 @@ static_resources:
             op_timeout: 5s
   clusters:
     - name: cluster_0
-      lb_policy: RANDOM
+      lb_policy: CLUSTER_PROVIDED
       hosts:
       - socket_address:
           address: 127.0.0.1
@@ -50,15 +53,18 @@ static_resources:
           value:
             cluster_refresh_rate: 1s
             cluster_refresh_timeout: 4s
-)EOF";
+)EOF");
+}
 
 // This is the basic redis_proxy configuration with an upstream
 // authentication password specified.
 
-const std::string CONFIG_WITH_AUTH = CONFIG + R"EOF(
+const std::string& testConfigWithAuth() {
+  CONSTRUCT_ON_FIRST_USE(std::string, testConfig() + R"EOF(
       extension_protocol_options:
         envoy.redis_proxy: { auth_password: { inline_string: somepassword }}
-)EOF";
+)EOF");
+}
 
 // This function encodes commands as an array of bulkstrings as transmitted by Redis clients to
 // Redis servers, according to the Redis protocol.
@@ -66,9 +72,9 @@ std::string makeBulkStringArray(std::vector<std::string>&& command_strings) {
   std::stringstream result;
 
   result << "*" << command_strings.size() << "\r\n";
-  for (uint64_t i = 0; i < command_strings.size(); i++) {
-    result << "$" << command_strings[i].size() << "\r\n";
-    result << command_strings[i] << "\r\n";
+  for (auto& command_string : command_strings) {
+    result << "$" << command_string.size() << "\r\n";
+    result << command_string << "\r\n";
   }
 
   return result.str();
@@ -77,7 +83,7 @@ std::string makeBulkStringArray(std::vector<std::string>&& command_strings) {
 class RedisClusterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                     public BaseIntegrationTest {
 public:
-  RedisClusterIntegrationTest(const std::string& config = CONFIG, int num_upstreams = 2)
+  RedisClusterIntegrationTest(const std::string& config = testConfig(), int num_upstreams = 2)
       : BaseIntegrationTest(GetParam(), config), num_upstreams_(num_upstreams),
         version_(GetParam()) {}
 
@@ -238,12 +244,9 @@ protected:
    * @param slot2 the ip of the master node of slot2.
    * @return The cluster slot response.
    */
-  std::string twoSlots(const Network::Address::Ip* slot1, const Network::Address::Ip* slot2) {
-    int64_t start_slot1 = 0;
-    int64_t end_slot1 = 10000;
-    int64_t start_slot2 = 10000;
-    int64_t end_slot2 = 16383;
-
+  std::string twoSlots(const Network::Address::Ip* slot1, const Network::Address::Ip* slot2,
+                       int64_t start_slot1 = 0, int64_t end_slot1 = 10000,
+                       int64_t start_slot2 = 10000, int64_t end_slot2 = 16383) {
     std::stringstream resp;
     resp << "*2\r\n"
          << "*3\r\n"
@@ -268,7 +271,7 @@ protected:
 
 class RedisClusterWithAuthIntegrationTest : public RedisClusterIntegrationTest {
 public:
-  RedisClusterWithAuthIntegrationTest(const std::string& config = CONFIG_WITH_AUTH,
+  RedisClusterWithAuthIntegrationTest(const std::string& config = testConfigWithAuth(),
                                       int num_upstreams = 2)
       : RedisClusterIntegrationTest(config, num_upstreams) {}
 };
@@ -294,12 +297,13 @@ TEST_P(RedisClusterIntegrationTest, SingleSlotMasterSlave) {
   on_server_init_function_ = [this]() {
     std::string cluster_slot_response = singleSlotMasterSlave(
         fake_upstreams_[0]->localAddress()->ip(), fake_upstreams_[1]->localAddress()->ip());
-    expectCallClusterSlot(0, cluster_slot_response);
+    expectCallClusterSlot(random_index_, cluster_slot_response);
   };
 
   initialize();
 
-  simpleRequestAndResponse(random_index_, makeBulkStringArray({"get", "foo"}), "$3\r\nbar\r\n");
+  // foo hashes to slot 12182 which is in upstream 0
+  simpleRequestAndResponse(0, makeBulkStringArray({"get", "foo"}), "$3\r\nbar\r\n");
 }
 
 // This test sends a simple "get foo" command from a fake
@@ -314,15 +318,16 @@ TEST_P(RedisClusterIntegrationTest, TwoSlot) {
   on_server_init_function_ = [this]() {
     std::string cluster_slot_response = twoSlots(fake_upstreams_[0]->localAddress()->ip(),
                                                  fake_upstreams_[1]->localAddress()->ip());
-    expectCallClusterSlot(0, cluster_slot_response);
+    expectCallClusterSlot(random_index_, cluster_slot_response);
   };
 
   initialize();
 
-  simpleRequestAndResponse(random_index_, makeBulkStringArray({"get", "foo"}), "$3\r\nbar\r\n");
-
-  // change the load balancer index and hit slot 2 master
-  ON_CALL(*mock_rng_, random()).WillByDefault(Return(1));
+  // foobar hashes to slot 12325 which is in upstream 1
+  simpleRequestAndResponse(1, makeBulkStringArray({"get", "foobar"}), "$3\r\nbar\r\n");
+  // bar hashes to slot 5061 which is in upstream 0
+  simpleRequestAndResponse(0, makeBulkStringArray({"get", "bar"}), "$3\r\nbar\r\n");
+  // foo hashes to slot 12182 which is in upstream 1
   simpleRequestAndResponse(1, makeBulkStringArray({"get", "foo"}), "$3\r\nbar\r\n");
 }
 

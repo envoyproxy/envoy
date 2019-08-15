@@ -39,6 +39,13 @@ public:
     shadow_enabled->mutable_default_value()->set_denominator(
         envoy::type::FractionalPercent::HUNDRED);
     shadow_enabled->set_runtime_key("csrf.shadow_enabled");
+
+    const auto& add_exact_origin = policy.mutable_additional_origins()->Add();
+    add_exact_origin->set_exact("additionalhost");
+
+    const auto& add_regex_origin = policy.mutable_additional_origins()->Add();
+    add_regex_origin->set_regex(R"(www\-[0-9]\.allow\.com)");
+
     return std::make_shared<CsrfFilterConfig>(policy, "test", stats_, runtime_);
   }
 
@@ -95,6 +102,8 @@ TEST_F(CsrfFilterTest, RequestWithNonMutableMethod) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.decodeMetadata(metadata_map));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
 
   EXPECT_EQ(0U, config_->stats().missing_source_origin_.value());
@@ -321,6 +330,43 @@ TEST_F(CsrfFilterTest, NoVHostCsrfEntry) {
   Http::TestHeaderMapImpl request_headers{{":method", "DELETE"}, {"origin", "localhost"}};
 
   setVirtualHostPolicy(nullptr);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
+
+  EXPECT_EQ(0U, config_->stats().missing_source_origin_.value());
+  EXPECT_EQ(1U, config_->stats().request_invalid_.value());
+  EXPECT_EQ(0U, config_->stats().request_valid_.value());
+}
+
+TEST_F(CsrfFilterTest, RequestFromAdditionalExactOrigin) {
+  Http::TestHeaderMapImpl request_headers{{":method", "PUT"}, {"origin", "additionalhost"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
+
+  EXPECT_EQ(0U, config_->stats().missing_source_origin_.value());
+  EXPECT_EQ(0U, config_->stats().request_invalid_.value());
+  EXPECT_EQ(1U, config_->stats().request_valid_.value());
+}
+
+TEST_F(CsrfFilterTest, RequestFromAdditionalRegexOrigin) {
+  Http::TestHeaderMapImpl request_headers{{":method", "PUT"}, {"origin", "www-1.allow.com"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
+
+  EXPECT_EQ(0U, config_->stats().missing_source_origin_.value());
+  EXPECT_EQ(0U, config_->stats().request_invalid_.value());
+  EXPECT_EQ(1U, config_->stats().request_valid_.value());
+}
+
+TEST_F(CsrfFilterTest, RequestFromInvalidAdditionalRegexOrigin) {
+  Http::TestHeaderMapImpl request_headers{{":method", "PUT"}, {"origin", "www.allow.com"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_.decodeHeaders(request_headers, false));

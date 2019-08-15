@@ -13,6 +13,18 @@
 namespace Envoy {
 namespace Config {
 
+/**
+ * Reason that a config update is failed.
+ */
+enum class ConfigUpdateFailureReason {
+  // A connection failure took place and the update could not be fetched.
+  ConnectionFailure,
+  // Config fetch timed out.
+  FetchTimedout,
+  // Update rejected because there is a problem in applying the update.
+  UpdateRejected
+};
+
 class SubscriptionCallbacks {
 public:
   virtual ~SubscriptionCallbacks() = default;
@@ -45,9 +57,10 @@ public:
   /**
    * Called when either the Subscription is unable to fetch a config update or when onConfigUpdate
    * invokes an exception.
+   * @param reason supplies the update failure reason.
    * @param e supplies any exception data on why the fetch failed. May be nullptr.
    */
-  virtual void onConfigUpdateFailed(const EnvoyException* e) PURE;
+  virtual void onConfigUpdateFailed(ConfigUpdateFailureReason reason, const EnvoyException* e) PURE;
 
   /**
    * Obtain the "name" of a v2 API resource in a google.protobuf.Any, e.g. the route config name for
@@ -68,10 +81,8 @@ public:
    * Start a configuration subscription asynchronously. This should be called once and will continue
    * to fetch throughout the lifetime of the Subscription object.
    * @param resources set of resource names to fetch.
-   * @param callbacks the callbacks to be notified of configuration updates. The callback must not
-   *        result in the deletion of the Subscription object.
    */
-  virtual void start(const std::set<std::string>& resources, SubscriptionCallbacks& callbacks) PURE;
+  virtual void start(const std::set<std::string>& resource_names) PURE;
 
   /**
    * Update the resources to fetch.
@@ -81,17 +92,18 @@ public:
   virtual void updateResources(const std::set<std::string>& update_to_these_names) PURE;
 };
 
+using SubscriptionPtr = std::unique_ptr<Subscription>;
+
 /**
  * Per subscription stats. @see stats_macros.h
  */
-// clang-format off
-#define ALL_SUBSCRIPTION_STATS(COUNTER, GAUGE) \
-  COUNTER(update_attempt)                      \
-  COUNTER(update_success)                      \
-  COUNTER(update_failure)                      \
-  COUNTER(update_rejected)                     \
-  GAUGE(version)
-// clang-format on
+#define ALL_SUBSCRIPTION_STATS(COUNTER, GAUGE)                                                     \
+  COUNTER(init_fetch_timeout)                                                                      \
+  COUNTER(update_attempt)                                                                          \
+  COUNTER(update_failure)                                                                          \
+  COUNTER(update_rejected)                                                                         \
+  COUNTER(update_success)                                                                          \
+  GAUGE(version, NeverImport)
 
 /**
  * Struct definition for per subscription stats. @see stats_macros.h

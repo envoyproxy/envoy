@@ -299,6 +299,8 @@ TEST_F(FaultFilterTest, AbortWithHttpStatus) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
   EXPECT_EQ(1UL, config_->stats().active_faults_.value());
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
@@ -1015,6 +1017,23 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitDisabled) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(request_headers_));
 }
 
+// Make sure we destroy the rate limiter if we are reset.
+TEST_F(FaultFilterRateLimitTest, DestroyWithResponseRateLimitEnabled) {
+  setupRateLimitTest(true);
+
+  ON_CALL(encoder_filter_callbacks_, encoderBufferLimit()).WillByDefault(Return(1100));
+  // The timer is consumed but not used by this test.
+  new NiceMock<Event::MockTimer>(&decoder_filter_callbacks_.dispatcher_);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
+
+  EXPECT_EQ(1UL, config_->stats().response_rl_injected_.value());
+  EXPECT_EQ(1UL, config_->stats().active_faults_.value());
+
+  filter_->onDestroy();
+
+  EXPECT_EQ(0UL, config_->stats().active_faults_.value());
+}
+
 TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
   setupRateLimitTest(true);
 
@@ -1092,6 +1111,42 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
 
   filter_->onDestroy();
   EXPECT_EQ(0UL, config_->stats().active_faults_.value());
+}
+
+class FaultFilterSettingsTest : public FaultFilterTest {};
+
+TEST_F(FaultFilterSettingsTest, CheckDefaultRuntimeKeys) {
+  envoy::config::filter::http::fault::v2::HTTPFault fault;
+
+  Fault::FaultSettings settings(fault);
+
+  EXPECT_EQ("fault.http.delay.fixed_delay_percent", settings.delayPercentRuntime());
+  EXPECT_EQ("fault.http.abort.abort_percent", settings.abortPercentRuntime());
+  EXPECT_EQ("fault.http.delay.fixed_duration_ms", settings.delayDurationRuntime());
+  EXPECT_EQ("fault.http.abort.http_status", settings.abortHttpStatusRuntime());
+  EXPECT_EQ("fault.http.max_active_faults", settings.maxActiveFaultsRuntime());
+  EXPECT_EQ("fault.http.rate_limit.response_percent", settings.responseRateLimitPercentRuntime());
+}
+
+TEST_F(FaultFilterSettingsTest, CheckOverrideRuntimeKeys) {
+  envoy::config::filter::http::fault::v2::HTTPFault fault;
+  fault.set_abort_percent_runtime(std::string("fault.abort_percent_runtime"));
+  fault.set_delay_percent_runtime(std::string("fault.delay_percent_runtime"));
+  fault.set_abort_http_status_runtime(std::string("fault.abort_http_status_runtime"));
+  fault.set_delay_duration_runtime(std::string("fault.delay_duration_runtime"));
+  fault.set_max_active_faults_runtime(std::string("fault.max_active_faults_runtime"));
+  fault.set_response_rate_limit_percent_runtime(
+      std::string("fault.response_rate_limit_percent_runtime"));
+
+  Fault::FaultSettings settings(fault);
+
+  EXPECT_EQ("fault.delay_percent_runtime", settings.delayPercentRuntime());
+  EXPECT_EQ("fault.abort_percent_runtime", settings.abortPercentRuntime());
+  EXPECT_EQ("fault.delay_duration_runtime", settings.delayDurationRuntime());
+  EXPECT_EQ("fault.abort_http_status_runtime", settings.abortHttpStatusRuntime());
+  EXPECT_EQ("fault.max_active_faults_runtime", settings.maxActiveFaultsRuntime());
+  EXPECT_EQ("fault.response_rate_limit_percent_runtime",
+            settings.responseRateLimitPercentRuntime());
 }
 
 } // namespace

@@ -15,7 +15,9 @@ jobs:
   - script: ./ci/mac_ci_steps.sh
     displayName: 'Run Mac CI'
     env:
-      BAZEL_REMOTE_CACHE: https://storage.googleapis.com/envoy-circleci-bazel-cache/
+      BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+      BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+      GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
 
   - task: PublishTestResults@2
     inputs:

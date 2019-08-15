@@ -209,42 +209,6 @@ std::string Utility::makeSetCookieValue(const std::string& key, const std::strin
   return cookie_value;
 }
 
-bool Utility::hasSetCookie(const HeaderMap& headers, const std::string& key) {
-
-  struct State {
-    std::string key_;
-    bool ret_;
-  };
-
-  State state;
-  state.key_ = key;
-  state.ret_ = false;
-
-  headers.iterate(
-      [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
-        // Find the set-cookie headers in the request
-        if (header.key() == Http::Headers::get().SetCookie.get()) {
-          const absl::string_view value{header.value().getStringView()};
-          const size_t equals_index = value.find('=');
-
-          if (equals_index == absl::string_view::npos) {
-            // The cookie is malformed if it does not have an `=`.
-            return HeaderMap::Iterate::Continue;
-          }
-          absl::string_view k = value.substr(0, equals_index);
-          State* state = static_cast<State*>(context);
-          if (k == state->key_) {
-            state->ret_ = true;
-            return HeaderMap::Iterate::Break;
-          }
-        }
-        return HeaderMap::Iterate::Continue;
-      },
-      &state);
-
-  return state.ret_;
-}
-
 uint64_t Utility::getResponseStatus(const HeaderMap& headers) {
   const HeaderEntry* header = headers.Status();
   uint64_t response_code;
@@ -286,8 +250,23 @@ Utility::parseHttp2Settings(const envoy::api::v2::core::Http2ProtocolOptions& co
   ret.initial_connection_window_size_ =
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, initial_connection_window_size,
                                       Http::Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE);
+  ret.max_outbound_frames_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      config, max_outbound_frames, Http::Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES);
+  ret.max_outbound_control_frames_ =
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_outbound_control_frames,
+                                      Http::Http2Settings::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES);
+  ret.max_consecutive_inbound_frames_with_empty_payload_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      config, max_consecutive_inbound_frames_with_empty_payload,
+      Http::Http2Settings::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD);
+  ret.max_inbound_priority_frames_per_stream_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      config, max_inbound_priority_frames_per_stream,
+      Http::Http2Settings::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM);
+  ret.max_inbound_window_update_frames_per_data_frame_sent_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      config, max_inbound_window_update_frames_per_data_frame_sent,
+      Http::Http2Settings::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT);
   ret.allow_connect_ = config.allow_connect();
   ret.allow_metadata_ = config.allow_metadata();
+  ret.stream_error_on_invalid_http_messaging_ = config.stream_error_on_invalid_http_messaging();
   return ret;
 }
 
@@ -332,8 +311,9 @@ void Utility::sendLocalReply(
              enumToInt(grpc_status ? grpc_status.value()
                                    : Grpc::Utility::httpToGrpcStatus(enumToInt(response_code))))}}};
     if (!body_text.empty() && !is_head_request) {
-      // TODO: GrpcMessage should be percent-encoded
-      response_headers->insertGrpcMessage().value(body_text);
+      // TODO(dio): Probably it is worth to consider caching the encoded message based on gRPC
+      // status.
+      response_headers->insertGrpcMessage().value(PercentEncoding::encode(body_text));
     }
     encode_headers(std::move(response_headers), true); // Trailers only response
     return;
@@ -457,7 +437,7 @@ MessagePtr Utility::prepareHeaders(const ::envoy::api::v2::core::HttpUri& http_u
 std::string Utility::queryParamsToString(const QueryParams& params) {
   std::string out;
   std::string delim = "?";
-  for (auto p : params) {
+  for (const auto& p : params) {
     absl::StrAppend(&out, delim, p.first, "=", p.second);
     delim = "&";
   }
@@ -570,6 +550,68 @@ void Utility::traversePerFilterConfigGeneric(
       cb(*maybe_weighted_cluster_config);
     }
   }
+}
+
+std::string Utility::PercentEncoding::encode(absl::string_view value) {
+  for (size_t i = 0; i < value.size(); ++i) {
+    const char& ch = value[i];
+    // The escaping characters are defined in
+    // https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#responses.
+    //
+    // We do checking for each char in the string. If the current char is included in the defined
+    // escaping characters, we jump to "the slow path" (append the char [encoded or not encoded] to
+    // the returned string one by one) started from the current index.
+    if (ch < ' ' || ch >= '~' || ch == '%') {
+      return PercentEncoding::encode(value, i);
+    }
+  }
+  return std::string(value);
+}
+
+std::string Utility::PercentEncoding::encode(absl::string_view value, const size_t index) {
+  std::string encoded;
+  if (index > 0) {
+    absl::StrAppend(&encoded, value.substr(0, index - 1));
+  }
+
+  for (size_t i = index; i < value.size(); ++i) {
+    const char& ch = value[i];
+    if (ch < ' ' || ch >= '~' || ch == '%') {
+      // For consistency, URI producers should use uppercase hexadecimal digits for all
+      // percent-encodings. https://tools.ietf.org/html/rfc3986#section-2.1.
+      absl::StrAppend(&encoded, fmt::format("%{:02X}", ch));
+    } else {
+      encoded.push_back(ch);
+    }
+  }
+  return encoded;
+}
+
+std::string Utility::PercentEncoding::decode(absl::string_view encoded) {
+  std::string decoded;
+  decoded.reserve(encoded.size());
+  for (size_t i = 0; i < encoded.size(); ++i) {
+    char ch = encoded[i];
+    if (ch == '%' && i + 2 < encoded.size()) {
+      const char& hi = encoded[i + 1];
+      const char& lo = encoded[i + 2];
+      if (absl::ascii_isdigit(hi)) {
+        ch = hi - '0';
+      } else {
+        ch = absl::ascii_toupper(hi) - 'A' + 10;
+      }
+
+      ch *= 16;
+      if (absl::ascii_isdigit(lo)) {
+        ch += lo - '0';
+      } else {
+        ch += absl::ascii_toupper(lo) - 'A' + 10;
+      }
+      i += 2;
+    }
+    decoded.push_back(ch);
+  }
+  return decoded;
 }
 
 } // namespace Http

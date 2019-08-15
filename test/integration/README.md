@@ -111,6 +111,19 @@ reused in other integration tests. If it's likely be reused, please add the
 appropriate functions to existing utilities or add new test utilities. If it's
 likely a one-off change, it can be scoped to the existing test file.
 
+# Debugging integration tests
+
+The Envoy integration test framework is generally designed to fast-fail when
+things go wrong, with an explanatory message such as
+"Timed out waiting for new connection."
+but it's not always clear what the underlying cause is. Because there are many
+Envoy components under test, often the best tool for debugging is to try to get
+a run of the test with `--test_arg="-l debug"`, or `--test_arg="-l trace"` ideally
+with a clean run (if it's a code change which caused test breakage) or a comparable
+test (if it's a new test failing). Looking at the conn_manager_impl.cc
+logs, router.cc logs, and fake_upstream.cc logs, can often give you a feel for
+what unexpected event is occurring. If that doesn't help, following the GDB
+instructions to run the test in a debugger or sprinkling cerrs around are both often helpful.
 
 # Deflaking tests
 

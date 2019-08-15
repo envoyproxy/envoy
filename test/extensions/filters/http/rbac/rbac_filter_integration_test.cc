@@ -31,7 +31,7 @@ config:
           - any: true
 )EOF";
 
-typedef HttpProtocolIntegrationTest RBACIntegrationTest;
+using RBACIntegrationTest = HttpProtocolIntegrationTest;
 
 INSTANTIATE_TEST_SUITE_P(Protocols, RBACIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
@@ -159,7 +159,7 @@ TEST_P(RBACIntegrationTest, RouteOverride) {
   config_helper_.addConfigModifier(
       [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& cfg) {
         ProtobufWkt::Struct pfc;
-        MessageUtil::loadFromJson("{}", pfc);
+        TestUtility::loadFromJson("{}", pfc);
 
         auto* config = cfg.mutable_route_config()
                            ->mutable_virtual_hosts()

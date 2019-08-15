@@ -144,6 +144,22 @@ TEST_P(GrpcClientIntegrationTest, BadReplyProtobuf) {
   dispatcher_helper_.runDispatcher();
 }
 
+// Validate that a reply with bad protobuf is handled as an INTERNAL gRPC error.
+TEST_P(GrpcClientIntegrationTest, BadRequestReplyProtobuf) {
+  initialize();
+  auto request = createRequest(empty_metadata_);
+  request->fake_stream_->startGrpcStream();
+  EXPECT_CALL(*request->child_span_, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("0")));
+  EXPECT_CALL(*request, onFailure(Status::Internal, "", _)).WillExitIfNeeded();
+  EXPECT_CALL(*request->child_span_, finishSpan());
+  dispatcher_helper_.setStreamEventPending();
+  Buffer::OwnedImpl reply_buffer("\x00\x00\x00\x00\x02\xff\xff", 7);
+  Common::prependGrpcFrameHeader(reply_buffer);
+  request->fake_stream_->encodeData(reply_buffer, false);
+  request->fake_stream_->finishGrpcStream(Grpc::Status::Ok);
+  dispatcher_helper_.runDispatcher();
+}
+
 // Validate that an out-of-range gRPC status is handled as an INVALID_CODE gRPC
 // error.
 TEST_P(GrpcClientIntegrationTest, OutOfRangeGrpcStatus) {
@@ -380,8 +396,8 @@ public:
     AssertionResult result = fake_stream.waitForHeadersComplete();
     RELEASE_ASSERT(result, result.message());
     Http::TestHeaderMapImpl stream_headers(fake_stream.headers());
-    if (access_token_value_ != "") {
-      if (access_token_value_2_ == "") {
+    if (!access_token_value_.empty()) {
+      if (access_token_value_2_.empty()) {
         EXPECT_EQ("Bearer " + access_token_value_, stream_headers.get_("authorization"));
       } else {
         EXPECT_EQ("Bearer " + access_token_value_ + ",Bearer " + access_token_value_2_,
@@ -390,7 +406,7 @@ public:
     }
   }
 
-  virtual envoy::api::v2::core::GrpcService createGoogleGrpcConfig() override {
+  envoy::api::v2::core::GrpcService createGoogleGrpcConfig() override {
     auto config = GrpcClientIntegrationTest::createGoogleGrpcConfig();
     auto* google_grpc = config.mutable_google_grpc();
     google_grpc->set_credentials_factory_name(credentials_factory_name_);
@@ -398,10 +414,10 @@ public:
     ssl_creds->mutable_root_certs()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
     google_grpc->add_call_credentials()->set_access_token(access_token_value_);
-    if (access_token_value_2_ != "") {
+    if (!access_token_value_2_.empty()) {
       google_grpc->add_call_credentials()->set_access_token(access_token_value_2_);
     }
-    if (refresh_token_value_ != "") {
+    if (!refresh_token_value_.empty()) {
       google_grpc->add_call_credentials()->set_google_refresh_token(refresh_token_value_);
     }
     return config;

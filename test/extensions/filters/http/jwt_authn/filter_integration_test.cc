@@ -47,7 +47,8 @@ public:
   HeaderToFilterStateFilterConfig()
       : Common::EmptyHttpFilterConfig(HeaderToFilterStateFilterName) {}
 
-  Http::FilterFactoryCb createFilter(const std::string&, Server::Configuration::FactoryContext&) {
+  Http::FilterFactoryCb createFilter(const std::string&,
+                                     Server::Configuration::FactoryContext&) override {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamDecoderFilter(
           std::make_shared<HeaderToFilterStateFilter>("jwt_selector", "jwt_selector"));
@@ -61,7 +62,7 @@ REGISTER_FACTORY(HeaderToFilterStateFilterConfig,
 
 std::string getAuthFilterConfig(const std::string& config_str, bool use_local_jwks) {
   JwtAuthentication proto_config;
-  MessageUtil::loadFromYaml(config_str, proto_config);
+  TestUtility::loadFromYaml(config_str, proto_config);
 
   if (use_local_jwks) {
     auto& provider0 = (*proto_config.mutable_providers())[std::string(ProviderName)];
@@ -72,7 +73,7 @@ std::string getAuthFilterConfig(const std::string& config_str, bool use_local_jw
 
   HttpFilter filter;
   filter.set_name(HttpFilterNames::get().JwtAuthn);
-  MessageUtil::jsonConvert(proto_config, *filter.mutable_config());
+  TestUtility::jsonConvert(proto_config, *filter.mutable_config());
   return MessageUtil::getJsonStringFromMessage(filter);
 }
 
@@ -80,7 +81,7 @@ std::string getFilterConfig(bool use_local_jwks) {
   return getAuthFilterConfig(ExampleConfig, use_local_jwks);
 }
 
-typedef HttpProtocolIntegrationTest LocalJwksIntegrationTest;
+using LocalJwksIntegrationTest = HttpProtocolIntegrationTest;
 
 INSTANTIATE_TEST_SUITE_P(Protocols, LocalJwksIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),

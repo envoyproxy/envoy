@@ -43,6 +43,15 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
   // Make sure inexact matches work also on data already received.
   tcp_client->waitForData("ello", false);
 
+  // Make sure length based wait works for the data already received
+  tcp_client->waitForData(5);
+  tcp_client->waitForData(4);
+
+  // Drain part of the received message
+  tcp_client->clearData(2);
+  tcp_client->waitForData("llo");
+  tcp_client->waitForData(3);
+
   tcp_client->write("hello");
   ASSERT_TRUE(fake_upstream_connection->waitForData(5));
 
@@ -229,7 +238,7 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
     auto* config_blob = filter_chain->mutable_filters(0)->mutable_config();
 
     envoy::config::filter::network::tcp_proxy::v2::TcpProxy tcp_proxy_config;
-    MessageUtil::jsonConvert(*config_blob, tcp_proxy_config);
+    TestUtility::jsonConvert(*config_blob, tcp_proxy_config);
 
     auto* access_log = tcp_proxy_config.add_access_log();
     access_log->set_name("envoy.file_access_log");
@@ -238,9 +247,9 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
     access_log_config.set_format(
         "upstreamlocal=%UPSTREAM_LOCAL_ADDRESS% "
         "upstreamhost=%UPSTREAM_HOST% downstream=%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%\n");
-    MessageUtil::jsonConvert(access_log_config, *access_log->mutable_config());
+    TestUtility::jsonConvert(access_log_config, *access_log->mutable_config());
 
-    MessageUtil::jsonConvert(tcp_proxy_config, *config_blob);
+    TestUtility::jsonConvert(tcp_proxy_config, *config_blob);
   });
   initialize();
 
@@ -317,11 +326,11 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithNoData) {
     auto* config_blob = filter_chain->mutable_filters(0)->mutable_config();
 
     envoy::config::filter::network::tcp_proxy::v2::TcpProxy tcp_proxy_config;
-    MessageUtil::jsonConvert(*config_blob, tcp_proxy_config);
+    TestUtility::jsonConvert(*config_blob, tcp_proxy_config);
     tcp_proxy_config.mutable_idle_timeout()->set_nanos(
         std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(100))
             .count());
-    MessageUtil::jsonConvert(tcp_proxy_config, *config_blob);
+    TestUtility::jsonConvert(tcp_proxy_config, *config_blob);
   });
 
   initialize();
@@ -338,11 +347,11 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
     auto* config_blob = filter_chain->mutable_filters(0)->mutable_config();
 
     envoy::config::filter::network::tcp_proxy::v2::TcpProxy tcp_proxy_config;
-    MessageUtil::jsonConvert(*config_blob, tcp_proxy_config);
+    TestUtility::jsonConvert(*config_blob, tcp_proxy_config);
     tcp_proxy_config.mutable_idle_timeout()->set_nanos(
         std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(500))
             .count());
-    MessageUtil::jsonConvert(tcp_proxy_config, *config_blob);
+    TestUtility::jsonConvert(tcp_proxy_config, *config_blob);
   });
 
   initialize();

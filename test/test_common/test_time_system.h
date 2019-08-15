@@ -15,7 +15,7 @@ class TestTimeSystem;
 // Adds sleep() and waitFor() interfaces to Event::TimeSystem.
 class TestTimeSystem : public Event::TimeSystem {
 public:
-  virtual ~TestTimeSystem() = default;
+  ~TestTimeSystem() override = default;
 
   /**
    * Advances time forward by the specified duration, running any timers
@@ -120,7 +120,9 @@ private:
       return std::make_unique<TimeSystemVariant>();
     };
     auto time_system = dynamic_cast<TimeSystemVariant*>(&singleton_->timeSystem(make_time_system));
-    RELEASE_ASSERT(time_system, "Two different types of time-systems allocated");
+    RELEASE_ASSERT(time_system,
+                   "Two different types of time-systems allocated. If deriving from "
+                   "Event::TestUsingSimulatedTime make sure it is the first base class.");
     return *time_system;
   }
 

@@ -1,5 +1,6 @@
 #include "envoy/api/v2/core/base.pb.h"
 
+#include "common/grpc/common.h"
 #include "common/http/headers.h"
 #include "common/protobuf/protobuf.h"
 
@@ -36,19 +37,20 @@ public:
 
   void initialize(bool use_alpha) {
     use_alpha_ = use_alpha;
-    client_ =
-        std::make_unique<GrpcClientImpl>(Grpc::AsyncClientPtr{async_client_}, timeout_, use_alpha_);
+    client_ = std::make_unique<GrpcClientImpl>(Grpc::RawAsyncClientPtr{async_client_}, timeout_,
+                                               use_alpha_);
   }
 
   void expectCallSend(envoy::service::auth::v2::CheckRequest& request) {
-    EXPECT_CALL(*async_client_, send(_, ProtoEq(request), Ref(*(client_.get())), _, _))
+    EXPECT_CALL(*async_client_,
+                sendRaw(_, _, Grpc::ProtoBufferEq(request), Ref(*(client_.get())), _, _))
         .WillOnce(Invoke(
             [this](
-                const Protobuf::MethodDescriptor& service_method, const Protobuf::Message&,
-                Grpc::AsyncRequestCallbacks&, Tracing::Span&,
+                absl::string_view service_full_name, absl::string_view method_name,
+                Buffer::InstancePtr&&, Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
                 const absl::optional<std::chrono::milliseconds>& timeout) -> Grpc::AsyncRequest* {
-              EXPECT_EQ(use_alpha_ ? V2Alpha : V2, service_method.service()->full_name());
-              EXPECT_EQ("Check", service_method.name());
+              EXPECT_EQ(use_alpha_ ? V2Alpha : V2, service_full_name);
+              EXPECT_EQ("Check", method_name);
               EXPECT_EQ(timeout_->count(), timeout->count());
               return &async_request_;
             }));
@@ -205,7 +207,7 @@ TEST_P(ExtAuthzGrpcClientTest, CancelledAuthorizationRequest) {
   initialize(GetParam());
 
   envoy::service::auth::v2::CheckRequest request;
-  EXPECT_CALL(*async_client_, send(_, _, _, _, _)).WillOnce(Return(&async_request_));
+  EXPECT_CALL(*async_client_, sendRaw(_, _, _, _, _, _)).WillOnce(Return(&async_request_));
   client_->check(request_callbacks_, request, Tracing::NullSpan::instance());
 
   EXPECT_CALL(async_request_, cancel());

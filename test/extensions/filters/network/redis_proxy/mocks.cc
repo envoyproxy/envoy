@@ -1,40 +1,41 @@
 #include "mocks.h"
 
-#include <cstdint>
-
-#include "common/common/assert.h"
-
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
-
 using testing::_;
 using testing::Invoke;
+using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
 
-MockRouter::MockRouter() {}
-MockRouter::~MockRouter() {}
+MockRouter::MockRouter() = default;
+MockRouter::~MockRouter() = default;
+
+MockRoute::MockRoute(ConnPool::InstanceSharedPtr conn_pool) : conn_pool_(std::move(conn_pool)) {
+  ON_CALL(*this, upstream()).WillByDefault(Return(conn_pool_));
+  ON_CALL(*this, mirrorPolicies()).WillByDefault(ReturnRef(policies_));
+}
+MockRoute::~MockRoute() = default;
 
 namespace ConnPool {
 
-MockInstance::MockInstance() {}
-MockInstance::~MockInstance() {}
+MockInstance::MockInstance() = default;
+MockInstance::~MockInstance() = default;
 
 } // namespace ConnPool
 
 namespace CommandSplitter {
 
-MockSplitRequest::MockSplitRequest() {}
-MockSplitRequest::~MockSplitRequest() {}
+MockSplitRequest::MockSplitRequest() = default;
+MockSplitRequest::~MockSplitRequest() = default;
 
-MockSplitCallbacks::MockSplitCallbacks() {}
-MockSplitCallbacks::~MockSplitCallbacks() {}
+MockSplitCallbacks::MockSplitCallbacks() = default;
+MockSplitCallbacks::~MockSplitCallbacks() = default;
 
-MockInstance::MockInstance() {}
-MockInstance::~MockInstance() {}
+MockInstance::MockInstance() = default;
+MockInstance::~MockInstance() = default;
 
 } // namespace CommandSplitter
 } // namespace RedisProxy

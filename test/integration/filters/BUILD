@@ -112,6 +112,37 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "process_context_lib",
+    srcs = [
+        "process_context_filter.cc",
+    ],
+    hdrs = [
+        "process_context_filter.h",
+    ],
+    deps = [
+        "//include/envoy/http:filter_interface",
+        "//include/envoy/registry",
+        "//include/envoy/server:process_context_interface",
+        "//source/extensions/filters/http/common:empty_http_filter_config_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "stop_iteration_and_continue",
+    srcs = [
+        "stop_iteration_and_continue_filter.cc",
+    ],
+    deps = [
+        "//include/envoy/http:filter_interface",
+        "//include/envoy/registry",
+        "//source/common/network:connection_lib",
+        "//source/extensions/filters/http/common:empty_http_filter_config_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+    ],
+)
+
+envoy_cc_test_library(
     name = "common_lib",
     hdrs = [
         "common.h",
@@ -121,6 +152,20 @@ envoy_cc_test_library(
         "//include/envoy/registry",
         "//source/extensions/filters/http/common:empty_http_filter_config_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "request_metadata_filter_config_lib",
+    srcs = [
+        "request_metadata_filter.cc",
+    ],
+    deps = [
+        "//include/envoy/http:filter_interface",
+        "//include/envoy/registry",
+        "//include/envoy/server:filter_config_interface",
+        "//source/extensions/filters/http/common:empty_http_filter_config_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
     ],
 )
 
@@ -189,6 +234,38 @@ envoy_cc_test_library(
     name = "encode_headers_return_stop_all_filter_config_lib",
     srcs = [
         "encode_headers_return_stop_all_filter.cc",
+    ],
+    deps = [
+        ":common_lib",
+        "//include/envoy/event:timer_interface",
+        "//include/envoy/http:filter_interface",
+        "//include/envoy/registry",
+        "//include/envoy/server:filter_config_interface",
+        "//source/extensions/filters/http/common:empty_http_filter_config_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "udp_listener_echo_filter_lib",
+    srcs = [
+        "udp_listener_echo_filter.cc",
+    ],
+    deps = [
+        "//include/envoy/buffer:buffer_interface",
+        "//include/envoy/network:filter_interface",
+        "//include/envoy/network:listener_interface",
+        "//include/envoy/registry",
+        "//include/envoy/server:filter_config_interface",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/network:connection_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "metadata_stop_all_filter_config_lib",
+    srcs = [
+        "metadata_stop_all_filter.cc",
     ],
     deps = [
         ":common_lib",

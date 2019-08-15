@@ -1,5 +1,6 @@
 #include "common/network/socket_option_factory.h"
 
+#include "common/common/fmt.h"
 #include "common/network/addr_family_aware_socket_option_impl.h"
 #include "common/network/socket_option_impl.h"
 
@@ -73,13 +74,15 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildLiteralOptions(
       buf.append(socket_option.buf_value());
       break;
     default:
-      ENVOY_LOG(warn, "Socket option specified with no or uknown value: {}",
+      ENVOY_LOG(warn, "Socket option specified with no or unknown value: {}",
                 socket_option.DebugString());
       continue;
     }
     options->emplace_back(std::make_shared<Network::SocketOptionImpl>(
         socket_option.state(),
-        Network::SocketOptionName(std::make_pair(socket_option.level(), socket_option.name())),
+        Network::SocketOptionName(
+            socket_option.level(), socket_option.name(),
+            fmt::format("{}/{}", socket_option.level(), socket_option.name())),
         buf));
   }
   return options;
@@ -91,6 +94,24 @@ SocketOptionFactory::buildTcpFastOpenOptions(uint32_t queue_length) {
   options->push_back(std::make_shared<Network::SocketOptionImpl>(
       envoy::api::v2::core::SocketOption::STATE_LISTENING, ENVOY_SOCKET_TCP_FASTOPEN,
       queue_length));
+  return options;
+}
+
+std::unique_ptr<Socket::Options> SocketOptionFactory::buildIpPacketInfoOptions() {
+  std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
+  options->push_back(std::make_shared<AddrFamilyAwareSocketOptionImpl>(
+      envoy::api::v2::core::SocketOption::STATE_BOUND, ENVOY_SELF_IP_ADDR, ENVOY_SELF_IPV6_ADDR,
+      1));
+  return options;
+}
+
+std::unique_ptr<Socket::Options> SocketOptionFactory::buildRxQueueOverFlowOptions() {
+  std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
+#ifdef SO_RXQ_OVFL
+  options->push_back(std::make_shared<Network::SocketOptionImpl>(
+      envoy::api::v2::core::SocketOption::STATE_BOUND,
+      ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_RXQ_OVFL), 1));
+#endif
   return options;
 }
 
