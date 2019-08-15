@@ -15,10 +15,10 @@ namespace Redis {
 
 class RedisCommandStats {
 public:
-  RedisCommandStats(Stats::Scope& scope, const std::string& prefix);
+  RedisCommandStats(Stats::Scope& scope, const std::string& prefix, bool enableCommandCounts);
 
   Stats::Counter& counter(std::string name);
-  Stats::Histogram& histogram(Stats::StatName statName); // We might want one with a string name too
+  Stats::Histogram& histogram(Stats::StatName statName); // This is only used by upstream_rq_time_ currently, so no need to do a dynamic lookup
   // Could add histogram timer for each command in future
 
 private:

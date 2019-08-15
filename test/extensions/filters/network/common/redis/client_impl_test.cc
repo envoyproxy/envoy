@@ -158,6 +158,7 @@ class ConfigBufferSizeGTSingleRequest : public Config {
     return std::chrono::milliseconds(1);
   }
   uint32_t maxUpstreamUnknownConnections() const override { return 0; }
+  bool enableCommandStats() const override { return false; }
 };
 
 TEST_F(RedisClientImplTest, BatchWithTimerFiring) {
@@ -470,6 +471,7 @@ class ConfigOutlierDisabled : public Config {
     return std::chrono::milliseconds(0);
   }
   uint32_t maxUpstreamUnknownConnections() const override { return 0; }
+  bool enableCommandStats() const override { return false; }
 };
 
 TEST_F(RedisClientImplTest, OutlierDisabled) {

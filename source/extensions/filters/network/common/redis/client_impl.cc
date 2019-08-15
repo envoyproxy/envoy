@@ -19,15 +19,14 @@ ConfigImpl::ConfigImpl(
           3)), // Default timeout is 3ms. If max_buffer_size_before_flush is zero, this is not used
                // as the buffer is flushed on each request immediately.
       max_upstream_unknown_connections_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_upstream_unknown_connections, 100)) {}
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_upstream_unknown_connections, 100)),
+      enable_command_stats_(config.enable_command_stats()) {}
 
 ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                              EncoderPtr&& encoder, DecoderFactory& decoder_factory,
                              const Config& config) {
-
-  // TODO: Maybe this should take a boolean not to create the stats?
   auto redis_command_stats =
-      std::make_shared<RedisCommandStats>(host->cluster().statsScope(), "fml");
+      std::make_shared<RedisCommandStats>(host->cluster().statsScope(), "fml", config.enableCommandStats());
   std::unique_ptr<ClientImpl> client(new ClientImpl(host, dispatcher, std::move(encoder),
                                                     decoder_factory, config, redis_command_stats));
   client->connection_ = host->createConnection(dispatcher, nullptr, nullptr).connection_;
@@ -77,11 +76,13 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, PoolCallbacks& ca
   pending_requests_.emplace_back(*this, callbacks);
   encoder_->encode(request, encoder_buffer_);
 
-  // TODO: Make this part work pretty please
-  // std::vector<RespValue> command_array = request.asArray();
-  // std::string command_name = command_array.front().asString();
-  // redis_command_stats_->counter(command_name);
-  // redis_command_stats_->counter("fml").inc();
+  if (config_.enableCommandStats()) {
+    // TODO: This doesn't work. Need to remember where to get the command string from!
+    // std::vector<RespValue> command_array = request.asArray();
+    // std::string command_name = command_array.front().asString();
+    // redis_command_stats_->counter(command_name);
+    redis_command_stats_->counter("fml").inc();
+  }
 
   // If buffer is full, flush. If the buffer was empty before the request, start the timer.
   if (encoder_buffer_.length() >= config_.maxBufferSizeBeforeFlush()) {

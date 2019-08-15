@@ -90,6 +90,10 @@ message RedisProxy {
     // this limit, then redirection will fail and the original redirection error will be passed
     // downstream unchanged. This limit defaults to 100.
     google.protobuf.UInt32Value max_upstream_unknown_connections = 6;
+
+    // Enable per-command statistics per upstream cluster, in addition to the filter level aggregate
+    // count.
+    bool enable_command_stats = 7;
   }
 
   // Network settings for the connection pool to the upstream clusters.

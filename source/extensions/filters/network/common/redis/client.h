@@ -157,6 +157,11 @@ public:
    * minimize the need for a large maxUpstreamUnknownConnections() value.
    */
   virtual uint32_t maxUpstreamUnknownConnections() const PURE;
+
+  /**
+   * @return when enabled, upstream cluster per-command statistics will be recorded.
+   */
+  virtual bool enableCommandStats() const PURE;
 };
 
 /**

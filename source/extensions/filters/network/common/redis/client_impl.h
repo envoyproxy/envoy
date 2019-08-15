@@ -51,6 +51,7 @@ public:
   uint32_t maxUpstreamUnknownConnections() const override {
     return max_upstream_unknown_connections_;
   }
+  bool enableCommandStats() const override { return enable_command_stats_; }
 
 private:
   const std::chrono::milliseconds op_timeout_;
@@ -59,6 +60,7 @@ private:
   const uint32_t max_buffer_size_before_flush_;
   const std::chrono::milliseconds buffer_flush_timeout_;
   const uint32_t max_upstream_unknown_connections_;
+  const bool enable_command_stats_;
 };
 
 class ClientImpl : public Client, public DecoderCallbacks, public Network::ConnectionCallbacks {
