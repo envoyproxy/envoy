@@ -152,7 +152,11 @@ typedef void (*envoy_on_trailers_f)(envoy_headers trailers, void* context);
  */
 typedef void (*envoy_on_error_f)(envoy_error error, void* context);
 
-// FIXME comments
+/**
+ * Called when the async HTTP stream has completed without an error bi-directionally.
+ * @param context, contains the necessary state to carry out platform-specific dispatch and
+ * execution.
+ */
 typedef void (*envoy_on_complete_f)(void* context);
 
 #ifdef __cplusplus
@@ -167,7 +171,7 @@ typedef struct {
   envoy_on_data_f on_data;
   envoy_on_metadata_f on_metadata;
   envoy_on_trailers_f on_trailers;
-  envoy_on_complete_f on_complete;
   envoy_on_error_f on_error;
+  envoy_on_complete_f on_complete;
   void* context; // Will be passed through to callbacks to provide dispatch and execution state.
 } envoy_observer;
