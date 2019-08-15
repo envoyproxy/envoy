@@ -104,7 +104,7 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
 
   TCLAP::ValueArg<bool> use_libevent_buffer("", "use-libevent-buffers",
                                             "Use the original libevent buffer implementation",
-                                            false, true, "bool", cmd);
+                                            false, false, "bool", cmd);
 
   cmd.setExceptionHandling(false);
   try {

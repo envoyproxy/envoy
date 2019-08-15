@@ -211,7 +211,11 @@ bool RouterCheckTool::compareCluster(ToolConfig& tool_config, const std::string&
   if (tool_config.route_->routeEntry() != nullptr) {
     actual = tool_config.route_->routeEntry()->clusterName();
   }
-  return compareResults(actual, expected, "cluster_name");
+  const bool matches = compareResults(actual, expected, "cluster_name");
+  if (matches && tool_config.route_->routeEntry() != nullptr) {
+    coverage_.markClusterCovered(*tool_config.route_->routeEntry());
+  }
+  return matches;
 }
 
 bool RouterCheckTool::compareCluster(
@@ -234,7 +238,11 @@ bool RouterCheckTool::compareVirtualCluster(ToolConfig& tool_config, const std::
         tool_config.route_->routeEntry()->virtualCluster(*tool_config.headers_)->statName();
     actual = tool_config.symbolTable().toString(stat_name);
   }
-  return compareResults(actual, expected, "virtual_cluster_name");
+  const bool matches = compareResults(actual, expected, "virtual_cluster_name");
+  if (matches && tool_config.route_->routeEntry() != nullptr) {
+    coverage_.markVirtualClusterCovered(*tool_config.route_->routeEntry());
+  }
+  return matches;
 }
 
 bool RouterCheckTool::compareVirtualCluster(
@@ -254,7 +262,11 @@ bool RouterCheckTool::compareVirtualHost(ToolConfig& tool_config, const std::str
     Stats::StatName stat_name = tool_config.route_->routeEntry()->virtualHost().statName();
     actual = tool_config.symbolTable().toString(stat_name);
   }
-  return compareResults(actual, expected, "virtual_host_name");
+  const bool matches = compareResults(actual, expected, "virtual_host_name");
+  if (matches && tool_config.route_->routeEntry() != nullptr) {
+    coverage_.markVirtualHostCovered(*tool_config.route_->routeEntry());
+  }
+  return matches;
 }
 
 bool RouterCheckTool::compareVirtualHost(
@@ -282,8 +294,8 @@ bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config, const std::str
     actual = tool_config.headers_->get_(Http::Headers::get().Path);
   }
   const bool matches = compareResults(actual, expected, "path_rewrite");
-  if (matches) {
-    coverage_.markCovered(*tool_config.route_->routeEntry());
+  if (matches && tool_config.route_->routeEntry() != nullptr) {
+    coverage_.markPathRewriteCovered(*tool_config.route_->routeEntry());
   }
   return matches;
 }
@@ -312,7 +324,11 @@ bool RouterCheckTool::compareRewriteHost(ToolConfig& tool_config, const std::str
 
     actual = tool_config.headers_->get_(Http::Headers::get().Host);
   }
-  return compareResults(actual, expected, "host_rewrite");
+  const bool matches = compareResults(actual, expected, "host_rewrite");
+  if (matches && tool_config.route_->routeEntry() != nullptr) {
+    coverage_.markHostRewriteCovered(*tool_config.route_->routeEntry());
+  }
+  return matches;
 }
 
 bool RouterCheckTool::compareRewriteHost(
@@ -332,7 +348,11 @@ bool RouterCheckTool::compareRedirectPath(ToolConfig& tool_config, const std::st
     actual = tool_config.route_->directResponseEntry()->newPath(*tool_config.headers_);
   }
 
-  return compareResults(actual, expected, "path_redirect");
+  const bool matches = compareResults(actual, expected, "path_redirect");
+  if (matches && tool_config.route_->routeEntry() != nullptr) {
+    coverage_.markRedirectPathCovered(*tool_config.route_->routeEntry());
+  }
+  return matches;
 }
 
 bool RouterCheckTool::compareRedirectPath(
@@ -422,6 +442,8 @@ Options::Options(int argc, char** argv) {
   TCLAP::ValueArg<double> fail_under("f", "fail-under",
                                      "Fail if test coverage is under a specified amount", false,
                                      0.0, "float", cmd);
+  TCLAP::SwitchArg comprehensive_coverage(
+      "", "covall", "Measure coverage by checking all route fields", cmd, false);
   TCLAP::ValueArg<std::string> config_path("c", "config-path", "Path to configuration file.", false,
                                            "", "string", cmd);
   TCLAP::ValueArg<std::string> test_path("t", "test-path", "Path to test file.", false, "",
@@ -438,6 +460,7 @@ Options::Options(int argc, char** argv) {
   is_proto_ = is_proto.getValue();
   is_detailed_ = is_detailed.getValue();
   fail_under_ = fail_under.getValue();
+  comprehensive_coverage_ = comprehensive_coverage.getValue();
 
   if (is_proto_) {
     config_path_ = config_path.getValue();

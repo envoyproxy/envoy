@@ -26,6 +26,7 @@ public:
   }
   nghttp2_session* session() { return session_; }
   using ClientConnectionImpl::getStream;
+  using ConnectionImpl::sendPendingFrames;
 };
 
 } // namespace Http2

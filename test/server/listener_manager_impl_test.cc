@@ -448,6 +448,65 @@ filter_chains:
   EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true),
                           EnvoyException, "foo: Cannot find field");
 }
+class NonTerminalFilterFactory : public Configuration::NamedNetworkFilterConfigFactory {
+public:
+  // Configuration::NamedNetworkFilterConfigFactory
+  Network::FilterFactoryCb createFilterFactory(const Json::Object&,
+                                               Configuration::FactoryContext&) override {
+    return [](Network::FilterManager&) -> void {};
+  }
+
+  Network::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message&,
+                                                        Configuration::FactoryContext&) override {
+    return [](Network::FilterManager&) -> void {};
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Envoy::ProtobufWkt::Empty>();
+  }
+
+  std::string name() override { return "non_terminal"; }
+};
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, TerminalNotLast) {
+  Registry::RegisterFactory<NonTerminalFilterFactory,
+                            Configuration::NamedNetworkFilterConfigFactory>
+      registered;
+  const std::string yaml = R"EOF(
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters:
+  - name: non_terminal
+    config: {}
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true),
+                          EnvoyException,
+                          "Error: non-terminal filter non_terminal is the last "
+                          "filter in a network filter chain.");
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, NotTerminalLast) {
+  const std::string yaml = R"EOF(
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters:
+  - name: envoy.tcp_proxy
+    config: {}
+  - name: unknown_but_will_not_be_processed
+    config: {}
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true),
+                          EnvoyException,
+                          "Error: envoy.tcp_proxy must be the terminal network filter.");
+}
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, BadFilterName) {
   const std::string yaml = R"EOF(
@@ -485,6 +544,7 @@ public:
   }
 
   std::string name() override { return "stats_test"; }
+  bool isTerminalFilter() override { return true; }
 
 private:
   Network::FilterFactoryCb commonFilterFactory(Configuration::FactoryContext& context) {
