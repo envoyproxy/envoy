@@ -200,8 +200,7 @@ message Listener {
   // <envoy_api_field_core.SocketAddress.protocol>` is :ref:'UDP
   // <envoy_api_field_core.Protocol.UDP>`, this field specifies the actual udp listener to create,
   // i.e. :ref:`udp_listener_name
-  // <envoy_api_field_listener.UdpListenerConfig.udp_listener_name>` =
-  // "raw_udp_listener" for creating an ActiveUdpListener. If not present, treat it as
-  // "raw_udp_listener".
+  // <envoy_api_field_listener.UdpListenerConfig.udp_listener_name>` = "raw_udp_listener" for
+  // creating a packet-orientented UDP listener. If not present, treat it as "raw_udp_listener".
   listener.UdpListenerConfig udp_listener_config = 18;
 }

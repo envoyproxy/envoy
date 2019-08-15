@@ -16,6 +16,7 @@
 #include "common/network/cidr_range.h"
 #include "common/network/lc_trie.h"
 
+#include "server/connection_handler_impl.h"
 #include "server/filter_chain_manager_impl.h"
 #include "server/lds_api.h"
 
@@ -277,7 +278,9 @@ public:
   Stats::Scope& listenerScope() override { return *listener_scope_; }
   uint64_t listenerTag() const override { return listener_tag_; }
   const std::string& name() const override { return name_; }
-  ActiveUdpListenerFactory* udpListenerFactory() override { return udp_listener_factory_.get(); }
+  const ActiveUdpListenerFactory* udpListenerFactory() override {
+    return udp_listener_factory_.get();
+  }
 
   // Server::Configuration::ListenerFactoryContext
   AccessLog::AccessLogManager& accessLogManager() override {
@@ -377,7 +380,7 @@ private:
   Network::Socket::OptionsSharedPtr listen_socket_options_;
   const std::chrono::milliseconds listener_filters_timeout_;
   const bool continue_on_listener_filters_timeout_;
-  std::unique_ptr<Server::ActiveUdpListenerFactory> udp_listener_factory_;
+  ActiveUdpListenerFactoryPtr udp_listener_factory_;
   // to access ListenerManagerImpl::factory_.
   friend class ListenerFilterChainFactoryBuilder;
 };

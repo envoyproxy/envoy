@@ -73,7 +73,9 @@ public:
     Stats::Scope& listenerScope() override { return parent_.stats_store_; }
     uint64_t listenerTag() const override { return tag_; }
     const std::string& name() const override { return name_; }
-    ActiveUdpListenerFactory* udpListenerFactory() override { return udp_listener_factory_.get(); }
+    const ActiveUdpListenerFactory* udpListenerFactory() override {
+      return udp_listener_factory_.get();
+    }
 
     ConnectionHandlerTest& parent_;
     Network::MockListenSocket socket_;

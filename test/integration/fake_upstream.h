@@ -611,7 +611,7 @@ private:
     }
 
     FakeUpstream& parent_;
-    std::unique_ptr<Server::ActiveUdpListenerFactory> udp_listener_factory_;
+    Server::ActiveUdpListenerFactoryPtr udp_listener_factory_;
     std::string name_;
   };
 

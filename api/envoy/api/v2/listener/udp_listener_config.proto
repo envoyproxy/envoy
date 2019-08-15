@@ -16,13 +16,13 @@ import "google/protobuf/any.proto";
 // Listener :ref:`configuration overview <config_listeners>`
 
 message UdpListenerConfig {
-  // Used to look up UDP listener factory, matches one of the implementation of
-  // Server::ActiveUdpListenerConfigFactory::name().
+  // Used to look up UDP listener factory, matches "raw_udp_listener" or
+  // "quic_listener" to create a specific udp listener.
   // If not specified, treat as "raw_udp_listener".
   string udp_listener_name = 1;
 
   // Used to create a specific listener factory. To some factory, e.g.
-  // Server::ActiveRawUdpListenerFactory, config is not needed.
+  // "raw_udp_listener", config is not needed.
   oneof config_type {
     google.protobuf.Struct config = 2;
 

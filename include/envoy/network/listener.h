@@ -100,7 +100,7 @@ public:
    * @return factory pointer if listening on UDP socket, otherwise return
    * nullptr.
    */
-  virtual Server::ActiveUdpListenerFactory* udpListenerFactory() PURE;
+  virtual const Server::ActiveUdpListenerFactory* udpListenerFactory() PURE;
 };
 
 /**

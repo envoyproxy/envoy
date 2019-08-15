@@ -235,12 +235,16 @@ public:
   virtual ~ActiveUdpListenerFactory() = default;
 
   virtual ConnectionHandlerImpl::ActiveListenerBasePtr
-  createActiveUdpListener(ConnectionHandlerImpl& parent, Network::ListenerConfig& config) PURE;
+  createActiveUdpListener(ConnectionHandlerImpl& parent,
+                          Network::ListenerConfig& config) const PURE;
 };
+
+using ActiveUdpListenerFactoryPtr = std::unique_ptr<ActiveUdpListenerFactory>;
 
 class ActiveRawUdpListenerFactory : public ActiveUdpListenerFactory {
   ConnectionHandlerImpl::ActiveListenerBasePtr
-  createActiveUdpListener(ConnectionHandlerImpl& parent, Network::ListenerConfig& config) override {
+  createActiveUdpListener(ConnectionHandlerImpl& parent,
+                          Network::ListenerConfig& config) const override {
     return std::make_unique<ConnectionHandlerImpl::ActiveUdpListener>(parent, config);
   }
 };

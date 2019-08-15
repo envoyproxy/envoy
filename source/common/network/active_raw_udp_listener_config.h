@@ -11,7 +11,7 @@ namespace Network {
 // This is the default UDP listener if not specified in config.
 class ActiveRawUdpListenerConfigFactory : public Server::ActiveUdpListenerConfigFactory {
 
-  std::unique_ptr<Server::ActiveUdpListenerFactory>
+  Server::ActiveUdpListenerFactoryPtr
   createActiveUdpListenerFactory(const Protobuf::Message&) override;
 
   std::string name() override;

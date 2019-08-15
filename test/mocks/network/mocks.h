@@ -311,7 +311,7 @@ public:
   MOCK_METHOD0(listenerScope, Stats::Scope&());
   MOCK_CONST_METHOD0(listenerTag, uint64_t());
   MOCK_CONST_METHOD0(name, const std::string&());
-  MOCK_METHOD0(udpListenerFactory, Server::ActiveUdpListenerFactory*());
+  MOCK_METHOD0(udpListenerFactory, const Server::ActiveUdpListenerFactory*());
 
   testing::NiceMock<MockFilterChainFactory> filter_chain_factory_;
   testing::NiceMock<MockListenSocket> socket_;
