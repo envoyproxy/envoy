@@ -332,9 +332,9 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(HeaderMap& request_header
         break;
       }
       case ClientCertDetailsType::DNS: {
-        const std::vector<absl::string_view> dns_sans = connection.ssl()->dnsSansPeerCertificate();
+        const auto& dns_sans = connection.ssl()->dnsSansPeerCertificate();
         if (!dns_sans.empty()) {
-          for (const auto dns : dns_sans) {
+          for (const auto& dns : dns_sans) {
             client_cert_details.push_back(absl::StrCat("DNS=", dns));
           }
         }

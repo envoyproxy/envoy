@@ -8,6 +8,7 @@
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
+#include "absl/types/span.h"
 
 namespace Envoy {
 namespace Ssl {
@@ -25,10 +26,10 @@ public:
   virtual bool peerCertificatePresented() const PURE;
 
   /**
-   * @return absl::string_view the URIs in the SAN field of the local certificate. Returns {} if
+   * @return absl::Span<const std::string> the URIs in the SAN field of the local certificate. Returns {} if
    *there is no local certificate, or no SAN field, or no URI.
    **/
-  virtual std::vector<absl::string_view> uriSanLocalCertificate() const PURE;
+  virtual absl::Span<const std::string> uriSanLocalCertificate() const PURE;
 
   /**
    * @return absl::string_view the subject field of the local certificate in RFC 2253 format.
@@ -61,10 +62,10 @@ public:
   virtual absl::string_view subjectPeerCertificate() const PURE;
 
   /**
-   * @return absl::string_view the URIs in the SAN field of the peer certificate. Returns {} if
+   * @return absl::Span<const std::string> the URIs in the SAN field of the peer certificate. Returns {} if
    *there is no peer certificate, or no SAN field, or no URI.
    **/
-  virtual std::vector<absl::string_view> uriSanPeerCertificate() const PURE;
+  virtual absl::Span<const std::string> uriSanPeerCertificate() const PURE;
 
   /**
    * @return absl::string_view the URL-encoded PEM-encoded representation of the peer certificate.
@@ -81,16 +82,16 @@ public:
   virtual absl::string_view urlEncodedPemEncodedPeerCertificateChain() const PURE;
 
   /**
-   * @return std::vector<absl::string_view> the DNS entries in the SAN field of the peer
+   * @return absl::Span<const std::string> the DNS entries in the SAN field of the peer
    *certificate. Returns {} if there is no peer certificate, or no SAN field, or no DNS.
    **/
-  virtual std::vector<absl::string_view> dnsSansPeerCertificate() const PURE;
+  virtual absl::Span<const std::string> dnsSansPeerCertificate() const PURE;
 
   /**
-   * @return std::vector<absl::string_view> the DNS entries in the SAN field of the local
+   * @return absl::Span<const std::string> the DNS entries in the SAN field of the local
    *certificate. Returns {} if there is no local certificate, or no SAN field, or no DNS.
    **/
-  virtual std::vector<absl::string_view> dnsSansLocalCertificate() const PURE;
+  virtual absl::Span<const std::string> dnsSansLocalCertificate() const PURE;
 
   /**
    * @return absl::optional<SystemTime> the time that the peer certificate was issued and should be

@@ -207,16 +207,16 @@ TEST(AuthenticatedMatcher, uriSanPeerCertificate) {
 
 TEST(AuthenticatedMatcher, dnsSanPeerCertificate) {
   Envoy::Network::MockConnection conn;
-  Envoy::Ssl::MockConnectionInfo ssl;
+  auto ssl = std::make_shared<Ssl::MockConnectionInfo>();
 
-  const std::vector<std::string> uri_sans;
-  const std::vector<std::string> dns_sans{"foo", "baz"};
+  const std::vector<absl::string_view> uri_sans;
+  const std::vector<absl::string_view> dns_sans{"foo", "baz"};
 
-  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return(uri_sans));
-  EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(&ssl));
+  EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(uri_sans));
+  EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(ssl));
 
-  EXPECT_CALL(ssl, dnsSansPeerCertificate()).WillRepeatedly(Return(dns_sans));
-  EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(&ssl));
+  EXPECT_CALL(*ssl, dnsSansPeerCertificate()).WillRepeatedly(Return(dns_sans));
+  EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(ssl));
 
   // We should get the first DNS SAN as URI SAN is not available.
   envoy::config::rbac::v2::Principal_Authenticated auth;
@@ -233,7 +233,7 @@ TEST(AuthenticatedMatcher, subjectPeerCertificate) {
 
   const std::vector<absl::string_view> sans;
   EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(sans));
-  EXPECT_CALL(ssl, dnsSansPeerCertificate()).WillRepeatedly(Return(sans));
+  EXPECT_CALL(*ssl, dnsSansPeerCertificate()).WillRepeatedly(Return(sans));
   EXPECT_CALL(*ssl, subjectPeerCertificate()).WillRepeatedly(Return("bar"));
   EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(ssl));
 
