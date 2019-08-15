@@ -109,7 +109,8 @@ more details on the supported API.
     {
       [":method"] = "POST",
       [":path"] = "/",
-      [":authority"] = "lua_cluster"
+      [":authority"] = "lua_cluster",
+      ["set-cookie"] = { "lang=lua; Path=/", "type=binding; Path=/" }
     },
     "hello world",
     5000)
@@ -236,9 +237,9 @@ httpCall()
 
 Makes an HTTP call to an upstream host. Envoy will yield the script until the call completes or
 has an error. *cluster* is a string which maps to a configured cluster manager cluster. *headers*
-is a table of key/value pairs to send. Note that the *:method*, *:path*, and *:authority* headers
-must be set. *body* is an optional string of body data to send. *timeout* is an integer that
-specifies the call timeout in milliseconds.
+is a table of key/value pairs to send (the value can be a string or table of strings). Note that
+the *:method*, *:path*, and *:authority* headers must be set. *body* is an optional string of body
+data to send. *timeout* is an integer that specifies the call timeout in milliseconds.
 
 Returns *headers* which is a table of response headers. Returns *body* which is the string response
 body. May be nil if there is no body.
@@ -264,8 +265,9 @@ passed to subsequent filters. Meaning, the following Lua code is invalid:
     end
   end
 
-*headers* is a table of key/value pairs to send. Note that the *:status* header
-must be set. *body* is a string and supplies the optional response body. May be nil.
+*headers* is a table of key/value pairs to send (the value can be a string or table of strings).
+Note that the *:status* header must be set. *body* is a string and supplies the optional response
+body. May be nil.
 
 metadata()
 ^^^^^^^^^^
@@ -316,10 +318,10 @@ importPublicKey()
 ^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
-  
+
   pubkey = handle:importPublicKey(keyder, keyderLength)
 
-Returns public key which is used by :ref:`verifySignature <verify_signature>` to verify digital signature. 
+Returns public key which is used by :ref:`verifySignature <verify_signature>` to verify digital signature.
 
 .. _verify_signature:
 
@@ -330,13 +332,13 @@ verifySignature()
 
   ok, error = verifySignature(hashFunction, pubkey, signature, signatureLength, data, dataLength)
 
-Verify signature using provided parameters. *hashFunction* is the variable for hash function which be used 
-for verifying signature. *SHA1*, *SHA224*, *SHA256*, *SHA384* and *SHA512* are supported. 
-*pubkey* is the public key. *signature* is the signature to be verified. *signatureLength* is 
+Verify signature using provided parameters. *hashFunction* is the variable for hash function which be used
+for verifying signature. *SHA1*, *SHA224*, *SHA256*, *SHA384* and *SHA512* are supported.
+*pubkey* is the public key. *signature* is the signature to be verified. *signatureLength* is
 the length of the signature. *data* is the content which will be hashed. *dataLength* is the length of data.
 
 The function returns a pair. If the first element is *true*, the second element will be empty
-which means signature is verified; otherwise, the second element will store the error message. 
+which means signature is verified; otherwise, the second element will store the error message.
 
 .. _config_http_filters_lua_header_wrapper:
 

@@ -65,6 +65,9 @@ message ApiConfigSource {
   // For GRPC APIs, the rate limit settings. If present, discovery requests made by Envoy will be
   // rate limited.
   RateLimitSettings rate_limit_settings = 6;
+
+  // Skip the node identifier in subsequent discovery requests for streaming gRPC config types.
+  bool set_node_on_first_message_only = 7;
 }
 
 // Aggregated Discovery Service (ADS) options. This is currently empty, but when

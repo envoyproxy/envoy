@@ -28,7 +28,7 @@ TEST_F(GrpcSubscriptionImplTest, StreamCreationFailure) {
   // Retry and succeed.
   EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
 
-  expectSendMessage({"cluster2"}, "");
+  expectSendMessage({"cluster2"}, "", true);
   timer_cb_();
   EXPECT_TRUE(statsAre(3, 0, 0, 1, 0, 0));
   verifyControlPlaneStats(1);
@@ -49,7 +49,7 @@ TEST_F(GrpcSubscriptionImplTest, RemoteStreamClose) {
 
   // Retry and succeed.
   EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
-  expectSendMessage({"cluster0", "cluster1"}, "");
+  expectSendMessage({"cluster0", "cluster1"}, "", true);
   timer_cb_();
   EXPECT_TRUE(statsAre(2, 0, 0, 1, 0, 0));
 }

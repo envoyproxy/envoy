@@ -20,6 +20,7 @@ dynamic_resources:
   cds_config: {ads: {}}
   ads_config:
     api_type: GRPC
+    set_node_on_first_message_only: true
 static_resources:
   clusters:
     name: dummy_cluster

@@ -150,6 +150,9 @@ message OpenCensusConfig {
 
     // "X-Cloud-Trace-Context:" header.
     CLOUD_TRACE_CONTEXT = 3;
+
+    // X-B3-* headers.
+    B3 = 4;
   }
 
   // List of incoming trace context headers we will accept. First one found

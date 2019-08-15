@@ -44,7 +44,7 @@ service ListenerDiscoveryService {
   }
 }
 
-// [#comment:next free field: 17]
+// [#comment:next free field: 18]
 message Listener {
   // The unique name by which this listener is known. If no name is provided,
   // Envoy will allocate an internal UUID for the listener. If the listener is to be dynamically
@@ -132,9 +132,19 @@ message Listener {
   repeated listener.ListenerFilter listener_filters = 9;
 
   // The timeout to wait for all listener filters to complete operation. If the timeout is reached,
-  // the accepted socket is closed without a connection being created. Specify 0 to disable the
+  // the accepted socket is closed without a connection being created unless
+  // `continue_on_listener_filters_timeout` is set to true. Specify 0 to disable the
   // timeout. If not specified, a default timeout of 15s is used.
   google.protobuf.Duration listener_filters_timeout = 15 [(gogoproto.stdduration) = true];
+
+  // Whether a connection should be created when listener filters timeout. Default is false.
+  //
+  // .. attention::
+  //
+  //   Some listener filters, such as :ref:`Proxy Protocol filter
+  //   <config_listener_filters_proxy_protocol>`, should not be used with this option. It will cause
+  //   unexpected behavior when a connection is created.
+  bool continue_on_listener_filters_timeout = 17;
 
   // Whether the listener should be set as a transparent socket.
   // When this flag is set to true, connections can be redirected to the listener using an
