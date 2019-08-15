@@ -31,7 +31,8 @@ void expectValidBufferedProtoListOfSpans(const SpanBuffer& buffer) {
     expected_yaml += expected_span_yaml;
   }
   zipkin::proto3::ListOfSpans expected_msg;
-  MessageUtil::loadFromYaml(expected_yaml, expected_msg, ProtobufMessage::getStrictValidationVisitor());
+  MessageUtil::loadFromYaml(expected_yaml, expected_msg,
+                            ProtobufMessage::getStrictValidationVisitor());
   EXPECT_EQ(buffer.toProtoListOfSpans().DebugString(), expected_msg.DebugString());
 }
 
