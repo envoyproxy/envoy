@@ -1,7 +1,6 @@
 #include <vector>
 
 #include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
 #include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -10,9 +9,7 @@
 #include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/extensions/filters/network/common/redis/test_utils.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
-#include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -158,6 +155,7 @@ class ConfigBufferSizeGTSingleRequest : public Config {
     return std::chrono::milliseconds(1);
   }
   uint32_t maxUpstreamUnknownConnections() const override { return 0; }
+  ReadPolicy readPolicy() const override { return ReadPolicy::Master; }
 };
 
 TEST_F(RedisClientImplTest, BatchWithTimerFiring) {
@@ -469,6 +467,7 @@ class ConfigOutlierDisabled : public Config {
   std::chrono::milliseconds bufferFlushTimeoutInMs() const override {
     return std::chrono::milliseconds(0);
   }
+  ReadPolicy readPolicy() const override { return ReadPolicy::Master; }
   uint32_t maxUpstreamUnknownConnections() const override { return 0; }
 };
 
