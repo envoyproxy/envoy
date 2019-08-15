@@ -226,13 +226,13 @@ following are the command line options that Envoy supports.
   (:http:get:`/contention`). Mutex tracing is not enabled by default, since it incurs a slight performance
   penalty for those Envoys which already experience mutex contention.
 
-.. option:: --allow-unknown-fields
+.. option:: --allow-unknown-static-fields
 
   *(optional)* This flag disables validation of protobuf configurations for unknown fields. By default, the
   validation is enabled. For most deployments, the default should be used which ensures configuration errors
   are caught upfront and Envoy is configured as intended.
 
-.. option:: --reject-unknown-fields-dynamic
+.. option:: --reject-unknown-dynamic-fields
 
   *(optional)* This flag disables validation of protobuf configuration for unknown fields in
   dynamic configuration. By default, this flag is set false, disabling validation for fields beyond

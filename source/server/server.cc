@@ -58,9 +58,9 @@ InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_syste
                            std::unique_ptr<ProcessContext> process_context)
     : workers_started_(false), shutdown_(false), options_(options),
       validation_context_(
-          options_.allowUnknownFields() ? static_warning_validation_visitor_
-                                        : ProtobufMessage::getStrictValidationVisitor(),
-          !options.rejectUnknownFieldsDynamic() ? dynamic_warning_validation_visitor_
+          options_.allowUnknownStaticFields() ? static_warning_validation_visitor_
+                                              : ProtobufMessage::getStrictValidationVisitor(),
+          !options.rejectUnknownDynamicFields() ? dynamic_warning_validation_visitor_
                                                 : ProtobufMessage::getStrictValidationVisitor()),
       time_source_(time_system), restarter_(restarter), start_time_(time(nullptr)),
       original_start_time_(start_time_), stats_store_(store), thread_local_(tls),

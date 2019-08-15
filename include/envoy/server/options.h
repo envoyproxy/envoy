@@ -88,12 +88,12 @@ public:
   /**
    * @return bool allow unknown fields in the static configuration?
    */
-  virtual bool allowUnknownFields() const PURE;
+  virtual bool allowUnknownStaticFields() const PURE;
 
   /**
    * @return bool allow unknown fields in the dynamic configuration?
    */
-  virtual bool rejectUnknownFieldsDynamic() const PURE;
+  virtual bool rejectUnknownDynamicFields() const PURE;
 
   /**
    * @return const std::string& the admin address output file.

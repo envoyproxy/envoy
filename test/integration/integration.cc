@@ -417,13 +417,13 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
 
 void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootstrap_path,
                                                        const std::vector<std::string>& port_names,
-                                                       bool allow_unknown_fields,
-                                                       bool reject_unknown_fields_dynamic,
+                                                       bool allow_unknown_static_fields,
+                                                       bool reject_unknown_dynamic_fields,
                                                        bool allow_lds_rejection) {
-  test_server_ = IntegrationTestServer::create(bootstrap_path, version_, on_server_init_function_,
-                                               deterministic_, timeSystem(), *api_,
-                                               defer_listener_finalization_, process_object_,
-                                               allow_unknown_fields, reject_unknown_fields_dynamic);
+  test_server_ = IntegrationTestServer::create(
+      bootstrap_path, version_, on_server_init_function_, deterministic_, timeSystem(), *api_,
+      defer_listener_finalization_, process_object_, allow_unknown_static_fields,
+      reject_unknown_dynamic_fields);
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0 &&
       !defer_listener_finalization_) {
 
@@ -453,8 +453,8 @@ void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootst
 
 void BaseIntegrationTest::createApiTestServer(const ApiFilesystemConfig& api_filesystem_config,
                                               const std::vector<std::string>& port_names,
-                                              bool allow_unknown_fields,
-                                              bool reject_unknown_fields_dynamic,
+                                              bool allow_unknown_static_fields,
+                                              bool reject_unknown_dynamic_fields,
                                               bool allow_lds_rejection) {
   const std::string eds_path = TestEnvironment::temporaryFileSubstitute(
       api_filesystem_config.eds_path_, port_map_, version_);
@@ -468,7 +468,7 @@ void BaseIntegrationTest::createApiTestServer(const ApiFilesystemConfig& api_fil
       TestEnvironment::temporaryFileSubstitute(
           api_filesystem_config.bootstrap_path_,
           {{"cds_json_path", cds_path}, {"lds_json_path", lds_path}}, port_map_, version_),
-      port_names, allow_unknown_fields, reject_unknown_fields_dynamic, allow_lds_rejection);
+      port_names, allow_unknown_static_fields, reject_unknown_dynamic_fields, allow_lds_rejection);
 }
 
 void BaseIntegrationTest::createTestServer(const std::string& json_path,

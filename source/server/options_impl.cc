@@ -49,9 +49,9 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
       "", "config-yaml", "Inline YAML configuration, merges with the contents of --config-path",
       false, "", "string", cmd);
 
-  TCLAP::SwitchArg allow_unknown_fields("", "allow-unknown-fields",
-                                        "allow unknown fields in the configuration", cmd, false);
-  TCLAP::SwitchArg reject_unknown_fields_dynamic("", "reject-unknown-fields-dynamic",
+  TCLAP::SwitchArg allow_unknown_static_fields(
+      "", "allow-unknown-static-fields", "allow unknown fields in the configuration", cmd, false);
+  TCLAP::SwitchArg reject_unknown_dynamic_fields("", "reject-unknown-dynamic-fields",
                                                  "reject unknown fields in dynamic configuration",
                                                  cmd, false);
 
@@ -184,8 +184,8 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
 
   config_path_ = config_path.getValue();
   config_yaml_ = config_yaml.getValue();
-  allow_unknown_fields_ = allow_unknown_fields.getValue();
-  reject_unknown_fields_dynamic_ = reject_unknown_fields_dynamic.getValue();
+  allow_unknown_static_fields_ = allow_unknown_static_fields.getValue();
+  reject_unknown_dynamic_fields_ = reject_unknown_dynamic_fields.getValue();
   admin_address_path_ = admin_address_path.getValue();
   log_path_ = log_path.getValue();
   restart_epoch_ = restart_epoch.getValue();
@@ -245,8 +245,8 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
   command_line_options->set_concurrency(concurrency());
   command_line_options->set_config_path(configPath());
   command_line_options->set_config_yaml(configYaml());
-  command_line_options->set_allow_unknown_fields(allow_unknown_fields_);
-  command_line_options->set_reject_unknown_fields_dynamic(reject_unknown_fields_dynamic_);
+  command_line_options->set_allow_unknown_static_fields(allow_unknown_static_fields_);
+  command_line_options->set_reject_unknown_dynamic_fields(reject_unknown_dynamic_fields_);
   command_line_options->set_admin_address_path(adminAddressPath());
   command_line_options->set_component_log_level(component_log_level_str_);
   command_line_options->set_log_level(spdlog::level::to_string_view(logLevel()).data(),

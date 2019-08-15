@@ -62,18 +62,18 @@ class DynamicValidationIntegrationTest
 public:
   DynamicValidationIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, std::get<0>(GetParam())),
-        reject_unknown_fields_dynamic_(std::get<1>(GetParam())) {
+        reject_unknown_dynamic_fields_(std::get<1>(GetParam())) {
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
   }
 
   void createEnvoy() override {
     registerPort("upstream_0", fake_upstreams_.back()->localAddress()->ip()->port());
-    createApiTestServer(api_filesystem_config_, {"http"}, reject_unknown_fields_dynamic_,
-                        reject_unknown_fields_dynamic_, allow_lds_rejection_);
+    createApiTestServer(api_filesystem_config_, {"http"}, reject_unknown_dynamic_fields_,
+                        reject_unknown_dynamic_fields_, allow_lds_rejection_);
   }
 
   ApiFilesystemConfig api_filesystem_config_;
-  const bool reject_unknown_fields_dynamic_;
+  const bool reject_unknown_dynamic_fields_;
   bool allow_lds_rejection_{};
 };
 
@@ -92,7 +92,7 @@ TEST_P(DynamicValidationIntegrationTest, CdsProtocolOptionsRejected) {
       "test/config/integration/server_xds.rds.yaml",
   };
   initialize();
-  if (reject_unknown_fields_dynamic_) {
+  if (reject_unknown_dynamic_fields_) {
     EXPECT_EQ(0, test_server_->counter("cluster_manager.cds.update_success")->value());
     // CDS API parsing will reject due to unknown HCM field.
     EXPECT_EQ(1, test_server_->counter("cluster_manager.cds.update_rejected")->value());
@@ -114,7 +114,7 @@ TEST_P(DynamicValidationIntegrationTest, LdsFilterRejected) {
       "test/config/integration/server_xds.rds.yaml",
   };
   initialize();
-  if (reject_unknown_fields_dynamic_) {
+  if (reject_unknown_dynamic_fields_) {
     EXPECT_EQ(0, test_server_->counter("listener_manager.lds.update_success")->value());
     // LDS API parsing will reject due to unknown HCM field.
     EXPECT_EQ(1, test_server_->counter("listener_manager.lds.update_rejected")->value());
@@ -140,7 +140,7 @@ TEST_P(DynamicValidationIntegrationTest, RdsFailedBySubscription) {
   };
   initialize();
   EXPECT_EQ(1, test_server_->counter("listener_manager.lds.update_success")->value());
-  if (reject_unknown_fields_dynamic_) {
+  if (reject_unknown_dynamic_fields_) {
     EXPECT_EQ(0, test_server_->counter("http.router.rds.route_config_0.update_success")->value());
     // FilesystemSubscriptionImpl will reject early at the ingestion level
     EXPECT_EQ(1, test_server_->counter("http.router.rds.route_config_0.update_failure")->value());
@@ -166,7 +166,7 @@ TEST_P(DynamicValidationIntegrationTest, EdsFailedBySubscription) {
   EXPECT_EQ(1, test_server_->counter("listener_manager.lds.update_success")->value());
   EXPECT_EQ(1, test_server_->counter("http.router.rds.route_config_0.update_success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster_manager.cds.update_success")->value());
-  if (reject_unknown_fields_dynamic_) {
+  if (reject_unknown_dynamic_fields_) {
     EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.update_success")->value());
     // FilesystemSubscriptionImpl will reject early at the ingestion level
     EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.update_failure")->value());

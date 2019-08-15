@@ -461,11 +461,11 @@ TEST_P(ServerInstanceImplTest, ValidationDefault) {
   EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "server.dynamic_unknown_fields")->value());
 }
 
-// Validation mode with --allow-unknown-fields
+// Validation mode with --allow-unknown-static-fields
 TEST_P(ServerInstanceImplTest, ValidationAllowStatic) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
-  options_.allow_unknown_fields_ = true;
+  options_.allow_unknown_static_fields_ = true;
   EXPECT_NO_THROW(initialize("test/server/empty_bootstrap.yaml"));
   EXPECT_NO_THROW(
       server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo"));
@@ -475,11 +475,11 @@ TEST_P(ServerInstanceImplTest, ValidationAllowStatic) {
   EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "server.dynamic_unknown_fields")->value());
 }
 
-// Validation mode with --reject-unknown-fields-dynamic
+// Validation mode with --reject-unknown-dynamic-fields
 TEST_P(ServerInstanceImplTest, ValidationRejectDynamic) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
-  options_.reject_unknown_fields_dynamic_ = true;
+  options_.reject_unknown_dynamic_fields_ = true;
   EXPECT_NO_THROW(initialize("test/server/empty_bootstrap.yaml"));
   EXPECT_THAT_THROWS_MESSAGE(
       server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo"),
@@ -491,12 +491,12 @@ TEST_P(ServerInstanceImplTest, ValidationRejectDynamic) {
   EXPECT_EQ(0, TestUtility::findCounter(stats_store_, "server.dynamic_unknown_fields")->value());
 }
 
-// Validation mode with --allow-unknown-fields --reject-unknown-fields-dynamic
+// Validation mode with --allow-unknown-static-fields --reject-unknown-dynamic-fields
 TEST_P(ServerInstanceImplTest, ValidationAllowStaticRejectDynamic) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
-  options_.allow_unknown_fields_ = true;
-  options_.reject_unknown_fields_dynamic_ = true;
+  options_.allow_unknown_static_fields_ = true;
+  options_.reject_unknown_dynamic_fields_ = true;
   EXPECT_NO_THROW(initialize("test/server/empty_bootstrap.yaml"));
   EXPECT_NO_THROW(
       server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo"));
@@ -855,10 +855,10 @@ protected:
     version_ = std::get<0>(GetParam());
     options_.service_cluster_name_ = "some_cluster_name";
     options_.service_node_name_ = "some_node_name";
-    options_.allow_unknown_fields_ = std::get<1>(GetParam());
+    options_.allow_unknown_static_fields_ = std::get<1>(GetParam());
     // By inverting the static validation value, we can hopefully catch places we may have confused
     // static/dynamic validation.
-    options_.reject_unknown_fields_dynamic_ = options_.allow_unknown_fields_;
+    options_.reject_unknown_dynamic_fields_ = options_.allow_unknown_static_fields_;
   }
 
   AssertionResult validate(absl::string_view yaml_filename) {
@@ -867,9 +867,9 @@ protected:
     try {
       initialize(path);
     } catch (EnvoyException&) {
-      return options_.allow_unknown_fields_ ? AssertionFailure() : AssertionSuccess();
+      return options_.allow_unknown_static_fields_ ? AssertionFailure() : AssertionSuccess();
     }
-    return options_.allow_unknown_fields_ ? AssertionSuccess() : AssertionFailure();
+    return options_.allow_unknown_static_fields_ ? AssertionSuccess() : AssertionFailure();
   }
 };
 
@@ -879,7 +879,8 @@ std::string staticValidationTestParamsToString(
       "{}_{}",
       TestUtility::ipTestParamsToString(
           ::testing::TestParamInfo<Network::Address::IpVersion>(std::get<0>(params.param), 0)),
-      std::get<1>(params.param) ? "with_allow_unknown_fields" : "without_allow_unknown_fields");
+      std::get<1>(params.param) ? "with_allow_unknown_static_fields"
+                                : "without_allow_unknown_static_fields");
 }
 
 INSTANTIATE_TEST_SUITE_P(
