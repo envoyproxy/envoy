@@ -7,6 +7,7 @@
 #include "common/network/address_impl.h"
 
 #include "quiche/quic/core/http/quic_header_list.h"
+#include "quiche/quic/core/quic_error_codes.h"
 #include "quiche/quic/platform/api/quic_ip_address.h"
 #include "quiche/quic/platform/api/quic_socket_address.h"
 
