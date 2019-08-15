@@ -60,7 +60,7 @@ namespace {
  */
 class TestUtilOptionsBase {
 public:
-  const std::vector<std::string>& expectedClientCertUri() const {
+  const std::vector<absl::string_view>& expectedClientCertUri() const {
     return expected_client_cert_uri_;
   }
   const std::string& expectedServerStats() const { return expected_server_stats_; }
@@ -84,7 +84,7 @@ private:
   const Network::Address::IpVersion version_;
 
   std::string expected_server_stats_;
-  std::vector<std::string> expected_client_cert_uri_;
+  std::vector<absl::string_view> expected_client_cert_uri_;
 };
 
 /**
@@ -142,7 +142,7 @@ public:
     return *this;
   }
 
-  const std::vector<std::string>& expectedLocalUri() const { return expected_local_uri_; }
+  const std::vector<absl::string_view>& expectedLocalUri() const { return expected_local_uri_; }
 
   TestUtilOptions& setExpectedSerialNumber(const std::string& expected_serial_number) {
     expected_serial_number_ = expected_serial_number;
@@ -211,7 +211,7 @@ private:
   bool expect_no_cert_;
   bool expect_no_cert_chain_;
   std::string expected_digest_;
-  std::vector<std::string> expected_local_uri_;
+  std::vector<absl::string_view> expected_local_uri_;
   std::string expected_serial_number_;
   std::string expected_peer_issuer_;
   std::string expected_peer_subject_;
@@ -342,7 +342,7 @@ void testUtil(const TestUtilOptions& options) {
         EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->sha256PeerCertificateDigest());
         EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->urlEncodedPemEncodedPeerCertificate());
         EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->subjectPeerCertificate());
-        EXPECT_EQ(std::vector<std::string>{}, server_connection->ssl()->dnsSansPeerCertificate());
+        EXPECT_EQ(std::vector<absl::string_view>{}, server_connection->ssl()->dnsSansPeerCertificate());
       }
       if (options.expectNoCertChain()) {
         EXPECT_EQ(EMPTY_STRING,

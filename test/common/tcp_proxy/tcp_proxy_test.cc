@@ -946,10 +946,10 @@ TEST_F(TcpProxyTest, AccessLogPeerUriSan) {
   filter_callbacks_.connection_.remote_address_ =
       Network::Utility::resolveUrl("tcp://1.1.1.1:40000");
 
-  const std::vector<std::string> uriSan{"someSan"};
-  Ssl::MockConnectionInfo mockConnectionInfo;
-  EXPECT_CALL(mockConnectionInfo, uriSanPeerCertificate()).WillOnce(Return(uriSan));
-  EXPECT_CALL(filter_callbacks_.connection_, ssl()).WillRepeatedly(Return(&mockConnectionInfo));
+  const std::vector<absl::string_view> uriSan{"someSan"};
+  auto mockConnectionInfo = std::make_shared<Ssl::MockConnectionInfo>();
+  EXPECT_CALL(*mockConnectionInfo, uriSanPeerCertificate()).WillOnce(Return(uriSan));
+  EXPECT_CALL(filter_callbacks_.connection_, ssl()).WillRepeatedly(Return(mockConnectionInfo));
 
   setup(1, accessLogConfig("%DOWNSTREAM_PEER_URI_SAN%"));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
@@ -966,9 +966,9 @@ TEST_F(TcpProxyTest, AccessLogTlsSessionId) {
 
   const std::string tlsSessionId{
       "D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B"};
-  Ssl::MockConnectionInfo mockConnectionInfo;
-  EXPECT_CALL(mockConnectionInfo, sessionId()).WillOnce(Return(tlsSessionId));
-  EXPECT_CALL(filter_callbacks_.connection_, ssl()).WillRepeatedly(Return(&mockConnectionInfo));
+  auto mockConnectionInfo = std::make_shared<Ssl::MockConnectionInfo>();
+  EXPECT_CALL(*mockConnectionInfo, sessionId()).WillOnce(Return(tlsSessionId));
+  EXPECT_CALL(filter_callbacks_.connection_, ssl()).WillRepeatedly(Return(mockConnectionInfo));
 
   setup(1, accessLogConfig("%DOWNSTREAM_TLS_SESSION_ID%"));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);

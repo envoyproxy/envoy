@@ -425,6 +425,10 @@ absl::string_view SslSocket::ConnectionInfo::tlsVersion() const {
   return SSL_get_version(ssl_.get());
 }
 
+absl::string_view SslSocket::ConnectionInfo::serverName() const {
+  return SSL_get_servername(ssl_.get(), TLSEXT_NAMETYPE_host_name);
+}
+
 absl::string_view SslSocket::failureReason() const { return failure_reason_; }
 
 absl::string_view SslSocket::ConnectionInfo::serialNumberPeerCertificate() const {

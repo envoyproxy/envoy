@@ -3050,13 +3050,13 @@ TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
 }
 
 TEST_F(RouterTest, HttpsInternalRedirectSucceeded) {
-  Ssl::MockConnectionInfo ssl_connection;
+  auto ssl_connection = std::make_shared<Ssl::MockConnectionInfo>();
   enableRedirects();
 
   sendRequest();
 
   redirect_headers_->insertLocation().value(std::string("https://www.foo.com"));
-  EXPECT_CALL(connection_, ssl()).Times(1).WillOnce(Return(&ssl_connection));
+  EXPECT_CALL(connection_, ssl()).Times(1).WillOnce(Return(ssl_connection));
   EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
   EXPECT_CALL(callbacks_, recreateStream()).Times(1).WillOnce(Return(true));
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);

@@ -126,6 +126,11 @@ public:
    *         connection.
    **/
   virtual absl::string_view tlsVersion() const PURE;
+
+  /**
+   * @return absl::string_view The server name used in the established TLS connection.
+   */
+  virtual absl::string_view serverName() const PURE;
 };
 
 using ConnectionInfoConstSharedPtr = std::shared_ptr<const ConnectionInfo>;

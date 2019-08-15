@@ -28,13 +28,14 @@ public:
     addr_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
     protocol_ = Envoy::Http::Protocol::Http10;
     buffer_ = CheckRequestUtilsTest::newTestBuffer(8192);
+    ssl_ = std::make_shared<NiceMock<Envoy::Ssl::MockConnectionInfo>>();
   };
 
   void ExpectBasicHttp() {
     EXPECT_CALL(callbacks_, connection()).Times(2).WillRepeatedly(Return(&connection_));
     EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
     EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
-    EXPECT_CALL(Const(connection_), ssl()).Times(2).WillRepeatedly(Return(&ssl_));
+    EXPECT_CALL(Const(connection_), ssl()).Times(2).WillRepeatedly(Return(ssl_));
     EXPECT_CALL(callbacks_, streamId()).Times(1).WillOnce(Return(0));
     EXPECT_CALL(callbacks_, decodingBuffer()).WillOnce(Return(buffer_.get()));
     EXPECT_CALL(callbacks_, streamInfo()).Times(3).WillRepeatedly(ReturnRef(req_info_));
@@ -57,7 +58,7 @@ public:
   NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> callbacks_;
   NiceMock<Envoy::Network::MockReadFilterCallbacks> net_callbacks_;
   NiceMock<Envoy::Network::MockConnection> connection_;
-  NiceMock<Envoy::Ssl::MockConnectionInfo> ssl_;
+  std::shared_ptr<NiceMock<Envoy::Ssl::MockConnectionInfo>> ssl_;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> req_info_;
   Buffer::InstancePtr buffer_;
 };
@@ -68,7 +69,7 @@ TEST_F(CheckRequestUtilsTest, BasicTcp) {
   EXPECT_CALL(net_callbacks_, connection()).Times(2).WillRepeatedly(ReturnRef(connection_));
   EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(Const(connection_), ssl()).Times(2).WillRepeatedly(Return(&ssl_));
+  EXPECT_CALL(Const(connection_), ssl()).Times(2).WillRepeatedly(Return(ssl_));
 
   CheckRequestUtils::createTcpCheck(&net_callbacks_, request);
 }
@@ -134,14 +135,14 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeer) {
   EXPECT_CALL(callbacks_, connection()).WillRepeatedly(Return(&connection_));
   EXPECT_CALL(connection_, remoteAddress()).WillRepeatedly(ReturnRef(addr_));
   EXPECT_CALL(connection_, localAddress()).WillRepeatedly(ReturnRef(addr_));
-  EXPECT_CALL(Const(connection_), ssl()).WillRepeatedly(Return(&ssl_));
+  EXPECT_CALL(Const(connection_), ssl()).WillRepeatedly(Return(ssl_));
   EXPECT_CALL(callbacks_, streamId()).WillRepeatedly(Return(0));
   EXPECT_CALL(callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
   EXPECT_CALL(req_info_, protocol()).WillRepeatedly(ReturnPointee(&protocol_));
-  EXPECT_CALL(ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
-  EXPECT_CALL(ssl_, uriSanLocalCertificate())
-      .WillOnce(Return(std::vector<std::string>{"destination"}));
+  EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<absl::string_view>{"source"}));
+  EXPECT_CALL(*ssl_, uriSanLocalCertificate())
+      .WillOnce(Return(std::vector<absl::string_view>{"destination"}));
 
   Protobuf::Map<std::string, std::string> context_extensions;
   context_extensions["key"] = "value";

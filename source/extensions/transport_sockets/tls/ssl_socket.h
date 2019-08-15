@@ -99,6 +99,7 @@ private:
     uint16_t ciphersuiteId() const override;
     absl::string_view ciphersuiteString() const override;
     absl::string_view tlsVersion() const override;
+    absl::string_view serverName() const override;
 
     bssl::UniquePtr<SSL> ssl_;
     mutable std::string cached_serial_number_peer_certificate_;
