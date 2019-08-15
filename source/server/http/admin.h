@@ -321,14 +321,13 @@ private:
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
     const Server::ActiveUdpListenerFactory* udpListenerFactory() override {
-      return udp_listener_factory_.get();
+      NOT_REACHED_GCOVR_EXCL_LINE;
     }
 
     AdminImpl& parent_;
     const std::string name_;
     Stats::ScopePtr scope_;
     Http::ConnectionManagerListenerStats stats_;
-    std::unique_ptr<Server::ActiveUdpListenerFactory> udp_listener_factory_;
   };
   using AdminListenerPtr = std::unique_ptr<AdminListener>;
 
