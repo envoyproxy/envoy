@@ -318,14 +318,7 @@ def _net_zlib():
     )
 
 def _com_google_cel_cpp():
-    location = REPOSITORY_LOCATIONS["com_google_cel_cpp"]
-    http_archive(
-        name = "com_google_cel_cpp",
-        # TODO(kyessenov): requires C++17 partial template specialization available in clang-8 but not gcc
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel:com_google_cel_cpp.patch"],
-        **location
-    )
+    _repository_impl("com_google_cel_cpp")
 
 def _com_github_nghttp2_nghttp2():
     location = REPOSITORY_LOCATIONS["com_github_nghttp2_nghttp2"]
