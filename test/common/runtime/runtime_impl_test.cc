@@ -14,6 +14,7 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -494,6 +495,11 @@ TEST_F(StaticLoaderImplTest, All) {
   EXPECT_CALL(generator_, random()).WillOnce(Return(49));
   EXPECT_TRUE(loader_->snapshot().featureEnabled("foo", 50));
   testNewOverrides(*loader_, store_);
+}
+
+// Validate that Static Layer does not log as unsupported.
+TEST_F(StaticLoaderImplTest, NoUnsupportedStaticLog) {
+  EXPECT_LOG_NOT_CONTAINS("warning", "Skipping unsupported runtime layer", setup());
 }
 
 // Validate proto parsing sanity.
