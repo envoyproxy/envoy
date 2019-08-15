@@ -25,8 +25,12 @@ ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatche
                              EncoderPtr&& encoder, DecoderFactory& decoder_factory,
                              const Config& config, RedisClusterStats& redis_cluster_stats) {
 
+  // TODO: Maybe this should take a boolean not to create the stats?
+  auto redis_command_stats =
+      std::make_shared<RedisCommandStats>(host->cluster().statsScope(), "fml");
   std::unique_ptr<ClientImpl> client(new ClientImpl(host, dispatcher, std::move(encoder),
-                                                    decoder_factory, config, redis_cluster_stats));
+                                                    decoder_factory, config, redis_cluster_stats,
+                                                    redis_command_stats));
   client->connection_ = host->createConnection(dispatcher, nullptr, nullptr).connection_;
   client->connection_->addConnectionCallbacks(*client);
   client->connection_->addReadFilter(Network::ReadFilterSharedPtr{new UpstreamReadFilter(*client)});
@@ -37,13 +41,14 @@ ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatche
 
 ClientImpl::ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                        EncoderPtr&& encoder, DecoderFactory& decoder_factory, const Config& config,
-                       RedisClusterStats& redis_cluster_stats)
+                       RedisClusterStats& redis_cluster_stats,
+                       RedisCommandStatsPtr& redis_command_stats)
     : host_(host), encoder_(std::move(encoder)), decoder_(decoder_factory.create(*this)),
       config_(config),
       connect_or_op_timer_(dispatcher.createTimer([this]() -> void { onConnectOrOpTimeout(); })),
       flush_timer_(dispatcher.createTimer([this]() -> void { flushBufferAndResetTimer(); })),
       redis_cluster_stats_(redis_cluster_stats), time_source_(dispatcher.timeSource()),
-      redis_command_stats_{std::move(std::make_shared<RedisCommandStats>(host->cluster().statsScope(), "foo"))} {
+      redis_command_stats_(redis_command_stats) {
   host->cluster().stats().upstream_cx_total_.inc();
   host->stats().cx_total_.inc();
   host->cluster().stats().upstream_cx_active_.inc();
@@ -75,10 +80,11 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, PoolCallbacks& ca
   pending_requests_.emplace_back(*this, callbacks);
   encoder_->encode(request, encoder_buffer_);
 
-  // TODO: Clean up this part
-  std::vector<RespValue> command_array = request.asArray();
-  std::string command_name = command_array.front().asString();
-  redis_command_stats_->counter(command_name);
+  // TODO: Make this part work pretty please
+  // std::vector<RespValue> command_array = request.asArray();
+  // std::string command_name = command_array.front().asString();
+  // redis_command_stats_->counter(command_name);
+  redis_command_stats_->counter("fml");
 
   // If buffer is full, flush. If the buffer was empty before the request, start the timer.
   if (encoder_buffer_.length() >= config_.maxBufferSizeBeforeFlush()) {
@@ -212,7 +218,8 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
 ClientImpl::PendingRequest::PendingRequest(ClientImpl& parent, PoolCallbacks& callbacks)
     : parent_(parent), callbacks_(callbacks),
       request_timer_(std::make_unique<Stats::Timespan>(
-          parent_.redis_cluster_stats_.upstream_rq_time_, parent_.time_source_)) {
+          parent_.redis_command_stats_->histogram(parent_.redis_command_stats_->upstream_rq_time_),
+          parent_.time_source_)) {
   parent.host_->cluster().stats().upstream_rq_total_.inc();
   parent.host_->stats().rq_total_.inc();
   parent.host_->cluster().stats().upstream_rq_active_.inc();

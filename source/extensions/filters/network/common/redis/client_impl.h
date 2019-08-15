@@ -108,7 +108,7 @@ private:
 
   ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
              DecoderFactory& decoder_factory, const Config& config,
-             RedisClusterStats& redis_cluster_stats);
+             RedisClusterStats& redis_cluster_stats, RedisCommandStatsPtr& redis_command_stats);
   void onConnectOrOpTimeout();
   void onData(Buffer::Instance& data);
   void putOutlierEvent(Upstream::Outlier::Result result);
@@ -133,7 +133,7 @@ private:
   Event::TimerPtr flush_timer_;
   RedisClusterStats redis_cluster_stats_;
   Envoy::TimeSource& time_source_;
-  const RedisCommandStatsPtr& redis_command_stats_;
+  const RedisCommandStatsPtr redis_command_stats_;
 };
 
 class ClientFactoryImpl : public ClientFactory {

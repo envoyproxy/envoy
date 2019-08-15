@@ -10,7 +10,8 @@ namespace Redis {
 
 RedisCommandStats::RedisCommandStats(Stats::Scope& scope, const std::string& prefix)
     : scope_(scope), stat_name_set_(scope.symbolTable()),
-      prefix_(stat_name_set_.add(prefix + "commands")) {
+      prefix_(stat_name_set_.add(prefix + "commands")),
+      upstream_rq_time_(stat_name_set_.add("upstream_rq_time")) {
 
   // Create StatName for each Redis command. Note that we don't include Auth or Ping.
   for (const std::string& command :
@@ -31,6 +32,10 @@ RedisCommandStats::RedisCommandStats(Stats::Scope& scope, const std::string& pre
 
 Stats::Counter& RedisCommandStats::counter(std::string name) {
   return scope_.counterFromStatName(stat_name_set_.getStatName(name));
+}
+
+Stats::Histogram& RedisCommandStats::histogram(Stats::StatName statName) {
+  return scope_.histogramFromStatName(statName);
 }
 
 } // namespace Redis

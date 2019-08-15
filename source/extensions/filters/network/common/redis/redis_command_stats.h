@@ -18,6 +18,7 @@ public:
   RedisCommandStats(Stats::Scope& scope, const std::string& prefix);
 
   Stats::Counter& counter(std::string name);
+  Stats::Histogram& histogram(Stats::StatName statName); // We might want one with a string name too
   // Could add histogram timer for each command in future
 
 private:
@@ -26,6 +27,9 @@ private:
   Stats::Scope& scope_;
   Stats::StatNameSet stat_name_set_;
   const Stats::StatName prefix_;
+
+public:
+  const Stats::StatName upstream_rq_time_;
 };
 using RedisCommandStatsPtr = std::shared_ptr<RedisCommandStats>;
 
