@@ -510,7 +510,7 @@ TEST_F(RedisClientImplTest, ConnectTimeout) {
   EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(callbacks1, onFailure());
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
-  connect_or_op_timer_->callback_();
+  connect_or_op_timer_->invokeCallback();
 
   EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_cx_connect_timeout_.value());
   EXPECT_EQ(1UL, host_->stats_.cx_connect_fail_.value());
@@ -553,7 +553,7 @@ TEST_F(RedisClientImplTest, OpTimeout) {
   EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(callbacks1, onFailure());
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
-  connect_or_op_timer_->callback_();
+  connect_or_op_timer_->invokeCallback();
 
   EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_rq_timeout_.value());
   EXPECT_EQ(1UL, host_->stats_.rq_timeout_.value());
