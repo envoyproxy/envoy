@@ -473,7 +473,7 @@ protected:
 
     // No change.
     expectRedisResolve();
-    resolve_timer_->callback_();
+    resolve_timer_->invokeCallback();
     EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(1).WillOnce(Return(false));
     expectClusterSlotResponse(twoSlotsMastersWithReplica());
     expectHealthyHosts(std::list<std::string>(
@@ -482,7 +482,7 @@ protected:
     // Remove 2nd shard.
     expectRedisResolve();
     EXPECT_CALL(membership_updated_, ready());
-    resolve_timer_->callback_();
+    resolve_timer_->invokeCallback();
     EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(1);
     expectClusterSlotResponse(singleSlotMasterReplica("127.0.0.1", "127.0.0.2", 22120));
     expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120", "127.0.0.2:22120"}));
@@ -819,7 +819,7 @@ TEST_F(RedisClusterTest, RedisReplicaErrorResponse) {
   for (uint64_t i = 1; i < (1 << 3); i++) {
     std::bitset<3> replica_flags(i);
     expectRedisResolve();
-    resolve_timer_->callback_();
+    resolve_timer_->invokeCallback();
     if (replica_flags.all()) {
       EXPECT_CALL(membership_updated_, ready());
       EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(1).WillOnce(Return(false));
