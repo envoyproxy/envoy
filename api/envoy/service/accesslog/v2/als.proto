@@ -67,7 +67,6 @@ message StreamAccessLogsMessage {
 
     HTTPAccessLogEntries http_logs = 2;
 
-    // [#not-implemented-hide:]
     TCPAccessLogEntries tcp_logs = 3;
   }
 }
