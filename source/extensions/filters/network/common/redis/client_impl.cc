@@ -84,7 +84,7 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, PoolCallbacks& ca
   // std::vector<RespValue> command_array = request.asArray();
   // std::string command_name = command_array.front().asString();
   // redis_command_stats_->counter(command_name);
-  redis_command_stats_->counter("fml");
+  redis_command_stats_->counter("fml").inc();
 
   // If buffer is full, flush. If the buffer was empty before the request, start the timer.
   if (encoder_buffer_.length() >= config_.maxBufferSizeBeforeFlush()) {
