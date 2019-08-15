@@ -311,7 +311,7 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
   EXPECT_EQ("localhost1", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->hostname());
 
   resolver1.expectResolve(*dns_resolver_);
-  resolver1.timer_->callback_();
+  resolver1.timer_->invokeCallback();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
   resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
   EXPECT_THAT(
@@ -319,14 +319,14 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
       ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
 
   resolver1.expectResolve(*dns_resolver_);
-  resolver1.timer_->callback_();
+  resolver1.timer_->invokeCallback();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
   resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
       ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
 
-  resolver1.timer_->callback_();
+  resolver1.timer_->invokeCallback();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
   EXPECT_CALL(membership_updated, ready());
   resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.3"}));
@@ -353,9 +353,9 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
 
   // Make sure we cancel.
   resolver1.expectResolve(*dns_resolver_);
-  resolver1.timer_->callback_();
+  resolver1.timer_->invokeCallback();
   resolver2.expectResolve(*dns_resolver_);
-  resolver2.timer_->callback_();
+  resolver2.timer_->invokeCallback();
 
   EXPECT_CALL(resolver1.active_dns_query_, cancel());
   EXPECT_CALL(resolver2.active_dns_query_, cancel());
@@ -610,7 +610,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   EXPECT_EQ(0UL, stats_.counter("cluster.name.update_no_rebuild").value());
 
   resolver1.expectResolve(*dns_resolver_);
-  resolver1.timer_->callback_();
+  resolver1.timer_->invokeCallback();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
   resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
   EXPECT_THAT(
@@ -622,7 +622,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   EXPECT_EQ(1UL, stats_.counter("cluster.name.update_no_rebuild").value());
 
   resolver1.expectResolve(*dns_resolver_);
-  resolver1.timer_->callback_();
+  resolver1.timer_->invokeCallback();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
   resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
   EXPECT_THAT(
@@ -641,14 +641,14 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   EXPECT_EQ(2UL, stats_.counter("cluster.name.update_no_rebuild").value());
 
   resolver1.expectResolve(*dns_resolver_);
-  resolver1.timer_->callback_();
+  resolver1.timer_->invokeCallback();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
   resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
 
   // We again received the same set as before for localhost1. No rebuild this time.
   EXPECT_EQ(3UL, stats_.counter("cluster.name.update_no_rebuild").value());
 
-  resolver1.timer_->callback_();
+  resolver1.timer_->invokeCallback();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
   EXPECT_CALL(membership_updated, ready());
   resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.3"}));
@@ -717,11 +717,11 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
 
   // Make sure we cancel.
   resolver1.expectResolve(*dns_resolver_);
-  resolver1.timer_->callback_();
+  resolver1.timer_->invokeCallback();
   resolver2.expectResolve(*dns_resolver_);
-  resolver2.timer_->callback_();
+  resolver2.timer_->invokeCallback();
   resolver3.expectResolve(*dns_resolver_);
-  resolver3.timer_->callback_();
+  resolver3.timer_->invokeCallback();
 
   EXPECT_CALL(resolver1.active_dns_query_, cancel());
   EXPECT_CALL(resolver2.active_dns_query_, cancel());
@@ -799,7 +799,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
   EXPECT_EQ("localhost1", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->hostname());
 
   resolver1.expectResolve(*dns_resolver_);
-  resolver1.timer_->callback_();
+  resolver1.timer_->invokeCallback();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
   resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
   EXPECT_THAT(
@@ -807,14 +807,14 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
       ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
 
   resolver1.expectResolve(*dns_resolver_);
-  resolver1.timer_->callback_();
+  resolver1.timer_->invokeCallback();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
   resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
       ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
 
-  resolver1.timer_->callback_();
+  resolver1.timer_->invokeCallback();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
   EXPECT_CALL(membership_updated, ready());
   resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.3"}));
@@ -850,11 +850,11 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
 
   // Make sure we cancel.
   resolver1.expectResolve(*dns_resolver_);
-  resolver1.timer_->callback_();
+  resolver1.timer_->invokeCallback();
   resolver2.expectResolve(*dns_resolver_);
-  resolver2.timer_->callback_();
+  resolver2.timer_->invokeCallback();
   resolver3.expectResolve(*dns_resolver_);
-  resolver3.timer_->callback_();
+  resolver3.timer_->invokeCallback();
 
   EXPECT_CALL(resolver1.active_dns_query_, cancel());
   EXPECT_CALL(resolver2.active_dns_query_, cancel());

@@ -101,7 +101,7 @@ protected:
     logical_host->outlierDetector().putHttpResponseCode(200);
 
     expectResolve(Network::DnsLookupFamily::V4Only, expected_address);
-    resolve_timer_->callback_();
+    resolve_timer_->invokeCallback();
 
     // Should not cause any changes.
     EXPECT_CALL(*resolve_timer_, enableTimer(_));
@@ -133,7 +133,7 @@ protected:
     data.host_description_->healthChecker().setUnhealthy();
 
     expectResolve(Network::DnsLookupFamily::V4Only, expected_address);
-    resolve_timer_->callback_();
+    resolve_timer_->invokeCallback();
 
     // Should cause a change.
     EXPECT_CALL(*resolve_timer_, enableTimer(_));
@@ -151,7 +151,7 @@ protected:
     logical_host->createConnection(dispatcher_, nullptr, nullptr);
 
     expectResolve(Network::DnsLookupFamily::V4Only, expected_address);
-    resolve_timer_->callback_();
+    resolve_timer_->invokeCallback();
 
     // Empty should not cause any change.
     EXPECT_CALL(*resolve_timer_, enableTimer(_));
@@ -167,7 +167,7 @@ protected:
     // Make sure we cancel.
     EXPECT_CALL(active_dns_query_, cancel());
     expectResolve(Network::DnsLookupFamily::V4Only, expected_address);
-    resolve_timer_->callback_();
+    resolve_timer_->invokeCallback();
 
     tls_.shutdownThread();
   }

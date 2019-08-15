@@ -18,6 +18,19 @@ Redis::RespValue makeAuthCommand(const std::string& password) {
   return auth_command;
 }
 
+ReadOnlyRequest::ReadOnlyRequest() {
+  std::vector<NetworkFilters::Common::Redis::RespValue> values(1);
+  values[0].type(NetworkFilters::Common::Redis::RespType::BulkString);
+  values[0].asString() = "readonly";
+  type(NetworkFilters::Common::Redis::RespType::Array);
+  asArray().swap(values);
+}
+
+const ReadOnlyRequest& ReadOnlyRequest::instance() {
+  static const ReadOnlyRequest* instance = new ReadOnlyRequest{};
+  return *instance;
+}
+
 } // namespace Utility
 } // namespace Redis
 } // namespace Common

@@ -393,6 +393,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                                      factory_context.messageValidationVisitor())),
       rate_limit_policy_(route.route().rate_limits()), shadow_policy_(route.route()),
       priority_(ConfigUtility::parsePriority(route.route().priority())),
+      config_headers_(Http::HeaderUtility::buildHeaderDataVector(route.match().headers())),
       total_cluster_weight_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route().weighted_clusters(), total_weight, 100UL)),
       request_headers_parser_(HeaderParser::configure(route.request_headers_to_add(),
@@ -439,11 +440,6 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       throw EnvoyException(fmt::format("Sum of weights in the weighted_cluster should add up to {}",
                                        total_cluster_weight_));
     }
-  }
-
-  // fixfix dedup
-  for (const auto& header_map : route.match().headers()) {
-    config_headers_.push_back(std::make_unique<Http::HeaderUtility::HeaderData>(header_map));
   }
 
   for (const auto& query_parameter : route.match().query_parameters()) {

@@ -290,7 +290,7 @@ TEST_F(OriginalDstClusterTest, Membership) {
   ASSERT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(true, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->used());
   EXPECT_CALL(*cleanup_timer_, enableTimer(_));
-  cleanup_timer_->callback_();
+  cleanup_timer_->invokeCallback();
   EXPECT_EQ(
       cluster_hosts,
       cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()); // hosts vector remains the same
@@ -301,7 +301,7 @@ TEST_F(OriginalDstClusterTest, Membership) {
 
   EXPECT_CALL(*cleanup_timer_, enableTimer(_));
   EXPECT_CALL(membership_updated_, ready());
-  cleanup_timer_->callback_();
+  cleanup_timer_->invokeCallback();
   EXPECT_NE(cluster_hosts,
             cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()); // hosts vector changes
 
@@ -392,7 +392,7 @@ TEST_F(OriginalDstClusterTest, Membership2) {
   EXPECT_EQ(true, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->used());
   EXPECT_EQ(true, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[1]->used());
   EXPECT_CALL(*cleanup_timer_, enableTimer(_));
-  cleanup_timer_->callback_();
+  cleanup_timer_->invokeCallback();
   EXPECT_EQ(
       cluster_hosts,
       cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()); // hosts vector remains the same
@@ -404,7 +404,7 @@ TEST_F(OriginalDstClusterTest, Membership2) {
 
   EXPECT_CALL(*cleanup_timer_, enableTimer(_));
   EXPECT_CALL(membership_updated_, ready());
-  cleanup_timer_->callback_();
+  cleanup_timer_->invokeCallback();
   EXPECT_NE(cluster_hosts,
             cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()); // hosts vector changes
 

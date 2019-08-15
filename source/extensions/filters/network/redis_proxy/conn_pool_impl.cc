@@ -9,7 +9,6 @@
 #include "common/stats/utility.h"
 
 #include "extensions/filters/network/redis_proxy/config.h"
-#include "extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -198,9 +197,17 @@ InstanceImpl::ThreadLocalPool::threadLocalActiveClient(Upstream::HostConstShared
     client->host_ = host;
     client->redis_client_ = parent_.client_factory_.create(host, dispatcher_, parent_.config_);
     client->redis_client_->addConnectionCallbacks(*client);
+    // TODO(hyang): should the auth command and readonly command be moved to the factory method?
     if (!auth_password_.empty()) {
       // Send an AUTH command to the upstream server.
       client->redis_client_->makeRequest(Common::Redis::Utility::makeAuthCommand(auth_password_),
+                                         null_pool_callbacks);
+    }
+    // Any connection to replica requires the READONLY command in order to perform read.
+    // Also the READONLY command is a no-opt for the master.
+    // We only need to send the READONLY command iff it's possible that the host is a replica.
+    if (parent_.config_.readPolicy() != Common::Redis::Client::ReadPolicy::Master) {
+      client->redis_client_->makeRequest(Common::Redis::Utility::ReadOnlyRequest::instance(),
                                          null_pool_callbacks);
     }
   }
@@ -218,8 +225,8 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key,
   }
 
   const bool use_crc16 = is_redis_cluster_;
-  Clusters::Redis::RedisLoadBalancerContext lb_context(key, parent_.config_.enableHashtagging(),
-                                                       use_crc16);
+  Clusters::Redis::RedisLoadBalancerContextImpl lb_context(key, parent_.config_.enableHashtagging(),
+                                                           use_crc16, request);
   Upstream::HostConstSharedPtr host = cluster_->loadBalancer().chooseHost(&lb_context);
   if (!host) {
     return nullptr;

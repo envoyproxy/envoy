@@ -474,6 +474,9 @@ LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator
       throw EnvoyException(absl::StrCat("Duplicate layer name: ", layer.name()));
     }
     switch (layer.layer_specifier_case()) {
+    case envoy::config::bootstrap::v2::RuntimeLayer::kStaticLayer:
+      // Nothing needs to be done here.
+      break;
     case envoy::config::bootstrap::v2::RuntimeLayer::kAdminLayer:
       if (admin_layer_ != nullptr) {
         throw EnvoyException(
@@ -494,8 +497,7 @@ LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator
       init_manager.add(subscriptions_.back()->init_target_);
       break;
     default:
-      ENVOY_LOG(warn, "Skipping unsupported runtime layer: {}", layer.DebugString());
-      break;
+      NOT_REACHED_GCOVR_EXCL_LINE;
     }
   }
 
