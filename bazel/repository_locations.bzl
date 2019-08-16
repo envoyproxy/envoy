@@ -4,14 +4,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/0.18.1/bazel-gazelle-0.18.1.tar.gz"],
     ),
     bazel_toolchains = dict(
-        sha256 = "0710ec5a88201c4c3038ea458f7e9078cc3ad7ad61736ab287c115438eb91b1d",
-        strip_prefix = "bazel-toolchains-5a8611ee011d0d68498b16bf42a9c69d139bc708",
-        # 2019-08-01
-        # Need:
-        # - https://github.com/bazelbuild/bazel-toolchains/pull/644 to select correct toolchain from same image
-        # - https://github.com/bazelbuild/bazel-toolchains/pull/650 to support no java config
-        # TODO(lizan): Update to release when new version is released.
-        urls = ["https://github.com/bazelbuild/bazel-toolchains/archive/5a8611ee011d0d68498b16bf42a9c69d139bc708.tar.gz"],
+        sha256 = "b72e7a911436b2900b05759a1fcd735070edbd4442f0a3506ef021fdcd6e15b3",
+        strip_prefix = "bazel-toolchains-0.28.5",
+        urls = ["https://github.com/bazelbuild/bazel-toolchains/archive/0.28.5.tar.gz"],
     ),
     boringssl = dict(
         # Use commits from branch "chromium-stable-with-bazel"
@@ -219,8 +214,8 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/grpc-ecosystem/grpc-httpjson-transcoding/archive/64d6ac985360b624d8e95105701b64a3814794cd.tar.gz"],
     ),
     io_bazel_rules_go = dict(
-        sha256 = "a82a352bffae6bee4e95f68a8d80a70e87f42c4741e6a448bec11998fcc82329",
-        urls = ["https://github.com/bazelbuild/rules_go/releases/download/0.18.5/rules_go-0.18.5.tar.gz"],
+        sha256 = "96b1f81de5acc7658e1f5a86d7dc9e1b89bc935d83799b711363a748652c471a",
+        urls = ["https://github.com/bazelbuild/rules_go/releases/download/0.19.2/rules_go-0.19.2.tar.gz"],
     ),
     rules_foreign_cc = dict(
         sha256 = "c957e6663094a1478c43330c1bbfa71afeaf1ab86b7565233783301240c7a0ab",
@@ -239,9 +234,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/census-instrumentation/opencensus-cpp/archive/cad0d03ff3474cf14389fc249e16847ab7b6895f.tar.gz"],
     ),
     com_github_curl = dict(
-        sha256 = "821aeb78421375f70e55381c9ad2474bf279fc454b791b7e95fc83562951c690",
-        strip_prefix = "curl-7.65.1",
-        urls = ["https://github.com/curl/curl/releases/download/curl-7_65_1/curl-7.65.1.tar.gz"],
+        sha256 = "4376ac72b95572fb6c4fbffefb97c7ea0dd083e1974c0e44cd7e49396f454839",
+        strip_prefix = "curl-7.65.3",
+        urls = ["https://github.com/curl/curl/releases/download/curl-7_65_3/curl-7.65.3.tar.gz"],
     ),
     com_googlesource_quiche = dict(
         # Static snapshot of https://quiche.googlesource.com/quiche/+archive/2a930469533c3b541443488a629fe25cd8ff53d0.tar.gz
