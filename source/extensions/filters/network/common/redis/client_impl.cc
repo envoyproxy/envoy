@@ -77,11 +77,12 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, PoolCallbacks& ca
   encoder_->encode(request, encoder_buffer_);
 
   if (config_.enableCommandStats()) {
-    // TODO: This doesn't work. Need to remember where to get the command string from!
-    // std::vector<RespValue> command_array = request.asArray();
-    // std::string command_name = command_array.front().asString();
-    // redis_command_stats_->counter(command_name);
-    redis_command_stats_->counter("fml").inc();
+    // Get command from RespValue
+    if (request.type() == RespType::Array) {
+      redis_command_stats_->counter(request.asArray().front().toString());
+    } else {
+      redis_command_stats_->counter(request.toString());
+    }
   }
 
   // If buffer is full, flush. If the buffer was empty before the request, start the timer.
