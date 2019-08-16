@@ -239,11 +239,11 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersio
 }
 
 bool Utility::isLocalConnection(const Network::ConnectionSocket& socket) {
-  const auto& remote_address = socket.remoteAddress();
-  // Before calling getifaddrs, verify the obvious checks. These are local:
+  // These are local:
   // - Pipes
   // - Sockets to a loopback address
   // - Sockets where the local and remote address (ignoring port) are the same
+  const auto& remote_address = socket.remoteAddress();
   if (remote_address->type() == Envoy::Network::Address::Type::Pipe ||
       isLoopbackAddress(*remote_address)) {
     return true;
@@ -254,35 +254,6 @@ bool Utility::isLocalConnection(const Network::ConnectionSocket& socket) {
       remote_ip->addressAsString() == local_ip->addressAsString()) {
     return true;
   }
-
-  // If not obviously local, check if remote addr matches an interface address
-  struct ifaddrs* ifaddr;
-  const int rc = getifaddrs(&ifaddr);
-  Cleanup ifaddr_cleanup([ifaddr] {
-    if (ifaddr) {
-      freeifaddrs(ifaddr);
-    }
-  });
-  RELEASE_ASSERT(rc == 0, "");
-
-  const auto af_look_up = (remote_ip->version() == Address::IpVersion::v4) ? AF_INET : AF_INET6;
-
-  for (struct ifaddrs* ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
-    if (ifa->ifa_addr == nullptr) {
-      continue;
-    }
-
-    if (ifa->ifa_addr->sa_family == af_look_up) {
-      const auto* addr = reinterpret_cast<const struct sockaddr_storage*>(ifa->ifa_addr);
-      const auto local_address = Address::addressFromSockAddr(
-          *addr, (af_look_up == AF_INET) ? sizeof(sockaddr_in) : sizeof(sockaddr_in6));
-
-      if (*remote_address == *local_address) {
-        return true;
-      }
-    }
-  }
-
   return false;
 }
 
