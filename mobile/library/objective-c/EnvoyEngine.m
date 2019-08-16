@@ -224,8 +224,8 @@ static void ios_on_error(envoy_error error, void *context) {
 
   // Create native observer
   envoy_observer *native_obs = (envoy_observer *)malloc(sizeof(envoy_observer));
-  envoy_observer native_init = {ios_on_headers,  ios_on_data,  ios_on_trailers, ios_on_metadata,
-                                ios_on_complete, ios_on_error, context};
+  envoy_observer native_init = {ios_on_headers, ios_on_data,     ios_on_trailers, ios_on_metadata,
+                                ios_on_error,   ios_on_complete, context};
   memcpy(native_obs, &native_init, sizeof(envoy_observer));
   _nativeObserver = native_obs;
 
