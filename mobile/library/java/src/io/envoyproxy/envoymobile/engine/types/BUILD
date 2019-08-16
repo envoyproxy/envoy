@@ -12,7 +12,6 @@ envoy_mobile_java_library(
         "EnvoyHeaders.java",
         "EnvoyObserver.java",
         "EnvoyStatus.java",
-        "EnvoyStream.java",
     ],
     visibility = ["//visibility:public"],
 )
