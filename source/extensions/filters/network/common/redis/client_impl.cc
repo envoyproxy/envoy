@@ -79,9 +79,9 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, PoolCallbacks& ca
   if (config_.enableCommandStats()) {
     // Get command from RespValue
     if (request.type() == RespType::Array) {
-      redis_command_stats_->counter(request.asArray().front().toString());
+      redis_command_stats_->counter("fml." + request.asArray().front().asString()).inc();
     } else {
-      redis_command_stats_->counter(request.toString());
+      redis_command_stats_->counter("fml." + request.asString()).inc();
     }
   }
 
