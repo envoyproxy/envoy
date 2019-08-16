@@ -35,7 +35,7 @@ TcpGrpcAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config
 }
 
 ProtobufTypes::MessagePtr TcpGrpcAccessLogFactory::createEmptyConfigProto() {
-  return ProtobufTypes::MessagePtr{new envoy::config::accesslog::v2::TcpGrpcAccessLogConfig()};
+  return std::make_unique<envoy::config::accesslog::v2::TcpGrpcAccessLogConfig>();
 }
 
 std::string TcpGrpcAccessLogFactory::name() const { return AccessLogNames::get().TcpGrpc; }
