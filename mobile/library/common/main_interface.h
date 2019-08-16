@@ -12,6 +12,13 @@ extern "C" { // functions
 #endif
 
 /**
+ * Template configuration compiled with the Envoy Mobile library.
+ * More information about Envoy's config can be found at:
+ * https://www.envoyproxy.io/docs/envoy/latest/configuration/configuration
+ */
+extern const char* config_template;
+
+/**
  * Initialize an underlying HTTP stream.
  * @param engine, handle to the engine that will manage this stream.
  * @return envoy_stream_t, handle to the underlying stream.
