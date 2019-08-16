@@ -29,8 +29,8 @@ build --action_env=PATH
 build:asan --action_env=BAZEL_LINKLIBS=
 build:asan --action_env=BAZEL_LINKOPTS=-lstdc++:-lm
 build:asan --define ENVOY_CONFIG_ASAN=1
-build:asan --copt -fsanitize=address,undefined
-build:asan --linkopt -fsanitize=address,undefined
+build:asan --copt -fsanitize=address
+build:asan --linkopt -fsanitize=address
 build:asan --copt -fno-sanitize=vptr
 build:asan --linkopt -fno-sanitize=vptr
 build:asan --linkopt -ldl
@@ -41,15 +41,19 @@ build:asan --define signal_trace=disabled
 build:asan --copt -DADDRESS_SANITIZER=1
 build:asan --copt -D__SANITIZE_ADDRESS__
 build:asan --test_env=ASAN_OPTIONS=handle_abort=1:allow_addr2line=true:check_initialization_order=true:strict_init_order=true:detect_odr_violation=1
-build:asan --test_env=UBSAN_OPTIONS=halt_on_error=true:print_stacktrace=1
 build:asan --test_env=ASAN_SYMBOLIZER_PATH
 
+# Basic UBSAN that works for gcc
+build:ubsan --copt -fsanitize=undefined
+build:ubsan --linkopt -fsanitize=undefined
+build:ubsan --test_env=UBSAN_OPTIONS=halt_on_error=true:print_stacktrace=1
+
 # Clang ASAN/UBSAN
-build:clang-asan --config=asan
+build:clang-asan --config=asan --config=ubsan
 build:clang-asan --linkopt -fuse-ld=lld
 
 # macOS ASAN/UBSAN
-build:macos-asan --config=asan
+build:macos-asan --config=asan --config=ubsan
 # Workaround, see https://github.com/bazelbuild/bazel/issues/6932
 build:macos-asan --copt -Wno-macro-redefined
 build:macos-asan --copt -D_FORTIFY_SOURCE=0
