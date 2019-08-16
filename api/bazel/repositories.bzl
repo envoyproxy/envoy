@@ -35,7 +35,7 @@ def api_dependencies():
         build_file_content = KAFKASOURCE_BUILD_CONTENT,
     )
     envoy_http_archive(
-        name = "com_github_apache_zipkinapi",
+        name = "com_github_openzipkin_zipkinapi",
         locations = REPOSITORY_LOCATIONS,
         build_file_content = ZIPKINAPI_BUILD_CONTENT,
     )

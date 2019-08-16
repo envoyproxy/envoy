@@ -57,9 +57,9 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "kafka-2.2.0-rc2/clients/src/main/resources/common/message",
         urls = ["https://github.com/apache/kafka/archive/2.2.0-rc2.zip"],
     ),
-    com_github_apache_zipkinapi = dict(
+    com_github_openzipkin_zipkinapi = dict(
         sha256 = ZIPKINAPI_SHA256,
         strip_prefix = "incubator-zipkin-api-" + ZIPKINAPI_RELEASE,
-        urls = ["https://github.com/apache/incubator-zipkin-api/archive/v" + ZIPKINAPI_RELEASE + ".tar.gz"],
+        urls = ["https://github.com/openzipkin/zipkin-api/archive/v" + ZIPKINAPI_RELEASE + ".tar.gz"],
     ),
 )
