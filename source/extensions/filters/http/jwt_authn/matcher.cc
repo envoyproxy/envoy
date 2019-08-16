@@ -49,8 +49,7 @@ protected:
 
 private:
   std::vector<Http::HeaderUtility::HeaderDataPtr> config_headers_;
-  std::vector<std::unique_ptr<Router::ConfigUtility::QueryParameterMatcher>>
-      config_query_parameters_;
+  std::vector<Router::ConfigUtility::QueryParameterMatcherPtr> config_query_parameters_;
 };
 
 /**

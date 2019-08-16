@@ -88,7 +88,7 @@ private:
   uint64_t http_status_{}; // HTTP or gRPC return codes
   Filters::Common::Fault::FaultDelayConfigPtr request_delay_config_;
   std::string upstream_cluster_; // restrict faults to specific upstream cluster
-  std::vector<Http::HeaderUtility::HeaderDataPtr> fault_filter_headers_;
+  const std::vector<Http::HeaderUtility::HeaderDataPtr> fault_filter_headers_;
   absl::flat_hash_set<std::string> downstream_nodes_{}; // Inject failures for specific downstream
   absl::optional<uint64_t> max_active_faults_;
   Filters::Common::Fault::FaultRateLimitConfigPtr response_rate_limit_;

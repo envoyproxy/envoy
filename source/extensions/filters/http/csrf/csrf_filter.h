@@ -39,7 +39,7 @@ public:
       : policy_(policy), runtime_(runtime) {
     for (const auto& additional_origin : policy.additional_origins()) {
       additional_origins_.emplace_back(
-          std::make_unique<Matchers::StringMatcher>(additional_origin));
+          std::make_unique<Matchers::StringMatcherImpl>(additional_origin));
     }
   }
 
@@ -58,13 +58,13 @@ public:
                                               shadow_enabled.default_value());
   }
 
-  const std::vector<std::unique_ptr<Matchers::StringMatcher>>& additional_origins() const {
+  const std::vector<Matchers::StringMatcherPtr>& additional_origins() const {
     return additional_origins_;
   };
 
 private:
   const envoy::config::filter::http::csrf::v2::CsrfPolicy policy_;
-  std::vector<std::unique_ptr<Matchers::StringMatcher>> additional_origins_;
+  std::vector<Matchers::StringMatcherPtr> additional_origins_;
   Runtime::Loader& runtime_;
 };
 using CsrfPolicyPtr = std::unique_ptr<CsrfPolicy>;

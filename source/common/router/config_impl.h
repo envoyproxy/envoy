@@ -670,7 +670,7 @@ private:
   const ShadowPolicyImpl shadow_policy_;
   const Upstream::ResourcePriority priority_;
   std::vector<Http::HeaderUtility::HeaderDataPtr> config_headers_;
-  std::vector<std::unique_ptr<ConfigUtility::QueryParameterMatcher>> config_query_parameters_;
+  std::vector<ConfigUtility::QueryParameterMatcherPtr> config_query_parameters_;
   std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
 
   UpgradeMap upgrade_map_;

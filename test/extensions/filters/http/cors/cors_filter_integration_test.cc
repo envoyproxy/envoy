@@ -62,7 +62,7 @@ public:
             auto* route = virtual_host->add_routes();
             route->mutable_match()->set_prefix("/cors-allow-origin-regex");
             route->mutable_route()->set_cluster("cluster_0");
-            auto* cors = route->mustable_route()->mutable_cors();
+            auto* cors = route->mutable_route()->mutable_cors();
             auto* safe_regex =
                 cors->mutable_allow_origin_string_match()->Add()->mutable_safe_regex();
             safe_regex->mutable_google_re2();

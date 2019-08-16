@@ -46,7 +46,8 @@ public:
     const std::string name_;
     const absl::optional<Matchers::StringMatcherImpl> matcher_;
   };
-  // fixfix ptr alias
+
+  using QueryParameterMatcherPtr = std::unique_ptr<const QueryParameterMatcher>;
 
   /**
    * @return the resource priority parsed from proto.
@@ -61,9 +62,8 @@ public:
    * @return bool true if all the query params (and values) in the config_params are found in the
    *         query_params
    */
-  static bool
-  matchQueryParams(const Http::Utility::QueryParams& query_params,
-                   const std::vector<std::unique_ptr<QueryParameterMatcher>>& config_query_params);
+  static bool matchQueryParams(const Http::Utility::QueryParams& query_params,
+                               const std::vector<QueryParameterMatcherPtr>& config_query_params);
 
   /**
    * Returns the redirect HTTP Status Code enum parsed from proto.

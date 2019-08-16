@@ -71,7 +71,7 @@ ConfigUtility::parsePriority(const envoy::api::v2::core::RoutingPriority& priori
 
 bool ConfigUtility::matchQueryParams(
     const Http::Utility::QueryParams& query_params,
-    const std::vector<std::unique_ptr<QueryParameterMatcher>>& config_query_params) {
+    const std::vector<QueryParameterMatcherPtr>& config_query_params) {
   for (const auto& config_query_param : config_query_params) {
     if (!config_query_param->matches(query_params)) {
       return false;
