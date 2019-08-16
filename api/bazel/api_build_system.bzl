@@ -74,7 +74,7 @@ def api_go_grpc_library(name, proto, deps = []):
         ],
     )
 
-def api_cc_grpc_library(name, proto, deps = []):
+def _api_cc_grpc_library(name, proto, deps = []):
     cc_grpc_library(
         name = name,
         srcs = [proto],
@@ -111,7 +111,7 @@ def api_proto_library(
         has_services = 0,
         linkstatic = None,
         require_py = 1):
-    this = ":" + name
+    relative_name = ":" + name
     native.proto_library(
         name = name,
         srcs = srcs,
@@ -139,7 +139,7 @@ def api_proto_library(
             "@googleapis//:http_api_protos",
             "@googleapis//:rpc_status_protos",
         ],
-        deps = [this],
+        deps = [relative_name],
         visibility = ["//visibility:public"],
     )
     py_export_suffixes = []
@@ -153,7 +153,7 @@ def api_proto_library(
         # TODO: when Python services are required, add to the below stub generations.
         cc_grpc_name = _Suffix(name, _CC_GRPC_SUFFIX)
         cc_proto_deps = [cc_proto_library_name] + [_Suffix(_ToCanonicalLabel(x), _CC_SUFFIX) for x in deps]
-        api_cc_grpc_library(name = cc_grpc_name, proto = this, deps = cc_proto_deps)
+        _api_cc_grpc_library(name = cc_grpc_name, proto = relative_name, deps = cc_proto_deps)
 
     # Allow unlimited visibility for consumers
     export_suffixes = ["", "_cc", "_cc_validate"] + py_export_suffixes
