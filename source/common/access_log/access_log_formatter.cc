@@ -484,6 +484,11 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
         sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
           return std::string(connection_info.tlsVersion());
         });
+  } else if (field_name == "UPSTREAM_TLS_VERSION") {
+    field_extractor_ =
+        upstreamSslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
+          return std::string(connection_info.tlsVersion());
+        });
   } else if (field_name == "DOWNSTREAM_PEER_FINGERPRINT_256") {
     field_extractor_ =
         sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {

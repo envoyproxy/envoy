@@ -140,10 +140,9 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeer) {
   EXPECT_CALL(callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
   EXPECT_CALL(req_info_, protocol()).WillRepeatedly(ReturnPointee(&protocol_));
-  EXPECT_CALL(*ssl_, uriSanPeerCertificate())
-      .WillOnce(Return(std::vector<absl::string_view>{"source"}));
+  EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
   EXPECT_CALL(*ssl_, uriSanLocalCertificate())
-      .WillOnce(Return(std::vector<absl::string_view>{"destination"}));
+      .WillOnce(Return(std::vector<std::string>{"destination"}));
 
   Protobuf::Map<std::string, std::string> context_extensions;
   context_extensions["key"] = "value";

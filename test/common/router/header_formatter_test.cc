@@ -90,7 +90,7 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithProtocolVariable) {
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerUriSanVariableSingleSan) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
-  const std::vector<absl::string_view> sans{"san"};
+  const std::vector<std::string> sans{"san"};
   ON_CALL(*connection_info, uriSanPeerCertificate()).WillByDefault(Return(sans));
   EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
   testFormatting(stream_info, "DOWNSTREAM_PEER_URI_SAN", "san");
@@ -99,7 +99,7 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerUriSanVariable
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerUriSanVariableMultipleSans) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
-  const std::vector<absl::string_view> sans{"san1", "san2"};
+  const std::vector<std::string> sans{"san1", "san2"};
   ON_CALL(*connection_info, uriSanPeerCertificate()).WillByDefault(Return(sans));
   EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
   testFormatting(stream_info, "DOWNSTREAM_PEER_URI_SAN", "san1,san2");
@@ -109,7 +109,7 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerUriSanEmpty) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   ON_CALL(*connection_info, uriSanPeerCertificate())
-      .WillByDefault(Return(std::vector<absl::string_view>()));
+      .WillByDefault(Return(std::vector<std::string>()));
   EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
   testFormatting(stream_info, "DOWNSTREAM_PEER_URI_SAN", EMPTY_STRING);
 }
@@ -123,7 +123,7 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerNoTls) {
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamLocalUriSanVariableSingleSan) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
-  const std::vector<absl::string_view> sans{"san"};
+  const std::vector<std::string> sans{"san"};
   ON_CALL(*connection_info, uriSanLocalCertificate()).WillByDefault(Return(sans));
   EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
   testFormatting(stream_info, "DOWNSTREAM_LOCAL_URI_SAN", "san");
@@ -132,7 +132,7 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamLocalUriSanVariabl
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamLocalUriSanVariableMultipleSans) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
-  const std::vector<absl::string_view> sans{"san1", "san2"};
+  const std::vector<std::string> sans{"san1", "san2"};
   ON_CALL(*connection_info, uriSanLocalCertificate()).WillByDefault(Return(sans));
   EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
   testFormatting(stream_info, "DOWNSTREAM_LOCAL_URI_SAN", "san1,san2");
@@ -142,7 +142,7 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamLocalUriSanVariabl
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   ON_CALL(*connection_info, uriSanLocalCertificate())
-      .WillByDefault(Return(std::vector<absl::string_view>()));
+      .WillByDefault(Return(std::vector<std::string>()));
   EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
   testFormatting(stream_info, "DOWNSTREAM_LOCAL_URI_SAN", EMPTY_STRING);
 }

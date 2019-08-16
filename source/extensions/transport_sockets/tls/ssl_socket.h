@@ -102,17 +102,17 @@ private:
     absl::string_view serverName() const override;
 
     bssl::UniquePtr<SSL> ssl_;
-    std::vector<std::string> cached_uri_san_local_certificate_;
+    mutable std::vector<std::string> cached_uri_san_local_certificate_;
     mutable std::string cached_sha_256_peer_certificate_digest_;
     mutable std::string cached_serial_number_peer_certificate_;
     mutable std::string cached_issuer_peer_certificate_;
     mutable std::string cached_subject_peer_certificate_;
     mutable std::string cached_subject_local_certificate_;
-    std::vector<std::string> cached_uri_san_peer_certificate_;
+    mutable std::vector<std::string> cached_uri_san_peer_certificate_;
     mutable std::string cached_url_encoded_pem_encoded_peer_certificate_;
     mutable std::string cached_url_encoded_pem_encoded_peer_cert_chain_;
-    std::vector<std::string> cached_dns_san_peer_certificate_;
-    std::vector<std::string> cached_dns_san_local_certificate_;
+    mutable std::vector<std::string> cached_dns_san_peer_certificate_;
+    mutable std::vector<std::string> cached_dns_san_local_certificate_;
     mutable std::string cached_session_id_;
   };
 

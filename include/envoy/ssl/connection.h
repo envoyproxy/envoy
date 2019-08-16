@@ -26,8 +26,8 @@ public:
   virtual bool peerCertificatePresented() const PURE;
 
   /**
-   * @return absl::Span<const std::string> the URIs in the SAN field of the local certificate. Returns {} if
-   *there is no local certificate, or no SAN field, or no URI.
+   * @return absl::Span<const std::string> the URIs in the SAN field of the local certificate.
+   *Returns {} if there is no local certificate, or no SAN field, or no URI.
    **/
   virtual absl::Span<const std::string> uriSanLocalCertificate() const PURE;
 
@@ -62,8 +62,8 @@ public:
   virtual absl::string_view subjectPeerCertificate() const PURE;
 
   /**
-   * @return absl::Span<const std::string> the URIs in the SAN field of the peer certificate. Returns {} if
-   *there is no peer certificate, or no SAN field, or no URI.
+   * @return absl::Span<const std::string> the URIs in the SAN field of the peer certificate.
+   *Returns {} if there is no peer certificate, or no SAN field, or no URI.
    **/
   virtual absl::Span<const std::string> uriSanPeerCertificate() const PURE;
 

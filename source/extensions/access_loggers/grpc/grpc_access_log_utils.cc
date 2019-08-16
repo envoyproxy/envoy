@@ -137,7 +137,8 @@ void Utility::extractCommonAccessLogProperties(
       auto* local_san = local_properties->add_subject_alt_name();
       local_san->set_uri(uri_san);
     }
-    local_properties->set_subject(std::string(downstream_ssl_connection->subjectLocalCertificate()));
+    local_properties->set_subject(
+        std::string(downstream_ssl_connection->subjectLocalCertificate()));
 
     auto* peer_properties = tls_properties->mutable_peer_certificate_properties();
     for (const auto& uri_san : downstream_ssl_connection->uriSanPeerCertificate()) {

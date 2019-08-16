@@ -946,7 +946,7 @@ TEST_F(TcpProxyTest, AccessLogPeerUriSan) {
   filter_callbacks_.connection_.remote_address_ =
       Network::Utility::resolveUrl("tcp://1.1.1.1:40000");
 
-  const std::vector<absl::string_view> uriSan{"someSan"};
+  const std::vector<std::string> uriSan{"someSan"};
   auto mockConnectionInfo = std::make_shared<Ssl::MockConnectionInfo>();
   EXPECT_CALL(*mockConnectionInfo, uriSanPeerCertificate()).WillOnce(Return(uriSan));
   EXPECT_CALL(filter_callbacks_.connection_, ssl()).WillRepeatedly(Return(mockConnectionInfo));

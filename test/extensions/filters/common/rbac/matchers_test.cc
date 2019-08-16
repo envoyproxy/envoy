@@ -192,7 +192,7 @@ TEST(AuthenticatedMatcher, uriSanPeerCertificate) {
   Envoy::Network::MockConnection conn;
   auto ssl = std::make_shared<Ssl::MockConnectionInfo>();
 
-  const std::vector<absl::string_view> sans{"foo", "baz"};
+  const std::vector<std::string> sans{"foo", "baz"};
   EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(sans));
   EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(ssl));
 
@@ -209,8 +209,8 @@ TEST(AuthenticatedMatcher, dnsSanPeerCertificate) {
   Envoy::Network::MockConnection conn;
   auto ssl = std::make_shared<Ssl::MockConnectionInfo>();
 
-  const std::vector<absl::string_view> uri_sans;
-  const std::vector<absl::string_view> dns_sans{"foo", "baz"};
+  const std::vector<std::string> uri_sans;
+  const std::vector<std::string> dns_sans{"foo", "baz"};
 
   EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(uri_sans));
   EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(ssl));
@@ -231,7 +231,7 @@ TEST(AuthenticatedMatcher, subjectPeerCertificate) {
   Envoy::Network::MockConnection conn;
   auto ssl = std::make_shared<Ssl::MockConnectionInfo>();
 
-  const std::vector<absl::string_view> sans;
+  const std::vector<std::string> sans;
   EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(sans));
   EXPECT_CALL(*ssl, dnsSansPeerCertificate()).WillRepeatedly(Return(sans));
   EXPECT_CALL(*ssl, subjectPeerCertificate()).WillRepeatedly(Return("bar"));
@@ -248,7 +248,7 @@ TEST(AuthenticatedMatcher, subjectPeerCertificate) {
 TEST(AuthenticatedMatcher, AnySSLSubject) {
   Envoy::Network::MockConnection conn;
   auto ssl = std::make_shared<Ssl::MockConnectionInfo>();
-  const std::vector<absl::string_view> sans{"foo", "baz"};
+  const std::vector<std::string> sans{"foo", "baz"};
   EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(sans));
   EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(ssl));
 
@@ -300,7 +300,7 @@ TEST(PolicyMatcher, PolicyMatcher) {
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
 
-  const std::vector<absl::string_view> sans{"bar", "baz"};
+  const std::vector<std::string> sans{"bar", "baz"};
   EXPECT_CALL(*ssl, uriSanPeerCertificate()).Times(2).WillRepeatedly(Return(sans));
   EXPECT_CALL(Const(conn), ssl()).Times(2).WillRepeatedly(Return(ssl));
   EXPECT_CALL(conn, localAddress()).Times(2).WillRepeatedly(ReturnRef(addr));
