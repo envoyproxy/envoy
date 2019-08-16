@@ -165,6 +165,7 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         ":utility_lib",
+        "//include/envoy/common:matchers_interface",
         "//source/common/common:regex_lib",
         "//source/common/config:metadata_lib",
         "//source/common/protobuf",

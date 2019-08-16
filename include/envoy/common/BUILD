@@ -30,6 +30,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "matchers_interface",
+    hdrs = ["matchers.h"],
+)
+
+envoy_cc_library(
     name = "regex_interface",
     hdrs = ["regex.h"],
 )

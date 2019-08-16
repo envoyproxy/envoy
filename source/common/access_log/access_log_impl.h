@@ -174,7 +174,7 @@ public:
                 const Http::HeaderMap& response_trailers) override;
 
 private:
-  std::vector<Http::HeaderUtility::HeaderDataPtr> header_data_;
+  std::vector<Http::HeaderUtility::HeaderDataPtr> header_data_; // fixfix not vector?
 };
 
 /**

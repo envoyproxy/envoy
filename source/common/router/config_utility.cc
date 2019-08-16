@@ -10,11 +10,11 @@ namespace Envoy {
 namespace Router {
 namespace {
 
-absl::optional<Matchers::StringMatcher>
+absl::optional<Matchers::StringMatcherImpl>
 maybeCreateStringMatcher(const envoy::api::v2::route::QueryParameterMatcher& config) {
   switch (config.query_parameter_match_specifier_case()) {
   case envoy::api::v2::route::QueryParameterMatcher::kStringMatch: {
-    return Matchers::StringMatcher(config.string_match());
+    return Matchers::StringMatcherImpl(config.string_match());
   }
   case envoy::api::v2::route::QueryParameterMatcher::kPresentMatch: {
     return absl::nullopt;
@@ -31,7 +31,7 @@ maybeCreateStringMatcher(const envoy::api::v2::route::QueryParameterMatcher& con
     } else {
       matcher_config.set_exact(config.value());
     }
-    return Matchers::StringMatcher(matcher_config);
+    return Matchers::StringMatcherImpl(matcher_config);
   }
   }
 

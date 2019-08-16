@@ -17,7 +17,7 @@ ValueMatcherConstSharedPtr ValueMatcher::create(const envoy::type::matcher::Valu
   case envoy::type::matcher::ValueMatcher::kDoubleMatch:
     return std::make_shared<const DoubleMatcher>(v.double_match());
   case envoy::type::matcher::ValueMatcher::kStringMatch:
-    return std::make_shared<const StringMatcher>(v.string_match());
+    return std::make_shared<const StringMatcherImpl>(v.string_match());
   case envoy::type::matcher::ValueMatcher::kBoolMatch:
     return std::make_shared<const BoolMatcher>(v.bool_match());
   case envoy::type::matcher::ValueMatcher::kPresentMatch:
@@ -57,7 +57,7 @@ bool DoubleMatcher::match(const ProtobufWkt::Value& value) const {
   };
 }
 
-StringMatcher::StringMatcher(const envoy::type::matcher::StringMatcher& matcher)
+StringMatcherImpl::StringMatcherImpl(const envoy::type::matcher::StringMatcher& matcher)
     : matcher_(matcher) {
   if (matcher.match_pattern_case() == envoy::type::matcher::StringMatcher::kRegex) {
     regex_ = Regex::Utility::parseStdRegexAsCompiledMatcher(matcher_.regex());
@@ -66,7 +66,7 @@ StringMatcher::StringMatcher(const envoy::type::matcher::StringMatcher& matcher)
   }
 }
 
-bool StringMatcher::match(const ProtobufWkt::Value& value) const {
+bool StringMatcherImpl::match(const ProtobufWkt::Value& value) const {
   if (value.kind_case() != ProtobufWkt::Value::kStringValue) {
     return false;
   }
@@ -74,7 +74,7 @@ bool StringMatcher::match(const ProtobufWkt::Value& value) const {
   return match(value.string_value());
 }
 
-bool StringMatcher::match(const absl::string_view value) const {
+bool StringMatcherImpl::match(const absl::string_view value) const {
   switch (matcher_.match_pattern_case()) {
   case envoy::type::matcher::StringMatcher::kExact:
     return matcher_.exact() == value;

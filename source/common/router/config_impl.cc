@@ -151,13 +151,17 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config,
       max_age_(config.max_age()),
       legacy_enabled_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enabled, true)) {
   for (const auto& origin : config.allow_origin()) {
-    allow_origin_.push_back(origin);
+    envoy::type::matcher::StringMatcher matcher_config;
+    matcher_config.set_exact(origin);
+    allow_origins_.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher_config));
   }
   for (const auto& regex : config.allow_origin_regex()) {
-    allow_origin_regex_.push_back(Regex::Utility::parseStdRegexAsCompiledMatcher(regex));
+    envoy::type::matcher::StringMatcher matcher_config;
+    matcher_config.set_regex(regex);
+    allow_origins_.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher_config));
   }
-  for (const auto& regex : config.allow_origin_string_match()) {
-    allow_origin_regex_.push_back(Regex::Utility::parseRegex(regex));
+  for (const auto& string_match : config.allow_origin_string_match()) {
+    allow_origins_.push_back(std::make_unique<Matchers::StringMatcherImpl>(string_match));
   }
   if (config.has_allow_credentials()) {
     allow_credentials_ = PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_credentials);

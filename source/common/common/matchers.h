@@ -3,6 +3,7 @@
 #include <string>
 
 #include "envoy/api/v2/core/base.pb.h"
+#include "envoy/common/matchers.h"
 #include "envoy/common/regex.h"
 #include "envoy/type/matcher/metadata.pb.h"
 #include "envoy/type/matcher/number.pb.h"
@@ -71,12 +72,11 @@ private:
   const envoy::type::matcher::DoubleMatcher matcher_;
 };
 
-class StringMatcher : public ValueMatcher {
+class StringMatcherImpl : public ValueMatcher, public StringMatcher {
 public:
-  explicit StringMatcher(const envoy::type::matcher::StringMatcher& matcher);
+  explicit StringMatcherImpl(const envoy::type::matcher::StringMatcher& matcher);
 
-  bool match(const absl::string_view value) const;
-
+  bool match(const absl::string_view value) const override;
   bool match(const ProtobufWkt::Value& value) const override;
 
 private:
@@ -97,7 +97,7 @@ private:
   envoy::type::matcher::StringMatcher
   toLowerCase(const envoy::type::matcher::StringMatcher& matcher);
 
-  const StringMatcher matcher_;
+  const StringMatcherImpl matcher_;
 };
 
 using LowerCaseStringMatcherPtr = std::unique_ptr<LowerCaseStringMatcher>;

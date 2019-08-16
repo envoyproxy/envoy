@@ -44,7 +44,7 @@ public:
 
   private:
     const std::string name_;
-    const absl::optional<Matchers::StringMatcher> matcher_;
+    const absl::optional<Matchers::StringMatcherImpl> matcher_;
   };
   // fixfix ptr alias
 
