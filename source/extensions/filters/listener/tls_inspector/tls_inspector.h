@@ -36,6 +36,7 @@ struct TlsInspectorStats {
   ALL_TLS_INSPECTOR_STATS(GENERATE_COUNTER_STRUCT)
 };
 
+enum class ParseState { Done, Continue, Error };
 /**
  * Global configuration for TLS inspector.
  */
@@ -68,8 +69,8 @@ public:
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
 
 private:
-  void parseClientHello(const void* data, size_t len);
-  void onRead();
+  ParseState parseClientHello(const void* data, size_t len);
+  ParseState onRead();
   void done(bool success);
   void onALPN(const unsigned char* data, unsigned int len);
   void onServername(absl::string_view name);

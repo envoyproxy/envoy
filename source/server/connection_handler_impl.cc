@@ -195,7 +195,12 @@ void ConnectionHandlerImpl::ActiveSocket::continueFilterChain(bool success) {
       if (status == Network::FilterStatus::StopIteration) {
         // The filter is responsible for calling us again at a later time to continue the filter
         // chain from the next filter.
-        return;
+        if (!socket().ioHandle().isOpen()) {
+          return;
+        } else {
+          unlink();
+          return;
+        }
       }
     }
     // Successfully ran all the accept filters.

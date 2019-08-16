@@ -73,6 +73,17 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   Network::ConnectionSocket& socket = cb.socket();
   ASSERT(file_event_ == nullptr);
 
+  ParseState parse_state = onRead();
+  switch (parse_state) {
+  case ParseState::Error:
+    cb.socket().close();
+    return Network::FilterStatus::StopIteration;
+  case ParseState::Done:
+    return Network::FilterStatus::Continue;
+  case ParseState::Continue:
+    // do nothing but create the event
+    break;
+  }
   file_event_ = cb.dispatcher().createFileEvent(
       socket.ioHandle().fd(),
       [this](uint32_t events) {
@@ -83,7 +94,18 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
         }
 
         ASSERT(events == Event::FileReadyType::Read);
-        onRead();
+        ParseState parse_state = onRead();
+        switch (parse_state) {
+        case ParseState::Error:
+          done(false);
+          break;
+        case ParseState::Done:
+          done(true);
+          break;
+        case ParseState::Continue:
+          // do nothing but wait for the next event
+          break;
+        }
       },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Closed);
 
@@ -122,7 +144,7 @@ void Filter::onServername(absl::string_view name) {
   clienthello_success_ = true;
 }
 
-void Filter::onRead() {
+ParseState Filter::onRead() {
   // This receive code is somewhat complicated, because it must be done as a MSG_PEEK because
   // there is no way for a listener-filter to pass payload data to the ConnectionImpl and filters
   // that get created later.
@@ -141,11 +163,10 @@ void Filter::onRead() {
   ENVOY_LOG(trace, "tls inspector: recv: {}", result.rc_);
 
   if (result.rc_ == -1 && result.errno_ == EAGAIN) {
-    return;
+    return ParseState::Continue;
   } else if (result.rc_ < 0) {
     config_->stats().read_error_.inc();
-    done(false);
-    return;
+    return ParseState::Error;
   }
 
   // Because we're doing a MSG_PEEK, data we've seen before gets returned every time, so
@@ -154,8 +175,9 @@ void Filter::onRead() {
     const uint8_t* data = buf_ + read_;
     const size_t len = result.rc_ - read_;
     read_ = result.rc_;
-    parseClientHello(data, len);
+    return parseClientHello(data, len);
   }
+  return ParseState::Continue;
 }
 
 void Filter::done(bool success) {
@@ -164,7 +186,7 @@ void Filter::done(bool success) {
   cb_->continueFilterChain(success);
 }
 
-void Filter::parseClientHello(const void* data, size_t len) {
+ParseState Filter::parseClientHello(const void* data, size_t len) {
   // Ownership is passed to ssl_ in SSL_set_bio()
   bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(data, len));
 
@@ -185,9 +207,9 @@ void Filter::parseClientHello(const void* data, size_t len) {
       // We've hit the specified size limit. This is an unreasonably large ClientHello;
       // indicate failure.
       config_->stats().client_hello_too_large_.inc();
-      done(false);
+      return ParseState::Error;
     }
-    break;
+    return ParseState::Continue;
   case SSL_ERROR_SSL:
     if (clienthello_success_) {
       config_->stats().tls_found_.inc();
@@ -200,11 +222,9 @@ void Filter::parseClientHello(const void* data, size_t len) {
     } else {
       config_->stats().tls_not_found_.inc();
     }
-    done(true);
-    break;
+    return ParseState::Done;
   default:
-    done(false);
-    break;
+    return ParseState::Error;
   }
 }
 
