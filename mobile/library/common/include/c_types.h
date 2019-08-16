@@ -57,17 +57,6 @@ typedef struct {
 } envoy_data;
 
 /**
- * Holds data about an HTTP stream.
- */
-typedef struct {
-  // Status of the Envoy HTTP stream. Note that the stream might have failed inline.
-  // Thus the status should be checked before pursuing other operations on the stream.
-  envoy_status_t status;
-  // Handle to the Envoy HTTP Stream.
-  envoy_stream_t stream;
-} envoy_stream;
-
-/**
  * Holds a single key/value header.
  */
 typedef struct {
