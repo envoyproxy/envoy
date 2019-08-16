@@ -47,6 +47,8 @@ bool EnvoyQuicConnection::OnPacketHeader(const quic::QuicPacketHeader& header) {
                       quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
       return false;
     }
+    // HCM should have initialized connection stats.
+    ASSERT(connection_stats_ != nullptr);
   }
   return true;
 }

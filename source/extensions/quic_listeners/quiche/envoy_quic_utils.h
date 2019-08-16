@@ -71,6 +71,19 @@ spdyHeaderBlockToEnvoyHeaders(const spdy::SpdyHeaderBlock& header_block) {
   return headers;
 }
 
+spdy::SpdyHeaderBlock envoyHeadersToSpdyHeaderBlock(const Http::HeaderMap& headers) {
+  spdy::SpdyHeaderBlock header_block;
+  headers.iterate(
+      [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
+        auto spdy_headers = static_cast<spdy::SpdyHeaderBlock*>(context);
+        // The key-value pairs are copied.
+        spdy_headers->insert({header.key().getStringView(), header.value().getStringView()});
+        return Http::HeaderMap::Iterate::Continue;
+      },
+      &header_block);
+  return header_block;
+}
+
 inline Http::StreamResetReason
 quicRstErrorToEnvoyResetReason(quic::QuicRstStreamErrorCode quic_rst) {
   switch (quic_rst) {

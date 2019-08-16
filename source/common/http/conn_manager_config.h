@@ -25,6 +25,7 @@ namespace Http {
   COUNTER(downstream_cx_drain_close)                                                               \
   COUNTER(downstream_cx_http1_total)                                                               \
   COUNTER(downstream_cx_http2_total)                                                               \
+  COUNTER(downstream_cx_quic_total)                                                                \
   COUNTER(downstream_cx_idle_timeout)                                                              \
   COUNTER(downstream_cx_overload_disable_keepalive)                                                \
   COUNTER(downstream_cx_protocol_error)                                                            \
@@ -43,6 +44,7 @@ namespace Http {
   COUNTER(downstream_rq_completed)                                                                 \
   COUNTER(downstream_rq_http1_total)                                                               \
   COUNTER(downstream_rq_http2_total)                                                               \
+  COUNTER(downstream_rq_quic_total)                                                                \
   COUNTER(downstream_rq_idle_timeout)                                                              \
   COUNTER(downstream_rq_non_relative_path)                                                         \
   COUNTER(downstream_rq_overload_close)                                                            \
@@ -57,6 +59,7 @@ namespace Http {
   GAUGE(downstream_cx_active, Accumulate)                                                          \
   GAUGE(downstream_cx_http1_active, Accumulate)                                                    \
   GAUGE(downstream_cx_http2_active, Accumulate)                                                    \
+  GAUGE(downstream_cx_quic_active, Accumulate)                                                     \
   GAUGE(downstream_cx_rx_bytes_buffered, Accumulate)                                               \
   GAUGE(downstream_cx_ssl_active, Accumulate)                                                      \
   GAUGE(downstream_cx_tx_bytes_buffered, Accumulate)                                               \

@@ -769,6 +769,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "spdy_core_fifo_write_scheduler_lib",
+    hdrs = ["quiche/spdy/core/fifo_write_scheduler.h"],
+    deps = [
+        ":spdy_core_write_scheduler_lib",
+        ":spdy_platform",
+    ],
+)
+
+envoy_cc_library(
     name = "spdy_core_framer_lib",
     srcs = [
         "quiche/spdy/core/spdy_frame_builder.cc",

@@ -19,8 +19,9 @@
 #include "common/stream_info/stream_info_impl.h"
 #include "envoy/network/connection.h"
 #include "envoy/event/dispatcher.h"
-#include "extensions/quic_listeners/quiche/envoy_quic_stream.h"
+#include "extensions/quic_listeners/quiche/envoy_quic_server_stream.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_connection.h"
+#include "extensions/quic_listeners/quiche/envoy_quic_simulated_watermark_buffer.h"
 
 namespace Envoy {
 namespace Quic {
@@ -37,7 +38,7 @@ public:
                          quic::QuicCryptoServerStream::Helper* helper,
                          const quic::QuicCryptoServerConfig* crypto_config,
                          quic::QuicCompressedCertsCache* compressed_certs_cache,
-                         Event::Dispatcher& dispatcher);
+                         Event::Dispatcher& dispatcher, uint32_t send_buffer_limit);
 
   // Overridden to delete connection object.
   ~EnvoyQuicServerSession() override;
@@ -67,7 +68,9 @@ public:
   void setDelayedCloseTimeout(std::chrono::milliseconds timeout) override;
   std::chrono::milliseconds delayedCloseTimeout() const override;
   void readDisable(bool disable) override {
-    ASSERT(!disable, "Quic connection should be able to read through out its life time.");
+    // QUIC connection should always be able to read. Upstream network buffer
+    // high watermark limit should only affect stream flow control.
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
   void detectEarlyCloseWhenReadDisabled(bool /*value*/) override { NOT_REACHED_GCOVR_EXCL_LINE; }
   bool readEnabled() const override { return true; }
@@ -129,6 +132,10 @@ public:
                           quic::ConnectionCloseSource source) override;
   void Initialize() override;
 
+  void adjustBytesToSend(int64_t delta);
+
+  using quic::QuicSession::dynamic_streams;
+
 protected:
   // quic::QuicServerSessionBase
   quic::QuicCryptoServerStreamBase*
@@ -145,6 +152,11 @@ protected:
 private:
   void setUpRequestDecoder(EnvoyQuicStream& stream);
 
+  // Called when aggregated buffered bytes across all the streams exceeds high watermark.
+  void onSendBufferHighWatermark();
+  // Called when aggregated buffered bytes across all the streams declines to low watermark.
+  void onSendBufferLowWatermark();
+
   // Currently ConnectionManagerImpl is the one and only filter. If more network
   // filters are added, ConnectionManagerImpl should always be the last one.
   // Its onRead() is only called once to trigger ReadFilter::onNewConnection()
@@ -159,6 +171,8 @@ private:
   // them.
   Http::ServerConnectionCallbacks* http_connection_callbacks_{nullptr};
   std::list<Network::ConnectionCallbacks*> network_connection_callbacks_;
+  uint32_t bytes_to_send_{0};
+  EnvoyQuicSimulatedWatermarkBuffer write_buffer_watermark_simulation_;
 };
 
 } // namespace Quic

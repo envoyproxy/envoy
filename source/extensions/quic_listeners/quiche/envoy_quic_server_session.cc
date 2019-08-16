@@ -9,7 +9,7 @@
 #include "quiche/quic/core/quic_crypto_server_stream.h"
 #pragma GCC diagnostic pop
 
-#include "extensions/quic_listeners/quiche/envoy_quic_server_stream.h"
+#include "common/common/assert.h"
 
 namespace Envoy {
 namespace Quic {
@@ -18,10 +18,14 @@ EnvoyQuicServerSession::EnvoyQuicServerSession(
     const quic::QuicConfig& config, const quic::ParsedQuicVersionVector& supported_versions,
     quic::QuicConnection* connection, quic::QuicSession::Visitor* visitor,
     quic::QuicCryptoServerStream::Helper* helper, const quic::QuicCryptoServerConfig* crypto_config,
-    quic::QuicCompressedCertsCache* compressed_certs_cache, Event::Dispatcher& dispatcher)
+    quic::QuicCompressedCertsCache* compressed_certs_cache, Event::Dispatcher& dispatcher,
+    uint32_t send_buffer_limit)
     : quic::QuicServerSessionBase(config, supported_versions, connection, visitor, helper,
                                   crypto_config, compressed_certs_cache),
-      filter_manager_(*this), dispatcher_(dispatcher), stream_info_(dispatcher.timeSource()) {}
+      filter_manager_(*this), dispatcher_(dispatcher), stream_info_(dispatcher.timeSource()),
+      write_buffer_watermark_simulation_(
+          send_buffer_limit / 2, send_buffer_limit, [this]() { onSendBufferLowWatermark(); },
+          [this]() { onSendBufferHighWatermark(); }) {}
 
 EnvoyQuicServerSession::~EnvoyQuicServerSession() { delete connection(); }
 
@@ -112,10 +116,10 @@ void EnvoyQuicServerSession::enableHalfClose(bool enabled) {
 }
 
 void EnvoyQuicServerSession::setBufferLimits(uint32_t /*limit*/) {
-  // TODO(danzh): add interface to quic for connection level buffer throttling.
-  // Currently read buffer is capped by connection level flow control. And
-  // write buffer is not capped.
-  ENVOY_CONN_LOG(error, "Quic manages its own buffer currently.", *this);
+  // Unlike TCP, write buffer limits are already set during construction.
+  // Read buffer limits is not needed as connection level flow control should do
+  // the work.
+  ASSERT(false, "Buffer limit should be set during construction.");
 }
 
 uint32_t EnvoyQuicServerSession::bufferLimit() const {
@@ -175,6 +179,26 @@ const Ssl::ConnectionInfo* EnvoyQuicServerSession::ssl() const {
 void EnvoyQuicServerSession::rawWrite(Buffer::Instance& /*data*/, bool /*end_stream*/) {
   // Network filter should stop iteration.
   NOT_REACHED_GCOVR_EXCL_LINE;
+}
+
+void EnvoyQuicServerSession::adjustBytesToSend(int64_t delta) {
+  bytes_to_send_ += delta;
+  write_buffer_watermark_simulation_.checkHighWatermark(bytes_to_send_);
+  write_buffer_watermark_simulation_.checkLowWatermark(bytes_to_send_);
+}
+
+void EnvoyQuicServerSession::onSendBufferHighWatermark() {
+  ENVOY_CONN_LOG(trace, "onSendBufferHighWatermark", *this);
+  for (auto callback : network_connection_callbacks_) {
+    callback->onAboveWriteBufferHighWatermark();
+  }
+}
+
+void EnvoyQuicServerSession::onSendBufferLowWatermark() {
+  ENVOY_CONN_LOG(trace, "onSendBufferLowWatermark", *this);
+  for (auto callback : network_connection_callbacks_) {
+    callback->onBelowWriteBufferLowWatermark();
+  }
 }
 
 } // namespace Quic

@@ -1,9 +1,10 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_server_stream.h"
 
+#include <bits/stdint-uintn.h>
 #include <openssl/bio.h>
 #include <openssl/evp.h>
 
-#include <cstddef>
+#include <memory>
 
 #pragma GCC diagnostic push
 // QUICHE allows unused parameters.
@@ -13,10 +14,11 @@
 
 #include "quiche/quic/core/http/quic_header_list.h"
 #include "quiche/spdy/core/spdy_header_block.h"
-
+#include "quiche/quic/platform/api/quic_mem_slice_span.h"
 #pragma GCC diagnostic pop
 
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
+#include "extensions/quic_listeners/quiche/envoy_quic_server_session.h"
 #include "common/buffer/buffer_impl.h"
 #include "common/http/header_map_impl.h"
 #include "common/common/assert.h"
@@ -24,28 +26,81 @@
 namespace Envoy {
 namespace Quic {
 
+EnvoyQuicServerStream::EnvoyQuicServerStream(quic::QuicStreamId id, quic::QuicSpdySession* session,
+                                             quic::StreamType type)
+    : quic::QuicSpdyServerStreamBase(id, session, type),
+      EnvoyQuicStream(
+          session->config()->GetInitialStreamFlowControlWindowToSend(),
+          [this]() { runLowWatermarkCallbacks(); }, [this]() { runHighWatermarkCallbacks(); }) {}
+
+EnvoyQuicServerStream::EnvoyQuicServerStream(quic::PendingStream* pending,
+                                             quic::QuicSpdySession* session, quic::StreamType type)
+    : quic::QuicSpdyServerStreamBase(pending, session, type),
+      EnvoyQuicStream(
+          session->config()->GetInitialStreamFlowControlWindowToSend(),
+          [this]() { runLowWatermarkCallbacks(); }, [this]() { runHighWatermarkCallbacks(); }) {}
+
 void EnvoyQuicServerStream::encode100ContinueHeaders(const Http::HeaderMap& headers) {
   ASSERT(headers.Status()->value() == "100");
   encodeHeaders(headers, false);
 }
-void EnvoyQuicServerStream::encodeHeaders(const Http::HeaderMap& /*headers*/, bool /*end_stream*/) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+
+void EnvoyQuicServerStream::encodeHeaders(const Http::HeaderMap& headers, bool end_stream) {
+  WriteHeaders(envoyHeadersToSpdyHeaderBlock(headers), end_stream, nullptr);
 }
-void EnvoyQuicServerStream::encodeData(Buffer::Instance& /*data*/, bool /*end_stream*/) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+
+void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) {
+  if (data.length() == 0) {
+    return;
+  }
+  // This is counting not serialized bytes in the send buffer.
+  uint64_t bytes_to_send_old = BufferedDataBytes();
+  // QUIC stream must take all.
+  quic::QuicConsumedData bytes_consumed =
+      WriteBodySlices(quic::QuicMemSliceSpan(quic::QuicMemSliceSpanImpl(data)), end_stream);
+  ASSERT(bytes_consumed.bytes_consumed == data.length());
+
+  uint64_t bytes_to_send_new = BufferedDataBytes();
+  ASSERT(bytes_to_send_old <= bytes_to_send_new);
+  if (bytes_to_send_new > bytes_to_send_old) {
+    // If buffered bytes changed, update stream and session's watermark book
+    // keeping.
+    sendBufferSimulation().checkHighWatermark(bytes_to_send_new);
+    dynamic_cast<EnvoyQuicServerSession*>(session())->adjustBytesToSend(bytes_to_send_new -
+                                                                        bytes_to_send_old);
+  }
 }
-void EnvoyQuicServerStream::encodeTrailers(const Http::HeaderMap& /*trailers*/) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+
+void EnvoyQuicServerStream::encodeTrailers(const Http::HeaderMap& trailers) {
+  WriteTrailers(envoyHeadersToSpdyHeaderBlock(trailers), nullptr);
 }
+
 void EnvoyQuicServerStream::encodeMetadata(const Http::MetadataMapVector& /*metadata_map_vector*/) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  ASSERT(false, "Metadata Frame is not supported in QUIC");
 }
 
-void EnvoyQuicServerStream::resetStream(Http::StreamResetReason /*reason*/) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+quic::QuicRstStreamErrorCode envoyResetReasonToQuicRstError(Http::StreamResetReason reason) {
+  switch (reason) {
+  case Http::StreamResetReason::LocalRefusedStreamReset:
+    return quic::QUIC_REFUSED_STREAM;
+  case Http::StreamResetReason::ConnectionTermination:
+    return quic::QUIC_STREAM_NO_ERROR;
+  case Http::StreamResetReason::ConnectionFailure:
+    return quic::QUIC_STREAM_CONNECTION_ERROR;
+  default:
+    return quic::QUIC_STREAM_NO_ERROR;
+  }
 }
 
-void EnvoyQuicServerStream::readDisable(bool /*disable*/) { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+void EnvoyQuicServerStream::resetStream(Http::StreamResetReason reason) {
+  quic::QuicRstStreamErrorCode rst = envoyResetReasonToQuicRstError(reason);
+  Reset(rst);
+}
+
+void EnvoyQuicServerStream::readDisable(bool /*disable*/) {
+  // TODO(danzh): Disable/Re-enable stream flow control.
+  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+}
 
 void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
                                                      const quic::QuicHeaderList& header_list) {
@@ -104,6 +159,20 @@ void EnvoyQuicServerStream::OnStreamReset(const quic::QuicRstStreamFrame& frame)
   quic::QuicSpdyServerStreamBase::OnStreamReset(frame);
   Http::StreamResetReason reason = quicRstErrorToEnvoyResetReason(frame.error_code);
   runResetCallbacks(reason);
+}
+
+void EnvoyQuicServerStream::OnCanWrite() {
+  uint64_t buffered_data_old = BufferedDataBytes();
+  quic::QuicSpdyServerStreamBase::OnCanWrite();
+  uint64_t buffered_data_new = BufferedDataBytes();
+  // As long as OnCanWriteNewData() is no-op, data to sent in buffer shouldn't
+  // increase.
+  ASSERT(buffered_data_new <= buffered_data_old);
+  if (buffered_data_new < buffered_data_old) {
+    sendBufferSimulation().checkLowWatermark(buffered_data_new);
+    dynamic_cast<EnvoyQuicServerSession*>(session())->adjustBytesToSend(buffered_data_new -
+                                                                        buffered_data_old);
+  }
 }
 
 void EnvoyQuicServerStream::OnConnectionClosed(quic::QuicErrorCode error,

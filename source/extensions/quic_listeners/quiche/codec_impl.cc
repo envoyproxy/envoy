@@ -9,14 +9,20 @@ void QuicHttpConnectionImplBase::goAway() {
 
 bool QuicHttpConnectionImplBase::wantsToWrite() { return quic_session_.HasDataToWrite(); }
 
-// TODO(danzh): modify QUIC stack to react based on aggregated bytes across all
-// the streams. And call StreamCallbackHelper::runHighWatermarkCallbacks() for each stream.
 void QuicHttpConnectionImplBase::onUnderlyingConnectionAboveWriteBufferHighWatermark() {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  for (auto& it : quic_session_.dynamic_streams()) {
+    if (!it.second->is_static()) {
+      dynamic_cast<EnvoyQuicServerStream*>(it.second.get())->runHighWatermarkCallbacks();
+    }
+  }
 }
 
 void QuicHttpConnectionImplBase::onUnderlyingConnectionBelowWriteBufferLowWatermark() {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  for (const auto& it : quic_session_.dynamic_streams()) {
+    if (!it.second->is_static()) {
+      dynamic_cast<EnvoyQuicServerStream*>(it.second.get())->runLowWatermarkCallbacks();
+    }
+  }
 }
 
 } // namespace Quic
