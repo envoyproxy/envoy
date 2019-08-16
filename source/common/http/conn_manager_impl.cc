@@ -35,6 +35,8 @@
 #include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
 
+#include "extensions/quic_listeners/quiche/codec_impl.h"
+
 #include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
 
@@ -154,8 +156,8 @@ ConnectionManagerImpl::~ConnectionManagerImpl() {
   if (codec_) {
     if (codec_->protocol() == Protocol::Http2) {
       stats_.named_.downstream_cx_http2_active_.dec();
-    } else if (codec_->protocol() == Protocol::Quic) {
-      stats_.named_.downstream_cx_quic_active_.dec();
+    } else if (codec_->protocol() == Protocol::Http3) {
+      stats_.named_.downstream_cx_http3_active_.dec();
     } else {
       stats_.named_.downstream_cx_http1_active_.dec();
     }
@@ -199,7 +201,7 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
   }
 
   if (reset_stream && codec_->protocol() != Protocol::Http2 &&
-      codec_->protocol() != Protocol::Quic) {
+      codec_->protocol() != Protocol::Http3) {
     drain_state_ = DrainState::Closing;
   }
 
@@ -209,7 +211,7 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
   // Also be sure to unwind any read-disable done by the prior downstream
   // connection.
   if (drain_state_ != DrainState::Closing && codec_->protocol() != Protocol::Http2 &&
-      codec_->protocol() != Protocol::Quic) {
+      codec_->protocol() != Protocol::Http3) {
     while (!read_callbacks_->connection().readEnabled()) {
       read_callbacks_->connection().readDisable(false);
     }
@@ -280,9 +282,9 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
     if (codec_->protocol() == Protocol::Http2) {
       stats_.named_.downstream_cx_http2_total_.inc();
       stats_.named_.downstream_cx_http2_active_.inc();
-    } else if (codec_->protocol() == Protocol::Quic) {
-      stats_.named_.downstream_cx_quic_total_.inc();
-      stats_.named_.downstream_cx_quic_active_.inc();
+    } else if (codec_->protocol() == Protocol::Http3) {
+      stats_.named_.downstream_cx_http3_total_.inc();
+      stats_.named_.downstream_cx_http3_active_.inc();
     } else {
       stats_.named_.downstream_cx_http1_total_.inc();
       stats_.named_.downstream_cx_http1_active_.inc();
@@ -324,7 +326,7 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
     // either redispatch if there are no streams and we have more data. If we have a single
     // complete non-WebSocket stream but have not responded yet we will pause socket reads
     // to apply back pressure.
-    if (codec_->protocol() != Protocol::Http2 && codec_->protocol() != Protocol::Quic) {
+    if (codec_->protocol() != Protocol::Http2 && codec_->protocol() != Protocol::Http3) {
       if (read_callbacks_->connection().state() == Network::Connection::State::Open &&
           data.length() > 0 && streams_.empty()) {
         redispatch = true;
@@ -343,7 +345,8 @@ Network::FilterStatus ConnectionManagerImpl::onNewConnection() {
   if (!read_callbacks_->connection().isQuic()) {
     return Network::FilterStatus::Continue;
   }
-  codec_ = std::make_unique<QuicHttpServerConnectionImpl>(read_callbacks_->connection(), *this);
+  codec_ = std::make_unique<Quic::QuicHttpServerConnectionImpl>(
+      dynamic_cast<Quic::EnvoyQuicServerSession&>(read_callbacks_->connection()), *this);
   return Network::FilterStatus::StopIteration;
 }
 
@@ -459,8 +462,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   connection_manager_.stats_.named_.downstream_rq_active_.inc();
   if (connection_manager_.codec_->protocol() == Protocol::Http2) {
     connection_manager_.stats_.named_.downstream_rq_http2_total_.inc();
-  } else if (connection_manager_.codec_->protocol() == Protocol::Quic) {
-    connection_manager_.stats_.named_.downstream_rq_quic_total_.inc();
+  } else if (connection_manager_.codec_->protocol() == Protocol::Http3) {
+    connection_manager_.stats_.named_.downstream_rq_http3_total_.inc();
   } else {
     connection_manager_.stats_.named_.downstream_rq_http1_total_.inc();
   }
@@ -750,7 +753,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   // Note: Proxy-Connection is not a standard header, but is supported here
   // since it is supported by http-parser the underlying parser for http
   // requests.
-  if (protocol != Protocol::Http2 && protocol != Protocol::Quic && !state_.saw_connection_close_ &&
+  if (protocol != Protocol::Http2 && protocol != Protocol::Http3 && !state_.saw_connection_close_ &&
       request_headers_->ProxyConnection() &&
       absl::EqualsIgnoreCase(request_headers_->ProxyConnection()->value().getStringView(),
                              Http::Headers::get().ConnectionValues.Close)) {
@@ -1403,7 +1406,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
   // finish.
   if (!state_.remote_complete_) {
     if (connection_manager_.codec_->protocol() != Protocol::Http2 &&
-        connection_manager_.codec_->protocol() != Protocol::Quic) {
+        connection_manager_.codec_->protocol() != Protocol::Http3) {
       connection_manager_.drain_state_ = DrainState::Closing;
     }
 
@@ -1412,7 +1415,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
 
   if (connection_manager_.drain_state_ != DrainState::NotDraining &&
       connection_manager_.codec_->protocol() != Protocol::Http2 &&
-      connection_manager_.codec_->protocol() != Protocol::Quic) {
+      connection_manager_.codec_->protocol() != Protocol::Http3) {
     // If the connection manager is draining send "Connection: Close" on HTTP/1.1 connections.
     // Do not do this for H2 (which drains via GOAWAY) or Upgrade (as the upgrade
     // payload is no longer HTTP/1.1)
