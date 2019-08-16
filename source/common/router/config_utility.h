@@ -46,6 +46,7 @@ public:
     const std::string name_;
     const absl::optional<Matchers::StringMatcher> matcher_;
   };
+  // fixfix ptr alias
 
   /**
    * @return the resource priority parsed from proto.

@@ -4270,7 +4270,7 @@ virtual_hosts:
       allow_origin: ["test-origin"]
       allow_origin_regex:
       - .*\.envoyproxy\.io
-      allow_origin_safe_regex:
+      allow_origin_string_match:
       - google_re2: {}
         regex: .*\.envoyproxy\.io
       allow_methods: "test-methods"

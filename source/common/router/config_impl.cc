@@ -156,7 +156,7 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config,
   for (const auto& regex : config.allow_origin_regex()) {
     allow_origin_regex_.push_back(Regex::Utility::parseStdRegexAsCompiledMatcher(regex));
   }
-  for (const auto& regex : config.allow_origin_safe_regex()) {
+  for (const auto& regex : config.allow_origin_string_match()) {
     allow_origin_regex_.push_back(Regex::Utility::parseRegex(regex));
   }
   if (config.has_allow_credentials()) {

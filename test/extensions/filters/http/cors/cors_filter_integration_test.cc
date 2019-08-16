@@ -63,7 +63,7 @@ public:
             route->mutable_match()->set_prefix("/cors-allow-origin-regex");
             route->mutable_route()->set_cluster("cluster_0");
             auto* cors = route->mutable_route()->mutable_cors();
-            auto* safe_regex = cors->mutable_allow_origin_safe_regex()->Add();
+            auto* safe_regex = cors->mutable_allow_origin_string_match()->Add();
             safe_regex->mutable_google_re2();
             safe_regex->set_regex(".*\\.envoyproxy\\.io");
           }

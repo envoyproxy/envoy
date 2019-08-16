@@ -10,7 +10,7 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/v2/core/base.pb.h"
-#include "envoy/common/regex.h"
+//fixfix#include "envoy/common/regex.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
@@ -105,11 +105,6 @@ public:
    * @return std::list<std::string>& access-control-allow-origin values.
    */
   virtual const std::list<std::string>& allowOrigins() const PURE;
-
-  /**
-   * @return std::list<Regex::CompiledMatcherPtr>& regexes that match allowed origins.
-   */
-  virtual const std::list<Regex::CompiledMatcherPtr>& allowOriginRegexes() const PURE;
 
   /**
    * @return std::string access-control-allow-methods value.

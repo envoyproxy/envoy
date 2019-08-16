@@ -416,22 +416,24 @@ message CorsPolicy {
   // Specifies the origins that will be allowed to do CORS requests.
   //
   // An origin is allowed if either allow_origin or allow_origin_regex match.
-  repeated string allow_origin = 1;
+  //
+  // .. attention::
+  //  This field has been deprecated in favor of `allow_origin_string_match`.
+  repeated string allow_origin = 1 [deprecated = true];
 
   // Specifies regex patterns that match allowed origins.
   //
   // An origin is allowed if either allow_origin or allow_origin_regex match.
   //
   // .. attention::
-  //   This field has been deprecated in favor of `allow_origin_safe_regex` as it is not safe for
+  //   This field has been deprecated in favor of `allow_origin_string_match` as it is not safe for
   //   use with untrusted input in all cases.
   repeated string allow_origin_regex = 8
       [(validate.rules).repeated .items.string.max_bytes = 1024, deprecated = true];
 
-  // Specifies regex patterns that match allowed origins.
-  //
-  // An origin is allowed if either allow_origin or allow_origin_safe_regex match.
-  repeated type.matcher.RegexMatcher allow_origin_safe_regex = 11;
+  // Specifies string patterns that match allowed origins. An origin is allowed if any of the
+  // string matchers match.
+  repeated type.matcher.StringMatcher allow_origin_string_match = 11;
 
   // Specifies the content for the *access-control-allow-methods* header.
   string allow_methods = 2;
