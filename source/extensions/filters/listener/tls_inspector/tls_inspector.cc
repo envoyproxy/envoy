@@ -112,6 +112,8 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
         Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Closed);
     return Network::FilterStatus::StopIteration;
   }
+  // massage bazel gcc since it failed to detect the switch block will always return
+  return Network::FilterStatus::StopIteration;
 }
 
 void Filter::onALPN(const unsigned char* data, unsigned int len) {
