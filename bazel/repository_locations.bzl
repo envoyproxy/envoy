@@ -9,7 +9,7 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/bazelbuild/bazel-toolchains/archive/0.28.5.tar.gz"],
     ),
     boringssl = dict(
-        # Use commits from branch "chromium-stable-with-bazel"
+        # Use commits from branch "master-with-bazel"
         sha256 = "c712766ddc844de2a38e686e1cdd7288795e9a6fe7f699c6636f1b76703db84e",
         strip_prefix = "boringssl-265728decec4370cd02b941f72fba9f0735e2923",
         # chromium-77.0.3865.37 (BETA)
