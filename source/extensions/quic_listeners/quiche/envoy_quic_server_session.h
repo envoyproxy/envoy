@@ -34,14 +34,12 @@ public:
   // Owns connection.
   EnvoyQuicServerSession(const quic::QuicConfig& config,
                          const quic::ParsedQuicVersionVector& supported_versions,
-                         quic::QuicConnection* connection, quic::QuicSession::Visitor* visitor,
+                         std::unique_ptr<EnvoyQuicConnection> connection,
+                         quic::QuicSession::Visitor* visitor,
                          quic::QuicCryptoServerStream::Helper* helper,
                          const quic::QuicCryptoServerConfig* crypto_config,
                          quic::QuicCompressedCertsCache* compressed_certs_cache,
                          Event::Dispatcher& dispatcher, uint32_t send_buffer_limit);
-
-  // Overridden to delete connection object.
-  ~EnvoyQuicServerSession() override;
 
   // Network::FilterManager
   // Overridden to delegate calls to filter_manager_.
@@ -67,7 +65,7 @@ public:
   }
   void setDelayedCloseTimeout(std::chrono::milliseconds timeout) override;
   std::chrono::milliseconds delayedCloseTimeout() const override;
-  void readDisable(bool disable) override {
+  void readDisable(bool /*disable*/) override {
     // QUIC connection should always be able to read. Upstream network buffer
     // high watermark limit should only affect stream flow control.
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -157,6 +155,7 @@ private:
   // Called when aggregated buffered bytes across all the streams declines to low watermark.
   void onSendBufferLowWatermark();
 
+  std::unique_ptr<EnvoyQuicConnection> quic_connection_;
   // Currently ConnectionManagerImpl is the one and only filter. If more network
   // filters are added, ConnectionManagerImpl should always be the last one.
   // Its onRead() is only called once to trigger ReadFilter::onNewConnection()

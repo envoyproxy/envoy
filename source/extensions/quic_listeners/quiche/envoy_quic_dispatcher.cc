@@ -36,17 +36,21 @@ void EnvoyQuicDispatcher::OnConnectionClosed(quic::QuicConnectionId connection_i
 quic::QuicSession* EnvoyQuicDispatcher::CreateQuicSession(
     quic::QuicConnectionId server_connection_id, const quic::QuicSocketAddress& peer_address,
     quic::QuicStringPiece /*alpn*/, const quic::ParsedQuicVersion& version) {
-  auto quic_connection = new EnvoyQuicConnection(
+  auto quic_connection = std::make_unique<EnvoyQuicConnection>(
       server_connection_id, peer_address, *helper(), *alarm_factory(), *writer(),
       /*owns_writer=*/false, quic::Perspective::IS_SERVER, quic::ParsedQuicVersionVector{version},
       listener_config_, listener_stats_);
   auto quic_session = new EnvoyQuicServerSession(
-      config(), quic::ParsedQuicVersionVector{version}, quic_connection, this, session_helper(),
-      crypto_config(), compressed_certs_cache(), connection_handler_.dispatcher_,
+      config(), quic::ParsedQuicVersionVector{version}, std::move(quic_connection), this,
+      session_helper(), crypto_config(), compressed_certs_cache(), connection_handler_.dispatcher_,
       listener_config_.perConnectionBufferLimitBytes());
   quic_session->Initialize();
   // Filter chain can't be retrieved here as self address is unknown at this
   // point.
+  // TODO(danzh): change QUIC interface to pass in self address as it is already
+  // known. In this way, filter chain can be retrieved at this point. But one
+  // thing to pay attention is that if the retrival fails, connection needs to
+  // be closed, and it should be added to time wait list instead of session map.
   ++connection_handler_.num_connections_;
   return quic_session;
 }

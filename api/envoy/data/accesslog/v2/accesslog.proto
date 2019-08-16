@@ -44,7 +44,7 @@ message HTTPAccessLogEntry {
     HTTP10 = 1;
     HTTP11 = 2;
     HTTP2 = 3;
-    QUIC = 4;
+    HTTP3 = 4;
   }
   HTTPVersion protocol_version = 2;
 
