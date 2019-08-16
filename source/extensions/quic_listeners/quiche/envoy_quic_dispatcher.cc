@@ -46,6 +46,10 @@ quic::QuicSession* EnvoyQuicDispatcher::CreateQuicSession(
   quic_session->Initialize();
   // Filter chain can't be retrieved here as self address is unknown at this
   // point.
+  // TODO(danzh): change QUIC interface to pass in self address as it is already
+  // known. In this way, filter chain can be retrieved at this point. But one
+  // thing to pay attention is that if the retrival fails, connection needs to
+  // be closed, and it should be added to time wait list instead of session map.
   ++connection_handler_.num_connections_;
   return quic_session;
 }
