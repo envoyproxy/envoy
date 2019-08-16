@@ -32,8 +32,11 @@ void TcpGrpcAccessLog::emitLog(const Http::HeaderMap&, const Http::HeaderMap&,
   envoy::data::accesslog::v2::TCPAccessLogEntry log_entry;
   GrpcCommon::Utility::extractCommonAccessLogProperties(*log_entry.mutable_common_properties(),
                                                         stream_info);
-  log_entry.mutable_connection_properties()->set_bytes_received(stream_info.bytesReceived());
-  log_entry.mutable_connection_properties()->set_bytes_sent(stream_info.bytesSent());
+
+  envoy::data::accesslog::v2::ConnectionProperties& connection_properties =
+      *log_entry.mutable_connection_properties();
+  connection_properties.set_bytes_received(stream_info.bytesReceived());
+  connection_properties.set_bytes_sent(stream_info.bytesSent());
 
   // request_properties->set_request_body_bytes(stream_info.bytesReceived());
   tls_slot_->getTyped<ThreadLocalLogger>().logger_->log(std::move(log_entry));

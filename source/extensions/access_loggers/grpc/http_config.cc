@@ -35,7 +35,7 @@ HttpGrpcAccessLogFactory::createAccessLogInstance(const Protobuf::Message& confi
 }
 
 ProtobufTypes::MessagePtr HttpGrpcAccessLogFactory::createEmptyConfigProto() {
-  return ProtobufTypes::MessagePtr{new envoy::config::accesslog::v2::HttpGrpcAccessLogConfig()};
+  return std::make_unique<envoy::config::accesslog::v2::HttpGrpcAccessLogConfig>();
 }
 
 std::string HttpGrpcAccessLogFactory::name() const { return AccessLogNames::get().HttpGrpc; }

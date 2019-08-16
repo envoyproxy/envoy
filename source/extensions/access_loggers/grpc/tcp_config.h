@@ -10,7 +10,7 @@ namespace AccessLoggers {
 namespace TcpGrpc {
 
 /**
- * Config registration for the HTTP gRPC access log. @see AccessLogInstanceFactory.
+ * Config registration for the TCP gRPC access log. @see AccessLogInstanceFactory.
  */
 class TcpGrpcAccessLogFactory : public Server::Configuration::AccessLogInstanceFactory {
 public:

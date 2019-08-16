@@ -129,7 +129,7 @@ private:
     ThreadLocalCache(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
 
     Event::Dispatcher& dispatcher_;
-    // Access loggers indexed by the hash of logger's configuration.
+    // Access loggers indexed by the hash of logger's configuration and logger type.
     absl::flat_hash_map<std::pair<std::size_t, GrpcAccessLoggerType>, GrpcAccessLoggerSharedPtr>
         access_loggers_;
   };
