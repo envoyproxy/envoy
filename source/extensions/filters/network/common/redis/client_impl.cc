@@ -26,7 +26,7 @@ ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatche
                              EncoderPtr&& encoder, DecoderFactory& decoder_factory,
                              const Config& config) {
   auto redis_command_stats = std::make_shared<RedisCommandStats>(
-      host->cluster().statsScope(), "fml", config.enableCommandStats());
+      host->cluster().statsScope(), "upstream_commands", config.enableCommandStats());
   std::unique_ptr<ClientImpl> client(new ClientImpl(host, dispatcher, std::move(encoder),
                                                     decoder_factory, config, redis_command_stats));
   client->connection_ = host->createConnection(dispatcher, nullptr, nullptr).connection_;
@@ -79,9 +79,9 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, PoolCallbacks& ca
   if (config_.enableCommandStats()) {
     // Get command from RespValue
     if (request.type() == RespType::Array) {
-      redis_command_stats_->counter("fml." + request.asArray().front().asString()).inc();
+      redis_command_stats_->counter(request.asArray().front().asString()).inc();
     } else {
-      redis_command_stats_->counter("fml." + request.asString()).inc();
+      redis_command_stats_->counter(request.asString()).inc();
     }
   }
 
