@@ -85,10 +85,19 @@ CI_TARGET=$1
 
 if [[ $# -gt 1 ]]; then
   shift
+  # If this is a fuzz test, add _with_libfuzzer
+  if [[ "$CI_TARGET" == "bazel.fuzz" ]]; then
+    FUZZ_TEST_TARGETS=$*"_with_libfuzzer"
+  fi
   TEST_TARGETS=$*
 else
   TEST_TARGETS=//test/...
+  if [[ "$CI_TARGET" == "bazel.fuzz" ]]; then
+    FUZZER_TARGETS_CC=$(find . -name *_fuzz_test.cc)
+    FUZZ_TEST_TARGETS="$(for t in ${FUZZER_TARGETS_CC}; do echo "${t:2:-3}_with_libfuzzer"; done;)"    
+  fi  
 fi
+
 
 if [[ "$CI_TARGET" == "bazel.release" ]]; then
   # When testing memory consumption, we want to test against exact byte-counts
@@ -251,6 +260,12 @@ elif [[ "$CI_TARGET" == "bazel.coverity" ]]; then
   cp -f \
      "${ENVOY_BUILD_DIR}"/envoy-coverity-output.tgz \
      "${ENVOY_DELIVERY_DIR}"/envoy-coverity-output.tgz
+  exit 0
+elif [[ "$CI_TARGET" == "bazel.fuzz" ]]; then
+  setup_clang_toolchain
+  echo "bazel ASAN libFuzzer build with fuzz tests ${FUZZ_TEST_TARGETS}"
+  echo "Building envoy fuzzers and running against corpora"
+  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=asan-fuzzer ${FUZZ_TEST_TARGETS}
   exit 0
 elif [[ "$CI_TARGET" == "fix_format" ]]; then
   echo "fix_format..."
