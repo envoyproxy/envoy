@@ -33,12 +33,23 @@ RedisCommandStats::RedisCommandStats(Stats::Scope& scope, const std::string& pre
   }
 }
 
+Stats::SymbolTable::StoragePtr RedisCommandStats::addPrefix(const Stats::StatName name) {
+  Stats::StatNameVec names_with_prefix;
+  names_with_prefix.reserve(2);
+  names_with_prefix.push_back(prefix_);
+  names_with_prefix.insert(names_with_prefix.end(), name);
+  return scope_.symbolTable().join(names_with_prefix);
+}
+
 Stats::Counter& RedisCommandStats::counter(std::string name) {
-  return scope_.counterFromStatName(stat_name_set_.getStatName(name));
+  Stats::StatName statName = stat_name_set_.getStatName(name);
+  const Stats::SymbolTable::StoragePtr stat_name_storage = addPrefix(statName);
+  return scope_.counterFromStatName(Stats::StatName(stat_name_storage.get()));
 }
 
 Stats::Histogram& RedisCommandStats::histogram(Stats::StatName statName) {
-  return scope_.histogramFromStatName(statName);
+  const Stats::SymbolTable::StoragePtr stat_name_storage = addPrefix(statName);
+  return scope_.histogramFromStatName(Stats::StatName(stat_name_storage.get()));
 }
 
 } // namespace Redis

@@ -24,7 +24,7 @@ public:
   // Could add histogram timer for each command in future
 
 private:
-  Stats::SymbolTable::StoragePtr addPrefix(const Stats::StatNameVec& names);
+   Stats::SymbolTable::StoragePtr addPrefix(const Stats::StatName name);
 
   Stats::Scope& scope_;
   Stats::StatNameSet stat_name_set_;

@@ -620,7 +620,7 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
   }
 
   auto handler = handler_lookup_table_.find(to_lower_string.c_str());
-  if (handler == nullptr) {
+  if (handler == nullptr) { 
     stats_.unsupported_command_.inc();
     callbacks.onResponse(Utility::makeError(
         fmt::format("unsupported command '{}'", request->asArray()[0].asString())));
