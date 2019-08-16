@@ -51,6 +51,16 @@
 
 @end
 
+#pragma mark - EnvoyConfiguration
+
+@implementation EnvoyConfiguration
+
++ (NSString *)templateString {
+  return [[NSString alloc] initWithUTF8String:config_template];
+}
+
+@end
+
 #pragma mark - Utilities to move elsewhere
 
 typedef struct {

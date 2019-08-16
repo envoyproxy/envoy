@@ -6,6 +6,7 @@ swift_static_framework(
     name = "ios_framework",
     srcs = [
         "Client.swift",
+        "Configuration.swift",
         "Envoy.swift",
         "Error.swift",
         "LogLevel.swift",

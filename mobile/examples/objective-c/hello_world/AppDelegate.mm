@@ -16,12 +16,7 @@
   [self.window setRootViewController:controller];
   [self.window makeKeyAndVisible];
 
-  NSString *configFile = [[NSBundle mainBundle] pathForResource:@"config" ofType:@"yaml"];
-  NSString *configYaml = [NSString stringWithContentsOfFile:configFile
-                                                   encoding:NSUTF8StringEncoding
-                                                      error:NULL];
-  NSLog(@"Loading config:\n%@", configYaml);
-  self.envoy = [[Envoy alloc] initWithConfig:configYaml];
+  self.envoy = [[Envoy alloc] initWithConfig:[Configuration new]];
   NSLog(@"Finished launching!");
   return YES;
 }

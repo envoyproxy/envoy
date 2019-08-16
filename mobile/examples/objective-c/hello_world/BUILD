@@ -8,7 +8,6 @@ objc_library(
         "*.h",
         "*.mm",
     ]),
-    data = ["config.yaml"],
     deps = ["//dist:envoy_mobile_ios"],
 )
 
