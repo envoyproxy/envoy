@@ -75,6 +75,9 @@ public:
     signal_handling_enabled_ = signal_handling_enabled;
   }
   void setCpusetThreads(bool cpuset_threads_enabled) { cpuset_threads_ = cpuset_threads_enabled; }
+  void setFakeSymbolTableEnabled(bool fake_symbol_table_enabled) {
+    fake_symbol_table_enabled_ = fake_symbol_table_enabled;
+  }
 
   // Server::Options
   uint64_t baseId() const override { return base_id_; }
