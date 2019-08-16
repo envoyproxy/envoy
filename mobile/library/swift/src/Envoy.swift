@@ -20,7 +20,6 @@ public final class Envoy: NSObject {
   /// - parameter config:   Configuration file that is recognizable by Envoy (YAML).
   /// - parameter logLevel: Log level to use for this instance.
   public init(config: String, logLevel: LogLevel = .info) {
-    //self.engine = engine
     self.runner = RunnerThread(config: config, engine: self.engine, logLevel: logLevel)
     self.runner.start()
   }
