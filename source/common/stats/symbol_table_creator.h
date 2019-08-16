@@ -9,8 +9,8 @@ namespace Stats {
 class SymbolTableCreator {
 public:
   // Factory method to create SymbolTables. This is needed to help make it
-  // possible to flag-flip use of real symbol tables, and but ultimately
-  // should be removed.
+  // possible to flag-flip use of real symbol tables, and ultimately should be
+  // removed.
   static SymbolTablePtr makeSymbolTable(bool use_fake) {
     use_fake_symbol_tables_ = use_fake;
     return makeSymbolTable();
