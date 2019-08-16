@@ -25,8 +25,8 @@ ConfigImpl::ConfigImpl(
 ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                              EncoderPtr&& encoder, DecoderFactory& decoder_factory,
                              const Config& config) {
-  auto redis_command_stats = std::make_shared<RedisCommandStats>(
-      host->cluster().statsScope(), "fml", config.enableCommandStats());
+  auto redis_command_stats =
+      std::make_shared<RedisCommandStats>(host->cluster().statsScope(), "fml", true); // TODO: fix?
   std::unique_ptr<ClientImpl> client(new ClientImpl(host, dispatcher, std::move(encoder),
                                                     decoder_factory, config, redis_command_stats));
   client->connection_ = host->createConnection(dispatcher, nullptr, nullptr).connection_;
