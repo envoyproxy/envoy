@@ -52,7 +52,7 @@ service ClusterDiscoveryService {
 // [#protodoc-title: Clusters]
 
 // Configuration for a single upstream cluster.
-// [#comment:next free field: 41]
+// [#comment:next free field: 42]
 message Cluster {
   // Supplies the name of the cluster which must be unique across all clusters.
   // The cluster name is used when emitting
@@ -640,6 +640,23 @@ message Cluster {
   // outgoing connections made by the cluster. Order matters as the filters are
   // processed sequentially as connection events happen.
   repeated cluster.Filter filters = 40;
+
+  // If present, tells the client where to send load reports via LRS.
+  //
+  // If multiple clusters are configured to use the same LRS server,
+  // then the data for all of those clusters may be sent on the same LRS
+  // stream.
+  //
+  // Note that if LRS is configured this way, then there is no need for
+  // the LRS server to send LoadStatsResponse messages on the LRS
+  // stream, because the data it would have sent is already configured
+  // here.
+  message LoadReportConfig {
+    core.ApiConfigSource lrs_server = 1;
+    google.protobuf.Duration load_reporting_interval = 2;
+    bool report_endpoint_granularity = 3;
+  }
+  LoadReportConfig load_report_config = 41;
 }
 
 // An extensible structure containing the address Envoy should bind to when
