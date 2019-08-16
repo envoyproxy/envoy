@@ -2,16 +2,14 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-// MARK: - Aliases
+#pragma mark - Aliases
 
 /// A set of headers that may be passed to/from an Envoy stream.
 typedef NSDictionary<NSString *, NSArray<NSString *> *> EnvoyHeaders;
 
-// MARK: - EnvoyObserver
+#pragma mark - EnvoyObserver
 
-/// Interface that can handle HTTP callbacks.
-// FIXME: can we just bridge the swift object here and/or just expose this to swift as the
-// ResponseHandler?
+/// Interface that can handle callbacks from an HTTP stream.
 @interface EnvoyObserver : NSObject
 
 /**
@@ -50,20 +48,25 @@ typedef NSDictionary<NSString *, NSArray<NSString *> *> EnvoyHeaders;
 
 /**
  * Called when the async HTTP stream has an error.
- * @param error the error received/caused by the async HTTP stream.
  */
 @property (nonatomic, strong) void (^onError)();
 
-// FIXME
+/**
+ * Called when the async HTTP stream is canceled.
+ */
 @property (nonatomic, strong) void (^onCancel)();
 
 @end
 
-@interface EnvoyHttpStream : NSObject
+#pragma mark - EnvoyHTTPStream
+
+@interface EnvoyHTTPStream : NSObject
+
 /**
  Open an underlying HTTP stream.
 
- @param observer the observer that will run the stream callbacks.
+ @param handle Underlying handle of the HTTP stream owned by an Envoy engine.
+ @param observer The observer that will run the stream callbacks.
  */
 - (instancetype)initWithHandle:(uint64_t)handle observer:(EnvoyObserver *)observer;
 
@@ -100,11 +103,14 @@ typedef NSDictionary<NSString *, NSArray<NSString *> *> EnvoyHeaders;
 /**
  Cancel the stream. This functions as an interrupt, and aborts further callbacks and handling of the
  stream.
- @return Success, unless the stream has already been canceled.
+
+ @return Success unless the stream has already been canceled.
  */
 - (int)cancel;
 
 @end
+
+#pragma mark - EnvoyEngine
 
 /// Wrapper layer for calling into Envoy's C/++ API.
 @protocol EnvoyEngine
@@ -133,11 +139,13 @@ typedef NSDictionary<NSString *, NSArray<NSString *> *> EnvoyHeaders;
 /**
  Opens a new HTTP stream attached to this engine.
 
- @param observer Handler for stream events.
+ @param observer Handler for observing stream events.
  */
-- (EnvoyHttpStream *)openHttpStreamWithObserver:(EnvoyObserver *)observer;
+- (EnvoyHTTPStream *)startStreamWithObserver:(EnvoyObserver *)observer;
 
 @end
+
+#pragma mark - EnvoyEngineImpl
 
 // Concrete implementation of the `EnvoyEngine` protocol.
 @interface EnvoyEngineImpl : NSObject <EnvoyEngine>
