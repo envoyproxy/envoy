@@ -114,10 +114,11 @@ using GradientControllerConfigSharedPtr = std::shared_ptr<GradientControllerConf
  * (indicated by inMinRTTSamplingWindow() returning true) and the concurrency limit is pinned to 1.
  * This window lasts until the configured number of requests is received, the minRTT value is
  * updated, and the minRTT value is set by a single worker thread. To prevent sampleRTT calculations
- * from triggering during this window, the update_window_mtx_ is held. Since it's necessary for a
- * worker thread to know which update window update_window_mtx_ is held for, they check the state of
- * inMinRTTSamplingWindow() after each sample. When the minRTT calculation is complete, a timer is
- * set to trigger the next minRTT sampling window by the worker thread who updates the minRTT value.
+ * from triggering during this window, the update window mutex is held. Since it's necessary for a
+ * worker thread to know which update window update window mutex is held for, they check the state
+ * of inMinRTTSamplingWindow() after each sample. When the minRTT calculation is complete, a timer
+ * is set to trigger the next minRTT sampling window by the worker thread who updates the minRTT
+ * value.
  *
  * If the controller is not in a minRTT sampling window, it's possible that the controller is in a
  * sampleRTT calculation window. In this, all of the latency samples are consolidated into a
@@ -129,15 +130,15 @@ using GradientControllerConfigSharedPtr = std::shared_ptr<GradientControllerConf
  *
  * Locking:
  * ========
- * There are 2 mutually exclusive calculation windows, so update_window_mtx_ is held to prevent the
+ * There are 2 mutually exclusive calculation windows, so update window mutex is held to prevent the
  * overlap of these windows. It is necessary for a worker thread to know specifically if the
  * controller is inside of a minRTT recalculation window during the recording of a latency sample,
  * so this extra bit of information is stored in the recalculating_min_rtt_ boolean. The
  * recalculating_min_rtt_ flag can only be set if inside of a minRTT calculation window.
  *
  * The histogram that aggregates latency samples, latency_sample_hist_, must be protected by a
- * separate lock (latency_sample_mtx_). The additional lock is necessary because not only is the
- * histogram mutated during both calculation windows, but also during latency samples triggered
+ * separate lock (the latency sample mutex). The additional lock is necessary because not only is
+ * the histogram mutated during both calculation windows, but also during latency samples triggered
  * during the adaptive concurrency filter's header encoding step.
  */
 class GradientController : public ConcurrencyController {
@@ -148,7 +149,7 @@ public:
 
   // ConcurrencyController.
   RequestForwardingAction forwardingDecision() override;
-  void recordLatencySample(std::chrono::nanoseconds&& rq_latency) override;
+  void recordLatencySample(std::chrono::nanoseconds rq_latency) override;
   uint32_t concurrencyLimit() const override { return concurrency_limit_.load(); }
 
 private:

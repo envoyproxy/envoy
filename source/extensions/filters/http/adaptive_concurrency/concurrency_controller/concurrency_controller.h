@@ -43,7 +43,7 @@ public:
    *
    * @param rq_latency is the clocked round-trip time for the request.
    */
-  virtual void recordLatencySample(std::chrono::nanoseconds&& rq_latency) PURE;
+  virtual void recordLatencySample(std::chrono::nanoseconds rq_latency) PURE;
 
   /**
    * Returns the current concurrency limit.

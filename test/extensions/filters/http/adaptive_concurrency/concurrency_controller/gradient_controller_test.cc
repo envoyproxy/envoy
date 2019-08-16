@@ -70,7 +70,7 @@ protected:
     const auto config = makeConfig(yaml_config);
     for (uint32_t ii = 1; ii <= config->min_rtt_aggregate_request_count() + 1; ++ii) {
       tryForward(controller, true);
-      controller->recordLatencySample(std::move(latency));
+      controller->recordLatencySample(latency);
     }
   }
 

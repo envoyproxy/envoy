@@ -153,7 +153,7 @@ RequestForwardingAction GradientController::forwardingDecision() {
   return RequestForwardingAction::Block;
 }
 
-void GradientController::recordLatencySample(std::chrono::nanoseconds&& rq_latency) {
+void GradientController::recordLatencySample(std::chrono::nanoseconds rq_latency) {
   const uint32_t latency_usec =
       std::chrono::duration_cast<std::chrono::microseconds>(rq_latency).count();
   ASSERT(num_rq_outstanding_.load() > 0);

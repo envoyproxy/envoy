@@ -24,7 +24,7 @@ using ConcurrencyController::RequestForwardingAction;
 class MockConcurrencyController : public ConcurrencyController::ConcurrencyController {
 public:
   MOCK_METHOD0(forwardingDecision, RequestForwardingAction());
-  MOCK_METHOD1(recordLatencySample, void(std::chrono::nanoseconds&&));
+  MOCK_METHOD1(recordLatencySample, void(std::chrono::nanoseconds));
 
   uint32_t concurrencyLimit() const override { return 0; }
 };
@@ -89,7 +89,7 @@ TEST_F(AdaptiveConcurrencyFilterTest, EncodeHeadersValidTest) {
 
   Http::TestHeaderMapImpl response_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
-  EXPECT_CALL(*controller_, recordLatencySample(std::move(advance_time)));
+  EXPECT_CALL(*controller_, recordLatencySample(advance_time));
   filter_->encodeComplete();
 }
 
