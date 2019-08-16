@@ -49,8 +49,12 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
       "", "config-yaml", "Inline YAML configuration, merges with the contents of --config-path",
       false, "", "string", cmd);
 
-  TCLAP::SwitchArg allow_unknown_static_fields(
-      "", "allow-unknown-static-fields", "allow unknown fields in the configuration", cmd, false);
+  TCLAP::SwitchArg allow_unknown_fields("", "allow-unknown-fields",
+                                        "allow unknown fields in static configuration (DEPRECATED)",
+                                        cmd, false);
+  TCLAP::SwitchArg allow_unknown_static_fields("", "allow-unknown-static-fields",
+                                               "allow unknown fields in static configuration", cmd,
+                                               false);
   TCLAP::SwitchArg reject_unknown_dynamic_fields("", "reject-unknown-dynamic-fields",
                                                  "reject unknown fields in dynamic configuration",
                                                  cmd, false);
@@ -184,7 +188,12 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
 
   config_path_ = config_path.getValue();
   config_yaml_ = config_yaml.getValue();
-  allow_unknown_static_fields_ = allow_unknown_static_fields.getValue();
+  if (allow_unknown_fields.getValue()) {
+    ENVOY_LOG(warn,
+              "--allow-unknown-fields is deprecated, use --allow-unknown-static-fields instead.");
+  }
+  allow_unknown_static_fields_ =
+      allow_unknown_static_fields.getValue() || allow_unknown_fields.getValue();
   reject_unknown_dynamic_fields_ = reject_unknown_dynamic_fields.getValue();
   admin_address_path_ = admin_address_path.getValue();
   log_path_ = log_path.getValue();

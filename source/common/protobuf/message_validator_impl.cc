@@ -2,6 +2,7 @@
 
 #include "envoy/common/exception.h"
 
+#include "common/common/assert.h"
 #include "common/common/hash.h"
 #include "common/common/logger.h"
 #include "common/common/macros.h"
@@ -12,6 +13,7 @@ namespace Envoy {
 namespace ProtobufMessage {
 
 void WarningValidationVisitorImpl::setCounter(Stats::Counter& counter) {
+  ASSERT(counter_ == nullptr, "");
   counter_ = &counter;
   counter.add(prestats_count_);
 }

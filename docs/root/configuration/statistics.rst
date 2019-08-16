@@ -3,6 +3,8 @@
 Statistics
 ==========
 
+.. _server_statistics:
+
 Server
 ------
 

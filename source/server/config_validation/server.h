@@ -173,6 +173,8 @@ private:
   // - There may be active connections referencing it.
   std::unique_ptr<Secret::SecretManager> secret_manager_;
   const Options& options_;
+  ProtobufMessage::WarningValidationVisitorImpl static_warning_validation_visitor_;
+  ProtobufMessage::WarningValidationVisitorImpl dynamic_warning_validation_visitor_;
   ProtobufMessage::ValidationContextImpl validation_context_;
   Stats::IsolatedStoreImpl& stats_store_;
   ThreadLocal::InstanceImpl thread_local_;

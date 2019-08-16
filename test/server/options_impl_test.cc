@@ -104,6 +104,26 @@ TEST_F(OptionsImplTest, All) {
   EXPECT_EQ(Server::Mode::InitOnly, options->mode());
 }
 
+// Either variants of allow-unknown-[static-]-fields works.
+TEST_F(OptionsImplTest, AllowUnknownFields) {
+  {
+    std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy");
+    EXPECT_FALSE(options->allowUnknownStaticFields());
+  }
+  {
+    std::unique_ptr<OptionsImpl> options;
+    EXPECT_LOG_CONTAINS(
+        "warning",
+        "--allow-unknown-fields is deprecated, use --allow-unknown-static-fields instead.",
+        options = createOptionsImpl("envoy --allow-unknown-fields"));
+    EXPECT_TRUE(options->allowUnknownStaticFields());
+  }
+  {
+    std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --allow-unknown-static-fields");
+    EXPECT_TRUE(options->allowUnknownStaticFields());
+  }
+}
+
 TEST_F(OptionsImplTest, SetAll) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy -c hello");
   bool hot_restart_disabled = options->hotRestartDisabled();
@@ -221,12 +241,13 @@ TEST_F(OptionsImplTest, OptionsAreInSyncWithProto) {
   Server::CommandLineOptionsPtr command_line_options = options->toCommandLineOptions();
   // Failure of this condition indicates that the server_info proto is not in sync with the options.
   // If an option is added/removed, please update server_info proto as well to keep it in sync.
-  // Currently the following 4 options are not defined in proto, hence the count differs by 5.
+  // Currently the following 5 options are not defined in proto, hence the count differs by 5.
   // 1. version        - default TCLAP argument.
   // 2. help           - default TCLAP argument.
   // 3. ignore_rest    - default TCLAP argument.
   // 4. use-libevent-buffers  - short-term override for rollout of new buffer implementation.
-  EXPECT_EQ(options->count() - 4, command_line_options->GetDescriptor()->field_count());
+  // 5. allow-unknown-fields  - deprecated alias of allow-unknown-static-fields.
+  EXPECT_EQ(options->count() - 5, command_line_options->GetDescriptor()->field_count());
 }
 
 TEST_F(OptionsImplTest, BadCliOption) {

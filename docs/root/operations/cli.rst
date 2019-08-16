@@ -226,11 +226,17 @@ following are the command line options that Envoy supports.
   (:http:get:`/contention`). Mutex tracing is not enabled by default, since it incurs a slight performance
   penalty for those Envoys which already experience mutex contention.
 
+.. option:: --allow-unknown-fields
+
+  *(optional)* Deprecated alias for :option:`--allow-unknown-static-fields`.
+
 .. option:: --allow-unknown-static-fields
 
   *(optional)* This flag disables validation of protobuf configurations for unknown fields. By default, the
   validation is enabled. For most deployments, the default should be used which ensures configuration errors
-  are caught upfront and Envoy is configured as intended.
+  are caught upfront and Envoy is configured as intended. Warnings are logged for the first use of
+  any unknown field and these occurences are counted in the :ref:`server.static_unknown_fields
+  <server_statistics>` statistic.
 
 .. option:: --reject-unknown-dynamic-fields
 
@@ -238,7 +244,9 @@ following are the command line options that Envoy supports.
   dynamic configuration. By default, this flag is set false, disabling validation for fields beyond
   bootstrap. This allows newer xDS configurations to be delivered to older Envoys. This can be set
   true for strict dynamic checking when this behavior is not wanted but the default should be
-  desirable for most Envoy deployments.
+  desirable for most Envoy deployments. Warnings are logged for the first use of any unknown field
+  and these occurences are counted in the :ref:`server.dynamic_unknown_fields <server_statistics>`
+  statistic.
 
 .. option:: --version
 
