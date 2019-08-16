@@ -184,6 +184,7 @@ void ConnectionHandlerImpl::ActiveSocket::unlink() {
 
 void ConnectionHandlerImpl::ActiveSocket::continueFilterChain(bool success) {
   if (success) {
+    bool no_error = true;
     if (iter_ == accept_filters_.end()) {
       iter_ = accept_filters_.begin();
     } else {
@@ -196,15 +197,19 @@ void ConnectionHandlerImpl::ActiveSocket::continueFilterChain(bool success) {
         // The filter is responsible for calling us again at a later time to continue the filter
         // chain from the next filter.
         if (!socket().ioHandle().isOpen()) {
-          return;
+          // break the loop but should not create new connection
+          no_error = false;
+          break;
         } else {
-          unlink();
+          // Blocking at the filter but no error
           return;
         }
       }
     }
     // Successfully ran all the accept filters.
-    newConnection();
+    if (no_error) {
+      newConnection();
+    }
   }
 
   // Filter execution concluded, unlink and delete this ActiveSocket if it was linked.

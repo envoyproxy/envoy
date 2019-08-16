@@ -72,45 +72,46 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   ENVOY_LOG(debug, "tls inspector: new connection accepted");
   Network::ConnectionSocket& socket = cb.socket();
   ASSERT(file_event_ == nullptr);
+  cb_ = &cb;
 
   ParseState parse_state = onRead();
   switch (parse_state) {
   case ParseState::Error:
+    // As per discussion in https://github.com/envoyproxy/envoy/issues/7864
+    // we don't add new enum in FilterStatus so we have to signal the caller
+    // the new condition.
     cb.socket().close();
     return Network::FilterStatus::StopIteration;
   case ParseState::Done:
     return Network::FilterStatus::Continue;
   case ParseState::Continue:
     // do nothing but create the event
-    break;
+    file_event_ = cb.dispatcher().createFileEvent(
+        socket.ioHandle().fd(),
+        [this](uint32_t events) {
+          if (events & Event::FileReadyType::Closed) {
+            config_->stats().connection_closed_.inc();
+            done(false);
+            return;
+          }
+
+          ASSERT(events == Event::FileReadyType::Read);
+          ParseState parse_state = onRead();
+          switch (parse_state) {
+          case ParseState::Error:
+            done(false);
+            break;
+          case ParseState::Done:
+            done(true);
+            break;
+          case ParseState::Continue:
+            // do nothing but wait for the next event
+            break;
+          }
+        },
+        Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Closed);
+    return Network::FilterStatus::StopIteration;
   }
-  file_event_ = cb.dispatcher().createFileEvent(
-      socket.ioHandle().fd(),
-      [this](uint32_t events) {
-        if (events & Event::FileReadyType::Closed) {
-          config_->stats().connection_closed_.inc();
-          done(false);
-          return;
-        }
-
-        ASSERT(events == Event::FileReadyType::Read);
-        ParseState parse_state = onRead();
-        switch (parse_state) {
-        case ParseState::Error:
-          done(false);
-          break;
-        case ParseState::Done:
-          done(true);
-          break;
-        case ParseState::Continue:
-          // do nothing but wait for the next event
-          break;
-        }
-      },
-      Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Closed);
-
-  cb_ = &cb;
-  return Network::FilterStatus::StopIteration;
 }
 
 void Filter::onALPN(const unsigned char* data, unsigned int len) {

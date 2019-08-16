@@ -36,7 +36,14 @@ struct TlsInspectorStats {
   ALL_TLS_INSPECTOR_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-enum class ParseState { Done, Continue, Error };
+enum class ParseState {
+  // Parse result is out. It could be tls or not.
+  Done,
+  // Parser expects more data.
+  Continue,
+  // Parser reports unrecoverable error.
+  Error
+};
 /**
  * Global configuration for TLS inspector.
  */
