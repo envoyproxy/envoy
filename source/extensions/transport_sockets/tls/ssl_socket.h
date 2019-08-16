@@ -39,6 +39,47 @@ struct SslSocketFactoryStats {
 
 enum class InitialState { Client, Server };
 
+struct SslSocketInfo : public Envoy::Ssl::ConnectionInfo {
+  SslSocketInfo(bssl::UniquePtr<SSL> ssl) : ssl_(std::move(ssl)) {}
+
+  // Ssl::ConnectionInfo
+  bool peerCertificatePresented() const override;
+  absl::Span<const std::string> uriSanLocalCertificate() const override;
+  absl::string_view sha256PeerCertificateDigest() const override;
+  absl::string_view serialNumberPeerCertificate() const override;
+  absl::string_view issuerPeerCertificate() const override;
+  absl::string_view subjectPeerCertificate() const override;
+  absl::string_view subjectLocalCertificate() const override;
+  absl::Span<const std::string> uriSanPeerCertificate() const override;
+  absl::string_view urlEncodedPemEncodedPeerCertificate() const override;
+  absl::string_view urlEncodedPemEncodedPeerCertificateChain() const override;
+  absl::Span<const std::string> dnsSansPeerCertificate() const override;
+  absl::Span<const std::string> dnsSansLocalCertificate() const override;
+  absl::optional<SystemTime> validFromPeerCertificate() const override;
+  absl::optional<SystemTime> expirationPeerCertificate() const override;
+  absl::string_view sessionId() const override;
+  uint16_t ciphersuiteId() const override;
+  absl::string_view ciphersuiteString() const override;
+  absl::string_view tlsVersion() const override;
+  absl::string_view serverName() const override;
+
+  SSL* rawSslForTest() const { return ssl_.get(); }
+
+  bssl::UniquePtr<SSL> ssl_;
+  mutable std::vector<std::string> cached_uri_san_local_certificate_;
+  mutable std::string cached_sha_256_peer_certificate_digest_;
+  mutable std::string cached_serial_number_peer_certificate_;
+  mutable std::string cached_issuer_peer_certificate_;
+  mutable std::string cached_subject_peer_certificate_;
+  mutable std::string cached_subject_local_certificate_;
+  mutable std::vector<std::string> cached_uri_san_peer_certificate_;
+  mutable std::string cached_url_encoded_pem_encoded_peer_certificate_;
+  mutable std::string cached_url_encoded_pem_encoded_peer_cert_chain_;
+  mutable std::vector<std::string> cached_dns_san_peer_certificate_;
+  mutable std::vector<std::string> cached_dns_san_local_certificate_;
+  mutable std::string cached_session_id_;
+};
+
 class SslSocket : public Network::TransportSocket,
                   protected Logger::Loggable<Logger::Id::connection> {
 public:
@@ -76,45 +117,6 @@ private:
   bool shutdown_sent_{};
   uint64_t bytes_to_retry_{};
   std::string failure_reason_;
-
-  struct ConnectionInfo : public Envoy::Ssl::ConnectionInfo {
-    ConnectionInfo(bssl::UniquePtr<SSL> ssl) : ssl_(std::move(ssl)) {}
-
-    // Ssl::ConnectionInfo
-    bool peerCertificatePresented() const override;
-    absl::Span<const std::string> uriSanLocalCertificate() const override;
-    absl::string_view sha256PeerCertificateDigest() const override;
-    absl::string_view serialNumberPeerCertificate() const override;
-    absl::string_view issuerPeerCertificate() const override;
-    absl::string_view subjectPeerCertificate() const override;
-    absl::string_view subjectLocalCertificate() const override;
-    absl::Span<const std::string> uriSanPeerCertificate() const override;
-    absl::string_view urlEncodedPemEncodedPeerCertificate() const override;
-    absl::string_view urlEncodedPemEncodedPeerCertificateChain() const override;
-    absl::Span<const std::string> dnsSansPeerCertificate() const override;
-    absl::Span<const std::string> dnsSansLocalCertificate() const override;
-    absl::optional<SystemTime> validFromPeerCertificate() const override;
-    absl::optional<SystemTime> expirationPeerCertificate() const override;
-    absl::string_view sessionId() const override;
-    uint16_t ciphersuiteId() const override;
-    absl::string_view ciphersuiteString() const override;
-    absl::string_view tlsVersion() const override;
-    absl::string_view serverName() const override;
-
-    bssl::UniquePtr<SSL> ssl_;
-    mutable std::vector<std::string> cached_uri_san_local_certificate_;
-    mutable std::string cached_sha_256_peer_certificate_digest_;
-    mutable std::string cached_serial_number_peer_certificate_;
-    mutable std::string cached_issuer_peer_certificate_;
-    mutable std::string cached_subject_peer_certificate_;
-    mutable std::string cached_subject_local_certificate_;
-    mutable std::vector<std::string> cached_uri_san_peer_certificate_;
-    mutable std::string cached_url_encoded_pem_encoded_peer_certificate_;
-    mutable std::string cached_url_encoded_pem_encoded_peer_cert_chain_;
-    mutable std::vector<std::string> cached_dns_san_peer_certificate_;
-    mutable std::vector<std::string> cached_dns_san_local_certificate_;
-    mutable std::string cached_session_id_;
-  };
 
   SSL* ssl_;
   Ssl::ConnectionInfoConstSharedPtr info_;
