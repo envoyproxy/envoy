@@ -1017,19 +1017,26 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtu
 VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
     const envoy::api::v2::route::VirtualCluster& virtual_cluster, Stats::StatNamePool& pool)
     : stat_name_(pool.add(virtual_cluster.name())) {
-  if (virtual_cluster.method() != envoy::api::v2::core::RequestMethod::METHOD_UNSPECIFIED) {
-    method_ = envoy::api::v2::core::RequestMethod_Name(virtual_cluster.method());
-  }
-
-  if (virtual_cluster.pattern().empty() == !virtual_cluster.has_regex()) {
-    throw EnvoyException("virtual clusters must define either 'pattern' or 'regex'");
+  if (virtual_cluster.pattern().empty() == virtual_cluster.headers().empty()) {
+    throw EnvoyException("virtual clusters must define either 'pattern' or 'headers'");
   }
 
   if (!virtual_cluster.pattern().empty()) {
-    regex_ = Regex::Utility::parseStdRegexAsCompiledMatcher(virtual_cluster.pattern());
+    envoy::api::v2::route::HeaderMatcher matcher_config;
+    matcher_config.set_name(Http::Headers::get().Path.get());
+    matcher_config.set_regex_match(virtual_cluster.pattern());
+    headers_.push_back(std::make_unique<Http::HeaderUtility::HeaderData>(matcher_config));
   } else {
-    ASSERT(virtual_cluster.has_regex());
-    regex_ = Regex::Utility::parseRegex(virtual_cluster.regex());
+    ASSERT(!virtual_cluster.headers().empty());
+    headers_ = Http::HeaderUtility::buildHeaderDataVector(virtual_cluster.headers());
+  }
+
+  if (virtual_cluster.method() != envoy::api::v2::core::RequestMethod::METHOD_UNSPECIFIED) {
+    envoy::api::v2::route::HeaderMatcher matcher_config;
+    matcher_config.set_name(Http::Headers::get().Method.get());
+    matcher_config.set_exact_match(
+        envoy::api::v2::core::RequestMethod_Name(virtual_cluster.method()));
+    headers_.push_back(std::make_unique<Http::HeaderUtility::HeaderData>(matcher_config));
   }
 }
 
@@ -1174,11 +1181,7 @@ const std::shared_ptr<const SslRedirectRoute> VirtualHostImpl::SSL_REDIRECT_ROUT
 const VirtualCluster*
 VirtualHostImpl::virtualClusterFromEntries(const Http::HeaderMap& headers) const {
   for (const VirtualClusterEntry& entry : virtual_clusters_) {
-    bool method_matches =
-        !entry.method_ || headers.Method()->value().getStringView() == entry.method_.value();
-
-    absl::string_view path_view = headers.Path()->value().getStringView();
-    if (method_matches && entry.regex_->match(path_view)) {
+    if (Http::HeaderUtility::matchHeaders(headers, entry.headers_)) {
       return &entry;
     }
   }

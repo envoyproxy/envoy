@@ -297,10 +297,13 @@ virtual_hosts:
   - pattern: "^/users/\\d+$"
     method: PUT
     name: update_user
-  - regex:
-      google_re2: {}
-      regex: "^/users/\\d+/location$"
-    method: POST
+  - headers:
+    - name: ":path"
+      safe_regex_match:
+        google_re2: {}
+        regex: "^/users/\\d+/location$"
+    - name: ":method"
+      exact_match: POST
     name: ulu
   )EOF";
 
@@ -664,7 +667,7 @@ virtual_hosts:
   EXPECT_THROW_WITH_REGEX(TestConfigImpl(parseRouteConfigurationFromV2Yaml(invalid_virtual_cluster),
                                          factory_context_, true),
                           EnvoyException,
-                          "virtual clusters must define either 'pattern' or 'regex'");
+                          "virtual clusters must define either 'pattern' or 'headers'");
 }
 
 // Validates behavior of request_headers_to_add at router, vhost, and route levels.

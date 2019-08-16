@@ -22,8 +22,8 @@ Version 1.12.0 (pending)
 * The `allow_origin` and `allow_origin_regex` fields in :ref:`CorsPolicy
   <envoy_api_msg_route.CorsPolicy>` have been deprecated in favor of the
   `allow_origin_string_match` field.
-* The `pattern` field in :ref:`VirtualCluster <envoy_api_msg_route.VirtualCluster>` has been
-  deprecated in favor of the `regex` field.
+* The `pattern` and `method` fields in :ref:`VirtualCluster <envoy_api_msg_route.VirtualCluster>`
+  have been deprecated in favor of the `headers` field.
 * The `regex_match` field in :ref:`HeaderMatcher <envoy_api_msg_route.HeaderMatcher>` has been
   deprecated in favor of the `safe_regex_match` field.
 * The `value` and `regex` fields in :ref:`QueryParameterMatcher

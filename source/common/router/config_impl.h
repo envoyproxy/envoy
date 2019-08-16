@@ -182,9 +182,8 @@ private:
     // Router::VirtualCluster
     Stats::StatName statName() const override { return stat_name_; }
 
-    Regex::CompiledMatcherPtr regex_;
-    absl::optional<std::string> method_;
     const Stats::StatName stat_name_;
+    std::vector<Http::HeaderUtility::HeaderDataPtr> headers_;
   };
 
   class CatchAllVirtualCluster : public VirtualCluster {

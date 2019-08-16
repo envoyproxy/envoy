@@ -1103,13 +1103,14 @@ message VirtualCluster {
   // * The regex */rides/\d+* does not match the path */rides/123/456*
   //
   // .. attention::
-  //   This field has been deprecated in favor of `regex` as it is not safe for use with
+  //   This field has been deprecated in favor of `headers` as it is not safe for use with
   //   untrusted input in all cases.
   string pattern = 1 [(validate.rules).string.max_bytes = 1024, deprecated = true];
 
-  // Specifies a regex pattern to use for matching requests. The entire path of the request
-  // must match the regex.
-  type.matcher.RegexMatcher regex = 4;
+  // Specifies a list of header matchers to use for matching requests. Each specified header must
+  // match. The pseudo-headers `:path` and `:method` can be used to match the request path and
+  // method, respectively.
+  repeated HeaderMatcher headers = 4;
 
   // Specifies the name of the virtual cluster. The virtual cluster name as well
   // as the virtual host name are used when emitting statistics. The statistics are emitted by the
@@ -1118,9 +1119,10 @@ message VirtualCluster {
 
   // Optionally specifies the HTTP method to match on. For example GET, PUT,
   // etc.
-  // [#comment:TODO(htuch): add (validate.rules).enum.defined_only = true once
-  // https://github.com/lyft/protoc-gen-validate/issues/42 is resolved.]
-  core.RequestMethod method = 3;
+  //
+  // .. attention::
+  //   This field has been deprecated in favor of `headers`.
+  core.RequestMethod method = 3 [deprecated = true];
 }
 
 // Global rate limiting :ref:`architecture overview <arch_overview_rate_limit>`.
