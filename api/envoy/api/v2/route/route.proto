@@ -361,6 +361,14 @@ message RouteMatch {
     // regex must match the *:path* header once the query string is removed. The entire path
     // (without the query string) must match the regex. The rule will not match if only a
     // subsequence of the *:path* header matches the regex.
+    //
+    // [#comment:TODO(mattklein123): In the v3 API we should redo how path specification works such
+    // that we utilize StringMatcher, and additionally have consistent options around whether we
+    // strip query strings, do a case sensitive match, etc. In the interim it will be too disruptive
+    // to deprecate the existing options. We should even consider whether we want to do away with
+    // path_specifier entirely and just rely on a set of header matchers which can already match
+    // on :path, etc. The issue with that is it is unclear how to generically deal with query string
+    // stripping. This needs more thought.]
     type.matcher.RegexMatcher safe_regex = 10 [(validate.rules).message.required = true];
   }
 
