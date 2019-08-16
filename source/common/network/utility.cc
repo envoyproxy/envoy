@@ -250,19 +250,9 @@ bool Utility::isLocalConnection(const Network::ConnectionSocket& socket) {
   }
   const auto local_ip = socket.localAddress()->ip();
   const auto remote_ip = remote_address->ip();
-  if (remote_ip != nullptr && local_ip != nullptr) {
-    switch (remote_ip->version()) {
-    case Network::Address::IpVersion::v4:
-      if (local_ip->ipv4() && local_ip->ipv4()->address() == remote_ip->ipv4()->address()) {
-        return true;
-      }
-      break;
-    case Network::Address::IpVersion::v6:
-      if (local_ip->ipv6() && local_ip->ipv6()->address() == remote_ip->ipv6()->address()) {
-        return true;
-      }
-      break;
-    }
+  if (remote_ip != nullptr && local_ip != nullptr &&
+      remote_ip->addressAsString() == local_ip->addressAsString()) {
+    return true;
   }
 
   // If not obviously local, check if remote addr matches an interface address
