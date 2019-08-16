@@ -127,7 +127,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithFullBody) {
 
 // Verify that createHttpCheck extract the proper attributes from the http request into CheckRequest
 // proto object.
-TEST_F(CheckRequestUtilsTest, CheckAttrContextPeer) {
+TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerUriSans) {
   Http::TestHeaderMapImpl request_headers{{"x-envoy-downstream-service-cluster", "foo"},
                                           {":path", "/bar"}};
   envoy::service::auth::v2::CheckRequest request;
@@ -141,6 +141,37 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeer) {
   EXPECT_CALL(req_info_, protocol()).WillRepeatedly(ReturnPointee(&protocol_));
   EXPECT_CALL(ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
   EXPECT_CALL(ssl_, uriSanLocalCertificate())
+      .WillOnce(Return(std::vector<std::string>{"destination"}));
+
+  Protobuf::Map<std::string, std::string> context_extensions;
+  context_extensions["key"] = "value";
+
+  CheckRequestUtils::createHttpCheck(&callbacks_, request_headers, std::move(context_extensions),
+                                     request, false);
+
+  EXPECT_EQ("source", request.attributes().source().principal());
+  EXPECT_EQ("destination", request.attributes().destination().principal());
+  EXPECT_EQ("foo", request.attributes().source().service());
+  EXPECT_EQ("value", request.attributes().context_extensions().at("key"));
+}
+
+TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerDnsSans) {
+  Http::TestHeaderMapImpl request_headers{{"x-envoy-downstream-service-cluster", "foo"},
+                                          {":path", "/bar"}};
+  envoy::service::auth::v2::CheckRequest request;
+  EXPECT_CALL(callbacks_, connection()).WillRepeatedly(Return(&connection_));
+  EXPECT_CALL(connection_, remoteAddress()).WillRepeatedly(ReturnRef(addr_));
+  EXPECT_CALL(connection_, localAddress()).WillRepeatedly(ReturnRef(addr_));
+  EXPECT_CALL(Const(connection_), ssl()).WillRepeatedly(Return(&ssl_));
+  EXPECT_CALL(callbacks_, streamId()).WillRepeatedly(Return(0));
+  EXPECT_CALL(callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+  EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
+  EXPECT_CALL(req_info_, protocol()).WillRepeatedly(ReturnPointee(&protocol_));
+  EXPECT_CALL(ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{}));
+  EXPECT_CALL(ssl_, dnsSansPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
+
+  EXPECT_CALL(ssl_, uriSanLocalCertificate()).WillOnce(Return(std::vector<std::string>{}));
+  EXPECT_CALL(ssl_, dnsSansLocalCertificate())
       .WillOnce(Return(std::vector<std::string>{"destination"}));
 
   Protobuf::Map<std::string, std::string> context_extensions;
