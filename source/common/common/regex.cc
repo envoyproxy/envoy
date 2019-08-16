@@ -4,6 +4,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
+#include "common/protobuf/utility.h"
 
 #include "re2/re2.h"
 
@@ -26,9 +27,18 @@ private:
 
 class CompiledGoogleReMatcher : public CompiledMatcher {
 public:
-  CompiledGoogleReMatcher(const std::string& regex) : regex_(regex, re2::RE2::Quiet) {
+  CompiledGoogleReMatcher(const envoy::type::matcher::RegexMatcher& config)
+      : regex_(config.regex(), re2::RE2::Quiet) {
     if (!regex_.ok()) {
       throw EnvoyException(regex_.error());
+    }
+
+    const uint32_t max_program_size =
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.google_re2(), max_program_size, 100);
+    if (static_cast<uint32_t>(regex_.ProgramSize()) > max_program_size) {
+      throw EnvoyException(fmt::format("regex '{}' RE2 program size of {} > max program size of "
+                                       "{}. Increase configured max program size if necessary.",
+                                       config.regex(), regex_.ProgramSize(), max_program_size));
     }
   }
 
@@ -46,7 +56,7 @@ private:
 CompiledMatcherPtr Utility::parseRegex(const envoy::type::matcher::RegexMatcher& matcher) {
   // Google Re is the only currently supported engine.
   ASSERT(matcher.has_google_re2());
-  return std::make_unique<CompiledGoogleReMatcher>(matcher.regex());
+  return std::make_unique<CompiledGoogleReMatcher>(matcher);
 }
 
 CompiledMatcherPtr Utility::parseStdRegexAsCompiledMatcher(const std::string& regex,

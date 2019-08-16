@@ -183,6 +183,7 @@ envoy_cc_library(
     deps = [
         ":assert_lib",
         "//include/envoy/common:regex_interface",
+        "//source/common/protobuf:utility_lib",
         "@com_googlesource_code_re2//:re2",
         "@envoy_api//envoy/type/matcher:regex_cc",
     ],

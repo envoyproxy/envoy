@@ -7,11 +7,16 @@
 namespace Envoy {
 namespace Matchers {
 
-// fixfix comments
+/**
+ * Generic string matching interface.
+ */
 class StringMatcher {
 public:
   virtual ~StringMatcher() = default;
 
+  /**
+   * Return whether a passed string value matches.
+   */
   virtual bool match(const absl::string_view value) const PURE;
 };
 
