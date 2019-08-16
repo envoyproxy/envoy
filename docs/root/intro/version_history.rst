@@ -13,7 +13,7 @@ Version history
 * config: added support for :option:`--reject-unknown-dynamic-fields`, providing independent control
   over whether unknown fields are rejected in static and dynamic configuration. By default, unknown
   fields in static configuration are rejected and are allowed in dynamic configuration. Warnings
-  are logged for the first use of any unknown field and these occurences are counted in the
+  are logged for the first use of any unknown field and these occurrences are counted in the
   :ref:`server.static_unknown_fields <server_statistics>` and :ref:`server.dynamic_unknown_fields
   <server_statistics>` statistics.
 * config: async data access for local and remote data source.
