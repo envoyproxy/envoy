@@ -68,9 +68,9 @@ protected:
                               const std::string& yaml_config,
                               std::chrono::milliseconds latency = std::chrono::milliseconds(5)) {
     const auto config = makeConfig(yaml_config);
-    for (int ii = 1; ii <= config->min_rtt_aggregate_request_count() + 1; ++ii) {
+    for (uint32_t ii = 1; ii <= config->min_rtt_aggregate_request_count() + 1; ++ii) {
       tryForward(controller, true);
-      controller->recordLatencySample(latency);
+      controller->recordLatencySample(std::move(latency));
     }
   }
 
@@ -83,7 +83,8 @@ protected:
 
 TEST_F(GradientControllerConfigTest, BasicTest) {
   const std::string yaml = R"EOF(
-sample_aggregate_percentile: 0.42
+sample_aggregate_percentile:
+  value: 42
 concurrency_limit_params:
   max_gradient: 2.1
   max_concurrency_limit: 1337
@@ -135,7 +136,8 @@ min_rtt_calc_params:
 
 TEST_F(GradientControllerTest, MinRTTLogicTest) {
   const std::string yaml = R"EOF(
-sample_aggregate_percentile: 0.5
+sample_aggregate_percentile:
+  value: 50
 concurrency_limit_params:
   max_gradient: 2.0
   max_concurrency_limit: 
@@ -172,7 +174,8 @@ min_rtt_calc_params:
 
 TEST_F(GradientControllerTest, SamplePercentileProcessTest) {
   const std::string yaml = R"EOF(
-sample_aggregate_percentile: 0.5
+sample_aggregate_percentile:
+  value: 50
 concurrency_limit_params:
   max_gradient: 2.0
   max_concurrency_limit: 
@@ -196,7 +199,8 @@ min_rtt_calc_params:
 
 TEST_F(GradientControllerTest, ConcurrencyLimitBehaviorTestBasic) {
   const std::string yaml = R"EOF(
-sample_aggregate_percentile: 0.5
+sample_aggregate_percentile:
+  value: 50
 concurrency_limit_params:
   max_gradient: 2.0
   max_concurrency_limit: 
@@ -249,7 +253,8 @@ min_rtt_calc_params:
 
 TEST_F(GradientControllerTest, MaxGradientTest) {
   const std::string yaml = R"EOF(
-sample_aggregate_percentile: 0.5
+sample_aggregate_percentile:
+  value: 50
 concurrency_limit_params:
   max_gradient: 3.0
   max_concurrency_limit: 
@@ -283,60 +288,10 @@ min_rtt_calc_params:
             stats_.gauge("test_prefix.gradient", Stats::Gauge::ImportMode::Accumulate).value());
 }
 
-TEST_F(GradientControllerTest, OutstandingRequestTest) {
-  const std::string yaml = R"EOF(
-sample_aggregate_percentile: 0.5
-concurrency_limit_params:
-  max_gradient: 3.0
-  max_concurrency_limit: 
-  concurrency_update_interval: 
-    nanos: 100000000 # 100ms
-min_rtt_calc_params:
-  interval:
-    seconds: 30
-  request_count: 5
-)EOF";
-
-  auto controller = makeController(yaml);
-  EXPECT_EQ(controller->concurrencyLimit(), 1);
-
-  // Get minRTT measurement out of the way.
-  advancePastMinRTTStage(controller, yaml, std::chrono::milliseconds(5));
-
-  // Force the limit calculation to run a few times from some measurements.
-  for (int sample_iters = 0; sample_iters < 5; ++sample_iters) {
-    const auto last_concurrency = controller->concurrencyLimit();
-    for (int ii = 1; ii <= 5; ++ii) {
-      tryForward(controller, true);
-      controller->recordLatencySample(std::chrono::milliseconds(4));
-    }
-    time_system_.sleep(std::chrono::milliseconds(101));
-    dispatcher_->run(Event::Dispatcher::RunType::Block);
-    // Verify the value is growing.
-    EXPECT_GT(controller->concurrencyLimit(), last_concurrency);
-  }
-
-  const auto rq_outstanding = [this]() {
-    return stats_.gauge("test_prefix.rq_outstanding", Stats::Gauge::ImportMode::Accumulate).value();
-  };
-
-  // Verify the outstanding requests make sense.
-  for (int ii = 0; ii < controller->concurrencyLimit(); ++ii) {
-    EXPECT_EQ(ii, rq_outstanding());
-    tryForward(controller, true);
-    EXPECT_EQ(ii + 1, rq_outstanding());
-  }
-
-  // The outstanding requests should never exceed the concurrency limit.
-  tryForward(controller, false);
-  EXPECT_EQ(controller->concurrencyLimit(), rq_outstanding());
-  tryForward(controller, false);
-  EXPECT_EQ(controller->concurrencyLimit(), rq_outstanding());
-}
-
 TEST_F(GradientControllerTest, MinRTTRescheduleTest) {
   const std::string yaml = R"EOF(
-sample_aggregate_percentile: 0.5
+sample_aggregate_percentile:
+  value: 50
 concurrency_limit_params:
   max_gradient: 3.0
   max_concurrency_limit: 
@@ -380,7 +335,8 @@ min_rtt_calc_params:
 
 TEST_F(GradientControllerTest, NoSamplesTest) {
   const std::string yaml = R"EOF(
-sample_aggregate_percentile: 0.5
+sample_aggregate_percentile:
+  value: 50
 concurrency_limit_params:
   max_gradient: 3.0
   max_concurrency_limit: 
@@ -422,7 +378,8 @@ min_rtt_calc_params:
 
 TEST_F(GradientControllerTest, TimerAccuracyTest) {
   const std::string yaml = R"EOF(
-sample_aggregate_percentile: 0.5
+sample_aggregate_percentile:
+  value: 50
 concurrency_limit_params:
   max_gradient: 3.0
   max_concurrency_limit: 

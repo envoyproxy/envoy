@@ -37,8 +37,8 @@ Http::FilterHeadersStatus AdaptiveConcurrencyFilter::decodeHeaders(Http::HeaderM
 }
 
 void AdaptiveConcurrencyFilter::encodeComplete() {
-  const auto rq_latency = config_->timeSource().monotonicTime() - rq_start_time_;
-  controller_->recordLatencySample(rq_latency);
+  auto rq_latency = config_->timeSource().monotonicTime() - rq_start_time_;
+  controller_->recordLatencySample(std::move(rq_latency));
 }
 
 } // namespace AdaptiveConcurrency

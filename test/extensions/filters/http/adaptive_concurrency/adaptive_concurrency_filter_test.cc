@@ -24,9 +24,9 @@ using ConcurrencyController::RequestForwardingAction;
 class MockConcurrencyController : public ConcurrencyController::ConcurrencyController {
 public:
   MOCK_METHOD0(forwardingDecision, RequestForwardingAction());
-  MOCK_METHOD1(recordLatencySample, void(const std::chrono::nanoseconds&));
+  MOCK_METHOD1(recordLatencySample, void(std::chrono::nanoseconds&&));
 
-  int concurrencyLimit() const override { return 0; }
+  uint32_t concurrencyLimit() const override { return 0; }
 };
 
 class AdaptiveConcurrencyFilterTest : public testing::Test {
@@ -83,13 +83,13 @@ TEST_F(AdaptiveConcurrencyFilterTest, EncodeHeadersValidTest) {
       .WillOnce(Return(RequestForwardingAction::Forward));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 
-  const std::chrono::nanoseconds advance_time = std::chrono::milliseconds(42);
+  std::chrono::nanoseconds advance_time = std::chrono::milliseconds(42);
   mt = time_system_.monotonicTime();
   time_system_.setMonotonicTime(mt + advance_time);
 
   Http::TestHeaderMapImpl response_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
-  EXPECT_CALL(*controller_, recordLatencySample(advance_time));
+  EXPECT_CALL(*controller_, recordLatencySample(std::move(advance_time)));
   filter_->encodeComplete();
 }
 
