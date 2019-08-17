@@ -2,7 +2,6 @@ import Foundation
 
 @objcMembers
 public final class Envoy: NSObject {
-  private let engine: EnvoyEngine = EnvoyEngineImpl()
   private let runner: RunnerThread
 
   /// Indicates whether this Envoy instance is currently active and running.
@@ -15,36 +14,31 @@ public final class Envoy: NSObject {
     return self.runner.isFinished
   }
 
-  /// Initialize a new Envoy instance using a typed configuration.
-  ///
-  /// - parameter config:   Configuration to use for starting Envoy.
-  /// - parameter logLevel: Log level to use for this instance.
-  public convenience init(config: Configuration = Configuration(), logLevel: LogLevel = .info) throws {
-    self.init(configYAML: try config.build(), logLevel: logLevel)
-  }
-
   /// Initialize a new Envoy instance using a string configuration.
   ///
   /// - parameter configYAML: Configuration YAML to use for starting Envoy.
   /// - parameter logLevel:   Log level to use for this instance.
-  public init(configYAML: String, logLevel: LogLevel = .info) {
-    self.runner = RunnerThread(config: configYAML, engine: self.engine, logLevel: logLevel)
+  /// - parameter engine:     The underlying engine to use for starting Envoy.
+  init(configYAML: String, logLevel: LogLevel = .info, engine: EnvoyEngine) {
+    self.runner = RunnerThread(configYAML: configYAML, logLevel: logLevel, engine: engine)
     self.runner.start()
   }
 
+  // MARK: - Private
+
   private final class RunnerThread: Thread {
     private let engine: EnvoyEngine
-    private let config: String
+    private let configYAML: String
     private let logLevel: LogLevel
 
-    init(config: String, engine: EnvoyEngine, logLevel: LogLevel) {
-      self.engine = engine
-      self.config = config
+    init(configYAML: String, logLevel: LogLevel, engine: EnvoyEngine) {
+      self.configYAML = configYAML
       self.logLevel = logLevel
+      self.engine = engine
     }
 
     override func main() {
-      self.engine.run(withConfig: self.config, logLevel: self.logLevel.stringValue)
+      self.engine.run(withConfig: self.configYAML, logLevel: self.logLevel.stringValue)
     }
   }
 }

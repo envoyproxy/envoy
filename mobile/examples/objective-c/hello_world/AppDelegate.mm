@@ -16,7 +16,7 @@
   [self.window setRootViewController:controller];
   [self.window makeKeyAndVisible];
 
-  self.envoy = [[Envoy alloc] initWithConfig:[Configuration new]];
+  self.envoy = [[EnvoyBuilder new] build];
   NSLog(@"Finished launching!");
   return YES;
 }

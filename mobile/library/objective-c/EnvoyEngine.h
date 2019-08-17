@@ -116,6 +116,11 @@ typedef NSDictionary<NSString *, NSArray<NSString *> *> EnvoyHeaders;
 @protocol EnvoyEngine
 
 /**
+ Create a new instance of the engine.
+ */
+- (instancetype)init;
+
+/**
  Run the Envoy engine with the provided config and log level.
 
  @param config The configuration file with which to start Envoy.
