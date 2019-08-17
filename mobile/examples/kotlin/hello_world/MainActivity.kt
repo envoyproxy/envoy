@@ -10,6 +10,7 @@ import android.support.v7.widget.LinearLayoutManager
 import android.support.v7.widget.RecyclerView
 import android.util.Log
 import io.envoyproxy.envoymobile.Envoy
+import io.envoyproxy.envoymobile.engine.AndroidEngineImpl
 import io.envoyproxy.envoymobile.shared.Failure
 import io.envoyproxy.envoymobile.shared.Response
 import io.envoyproxy.envoymobile.shared.ResponseRecyclerViewAdapter
@@ -33,10 +34,9 @@ class MainActivity : Activity() {
     super.onCreate(savedInstanceState)
     setContentView(R.layout.activity_main)
 
-    Envoy.load(baseContext)
-
     // Create Envoy instance with config.
-    envoy = Envoy(baseContext, loadEnvoyConfig(baseContext, R.raw.config))
+    val envoyEngine = AndroidEngineImpl(baseContext)
+    envoy = Envoy(envoyEngine, loadEnvoyConfig(baseContext, R.raw.config))
 
     recyclerView = findViewById(R.id.recycler_view) as RecyclerView
     recyclerView.layoutManager = LinearLayoutManager(this)

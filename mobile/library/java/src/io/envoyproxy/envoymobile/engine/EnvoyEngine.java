@@ -9,7 +9,7 @@ public interface EnvoyEngine {
    * @param observer The observer for receiving callbacks from the stream.
    * @return A stream that may be used for sending data.
    */
-  EnvoyStream startStream(EnvoyObserver observer);
+  EnvoyHTTPStream startStream(EnvoyObserver observer);
 
   /**
    * Run the Envoy engine with the provided config and log level.

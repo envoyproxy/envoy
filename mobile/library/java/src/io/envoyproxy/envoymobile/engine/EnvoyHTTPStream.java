@@ -4,11 +4,11 @@ import io.envoyproxy.envoymobile.engine.types.EnvoyData;
 import io.envoyproxy.envoymobile.engine.types.EnvoyHeaders;
 import io.envoyproxy.envoymobile.engine.types.EnvoyObserver;
 
-public class EnvoyStream {
+public class EnvoyHTTPStream {
 
   private final long streamHandle;
 
-  EnvoyStream(long streamHandle, EnvoyObserver observer) {
+  EnvoyHTTPStream(long streamHandle, EnvoyObserver observer) {
     this.streamHandle = streamHandle;
     JniLibrary.startStream(streamHandle, observer);
   }
