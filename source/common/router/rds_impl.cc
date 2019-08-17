@@ -100,7 +100,7 @@ void RdsRouteConfigSubscription::onConfigUpdate(
                                      route_config_name_, route_config.name()));
   }
   for (auto* provider : route_config_providers_) {
-    // This seems inefficient, though it is neccessary to validate config in each context,
+    // This seems inefficient, though it is necessary to validate config in each context,
     // especially when it comes with per_filter_config,
     provider->validateConfig(route_config);
   }
