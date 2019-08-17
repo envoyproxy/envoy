@@ -84,11 +84,23 @@ message ZipkinConfig {
   // The default value is true.
   google.protobuf.BoolValue shared_span_context = 4;
 
-  // Available zipkin collector endpoint versions.
+  // Available Zipkin collector endpoint versions.
   enum CollectorEndpointVersion {
+    // Currently this falbacks to HTTP_JSON_V1.
     DEFAULT = 0;
+
+    // Zipkin API v1, JSON over HTTP.
     HTTP_JSON_V1 = 1;
-    HTTP_PROTO = 2;
+
+    // Zipkin API v2, JSON over HTTP.
+    HTTP_JSON_V2 = 2;
+
+    // Zipkin API v2, protobuf over HTTP.
+    HTTP_PROTO = 3;
+
+    // Zipkin API v2, GRPC API.
+    // [#not-implemented-hide:]
+    GRPC = 4;
   }
 
   // Determines the selected collector endpoint version. By default, the ``HTTP_JSON_V1`` will be

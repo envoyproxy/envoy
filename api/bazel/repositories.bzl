@@ -161,6 +161,7 @@ load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
 api_proto_library(
     name = "zipkin",
     srcs = [
+        "zipkin-jsonv2.proto",
         "zipkin.proto",
     ],
     visibility = ["//visibility:public"],

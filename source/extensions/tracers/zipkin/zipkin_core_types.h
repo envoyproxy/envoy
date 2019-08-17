@@ -14,6 +14,7 @@
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
+#include "zipkin-jsonv2.pb.h"
 #include "zipkin.pb.h"
 
 namespace Envoy {
@@ -102,6 +103,13 @@ public:
    * @return zipkin::proto3::Endpoint the protobuf message representation of this endpoint.
    */
   const zipkin::proto3::Endpoint toProtoEndpoint() const;
+
+  /**
+   * Builds protobuf message representation of this endpoint.
+   *
+   * @return zipkin::jsonv2::Endpoint the protobuf message representation of this endpoint.
+   */
+  const zipkin::jsonv2::Endpoint toJsonEndpoint() const;
 
 private:
   std::string service_name_;
@@ -550,6 +558,8 @@ public:
    * @return a stringified JSON.
    */
   const std::string toJson() override;
+
+  const zipkin::jsonv2::Span toJsonSpan() const;
 
   /**
    * Builds protobuf message representation of this span.

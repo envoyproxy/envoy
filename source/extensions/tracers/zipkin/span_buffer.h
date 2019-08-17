@@ -2,6 +2,7 @@
 
 #include "extensions/tracers/zipkin/zipkin_core_types.h"
 
+#include "zipkin-jsonv2.pb.h"
 #include "zipkin.pb.h"
 
 namespace Envoy {
@@ -60,6 +61,11 @@ public:
    * each JSON in the array corresponds to one Zipkin span.
    */
   std::string toStringifiedJsonArray();
+
+  /**
+   * @return the contents of the buffer as a zipkin::proto3::ListOfSpans.
+   */
+  const std::string toJsonListOfSpans() const;
 
   /**
    * @return the contents of the buffer as a zipkin::proto3::ListOfSpans.

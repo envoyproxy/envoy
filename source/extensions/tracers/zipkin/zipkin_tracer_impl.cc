@@ -182,6 +182,11 @@ void ReporterImpl::flushSpans() {
           Http::Headers::get().ContentTypeValues.Protobuf);
       // TODO(dio): use grpc message serializer so no round trip to std::string is required.
       span_buffer_.toProtoListOfSpans().SerializeToString(&payload);
+    } else if (collector_.version == envoy::config::trace::v2::ZipkinConfig::HTTP_JSON_V2) {
+      message->headers().insertContentType().value().setReference(
+          Http::Headers::get().ContentTypeValues.Json);
+      // TODO(dio): Handle the returned status.
+      payload = span_buffer_.toJsonListOfSpans();
     } else {
       message->headers().insertContentType().value().setReference(
           Http::Headers::get().ContentTypeValues.Json);
@@ -189,6 +194,7 @@ void ReporterImpl::flushSpans() {
     }
 
     Buffer::InstancePtr body(new Buffer::OwnedImpl());
+    std::cerr << payload << "\n";
     body->add(payload);
     message->body() = std::move(body);
 

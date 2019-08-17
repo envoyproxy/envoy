@@ -1,5 +1,7 @@
 #include "extensions/tracers/zipkin/span_buffer.h"
 
+#include "common/protobuf/protobuf.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
@@ -25,6 +27,24 @@ std::string SpanBuffer::toStringifiedJsonArray() {
     for (uint64_t i = 1; i < size; i++) {
       stringified_json_array += ",";
       stringified_json_array += span_buffer_[i].toJson();
+    }
+  }
+  stringified_json_array += "]";
+
+  return stringified_json_array;
+}
+
+const std::string SpanBuffer::toJsonListOfSpans() const {
+  std::string stringified_json_array = "[";
+  if (pendingSpans()) {
+    std::string payload;
+    Protobuf::util::MessageToJsonString(span_buffer_[0].toJsonSpan(), &payload);
+    stringified_json_array += payload;
+    const uint64_t size = span_buffer_.size();
+    for (uint64_t i = 1; i < size; i++) {
+      stringified_json_array += ",";
+      Protobuf::util::MessageToJsonString(span_buffer_[i].toJsonSpan(), &payload);
+      stringified_json_array += payload;
     }
   }
   stringified_json_array += "]";

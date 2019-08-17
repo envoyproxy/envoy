@@ -470,6 +470,10 @@ tags:
                             ProtobufMessage::getStrictValidationVisitor());
   EXPECT_EQ(span.toProtoSpan().DebugString(), expected_msg.DebugString());
 
+  std::string json;
+  const auto status = Protobuf::util::MessageToJsonString(span.toJsonSpan(), &json);
+  std::cerr << json << "\n";
+
   // Test the copy-semantics flavor of addAnnotation and addBinaryAnnotation
 
   ann.setValue(Zipkin::ZipkinCoreConstants::get().SERVER_SEND);

@@ -57,6 +57,24 @@ const std::string Endpoint::toJson() {
   return json_string;
 }
 
+const zipkin::jsonv2::Endpoint Endpoint::toJsonEndpoint() const {
+  zipkin::jsonv2::Endpoint endpoint;
+  if (address_) {
+    if (address_->ip()->version() == Network::Address::IpVersion::v4) {
+      endpoint.set_ipv4(address_->ip()->addressAsString());
+    } else {
+      endpoint.set_ipv6(address_->ip()->addressAsString());
+    }
+    endpoint.set_port(address_->ip()->port());
+  }
+
+  if (!service_name_.empty()) {
+    endpoint.set_service_name(service_name_);
+  }
+
+  return endpoint;
+}
+
 const zipkin::proto3::Endpoint Endpoint::toProtoEndpoint() const {
   zipkin::proto3::Endpoint endpoint;
   if (address_) {
@@ -237,6 +255,41 @@ const std::string Span::toJson() {
                        ZipkinJsonFieldNames::get().SPAN_BINARY_ANNOTATIONS);
 
   return json_string;
+}
+
+const zipkin::jsonv2::Span Span::toJsonSpan() const {
+  zipkin::jsonv2::Span span;
+  span.set_trace_id(traceIdAsHexString());
+  if (parent_id_ && parent_id_.value()) {
+    span.set_parent_id(Hex::uint64ToHex(parent_id_.value()));
+  }
+  span.set_id(Hex::uint64ToHex(id_));
+  span.set_name(name_);
+
+  if (timestamp_) {
+    span.set_timestamp(timestamp_.value());
+  }
+
+  if (duration_) {
+    span.set_duration(duration_.value());
+  }
+
+  for (const auto& annotation : annotations_) {
+    if (annotation.isSetEndpoint()) {
+      if (annotation.value() == ZipkinCoreConstants::get().CLIENT_SEND) {
+        span.set_kind("CLIENT");
+      } else if (annotation.value() == ZipkinCoreConstants::get().SERVER_RECV) {
+        span.set_kind("SERVER");
+      }
+      span.mutable_local_endpoint()->MergeFrom(annotation.endpoint().toJsonEndpoint());
+    }
+  }
+
+  auto& tags = *span.mutable_tags();
+  for (const auto& binary_annotation : binary_annotations_) {
+    tags[binary_annotation.key()] = binary_annotation.value();
+  }
+  return span;
 }
 
 const zipkin::proto3::Span Span::toProtoSpan() const {
