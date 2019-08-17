@@ -5,6 +5,35 @@ import io.envoyproxy.envoymobile.engine.types.EnvoyHeaders;
 import io.envoyproxy.envoymobile.engine.types.EnvoyObserver;
 
 class JniLibrary {
+
+  private static final String ENVOY_JNI = "envoy_jni";
+
+  // Internal reference to helper object used to load and initialize the native library.
+  // Volatile to ensure double-checked locking works correctly.
+  private static volatile JavaLoader loader = null;
+
+  // Load and initialize Envoy and its dependencies, but only once.
+  public static void load() {
+    if (loader != null) {
+      return;
+    }
+
+    synchronized (JavaLoader.class) {
+      if (loader != null) {
+        return;
+      }
+
+      loader = new JavaLoader();
+    }
+  }
+
+  // Private helper class used by the load method to ensure the native library and its
+  // dependencies are loaded and initialized at most once.
+  private static class JavaLoader {
+
+    private JavaLoader() { System.loadLibrary(ENVOY_JNI); }
+  }
+
   /**
    * Initialize an underlying HTTP stream.
    *

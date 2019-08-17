@@ -10,6 +10,8 @@ import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.Log;
 import io.envoyproxy.envoymobile.Envoy;
+import io.envoyproxy.envoymobile.engine.AndroidEngineImpl;
+import io.envoyproxy.envoymobile.engine.EnvoyEngine;
 import io.envoyproxy.envoymobile.shared.Failure;
 import io.envoyproxy.envoymobile.shared.Response;
 import io.envoyproxy.envoymobile.shared.ResponseRecyclerViewAdapter;
@@ -43,7 +45,6 @@ public class MainActivity extends Activity {
     setContentView(R.layout.activity_main);
 
     Context context = getBaseContext();
-    Envoy.load(context);
 
     // Create envoy instance with config.
     String config;
@@ -53,7 +54,9 @@ public class MainActivity extends Activity {
       Log.d("MainActivity", "exception getting config.", e);
       throw new RuntimeException("Can't get config to run envoy.");
     }
-    envoy = new Envoy(context, config);
+
+    EnvoyEngine envoyEngine = new AndroidEngineImpl(context);
+    envoy = new Envoy(envoyEngine, config);
 
     recyclerView = (RecyclerView)findViewById(R.id.recycler_view);
     recyclerView.setLayoutManager(new LinearLayoutManager(this));

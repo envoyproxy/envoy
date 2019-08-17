@@ -6,7 +6,10 @@ public class EnvoyEngineImpl implements EnvoyEngine {
 
   private final long engineHandle;
 
-  public EnvoyEngineImpl() { this.engineHandle = JniLibrary.initEngine(); }
+  public EnvoyEngineImpl() {
+    JniLibrary.load();
+    this.engineHandle = JniLibrary.initEngine();
+  }
 
   /**
    * Creates a new stream with the provided observer.
@@ -15,9 +18,9 @@ public class EnvoyEngineImpl implements EnvoyEngine {
    * @return A stream that may be used for sending data.
    */
   @Override
-  public EnvoyStream startStream(EnvoyObserver observer) {
+  public EnvoyHTTPStream startStream(EnvoyObserver observer) {
     long streamHandle = JniLibrary.initStream(engineHandle);
-    return new EnvoyStream(streamHandle, observer);
+    return new EnvoyHTTPStream(streamHandle, observer);
   }
 
   /**

@@ -1,7 +1,6 @@
 package io.envoyproxy.envoymobile
 
-import android.content.Context
-import io.envoyproxy.envoymobile.engine.AndroidEngineImpl
+import io.envoyproxy.envoymobile.engine.EnvoyEngine
 
 /**
  * Available logging levels for an Envoy instance. Note some levels may be compiled out.
@@ -20,13 +19,15 @@ enum class LogLevel(internal val level: String) {
  * Wrapper class that allows for easy calling of Envoy's JNI interface in native Java.
  */
 class Envoy @JvmOverloads constructor(
-    context: Context,
-    config: String,
-    logLevel: LogLevel = LogLevel.INFO
+  engine: EnvoyEngine,
+  config: String,
+  logLevel: LogLevel = LogLevel.INFO
 ) {
 
   // Dedicated thread for running this instance of Envoy.
-  private val runner: Thread
+  private val runner: Thread = Thread(Runnable {
+    engine.runWithConfig(config.trim(), logLevel.level)
+  })
 
   /**
    * Create a new Envoy instance. The Envoy runner Thread is started as part of instance
@@ -35,13 +36,6 @@ class Envoy @JvmOverloads constructor(
    * the first instance is created.
    */
   init {
-    // Lazily initialize Envoy and its dependencies, if necessary.
-    load(context)
-
-    runner = Thread(Runnable {
-      AndroidEngineImpl.run(config.trim(), logLevel.level)
-    })
-
     runner.start()
   }
 
@@ -58,12 +52,5 @@ class Envoy @JvmOverloads constructor(
    */
   fun isTerminated(): Boolean {
     return runner.state == Thread.State.TERMINATED
-  }
-
-  companion object {
-    @JvmStatic
-    fun load(context: Context) {
-      AndroidEngineImpl.load(context)
-    }
   }
 }
