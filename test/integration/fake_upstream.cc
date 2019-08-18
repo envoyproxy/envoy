@@ -73,6 +73,8 @@ void FakeStream::decodeMetadata(Http::MetadataMapPtr&& metadata_map_ptr) {
 }
 
 void FakeStream::encode100ContinueHeaders(const Http::HeaderMapImpl& headers) {
+  // TSan complains about thread-safety of std::shared_ptr when linked against libc++.
+  // See: https://github.com/envoyproxy/envoy/pull/7929
   std::unique_ptr<Http::HeaderMapImpl> headers_copy(
       new Http::HeaderMapImpl(static_cast<const Http::HeaderMap&>(headers)));
   parent_.connection().dispatcher().post([this, headers = headers_copy.release()]() -> void {
@@ -82,6 +84,8 @@ void FakeStream::encode100ContinueHeaders(const Http::HeaderMapImpl& headers) {
 }
 
 void FakeStream::encodeHeaders(const Http::HeaderMapImpl& headers, bool end_stream) {
+  // TSan complains about thread-safety of std::shared_ptr when linked against libc++.
+  // See: https://github.com/envoyproxy/envoy/pull/7929
   std::unique_ptr<Http::HeaderMapImpl> headers_copy(
       new Http::HeaderMapImpl(static_cast<const Http::HeaderMap&>(headers)));
   if (add_served_by_header_) {
@@ -110,6 +114,8 @@ void FakeStream::encodeData(uint64_t size, bool end_stream) {
 }
 
 void FakeStream::encodeData(Buffer::Instance& data, bool end_stream) {
+  // TSan complains about thread-safety of std::shared_ptr when linked against libc++.
+  // See: https://github.com/envoyproxy/envoy/pull/7929
   std::unique_ptr<Buffer::Instance> data_copy(new Buffer::OwnedImpl(data));
   parent_.connection().dispatcher().post([this, data = data_copy.release(), end_stream]() -> void {
     encoder_.encodeData(*data, end_stream);
@@ -118,6 +124,8 @@ void FakeStream::encodeData(Buffer::Instance& data, bool end_stream) {
 }
 
 void FakeStream::encodeTrailers(const Http::HeaderMapImpl& trailers) {
+  // TSan complains about thread-safety of std::shared_ptr when linked against libc++.
+  // See: https://github.com/envoyproxy/envoy/pull/7929
   std::unique_ptr<Http::HeaderMapImpl> trailers_copy(
       new Http::HeaderMapImpl(static_cast<const Http::HeaderMap&>(trailers)));
   parent_.connection().dispatcher().post([this, trailers = trailers_copy.release()]() -> void {
