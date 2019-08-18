@@ -89,7 +89,9 @@ public:
    */
   void setShowDetails() { details_ = true; }
 
-  float coverage() { return coverage_.report(); }
+  float coverage(bool detailed) {
+    return detailed ? coverage_.detailedReport() : coverage_.report();
+  }
 
 private:
   RouterCheckTool(
@@ -182,6 +184,11 @@ public:
   double failUnder() const { return fail_under_; }
 
   /**
+   * @return true if test coverage should be comprehensive.
+   */
+  bool comprehensiveCoverage() const { return comprehensive_coverage_; }
+
+  /**
    * @return true if proto schema test is used.
    */
   bool isProto() const { return is_proto_; }
@@ -197,6 +204,7 @@ private:
   std::string unlabelled_test_path_;
   std::string unlabelled_config_path_;
   float fail_under_;
+  bool comprehensive_coverage_;
   bool is_proto_;
   bool is_detailed_;
 };

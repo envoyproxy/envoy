@@ -76,11 +76,14 @@ void RedisCluster::updateAllHosts(const Upstream::HostVector& hosts_added,
       hosts_added, hosts_removed, absl::nullopt);
 }
 
-void RedisCluster::onClusterSlotUpdate(const std::vector<ClusterSlot>& slots) {
+void RedisCluster::onClusterSlotUpdate(ClusterSlotsPtr&& slots) {
   Upstream::HostVector new_hosts;
 
-  for (const ClusterSlot& slot : slots) {
+  for (const ClusterSlot& slot : *slots) {
     new_hosts.emplace_back(new RedisHost(info(), "", slot.master(), *this, true));
+    for (auto const& replica : slot.replicas()) {
+      new_hosts.emplace_back(new RedisHost(info(), "", replica, *this, false));
+    }
   }
 
   std::unordered_map<std::string, Upstream::HostSharedPtr> updated_hosts;
@@ -89,7 +92,7 @@ void RedisCluster::onClusterSlotUpdate(const std::vector<ClusterSlot>& slots) {
   const bool host_updated = updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed,
                                                   updated_hosts, all_hosts_);
   const bool slot_updated =
-      lb_factory_ ? lb_factory_->onClusterSlotUpdate(slots, updated_hosts) : false;
+      lb_factory_ ? lb_factory_->onClusterSlotUpdate(std::move(slots), updated_hosts) : false;
 
   // If slot is updated, call updateAllHosts regardless of if there's new hosts to force
   // update of the thread local load balancers.
@@ -109,6 +112,13 @@ void RedisCluster::onClusterSlotUpdate(const std::vector<ClusterSlot>& slots) {
   // DNS resolution completes. This is not perfect but is easier to code and it is unclear
   // if the extra complexity is needed so will start with this.
   onPreInitComplete();
+}
+
+void RedisCluster::reloadHealthyHostsHelper(const Upstream::HostSharedPtr& host) {
+  if (lb_factory_) {
+    lb_factory_->onHostHealthUpdate();
+  }
+  ClusterImplBase::reloadHealthyHostsHelper(host);
 }
 
 // DnsDiscoveryResolveTarget
@@ -259,13 +269,18 @@ void RedisCluster::RedisDiscoverySession::onResponse(
     NetworkFilters::Common::Redis::RespValuePtr&& value) {
   current_request_ = nullptr;
 
+  const uint32_t SlotRangeStart = 0;
+  const uint32_t SlotRangeEnd = 1;
+  const uint32_t SlotMaster = 2;
+  const uint32_t SlotSlaveStart = 3;
+
   // Do nothing if the cluster is empty.
   if (value->type() != NetworkFilters::Common::Redis::RespType::Array || value->asArray().empty()) {
     onUnexpectedResponse(value);
     return;
   }
 
-  std::vector<ClusterSlot> slots_;
+  auto slots = std::make_unique<std::vector<ClusterSlot>>();
 
   // Loop through the cluster slot response and error checks for each field.
   for (const NetworkFilters::Common::Redis::RespValue& part : value->asArray()) {
@@ -275,27 +290,36 @@ void RedisCluster::RedisDiscoverySession::onResponse(
     }
     const std::vector<NetworkFilters::Common::Redis::RespValue>& slot_range = part.asArray();
     if (slot_range.size() < 3 ||
-        slot_range[0].type() !=
+        slot_range[SlotRangeStart].type() !=
             NetworkFilters::Common::Redis::RespType::Integer || // Start slot range is an integer.
-        slot_range[1].type() !=
+        slot_range[SlotRangeEnd].type() !=
             NetworkFilters::Common::Redis::RespType::Integer) { // End slot range is an integer.
       onUnexpectedResponse(value);
       return;
     }
 
     // Field 2: Master address for slot range
-    // TODO(hyang): For now we're only adding the master node for each slot. When we're ready to
-    //  send requests to replica nodes, we need to add subsequent address in the response as
-    //  replica nodes.
-    auto master_address = ProcessCluster(slot_range[2]);
+    auto master_address = ProcessCluster(slot_range[SlotMaster]);
     if (!master_address) {
       onUnexpectedResponse(value);
       return;
     }
-    slots_.emplace_back(slot_range[0].asInteger(), slot_range[1].asInteger(), master_address);
+
+    slots->emplace_back(slot_range[SlotRangeStart].asInteger(),
+                        slot_range[SlotRangeEnd].asInteger(), master_address);
+
+    for (auto replica = std::next(slot_range.begin(), SlotSlaveStart); replica != slot_range.end();
+         ++replica) {
+      auto replica_address = ProcessCluster(*replica);
+      if (!replica_address) {
+        onUnexpectedResponse(value);
+        return;
+      }
+      slots->back().addReplica(std::move(replica_address));
+    }
   }
 
-  parent_.onClusterSlotUpdate(slots_);
+  parent_.onClusterSlotUpdate(std::move(slots));
   resolve_timer_->enableTimer(parent_.cluster_refresh_rate_);
 }
 
@@ -340,7 +364,7 @@ RedisClusterFactory::createClusterWithConfig(
                               std::move(stats_scope), context.addedViaApi(), nullptr),
                           nullptr);
   }
-  auto lb_factory = std::make_shared<RedisClusterLoadBalancerFactory>();
+  auto lb_factory = std::make_shared<RedisClusterLoadBalancerFactory>(context.random());
   return std::make_pair(std::make_shared<RedisCluster>(
                             cluster, proto_config,
                             NetworkFilters::Common::Redis::Client::ClientFactoryImpl::instance_,

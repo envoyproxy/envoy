@@ -94,7 +94,7 @@ TEST_F(OptionsImplTest, All) {
   EXPECT_EQ(std::chrono::seconds(60), options->drainTime());
   EXPECT_EQ(std::chrono::seconds(90), options->parentShutdownTime());
   EXPECT_EQ(true, options->hotRestartDisabled());
-  EXPECT_EQ(true, options->libeventBufferEnabled());
+  EXPECT_EQ(false, options->libeventBufferEnabled());
   EXPECT_EQ(true, options->fakeSymbolTableEnabled());
   EXPECT_EQ(true, options->cpusetThreadsEnabled());
 
