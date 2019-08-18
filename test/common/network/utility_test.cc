@@ -175,7 +175,7 @@ TEST(NetworkUtility, LocalConnection) {
 
   testing::NiceMock<Network::MockConnectionSocket> socket;
 
-  EXPECT_CALL(socket, remoteAddress()).WillRepeatedly(testing::ReturnRef(local_addr));
+  EXPECT_CALL(socket, localAddress()).WillRepeatedly(testing::ReturnRef(local_addr));
   EXPECT_CALL(socket, remoteAddress()).WillRepeatedly(testing::ReturnRef(remote_addr));
 
   local_addr.reset(new Network::Address::Ipv4Instance("127.0.0.1"));
@@ -197,12 +197,30 @@ TEST(NetworkUtility, LocalConnection) {
   remote_addr.reset(new Network::Address::Ipv4Instance("8.8.8.8"));
   EXPECT_FALSE(Utility::isLocalConnection(socket));
 
+  local_addr.reset(new Network::Address::Ipv4Instance("4.4.4.4"));
+  remote_addr.reset(new Network::Address::Ipv4Instance("4.4.4.4"));
+  EXPECT_TRUE(Utility::isLocalConnection(socket));
+
+  local_addr.reset(new Network::Address::Ipv4Instance("4.4.4.4", 1234));
+  remote_addr.reset(new Network::Address::Ipv4Instance("4.4.4.4", 4321));
+  EXPECT_TRUE(Utility::isLocalConnection(socket));
+
   local_addr.reset(new Network::Address::Ipv6Instance("::1"));
   remote_addr.reset(new Network::Address::Ipv6Instance("::1"));
   EXPECT_TRUE(Utility::isLocalConnection(socket));
 
   local_addr.reset(new Network::Address::Ipv6Instance("::2"));
   remote_addr.reset(new Network::Address::Ipv6Instance("::1"));
+  EXPECT_TRUE(Utility::isLocalConnection(socket));
+
+  remote_addr.reset(new Network::Address::Ipv6Instance("::3"));
+  EXPECT_FALSE(Utility::isLocalConnection(socket));
+
+  remote_addr.reset(new Network::Address::Ipv6Instance("::2"));
+  EXPECT_TRUE(Utility::isLocalConnection(socket));
+
+  remote_addr.reset(new Network::Address::Ipv6Instance("::2", 4321));
+  local_addr.reset(new Network::Address::Ipv6Instance("::2", 1234));
   EXPECT_TRUE(Utility::isLocalConnection(socket));
 
   remote_addr.reset(new Network::Address::Ipv6Instance("fd00::"));
