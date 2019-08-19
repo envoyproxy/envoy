@@ -222,7 +222,7 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
 
   // Interval timer fires.
   setupRequest();
-  interval_timer_->callback_();
+  interval_timer_->invokeCallback();
 
   // Error response.
   EXPECT_CALL(*interval_timer_, enableTimer(_));
@@ -232,7 +232,7 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
 
   // Interval timer fires.
   setupRequest();
-  interval_timer_->callback_();
+  interval_timer_->invokeCallback();
 
   // Parsing error
   EXPECT_CALL(*interval_timer_, enableTimer(_));
@@ -243,7 +243,7 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
 
   // Interval timer fires.
   setupRequest();
-  interval_timer_->callback_();
+  interval_timer_->invokeCallback();
 
   // No response failure.
   EXPECT_CALL(*interval_timer_, enableTimer(_));
@@ -260,7 +260,7 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
             return nullptr;
           }));
   EXPECT_CALL(*interval_timer_, enableTimer(_));
-  interval_timer_->callback_();
+  interval_timer_->invokeCallback();
 
   EXPECT_EQ(4U, stats_store_.counter("auth.clientssl.vpn.update_failure").value());
 }

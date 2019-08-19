@@ -246,7 +246,7 @@ TEST_F(ZipkinDriverTest, FlushSpansTimer) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.flush_interval_ms", 5000U))
       .WillOnce(Return(5000U));
 
-  timer_->callback_();
+  timer_->invokeCallback();
 
   EXPECT_EQ(1U, stats_.counter("tracing.zipkin.timer_flushed").value());
   EXPECT_EQ(1U, stats_.counter("tracing.zipkin.spans_sent").value());

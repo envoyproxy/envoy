@@ -68,6 +68,9 @@ private:
     bool enableRedirection() const override {
       return true;
     } // Redirection errors are treated as check successes.
+    NetworkFilters::Common::Redis::Client::ReadPolicy readPolicy() const override {
+      return NetworkFilters::Common::Redis::Client::ReadPolicy::Master;
+    }
 
     // Batching
     unsigned int maxBufferSizeBeforeFlush() const override {

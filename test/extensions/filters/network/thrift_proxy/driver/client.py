@@ -233,7 +233,7 @@ if __name__ == "__main__":
       "--headers",
       dest="headers",
       metavar="KEY=VALUE[,KEY=VALUE]",
-      help="list of comma-delimited, key value pairs to include as tranport headers.",
+      help="list of comma-delimited, key value pairs to include as transport headers.",
   )
 
   cfg = parser.parse_args()
