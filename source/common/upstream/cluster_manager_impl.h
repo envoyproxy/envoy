@@ -43,10 +43,10 @@ public:
                             Event::Dispatcher& main_thread_dispatcher,
                             const LocalInfo::LocalInfo& local_info,
                             Secret::SecretManager& secret_manager,
-                            ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
+                            ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
                             Http::Context& http_context, AccessLog::AccessLogManager& log_manager,
                             Singleton::Manager& singleton_manager)
-      : main_thread_dispatcher_(main_thread_dispatcher), validation_visitor_(validation_visitor),
+      : main_thread_dispatcher_(main_thread_dispatcher), validation_context_(validation_context),
         api_(api), http_context_(http_context), admin_(admin), runtime_(runtime), stats_(stats),
         tls_(tls), random_(random), dns_resolver_(dns_resolver),
         ssl_context_manager_(ssl_context_manager), local_info_(local_info),
@@ -74,7 +74,7 @@ public:
 
 protected:
   Event::Dispatcher& main_thread_dispatcher_;
-  ProtobufMessage::ValidationVisitor& validation_visitor_;
+  ProtobufMessage::ValidationContext& validation_context_;
   Api::Api& api_;
   Http::Context& http_context_;
   Server::Admin& admin_;
@@ -173,7 +173,7 @@ public:
                      Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
                      AccessLog::AccessLogManager& log_manager,
                      Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
-                     ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
+                     ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
                      Http::Context& http_context);
 
   // Upstream::ClusterManager

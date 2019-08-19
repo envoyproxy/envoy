@@ -10,6 +10,12 @@ Version history
 * config: enforcing that terminal filters (e.g. HttpConnectionManager for L4, router for L7) be the last in their respective filter chains.
 * buffer filter: the buffer filter populates content-length header if not present, behavior can be disabled using the runtime feature `envoy.reloadable_features.buffer_filter_populate_content_length`.
 * config: added access log :ref:`extension filter<envoy_api_field_config.filter.accesslog.v2.AccessLogFilter.extension_filter>`.
+* config: added support for :option:`--reject-unknown-dynamic-fields`, providing independent control
+  over whether unknown fields are rejected in static and dynamic configuration. By default, unknown
+  fields in static configuration are rejected and are allowed in dynamic configuration. Warnings
+  are logged for the first use of any unknown field and these occurrences are counted in the
+  :ref:`server.static_unknown_fields <server_statistics>` and :ref:`server.dynamic_unknown_fields
+  <server_statistics>` statistics.
 * config: async data access for local and remote data source.
 * config: changed the default value of :ref:`initial_fetch_timeout <envoy_api_field_core.ConfigSource.initial_fetch_timeout>` from 0s to 15s. This is a change in behaviour in the sense that Envoy will move to the next initialization phase, even if the first config is not delivered in 15s. Refer to :ref:`initialization process <arch_overview_initialization>` for more details.
 * config: added stat :ref:`init_fetch_timeout <config_cluster_manager_cds>`.
@@ -21,11 +27,18 @@ Version history
 * http: added the ability to :ref:`merge adjacent slashes<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.merge_slashes>` in the path.
 * listeners: added :ref:`continue_on_listener_filters_timeout <envoy_api_field_Listener.continue_on_listener_filters_timeout>` to configure whether a listener will still create a connection when listener filters time out.
 * listeners: added :ref:`HTTP inspector listener filter <config_listener_filters_http_inspector>`.
+* redis: added :ref:`read_policy <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.ConnPoolSettings.read_policy>` to allow reading from redis replicas for Redis Cluster deployments.
+* rbac: added support for DNS SAN as :ref:`principal_name <envoy_api_field_config.rbac.v2.Principal.Authenticated.principal_name>`.
+* lua: extended `httpCall()` and `respond()` APIs to accept headers with entry values that can be a string or table of strings.
+* performance: new buffer implementation enabled by default (to disable add "--use-libevent-buffers 1" to the command-line arguments when starting Envoy).
+* rbac: added conditions to the policy, see :ref:`condition <envoy_api_field_config.rbac.v2.Policy.condition>`.
 * router: added :ref:`rq_retry_skipped_request_not_complete <config_http_filters_router_stats>` counter stat to router stats.
 * router check tool: add coverage reporting & enforcement.
+* router check tool: add comprehensive coverage reporting.
 * tls: added verification of IP address SAN fields in certificates against configured SANs in the
   certificate validation context.
 * upstream: added network filter chains to upstream connections, see :ref:`filters<envoy_api_field_Cluster.filters>`.
+* upstream: use p2c to select hosts for least-requests load balancers if all host weights are the same, even in cases where weights are not equal to 1.
 * zookeeper: parse responses and emit latency stats.
 
 1.11.1 (August 13, 2019)

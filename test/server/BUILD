@@ -243,6 +243,11 @@ filegroup(
     srcs = glob(["test_data/runtime/**"]),
 )
 
+filegroup(
+    name = "static_validation_test_data",
+    srcs = glob(["test_data/static_validation/**"]),
+)
+
 envoy_cc_test(
     name = "server_test",
     srcs = ["server_test.cc"],
@@ -261,6 +266,7 @@ envoy_cc_test(
         ":node_bootstrap_without_access_log.yaml",
         ":runtime_bootstrap.yaml",
         ":runtime_test_data",
+        ":static_validation_test_data",
         ":stats_sink_bootstrap.yaml",
         ":zipkin_tracing.yaml",
     ],

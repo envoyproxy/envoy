@@ -60,9 +60,9 @@ public:
 
   // Server::ListenerComponentFactory
   LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config) override {
-    return std::make_unique<LdsApiImpl>(lds_config, server_.clusterManager(), server_.initManager(),
-                                        server_.stats(), server_.listenerManager(),
-                                        server_.messageValidationVisitor());
+    return std::make_unique<LdsApiImpl>(
+        lds_config, server_.clusterManager(), server_.initManager(), server_.stats(),
+        server_.listenerManager(), server_.messageValidationContext().dynamicValidationVisitor());
   }
   std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
@@ -126,7 +126,7 @@ public:
 
   // Server::ListenerManager
   bool addOrUpdateListener(const envoy::api::v2::Listener& config, const std::string& version_info,
-                           bool modifiable) override;
+                           bool added_via_api) override;
   void createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config) override {
     ASSERT(lds_api_ == nullptr);
     lds_api_ = factory_.createLdsApi(lds_config);
@@ -218,21 +218,23 @@ public:
    * @param version_info supplies the xDS version of the listener.
    * @param parent supplies the owning manager.
    * @param name supplies the listener name.
-   * @param modifiable supplies whether the listener can be updated or removed.
+   * @param added_via_api supplies whether the listener can be updated or removed.
    * @param workers_started supplies whether the listener is being added before or after workers
    *        have been started. This controls various behavior related to init management.
    * @param hash supplies the hash to use for duplicate checking.
+   * @param validation_visitor message validation visitor instance.
    */
   ListenerImpl(const envoy::api::v2::Listener& config, const std::string& version_info,
-               ListenerManagerImpl& parent, const std::string& name, bool modifiable,
-               bool workers_started, uint64_t hash);
+               ListenerManagerImpl& parent, const std::string& name, bool added_via_api,
+               bool workers_started, uint64_t hash,
+               ProtobufMessage::ValidationVisitor& validation_visitor);
   ~ListenerImpl() override;
 
   /**
    * Helper functions to determine whether a listener is blocked for update or remove.
    */
-  bool blockUpdate(uint64_t new_hash) { return new_hash == hash_ || !modifiable_; }
-  bool blockRemove() { return !modifiable_; }
+  bool blockUpdate(uint64_t new_hash) { return new_hash == hash_ || !added_via_api_; }
+  bool blockRemove() { return !added_via_api_; }
 
   /**
    * Called when a listener failed to be actually created on a worker.
@@ -313,7 +315,7 @@ public:
   }
   const Network::ListenerConfig& listenerConfig() const override { return *this; }
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
-    return parent_.server_.messageValidationVisitor();
+    return validation_visitor_;
   }
   Api::Api& api() override { return parent_.server_.api(); }
   ServerLifecycleNotifier& lifecycleNotifier() override {
@@ -356,9 +358,10 @@ private:
   const uint32_t per_connection_buffer_limit_bytes_;
   const uint64_t listener_tag_;
   const std::string name_;
-  const bool modifiable_;
+  const bool added_via_api_;
   const bool workers_started_;
   const uint64_t hash_;
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
 
   // This init manager is populated with targets from the filter chain factories, namely
   // RdsRouteConfigSubscription::init_target_, so the listener can wait for route configs.
