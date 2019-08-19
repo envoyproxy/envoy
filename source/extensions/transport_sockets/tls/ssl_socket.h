@@ -95,7 +95,7 @@ public:
   Network::IoResult doRead(Buffer::Instance& read_buffer) override;
   Network::IoResult doWrite(Buffer::Instance& write_buffer, bool end_stream) override;
   void onConnected() override;
-  const Ssl::ConnectionInfoConstSharedPtr ssl() const override;
+  Ssl::ConnectionInfoConstSharedPtr ssl() const override;
 
   SSL* rawSslForTest() const { return ssl_; }
 

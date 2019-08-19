@@ -38,7 +38,7 @@ public:
     return {PostIoAction::Close, 0, false};
   }
   void onConnected() override {}
-  const Ssl::ConnectionInfoConstSharedPtr ssl() const override { return nullptr; }
+  Ssl::ConnectionInfoConstSharedPtr ssl() const override { return nullptr; }
 };
 } // namespace
 
@@ -264,7 +264,7 @@ Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer, bool end_st
 
 void SslSocket::onConnected() { ASSERT(!handshake_complete_); }
 
-const Ssl::ConnectionInfoConstSharedPtr SslSocket::ssl() const { return info_; }
+Ssl::ConnectionInfoConstSharedPtr SslSocket::ssl() const { return info_; }
 
 void SslSocket::shutdownSsl() {
   ASSERT(handshake_complete_);

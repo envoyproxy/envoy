@@ -429,7 +429,7 @@ public:
    * @return the downstream SSL connection. This will be nullptr if the downstream
    * connection does not use SSL.
    */
-  virtual const Ssl::ConnectionInfoConstSharedPtr downstreamSslConnection() const PURE;
+  virtual Ssl::ConnectionInfoConstSharedPtr downstreamSslConnection() const PURE;
 
   /**
    * @param connection_info sets the upstream ssl connection.
@@ -441,7 +441,7 @@ public:
    * @return the upstream SSL connection. This will be nullptr if the upstream
    * connection does not use SSL.
    */
-  virtual const Ssl::ConnectionInfoConstSharedPtr upstreamSslConnection() const PURE;
+  virtual Ssl::ConnectionInfoConstSharedPtr upstreamSslConnection() const PURE;
 
   /**
    * @return const Router::RouteEntry* Get the route entry selected for this request. Note: this

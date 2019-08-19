@@ -46,22 +46,6 @@ StreamInfoFormatter::FieldExtractor sslConnectionInfoStringExtractor(
   };
 }
 
-StreamInfoFormatter::FieldExtractor upstreamSslConnectionInfoStringExtractor(
-    std::function<std::string(const Ssl::ConnectionInfo& connection_info)> string_extractor) {
-  return [string_extractor](const StreamInfo::StreamInfo& stream_info) {
-    if (stream_info.upstreamSslConnection() == nullptr) {
-      return UnspecifiedValueString;
-    }
-
-    const auto value = string_extractor(*stream_info.upstreamSslConnection());
-    if (value.empty()) {
-      return UnspecifiedValueString;
-    } else {
-      return value;
-    }
-  };
-}
-
 // Helper that handles the case when the desired time field is empty.
 StreamInfoFormatter::FieldExtractor sslConnectionInfoStringTimeExtractor(
     std::function<absl::optional<SystemTime>(const Ssl::ConnectionInfo& connection_info)>
@@ -434,19 +418,9 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
         sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
           return absl::StrJoin(connection_info.uriSanPeerCertificate(), ",");
         });
-  } else if (field_name == "UPSTREAM_PEER_URI_SAN") {
-    field_extractor_ =
-        upstreamSslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
-          return absl::StrJoin(connection_info.uriSanPeerCertificate(), ",");
-        });
   } else if (field_name == "DOWNSTREAM_LOCAL_URI_SAN") {
     field_extractor_ =
         sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
-          return absl::StrJoin(connection_info.uriSanLocalCertificate(), ",");
-        });
-  } else if (field_name == "UPSTREAM_LOCAL_URI_SAN") {
-    field_extractor_ =
-        upstreamSslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
           return absl::StrJoin(connection_info.uriSanLocalCertificate(), ",");
         });
   } else if (field_name == "DOWNSTREAM_PEER_SUBJECT") {
@@ -454,19 +428,9 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
         sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
           return std::string(connection_info.subjectPeerCertificate());
         });
-  } else if (field_name == "UPSTREAM_PEER_SUBJECT") {
-    field_extractor_ =
-        upstreamSslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
-          return std::string(connection_info.subjectPeerCertificate());
-        });
   } else if (field_name == "DOWNSTREAM_LOCAL_SUBJECT") {
     field_extractor_ =
         sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
-          return std::string(connection_info.subjectLocalCertificate());
-        });
-  } else if (field_name == "UPSTREAM_LOCAL_SUBJECT") {
-    field_extractor_ =
-        upstreamSslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
           return std::string(connection_info.subjectLocalCertificate());
         });
   } else if (field_name == "DOWNSTREAM_TLS_SESSION_ID") {
@@ -484,11 +448,6 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
         sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
           return std::string(connection_info.tlsVersion());
         });
-  } else if (field_name == "UPSTREAM_TLS_VERSION") {
-    field_extractor_ =
-        upstreamSslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
-          return std::string(connection_info.tlsVersion());
-        });
   } else if (field_name == "DOWNSTREAM_PEER_FINGERPRINT_256") {
     field_extractor_ =
         sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
@@ -497,11 +456,6 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
   } else if (field_name == "DOWNSTREAM_PEER_SERIAL") {
     field_extractor_ =
         sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
-          return std::string(connection_info.serialNumberPeerCertificate());
-        });
-  } else if (field_name == "UPSTREAM_PEER_SERIAL") {
-    field_extractor_ =
-        upstreamSslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
           return std::string(connection_info.serialNumberPeerCertificate());
         });
   } else if (field_name == "DOWNSTREAM_PEER_ISSUER") {

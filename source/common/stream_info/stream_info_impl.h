@@ -180,7 +180,7 @@ struct StreamInfoImpl : public StreamInfo {
     downstream_ssl_info_ = connection_info;
   }
 
-  const Ssl::ConnectionInfoConstSharedPtr downstreamSslConnection() const override {
+  Ssl::ConnectionInfoConstSharedPtr downstreamSslConnection() const override {
     return downstream_ssl_info_;
   }
 
@@ -188,7 +188,7 @@ struct StreamInfoImpl : public StreamInfo {
     upstream_ssl_info_ = connection_info;
   }
 
-  const Ssl::ConnectionInfoConstSharedPtr upstreamSslConnection() const override {
+  Ssl::ConnectionInfoConstSharedPtr upstreamSslConnection() const override {
     return upstream_ssl_info_;
   }
 

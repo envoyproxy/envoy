@@ -90,7 +90,7 @@ public:
     downstream_connection_info_ = connection_info;
   }
 
-  const Ssl::ConnectionInfoConstSharedPtr downstreamSslConnection() const override {
+  Ssl::ConnectionInfoConstSharedPtr downstreamSslConnection() const override {
     return downstream_connection_info_;
   }
 
@@ -98,7 +98,7 @@ public:
     upstream_connection_info_ = connection_info;
   }
 
-  const Ssl::ConnectionInfoConstSharedPtr upstreamSslConnection() const override {
+  Ssl::ConnectionInfoConstSharedPtr upstreamSslConnection() const override {
     return upstream_connection_info_;
   }
   void setRouteName(absl::string_view route_name) override {
