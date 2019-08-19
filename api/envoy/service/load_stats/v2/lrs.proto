@@ -46,6 +46,12 @@ service LoadReportingService {
   // 6. The management server uses the load reports from all reported Envoys
   //    from around the world, computes global assignment and prepares traffic
   //    assignment destined for each zone Envoys are located in. Goto 2.
+  //
+  // Note: If the management server configured use of LRS via via the CDS
+  // :ref:`Cluster.load_report_config
+  // <envoy_api_field_Cluster.load_report_config>` field, then it will never
+  // send a response message on the stream. Instead, that data will
+  // come from the CDS response.
   rpc StreamLoadStats(stream LoadStatsRequest) returns (stream LoadStatsResponse) {
   }
 }
