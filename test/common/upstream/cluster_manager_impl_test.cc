@@ -33,6 +33,7 @@
 #include "test/mocks/tcp/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
@@ -544,7 +545,7 @@ static_resources:
   EXPECT_THROW_WITH_MESSAGE(
       create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
       "cluster: LB policy ROUND_ROBIN is not valid for Cluster type ORIGINAL_DST. Only "
-      "'original_dst_lb' is allowed with cluster type 'original_dst'");
+      "'CLUSTER_PROVIDED' or 'ORIGINAL_DST_LB' is allowed with cluster type 'ORIGINAL_DST'");
 }
 
 TEST_F(ClusterManagerImplTest, OriginalDstLbRestriction2) {
@@ -567,8 +568,8 @@ static_resources:
 
   EXPECT_THROW_WITH_MESSAGE(
       create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
-      "cluster: LB policy ORIGINAL_DST_LB is not valid for Cluster type STATIC. Only "
-      "'original_dst_lb' is allowed with cluster type 'original_dst'");
+      "cluster: LB policy ORIGINAL_DST_LB is not valid for Cluster type STATIC. "
+      "'ORIGINAL_DST_LB' is allowed only with cluster type 'ORIGINAL_DST'");
 }
 
 TEST_F(ClusterManagerImplTest, SubsetLoadBalancerInitialization) {
@@ -1792,7 +1793,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   EXPECT_CALL(*tcp1_high, addDrainedCallback(_)).WillOnce(SaveArg<0>(&tcp_drained_cb_high));
 
   // Remove the first host, this should lead to the first cp being drained.
-  dns_timer_->callback_();
+  dns_timer_->invokeCallback();
   dns_callback(TestUtility::makeDnsResponse({"127.0.0.2"}));
   drained_cb();
   drained_cb = nullptr;
@@ -1825,7 +1826,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
 
   // Now add and remove a host that we never have a conn pool to. This should not lead to any
   // drain callbacks, etc.
-  dns_timer_->callback_();
+  dns_timer_->invokeCallback();
   dns_callback(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.3"}));
   factory_.tls_.shutdownThread();
 }
@@ -2008,7 +2009,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   EXPECT_CALL(*tcp1_ibm_com, addDrainedCallback(_)).WillOnce(SaveArg<0>(&tcp_drained_cb_ibm_com));
 
   // Remove the first host, this should lead to the first cp being drained.
-  dns_timer_->callback_();
+  dns_timer_->invokeCallback();
   dns_callback(TestUtility::makeDnsResponse({"127.0.0.2"}));
   drained_cb();
   drained_cb = nullptr;
@@ -2055,7 +2056,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
 
   // Now add and remove a host that we never have a conn pool to. This should not lead to any
   // drain callbacks, etc.
-  dns_timer_->callback_();
+  dns_timer_->invokeCallback();
   dns_callback(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.3"}));
   factory_.tls_.shutdownThread();
 }
@@ -2122,7 +2123,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
 
   // Remove the first host, this should lead to the cp being drained, without
   // crash.
-  dns_timer_->callback_();
+  dns_timer_->invokeCallback();
   dns_callback(TestUtility::makeDnsResponse({}));
 
   factory_.tls_.shutdownThread();
@@ -2198,7 +2199,7 @@ TEST_F(ClusterManagerImplTest, ConnPoolDestroyWithDraining) {
   EXPECT_CALL(*cp, addDrainedCallback(_)).WillOnce(SaveArg<0>(&drained_cb));
   Tcp::ConnectionPool::Instance::DrainedCb tcp_drained_cb;
   EXPECT_CALL(*tcp, addDrainedCallback(_)).WillOnce(SaveArg<0>(&tcp_drained_cb));
-  dns_timer_->callback_();
+  dns_timer_->invokeCallback();
   dns_callback(TestUtility::makeDnsResponse({}));
 
   // The drained callback might get called when the CP is being destroyed.
@@ -2326,7 +2327,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
 
   // Ensure the merged updates were applied.
-  timer->callback_();
+  timer->invokeCallback();
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
@@ -2687,6 +2688,61 @@ TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsNullIsOkay) {
       "cluster_1", ResourcePriority::Default, Http::Protocol::Http11, &context);
 
   EXPECT_NE(nullptr, cp);
+}
+
+class TestUpstreamNetworkFilter : public Network::WriteFilter {
+public:
+  Network::FilterStatus onWrite(Buffer::Instance&, bool) override {
+    return Network::FilterStatus::Continue;
+  }
+};
+
+class TestUpstreamNetworkFilterConfigFactory
+    : public Server::Configuration::NamedUpstreamNetworkFilterConfigFactory {
+public:
+  Network::FilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message&,
+                               Server::Configuration::CommonFactoryContext&) override {
+    return [](Network::FilterManager& filter_manager) -> void {
+      filter_manager.addWriteFilter(std::make_shared<TestUpstreamNetworkFilter>());
+    };
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Envoy::ProtobufWkt::Empty>();
+  }
+  std::string name() override { return "envoy.test.filter"; }
+};
+
+// Verify that configured upstream filters are added to client connections.
+TEST_F(ClusterManagerImplTest, AddUpstreamFilters) {
+  TestUpstreamNetworkFilterConfigFactory factory;
+  Registry::InjectFactory<Server::Configuration::NamedUpstreamNetworkFilterConfigFactory> registry(
+      factory);
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      hosts:
+      - socket_address:
+          address: "127.0.0.1"
+          port_value: 11001
+      filters:
+      - name: envoy.test.filter
+  )EOF";
+
+  create(parseBootstrapFromV2Yaml(yaml));
+  Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
+  EXPECT_CALL(*connection, addReadFilter(_)).Times(0);
+  EXPECT_CALL(*connection, addWriteFilter(_)).Times(1);
+  EXPECT_CALL(*connection, addFilter(_)).Times(0);
+  EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
+      .WillOnce(Return(connection));
+  auto conn_data = cluster_manager_->tcpConnForCluster("cluster_1", nullptr, nullptr);
+  EXPECT_EQ(connection, conn_data.connection_.get());
+  factory_.tls_.shutdownThread();
 }
 
 class ClusterManagerInitHelperTest : public testing::Test {

@@ -91,6 +91,7 @@ public:
                                    router_proto));
     router_.reset(new TestFilter(*config_));
     router_->setDecoderFilterCallbacks(callbacks_);
+    EXPECT_CALL(callbacks_.dispatcher_, setTrackedObject(_)).Times(testing::AnyNumber());
 
     upstream_locality_.set_zone("to_az");
 
@@ -175,7 +176,7 @@ public:
     router_->retry_state_->expectResetRetry();
     EXPECT_CALL(context_.cluster_manager_.conn_pool_.host_->outlier_detector_,
                 putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, _));
-    per_try_timeout_->callback_();
+    per_try_timeout_->invokeCallback();
 
     // We expect this reset to kick off a new request.
     NiceMock<Http::MockStreamEncoder> encoder2;

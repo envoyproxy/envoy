@@ -49,6 +49,77 @@ TEST_F(HttpConnectionManagerConfigTest, ValidateFail) {
       ProtoValidationException);
 }
 
+// Verify that the v1 JSON config path still works. This will be deleted when v1 is fully removed.
+TEST_F(HttpConnectionManagerConfigTest, V1Config) {
+  const std::string yaml_string = R"EOF(
+drain_timeout_ms: 5000
+route_config:
+  virtual_hosts:
+  - require_ssl: all
+    routes:
+    - cluster: cluster_1
+      prefix: "/"
+    domains:
+    - www.redirect.com
+    name: redirect
+  - routes:
+    - prefix: "/"
+      cluster: cluster_1
+      runtime:
+        key: some_key
+        default: 0
+    - prefix: "/test/long/url"
+      rate_limits:
+      - actions:
+        - type: destination_cluster
+      cluster: cluster_1
+    - prefix: "/test/"
+      cluster: cluster_2
+    - prefix: "/websocket/test"
+      prefix_rewrite: "/websocket"
+      cluster: cluster_1
+    domains:
+    - "*"
+    name: integration
+codec_type: http1
+stat_prefix: router
+filters:
+- name: health_check
+  config:
+    endpoint: "/healthcheck"
+    pass_through_mode: false
+- name: rate_limit
+  config:
+    domain: foo
+- name: router
+  config: {}
+access_log:
+- format: '[%START_TIME%] "%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%
+    %PROTOCOL%" %RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT%
+    %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% "%REQ(X-FORWARDED-FOR)%"
+    "%REQ(USER-AGENT)%" "%REQ(X-REQUEST-ID)%" "%REQ(:AUTHORITY)%" "%UPSTREAM_HOST%"
+    "%REQUEST_DURATION%" "%RESPONSE_DURATION%"'
+  path: "/dev/null"
+  filter:
+    filters:
+    - type: status_code
+      op: ">="
+      value: 500
+    - type: duration
+      op: ">="
+      value: 1000000
+    type: logical_or
+- path: "/dev/null"
+  )EOF";
+
+  ON_CALL(context_.runtime_loader_.snapshot_,
+          deprecatedFeatureEnabled("envoy.deprecated_features.v1_filter_json_config"))
+      .WillByDefault(Return(true));
+
+  HttpConnectionManagerFilterConfigFactory().createFilterFactory(
+      *Json::Factory::loadFromYamlString(yaml_string), context_);
+}
+
 TEST_F(HttpConnectionManagerConfigTest, InvalidFilterName) {
   const std::string yaml_string = R"EOF(
 codec_type: http1
@@ -73,6 +144,65 @@ http_filters:
                                   date_provider_, route_config_provider_manager_,
                                   scoped_routes_config_provider_manager_),
       EnvoyException, "Didn't find a registered implementation for name: 'foo'");
+}
+
+TEST_F(HttpConnectionManagerConfigTest, RouterInverted) {
+  const std::string yaml_string = R"EOF(
+codec_type: http1
+server_name: foo
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+http_filters:
+- name: envoy.router
+  config: {}
+- name: envoy.health_check
+  config:
+      pass_through_mode: false
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                  date_provider_, route_config_provider_manager_,
+                                  scoped_routes_config_provider_manager_),
+      EnvoyException, "Error: envoy.router must be the terminal http filter.");
+}
+
+TEST_F(HttpConnectionManagerConfigTest, NonTerminalFilter) {
+  const std::string yaml_string = R"EOF(
+codec_type: http1
+server_name: foo
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+http_filters:
+- name: envoy.health_check
+  config:
+      pass_through_mode: false
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                  date_provider_, route_config_provider_manager_,
+                                  scoped_routes_config_provider_manager_),
+      EnvoyException,
+      "Error: non-terminal filter envoy.health_check is the last filter in a http filter chain.");
 }
 
 TEST_F(HttpConnectionManagerConfigTest, MiscConfig) {
@@ -341,6 +471,56 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathFalse) {
   EXPECT_FALSE(config.shouldNormalizePath());
 }
 
+// Validated that by default we don't merge slashes.
+TEST_F(HttpConnectionManagerConfigTest, MergeSlashesDefault) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
+  EXPECT_FALSE(config.shouldMergeSlashes());
+}
+
+// Validated that when configured, we merge slashes.
+TEST_F(HttpConnectionManagerConfigTest, MergeSlashesTrue) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  merge_slashes: true
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
+  EXPECT_TRUE(config.shouldMergeSlashes());
+}
+
+// Validated that when explicitly set false, we don't merge slashes.
+TEST_F(HttpConnectionManagerConfigTest, MergeSlashesFalse) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  merge_slashes: false
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
+  EXPECT_FALSE(config.shouldMergeSlashes());
+}
+
 TEST_F(HttpConnectionManagerConfigTest, ConfiguredRequestTimeout) {
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http
@@ -405,7 +585,7 @@ route_config:
 http_filters:
 - name: envoy.http_dynamo_filter
   config: {}
-
+- name: envoy.router
   )EOF";
 
   auto proto_config = parseHttpConnectionManagerFromV2Yaml(yaml_string);
@@ -414,6 +594,7 @@ http_filters:
   EXPECT_CALL(context_.thread_local_, allocateSlot());
   Network::FilterFactoryCb cb1 = factory.createFilterFactoryFromProto(proto_config, context_);
   Network::FilterFactoryCb cb2 = factory.createFilterFactoryFromProto(proto_config, context_);
+  EXPECT_TRUE(factory.isTerminalFilter());
 }
 
 TEST_F(HttpConnectionManagerConfigTest, BadHttpConnectionMangerConfig) {
@@ -664,13 +845,13 @@ TEST_F(FilterChainTest, createCustomUpgradeFilterChain) {
 
   auto foo_config = hcm_config.add_upgrade_configs();
   foo_config->set_upgrade_type("foo");
+  foo_config->add_filters()->ParseFromString("\n"
+                                             "\x18"
+                                             "envoy.http_dynamo_filter");
+  foo_config->add_filters()->ParseFromString("\n"
+                                             "\x18"
+                                             "envoy.http_dynamo_filter");
   foo_config->add_filters()->ParseFromString("\n\fenvoy.router");
-  foo_config->add_filters()->ParseFromString("\n"
-                                             "\x18"
-                                             "envoy.http_dynamo_filter");
-  foo_config->add_filters()->ParseFromString("\n"
-                                             "\x18"
-                                             "envoy.http_dynamo_filter");
 
   HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
                                      route_config_provider_manager_,
@@ -695,6 +876,27 @@ TEST_F(FilterChainTest, createCustomUpgradeFilterChain) {
     EXPECT_CALL(callbacks, addStreamFilter(_)).Times(2); // Dynamo
     EXPECT_TRUE(config.createUpgradeFilterChain("Foo", nullptr, callbacks));
   }
+}
+
+TEST_F(FilterChainTest, createCustomUpgradeFilterChainWithRouterNotLast) {
+  auto hcm_config = parseHttpConnectionManagerFromV2Yaml(basic_config_);
+  auto websocket_config = hcm_config.add_upgrade_configs();
+  websocket_config->set_upgrade_type("websocket");
+
+  ASSERT_TRUE(websocket_config->add_filters()->ParseFromString("\n\fenvoy.router"));
+
+  auto foo_config = hcm_config.add_upgrade_configs();
+  foo_config->set_upgrade_type("foo");
+  foo_config->add_filters()->ParseFromString("\n\fenvoy.router");
+  foo_config->add_filters()->ParseFromString("\n"
+                                             "\x18"
+                                             "envoy.http_dynamo_filter");
+
+  EXPECT_THROW_WITH_MESSAGE(HttpConnectionManagerConfig(hcm_config, context_, date_provider_,
+                                                        route_config_provider_manager_,
+                                                        scoped_routes_config_provider_manager_),
+                            EnvoyException,
+                            "Error: envoy.router must be the terminal http upgrade filter.");
 }
 
 TEST_F(FilterChainTest, invalidConfig) {

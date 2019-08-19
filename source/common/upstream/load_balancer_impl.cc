@@ -50,6 +50,20 @@ std::pair<int32_t, size_t> distributeLoad(PriorityLoad& per_priority_load,
   return {first_available_priority, total_load};
 }
 
+// Returns true if the weights of all the hosts in the HostVector are equal.
+bool hostWeightsAreEqual(const HostVector& hosts) {
+  if (hosts.size() <= 1) {
+    return true;
+  }
+  const uint32_t weight = hosts[0]->weight();
+  for (size_t i = 1; i < hosts.size(); ++i) {
+    if (hosts[i]->weight() != weight) {
+      return false;
+    }
+  }
+  return true;
+}
+
 } // namespace
 
 std::pair<uint32_t, LoadBalancerBase::HostAvailability>
@@ -629,6 +643,16 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
     auto& scheduler = scheduler_[source] = Scheduler{};
     refreshHostSource(source);
 
+    // Check if the original host weights are equal and skip EDF creation if they are. When all
+    // original weights are equal we can rely on unweighted host pick to do optimal round robin and
+    // least-loaded host selection with lower memory and CPU overhead.
+    if (hostWeightsAreEqual(hosts)) {
+      // Skip edf creation.
+      return;
+    }
+
+    scheduler.edf_ = std::make_unique<EdfScheduler<const Host>>();
+
     // Populate scheduler with host list.
     // TODO(mattklein123): We must build the EDF schedule even if all of the hosts are currently
     // weighted 1. This is because currently we don't refresh host sets if only weights change.
@@ -639,7 +663,7 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
       // notification, this will only be stale until this host is next picked,
       // at which point it is reinserted into the EdfScheduler with its new
       // weight in chooseHost().
-      scheduler.edf_.add(hostWeight(*host), host);
+      scheduler.edf_->add(hostWeight(*host), host);
     }
 
     // Cycle through hosts to achieve the intended offset behavior.
@@ -647,8 +671,8 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
     // refreshes for the weighted case.
     if (!hosts.empty()) {
       for (uint32_t i = 0; i < seed_ % hosts.size(); ++i) {
-        auto host = scheduler.edf_.pick();
-        scheduler.edf_.add(hostWeight(*host), host);
+        auto host = scheduler.edf_->pick();
+        scheduler.edf_->add(hostWeight(*host), host);
       }
     }
   };
@@ -684,15 +708,12 @@ HostConstSharedPtr EdfLoadBalancerBase::chooseHostOnce(LoadBalancerContext* cont
 
   // As has been commented in both EdfLoadBalancerBase::refresh and
   // BaseDynamicClusterImpl::updateDynamicHostList, we must do a runtime pivot here to determine
-  // whether to use EDF or do unweighted (fast) selection.
-  // TODO(mattklein123): As commented elsewhere, this is wasteful, and we should just refresh the
-  // host set if any weights change. Additionally, it has the property that if all weights are
-  // the same but not 1 (like 42), we will use the EDF schedule not the unweighted pick. This is
-  // not optimal. If this is fixed, remove the note in the arch overview docs for the LR LB.
-  if (stats_.max_host_weight_.value() != 1) {
-    auto host = scheduler.edf_.pick();
+  // whether to use EDF or do unweighted (fast) selection. EDF is non-null iff the original weights
+  // of 2 or more hosts differ.
+  if (scheduler.edf_ != nullptr) {
+    auto host = scheduler.edf_->pick();
     if (host != nullptr) {
-      scheduler.edf_.add(hostWeight(*host), host);
+      scheduler.edf_->add(hostWeight(*host), host);
     }
     return host;
   } else {

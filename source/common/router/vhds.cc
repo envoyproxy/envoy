@@ -46,7 +46,8 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
           *scope_, *this);
 }
 
-void VhdsSubscription::onConfigUpdateFailed(const EnvoyException*) {
+void VhdsSubscription::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason,
+                                            const EnvoyException*) {
   // We need to allow server startup to continue, even if we have a bad
   // config.
   init_target_.ready();

@@ -58,7 +58,7 @@ message VirtualHost {
 
   // The list of routes that will be matched, in order, for incoming requests.
   // The first route that matches will be used.
-  repeated Route routes = 3 [(gogoproto.nullable) = false];
+  repeated Route routes = 3;
 
   enum TlsRequirementType {
     // No TLS requirement for the virtual host.
@@ -164,7 +164,7 @@ message Route {
   string name = 14;
 
   // Route matching parameters.
-  RouteMatch match = 1 [(validate.rules).message.required = true, (gogoproto.nullable) = false];
+  RouteMatch match = 1 [(validate.rules).message.required = true];
 
   oneof action {
     option (validate.required) = true;
@@ -562,7 +562,8 @@ message RouteAction {
 
   // Specifies the upstream timeout for the route. If not specified, the default is 15s. This
   // spans between the point at which the entire downstream request (i.e. end-of-stream) has been
-  // processed and when the upstream response has been completely processed.
+  // processed and when the upstream response has been completely processed. A value of 0 will
+  // disable the route's timeout.
   //
   // .. note::
   //

@@ -141,6 +141,7 @@ public:
   MOCK_METHOD0(streamInfo, StreamInfo::StreamInfo&());
   MOCK_METHOD0(activeSpan, Tracing::Span&());
   MOCK_METHOD0(tracingConfig, Tracing::Config&());
+  MOCK_METHOD0(scope, const ScopeTrackedObject&());
   MOCK_METHOD0(onDecoderFilterAboveWriteBufferHighWatermark, void());
   MOCK_METHOD0(onDecoderFilterBelowWriteBufferLowWatermark, void());
   MOCK_METHOD1(addDownstreamWatermarkCallbacks, void(DownstreamWatermarkCallbacks&));
@@ -189,6 +190,7 @@ public:
   std::list<DownstreamWatermarkCallbacks*> callbacks_{};
   testing::NiceMock<Tracing::MockSpan> active_span_;
   testing::NiceMock<Tracing::MockConfig> tracing_config_;
+  testing::NiceMock<MockScopedTrackedObject> scope_;
   std::string details_;
   bool is_grpc_request_{};
   bool is_head_request_{false};
@@ -212,6 +214,7 @@ public:
   MOCK_METHOD0(streamInfo, StreamInfo::StreamInfo&());
   MOCK_METHOD0(activeSpan, Tracing::Span&());
   MOCK_METHOD0(tracingConfig, Tracing::Config&());
+  MOCK_METHOD0(scope, const ScopeTrackedObject&());
   MOCK_METHOD0(onEncoderFilterAboveWriteBufferHighWatermark, void());
   MOCK_METHOD0(onEncoderFilterBelowWriteBufferLowWatermark, void());
   MOCK_METHOD1(setEncoderBufferLimit, void(uint32_t));
@@ -221,6 +224,7 @@ public:
   MOCK_METHOD2(addEncodedData, void(Buffer::Instance& data, bool streaming));
   MOCK_METHOD2(injectEncodedDataToFilterChain, void(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD0(addEncodedTrailers, HeaderMap&());
+  MOCK_METHOD1(addEncodedMetadata, void(Http::MetadataMapPtr&&));
   MOCK_METHOD0(continueEncoding, void());
   MOCK_METHOD0(encodingBuffer, const Buffer::Instance*());
   MOCK_METHOD1(modifyEncodingBuffer, void(std::function<void(Buffer::Instance&)>));
@@ -228,6 +232,7 @@ public:
   Buffer::InstancePtr buffer_;
   testing::NiceMock<Tracing::MockSpan> active_span_;
   testing::NiceMock<Tracing::MockConfig> tracing_config_;
+  testing::NiceMock<MockScopedTrackedObject> scope_;
 };
 
 class MockStreamDecoderFilter : public StreamDecoderFilter {
@@ -343,6 +348,7 @@ public:
   MOCK_METHOD2(onHeaders_, void(HeaderMap& headers, bool end_stream));
   MOCK_METHOD2(onData, void(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD1(onTrailers_, void(HeaderMap& headers));
+  MOCK_METHOD0(onComplete, void());
   MOCK_METHOD0(onReset, void());
 };
 

@@ -12,14 +12,6 @@ yum install -y devtoolset-7-gcc devtoolset-7-gcc-c++ devtoolset-7-binutils java-
 ln -s /usr/bin/cmake3 /usr/bin/cmake
 ln -s /usr/bin/ninja-build /usr/bin/ninja
 
-BAZEL_VERSION="$(curl -s https://api.github.com/repos/bazelbuild/bazel/releases/latest |
-    python -c "import json, sys; print json.load(sys.stdin)['tag_name']")"
-BAZEL_INSTALLER="bazel-${BAZEL_VERSION}-installer-linux-x86_64.sh"
-curl -OL "https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/${BAZEL_INSTALLER}"
-chmod u+x "./${BAZEL_INSTALLER}"
-"./${BAZEL_INSTALLER}"
-rm "./${BAZEL_INSTALLER}"
-
 # SLES 11 has older glibc than CentOS 7, so pre-built binary for it works on CentOS 7
 LLVM_VERSION=8.0.0
 LLVM_RELEASE="clang+llvm-${LLVM_VERSION}-x86_64-linux-sles11.3"

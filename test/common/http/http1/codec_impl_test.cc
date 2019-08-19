@@ -18,6 +18,7 @@
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
@@ -49,11 +50,8 @@ public:
   }
 
   void initialize() {
-    strict_header_validation_ =
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_header_validation");
-    codec_ =
-        std::make_unique<ServerConnectionImpl>(connection_, callbacks_, codec_settings_,
-                                               max_request_headers_kb_, strict_header_validation_);
+    codec_ = std::make_unique<ServerConnectionImpl>(connection_, store_, callbacks_,
+                                                    codec_settings_, max_request_headers_kb_);
   }
 
   NiceMock<Network::MockConnection> connection_;
@@ -67,7 +65,6 @@ public:
 
 protected:
   uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
-  bool strict_header_validation_;
   Event::MockDispatcher dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::IsolatedStoreImpl store_;
@@ -88,9 +85,8 @@ void Http1ServerConnectionImplTest::expect400(Protocol p, bool allow_absolute_ur
 
   if (allow_absolute_url) {
     codec_settings_.allow_absolute_url_ = allow_absolute_url;
-    codec_ =
-        std::make_unique<ServerConnectionImpl>(connection_, callbacks_, codec_settings_,
-                                               max_request_headers_kb_, strict_header_validation_);
+    codec_ = std::make_unique<ServerConnectionImpl>(connection_, store_, callbacks_,
+                                                    codec_settings_, max_request_headers_kb_);
   }
 
   Http::MockStreamDecoder decoder;
@@ -109,9 +105,8 @@ void Http1ServerConnectionImplTest::expectHeadersTest(Protocol p, bool allow_abs
   // Make a new 'codec' with the right settings
   if (allow_absolute_url) {
     codec_settings_.allow_absolute_url_ = allow_absolute_url;
-    codec_ =
-        std::make_unique<ServerConnectionImpl>(connection_, callbacks_, codec_settings_,
-                                               max_request_headers_kb_, strict_header_validation_);
+    codec_ = std::make_unique<ServerConnectionImpl>(connection_, store_, callbacks_,
+                                                    codec_settings_, max_request_headers_kb_);
   }
 
   Http::MockStreamDecoder decoder;
@@ -241,6 +236,8 @@ TEST_F(Http1ServerConnectionImplTest, Http11AbsolutePath2) {
 }
 
 TEST_F(Http1ServerConnectionImplTest, Http11AbsolutePathWithPort) {
+  initialize();
+
   TestHeaderMapImpl expected_headers{
       {":authority", "www.somewhere.com:4532"}, {":path", "/foo/bar"}, {":method", "GET"}};
   Buffer::OwnedImpl buffer(
@@ -582,9 +579,7 @@ TEST_F(Http1ServerConnectionImplTest, HeaderOnlyResponseWith100Then200) {
   EXPECT_EQ("HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n", output);
 }
 
-class Http1ServerConnectionImplDeathTest : public Http1ServerConnectionImplTest {};
-
-TEST_F(Http1ServerConnectionImplDeathTest, MetadataTest) {
+TEST_F(Http1ServerConnectionImplTest, MetadataTest) {
   initialize();
 
   NiceMock<Http::MockStreamDecoder> decoder;
@@ -602,7 +597,8 @@ TEST_F(Http1ServerConnectionImplDeathTest, MetadataTest) {
   MetadataMapPtr metadata_map_ptr = std::make_unique<MetadataMap>(metadata_map);
   MetadataMapVector metadata_map_vector;
   metadata_map_vector.push_back(std::move(metadata_map_ptr));
-  EXPECT_DEATH_LOG_TO_STDERR(response_encoder->encodeMetadata(metadata_map_vector), "");
+  response_encoder->encodeMetadata(metadata_map_vector);
+  EXPECT_EQ(1, store_.counter("http1.metadata_not_supported_error").value());
 }
 
 TEST_F(Http1ServerConnectionImplTest, ChunkedResponse) {
@@ -865,10 +861,7 @@ public:
   }
 
   void initialize() {
-    strict_header_validation_ =
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_header_validation");
-    codec_ =
-        std::make_unique<ClientConnectionImpl>(connection_, callbacks_, strict_header_validation_);
+    codec_ = std::make_unique<ClientConnectionImpl>(connection_, store_, callbacks_);
   }
 
   NiceMock<Network::MockConnection> connection_;
@@ -885,7 +878,6 @@ protected:
   Init::MockManager init_manager_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   std::unique_ptr<Runtime::ScopedLoaderSingleton> loader_;
-  bool strict_header_validation_;
 };
 
 TEST_F(Http1ClientConnectionImplTest, SimpleGet) {

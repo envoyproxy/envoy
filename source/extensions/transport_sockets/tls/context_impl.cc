@@ -518,6 +518,7 @@ bool ContextImpl::verifySubjectAltName(X509* cert,
     case GEN_IPADD: {
       if (san->d.ip->length == 4) {
         sockaddr_in sin;
+        sin.sin_port = 0;
         sin.sin_family = AF_INET;
         memcpy(&sin.sin_addr, san->d.ip->data, sizeof(sin.sin_addr));
         Network::Address::Ipv4Instance addr(&sin);
@@ -528,6 +529,7 @@ bool ContextImpl::verifySubjectAltName(X509* cert,
         }
       } else if (san->d.ip->length == 16) {
         sockaddr_in6 sin6;
+        sin6.sin6_port = 0;
         sin6.sin6_family = AF_INET6;
         memcpy(&sin6.sin6_addr, san->d.ip->data, sizeof(sin6.sin6_addr));
         Network::Address::Ipv6Instance addr(sin6);

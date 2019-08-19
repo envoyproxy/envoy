@@ -2,7 +2,7 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load(":genrule_repository.bzl", "genrule_repository")
 load("@envoy_api//bazel:envoy_http_archive.bzl", "envoy_http_archive")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS")
-load("@envoy_api//bazel:repositories.bzl", "api_dependencies")
+load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_language")
 
 # dict of {build recipe name: longform extension name,}
 PPC_SKIP_TARGETS = {"luajit": "envoy.filters.http.lua"}
@@ -14,9 +14,6 @@ NOBORINGSSL_SKIP_TARGETS = {
     "tls": "envoy.transport_sockets.tls",
     "tls_inspector": "envoy.filters.listener.tls_inspector",
 }
-
-# go version for rules_go
-GO_VERSION = "1.12.5"
 
 # Make all contents of an external repository accessible under a filegroup.  Used for external HTTP
 # archives, e.g. cares.
@@ -161,7 +158,16 @@ def envoy_dependencies(skip_targets = []):
     _python_deps()
     _cc_deps()
     _go_deps(skip_targets)
-    api_dependencies()
+
+    switched_rules_by_language(
+        name = "com_google_googleapis_imports",
+        cc = True,
+        go = True,
+        grpc = True,
+        rules_override = {
+            "py_proto_library": "@envoy_api//bazel:api_build_system.bzl",
+        },
+    )
 
 def _boringssl():
     _repository_impl("boringssl")
@@ -516,13 +522,15 @@ def _io_opencensus_cpp():
     location = REPOSITORY_LOCATIONS["io_opencensus_cpp"]
     http_archive(
         name = "io_opencensus_cpp",
-        patch_args = ["-p0"],
-        patches = ["@envoy//bazel/foreign_cc:io_opencensus_cpp.patch"],
         **location
     )
     native.bind(
         name = "opencensus_trace",
         actual = "@io_opencensus_cpp//opencensus/trace",
+    )
+    native.bind(
+        name = "opencensus_trace_b3",
+        actual = "@io_opencensus_cpp//opencensus/trace:b3",
     )
     native.bind(
         name = "opencensus_trace_cloud_trace_context",
@@ -592,7 +600,17 @@ def _com_googlesource_quiche():
     )
 
 def _com_github_grpc_grpc():
-    _repository_impl("com_github_grpc_grpc")
+    _repository_impl(
+        "com_github_grpc_grpc",
+        patches = [
+            # Workaround for https://github.com/envoyproxy/envoy/issues/7863
+            "@envoy//bazel:grpc-protoinfo-1.patch",
+            "@envoy//bazel:grpc-protoinfo-2.patch",
+            # Pre-integration of https://github.com/grpc/grpc/pull/19860
+            "@envoy//bazel:grpc-protoinfo-3.patch",
+        ],
+        patch_args = ["-p1"],
+    )
 
     # Rebind some stuff to match what the gRPC Bazel is expecting.
     native.bind(

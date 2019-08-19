@@ -7,22 +7,20 @@ static_resources:
     - filters:
       - name: envoy.http_connection_manager
         config:
-          value:
-            filters:
-            - name: router
-              config: {}
-            codec_type: auto
-            stat_prefix: router
-            drain_timeout_ms: 5000
-            route_config:
-              virtual_hosts:
-              - domains:
-                - "*"
-                name: vhost_0
-                routes:
-                - prefix: "/"
-                  cluster: cluster_0
-          deprecated_v1: true
+          filters:
+          - name: router
+            config: {}
+          codec_type: auto
+          stat_prefix: router
+          drain_timeout_ms: 5000
+          route_config:
+            virtual_hosts:
+            - domains:
+              - "*"
+              name: vhost_0
+              routes:
+              - match: { prefix: "/" }
+                route: { cluster: cluster_0 }
   clusters:
   - name: cluster_0
     connect_timeout: 5s

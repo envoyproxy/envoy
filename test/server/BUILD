@@ -122,6 +122,7 @@ envoy_cc_test(
         "//test/test_common:logging_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
     ],
 )
 
@@ -175,6 +176,7 @@ envoy_cc_test(
         "//source/extensions/filters/listener/original_dst:config",
         "//source/extensions/filters/listener/tls_inspector:config",
         "//source/extensions/filters/network/http_connection_manager:config",
+        "//source/extensions/filters/network/tcp_proxy:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:config",
         "//source/extensions/transport_sockets/tls:ssl_socket_lib",
@@ -251,6 +253,7 @@ envoy_cc_test(
         ":invalid_bootstrap.yaml",
         ":invalid_layered_runtime_duplicate_name.yaml",
         ":invalid_layered_runtime_missing_name.yaml",
+        ":invalid_layered_runtime_no_layer_specifier.yaml",
         ":invalid_runtime_bootstrap.yaml",
         ":node_bootstrap.yaml",
         ":node_bootstrap_no_admin_port.yaml",
@@ -260,8 +263,6 @@ envoy_cc_test(
         ":runtime_test_data",
         ":stats_sink_bootstrap.yaml",
         ":zipkin_tracing.yaml",
-        "//test/config/integration:server.json",
-        "//test/config/integration:server_config_files",
     ],
     deps = [
         "//source/common/common:version_lib",
