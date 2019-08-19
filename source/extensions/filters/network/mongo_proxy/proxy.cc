@@ -230,7 +230,7 @@ void ProxyFilter::decodeReply(ReplyMessagePtr&& message) {
       // Callsite stats if we have it.
       if (!active_query.query_info_.callsite().empty()) {
         // Currently, names == {"collection", collection, "query"} and we are going
-        // to mutate the array to {"collection{", collection, "callsite", callsite, "query"}.
+        // to mutate the array to {"collection", collection, "callsite", callsite, "query"}.
         ASSERT(names.size() == 3);
         names.back() = mongo_stats_->callsite_; // Replaces "query".
         names.push_back(mongo_stats_->getStatName(active_query.query_info_.callsite()));
