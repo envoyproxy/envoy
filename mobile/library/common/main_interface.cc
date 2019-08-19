@@ -50,6 +50,10 @@ envoy_engine_t init_engine() {
 
 /*
  * Setup envoy for interaction via the main interface.
+ * As it stands this function __must__ be executed after calling `run_engine`.
+ * run_engine assigns a static unique pointer used by this function.
+ * TODO: this will change when the engine is no longer static:
+ * https://github.com/lyft/envoy-mobile/issues/332
  */
 void setup_envoy() {
   http_dispatcher_ = std::make_unique<Envoy::Http::Dispatcher>(
