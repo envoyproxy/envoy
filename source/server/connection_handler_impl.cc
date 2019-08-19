@@ -209,6 +209,9 @@ void ConnectionHandlerImpl::ActiveSocket::continueFilterChain(bool success) {
     // Successfully ran all the accept filters.
     if (no_error) {
       newConnection();
+    } else {
+      // Signal the caller that no extra filter chain iteration is needed.
+      iter_ = accept_filters_.end();
     }
   }
 

@@ -2,6 +2,7 @@
 
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
+#include "common/network/io_socket_handle_impl.h"
 #include "common/network/raw_buffer_socket.h"
 #include "common/network/utility.h"
 
@@ -10,6 +11,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -26,7 +28,6 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Server {
 namespace {
-
 class ConnectionHandlerTest : public testing::Test, protected Logger::Loggable<Logger::Id::main> {
 public:
   ConnectionHandlerTest()
@@ -69,6 +70,7 @@ public:
 
     ConnectionHandlerTest& parent_;
     Network::MockListenSocket socket_;
+
     uint64_t tag_;
     bool bind_to_port_;
     const bool hand_off_restored_destination_connections_;
@@ -99,6 +101,8 @@ public:
   NiceMock<Network::MockFilterChainFactory> factory_;
   std::list<TestListenerPtr> listeners_;
   const Network::FilterChainSharedPtr filter_chain_;
+  NiceMock<Api::MockOsSysCalls> os_sys_calls_;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&os_sys_calls_};
 };
 
 TEST_F(ConnectionHandlerTest, RemoveListener) {
@@ -600,9 +604,14 @@ TEST_F(ConnectionHandlerTest, ListenerFilterTimeout) {
       .WillOnce(Invoke([&](Network::ListenerFilterCallbacks&) -> Network::FilterStatus {
         return Network::FilterStatus::StopIteration;
       }));
+
+  Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
+  Network::IoSocketHandleImpl io_handle{42};
+  EXPECT_CALL(*accepted_socket, ioHandle()).WillRepeatedly(ReturnRef(io_handle));
+
   Event::MockTimer* timeout = new Event::MockTimer(&dispatcher_);
   EXPECT_CALL(*timeout, enableTimer(std::chrono::milliseconds(15000)));
-  Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
+
   listener_callbacks->onAccept(Network::ConnectionSocketPtr{accepted_socket}, true);
   Stats::Gauge& downstream_pre_cx_active =
       stats_store_.gauge("downstream_pre_cx_active", Stats::Gauge::ImportMode::Accumulate);
@@ -648,9 +657,14 @@ TEST_F(ConnectionHandlerTest, ContinueOnListenerFilterTimeout) {
       .WillOnce(Invoke([&](Network::ListenerFilterCallbacks&) -> Network::FilterStatus {
         return Network::FilterStatus::StopIteration;
       }));
+
+  Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
+  Network::IoSocketHandleImpl io_handle{42};
+  EXPECT_CALL(*accepted_socket, ioHandle()).WillRepeatedly(ReturnRef(io_handle));
+
   Event::MockTimer* timeout = new Event::MockTimer(&dispatcher_);
   EXPECT_CALL(*timeout, enableTimer(std::chrono::milliseconds(15000)));
-  Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
+
   listener_callbacks->onAccept(Network::ConnectionSocketPtr{accepted_socket}, true);
   Stats::Gauge& downstream_pre_cx_active =
       stats_store_.gauge("downstream_pre_cx_active", Stats::Gauge::ImportMode::Accumulate);
@@ -697,9 +711,12 @@ TEST_F(ConnectionHandlerTest, ListenerFilterTimeoutResetOnSuccess) {
         listener_filter_cb = &cb;
         return Network::FilterStatus::StopIteration;
       }));
+  Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
+  Network::IoSocketHandleImpl io_handle{42};
+  EXPECT_CALL(*accepted_socket, ioHandle()).WillRepeatedly(ReturnRef(io_handle));
   Event::MockTimer* timeout = new Event::MockTimer(&dispatcher_);
   EXPECT_CALL(*timeout, enableTimer(std::chrono::milliseconds(15000)));
-  Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
+
   listener_callbacks->onAccept(Network::ConnectionSocketPtr{accepted_socket}, true);
 
   EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(nullptr));
@@ -740,6 +757,51 @@ TEST_F(ConnectionHandlerTest, ListenerFilterDisabledTimeout) {
   EXPECT_CALL(dispatcher_, createTimer_(_)).Times(0);
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
   listener_callbacks->onAccept(Network::ConnectionSocketPtr{accepted_socket}, true);
+
+  EXPECT_CALL(*listener, onDestroy());
+}
+
+// Listener Filter could close socket in the context of listener callbak.
+TEST_F(ConnectionHandlerTest, ListenerFilterReportError) {
+  InSequence s;
+
+  TestListener* test_listener = addListener(1, true, false, "test_listener");
+  Network::MockListener* listener = new Network::MockListener();
+  Network::ListenerCallbacks* listener_callbacks;
+  EXPECT_CALL(dispatcher_, createListener_(_, _, _, false))
+      .WillOnce(Invoke(
+          [&](Network::Socket&, Network::ListenerCallbacks& cb, bool, bool) -> Network::Listener* {
+            listener_callbacks = &cb;
+            return listener;
+          }));
+  EXPECT_CALL(test_listener->socket_, localAddress());
+  handler_->addListener(*test_listener);
+
+  Network::MockListenerFilter* first_filter = new Network::MockListenerFilter();
+  Network::MockListenerFilter* last_filter = new Network::MockListenerFilter();
+
+  EXPECT_CALL(factory_, createListenerFilterChain(_))
+      .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
+        manager.addAcceptFilter(Network::ListenerFilterPtr{first_filter});
+        manager.addAcceptFilter(Network::ListenerFilterPtr{last_filter});
+        return true;
+      }));
+  // The first filter close the socket
+  EXPECT_CALL(*first_filter, onAccept(_))
+      .WillOnce(Invoke([&](Network::ListenerFilterCallbacks& cb) -> Network::FilterStatus {
+        cb.socket().close();
+        return Network::FilterStatus::StopIteration;
+      }));
+  // The last filter won't be invoked
+  EXPECT_CALL(*last_filter, onAccept(_)).Times(0);
+  Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
+  listener_callbacks->onAccept(Network::ConnectionSocketPtr{accepted_socket}, true);
+
+  dispatcher_.clearDeferredDeleteList();
+  // Make sure the error leads to no listener timer created.
+  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(0);
+  // Make sure we never try to match the filer chain since listener filter doesn't complete.
+  EXPECT_CALL(manager_, findFilterChain(_)).Times(0);
 
   EXPECT_CALL(*listener, onDestroy());
 }
