@@ -95,7 +95,7 @@ TEST_F(SubscriptionFactoryTest, RestClusterSingleton) {
   config.mutable_api_config_source()->add_cluster_names("static_cluster");
   cluster_map.emplace("static_cluster", cluster);
 
-  EXPECT_CALL(dispatcher_, createTimer_(_, _));
+  EXPECT_CALL(dispatcher_, createTimer_(_));
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(*cluster.info_, addedViaApi()).WillOnce(Return(false));
   EXPECT_CALL(*cluster.info_, type()).WillOnce(Return(envoy::api::v2::Cluster::STATIC));
@@ -129,7 +129,7 @@ TEST_F(SubscriptionFactoryTest, GrpcClusterSingleton) {
       }));
   EXPECT_CALL(*cluster.info_, addedViaApi()).WillOnce(Return(false));
   EXPECT_CALL(*cluster.info_, type()).WillOnce(Return(envoy::api::v2::Cluster::STATIC));
-  EXPECT_CALL(dispatcher_, createTimer_(_, _));
+  EXPECT_CALL(dispatcher_, createTimer_(_));
 
   subscriptionFromConfigSource(config);
 }
@@ -226,7 +226,7 @@ TEST_F(SubscriptionFactoryTest, HttpSubscriptionCustomRequestTimeout) {
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cluster, info()).Times(2);
   EXPECT_CALL(*cluster.info_, addedViaApi());
-  EXPECT_CALL(dispatcher_, createTimer_(_, _)).Times(2);
+  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(2);
   EXPECT_CALL(cm_, httpAsyncClientForCluster("static_cluster"));
   EXPECT_CALL(
       cm_.async_client_,
@@ -246,7 +246,7 @@ TEST_F(SubscriptionFactoryTest, HttpSubscription) {
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cluster, info()).Times(2);
   EXPECT_CALL(*cluster.info_, addedViaApi());
-  EXPECT_CALL(dispatcher_, createTimer_(_, _)).Times(2);
+  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(2);
   EXPECT_CALL(cm_, httpAsyncClientForCluster("static_cluster"));
   EXPECT_CALL(cm_.async_client_, send_(_, _, _))
       .WillOnce(Invoke([this](Http::MessagePtr& request, Http::AsyncClient::Callbacks&,
@@ -301,7 +301,7 @@ TEST_F(SubscriptionFactoryTest, GrpcSubscription) {
         return async_client_factory;
       }));
   EXPECT_CALL(random_, random());
-  EXPECT_CALL(dispatcher_, createTimer_(_, _)).Times(2);
+  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(2);
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _));
   subscriptionFromConfigSource(config)->start({"static_cluster"});
 }

@@ -181,6 +181,7 @@ private:
   const uint64_t bytes_per_time_slice_;
   const std::function<void(Buffer::Instance&, bool)> write_data_cb_;
   const std::function<void()> continue_cb_;
+  const ScopeTrackedObject& scope_;
   TokenBucketImpl token_bucket_;
   Event::TimerPtr token_timer_;
   bool saw_data_{};

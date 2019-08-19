@@ -470,8 +470,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   if (connection_manager_.config_.requestTimeout().count()) {
     std::chrono::milliseconds request_timeout_ms_ = connection_manager_.config_.requestTimeout();
     request_timer_ = connection_manager.read_callbacks_->connection().dispatcher().createTimer(
-        [this]() -> void { onRequestTimeout(); }, this);
-    request_timer_->enableTimer(request_timeout_ms_);
+        [this]() -> void { onRequestTimeout(); });
+    request_timer_->enableTimer(request_timeout_ms_, this);
   }
 
   stream_info_.setRequestedServerName(

@@ -132,13 +132,12 @@ TEST_F(GrpcMuxImplTest, ResetStream) {
 
   Event::MockTimer* timer = nullptr;
   Event::TimerCb timer_cb;
-  EXPECT_CALL(dispatcher_, createTimer_(_, _))
-      .WillOnce(Invoke([&timer, &timer_cb](Event::TimerCb cb, const ScopeTrackedObject*) {
-        timer_cb = cb;
-        EXPECT_EQ(nullptr, timer);
-        timer = new Event::MockTimer();
-        return timer;
-      }));
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([&timer, &timer_cb](Event::TimerCb cb) {
+    timer_cb = cb;
+    EXPECT_EQ(nullptr, timer);
+    timer = new Event::MockTimer();
+    return timer;
+  }));
 
   setup();
   auto foo_sub = grpc_mux_->subscribe("foo", {"x", "y"}, callbacks_);
@@ -155,7 +154,7 @@ TEST_F(GrpcMuxImplTest, ResetStream) {
       .Times(3);
   EXPECT_CALL(random_, random());
   ASSERT_TRUE(timer != nullptr); // initialized from dispatcher mock.
-  EXPECT_CALL(*timer, enableTimer(_));
+  EXPECT_CALL(*timer, enableTimer(_, _));
   grpc_mux_->grpcStreamForTest().onRemoteClose(Grpc::Status::GrpcStatus::Canceled, "");
   EXPECT_EQ(0, control_plane_connected_state_.value());
   EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
@@ -398,13 +397,12 @@ TEST_F(GrpcMuxImplTestWithMockTimeSystem, TooManyRequestsWithDefaultSettings) {
   // Validate that only connection retry timer is enabled.
   Event::MockTimer* timer = nullptr;
   Event::TimerCb timer_cb;
-  EXPECT_CALL(dispatcher_, createTimer_(_, _))
-      .WillOnce(Invoke([&timer, &timer_cb](Event::TimerCb cb, const ScopeTrackedObject*) {
-        timer_cb = cb;
-        EXPECT_EQ(nullptr, timer);
-        timer = new Event::MockTimer();
-        return timer;
-      }));
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([&timer, &timer_cb](Event::TimerCb cb) {
+    timer_cb = cb;
+    EXPECT_EQ(nullptr, timer);
+    timer = new Event::MockTimer();
+    return timer;
+  }));
 
   // Validate that rate limiter is not created.
   EXPECT_CALL(*mock_time_system_, monotonicTime()).Times(0);
@@ -444,20 +442,19 @@ TEST_F(GrpcMuxImplTestWithMockTimeSystem, TooManyRequestsWithEmptyRateLimitSetti
   Event::MockTimer* drain_request_timer = nullptr;
 
   Event::TimerCb timer_cb;
-  EXPECT_CALL(dispatcher_, createTimer_(_, _))
-      .WillOnce(Invoke([&timer, &timer_cb](Event::TimerCb cb, const ScopeTrackedObject*) {
+  EXPECT_CALL(dispatcher_, createTimer_(_))
+      .WillOnce(Invoke([&timer, &timer_cb](Event::TimerCb cb) {
         timer_cb = cb;
         EXPECT_EQ(nullptr, timer);
         timer = new Event::MockTimer();
         return timer;
       }))
-      .WillOnce(
-          Invoke([&drain_request_timer, &timer_cb](Event::TimerCb cb, const ScopeTrackedObject*) {
-            timer_cb = cb;
-            EXPECT_EQ(nullptr, drain_request_timer);
-            drain_request_timer = new Event::MockTimer();
-            return drain_request_timer;
-          }));
+      .WillOnce(Invoke([&drain_request_timer, &timer_cb](Event::TimerCb cb) {
+        timer_cb = cb;
+        EXPECT_EQ(nullptr, drain_request_timer);
+        drain_request_timer = new Event::MockTimer();
+        return drain_request_timer;
+      }));
   EXPECT_CALL(*mock_time_system_, monotonicTime())
       .WillRepeatedly(Return(std::chrono::steady_clock::time_point{}));
 
@@ -484,7 +481,7 @@ TEST_F(GrpcMuxImplTestWithMockTimeSystem, TooManyRequestsWithEmptyRateLimitSetti
   grpc_mux_->start();
 
   // Validate that drain_request_timer is enabled when there are no tokens.
-  EXPECT_CALL(*drain_request_timer, enableTimer(std::chrono::milliseconds(100)));
+  EXPECT_CALL(*drain_request_timer, enableTimer(std::chrono::milliseconds(100), _));
   onReceiveMessage(99);
   EXPECT_EQ(1, stats_.counter("control_plane.rate_limit_enforced").value());
   EXPECT_EQ(
@@ -501,20 +498,19 @@ TEST_F(GrpcMuxImplTest, TooManyRequestsWithCustomRateLimitSettings) {
   Event::TimerCb timer_cb;
   Event::TimerCb drain_timer_cb;
 
-  EXPECT_CALL(dispatcher_, createTimer_(_, _))
-      .WillOnce(Invoke([&timer, &timer_cb](Event::TimerCb cb, const ScopeTrackedObject*) {
+  EXPECT_CALL(dispatcher_, createTimer_(_))
+      .WillOnce(Invoke([&timer, &timer_cb](Event::TimerCb cb) {
         timer_cb = cb;
         EXPECT_EQ(nullptr, timer);
         timer = new Event::MockTimer();
         return timer;
       }))
-      .WillOnce(Invoke(
-          [&drain_request_timer, &drain_timer_cb](Event::TimerCb cb, const ScopeTrackedObject*) {
-            drain_timer_cb = cb;
-            EXPECT_EQ(nullptr, drain_request_timer);
-            drain_request_timer = new Event::MockTimer();
-            return drain_request_timer;
-          }));
+      .WillOnce(Invoke([&drain_request_timer, &drain_timer_cb](Event::TimerCb cb) {
+        drain_timer_cb = cb;
+        EXPECT_EQ(nullptr, drain_request_timer);
+        drain_request_timer = new Event::MockTimer();
+        return drain_request_timer;
+      }));
 
   RateLimitSettings custom_rate_limit_settings;
   custom_rate_limit_settings.enabled_ = true;
@@ -545,7 +541,8 @@ TEST_F(GrpcMuxImplTest, TooManyRequestsWithCustomRateLimitSettings) {
   EXPECT_EQ(0, stats_.counter("control_plane.rate_limit_enforced").value());
 
   // Validate that drain_request_timer is enabled when there are no tokens.
-  EXPECT_CALL(*drain_request_timer, enableTimer(std::chrono::milliseconds(500))).Times(AtLeast(1));
+  EXPECT_CALL(*drain_request_timer, enableTimer(std::chrono::milliseconds(500), _))
+      .Times(AtLeast(1));
   onReceiveMessage(160);
   EXPECT_EQ(12, stats_.counter("control_plane.rate_limit_enforced").value());
   Stats::Gauge& pending_requests =

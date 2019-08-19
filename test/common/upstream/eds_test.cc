@@ -1675,15 +1675,14 @@ TEST_F(EdsTest, MalformedIP) {
 class EdsAssignmentTimeoutTest : public EdsTest {
 public:
   EdsAssignmentTimeoutTest() {
-    EXPECT_CALL(dispatcher_, createTimer_(_, _))
-        .WillOnce(Invoke([this](Event::TimerCb cb, const ScopeTrackedObject*) {
+    EXPECT_CALL(dispatcher_, createTimer_(_))
+        .WillOnce(Invoke([this](Event::TimerCb cb) {
           timer_cb_ = cb;
           EXPECT_EQ(nullptr, interval_timer_);
           interval_timer_ = new Event::MockTimer();
           return interval_timer_;
         }))
-        .WillRepeatedly(Invoke(
-            [](Event::TimerCb, const ScopeTrackedObject*) { return new Event::MockTimer(); }));
+        .WillRepeatedly(Invoke([](Event::TimerCb) { return new Event::MockTimer(); }));
 
     resetCluster();
   }
@@ -1714,9 +1713,9 @@ TEST_F(EdsAssignmentTimeoutTest, AssignmentTimeoutEnableDisable) {
   cluster_load_assignment_lease.mutable_policy()->mutable_endpoint_stale_after()->MergeFrom(
       Protobuf::util::TimeUtil::SecondsToDuration(1));
 
-  EXPECT_CALL(*interval_timer_, enableTimer(_)).Times(2); // Timer enabled twice.
-  EXPECT_CALL(*interval_timer_, disableTimer()).Times(1); // Timer disabled once.
-  EXPECT_CALL(*interval_timer_, enabled()).Times(6);      // Includes calls by test.
+  EXPECT_CALL(*interval_timer_, enableTimer(_, _)).Times(2); // Timer enabled twice.
+  EXPECT_CALL(*interval_timer_, disableTimer()).Times(1);    // Timer disabled once.
+  EXPECT_CALL(*interval_timer_, enabled()).Times(6);         // Includes calls by test.
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment_lease);
   // Check that the timer is enabled.
   EXPECT_EQ(interval_timer_->enabled(), true);
@@ -1756,7 +1755,7 @@ TEST_F(EdsAssignmentTimeoutTest, AssignmentLeaseExpired) {
   add_endpoint(81);
 
   // Expect the timer to be enabled once.
-  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(1000)));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(1000), _));
   // Expect the timer to be disabled when stale assignments are removed.
   EXPECT_CALL(*interval_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enabled()).Times(2);

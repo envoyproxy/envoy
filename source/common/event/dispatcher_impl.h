@@ -62,7 +62,7 @@ public:
                                       bool hand_off_restored_destination_connections) override;
   Network::ListenerPtr createUdpListener(Network::Socket& socket,
                                          Network::UdpListenerCallbacks& cb) override;
-  TimerPtr createTimer(TimerCb cb, const ScopeTrackedObject* object) override;
+  TimerPtr createTimer(TimerCb cb) override;
   void deferredDelete(DeferredDeletablePtr&& to_delete) override;
   void exit() override;
   SignalEventPtr listenForSignal(int signal_num, SignalCb cb) override;
@@ -87,7 +87,7 @@ public:
   }
 
 private:
-  TimerPtr createTimerInternal(TimerCb cb, const ScopeTrackedObject* object = nullptr);
+  TimerPtr createTimerInternal(TimerCb cb);
   void runPostCallbacks();
 
   // Validate that an operation is thread safe, i.e. it's invoked on the same thread that the

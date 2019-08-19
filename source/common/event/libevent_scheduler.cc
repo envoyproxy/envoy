@@ -19,9 +19,8 @@ LibeventScheduler::LibeventScheduler() : libevent_(event_base_new()) {
   RELEASE_ASSERT(Libevent::Global::initialized(), "");
 }
 
-TimerPtr LibeventScheduler::createTimer(const TimerCb& cb, Dispatcher& dispatcher,
-                                        const ScopeTrackedObject* object) {
-  return std::make_unique<TimerImpl>(libevent_, cb, dispatcher, object);
+TimerPtr LibeventScheduler::createTimer(const TimerCb& cb, Dispatcher& dispatcher) {
+  return std::make_unique<TimerImpl>(libevent_, cb, dispatcher);
 };
 
 void LibeventScheduler::run(Dispatcher::RunType mode) {

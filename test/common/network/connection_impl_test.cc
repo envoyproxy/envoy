@@ -1181,7 +1181,7 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayConfigDisabledTest) {
   // Ensure the delayed close timer is not created when the delayedCloseTimeout config value is set
   // to 0.
   server_connection->setDelayedCloseTimeout(std::chrono::milliseconds(0));
-  EXPECT_CALL(dispatcher, createTimer_(_, _)).Times(0);
+  EXPECT_CALL(dispatcher, createTimer_(_)).Times(0);
 
   NiceMockConnectionStats stats;
   server_connection->setConnectionStats(stats.toBufferStats());
@@ -1224,7 +1224,7 @@ TEST_P(ConnectionImplTest, DelayedCloseTimerResetWithPendingWriteBufferFlushes) 
   Buffer::OwnedImpl data("data");
   server_connection->write(data, false);
 
-  EXPECT_CALL(*mocks.timer_, enableTimer(timeout)).Times(1);
+  EXPECT_CALL(*mocks.timer_, enableTimer(timeout, _)).Times(1);
   server_connection->close(ConnectionCloseType::FlushWriteAndDelay);
 
   // The write ready event cb (ConnectionImpl::onWriteReady()) will reset the timer to its original
@@ -1234,7 +1234,7 @@ TEST_P(ConnectionImplTest, DelayedCloseTimerResetWithPendingWriteBufferFlushes) 
         // Partial flush.
         return IoResult{PostIoAction::KeepOpen, 1, false};
       }));
-  EXPECT_CALL(*mocks.timer_, enableTimer(timeout)).Times(1);
+  EXPECT_CALL(*mocks.timer_, enableTimer(timeout, _)).Times(1);
   (*mocks.file_ready_cb_)(Event::FileReadyType::Write);
 
   EXPECT_CALL(*transport_socket, doWrite(BufferStringEqual("data"), _))
@@ -1243,7 +1243,7 @@ TEST_P(ConnectionImplTest, DelayedCloseTimerResetWithPendingWriteBufferFlushes) 
         buffer.drain(buffer.length());
         return IoResult{PostIoAction::KeepOpen, buffer.length(), false};
       }));
-  EXPECT_CALL(*mocks.timer_, enableTimer(timeout)).Times(1);
+  EXPECT_CALL(*mocks.timer_, enableTimer(timeout, _)).Times(1);
   (*mocks.file_ready_cb_)(Event::FileReadyType::Write);
 
   // Force the delayed close timeout to trigger so the connection is cleaned up.
@@ -1277,7 +1277,7 @@ TEST_P(ConnectionImplTest, DelayedCloseTimeoutDisableOnSocketClose) {
         return IoResult{PostIoAction::KeepOpen, buffer.length(), false};
       }));
   server_connection->write(data, false);
-  EXPECT_CALL(*mocks.timer_, enableTimer(_)).Times(1);
+  EXPECT_CALL(*mocks.timer_, enableTimer(_, _)).Times(1);
   // Enable the delayed close timer.
   server_connection->close(ConnectionCloseType::FlushWriteAndDelay);
   EXPECT_CALL(*mocks.timer_, disableTimer()).Times(1);
@@ -1318,7 +1318,7 @@ TEST_P(ConnectionImplTest, DelayedCloseTimeoutNullStats) {
       }));
   server_connection->write(data, false);
 
-  EXPECT_CALL(*mocks.timer_, enableTimer(_)).Times(1);
+  EXPECT_CALL(*mocks.timer_, enableTimer(_, _)).Times(1);
   server_connection->close(ConnectionCloseType::FlushWriteAndDelay);
   EXPECT_CALL(*mocks.timer_, disableTimer()).Times(1);
   // The following close() will call closeSocket() and reset internal data structures such as
@@ -1728,7 +1728,7 @@ TEST_F(PostCloseConnectionImplTest, ReadAfterCloseFlushWriteDelayIgnored) {
   initialize();
 
   // Delayed connection close.
-  EXPECT_CALL(dispatcher_, createTimer_(_, _));
+  EXPECT_CALL(dispatcher_, createTimer_(_));
   EXPECT_CALL(*file_event_, setEnabled(Event::FileReadyType::Closed));
   connection_->close(ConnectionCloseType::FlushWriteAndDelay);
 
@@ -1753,7 +1753,7 @@ TEST_F(PostCloseConnectionImplTest, ReadAfterCloseFlushWriteDelayIgnoredWithWrit
   writeSomeData();
 
   // Delayed connection close.
-  EXPECT_CALL(dispatcher_, createTimer_(_, _));
+  EXPECT_CALL(dispatcher_, createTimer_(_));
   // With half-close semantics enabled we will not wait for early close notification.
   // See the `Envoy::Network::ConnectionImpl::readDisable()' method for more details.
   EXPECT_CALL(*file_event_, setEnabled(0));
@@ -1788,7 +1788,7 @@ TEST_F(PostCloseConnectionImplTest, ReadAfterCloseFlushWriteDelayIgnoredCanFlush
   ON_CALL(*transport_socket_, canFlushClose()).WillByDefault(Return(true));
 
   // Delayed connection close.
-  EXPECT_CALL(dispatcher_, createTimer_(_, _));
+  EXPECT_CALL(dispatcher_, createTimer_(_));
   EXPECT_CALL(*file_event_, setEnabled(Event::FileReadyType::Write | Event::FileReadyType::Closed));
   connection_->close(ConnectionCloseType::FlushWriteAndDelay);
 

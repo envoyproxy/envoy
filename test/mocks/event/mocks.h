@@ -70,8 +70,8 @@ public:
     return Network::ListenerPtr{createUdpListener_(socket, cb)};
   }
 
-  Event::TimerPtr createTimer(Event::TimerCb cb, const ScopeTrackedObject* object) override {
-    return Event::TimerPtr{createTimer_(cb, object)};
+  Event::TimerPtr createTimer(Event::TimerCb cb) override {
+    return Event::TimerPtr{createTimer_(cb)};
   }
 
   void deferredDelete(DeferredDeletablePtr&& to_delete) override {
@@ -109,7 +109,7 @@ public:
                                   bool hand_off_restored_destination_connections));
   MOCK_METHOD2(createUdpListener_,
                Network::Listener*(Network::Socket& socket, Network::UdpListenerCallbacks& cb));
-  MOCK_METHOD2(createTimer_, Timer*(Event::TimerCb cb, const ScopeTrackedObject* object));
+  MOCK_METHOD1(createTimer_, Timer*(Event::TimerCb cb));
   MOCK_METHOD1(deferredDelete_, void(DeferredDeletable* to_delete));
   MOCK_METHOD0(exit, void());
   MOCK_METHOD2(listenForSignal_, SignalEvent*(int signal_num, SignalCb cb));
@@ -133,22 +133,24 @@ public:
   void invokeCallback() {
     EXPECT_TRUE(enabled_);
     enabled_ = false;
-    if (object_ != nullptr) {
-      ScopeTrackerScopeState scope(object_, *dispatcher_);
+    if (scope_ == nullptr) {
       callback_();
-    } else {
-      callback_();
+      return;
     }
+    ScopeTrackerScopeState scope(scope_, *dispatcher_);
+    scope_ = nullptr;
+    callback_();
   }
 
   // Timer
   MOCK_METHOD0(disableTimer, void());
-  MOCK_METHOD1(enableTimer, void(const std::chrono::milliseconds&));
+  MOCK_METHOD2(enableTimer,
+               void(const std::chrono::milliseconds&, const ScopeTrackedObject* scope));
   MOCK_METHOD0(enabled, bool());
 
-  MockDispatcher* dispatcher_;
+  MockDispatcher* dispatcher_{};
+  const ScopeTrackedObject* scope_{};
   bool enabled_{};
-  const ScopeTrackedObject* object_;
 
 private:
   Event::TimerCb callback_;

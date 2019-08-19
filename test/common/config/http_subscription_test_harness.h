@@ -41,11 +41,10 @@ public:
         timer_(new Event::MockTimer()), http_request_(&cm_.async_client_) {
     node_.set_id("fo0");
     EXPECT_CALL(local_info_, node()).WillOnce(testing::ReturnRef(node_));
-    EXPECT_CALL(dispatcher_, createTimer_(_, _))
-        .WillOnce(Invoke([this](Event::TimerCb timer_cb, const ScopeTrackedObject*) {
-          timer_cb_ = timer_cb;
-          return timer_;
-        }));
+    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
+      timer_cb_ = timer_cb;
+      return timer_;
+    }));
     subscription_ = std::make_unique<HttpSubscriptionImpl>(
         local_info_, cm_, "eds_cluster", dispatcher_, random_gen_, std::chrono::milliseconds(1),
         std::chrono::milliseconds(1000), *method_descriptor_, callbacks_, stats_,
@@ -145,7 +144,7 @@ public:
                                   Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, _));
     }
     EXPECT_CALL(random_gen_, random()).WillOnce(Return(0));
-    EXPECT_CALL(*timer_, enableTimer(_));
+    EXPECT_CALL(*timer_, enableTimer(_, _));
     http_callbacks_->onSuccess(std::move(message));
     if (accept) {
       version_ = version;
@@ -160,7 +159,7 @@ public:
 
   void expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds timeout) override {
     init_timeout_timer_ = new Event::MockTimer(&dispatcher_);
-    EXPECT_CALL(*init_timeout_timer_, enableTimer(std::chrono::milliseconds(timeout)));
+    EXPECT_CALL(*init_timeout_timer_, enableTimer(std::chrono::milliseconds(timeout), _));
   }
 
   void expectDisableInitFetchTimeoutTimer() override {

@@ -53,7 +53,7 @@ public:
     codec_ = new Http::MockClientConnection();
 
     Network::ClientConnectionPtr connection{connection_};
-    EXPECT_CALL(dispatcher_, createTimer_(_, _));
+    EXPECT_CALL(dispatcher_, createTimer_(_));
     client_ = std::make_unique<CodecClientForTest>(std::move(connection), codec_, nullptr, host_,
                                                    dispatcher_);
   }

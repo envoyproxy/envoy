@@ -161,9 +161,10 @@ Http::FilterHeadersStatus SquashFilter::decodeHeaders(Http::HeaderMap& headers, 
     return Http::FilterHeadersStatus::Continue;
   }
 
-  attachment_timeout_timer_ = decoder_callbacks_->dispatcher().createTimer(
-      [this]() -> void { doneSquashing(); }, &decoder_callbacks_->scope());
-  attachment_timeout_timer_->enableTimer(config_->attachmentTimeout());
+  attachment_timeout_timer_ =
+      decoder_callbacks_->dispatcher().createTimer([this]() -> void { doneSquashing(); });
+  attachment_timeout_timer_->enableTimer(config_->attachmentTimeout(),
+                                         &decoder_callbacks_->scope());
   // Check if the timer expired inline.
   if (!is_squashing_) {
     return Http::FilterHeadersStatus::Continue;
@@ -258,10 +259,11 @@ void SquashFilter::onGetAttachmentFailure(Http::AsyncClient::FailureReason) {
 
 void SquashFilter::scheduleRetry() {
   if (attachment_poll_period_timer_.get() == nullptr) {
-    attachment_poll_period_timer_ = decoder_callbacks_->dispatcher().createTimer(
-        [this]() -> void { pollForAttachment(); }, &decoder_callbacks_->scope());
+    attachment_poll_period_timer_ =
+        decoder_callbacks_->dispatcher().createTimer([this]() -> void { pollForAttachment(); });
   }
-  attachment_poll_period_timer_->enableTimer(config_->attachmentPollPeriod());
+  attachment_poll_period_timer_->enableTimer(config_->attachmentPollPeriod(),
+                                             &decoder_callbacks_->scope());
 }
 
 void SquashFilter::pollForAttachment() {

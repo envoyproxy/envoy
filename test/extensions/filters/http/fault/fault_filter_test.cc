@@ -144,7 +144,7 @@ public:
 
   void expectDelayTimer(uint64_t duration_ms) {
     timer_ = new Event::MockTimer(&decoder_filter_callbacks_.dispatcher_);
-    EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(duration_ms)));
+    EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(duration_ms), _));
     EXPECT_CALL(*timer_, disableTimer());
   }
 
@@ -769,7 +769,7 @@ TEST_F(FaultFilterTest, TimerResetAfterStreamReset) {
 
   SCOPED_TRACE("FixedDelayWithStreamReset");
   timer_ = new Event::MockTimer(&decoder_filter_callbacks_.dispatcher_);
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5000UL)));
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5000UL), _));
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::DelayInjected));
@@ -1056,7 +1056,7 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
 
   // Send a small amount of data which should be within limit.
   Buffer::OwnedImpl data1("hello");
-  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(0)));
+  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(0), _));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(data1, false));
   EXPECT_CALL(encoder_filter_callbacks_,
               injectEncodedDataToFilterChain(BufferStringEqual("hello"), false));
@@ -1067,11 +1067,11 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
 
   // Send 1152 bytes of data which is 1s + 2 refill cycles of data.
   EXPECT_CALL(encoder_filter_callbacks_, onEncoderFilterAboveWriteBufferHighWatermark());
-  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(0)));
+  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(0), _));
   Buffer::OwnedImpl data2(std::string(1152, 'a'));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(data2, false));
 
-  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(63)));
+  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(63), _));
   EXPECT_CALL(encoder_filter_callbacks_, onEncoderFilterBelowWriteBufferLowWatermark());
   EXPECT_CALL(encoder_filter_callbacks_,
               injectEncodedDataToFilterChain(BufferStringEqual(std::string(1024, 'a')), false));
@@ -1079,7 +1079,7 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
 
   // Fire timer, also advance time.
   time_system_.sleep(std::chrono::milliseconds(63));
-  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(63)));
+  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(63), _));
   EXPECT_CALL(encoder_filter_callbacks_,
               injectEncodedDataToFilterChain(BufferStringEqual(std::string(64, 'a')), false));
   token_timer->invokeCallback();
@@ -1090,7 +1090,7 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
 
   // Fire timer, also advance time.
   time_system_.sleep(std::chrono::milliseconds(63));
-  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(63)));
+  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(63), _));
   EXPECT_CALL(encoder_filter_callbacks_,
               injectEncodedDataToFilterChain(BufferStringEqual(std::string(64, 'a')), false));
   token_timer->invokeCallback();
@@ -1105,7 +1105,7 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
   time_system_.sleep(std::chrono::seconds(1));
 
   // Now send 1024 in one shot with end_stream true which should go through and end the stream.
-  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(0)));
+  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(0), _));
   Buffer::OwnedImpl data4(std::string(1024, 'c'));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(data4, true));
   EXPECT_CALL(encoder_filter_callbacks_,

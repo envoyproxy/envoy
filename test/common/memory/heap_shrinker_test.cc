@@ -38,7 +38,7 @@ protected:
 TEST_F(HeapShrinkerTest, DoNotShrinkWhenNotConfigured) {
   NiceMock<Event::MockDispatcher> dispatcher;
   EXPECT_CALL(overload_manager_, registerForAction(_, _, _)).WillOnce(Return(false));
-  EXPECT_CALL(dispatcher, createTimer_(_, _)).Times(0);
+  EXPECT_CALL(dispatcher, createTimer_(_)).Times(0);
   HeapShrinker h(dispatcher, overload_manager_, stats_);
 }
 

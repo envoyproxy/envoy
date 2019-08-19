@@ -24,12 +24,11 @@ public:
  */
 class TimerImpl : public Timer, ImplBase {
 public:
-  TimerImpl(Libevent::BasePtr& libevent, TimerCb cb, Event::Dispatcher& dispatcher,
-            const ScopeTrackedObject* object = nullptr);
+  TimerImpl(Libevent::BasePtr& libevent, TimerCb cb, Event::Dispatcher& dispatcher);
 
   // Timer
   void disableTimer() override;
-  void enableTimer(const std::chrono::milliseconds& d) override;
+  void enableTimer(const std::chrono::milliseconds& d, const ScopeTrackedObject* scope) override;
   bool enabled() override;
 
 private:
