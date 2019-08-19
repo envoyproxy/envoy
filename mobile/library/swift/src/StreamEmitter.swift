@@ -16,6 +16,7 @@ public protocol StreamEmitter {
   /// - throws: `Envoy.Error` when the stream is inactive or data can't be sent.
   ///
   /// - returns: The stream emitter, for chaining syntax.
+  @discardableResult
   func sendData(_ data: Data) throws -> StreamEmitter
 
   /// Send metadata over the associated stream.
@@ -25,6 +26,7 @@ public protocol StreamEmitter {
   /// - throws: `Envoy.Error` when the stream is inactive or data can't be sent.
   ///
   /// - returns: The stream emitter, for chaining syntax.
+  @discardableResult
   func sendMetadata(_ metadata: [String: [String]]) throws -> StreamEmitter
 
   /// End the stream after sending any provided trailers.
