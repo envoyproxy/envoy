@@ -90,6 +90,29 @@ message RedisProxy {
     // this limit, then redirection will fail and the original redirection error will be passed
     // downstream unchanged. This limit defaults to 100.
     google.protobuf.UInt32Value max_upstream_unknown_connections = 6;
+
+    // ReadPolicy controls how Envoy routes read commands to Redis nodes. This is currently
+    // supported for Redis Cluster. All ReadPolicy settings except MASTER may return stale data
+    // because replication is asynchronous and requires some delay. You need to ensure that your
+    // application can tolerate stale data.
+    enum ReadPolicy {
+      // Default mode. Read from the current master node.
+      MASTER = 0;
+      // Read from the master, but if it is unavailable, read from replica nodes.
+      PREFER_MASTER = 1;
+      // Read from replica nodes. If multiple replica nodes are present within a shard, a random
+      // node is selected. Healthy nodes have precedent over unhealthy nodes.
+      REPLICA = 2;
+      // Read from the replica nodes (similar to REPLICA), but if all replicas are unavailable (not
+      // present or unhealthy), read from the master.
+      PREFER_REPLICA = 3;
+      // Read from any node of the cluster. A random node is selected among the master and replicas,
+      // healthy nodes have precedent over unhealthy nodes.
+      ANY = 4;
+    }
+
+    // Read policy. The default is to read from the master.
+    ReadPolicy read_policy = 7 [(validate.rules).enum.defined_only = true];
   }
 
   // Network settings for the connection pool to the upstream clusters.

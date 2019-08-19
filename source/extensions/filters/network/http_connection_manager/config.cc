@@ -307,7 +307,10 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
   const auto& filters = config.http_filters();
   for (int32_t i = 0; i < filters.size(); i++) {
-    processFilter(filters[i], i, "http", filter_factories_);
+    bool is_terminal = false;
+    processFilter(filters[i], i, "http", filter_factories_, is_terminal);
+    Config::Utility::validateTerminalFilters(filters[i].name(), "http", is_terminal,
+                                             i == filters.size() - 1);
   }
 
   for (const auto& upgrade_config : config.upgrade_configs()) {
@@ -320,8 +323,12 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     }
     if (!upgrade_config.filters().empty()) {
       std::unique_ptr<FilterFactoriesList> factories = std::make_unique<FilterFactoriesList>();
-      for (int32_t i = 0; i < upgrade_config.filters().size(); i++) {
-        processFilter(upgrade_config.filters(i), i, name, *factories);
+      for (int32_t j = 0; j < upgrade_config.filters().size(); j++) {
+        bool is_terminal = false;
+        processFilter(upgrade_config.filters(j), j, name, *factories, is_terminal);
+        Config::Utility::validateTerminalFilters(upgrade_config.filters(j).name(), "http upgrade",
+                                                 is_terminal,
+                                                 j == upgrade_config.filters().size() - 1);
       }
       upgrade_filter_factories_.emplace(
           std::make_pair(name, FilterConfig{std::move(factories), enabled}));
@@ -335,7 +342,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
 void HttpConnectionManagerConfig::processFilter(
     const envoy::config::filter::network::http_connection_manager::v2::HttpFilter& proto_config,
-    int i, absl::string_view prefix, std::list<Http::FilterFactoryCb>& filter_factories) {
+    int i, absl::string_view prefix, std::list<Http::FilterFactoryCb>& filter_factories,
+    bool& is_terminal) {
   const std::string& string_name = proto_config.name();
 
   ENVOY_LOG(debug, "    {} filter #{}", prefix, i);
@@ -358,6 +366,7 @@ void HttpConnectionManagerConfig::processFilter(
         proto_config, context_.messageValidationVisitor(), factory);
     callback = factory.createFilterFactoryFromProto(*message, stats_prefix_, context_);
   }
+  is_terminal = factory.isTerminalFilter();
   filter_factories.push_back(callback);
 }
 

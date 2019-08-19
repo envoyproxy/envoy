@@ -13,6 +13,7 @@ startup --host_jvm_args=-Xmx2g
 build --workspace_status_command=bazel/get_workspace_status
 build --experimental_remap_main_repo
 build --experimental_local_memory_estimate
+build --experimental_strict_action_env=true
 build --host_force_python=PY2
 build --action_env=BAZEL_LINKLIBS=-l%:libstdc++.a
 build --action_env=BAZEL_LINKOPTS=-lm:-static-libgcc

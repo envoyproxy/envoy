@@ -9,8 +9,13 @@
 #include "common/http/http2/codec_impl.h"
 
 #include "test/common/http/common.h"
+#include "test/common/http/http2/http2_frame.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/init/mocks.h"
+#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/protobuf/mocks.h"
+#include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
@@ -97,6 +102,14 @@ public:
     setting.initial_stream_window_size_ = ::testing::get<2>(tp);
     setting.initial_connection_window_size_ = ::testing::get<3>(tp);
     setting.allow_metadata_ = allow_metadata_;
+    setting.stream_error_on_invalid_http_messaging_ = stream_error_on_invalid_http_messaging_;
+    setting.max_outbound_frames_ = max_outbound_frames_;
+    setting.max_outbound_control_frames_ = max_outbound_control_frames_;
+    setting.max_consecutive_inbound_frames_with_empty_payload_ =
+        max_consecutive_inbound_frames_with_empty_payload_;
+    setting.max_inbound_priority_frames_per_stream_ = max_inbound_priority_frames_per_stream_;
+    setting.max_inbound_window_update_frames_per_data_frame_sent_ =
+        max_inbound_window_update_frames_per_data_frame_sent_;
   }
 
   // corruptMetadataFramePayload assumes data contains at least 10 bytes of the beginning of a
@@ -121,6 +134,7 @@ public:
   const Http2SettingsTuple client_settings_;
   const Http2SettingsTuple server_settings_;
   bool allow_metadata_ = false;
+  bool stream_error_on_invalid_http_messaging_ = false;
   Stats::IsolatedStoreImpl stats_store_;
   Http2Settings client_http2settings_;
   NiceMock<Network::MockConnection> client_connection_;
@@ -141,13 +155,103 @@ public:
   bool corrupt_metadata_frame_ = false;
 
   uint32_t max_request_headers_kb_ = Http::DEFAULT_MAX_REQUEST_HEADERS_KB;
+  uint32_t max_outbound_frames_ = Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES;
+  uint32_t max_outbound_control_frames_ = Http2Settings::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES;
+  uint32_t max_consecutive_inbound_frames_with_empty_payload_ =
+      Http2Settings::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD;
+  uint32_t max_inbound_priority_frames_per_stream_ =
+      Http2Settings::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM;
+  uint32_t max_inbound_window_update_frames_per_data_frame_sent_ =
+      Http2Settings::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT;
 };
 
 class Http2CodecImplTest : public ::testing::TestWithParam<Http2SettingsTestParam>,
                            protected Http2CodecImplTestFixture {
 public:
   Http2CodecImplTest()
-      : Http2CodecImplTestFixture(::testing::get<0>(GetParam()), ::testing::get<1>(GetParam())) {}
+      : Http2CodecImplTestFixture(::testing::get<0>(GetParam()), ::testing::get<1>(GetParam())),
+        api_(Api::createApiForTest()) {
+    envoy::config::bootstrap::v2::LayeredRuntime config;
+    config.add_layers()->mutable_admin_layer();
+
+    // Create a runtime loader, so that tests can manually manipulate runtime
+    // guarded features.
+    loader_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
+        std::make_unique<Runtime::LoaderImpl>(dispatcher_, tls_, config, local_info_, init_manager_,
+                                              store_, generator_, validation_visitor_, *api_));
+  }
+
+protected:
+  void priorityFlood() {
+    initialize();
+
+    TestHeaderMapImpl request_headers;
+    HttpTestUtility::addDefaultHeaders(request_headers, "POST");
+    EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+    request_encoder_->encodeHeaders(request_headers, false);
+
+    nghttp2_priority_spec spec = {0, 10, 0};
+    // HTTP/2 codec adds 1 to the number of active streams when computing PRIORITY frames limit
+    constexpr uint32_t max_allowed =
+        2 * Http2Settings::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM;
+    for (uint32_t i = 0; i < max_allowed + 1; ++i) {
+      EXPECT_EQ(0, nghttp2_submit_priority(client_->session(), NGHTTP2_FLAG_NONE, 1, &spec));
+    }
+  }
+
+  void windowUpdateFlood() {
+    initialize();
+
+    TestHeaderMapImpl request_headers;
+    HttpTestUtility::addDefaultHeaders(request_headers);
+    EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+    request_encoder_->encodeHeaders(request_headers, true);
+
+    // Send one DATA frame back
+    EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
+    EXPECT_CALL(response_decoder_, decodeData(_, false));
+    TestHeaderMapImpl response_headers{{":status", "200"}};
+    response_encoder_->encodeHeaders(response_headers, false);
+    Buffer::OwnedImpl data("0");
+    EXPECT_NO_THROW(response_encoder_->encodeData(data, false));
+
+    // See the limit formula in the
+    // `Envoy::Http::Http2::ServerConnectionImpl::checkInboundFrameLimits()' method.
+    constexpr uint32_t max_allowed =
+        1 + 2 * (Http2Settings::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT + 1);
+    for (uint32_t i = 0; i < max_allowed + 1; ++i) {
+      EXPECT_EQ(0, nghttp2_submit_window_update(client_->session(), NGHTTP2_FLAG_NONE, 1, 1));
+    }
+  }
+
+  void emptyDataFlood(Buffer::OwnedImpl& data) {
+    initialize();
+
+    TestHeaderMapImpl request_headers;
+    HttpTestUtility::addDefaultHeaders(request_headers, "POST");
+    EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+    request_encoder_->encodeHeaders(request_headers, false);
+
+    // HTTP/2 codec does not send empty DATA frames with no END_STREAM flag.
+    // To make this work, send raw bytes representing empty DATA frames bypassing client codec.
+    Http2Frame emptyDataFrame = Http2Frame::makeEmptyDataFrame(0);
+    constexpr uint32_t max_allowed =
+        Http2Settings::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD;
+    for (uint32_t i = 0; i < max_allowed + 1; ++i) {
+      data.add(emptyDataFrame.data(), emptyDataFrame.size());
+    }
+  }
+
+private:
+  Event::MockDispatcher dispatcher_;
+  NiceMock<ThreadLocal::MockInstance> tls_;
+  Stats::IsolatedStoreImpl store_;
+  Runtime::MockRandomGenerator generator_;
+  Api::ApiPtr api_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  Init::MockManager init_manager_;
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
+  std::unique_ptr<Runtime::ScopedLoaderSingleton> loader_;
 };
 
 TEST_P(Http2CodecImplTest, ShutdownNotice) {
@@ -187,6 +291,20 @@ TEST_P(Http2CodecImplTest, ContinueHeaders) {
 TEST_P(Http2CodecImplTest, InvalidContinueWithFin) {
   initialize();
 
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  request_encoder_->encodeHeaders(request_headers, true);
+
+  TestHeaderMapImpl continue_headers{{":status", "100"}};
+  EXPECT_THROW(response_encoder_->encodeHeaders(continue_headers, true), CodecProtocolException);
+  EXPECT_EQ(1, stats_store_.counter("http2.rx_messaging_error").value());
+}
+
+TEST_P(Http2CodecImplTest, InvalidContinueWithFinAllowed) {
+  stream_error_on_invalid_http_messaging_ = true;
+  initialize();
+
   MockStreamCallbacks request_callbacks;
   request_encoder_->getStream().addCallbacks(request_callbacks);
 
@@ -212,6 +330,23 @@ TEST_P(Http2CodecImplTest, InvalidContinueWithFin) {
 }
 
 TEST_P(Http2CodecImplTest, InvalidRepeatContinue) {
+  initialize();
+
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  request_encoder_->encodeHeaders(request_headers, true);
+
+  TestHeaderMapImpl continue_headers{{":status", "100"}};
+  EXPECT_CALL(response_decoder_, decode100ContinueHeaders_(_));
+  response_encoder_->encode100ContinueHeaders(continue_headers);
+
+  EXPECT_THROW(response_encoder_->encodeHeaders(continue_headers, true), CodecProtocolException);
+  EXPECT_EQ(1, stats_store_.counter("http2.rx_messaging_error").value());
+};
+
+TEST_P(Http2CodecImplTest, InvalidRepeatContinueAllowed) {
+  stream_error_on_invalid_http_messaging_ = true;
   initialize();
 
   MockStreamCallbacks request_callbacks;
@@ -265,6 +400,28 @@ TEST_P(Http2CodecImplTest, Invalid103) {
 TEST_P(Http2CodecImplTest, Invalid204WithContentLength) {
   initialize();
 
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  request_encoder_->encodeHeaders(request_headers, true);
+
+  TestHeaderMapImpl response_headers{{":status", "204"}, {"content-length", "3"}};
+  // What follows is a hack to get headers that should span into continuation frames. The default
+  // maximum frame size is 16K. We will add 3,000 headers that will take us above this size and
+  // not easily compress with HPACK. (I confirmed this generates 26,468 bytes of header data
+  // which should contain a continuation.)
+  for (uint i = 1; i < 3000; i++) {
+    response_headers.addCopy(std::to_string(i), std::to_string(i));
+  }
+
+  EXPECT_THROW(response_encoder_->encodeHeaders(response_headers, false), CodecProtocolException);
+  EXPECT_EQ(1, stats_store_.counter("http2.rx_messaging_error").value());
+};
+
+TEST_P(Http2CodecImplTest, Invalid204WithContentLengthAllowed) {
+  stream_error_on_invalid_http_messaging_ = true;
+  initialize();
+
   MockStreamCallbacks request_callbacks;
   request_encoder_->getStream().addCallbacks(request_callbacks);
 
@@ -314,7 +471,34 @@ TEST_P(Http2CodecImplTest, RefusedStreamReset) {
   response_encoder_->getStream().resetStream(StreamResetReason::LocalRefusedStreamReset);
 }
 
-TEST_P(Http2CodecImplTest, InvalidFrame) {
+TEST_P(Http2CodecImplTest, InvalidHeadersFrame) {
+  initialize();
+
+  EXPECT_THROW(request_encoder_->encodeHeaders(TestHeaderMapImpl{}, true), CodecProtocolException);
+  EXPECT_EQ(1, stats_store_.counter("http2.rx_messaging_error").value());
+}
+
+TEST_P(Http2CodecImplTest, InvalidHeadersFrameAllowed) {
+  stream_error_on_invalid_http_messaging_ = true;
+  initialize();
+
+  MockStreamCallbacks request_callbacks;
+  request_encoder_->getStream().addCallbacks(request_callbacks);
+
+  ON_CALL(client_connection_, write(_, _))
+      .WillByDefault(
+          Invoke([&](Buffer::Instance& data, bool) -> void { server_wrapper_.buffer_.add(data); }));
+
+  request_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalReset, _));
+  EXPECT_CALL(request_callbacks, onResetStream(StreamResetReason::RemoteReset, _));
+  server_wrapper_.dispatch(Buffer::OwnedImpl(), *server_);
+}
+
+TEST_P(Http2CodecImplTest, InvalidHeadersFrameOverriden) {
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.http2_protocol_options.stream_error_on_invalid_http_messaging",
+        "true"}});
   initialize();
 
   MockStreamCallbacks request_callbacks;
@@ -1037,6 +1221,311 @@ TEST_P(Http2CodecImplTestAll, TestCodecHeaderCompression) {
     EXPECT_EQ(0, nghttp2_session_get_hd_deflate_dynamic_table_size(client_->session()));
     EXPECT_EQ(0, nghttp2_session_get_hd_deflate_dynamic_table_size(server_->session()));
   }
+}
+
+// Verify that codec detects PING flood
+TEST_P(Http2CodecImplTest, PingFlood) {
+  initialize();
+
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  request_encoder_->encodeHeaders(request_headers, false);
+
+  // Send one frame above the outbound control queue size limit
+  for (uint32_t i = 0; i < Http2Settings::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES + 1; ++i) {
+    EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
+  }
+
+  int ack_count = 0;
+  Buffer::OwnedImpl buffer;
+  ON_CALL(server_connection_, write(_, _))
+      .WillByDefault(Invoke([&buffer, &ack_count](Buffer::Instance& frame, bool) {
+        ++ack_count;
+        buffer.move(frame);
+      }));
+
+  EXPECT_THROW(client_->sendPendingFrames(), FrameFloodException);
+  EXPECT_EQ(ack_count, Http2Settings::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES);
+  EXPECT_EQ(1, stats_store_.counter("http2.outbound_control_flood").value());
+}
+
+// Verify that codec allows PING flood when mitigation is disabled
+TEST_P(Http2CodecImplTest, PingFloodMitigationDisabled) {
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.http2_protocol_options.max_outbound_control_frames",
+        "2147483647"}});
+  initialize();
+
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  request_encoder_->encodeHeaders(request_headers, false);
+
+  // Send one frame above the outbound control queue size limit
+  for (uint32_t i = 0; i < Http2Settings::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES + 1; ++i) {
+    EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
+  }
+
+  EXPECT_CALL(server_connection_, write(_, _))
+      .Times(Http2Settings::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES + 1);
+  EXPECT_NO_THROW(client_->sendPendingFrames());
+}
+
+// Verify that outbound control frame counter decreases when send buffer is drained
+TEST_P(Http2CodecImplTest, PingFloodCounterReset) {
+  static const int kMaxOutboundControlFrames = 100;
+  max_outbound_control_frames_ = kMaxOutboundControlFrames;
+  initialize();
+
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  request_encoder_->encodeHeaders(request_headers, false);
+
+  for (int i = 0; i < kMaxOutboundControlFrames; ++i) {
+    EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
+  }
+
+  int ack_count = 0;
+  Buffer::OwnedImpl buffer;
+  ON_CALL(server_connection_, write(_, _))
+      .WillByDefault(Invoke([&buffer, &ack_count](Buffer::Instance& frame, bool) {
+        ++ack_count;
+        buffer.move(frame);
+      }));
+
+  // We should be 1 frame under the control frame flood mitigation threshold.
+  EXPECT_NO_THROW(client_->sendPendingFrames());
+  EXPECT_EQ(ack_count, kMaxOutboundControlFrames);
+
+  // Drain kMaxOutboundFrames / 2 slices from the send buffer
+  buffer.drain(buffer.length() / 2);
+
+  // Send kMaxOutboundFrames / 2 more pings.
+  for (int i = 0; i < kMaxOutboundControlFrames / 2; ++i) {
+    EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
+  }
+  // The number of outbound frames should be half of max so the connection should not be terminated.
+  EXPECT_NO_THROW(client_->sendPendingFrames());
+
+  // 1 more ping frame should overflow the outbound frame limit.
+  EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
+  EXPECT_THROW(client_->sendPendingFrames(), FrameFloodException);
+}
+
+// Verify that codec detects flood of outbound HEADER frames
+TEST_P(Http2CodecImplTest, ResponseHeadersFlood) {
+  initialize();
+
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  request_encoder_->encodeHeaders(request_headers, false);
+
+  int frame_count = 0;
+  Buffer::OwnedImpl buffer;
+  ON_CALL(server_connection_, write(_, _))
+      .WillByDefault(Invoke([&buffer, &frame_count](Buffer::Instance& frame, bool) {
+        ++frame_count;
+        buffer.move(frame);
+      }));
+
+  TestHeaderMapImpl response_headers{{":status", "200"}};
+  for (uint32_t i = 0; i < Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES + 1; ++i) {
+    EXPECT_NO_THROW(response_encoder_->encodeHeaders(response_headers, false));
+  }
+  // Presently flood mitigation is done only when processing downstream data
+  // So we need to send stream from downstream client to trigger mitigation
+  EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
+  EXPECT_THROW(client_->sendPendingFrames(), FrameFloodException);
+
+  EXPECT_EQ(frame_count, Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
+  EXPECT_EQ(1, stats_store_.counter("http2.outbound_flood").value());
+}
+
+// Verify that codec detects flood of outbound DATA frames
+TEST_P(Http2CodecImplTest, ResponseDataFlood) {
+  initialize();
+
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  request_encoder_->encodeHeaders(request_headers, false);
+
+  int frame_count = 0;
+  Buffer::OwnedImpl buffer;
+  ON_CALL(server_connection_, write(_, _))
+      .WillByDefault(Invoke([&buffer, &frame_count](Buffer::Instance& frame, bool) {
+        ++frame_count;
+        buffer.move(frame);
+      }));
+
+  TestHeaderMapImpl response_headers{{":status", "200"}};
+  response_encoder_->encodeHeaders(response_headers, false);
+  // Account for the single HEADERS frame above
+  for (uint32_t i = 0; i < Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES; ++i) {
+    Buffer::OwnedImpl data("0");
+    EXPECT_NO_THROW(response_encoder_->encodeData(data, false));
+  }
+  // Presently flood mitigation is done only when processing downstream data
+  // So we need to send stream from downstream client to trigger mitigation
+  EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
+  EXPECT_THROW(client_->sendPendingFrames(), FrameFloodException);
+
+  EXPECT_EQ(frame_count, Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
+  EXPECT_EQ(1, stats_store_.counter("http2.outbound_flood").value());
+}
+
+// Verify that codec allows outbound DATA flood when mitigation is disabled
+TEST_P(Http2CodecImplTest, ResponseDataFloodMitigationDisabled) {
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.http2_protocol_options.max_outbound_frames", "2147483647"}});
+  initialize();
+
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  request_encoder_->encodeHeaders(request_headers, false);
+
+  // +2 is to account for HEADERS and PING ACK, that is used to trigger mitigation
+  EXPECT_CALL(server_connection_, write(_, _))
+      .Times(Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES + 2);
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, false)).Times(1);
+  EXPECT_CALL(response_decoder_, decodeData(_, false))
+      .Times(Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES);
+  TestHeaderMapImpl response_headers{{":status", "200"}};
+  response_encoder_->encodeHeaders(response_headers, false);
+  // Account for the single HEADERS frame above
+  for (uint32_t i = 0; i < Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES; ++i) {
+    Buffer::OwnedImpl data("0");
+    EXPECT_NO_THROW(response_encoder_->encodeData(data, false));
+  }
+  // Presently flood mitigation is done only when processing downstream data
+  // So we need to send stream from downstream client to trigger mitigation
+  EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
+  EXPECT_NO_THROW(client_->sendPendingFrames());
+}
+
+// Verify that outbound frame counter decreases when send buffer is drained
+TEST_P(Http2CodecImplTest, ResponseDataFloodCounterReset) {
+  static const int kMaxOutboundFrames = 100;
+  max_outbound_frames_ = kMaxOutboundFrames;
+  initialize();
+
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  request_encoder_->encodeHeaders(request_headers, false);
+
+  int frame_count = 0;
+  Buffer::OwnedImpl buffer;
+  ON_CALL(server_connection_, write(_, _))
+      .WillByDefault(Invoke([&buffer, &frame_count](Buffer::Instance& frame, bool) {
+        ++frame_count;
+        buffer.move(frame);
+      }));
+
+  TestHeaderMapImpl response_headers{{":status", "200"}};
+  response_encoder_->encodeHeaders(response_headers, false);
+  // Account for the single HEADERS frame above
+  for (uint32_t i = 0; i < kMaxOutboundFrames - 1; ++i) {
+    Buffer::OwnedImpl data("0");
+    EXPECT_NO_THROW(response_encoder_->encodeData(data, false));
+  }
+
+  EXPECT_EQ(frame_count, kMaxOutboundFrames);
+  // Drain kMaxOutboundFrames / 2 slices from the send buffer
+  buffer.drain(buffer.length() / 2);
+
+  for (uint32_t i = 0; i < kMaxOutboundFrames / 2 + 1; ++i) {
+    Buffer::OwnedImpl data("0");
+    EXPECT_NO_THROW(response_encoder_->encodeData(data, false));
+  }
+
+  // Presently flood mitigation is done only when processing downstream data
+  // So we need to send a frame from downstream client to trigger mitigation
+  EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
+  EXPECT_THROW(client_->sendPendingFrames(), FrameFloodException);
+}
+
+// Verify that control frames are added to the counter of outbound frames of all types.
+TEST_P(Http2CodecImplTest, PingStacksWithDataFlood) {
+  initialize();
+
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  request_encoder_->encodeHeaders(request_headers, false);
+
+  int frame_count = 0;
+  Buffer::OwnedImpl buffer;
+  ON_CALL(server_connection_, write(_, _))
+      .WillByDefault(Invoke([&buffer, &frame_count](Buffer::Instance& frame, bool) {
+        ++frame_count;
+        buffer.move(frame);
+      }));
+
+  TestHeaderMapImpl response_headers{{":status", "200"}};
+  response_encoder_->encodeHeaders(response_headers, false);
+  // Account for the single HEADERS frame above
+  for (uint32_t i = 0; i < Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES - 1; ++i) {
+    Buffer::OwnedImpl data("0");
+    EXPECT_NO_THROW(response_encoder_->encodeData(data, false));
+  }
+  // Send one PING frame above the outbound queue size limit
+  EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
+  EXPECT_THROW(client_->sendPendingFrames(), FrameFloodException);
+
+  EXPECT_EQ(frame_count, Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES);
+  EXPECT_EQ(1, stats_store_.counter("http2.outbound_flood").value());
+}
+
+TEST_P(Http2CodecImplTest, PriorityFlood) {
+  priorityFlood();
+  EXPECT_THROW(client_->sendPendingFrames(), FrameFloodException);
+}
+
+TEST_P(Http2CodecImplTest, PriorityFloodOverride) {
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.http2_protocol_options.max_inbound_priority_frames_per_stream",
+        "2147483647"}});
+
+  priorityFlood();
+  EXPECT_NO_THROW(client_->sendPendingFrames());
+}
+
+TEST_P(Http2CodecImplTest, WindowUpdateFlood) {
+  windowUpdateFlood();
+  EXPECT_THROW(client_->sendPendingFrames(), FrameFloodException);
+}
+
+TEST_P(Http2CodecImplTest, WindowUpdateFloodOverride) {
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.http2_protocol_options.max_inbound_window_update_frames_per_"
+        "data_frame_sent",
+        "2147483647"}});
+  windowUpdateFlood();
+  EXPECT_NO_THROW(client_->sendPendingFrames());
+}
+
+TEST_P(Http2CodecImplTest, EmptyDataFlood) {
+  Buffer::OwnedImpl data;
+  emptyDataFlood(data);
+  EXPECT_CALL(request_decoder_, decodeData(_, false));
+  EXPECT_THROW(server_wrapper_.dispatch(data, *server_), FrameFloodException);
+}
+
+TEST_P(Http2CodecImplTest, EmptyDataFloodOverride) {
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.http2_protocol_options.max_consecutive_inbound_frames_with_"
+        "empty_payload",
+        "2147483647"}});
+  Buffer::OwnedImpl data;
+  emptyDataFlood(data);
+  EXPECT_CALL(request_decoder_, decodeData(_, false))
+      .Times(Http2Settings::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD + 1);
+  EXPECT_NO_THROW(server_wrapper_.dispatch(data, *server_));
 }
 
 } // namespace Http2

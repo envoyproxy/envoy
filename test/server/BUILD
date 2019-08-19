@@ -176,6 +176,7 @@ envoy_cc_test(
         "//source/extensions/filters/listener/original_dst:config",
         "//source/extensions/filters/listener/tls_inspector:config",
         "//source/extensions/filters/network/http_connection_manager:config",
+        "//source/extensions/filters/network/tcp_proxy:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:config",
         "//source/extensions/transport_sockets/tls:ssl_socket_lib",
@@ -242,6 +243,11 @@ filegroup(
     srcs = glob(["test_data/runtime/**"]),
 )
 
+filegroup(
+    name = "static_validation_test_data",
+    srcs = glob(["test_data/static_validation/**"]),
+)
+
 envoy_cc_test(
     name = "server_test",
     srcs = ["server_test.cc"],
@@ -252,6 +258,7 @@ envoy_cc_test(
         ":invalid_bootstrap.yaml",
         ":invalid_layered_runtime_duplicate_name.yaml",
         ":invalid_layered_runtime_missing_name.yaml",
+        ":invalid_layered_runtime_no_layer_specifier.yaml",
         ":invalid_runtime_bootstrap.yaml",
         ":node_bootstrap.yaml",
         ":node_bootstrap_no_admin_port.yaml",
@@ -259,6 +266,7 @@ envoy_cc_test(
         ":node_bootstrap_without_access_log.yaml",
         ":runtime_bootstrap.yaml",
         ":runtime_test_data",
+        ":static_validation_test_data",
         ":stats_sink_bootstrap.yaml",
         ":zipkin_tracing.yaml",
     ],
