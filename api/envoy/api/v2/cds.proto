@@ -175,7 +175,14 @@ message Cluster {
   }
   // The :ref:`load balancer type <arch_overview_load_balancing_types>` to use
   // when picking a host in the cluster.
-  LbPolicy lb_policy = 6 [(validate.rules).enum.defined_only = true];
+  //
+  // .. attention::
+  //
+  //   **This field is deprecated**. Set the
+  //   :ref:`load_balancing_policy<envoy_api_field_Cluster.load_balancing_policy>`
+  //   field instead.
+  //
+  LbPolicy lb_policy = 6 [(validate.rules).enum.defined_only = true, deprecated = true];
 
   // If the service discovery type is
   // :ref:`STATIC<envoy_api_enum_value_Cluster.DiscoveryType.STATIC>`,
@@ -448,6 +455,10 @@ message Cluster {
     // The number of random healthy hosts from which the host with the fewest active requests will
     // be chosen. Defaults to 2 so that we perform two-choice selection if the field is not set.
     google.protobuf.UInt32Value choice_count = 1 [(validate.rules).uint32.gte = 2];
+    // Populated only when the LB policy is configured via the new
+    // :ref:`load_balancing_policy<envoy_api_field_Cluster.load_balancing_policy>`
+    // field.
+    CommonLbConfig common_fields = 2;
   }
 
   // Specific configuration for the :ref:`RingHash<arch_overview_load_balancing_types_ring_hash>`
@@ -479,6 +490,11 @@ message Cluster {
     // to further constrain resource use. See also
     // :ref:`minimum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.minimum_ring_size>`.
     google.protobuf.UInt64Value maximum_ring_size = 4 [(validate.rules).uint64.lte = 8388608];
+
+    // Populated only when the LB policy is configured via the new
+    // :ref:`load_balancing_policy<envoy_api_field_Cluster.load_balancing_policy>`
+    // field.
+    CommonLbConfig common_fields = 5;
   }
 
   // Specific configuration for the
@@ -495,6 +511,11 @@ message Cluster {
     //   route traffic to arbitrary hosts and/or ports, which may have serious security
     //   consequences.
     bool use_http_header = 1;
+
+    // Populated only when the LB policy is configured via the new
+    // :ref:`load_balancing_policy<envoy_api_field_Cluster.load_balancing_policy>`
+    // field.
+    CommonLbConfig common_fields = 2;
   }
 
   // Optional configuration for the load balancing algorithm selected by
@@ -504,13 +525,20 @@ message Cluster {
   // has additional configuration options.
   // Specifying ring_hash_lb_config or least_request_lb_config without setting the corresponding
   // LbPolicy will generate an error at runtime.
+  //
+  // .. attention::
+  //
+  //   **These fields are deprecated**. Set the
+  //   :ref:`load_balancing_policy<envoy_api_field_Cluster.load_balancing_policy>`
+  //   field instead.
+  //
   oneof lb_config {
     // Optional configuration for the Ring Hash load balancing policy.
-    RingHashLbConfig ring_hash_lb_config = 23;
+    RingHashLbConfig ring_hash_lb_config = 23 [deprecated = true];
     // Optional configuration for the Original Destination load balancing policy.
-    OriginalDstLbConfig original_dst_lb_config = 34;
+    OriginalDstLbConfig original_dst_lb_config = 34 [deprecated = true];
     // Optional configuration for the LeastRequest load balancing policy.
-    LeastRequestLbConfig least_request_lb_config = 37;
+    LeastRequestLbConfig least_request_lb_config = 37 [deprecated = true];
   }
 
   // Common configuration for all load balancer implementations.
@@ -583,7 +611,14 @@ message Cluster {
   }
 
   // Common configuration for all load balancer implementations.
-  CommonLbConfig common_lb_config = 27;
+  //
+  // .. attention::
+  //
+  //   **This field is deprecated**. Set the
+  //   :ref:`load_balancing_policy<envoy_api_field_Cluster.load_balancing_policy>`
+  //   field instead.
+  //
+  CommonLbConfig common_lb_config = 27 [deprecated = true];
 
   // Optional custom transport socket implementation to use for upstream connections.
   core.TransportSocket transport_socket = 24;
@@ -634,8 +669,11 @@ message Cluster {
   bool drain_connections_on_host_removal = 32;
 
   // New mechanism for LB policy configuration. If set and understood
-  // by the client, replaces the lb_policy field, the common_lb_config
-  // field, and the fields in the lb_config oneof. For backward
+  // by the client, replaces the
+  // :ref:`lb_policy<envoy_api_field_Cluster.lb_policy>` field, the
+  // :ref:`common_lb_config<envoy_api_field_Cluster.common_lb_config>`
+  // field, and the fields in the
+  // :ref:`lb_config<envoy_api_field_Cluster.lb_config>` oneof. For backward
   // compatibility, management servers should populate both sets of fields.
   LoadBalancingPolicy load_balancing_policy = 40;
 }
@@ -647,15 +685,59 @@ message Cluster {
 // parameters, it must define a message for its own configuration, which will
 // be stored in the config field. The name of the policy will tell clients
 // which type of message they should expect to see in the config field.
+//
+// Envoy supports the following LB policies, each of which has its own
+// configuration message. Refer to
+// :ref:`load balancer type <arch_overview_load_balancing_types>` architecture
+// overview section for information on each type.
+//
+// "io.envoyproxy.weighted_round_robin":
+//     Config type: :ref:`CommonLbConfig<envoy_api_msg_Cluster.CommonLbConfig>`
+//     Refer to the :ref:`round robin load balancing
+//     policy<arch_overview_load_balancing_types_round_robin>`
+//     for an explanation.
+//
+// "io.envoyproxy.least_request":
+//     Config type: :ref:`LeastRequestLbConfig<envoy_api_msg_Cluster.LeastRequestLbConfig>`
+//     Refer to the :ref:`least request load balancing
+//     policy<arch_overview_load_balancing_types_least_request>`
+//     for an explanation.
+//
+// "io.envoyproxy.ring_hash":
+//     Config type: :ref:`RingHashLbConfig<envoy_api_msg_Cluster.RingHashLbConfig>`
+//     Refer to the :ref:`ring hash load balancing
+//     policy<arch_overview_load_balancing_types_ring_hash>`
+//     for an explanation.
+//
+// "io.envoyproxy.random":
+//     Config type: :ref:`CommonLbConfig<envoy_api_msg_Cluster.CommonLbConfig>`
+//     Refer to the :ref:`random load balancing
+//     policy<arch_overview_load_balancing_types_random>`
+//     for an explanation.
+//
+// "io.envoyproxy.original_dst":
+//     Config type: :ref:`OriginalDstLbConfig<envoy_api_msg_Cluster.OriginalDstLbConfig>`
+//     Refer to the :ref:`original destination load balancing
+//     policy<arch_overview_load_balancing_types_original_destination>`
+//     for an explanation.
+//
+// "io.envoyproxy.maglev":
+//     Config type: :ref:`CommonLbConfig<envoy_api_msg_Cluster.CommonLbConfig>`
+//     Refer to the :ref:`Maglev load balancing
+//     policy<arch_overview_load_balancing_types_maglev>` for an explanation.
 message LoadBalancingPolicy {
   message Policy {
-    string name = 1;                // Required. The name of the LB policy.
-    google.protobuf.Any config = 2; // Optional. Config for the LB policy.
+    // Required. The name of the LB policy.
+    string name = 1;
+    // Optional config for the LB policy.
+    // No more than one of these two fields may be populated.
+    google.protobuf.Struct config = 2;
+    google.protobuf.Any typed_config = 3;
   }
   // Each client will iterate over the list in order and stop at the first
   // policy that it supports. This provides a mechanism for starting to use
   // new LB policies that are not yet supported by all clients.
-  repeated Policy policy = 1;
+  repeated Policy policies = 1;
 }
 
 // An extensible structure containing the address Envoy should bind to when
