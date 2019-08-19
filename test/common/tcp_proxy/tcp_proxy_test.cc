@@ -1010,6 +1010,21 @@ TEST_F(TcpProxyTest, AccessLogBytesRxTxDuration) {
                   "bytesreceived=1 bytessent=2 datetime=[0-9-]+T[0-9:.]+Z nonzeronum=[1-9][0-9]*"));
 }
 
+TEST_F(TcpProxyTest, AccessLogUpstreamSSLConnection) {
+  setup(1);
+
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  const std::string session_id = "D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B";
+  auto ssl_info = std::make_shared<Ssl::MockConnectionInfo>();
+  EXPECT_CALL(*ssl_info, sessionId()).WillRepeatedly(Return(session_id));
+  stream_info.setDownstreamSslConnection(ssl_info);
+  EXPECT_CALL(*upstream_connections_.at(0), streamInfo()).WillRepeatedly(ReturnRef(stream_info));
+
+  raiseEventUpstreamConnected(0);
+  ASSERT_NE(nullptr, filter_->getStreamInfo().upstreamSslConnection());
+  EXPECT_EQ(session_id, filter_->getStreamInfo().upstreamSslConnection()->sessionId());
+}
+
 // Tests that upstream flush works properly with no idle timeout configured.
 TEST_F(TcpProxyTest, UpstreamFlushNoTimeout) {
   setup(1);
