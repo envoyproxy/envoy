@@ -22,7 +22,7 @@ std::string convertToString(envoy_data s);
  * @param headers, the envoy_headers to transform.
  * @return HeaderMapPtr, the HeaderMap 1:1 transformation of the headers param.
  */
-HeaderMapPtr transformHeaders(envoy_headers headers);
+HeaderMapPtr toInternalHeaders(envoy_headers headers);
 
 /**
  * Transform envoy_headers to HeaderMap.
@@ -31,7 +31,7 @@ HeaderMapPtr transformHeaders(envoy_headers headers);
  * @param headers, the HeaderMap to transform.
  * @return envoy_headers, the HeaderMap 1:1 transformation of the headers param.
  */
-envoy_headers transformHeaders(const HeaderMap& headers);
+envoy_headers toBridgeHeaders(const HeaderMap& headers);
 
 } // namespace Utility
 } // namespace Http

@@ -14,7 +14,7 @@ Dispatcher::DirectStreamCallbacks::DirectStreamCallbacks(envoy_stream_t stream,
 void Dispatcher::DirectStreamCallbacks::onHeaders(HeaderMapPtr&& headers, bool end_stream) {
   ENVOY_LOG(debug, "[S{}] response headers for stream (end_stream={}):\n{}", stream_handle_,
             end_stream, *headers);
-  observer_.on_headers(Utility::transformHeaders(*headers), end_stream, observer_.context);
+  observer_.on_headers(Utility::toBridgeHeaders(*headers), end_stream, observer_.context);
 }
 
 void Dispatcher::DirectStreamCallbacks::onData(Buffer::Instance& data, bool end_stream) {
@@ -25,7 +25,7 @@ void Dispatcher::DirectStreamCallbacks::onData(Buffer::Instance& data, bool end_
 
 void Dispatcher::DirectStreamCallbacks::onTrailers(HeaderMapPtr&& trailers) {
   ENVOY_LOG(debug, "[S{}] response trailers for stream:\n{}", stream_handle_, *trailers);
-  observer_.on_trailers(Utility::transformHeaders(*trailers), observer_.context);
+  observer_.on_trailers(Utility::toBridgeHeaders(*trailers), observer_.context);
 }
 
 void Dispatcher::DirectStreamCallbacks::onComplete() {
@@ -83,7 +83,7 @@ envoy_status_t Dispatcher::sendHeaders(envoy_stream_t stream, envoy_headers head
     // from the caller.
     // https://github.com/lyft/envoy-mobile/issues/301
     if (direct_stream != nullptr) {
-      direct_stream->headers_ = Utility::transformHeaders(headers);
+      direct_stream->headers_ = Utility::toInternalHeaders(headers);
       ENVOY_LOG(debug, "[S{}] request headers for stream (end_stream={}):\n{}", stream, end_stream,
                 *direct_stream->headers_);
       direct_stream->underlying_stream_.sendHeaders(*direct_stream->headers_, end_stream);

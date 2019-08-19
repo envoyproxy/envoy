@@ -66,7 +66,7 @@ TEST_F(DispatcherTest, BasicStreamHeadersOnly) {
   observer.context = &cc;
   observer.on_headers = [](envoy_headers c_headers, bool end_stream, void* context) -> void {
     ASSERT_TRUE(end_stream);
-    HeaderMapPtr response_headers = Utility::transformHeaders(c_headers);
+    HeaderMapPtr response_headers = Utility::toInternalHeaders(c_headers);
     EXPECT_EQ(response_headers->Status()->value().getStringView(), "200");
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_headers = true;
@@ -88,7 +88,7 @@ TEST_F(DispatcherTest, BasicStreamHeadersOnly) {
   // Build a set of request headers.
   TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
-  envoy_headers c_headers = Utility::transformHeaders(headers);
+  envoy_headers c_headers = Utility::toBridgeHeaders(headers);
 
   // Create a stream.
   EXPECT_CALL(cm_, httpAsyncClientForCluster("egress_cluster"))
@@ -177,7 +177,7 @@ TEST_F(DispatcherTest, MultipleStreams) {
   observer.context = &cc;
   observer.on_headers = [](envoy_headers c_headers, bool end_stream, void* context) -> void {
     ASSERT_TRUE(end_stream);
-    HeaderMapPtr response_headers = Utility::transformHeaders(c_headers);
+    HeaderMapPtr response_headers = Utility::toInternalHeaders(c_headers);
     EXPECT_EQ(response_headers->Status()->value().getStringView(), "200");
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_headers = true;
@@ -199,7 +199,7 @@ TEST_F(DispatcherTest, MultipleStreams) {
   // Build a set of request headers.
   TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
-  envoy_headers c_headers = Utility::transformHeaders(headers);
+  envoy_headers c_headers = Utility::toBridgeHeaders(headers);
 
   // Create a stream.
   EXPECT_CALL(cm_, httpAsyncClientForCluster("egress_cluster"))
@@ -229,7 +229,7 @@ TEST_F(DispatcherTest, MultipleStreams) {
   observer2.context = &cc2;
   observer2.on_headers = [](envoy_headers c_headers, bool end_stream, void* context) -> void {
     ASSERT_TRUE(end_stream);
-    HeaderMapPtr response_headers = Utility::transformHeaders(c_headers);
+    HeaderMapPtr response_headers = Utility::toInternalHeaders(c_headers);
     EXPECT_EQ(response_headers->Status()->value().getStringView(), "503");
     bool* on_headers_called2 = static_cast<bool*>(context);
     *on_headers_called2 = true;
@@ -251,7 +251,7 @@ TEST_F(DispatcherTest, MultipleStreams) {
   // Build a set of request headers.
   TestHeaderMapImpl headers2;
   HttpTestUtility::addDefaultHeaders(headers2);
-  envoy_headers c_headers2 = Utility::transformHeaders(headers2);
+  envoy_headers c_headers2 = Utility::toBridgeHeaders(headers2);
 
   // Create a stream.
   EXPECT_CALL(cm_, httpAsyncClientForCluster("egress_cluster"))
@@ -303,7 +303,7 @@ TEST_F(DispatcherTest, LocalResetAfterStreamStart) {
   };
   observer.on_headers = [](envoy_headers c_headers, bool end_stream, void* context) -> void {
     ASSERT_FALSE(end_stream);
-    HeaderMapPtr response_headers = Utility::transformHeaders(c_headers);
+    HeaderMapPtr response_headers = Utility::toInternalHeaders(c_headers);
     EXPECT_EQ(response_headers->Status()->value().getStringView(), "200");
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_headers = true;
@@ -325,7 +325,7 @@ TEST_F(DispatcherTest, LocalResetAfterStreamStart) {
   // Build a set of request headers.
   TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
-  envoy_headers c_headers = Utility::transformHeaders(headers);
+  envoy_headers c_headers = Utility::toBridgeHeaders(headers);
 
   // Create a stream.
   EXPECT_CALL(cm_, httpAsyncClientForCluster("egress_cluster"))
@@ -376,7 +376,7 @@ TEST_F(DispatcherTest, RemoteResetAfterStreamStart) {
   };
   observer.on_headers = [](envoy_headers c_headers, bool end_stream, void* context) -> void {
     ASSERT_FALSE(end_stream);
-    HeaderMapPtr response_headers = Utility::transformHeaders(c_headers);
+    HeaderMapPtr response_headers = Utility::toInternalHeaders(c_headers);
     EXPECT_EQ(response_headers->Status()->value().getStringView(), "200");
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_headers = true;
@@ -398,7 +398,7 @@ TEST_F(DispatcherTest, RemoteResetAfterStreamStart) {
   // Build a set of request headers.
   TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
-  envoy_headers c_headers = Utility::transformHeaders(headers);
+  envoy_headers c_headers = Utility::toBridgeHeaders(headers);
 
   // Create a stream.
   EXPECT_CALL(cm_, httpAsyncClientForCluster("egress_cluster"))
@@ -443,7 +443,7 @@ TEST_F(DispatcherTest, DestroyWithActiveStream) {
   // Build a set of request headers.
   TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
-  envoy_headers c_headers = Utility::transformHeaders(headers);
+  envoy_headers c_headers = Utility::toBridgeHeaders(headers);
 
   // Create a stream.
   EXPECT_CALL(cm_, httpAsyncClientForCluster("egress_cluster"))
@@ -474,7 +474,7 @@ TEST_F(DispatcherTest, ResetInOnHeaders) {
   // Build a set of request headers.
   TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
-  envoy_headers c_headers = Utility::transformHeaders(headers);
+  envoy_headers c_headers = Utility::toBridgeHeaders(headers);
 
   // Create a stream.
   EXPECT_CALL(cm_, httpAsyncClientForCluster("egress_cluster"))
@@ -517,7 +517,7 @@ TEST_F(DispatcherTest, StreamTimeout) {
   // Build a set of request headers.
   TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
-  envoy_headers c_headers = Utility::transformHeaders(headers);
+  envoy_headers c_headers = Utility::toBridgeHeaders(headers);
 
   EXPECT_CALL(cm_, httpAsyncClientForCluster("egress_cluster"))
       .WillOnce(ReturnRef(cm_.async_client_));
@@ -566,7 +566,7 @@ TEST_F(DispatcherTest, StreamTimeoutHeadReply) {
   // Build a set of request headers.
   TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers, "HEAD");
-  envoy_headers c_headers = Utility::transformHeaders(headers);
+  envoy_headers c_headers = Utility::toBridgeHeaders(headers);
 
   EXPECT_CALL(cm_, httpAsyncClientForCluster("egress_cluster"))
       .WillOnce(ReturnRef(cm_.async_client_));
@@ -605,7 +605,7 @@ TEST_F(DispatcherTest, DisableTimerWithStream) {
 
   TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers, "HEAD");
-  envoy_headers c_headers = Utility::transformHeaders(headers);
+  envoy_headers c_headers = Utility::toBridgeHeaders(headers);
 
   EXPECT_CALL(cm_, httpAsyncClientForCluster("egress_cluster"))
       .WillOnce(ReturnRef(cm_.async_client_));
