@@ -131,6 +131,8 @@ static EnvoyHeaders *to_ios_headers(envoy_headers headers) {
     }
     [headerValueList addObject:headerValue];
   }
+  // The C envoy_headers struct can be released now because the headers have been copied.
+  release_envoy_headers(headers);
   return headerDict;
 }
 
