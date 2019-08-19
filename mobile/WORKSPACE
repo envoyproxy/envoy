@@ -108,6 +108,9 @@ maven_install(
         # Test artifacts
         "org.assertj:assertj-core:3.9.0",
         "junit:junit:4.12",
+        "com.nhaarman.mockitokotlin2:mockito-kotlin:2.1.0",
+        "org.mockito:mockito-inline:2.28.2",
+        "org.mockito:mockito-core:2.28.2",
     ],
     repositories = [
         "https://repo1.maven.org/maven2",
