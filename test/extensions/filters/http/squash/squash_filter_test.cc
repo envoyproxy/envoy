@@ -433,6 +433,8 @@ TEST_F(SquashFilterTest, TimerExpiresInline) {
   initFilter();
 
   attachmentTimeout_timer_ = new NiceMock<Envoy::Event::MockTimer>(&filter_callbacks_.dispatcher_);
+  // TODO: this is a really synthetic test as the callback can't actually be called under the stack
+  // of enableTimer. It'd be good to clean this up.
   EXPECT_CALL(*attachmentTimeout_timer_, enableTimer(config_->attachmentTimeout()))
       .WillOnce(Invoke([&](const std::chrono::milliseconds&) {
         attachmentTimeout_timer_->enabled_ = true;

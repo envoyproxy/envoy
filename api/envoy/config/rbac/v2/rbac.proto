@@ -170,8 +170,9 @@ message Principal {
     reserved 1;
     reserved "name";
 
-    // The name of the principal. If set, The URI SAN is used from the certificate, otherwise the
-    // subject field is used. If unset, it applies to any user that is authenticated.
+    // The name of the principal. If set, The URI SAN or DNS SAN in that order is used from the
+    // certificate, otherwise the subject field is used. If unset, it applies to any user that is
+    // authenticated.
     envoy.type.matcher.StringMatcher principal_name = 2;
   }
 

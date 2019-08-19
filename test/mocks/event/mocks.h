@@ -148,10 +148,10 @@ public:
 
   MockDispatcher* dispatcher_;
   bool enabled_{};
-  Event::TimerCb callback_; // TODO(mattklein123): This should be private and only called via
-                            // invoke callback to clear enabled_, but that will break too many
-                            // tests and can be done later.
   const ScopeTrackedObject* object_;
+
+private:
+  Event::TimerCb callback_;
 };
 
 class MockSignalEvent : public SignalEvent {

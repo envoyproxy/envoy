@@ -468,7 +468,7 @@ public:
   std::string name() override { return "non_terminal"; }
 };
 
-TEST_F(ListenerManagerImplWithRealFiltersTest, DISABLED_TerminalNotLast) {
+TEST_F(ListenerManagerImplWithRealFiltersTest, TerminalNotLast) {
   Registry::RegisterFactory<NonTerminalFilterFactory,
                             Configuration::NamedNetworkFilterConfigFactory>
       registered;
