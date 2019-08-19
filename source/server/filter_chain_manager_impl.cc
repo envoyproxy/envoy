@@ -57,7 +57,8 @@ void FilterChainManagerImpl::addFilterChain(
       if (Network::Address::ipFamilySupported(AF_INET6)) {
         destination_ips.push_back(Network::Utility::getIpv6CidrCatchAllAddress());
       }
-      // Insert a 0.0.0.0 to avoid empty entry to match UDS address.
+      // Insert a match-all address. Otherwise if we insert another filtr chain with explicit
+      // address would hide the match-all matcher.
       if (destination_ips.empty() || Network::Address::ipFamilySupported(AF_INET)) {
         destination_ips.push_back(Network::Utility::getIpv4CidrCatchAllAddress());
       }
@@ -72,7 +73,8 @@ void FilterChainManagerImpl::addFilterChain(
       if (Network::Address::ipFamilySupported(AF_INET6)) {
         source_ips.push_back(Network::Utility::getIpv6CidrCatchAllAddress());
       }
-      // Insert a 0.0.0.0 to avoid empty entry to match UDS address.
+      // Insert a match-all address. Otherwise if we insert another filtr chain with explicit
+      // address would hide the match-all matcher.
       if (source_ips.empty() || Network::Address::ipFamilySupported(AF_INET)) {
         source_ips.push_back(Network::Utility::getIpv4CidrCatchAllAddress());
       }
