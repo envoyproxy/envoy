@@ -26,6 +26,8 @@ def envoy_mobile_kt_test(name, srcs, deps = []):
         # We'll resolve only the targets in `//library/kotlin/src/io/envoyproxy/envoymobile`
         if dep.startswith("//library/kotlin/src/io/envoyproxy/envoymobile"):
             dep_srcs.append(dep + "_srcs")
+        elif dep.startswith("//library/java/src/io/envoyproxy/envoymobile"):
+            dep_srcs.append(dep + "_srcs")
 
     kt_jvm_test(
         name = name,
@@ -35,5 +37,8 @@ def envoy_mobile_kt_test(name, srcs, deps = []):
             "//bazel:envoy_mobile_test_suite",
             "@maven//:org_assertj_assertj_core",
             "@maven//:junit_junit",
-        ],
+            "@maven//:com_nhaarman_mockitokotlin2_mockito_kotlin",
+            "@maven//:org_mockito_mockito_inline",
+            "@maven//:org_mockito_mockito_core",
+        ] + deps,
     )
