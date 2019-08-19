@@ -193,9 +193,13 @@ public:
   void registerTestServerPorts(const std::vector<std::string>& port_names);
   void createTestServer(const std::string& json_path, const std::vector<std::string>& port_names);
   void createGeneratedApiTestServer(const std::string& bootstrap_path,
-                                    const std::vector<std::string>& port_names);
+                                    const std::vector<std::string>& port_names,
+                                    bool allow_unknown_static_fields,
+                                    bool reject_unknown_dynamic_fields, bool allow_lds_rejection);
   void createApiTestServer(const ApiFilesystemConfig& api_filesystem_config,
-                           const std::vector<std::string>& port_names);
+                           const std::vector<std::string>& port_names,
+                           bool allow_unknown_static_fields, bool reject_unknown_dynamic_fields,
+                           bool allow_lds_rejection);
 
   Event::TestTimeSystem& timeSystem() { return time_system_; }
 
