@@ -9,11 +9,15 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/bazelbuild/bazel-toolchains/archive/0.28.5.tar.gz"],
     ),
     boringssl = dict(
-        # Use commits from branch "chromium-stable-with-bazel"
-        sha256 = "18edf961f8377e8d10fd8497bc8a331def9cb60a6c2a50a4c8eb322b045042d5",
-        strip_prefix = "boringssl-87d1c8f292e5184fd727efe84f458d89687d7742",
-        # chromium-76.0.3809.87
-        urls = ["https://github.com/google/boringssl/archive/87d1c8f292e5184fd727efe84f458d89687d7742.tar.gz"],
+        sha256 = "c712766ddc844de2a38e686e1cdd7288795e9a6fe7f699c6636f1b76703db84e",
+        strip_prefix = "boringssl-265728decec4370cd02b941f72fba9f0735e2923",
+        # To update BoringSSL, which tracks Chromium releases:
+        # 1. Open https://omahaproxy.appspot.com/ and note <current_version> of linux/beta release.
+        # 2. Open https://chromium.googlesource.com/chromium/src/+/refs/tags/<current_version>/DEPS and note <boringssl_revision>.
+        # 3. Find a commit in BoringSSL's "master-with-bazel" branch that merges <boringssl_revision>.
+        #
+        # chromium-77.0.3865.35 (BETA)
+        urls = ["https://github.com/google/boringssl/archive/265728decec4370cd02b941f72fba9f0735e2923.tar.gz"],
     ),
     boringssl_fips = dict(
         sha256 = "b12ad676ee533824f698741bd127f6fbc82c46344398a6d78d25e62c6c418c73",
