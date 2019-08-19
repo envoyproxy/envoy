@@ -65,6 +65,7 @@ public:
         .WillByDefault(Invoke([&](const std::string& file) -> std::string {
           return api_->fileSystem().fileReadToEnd(file);
         }));
+    ON_CALL(os_sys_calls_, close(_)).WillByDefault(Return(Api::SysCallIntResult{0, 0}));
 
     // Here we setup runtime to mimic the actual deprecated feature list used in the
     // production code. Note that this test is actually more strict than production because
