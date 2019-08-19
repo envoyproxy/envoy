@@ -43,7 +43,9 @@ ValidationInstance::ValidationInstance(const Options& options, Event::TimeSystem
                                        ComponentFactory& component_factory,
                                        Thread::ThreadFactory& thread_factory,
                                        Filesystem::Instance& file_system)
-    : options_(options), stats_store_(store),
+    : options_(options), validation_context_(options_.allowUnknownStaticFields(),
+                                             !options.rejectUnknownDynamicFields()),
+      stats_store_(store),
       api_(new Api::ValidationImpl(thread_factory, store, time_system, file_system)),
       dispatcher_(api_->allocateDispatcher()),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
@@ -75,7 +77,8 @@ void ValidationInstance::initialize(const Options& options,
   // be ready to serve, then the config has passed validation.
   // Handle configuration that needs to take place prior to the main configuration load.
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  InstanceUtil::loadBootstrapConfig(bootstrap, options, messageValidationVisitor(), *api_);
+  InstanceUtil::loadBootstrapConfig(bootstrap, options,
+                                    messageValidationContext().staticValidationVisitor(), *api_);
 
   Config::Utility::createTagProducer(bootstrap);
 
@@ -86,9 +89,9 @@ void ValidationInstance::initialize(const Options& options,
       options.serviceNodeName());
 
   Configuration::InitialImpl initial_config(bootstrap);
-  overload_manager_ = std::make_unique<OverloadManagerImpl>(dispatcher(), stats(), threadLocal(),
-                                                            bootstrap.overload_manager(),
-                                                            messageValidationVisitor(), *api_);
+  overload_manager_ = std::make_unique<OverloadManagerImpl>(
+      dispatcher(), stats(), threadLocal(), bootstrap.overload_manager(),
+      messageValidationContext().staticValidationVisitor(), *api_);
   listener_manager_ = std::make_unique<ListenerManagerImpl>(*this, *this, *this, false);
   thread_local_.registerThread(*dispatcher_, true);
   runtime_loader_ = component_factory.createRuntime(*this, initial_config);
@@ -97,7 +100,7 @@ void ValidationInstance::initialize(const Options& options,
       createContextManager(Ssl::ContextManagerFactory::name(), api_->timeSource());
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
       admin(), runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(),
-      dispatcher(), localInfo(), *secret_manager_, messageValidationVisitor(), *api_, http_context_,
+      dispatcher(), localInfo(), *secret_manager_, messageValidationContext(), *api_, http_context_,
       accessLogManager(), singletonManager(), time_system_);
   config_.initialize(bootstrap, *this, *cluster_manager_factory_);
   http_context_.setTracer(config_.httpTracer());
