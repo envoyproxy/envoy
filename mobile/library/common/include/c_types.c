@@ -2,10 +2,6 @@
 
 #include <string.h>
 
-// NOLINT(namespace-envoy)
-// Although this file is in an envoy_cc_library rule it should be C compatible with old style casts.
-#pragma GCC diagnostic ignored "-Wold-style-cast"
-
 void envoy_noop_release(void* context) { (void)context; }
 
 void release_envoy_headers(envoy_headers headers) {
