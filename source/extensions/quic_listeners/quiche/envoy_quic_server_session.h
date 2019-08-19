@@ -30,7 +30,6 @@ class EnvoyQuicServerSession : public quic::QuicServerSessionBase,
                                public Network::FilterManagerConnection,
                                protected Logger::Loggable<Logger::Id::connection> {
 public:
-  // Owns connection.
   EnvoyQuicServerSession(const quic::QuicConfig& config,
                          const quic::ParsedQuicVersionVector& supported_versions,
                          std::unique_ptr<EnvoyQuicConnection> connection,
@@ -78,7 +77,7 @@ public:
   }
   void setConnectionStats(const Network::Connection::ConnectionStats& stats) override {
     stats_ = std::make_unique<Network::Connection::ConnectionStats>(stats);
-    reinterpret_cast<EnvoyQuicConnection*>(connection())->setConnectionStats(stats);
+    quic_connection_->setConnectionStats(stats);
   }
   const Ssl::ConnectionInfo* ssl() const override;
   Network::Connection::State state() const override {

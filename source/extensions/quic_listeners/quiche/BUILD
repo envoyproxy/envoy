@@ -149,6 +149,7 @@ envoy_cc_library(
     hdrs = ["quic_io_handle_wrapper.h"],
     deps = [
         "//include/envoy/network:io_handle_interface",
+        "//source/common/network:io_socket_error_lib",
     ],
 )
 
@@ -189,6 +190,7 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "envoy_quic_utils_lib",
+    srcs = ["envoy_quic_utils.cc"],
     hdrs = ["envoy_quic_utils.h"],
     external_deps = ["quiche_quic_platform"],
     deps = [

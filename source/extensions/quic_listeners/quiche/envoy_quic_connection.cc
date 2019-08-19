@@ -43,7 +43,7 @@ bool EnvoyQuicConnection::OnPacketHeader(const quic::QuicPacketHeader& header) {
     const bool empty_filter_chain = !listener_config_.filterChainFactory().createNetworkFilterChain(
         *envoy_connection_, filter_chain_->networkFilterFactories());
     if (empty_filter_chain) {
-      CloseConnection(quic::QUIC_NO_ERROR, "closing connection: filter chain is empty",
+      CloseConnection(quic::QUIC_CRYPTO_INTERNAL_ERROR, "closing connection: filter chain is empty",
                       quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
       return false;
     }

@@ -1,5 +1,7 @@
 #include "envoy/network/io_handle.h"
 
+#include "common/network/io_socket_error_impl.h"
+
 namespace Envoy {
 namespace Quic {
 
@@ -18,22 +20,42 @@ public:
   bool isOpen() const override { return !closed_; }
   Api::IoCallUint64Result readv(uint64_t max_length, Buffer::RawSlice* slices,
                                 uint64_t num_slice) override {
+    if (closed_) {
+      return Api::IoCallUint64Result(0, Api::IoErrorPtr(new Network::IoSocketError(EBADF),
+                                                        Network::IoSocketError::deleteIoError));
+    }
     return io_handle_.readv(max_length, slices, num_slice);
   }
   Api::IoCallUint64Result writev(const Buffer::RawSlice* slices, uint64_t num_slice) override {
+    if (closed_) {
+      return Api::IoCallUint64Result(0, Api::IoErrorPtr(new Network::IoSocketError(EBADF),
+                                                        Network::IoSocketError::deleteIoError));
+    }
     return io_handle_.writev(slices, num_slice);
   }
   Api::IoCallUint64Result sendto(const Buffer::RawSlice& slice, int flags,
                                  const Network::Address::Instance& address) override {
+    if (closed_) {
+      return Api::IoCallUint64Result(0, Api::IoErrorPtr(new Network::IoSocketError(EBADF),
+                                                        Network::IoSocketError::deleteIoError));
+    }
     return io_handle_.sendto(slice, flags, address);
   }
   Api::IoCallUint64Result sendmsg(const Buffer::RawSlice* slices, uint64_t num_slice, int flags,
                                   const Envoy::Network::Address::Ip* self_ip,
                                   const Network::Address::Instance& peer_address) override {
+    if (closed_) {
+      return Api::IoCallUint64Result(0, Api::IoErrorPtr(new Network::IoSocketError(EBADF),
+                                                        Network::IoSocketError::deleteIoError));
+    }
     return io_handle_.sendmsg(slices, num_slice, flags, self_ip, peer_address);
   }
   Api::IoCallUint64Result recvmsg(Buffer::RawSlice* slices, const uint64_t num_slice,
                                   uint32_t self_port, RecvMsgOutput& output) override {
+    if (closed_) {
+      return Api::IoCallUint64Result(0, Api::IoErrorPtr(new Network::IoSocketError(EBADF),
+                                                        Network::IoSocketError::deleteIoError));
+    }
     return io_handle_.recvmsg(slices, num_slice, self_port, output);
   }
 

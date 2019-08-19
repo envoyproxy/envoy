@@ -83,6 +83,9 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
   ASSERT(decoder() != nullptr);
   decoder()->decodeData(*buffer, finished_reading);
   if (sequencer()->IsClosed() && !FinishedReadingTrailers()) {
+    // For Google QUIC implementation, trailers may arrived earlier and wait to
+    // be consumed after reading all the body. Consume it here.
+    // IETF QUIC shouldn't reach here because trailers are sent on same stream.
     decoder()->decodeTrailers(spdyHeaderBlockToEnvoyHeaders(received_trailers()));
     MarkTrailersConsumed();
   }

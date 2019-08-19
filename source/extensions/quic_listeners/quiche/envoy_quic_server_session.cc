@@ -49,7 +49,7 @@ quic::QuicSpdyStream* EnvoyQuicServerSession::CreateIncomingStream(quic::Pending
 }
 
 quic::QuicSpdyStream* EnvoyQuicServerSession::CreateOutgoingBidirectionalStream() {
-  // Not allow server initiated stream.
+  // Disallow server initiated stream.
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
@@ -143,7 +143,10 @@ std::chrono::milliseconds EnvoyQuicServerSession::delayedCloseTimeout() const {
 }
 
 const Network::ConnectionSocket::OptionsSharedPtr& EnvoyQuicServerSession::socketOptions() const {
-  ENVOY_CONN_LOG(error, "QUIC does not support connection pooling", *this);
+  ENVOY_CONN_LOG(
+      error,
+      "QUIC connection socket is merely a wrapper, and doesn't have any specific socket options.",
+      *this);
   return quic_connection_->connectionSocket()->options();
 }
 
