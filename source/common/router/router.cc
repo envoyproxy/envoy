@@ -877,7 +877,7 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
 
   // If gRPC request is finished without grpc-status code, use the one from the
   // response headers.
-  if (grpc_request_ && !grpc_status_code_received_) {
+  if (grpc_request_ && http_status_code_ != 0) {
     upstream_request.upstream_host_->outlierDetector().putHttpResponseCode(http_status_code_);
   }
 
@@ -1006,7 +1006,6 @@ void Filter::resetOtherUpstreams(UpstreamRequest& upstream_request) {
 void Filter::maybeSetGrpcStatusToOutlierDetection(
     UpstreamRequest& upstream_request, absl::optional<Grpc::Status::GrpcStatus> grpc_status) {
   if (grpc_status) {
-    grpc_status_code_received_ = true;
     if (Http::CodeUtility::is5xx(Grpc::Utility::grpcToHttpStatus(grpc_status.value()))) {
       // For gRPC request, use the grpc status code for outlier detector when the mapped
       // http code is 5xx.
@@ -1015,6 +1014,7 @@ void Filter::maybeSetGrpcStatusToOutlierDetection(
     } else {
       upstream_request.upstream_host_->outlierDetector().putHttpResponseCode(http_status_code_);
     }
+    http_status_code_ = 0;
   }
 }
 
@@ -1196,7 +1196,7 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
 
   // If gRPC request is finished without grpc-status code, use the one from the
   // response headers.
-  if (grpc_request_ && !grpc_status_code_received_) {
+  if (grpc_request_ && http_status_code_ != 0) {
     upstream_request.upstream_host_->outlierDetector().putHttpResponseCode(http_status_code_);
   }
 

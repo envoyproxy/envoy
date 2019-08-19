@@ -233,8 +233,7 @@ public:
   Filter(FilterConfig& config)
       : config_(config), final_upstream_request_(nullptr), downstream_response_started_(false),
         downstream_end_stream_(false), do_shadowing_(false), is_retry_(false),
-        attempting_internal_redirect_with_complete_stream_(false),
-        grpc_status_code_received_(false) {}
+        attempting_internal_redirect_with_complete_stream_(false) {}
 
   ~Filter() override;
 
@@ -575,8 +574,7 @@ private:
   bool is_retry_ : 1;
   bool include_attempt_count_ : 1;
   bool attempting_internal_redirect_with_complete_stream_ : 1;
-  bool grpc_status_code_received_ : 1;
-  uint64_t http_status_code_{200};
+  uint64_t http_status_code_{0};
   uint32_t attempt_count_{1};
   uint32_t pending_retries_{0};
 };
