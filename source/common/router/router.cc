@@ -1024,12 +1024,12 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& head
 
   modify_headers_(*headers);
 
-  if (!grpc_request_) {
-    upstream_request.upstream_host_->outlierDetector().putHttpResponseCode(response_code);
-  } else {
+  if (grpc_request_) {
     http_status_code_ = response_code;
     absl::optional<Grpc::Status::GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(*headers);
     maybeSetGrpcStatusToOutlierDetection(upstream_request, grpc_status);
+  } else {
+    upstream_request.upstream_host_->outlierDetector().putHttpResponseCode(response_code);
   }
 
   if (headers->EnvoyImmediateHealthCheckFail() != nullptr) {
