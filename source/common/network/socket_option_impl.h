@@ -105,7 +105,7 @@ public:
   SocketOptionImpl(envoy::api::v2::core::SocketOption::SocketState in_state,
                    Network::SocketOptionName optname, absl::string_view value)
       : in_state_(in_state), optname_(optname), value_(value.begin(), value.end()) {
-    ASSERT(reinterpret_cast<uintptr_t>(value_.data()) % alignof(std::max_align_t) == 0);
+    ASSERT(reinterpret_cast<uintptr_t>(value_.data()) % alignof(void*) == 0);
   }
 
   // Socket::Option
@@ -138,7 +138,7 @@ private:
   const envoy::api::v2::core::SocketOption::SocketState in_state_;
   const Network::SocketOptionName optname_;
   // This has to be a std::vector<uint8_t> but not std::string because std::string might inline
-  // the buffer so its data() is not aligned in to alignof(std::max_align_t).
+  // the buffer so its data() is not aligned in to alignof(void*).
   const std::vector<uint8_t> value_;
 };
 
