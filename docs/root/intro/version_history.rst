@@ -10,6 +10,7 @@ Version history
 * http: added the ability to reject HTTP/1.1 requests with invalid HTTP header values, using the runtime feature `envoy.reloadable_features.strict_header_validation`.
 * tls: added verification of IP address SAN fields in certificates against configured SANs in the
   certificate validation context.
+* upstream: added :ref:`an option <envoy_api_field_Cluster.CommonLbConfig.close_connections_on_host_set_change>` that allows to drain http, tcp connection pools on cluster membership change.
 
 1.11.0 (July 11, 2019)
 ======================
