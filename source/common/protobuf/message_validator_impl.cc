@@ -13,7 +13,7 @@ namespace Envoy {
 namespace ProtobufMessage {
 
 void WarningValidationVisitorImpl::setCounter(Stats::Counter& counter) {
-  ASSERT(counter_ == nullptr, "");
+  ASSERT(counter_ == nullptr);
   counter_ = &counter;
   counter.add(prestats_count_);
 }

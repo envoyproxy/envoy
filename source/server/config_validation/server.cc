@@ -43,12 +43,8 @@ ValidationInstance::ValidationInstance(const Options& options, Event::TimeSystem
                                        ComponentFactory& component_factory,
                                        Thread::ThreadFactory& thread_factory,
                                        Filesystem::Instance& file_system)
-    : options_(options), validation_context_(options_.allowUnknownStaticFields()
-                                                 ? static_warning_validation_visitor_
-                                                 : ProtobufMessage::getStrictValidationVisitor(),
-                                             !options.rejectUnknownDynamicFields()
-                                                 ? dynamic_warning_validation_visitor_
-                                                 : ProtobufMessage::getStrictValidationVisitor()),
+    : options_(options), validation_context_(options_.allowUnknownStaticFields(),
+                                             !options.rejectUnknownDynamicFields()),
       stats_store_(store),
       api_(new Api::ValidationImpl(thread_factory, store, time_system, file_system)),
       dispatcher_(api_->allocateDispatcher()),

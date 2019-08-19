@@ -237,9 +237,7 @@ private:
   bool workers_started_;
   bool shutdown_;
   const Options& options_;
-  ProtobufMessage::WarningValidationVisitorImpl static_warning_validation_visitor_;
-  ProtobufMessage::WarningValidationVisitorImpl dynamic_warning_validation_visitor_;
-  ProtobufMessage::ValidationContextImpl validation_context_;
+  ProtobufMessage::ProdValidationContextImpl validation_context_;
   TimeSource& time_source_;
   HotRestart& restarter_;
   const time_t start_time_;

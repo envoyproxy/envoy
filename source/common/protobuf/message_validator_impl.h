@@ -58,5 +58,27 @@ private:
   ValidationVisitor& dynamic_validation_visitor_;
 };
 
+class ProdValidationContextImpl : public ValidationContextImpl {
+public:
+  ProdValidationContextImpl(bool allow_unknown_static_fields, bool allow_unknown_dynamic_fields)
+      : ValidationContextImpl(allow_unknown_static_fields ? static_warning_validation_visitor_
+                                                          : getStrictValidationVisitor(),
+                              allow_unknown_dynamic_fields
+                                  ? dynamic_warning_validation_visitor_
+                                  : ProtobufMessage::getStrictValidationVisitor()) {}
+
+  ProtobufMessage::WarningValidationVisitorImpl& static_warning_validation_visitor() {
+    return static_warning_validation_visitor_;
+  }
+
+  ProtobufMessage::WarningValidationVisitorImpl& dynamic_warning_validation_visitor() {
+    return dynamic_warning_validation_visitor_;
+  }
+
+private:
+  ProtobufMessage::WarningValidationVisitorImpl static_warning_validation_visitor_;
+  ProtobufMessage::WarningValidationVisitorImpl dynamic_warning_validation_visitor_;
+};
+
 } // namespace ProtobufMessage
 } // namespace Envoy
