@@ -761,7 +761,7 @@ TEST_F(ConnectionHandlerTest, ListenerFilterDisabledTimeout) {
   EXPECT_CALL(*listener, onDestroy());
 }
 
-// Listener Filter could close socket in the context of listener callbak.
+// Listener Filter could close socket in the context of listener callback.
 TEST_F(ConnectionHandlerTest, ListenerFilterReportError) {
   InSequence s;
 
