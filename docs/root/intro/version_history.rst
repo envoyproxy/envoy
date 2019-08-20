@@ -41,7 +41,7 @@ Version history
 * upstream: added network filter chains to upstream connections, see :ref:`filters<envoy_api_field_Cluster.filters>`.
 * upstream: use p2c to select hosts for least-requests load balancers if all host weights are the same, even in cases where weights are not equal to 1.
 * zookeeper: parse responses and emit latency stats.
-* http1: ignore and remove Upgrade: h2c.
+* http: ignore h2c upgrades for HTTP/1.1 requests which are not currently supported.
 
 1.11.1 (August 13, 2019)
 ========================

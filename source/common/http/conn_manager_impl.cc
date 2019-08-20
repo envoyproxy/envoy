@@ -763,8 +763,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   // TODO if there are no filters when starting a filter iteration, the connection manager
   // should return 404. The current returns no response if there is no router filter.
   if (protocol == Protocol::Http11 && hasCachedRoute()) {
-    if (create_result == CreateFilterChainResult::UPGRADE_REJECTED ||
-        create_result == CreateFilterChainResult::OVERLOADED) {
+    if (create_result == CreateFilterChainResult::UpgradeRejected ||
+        create_result == CreateFilterChainResult::Overloaded) {
       // Do not allow upgrades if the route does not support it.
       // NB: includes OVERLOADED and failed h2c upgrades.
       connection_manager_.stats_.named_.downstream_rq_ws_on_non_ws_route_.inc();
@@ -1727,13 +1727,12 @@ void ConnectionManagerImpl::ActiveStream::setBufferLimit(uint32_t new_limit) {
 ConnectionManagerImpl::ActiveStream::CreateFilterChainResult
 ConnectionManagerImpl::ActiveStream::createFilterChain() {
   if (state_.created_filter_chain_) {
-    return CreateFilterChainResult::ALREADY_CREATED;
+    return CreateFilterChainResult::AlreadyCreated;
   }
   if (state_.overloaded_do_not_create_filter_chain_) {
-    return CreateFilterChainResult::OVERLOADED;
+    return CreateFilterChainResult::Overloaded;
   }
-  bool upgrade_rejected = false;
-  bool upgrade_ignored = false;
+  auto result = CreateFilterChainResult::Created;
   auto upgrade = request_headers_ ? request_headers_->Upgrade() : nullptr;
   state_.created_filter_chain_ = true;
   if (upgrade != nullptr) {
@@ -1750,14 +1749,17 @@ ConnectionManagerImpl::ActiveStream::createFilterChain() {
       state_.successful_upgrade_ = true;
       connection_manager_.stats_.named_.downstream_cx_upgrades_total_.inc();
       connection_manager_.stats_.named_.downstream_cx_upgrades_active_.inc();
-      return CreateFilterChainResult::UPGRADED;
+      return CreateFilterChainResult::Upgraded;
     } else {
+      // Ignore h2c upgrade requests until we support them.
+      // See https://github.com/envoyproxy/envoy/issues/7161 for details.
       if (absl::EqualsIgnoreCase(request_headers_->Upgrade()->value().getStringView(),
                                  Http::Headers::get().UpgradeValues.H2c)) {
         request_headers_->removeUpgrade();
-        upgrade_ignored = true;
+        result = CreateFilterChainResult::UpgradeIgnored;
+        // Fall through to the default filter chain.
       } else {
-        upgrade_rejected = true;
+        result = CreateFilterChainResult::UpgradeRejected;
         // Fall through to the default filter chain. The function calling this
         // will send a local reply indicating that the upgrade failed.
       }
@@ -1765,15 +1767,7 @@ ConnectionManagerImpl::ActiveStream::createFilterChain() {
   }
 
   connection_manager_.config_.filterFactory().createFilterChain(*this);
-  if (upgrade_rejected) {
-    return CreateFilterChainResult::UPGRADE_REJECTED;
-  } else if (upgrade_ignored) {
-    return CreateFilterChainResult::UPGRADE_IGNORED;
-  } else if (upgrade) {
-    return CreateFilterChainResult::UPGRADED;
-  } else {
-    return CreateFilterChainResult::CREATED;
-  }
+  return result;
 }
 
 void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {

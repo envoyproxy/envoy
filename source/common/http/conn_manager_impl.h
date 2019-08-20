@@ -562,13 +562,13 @@ private:
     // Possibly increases buffer_limit_ to the value of limit.
     void setBufferLimit(uint32_t limit);
     // Set up the Encoder/Decoder filter chain.
-    enum class CreateFilterChainResult : int {
-      OVERLOADED = 0,       // Filter chain not created.
-      ALREADY_CREATED = 1,  // Filter chain not created (again).
-      UPGRADE_REJECTED = 2, // Filter chain not created.
-      UPGRADE_IGNORED = 3,  // Filter chain created (e.g. http1 for Upgrade: h2c).
-      CREATED = 4,          // Filter chain created, no Upgrade header.
-      UPGRADED = 5,         // Upgraded filter chain created.
+    enum class CreateFilterChainResult {
+      Overloaded,      // Filter chain not created.
+      AlreadyCreated,  // Filter chain not created (again).
+      UpgradeRejected, // Filter chain not created.
+      UpgradeIgnored,  // Filter chain created (e.g. http1 for Upgrade: h2c).
+      Created,         // Filter chain created, no Upgrade header.
+      Upgraded,        // Upgraded filter chain created.
     };
     CreateFilterChainResult createFilterChain();
     // Per-stream idle timeout callback.
