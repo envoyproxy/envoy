@@ -133,7 +133,7 @@ elif [[ "$CI_TARGET" == "bazel.debug" ]]; then
   echo "bazel debug build with tests..."
   bazel_binary_build debug
   echo "Testing ${TEST_TARGETS}"
-  bazel test ${BAZEL_BUILD_OPTIONS} --define deprecated_features=disabled -c dbg ${TEST_TARGETS}
+  bazel test ${BAZEL_BUILD_OPTIONS} -c dbg ${TEST_TARGETS}
   exit 0
 elif [[ "$CI_TARGET" == "bazel.debug.server_only" ]]; then
   setup_clang_toolchain
@@ -144,10 +144,10 @@ elif [[ "$CI_TARGET" == "bazel.asan" ]]; then
   setup_clang_toolchain
   echo "bazel ASAN/UBSAN debug build with tests"
   echo "Building and testing envoy tests ${TEST_TARGETS}"
-  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-asan ${TEST_TARGETS}
+  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --define deprecated_features=disabled --config=clang-asan ${TEST_TARGETS}
   echo "Building and testing envoy-filter-example tests..."
   pushd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
-  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-asan \
+  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --define deprecated_features=disabled --config=clang-asan \
     //:echo2_integration_test //:envoy_binary_test
   popd
   # Also validate that integration test traffic tapping (useful when debugging etc.)

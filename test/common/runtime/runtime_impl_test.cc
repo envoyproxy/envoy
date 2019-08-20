@@ -180,7 +180,7 @@ TEST_F(DiskLoaderImplTest, All) {
   EXPECT_EQ(false, snapshot->runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
 
   // Deprecation
-#ifdef DISABLE_DEPRECATED_FEATURES
+#ifdef ENVOY_DISABLE_DEPRECATED_FEATURES
   EXPECT_EQ(false, snapshot->deprecatedFeatureEnabled("random_string_should_be_enabled"));
 #else
   EXPECT_EQ(true, snapshot->deprecatedFeatureEnabled("random_string_should_be_enabled"));
