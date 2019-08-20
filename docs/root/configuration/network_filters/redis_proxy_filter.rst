@@ -47,7 +47,7 @@ The Redis filter will gather statistics for the command splitter in the
 Per command statistics
 ----------------------
 
-The Redis filter will gather statistics for commands in the *redis.<stat_prefix>.upstream_commands.<command>.* namespace.
+The Redis filter will gather statistics for commands in the *redis.<stat_prefix>.upstream_commands.<command>.* namespace. Additionally, it will collect the aggegate request time to the upstream in *redis.<stat_prefix>.upstream_commands.upstream_rq_time.
 
 .. csv-table::
   :header: Name, Type, Description

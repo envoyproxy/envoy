@@ -201,9 +201,9 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
   if (redis_command_stats_->enabled()) {
     bool success = !canceled && (value->type() != Common::Redis::RespType::Error);
     redis_command_stats_->updateStats(success, request.command_);
-    request.aggregate_request_timer_->complete();
     request.command_request_timer_->complete();
   }
+  request.aggregate_request_timer_->complete();
 
   PoolCallbacks& callbacks = request.callbacks_;
 
