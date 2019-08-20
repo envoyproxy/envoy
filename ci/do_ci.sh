@@ -93,8 +93,7 @@ if [[ $# -gt 1 ]]; then
 else
   TEST_TARGETS=//test/...
   if [[ "$CI_TARGET" == "bazel.fuzz" ]]; then
-    FUZZER_TARGETS_CC=$(find . -name *_fuzz_test.cc)
-    FUZZ_TEST_TARGETS="$(for t in ${FUZZER_TARGETS_CC}; do echo "${t:2:-3}_with_libfuzzer"; done;)"    
+    FUZZ_TEST_TARGETS="$(for t in $(bazel query "attr('tags','libfuzzer',//test/...)"); do echo $t; done;)"
   fi  
 fi
 

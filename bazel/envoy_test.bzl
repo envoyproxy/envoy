@@ -123,7 +123,7 @@ def envoy_cc_fuzz_test(name, corpus, deps = [], tags = [], **kwargs):
         testonly = 1,
         data = [corpus_name],
         deps = [":" + test_lib_name],
-        tags = ["manual"] + tags,
+        tags = ["manual", "libfuzzer"] + tags,
     )
 
 # Envoy C++ test targets should be specified with this function.
