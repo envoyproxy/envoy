@@ -45,8 +45,11 @@ public:
 
   std::string name() override { return name_; }
 
+  bool isTerminalFilter() override { return is_terminal_filter_; }
+
 protected:
-  FactoryBase(const std::string& name) : name_(name) {}
+  FactoryBase(const std::string& name, bool is_terminal = false)
+      : name_(name), is_terminal_filter_(is_terminal) {}
 
 private:
   virtual Network::FilterFactoryCb
@@ -59,6 +62,7 @@ private:
   }
 
   const std::string name_;
+  const bool is_terminal_filter_;
 };
 
 } // namespace Common
