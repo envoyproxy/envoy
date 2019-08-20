@@ -121,6 +121,10 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
   if (!secondary_init_clusters_.empty()) {
     if (!started_secondary_initialize_) {
       ENVOY_LOG(info, "cm init: initializing secondary clusters");
+      cm_.adsMux().pause(Config::TypeUrl::get().ClusterLoadAssignment);
+      Cleanup eds_resume(
+          [this] { cm_.adsMux().resume(Config::TypeUrl::get().ClusterLoadAssignment); });
+
       started_secondary_initialize_ = true;
       // Cluster::initialize() method can modify the list of secondary_init_clusters_ to remove
       // the item currently being initialized, so we eschew range-based-for and do this complicated
@@ -188,7 +192,7 @@ ClusterManagerImpl::ClusterManagerImpl(
     : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls.allocateSlot()),
       random_(random), bind_config_(bootstrap.cluster_manager().upstream_bind_config()),
       local_info_(local_info), cm_stats_(generateStats(stats)),
-      init_helper_([this](Cluster& cluster) { onClusterInit(cluster); }),
+      init_helper_(*this, [this](Cluster& cluster) { onClusterInit(cluster); }),
       config_tracker_entry_(
           admin.getConfigTracker().add("clusters", [this] { return dumpClusterConfigs(); })),
       time_source_(main_thread_dispatcher.timeSource()), dispatcher_(main_thread_dispatcher),
@@ -487,7 +491,7 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& clust
   loadCluster(cluster, version_info, true, use_active_map ? active_clusters_ : warming_clusters_);
 
   if (use_active_map) {
-    ENVOY_LOG(info, "add/update cluster {} during init", cluster_name);
+    ENVOY_LOG(debug, "add/update cluster {} during init", cluster_name);
     auto& cluster_entry = active_clusters_.at(cluster_name);
     createOrUpdateThreadLocalCluster(*cluster_entry);
     init_helper_.addCluster(*cluster_entry->cluster_);
