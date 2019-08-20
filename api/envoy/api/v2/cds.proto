@@ -585,7 +585,7 @@ message Cluster {
     bool ignore_new_hosts_until_first_hc = 5;
 
     // If set to `true`, the cluster manager will drain all existing
-    // connections to upstream hosts whenever hosts are added or removed from cluster.
+    // connections to upstream hosts whenever hosts are added or removed from the cluster.
     bool close_connections_on_host_set_change = 6;
   }
 
