@@ -24,16 +24,16 @@ SlotPtr InstanceImpl::allocateSlot() {
   ASSERT(std::this_thread::get_id() == main_thread_id_);
   ASSERT(!shutdown_);
 
-  for (uint64_t i = 0; i < slots_.size(); i++) {
-    if (slots_[i] == nullptr) {
-      std::unique_ptr<SlotImpl> slot(new SlotImpl(*this, i));
-      slots_[i] = slot.get();
-      return slot;
-    }
+  if (free_slot_indexes_.empty()) {
+    std::unique_ptr<SlotImpl> slot(new SlotImpl(*this, slots_.size()));
+    slots_.push_back(slot.get());
+    return slot;
   }
-
-  std::unique_ptr<SlotImpl> slot(new SlotImpl(*this, slots_.size()));
-  slots_.push_back(slot.get());
+  uint32_t idx = *free_slot_indexes_.begin();
+  free_slot_indexes_.erase(idx);
+  ASSERT(idx < slots_.size());
+  std::unique_ptr<SlotImpl> slot(new SlotImpl(*this, idx));
+  slots_[idx] = slot.get();
   return slot;
 }
 
@@ -73,6 +73,8 @@ void InstanceImpl::removeSlot(SlotImpl& slot) {
 
   const uint64_t index = slot.index_;
   slots_[index] = nullptr;
+  auto ret = free_slot_indexes_.emplace(index);
+  ASSERT(ret.second, fmt::format("slot index {} already in free slot set!", index));
   runOnAllThreads([index]() -> void {
     // This runs on each thread and clears the slot, making it available for a new allocations.
     // This is safe even if a new allocation comes in, because everything happens with post() and
