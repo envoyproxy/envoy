@@ -30,7 +30,8 @@ ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatche
       std::make_shared<RedisCommandStats>(host->cluster().statsScope(), "upstream_commands",
                                           config.enableCommandStats(), config.latencyInMicros());
   std::unique_ptr<ClientImpl> client(new ClientImpl(host, dispatcher, std::move(encoder),
-                                                    decoder_factory, config, redis_command_stats));
+                                                    decoder_factory, config,
+                                                    std::move(redis_command_stats)));
   client->connection_ = host->createConnection(dispatcher, nullptr, nullptr).connection_;
   client->connection_->addConnectionCallbacks(*client);
   client->connection_->addReadFilter(Network::ReadFilterSharedPtr{new UpstreamReadFilter(*client)});
@@ -41,7 +42,7 @@ ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatche
 
 ClientImpl::ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                        EncoderPtr&& encoder, DecoderFactory& decoder_factory, const Config& config,
-                       RedisCommandStatsPtr& redis_command_stats)
+                       RedisCommandStatsPtr&& redis_command_stats)
     : host_(host), encoder_(std::move(encoder)), decoder_(decoder_factory.create(*this)),
       config_(config),
       connect_or_op_timer_(dispatcher.createTimer([this]() -> void { onConnectOrOpTimeout(); })),

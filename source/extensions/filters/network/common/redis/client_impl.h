@@ -114,7 +114,7 @@ private:
 
   ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
              DecoderFactory& decoder_factory, const Config& config,
-             RedisCommandStatsPtr& redis_command_stats);
+             RedisCommandStatsPtr&& redis_command_stats);
   void onConnectOrOpTimeout();
   void onData(Buffer::Instance& data);
   void putOutlierEvent(Upstream::Outlier::Result result);
