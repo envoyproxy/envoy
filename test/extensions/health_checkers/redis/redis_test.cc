@@ -215,7 +215,7 @@ TEST_F(RedisHealthCheckerTest, PingAndVariousFailures) {
   pool_callbacks_->onResponse(std::move(response));
 
   expectPingRequestCreate();
-  interval_timer_->callback_();
+  interval_timer_->invokeCallback();
 
   // Failure
   EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
@@ -225,7 +225,7 @@ TEST_F(RedisHealthCheckerTest, PingAndVariousFailures) {
   pool_callbacks_->onResponse(std::move(response));
 
   expectPingRequestCreate();
-  interval_timer_->callback_();
+  interval_timer_->invokeCallback();
 
   // Redis failure via disconnect
   EXPECT_CALL(*timeout_timer_, disableTimer());
@@ -235,18 +235,18 @@ TEST_F(RedisHealthCheckerTest, PingAndVariousFailures) {
 
   expectClientCreate();
   expectPingRequestCreate();
-  interval_timer_->callback_();
+  interval_timer_->invokeCallback();
 
   // Timeout
   EXPECT_CALL(pool_request_, cancel());
   EXPECT_CALL(*client_, close());
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
-  timeout_timer_->callback_();
+  timeout_timer_->invokeCallback();
 
   expectClientCreate();
   expectPingRequestCreate();
-  interval_timer_->callback_();
+  interval_timer_->invokeCallback();
 
   // Shutdown with active request.
   EXPECT_CALL(pool_request_, cancel());
@@ -283,7 +283,7 @@ TEST_F(RedisHealthCheckerTest, FailuresLogging) {
   pool_callbacks_->onResponse(std::move(response));
 
   expectPingRequestCreate();
-  interval_timer_->callback_();
+  interval_timer_->invokeCallback();
 
   // Failure
   EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
@@ -294,7 +294,7 @@ TEST_F(RedisHealthCheckerTest, FailuresLogging) {
   pool_callbacks_->onResponse(std::move(response));
 
   expectPingRequestCreate();
-  interval_timer_->callback_();
+  interval_timer_->invokeCallback();
 
   // Fail again
   EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, false));
@@ -304,7 +304,7 @@ TEST_F(RedisHealthCheckerTest, FailuresLogging) {
   pool_callbacks_->onResponse(std::move(response));
 
   expectPingRequestCreate();
-  interval_timer_->callback_();
+  interval_timer_->invokeCallback();
 
   // Shutdown with active request.
   EXPECT_CALL(pool_request_, cancel());
@@ -341,7 +341,7 @@ TEST_F(RedisHealthCheckerTest, LogInitialFailure) {
 
   expectClientCreate();
   expectPingRequestCreate();
-  interval_timer_->callback_();
+  interval_timer_->invokeCallback();
 
   // Success
   EXPECT_CALL(*event_logger_, logAddHealthy(_, _, false));
@@ -354,7 +354,7 @@ TEST_F(RedisHealthCheckerTest, LogInitialFailure) {
   pool_callbacks_->onResponse(std::move(response));
 
   expectPingRequestCreate();
-  interval_timer_->callback_();
+  interval_timer_->invokeCallback();
 
   // Shutdown with active request.
   EXPECT_CALL(pool_request_, cancel());
@@ -391,7 +391,7 @@ TEST_F(RedisHealthCheckerTest, Exists) {
   pool_callbacks_->onResponse(std::move(response));
 
   expectExistsRequestCreate();
-  interval_timer_->callback_();
+  interval_timer_->invokeCallback();
 
   // Failure, exists
   EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
@@ -403,7 +403,7 @@ TEST_F(RedisHealthCheckerTest, Exists) {
   pool_callbacks_->onResponse(std::move(response));
 
   expectExistsRequestCreate();
-  interval_timer_->callback_();
+  interval_timer_->invokeCallback();
 
   // Failure, no value
   EXPECT_CALL(*timeout_timer_, disableTimer());
@@ -442,7 +442,7 @@ TEST_F(RedisHealthCheckerTest, ExistsRedirected) {
   pool_callbacks_->onRedirection(moved_response);
 
   expectExistsRequestCreate();
-  interval_timer_->callback_();
+  interval_timer_->invokeCallback();
 
   // Success with ask redirection
   EXPECT_CALL(*timeout_timer_, disableTimer());
@@ -484,7 +484,7 @@ TEST_F(RedisHealthCheckerTest, NoConnectionReuse) {
 
   expectClientCreate();
   expectPingRequestCreate();
-  interval_timer_->callback_();
+  interval_timer_->invokeCallback();
 
   // The connection will close on failure.
   EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
@@ -496,7 +496,7 @@ TEST_F(RedisHealthCheckerTest, NoConnectionReuse) {
 
   expectClientCreate();
   expectPingRequestCreate();
-  interval_timer_->callback_();
+  interval_timer_->invokeCallback();
 
   // Redis failure via disconnect, the connection was closed by the other end.
   EXPECT_CALL(*timeout_timer_, disableTimer());
@@ -506,18 +506,18 @@ TEST_F(RedisHealthCheckerTest, NoConnectionReuse) {
 
   expectClientCreate();
   expectPingRequestCreate();
-  interval_timer_->callback_();
+  interval_timer_->invokeCallback();
 
   // Timeout, the connection will be closed.
   EXPECT_CALL(pool_request_, cancel());
   EXPECT_CALL(*client_, close());
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
-  timeout_timer_->callback_();
+  timeout_timer_->invokeCallback();
 
   expectClientCreate();
   expectPingRequestCreate();
-  interval_timer_->callback_();
+  interval_timer_->invokeCallback();
 
   // Shutdown with active request.
   EXPECT_CALL(pool_request_, cancel());

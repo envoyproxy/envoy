@@ -122,7 +122,9 @@ private:
   void updateAllHosts(const Upstream::HostVector& hosts_added,
                       const Upstream::HostVector& hosts_removed, uint32_t priority);
 
-  void onClusterSlotUpdate(const std::vector<ClusterSlot>&);
+  void onClusterSlotUpdate(ClusterSlotsPtr&&);
+
+  void reloadHealthyHostsHelper(const Upstream::HostSharedPtr& host) override;
 
   const envoy::api::v2::endpoint::LocalityLbEndpoints& localityLbEndpoint() const {
     // Always use the first endpoint.
@@ -214,6 +216,11 @@ private:
     uint32_t maxUpstreamUnknownConnections() const override { return 0; }
     bool enableCommandStats() const override { return false; }
     bool latencyInMicros() const override { return false; }
+    // This is effectively not in used for making the "Cluster Slots" calls.
+    // since we call cluster slots on both the master and slaves, ANY is more appropriate here.
+    Extensions::NetworkFilters::Common::Redis::Client::ReadPolicy readPolicy() const override {
+      return Extensions::NetworkFilters::Common::Redis::Client::ReadPolicy::Any;
+    }
 
     // Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks
     void onResponse(NetworkFilters::Common::Redis::RespValuePtr&& value) override;

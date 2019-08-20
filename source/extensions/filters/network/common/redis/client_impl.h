@@ -53,6 +53,7 @@ public:
   }
   bool enableCommandStats() const override { return enable_command_stats_; }
   bool latencyInMicros() const override { return latency_in_micros_; }
+  ReadPolicy readPolicy() const override { return read_policy_; }
 
 private:
   const std::chrono::milliseconds op_timeout_;
@@ -63,6 +64,7 @@ private:
   const uint32_t max_upstream_unknown_connections_;
   const bool enable_command_stats_;
   const bool latency_in_micros_;
+  ReadPolicy read_policy_;
 };
 
 class ClientImpl : public Client, public DecoderCallbacks, public Network::ConnectionCallbacks {

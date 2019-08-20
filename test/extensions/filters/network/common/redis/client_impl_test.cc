@@ -1,7 +1,6 @@
 #include <vector>
 
 #include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
 #include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -10,9 +9,7 @@
 #include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/extensions/filters/network/common/redis/test_utils.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
-#include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -160,6 +157,7 @@ class ConfigBufferSizeGTSingleRequest : public Config {
   uint32_t maxUpstreamUnknownConnections() const override { return 0; }
   bool enableCommandStats() const override { return false; }
   bool latencyInMicros() const override { return false; }
+  ReadPolicy readPolicy() const override { return ReadPolicy::Master; }
 };
 
 TEST_F(RedisClientImplTest, BatchWithTimerFiring) {
@@ -471,6 +469,7 @@ class ConfigOutlierDisabled : public Config {
   std::chrono::milliseconds bufferFlushTimeoutInMs() const override {
     return std::chrono::milliseconds(0);
   }
+  ReadPolicy readPolicy() const override { return ReadPolicy::Master; }
   uint32_t maxUpstreamUnknownConnections() const override { return 0; }
   bool enableCommandStats() const override { return false; }
   bool latencyInMicros() const override { return false; }
@@ -514,7 +513,7 @@ TEST_F(RedisClientImplTest, ConnectTimeout) {
   EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(callbacks1, onFailure());
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
-  connect_or_op_timer_->callback_();
+  connect_or_op_timer_->invokeCallback();
 
   EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_cx_connect_timeout_.value());
   EXPECT_EQ(1UL, host_->stats_.cx_connect_fail_.value());
@@ -557,7 +556,7 @@ TEST_F(RedisClientImplTest, OpTimeout) {
   EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(callbacks1, onFailure());
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
-  connect_or_op_timer_->callback_();
+  connect_or_op_timer_->invokeCallback();
 
   EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_rq_timeout_.value());
   EXPECT_EQ(1UL, host_->stats_.rq_timeout_.value());

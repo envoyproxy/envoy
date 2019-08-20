@@ -39,6 +39,7 @@
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/test_time.h"
 
@@ -55,6 +56,7 @@ using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
+using testing::Matcher;
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
@@ -1408,7 +1410,7 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutGlobal) {
     // encodeHeaders()/encodeData().
     EXPECT_CALL(*idle_timer, enableTimer(_)).Times(2);
     EXPECT_CALL(*idle_timer, disableTimer());
-    idle_timer->callback_();
+    idle_timer->invokeCallback();
   }));
 
   // 408 direct response after timeout.
@@ -1447,7 +1449,7 @@ TEST_F(HttpConnectionManagerImplTest, AccessEncoderRouteBeforeHeadersArriveOnIdl
     EXPECT_CALL(*idle_timer, enableTimer(_)).Times(2);
     EXPECT_CALL(*idle_timer, disableTimer());
     // Simulate and idle timeout so that the filter chain gets created.
-    idle_timer->callback_();
+    idle_timer->invokeCallback();
   }));
 
   // This should not be called as we don't have request headers.
@@ -1487,7 +1489,7 @@ TEST_F(HttpConnectionManagerImplTest, TestStreamIdleAccessLog) {
     // encodeHeaders()/encodeData().
     EXPECT_CALL(*idle_timer, enableTimer(_)).Times(2);
     EXPECT_CALL(*idle_timer, disableTimer());
-    idle_timer->callback_();
+    idle_timer->invokeCallback();
   }));
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
@@ -1595,7 +1597,7 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterDownstreamHeaders
     // encodeHeaders()/encodeData().
     EXPECT_CALL(*idle_timer, enableTimer(_)).Times(2);
     EXPECT_CALL(*idle_timer, disableTimer());
-    idle_timer->callback_();
+    idle_timer->invokeCallback();
 
     data.drain(4);
   }));
@@ -1667,7 +1669,7 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterDownstreamHeaders
     // encodeHeaders()/encodeData().
     EXPECT_CALL(*idle_timer, enableTimer(_)).Times(2);
     EXPECT_CALL(*idle_timer, disableTimer());
-    idle_timer->callback_();
+    idle_timer->invokeCallback();
 
     data.drain(4);
   }));
@@ -1718,7 +1720,7 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterUpstreamHeaders) 
     filter->callbacks_->encodeHeaders(std::move(response_headers), false);
 
     EXPECT_CALL(*idle_timer, disableTimer());
-    idle_timer->callback_();
+    idle_timer->invokeCallback();
 
     data.drain(4);
   }));
@@ -1782,7 +1784,7 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterBidiData) {
     filter->callbacks_->encodeData(fake_response, false);
 
     EXPECT_CALL(*idle_timer, disableTimer());
-    idle_timer->callback_();
+    idle_timer->invokeCallback();
 
     data.drain(4);
   }));
@@ -1863,7 +1865,7 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutCallbackDisarmsAndReturns408
     EXPECT_CALL(response_encoder_, encodeData(_, true)).WillOnce(AddBufferToString(&response_body));
 
     conn_manager_->newStream(response_encoder_);
-    request_timer->callback_();
+    request_timer->invokeCallback();
   }));
 
   Buffer::OwnedImpl fake_input("1234");
@@ -2146,7 +2148,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainClose) {
   EXPECT_CALL(filter_callbacks_.connection_,
               close(Network::ConnectionCloseType::FlushWriteAndDelay));
   EXPECT_CALL(*drain_timer, disableTimer());
-  drain_timer->callback_();
+  drain_timer->invokeCallback();
 
   EXPECT_EQ(1U, stats_.named_.downstream_cx_drain_close_.value());
   EXPECT_EQ(1U, stats_.named_.downstream_rq_3xx_.value());
@@ -2316,6 +2318,58 @@ TEST_F(HttpConnectionManagerImplTest, DownstreamProtocolError) {
   conn_manager_->onData(fake_input, false);
 }
 
+// Verify that FrameFloodException causes connection to be closed abortively.
+TEST_F(HttpConnectionManagerImplTest, FrameFloodError) {
+  InSequence s;
+  setup(false, "");
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    conn_manager_->newStream(response_encoder_);
+    throw FrameFloodException("too many outbound frames.");
+  }));
+
+  EXPECT_CALL(response_encoder_.stream_, removeCallbacks(_));
+  EXPECT_CALL(filter_factory_, createFilterChain(_)).Times(0);
+
+  // FrameFloodException should result in reset of the streams followed by abortive close.
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWriteAndDelay));
+
+  // Kick off the incoming data.
+  Buffer::OwnedImpl fake_input("1234");
+  EXPECT_LOG_NOT_CONTAINS("warning", "downstream HTTP flood",
+                          conn_manager_->onData(fake_input, false));
+}
+
+// Verify that FrameFloodException causes connection to be closed abortively as well as logged
+// if runtime indicates to do so.
+TEST_F(HttpConnectionManagerImplTest, FrameFloodErrorWithLog) {
+  InSequence s;
+  setup(false, "");
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    conn_manager_->newStream(response_encoder_);
+    throw FrameFloodException("too many outbound frames.");
+  }));
+
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("http.connection_manager.log_flood_exception",
+                                                 Matcher<const envoy::type::FractionalPercent&>(_)))
+      .WillOnce(Return(true));
+
+  EXPECT_CALL(response_encoder_.stream_, removeCallbacks(_));
+  EXPECT_CALL(filter_factory_, createFilterChain(_)).Times(0);
+
+  // FrameFloodException should result in reset of the streams followed by abortive close.
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWriteAndDelay));
+
+  // Kick off the incoming data.
+  Buffer::OwnedImpl fake_input("1234");
+  EXPECT_LOG_CONTAINS("warning",
+                      "downstream HTTP flood from IP '0.0.0.0:0': too many outbound frames.",
+                      conn_manager_->onData(fake_input, false));
+}
+
 TEST_F(HttpConnectionManagerImplTest, IdleTimeoutNoCodec) {
   // Not used in the test.
   delete codec_;
@@ -2327,7 +2381,7 @@ TEST_F(HttpConnectionManagerImplTest, IdleTimeoutNoCodec) {
 
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
   EXPECT_CALL(*idle_timer, disableTimer());
-  idle_timer->callback_();
+  idle_timer->invokeCallback();
 
   EXPECT_EQ(1U, stats_.named_.downstream_cx_idle_timeout_.value());
 }
@@ -2372,14 +2426,14 @@ TEST_F(HttpConnectionManagerImplTest, IdleTimeout) {
 
   Event::MockTimer* drain_timer = setUpTimer();
   EXPECT_CALL(*drain_timer, enableTimer(_));
-  idle_timer->callback_();
+  idle_timer->invokeCallback();
 
   EXPECT_CALL(*codec_, goAway());
   EXPECT_CALL(filter_callbacks_.connection_,
               close(Network::ConnectionCloseType::FlushWriteAndDelay));
   EXPECT_CALL(*idle_timer, disableTimer());
   EXPECT_CALL(*drain_timer, disableTimer());
-  drain_timer->callback_();
+  drain_timer->invokeCallback();
 
   EXPECT_EQ(1U, stats_.named_.downstream_cx_idle_timeout_.value());
 }

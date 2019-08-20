@@ -21,7 +21,32 @@ ConfigImpl::ConfigImpl(
       max_upstream_unknown_connections_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_upstream_unknown_connections, 100)),
       enable_command_stats_(config.enable_command_stats()),
-      latency_in_micros_(config.latency_in_micros()) {}
+      latency_in_micros_(config.latency_in_micros()) {
+  switch (config.read_policy()) {
+  case envoy::config::filter::network::redis_proxy::v2::
+      RedisProxy_ConnPoolSettings_ReadPolicy_MASTER:
+    read_policy_ = ReadPolicy::Master;
+    break;
+  case envoy::config::filter::network::redis_proxy::v2::
+      RedisProxy_ConnPoolSettings_ReadPolicy_PREFER_MASTER:
+    read_policy_ = ReadPolicy::PreferMaster;
+    break;
+  case envoy::config::filter::network::redis_proxy::v2::
+      RedisProxy_ConnPoolSettings_ReadPolicy_REPLICA:
+    read_policy_ = ReadPolicy::PreferMaster;
+    break;
+  case envoy::config::filter::network::redis_proxy::v2::
+      RedisProxy_ConnPoolSettings_ReadPolicy_PREFER_REPLICA:
+    read_policy_ = ReadPolicy::PreferMaster;
+    break;
+  case envoy::config::filter::network::redis_proxy::v2::RedisProxy_ConnPoolSettings_ReadPolicy_ANY:
+    read_policy_ = ReadPolicy::PreferMaster;
+    break;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+    break;
+  }
+}
 
 ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                              EncoderPtr&& encoder, DecoderFactory& decoder_factory,

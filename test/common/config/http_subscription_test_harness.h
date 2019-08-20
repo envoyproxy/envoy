@@ -58,8 +58,9 @@ public:
     }
   }
 
-  void expectSendMessage(const std::set<std::string>& cluster_names,
-                         const std::string& version) override {
+  void expectSendMessage(const std::set<std::string>& cluster_names, const std::string& version,
+                         bool expect_node = false) override {
+    UNREFERENCED_PARAMETER(expect_node);
     EXPECT_CALL(cm_, httpAsyncClientForCluster("eds_cluster"));
     EXPECT_CALL(cm_.async_client_, send_(_, _, _))
         .WillOnce(Invoke([this, cluster_names, version](Http::MessagePtr& request,
@@ -165,7 +166,7 @@ public:
     EXPECT_CALL(*init_timeout_timer_, disableTimer());
   }
 
-  void callInitFetchTimeoutCb() override { init_timeout_timer_->callback_(); }
+  void callInitFetchTimeoutCb() override { init_timeout_timer_->invokeCallback(); }
 
   void timerTick() {
     expectSendMessage(cluster_names_, version_);

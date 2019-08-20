@@ -162,9 +162,10 @@ public:
                          Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
                          AccessLog::AccessLogManager& log_manager,
                          Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
-                         Api::Api& api, Http::Context& http_context)
+                         ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
+                         Http::Context& http_context)
       : ClusterManagerImpl(bootstrap, factory, stats, tls, runtime, random, local_info, log_manager,
-                           main_thread_dispatcher, admin, validation_visitor_, api, http_context) {}
+                           main_thread_dispatcher, admin, validation_context, api, http_context) {}
 
   std::map<std::string, std::reference_wrapper<Cluster>> activeClusters() {
     std::map<std::string, std::reference_wrapper<Cluster>> clusters;
@@ -173,8 +174,6 @@ public:
     }
     return clusters;
   }
-
-  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
 };
 
 // Override postThreadLocalClusterUpdate so we can test that merged updates calls
@@ -186,10 +185,12 @@ public:
       Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
       Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
       AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
-      Server::Admin& admin, Api::Api& api, MockLocalClusterUpdate& local_cluster_update,
-      MockLocalHostsRemoved& local_hosts_removed, Http::Context& http_context)
+      Server::Admin& admin, ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
+      MockLocalClusterUpdate& local_cluster_update, MockLocalHostsRemoved& local_hosts_removed,
+      Http::Context& http_context)
       : TestClusterManagerImpl(bootstrap, factory, stats, tls, runtime, random, local_info,
-                               log_manager, main_thread_dispatcher, admin, api, http_context),
+                               log_manager, main_thread_dispatcher, admin, validation_context, api,
+                               http_context),
         local_cluster_update_(local_cluster_update), local_hosts_removed_(local_hosts_removed) {}
 
 protected:
@@ -225,7 +226,8 @@ public:
   void create(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
     cluster_manager_ = std::make_unique<TestClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
-        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, *api_, http_context_);
+        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
+        *api_, http_context_);
   }
 
   void createWithLocalClusterUpdate(const bool enable_merge_window = true) {
@@ -259,8 +261,8 @@ public:
 
     cluster_manager_ = std::make_unique<MockedUpdatedClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
-        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, *api_,
-        local_cluster_update_, local_hosts_removed_, http_context_);
+        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
+        *api_, local_cluster_update_, local_hosts_removed_, http_context_);
   }
 
   void checkStats(uint64_t added, uint64_t modified, uint64_t removed, uint64_t active,
@@ -303,6 +305,7 @@ public:
   Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
   NiceMock<TestClusterManagerFactory> factory_;
+  NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
   std::unique_ptr<TestClusterManagerImpl> cluster_manager_;
   AccessLog::MockAccessLogManager log_manager_;
   NiceMock<Server::MockAdmin> admin_;
@@ -1793,7 +1796,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   EXPECT_CALL(*tcp1_high, addDrainedCallback(_)).WillOnce(SaveArg<0>(&tcp_drained_cb_high));
 
   // Remove the first host, this should lead to the first cp being drained.
-  dns_timer_->callback_();
+  dns_timer_->invokeCallback();
   dns_callback(TestUtility::makeDnsResponse({"127.0.0.2"}));
   drained_cb();
   drained_cb = nullptr;
@@ -1826,7 +1829,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
 
   // Now add and remove a host that we never have a conn pool to. This should not lead to any
   // drain callbacks, etc.
-  dns_timer_->callback_();
+  dns_timer_->invokeCallback();
   dns_callback(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.3"}));
   factory_.tls_.shutdownThread();
 }
@@ -2009,7 +2012,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   EXPECT_CALL(*tcp1_ibm_com, addDrainedCallback(_)).WillOnce(SaveArg<0>(&tcp_drained_cb_ibm_com));
 
   // Remove the first host, this should lead to the first cp being drained.
-  dns_timer_->callback_();
+  dns_timer_->invokeCallback();
   dns_callback(TestUtility::makeDnsResponse({"127.0.0.2"}));
   drained_cb();
   drained_cb = nullptr;
@@ -2056,7 +2059,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
 
   // Now add and remove a host that we never have a conn pool to. This should not lead to any
   // drain callbacks, etc.
-  dns_timer_->callback_();
+  dns_timer_->invokeCallback();
   dns_callback(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.3"}));
   factory_.tls_.shutdownThread();
 }
@@ -2123,7 +2126,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
 
   // Remove the first host, this should lead to the cp being drained, without
   // crash.
-  dns_timer_->callback_();
+  dns_timer_->invokeCallback();
   dns_callback(TestUtility::makeDnsResponse({}));
 
   factory_.tls_.shutdownThread();
@@ -2199,7 +2202,7 @@ TEST_F(ClusterManagerImplTest, ConnPoolDestroyWithDraining) {
   EXPECT_CALL(*cp, addDrainedCallback(_)).WillOnce(SaveArg<0>(&drained_cb));
   Tcp::ConnectionPool::Instance::DrainedCb tcp_drained_cb;
   EXPECT_CALL(*tcp, addDrainedCallback(_)).WillOnce(SaveArg<0>(&tcp_drained_cb));
-  dns_timer_->callback_();
+  dns_timer_->invokeCallback();
   dns_callback(TestUtility::makeDnsResponse({}));
 
   // The drained callback might get called when the CP is being destroyed.
@@ -2327,7 +2330,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
 
   // Ensure the merged updates were applied.
-  timer->callback_();
+  timer->invokeCallback();
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
