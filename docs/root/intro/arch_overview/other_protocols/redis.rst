@@ -90,7 +90,11 @@ Every Redis cluster has its own extra statistics tree rooted at *cluster.<name>.
 
   max_upstream_unknown_connections_reached, Counter, Total number of times that an upstream connection to an unknown host is not created after redirection having reached the connection pool's max_upstream_unknown_connections limit
   upstream_cx_drained, Counter, Total number of upstream connections drained of active requests before being closed
-  upstream_rq_time, Histogram, Histogram of upstream request times for all types of requests
+  upstream_commands.upstream_rq_time, Histogram, Histogram of upstream request times for all types of requests
+  upstream_commands.[command].success, Counter, Total number of successful requests for a specific Redis command
+  upstream_commands.[command].error, Counter, Total number of failed or cancelled requests for a specific Redis command
+  upstream_commands.[command].total, Counter, Total number of requests for a specific Redis command (sum of success and error)
+  upstream_commands.[command].latency, Histogram, Latency of requests for a specific Redis command
   
 Supported commands
 ------------------
