@@ -71,13 +71,8 @@ HeaderValueExtractorImpl::computeFragment(const Http::HeaderMap& headers) const 
 }
 
 ScopedRouteInfo::ScopedRouteInfo(envoy::api::v2::ScopedRouteConfiguration&& config_proto,
-                                 std::unique_ptr<RouteConfigProvider>&& route_provider)
-    : config_proto_(std::move(config_proto)), route_provider_(std::move(route_provider)) {
-  ASSERT(route_provider_ != nullptr, "ScopedRouteInfo expects a valid RouteConfigProvider.");
-  ASSERT(!route_provider_->configInfo().has_value() ||
-             route_provider_->config()->name() == config_proto_.route_configuration_name(),
-         fmt::format("RouteConfigProvider's name '{}' doesn't match route_configuration_name '{}'.",
-                     route_provider_->config()->name(), config_proto_.route_configuration_name()));
+                                 ConfigConstSharedPtr&& route_config)
+    : config_proto_(std::move(config_proto)), route_config_(std::move(route_config)) {
   // TODO(stevenzzzz): Maybe worth a KeyBuilder abstraction when there are more than one type of
   // Fragment.
   for (const auto& fragment : config_proto_.key().fragments()) {

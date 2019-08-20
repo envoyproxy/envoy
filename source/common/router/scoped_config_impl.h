@@ -147,17 +147,17 @@ private:
 class ScopedRouteInfo {
 public:
   ScopedRouteInfo(envoy::api::v2::ScopedRouteConfiguration&& config_proto,
-                  std::unique_ptr<RouteConfigProvider>&& route_provider);
+                  ConfigConstSharedPtr&& route_config);
 
-  Router::ConfigConstSharedPtr routeConfig() const { return route_provider_->config(); }
+  ConfigConstSharedPtr routeConfig() const { return route_config_; }
   const ScopeKey& scopeKey() const { return scope_key_; }
   const envoy::api::v2::ScopedRouteConfiguration& configProto() const { return config_proto_; }
   const std::string& scopeName() const { return config_proto_.name(); }
 
 private:
-  const envoy::api::v2::ScopedRouteConfiguration config_proto_;
+  envoy::api::v2::ScopedRouteConfiguration config_proto_;
   ScopeKey scope_key_;
-  std::unique_ptr<RouteConfigProvider> route_provider_;
+  ConfigConstSharedPtr route_config_;
 };
 using ScopedRouteInfoConstSharedPtr = std::shared_ptr<const ScopedRouteInfo>;
 // Ordered map for consistent config dumping.

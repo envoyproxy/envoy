@@ -6,9 +6,11 @@
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/router/route_config_provider_manager.h"
+#include "common/init/manager_impl.h"
 #include "envoy/stats/scope.h"
-
 #include "common/config/config_provider_impl.h"
+#include "envoy/common/callback.h"
+#include "common/router/rds_impl.h"
 #include "common/router/scoped_config_impl.h"
 
 namespace Envoy {
@@ -95,15 +97,28 @@ public:
       RouteConfigProviderManager& route_config_provider_manager,
       ScopedRoutesConfigProviderManager& config_provider_manager);
 
-  ~ScopedRdsConfigSubscription() override;
+  ~ScopedRdsConfigSubscription() override = default;
 
   const std::string& name() const { return name_; }
 
   const ScopedRouteMap& scopedRouteMap() const { return scoped_route_map_; }
 
 private:
-  // Cleanup stale ScopedRouteInfo instances.
-  void cleanupDefferedDeletes();
+  // A helper class that takes care the life circle management of a RDS route provider and the
+  // update callback handle.
+  struct RdsRouteConfigProviderHelper {
+    RdsRouteConfigProviderHelper(
+        ScopedRdsConfigSubscription& parent, std::string scope_name,
+        envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
+        Init::Manager& init_manager);
+    ~RdsRouteConfigProviderHelper() { rds_update_callback_handle_->remove(); }
+    ConfigConstSharedPtr routeConfig() { return route_provider_->config(); }
+
+    ScopedRdsConfigSubscription& parent_;
+    std::string scope_name_;
+    std::unique_ptr<RdsRouteConfigProviderImpl> route_provider_;
+    Common::CallbackHandle* rds_update_callback_handle_;
+  };
 
   // Envoy::Config::DeltaConfigSubscriptionInstance
   void start() override { subscription_->start({}); }
@@ -128,20 +143,19 @@ private:
                                                                              validation_visitor_)
         .name();
   }
+  // Propagate RDS updates to ScopeConfigImpl in workers.
+  void onRdsConfigUpdate(const std::string& scope_name,
+                         RdsRouteConfigSubscription& rds_subscription);
 
   // ScopedRouteInfo by scope name.
   ScopedRouteMap scoped_route_map_;
+  // RdsRouteConfigProvider by scope name.
+  absl::flat_hash_map<std::string, std::unique_ptr<RdsRouteConfigProviderHelper>>
+      route_provider_by_scope_;
   // A map of (hash, scope-name), used to detect the key conflict between scopes.
   absl::flat_hash_map<uint64_t, std::string> scope_name_by_hash_;
   // For creating RDS subscriptions.
   Server::Configuration::FactoryContext& factory_context_;
-  // Deferred to be deleted ScopedRouteInfo.
-  // As RdsRouteConfigProvider instance (which contains a tls slot) can only be destructed in main
-  // thread, we need to make sure the shared ScopedRouteInfo is deleted in main thread.
-  std::list<ScopedRouteInfoConstSharedPtr> deffered_to_be_deleted_;
-  Envoy::Event::TimerPtr cleanup_timer_;
-  const std::chrono::milliseconds cleanup_interval_{3000}; // Clean up every 3s.
-
   const std::string name_;
   std::unique_ptr<Envoy::Config::Subscription> subscription_;
   const envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::ScopeKeyBuilder
@@ -160,15 +174,11 @@ using ScopedRdsConfigSubscriptionSharedPtr = std::shared_ptr<ScopedRdsConfigSubs
 // subscription.
 class ScopedRdsConfigProvider : public Envoy::Config::MutableConfigProviderCommonBase {
 public:
-  ScopedRdsConfigProvider(ScopedRdsConfigSubscriptionSharedPtr&& subscription,
-                          envoy::api::v2::core::ConfigSource rds_config_source);
+  ScopedRdsConfigProvider(ScopedRdsConfigSubscriptionSharedPtr&& subscription);
 
   ScopedRdsConfigSubscription& subscription() {
     return *static_cast<ScopedRdsConfigSubscription*>(subscription_.get());
   }
-
-private:
-  const envoy::api::v2::core::ConfigSource rds_config_source_;
 };
 
 // A ConfigProviderManager for scoped routing configuration that creates static/inline and dynamic

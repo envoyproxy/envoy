@@ -360,40 +360,21 @@ public:
 
     route_config_ = std::make_shared<NiceMock<MockConfig>>();
     route_config_->name_ = "foo_route";
-
-    route_config_provider_ = std::make_unique<MockRouteConfigProvider>();
-    EXPECT_CALL(*route_config_provider_, config()).WillRepeatedly(Return(route_config_));
-    EXPECT_CALL(*route_config_provider_, configInfo())
-        .WillRepeatedly(Return(RouteConfigProvider::ConfigInfo{route_configuration_, ""}));
   }
 
   envoy::api::v2::RouteConfiguration route_configuration_;
   envoy::api::v2::ScopedRouteConfiguration scoped_route_config_;
   std::shared_ptr<MockConfig> route_config_;
   std::unique_ptr<ScopedRouteInfo> info_;
-  std::unique_ptr<MockRouteConfigProvider> route_config_provider_;
 };
 
 TEST_F(ScopedRouteInfoTest, Creation) {
   envoy::api::v2::ScopedRouteConfiguration config_copy = scoped_route_config_;
-  info_ = std::make_unique<ScopedRouteInfo>(std::move(scoped_route_config_),
-                                            std::move(route_config_provider_));
+  info_ = std::make_unique<ScopedRouteInfo>(std::move(scoped_route_config_), route_config_);
   EXPECT_EQ(info_->routeConfig().get(), route_config_.get());
   EXPECT_TRUE(TestUtility::protoEqual(info_->configProto(), config_copy));
   EXPECT_EQ(info_->scopeName(), "foo_scope");
   EXPECT_EQ(info_->scopeKey(), makeKey({"foo", "bar"}));
-}
-
-class ScopedRouteInfoDeathTest : public ScopedRouteInfoTest {};
-
-TEST_F(ScopedRouteInfoDeathTest, AssertFailure) {
-  EXPECT_DEBUG_DEATH(ScopedRouteInfo(std::move(scoped_route_config_), nullptr),
-                     "ScopedRouteInfo expects a valid RouteConfigProvider.");
-
-  route_config_->name_ = "bar_route";
-  EXPECT_DEBUG_DEATH(
-      ScopedRouteInfo(std::move(scoped_route_config_), std::move(route_config_provider_)),
-      "RouteConfigProvider's name 'bar_route' doesn't match route_configuration_name 'foo_route'.");
 }
 
 class ScopedConfigImplTest : public testing::Test {
@@ -445,12 +426,8 @@ public:
 
     std::shared_ptr<MockConfig> route_config = std::make_shared<NiceMock<MockConfig>>();
     route_config->name_ = scoped_route_config.route_configuration_name();
-
-    std::unique_ptr<MockRouteConfigProvider> route_config_provider =
-        std::make_unique<NiceMock<MockRouteConfigProvider>>();
-    EXPECT_CALL(*route_config_provider, config()).WillRepeatedly(Return(route_config));
     return std::make_shared<ScopedRouteInfo>(std::move(scoped_route_config),
-                                             std::move(route_config_provider));
+                                             std::move(route_config));
   }
 
   std::shared_ptr<ScopedRouteInfo> scope_info_a_;

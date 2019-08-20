@@ -13,6 +13,7 @@
 #include "envoy/config/subscription.h"
 #include "envoy/http/codes.h"
 #include "envoy/local_info/local_info.h"
+#include "common/common/callback_impl.h"
 #include "envoy/router/rds.h"
 #include "envoy/router/route_config_provider_manager.h"
 #include "envoy/router/route_config_update_receiver.h"
@@ -30,6 +31,9 @@
 
 namespace Envoy {
 namespace Router {
+
+// For friend class declaration in RdsRouteConfigSubscription.
+class ScopedRdsConfigSubscription;
 
 /**
  * Route configuration provider utilities.
@@ -122,6 +126,10 @@ private:
         .name();
   }
 
+  Common::CallbackHandle* addUpdateCallback(std::function<void()> callback) {
+    return update_callback_manager_.add(callback);
+  }
+
   RdsRouteConfigSubscription(
       const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
       const uint64_t manager_identifier, Server::Configuration::FactoryContext& factory_context,
@@ -143,8 +151,11 @@ private:
   VhdsSubscriptionPtr vhds_subscription_;
   RouteConfigUpdatePtr config_update_info_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
+  Common::CallbackManager<> update_callback_manager_;
 
   friend class RouteConfigProviderManagerImpl;
+  // Access to addUpdateCallback
+  friend class ScopedRdsConfigSubscription;
 };
 
 using RdsRouteConfigSubscriptionSharedPtr = std::shared_ptr<RdsRouteConfigSubscription>;
