@@ -93,6 +93,9 @@ envoy_status_t run_engine(const char* config, const char* log_level) {
   // https://github.com/lyft/envoy-mobile/issues/34
   try {
     main_common_ = std::make_unique<Envoy::MainCommon>(5, envoy_argv);
+    // TODO: this call should be done in a post init callback.
+    // related issue: https://github.com/lyft/envoy-mobile/issues/285.
+    setup_envoy();
   } catch (const Envoy::NoServingException& e) {
     return ENVOY_SUCCESS;
   } catch (const Envoy::MalformedArgvException& e) {

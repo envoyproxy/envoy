@@ -137,10 +137,6 @@ typedef NSDictionary<NSString *, NSArray<NSString *> *> EnvoyHeaders;
  */
 - (int)runWithConfig:(NSString *)config logLevel:(NSString *)logLevel;
 
-/// Performs necessary setup after Envoy has initialized and started running.
-/// TODO: create a post-initialization callback from Envoy to handle this automatically.
-- (void)setup;
-
 /**
  Opens a new HTTP stream attached to this engine.
 

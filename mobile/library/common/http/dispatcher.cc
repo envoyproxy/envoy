@@ -14,7 +14,8 @@ Dispatcher::DirectStreamCallbacks::DirectStreamCallbacks(envoy_stream_t stream,
 void Dispatcher::DirectStreamCallbacks::onHeaders(HeaderMapPtr&& headers, bool end_stream) {
   ENVOY_LOG(debug, "[S{}] response headers for stream (end_stream={}):\n{}", stream_handle_,
             end_stream, *headers);
-  observer_.on_headers(Utility::toBridgeHeaders(*headers), end_stream, observer_.context);
+  envoy_headers bridge_headers = Utility::toBridgeHeaders(*headers);
+  observer_.on_headers(bridge_headers, end_stream, observer_.context);
 }
 
 void Dispatcher::DirectStreamCallbacks::onData(Buffer::Instance& data, bool end_stream) {
@@ -53,7 +54,7 @@ envoy_status_t Dispatcher::startStream(envoy_stream_t new_stream_handle, envoy_o
   event_dispatcher_.post([this, observer, new_stream_handle]() -> void {
     DirectStreamCallbacksPtr callbacks =
         std::make_unique<DirectStreamCallbacks>(new_stream_handle, observer, *this);
-    AsyncClient& async_client = cluster_manager_.httpAsyncClientForCluster("egress_cluster");
+    AsyncClient& async_client = cluster_manager_.httpAsyncClientForCluster("base");
     AsyncClient::Stream* underlying_stream = async_client.start(*callbacks, {});
 
     if (!underlying_stream) {

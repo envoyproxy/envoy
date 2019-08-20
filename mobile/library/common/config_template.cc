@@ -61,9 +61,9 @@ static_resources:
         - lb_endpoints:
             - endpoint:
                 address:
-                  socket_address: {address: example.com, port_value: 443}
+                  socket_address: {address: s3.amazonaws.com, port_value: 443}
     tls_context:
-      sni: example.com
+      sni: s3.amazonaws.com
     type: LOGICAL_DNS
   - name: default_egress
     connect_timeout: {{ connect_timeout }}
