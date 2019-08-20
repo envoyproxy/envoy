@@ -1229,7 +1229,7 @@ TEST_P(LeastRequestLoadBalancerTest, SingleHost) {
 
   // Host weight is 100.
   {
-    EXPECT_CALL(random_, random()).WillOnce(Return(0));
+    EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(2)).WillOnce(Return(3));
     stats_.max_host_weight_.set(100UL);
     EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
   }
@@ -1237,7 +1237,7 @@ TEST_P(LeastRequestLoadBalancerTest, SingleHost) {
   HostVector empty;
   {
     hostSet().runCallbacks(empty, empty);
-    EXPECT_CALL(random_, random()).WillOnce(Return(0));
+    EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(2)).WillOnce(Return(3));
     EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
   }
 

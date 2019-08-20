@@ -42,7 +42,7 @@ AddedRemoved WatchMap::updateWatchInterest(Watch* watch,
 
 absl::flat_hash_set<Watch*> WatchMap::watchesInterestedIn(const std::string& resource_name) {
   absl::flat_hash_set<Watch*> ret = wildcard_watches_;
-  auto watches_interested = watch_interest_.find(resource_name);
+  const auto watches_interested = watch_interest_.find(resource_name);
   if (watches_interested != watch_interest_.end()) {
     for (const auto& watch : watches_interested->second) {
       ret.insert(watch);
@@ -73,7 +73,7 @@ void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>
 
   // We just bundled up the updates into nice per-watch packages. Now, deliver them.
   for (auto& watch : watches_) {
-    auto this_watch_updates = per_watch_updates.find(watch);
+    const auto this_watch_updates = per_watch_updates.find(watch);
     if (this_watch_updates == per_watch_updates.end()) {
       // This update included no resources this watch cares about - so we do an empty
       // onConfigUpdate(), to notify the watch that its resources - if they existed before this -
@@ -110,7 +110,7 @@ void WatchMap::onConfigUpdate(
   // We just bundled up the updates into nice per-watch packages. Now, deliver them.
   for (const auto& added : per_watch_added) {
     const Watch* cur_watch = added.first;
-    auto removed = per_watch_removed.find(cur_watch);
+    const auto removed = per_watch_removed.find(cur_watch);
     if (removed == per_watch_removed.end()) {
       // additions only, no removals
       cur_watch->callbacks_.onConfigUpdate(added.second, {}, system_version_info);
