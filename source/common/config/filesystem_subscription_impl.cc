@@ -49,11 +49,14 @@ void FilesystemSubscriptionImpl::refresh() {
       ENVOY_LOG(warn, "Filesystem config update rejected: {}", e.what());
       ENVOY_LOG(debug, "Failed configuration:\n{}", message.DebugString());
       stats_.update_rejected_.inc();
+      callbacks_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &e);
     } else {
       ENVOY_LOG(warn, "Filesystem config update failure: {}", e.what());
       stats_.update_failure_.inc();
+      // This could happen due to filesystem issues or a bad configuration (e.g. proto validation).
+      // Since the latter is more likely, for now we will treat it as rejection.
+      callbacks_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &e);
     }
-    callbacks_.onConfigUpdateFailed(&e);
   }
 }
 

@@ -12,7 +12,6 @@
 #include "jwt_verify_lib/jwt.h"
 #include "jwt_verify_lib/verify.h"
 
-using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider;
 using ::google::jwt_verify::CheckAudience;
 using ::google::jwt_verify::Status;
 

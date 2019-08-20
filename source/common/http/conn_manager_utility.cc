@@ -46,8 +46,8 @@ ServerConnectionPtr ConnectionManagerUtility::autoCreateCodec(
     return std::make_unique<Http2::ServerConnectionImpl>(connection, callbacks, scope,
                                                          http2_settings, max_request_headers_kb);
   } else {
-    return std::make_unique<Http1::ServerConnectionImpl>(connection, callbacks, http1_settings,
-                                                         max_request_headers_kb);
+    return std::make_unique<Http1::ServerConnectionImpl>(connection, scope, callbacks,
+                                                         http1_settings, max_request_headers_kb);
   }
 }
 

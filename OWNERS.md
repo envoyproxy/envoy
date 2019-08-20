@@ -38,6 +38,7 @@ routing PRs, questions, etc. to the right place.
 
 * All maintainers
 * Piotr Sikora ([PiotrSikora](https://github.com/PiotrSikora)) (piotrsikora@google.com)
+* Yan Avlasov ([yanavlasov](https://github.com/yanavlasov)) (yavlasov@google.com)
 
 # Emeritus maintainers
 

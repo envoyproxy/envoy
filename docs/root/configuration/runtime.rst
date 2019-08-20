@@ -27,12 +27,16 @@ be:
 .. code-block:: yaml
 
   layers:
-  - static_layer:
+  - name: static_layer_0
+    static_layer:
       health_check:
         min_interval: 5
-  - disk_layer: { symlink_root: /srv/runtime/current, subdirectory: envoy }
-  - disk_layer: { symlink_root: /srv/runtime/current, subdirectory: envoy_override, append_service_cluster: true }
-  - admin_layer: {}
+  - name: disk_layer_0
+    disk_layer: { symlink_root: /srv/runtime/current, subdirectory: envoy }
+  - name: disk_layer_1
+    disk_layer: { symlink_root: /srv/runtime/current, subdirectory: envoy_override, append_service_cluster: true }
+  - name: admin_layer_0
+    admin_layer: {}
 
 In the deprecated :ref:`runtime <envoy_api_msg_config.bootstrap.v2.Runtime>` bootstrap
 configuration, the layering was implicit and fixed:
@@ -253,7 +257,7 @@ The file system runtime provider emits some statistics in the *runtime.* namespa
   :widths: 1, 1, 2
 
   admin_overrides_active, Gauge, 1 if any admin overrides are active otherwise 0
-  deprecated_feature_use, Counter, Total number of times deprecated features were used
+  deprecated_feature_use, Counter, Total number of times deprecated features were used. Detailed information about the feature used will be logged to warning logs in the form "Using deprecated option 'X' from file Y".
   load_error, Counter, Total number of load attempts that resulted in an error in any layer
   load_success, Counter, Total number of load attempts that were successful at all layers
   num_keys, Gauge, Number of keys currently loaded
