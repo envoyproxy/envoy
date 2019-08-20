@@ -117,4 +117,13 @@ class JniLibrary {
    * @return int, the resulting status of the operation.
    */
   protected static native int runEngine(String config, String logLevel);
+
+  // Other native methods
+
+  /**
+   * Provides a default configuration template that may be used for starting Envoy.
+   *
+   * @return A template that may be used as a starting point for constructing configurations.
+   */
+  public static native String templateString();
 }

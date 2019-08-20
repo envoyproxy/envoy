@@ -21,6 +21,8 @@ envoy_mobile_android_library(
 envoy_mobile_java_library(
     name = "envoy_base_engine_lib",
     srcs = [
+        "EnvoyConfiguration.java",
+        "EnvoyConfigurationImpl.java",
         "EnvoyEngine.java",
         "EnvoyEngineImpl.java",
         "EnvoyHTTPStream.java",

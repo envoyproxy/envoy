@@ -20,8 +20,8 @@ enum class LogLevel(internal val level: String) {
  */
 class Envoy @JvmOverloads constructor(
   engine: EnvoyEngine,
-  config: String,
-  logLevel: LogLevel = LogLevel.INFO
+  internal val config: String,
+  internal val logLevel: LogLevel = LogLevel.INFO
 ) {
 
   // Dedicated thread for running this instance of Envoy.
