@@ -85,6 +85,9 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
   Network::Address::InstanceConstSharedPtr final_remote_address;
   bool single_xff_address;
   const uint32_t xff_num_trusted_hops = config.xffNumTrustedHops();
+  bool trusted_forwarded_proto =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.trusted_forwarded_proto");
+
   if (config.useRemoteAddress()) {
     single_xff_address = request_headers.ForwardedFor() == nullptr;
     // If there are any trusted proxies in front of this Envoy instance (as indicated by
@@ -107,8 +110,17 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
         Utility::appendXff(request_headers, *connection.remoteAddress());
       }
     }
-    request_headers.insertForwardedProto().value().setReference(
-        connection.ssl() ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http);
+    if (trusted_forwarded_proto) {
+      // Set x-forwarded-proto unless it already exists and was forwarded on by a trusted proxy.
+      if (xff_num_trusted_hops == 0 || request_headers.ForwardedProto() == nullptr) {
+        request_headers.insertForwardedProto().value().setReference(
+            connection.ssl() ? Headers::get().SchemeValues.Https
+                             : Headers::get().SchemeValues.Http);
+      }
+    } else {
+      request_headers.insertForwardedProto().value().setReference(
+          connection.ssl() ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http);
+    }
   } else {
     // If we are not using remote address, attempt to pull a valid IPv4 or IPv6 address out of XFF.
     // If we find one, it will be used as the downstream address for logging. It may or may not be
