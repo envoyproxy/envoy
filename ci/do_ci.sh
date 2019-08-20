@@ -144,10 +144,10 @@ elif [[ "$CI_TARGET" == "bazel.asan" ]]; then
   setup_clang_toolchain
   echo "bazel ASAN/UBSAN debug build with tests"
   echo "Building and testing envoy tests ${TEST_TARGETS}"
-  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --define deprecated_features=disabled --config=clang-asan ${TEST_TARGETS}
+  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-asan ${TEST_TARGETS}
   echo "Building and testing envoy-filter-example tests..."
   pushd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
-  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --define deprecated_features=disabled --config=clang-asan \
+  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-asan \
     //:echo2_integration_test //:envoy_binary_test
   popd
   # Also validate that integration test traffic tapping (useful when debugging etc.)
@@ -197,6 +197,7 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
     --define log_debug_assert_in_release=enabled \
     --define quiche=enabled \
     --define path_normalization_by_default=true \
+    --define deprecated_features=disabled \
   "
   setup_clang_libcxx_toolchain
   # This doesn't go into CI but is available for developer convenience.
