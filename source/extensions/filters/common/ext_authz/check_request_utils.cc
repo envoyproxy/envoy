@@ -143,6 +143,7 @@ void CheckRequestUtils::createHttpCheck(
     const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
     const Envoy::Http::HeaderMap& headers,
     Protobuf::Map<std::string, std::string>&& context_extensions,
+    envoy::api::v2::core::Metadata&& metadata_context,
     envoy::service::auth::v2::CheckRequest& request, uint64_t max_request_bytes) {
 
   auto attrs = request.mutable_attributes();
@@ -158,6 +159,7 @@ void CheckRequestUtils::createHttpCheck(
 
   // Fill in the context extensions:
   (*attrs->mutable_context_extensions()) = std::move(context_extensions);
+  (*attrs->mutable_metadata_context()) = std::move(metadata_context);
 }
 
 void CheckRequestUtils::createTcpCheck(const Network::ReadFilterCallbacks* callbacks,

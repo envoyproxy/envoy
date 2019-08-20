@@ -7,6 +7,7 @@ option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.service.auth.v2";
 
 import "envoy/api/v2/core/address.proto";
+import "envoy/api/v2/core/base.proto";
 
 import "google/protobuf/timestamp.proto";
 import "gogoproto/gogo.proto";
@@ -135,6 +136,9 @@ message AttributeContext {
   // information to the auth server without modifying the proto definition. It maps to the
   // internal opaque context in the filter chain.
   map<string, string> context_extensions = 10;
+
+  // Dynamic metadata associated with the request.
+  envoy.api.v2.core.Metadata metadata_context = 11;
 }
 
 // The following items are left out of this proto

@@ -48,6 +48,7 @@ public:
   static void createHttpCheck(const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
                               const Envoy::Http::HeaderMap& headers,
                               Protobuf::Map<std::string, std::string>&& context_extensions,
+                              envoy::api::v2::core::Metadata&& metadata_context,
                               envoy::service::auth::v2::CheckRequest& request,
                               uint64_t max_request_bytes);
 
