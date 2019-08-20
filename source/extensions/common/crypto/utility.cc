@@ -66,7 +66,7 @@ const VerificationOutput verifySignature(absl::string_view hash, CryptoObjectPtr
   }
 
   // Step 3: initialize EVP_DigestVerify
-  auto pkeyWrapper = Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyWrapper>(pubKey);
+  auto pkeyWrapper = Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyWrapper>(*pubKey);
   EVP_PKEY* pkey = pkeyWrapper->getEVP_PKEY();
   int ok = EVP_DigestVerifyInit(ctx.get(), nullptr, md, nullptr, pkey);
   if (!ok) {

@@ -211,7 +211,7 @@ private:
  */
 class PublicKeyWrapper : public Filters::Common::Lua::BaseLuaObject<PublicKeyWrapper> {
 public:
-  PublicKeyWrapper(Envoy::Common::Crypto::CryptoObjectPtr* key) : public_key_(std::move(*key)) {}
+  PublicKeyWrapper(Envoy::Common::Crypto::CryptoObjectPtr& key) : public_key_(std::move(key)) {}
   static ExportedFunctions exportedFunctions() { return {{"get", static_luaGet}}; }
 
 private:

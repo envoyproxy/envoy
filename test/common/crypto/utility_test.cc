@@ -64,13 +64,13 @@ TEST(UtilityTest, TestImportPublicKey) {
 
   Common::Crypto::CryptoObjectPtr cryptoPtr(
       Common::Crypto::Utility::importPublicKey(Hex::decode(key)));
-  auto wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyWrapper>(&cryptoPtr);
+  auto wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyWrapper>(cryptoPtr);
   EVP_PKEY* pkey = wrapper->getEVP_PKEY();
   EXPECT_NE(nullptr, pkey);
 
   key = "badkey";
   cryptoPtr = Common::Crypto::Utility::importPublicKey(Hex::decode(key));
-  wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyWrapper>(&cryptoPtr);
+  wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyWrapper>(cryptoPtr);
   pkey = wrapper->getEVP_PKEY();
   EXPECT_EQ(nullptr, pkey);
 }

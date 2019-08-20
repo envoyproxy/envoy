@@ -479,7 +479,7 @@ int StreamHandleWrapper::luaImportPublicKey(lua_State* state) {
     public_key_wrapper_.pushStack();
   } else {
     Common::Crypto::CryptoObjectPtr cryptoPtr = Common::Crypto::Utility::importPublicKey(key);
-    public_key_wrapper_.reset(PublicKeyWrapper::create(state, &cryptoPtr), true);
+    public_key_wrapper_.reset(PublicKeyWrapper::create(state, cryptoPtr), true);
   }
 
   return 1;
