@@ -37,7 +37,7 @@ TEST_F(DrainManagerImplTest, Default) {
   drain_manager.startParentShutdownSequence();
 
   EXPECT_CALL(server_.hot_restart_, sendParentTerminateRequest());
-  shutdown_timer->callback_();
+  shutdown_timer->invokeCallback();
 
   // Verify basic drain close.
   EXPECT_CALL(server_, healthCheckFailed()).WillOnce(Return(false));
@@ -58,7 +58,7 @@ TEST_F(DrainManagerImplTest, Default) {
     } else {
       EXPECT_CALL(drain_complete, ready());
     }
-    drain_timer->callback_();
+    drain_timer->invokeCallback();
   }
 
   EXPECT_CALL(server_, healthCheckFailed()).WillOnce(Return(false));

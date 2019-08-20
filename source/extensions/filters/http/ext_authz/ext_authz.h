@@ -47,6 +47,8 @@ public:
         max_request_bytes_(config.with_request_body().max_request_bytes()),
         status_on_error_(toErrorCode(config.status_on_error().code())), local_info_(local_info),
         scope_(scope), runtime_(runtime), http_context_(http_context), pool_(scope.symbolTable()),
+        metadata_context_namespaces_(config.metadata_context_namespaces().begin(),
+                                     config.metadata_context_namespaces().end()),
         ext_authz_ok_(pool_.add("ext_authz.ok")), ext_authz_denied_(pool_.add("ext_authz.denied")),
         ext_authz_error_(pool_.add("ext_authz.error")),
         ext_authz_failure_mode_allowed_(pool_.add("ext_authz.failure_mode_allowed")) {}
@@ -75,6 +77,10 @@ public:
     scope.counterFromStatName(name).inc();
   }
 
+  const std::vector<std::string>& metadataContextNamespaces() {
+    return metadata_context_namespaces_;
+  }
+
 private:
   static Http::Code toErrorCode(uint64_t status) {
     const auto code = static_cast<Http::Code>(status);
@@ -93,7 +99,10 @@ private:
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
   Http::Context& http_context_;
+
   Stats::StatNamePool pool_;
+
+  const std::vector<std::string> metadata_context_namespaces_;
 
 public:
   const Stats::StatName ext_authz_ok_;

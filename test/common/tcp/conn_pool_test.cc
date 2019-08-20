@@ -116,7 +116,7 @@ public:
 
   void expectAndRunUpstreamReady() {
     EXPECT_TRUE(upstream_ready_enabled_);
-    mock_upstream_ready_timer_->callback_();
+    mock_upstream_ready_timer_->invokeCallback();
     EXPECT_FALSE(upstream_ready_enabled_);
   }
 
@@ -576,10 +576,10 @@ TEST_F(TcpConnPoolImplTest, ConnectTimeout) {
     EXPECT_NE(nullptr, conn_pool_.newConnection(callbacks2));
   }));
 
-  conn_pool_.test_conns_[0].connect_timer_->callback_();
+  conn_pool_.test_conns_[0].connect_timer_->invokeCallback();
 
   EXPECT_CALL(callbacks2.pool_failure_, ready());
-  conn_pool_.test_conns_[1].connect_timer_->callback_();
+  conn_pool_.test_conns_[1].connect_timer_->invokeCallback();
 
   EXPECT_CALL(conn_pool_, onConnDestroyedForTest()).Times(2);
   dispatcher_.clearDeferredDeleteList();

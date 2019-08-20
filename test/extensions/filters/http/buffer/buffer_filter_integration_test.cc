@@ -51,12 +51,16 @@ TEST_P(BufferIntegrationTest, RouterRequestPopulateContentLength) {
 
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
   auto* content_length = upstream_request_->headers().ContentLength();
   ASSERT_NE(content_length, nullptr);
   EXPECT_EQ(content_length->value().getStringView(), "9");
+
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
 
 TEST_P(BufferIntegrationTest, RouterRequestBufferLimitExceeded) {

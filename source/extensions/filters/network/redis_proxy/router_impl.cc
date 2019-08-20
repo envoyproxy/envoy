@@ -19,8 +19,7 @@ bool MirrorPolicyImpl::shouldMirror(const std::string& command) const {
     return false;
   }
 
-  if (exclude_read_commands_ && Common::Redis::SupportedCommands::writeCommands().find(command) ==
-                                    Common::Redis::SupportedCommands::writeCommands().end()) {
+  if (exclude_read_commands_ && Common::Redis::SupportedCommands::isReadCommand(command)) {
     return false;
   }
 

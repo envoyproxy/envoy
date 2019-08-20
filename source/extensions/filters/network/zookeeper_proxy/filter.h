@@ -108,6 +108,7 @@ public:
   Stats::StatNameSet stat_name_set_;
   const Stats::StatName stat_prefix_;
   const Stats::StatName auth_;
+  const Stats::StatName connect_latency_;
 
 private:
   ZooKeeperProxyStats generateStats(const std::string& prefix, Stats::Scope& scope) {
@@ -124,7 +125,7 @@ class ZooKeeperFilter : public Network::Filter,
                         DecoderCallbacks,
                         Logger::Loggable<Logger::Id::filter> {
 public:
-  explicit ZooKeeperFilter(ZooKeeperFilterConfigSharedPtr config);
+  ZooKeeperFilter(ZooKeeperFilterConfigSharedPtr config, TimeSource& time_source);
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
@@ -159,12 +160,14 @@ public:
   void onGetAllChildrenNumberRequest(const std::string& path) override;
   void onCloseRequest() override;
   void onResponseBytes(uint64_t bytes) override;
-  void onConnectResponse(int32_t proto_version, int32_t timeout, bool readonly) override;
-  void onResponse(OpCodes opcode, int32_t xid, int64_t zxid, int32_t error) override;
+  void onConnectResponse(int32_t proto_version, int32_t timeout, bool readonly,
+                         const std::chrono::milliseconds& latency) override;
+  void onResponse(OpCodes opcode, int32_t xid, int64_t zxid, int32_t error,
+                  const std::chrono::milliseconds& latency) override;
   void onWatchEvent(int32_t event_type, int32_t client_state, const std::string& path, int64_t zxid,
                     int32_t error) override;
 
-  DecoderPtr createDecoder(DecoderCallbacks& callbacks);
+  DecoderPtr createDecoder(DecoderCallbacks& callbacks, TimeSource& time_source);
   void setDynamicMetadata(const std::string& key, const std::string& value);
   void setDynamicMetadata(const std::vector<std::pair<const std::string, const std::string>>& data);
   void clearDynamicMetadata();
