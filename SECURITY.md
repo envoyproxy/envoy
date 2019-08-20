@@ -222,7 +222,7 @@ organization, it is the responsibility of the PoC to share CVE and related patch
 should be performed on a strictly need-to-know basis with affected groups to the extent that this is
 technically plausible. All teams should be aware of the embargo conditions and accept them.
 Ultimately, if an organization breaks embargo transitively through such sharing, they will lose
-early disclosure, so it's in their best interest to carefully share information internally,
+the early disclosure privilege, so it's in their best interest to carefully share information internally,
 following best practices and use their judgement in balancing the tradeoff between protecting users
 and maintaining confidentiality.
 
