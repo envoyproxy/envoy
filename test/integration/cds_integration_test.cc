@@ -94,7 +94,7 @@ public:
     acceptXdsConnection();
 
     // Do the initial compareDiscoveryRequest / sendDiscoveryResponse for cluster_1.
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}));
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
     sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster, {cluster1_},
                                                    {cluster1_}, {}, "55");
 

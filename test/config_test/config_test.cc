@@ -81,15 +81,15 @@ public:
         }));
 
     envoy::config::bootstrap::v2::Bootstrap bootstrap;
-    Server::InstanceUtil::loadBootstrapConfig(bootstrap, options_,
-                                              server_.messageValidationVisitor(), *api_);
+    Server::InstanceUtil::loadBootstrapConfig(
+        bootstrap, options_, server_.messageValidationContext().staticValidationVisitor(), *api_);
     Server::Configuration::InitialImpl initial_config(bootstrap);
     Server::Configuration::MainImpl main_config;
 
     cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
         server_.admin(), server_.runtime(), server_.stats(), server_.threadLocal(),
         server_.random(), server_.dnsResolver(), ssl_context_manager_, server_.dispatcher(),
-        server_.localInfo(), server_.secretManager(), server_.messageValidationVisitor(), *api_,
+        server_.localInfo(), server_.secretManager(), server_.messageValidationContext(), *api_,
         server_.httpContext(), server_.accessLogManager(), server_.singletonManager(),
         time_system_);
 

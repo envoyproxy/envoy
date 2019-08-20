@@ -259,6 +259,18 @@ StreamDecoder& ConnectionManagerImpl::newStream(StreamEncoder& response_encoder,
   return **streams_.begin();
 }
 
+void ConnectionManagerImpl::handleCodecException(const char* error) {
+  ENVOY_CONN_LOG(debug, "dispatch error: {}", read_callbacks_->connection(), error);
+
+  // In the protocol error case, we need to reset all streams now. The connection might stick around
+  // long enough for a pending stream to come back and try to encode.
+  resetAllStreams();
+
+  // HTTP/1.1 codec has already sent a 400 response if possible. HTTP/2 codec has already sent
+  // GOAWAY.
+  read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWriteAndDelay);
+}
+
 Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool) {
   if (!codec_) {
     codec_ = config_.createCodec(read_callbacks_->connection(), data, *this);
@@ -277,18 +289,25 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
 
     try {
       codec_->dispatch(data);
+    } catch (const FrameFloodException& e) {
+      // TODO(mattklein123): This is an emergency substitute for the lack of connection level
+      // logging in the HCM. In a public follow up change we will add full support for connection
+      // level logging in the HCM, similar to what we have in tcp_proxy. This will allow abuse
+      // indicators to be stored in the connection level stream info, and then matched, sampled,
+      // etc. when logged.
+      const envoy::type::FractionalPercent default_value; // 0
+      if (runtime_.snapshot().featureEnabled("http.connection_manager.log_flood_exception",
+                                             default_value)) {
+        ENVOY_CONN_LOG(warn, "downstream HTTP flood from IP '{}': {}",
+                       read_callbacks_->connection(),
+                       read_callbacks_->connection().remoteAddress()->asString(), e.what());
+      }
+
+      handleCodecException(e.what());
+      return Network::FilterStatus::StopIteration;
     } catch (const CodecProtocolException& e) {
-      // HTTP/1.1 codec has already sent a 400 response if possible. HTTP/2 codec has already sent
-      // GOAWAY.
-      ENVOY_CONN_LOG(debug, "dispatch error: {}", read_callbacks_->connection(), e.what());
       stats_.named_.downstream_cx_protocol_error_.inc();
-
-      // In the protocol error case, we need to reset all streams now. Since we do a flush write and
-      // delayed close, the connection might stick around long enough for a pending stream to come
-      // back and try to encode.
-      resetAllStreams();
-
-      read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWriteAndDelay);
+      handleCodecException(e.what());
       return Network::FilterStatus::StopIteration;
     }
 
@@ -1352,6 +1371,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
     ENVOY_STREAM_LOG(trace, "encode headers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
 
+    (*entry)->encode_headers_called_ = true;
     const auto continue_iteration =
         (*entry)->commonHandleAfterHeadersCallback(status, encoding_headers_only_);
 
@@ -1481,10 +1501,19 @@ void ConnectionManagerImpl::ActiveStream::encodeMetadata(ActiveStreamEncoderFilt
                                                          MetadataMapPtr&& metadata_map_ptr) {
   resetIdleTimer();
 
-  // Metadata currently go through all filters.
-  ASSERT(filter == nullptr);
-  std::list<ActiveStreamEncoderFilterPtr>::iterator entry = encoder_filters_.begin();
+  std::list<ActiveStreamEncoderFilterPtr>::iterator entry =
+      commonEncodePrefix(filter, false, FilterIterationStartState::CanStartFromCurrent);
+
   for (; entry != encoder_filters_.end(); entry++) {
+    // If the filter pointed by entry has stopped for all frame type, stores metadata and returns.
+    // If the filter pointed by entry hasn't returned from encodeHeaders, stores newly added
+    // metadata in case encodeHeaders returns StopAllIteration. The latter can happen when headers
+    // callbacks generate new metadata.
+    if (!(*entry)->encode_headers_called_ || (*entry)->stoppedAll()) {
+      (*entry)->getSavedResponseMetadata()->emplace_back(std::move(metadata_map_ptr));
+      return;
+    }
+
     FilterMetadataStatus status = (*entry)->handle_->encodeMetadata(*metadata_map_ptr);
     ENVOY_STREAM_LOG(trace, "encode metadata called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
@@ -2129,6 +2158,19 @@ Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamEncoderFilter::cre
   return Buffer::WatermarkBufferPtr{buffer};
 }
 
+void ConnectionManagerImpl::ActiveStreamEncoderFilter::handleMetadataAfterHeadersCallback() {
+  // If we drain accumulated metadata, the iteration must start with the current filter.
+  const bool saved_state = iterate_from_current_filter_;
+  iterate_from_current_filter_ = true;
+  // If encodeHeaders() returns StopAllIteration, we should skip draining metadata, and wait
+  // for doMetadata() to drain the metadata after iteration continues.
+  if (!stoppedAll() && saved_response_metadata_ != nullptr &&
+      !getSavedResponseMetadata()->empty()) {
+    drainSavedResponseMetadata();
+  }
+  // Restores the original value of iterate_from_current_filter_.
+  iterate_from_current_filter_ = saved_state;
+}
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedData(Buffer::Instance& data,
                                                                       bool streaming) {
   return parent_.addEncodedData(*this, data, streaming);
@@ -2142,6 +2184,11 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::injectEncodedDataToFilter
 
 HeaderMap& ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedTrailers() {
   return parent_.addEncodedTrailers();
+}
+
+void ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedMetadata(
+    MetadataMapPtr&& metadata_map_ptr) {
+  return parent_.encodeMetadata(this, std::move(metadata_map_ptr));
 }
 
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::

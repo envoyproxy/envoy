@@ -35,6 +35,7 @@ public:
   }
 
   std::string name() override { return NetworkFilterNames::get().Echo; }
+  bool isTerminalFilter() override { return true; }
 };
 
 /**

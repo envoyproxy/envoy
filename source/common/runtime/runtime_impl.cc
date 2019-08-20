@@ -35,6 +35,17 @@ bool runtimeFeatureEnabled(absl::string_view feature) {
   return RuntimeFeaturesDefaults::get().enabledByDefault(feature);
 }
 
+uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
+  ASSERT(absl::StartsWith(feature, "envoy.reloadable_features"));
+  if (Runtime::LoaderSingleton::getExisting()) {
+    return Runtime::LoaderSingleton::getExisting()->threadsafeSnapshot()->getInteger(
+        std::string(feature), default_value);
+  }
+  ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::runtime), warn,
+                      "Unable to use runtime singleton for feature {}", feature);
+  return default_value;
+}
+
 const size_t RandomGeneratorImpl::UUID_LENGTH = 36;
 
 uint64_t RandomGeneratorImpl::random() {
@@ -463,6 +474,9 @@ LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator
       throw EnvoyException(absl::StrCat("Duplicate layer name: ", layer.name()));
     }
     switch (layer.layer_specifier_case()) {
+    case envoy::config::bootstrap::v2::RuntimeLayer::kStaticLayer:
+      // Nothing needs to be done here.
+      break;
     case envoy::config::bootstrap::v2::RuntimeLayer::kAdminLayer:
       if (admin_layer_ != nullptr) {
         throw EnvoyException(
@@ -483,8 +497,7 @@ LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator
       init_manager.add(subscriptions_.back()->init_target_);
       break;
     default:
-      ENVOY_LOG(warn, "Skipping unsupported runtime layer: {}", layer.DebugString());
-      break;
+      NOT_REACHED_GCOVR_EXCL_LINE;
     }
   }
 
@@ -526,7 +539,8 @@ void RtdsSubscription::onConfigUpdate(
   onConfigUpdate(unwrapped_resource, resources[0].version());
 }
 
-void RtdsSubscription::onConfigUpdateFailed(const EnvoyException*) {
+void RtdsSubscription::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason,
+                                            const EnvoyException*) {
   // We need to allow server startup to continue, even if we have a bad
   // config.
   init_target_.ready();

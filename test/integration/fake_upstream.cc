@@ -73,22 +73,30 @@ void FakeStream::decodeMetadata(Http::MetadataMapPtr&& metadata_map_ptr) {
 }
 
 void FakeStream::encode100ContinueHeaders(const Http::HeaderMapImpl& headers) {
-  std::shared_ptr<Http::HeaderMapImpl> headers_copy(
+  // TSan complains about thread-safety of std::shared_ptr when linked against libc++.
+  // See: https://github.com/envoyproxy/envoy/pull/7929
+  std::unique_ptr<Http::HeaderMapImpl> headers_copy(
       new Http::HeaderMapImpl(static_cast<const Http::HeaderMap&>(headers)));
-  parent_.connection().dispatcher().post(
-      [this, headers_copy]() -> void { encoder_.encode100ContinueHeaders(*headers_copy); });
+  parent_.connection().dispatcher().post([this, headers = headers_copy.release()]() -> void {
+    encoder_.encode100ContinueHeaders(*headers);
+    delete headers;
+  });
 }
 
 void FakeStream::encodeHeaders(const Http::HeaderMapImpl& headers, bool end_stream) {
-  std::shared_ptr<Http::HeaderMapImpl> headers_copy(
+  // TSan complains about thread-safety of std::shared_ptr when linked against libc++.
+  // See: https://github.com/envoyproxy/envoy/pull/7929
+  std::unique_ptr<Http::HeaderMapImpl> headers_copy(
       new Http::HeaderMapImpl(static_cast<const Http::HeaderMap&>(headers)));
   if (add_served_by_header_) {
     headers_copy->addCopy(Http::LowerCaseString("x-served-by"),
                           parent_.connection().localAddress()->asString());
   }
-  parent_.connection().dispatcher().post([this, headers_copy, end_stream]() -> void {
-    encoder_.encodeHeaders(*headers_copy, end_stream);
-  });
+  parent_.connection().dispatcher().post(
+      [this, headers = headers_copy.release(), end_stream]() -> void {
+        encoder_.encodeHeaders(*headers, end_stream);
+        delete headers;
+      });
 }
 
 void FakeStream::encodeData(absl::string_view data, bool end_stream) {
@@ -106,16 +114,24 @@ void FakeStream::encodeData(uint64_t size, bool end_stream) {
 }
 
 void FakeStream::encodeData(Buffer::Instance& data, bool end_stream) {
-  std::shared_ptr<Buffer::Instance> data_copy(new Buffer::OwnedImpl(data));
-  parent_.connection().dispatcher().post(
-      [this, data_copy, end_stream]() -> void { encoder_.encodeData(*data_copy, end_stream); });
+  // TSan complains about thread-safety of std::shared_ptr when linked against libc++.
+  // See: https://github.com/envoyproxy/envoy/pull/7929
+  std::unique_ptr<Buffer::Instance> data_copy(new Buffer::OwnedImpl(data));
+  parent_.connection().dispatcher().post([this, data = data_copy.release(), end_stream]() -> void {
+    encoder_.encodeData(*data, end_stream);
+    delete data;
+  });
 }
 
 void FakeStream::encodeTrailers(const Http::HeaderMapImpl& trailers) {
-  std::shared_ptr<Http::HeaderMapImpl> trailers_copy(
+  // TSan complains about thread-safety of std::shared_ptr when linked against libc++.
+  // See: https://github.com/envoyproxy/envoy/pull/7929
+  std::unique_ptr<Http::HeaderMapImpl> trailers_copy(
       new Http::HeaderMapImpl(static_cast<const Http::HeaderMap&>(trailers)));
-  parent_.connection().dispatcher().post(
-      [this, trailers_copy]() -> void { encoder_.encodeTrailers(*trailers_copy); });
+  parent_.connection().dispatcher().post([this, trailers = trailers_copy.release()]() -> void {
+    encoder_.encodeTrailers(*trailers);
+    delete trailers;
+  });
 }
 
 void FakeStream::encodeResetStream() {
@@ -221,7 +237,8 @@ FakeHttpConnection::FakeHttpConnection(SharedConnectionWrapper& shared_connectio
     : FakeConnectionBase(shared_connection, time_system) {
   if (type == Type::HTTP1) {
     codec_ = std::make_unique<Http::Http1::ServerConnectionImpl>(
-        shared_connection_.connection(), *this, Http::Http1Settings(), max_request_headers_kb);
+        shared_connection_.connection(), store, *this, Http::Http1Settings(),
+        max_request_headers_kb);
   } else {
     auto settings = Http::Http2Settings();
     settings.allow_connect_ = true;
@@ -481,13 +498,13 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
                                     std::vector<std::unique_ptr<FakeUpstream>>& upstreams,
                                     FakeHttpConnectionPtr& connection, milliseconds timeout) {
   if (upstreams.empty()) {
-    return AssertionFailure() << "No upstreams confgured.";
+    return AssertionFailure() << "No upstreams configured.";
   }
   Event::TestTimeSystem& time_system = upstreams[0]->timeSystem();
   auto end_time = time_system.monotonicTime() + timeout;
   while (time_system.monotonicTime() < end_time) {
-    for (auto it = upstreams.begin(); it != upstreams.end(); ++it) {
-      FakeUpstream& upstream = **it;
+    for (auto& it : upstreams) {
+      FakeUpstream& upstream = *it;
       Thread::ReleasableLockGuard lock(upstream.lock_);
       if (upstream.new_connections_.empty()) {
         time_system.waitFor(upstream.lock_, upstream.new_connection_event_, 5ms);

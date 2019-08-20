@@ -14,8 +14,14 @@ public:
   ~FileImplWin32();
 
 protected:
+  struct FlagsAndMode {
+    int flags_ = 0;
+    int pmode_ = 0;
+  };
+
   // Filesystem::FileSharedImpl
-  void openFile() override;
+  FlagsAndMode translateFlag(FlagSet in);
+  void openFile(FlagSet in) override;
   ssize_t writeFile(absl::string_view buffer) override;
   bool closeFile() override;
 

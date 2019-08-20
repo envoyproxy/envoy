@@ -116,7 +116,8 @@ private:
   void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
                       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                       const std::string& version_info) override;
-  void onConfigUpdateFailed(const EnvoyException*) override {
+  void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason,
+                            const EnvoyException*) override {
     DeltaConfigSubscriptionInstance::onConfigUpdateFailed();
   }
   std::string resourceName(const ProtobufWkt::Any& resource) override {

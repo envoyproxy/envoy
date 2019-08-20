@@ -622,7 +622,7 @@ TEST_F(Http2ConnPoolImplTest, ConnectTimeout) {
   expectClientCreate();
   ActiveTestRequest r1(*this, 0, false);
   EXPECT_CALL(r1.callbacks_.pool_failure_, ready());
-  test_clients_[0].connect_timer_->callback_();
+  test_clients_[0].connect_timer_->invokeCallback();
 
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
