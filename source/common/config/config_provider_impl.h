@@ -9,6 +9,7 @@
 #include "envoy/server/config_tracker.h"
 #include "envoy/singleton/instance.h"
 #include "envoy/thread_local/thread_local.h"
+
 #include "common/common/thread.h"
 #include "common/common/utility.h"
 #include "common/config/utility.h"

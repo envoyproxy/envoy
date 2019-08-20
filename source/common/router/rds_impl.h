@@ -13,7 +13,6 @@
 #include "envoy/config/subscription.h"
 #include "envoy/http/codes.h"
 #include "envoy/local_info/local_info.h"
-#include "common/common/callback_impl.h"
 #include "envoy/router/rds.h"
 #include "envoy/router/route_config_provider_manager.h"
 #include "envoy/router/route_config_update_receiver.h"
@@ -23,6 +22,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
 
+#include "common/common/callback_impl.h"
 #include "common/common/logger.h"
 #include "common/init/target_impl.h"
 #include "common/protobuf/utility.h"

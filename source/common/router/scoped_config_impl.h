@@ -66,8 +66,11 @@ public:
 private:
   // Update the key's hash with the new fragment hash.
   void updateHash(const ScopeKeyFragmentBase& fragment) {
-    absl::uint128 buffer = absl::MakeUint128(hash_, fragment.hash());
-    hash_ = HashUtil::xxHash64(absl::string_view(reinterpret_cast<char*>(&buffer), 16));
+    std::stringbuf buffer;
+    buffer.sputn(reinterpret_cast<const char*>(&hash_), sizeof(hash_));
+    const auto& fragment_hash = fragment.hash();
+    buffer.sputn(reinterpret_cast<const char*>(&fragment_hash), sizeof(fragment_hash));
+    hash_ = HashUtil::xxHash64(buffer.str());
   }
 
   uint64_t hash_{0};

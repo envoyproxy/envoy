@@ -6,8 +6,8 @@
 #include "envoy/api/v2/srds.pb.validate.h"
 
 #include "common/common/assert.h"
-#include "common/common/logger.h"
 #include "common/common/cleanup.h"
+#include "common/common/logger.h"
 #include "common/common/utility.h"
 #include "common/config/resources.h"
 #include "common/init/manager_impl.h"
@@ -184,7 +184,8 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
                                               : *overriding_init_manager));
       auto scoped_route_info = std::make_shared<ScopedRouteInfo>(
           std::move(scoped_route_config), rds_config_provider_helper->routeConfig());
-      // Detect if there is key conflict between two scopes.
+      // Detect if there is key conflict between two scopes, in which case Envoy won't be able to
+      // tell which RouteConfiguration to use. Reject the second scope in the delta form API.
       auto iter = scope_name_by_hash_.find(scoped_route_info->scopeKey().hash());
       if (iter != scope_name_by_hash_.end()) {
         if (iter->second != scoped_route_info->scopeName()) {
