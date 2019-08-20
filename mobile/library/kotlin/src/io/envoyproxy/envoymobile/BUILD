@@ -29,6 +29,8 @@ envoy_mobile_kt_library(
     name = "envoy_interfaces_lib",
     srcs = [
         "Client.kt",
+        "Envoy.kt",
+        "EnvoyBuilder.kt",
         "EnvoyException.kt",
         "Request.kt",
         "RequestBuilder.kt",
@@ -40,4 +42,7 @@ envoy_mobile_kt_library(
         "StreamEmitter.kt",
     ],
     visibility = ["//visibility:public"],
+    deps = [
+        "//library/java/src/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib",
+    ],
 )
