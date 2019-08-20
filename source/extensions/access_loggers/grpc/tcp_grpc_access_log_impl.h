@@ -25,7 +25,7 @@ namespace TcpGrpc {
 // TODO(mattklein123): Stats
 
 /**
- * Access log Instance that streams HTTP logs over gRPC.
+ * Access log Instance that streams TCP logs over gRPC.
  */
 class TcpGrpcAccessLog : public Common::ImplBase {
 public:

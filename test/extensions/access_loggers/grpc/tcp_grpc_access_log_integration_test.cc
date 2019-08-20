@@ -174,8 +174,8 @@ tcp_logs:
           address: {}
       upstream_cluster: cluster_0
     connection_properties:
-      bytes_received: 3
-      bytes_sent: 5
+      received_bytes: 3
+      sent_bytes: 5
 )EOF",
                   VersionInfo::version(), Network::Test::getLoopbackAddressString(ipVersion()),
                   Network::Test::getLoopbackAddressString(ipVersion()),
