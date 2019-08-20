@@ -86,7 +86,8 @@ TEST_F(CheckRequestUtilsTest, BasicHttp) {
 
   ExpectBasicHttp();
   CheckRequestUtils::createHttpCheck(&callbacks_, request_headers,
-                                     Protobuf::Map<std::string, std::string>(), request_, size);
+                                     Protobuf::Map<std::string, std::string>(),
+                                     envoy::api::v2::core::Metadata(), request_, size);
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
   EXPECT_EQ(request_.attributes().request().http().headers().end(),
@@ -102,7 +103,8 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithPartialBody) {
 
   ExpectBasicHttp();
   CheckRequestUtils::createHttpCheck(&callbacks_, headers_,
-                                     Protobuf::Map<std::string, std::string>(), request_, size);
+                                     Protobuf::Map<std::string, std::string>(),
+                                     envoy::api::v2::core::Metadata(), request_, size);
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
   EXPECT_EQ("true", request_.attributes().request().http().headers().at(
@@ -116,8 +118,8 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithFullBody) {
 
   ExpectBasicHttp();
   CheckRequestUtils::createHttpCheck(&callbacks_, headers_,
-                                     Protobuf::Map<std::string, std::string>(), request_,
-                                     buffer_->length());
+                                     Protobuf::Map<std::string, std::string>(),
+                                     envoy::api::v2::core::Metadata(), request_, buffer_->length());
   ASSERT_EQ(buffer_->length(), request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, buffer_->length()),
             request_.attributes().request().http().body());
@@ -146,13 +148,24 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeer) {
   Protobuf::Map<std::string, std::string> context_extensions;
   context_extensions["key"] = "value";
 
+  envoy::api::v2::core::Metadata metadata_context;
+  auto metadata_val = MessageUtil::keyValueStruct("foo", "bar");
+  (*metadata_context.mutable_filter_metadata())["meta.key"] = metadata_val;
+
   CheckRequestUtils::createHttpCheck(&callbacks_, request_headers, std::move(context_extensions),
-                                     request, false);
+                                     std::move(metadata_context), request, false);
 
   EXPECT_EQ("source", request.attributes().source().principal());
   EXPECT_EQ("destination", request.attributes().destination().principal());
   EXPECT_EQ("foo", request.attributes().source().service());
   EXPECT_EQ("value", request.attributes().context_extensions().at("key"));
+  EXPECT_EQ("bar", request.attributes()
+                       .metadata_context()
+                       .filter_metadata()
+                       .at("meta.key")
+                       .fields()
+                       .at("foo")
+                       .string_value());
 }
 
 } // namespace

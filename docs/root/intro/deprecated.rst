@@ -29,6 +29,8 @@ Version 1.12.0 (pending)
 * The `value` and `regex` fields in :ref:`QueryParameterMatcher
   <envoy_api_msg_route.QueryParameterMatcher>` has been deprecated in favor of the `string_match`
   and `present_match` fields.
+* The :option:`--allow-unknown-fields` command-line option,
+  use :option:`--allow-unknown-static-fields` instead.
 
 Version 1.11.0 (July 11, 2019)
 ==============================
