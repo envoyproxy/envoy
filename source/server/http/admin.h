@@ -320,7 +320,7 @@ private:
     Stats::Scope& listenerScope() override { return *scope_; }
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
-    const Server::ActiveUdpListenerFactory* udpListenerFactory() override {
+    const Network::ActiveUdpListenerFactory* udpListenerFactory() override {
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
 

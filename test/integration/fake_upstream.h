@@ -606,12 +606,12 @@ private:
     Stats::Scope& listenerScope() override { return parent_.stats_store_; }
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
-    Server::ActiveUdpListenerFactory* udpListenerFactory() override {
+    Network::ActiveUdpListenerFactory* udpListenerFactory() override {
       return udp_listener_factory_.get();
     }
 
     FakeUpstream& parent_;
-    Server::ActiveUdpListenerFactoryPtr udp_listener_factory_;
+    Network::ActiveUdpListenerFactoryPtr udp_listener_factory_;
     std::string name_;
   };
 

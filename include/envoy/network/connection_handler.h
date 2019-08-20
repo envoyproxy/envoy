@@ -68,9 +68,32 @@ public:
    * after they have been temporarily disabled.
    */
   virtual void enableListeners() PURE;
+
+  /**
+   * Used by ConnectionHandler to manage listeners.
+   */
+  class ActiveListener {
+  public:
+    virtual ~ActiveListener() = default;
+
+    virtual uint64_t listenerTag() PURE;
+    virtual ListenerPtr& listener() PURE;
+  };
+
+  using ActiveListenerPtr = std::unique_ptr<ActiveListener>;
 };
 
 using ConnectionHandlerPtr = std::unique_ptr<ConnectionHandler>;
+
+class ActiveUdpListenerFactory {
+public:
+  virtual ~ActiveUdpListenerFactory() = default;
+
+  virtual Network::ConnectionHandler::ActiveListenerPtr
+  createActiveUdpListener(ConnectionHandler& parent, Network::ListenerConfig& config) const PURE;
+};
+
+using ActiveUdpListenerFactoryPtr = std::unique_ptr<ActiveUdpListenerFactory>;
 
 } // namespace Network
 } // namespace Envoy

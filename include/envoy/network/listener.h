@@ -11,14 +11,10 @@
 #include "envoy/stats/scope.h"
 
 namespace Envoy {
-
-namespace Server {
-class ActiveUdpListenerFactory;
-} // namespace Server
-
 namespace Network {
 
 class UdpListenerFilterManager;
+class ActiveUdpListenerFactory;
 
 /**
  * A configuration for an individual listener.
@@ -100,7 +96,7 @@ public:
    * @return factory pointer if listening on UDP socket, otherwise return
    * nullptr.
    */
-  virtual const Server::ActiveUdpListenerFactory* udpListenerFactory() PURE;
+  virtual const ActiveUdpListenerFactory* udpListenerFactory() PURE;
 };
 
 /**

@@ -11,12 +11,6 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "active_udp_listener_config_interface",
-    hdrs = ["active_udp_listener_config.h"],
-    deps = [":connection_handler_lib"],
-)
-
-envoy_cc_library(
     name = "backtrace_lib",
     hdrs = ["backtrace.h"],
     external_deps = [
@@ -70,6 +64,7 @@ envoy_cc_library(
         "//include/envoy/network:filter_interface",
         "//include/envoy/network:listen_socket_interface",
         "//include/envoy/network:listener_interface",
+        "//include/envoy/server:active_udp_listener_config_interface",
         "//include/envoy/server:listener_manager_interface",
         "//include/envoy/stats:timespan",
         "//source/common/common:linked_object",
@@ -261,12 +256,12 @@ envoy_cc_library(
     srcs = ["listener_manager_impl.cc"],
     hdrs = ["listener_manager_impl.h"],
     deps = [
-        ":active_udp_listener_config_interface",
         ":configuration_lib",
         ":drain_manager_lib",
         ":filter_chain_manager_lib",
         ":lds_api_lib",
         ":transport_socket_config_lib",
+        "//include/envoy/server:active_udp_listener_config_interface",
         "//include/envoy/server:filter_config_interface",
         "//include/envoy/server:listener_manager_interface",
         "//include/envoy/server:transport_socket_config_interface",
@@ -445,5 +440,16 @@ envoy_cc_library(
     hdrs = ["transport_socket_config_impl.h"],
     deps = [
         "//include/envoy/server:transport_socket_config_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "active_raw_udp_listener_config",
+    srcs = ["active_raw_udp_listener_config.cc"],
+    hdrs = ["active_raw_udp_listener_config.h"],
+    deps = [
+        ":connection_handler_lib",
+        "//include/envoy/registry",
+        "//include/envoy/server:active_udp_listener_config_interface",
     ],
 )

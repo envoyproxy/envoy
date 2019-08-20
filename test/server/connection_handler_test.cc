@@ -1,3 +1,4 @@
+#include "envoy/server/active_udp_listener_config.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/utility.h"
@@ -5,7 +6,6 @@
 #include "common/network/raw_buffer_socket.h"
 #include "common/network/utility.h"
 
-#include "server/active_udp_listener_config.h"
 #include "server/connection_handler_impl.h"
 
 #include "test/mocks/network/mocks.h"
@@ -73,7 +73,7 @@ public:
     Stats::Scope& listenerScope() override { return parent_.stats_store_; }
     uint64_t listenerTag() const override { return tag_; }
     const std::string& name() const override { return name_; }
-    const ActiveUdpListenerFactory* udpListenerFactory() override {
+    const Network::ActiveUdpListenerFactory* udpListenerFactory() override {
       return udp_listener_factory_.get();
     }
 
@@ -85,7 +85,7 @@ public:
     const std::string name_;
     const std::chrono::milliseconds listener_filters_timeout_;
     const bool continue_on_listener_filters_timeout_;
-    std::unique_ptr<ActiveUdpListenerFactory> udp_listener_factory_;
+    std::unique_ptr<Network::ActiveUdpListenerFactory> udp_listener_factory_;
   };
 
   using TestListenerPtr = std::unique_ptr<TestListener>;

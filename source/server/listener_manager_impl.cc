@@ -4,6 +4,7 @@
 
 #include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/registry/registry.h"
+#include "envoy/server/active_udp_listener_config.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/stats/scope.h"
 
@@ -19,7 +20,6 @@
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 
-#include "server/active_udp_listener_config.h"
 #include "server/configuration_impl.h"
 #include "server/drain_manager_impl.h"
 #include "server/filter_chain_manager_impl.h"

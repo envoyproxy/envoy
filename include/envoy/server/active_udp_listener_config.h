@@ -1,4 +1,6 @@
-#include "server/connection_handler_impl.h"
+#pragma once
+
+#include "envoy/network/connection_handler.h"
 
 namespace Envoy {
 namespace Server {
@@ -9,7 +11,7 @@ class ActiveUdpListenerConfigFactory {
 public:
   virtual ~ActiveUdpListenerConfigFactory() = default;
 
-  virtual std::unique_ptr<ActiveUdpListenerFactory>
+  virtual Network::ActiveUdpListenerFactoryPtr
   createActiveUdpListenerFactory(const Protobuf::Message&) PURE;
 
   // Used to identify which udp listener to create: quic or raw udp.
