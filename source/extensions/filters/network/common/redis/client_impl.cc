@@ -99,12 +99,13 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, PoolCallbacks& ca
 
   const bool empty_buffer = encoder_buffer_.length() == 0;
 
-  std::string command = redis_command_stats_->getCommandFromRequest(request);
-  pending_requests_.emplace_back(*this, callbacks, command);
+  std::string to_lower_command(redis_command_stats_->getCommandFromRequest(request));
+  to_lower_table_.toLowerCase(to_lower_command);
+  pending_requests_.emplace_back(*this, callbacks, to_lower_command);
   encoder_->encode(request, encoder_buffer_);
 
   if (config_.enableCommandStats()) {
-    redis_command_stats_->updateStatsTotal(command);
+    redis_command_stats_->updateStatsTotal(to_lower_command);
   }
 
   // If buffer is full, flush. If the buffer was empty before the request, start the timer.

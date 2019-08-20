@@ -9,6 +9,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/hash.h"
+#include "common/common/to_lower_table.h"
 #include "common/network/filter_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/singleton/const_singleton.h"
@@ -139,6 +140,7 @@ private:
   Event::TimerPtr flush_timer_;
   Envoy::TimeSource& time_source_;
   const RedisCommandStatsPtr redis_command_stats_;
+  const ToLowerTable to_lower_table_;
 };
 
 class ClientFactoryImpl : public ClientFactory {
