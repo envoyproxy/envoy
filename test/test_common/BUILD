@@ -231,6 +231,7 @@ envoy_cc_test(
         ":simulated_time_system_lib",
         ":utility_lib",
         "//source/common/event:libevent_scheduler_lib",
+        "//test/mocks/event:event_mocks",
     ],
 )
 

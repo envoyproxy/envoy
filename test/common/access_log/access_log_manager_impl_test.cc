@@ -59,7 +59,7 @@ TEST_F(AccessLogManagerImplTest, flushToLogFilePeriodically) {
   EXPECT_CALL(*file_, open_()).WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
   AccessLogFileSharedPtr log_file = access_log_manager_.createAccessLog("foo");
 
-  EXPECT_CALL(*timer, enableTimer(timeout_40ms_));
+  EXPECT_CALL(*timer, enableTimer(timeout_40ms_, _));
   EXPECT_CALL(*file_, write_(_))
       .WillOnce(Invoke([](absl::string_view data) -> Api::IoCallSizeResult {
         EXPECT_EQ(0, data.compare("test"));
@@ -83,7 +83,7 @@ TEST_F(AccessLogManagerImplTest, flushToLogFilePeriodically) {
 
   // make sure timer is re-enabled on callback call
   log_file->write("test2");
-  EXPECT_CALL(*timer, enableTimer(timeout_40ms_));
+  EXPECT_CALL(*timer, enableTimer(timeout_40ms_, _));
   timer->invokeCallback();
 
   {
@@ -101,7 +101,7 @@ TEST_F(AccessLogManagerImplTest, flushToLogFileOnDemand) {
   EXPECT_CALL(*file_, open_()).WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
   AccessLogFileSharedPtr log_file = access_log_manager_.createAccessLog("foo");
 
-  EXPECT_CALL(*timer, enableTimer(timeout_40ms_));
+  EXPECT_CALL(*timer, enableTimer(timeout_40ms_, _));
 
   // The first write to a given file will start the flush thread, which can flush
   // immediately (race on whether it will or not). So do a write and flush to
@@ -146,7 +146,7 @@ TEST_F(AccessLogManagerImplTest, flushToLogFileOnDemand) {
 
   // make sure timer is re-enabled on callback call
   log_file->write("test2");
-  EXPECT_CALL(*timer, enableTimer(timeout_40ms_));
+  EXPECT_CALL(*timer, enableTimer(timeout_40ms_, _));
   timer->invokeCallback();
   expected_writes++;
 
