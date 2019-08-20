@@ -33,7 +33,7 @@ public:
    *
    * @param span The span that needs action.
    */
-  virtual void reportSpan(const Span& span) PURE;
+  virtual void reportSpan(Span&& span) PURE;
 };
 
 using ReporterPtr = std::unique_ptr<Reporter>;

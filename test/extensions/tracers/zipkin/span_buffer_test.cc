@@ -1,7 +1,3 @@
-#include "common/common/base64.h"
-#include "common/protobuf/message_validator_impl.h"
-#include "common/protobuf/utility.h"
-
 #include "extensions/tracers/zipkin/span_buffer.h"
 
 #include "test/test_common/test_time.h"
@@ -14,41 +10,17 @@ namespace Tracers {
 namespace Zipkin {
 namespace {
 
-void expectValidBufferedProtoListOfSpans(const SpanBuffer& buffer) {
-  std::string expected_yaml = "spans:";
-  for (const auto& span : buffer.spans()) {
-    const std::string expected_span_yaml = fmt::format(
-        R"EOF(
-- traceId: {}
-  parentId: {}
-  id: {}
-)EOF",
-        Base64::encode(span.traceIdAsByteString().c_str(), span.traceIdAsByteString().size()),
-        span.isSetParentId() ? Base64::encode(span.parentIdAsByteString().c_str(),
-                                              span.parentIdAsByteString().size())
-                             : "",
-        Base64::encode(span.idAsByteString().c_str(), span.idAsByteString().size()));
-    expected_yaml += expected_span_yaml;
-  }
-  zipkin::proto3::ListOfSpans expected_msg;
-  MessageUtil::loadFromYaml(expected_yaml, expected_msg,
-                            ProtobufMessage::getStrictValidationVisitor());
-  EXPECT_EQ(buffer.toProtoListOfSpans().DebugString(), expected_msg.DebugString());
-}
-
 TEST(ZipkinSpanBufferTest, defaultConstructorEndToEnd) {
   DangerousDeprecatedTestTime test_time;
-  SpanBuffer buffer;
+  SpanBuffer buffer(envoy::config::trace::v2::ZipkinConfig::HTTP_JSON_V1, true);
 
   EXPECT_EQ(0ULL, buffer.pendingSpans());
-  EXPECT_EQ("[]", buffer.toStringifiedJsonArray());
-  EXPECT_EQ(buffer.toProtoListOfSpans().DebugString(), "");
+  EXPECT_EQ("[]", buffer.serialize());
   EXPECT_FALSE(buffer.addSpan(Span(test_time.timeSystem())));
-  expectValidBufferedProtoListOfSpans(buffer);
 
   buffer.allocateBuffer(2);
   EXPECT_EQ(0ULL, buffer.pendingSpans());
-  EXPECT_EQ("[]", buffer.toStringifiedJsonArray());
+  EXPECT_EQ("[]", buffer.serialize());
 
   buffer.addSpan(Span(test_time.timeSystem()));
   EXPECT_EQ(1ULL, buffer.pendingSpans());
@@ -59,13 +31,11 @@ TEST(ZipkinSpanBufferTest, defaultConstructorEndToEnd) {
                                            R"("annotations":[],)"
                                            R"("binaryAnnotations":[])"
                                            "}]";
-  EXPECT_EQ(expected_json_array_string, buffer.toStringifiedJsonArray());
-  expectValidBufferedProtoListOfSpans(buffer);
+  EXPECT_EQ(expected_json_array_string, buffer.serialize());
 
   buffer.clear();
   EXPECT_EQ(0ULL, buffer.pendingSpans());
-  EXPECT_EQ("[]", buffer.toStringifiedJsonArray());
-  expectValidBufferedProtoListOfSpans(buffer);
+  EXPECT_EQ("[]", buffer.serialize());
 
   buffer.addSpan(Span(test_time.timeSystem()));
   buffer.addSpan(Span(test_time.timeSystem()));
@@ -87,21 +57,18 @@ TEST(ZipkinSpanBufferTest, defaultConstructorEndToEnd) {
                                "]";
   EXPECT_EQ(2ULL, buffer.pendingSpans());
   EXPECT_EQ(expected_json_array_string, buffer.toStringifiedJsonArray());
-  expectValidBufferedProtoListOfSpans(buffer);
 
   buffer.clear();
   EXPECT_EQ(0ULL, buffer.pendingSpans());
-  EXPECT_EQ("[]", buffer.toStringifiedJsonArray());
-  expectValidBufferedProtoListOfSpans(buffer);
+  EXPECT_EQ("[]", buffer.serialize());
 }
 
 TEST(ZipkinSpanBufferTest, sizeConstructorEndtoEnd) {
   DangerousDeprecatedTestTime test_time;
-  SpanBuffer buffer(2);
+  SpanBuffer buffer(envoy::config::trace::v2::ZipkinConfig::HTTP_JSON_V1, true, 2);
 
   EXPECT_EQ(0ULL, buffer.pendingSpans());
-  EXPECT_EQ("[]", buffer.toStringifiedJsonArray());
-  expectValidBufferedProtoListOfSpans(buffer);
+  EXPECT_EQ("[]", buffer.serialize());
 
   buffer.addSpan(Span(test_time.timeSystem()));
   EXPECT_EQ(1ULL, buffer.pendingSpans());
@@ -113,12 +80,10 @@ TEST(ZipkinSpanBufferTest, sizeConstructorEndtoEnd) {
                                            R"("binaryAnnotations":[])"
                                            "}]";
   EXPECT_EQ(expected_json_array_string, buffer.toStringifiedJsonArray());
-  expectValidBufferedProtoListOfSpans(buffer);
 
   buffer.clear();
   EXPECT_EQ(0ULL, buffer.pendingSpans());
-  EXPECT_EQ("[]", buffer.toStringifiedJsonArray());
-  expectValidBufferedProtoListOfSpans(buffer);
+  EXPECT_EQ("[]", buffer.serialize());
 
   buffer.addSpan(Span(test_time.timeSystem()));
   buffer.addSpan(Span(test_time.timeSystem()));
@@ -139,12 +104,10 @@ TEST(ZipkinSpanBufferTest, sizeConstructorEndtoEnd) {
                                "}]";
   EXPECT_EQ(2ULL, buffer.pendingSpans());
   EXPECT_EQ(expected_json_array_string, buffer.toStringifiedJsonArray());
-  expectValidBufferedProtoListOfSpans(buffer);
 
   buffer.clear();
   EXPECT_EQ(0ULL, buffer.pendingSpans());
-  EXPECT_EQ("[]", buffer.toStringifiedJsonArray());
-  expectValidBufferedProtoListOfSpans(buffer);
+  EXPECT_EQ("[]", buffer.serialize());
 }
 
 } // namespace

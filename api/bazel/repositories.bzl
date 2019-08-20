@@ -156,8 +156,10 @@ filegroup(
 """
 
 ZIPKINAPI_BUILD_CONTENT = """
-load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library")
+
+load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library", "api_go_proto_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
+
 api_proto_library(
     name = "zipkin",
     srcs = [
@@ -166,10 +168,9 @@ api_proto_library(
     ],
     visibility = ["//visibility:public"],
 )
-go_proto_library(
-    name = "zipkin_go_proto",
-    importpath = "zipkin",
+
+api_go_proto_library(
+    name = "zipkin",
     proto = ":zipkin",
-    visibility = ["//visibility:public"],
 )
 """

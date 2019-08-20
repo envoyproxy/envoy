@@ -14,8 +14,6 @@
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
-#include "zipkin-jsonv2.pb.h"
-#include "zipkin.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -96,20 +94,6 @@ public:
    * @return a stringified JSON.
    */
   const std::string toJson() override;
-
-  /**
-   * Builds protobuf message representation of this endpoint.
-   *
-   * @return zipkin::proto3::Endpoint the protobuf message representation of this endpoint.
-   */
-  const zipkin::proto3::Endpoint toProtoEndpoint() const;
-
-  /**
-   * Builds protobuf message representation of this endpoint.
-   *
-   * @return zipkin::jsonv2::Endpoint the protobuf message representation of this endpoint.
-   */
-  const zipkin::jsonv2::Endpoint toJsonEndpoint() const;
 
 private:
   std::string service_name_;
@@ -528,11 +512,10 @@ public:
    * @return the span's trace id as a byte string.
    */
   const std::string traceIdAsByteString() const {
-    // TODO(dio): Make sure this is the right interpretation of
     // https://github.com/apache/incubator-zipkin-api/blob/v0.2.1/zipkin.proto#L60-L61.
-    return trace_id_high_.has_value() ? Util::toByteString(trace_id_high_.value(), true) +
-                                            Util::toByteString(trace_id_, true)
-                                      : Util::toByteString(trace_id_, true);
+    return trace_id_high_.has_value() ? Util::toFlipableByteString(trace_id_high_.value(), true) +
+                                            Util::toFlipableByteString(trace_id_, true)
+                                      : Util::toFlipableByteString(trace_id_, true);
   }
 
   /**
@@ -558,15 +541,6 @@ public:
    * @return a stringified JSON.
    */
   const std::string toJson() override;
-
-  const zipkin::jsonv2::Span toJsonSpan() const;
-
-  /**
-   * Builds protobuf message representation of this span.
-   *
-   * @return zipkin::proto3::Span the protobuf message representation of this span.
-   */
-  const zipkin::proto3::Span toProtoSpan() const;
 
   /**
    * Associates a Tracer object with the span. The tracer's reportSpan() method is invoked

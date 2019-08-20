@@ -141,19 +141,22 @@ private:
  * Information about the Zipkin collector.
  */
 struct CollectorInfo {
-  // The Zipkin collector endpoint/path to receive the collected metrics. e.g. /api/v1/spans.
+  // The Zipkin collector endpoint/path to receive the collected trace data. e.g. /api/v1/spans if
+  // HTTP_JSON_V1 or /api/v2/spans otherwise.
   std::string endpoint{ZipkinCoreConstants::get().DEFAULT_COLLECTOR_ENDPOINT};
 
   // The version of the collector. This is related to endpoint's supported payload specification and
   // transport.
   envoy::config::trace::v2::ZipkinConfig::CollectorEndpointVersion version{
       envoy::config::trace::v2::ZipkinConfig::HTTP_JSON_V1};
+
+  bool shared_span_context{true};
 };
 
 /**
  * This class derives from the abstract Zipkin::Reporter.
- * It buffers spans and relies on Http::AsyncClient to send spans to Zipkin collector depends on the
- * chosen collector endpoint version. By default it sends JSON over HTTP.
+ * It buffers spans and relies on Http::AsyncClient to send spans to
+ * Zipkin using JSON over HTTP.
  *
  * Two runtime parameters control the span buffering/flushing behavior, namely:
  * tracing.zipkin.min_flush_spans and tracing.zipkin.flush_interval_ms.
@@ -171,7 +174,7 @@ public:
    *
    * @param driver ZipkinDriver to be associated with the reporter.
    * @param dispatcher Controls the timer used to flush buffered spans.
-   * @param CollectorInfo represents the Zipkin endpoint information to be used.
+   * @param collector holds the endpoint version and path information.
    * when making HTTP POST requests carrying spans. This value comes from the
    * Zipkin-related tracing configuration.
    */
@@ -184,7 +187,7 @@ public:
    *
    * @param span The span to be buffered.
    */
-  void reportSpan(const Span& span) override;
+  void reportSpan(Span&& span) override;
 
   // Http::AsyncClient::Callbacks.
   // The callbacks below record Zipkin-span-related stats.
@@ -196,7 +199,7 @@ public:
    *
    * @param driver ZipkinDriver to be associated with the reporter.
    * @param dispatcher Controls the timer used to flush buffered spans.
-   * @param collector_endpoint String representing the Zipkin endpoint to be used
+   * @param collector holds the endpoint version and path information.
    * when making HTTP POST requests carrying spans. This value comes from the
    * Zipkin-related tracing configuration.
    *
@@ -218,8 +221,8 @@ private:
 
   Driver& driver_;
   Event::TimerPtr flush_timer_;
-  SpanBuffer span_buffer_;
   const CollectorInfo collector_;
+  SpanBufferPtr span_buffer_;
 };
 } // namespace Zipkin
 } // namespace Tracers

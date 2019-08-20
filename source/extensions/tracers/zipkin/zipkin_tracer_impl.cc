@@ -80,8 +80,9 @@ Driver::Driver(const envoy::config::trace::v2::ZipkinConfig& zipkin_config,
   if (!zipkin_config.collector_endpoint().empty()) {
     collector.endpoint = zipkin_config.collector_endpoint();
   }
+
   if (zipkin_config.collector_endpoint_version() !=
-      envoy::config::trace::v2::ZipkinConfig::DEFAULT) {
+      envoy::config::trace::v2::ZipkinConfig::NOT_SET) {
     collector.version = zipkin_config.collector_endpoint_version();
   }
 
@@ -89,6 +90,7 @@ Driver::Driver(const envoy::config::trace::v2::ZipkinConfig& zipkin_config,
 
   const bool shared_span_context = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
       zipkin_config, shared_span_context, ZipkinCoreConstants::get().DEFAULT_SHARED_SPAN_CONTEXT);
+  collector.shared_span_context = shared_span_context;
 
   tls_->set([this, collector, &random_generator, trace_id_128bit, shared_span_context](
                 Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
@@ -130,7 +132,9 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMa
 
 ReporterImpl::ReporterImpl(Driver& driver, Event::Dispatcher& dispatcher,
                            const CollectorInfo& collector)
-    : driver_(driver), collector_(collector) {
+    : driver_(driver),
+      collector_(collector), span_buffer_{
+                                 new SpanBuffer(collector.version, collector.shared_span_context)} {
   flush_timer_ = dispatcher.createTimer([this]() -> void {
     driver_.tracerStats().timer_flushed_.inc();
     flushSpans();
@@ -139,7 +143,7 @@ ReporterImpl::ReporterImpl(Driver& driver, Event::Dispatcher& dispatcher,
 
   const uint64_t min_flush_spans =
       driver_.runtime().snapshot().getInteger("tracing.zipkin.min_flush_spans", 5U);
-  span_buffer_.allocateBuffer(min_flush_spans);
+  span_buffer_->allocateBuffer(min_flush_spans);
 
   enableTimer();
 }
@@ -150,13 +154,13 @@ ReporterPtr ReporterImpl::NewInstance(Driver& driver, Event::Dispatcher& dispatc
 }
 
 // TODO(fabolive): Need to avoid the copy to improve performance.
-void ReporterImpl::reportSpan(const Span& span) {
-  span_buffer_.addSpan(span);
+void ReporterImpl::reportSpan(Span&& span) {
+  span_buffer_->addSpan(std::move(span));
 
   const uint64_t min_flush_spans =
       driver_.runtime().snapshot().getInteger("tracing.zipkin.min_flush_spans", 5U);
 
-  if (span_buffer_.pendingSpans() == min_flush_spans) {
+  if (span_buffer_->pendingSpans() == min_flush_spans) {
     flushSpans();
   }
 }
@@ -168,34 +172,20 @@ void ReporterImpl::enableTimer() {
 }
 
 void ReporterImpl::flushSpans() {
-  if (span_buffer_.pendingSpans()) {
-    driver_.tracerStats().spans_sent_.add(span_buffer_.pendingSpans());
-
+  if (span_buffer_->pendingSpans()) {
+    driver_.tracerStats().spans_sent_.add(span_buffer_->pendingSpans());
+    const std::string request_body = span_buffer_->serialize();
     Http::MessagePtr message(new Http::RequestMessageImpl());
     message->headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Post);
     message->headers().insertPath().value(collector_.endpoint);
     message->headers().insertHost().value(driver_.cluster()->name());
-
-    std::string payload;
-    if (collector_.version == envoy::config::trace::v2::ZipkinConfig::HTTP_PROTO) {
-      message->headers().insertContentType().value().setReference(
-          Http::Headers::get().ContentTypeValues.Protobuf);
-      // TODO(dio): use grpc message serializer so no round trip to std::string is required.
-      span_buffer_.toProtoListOfSpans().SerializeToString(&payload);
-    } else if (collector_.version == envoy::config::trace::v2::ZipkinConfig::HTTP_JSON_V2) {
-      message->headers().insertContentType().value().setReference(
-          Http::Headers::get().ContentTypeValues.Json);
-      // TODO(dio): Handle the returned status.
-      payload = span_buffer_.toJsonListOfSpans();
-    } else {
-      message->headers().insertContentType().value().setReference(
-          Http::Headers::get().ContentTypeValues.Json);
-      payload = span_buffer_.toStringifiedJsonArray();
-    }
+    message->headers().insertContentType().value().setReference(
+        collector_.version == envoy::config::trace::v2::ZipkinConfig::HTTP_PROTO
+            ? Http::Headers::get().ContentTypeValues.Protobuf
+            : Http::Headers::get().ContentTypeValues.Json);
 
     Buffer::InstancePtr body(new Buffer::OwnedImpl());
-    std::cerr << payload << "\n";
-    body->add(payload);
+    body->add(request_body);
     message->body() = std::move(body);
 
     const uint64_t timeout =
@@ -205,7 +195,7 @@ void ReporterImpl::flushSpans() {
         .send(std::move(message), *this,
               Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(timeout)));
 
-    span_buffer_.clear();
+    span_buffer_->clear();
   }
 }
 

@@ -1,6 +1,5 @@
 #include "extensions/tracers/zipkin/zipkin_core_types.h"
 
-#include "common/common/byte_order.h"
 #include "common/common/utility.h"
 
 #include "extensions/tracers/zipkin/span_context.h"
@@ -36,8 +35,7 @@ const std::string Endpoint::toJson() {
     writer.String("");
     writer.Key(ZipkinJsonFieldNames::get().ENDPOINT_PORT.c_str());
     writer.Uint(0);
-  }
-  if (address_) {
+  } else {
     if (address_->ip()->version() == Network::Address::IpVersion::v4) {
       // IPv4
       writer.Key(ZipkinJsonFieldNames::get().ENDPOINT_IPV4.c_str());
@@ -55,42 +53,6 @@ const std::string Endpoint::toJson() {
   std::string json_string = s.GetString();
 
   return json_string;
-}
-
-const zipkin::jsonv2::Endpoint Endpoint::toJsonEndpoint() const {
-  zipkin::jsonv2::Endpoint endpoint;
-  if (address_) {
-    if (address_->ip()->version() == Network::Address::IpVersion::v4) {
-      endpoint.set_ipv4(address_->ip()->addressAsString());
-    } else {
-      endpoint.set_ipv6(address_->ip()->addressAsString());
-    }
-    endpoint.set_port(address_->ip()->port());
-  }
-
-  if (!service_name_.empty()) {
-    endpoint.set_service_name(service_name_);
-  }
-
-  return endpoint;
-}
-
-const zipkin::proto3::Endpoint Endpoint::toProtoEndpoint() const {
-  zipkin::proto3::Endpoint endpoint;
-  if (address_) {
-    if (address_->ip()->version() == Network::Address::IpVersion::v4) {
-      endpoint.set_ipv4(address_->ip()->addressAsString());
-    } else {
-      endpoint.set_ipv6(address_->ip()->addressAsString());
-    }
-    endpoint.set_port(address_->ip()->port());
-  }
-
-  if (!service_name_.empty()) {
-    endpoint.set_service_name(service_name_);
-  }
-
-  return endpoint;
 }
 
 Annotation::Annotation(const Annotation& ann) {
@@ -257,77 +219,6 @@ const std::string Span::toJson() {
   return json_string;
 }
 
-const zipkin::jsonv2::Span Span::toJsonSpan() const {
-  zipkin::jsonv2::Span span;
-  span.set_trace_id(traceIdAsHexString());
-  if (parent_id_ && parent_id_.value()) {
-    span.set_parent_id(Hex::uint64ToHex(parent_id_.value()));
-  }
-  span.set_id(Hex::uint64ToHex(id_));
-  span.set_name(name_);
-
-  if (timestamp_) {
-    span.set_timestamp(timestamp_.value());
-  }
-
-  if (duration_) {
-    span.set_duration(duration_.value());
-  }
-
-  for (const auto& annotation : annotations_) {
-    if (annotation.isSetEndpoint()) {
-      if (annotation.value() == ZipkinCoreConstants::get().CLIENT_SEND) {
-        span.set_kind("CLIENT");
-      } else if (annotation.value() == ZipkinCoreConstants::get().SERVER_RECV) {
-        span.set_kind("SERVER");
-      }
-      span.mutable_local_endpoint()->MergeFrom(annotation.endpoint().toJsonEndpoint());
-    }
-  }
-
-  auto& tags = *span.mutable_tags();
-  for (const auto& binary_annotation : binary_annotations_) {
-    tags[binary_annotation.key()] = binary_annotation.value();
-  }
-  return span;
-}
-
-const zipkin::proto3::Span Span::toProtoSpan() const {
-  zipkin::proto3::Span span;
-  span.set_trace_id(traceIdAsByteString());
-  if (parent_id_ && parent_id_.value()) {
-    span.set_parent_id(parentIdAsByteString());
-  }
-  span.set_id(idAsByteString());
-  span.set_name(name_);
-
-  if (timestamp_) {
-    span.set_timestamp(timestamp_.value());
-  }
-
-  if (duration_) {
-    span.set_duration(duration_.value());
-  }
-
-  for (const auto& annotation : annotations_) {
-    if (annotation.isSetEndpoint()) {
-      if (annotation.value() == ZipkinCoreConstants::get().CLIENT_SEND) {
-        span.set_kind(zipkin::proto3::Span::CLIENT);
-      } else if (annotation.value() == ZipkinCoreConstants::get().SERVER_RECV) {
-        span.set_kind(zipkin::proto3::Span::SERVER);
-      }
-      span.mutable_local_endpoint()->MergeFrom(annotation.endpoint().toProtoEndpoint());
-    }
-  }
-
-  auto& tags = *span.mutable_tags();
-  for (const auto& binary_annotation : binary_annotations_) {
-    tags[binary_annotation.key()] = binary_annotation.value();
-  }
-
-  return span;
-}
-
 void Span::finish() {
   // Assumption: Span will have only one annotation when this method is called
   SpanContext context(*this);
@@ -350,6 +241,9 @@ void Span::finish() {
     cr.setTimestamp(stop_timestamp);
     cr.setValue(ZipkinCoreConstants::get().CLIENT_RECV);
     annotations_.push_back(std::move(cr));
+  }
+
+  if (monotonic_start_time_) {
     const int64_t monotonic_stop_time = std::chrono::duration_cast<std::chrono::microseconds>(
                                             time_source_.monotonicTime().time_since_epoch())
                                             .count();

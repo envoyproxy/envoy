@@ -18,33 +18,11 @@ namespace Tracers {
 namespace Zipkin {
 namespace {
 
-void expectValidEndpointProto(const Endpoint& endpoint) {
-  const auto addr = endpoint.address();
-  const auto version =
-      addr ? (addr->ip()->version() == Network::Address::IpVersion::v4 ? "ipv4" : "ipv6") : "ipv4";
-  const auto ip = addr ? Base64::encode(addr->ip()->addressAsString().c_str(),
-                                        addr->ip()->addressAsString().size(), false)
-                       : "";
-  const auto port = addr ? addr->ip()->port() : 0;
-  const std::string expected_yaml = fmt::format(
-      R"EOF(
-{}: {}
-port: {}
-serviceName: {}
-)EOF",
-      version, ip, port, endpoint.serviceName());
-  zipkin::proto3::Endpoint expected_msg;
-  MessageUtil::loadFromYaml(expected_yaml, expected_msg,
-                            ProtobufMessage::getStrictValidationVisitor());
-  EXPECT_EQ(endpoint.toProtoEndpoint().DebugString(), expected_msg.DebugString());
-}
-
 TEST(ZipkinCoreTypesEndpointTest, defaultConstructor) {
   Endpoint ep;
 
   EXPECT_EQ("", ep.serviceName());
   EXPECT_EQ(R"({"ipv4":"","port":0,"serviceName":""})", ep.toJson());
-  expectValidEndpointProto(ep);
 
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddress("127.0.0.1");
@@ -62,7 +40,6 @@ TEST(ZipkinCoreTypesEndpointTest, defaultConstructor) {
   const std::string expected_json =
       R"({"ipv6":"2001:db8:85a3::8a2e:370:4444","port":7334,"serviceName":"my_service"})";
   EXPECT_EQ(expected_json, ep.toJson());
-  expectValidEndpointProto(ep);
 }
 
 TEST(ZipkinCoreTypesEndpointTest, customConstructor) {
@@ -79,7 +56,6 @@ TEST(ZipkinCoreTypesEndpointTest, customConstructor) {
 
   EXPECT_EQ(R"({"ipv6":"2001:db8:85a3::8a2e:370:4444","port":7334,"serviceName":"my_service"})",
             ep.toJson());
-  expectValidEndpointProto(ep);
 }
 
 TEST(ZipkinCoreTypesEndpointTest, copyOperator) {
@@ -93,8 +69,6 @@ TEST(ZipkinCoreTypesEndpointTest, copyOperator) {
 
   EXPECT_EQ(ep1.serviceName(), ep2.serviceName());
   EXPECT_EQ(ep1.toJson(), ep2.toJson());
-  expectValidEndpointProto(ep1);
-  expectValidEndpointProto(ep2);
 }
 
 TEST(ZipkinCoreTypesEndpointTest, assignmentOperator) {
@@ -108,8 +82,6 @@ TEST(ZipkinCoreTypesEndpointTest, assignmentOperator) {
 
   EXPECT_EQ(ep1.serviceName(), ep2.serviceName());
   EXPECT_EQ(ep1.toJson(), ep2.toJson());
-  expectValidEndpointProto(ep1);
-  expectValidEndpointProto(ep2);
 }
 
 TEST(ZipkinCoreTypesAnnotationTest, defaultConstructor) {
@@ -340,23 +312,6 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
             R"("annotations":[],"binaryAnnotations":[]})",
             span.toJson());
 
-  std::string expected_yaml = fmt::format(
-      R"EOF(
-traceId: {}
-parentId: {}
-id: {}
-)EOF",
-      Base64::encode(span.traceIdAsByteString().c_str(), span.traceIdAsByteString().size()),
-      span.isSetParentId()
-          ? Base64::encode(span.parentIdAsByteString().c_str(), span.parentIdAsByteString().size())
-          : "",
-      Base64::encode(span.idAsByteString().c_str(), span.idAsByteString().size()));
-
-  zipkin::proto3::Span expected_msg;
-  MessageUtil::loadFromYaml(expected_yaml, expected_msg,
-                            ProtobufMessage::getStrictValidationVisitor());
-  EXPECT_EQ(span.toProtoSpan().DebugString(), expected_msg.DebugString());
-
   uint64_t id = Util::generateRandom64(test_time.timeSystem());
   std::string id_hex = Hex::uint64ToHex(id);
   span.setId(id);
@@ -445,35 +400,6 @@ id: {}
                 R"({"ipv4":"192.168.1.2","port":3306,"serviceName":"my_service_name"}}]})",
             span.toJson());
 
-  expected_yaml = fmt::format(
-      R"EOF(
-traceId: {}
-parentId: {}
-id: {}
-kind: CLIENT
-name: span_name
-timestamp: {}
-duration: {}
-localEndpoint:
-  serviceName: my_service_name
-  ipv4: {}
-  port: 3306
-tags:
-  lc: my_component_name
-)EOF",
-      Base64::encode(span.traceIdAsByteString().c_str(), span.traceIdAsByteString().size()),
-      Base64::encode(span.parentIdAsByteString().c_str(), span.parentIdAsByteString().size()),
-      Base64::encode(span.idAsByteString().c_str(), span.idAsByteString().size()), span.timestamp(),
-      /* duration= */ 3000, /* localEndpoint.ipv4= */ Base64::encode("192.168.1.2", 11));
-
-  MessageUtil::loadFromYaml(expected_yaml, expected_msg,
-                            ProtobufMessage::getStrictValidationVisitor());
-  EXPECT_EQ(span.toProtoSpan().DebugString(), expected_msg.DebugString());
-
-  std::string json;
-  const auto status = Protobuf::util::MessageToJsonString(span.toJsonSpan(), &json);
-  std::cerr << json << "\n";
-
   // Test the copy-semantics flavor of addAnnotation and addBinaryAnnotation
 
   ann.setValue(Zipkin::ZipkinCoreConstants::get().SERVER_SEND);
@@ -525,32 +451,6 @@ tags:
                 R"("serviceName":"my_service_name"}}]})",
             span.toJson());
 
-  expected_yaml = fmt::format(
-      R"EOF(
-traceId: {}
-parentId: {}
-id: {}
-kind: SERVER
-name: span_name
-timestamp: {}
-duration: {}
-localEndpoint:
-  serviceName: my_service_name
-  ipv4: {}
-  port: 3306
-tags:
-  "http.return_code": "400"
-  lc: my_component_name
-)EOF",
-      Base64::encode(span.traceIdAsByteString().c_str(), span.traceIdAsByteString().size()),
-      Base64::encode(span.parentIdAsByteString().c_str(), span.parentIdAsByteString().size()),
-      Base64::encode(span.idAsByteString().c_str(), span.idAsByteString().size()), span.timestamp(),
-      /* duration= */ 3000, /* localEndpoint.ipv4= */ Base64::encode("192.168.1.2", 11));
-
-  MessageUtil::loadFromYaml(expected_yaml, expected_msg,
-                            ProtobufMessage::getStrictValidationVisitor());
-  EXPECT_EQ(span.toProtoSpan().DebugString(), expected_msg.DebugString());
-
   // Test setSourceServiceName and setDestinationServiceName
 
   ann.setValue(Zipkin::ZipkinCoreConstants::get().CLIENT_RECV); // NOLINT(bugprone-use-after-move)
@@ -588,32 +488,6 @@ tags:
                 R"("endpoint":{"ipv4":"192.168.1.2","port":3306,)"
                 R"("serviceName":"my_service_name"}}]})",
             span.toJson());
-
-  expected_yaml = fmt::format(
-      R"EOF(
-traceId: {}
-parentId: {}
-id: {}
-kind: SERVER
-name: span_name
-timestamp: {}
-duration: {}
-localEndpoint:
-  serviceName: NEW_SERVICE_NAME
-  ipv4: {}
-  port: 3306
-tags:
-  "http.return_code": "400"
-  lc: my_component_name
-)EOF",
-      Base64::encode(span.traceIdAsByteString().c_str(), span.traceIdAsByteString().size()),
-      Base64::encode(span.parentIdAsByteString().c_str(), span.parentIdAsByteString().size()),
-      Base64::encode(span.idAsByteString().c_str(), span.idAsByteString().size()), span.timestamp(),
-      /* duration= */ 3000, /* localEndpoint.ipv4= */ Base64::encode("192.168.1.2", 11));
-
-  MessageUtil::loadFromYaml(expected_yaml, expected_msg,
-                            ProtobufMessage::getStrictValidationVisitor());
-  EXPECT_EQ(span.toProtoSpan().DebugString(), expected_msg.DebugString());
 }
 
 TEST(ZipkinCoreTypesSpanTest, copyConstructor) {

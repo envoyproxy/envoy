@@ -1,5 +1,8 @@
 #pragma once
 
+#include "envoy/config/trace/v2/trace.pb.h"
+
+#include "extensions/tracers/zipkin/tracer_interface.h"
 #include "extensions/tracers/zipkin/zipkin_core_types.h"
 
 #include "zipkin-jsonv2.pb.h"
@@ -20,14 +23,16 @@ public:
    * Constructor that creates an empty buffer. Space needs to be allocated by invoking
    * the method allocateBuffer(size).
    */
-  SpanBuffer() = default;
+  SpanBuffer(const envoy::config::trace::v2::ZipkinConfig::CollectorEndpointVersion& version,
+             const bool shared_span_context);
 
   /**
    * Constructor that initializes a buffer with the given size.
    *
    * @param size The desired buffer size.
    */
-  SpanBuffer(uint64_t size) { allocateBuffer(size); }
+  SpanBuffer(const envoy::config::trace::v2::ZipkinConfig::CollectorEndpointVersion& version,
+             const bool shared_span_context, uint64_t size);
 
   /**
    * Allocates space for an empty buffer or resizes a previously-allocated one.
@@ -43,7 +48,7 @@ public:
    *
    * @return true if the span was successfully added, or false if the buffer was full.
    */
-  bool addSpan(const Span& span);
+  bool addSpan(Span&& span);
 
   /**
    * Empties the buffer. This method is supposed to be called when all buffered spans
@@ -54,7 +59,7 @@ public:
   /**
    * @return the number of spans currently buffered.
    */
-  uint64_t pendingSpans() const { return span_buffer_.size(); }
+  uint64_t pendingSpans() { return span_buffer_.size(); }
 
   /**
    * @return the contents of the buffer as a stringified array of JSONs, where
@@ -63,23 +68,53 @@ public:
   std::string toStringifiedJsonArray();
 
   /**
-   * @return the contents of the buffer as a zipkin::proto3::ListOfSpans.
+   * @return std::string
    */
-  const std::string toJsonListOfSpans() const;
-
-  /**
-   * @return the contents of the buffer as a zipkin::proto3::ListOfSpans.
-   */
-  const zipkin::proto3::ListOfSpans toProtoListOfSpans() const;
-
-  /**
-   * @return the current buffered spans.
-   */
-  std::vector<Span> spans() const { return span_buffer_; }
+  std::string serialize() { return serializer_->serialize(std::move(span_buffer_)); }
 
 private:
+  SerializerPtr
+  makeSerializer(const envoy::config::trace::v2::ZipkinConfig::CollectorEndpointVersion& version,
+                 const bool shared_span_context);
+
   // We use a pre-allocated vector to improve performance
   std::vector<Span> span_buffer_;
+  SerializerPtr serializer_;
+};
+
+using SpanBufferPtr = std::unique_ptr<SpanBuffer>;
+
+class JsonV1Serializer : public Serializer {
+public:
+  JsonV1Serializer() = default;
+
+  std::string serialize(std::vector<Span>&& pending_spans) override;
+};
+
+class JsonV2Serializer : public Serializer {
+public:
+  JsonV2Serializer(const bool shared_span_context);
+
+  std::string serialize(std::vector<Span>&& pending_spans) override;
+
+private:
+  const zipkin::jsonv2::ListOfSpans toListOfSpans(const Span& zipkin_span) const;
+  const zipkin::jsonv2::Endpoint toProtoEndpoint(const Endpoint& zipkin_endpoint) const;
+
+  const bool shared_span_context_;
+};
+
+class ProtobufSerializer : public Serializer {
+public:
+  ProtobufSerializer(const bool shared_span_context);
+
+  std::string serialize(std::vector<Span>&& pending_spans) override;
+
+private:
+  const zipkin::proto3::ListOfSpans toListOfSpans(const Span& zipkin_span) const;
+  const zipkin::proto3::Endpoint toProtoEndpoint(const Endpoint& zipkin_endpoint) const;
+
+  const bool shared_span_context_;
 };
 
 } // namespace Zipkin

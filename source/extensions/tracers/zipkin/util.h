@@ -55,10 +55,20 @@ public:
    * Returns byte string representation of an number.
    *
    * @param value Number that will be represented in byte string.
+   * @return std::string byte string representation of a number.
+   */
+  template <typename Type> static std::string toByteString(Type value) {
+    return std::string(reinterpret_cast<const char*>(&value), sizeof(Type));
+  }
+
+  /**
+   * Returns byte string representation of an number.
+   *
+   * @param value Number that will be represented in byte string.
    * @param flip indicates to flip order or not.
    * @return std::string byte string representation of a number.
    */
-  template <typename Type> static std::string toByteString(Type value, bool flip = false) {
+  template <typename Type> static std::string toFlipableByteString(Type value, bool flip) {
     auto bytes = flip ? toEndianness<ByteOrder::BigEndian>(value) : value;
     return std::string(reinterpret_cast<const char*>(&bytes), sizeof(Type));
   }

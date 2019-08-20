@@ -185,11 +185,15 @@ TEST_F(ZipkinDriverTest, InitializeDriver) {
 }
 
 TEST_F(ZipkinDriverTest, FlushSeveralSpans) {
-  expectValidFlushSeveralSpans("DEFAULT", "application/json");
+  expectValidFlushSeveralSpans("NOT_SET", "application/json");
 }
 
 TEST_F(ZipkinDriverTest, FlushSeveralSpansHttpJsonV1) {
   expectValidFlushSeveralSpans("HTTP_JSON_V1", "application/json");
+}
+
+TEST_F(ZipkinDriverTest, FlushSeveralSpansHttpJson) {
+  expectValidFlushSeveralSpans("HTTP_JSON", "application/json");
 }
 
 TEST_F(ZipkinDriverTest, FlushSeveralSpansHttpProto) {
@@ -197,7 +201,7 @@ TEST_F(ZipkinDriverTest, FlushSeveralSpansHttpProto) {
 }
 
 TEST_F(ZipkinDriverTest, FlushOneSpanReportFailure) {
-  setupValidDriver("DEFAULT");
+  setupValidDriver("NOT_SET");
 
   Http::MockAsyncClientRequest request(&cm_.async_client_);
   Http::AsyncClient::Callbacks* callback;
@@ -239,7 +243,7 @@ TEST_F(ZipkinDriverTest, FlushOneSpanReportFailure) {
 }
 
 TEST_F(ZipkinDriverTest, FlushSpansTimer) {
-  setupValidDriver("DEFAULT");
+  setupValidDriver("NOT_SET");
 
   const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
   EXPECT_CALL(cm_.async_client_,
@@ -266,7 +270,7 @@ TEST_F(ZipkinDriverTest, FlushSpansTimer) {
 }
 
 TEST_F(ZipkinDriverTest, NoB3ContextSampledTrue) {
-  setupValidDriver("DEFAULT");
+  setupValidDriver("NOT_SET");
 
   EXPECT_EQ(nullptr, request_headers_.get(ZipkinCoreConstants::get().X_B3_SPAN_ID));
   EXPECT_EQ(nullptr, request_headers_.get(ZipkinCoreConstants::get().X_B3_TRACE_ID));
@@ -280,7 +284,7 @@ TEST_F(ZipkinDriverTest, NoB3ContextSampledTrue) {
 }
 
 TEST_F(ZipkinDriverTest, NoB3ContextSampledFalse) {
-  setupValidDriver("DEFAULT");
+  setupValidDriver("NOT_SET");
 
   EXPECT_EQ(nullptr, request_headers_.get(ZipkinCoreConstants::get().X_B3_SPAN_ID));
   EXPECT_EQ(nullptr, request_headers_.get(ZipkinCoreConstants::get().X_B3_TRACE_ID));
@@ -294,7 +298,7 @@ TEST_F(ZipkinDriverTest, NoB3ContextSampledFalse) {
 }
 
 TEST_F(ZipkinDriverTest, PropagateB3NoSampleDecisionSampleTrue) {
-  setupValidDriver("DEFAULT");
+  setupValidDriver("NOT_SET");
 
   request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_TRACE_ID,
                                    Hex::uint64ToHex(generateRandom64()));
@@ -310,7 +314,7 @@ TEST_F(ZipkinDriverTest, PropagateB3NoSampleDecisionSampleTrue) {
 }
 
 TEST_F(ZipkinDriverTest, PropagateB3NoSampleDecisionSampleFalse) {
-  setupValidDriver("DEFAULT");
+  setupValidDriver("NOT_SET");
 
   request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_TRACE_ID,
                                    Hex::uint64ToHex(generateRandom64()));
@@ -326,7 +330,7 @@ TEST_F(ZipkinDriverTest, PropagateB3NoSampleDecisionSampleFalse) {
 }
 
 TEST_F(ZipkinDriverTest, PropagateB3NotSampled) {
-  setupValidDriver("DEFAULT");
+  setupValidDriver("NOT_SET");
 
   EXPECT_EQ(nullptr, request_headers_.get(ZipkinCoreConstants::get().X_B3_SPAN_ID));
   EXPECT_EQ(nullptr, request_headers_.get(ZipkinCoreConstants::get().X_B3_TRACE_ID));
@@ -348,7 +352,7 @@ TEST_F(ZipkinDriverTest, PropagateB3NotSampled) {
 }
 
 TEST_F(ZipkinDriverTest, PropagateB3NotSampledWithFalse) {
-  setupValidDriver("DEFAULT");
+  setupValidDriver("NOT_SET");
 
   EXPECT_EQ(nullptr, request_headers_.get(ZipkinCoreConstants::get().X_B3_SPAN_ID));
   EXPECT_EQ(nullptr, request_headers_.get(ZipkinCoreConstants::get().X_B3_TRACE_ID));
@@ -370,7 +374,7 @@ TEST_F(ZipkinDriverTest, PropagateB3NotSampledWithFalse) {
 }
 
 TEST_F(ZipkinDriverTest, PropagateB3SampledWithTrue) {
-  setupValidDriver("DEFAULT");
+  setupValidDriver("NOT_SET");
 
   EXPECT_EQ(nullptr, request_headers_.get(ZipkinCoreConstants::get().X_B3_SPAN_ID));
   EXPECT_EQ(nullptr, request_headers_.get(ZipkinCoreConstants::get().X_B3_TRACE_ID));
@@ -392,7 +396,7 @@ TEST_F(ZipkinDriverTest, PropagateB3SampledWithTrue) {
 }
 
 TEST_F(ZipkinDriverTest, PropagateB3SampleFalse) {
-  setupValidDriver("DEFAULT");
+  setupValidDriver("NOT_SET");
 
   request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_TRACE_ID,
                                    Hex::uint64ToHex(generateRandom64()));
@@ -409,7 +413,7 @@ TEST_F(ZipkinDriverTest, PropagateB3SampleFalse) {
 }
 
 TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
-  setupValidDriver("DEFAULT");
+  setupValidDriver("NOT_SET");
 
   // ====
   // Test effective setTag()
@@ -489,7 +493,7 @@ TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
 }
 
 TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3HeadersTest) {
-  setupValidDriver("DEFAULT");
+  setupValidDriver("NOT_SET");
 
   const std::string trace_id = Hex::uint64ToHex(generateRandom64());
   const std::string span_id = Hex::uint64ToHex(generateRandom64());
@@ -513,7 +517,7 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3HeadersTest) {
 }
 
 TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3HeadersEmptyParentSpanTest) {
-  setupValidDriver("DEFAULT");
+  setupValidDriver("NOT_SET");
 
   // Root span so have same trace and span id
   const std::string id = Hex::uint64ToHex(generateRandom64());
@@ -534,7 +538,7 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3HeadersEmptyParentSpanTest) {
 }
 
 TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3Headers128TraceIdTest) {
-  setupValidDriver("DEFAULT");
+  setupValidDriver("NOT_SET");
 
   const uint64_t trace_id_high = generateRandom64();
   const uint64_t trace_id_low = generateRandom64();
@@ -562,7 +566,7 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3Headers128TraceIdTest) {
 }
 
 TEST_F(ZipkinDriverTest, ZipkinSpanContextFromInvalidTraceIdB3HeadersTest) {
-  setupValidDriver("DEFAULT");
+  setupValidDriver("NOT_SET");
 
   request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_TRACE_ID, std::string("xyz"));
   request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_SPAN_ID,
@@ -576,7 +580,7 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromInvalidTraceIdB3HeadersTest) {
 }
 
 TEST_F(ZipkinDriverTest, ZipkinSpanContextFromInvalidSpanIdB3HeadersTest) {
-  setupValidDriver("DEFAULT");
+  setupValidDriver("NOT_SET");
 
   request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_TRACE_ID,
                                    Hex::uint64ToHex(generateRandom64()));
@@ -590,7 +594,7 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromInvalidSpanIdB3HeadersTest) {
 }
 
 TEST_F(ZipkinDriverTest, ZipkinSpanContextFromInvalidParentIdB3HeadersTest) {
-  setupValidDriver("DEFAULT");
+  setupValidDriver("NOT_SET");
 
   request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_TRACE_ID,
                                    Hex::uint64ToHex(generateRandom64()));
@@ -605,7 +609,7 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromInvalidParentIdB3HeadersTest) {
 }
 
 TEST_F(ZipkinDriverTest, ExplicitlySetSampledFalse) {
-  setupValidDriver("DEFAULT");
+  setupValidDriver("NOT_SET");
 
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, true});
@@ -622,7 +626,7 @@ TEST_F(ZipkinDriverTest, ExplicitlySetSampledFalse) {
 }
 
 TEST_F(ZipkinDriverTest, ExplicitlySetSampledTrue) {
-  setupValidDriver("DEFAULT");
+  setupValidDriver("NOT_SET");
 
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, false});
@@ -639,7 +643,7 @@ TEST_F(ZipkinDriverTest, ExplicitlySetSampledTrue) {
 }
 
 TEST_F(ZipkinDriverTest, DuplicatedHeader) {
-  setupValidDriver("DEFAULT");
+  setupValidDriver("NOT_SET");
   request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_TRACE_ID,
                                    Hex::uint64ToHex(generateRandom64()));
   request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_SPAN_ID,
