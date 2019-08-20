@@ -36,7 +36,9 @@ static_resources:
         name: envoy.redis_proxy
         config:
           stat_prefix: redis_stats
-          cluster: cluster_0
+          prefix_routes:
+            catch_all_route:
+              cluster: cluster_0
           settings:
             op_timeout: 5s
   clusters:
