@@ -2752,7 +2752,8 @@ class ClusterManagerInitHelperTest : public testing::Test {
 public:
   MOCK_METHOD1(onClusterInit, void(Cluster& cluster));
 
-  ClusterManagerInitHelper init_helper_{[this](Cluster& cluster) { onClusterInit(cluster); }};
+  NiceMock<MockClusterManager> cm_;
+  ClusterManagerInitHelper init_helper_{cm_, [this](Cluster& cluster) { onClusterInit(cluster); }};
 };
 
 TEST_F(ClusterManagerInitHelperTest, ImmediateInitialize) {
