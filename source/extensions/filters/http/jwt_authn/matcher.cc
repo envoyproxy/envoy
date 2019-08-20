@@ -106,13 +106,20 @@ private:
 
 /**
  * Perform a match against any path with a regex rule.
+ * TODO(mattklein123): This code needs dedup with RegexRouteEntryImpl.
  */
 class RegexMatcherImpl : public BaseMatcherImpl {
 public:
-  // TODO(mattklein123): Update the filter matchers to use safe regex.
-  RegexMatcherImpl(const RequirementRule& rule)
-      : BaseMatcherImpl(rule), regex_(Regex::Utility::parseStdRegex(rule.match().regex())),
-        regex_str_(rule.match().regex()) {}
+  RegexMatcherImpl(const RequirementRule& rule) : BaseMatcherImpl(rule) {
+    if (rule.match().path_specifier_case() == envoy::api::v2::route::RouteMatch::kRegex) {
+      regex_ = Regex::Utility::parseStdRegexAsCompiledMatcher(rule.match().regex());
+      regex_str_ = rule.match().regex();
+    } else {
+      ASSERT(rule.match().path_specifier_case() == envoy::api::v2::route::RouteMatch::kSafeRegex);
+      regex_ = Regex::Utility::parseRegex(rule.match().safe_regex());
+      regex_str_ = rule.match().safe_regex().regex();
+    }
+  }
 
   bool matches(const Http::HeaderMap& headers) const override {
     if (BaseMatcherImpl::matchRoute(headers)) {
@@ -120,7 +127,7 @@ public:
       const absl::string_view query_string = Http::Utility::findQueryStringStart(path);
       absl::string_view path_view = path.getStringView();
       path_view.remove_suffix(query_string.length());
-      if (std::regex_match(path_view.begin(), path_view.end(), regex_)) {
+      if (regex_->match(path_view)) {
         ENVOY_LOG(debug, "Regex requirement '{}' matched.", regex_str_);
         return true;
       }
@@ -129,10 +136,9 @@ public:
   }
 
 private:
-  // regex object
-  const std::regex regex_;
+  Regex::CompiledMatcherPtr regex_;
   // raw regex string, for logging.
-  const std::string regex_str_;
+  std::string regex_str_;
 };
 
 } // namespace
@@ -144,7 +150,7 @@ MatcherConstPtr Matcher::create(const RequirementRule& rule) {
   case RouteMatch::PathSpecifierCase::kPath:
     return std::make_unique<PathMatcherImpl>(rule);
   case RouteMatch::PathSpecifierCase::kRegex:
-    // fixfix
+  case RouteMatch::PathSpecifierCase::kSafeRegex:
     return std::make_unique<RegexMatcherImpl>(rule);
   // path specifier is required.
   case RouteMatch::PathSpecifierCase::PATH_SPECIFIER_NOT_SET:
