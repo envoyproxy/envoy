@@ -3369,11 +3369,6 @@ TEST_F(ClusterManagerImplTest, ConnPoolsDrainedOnHostSetChange) {
       0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr, hosts, {},
       100);
 
-  // here actually no conn pools are being drained, as this is initial addition of hosts
-  EXPECT_EQ(
-      1, factory_.stats_.counter("cluster_manager.upstream_connections_closed_on_host_set_change")
-             .value());
-
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
@@ -3426,10 +3421,6 @@ TEST_F(ClusterManagerImplTest, ConnPoolsDrainedOnHostSetChange) {
       0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr, {},
       hosts_removed, 100);
 
-  EXPECT_EQ(
-      2, factory_.stats_.counter("cluster_manager.upstream_connections_closed_on_host_set_change")
-             .value());
-
   // Recreate connection pool for host1.
   cp1 = dynamic_cast<Http::ConnectionPool::MockInstance*>(cluster_manager_->httpConnPoolForCluster(
       "cluster_1", ResourcePriority::Default, Http::Protocol::Http11, nullptr));
@@ -3452,10 +3443,6 @@ TEST_F(ClusterManagerImplTest, ConnPoolsDrainedOnHostSetChange) {
   cluster.prioritySet().updateHosts(
       0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr,
       hosts_added, {}, 100);
-
-  EXPECT_EQ(
-      3, factory_.stats_.counter("cluster_manager.upstream_connections_closed_on_host_set_change")
-             .value());
 }
 
 TEST_F(ClusterManagerImplTest, ConnPoolsNotDrainedOnHostSetChange) {
@@ -3521,10 +3508,6 @@ TEST_F(ClusterManagerImplTest, ConnPoolsNotDrainedOnHostSetChange) {
   cluster.prioritySet().updateHosts(
       0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr,
       hosts_added, {}, 100);
-
-  EXPECT_EQ(
-      0, factory_.stats_.counter("cluster_manager.upstream_connections_closed_on_host_set_change")
-             .value());
 }
 
 } // namespace

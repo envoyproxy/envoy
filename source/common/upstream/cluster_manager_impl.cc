@@ -318,7 +318,6 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
             // This will drain all tcp and http connection pools.
             postThreadLocalDrainConnections(cluster, host_set->hosts());
           }
-          cm_stats_.upstream_connections_closed_on_host_set_change_.inc();
         } else {
           // TODO(snowp): Should this be subject to merge windows?
 
