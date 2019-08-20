@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package envoy.config.cluster.aggregate;
+
+option java_outer_classname = "AggregateClusterProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.config.cluster.aggregate";
+option go_package = "v2";
+
+import "envoy/api/v2/cds.proto";
+
+import "validate/validate.proto";
+
+// Configuration for the aggregate cluster.
+message ClusterConfig {
+  // Load balancing cluster.
+  message LbCluster {
+    api.v2.Cluster cluster = 1;
+
+    // The priority of the cluster. The field will be used for selecting cluster.
+    int32 priority = 2;
+  }
+
+  // Load balancing clusters in aggregated cluster.
+  repeated LbCluster lb_clusters = 1 [(validate.rules).repeated .min_items = 2];
+}
