@@ -1,5 +1,6 @@
 #pragma once
 
+#include "common/common/logger.h"
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/stats/stats.h"
 
