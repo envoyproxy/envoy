@@ -52,7 +52,6 @@ public:
     return max_upstream_unknown_connections_;
   }
   bool enableCommandStats() const override { return enable_command_stats_; }
-  bool latencyInMicros() const override { return latency_in_micros_; }
   ReadPolicy readPolicy() const override { return read_policy_; }
 
 private:
@@ -63,7 +62,6 @@ private:
   const std::chrono::milliseconds buffer_flush_timeout_;
   const uint32_t max_upstream_unknown_connections_;
   const bool enable_command_stats_;
-  const bool latency_in_micros_;
   ReadPolicy read_policy_;
 };
 

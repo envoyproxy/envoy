@@ -169,12 +169,6 @@ public:
   virtual bool enableCommandStats() const PURE;
 
   /**
-   * @return when enabled, upstream cluster per-command latency statistics will be recorded in
-   * microseconds.
-   */
-  virtual bool latencyInMicros() const PURE;
-
-  /**
    * @return the read policy the proxy should use.
    */
   virtual ReadPolicy readPolicy() const PURE;

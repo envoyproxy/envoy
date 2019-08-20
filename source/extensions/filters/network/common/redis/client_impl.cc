@@ -20,8 +20,7 @@ ConfigImpl::ConfigImpl(
                // as the buffer is flushed on each request immediately.
       max_upstream_unknown_connections_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_upstream_unknown_connections, 100)),
-      enable_command_stats_(config.enable_command_stats()),
-      latency_in_micros_(config.latency_in_micros()) {
+      enable_command_stats_(config.enable_command_stats()) {
   switch (config.read_policy()) {
   case envoy::config::filter::network::redis_proxy::v2::
       RedisProxy_ConnPoolSettings_ReadPolicy_MASTER:
@@ -51,9 +50,8 @@ ConfigImpl::ConfigImpl(
 ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                              EncoderPtr&& encoder, DecoderFactory& decoder_factory,
                              const Config& config) {
-  auto redis_command_stats =
-      std::make_shared<RedisCommandStats>(host->cluster().statsScope(), "upstream_commands",
-                                          config.enableCommandStats(), config.latencyInMicros());
+  auto redis_command_stats = std::make_shared<RedisCommandStats>(
+      host->cluster().statsScope(), "upstream_commands", config.enableCommandStats());
   std::unique_ptr<ClientImpl> client(new ClientImpl(host, dispatcher, std::move(encoder),
                                                     decoder_factory, config,
                                                     std::move(redis_command_stats)));
@@ -248,10 +246,10 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
 ClientImpl::PendingRequest::PendingRequest(ClientImpl& parent, PoolCallbacks& callbacks,
                                            std::string command)
     : parent_(parent), callbacks_(callbacks), command_{command},
-      aggregate_request_timer_(parent_.redis_command_stats_->createTimer(
-          parent_.redis_command_stats_->upstream_rq_time_, parent_.time_source_)),
+      aggregate_request_timer_(
+          parent_.redis_command_stats_->createAggregateTimer(parent_.time_source_)),
       command_request_timer_(
-          parent_.redis_command_stats_->createTimer(command_, parent_.time_source_)) {
+          parent_.redis_command_stats_->createCommandTimer(command_, parent_.time_source_)) {
   parent.host_->cluster().stats().upstream_rq_total_.inc();
   parent.host_->stats().rq_total_.inc();
   parent.host_->cluster().stats().upstream_rq_active_.inc();

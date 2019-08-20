@@ -18,15 +18,14 @@ namespace Redis {
 
 class RedisCommandStats {
 public:
-  RedisCommandStats(Stats::Scope& scope, const std::string& prefix, bool enabled,
-                    bool latency_in_micros);
+  RedisCommandStats(Stats::Scope& scope, const std::string& prefix, bool enabled);
 
   Stats::Counter& counter(std::string name);
   Stats::Histogram& histogram(std::string name);
   Stats::Histogram& histogram(Stats::StatName stat_name);
-  Stats::CompletableTimespanPtr createTimer(std::string name, Envoy::TimeSource& time_source);
-  Stats::CompletableTimespanPtr createTimer(Stats::StatName stat_name,
-                                            Envoy::TimeSource& time_source);
+  Stats::CompletableTimespanPtr createCommandTimer(std::string name,
+                                                   Envoy::TimeSource& time_source);
+  Stats::CompletableTimespanPtr createAggregateTimer(Envoy::TimeSource& time_source);
   std::string getCommandFromRequest(const RespValue& request);
   void updateStatsTotal(std::string command);
   void updateStats(const bool success, std::string command);
@@ -39,8 +38,8 @@ private:
   Stats::Scope& scope_;
   Stats::StatNameSet stat_name_set_;
   const Stats::StatName prefix_;
-  bool latency_in_micros_;
   bool enabled_;
+  const std::string latency_suffix_ = ".latency";
 
 public:
   const Stats::StatName upstream_rq_time_;

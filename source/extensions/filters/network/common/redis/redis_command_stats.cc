@@ -8,11 +8,9 @@ namespace NetworkFilters {
 namespace Common {
 namespace Redis {
 
-RedisCommandStats::RedisCommandStats(Stats::Scope& scope, const std::string& prefix, bool enabled,
-                                     bool latency_in_micros)
+RedisCommandStats::RedisCommandStats(Stats::Scope& scope, const std::string& prefix, bool enabled)
     : scope_(scope), stat_name_set_(scope.symbolTable()), prefix_(stat_name_set_.add(prefix)),
-      latency_in_micros_(latency_in_micros), enabled_(enabled),
-      upstream_rq_time_(stat_name_set_.add("upstream_rq_time")) {
+      enabled_(enabled), upstream_rq_time_(stat_name_set_.add("upstream_rq_time")) {
   // Note: Even if this is disabled, we track the upstream_rq_time.
   if (enabled_) {
     // Create StatName for each Redis command. Note that we don't include Auth or Ping.
@@ -64,21 +62,17 @@ Stats::Histogram& RedisCommandStats::histogram(Stats::StatName stat_name) {
   return scope_.histogramFromStatName(Stats::StatName(stat_name_storage.get()));
 }
 
-Stats::CompletableTimespanPtr RedisCommandStats::createTimer(std::string name,
-                                                             Envoy::TimeSource& time_source) {
-  Stats::StatName stat_name = stat_name_set_.getStatName(name);
-  return createTimer(stat_name, time_source);
+Stats::CompletableTimespanPtr
+RedisCommandStats::createCommandTimer(std::string name, Envoy::TimeSource& time_source) {
+  Stats::StatName stat_name = stat_name_set_.getStatName(name + latency_suffix_);
+  return std::make_unique<Stats::TimespanWithUnit<std::chrono::microseconds>>(histogram(stat_name),
+                                                                              time_source);
 }
 
-Stats::CompletableTimespanPtr RedisCommandStats::createTimer(Stats::StatName stat_name,
-                                                             Envoy::TimeSource& time_source) {
-  if (latency_in_micros_) {
-    return std::make_unique<Stats::TimespanWithUnit<std::chrono::microseconds>>(
-        histogram(stat_name), time_source);
-  } else {
-    return std::make_unique<Stats::TimespanWithUnit<std::chrono::milliseconds>>(
-        histogram(stat_name), time_source);
-  }
+Stats::CompletableTimespanPtr
+RedisCommandStats::createAggregateTimer(Envoy::TimeSource& time_source) {
+  return std::make_unique<Stats::TimespanWithUnit<std::chrono::microseconds>>(
+      histogram(upstream_rq_time_), time_source);
 }
 
 std::string RedisCommandStats::getCommandFromRequest(const RespValue& request) {

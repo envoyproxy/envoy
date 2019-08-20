@@ -95,10 +95,6 @@ message RedisProxy {
     // count.
     bool enable_command_stats = 8;
 
-    // Indicates that latency stat should be computed in microseconds. By default it is computed in
-    // milliseconds.
-    bool latency_in_micros = 9;
-
     // ReadPolicy controls how Envoy routes read commands to Redis nodes. This is currently
     // supported for Redis Cluster. All ReadPolicy settings except MASTER may return stale data
     // because replication is asynchronous and requires some delay. You need to ensure that your
@@ -128,11 +124,7 @@ message RedisProxy {
 
   // Indicates that latency stat should be computed in microseconds. By default it is computed in
   // milliseconds.
-  //
-  //   This field is deprecated. Use a :ref:`latency_in_micros
-  //   route<envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.ConnPoolSettings.latency_in_micros>`
-  //   instead.
-  bool latency_in_micros = 4 [deprecated = true];
+  bool latency_in_micros = 4;
 
   message PrefixRoutes {
     message Route {

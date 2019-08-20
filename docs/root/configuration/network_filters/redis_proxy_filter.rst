@@ -47,9 +47,7 @@ The Redis filter will gather statistics for the command splitter in the
 Per command statistics
 ----------------------
 
-The Redis filter will gather statistics for commands in the
-*redis.<stat_prefix>.command.<command>.* namespace. By default latency stats are in milliseconds and can be
-changed to microseconds by setting the configuration parameter :ref:`latency_in_micros <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.latency_in_micros>` to true.
+The Redis filter will gather statistics for commands in the *redis.<stat_prefix>.upstream_commands.<command>.* namespace.
 
 .. csv-table::
   :header: Name, Type, Description
