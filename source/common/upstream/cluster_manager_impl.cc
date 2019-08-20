@@ -183,7 +183,7 @@ ClusterManagerImpl::ClusterManagerImpl(
     Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
     Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
     AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
-    Server::Admin& admin, ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
+    Server::Admin& admin, ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
     Http::Context& http_context)
     : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls.allocateSlot()),
       random_(random), bind_config_(bootstrap.cluster_manager().upstream_bind_config()),
@@ -192,8 +192,9 @@ ClusterManagerImpl::ClusterManagerImpl(
       config_tracker_entry_(
           admin.getConfigTracker().add("clusters", [this] { return dumpClusterConfigs(); })),
       time_source_(main_thread_dispatcher.timeSource()), dispatcher_(main_thread_dispatcher),
-      http_context_(http_context), subscription_factory_(local_info, main_thread_dispatcher, *this,
-                                                         random, validation_visitor, api) {
+      http_context_(http_context),
+      subscription_factory_(local_info, main_thread_dispatcher, *this, random,
+                            validation_context.dynamicValidationVisitor(), api) {
   async_client_manager_ =
       std::make_unique<Grpc::AsyncClientManagerImpl>(*this, tls, time_source_, api);
   const auto& cm_config = bootstrap.cluster_manager();
@@ -1231,7 +1232,7 @@ ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
     const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
   return ClusterManagerPtr{new ClusterManagerImpl(
       bootstrap, *this, stats_, tls_, runtime_, random_, local_info_, log_manager_,
-      main_thread_dispatcher_, admin_, validation_visitor_, api_, http_context_)};
+      main_thread_dispatcher_, admin_, validation_context_, api_, http_context_)};
 }
 
 Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
@@ -1261,13 +1262,16 @@ std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ProdClusterManagerFactor
   return ClusterFactoryImplBase::create(
       cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_, random_,
       main_thread_dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
-      outlier_event_logger, added_via_api, validation_visitor_, api_);
+      outlier_event_logger, added_via_api,
+      added_via_api ? validation_context_.dynamicValidationVisitor()
+                    : validation_context_.staticValidationVisitor(),
+      api_);
 }
 
 CdsApiPtr ProdClusterManagerFactory::createCds(const envoy::api::v2::core::ConfigSource& cds_config,
                                                ClusterManager& cm) {
   // TODO(htuch): Differentiate static vs. dynamic validation visitors.
-  return CdsApiImpl::create(cds_config, cm, stats_, validation_visitor_);
+  return CdsApiImpl::create(cds_config, cm, stats_, validation_context_.dynamicValidationVisitor());
 }
 
 } // namespace Upstream

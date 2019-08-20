@@ -1247,7 +1247,7 @@ TEST_P(ConnectionImplTest, DelayedCloseTimerResetWithPendingWriteBufferFlushes) 
   (*mocks.file_ready_cb_)(Event::FileReadyType::Write);
 
   // Force the delayed close timeout to trigger so the connection is cleaned up.
-  mocks.timer_->callback_();
+  mocks.timer_->invokeCallback();
 }
 
 // Test that tearing down the connection will disable the delayed close timer.
@@ -1321,16 +1321,9 @@ TEST_P(ConnectionImplTest, DelayedCloseTimeoutNullStats) {
   EXPECT_CALL(*mocks.timer_, enableTimer(_)).Times(1);
   server_connection->close(ConnectionCloseType::FlushWriteAndDelay);
   EXPECT_CALL(*mocks.timer_, disableTimer()).Times(1);
-  // Copy the callback since mocks.timer will be freed when closeSocket() is called.
-  Event::TimerCb callback = mocks.timer_->callback_;
   // The following close() will call closeSocket() and reset internal data structures such as
   // stats.
   server_connection->close(ConnectionCloseType::NoFlush);
-  // Verify the onDelayedCloseTimeout() callback is resilient to the post closeSocket(), pre
-  // destruction state. This should not actually happen due to the timeout disablement in
-  // closeSocket(), but there is enough complexity in connection handling codepaths that being
-  // extra defensive is valuable.
-  callback();
 }
 
 class FakeReadFilter : public Network::ReadFilter {

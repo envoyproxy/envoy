@@ -354,7 +354,7 @@ void BaseIntegrationTest::createEnvoy() {
   for (int i = 0; i < static_resources.listeners_size(); ++i) {
     named_ports.push_back(static_resources.listeners(i).name());
   }
-  createGeneratedApiTestServer(bootstrap_path, named_ports);
+  createGeneratedApiTestServer(bootstrap_path, named_ports, false, true, false);
 }
 
 void BaseIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol) {
@@ -416,10 +416,14 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
 }
 
 void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootstrap_path,
-                                                       const std::vector<std::string>& port_names) {
-  test_server_ = IntegrationTestServer::create(bootstrap_path, version_, on_server_init_function_,
-                                               deterministic_, timeSystem(), *api_,
-                                               defer_listener_finalization_, process_object_);
+                                                       const std::vector<std::string>& port_names,
+                                                       bool allow_unknown_static_fields,
+                                                       bool reject_unknown_dynamic_fields,
+                                                       bool allow_lds_rejection) {
+  test_server_ = IntegrationTestServer::create(
+      bootstrap_path, version_, on_server_init_function_, deterministic_, timeSystem(), *api_,
+      defer_listener_finalization_, process_object_, allow_unknown_static_fields,
+      reject_unknown_dynamic_fields);
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0 &&
       !defer_listener_finalization_) {
 
@@ -427,15 +431,19 @@ void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootst
     // needs to know about the bound listener ports.
     auto end_time = time_system_.monotonicTime() + TestUtility::DefaultTimeout;
     const char* success = "listener_manager.listener_create_success";
-    const char* failure = "listener_manager.lds.update_rejected";
-    while (test_server_->counter(success) == nullptr ||
-           test_server_->counter(success)->value() == 0) {
+    const char* rejected = "listener_manager.lds.update_rejected";
+    while ((test_server_->counter(success) == nullptr ||
+            test_server_->counter(success)->value() == 0) &&
+           (!allow_lds_rejection || test_server_->counter(rejected) == nullptr ||
+            test_server_->counter(rejected)->value() == 0)) {
       if (time_system_.monotonicTime() >= end_time) {
         RELEASE_ASSERT(0, "Timed out waiting for listeners.");
       }
-      RELEASE_ASSERT(test_server_->counter(failure) == nullptr ||
-                         test_server_->counter(failure)->value() == 0,
-                     "Lds update failed");
+      if (!allow_lds_rejection) {
+        RELEASE_ASSERT(test_server_->counter(rejected) == nullptr ||
+                           test_server_->counter(rejected)->value() == 0,
+                       "Lds update failed");
+      }
       time_system_.sleep(std::chrono::milliseconds(10));
     }
 
@@ -444,7 +452,10 @@ void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootst
 }
 
 void BaseIntegrationTest::createApiTestServer(const ApiFilesystemConfig& api_filesystem_config,
-                                              const std::vector<std::string>& port_names) {
+                                              const std::vector<std::string>& port_names,
+                                              bool allow_unknown_static_fields,
+                                              bool reject_unknown_dynamic_fields,
+                                              bool allow_lds_rejection) {
   const std::string eds_path = TestEnvironment::temporaryFileSubstitute(
       api_filesystem_config.eds_path_, port_map_, version_);
   const std::string cds_path = TestEnvironment::temporaryFileSubstitute(
@@ -453,11 +464,11 @@ void BaseIntegrationTest::createApiTestServer(const ApiFilesystemConfig& api_fil
       api_filesystem_config.rds_path_, port_map_, version_);
   const std::string lds_path = TestEnvironment::temporaryFileSubstitute(
       api_filesystem_config.lds_path_, {{"rds_json_path", rds_path}}, port_map_, version_);
-  createGeneratedApiTestServer(TestEnvironment::temporaryFileSubstitute(
-                                   api_filesystem_config.bootstrap_path_,
-                                   {{"cds_json_path", cds_path}, {"lds_json_path", lds_path}},
-                                   port_map_, version_),
-                               port_names);
+  createGeneratedApiTestServer(
+      TestEnvironment::temporaryFileSubstitute(
+          api_filesystem_config.bootstrap_path_,
+          {{"cds_json_path", cds_path}, {"lds_json_path", lds_path}}, port_map_, version_),
+      port_names, allow_unknown_static_fields, reject_unknown_dynamic_fields, allow_lds_rejection);
 }
 
 void BaseIntegrationTest::createTestServer(const std::string& json_path,

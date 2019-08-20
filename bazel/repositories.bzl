@@ -153,6 +153,8 @@ def envoy_dependencies(skip_targets = []):
     _com_lightstep_tracer_cpp()
     _io_opentracing_cpp()
     _net_zlib()
+    _repository_impl("com_googlesource_code_re2")
+    _com_google_cel_cpp()
     _repository_impl("bazel_toolchains")
 
     _python_deps()
@@ -314,6 +316,9 @@ def _net_zlib():
         name = "zlib",
         actual = "@envoy//bazel/foreign_cc:zlib",
     )
+
+def _com_google_cel_cpp():
+    _repository_impl("com_google_cel_cpp")
 
 def _com_github_nghttp2_nghttp2():
     location = REPOSITORY_LOCATIONS["com_github_nghttp2_nghttp2"]

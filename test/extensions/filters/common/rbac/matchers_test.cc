@@ -25,7 +25,9 @@ void checkMatcher(
     const Envoy::Network::Connection& connection = Envoy::Network::MockConnection(),
     const Envoy::Http::HeaderMap& headers = Envoy::Http::HeaderMapImpl(),
     const envoy::api::v2::core::Metadata& metadata = envoy::api::v2::core::Metadata()) {
-  EXPECT_EQ(expected, matcher.matches(connection, headers, metadata));
+  NiceMock<StreamInfo::MockStreamInfo> info;
+  EXPECT_CALL(Const(info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+  EXPECT_EQ(expected, matcher.matches(connection, headers, info));
 }
 
 TEST(AlwaysMatcher, AlwaysMatches) { checkMatcher(RBAC::AlwaysMatcher(), true); }
@@ -293,7 +295,7 @@ TEST(PolicyMatcher, PolicyMatcher) {
   policy.add_principals()->mutable_authenticated()->mutable_principal_name()->set_exact("foo");
   policy.add_principals()->mutable_authenticated()->mutable_principal_name()->set_exact("bar");
 
-  RBAC::PolicyMatcher matcher(policy);
+  RBAC::PolicyMatcher matcher(policy, nullptr);
 
   Envoy::Network::MockConnection conn;
   Envoy::Ssl::MockConnectionInfo ssl;

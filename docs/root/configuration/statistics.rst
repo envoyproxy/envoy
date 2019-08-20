@@ -3,6 +3,8 @@
 Statistics
 ==========
 
+.. _server_statistics:
+
 Server
 ------
 
@@ -25,6 +27,8 @@ Server related statistics are rooted at *server.* with following statistics:
   hot_restart_epoch, Gauge, Current hot restart epoch
   initialization_time_ms, Histogram, Total time taken for Envoy initialization in milliseconds. This is the time from server start-up until the worker threads are ready to accept new connections
   debug_assertion_failures, Counter, Number of debug assertion failures detected in a release build if compiled with `--define log_debug_assert_in_release=enabled` or zero otherwise
+  static_unknown_fields, Counter, Number of messages in static configuration with unknown fields
+  dynamic_unknown_fields, Counter, Number of messages in dynamic configuration with unknown fields
 
 File system
 -----------
