@@ -86,8 +86,10 @@ envoy_cc_library(
     srcs = ["redis_command_stats.cc"],
     hdrs = ["redis_command_stats.h"],
     deps = [
+        ":codec_interface",
         ":supported_commands_lib",
         "//include/envoy/stats:stats_interface",
+        "//include/envoy/stats:timespan",
         "//source/common/stats:symbol_table_lib",
     ],
 )

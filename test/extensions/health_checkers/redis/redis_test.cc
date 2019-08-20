@@ -169,6 +169,8 @@ public:
     EXPECT_EQ(session->bufferFlushTimeoutInMs(), std::chrono::milliseconds(1));
     EXPECT_EQ(session->maxUpstreamUnknownConnections(), 0);
     EXPECT_FALSE(session->enableCommandStats());
+    EXPECT_FALSE(session->latencyInMicros());
+
     session->onDeferredDeleteBase(); // This must be called to pass assertions in the destructor.
   }
 

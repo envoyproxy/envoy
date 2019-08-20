@@ -8,29 +8,36 @@ namespace NetworkFilters {
 namespace Common {
 namespace Redis {
 
-RedisCommandStats::RedisCommandStats(Stats::Scope& scope, const std::string& prefix,
-                                     bool enableCommandCounts)
+RedisCommandStats::RedisCommandStats(Stats::Scope& scope, const std::string& prefix, bool enabled,
+                                     bool latency_in_micros)
     : scope_(scope), stat_name_set_(scope.symbolTable()), prefix_(stat_name_set_.add(prefix)),
+      latency_in_micros_(latency_in_micros), enabled_(enabled),
       upstream_rq_time_(stat_name_set_.add("upstream_rq_time")) {
-
   // Note: Even if this is disabled, we track the upstream_rq_time.
-  if (enableCommandCounts) {
+  if (enabled_) {
     // Create StatName for each Redis command. Note that we don't include Auth or Ping.
     for (const std::string& command :
          Extensions::NetworkFilters::Common::Redis::SupportedCommands::simpleCommands()) {
-      stat_name_set_.add(command);
+      createStats(command);
     }
     for (const std::string& command :
          Extensions::NetworkFilters::Common::Redis::SupportedCommands::evalCommands()) {
-      stat_name_set_.add(command);
+      createStats(command);
     }
     for (const std::string& command : Extensions::NetworkFilters::Common::Redis::SupportedCommands::
              hashMultipleSumResultCommands()) {
-      stat_name_set_.add(command);
+      createStats(command);
     }
-    stat_name_set_.add(Extensions::NetworkFilters::Common::Redis::SupportedCommands::mget());
-    stat_name_set_.add(Extensions::NetworkFilters::Common::Redis::SupportedCommands::mset());
+    createStats(Extensions::NetworkFilters::Common::Redis::SupportedCommands::mget());
+    createStats(Extensions::NetworkFilters::Common::Redis::SupportedCommands::mset());
   }
+}
+
+void RedisCommandStats::createStats(std::string name) {
+  stat_name_set_.add(name + ".total");
+  stat_name_set_.add(name + ".success");
+  stat_name_set_.add(name + ".error");
+  stat_name_set_.add(name + ".latency");
 }
 
 Stats::SymbolTable::StoragePtr RedisCommandStats::addPrefix(const Stats::StatName name) {
@@ -42,14 +49,60 @@ Stats::SymbolTable::StoragePtr RedisCommandStats::addPrefix(const Stats::StatNam
 }
 
 Stats::Counter& RedisCommandStats::counter(std::string name) {
-  Stats::StatName statName = stat_name_set_.getStatName(name);
-  const Stats::SymbolTable::StoragePtr stat_name_storage = addPrefix(statName);
+  Stats::StatName stat_name = stat_name_set_.getStatName(name);
+  const Stats::SymbolTable::StoragePtr stat_name_storage = addPrefix(stat_name);
   return scope_.counterFromStatName(Stats::StatName(stat_name_storage.get()));
 }
 
-Stats::Histogram& RedisCommandStats::histogram(Stats::StatName statName) {
-  const Stats::SymbolTable::StoragePtr stat_name_storage = addPrefix(statName);
+Stats::Histogram& RedisCommandStats::histogram(std::string name) {
+  Stats::StatName stat_name = stat_name_set_.getStatName(name);
+  return histogram(stat_name);
+}
+
+Stats::Histogram& RedisCommandStats::histogram(Stats::StatName stat_name) {
+  const Stats::SymbolTable::StoragePtr stat_name_storage = addPrefix(stat_name);
   return scope_.histogramFromStatName(Stats::StatName(stat_name_storage.get()));
+}
+
+Stats::CompletableTimespanPtr RedisCommandStats::createTimer(std::string name,
+                                                             Envoy::TimeSource& time_source) {
+  Stats::StatName stat_name = stat_name_set_.getStatName(name);
+  return createTimer(stat_name, time_source);
+}
+
+Stats::CompletableTimespanPtr RedisCommandStats::createTimer(Stats::StatName stat_name,
+                                                             Envoy::TimeSource& time_source) {
+  if (latency_in_micros_) {
+    return std::make_unique<Stats::TimespanWithUnit<std::chrono::microseconds>>(
+        histogram(stat_name), time_source);
+  } else {
+    return std::make_unique<Stats::TimespanWithUnit<std::chrono::milliseconds>>(
+        histogram(stat_name), time_source);
+  }
+}
+
+std::string RedisCommandStats::getCommandFromRequest(const RespValue& request) {
+  // Get command from RespValue
+  switch (request.type()) {
+  case RespType::Array:
+    return getCommandFromRequest(request.asArray().front());
+  case RespType::Integer:
+    return std::to_string(request.asInteger());
+  case RespType::Null:
+    return "null";
+  default:
+    return request.asString();
+  }
+}
+
+void RedisCommandStats::updateStatsTotal(std::string command) { counter(command + ".total").inc(); }
+
+void RedisCommandStats::updateStats(const bool success, std::string command) {
+  if (success) {
+    counter(command + ".success").inc();
+  } else {
+    counter(command + ".error").inc();
+  }
 }
 
 } // namespace Redis

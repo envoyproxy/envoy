@@ -52,6 +52,7 @@ public:
     return max_upstream_unknown_connections_;
   }
   bool enableCommandStats() const override { return enable_command_stats_; }
+  bool latencyInMicros() const override { return latency_in_micros_; }
 
 private:
   const std::chrono::milliseconds op_timeout_;
@@ -61,6 +62,7 @@ private:
   const std::chrono::milliseconds buffer_flush_timeout_;
   const uint32_t max_upstream_unknown_connections_;
   const bool enable_command_stats_;
+  const bool latency_in_micros_;
 };
 
 class ClientImpl : public Client, public DecoderCallbacks, public Network::ConnectionCallbacks {
@@ -96,7 +98,7 @@ private:
   };
 
   struct PendingRequest : public PoolRequest {
-    PendingRequest(ClientImpl& parent, PoolCallbacks& callbacks);
+    PendingRequest(ClientImpl& parent, PoolCallbacks& callbacks, std::string command);
     ~PendingRequest() override;
 
     // PoolRequest
@@ -104,8 +106,10 @@ private:
 
     ClientImpl& parent_;
     PoolCallbacks& callbacks_;
+    std::string command_;
     bool canceled_{};
-    Stats::TimespanPtr request_timer_;
+    Stats::CompletableTimespanPtr aggregate_request_timer_;
+    Stats::CompletableTimespanPtr command_request_timer_;
   };
 
   ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,

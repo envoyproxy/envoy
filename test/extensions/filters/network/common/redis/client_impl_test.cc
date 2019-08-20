@@ -159,6 +159,7 @@ class ConfigBufferSizeGTSingleRequest : public Config {
   }
   uint32_t maxUpstreamUnknownConnections() const override { return 0; }
   bool enableCommandStats() const override { return false; }
+  bool latencyInMicros() const override { return false; }
 };
 
 TEST_F(RedisClientImplTest, BatchWithTimerFiring) {
@@ -472,6 +473,7 @@ class ConfigOutlierDisabled : public Config {
   }
   uint32_t maxUpstreamUnknownConnections() const override { return 0; }
   bool enableCommandStats() const override { return false; }
+  bool latencyInMicros() const override { return false; }
 };
 
 TEST_F(RedisClientImplTest, OutlierDisabled) {

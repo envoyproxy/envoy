@@ -94,6 +94,10 @@ message RedisProxy {
     // Enable per-command statistics per upstream cluster, in addition to the filter level aggregate
     // count.
     bool enable_command_stats = 7;
+
+    // Indicates that latency stat should be computed in microseconds. By default it is computed in
+    // milliseconds.
+    bool latency_in_micros = 8;
   }
 
   // Network settings for the connection pool to the upstream clusters.
@@ -101,7 +105,11 @@ message RedisProxy {
 
   // Indicates that latency stat should be computed in microseconds. By default it is computed in
   // milliseconds.
-  bool latency_in_micros = 4;
+  //
+  //   This field is deprecated. Use a :ref:`latency_in_micros
+  //   route<envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.ConnPoolSettings.latency_in_micros>`
+  //   instead.
+  bool latency_in_micros = 4 [deprecated = true];
 
   message PrefixRoutes {
     message Route {

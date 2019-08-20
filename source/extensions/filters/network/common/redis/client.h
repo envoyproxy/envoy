@@ -162,6 +162,12 @@ public:
    * @return when enabled, upstream cluster per-command statistics will be recorded.
    */
   virtual bool enableCommandStats() const PURE;
+
+  /**
+   * @return when enabled, upstream cluster per-command latency statistics will be recorded in
+   * microseconds.
+   */
+  virtual bool latencyInMicros() const PURE;
 };
 
 /**
