@@ -67,7 +67,7 @@ final class ViewController: UITableViewController {
                                                 message: "failed within Envoy library")))
       }
 
-    envoy.sendUnary(request, handler: handler)
+    envoy.send(request, data: nil, handler: handler)
   }
 
   private func add(result: Result<Response, RequestError>) {

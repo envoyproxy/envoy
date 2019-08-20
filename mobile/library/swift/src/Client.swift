@@ -9,23 +9,28 @@ public protocol Client {
   /// - parameter handler: Handler for receiving stream events.
   ///
   /// - returns: Emitter for sending streaming data outward.
-  func startStream(with request: Request, handler: ResponseHandler) -> StreamEmitter
-
-  /// Convenience function for sending a unary request.
-  ///
-  /// - parameter request:  The request to send.
-  /// - parameter body:     Serialized data to send as the body of the request.
-  /// - parameter trailers: Trailers to send with the request.
-  func sendUnary(_ request: Request, body: Data?,
-                 trailers: [String: [String]], handler: ResponseHandler)
+  func send(_ request: Request, handler: ResponseHandler) -> StreamEmitter
 }
 
 extension Client {
-  /// Convenience function for sending a unary request without trailers.
+  /// Convenience function for sending a complete (non-streamed) request.
   ///
   /// - parameter request:  The request to send.
-  /// - parameter body:     Serialized data to send as the body of the request.
-  public func sendUnary(_ request: Request, body: Data?, handler: ResponseHandler) {
-    self.sendUnary(request, body: body, trailers: [:], handler: handler)
+  /// - parameter data:     Serialized data to send as the body of the request.
+  /// - parameter trailers: Trailers to send with the request.
+  ///
+  /// - returns: A cancelable request.
+  @discardableResult
+  public func send(_ request: Request, data: Data?,
+                   trailers: [String: [String]] = [:], handler: ResponseHandler)
+    -> CancelableStream
+  {
+    let emitter = self.send(request, handler: handler)
+    if let data = data {
+      emitter.sendData(data)
+    }
+
+    emitter.close(trailers: trailers)
+    return emitter
   }
 }
