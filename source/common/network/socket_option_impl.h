@@ -103,7 +103,7 @@ public:
 
   SocketOptionImpl(envoy::api::v2::core::SocketOption::SocketState in_state,
                    Network::SocketOptionName optname, absl::string_view value)
-      : in_state_(in_state), optname_(optname), value_(value) {}
+      : in_state_(in_state), optname_(optname), value_(value.begin(), value.end()) {}
 
   // Socket::Option
   bool setOption(Socket& socket,
@@ -128,12 +128,12 @@ public:
    */
   static Api::SysCallIntResult setSocketOption(Socket& socket,
                                                const Network::SocketOptionName& optname,
-                                               absl::string_view value);
+                                               const std::vector<uint8_t>& value);
 
 private:
   const envoy::api::v2::core::SocketOption::SocketState in_state_;
   const Network::SocketOptionName optname_;
-  const std::string value_;
+  const std::vector<uint8_t> value_;
 };
 
 } // namespace Network

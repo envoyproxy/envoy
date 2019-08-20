@@ -7,7 +7,7 @@ namespace {
 class SocketOptionImplTest : public SocketOptionTest {};
 
 TEST_F(SocketOptionImplTest, BadFd) {
-  absl::string_view zero("\0\0\0\0", 4);
+  std::vector<uint8_t> zero{'\0', '\0', '\0', '\0'};
   Api::SysCallIntResult result = SocketOptionImpl::setSocketOption(socket_, {}, zero);
   EXPECT_EQ(-1, result.rc_);
   EXPECT_EQ(ENOTSUP, result.errno_);

@@ -156,7 +156,8 @@ TEST_F(OriginalSrcTest, filterAddsMarkOption) {
   ASSERT_TRUE(mark_option.has_value());
   uint32_t value = 1234;
   absl::string_view value_as_bstr(reinterpret_cast<const char*>(&value), sizeof(value));
-  EXPECT_EQ(value_as_bstr, mark_option->value_);
+  std::vector<uint8_t> value_as_vector(value_as_bstr.begin(), value_as_bstr.end());
+  EXPECT_EQ(value_as_vector, mark_option->value_);
 }
 
 TEST_F(OriginalSrcTest, Mark0NotAdded) {

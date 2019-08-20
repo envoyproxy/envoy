@@ -73,7 +73,7 @@ public:
 
     Socket::Option::Details expected_info;
     expected_info.name_ = name;
-    expected_info.value_ = std::string(value_as_bstr);
+    expected_info.value_ = std::vector<uint8_t>(value_as_bstr.begin(), value_as_bstr.end());
 
     return expected_info;
   }

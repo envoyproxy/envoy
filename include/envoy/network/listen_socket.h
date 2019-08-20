@@ -111,7 +111,7 @@ public:
      */
     struct Details {
       SocketOptionName name_;
-      std::string value_; ///< Binary string representation of an option's value.
+      std::vector<uint8_t> value_; ///< Binary string representation of an option's value.
 
       bool operator==(const Details& other) const {
         return name_ == other.name_ && value_ == other.value_;

@@ -47,14 +47,14 @@ bool SocketOptionImpl::isSupported() const { return optname_.has_value(); }
 
 Api::SysCallIntResult SocketOptionImpl::setSocketOption(Socket& socket,
                                                         const Network::SocketOptionName& optname,
-                                                        const absl::string_view value) {
+                                                        const std::vector<uint8_t>& value) {
   if (!optname.has_value()) {
     return {-1, ENOTSUP};
   }
 
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
   return os_syscalls.setsockopt(socket.ioHandle().fd(), optname.level(), optname.option(),
-                                value.data(), value.size());
+                                static_cast<const void*>(value.data()), value.size());
 }
 
 } // namespace Network
