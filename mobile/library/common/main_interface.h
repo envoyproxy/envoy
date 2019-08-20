@@ -91,8 +91,6 @@ envoy_engine_t init_engine();
  */
 envoy_status_t run_engine(const char* config, const char* log_level);
 
-void setup_envoy();
-
 #ifdef __cplusplus
 } // functions
 #endif
