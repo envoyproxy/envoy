@@ -10,6 +10,7 @@
 #include "envoy/grpc/status.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
+#include "envoy/network/connection_handler.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/configuration.h"
 #include "envoy/server/listener_manager.h"
@@ -26,8 +27,6 @@
 #include "common/network/filter_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/stats/isolated_store_impl.h"
-
-#include "server/connection_handler_impl.h"
 
 #include "test/test_common/printers.h"
 #include "test/test_common/test_time_system.h"

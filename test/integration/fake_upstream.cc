@@ -18,6 +18,8 @@
 #include "common/network/raw_buffer_socket.h"
 #include "common/network/utility.h"
 
+#include "server/connection_handler_impl.h"
+
 #include "extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/integration/utility.h"
