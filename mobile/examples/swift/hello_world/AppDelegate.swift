@@ -1,10 +1,7 @@
-import Envoy
 import UIKit
 
 @UIApplicationMain
 final class AppDelegate: UIResponder, UIApplicationDelegate {
-  private let envoy = try! EnvoyBuilder().build()
-
   var window: UIWindow?
 
   func application(
@@ -15,8 +12,8 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
     window.rootViewController = ViewController()
     window.makeKeyAndVisible()
     self.window = window
-    NSLog("Finished launching!")
 
+    NSLog("Finished launching!")
     return true
   }
 }
