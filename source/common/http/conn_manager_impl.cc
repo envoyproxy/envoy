@@ -629,7 +629,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
       Server::OverloadActionState::Active) {
     // In this one special case, do not create the filter chain. If there is a risk of memory
     // overload it is more important to avoid unnecessary allocation than to create the filters.
-    state_.created_filter_chain_ = true;
+    state_.overloaded_do_not_create_filter_chain_ = true;
     connection_manager_.stats_.named_.downstream_rq_overload_close_.inc();
     sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_),
                    Http::Code::ServiceUnavailable, "envoy overloaded", nullptr, is_head_request_,
@@ -758,13 +758,15 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
         cached_route_.value().get());
   }
 
-  const bool upgrade_rejected = createFilterChain() == false;
+  const auto create_result = createFilterChain();
 
   // TODO if there are no filters when starting a filter iteration, the connection manager
   // should return 404. The current returns no response if there is no router filter.
   if (protocol == Protocol::Http11 && hasCachedRoute()) {
-    if (upgrade_rejected) {
+    if (create_result == CreateFilterChainResult::UPGRADE_REJECTED ||
+        create_result == CreateFilterChainResult::OVERLOADED) {
       // Do not allow upgrades if the route does not support it.
+      // NB: includes OVERLOADED and failed h2c upgrades.
       connection_manager_.stats_.named_.downstream_rq_ws_on_non_ws_route_.inc();
       sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::Forbidden, "",
                      nullptr, is_head_request_, absl::nullopt,
@@ -1243,9 +1245,7 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
   ASSERT(response_headers_ == nullptr);
   // For early error handling, do a best-effort attempt to create a filter chain
   // to ensure access logging.
-  if (!state_.created_filter_chain_) {
-    createFilterChain();
-  }
+  createFilterChain();
   stream_info_.setResponseCodeDetails(details);
   Utility::sendLocalReply(
       is_grpc_request,
@@ -1724,11 +1724,16 @@ void ConnectionManagerImpl::ActiveStream::setBufferLimit(uint32_t new_limit) {
   }
 }
 
-bool ConnectionManagerImpl::ActiveStream::createFilterChain() {
+ConnectionManagerImpl::ActiveStream::CreateFilterChainResult
+ConnectionManagerImpl::ActiveStream::createFilterChain() {
   if (state_.created_filter_chain_) {
-    return false;
+    return CreateFilterChainResult::ALREADY_CREATED;
+  }
+  if (state_.overloaded_do_not_create_filter_chain_) {
+    return CreateFilterChainResult::OVERLOADED;
   }
   bool upgrade_rejected = false;
+  bool upgrade_ignored = false;
   auto upgrade = request_headers_ ? request_headers_->Upgrade() : nullptr;
   state_.created_filter_chain_ = true;
   if (upgrade != nullptr) {
@@ -1745,16 +1750,30 @@ bool ConnectionManagerImpl::ActiveStream::createFilterChain() {
       state_.successful_upgrade_ = true;
       connection_manager_.stats_.named_.downstream_cx_upgrades_total_.inc();
       connection_manager_.stats_.named_.downstream_cx_upgrades_active_.inc();
-      return true;
+      return CreateFilterChainResult::UPGRADED;
     } else {
-      upgrade_rejected = true;
-      // Fall through to the default filter chain. The function calling this
-      // will send a local reply indicating that the upgrade failed.
+      if (absl::EqualsIgnoreCase(request_headers_->Upgrade()->value().getStringView(),
+                                 Http::Headers::get().UpgradeValues.H2c)) {
+        request_headers_->removeUpgrade();
+        upgrade_ignored = true;
+      } else {
+        upgrade_rejected = true;
+        // Fall through to the default filter chain. The function calling this
+        // will send a local reply indicating that the upgrade failed.
+      }
     }
   }
 
   connection_manager_.config_.filterFactory().createFilterChain(*this);
-  return !upgrade_rejected;
+  if (upgrade_rejected) {
+    return CreateFilterChainResult::UPGRADE_REJECTED;
+  } else if (upgrade_ignored) {
+    return CreateFilterChainResult::UPGRADE_IGNORED;
+  } else if (upgrade) {
+    return CreateFilterChainResult::UPGRADED;
+  } else {
+    return CreateFilterChainResult::CREATED;
+  }
 }
 
 void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {

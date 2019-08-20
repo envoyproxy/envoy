@@ -2108,6 +2108,33 @@ TEST_F(HttpConnectionManagerImplTest, FooUpgradeDrainClose) {
   conn_manager_->onData(fake_input, false);
 }
 
+TEST_F(HttpConnectionManagerImplTest, IgnoreUpgradeH2c) {
+  setup(false, "");
+  StreamDecoder* decoder = nullptr;
+  HeaderMap* header_map = nullptr;
+
+  NiceMock<MockStreamEncoder> encoder;
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
+    decoder = &conn_manager_->newStream(encoder);
+    HeaderMapPtr headers{new TestHeaderMapImpl{{":authority", "host"},
+                                               {":method", "GET"},
+                                               {":path", "/"},
+                                               {"connection", "Upgrade"},
+                                               {"upgrade", "h2c"}}};
+    header_map = headers.get();
+    decoder->decodeHeaders(std::move(headers), true);
+    data.drain(4);
+  }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  // The h2c header should be removed.
+  EXPECT_TRUE(header_map->Upgrade() == nullptr);
+
+  EXPECT_EQ(0U, stats_.named_.downstream_rq_ws_on_non_ws_route_.value());
+}
+
 TEST_F(HttpConnectionManagerImplTest, DrainClose) {
   setup(true, "");
 

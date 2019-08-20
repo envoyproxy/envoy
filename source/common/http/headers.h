@@ -158,6 +158,7 @@ public:
   } ConnectionValues;
 
   struct {
+    const std::string H2c{"h2c"};
     const std::string WebSocket{"websocket"};
   } UpgradeValues;
 
