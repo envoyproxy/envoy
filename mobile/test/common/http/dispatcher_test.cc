@@ -91,8 +91,7 @@ TEST_F(DispatcherTest, BasicStreamHeadersOnly) {
   envoy_headers c_headers = Utility::toBridgeHeaders(headers);
 
   // Create a stream.
-  EXPECT_CALL(cm_, httpAsyncClientForCluster("base"))
-      .WillOnce(ReturnRef(cm_.async_client_));
+  EXPECT_CALL(cm_, httpAsyncClientForCluster("base")).WillOnce(ReturnRef(cm_.async_client_));
   EXPECT_CALL(cm_.async_client_, start(_, _))
       .WillOnce(
           WithArg<0>(Invoke([&](AsyncClient::StreamCallbacks& callbacks) -> AsyncClient::Stream* {
@@ -146,8 +145,7 @@ TEST_F(DispatcherTest, ResetStream) {
     cc->on_complete = true;
   };
 
-  EXPECT_CALL(cm_, httpAsyncClientForCluster("base"))
-      .WillOnce(ReturnRef(cm_.async_client_));
+  EXPECT_CALL(cm_, httpAsyncClientForCluster("base")).WillOnce(ReturnRef(cm_.async_client_));
   EXPECT_CALL(cm_.async_client_, start(_, _))
       .WillOnce(
           WithArg<0>(Invoke([&](AsyncClient::StreamCallbacks& callbacks) -> AsyncClient::Stream* {
@@ -202,8 +200,7 @@ TEST_F(DispatcherTest, MultipleStreams) {
   envoy_headers c_headers = Utility::toBridgeHeaders(headers);
 
   // Create a stream.
-  EXPECT_CALL(cm_, httpAsyncClientForCluster("base"))
-      .WillOnce(ReturnRef(cm_.async_client_));
+  EXPECT_CALL(cm_, httpAsyncClientForCluster("base")).WillOnce(ReturnRef(cm_.async_client_));
   EXPECT_CALL(cm_.async_client_, start(_, _))
       .WillOnce(
           WithArg<0>(Invoke([&](AsyncClient::StreamCallbacks& callbacks) -> AsyncClient::Stream* {
@@ -254,8 +251,7 @@ TEST_F(DispatcherTest, MultipleStreams) {
   envoy_headers c_headers2 = Utility::toBridgeHeaders(headers2);
 
   // Create a stream.
-  EXPECT_CALL(cm_, httpAsyncClientForCluster("base"))
-      .WillOnce(ReturnRef(cm_.async_client_));
+  EXPECT_CALL(cm_, httpAsyncClientForCluster("base")).WillOnce(ReturnRef(cm_.async_client_));
   EXPECT_CALL(cm_.async_client_, start(_, _))
       .WillOnce(
           WithArg<0>(Invoke([&](AsyncClient::StreamCallbacks& callbacks) -> AsyncClient::Stream* {
@@ -328,8 +324,7 @@ TEST_F(DispatcherTest, LocalResetAfterStreamStart) {
   envoy_headers c_headers = Utility::toBridgeHeaders(headers);
 
   // Create a stream.
-  EXPECT_CALL(cm_, httpAsyncClientForCluster("base"))
-      .WillOnce(ReturnRef(cm_.async_client_));
+  EXPECT_CALL(cm_, httpAsyncClientForCluster("base")).WillOnce(ReturnRef(cm_.async_client_));
   EXPECT_CALL(cm_.async_client_, start(_, _))
       .WillOnce(
           WithArg<0>(Invoke([&](AsyncClient::StreamCallbacks& callbacks) -> AsyncClient::Stream* {
@@ -401,8 +396,7 @@ TEST_F(DispatcherTest, RemoteResetAfterStreamStart) {
   envoy_headers c_headers = Utility::toBridgeHeaders(headers);
 
   // Create a stream.
-  EXPECT_CALL(cm_, httpAsyncClientForCluster("base"))
-      .WillOnce(ReturnRef(cm_.async_client_));
+  EXPECT_CALL(cm_, httpAsyncClientForCluster("base")).WillOnce(ReturnRef(cm_.async_client_));
   EXPECT_CALL(cm_.async_client_, start(_, _))
       .WillOnce(
           WithArg<0>(Invoke([&](AsyncClient::StreamCallbacks& callbacks) -> AsyncClient::Stream* {
@@ -446,8 +440,7 @@ TEST_F(DispatcherTest, DestroyWithActiveStream) {
   envoy_headers c_headers = Utility::toBridgeHeaders(headers);
 
   // Create a stream.
-  EXPECT_CALL(cm_, httpAsyncClientForCluster("base"))
-      .WillOnce(ReturnRef(cm_.async_client_));
+  EXPECT_CALL(cm_, httpAsyncClientForCluster("base")).WillOnce(ReturnRef(cm_.async_client_));
   EXPECT_CALL(cm_.async_client_, start(_, _))
       .WillOnce(Return(client_.start(stream_callbacks_, AsyncClient::StreamOptions())));
   EXPECT_EQ(http_dispatcher_.startStream(stream, observer_), ENVOY_SUCCESS);
@@ -477,8 +470,7 @@ TEST_F(DispatcherTest, ResetInOnHeaders) {
   envoy_headers c_headers = Utility::toBridgeHeaders(headers);
 
   // Create a stream.
-  EXPECT_CALL(cm_, httpAsyncClientForCluster("base"))
-      .WillOnce(ReturnRef(cm_.async_client_));
+  EXPECT_CALL(cm_, httpAsyncClientForCluster("base")).WillOnce(ReturnRef(cm_.async_client_));
   EXPECT_CALL(cm_.async_client_, start(_, _))
       .WillOnce(Return(client_.start(stream_callbacks_, AsyncClient::StreamOptions())));
   EXPECT_EQ(http_dispatcher_.startStream(stream, observer_), ENVOY_SUCCESS);
@@ -519,8 +511,7 @@ TEST_F(DispatcherTest, StreamTimeout) {
   HttpTestUtility::addDefaultHeaders(headers);
   envoy_headers c_headers = Utility::toBridgeHeaders(headers);
 
-  EXPECT_CALL(cm_, httpAsyncClientForCluster("base"))
-      .WillOnce(ReturnRef(cm_.async_client_));
+  EXPECT_CALL(cm_, httpAsyncClientForCluster("base")).WillOnce(ReturnRef(cm_.async_client_));
   EXPECT_CALL(cm_.async_client_, start(_, _))
       .WillOnce(Return(client_.start(stream_callbacks_, AsyncClient::StreamOptions().setTimeout(
                                                             std::chrono::milliseconds(40)))));
@@ -568,8 +559,7 @@ TEST_F(DispatcherTest, StreamTimeoutHeadReply) {
   HttpTestUtility::addDefaultHeaders(headers, "HEAD");
   envoy_headers c_headers = Utility::toBridgeHeaders(headers);
 
-  EXPECT_CALL(cm_, httpAsyncClientForCluster("base"))
-      .WillOnce(ReturnRef(cm_.async_client_));
+  EXPECT_CALL(cm_, httpAsyncClientForCluster("base")).WillOnce(ReturnRef(cm_.async_client_));
   EXPECT_CALL(cm_.async_client_, start(_, _))
       .WillOnce(Return(client_.start(stream_callbacks_, AsyncClient::StreamOptions().setTimeout(
                                                             std::chrono::milliseconds(40)))));
@@ -607,8 +597,7 @@ TEST_F(DispatcherTest, DisableTimerWithStream) {
   HttpTestUtility::addDefaultHeaders(headers, "HEAD");
   envoy_headers c_headers = Utility::toBridgeHeaders(headers);
 
-  EXPECT_CALL(cm_, httpAsyncClientForCluster("base"))
-      .WillOnce(ReturnRef(cm_.async_client_));
+  EXPECT_CALL(cm_, httpAsyncClientForCluster("base")).WillOnce(ReturnRef(cm_.async_client_));
   EXPECT_CALL(cm_.async_client_, start(_, _))
       .WillOnce(Return(client_.start(stream_callbacks_, AsyncClient::StreamOptions().setTimeout(
                                                             std::chrono::milliseconds(40)))));
