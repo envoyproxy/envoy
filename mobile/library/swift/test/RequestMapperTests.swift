@@ -6,28 +6,28 @@ final class RequestMapperTests: XCTestCase {
     let headers = RequestBuilder(method: .post, scheme: "https", authority: "x.y.z", path: "/foo")
       .build()
       .outboundHeaders()
-    XCTAssertEqual("POST", headers[":method"])
+    XCTAssertEqual(["POST"], headers[":method"])
   }
 
   func testAddsSchemeToHeaders() {
     let headers = RequestBuilder(method: .post, scheme: "https", authority: "x.y.z", path: "/foo")
       .build()
       .outboundHeaders()
-    XCTAssertEqual("https", headers[":scheme"])
+    XCTAssertEqual(["https"], headers[":scheme"])
   }
 
   func testAddsAuthorityToHeaders() {
     let headers = RequestBuilder(method: .post, scheme: "https", authority: "x.y.z", path: "/foo")
       .build()
       .outboundHeaders()
-    XCTAssertEqual("x.y.z", headers[":authority"])
+    XCTAssertEqual(["x.y.z"], headers[":authority"])
   }
 
   func testAddsPathToHeaders() {
     let headers = RequestBuilder(method: .post, scheme: "https", authority: "x.y.z", path: "/foo")
       .build()
       .outboundHeaders()
-    XCTAssertEqual("/foo", headers[":path"])
+    XCTAssertEqual(["/foo"], headers[":path"])
   }
 
   func testJoinsHeaderValuesWithTheSameKey() {
@@ -36,7 +36,7 @@ final class RequestMapperTests: XCTestCase {
       .addHeader(name: "foo", value: "2")
       .build()
       .outboundHeaders()
-    XCTAssertEqual("1,2", headers["foo"])
+    XCTAssertEqual(["1", "2"], headers["foo"])
   }
 
   func testStripsHeadersWithSemicolonPrefix() {
@@ -55,9 +55,9 @@ final class RequestMapperTests: XCTestCase {
       .build()
       .outboundHeaders()
 
-    XCTAssertEqual("https", headers[":scheme"])
-    XCTAssertEqual("x.y.z", headers[":authority"])
-    XCTAssertEqual("/foo", headers[":path"])
+    XCTAssertEqual(["https"], headers[":scheme"])
+    XCTAssertEqual(["x.y.z"], headers[":authority"])
+    XCTAssertEqual(["/foo"], headers[":path"])
   }
 
   func testIncludesRetryPolicyHeaders() {
@@ -71,7 +71,7 @@ final class RequestMapperTests: XCTestCase {
       .build()
       .outboundHeaders()
 
-    XCTAssertEqual("bar", requestHeaders["foo"])
+    XCTAssertEqual(["bar"], requestHeaders["foo"])
     XCTAssertFalse(retryHeaders.isEmpty)
     for (retryHeader, expectedValue) in retryHeaders {
       XCTAssertEqual(expectedValue, requestHeaders[retryHeader])
@@ -88,6 +88,6 @@ final class RequestMapperTests: XCTestCase {
       .build()
       .outboundHeaders()
 
-    XCTAssertEqual("123", requestHeaders["x-envoy-max-retries"])
+    XCTAssertEqual(["123"], requestHeaders["x-envoy-max-retries"])
   }
 }

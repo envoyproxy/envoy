@@ -24,6 +24,13 @@ envoy_mobile_swift_test(
 )
 
 envoy_mobile_swift_test(
+    name = "response_handler_tests",
+    srcs = [
+        "ResponseHandlerTests.swift",
+    ],
+)
+
+envoy_mobile_swift_test(
     name = "retry_policy_tests",
     srcs = [
         "RetryPolicyTests.swift",
