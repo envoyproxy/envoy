@@ -457,10 +457,6 @@ message Cluster {
     // The number of random healthy hosts from which the host with the fewest active requests will
     // be chosen. Defaults to 2 so that we perform two-choice selection if the field is not set.
     google.protobuf.UInt32Value choice_count = 1 [(validate.rules).uint32.gte = 2];
-    // Populated only when the LB policy is configured via the new
-    // :ref:`load_balancing_policy<envoy_api_field_Cluster.load_balancing_policy>`
-    // field.
-    CommonLbConfig common_fields = 2;
   }
 
   // Specific configuration for the :ref:`RingHash<arch_overview_load_balancing_types_ring_hash>`
@@ -492,11 +488,6 @@ message Cluster {
     // to further constrain resource use. See also
     // :ref:`minimum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.minimum_ring_size>`.
     google.protobuf.UInt64Value maximum_ring_size = 4 [(validate.rules).uint64.lte = 8388608];
-
-    // Populated only when the LB policy is configured via the new
-    // :ref:`load_balancing_policy<envoy_api_field_Cluster.load_balancing_policy>`
-    // field.
-    CommonLbConfig common_fields = 5;
   }
 
   // Specific configuration for the
@@ -513,11 +504,6 @@ message Cluster {
     //   route traffic to arbitrary hosts and/or ports, which may have serious security
     //   consequences.
     bool use_http_header = 1;
-
-    // Populated only when the LB policy is configured via the new
-    // :ref:`load_balancing_policy<envoy_api_field_Cluster.load_balancing_policy>`
-    // field.
-    CommonLbConfig common_fields = 2;
   }
 
   // Optional configuration for the load balancing algorithm selected by
