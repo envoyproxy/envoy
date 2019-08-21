@@ -7,7 +7,7 @@ import io.envoyproxy.envoymobile.engine.EnvoyEngineImpl
 
 class ConfigurationException : Exception("Unresolved Template Key")
 
-class EnvoyBuilder internal constructor(
+open class EnvoyBuilder internal constructor(
     private val envoyConfiguration: EnvoyConfiguration
 ) {
   private var logLevel = LogLevel.INFO
