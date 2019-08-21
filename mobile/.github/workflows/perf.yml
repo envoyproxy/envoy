@@ -5,7 +5,7 @@ on: [push]
 jobs:
   sizecurrent:
     name: size_current
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v1
         with:
@@ -20,7 +20,7 @@ jobs:
           path: bazel-bin/test/performance/test_binary_size
   sizemaster:
     name: size_master
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v1
         with:
@@ -38,7 +38,7 @@ jobs:
   sizecompare:
     name: size_compare
     needs: [sizecurrent, sizemaster]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v1
       - name: 'Install dependencies'

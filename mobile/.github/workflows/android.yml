@@ -5,7 +5,7 @@ on: [push]
 jobs:
   linuxdist:
     name: linux_dist
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v1
         with:
@@ -30,7 +30,7 @@ jobs:
           ./bazelw build --fat_apk_cpu=x86 //examples/kotlin/hello_world:hello_envoy_kt
   macdist:
     name: mac_dist
-    runs-on: macos-latest
+    runs-on: macOS-10.14
     steps:
       - uses: actions/checkout@v1
         with:
@@ -46,7 +46,7 @@ jobs:
   macjava:
     name: mac_java_helloworld
     needs: macdist
-    runs-on: macos-latest
+    runs-on: macOS-10.14
     steps:
       - uses: actions/checkout@v1
         with:
@@ -67,7 +67,7 @@ jobs:
   mackotlin:
     name: mac_kotlin_helloworld
     needs: macdist
-    runs-on: macos-latest
+    runs-on: macOS-10.14
     steps:
       - uses: actions/checkout@v1
         with:
@@ -87,7 +87,7 @@ jobs:
         name: 'Check liveliness'
   kotlintests:
     name: kotlin_tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v1
         with:

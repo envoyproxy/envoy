@@ -5,7 +5,7 @@ on: [push]
 jobs:
   formatall:
     name: format_all
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     container:
       image: envoyproxy/envoy-build:cfc514546bc0284536893cca5fa43d7128edcd35
     steps:
@@ -18,7 +18,7 @@ jobs:
           ./tools/check_format.sh
   precommit:
     name: precommit
-    runs-on: macos-latest
+    runs-on: macOS-10.14
     steps:
       - uses: actions/checkout@v1
       - name: 'Install precommit'
@@ -27,7 +27,7 @@ jobs:
         run: pre-commit run --all-files
   swiftlint:
     name: swift_lint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     container:
       image: norionomura/swiftlint:0.33.0_swift-5.0
     steps:
@@ -36,7 +36,7 @@ jobs:
         run: swiftlint lint --strict
   kotlinlint:
     name: kotlin_lint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     container:
       image: openjdk:8-jdk
     steps:
