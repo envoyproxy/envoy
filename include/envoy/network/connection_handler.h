@@ -76,7 +76,13 @@ public:
   public:
     virtual ~ActiveListener() = default;
 
+    /**
+     * @return the tag value as configured.
+     */
     virtual uint64_t listenerTag() PURE;
+    /**
+     * @return the actual Listener object.
+     */
     virtual ListenerPtr& listener() PURE;
   };
 
@@ -85,10 +91,22 @@ public:
 
 using ConnectionHandlerPtr = std::unique_ptr<ConnectionHandler>;
 
+/**
+ * A registered factory interface to create different kinds of
+ * ActiveUdpListener.
+ */
 class ActiveUdpListenerFactory {
 public:
   virtual ~ActiveUdpListenerFactory() = default;
 
+  /**
+   * Creates an ActiveUdpListener object and a corresponding UdpListener
+   * according to given config.
+   * @param parent is the owner of the created ActiveListener objects.
+   * @param config provides information needed to create ActiveUdpListener and
+   * UdpListener objects.
+   * @return the ActiveUdpListener created.
+   */
   virtual Network::ConnectionHandler::ActiveListenerPtr
   createActiveUdpListener(ConnectionHandler& parent, Network::ListenerConfig& config) const PURE;
 };
