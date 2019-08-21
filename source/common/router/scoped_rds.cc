@@ -122,48 +122,15 @@ ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::RdsRouteConfigProvide
         parent_.onRdsConfigUpdate(scope_name_, route_provider_->subscription());
       })) {}
 
-void ScopedRdsConfigSubscription::onConfigUpdate(
-    const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
-    const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-    const std::string& version_info) {
+bool ScopedRdsConfigSubscription::addOrUpdateScopes(
+    const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& resources,
+    Init::Manager& init_manager, const std::string& version_info,
+    std::vector<std::string>& exception_msgs) {
   bool any_applied = false;
-  std::vector<std::string> exception_msgs;
-  absl::flat_hash_set<std::string> unique_resource_names;
   envoy::config::filter::network::http_connection_manager::v2::Rds rds;
   rds.mutable_config_source()->MergeFrom(rds_config_source_);
-
-  // If new route config sources come after the factory_context_.initManager()'s initialize() been
-  // called, that initManager can't accept new targets. Instead we use a local override which will
-  // start new subscriptions but not wait on them to be ready.
-  std::unique_ptr<Init::ManagerImpl> overriding_init_manager;
-  // NOTE: This should be defined after overriding_init_manager as it depends on the
-  // overriding_init_manager.
-  std::unique_ptr<Cleanup> resume_rds;
-  if (factory_context_.initManager().state() == Init::Manager::State::Initialized) {
-    overriding_init_manager =
-        std::make_unique<Init::ManagerImpl>(fmt::format("SRDS {}:{}", name_, version_info));
-    // Pause RDS to not send a burst of RDS requests until we start all the new subscriptions.
-    // In the case if factory_context_.initManager() is uninitialized, RDS is already paused either
-    // by Server init or LDS init.
-    factory_context_.clusterManager().adsMux().pause(
-        Envoy::Config::TypeUrl::get().RouteConfiguration);
-    resume_rds = std::make_unique<Cleanup>([this, &overriding_init_manager, version_info] {
-      // For new RDS subscriptions created after listener warming up, we don't wait for them to warm
-      // up.
-      Init::WatcherImpl noop_watcher(
-          // Note: we just throw it away.
-          fmt::format("SRDS ConfigUpdate watcher {}:{}", name_, version_info),
-          []() { /*Do nothing.*/ });
-      overriding_init_manager->initialize(noop_watcher);
-      // New RDS subscriptions should have been created, now lift the floodgate.
-      // Note in the case of partial acceptance, accepted RDS subscriptions should be started
-      // dispite of any error.
-      factory_context_.clusterManager().adsMux().resume(
-          Envoy::Config::TypeUrl::get().RouteConfiguration);
-    });
-  }
-
-  for (const auto& resource : added_resources) {
+  absl::flat_hash_set<std::string> unique_resource_names;
+  for (const auto& resource : resources) {
     envoy::api::v2::ScopedRouteConfiguration scoped_route_config;
     try {
       scoped_route_config = MessageUtil::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(
@@ -178,10 +145,8 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
       // config-provider-framework to make it light weight.
       rds.set_route_config_name(scoped_route_config.route_configuration_name());
       // Delete previous route provider if any.
-      auto rds_config_provider_helper = std::make_unique<RdsRouteConfigProviderHelper>(
-          *this, scope_name, rds,
-          (overriding_init_manager == nullptr ? factory_context_.initManager()
-                                              : *overriding_init_manager));
+      auto rds_config_provider_helper =
+          std::make_unique<RdsRouteConfigProviderHelper>(*this, scope_name, rds, init_manager);
       auto scoped_route_info = std::make_shared<ScopedRouteInfo>(
           std::move(scoped_route_config), rds_config_provider_helper->routeConfig());
       // Detect if there is key conflict between two scopes, in which case Envoy won't be able to
@@ -211,8 +176,13 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
       exception_msgs.emplace_back(fmt::format("{}", e.what()));
     }
   }
+  return any_applied;
+}
 
-  for (const auto& scope_name : removed_resources) {
+bool ScopedRdsConfigSubscription::removeScopes(
+    const Protobuf::RepeatedPtrField<std::string>& scope_names, const std::string& version_info) {
+  bool any_applied = false;
+  for (const auto& scope_name : scope_names) {
     auto iter = scoped_route_map_.find(scope_name);
     if (iter != scoped_route_map_.end()) {
       route_provider_by_scope_.erase(scope_name);
@@ -229,6 +199,50 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
       ENVOY_LOG(debug, "srds: remove scoped route '{}', version: {}", scope_name, version_info);
     }
   }
+  return any_applied;
+}
+
+void ScopedRdsConfigSubscription::onConfigUpdate(
+    const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
+    const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+    const std::string& version_info) {
+  // If new route config sources come after the factory_context_.initManager()'s initialize() been
+  // called, that initManager can't accept new targets. Instead we use a local override which will
+  // start new subscriptions but not wait on them to be ready.
+  std::unique_ptr<Init::ManagerImpl> overriding_init_manager;
+  // NOTE: This should be defined after overriding_init_manager as it depends on the
+  // overriding_init_manager.
+  std::unique_ptr<Cleanup> resume_rds;
+  if (factory_context_.initManager().state() == Init::Manager::State::Initialized) {
+    overriding_init_manager =
+        std::make_unique<Init::ManagerImpl>(fmt::format("SRDS {}:{}", name_, version_info));
+    // Pause RDS to not send a burst of RDS requests until we start all the new subscriptions.
+    // In the case if factory_context_.initManager() is uninitialized, RDS is already paused either
+    // by Server init or LDS init.
+    factory_context_.clusterManager().adsMux().pause(
+        Envoy::Config::TypeUrl::get().RouteConfiguration);
+    resume_rds = std::make_unique<Cleanup>([this, &overriding_init_manager, version_info] {
+      // For new RDS subscriptions created after listener warming up, we don't wait for them to warm
+      // up.
+      Init::WatcherImpl noop_watcher(
+          // Note: we just throw it away.
+          fmt::format("SRDS ConfigUpdate watcher {}:{}", name_, version_info),
+          []() { /*Do nothing.*/ });
+      overriding_init_manager->initialize(noop_watcher);
+      // New RDS subscriptions should have been created, now lift the floodgate.
+      // Note in the case of partial acceptance, accepted RDS subscriptions should be started
+      // despite of any error.
+      factory_context_.clusterManager().adsMux().resume(
+          Envoy::Config::TypeUrl::get().RouteConfiguration);
+    });
+  }
+  std::vector<std::string> exception_msgs;
+  bool any_applied =
+      addOrUpdateScopes(added_resources,
+                        (overriding_init_manager == nullptr ? factory_context_.initManager()
+                                                            : *overriding_init_manager),
+                        version_info, exception_msgs) ||
+      removeScopes(removed_resources, version_info);
   ConfigSubscriptionCommonBase::onConfigUpdate();
   if (any_applied) {
     setLastConfigInfo(absl::optional<LastConfigInfo>({absl::nullopt, version_info}));

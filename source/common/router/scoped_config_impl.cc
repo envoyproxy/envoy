@@ -118,6 +118,7 @@ void ScopedConfigImpl::addOrUpdateRoutingScope(
     const ScopedRouteInfoConstSharedPtr& scoped_route_info) {
   const auto iter = scoped_route_info_by_name_.find(scoped_route_info->scopeName());
   if (iter != scoped_route_info_by_name_.end()) {
+    ASSERT(scoped_route_info_by_key_.contains(iter->second->scopeKey().hash()));
     scoped_route_info_by_key_.erase(iter->second->scopeKey().hash());
   }
   scoped_route_info_by_name_[scoped_route_info->scopeName()] = scoped_route_info;
@@ -127,7 +128,7 @@ void ScopedConfigImpl::addOrUpdateRoutingScope(
 void ScopedConfigImpl::removeRoutingScope(const std::string& scope_name) {
   const auto iter = scoped_route_info_by_name_.find(scope_name);
   if (iter != scoped_route_info_by_name_.end()) {
-    ASSERT(scoped_route_info_by_key_.count(iter->second->scopeKey().hash()) == 1);
+    ASSERT(scoped_route_info_by_key_.contains(iter->second->scopeKey().hash()));
     scoped_route_info_by_key_.erase(iter->second->scopeKey().hash());
     scoped_route_info_by_name_.erase(iter);
   }

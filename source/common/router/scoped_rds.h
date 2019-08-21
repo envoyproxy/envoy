@@ -121,6 +121,17 @@ private:
     Common::CallbackHandle* rds_update_callback_handle_;
   };
 
+  // Adds or updates scopes, create a new RDS provider for each resource, if an exception is thrown
+  // during updating, the exception message is collected via the exception_msgs vector.
+  // Returns true if any scope updated, false otherwise.
+  bool addOrUpdateScopes(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& resources,
+                         Init::Manager& init_manager, const std::string& version_info,
+                         std::vector<std::string>& exception_msgs);
+  // Removes given scopes from the managed set of scopes.
+  // Returns true if any scope updated, false otherwise.
+  bool removeScopes(const Protobuf::RepeatedPtrField<std::string>& scope_names,
+                    const std::string& version_info);
+
   // Envoy::Config::DeltaConfigSubscriptionInstance
   void start() override { subscription_->start({}); }
 
