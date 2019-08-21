@@ -40,6 +40,11 @@ private:
   const Stats::StatName prefix_;
   bool enabled_;
   const std::string latency_suffix_ = ".latency";
+  const std::string total_suffix_ = ".total";
+  const std::string success_suffix_ = ".success";
+  const std::string error_suffix_ = ".error";
+  const std::string null_metric_ = "null";
+  const std::string unknown_metric_ = "unknown";
 
 public:
   const Stats::StatName upstream_rq_time_;

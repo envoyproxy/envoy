@@ -81,21 +81,21 @@ std::string RedisCommandStats::getCommandFromRequest(const RespValue& request) {
   case RespType::Array:
     return getCommandFromRequest(request.asArray().front());
   case RespType::Integer:
-    return std::to_string(request.asInteger());
+    return unknown_metric_;
   case RespType::Null:
-    return "null";
+    return null_metric_;
   default:
     return request.asString();
   }
 }
 
-void RedisCommandStats::updateStatsTotal(std::string command) { counter(command + ".total").inc(); }
+void RedisCommandStats::updateStatsTotal(std::string command) { counter(command + total_suffix_).inc(); }
 
 void RedisCommandStats::updateStats(const bool success, std::string command) {
   if (success) {
-    counter(command + ".success").inc();
+    counter(command + success_suffix_).inc();
   } else {
-    counter(command + ".error").inc();
+    counter(command + error_suffix_).inc();
   }
 }
 
