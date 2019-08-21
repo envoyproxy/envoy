@@ -41,7 +41,7 @@ ProtobufTypes::MessagePtr TcpGrpcAccessLogFactory::createEmptyConfigProto() {
 std::string TcpGrpcAccessLogFactory::name() const { return AccessLogNames::get().TcpGrpc; }
 
 /**
- * Static registration for the HTTP gRPC access log. @see RegisterFactory.
+ * Static registration for the TCP gRPC access log. @see RegisterFactory.
  */
 REGISTER_FACTORY(TcpGrpcAccessLogFactory, Server::Configuration::AccessLogInstanceFactory);
 
