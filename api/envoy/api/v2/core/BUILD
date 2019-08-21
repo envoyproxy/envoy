@@ -1,4 +1,4 @@
-load("@envoy_api//bazel:api_build_system.bzl", "api_go_grpc_library", "api_go_proto_library", "api_proto_library_internal")
+load("@envoy_api//bazel:api_build_system.bzl", "api_go_grpc_library", "api_go_proto_library", "api_proto_library_internal", "api_proto_package")
 
 licenses(["notice"])  # Apache 2
 
@@ -13,6 +13,17 @@ package_group(
         "//envoy/api/v2/endpoint",
         "//envoy/api/v2/listener",
         "//envoy/api/v2/route",
+    ],
+)
+
+api_proto_package(
+    name = "core",
+    srcs = glob(["*.proto"]),
+    deps = [
+        "//envoy/type:type",
+    ],
+    visibility = [
+        ":friends",
     ],
 )
 
