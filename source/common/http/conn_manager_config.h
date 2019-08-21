@@ -170,6 +170,8 @@ public:
  */
 class ConnectionManagerConfig {
 public:
+  enum class HeaderTransformation { OVERWRITE, APPEND_IF_ABSENT, PASS_THROUGH };
+
   virtual ~ConnectionManagerConfig() = default;
 
   /**
@@ -264,6 +266,11 @@ public:
    * @return const std::string& the server name to write into responses.
    */
   virtual const std::string& serverName() PURE;
+
+  /**
+   * @return HeaderTransformation the transformation to apply to Server response headers.
+   */
+  virtual HeaderTransformation serverHeaderTransformation() PURE;
 
   /**
    * @return ConnectionManagerStats& the stats to write to.

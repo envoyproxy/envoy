@@ -64,6 +64,7 @@ public:
   MOCK_METHOD0(routeConfigProvider, Router::RouteConfigProvider*());
   MOCK_METHOD0(scopedRouteConfigProvider, Config::ConfigProvider*());
   MOCK_METHOD0(serverName, const std::string&());
+  MOCK_METHOD0(serverHeaderTransformation, HeaderTransformation());
   MOCK_METHOD0(stats, ConnectionManagerStats&());
   MOCK_METHOD0(tracingStats, ConnectionManagerTracingStats&());
   MOCK_METHOD0(useRemoteAddress, bool());
