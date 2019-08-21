@@ -7,6 +7,7 @@
 #include "envoy/api/os_sys_calls.h"
 #include "envoy/network/listen_socket.h"
 
+#include "common/common/assert.h"
 #include "common/common/logger.h"
 
 namespace Envoy {
@@ -103,7 +104,9 @@ public:
 
   SocketOptionImpl(envoy::api::v2::core::SocketOption::SocketState in_state,
                    Network::SocketOptionName optname, absl::string_view value)
-      : in_state_(in_state), optname_(optname), value_(value) {}
+      : in_state_(in_state), optname_(optname), value_(value.begin(), value.end()) {
+    ASSERT(reinterpret_cast<uintptr_t>(value_.data()) % alignof(void*) == 0);
+  }
 
   // Socket::Option
   bool setOption(Socket& socket,
@@ -123,17 +126,20 @@ public:
    * @param socket the socket on which to apply the option.
    * @param optname the option name.
    * @param value the option value.
+   * @param size the option value size.
    * @return a Api::SysCallIntResult with rc_ = 0 for success and rc = -1 for failure. If the call
    * is successful, errno_ shouldn't be used.
    */
   static Api::SysCallIntResult setSocketOption(Socket& socket,
                                                const Network::SocketOptionName& optname,
-                                               absl::string_view value);
+                                               const void* value, size_t size);
 
 private:
   const envoy::api::v2::core::SocketOption::SocketState in_state_;
   const Network::SocketOptionName optname_;
-  const std::string value_;
+  // This has to be a std::vector<uint8_t> but not std::string because std::string might inline
+  // the buffer so its data() is not aligned in to alignof(void*).
+  const std::vector<uint8_t> value_;
 };
 
 } // namespace Network

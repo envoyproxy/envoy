@@ -109,7 +109,7 @@ protected:
     return factory_context_.scope().symbolTable().toString(name);
   }
 
-  Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
+  Stats::TestSymbolTable symbol_table_;
   Api::ApiPtr api_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
 };

@@ -16,7 +16,7 @@
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
 
-#include "test/common/http/codec_impl_fuzz.pb.h"
+#include "test/common/http/codec_impl_fuzz.pb.validate.h"
 #include "test/common/http/http2/codec_impl_test_util.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"
@@ -420,8 +420,10 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
     }
   };
 
+  constexpr auto max_actions = 1024;
   try {
-    for (const auto& action : input.actions()) {
+    for (int i = 0; i < std::min(max_actions, input.actions().size()); ++i) {
+      const auto& action = input.actions(i);
       ENVOY_LOG_MISC(trace, "action {} with {} streams", action.DebugString(), streams.size());
       switch (action.action_selector_case()) {
       case test::common::http::Action::kNewStream: {
@@ -502,8 +504,14 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
 
 // Fuzz the H1/H2 codec implementations.
 DEFINE_PROTO_FUZZER(const test::common::http::CodecImplFuzzTestCase& input) {
-  codecFuzz(input, HttpVersion::Http1);
-  codecFuzz(input, HttpVersion::Http2);
+  try {
+    // Validate input early.
+    MessageUtil::validate(input);
+    codecFuzz(input, HttpVersion::Http1);
+    codecFuzz(input, HttpVersion::Http2);
+  } catch (const EnvoyException& e) {
+    ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
+  }
 }
 
 } // namespace Http
