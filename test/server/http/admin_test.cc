@@ -14,6 +14,7 @@
 #include "common/profiler/profiler.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
+#include "common/stats/symbol_table_creator.h"
 #include "common/stats/thread_local_store.h"
 
 #include "server/http/admin.h"
@@ -50,7 +51,8 @@ namespace Server {
 
 class AdminStatsTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  AdminStatsTest() : alloc_(symbol_table_) {
+  AdminStatsTest()
+      : symbol_table_(Stats::SymbolTableCreator::makeSymbolTable()), alloc_(*symbol_table_) {
     store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(alloc_);
     store_->addSink(sink_);
   }
@@ -63,7 +65,7 @@ public:
                                   true /*pretty_print*/);
   }
 
-  Stats::FakeSymbolTableImpl symbol_table_;
+  Stats::SymbolTablePtr symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::AllocatorImpl alloc_;
@@ -1374,15 +1376,16 @@ private:
 
 class PrometheusStatsFormatterTest : public testing::Test {
 protected:
-  PrometheusStatsFormatterTest() : alloc_(symbol_table_) {}
+  PrometheusStatsFormatterTest()
+      : symbol_table_(Stats::SymbolTableCreator::makeSymbolTable()), alloc_(*symbol_table_) {}
 
   void addCounter(const std::string& name, std::vector<Stats::Tag> cluster_tags) {
-    Stats::StatNameManagedStorage storage(name, symbol_table_);
+    Stats::StatNameManagedStorage storage(name, *symbol_table_);
     counters_.push_back(alloc_.makeCounter(storage.statName(), name, cluster_tags));
   }
 
   void addGauge(const std::string& name, std::vector<Stats::Tag> cluster_tags) {
-    Stats::StatNameManagedStorage storage(name, symbol_table_);
+    Stats::StatNameManagedStorage storage(name, *symbol_table_);
     gauges_.push_back(alloc_.makeGauge(storage.statName(), name, cluster_tags,
                                        Stats::Gauge::ImportMode::Accumulate));
   }
@@ -1396,7 +1399,7 @@ protected:
     return MockHistogramSharedPtr(new NiceMock<Stats::MockParentHistogram>());
   }
 
-  Stats::FakeSymbolTableImpl symbol_table_;
+  Stats::SymbolTablePtr symbol_table_;
   Stats::AllocatorImpl alloc_;
   std::vector<Stats::CounterSharedPtr> counters_;
   std::vector<Stats::GaugeSharedPtr> gauges_;

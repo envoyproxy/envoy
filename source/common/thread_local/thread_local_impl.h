@@ -57,6 +57,9 @@ private:
 
   static thread_local ThreadLocalData thread_local_data_;
   std::vector<SlotImpl*> slots_;
+  // A list of index of freed slots.
+  std::list<uint32_t> free_slot_indexes_;
+
   std::list<std::reference_wrapper<Event::Dispatcher>> registered_threads_;
   std::thread::id main_thread_id_;
   Event::Dispatcher* main_thread_dispatcher_{};

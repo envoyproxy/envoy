@@ -66,6 +66,7 @@ public:
   }
   SystemTime lastUpdated() const override { return last_updated_; }
   void onConfigUpdate() override {}
+  void validateConfig(const envoy::api::v2::RouteConfiguration&) const override {}
 
 private:
   ConfigConstSharedPtr config_;
@@ -159,7 +160,6 @@ public:
   ~RdsRouteConfigProviderImpl() override;
 
   RdsRouteConfigSubscription& subscription() { return *subscription_; }
-  void onConfigUpdate() override;
 
   // Router::RouteConfigProvider
   Router::ConfigConstSharedPtr config() override;
@@ -167,6 +167,8 @@ public:
     return config_update_info_->configInfo();
   }
   SystemTime lastUpdated() const override { return config_update_info_->lastUpdated(); }
+  void onConfigUpdate() override;
+  void validateConfig(const envoy::api::v2::RouteConfiguration& config) const override;
 
 private:
   struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {

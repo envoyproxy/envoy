@@ -524,9 +524,9 @@ void BaseIntegrationTest::createXdsUpstream() {
     auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
         tls_context, factory_context_);
 
-    static Stats::Scope* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
+    upstream_stats_store_ = std::make_unique<Stats::TestIsolatedStoreImpl>();
     auto context = std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
-        std::move(cfg), context_manager_, *upstream_stats_store, std::vector<std::string>{});
+        std::move(cfg), context_manager_, *upstream_stats_store_, std::vector<std::string>{});
     fake_upstreams_.emplace_back(new FakeUpstream(
         std::move(context), 0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
   }
