@@ -86,12 +86,11 @@ CI_TARGET=$1
 if [[ $# -gt 1 ]]; then
   shift
   TEST_TARGETS=$*
-  FUZZ_TEST_TARGETS=$*"_with_libfuzzer"
 else
   TEST_TARGETS=//test/...
 fi
 
-if [[ ! -z "$FUZZ_TEST_TARGET" && "$CI_TARGET" == "bazel.fuzz" ]]; then
+if [[ "$CI_TARGET" == "bazel.fuzz" ]]; then
   FUZZ_TEST_TARGETS="$(bazel query "attr('tags','fuzzer',${TEST_TARGETS})")"
 fi  
 
