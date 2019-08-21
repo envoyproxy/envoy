@@ -25,7 +25,7 @@ namespace Envoy {
 // TODO(alyssawilk) move existing runtime tests over to using this.
 class TestScopedRuntime {
 public:
-  TestScopedRuntime() {
+  TestScopedRuntime() : api_(Api::createApiForTest()) {
     envoy::config::bootstrap::v2::LayeredRuntime config;
     config.add_layers()->mutable_admin_layer();
 
