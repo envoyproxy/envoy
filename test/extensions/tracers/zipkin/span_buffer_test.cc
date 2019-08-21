@@ -94,8 +94,8 @@ template <typename Type> std::string serializedMessageToJson(const std::string& 
 
 TEST(ZipkinSpanBufferTest, ConstructBuffer) {
   const bool shared = true;
-  SpanBuffer buffer1(envoy::config::trace::v2::ZipkinConfig::HTTP_JSON_V1, shared);
   const bool delay_allocation = true;
+  SpanBuffer buffer1(envoy::config::trace::v2::ZipkinConfig::HTTP_JSON_V1, shared);
   expectSerializedBuffer(buffer1, delay_allocation,
                          {"[{"
                           R"("traceId":"0000000000000000",)"

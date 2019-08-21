@@ -53,14 +53,12 @@ std::string JsonV1Serializer::serialize(std::vector<Span>&& zipkin_spans) {
   std::string stringified_json_array = "[";
 
   if (!zipkin_spans.empty()) {
-    stringified_json_array += zipkin_spans[0].toJson();
-    const uint64_t size = zipkin_spans.size();
-    for (uint64_t i = 1; i < size; i++) {
-      stringified_json_array += ",";
-      stringified_json_array += zipkin_spans[i].toJson();
+    absl::StrAppend(&stringified_json_array, zipkin_spans[0].toJson());
+    for (uint64_t i = 1; i < zipkin_spans.size(); i++) {
+      absl::StrAppend(&stringified_json_array, absl::StrCat(",", zipkin_spans[i].toJson()));
     }
   }
-  stringified_json_array += "]";
+  absl::StrAppend(&stringified_json_array, "]");
 
   return stringified_json_array;
 }
@@ -75,15 +73,18 @@ std::string JsonV2Serializer::serialize(std::vector<Span>&& zipkin_spans) {
   }
 
   std::string stringified_json_array = "[";
-  for (ssize_t i = 0; i < spans.spans_size(); i++) {
+  const ssize_t spans_size = spans.spans_size();
+  if (spans_size > 0) {
     std::string entry;
-    Protobuf::util::MessageToJsonString(spans.spans()[i], &entry);
-    stringified_json_array += entry;
-    if (i != spans.spans_size() - 1) {
-      stringified_json_array += ",";
+    Protobuf::util::MessageToJsonString(spans.spans()[0], &entry);
+    absl::StrAppend(&stringified_json_array, entry);
+    for (ssize_t i = 1; i < spans_size; i++) {
+      entry.clear();
+      Protobuf::util::MessageToJsonString(spans.spans()[i], &entry);
+      absl::StrAppend(&stringified_json_array, absl::StrCat(",", entry));
     }
   }
-  stringified_json_array += "]";
+  absl::StrAppend(&stringified_json_array, "]");
 
   return stringified_json_array;
 }
