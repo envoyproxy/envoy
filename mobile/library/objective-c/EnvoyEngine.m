@@ -249,7 +249,6 @@ static void ios_on_error(envoy_error error, void *context) {
     return nil;
   }
 
-  //_streamHandle = result.stream;
   _strongSelf = self;
   return self;
 }
