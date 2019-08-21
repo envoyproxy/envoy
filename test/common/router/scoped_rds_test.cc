@@ -216,8 +216,7 @@ key:
       "Error adding/updating scoped route\\(s\\): Proto constraint validation failed.*");
 
   EXPECT_THROW_WITH_REGEX(
-      subscription_callbacks_->onConfigUpdate(anyToResource(resources, "1"), {}, "1"),
-      EnvoyException,
+      srds_subscription_->onConfigUpdate(anyToResource(resources, "1"), {}, "1"), EnvoyException,
       "Error adding/updating scoped route\\(s\\): Proto constraint validation failed.*");
 
   // 'route_configuration_name' validation: value must be > 1 byte.
@@ -544,27 +543,24 @@ TEST_F(ScopedRdsTest, ConfigDump) {
       .WillRepeatedly(Return(Init::Manager::State::Initialized));
   init_watcher_.expectReady().Times(1); // SRDS only, no RDS push.
 
-  // Tests that the /config_dump handler returns the corresponding scoped routing
-  // config.
-  TEST_F(ScopedRoutesConfigProviderManagerTest, ConfigDump) {
-    auto message_ptr =
-        factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"]();
-    const auto& scoped_routes_config_dump =
-        MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::ScopedRoutesConfigDump&>(
-            *message_ptr);
+  auto message_ptr =
+      factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"]();
+  const auto& scoped_routes_config_dump =
+      MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::ScopedRoutesConfigDump&>(
+          *message_ptr);
 
-    // No routes at all(no SRDS push yet), no last_updated timestamp
-    envoy::admin::v2alpha::ScopedRoutesConfigDump expected_config_dump;
-    TestUtility::loadFromYaml(R"EOF(
+  // No routes at all(no SRDS push yet), no last_updated timestamp
+  envoy::admin::v2alpha::ScopedRoutesConfigDump expected_config_dump;
+  TestUtility::loadFromYaml(R"EOF(
 inline_scoped_route_configs:
 dynamic_scoped_route_configs:
 )EOF",
-                              expected_config_dump);
-    EXPECT_TRUE(TestUtility::protoEqual(expected_config_dump, scoped_routes_config_dump));
+                            expected_config_dump);
+  EXPECT_TRUE(TestUtility::protoEqual(expected_config_dump, scoped_routes_config_dump));
 
-    timeSystem().setSystemTime(std::chrono::milliseconds(1234567891234));
+  timeSystem().setSystemTime(std::chrono::milliseconds(1234567891234));
 
-    const std::string hcm_base_config_yaml = R"EOF(
+  const std::string hcm_base_config_yaml = R"EOF(
 codec_type: auto
 stat_prefix: foo
 http_filters:
@@ -579,7 +575,7 @@ scoped_routes:
           index: 0
 $1
 )EOF";
-    const std::string inline_scoped_route_configs_yaml = R"EOF(
+  const std::string inline_scoped_route_configs_yaml = R"EOF(
   scoped_route_configurations_list:
     scoped_route_configurations:
       - name: foo
@@ -591,17 +587,16 @@ $1
         key:
           fragments: { string_key: "172.10.10.20" }
 )EOF";
-    // Only load the inline scopes.
-    Envoy::Config::ConfigProviderPtr inline_config = ScopedRoutesConfigProviderUtil::create(
-        parseHttpConnectionManagerFromYaml(absl::Substitute(
-            hcm_base_config_yaml, "foo-scoped-routes", inline_scoped_route_configs_yaml)),
-        factory_context_, "foo.", *config_provider_manager_);
-    message_ptr =
-        factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"]();
-    const auto& scoped_routes_config_dump2 =
-        MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::ScopedRoutesConfigDump&>(
-            *message_ptr);
-    TestUtility::loadFromYaml(R"EOF(
+  // Only load the inline scopes.
+  Envoy::Config::ConfigProviderPtr inline_config = ScopedRoutesConfigProviderUtil::create(
+      parseHttpConnectionManagerFromYaml(absl::Substitute(hcm_base_config_yaml, "foo-scoped-routes",
+                                                          inline_scoped_route_configs_yaml)),
+      factory_context_, "foo.", *config_provider_manager_);
+  message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"]();
+  const auto& scoped_routes_config_dump2 =
+      MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::ScopedRoutesConfigDump&>(
+          *message_ptr);
+  TestUtility::loadFromYaml(R"EOF(
 inline_scoped_route_configs:
   - name: foo-scoped-routes
     scoped_route_configs:
@@ -618,22 +613,22 @@ inline_scoped_route_configs:
       nanos: 234000000
 dynamic_scoped_route_configs:
 )EOF",
-                              expected_config_dump);
-    EXPECT_TRUE(TestUtility::protoEqual(expected_config_dump, scoped_routes_config_dump2));
+                            expected_config_dump);
+  EXPECT_TRUE(TestUtility::protoEqual(expected_config_dump, scoped_routes_config_dump2));
 
-    // Now SRDS kicks off.
-    Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
-    resources.Add()->PackFrom(parseScopedRouteConfigurationFromYaml(R"EOF(
+  // Now SRDS kicks off.
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
+  resources.Add()->PackFrom(parseScopedRouteConfigurationFromYaml(R"EOF(
 name: dynamic-foo
 route_configuration_name: dynamic-foo-route-config
 key:
   fragments: { string_key: "172.30.30.10" }
 )EOF"));
 
-    timeSystem().setSystemTime(std::chrono::milliseconds(1234567891567));
-    srds_subscription_->onConfigUpdate(resources, "1");
+  timeSystem().setSystemTime(std::chrono::milliseconds(1234567891567));
+  srds_subscription_->onConfigUpdate(resources, "1");
 
-    TestUtility::loadFromYaml(R"EOF(
+  TestUtility::loadFromYaml(R"EOF(
 inline_scoped_route_configs:
   - name: foo-scoped-routes
     scoped_route_configs:
@@ -660,17 +655,16 @@ dynamic_scoped_route_configs:
       nanos: 567000000
     version_info: "1"
 )EOF",
-                              expected_config_dump);
-    message_ptr =
-        factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"]();
-    const auto& scoped_routes_config_dump3 =
-        MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::ScopedRoutesConfigDump&>(
-            *message_ptr);
-    EXPECT_TRUE(TestUtility::protoEqual(expected_config_dump, scoped_routes_config_dump3));
+                            expected_config_dump);
+  message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"]();
+  const auto& scoped_routes_config_dump3 =
+      MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::ScopedRoutesConfigDump&>(
+          *message_ptr);
+  EXPECT_TRUE(TestUtility::protoEqual(expected_config_dump, scoped_routes_config_dump3));
 
-    resources.Clear();
-    srds_subscription_->onConfigUpdate(resources, "2");
-    TestUtility::loadFromYaml(R"EOF(
+  resources.Clear();
+  srds_subscription_->onConfigUpdate(resources, "2");
+  TestUtility::loadFromYaml(R"EOF(
 inline_scoped_route_configs:
   - name: foo-scoped-routes
     scoped_route_configs:
@@ -692,30 +686,29 @@ dynamic_scoped_route_configs:
       nanos: 567000000
     version_info: "2"
 )EOF",
-                              expected_config_dump);
-    message_ptr =
-        factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"]();
-    const auto& scoped_routes_config_dump4 =
-        MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::ScopedRoutesConfigDump&>(
-            *message_ptr);
-    EXPECT_TRUE(TestUtility::protoEqual(expected_config_dump, scoped_routes_config_dump4));
-  }
+                            expected_config_dump);
+  message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"]();
+  const auto& scoped_routes_config_dump4 =
+      MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::ScopedRoutesConfigDump&>(
+          *message_ptr);
+  EXPECT_TRUE(TestUtility::protoEqual(expected_config_dump, scoped_routes_config_dump4));
+}
 
-  // Tests that SRDS only allows creation of delta static config providers.
-  TEST_F(ScopedRdsTest, DeltaStaticConfigProviderOnly) {
-    // Use match all regex due to lack of distinctive matchable output for
-    // coverage test.
-    EXPECT_DEATH(config_provider_manager_->createStaticConfigProvider(
-                     parseScopedRouteConfigurationFromYaml(R"EOF(
+// Tests that SRDS only allows creation of delta static config providers.
+TEST_F(ScopedRdsTest, DeltaStaticConfigProviderOnly) {
+  // Use match all regex due to lack of distinctive matchable output for
+  // coverage test.
+  EXPECT_DEATH(config_provider_manager_->createStaticConfigProvider(
+                   parseScopedRouteConfigurationFromYaml(R"EOF(
 name: dynamic-foo
 route_configuration_name: static-foo-route-config
 key:
   fragments: { string_key: "172.30.30.10" }
 )EOF"),
-                     factory_context_, Envoy::Config::ConfigProviderManager::NullOptionalArg()),
-                 ".*");
-  }
+                   factory_context_, Envoy::Config::ConfigProviderManager::NullOptionalArg()),
+               ".*");
+}
 
 } // namespace
-} // namespace
 } // namespace Router
+} // namespace Envoy

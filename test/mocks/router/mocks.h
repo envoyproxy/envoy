@@ -397,8 +397,8 @@ public:
 
 class MockRouteConfigProviderManager : public RouteConfigProviderManager {
 public:
-  MockRouteConfigProviderManager() = default;
-  ~MockRouteConfigProviderManager() override = default;
+  MockRouteConfigProviderManager();
+  ~MockRouteConfigProviderManager() override;
 
   MOCK_METHOD4(createRdsRouteConfigProvider,
                RouteConfigProviderPtr(
@@ -413,7 +413,7 @@ public:
 class MockScopedConfig : public ScopedConfig {
 public:
   MockScopedConfig();
-  ~MockScopedConfig() override = default;
+  ~MockScopedConfig() override;
 
   MOCK_CONST_METHOD1(getRouteConfig, ConfigConstSharedPtr(const Http::HeaderMap& headers));
 
