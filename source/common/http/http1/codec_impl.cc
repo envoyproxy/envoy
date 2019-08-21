@@ -474,6 +474,7 @@ int ConnectionImpl::onHeadersCompleteBase() {
     if (current_header_map_->Upgrade() &&
         absl::EqualsIgnoreCase(current_header_map_->Upgrade()->value().getStringView(),
                                Http::Headers::get().UpgradeValues.H2c)) {
+      ENVOY_CONN_LOG(trace, "removing unsupported h2c upgrade headers.", connection_);
       current_header_map_->removeUpgrade();
       // TODO(alyssawilk): remove the individual value "upgrade".
       if (current_header_map_->Connection() &&
