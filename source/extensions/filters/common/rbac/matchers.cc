@@ -70,9 +70,9 @@ AndMatcher::AndMatcher(const envoy::config::rbac::v2::Principal_Set& set) {
 
 bool AndMatcher::matches(const Network::Connection& connection,
                          const Envoy::Http::HeaderMap& headers,
-                         const envoy::api::v2::core::Metadata& metadata) const {
+                         const StreamInfo::StreamInfo& info) const {
   for (const auto& matcher : matchers_) {
-    if (!matcher->matches(connection, headers, metadata)) {
+    if (!matcher->matches(connection, headers, info)) {
       return false;
     }
   }
@@ -95,9 +95,9 @@ OrMatcher::OrMatcher(const Protobuf::RepeatedPtrField<::envoy::config::rbac::v2:
 
 bool OrMatcher::matches(const Network::Connection& connection,
                         const Envoy::Http::HeaderMap& headers,
-                        const envoy::api::v2::core::Metadata& metadata) const {
+                        const StreamInfo::StreamInfo& info) const {
   for (const auto& matcher : matchers_) {
-    if (matcher->matches(connection, headers, metadata)) {
+    if (matcher->matches(connection, headers, info)) {
       return true;
     }
   }
@@ -107,17 +107,17 @@ bool OrMatcher::matches(const Network::Connection& connection,
 
 bool NotMatcher::matches(const Network::Connection& connection,
                          const Envoy::Http::HeaderMap& headers,
-                         const envoy::api::v2::core::Metadata& metadata) const {
-  return !matcher_->matches(connection, headers, metadata);
+                         const StreamInfo::StreamInfo& info) const {
+  return !matcher_->matches(connection, headers, info);
 }
 
 bool HeaderMatcher::matches(const Network::Connection&, const Envoy::Http::HeaderMap& headers,
-                            const envoy::api::v2::core::Metadata&) const {
+                            const StreamInfo::StreamInfo&) const {
   return Envoy::Http::HeaderUtility::matchHeaders(headers, header_);
 }
 
 bool IPMatcher::matches(const Network::Connection& connection, const Envoy::Http::HeaderMap&,
-                        const envoy::api::v2::core::Metadata&) const {
+                        const StreamInfo::StreamInfo&) const {
   const Envoy::Network::Address::InstanceConstSharedPtr& ip =
       destination_ ? connection.localAddress() : connection.remoteAddress();
 
@@ -125,14 +125,14 @@ bool IPMatcher::matches(const Network::Connection& connection, const Envoy::Http
 }
 
 bool PortMatcher::matches(const Network::Connection& connection, const Envoy::Http::HeaderMap&,
-                          const envoy::api::v2::core::Metadata&) const {
+                          const StreamInfo::StreamInfo&) const {
   const Envoy::Network::Address::Ip* ip = connection.localAddress().get()->ip();
   return ip && ip->port() == port_;
 }
 
 bool AuthenticatedMatcher::matches(const Network::Connection& connection,
                                    const Envoy::Http::HeaderMap&,
-                                   const envoy::api::v2::core::Metadata&) const {
+                                   const StreamInfo::StreamInfo&) const {
   const auto* ssl = connection.ssl();
   if (!ssl) { // connection was not authenticated
     return false;
@@ -159,20 +159,21 @@ bool AuthenticatedMatcher::matches(const Network::Connection& connection,
 }
 
 bool MetadataMatcher::matches(const Network::Connection&, const Envoy::Http::HeaderMap&,
-                              const envoy::api::v2::core::Metadata& metadata) const {
-  return matcher_.match(metadata);
+                              const StreamInfo::StreamInfo& info) const {
+  return matcher_.match(info.dynamicMetadata());
 }
 
 bool PolicyMatcher::matches(const Network::Connection& connection,
                             const Envoy::Http::HeaderMap& headers,
-                            const envoy::api::v2::core::Metadata& metadata) const {
-  return permissions_.matches(connection, headers, metadata) &&
-         principals_.matches(connection, headers, metadata);
+                            const StreamInfo::StreamInfo& info) const {
+  return permissions_.matches(connection, headers, info) &&
+         principals_.matches(connection, headers, info) &&
+         (expr_ == nullptr ? true : Expr::matches(*expr_, info, headers));
 }
 
 bool RequestedServerNameMatcher::matches(const Network::Connection& connection,
                                          const Envoy::Http::HeaderMap&,
-                                         const envoy::api::v2::core::Metadata&) const {
+                                         const StreamInfo::StreamInfo&) const {
   return match(connection.requestedServerName());
 }
 

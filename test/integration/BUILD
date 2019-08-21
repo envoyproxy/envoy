@@ -773,6 +773,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "dynamic_validation_integration_test",
+    srcs = ["dynamic_validation_integration_test.cc"],
+    data = ["//test/config/integration:server_xds_files"],
+    deps = [
+        ":http_integration_lib",
+        "//source/common/stats:stats_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "xds_integration_test",
     srcs = ["xds_integration_test.cc"],
     data = ["//test/config/integration:server_xds_files"],
