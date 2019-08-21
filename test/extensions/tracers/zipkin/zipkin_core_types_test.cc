@@ -1,9 +1,6 @@
-#include "common/common/base64.h"
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
-#include "common/protobuf/message_validator_impl.h"
-#include "common/protobuf/utility.h"
 
 #include "extensions/tracers/zipkin/zipkin_core_constants.h"
 #include "extensions/tracers/zipkin/zipkin_core_types.h"
@@ -37,9 +34,8 @@ TEST(ZipkinCoreTypesEndpointTest, defaultConstructor) {
   ep.setServiceName("my_service");
   EXPECT_EQ("my_service", ep.serviceName());
 
-  const std::string expected_json =
-      R"({"ipv6":"2001:db8:85a3::8a2e:370:4444","port":7334,"serviceName":"my_service"})";
-  EXPECT_EQ(expected_json, ep.toJson());
+  EXPECT_EQ(R"({"ipv6":"2001:db8:85a3::8a2e:370:4444","port":7334,"serviceName":"my_service"})",
+            ep.toJson());
 }
 
 TEST(ZipkinCoreTypesEndpointTest, customConstructor) {
@@ -301,6 +297,7 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
   EXPECT_EQ(0ULL, span.annotations().size());
   EXPECT_EQ(0ULL, span.binaryAnnotations().size());
   EXPECT_EQ("0000000000000000", span.idAsHexString());
+  EXPECT_EQ("0000000000000000", span.parentIdAsHexString());
   EXPECT_EQ("0000000000000000", span.traceIdAsHexString());
   EXPECT_EQ(0LL, span.startTime());
   EXPECT_FALSE(span.debug());
