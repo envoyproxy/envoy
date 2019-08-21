@@ -85,18 +85,15 @@ CI_TARGET=$1
 
 if [[ $# -gt 1 ]]; then
   shift
-  # If this is a fuzz test, add _with_libfuzzer
-  if [[ "$CI_TARGET" == "bazel.fuzz" ]]; then
-    FUZZ_TEST_TARGETS=$*"_with_libfuzzer"
-  fi
   TEST_TARGETS=$*
+  FUZZ_TEST_TARGETS=$*"_with_libfuzzer"
 else
   TEST_TARGETS=//test/...
-  if [[ "$CI_TARGET" == "bazel.fuzz" ]]; then
-    FUZZ_TEST_TARGETS="$(bazel query "attr('tags','fuzzer',//test/...)")"
-  fi  
 fi
 
+if [[ ! -z "$FUZZ_TEST_TARGET" && "$CI_TARGET" == "bazel.fuzz" ]]; then
+  FUZZ_TEST_TARGETS="$(bazel query "attr('tags','fuzzer',${TEST_TARGETS})")"
+fi  
 
 if [[ "$CI_TARGET" == "bazel.release" ]]; then
   # When testing memory consumption, we want to test against exact byte-counts
