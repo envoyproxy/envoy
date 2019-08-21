@@ -493,6 +493,72 @@ TEST_F(RouteConfigProviderManagerImplTest, onConfigUpdateWrongSize) {
       EnvoyException, "Unexpected RDS resource length: 2");
 }
 
+// Regression test for https://github.com/envoyproxy/envoy/issues/7939
+TEST_F(RouteConfigProviderManagerImplTest, ConfigDumpAfterConfigRejected) {
+  auto message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"]();
+  const auto& route_config_dump =
+      MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::RoutesConfigDump&>(
+          *message_ptr);
+
+  // No routes at all, no last_updated timestamp
+  envoy::admin::v2alpha::RoutesConfigDump expected_route_config_dump;
+  TestUtility::loadFromYaml(R"EOF(
+static_route_configs:
+dynamic_route_configs:
+)EOF",
+                            expected_route_config_dump);
+  EXPECT_EQ(expected_route_config_dump.DebugString(), route_config_dump.DebugString());
+
+  timeSystem().setSystemTime(std::chrono::milliseconds(1234567891234));
+
+  // dynamic.
+  setup();
+  EXPECT_CALL(*factory_context_.cluster_manager_.subscription_factory_.subscription_, start(_));
+  factory_context_.init_manager_.initialize(init_watcher_);
+
+  const std::string response1_yaml = R"EOF(
+version_info: '1'
+resources:
+- "@type": type.googleapis.com/envoy.api.v2.RouteConfiguration
+  name: foo_route_config
+  virtual_hosts:
+  - name: integration
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/foo"
+      route:
+        cluster_header: ":authority"
+  - name: duplicate
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/foo"
+      route:
+        cluster_header: ":authority"
+)EOF";
+  auto response1 = TestUtility::parseYaml<envoy::api::v2::DiscoveryResponse>(response1_yaml);
+
+  EXPECT_CALL(init_watcher_, ready());
+
+  EXPECT_THROW_WITH_MESSAGE(
+      rds_callbacks_->onConfigUpdate(response1.resources(), response1.version_info()),
+      EnvoyException, "Only a single wildcard domain is permitted");
+
+  message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"]();
+  const auto& route_config_dump3 =
+      MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::RoutesConfigDump&>(
+          *message_ptr);
+  TestUtility::loadFromYaml(R"EOF(
+static_route_configs:
+dynamic_route_configs:
+)EOF",
+                            expected_route_config_dump);
+  EXPECT_EQ(expected_route_config_dump.DebugString(), route_config_dump3.DebugString());
+}
+
 } // namespace
 } // namespace Router
 } // namespace Envoy
