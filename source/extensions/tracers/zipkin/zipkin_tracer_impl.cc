@@ -83,6 +83,8 @@ Driver::Driver(const envoy::config::trace::v2::ZipkinConfig& zipkin_config,
 
   if (zipkin_config.collector_endpoint_version() !=
       envoy::config::trace::v2::ZipkinConfig::NOT_SET) {
+    // TODO(dio): Throw an error when we require user to explicitly setting up the collector
+    // endpoint version.
     collector.version = zipkin_config.collector_endpoint_version();
   }
 

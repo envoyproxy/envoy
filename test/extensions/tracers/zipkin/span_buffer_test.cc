@@ -13,18 +13,23 @@ namespace Tracers {
 namespace Zipkin {
 namespace {
 
-Endpoint createEndpoint() {
+enum class IpType { V4, V6 };
+
+Endpoint createEndpoint(const IpType ip_type) {
   Endpoint endpoint;
-  endpoint.setAddress(Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 8080, false));
+  endpoint.setAddress(ip_type == IpType::V6
+                          ? Envoy::Network::Utility::parseInternetAddress(
+                                "2001:db8:85a3::8a2e:370:4444", 7334, true)
+                          : Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 8080, false));
   endpoint.setServiceName("service1");
   return endpoint;
 }
 
-Annotation createAnnotation(const absl::string_view value) {
+Annotation createAnnotation(const absl::string_view value, const IpType ip_type) {
   Annotation annotation;
   annotation.setValue(value.data());
   annotation.setTimestamp(1566058071601051);
-  annotation.setEndpoint(createEndpoint());
+  annotation.setEndpoint(createEndpoint(ip_type));
   return annotation;
 }
 
@@ -35,15 +40,16 @@ BinaryAnnotation createTag() {
   return tag;
 }
 
-Span createSpan(const std::vector<absl::string_view>& annotation_values) {
+Span createSpan(const std::vector<absl::string_view>& annotation_values, const IpType ip_type) {
   DangerousDeprecatedTestTime test_time;
   Span span = Span(test_time.timeSystem());
   span.setId(1);
   span.setTraceId(1);
   span.setDuration(100);
   std::vector<Annotation> annotations;
+  annotations.reserve(annotation_values.size());
   for (absl::string_view value : annotation_values) {
-    annotations.push_back(createAnnotation(value));
+    annotations.push_back(createAnnotation(value, ip_type));
   }
   span.setAnnotations(annotations);
   span.setBinaryAnnotations({createTag()});
@@ -154,7 +160,7 @@ TEST(ZipkinSpanBufferTest, ConstructBuffer) {
 TEST(ZipkinSpanBufferTest, SerializeSpan) {
   const bool shared = true;
   SpanBuffer buffer1(envoy::config::trace::v2::ZipkinConfig::HTTP_JSON, shared, 2);
-  buffer1.addSpan(createSpan({"cs"}));
+  buffer1.addSpan(createSpan({"cs"}, IpType::V4));
   EXPECT_EQ("[{"
             R"("traceId":"0000000000000001",)"
             R"("id":"0000000000000001",)"
@@ -170,8 +176,25 @@ TEST(ZipkinSpanBufferTest, SerializeSpan) {
             "}]",
             buffer1.serialize());
 
+  SpanBuffer buffer1_v6(envoy::config::trace::v2::ZipkinConfig::HTTP_JSON, shared, 2);
+  buffer1_v6.addSpan(createSpan({"cs"}, IpType::V6));
+  EXPECT_EQ("[{"
+            R"("traceId":"0000000000000001",)"
+            R"("id":"0000000000000001",)"
+            R"("kind":"CLIENT",)"
+            R"("timestamp":"1566058071601051",)"
+            R"("duration":"100",)"
+            R"("localEndpoint":{)"
+            R"("serviceName":"service1",)"
+            R"("ipv6":"2001:db8:85a3::8a2e:370:4444",)"
+            R"("port":7334},)"
+            R"("tags":{)"
+            R"("component":"proxy"})"
+            "}]",
+            buffer1_v6.serialize());
+
   SpanBuffer buffer2(envoy::config::trace::v2::ZipkinConfig::HTTP_JSON, shared, 2);
-  buffer2.addSpan(createSpan({"cs", "sr"}));
+  buffer2.addSpan(createSpan({"cs", "sr"}, IpType::V4));
   EXPECT_EQ("[{"
             R"("traceId":"0000000000000001",)"
             R"("id":"0000000000000001",)"
@@ -201,7 +224,7 @@ TEST(ZipkinSpanBufferTest, SerializeSpan) {
             buffer2.serialize());
 
   SpanBuffer buffer3(envoy::config::trace::v2::ZipkinConfig::HTTP_JSON, !shared, 2);
-  buffer3.addSpan(createSpan({"cs", "sr"}));
+  buffer3.addSpan(createSpan({"cs", "sr"}, IpType::V4));
   EXPECT_EQ("[{"
             R"("traceId":"0000000000000001",)"
             R"("id":"0000000000000001",)"
@@ -230,7 +253,7 @@ TEST(ZipkinSpanBufferTest, SerializeSpan) {
             buffer3.serialize());
 
   SpanBuffer buffer4(envoy::config::trace::v2::ZipkinConfig::HTTP_PROTO, shared, 2);
-  buffer4.addSpan(createSpan({"cs"}));
+  buffer4.addSpan(createSpan({"cs"}, IpType::V4));
   EXPECT_EQ("{"
             R"("spans":[{)"
             R"("traceId":"AAAAAAAAAAE=",)"
@@ -247,8 +270,26 @@ TEST(ZipkinSpanBufferTest, SerializeSpan) {
             "}]}",
             serializedMessageToJson<zipkin::proto3::ListOfSpans>(buffer4.serialize()));
 
+  SpanBuffer buffer4_v6(envoy::config::trace::v2::ZipkinConfig::HTTP_PROTO, shared, 2);
+  buffer4_v6.addSpan(createSpan({"cs"}, IpType::V6));
+  EXPECT_EQ("{"
+            R"("spans":[{)"
+            R"("traceId":"AAAAAAAAAAE=",)"
+            R"("id":"AQAAAAAAAAA=",)"
+            R"("kind":"CLIENT",)"
+            R"("timestamp":"1566058071601051",)"
+            R"("duration":"100",)"
+            R"("localEndpoint":{)"
+            R"("serviceName":"service1",)"
+            R"("ipv6":"IAENuIWjAAAAAIouA3BERA==",)"
+            R"("port":7334},)"
+            R"("tags":{)"
+            R"("component":"proxy"})"
+            "}]}",
+            serializedMessageToJson<zipkin::proto3::ListOfSpans>(buffer4_v6.serialize()));
+
   SpanBuffer buffer5(envoy::config::trace::v2::ZipkinConfig::HTTP_PROTO, shared, 2);
-  buffer5.addSpan(createSpan({"cs", "sr"}));
+  buffer5.addSpan(createSpan({"cs", "sr"}, IpType::V4));
   EXPECT_EQ("{"
             R"("spans":[{)"
             R"("traceId":"AAAAAAAAAAE=",)"
@@ -279,7 +320,7 @@ TEST(ZipkinSpanBufferTest, SerializeSpan) {
             serializedMessageToJson<zipkin::proto3::ListOfSpans>(buffer5.serialize()));
 
   SpanBuffer buffer6(envoy::config::trace::v2::ZipkinConfig::HTTP_PROTO, !shared, 2);
-  buffer6.addSpan(createSpan({"cs", "sr"}));
+  buffer6.addSpan(createSpan({"cs", "sr"}, IpType::V4));
   EXPECT_EQ("{"
             R"("spans":[{)"
             R"("traceId":"AAAAAAAAAAE=",)"

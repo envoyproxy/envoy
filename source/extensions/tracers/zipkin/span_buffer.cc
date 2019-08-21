@@ -44,8 +44,7 @@ SerializerPtr SpanBuffer::makeSerializer(
   case envoy::config::trace::v2::ZipkinConfig::HTTP_PROTO:
     return std::make_unique<ProtobufSerializer>(shared_span_context);
   default:
-    // TODO(dio): Throw if it is required to be explicit when specifying version.
-    return std::make_unique<JsonV1Serializer>();
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 

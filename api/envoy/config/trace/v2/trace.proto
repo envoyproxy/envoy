@@ -65,6 +65,7 @@ message LightstepConfig {
   string access_token_file = 2 [(validate.rules).string.min_bytes = 1];
 }
 
+// Configuration for the Zipkin tracer.
 message ZipkinConfig {
   // The cluster manager cluster that hosts the Zipkin collectors. Note that the
   // Zipkin cluster must be defined in the :ref:`Bootstrap static cluster
@@ -87,10 +88,10 @@ message ZipkinConfig {
   // Available Zipkin collector endpoint versions.
   enum CollectorEndpointVersion {
     // If not set, it fallbacks to ``HTTP_JSON_V1``.
-    NOT_SET = 0;
+    NOT_SET = 0 [deprecated = true];
 
     // Zipkin API v1, JSON over HTTP.
-    HTTP_JSON_V1 = 1;
+    HTTP_JSON_V1 = 1 [deprecated = true];
 
     // Zipkin API v2, JSON over HTTP.
     HTTP_JSON = 2;
