@@ -7,6 +7,7 @@
 #include "common/common/fmt.h"
 #include "common/common/macros.h"
 #include "common/common/utility.h"
+#include "common/grpc/common.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
@@ -121,6 +122,8 @@ static void annotateVerbose(Span& span, const StreamInfo::StreamInfo& stream_inf
 }
 
 void HttpTracerUtility::finalizeSpan(Span& span, const Http::HeaderMap* request_headers,
+                                     const Http::HeaderMap* response_headers,
+                                     const Http::HeaderMap* response_trailers,
                                      const StreamInfo::StreamInfo& stream_info,
                                      const Config& tracing_config) {
   // Pre response data.
@@ -162,6 +165,19 @@ void HttpTracerUtility::finalizeSpan(Span& span, const Http::HeaderMap* request_
   span.setTag(Tracing::Tags::get().ResponseSize, std::to_string(stream_info.bytesSent()));
   span.setTag(Tracing::Tags::get().ResponseFlags,
               StreamInfo::ResponseFlagUtils::toShortString(stream_info));
+
+  // GRPC data.
+  if (response_headers && response_trailers && stream_info.protocol() == Http::Protocol::Http2 &&
+      Grpc::Common::hasGrpcContentType(*response_headers)) {
+    const Http::HeaderEntry* grpc_status_header = response_trailers->GrpcStatus();
+    if (grpc_status_header) {
+      span.setTag(Tracing::Tags::get().GrpcStatusCode, grpc_status_header->value().getStringView());
+    }
+    const Http::HeaderEntry* grpc_message_header = response_trailers->GrpcMessage();
+    if (grpc_message_header) {
+      span.setTag(Tracing::Tags::get().GrpcMessage, grpc_message_header->value().getStringView());
+    }
+  }
 
   if (tracing_config.verbose()) {
     annotateVerbose(span, stream_info);
