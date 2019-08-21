@@ -322,10 +322,10 @@ public:
   virtual ~FilterChain() = default;
 
   /**
-   * @return const TransportSocketFactory& a transport socket factory to be used by the new
-   * connection.
+   * @return a transport socket factory to be used by the new connection.
+   *         nullptr if the connection doesn't need a transport socket.
    */
-  virtual const TransportSocketFactory& transportSocketFactory() const PURE;
+  virtual const TransportSocketFactory* transportSocketFactory() const PURE;
 
   /**
    * const std::vector<FilterFactoryCb>& a list of filters to be used by the new connection.

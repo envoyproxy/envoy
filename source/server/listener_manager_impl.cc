@@ -805,11 +805,14 @@ void ListenerManagerImpl::stopWorkers() {
 
 ListenerFilterChainFactoryBuilder::ListenerFilterChainFactoryBuilder(
     ListenerImpl& listener,
-    Server::Configuration::TransportSocketFactoryContextImpl& factory_context)
-    : parent_(listener), factory_context_(factory_context) {}
+    Server::Configuration::TransportSocketFactoryContextImpl& factory_context, bool is_quic)
+    : parent_(listener), factory_context_(factory_context), is_quic_(is_quic) {}
 
 std::unique_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFilterChain(
     const ::envoy::api::v2::listener::FilterChain& filter_chain) const {
+  std::vector<std::string> server_names(filter_chain.filter_chain_match().server_names().begin(),
+                                        filter_chain.filter_chain_match().server_names().end());
+  if (!is_quic_) {
   // If the cluster doesn't have transport socket configured, then use the default "raw_buffer"
   // transport socket or BoringSSL-based "tls" transport socket if TLS settings are configured.
   // We copy by value first then override if necessary.
@@ -829,12 +832,20 @@ std::unique_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFi
   ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
       transport_socket, parent_.messageValidationVisitor(), config_factory);
 
-  std::vector<std::string> server_names(filter_chain.filter_chain_match().server_names().begin(),
-                                        filter_chain.filter_chain_match().server_names().end());
 
-  return std::make_unique<FilterChainImpl>(
+  return std::make_unique<TcpFilterChainImpl>(
       config_factory.createTransportSocketFactory(*message, factory_context_,
                                                   std::move(server_names)),
+      parent_.parent_.factory_.createNetworkFilterFactoryList(filter_chain.filters(), parent_));
+  }
+
+  if (!filter_chain.has_tls_context()) {
+    return nullptr;
+  }
+  auto tls_context_factory =
+      Config::Uitility::getAndCheckFactory<Ssl::ContextConfigFactory>("downstream_tls_context");
+  return std::make_unique<QuicFilterChainImpl>(
+      tls_context_factory.createSslContextConfig(filter_chain.tls_context(), factory_context_),
       parent_.parent_.factory_.createNetworkFilterFactoryList(filter_chain.filters(), parent_));
 }
 

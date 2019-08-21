@@ -383,13 +383,14 @@ private:
 class ListenerFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
 public:
   ListenerFilterChainFactoryBuilder(
-      ListenerImpl& listener, Configuration::TransportSocketFactoryContextImpl& factory_context);
+      ListenerImpl& listener, Configuration::TransportSocketFactoryContextImpl& factory_context, bool is_quic);
   std::unique_ptr<Network::FilterChain>
   buildFilterChain(const ::envoy::api::v2::listener::FilterChain& filter_chain) const override;
 
 private:
   ListenerImpl& parent_;
   Configuration::TransportSocketFactoryContextImpl& factory_context_;
+  bool is_quic_{false};
 };
 
 } // namespace Server

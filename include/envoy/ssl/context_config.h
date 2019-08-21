@@ -5,11 +5,21 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/common/pure.h"
 #include "envoy/ssl/certificate_validation_context_config.h"
 #include "envoy/ssl/tls_certificate_config.h"
 
+#include "common/protobuf/protobuf.h"
+
 namespace Envoy {
+
+namespace Server {
+namespace Configuration {
+class TransportSocketFactoryContext;
+} // namespace Configuration
+} // namespace Server
+
 namespace Ssl {
 
 /**
@@ -72,6 +82,8 @@ public:
   virtual void setSecretUpdateCallback(std::function<void()> callback) PURE;
 };
 
+using ContextConfigPtr = std::unique_ptr<ContextConfig>;
+
 class ClientContextConfig : public virtual ContextConfig {
 public:
   /**
@@ -123,6 +135,15 @@ public:
 };
 
 using ServerContextConfigPtr = std::unique_ptr<ServerContextConfig>;
+
+class ContextConfigFactory {
+public:
+  virtual ~ContextConfigFactory() = default;
+
+  virtual ContextConfigPtr createSslContextConfig(const Protobuf::Message& config, Server::Configuration::TransportSocketFactoryContext& context) PURE;
+
+   virtual std::string name() const PURE;
+};
 
 } // namespace Ssl
 } // namespace Envoy
