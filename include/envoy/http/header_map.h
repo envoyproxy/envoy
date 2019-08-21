@@ -317,7 +317,6 @@ private:
   HEADER_FUNC(GrpcStatus)                                                                          \
   HEADER_FUNC(GrpcTimeout)                                                                         \
   HEADER_FUNC(Host)                                                                                \
-  HEADER_FUNC(Http2Settings)                                                                       \
   HEADER_FUNC(KeepAlive)                                                                           \
   HEADER_FUNC(LastModified)                                                                        \
   HEADER_FUNC(Location)                                                                            \
