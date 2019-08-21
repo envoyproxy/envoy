@@ -88,6 +88,21 @@ ProtoValidationException::ProtoValidationException(const std::string& validation
   ENVOY_LOG_MISC(debug, "Proto validation error; throwing {}", what());
 }
 
+void MessageUtil::checkUnknownFields(const Protobuf::Message& message,
+                                     ProtobufMessage::ValidationVisitor& validation_visitor) {
+  const auto& unknown_fields = message.GetReflection()->GetUnknownFields(message);
+  // If there are no unknown fields, we're done here.
+  if (unknown_fields.empty()) {
+    return;
+  }
+  std::string error_msg;
+  for (int n = 0; n < unknown_fields.field_count(); ++n) {
+    error_msg += absl::StrCat(n > 0 ? ", " : "", unknown_fields.field(n).number());
+  }
+  validation_visitor.onUnknownField("type " + message.GetTypeName() + " with unknown field set {" +
+                                    error_msg + "}");
+}
+
 void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& message,
                                ProtobufMessage::ValidationVisitor& validation_visitor) {
   Protobuf::util::JsonParseOptions options;
