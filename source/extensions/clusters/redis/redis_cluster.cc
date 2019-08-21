@@ -185,13 +185,8 @@ RedisCluster::RedisDiscoverySession::RedisDiscoverySession::ProcessCluster(
     return nullptr;
   }
 
-  std::string address = array[0].asString();
-  bool ipv6 = (address.find(':') != std::string::npos);
   try {
-    if (ipv6) {
-      return std::make_shared<Network::Address::Ipv6Instance>(address, array[1].asInteger());
-    }
-    return std::make_shared<Network::Address::Ipv4Instance>(address, array[1].asInteger());
+    return Network::Utility::parseInternetAddress(array[0].asString(), array[1].asInteger(), false);
   } catch (const EnvoyException& ex) {
     ENVOY_LOG(debug, "Invalid ip address in CLUSTER SLOTS response: {}", ex.what());
     return nullptr;
