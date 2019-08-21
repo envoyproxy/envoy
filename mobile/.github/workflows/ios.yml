@@ -7,7 +7,7 @@ jobs:
   # is closed.
   macdist:
     name: mac_dist
-    runs-on: macos-latest
+    runs-on: macOS-10.14
     steps:
       - uses: actions/checkout@v1
         with:
@@ -34,7 +34,7 @@ jobs:
       #   name: 'Check liveliness'
   swifttests:
     name: swift_tests
-    runs-on: macos-latest
+    runs-on: macOS-10.14
     steps:
       - uses: actions/checkout@v1
     # TODO(rebello95): to fill out.
