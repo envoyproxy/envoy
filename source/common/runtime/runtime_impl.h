@@ -31,6 +31,7 @@ namespace Envoy {
 namespace Runtime {
 
 bool runtimeFeatureEnabled(absl::string_view feature);
+uint64_t getInteger(absl::string_view feature, uint64_t default_value);
 
 using RuntimeSingleton = ThreadSafeSingleton<Loader>;
 

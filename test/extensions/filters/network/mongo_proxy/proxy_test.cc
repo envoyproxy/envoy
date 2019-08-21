@@ -178,7 +178,7 @@ TEST_F(MongoProxyFilterTest, DelayFaults) {
   EXPECT_EQ(1U, store_.counter("test.op_kill_cursors").value());
 
   EXPECT_CALL(read_filter_callbacks_, continueReading());
-  delay_timer->callback_();
+  delay_timer->invokeCallback();
   EXPECT_EQ(1U, store_.counter("test.delays_injected").value());
 }
 
@@ -558,7 +558,7 @@ TEST_F(MongoProxyFilterTest, ConcurrentQueryWithDrainClose) {
 
   EXPECT_CALL(read_filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
   EXPECT_CALL(*drain_timer, disableTimer());
-  drain_timer->callback_();
+  drain_timer->invokeCallback();
 
   EXPECT_EQ(0U, store_.gauge("test.op_query_active", Stats::Gauge::ImportMode::Accumulate).value());
   EXPECT_EQ(1U, store_.counter("test.cx_drain_close").value());

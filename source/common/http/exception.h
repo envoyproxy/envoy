@@ -17,6 +17,14 @@ public:
 };
 
 /**
+ * Raised when outbound frame queue flood is detected.
+ */
+class FrameFloodException : public CodecProtocolException {
+public:
+  FrameFloodException(const std::string& message) : CodecProtocolException(message) {}
+};
+
+/**
  * Raised when a response is received on a connection that did not send a request. In practice
  * this can only happen on HTTP/1.1 connections.
  */

@@ -305,7 +305,7 @@ private:
   Buffer::RawSlice reserved_iovec_;
   char* reserved_current_{};
   Protocol protocol_{Protocol::Http11};
-  const uint32_t max_headers_kb_;
+  const uint32_t max_request_headers_kb_;
 
   bool strict_header_validation_;
 };
@@ -318,10 +318,6 @@ public:
   ServerConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
                        ServerConnectionCallbacks& callbacks, Http1Settings settings,
                        uint32_t max_request_headers_kb);
-
-  ServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks,
-                       Http1Settings settings, uint32_t max_request_headers_kb,
-                       bool strict_header_validation);
 
   bool supports_http_10() override { return codec_settings_.accept_http_10_; }
 

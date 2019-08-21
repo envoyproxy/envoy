@@ -20,6 +20,7 @@ namespace Config {
  * Manages the logic of a (non-aggregated) delta xDS subscription.
  * TODO(fredlas) add aggregation support. The plan is for that to happen in XdsGrpcContext,
  *               which this class will then "have a" rather than "be a".
+ * TODO(kyessenov) implement skip_subsequent_node for delta xDS subscription.
  */
 class DeltaSubscriptionImpl : public Subscription,
                               public GrpcStreamCallbacks<envoy::api::v2::DeltaDiscoveryResponse>,

@@ -328,6 +328,11 @@ public:
    * produced by the factory.
    */
   virtual std::string name() PURE;
+
+  /**
+   * @return bool true if this filter must be the last filter in a filter chain, false otherwise.
+   */
+  virtual bool isTerminalFilter() { return false; }
 };
 
 /**
@@ -428,6 +433,11 @@ public:
    * produced by the factory.
    */
   virtual std::string name() PURE;
+
+  /**
+   * @return bool true if this filter must be the last filter in a filter chain, false otherwise.
+   */
+  virtual bool isTerminalFilter() { return false; }
 };
 
 } // namespace Configuration

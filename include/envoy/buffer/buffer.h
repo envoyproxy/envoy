@@ -33,6 +33,7 @@ struct RawSlice {
  */
 class BufferFragment {
 public:
+  virtual ~BufferFragment() = default;
   /**
    * @return const void* a pointer to the referenced data.
    */
@@ -47,9 +48,6 @@ public:
    * Called by a buffer when the referenced data is no longer needed.
    */
   virtual void done() PURE;
-
-protected:
-  virtual ~BufferFragment() = default;
 };
 
 /**
