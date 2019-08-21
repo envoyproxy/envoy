@@ -105,6 +105,19 @@ namespace Envoy {
     }                                                                                              \
   } while (false)
 
+// A convenience macro for testing Envoy deprecated features. This will disable the test when
+// tests are built with --define deprecated_features=disabled to avoid the hard-failure mode for
+// deprecated features. Sample usage is:
+//
+// TEST_F(FixtureName, DEPRECATED_FEATURE_TEST(TestName)) {
+// ...
+// }
+#ifndef ENVOY_DISABLE_DEPRECATED_FEATURES
+#define DEPRECATED_FEATURE_TEST(X) X
+#else
+#define DEPRECATED_FEATURE_TEST(X) DISABLED_##X
+#endif
+
 // Random number generator which logs its seed to stderr. To repeat a test run with a non-zero seed
 // one can run the test with --test_arg=--gtest_random_seed=[seed]
 class TestRandomGenerator {

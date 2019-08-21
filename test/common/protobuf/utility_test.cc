@@ -492,8 +492,7 @@ TEST_F(DeprecatedFieldsTest, NoErrorWhenDeprecatedFieldsUnused) {
   EXPECT_EQ(0, runtime_deprecated_feature_use_.value());
 }
 
-#ifndef ENVOY_DISABLE_DEPRECATED_FEATURES
-TEST_F(DeprecatedFieldsTest, IndividualFieldDeprecated) {
+TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(IndividualFieldDeprecated)) {
   envoy::test::deprecation_test::Base base;
   base.set_is_deprecated("foo");
   // Non-fatal checks for a deprecated field should log rather than throw an exception.
@@ -504,7 +503,7 @@ TEST_F(DeprecatedFieldsTest, IndividualFieldDeprecated) {
 }
 
 // Use of a deprecated and disallowed field should result in an exception.
-TEST_F(DeprecatedFieldsTest, IndividualFieldDisallowed) {
+TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(IndividualFieldDisallowed)) {
   envoy::test::deprecation_test::Base base;
   base.set_is_deprecated_fatal("foo");
   EXPECT_THROW_WITH_REGEX(
@@ -512,7 +511,8 @@ TEST_F(DeprecatedFieldsTest, IndividualFieldDisallowed) {
       "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated_fatal'");
 }
 
-TEST_F(DeprecatedFieldsTest, IndividualFieldDisallowedWithRuntimeOverride) {
+TEST_F(DeprecatedFieldsTest,
+       DEPRECATED_FEATURE_TEST(IndividualFieldDisallowedWithRuntimeOverride)) {
   envoy::test::deprecation_test::Base base;
   base.set_is_deprecated_fatal("foo");
 
@@ -534,7 +534,7 @@ TEST_F(DeprecatedFieldsTest, IndividualFieldDisallowedWithRuntimeOverride) {
   EXPECT_EQ(1, runtime_deprecated_feature_use_.value());
 }
 
-TEST_F(DeprecatedFieldsTest, DisallowViaRuntime) {
+TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(DisallowViaRuntime)) {
   envoy::test::deprecation_test::Base base;
   base.set_is_deprecated("foo");
 
@@ -556,7 +556,7 @@ TEST_F(DeprecatedFieldsTest, DisallowViaRuntime) {
 // Note that given how Envoy config parsing works, the first time we hit a
 // 'fatal' error and throw, we won't log future warnings. That said, this tests
 // the case of the warning occurring before the fatal error.
-TEST_F(DeprecatedFieldsTest, MixOfFatalAndWarnings) {
+TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(MixOfFatalAndWarnings)) {
   envoy::test::deprecation_test::Base base;
   base.set_is_deprecated("foo");
   base.set_is_deprecated_fatal("foo");
@@ -569,7 +569,7 @@ TEST_F(DeprecatedFieldsTest, MixOfFatalAndWarnings) {
 }
 
 // Present (unused) deprecated messages should be detected as deprecated.
-TEST_F(DeprecatedFieldsTest, MessageDeprecated) {
+TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(MessageDeprecated)) {
   envoy::test::deprecation_test::Base base;
   base.mutable_deprecated_message();
   EXPECT_LOG_CONTAINS(
@@ -578,7 +578,7 @@ TEST_F(DeprecatedFieldsTest, MessageDeprecated) {
   EXPECT_EQ(1, runtime_deprecated_feature_use_.value());
 }
 
-TEST_F(DeprecatedFieldsTest, InnerMessageDeprecated) {
+TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(InnerMessageDeprecated)) {
   envoy::test::deprecation_test::Base base;
   base.mutable_not_deprecated_message()->set_inner_not_deprecated("foo");
   // Checks for a non-deprecated field shouldn't trigger warnings
@@ -594,7 +594,7 @@ TEST_F(DeprecatedFieldsTest, InnerMessageDeprecated) {
 }
 
 // Check that repeated sub-messages get validated.
-TEST_F(DeprecatedFieldsTest, SubMessageDeprecated) {
+TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(SubMessageDeprecated)) {
   envoy::test::deprecation_test::Base base;
   base.add_repeated_message();
   base.add_repeated_message()->set_inner_deprecated("foo");
@@ -608,7 +608,7 @@ TEST_F(DeprecatedFieldsTest, SubMessageDeprecated) {
 }
 
 // Check that deprecated repeated messages trigger
-TEST_F(DeprecatedFieldsTest, RepeatedMessageDeprecated) {
+TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(RepeatedMessageDeprecated)) {
   envoy::test::deprecation_test::Base base;
   base.add_deprecated_repeated_message();
 
@@ -618,7 +618,6 @@ TEST_F(DeprecatedFieldsTest, RepeatedMessageDeprecated) {
                       "'envoy.test.deprecation_test.Base.deprecated_repeated_message'",
                       MessageUtil::checkForDeprecation(base));
 }
-#endif
 
 class TimestampUtilTest : public testing::Test, public ::testing::WithParamInterface<int64_t> {};
 
