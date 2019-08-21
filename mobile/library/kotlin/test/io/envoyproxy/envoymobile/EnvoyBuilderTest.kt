@@ -10,7 +10,7 @@ import org.junit.Test
 import org.mockito.Mockito.`when`
 import org.mockito.Mockito.mock
 
-private const val TEST_CONFIG ="""
+private const val TEST_CONFIG = """
 mock_template:
 - name: mock
   connect_timeout: {{ connect_timeout }}
