@@ -172,17 +172,19 @@ message Cluster {
     // specific load balancer. Consult the configured cluster's documentation for whether to set
     // this option or not.
     CLUSTER_PROVIDED = 6;
+
+    // Use the new :ref:`load_balancing_policy
+    // <envoy_api_field_Cluster.load_balancing_policy>` field to
+    // determine the LB policy.
+    // [#next-major-version: In the v3 API, we should consider
+    // deprecating the lb_policy field and instead using the new
+    // load_balancing_policy field as the one and only mechanism for
+    // configuring this.]
+    NEW_POLICY_CONFIG = 7;
   }
   // The :ref:`load balancer type <arch_overview_load_balancing_types>` to use
   // when picking a host in the cluster.
-  //
-  // .. attention::
-  //
-  //   **This field is deprecated**. Set the
-  //   :ref:`load_balancing_policy<envoy_api_field_Cluster.load_balancing_policy>`
-  //   field instead.
-  //
-  LbPolicy lb_policy = 6 [(validate.rules).enum.defined_only = true, deprecated = true];
+  LbPolicy lb_policy = 6 [(validate.rules).enum.defined_only = true];
 
   // If the service discovery type is
   // :ref:`STATIC<envoy_api_enum_value_Cluster.DiscoveryType.STATIC>`,
@@ -525,20 +527,13 @@ message Cluster {
   // has additional configuration options.
   // Specifying ring_hash_lb_config or least_request_lb_config without setting the corresponding
   // LbPolicy will generate an error at runtime.
-  //
-  // .. attention::
-  //
-  //   **These fields are deprecated**. Set the
-  //   :ref:`load_balancing_policy<envoy_api_field_Cluster.load_balancing_policy>`
-  //   field instead.
-  //
   oneof lb_config {
     // Optional configuration for the Ring Hash load balancing policy.
-    RingHashLbConfig ring_hash_lb_config = 23 [deprecated = true];
+    RingHashLbConfig ring_hash_lb_config = 23;
     // Optional configuration for the Original Destination load balancing policy.
-    OriginalDstLbConfig original_dst_lb_config = 34 [deprecated = true];
+    OriginalDstLbConfig original_dst_lb_config = 34;
     // Optional configuration for the LeastRequest load balancing policy.
-    LeastRequestLbConfig least_request_lb_config = 37 [deprecated = true];
+    LeastRequestLbConfig least_request_lb_config = 37;
   }
 
   // Common configuration for all load balancer implementations.
@@ -611,14 +606,7 @@ message Cluster {
   }
 
   // Common configuration for all load balancer implementations.
-  //
-  // .. attention::
-  //
-  //   **This field is deprecated**. Set the
-  //   :ref:`load_balancing_policy<envoy_api_field_Cluster.load_balancing_policy>`
-  //   field instead.
-  //
-  CommonLbConfig common_lb_config = 27 [deprecated = true];
+  CommonLbConfig common_lb_config = 27;
 
   // Optional custom transport socket implementation to use for upstream connections.
   core.TransportSocket transport_socket = 24;
@@ -668,63 +656,19 @@ message Cluster {
   // checking before removing it from the cluster.
   bool drain_connections_on_host_removal = 32;
 
-  // New mechanism for LB policy configuration. If set and understood
-  // by the client, replaces the
-  // :ref:`lb_policy<envoy_api_field_Cluster.lb_policy>` field, the
-  // :ref:`common_lb_config<envoy_api_field_Cluster.common_lb_config>`
-  // field, and the fields in the
-  // :ref:`lb_config<envoy_api_field_Cluster.lb_config>` oneof. For backward
-  // compatibility, management servers should populate both sets of fields.
+  // New mechanism for LB policy configuration. Used only if the
+  // :ref:`lb_policy<envoy_api_field_Cluster.lb_policy>` field has the value
+  // :ref:`NEW_POLICY_CONFIG<envoy_api_enum_value_Cluster.LbPolicy.NEW_POLICY_CONFIG>`.
   LoadBalancingPolicy load_balancing_policy = 40;
 }
 
-// Load balancing policy selection.
+// New Load balancing policy selection.
 //
 // Every LB policy defined via this mechanism will be identified via a
 // unique name using reverse DNS notation. If the policy needs configuration
 // parameters, it must define a message for its own configuration, which will
 // be stored in the config field. The name of the policy will tell clients
 // which type of message they should expect to see in the config field.
-//
-// Envoy supports the following LB policies, each of which has its own
-// configuration message. Refer to
-// :ref:`load balancer type <arch_overview_load_balancing_types>` architecture
-// overview section for information on each type.
-//
-// "io.envoyproxy.weighted_round_robin":
-//     Config type: :ref:`CommonLbConfig<envoy_api_msg_Cluster.CommonLbConfig>`
-//     Refer to the :ref:`round robin load balancing
-//     policy<arch_overview_load_balancing_types_round_robin>`
-//     for an explanation.
-//
-// "io.envoyproxy.least_request":
-//     Config type: :ref:`LeastRequestLbConfig<envoy_api_msg_Cluster.LeastRequestLbConfig>`
-//     Refer to the :ref:`least request load balancing
-//     policy<arch_overview_load_balancing_types_least_request>`
-//     for an explanation.
-//
-// "io.envoyproxy.ring_hash":
-//     Config type: :ref:`RingHashLbConfig<envoy_api_msg_Cluster.RingHashLbConfig>`
-//     Refer to the :ref:`ring hash load balancing
-//     policy<arch_overview_load_balancing_types_ring_hash>`
-//     for an explanation.
-//
-// "io.envoyproxy.random":
-//     Config type: :ref:`CommonLbConfig<envoy_api_msg_Cluster.CommonLbConfig>`
-//     Refer to the :ref:`random load balancing
-//     policy<arch_overview_load_balancing_types_random>`
-//     for an explanation.
-//
-// "io.envoyproxy.original_dst":
-//     Config type: :ref:`OriginalDstLbConfig<envoy_api_msg_Cluster.OriginalDstLbConfig>`
-//     Refer to the :ref:`original destination load balancing
-//     policy<arch_overview_load_balancing_types_original_destination>`
-//     for an explanation.
-//
-// "io.envoyproxy.maglev":
-//     Config type: :ref:`CommonLbConfig<envoy_api_msg_Cluster.CommonLbConfig>`
-//     Refer to the :ref:`Maglev load balancing
-//     policy<arch_overview_load_balancing_types_maglev>` for an explanation.
 message LoadBalancingPolicy {
   message Policy {
     // Required. The name of the LB policy.
