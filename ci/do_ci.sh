@@ -264,9 +264,7 @@ elif [[ "$CI_TARGET" == "bazel.fuzz" ]]; then
   setup_clang_toolchain
   echo "bazel ASAN libFuzzer build with fuzz tests ${FUZZ_TEST_TARGETS}"
   echo "Building envoy fuzzers and executing 100 fuzz iterations..."
-  for t in ${FUZZ_TEST_TARGETS}; do
-    bazel_with_collection run ${BAZEL_BUILD_OPTIONS} --config=asan-fuzzer $t -- -runs=10
-  done;
+  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} --config=asan-fuzzer ${FUZZ_TEST_TARGETS} --test_arg="-runs=10"
   exit 0
 elif [[ "$CI_TARGET" == "fix_format" ]]; then
   echo "fix_format..."
