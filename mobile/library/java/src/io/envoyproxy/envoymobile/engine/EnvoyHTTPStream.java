@@ -61,7 +61,5 @@ public class EnvoyHTTPStream {
    *
    * @return Success, unless the streamHandle has already been canceled.
    */
-  public int resetStream() {
-    return JniLibrary.resetStream(streamHandle);
-  }
+  public int resetStream() { return JniLibrary.resetStream(streamHandle); }
 }
