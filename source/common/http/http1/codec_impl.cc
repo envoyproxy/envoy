@@ -476,11 +476,28 @@ int ConnectionImpl::onHeadersCompleteBase() {
                                Http::Headers::get().UpgradeValues.H2c)) {
       ENVOY_CONN_LOG(trace, "removing unsupported h2c upgrade headers.", connection_);
       current_header_map_->removeUpgrade();
-      // TODO(alyssawilk): remove the individual value "upgrade".
-      if (current_header_map_->Connection() &&
-          absl::EqualsIgnoreCase(current_header_map_->Connection()->value().getStringView(),
-                                 Http::Headers::get().ConnectionValues.Upgrade)) {
-        current_header_map_->removeConnection();
+      if (current_header_map_->Connection()) {
+        auto values = Envoy::StringUtil::splitToken(
+            current_header_map_->Connection()->value().getStringView(), ",");
+        std::string new_values;
+        for (auto& v : values) {
+          auto value = StringUtil::toLower(StringUtil::trim(v));
+          if (value == Http::Headers::get().ConnectionValues.Upgrade) {
+            continue;
+          }
+          if (value == Http::Headers::get().ConnectionValues.Http2Settings) {
+            continue;
+          }
+          if (!new_values.empty()) {
+            new_values += ", ";
+          }
+          new_values.append(value.data(), value.size());
+        }
+        if (new_values.empty()) {
+          current_header_map_->removeConnecton();
+        } else {
+          current_header_map_->Connection()->value(new_values);
+        }
       }
       current_header_map_->remove(Headers::get().Http2Settings);
     } else {

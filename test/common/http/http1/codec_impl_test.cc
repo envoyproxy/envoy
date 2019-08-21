@@ -749,7 +749,33 @@ TEST_F(Http1ServerConnectionImplTest, IgnoreUpgradeH2c) {
       {":authority", "www.somewhere.com"}, {":path", "/"}, {":method", "GET"}};
   Buffer::OwnedImpl buffer(
       "GET http://www.somewhere.com/ HTTP/1.1\r\nConnection: "
-      "upgrade\r\nUpgrade: h2c\r\nHTTP2-Settings: token64\r\nHost: bah\r\n\r\n");
+      "Upgrade, HTTP2-Settings\r\nUpgrade: h2c\r\nHTTP2-Settings: token64\r\nHost: bah\r\n\r\n");
+  expectHeadersTest(Protocol::Http11, true, buffer, expected_headers);
+}
+
+TEST_F(Http1ServerConnectionImplTest, IgnoreUpgradeH2cClose) {
+  initialize();
+
+  TestHeaderMapImpl expected_headers{{":authority", "www.somewhere.com"},
+                                     {":path", "/"},
+                                     {":method", "GET"},
+                                     {"connection", "close"}};
+  Buffer::OwnedImpl buffer("GET http://www.somewhere.com/ HTTP/1.1\r\nConnection: "
+                           "Upgrade, Close, HTTP2-Settings\r\nUpgrade: h2c\r\nHTTP2-Settings: "
+                           "token64\r\nHost: bah\r\n\r\n");
+  expectHeadersTest(Protocol::Http11, true, buffer, expected_headers);
+}
+
+TEST_F(Http1ServerConnectionImplTest, IgnoreUpgradeH2cCloseEtc) {
+  initialize();
+
+  TestHeaderMapImpl expected_headers{{":authority", "www.somewhere.com"},
+                                     {":path", "/"},
+                                     {":method", "GET"},
+                                     {"connection", "close, etc"}};
+  Buffer::OwnedImpl buffer("GET http://www.somewhere.com/ HTTP/1.1\r\nConnection: "
+                           "Upgrade, Close, HTTP2-Settings, Etc\r\nUpgrade: h2c\r\nHTTP2-Settings: "
+                           "token64\r\nHost: bah\r\n\r\n");
   expectHeadersTest(Protocol::Http11, true, buffer, expected_headers);
 }
 
