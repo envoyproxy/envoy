@@ -157,7 +157,7 @@ TEST_F(ProtobufUtilityTest, LoadBinaryProtoUnknownFieldFromFile) {
   EXPECT_THROW_WITH_MESSAGE(TestUtility::loadFromFile(filename, proto_from_file, *api_),
                             EnvoyException,
                             "Protobuf message (type envoy.config.bootstrap.v2.Bootstrap with "
-                            "unknown field(s) 1) has unknown fields");
+                            "unknown field set {1}) has unknown fields");
 }
 
 // Multiple unknown fields (or with wrong type) in a message are rejected.
@@ -171,7 +171,7 @@ TEST_F(ProtobufUtilityTest, LoadBinaryProtoUnknownMultipleFieldsFromFile) {
   EXPECT_THROW_WITH_MESSAGE(TestUtility::loadFromFile(filename, proto_from_file, *api_),
                             EnvoyException,
                             "Protobuf message (type envoy.config.bootstrap.v2.Bootstrap with "
-                            "unknown field(s) 1, 2) has unknown fields");
+                            "unknown field set {1, 2}) has unknown fields");
 }
 
 TEST_F(ProtobufUtilityTest, LoadTextProtoFromFile) {
@@ -350,7 +350,7 @@ TEST_F(ProtobufUtilityTest, AnyConvertWrongFields) {
   EXPECT_THROW_WITH_MESSAGE(TestUtility::anyConvert<ProtobufWkt::Timestamp>(source_any),
                             EnvoyException,
                             "Protobuf message (type google.protobuf.Timestamp with unknown "
-                            "field(s) 1) has unknown fields");
+                            "field set {1}) has unknown fields");
 }
 
 TEST_F(ProtobufUtilityTest, JsonConvertSuccess) {
