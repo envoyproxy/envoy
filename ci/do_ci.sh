@@ -93,7 +93,7 @@ if [[ $# -gt 1 ]]; then
 else
   TEST_TARGETS=//test/...
   if [[ "$CI_TARGET" == "bazel.fuzz" ]]; then
-    FUZZ_TEST_TARGETS="$(for t in $(bazel query "attr('tags','libfuzzer',//test/...)"); do echo $t; done;)"
+    FUZZ_TEST_TARGETS="$(bazel query "attr('tags','fuzzer',//test/...)")"
   fi  
 fi
 
@@ -263,8 +263,10 @@ elif [[ "$CI_TARGET" == "bazel.coverity" ]]; then
 elif [[ "$CI_TARGET" == "bazel.fuzz" ]]; then
   setup_clang_toolchain
   echo "bazel ASAN libFuzzer build with fuzz tests ${FUZZ_TEST_TARGETS}"
-  echo "Building envoy fuzzers and running against corpora"
-  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=asan-fuzzer ${FUZZ_TEST_TARGETS}
+  echo "Building envoy fuzzers and executing 100 fuzz iterations..."
+  for t in ${FUZZ_TEST_TARGETS}; do
+    bazel_with_collection run ${BAZEL_BUILD_OPTIONS} --config=asan-fuzzer $t -- -runs=10
+  done;
   exit 0
 elif [[ "$CI_TARGET" == "fix_format" ]]; then
   echo "fix_format..."
