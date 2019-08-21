@@ -30,7 +30,7 @@ namespace {
 TEST(ValidationClusterManagerTest, MockedMethods) {
   Stats::IsolatedStoreImpl stats_store;
   Event::SimulatedTimeSystem time_system;
-  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
+  NiceMock<ProtobufMessage::MockValidationContext> validation_context;
   Api::ApiPtr api(Api::createApiForTest(stats_store, time_system));
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<ThreadLocal::MockInstance> tls;
@@ -47,7 +47,7 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
 
   ValidationClusterManagerFactory factory(admin, runtime, stats_store, tls, random, dns_resolver,
                                           ssl_context_manager, dispatcher, local_info,
-                                          secret_manager, validation_visitor, *api, http_context,
+                                          secret_manager, validation_context, *api, http_context,
                                           log_manager, singleton_manager, time_system);
 
   const envoy::config::bootstrap::v2::Bootstrap bootstrap;

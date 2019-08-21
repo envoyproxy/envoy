@@ -848,9 +848,9 @@ TEST_F(StatsThreadLocalStoreTest, NonHotRestartNoTruncation) {
 class StatsThreadLocalStoreTestNoFixture : public testing::Test {
 protected:
   StatsThreadLocalStoreTestNoFixture()
-      : save_use_fakes_(Stats::SymbolTableCreator::useFakeSymbolTables()) {}
+      : save_use_fakes_(SymbolTableCreator::useFakeSymbolTables()) {}
   ~StatsThreadLocalStoreTestNoFixture() override {
-    Stats::SymbolTableCreator::setUseFakeSymbolTables(save_use_fakes_);
+    TestUtil::SymbolTableCreatorTestPeer::setUseFakeSymbolTables(save_use_fakes_);
     if (threading_enabled_) {
       store_->shutdownThreading();
       tls_.shutdownThread();
@@ -858,7 +858,7 @@ protected:
   }
 
   void init(bool use_fakes) {
-    Stats::SymbolTableCreator::setUseFakeSymbolTables(use_fakes);
+    TestUtil::SymbolTableCreatorTestPeer::setUseFakeSymbolTables(use_fakes);
     symbol_table_ = SymbolTableCreator::makeSymbolTable();
     alloc_ = std::make_unique<AllocatorImpl>(*symbol_table_);
     store_ = std::make_unique<ThreadLocalStoreImpl>(*alloc_);

@@ -167,6 +167,19 @@ run will fail.
 
 .. code:: bash
 
-  > bazel-bin/test/tools/router_check/router_check_tool --config-path ... --test-path ... --useproto --fail-under 0.08
-  Current route coverage: 0.0744863
-  Failed to meet coverage requirement: 0.08
+  > bazel-bin/test/tools/router_check/router_check_tool --config-path ... --test-path ... --useproto --fail-under 8
+  Current route coverage: 7.44863%
+  Failed to meet coverage requirement: 8%
+
+
+By default the coverage report measures test coverage by checking that at least one field is
+verified for every route. However, this can leave holes in the tests where fields
+aren't validated and later changed. For more comprehensive coverage you can add a flag,
+`--covall`, which will calculate coverage taking into account all of the possible
+fields that could be tested.
+
+.. code:: bash
+
+  > bazel-bin/test/tools/router_check/router_check_tool --config-path ... --test-path ... --useproto --f 7 --covall
+  Current route coverage: 6.2948%
+  Failed to meet coverage requirement: 7%

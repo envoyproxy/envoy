@@ -240,6 +240,7 @@ envoy_cc_test(
         "//source/extensions/filters/http/buffer:config",
         "//source/extensions/filters/http/dynamo:config",
         "//source/extensions/filters/http/health_check:config",
+        "//test/common/http/http2:http2_frame",
         "//test/integration/filters:metadata_stop_all_filter_config_lib",
         "//test/integration/filters:request_metadata_filter_config_lib",
         "//test/integration/filters:response_metadata_filter_config_lib",
@@ -770,6 +771,16 @@ envoy_cc_test(
         "//source/common/http:codec_client_lib",
         "//source/common/stats:stats_lib",
         "//test/test_common:environment_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "dynamic_validation_integration_test",
+    srcs = ["dynamic_validation_integration_test.cc"],
+    data = ["//test/config/integration:server_xds_files"],
+    deps = [
+        ":http_integration_lib",
+        "//source/common/stats:stats_lib",
     ],
 )
 

@@ -27,7 +27,7 @@ TEST(DateProviderImplTest, All) {
   EXPECT_NE(nullptr, headers.Date());
 
   EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(500)));
-  timer->callback_();
+  timer->invokeCallback();
 
   headers.removeDate();
   provider.setDateHeader(headers);

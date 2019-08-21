@@ -1,0 +1,11 @@
+version_info: "0"
+resources:
+- "@type": type.googleapis.com/envoy.api.v2.RouteConfiguration
+  name: route_config_0
+  virtual_hosts:
+  - name: integration
+    domains: [ "*" ]
+    routes:
+    - match: { prefix: "/test/long/url" }
+      route: { cluster: cluster_1 }
+  foo: bar

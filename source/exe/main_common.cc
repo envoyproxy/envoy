@@ -46,8 +46,8 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
                                Filesystem::Instance& file_system,
                                std::unique_ptr<ProcessContext> process_context)
     : options_(options), component_factory_(component_factory), thread_factory_(thread_factory),
-      file_system_(file_system),
-      symbol_table_(Stats::SymbolTableCreator::makeSymbolTable(options_.fakeSymbolTableEnabled())),
+      file_system_(file_system), symbol_table_(Stats::SymbolTableCreator::initAndMakeSymbolTable(
+                                     options_.fakeSymbolTableEnabled())),
       stats_allocator_(*symbol_table_) {
   switch (options_.mode()) {
   case Server::Mode::InitOnly:

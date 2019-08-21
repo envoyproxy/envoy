@@ -79,7 +79,7 @@ void ConnectionManager::onBelowWriteBufferLowWatermark() {
 }
 
 StreamHandler& ConnectionManager::newStream() {
-  ENVOY_LOG(debug, "dubbo: create the new docoder event handler");
+  ENVOY_LOG(debug, "dubbo: create the new decoder event handler");
 
   ActiveMessagePtr new_message(std::make_unique<ActiveMessage>(*this));
   new_message->createFilterChain();

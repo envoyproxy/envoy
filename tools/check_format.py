@@ -65,8 +65,8 @@ JSON_STRING_TO_MESSAGE_WHITELIST = ("./source/common/protobuf/utility.cc")
 
 CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-8")
 BUILDIFIER_PATH = os.getenv("BUILDIFIER_BIN", "$GOPATH/bin/buildifier")
-ENVOY_BUILD_FIXER_PATH = os.path.join(
-    os.path.dirname(os.path.abspath(sys.argv[0])), "envoy_build_fixer.py")
+ENVOY_BUILD_FIXER_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])),
+                                      "envoy_build_fixer.py")
 HEADER_ORDER_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "header_order.py")
 SUBDIR_SET = set(common.includeDirOrder())
 INCLUDE_ANGLE = "#include <"
@@ -136,7 +136,7 @@ UNOWNED_EXTENSIONS = {
   "extensions/stat_sinks/common",
   "extensions/stat_sinks/common/statsd",
   "extensions/health_checkers/redis",
-  "extensions/access_loggers/http_grpc",
+  "extensions/access_loggers/grpc",
   "extensions/access_loggers/file",
   "extensions/common/tap",
   "extensions/transport_sockets/raw_buffer",
@@ -502,8 +502,8 @@ def checkSourceLine(line, file_path, reportError):
                   "should be %s" % (invalid_construct, valid_construct))
   for invalid_construct, valid_construct in LIBCXX_REPLACEMENTS.items():
     if invalid_construct in line:
-      reportError("term %s should be replaced with standard library term %s" % (invalid_construct,
-                                                                                valid_construct))
+      reportError("term %s should be replaced with standard library term %s" %
+                  (invalid_construct, valid_construct))
 
   # Some errors cannot be fixed automatically, and actionable, consistent,
   # navigable messages should be emitted to make it easy to find and fix
@@ -811,53 +811,48 @@ def checkErrorMessages(error_messages):
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description="Check or fix file format.")
-  parser.add_argument(
-      "operation_type",
-      type=str,
-      choices=["check", "fix"],
-      help="specify if the run should 'check' or 'fix' format.")
+  parser.add_argument("operation_type",
+                      type=str,
+                      choices=["check", "fix"],
+                      help="specify if the run should 'check' or 'fix' format.")
   parser.add_argument(
       "target_path",
       type=str,
       nargs="?",
       default=".",
       help="specify the root directory for the script to recurse over. Default '.'.")
-  parser.add_argument(
-      "--add-excluded-prefixes", type=str, nargs="+", help="exclude additional prefixes.")
-  parser.add_argument(
-      "-j",
-      "--num-workers",
-      type=int,
-      default=multiprocessing.cpu_count(),
-      help="number of worker processes to use; defaults to one per core.")
+  parser.add_argument("--add-excluded-prefixes",
+                      type=str,
+                      nargs="+",
+                      help="exclude additional prefixes.")
+  parser.add_argument("-j",
+                      "--num-workers",
+                      type=int,
+                      default=multiprocessing.cpu_count(),
+                      help="number of worker processes to use; defaults to one per core.")
   parser.add_argument("--api-prefix", type=str, default="./api/", help="path of the API tree.")
-  parser.add_argument(
-      "--skip_envoy_build_rule_check",
-      action="store_true",
-      help="skip checking for '@envoy//' prefix in build rules.")
-  parser.add_argument(
-      "--namespace_check",
-      type=str,
-      nargs="?",
-      default="Envoy",
-      help="specify namespace check string. Default 'Envoy'.")
-  parser.add_argument(
-      "--namespace_check_excluded_paths",
-      type=str,
-      nargs="+",
-      default=[],
-      help="exclude paths from the namespace_check.")
-  parser.add_argument(
-      "--build_fixer_check_excluded_paths",
-      type=str,
-      nargs="+",
-      default=[],
-      help="exclude paths from envoy_build_fixer check.")
-  parser.add_argument(
-      "--include_dir_order",
-      type=str,
-      default=",".join(common.includeDirOrder()),
-      help="specify the header block include directory order.")
+  parser.add_argument("--skip_envoy_build_rule_check",
+                      action="store_true",
+                      help="skip checking for '@envoy//' prefix in build rules.")
+  parser.add_argument("--namespace_check",
+                      type=str,
+                      nargs="?",
+                      default="Envoy",
+                      help="specify namespace check string. Default 'Envoy'.")
+  parser.add_argument("--namespace_check_excluded_paths",
+                      type=str,
+                      nargs="+",
+                      default=[],
+                      help="exclude paths from the namespace_check.")
+  parser.add_argument("--build_fixer_check_excluded_paths",
+                      type=str,
+                      nargs="+",
+                      default=[],
+                      help="exclude paths from envoy_build_fixer check.")
+  parser.add_argument("--include_dir_order",
+                      type=str,
+                      default=",".join(common.includeDirOrder()),
+                      help="specify the header block include directory order.")
   args = parser.parse_args()
 
   operation_type = args.operation_type
