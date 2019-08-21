@@ -21,9 +21,9 @@ class RetryPolicyMapperTest {
         perRetryTimeoutMs = 9001)
 
     assertThat(retryPolicy.outboundHeaders()).isEqualTo(mapOf(
-        "x-envoy-max-retries" to "123",
-        "x-envoy-retry-on" to "5xx,gateway-error,connect-failure,retriable-4xx,refused-upstream",
-        "x-envoy-upstream-rq-per-try-timeout-ms" to "9001"
+        "x-envoy-max-retries" to listOf("123"),
+        "x-envoy-retry-on" to listOf("5xx", "gateway-error", "connect-failure", "retriable-4xx", "refused-upstream"),
+        "x-envoy-upstream-rq-per-try-timeout-ms" to listOf("9001")
     ))
   }
 

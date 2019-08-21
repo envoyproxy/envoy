@@ -1,55 +1,125 @@
 package io.envoyproxy.envoymobile
 
+import io.envoyproxy.envoymobile.engine.types.EnvoyObserver
 import java.nio.ByteBuffer
 
-interface ResponseHandler {
-  /**
-   * Called when response headers are received by the stream.
-   *
-   * @param headers the headers of the response.
-   * @param statusCode the status code of the response.
-   */
-  fun onHeaders(headers: Map<String, List<String>>, statusCode: Int)
+
+/**
+ * Callback interface for receiving stream events.
+ */
+class ResponseHandler {
+
+  class EnvoyObserverAdapter(
+      internal val responseHandler: ResponseHandler
+  ) : EnvoyObserver {
+
+    override fun onHeaders(headers: Map<String, List<String>>?, endStream: Boolean) {
+      val statusCode = headers!![":status"]?.first()?.toIntOrNull() ?: 0
+      responseHandler.onHeadersClosure(headers, statusCode)
+    }
+
+    override fun onData(byteBuffer: ByteBuffer?, endStream: Boolean) {
+      responseHandler.onDataClosure(byteBuffer, endStream)
+    }
+
+    override fun onMetadata(metadata: Map<String, List<String>>?) {
+      responseHandler.onMetadataClosure(metadata!!)
+    }
+
+    override fun onTrailers(trailers: Map<String, List<String>>?) {
+      responseHandler.onTrailersClosure(trailers!!)
+    }
+
+    override fun onError() {
+      responseHandler.onErrorClosure()
+    }
+
+    override fun onCancel() {
+      responseHandler.onCancelClosure()
+    }
+  }
+
+  internal val underlyingObserver = EnvoyObserverAdapter(this)
+
+  private var onHeadersClosure: (headers: Map<String, List<String>>, statusCode: Int) -> Unit = { _, _ -> Unit }
+  private var onDataClosure: (byteBuffer: ByteBuffer?, endStream: Boolean) -> Unit = { _, _ -> Unit }
+  private var onMetadataClosure: (metadata: Map<String, List<String>>) -> Unit = { Unit }
+  private var onTrailersClosure: (trailers: Map<String, List<String>>) -> Unit = { Unit }
+  private var onErrorClosure: () -> Unit = { Unit }
+  private var onCancelClosure: () -> Unit = { Unit }
 
   /**
-   * Called when a data frame is received by the stream.
+   * Specify a callback for when response headers are received by the stream.
+   * If `endStream` is `true`, the stream is complete.
    *
-   * @param byteBuffer the byte buffer of the response.
-   * @param endStream true if the stream is complete.
+   * @param closure: Closure which will receive the headers, status code,
+   *                 and flag indicating if the stream is headers-only.
+   * @param statusCode the status code of the response.
+   * @return ResponseHandler, this ResponseHandler.
    */
-  fun onData(byteBuffer: ByteBuffer, endStream: Boolean)
+  fun onHeaders(closure: (headers: Map<String, List<String>>, statusCode: Int) -> Unit): ResponseHandler {
+    this.onHeadersClosure = closure
+    return this
+  }
+
+  /**
+   * Specify a callback for when a data frame is received by the stream.
+   * If `endStream` is `true`, the stream is complete.
+   *
+   * @param closure: Closure which will receive the data,
+   *                 and flag indicating if the stream is complete.
+   * @return ResponseHandler, this ResponseHandler.
+   */
+  fun onData(closure: (byteBuffer: ByteBuffer?, endStream: Boolean) -> Unit): ResponseHandler {
+    this.onDataClosure = closure
+    return this
+  }
 
   /**
    * Called when response metadata is received by the stream.
    *
    * @param metadata the metadata of a response.
    * @param endStream true if the stream is complete.
+   * @return ResponseHandler, this ResponseHandler.
    */
-  fun onMetadata(metadata: Map<String, List<String>>, endStream: Boolean)
+  fun onMetadata(closure: (metadata: Map<String, List<String>>) -> Unit): ResponseHandler {
+    this.onMetadataClosure = closure
+    return this
+  }
 
   /**
-   * Called when response trailers are received by the stream.
+   * Specify a callback for when trailers are received by the stream.
+   * If the closure is called, the stream is complete.
    *
-   * @param trailers the trailers of the response.
+   * @param closure: Closure which will receive the trailers.
+   * @return ResponseHandler, this ResponseHandler.
    */
-  fun onTrailers(trailers: Map<String, List<String>>)
+  fun onTrailers(closure: (trailers: Map<String, List<String>>) -> Unit): ResponseHandler {
+    this.onTrailersClosure = closure
+    return this
+  }
 
   /**
-   * Called when an internal Envoy exception occurs with the stream.
+   * Specify a callback for when an internal Envoy exception occurs with the stream.
+   * If the closure is called, the stream is complete.
    *
-   * @param envoyException the exception associated with the stream.
+   * @param closure: Closure which will be called when an error occurs.
+   * @return ResponseHandler, this ResponseHandler.
    */
-  fun onError(envoyException: EnvoyException)
+  fun onError(closure: () -> Unit): ResponseHandler {
+    this.onErrorClosure = closure
+    return this
+  }
 
   /**
-   * Called when the stream is canceled.
+   * Specify a callback for when the stream is canceled.
+   * If the closure is called, the stream is complete.
    *
+   * @param closure: Closure which will be called when the stream is canceled.
+   * @return ResponseHandler, this ResponseHandler.
    */
-  fun onCanceled()
-
-  /**
-   * Called when the stream has been completed.
-   *
-   */
-  fun onCompletion()
+  fun onCanceled(closure: () -> Unit): ResponseHandler {
+    this.onCancelClosure = closure
+    return this
+  }
 }

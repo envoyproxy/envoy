@@ -1,8 +1,10 @@
 package io.envoyproxy.envoymobile.engine;
 
-import io.envoyproxy.envoymobile.engine.types.EnvoyData;
-import io.envoyproxy.envoymobile.engine.types.EnvoyHeaders;
 import io.envoyproxy.envoymobile.engine.types.EnvoyObserver;
+
+import java.nio.ByteBuffer;
+import java.util.List;
+import java.util.Map;
 
 public class EnvoyHTTPStream {
 
@@ -20,7 +22,7 @@ public class EnvoyHTTPStream {
    * @param headers,   the headers to send.
    * @param endStream, supplies whether this is headers only.
    */
-  public void sendHeaders(EnvoyHeaders headers, boolean endStream) {
+  public void sendHeaders(Map<String, List<String>> headers, boolean endStream) {
     JniLibrary.sendHeaders(streamHandle, headers, endStream);
   }
 
@@ -30,7 +32,7 @@ public class EnvoyHTTPStream {
    * @param data,      the data to send.
    * @param endStream, supplies whether this is the last data in the streamHandle.
    */
-  public void sendData(EnvoyData data, boolean endStream) {
+  public void sendData(ByteBuffer data, boolean endStream) {
     JniLibrary.sendData(streamHandle, data, endStream);
   }
 
@@ -39,7 +41,7 @@ public class EnvoyHTTPStream {
    *
    * @param metadata, the metadata to send.
    */
-  public void sendMetadata(EnvoyHeaders metadata) {
+  public void sendMetadata(Map<String, List<String>> metadata) {
     JniLibrary.sendMetadata(streamHandle, metadata);
   }
 
@@ -49,7 +51,7 @@ public class EnvoyHTTPStream {
    *
    * @param trailers, the trailers to send.
    */
-  public void sendTrailers(EnvoyHeaders trailers) {
+  public void sendTrailers(Map<String, List<String>> trailers) {
     JniLibrary.sendTrailers(streamHandle, trailers);
   }
 
@@ -59,5 +61,7 @@ public class EnvoyHTTPStream {
    *
    * @return Success, unless the streamHandle has already been canceled.
    */
-  public int resetStream() { return JniLibrary.resetStream(streamHandle); }
+  public int resetStream() {
+    return JniLibrary.resetStream(streamHandle);
+  }
 }
