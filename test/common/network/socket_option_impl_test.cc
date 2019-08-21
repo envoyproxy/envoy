@@ -8,7 +8,8 @@ class SocketOptionImplTest : public SocketOptionTest {};
 
 TEST_F(SocketOptionImplTest, BadFd) {
   absl::string_view zero("\0\0\0\0", 4);
-  Api::SysCallIntResult result = SocketOptionImpl::setSocketOption(socket_, {}, zero);
+  Api::SysCallIntResult result =
+      SocketOptionImpl::setSocketOption(socket_, {}, zero.data(), zero.size());
   EXPECT_EQ(-1, result.rc_);
   EXPECT_EQ(ENOTSUP, result.errno_);
 }

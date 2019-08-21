@@ -8,10 +8,10 @@ static_resources:
     - filters:
       - name: envoy.http_connection_manager
         config:
-          drain_timeout_ms: 5000
+          drain_timeout: 5s
           route_config:
             virtual_hosts:
-            - require_ssl: all
+            - require_tls: all
               routes:
               - route: { cluster: cluster_1 }
                 match: { prefix: "/" }
@@ -22,9 +22,6 @@ static_resources:
               - match: { prefix: "/" }
                 route:
                   cluster: cluster_1
-                  runtime:
-                    key: some_key
-                    default: 0
               - match: { prefix: "/test/long/url" }
                 route:
                   rate_limits:
@@ -42,15 +39,11 @@ static_resources:
               name: integration
           codec_type: http1
           stat_prefix: router
-          filters:
-          - name: health_check
+          http_filters:
+          - name: envoy.health_check
             config:
-              endpoint: "/healthcheck"
               pass_through_mode: false
-          - name: rate_limit
-            config:
-              domain: foo
-          - name: router
+          - name: envoy.router
             config: {}
           access_log:
           - name: envoy.file_access_log
