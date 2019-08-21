@@ -37,7 +37,8 @@ void CheckRequestUtils::setAttrContextPeer(envoy::service::auth::v2::AttributeCo
     Envoy::Network::Utility::addressToProtobufAddress(*connection.remoteAddress(), *addr);
   }
 
-  // Set the principal. Preferably the URI SAN, DNS SAN or Subject in that order from the peer's cert.
+  // Set the principal. Preferably the URI SAN, DNS SAN or Subject in that order from the peer's
+  // cert.
   Ssl::ConnectionInfo* ssl = const_cast<Ssl::ConnectionInfo*>(connection.ssl());
   if (ssl != nullptr) {
     if (local) {
