@@ -209,26 +209,28 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   // If new route config sources come after the factory_context_.initManager()'s initialize() been
   // called, that initManager can't accept new targets. Instead we use a local override which will
   // start new subscriptions but not wait on them to be ready.
-  std::unique_ptr<Init::ManagerImpl> overriding_init_manager;
-  // NOTE: This should be defined after overriding_init_manager as it depends on the
-  // overriding_init_manager.
+  // NOTE: For now we use a local init-manager, in the future when Envoy supports on-demand xDS, we
+  // will probably make this init-manager as a member of the subscription.
+  std::unique_ptr<Init::ManagerImpl> noop_init_manager;
+  // NOTE: This should be defined after noop_init_manager as it depends on the
+  // noop_init_manager.
   std::unique_ptr<Cleanup> resume_rds;
   if (factory_context_.initManager().state() == Init::Manager::State::Initialized) {
-    overriding_init_manager =
+    noop_init_manager =
         std::make_unique<Init::ManagerImpl>(fmt::format("SRDS {}:{}", name_, version_info));
     // Pause RDS to not send a burst of RDS requests until we start all the new subscriptions.
     // In the case if factory_context_.initManager() is uninitialized, RDS is already paused either
     // by Server init or LDS init.
     factory_context_.clusterManager().adsMux().pause(
         Envoy::Config::TypeUrl::get().RouteConfiguration);
-    resume_rds = std::make_unique<Cleanup>([this, &overriding_init_manager, version_info] {
+    resume_rds = std::make_unique<Cleanup>([this, &noop_init_manager, version_info] {
       // For new RDS subscriptions created after listener warming up, we don't wait for them to warm
       // up.
       Init::WatcherImpl noop_watcher(
           // Note: we just throw it away.
           fmt::format("SRDS ConfigUpdate watcher {}:{}", name_, version_info),
           []() { /*Do nothing.*/ });
-      overriding_init_manager->initialize(noop_watcher);
+      noop_init_manager->initialize(noop_watcher);
       // New RDS subscriptions should have been created, now lift the floodgate.
       // Note in the case of partial acceptance, accepted RDS subscriptions should be started
       // despite of any error.
@@ -237,12 +239,11 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
     });
   }
   std::vector<std::string> exception_msgs;
-  bool any_applied =
-      addOrUpdateScopes(added_resources,
-                        (overriding_init_manager == nullptr ? factory_context_.initManager()
-                                                            : *overriding_init_manager),
-                        version_info, exception_msgs) ||
-      removeScopes(removed_resources, version_info);
+  bool any_applied = addOrUpdateScopes(
+      added_resources,
+      (noop_init_manager == nullptr ? factory_context_.initManager() : *noop_init_manager),
+      version_info, exception_msgs);
+  any_applied = removeScopes(removed_resources, version_info) || any_applied;
   ConfigSubscriptionCommonBase::onConfigUpdate();
   if (any_applied) {
     setLastConfigInfo(absl::optional<LastConfigInfo>({absl::nullopt, version_info}));

@@ -1,7 +1,5 @@
 #pragma once
 
-#include <memory>
-
 #include "envoy/config/config_provider.h"
 #include "envoy/config/config_provider_manager.h"
 #include "envoy/init/manager.h"
@@ -146,9 +144,7 @@ class MutableConfigProviderCommonBase;
  * shared ownership of the underlying subscription.
  *
  */
-class ConfigSubscriptionCommonBase
-    : protected Logger::Loggable<Logger::Id::config>,
-      public std::enable_shared_from_this<ConfigSubscriptionCommonBase> {
+class ConfigSubscriptionCommonBase : protected Logger::Loggable<Logger::Id::config> {
 public:
   // Callback for updating a Config implementation held in each worker thread, the callback is
   // called in applyConfigUpdate() with the current version Config, and is expected to return the
@@ -226,6 +222,9 @@ protected:
       const ConfigUpdateCb& update_fn, const Event::PostCb& complete_cb = []() {}) {
     tls_->runOnAllThreads(
         [this, update_fn]() {
+          // NOTE: there is a known race condition between *this* subscription be teared down in
+          // main thread and the posted callback been executed before the destruction. See more
+          // details in https://github.com/envoyproxy/envoy/issues/7902
           tls_->getTyped<ThreadLocalConfig>().config_ = update_fn(getConfig());
         },
         complete_cb);
