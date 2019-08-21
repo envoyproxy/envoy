@@ -8,12 +8,12 @@ bool SymbolTableCreator::use_fake_symbol_tables_ = true;
 
 SymbolTablePtr SymbolTableCreator::initAndMakeSymbolTable(bool use_fake) {
   ASSERT(!initialized_ || (use_fake_symbol_tables_ == use_fake));
-  initialized_ = true;
   use_fake_symbol_tables_ = use_fake;
   return makeSymbolTable();
 }
 
 SymbolTablePtr SymbolTableCreator::makeSymbolTable() {
+  initialized_ = true;
   if (use_fake_symbol_tables_) {
     return std::make_unique<FakeSymbolTableImpl>();
   }
