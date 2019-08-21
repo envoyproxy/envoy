@@ -742,6 +742,16 @@ TEST_F(Http1ServerConnectionImplTest, RequestWithTrailers) {
   EXPECT_EQ(0U, buffer.length());
 }
 
+TEST_F(Http1ServerConnectionImplTest, IgnoreUpgradeH2c) {
+  initialize();
+
+  TestHeaderMapImpl expected_headers{
+      {":authority", "www.somewhere.com"}, {":path", "/"}, {":method", "GET"}};
+  Buffer::OwnedImpl buffer("GET http://www.somewhere.com/ HTTP/1.1\r\nConnection: "
+                           "upgrade\r\nUpgrade: h2c\r\nHost: bah\r\n\r\n");
+  expectHeadersTest(Protocol::Http11, true, buffer, expected_headers);
+}
+
 TEST_F(Http1ServerConnectionImplTest, UpgradeRequest) {
   initialize();
 

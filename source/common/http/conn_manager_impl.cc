@@ -1728,15 +1728,6 @@ bool ConnectionManagerImpl::ActiveStream::createFilterChain() {
   if (state_.created_filter_chain_) {
     return false;
   }
-
-  // Ignore h2c upgrade requests until we support them.
-  // See https://github.com/envoyproxy/envoy/issues/7161 for details.
-  if (request_headers_ && request_headers_->Upgrade() &&
-      absl::EqualsIgnoreCase(request_headers_->Upgrade()->value().getStringView(),
-                             Http::Headers::get().UpgradeValues.H2c)) {
-    request_headers_->removeUpgrade();
-  }
-
   bool upgrade_rejected = false;
   auto upgrade = request_headers_ ? request_headers_->Upgrade() : nullptr;
   state_.created_filter_chain_ = true;

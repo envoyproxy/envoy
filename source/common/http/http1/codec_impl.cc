@@ -469,8 +469,21 @@ int ConnectionImpl::onHeadersCompleteBase() {
     protocol_ = Protocol::Http10;
   }
   if (Utility::isUpgrade(*current_header_map_)) {
-    ENVOY_CONN_LOG(trace, "codec entering upgrade mode.", connection_);
-    handling_upgrade_ = true;
+    // Ignore h2c upgrade requests until we support them.
+    // See https://github.com/envoyproxy/envoy/issues/7161 for details.
+    if (current_header_map_->Upgrade() &&
+        absl::EqualsIgnoreCase(current_header_map_->Upgrade()->value().getStringView(),
+                               Http::Headers::get().UpgradeValues.H2c)) {
+      current_header_map_->removeUpgrade();
+      if (current_header_map_->Connection() &&
+          absl::EqualsIgnoreCase(current_header_map_->Connection()->value().getStringView(),
+                                 Http::Headers::get().ConnectionValues.Upgrade)) {
+        current_header_map_->removeConnection();
+      }
+    } else {
+      ENVOY_CONN_LOG(trace, "codec entering upgrade mode.", connection_);
+      handling_upgrade_ = true;
+    }
   }
 
   int rc = onHeadersComplete(std::move(current_header_map_));
