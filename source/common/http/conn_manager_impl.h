@@ -530,7 +530,7 @@ private:
       State()
           : remote_complete_(false), local_complete_(false), codec_saw_local_complete_(false),
             saw_connection_close_(false), successful_upgrade_(false), created_filter_chain_(false),
-            overloaded_do_not_create_filter_chain_(false), is_internally_created_(false) {}
+            is_internally_created_(false) {}
 
       uint32_t filter_call_state_{0};
       // The following 3 members are booleans rather than part of the space-saving bitfield as they
@@ -548,7 +548,6 @@ private:
       bool saw_connection_close_ : 1;
       bool successful_upgrade_ : 1;
       bool created_filter_chain_ : 1;
-      bool overloaded_do_not_create_filter_chain_ : 1;
 
       // True if this stream is internally created. Currently only used for
       // internal redirects or other streams created via recreateStream().
@@ -562,15 +561,7 @@ private:
     // Possibly increases buffer_limit_ to the value of limit.
     void setBufferLimit(uint32_t limit);
     // Set up the Encoder/Decoder filter chain.
-    enum class CreateFilterChainResult {
-      Overloaded,      // Filter chain not created.
-      AlreadyCreated,  // Filter chain not created (again).
-      UpgradeRejected, // Filter chain not created.
-      UpgradeIgnored,  // Filter chain created (e.g. http1 for Upgrade: h2c).
-      Created,         // Filter chain created, no Upgrade header.
-      Upgraded,        // Upgraded filter chain created.
-    };
-    CreateFilterChainResult createFilterChain();
+    bool createFilterChain();
     // Per-stream idle timeout callback.
     void onIdleTimeout();
     // Reset per-stream idle timer.
