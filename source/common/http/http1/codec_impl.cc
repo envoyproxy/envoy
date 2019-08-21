@@ -482,6 +482,7 @@ int ConnectionImpl::onHeadersCompleteBase() {
                                  Http::Headers::get().ConnectionValues.Upgrade)) {
         current_header_map_->removeConnection();
       }
+      current_header_map_->removeHttp2Settings();
     } else {
       ENVOY_CONN_LOG(trace, "codec entering upgrade mode.", connection_);
       handling_upgrade_ = true;

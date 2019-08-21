@@ -125,6 +125,7 @@ public:
   const LowerCaseString GrpcAcceptEncoding{"grpc-accept-encoding"};
   const LowerCaseString Host{":authority"};
   const LowerCaseString HostLegacy{"host"};
+  const LowerCaseString Http2Settings{"http2-settings"};
   const LowerCaseString KeepAlive{"keep-alive"};
   const LowerCaseString LastModified{"last-modified"};
   const LowerCaseString Location{"location"};
