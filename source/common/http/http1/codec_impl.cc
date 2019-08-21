@@ -475,6 +475,7 @@ int ConnectionImpl::onHeadersCompleteBase() {
         absl::EqualsIgnoreCase(current_header_map_->Upgrade()->value().getStringView(),
                                Http::Headers::get().UpgradeValues.H2c)) {
       current_header_map_->removeUpgrade();
+      // TODO(alyssawilk): remove the individual value "upgrade".
       if (current_header_map_->Connection() &&
           absl::EqualsIgnoreCase(current_header_map_->Connection()->value().getStringView(),
                                  Http::Headers::get().ConnectionValues.Upgrade)) {
