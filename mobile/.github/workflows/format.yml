@@ -1,0 +1,47 @@
+name: format
+
+on: [push]
+
+jobs:
+  formatall:
+    name: format_all
+    runs-on: ubuntu-latest
+    container:
+      image: envoyproxy/envoy-build:cfc514546bc0284536893cca5fa43d7128edcd35
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          submodules: true
+      - name: 'Run formatters'
+        run: |
+          export BUILDIFIER_BIN=/usr/local/bin/buildifier
+          ./tools/check_format.sh
+  precommit:
+    name: precommit
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v1
+      - name: 'Install precommit'
+        run: brew install pre-commit
+      - name: 'Run precommit'
+        run: pre-commit run --all-files
+  swiftlint:
+    name: swift_lint
+    runs-on: ubuntu-latest
+    container:
+      image: norionomura/swiftlint:0.33.0_swift-5.0
+    steps:
+      - uses: actions/checkout@v1
+      - name: 'Run SwiftLint'
+        run: swiftlint lint --strict
+  kotlinlint:
+    name: kotlin_lint
+    runs-on: ubuntu-latest
+    container:
+      image: openjdk:8-jdk
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          submodules: true
+      - name: 'Run Kotlin lint'
+        run: ./ci/kotlin_lint.sh

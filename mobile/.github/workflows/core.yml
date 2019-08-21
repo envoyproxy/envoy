@@ -1,0 +1,16 @@
+name: core
+
+on: [push]
+
+jobs:
+  unittests:
+    name: unit_tests
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          submodules: true
+      - name: 'Install dependencies'
+        run: ./ci/mac_ci_setup.sh
+      - name: 'Run tests'
+        run: ./bazelw test //test/common/...

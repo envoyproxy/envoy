@@ -1,0 +1,40 @@
+name: ios
+
+on: [push]
+
+jobs:
+  # TODO: need to add back objc demo once https://github.com/lyft/envoy-mobile/issues/230
+  # is closed.
+  macdist:
+    name: mac_dist
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          submodules: true
+      - name: 'Install dependencies'
+        run: ./ci/mac_ci_setup.sh
+      - name: 'Build Envoy.framework distributable'
+        run: |
+          ./bazelw build --config=ios //:ios_dist
+      - run: ./bazelw build --config=ios //examples/swift/hello_world:app
+        name: 'Build swift app'
+      # TODO: re-enable liveliness test.
+      # TODO: re-enable objc app once https://github.com/lyft/envoy-mobile/issues/230 closes.
+      # - run: npm install -g ios-sim && ios-sim start --devicetypeid "iPhone-X, 12.2"
+      #   name: 'Start the iOS simulator'
+      # # Run the app in the background and redirect logs.
+      # - run: ./bazelw run --config=ios //examples/swift/hello_world:app &> /tmp/envoy.log &
+      #   name: 'Run swift app'
+      # # Wait for the app to start and get some requests/responses.
+      # - run: sleep 60
+      #   name: 'Sleep'
+      # # Check for the sentinel value that shows the app is alive and well.
+      # - run: cat /tmp/envoy.log | grep 'Hello, world!'
+      #   name: 'Check liveliness'
+  swifttests:
+    name: swift_tests
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v1
+    # TODO(rebello95): to fill out.

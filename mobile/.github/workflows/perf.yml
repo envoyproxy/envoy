@@ -1,0 +1,62 @@
+name: perf
+
+on: [push]
+
+jobs:
+  sizecurrent:
+    name: size_current
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          submodules: true
+      - name: 'Install dependencies'
+        run: ./ci/linux_ci_setup.sh
+      - name: 'Build test binary'
+        run: ./bazelw build //test/performance:test_binary_size --config=sizeopt
+      - uses: actions/upload-artifact@v1
+        with:
+          name: sizecurrent
+          path: bazel-bin/test/performance/test_binary_size
+  sizemaster:
+    name: size_master
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          submodules: true
+      - name: 'Install dependencies'
+        run: ./ci/linux_ci_setup.sh
+      - name: 'Build test binary'
+        run: |
+          git checkout master && git pull origin master && git submodule update
+          ./bazelw build //test/performance:test_binary_size --config=sizeopt
+      - uses: actions/upload-artifact@v1
+        with:
+          name: sizemaster
+          path: bazel-bin/test/performance/test_binary_size
+  sizecompare:
+    name: size_compare
+    needs: [sizecurrent, sizemaster]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - name: 'Install dependencies'
+        run: ./ci/linux_ci_setup.sh
+      - uses: actions/download-artifact@v1
+        with:
+          name: sizecurrent
+          path: dist/sizecurrent
+      - uses: actions/download-artifact@v1
+        with:
+          name: sizemaster
+          path: dist/sizemaster
+      - name: 'Strip and Zip binary'
+        run: |
+          ls -lh dist/
+          strip -s -o dist/master.stripped dist/sizemaster/test_binary_size
+          strip -s -o dist/current.stripped dist/sizecurrent/test_binary_size
+          zip -9 dist/master.zip dist/master.stripped
+          zip -9 dist/current.zip dist/current.stripped
+      - name: 'Test size regression'
+        run: ./ci/test_size_regression.sh dist/master.zip dist/current.zip
