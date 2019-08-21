@@ -696,7 +696,7 @@ TEST_P(ServerInstanceImplTest, EmptyBootstrap) {
 }
 
 // Custom header bootstrap succeeds.
-TEST_P(ServerInstanceImplTest, CusomHeaderBoostrap) {
+TEST_P(ServerInstanceImplTest, CustomHeaderBootstrap) {
   options_.config_path_ = TestEnvironment::writeStringToFileForTest(
       "custom.yaml", "header_prefix: \"x-envoy\"\nstatic_resources:\n");
   options_.service_cluster_name_ = "some_cluster_name";

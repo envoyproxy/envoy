@@ -170,11 +170,11 @@ RedisCluster::RedisDiscoverySession::RedisDiscoverySession(
       resolve_timer_(parent.dispatcher_.createTimer([this]() -> void { startResolveRedis(); })),
       client_factory_(client_factory), buffer_timeout_(0) {}
 
-namespace {
 // Convert the cluster slot IP/Port response to and address, return null if the response does not
 // match the expected type.
 Network::Address::InstanceConstSharedPtr
-ProcessCluster(const NetworkFilters::Common::Redis::RespValue& value) {
+RedisCluster::RedisDiscoverySession::RedisDiscoverySession::ProcessCluster(
+    const NetworkFilters::Common::Redis::RespValue& value) {
   if (value.type() != NetworkFilters::Common::Redis::RespType::Array) {
     return nullptr;
   }
@@ -185,14 +185,13 @@ ProcessCluster(const NetworkFilters::Common::Redis::RespValue& value) {
     return nullptr;
   }
 
-  std::string address = array[0].asString();
-  bool ipv6 = (address.find(':') != std::string::npos);
-  if (ipv6) {
-    return std::make_shared<Network::Address::Ipv6Instance>(address, array[1].asInteger());
+  try {
+    return Network::Utility::parseInternetAddress(array[0].asString(), array[1].asInteger(), false);
+  } catch (const EnvoyException& ex) {
+    ENVOY_LOG(debug, "Invalid ip address in CLUSTER SLOTS response: {}", ex.what());
+    return nullptr;
   }
-  return std::make_shared<Network::Address::Ipv4Instance>(address, array[1].asInteger());
 }
-} // namespace
 
 RedisCluster::RedisDiscoverySession::~RedisDiscoverySession() {
   if (current_request_) {

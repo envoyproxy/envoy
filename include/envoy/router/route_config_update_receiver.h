@@ -28,6 +28,7 @@ public:
    */
   virtual bool onRdsUpdate(const envoy::api::v2::RouteConfiguration& rc,
                            const std::string& version_info) PURE;
+
   /**
    * Called on updates via VHDS.
    * @param added_resources supplies Resources (each containing a VirtualHost) that have been
