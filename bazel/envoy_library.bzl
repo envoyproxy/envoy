@@ -6,7 +6,6 @@ load(
     "envoy_external_dep_path",
     "envoy_linkstatic",
 )
-load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library", "py_proto_library")
 load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library")
 
 # As above, but wrapped in list form for adding to dep lists. This smell seems needed as
@@ -39,6 +38,7 @@ def envoy_cc_library(
         tags = [],
         deps = [],
         strip_include_prefix = None,
+        handle_include_prefixes = ["source/", "include/"],
         textual_hdrs = None):
     if tcmalloc_dep:
         deps += _tcmalloc_external_deps(repository)
@@ -60,7 +60,7 @@ def envoy_cc_library(
             envoy_external_dep_path("spdlog"),
             envoy_external_dep_path("fmtlib"),
         ],
-        include_prefix = envoy_include_prefix(native.package_name()),
+        include_prefix = envoy_include_prefix(native.package_name(), handle_include_prefixes),
         alwayslink = 1,
         linkstatic = envoy_linkstatic(),
         linkstamp = select({
@@ -103,9 +103,10 @@ def envoy_cc_win32_library(name, srcs = [], hdrs = [], **kargs):
 # Transform the package path (e.g. include/envoy/common) into a path for
 # exporting the package headers at (e.g. envoy/common). Source files can then
 # include using this path scheme (e.g. #include "envoy/common/time.h").
-def envoy_include_prefix(path):
-    if path.startswith("source/") or path.startswith("include/"):
-        return "/".join(path.split("/")[1:])
+def envoy_include_prefix(path, handled_prefixes = ["source/", "include/"]):
+    for prefix in handled_prefixes:
+        if path.startswith(prefix):
+            return "/".join(path.split("/")[1:])
     return None
 
 # Envoy proto targets should be specified with this function.
