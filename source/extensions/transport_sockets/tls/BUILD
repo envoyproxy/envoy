@@ -119,3 +119,12 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "downstream_context_config_factory_lib",
+    srcs = ["downstream_context_config_factory.cc"],
+    hdrs = ["downstream_context_config_factory.h"],
+    deps = [
+        "//source/extensions/transport_sockets/tls:context_config_lib",
+    ],
+)

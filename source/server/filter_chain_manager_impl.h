@@ -5,6 +5,7 @@
 #include "envoy/api/v2/listener/listener.pb.h"
 #include "envoy/server/transport_socket_config.h"
 
+#include "extensions/transport_sockets/tls/context_config_impl.h"
 #include "common/common/logger.h"
 #include "common/network/cidr_range.h"
 #include "common/network/lc_trie.h"
@@ -18,7 +19,7 @@ class FilterChainFactoryBuilder {
 public:
   virtual ~FilterChainFactoryBuilder() = default;
   virtual std::unique_ptr<Network::FilterChain>
-  buildFilterChain(const ::envoy::api::v2::listener::FilterChain& filter_chain) const PURE;
+  buildFilterChain(const ::envoy::api::v2::listener::FilterChain& filter_chain, bool is_quic) const PURE;
 };
 
 /**
@@ -134,25 +135,50 @@ private:
   const Network::Address::InstanceConstSharedPtr address_;
 };
 
-class FilterChainImpl : public Network::FilterChain {
+class FilterChainImplBase : public Network::FilterChain {
 public:
-  FilterChainImpl(Network::TransportSocketFactoryPtr&& transport_socket_factory,
-                  std::vector<Network::FilterFactoryCb>&& filters_factory)
-      : transport_socket_factory_(std::move(transport_socket_factory)),
+  FilterChainImplBase(std::vector<Network::FilterFactoryCb>&& filters_factory) :
         filters_factory_(std::move(filters_factory)) {}
 
   // Network::FilterChain
-  const Network::TransportSocketFactory& transportSocketFactory() const override {
-    return *transport_socket_factory_;
-  }
-
   const std::vector<Network::FilterFactoryCb>& networkFilterFactories() const override {
     return filters_factory_;
   }
 
 private:
-  const Network::TransportSocketFactoryPtr transport_socket_factory_;
   const std::vector<Network::FilterFactoryCb> filters_factory_;
+
+};
+
+class TcpFilterChainImpl : public FilterChainImplBase {
+public:
+  TcpFilterChainImpl(Network::TransportSocketFactoryPtr&& transport_socket_factory,
+                  std::vector<Network::FilterFactoryCb>&& filters_factory)
+      : FilterChainImplBase(filters_factory), transport_socket_factory_(std::move(transport_socket_factory)) {}
+
+  const Network::TransportSocketFactory* transportSocketFactory() const override {
+    return *transport_socket_factory_;
+  }
+
+private:
+  const Network::TransportSocketFactoryPtr transport_socket_factory_;
+};
+
+class QuicFilterChainImpl : public FilterChainImplBase {
+public:
+  QuicFilterChainImpl(std::unique_ptr<Ssl::ContextConfig> tls_context_config,
+                  std::vector<Network::FilterFactoryCb>&& filters_factory) : FilterChainImplBase(filters_factory), tls_context_config_(std::move(tls_context_config)) {}
+
+  const Network::TransportSocketFactory* transportSocketFactory() const override {
+    return nullptr;
+  }
+
+  Ssl::ContextConfig& tls_context_config() {
+  return *tls_context_config_;
+  }
+
+private:
+  std::unique_ptr<Ssl::ContextConfig> tls_context_config_;
 };
 
 } // namespace Server
