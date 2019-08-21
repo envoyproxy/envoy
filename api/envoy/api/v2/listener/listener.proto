@@ -190,7 +190,7 @@ message FilterChain {
   core.TransportSocket transport_socket = 6;
 
   // The unique name (or empty) by which this filter chain is known. If no name is provided,
-  // Envoy will allocate an internal UUID for the listener. If the listener is to be dynamically
+  // Envoy will allocate an internal UUID for the filter chain. If the filter chain is to be dynamically
   // updated or removed via FCDS(not implemented yet) a unique name must be provided.
   string name = 7;
 }
