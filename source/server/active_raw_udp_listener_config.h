@@ -8,6 +8,7 @@ namespace Envoy {
 namespace Server {
 
 class ActiveRawUdpListenerFactory : public Network::ActiveUdpListenerFactory {
+public:
   Network::ConnectionHandler::ActiveListenerPtr
   createActiveUdpListener(Network::ConnectionHandler& parent,
                           Network::ListenerConfig& config) const override;
@@ -17,7 +18,7 @@ class ActiveRawUdpListenerFactory : public Network::ActiveUdpListenerFactory {
 // creates a Server::ConnectionHandlerImpl::ActiveUdpListener.
 // This is the default UDP listener if not specified in config.
 class ActiveRawUdpListenerConfigFactory : public ActiveUdpListenerConfigFactory {
-
+public:
   Network::ActiveUdpListenerFactoryPtr
   createActiveUdpListenerFactory(const Protobuf::Message&) override;
 

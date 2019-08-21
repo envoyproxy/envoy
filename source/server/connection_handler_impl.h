@@ -71,8 +71,6 @@ public:
     ActiveListenerImplBase(ConnectionHandlerImpl& parent, Network::ListenerPtr&& listener,
                            Network::ListenerConfig& config);
 
-    ~ActiveListenerImplBase() override = default;
-
     // Network::ConnectionHandler::ActiveListener.
     uint64_t listenerTag() override { return listener_tag_; }
     Network::ListenerPtr& listener() override { return listener_; }
