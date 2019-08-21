@@ -193,7 +193,7 @@ RedisCluster::RedisDiscoverySession::RedisDiscoverySession::ProcessCluster(
     }
     return std::make_shared<Network::Address::Ipv4Instance>(address, array[1].asInteger());
   } catch (const EnvoyException& ex) {
-    ENVOY_LOG(warn, "Invalid ip address in CLUSTER SLOTS response: {}", ex.what());
+    ENVOY_LOG(debug, "Invalid ip address in CLUSTER SLOTS response: {}", ex.what());
     return nullptr;
   }
 }
