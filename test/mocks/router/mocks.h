@@ -385,7 +385,7 @@ public:
 class MockRouteConfigProvider : public RouteConfigProvider {
 public:
   MockRouteConfigProvider();
-  ~MockRouteConfigProvider() override = default;
+  ~MockRouteConfigProvider() override;
 
   MOCK_METHOD0(config, ConfigConstSharedPtr());
   MOCK_CONST_METHOD0(configInfo, absl::optional<ConfigInfo>());
@@ -423,7 +423,7 @@ public:
 class MockScopedRouteConfigProvider : public Envoy::Config::ConfigProvider {
 public:
   MockScopedRouteConfigProvider();
-  ~MockScopedRouteConfigProvider() override = default;
+  ~MockScopedRouteConfigProvider() override;
 
   // Config::ConfigProvider
   MOCK_CONST_METHOD0(lastUpdated, SystemTime());

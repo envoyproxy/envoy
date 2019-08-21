@@ -66,8 +66,11 @@ public:
 private:
   // Update the key's hash with the new fragment hash.
   void updateHash(const ScopeKeyFragmentBase& fragment) {
-    absl::uint128 buffer = absl::MakeUint128(hash_, fragment.hash());
-    hash_ = HashUtil::xxHash64(absl::string_view(reinterpret_cast<char*>(&buffer), 16));
+    std::stringbuf buffer;
+    buffer.sputn(reinterpret_cast<const char*>(&hash_), sizeof(hash_));
+    const auto& fragment_hash = fragment.hash();
+    buffer.sputn(reinterpret_cast<const char*>(&fragment_hash), sizeof(fragment_hash));
+    hash_ = HashUtil::xxHash64(buffer.str());
   }
 
   uint64_t hash_{0};
@@ -147,28 +150,9 @@ private:
 class ScopedRouteInfo {
 public:
   ScopedRouteInfo(envoy::api::v2::ScopedRouteConfiguration&& config_proto,
-                  std::unique_ptr<RouteConfigProvider>&& route_provider)
-      : config_proto_(std::move(config_proto)), route_provider_(std::move(route_provider)) {
-    ASSERT(route_provider_ != nullptr, "ScopedRouteInfo expects a valid RouteConfigProvider.");
-    ASSERT(
-        !route_provider_->configInfo().has_value() ||
-            route_provider_->config()->name() == config_proto_.route_configuration_name(),
-        fmt::format("RouteConfigProvider's name '{}' doesn't match route_configuration_name '{}'.",
-                    route_provider_->config()->name(), config_proto_.route_configuration_name()));
-    // TODO(stevenzzzz): Maybe worth a KeyBuilder abstraction when there are more than one type of
-    // Fragment.
-    for (const auto& fragment : config_proto_.key().fragments()) {
-      switch (fragment.type_case()) {
-      case envoy::api::v2::ScopedRouteConfiguration::Key::Fragment::kStringKey:
-        scope_key_.addFragment(std::make_unique<StringKeyFragment>(fragment.string_key()));
-        break;
-      default:
-        NOT_REACHED_GCOVR_EXCL_LINE;
-      }
-    }
-  }
+                  ConfigConstSharedPtr&& route_config);
 
-  Router::ConfigConstSharedPtr routeConfig() const { return route_provider_->config(); }
+  ConfigConstSharedPtr routeConfig() const { return route_config_; }
   const ScopeKey& scopeKey() const { return scope_key_; }
   const envoy::api::v2::ScopedRouteConfiguration& configProto() const { return config_proto_; }
   const std::string& scopeName() const { return config_proto_.name(); }
@@ -176,7 +160,7 @@ public:
 private:
   const envoy::api::v2::ScopedRouteConfiguration config_proto_;
   ScopeKey scope_key_;
-  std::unique_ptr<RouteConfigProvider> route_provider_;
+  ConfigConstSharedPtr route_config_;
 };
 using ScopedRouteInfoConstSharedPtr = std::shared_ptr<const ScopedRouteInfo>;
 // Ordered map for consistent config dumping.

@@ -120,6 +120,7 @@ void RdsRouteConfigSubscription::onConfigUpdate(
       }
       vhds_subscription_.release();
     }
+    update_callback_manager_.runCallbacks();
   }
 
   init_target_.ready();
