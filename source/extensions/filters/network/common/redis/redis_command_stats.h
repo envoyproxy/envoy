@@ -18,7 +18,9 @@ namespace Redis {
 
 class RedisCommandStats {
 public:
-  RedisCommandStats(Stats::Scope& scope, const std::string& prefix, bool enabled);
+  RedisCommandStats(Stats::Scope& scope, const std::string& prefix, bool enabled)
+      : scope_(scope), stat_name_set_(scope.symbolTable()), prefix_(stat_name_set_.add(prefix)),
+        enabled_(enabled), upstream_rq_time_(stat_name_set_.add(prefix)) {}
 
   Stats::Counter& counter(std::string name);
   Stats::Histogram& histogram(std::string name);
@@ -32,7 +34,6 @@ public:
   bool enabled() { return enabled_; }
 
 private:
-  void createStats(std::string name);
   Stats::SymbolTable::StoragePtr addPrefix(const Stats::StatName name);
 
   Stats::Scope& scope_;

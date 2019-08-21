@@ -8,42 +8,8 @@ namespace NetworkFilters {
 namespace Common {
 namespace Redis {
 
-RedisCommandStats::RedisCommandStats(Stats::Scope& scope, const std::string& prefix, bool enabled)
-    : scope_(scope), stat_name_set_(scope.symbolTable()), prefix_(stat_name_set_.add(prefix)),
-      enabled_(enabled), upstream_rq_time_(stat_name_set_.add("upstream_rq_time")) {
-  // Note: Even if this is disabled, we track the upstream_rq_time.
-  if (enabled_) {
-    // Create StatName for each Redis command. Note that we don't include Auth or Ping.
-    for (const std::string& command :
-         Extensions::NetworkFilters::Common::Redis::SupportedCommands::simpleCommands()) {
-      createStats(command);
-    }
-    for (const std::string& command :
-         Extensions::NetworkFilters::Common::Redis::SupportedCommands::evalCommands()) {
-      createStats(command);
-    }
-    for (const std::string& command : Extensions::NetworkFilters::Common::Redis::SupportedCommands::
-             hashMultipleSumResultCommands()) {
-      createStats(command);
-    }
-    createStats(Extensions::NetworkFilters::Common::Redis::SupportedCommands::mget());
-    createStats(Extensions::NetworkFilters::Common::Redis::SupportedCommands::mset());
-  }
-}
-
-void RedisCommandStats::createStats(std::string name) {
-  stat_name_set_.add(name + ".total");
-  stat_name_set_.add(name + ".success");
-  stat_name_set_.add(name + ".error");
-  stat_name_set_.add(name + ".latency");
-}
-
 Stats::SymbolTable::StoragePtr RedisCommandStats::addPrefix(const Stats::StatName name) {
-  Stats::StatNameVec names_with_prefix;
-  names_with_prefix.reserve(2);
-  names_with_prefix.push_back(prefix_);
-  names_with_prefix.insert(names_with_prefix.end(), name);
-  return scope_.symbolTable().join(names_with_prefix);
+  return scope_.symbolTable().join({prefix_, name});
 }
 
 Stats::Counter& RedisCommandStats::counter(std::string name) {
@@ -89,7 +55,9 @@ std::string RedisCommandStats::getCommandFromRequest(const RespValue& request) {
   }
 }
 
-void RedisCommandStats::updateStatsTotal(std::string command) { counter(command + total_suffix_).inc(); }
+void RedisCommandStats::updateStatsTotal(std::string command) {
+  counter(command + total_suffix_).inc();
+}
 
 void RedisCommandStats::updateStats(const bool success, std::string command) {
   if (success) {
