@@ -227,6 +227,9 @@ private:
     bool onRedirection(const NetworkFilters::Common::Redis::RespValue&) override { return true; }
     void onUnexpectedResponse(const NetworkFilters::Common::Redis::RespValuePtr&);
 
+    Network::Address::InstanceConstSharedPtr
+    ProcessCluster(const NetworkFilters::Common::Redis::RespValue& value);
+
     RedisCluster& parent_;
     Event::Dispatcher& dispatcher_;
     std::string current_host_address_;
