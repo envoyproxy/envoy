@@ -516,57 +516,36 @@ dynamic_route_configs:
   EXPECT_CALL(*factory_context_.cluster_manager_.subscription_factory_.subscription_, start(_));
   factory_context_.init_manager_.initialize(init_watcher_);
 
-  const std::string response1_json = R"EOF(
-{
-  "version_info": "1",
-  "resources": [
-    {
-      "@type": "type.googleapis.com/envoy.api.v2.RouteConfiguration",
-      "name": "foo_route_config",
-      "virtual_hosts": [
-        {
-          "name": "integration",
-          "domains": [
-            "*"
-          ],
-          "routes": [
-            {
-              "match": {
-                "prefix": "/foo"
-              },
-              "route": {
-                "cluster_header": ":authority"
-              }
-            }
-          ]
-        },
-        {
-          "name": "duplicate",
-          "domains": [
-            "*"
-          ],
-          "routes": [
-            {
-              "match": {
-                "prefix": "/foo"
-              },
-              "route": {
-                "cluster_header": ":authority"
-              }
-            }
-          ]
-        }
-      ]
-    }
-  ]
-}
+  const std::string response1_yaml = R"EOF(
+version_info: '1'
+resources:
+- "@type": type.googleapis.com/envoy.api.v2.RouteConfiguration
+  name: foo_route_config
+  virtual_hosts:
+  - name: integration
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/foo"
+      route:
+        cluster_header: ":authority"
+  - name: duplicate
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/foo"
+      route:
+        cluster_header: ":authority"
 )EOF";
-  auto response1 = TestUtility::parseYaml<envoy::api::v2::DiscoveryResponse>(response1_json);
+  auto response1 = TestUtility::parseYaml<envoy::api::v2::DiscoveryResponse>(response1_yaml);
 
   EXPECT_CALL(init_watcher_, ready());
 
-  EXPECT_THROW(rds_callbacks_->onConfigUpdate(response1.resources(), response1.version_info()),
-               EnvoyException);
+  EXPECT_THROW_WITH_MESSAGE(
+      rds_callbacks_->onConfigUpdate(response1.resources(), response1.version_info()),
+      EnvoyException, "Only a single wildcard domain is permitted");
 
   message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"]();
   const auto& route_config_dump3 =
