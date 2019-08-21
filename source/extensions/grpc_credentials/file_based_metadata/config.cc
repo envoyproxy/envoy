@@ -37,7 +37,7 @@ FileBasedMetadataGrpcCredentialsFactory::getChannelCredentials(
                 file_based_metadata_credentials_factory);
         const auto& file_based_metadata_config = Envoy::MessageUtil::downcastAndValidate<
             const envoy::config::grpc_credential::v2alpha::FileBasedMetadataConfig&>(
-            *file_based_metadata_config_message);
+            *file_based_metadata_config_message, ProtobufMessage::getNullValidationVisitor());
         std::shared_ptr<grpc::CallCredentials> new_call_creds = grpc::MetadataCredentialsFromPlugin(
             std::make_unique<FileBasedMetadataAuthenticator>(file_based_metadata_config, api));
         if (call_creds == nullptr) {

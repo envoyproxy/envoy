@@ -231,7 +231,7 @@ InstanceUtil::BootstrapVersion InstanceUtil::loadBootstrapConfig(
   if (config_proto.ByteSize() != 0) {
     bootstrap.MergeFrom(config_proto);
   }
-  MessageUtil::validate(bootstrap);
+  MessageUtil::validate(bootstrap, validation_visitor);
   return BootstrapVersion::V2;
 }
 

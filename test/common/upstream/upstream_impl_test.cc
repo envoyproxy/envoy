@@ -2094,7 +2094,8 @@ public:
     return parent_.createEmptyProtocolOptionsProto();
   }
   Upstream::ProtocolOptionsConfigConstSharedPtr
-  createProtocolOptionsConfig(const Protobuf::Message& msg) override {
+  createProtocolOptionsConfig(const Protobuf::Message& msg,
+                              ProtobufMessage::ValidationVisitor&) override {
     return parent_.createProtocolOptionsConfig(msg);
   }
   std::string name() override { CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.filter"); }
@@ -2130,7 +2131,8 @@ public:
     return parent_.createEmptyProtocolOptionsProto();
   }
   Upstream::ProtocolOptionsConfigConstSharedPtr
-  createProtocolOptionsConfig(const Protobuf::Message& msg) override {
+  createProtocolOptionsConfig(const Protobuf::Message& msg,
+                              ProtobufMessage::ValidationVisitor&) override {
     return parent_.createProtocolOptionsConfig(msg);
   }
   std::string name() override { CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.filter"); }

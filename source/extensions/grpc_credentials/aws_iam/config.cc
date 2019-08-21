@@ -39,7 +39,8 @@ std::shared_ptr<grpc::ChannelCredentials> AwsIamGrpcCredentialsFactory::getChann
                 credential.from_plugin(), ProtobufMessage::getNullValidationVisitor(),
                 credentials_factory);
         const auto& config = Envoy::MessageUtil::downcastAndValidate<
-            const envoy::config::grpc_credential::v2alpha::AwsIamConfig&>(*config_message);
+            const envoy::config::grpc_credential::v2alpha::AwsIamConfig&>(
+            *config_message, ProtobufMessage::getNullValidationVisitor());
         auto credentials_provider =
             std::make_shared<HttpFilters::Common::Aws::DefaultCredentialsProviderChain>(
                 api, HttpFilters::Common::Aws::Utility::metadataFetcher);

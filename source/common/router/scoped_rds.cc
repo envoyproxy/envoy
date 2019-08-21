@@ -105,8 +105,8 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
     const std::string& version_info) {
   std::vector<envoy::api::v2::ScopedRouteConfiguration> scoped_routes;
   for (const auto& resource_any : resources) {
-    scoped_routes.emplace_back(MessageUtil::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(
-        resource_any, validation_visitor_));
+    scoped_routes.emplace_back(
+        MessageUtil::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(resource_any));
   }
 
   std::unordered_set<std::string> resource_names;
@@ -117,7 +117,7 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
     }
   }
   for (const auto& scoped_route : scoped_routes) {
-    MessageUtil::validate(scoped_route);
+    MessageUtil::validate(scoped_route, validation_visitor_);
   }
 
   // TODO(AndresGuedez): refactor such that it can be shared with other delta APIs (e.g., CDS).
