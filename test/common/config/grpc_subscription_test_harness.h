@@ -149,7 +149,7 @@ public:
     EXPECT_CALL(*init_timeout_timer_, disableTimer());
   }
 
-  void callInitFetchTimeoutCb() override { init_timeout_timer_->callback_(); }
+  void callInitFetchTimeoutCb() override { init_timeout_timer_->invokeCallback(); }
 
   std::string version_;
   const Protobuf::MethodDescriptor* method_descriptor_;
