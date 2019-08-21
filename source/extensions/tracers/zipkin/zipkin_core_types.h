@@ -513,9 +513,9 @@ public:
    */
   const std::string traceIdAsByteString() const {
     // https://github.com/apache/incubator-zipkin-api/blob/v0.2.1/zipkin.proto#L60-L61.
-    return trace_id_high_.has_value() ? Util::toFlipableByteString(trace_id_high_.value(), true) +
-                                            Util::toFlipableByteString(trace_id_, true)
-                                      : Util::toFlipableByteString(trace_id_, true);
+    return trace_id_high_.has_value() ? Util::toBigEndianByteString(trace_id_high_.value()) +
+                                            Util::toBigEndianByteString(trace_id_)
+                                      : Util::toBigEndianByteString(trace_id_);
   }
 
   /**

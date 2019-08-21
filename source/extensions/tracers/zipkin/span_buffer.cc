@@ -33,22 +33,6 @@ bool SpanBuffer::addSpan(Span&& span) {
   return true;
 }
 
-std::string SpanBuffer::toStringifiedJsonArray() {
-  std::string stringified_json_array = "[";
-
-  if (pendingSpans()) {
-    stringified_json_array += span_buffer_[0].toJson();
-    const uint64_t size = span_buffer_.size();
-    for (uint64_t i = 1; i < size; i++) {
-      stringified_json_array += ",";
-      stringified_json_array += span_buffer_[i].toJson();
-    }
-  }
-  stringified_json_array += "]";
-
-  return stringified_json_array;
-}
-
 SerializerPtr SpanBuffer::makeSerializer(
     const envoy::config::trace::v2::ZipkinConfig::CollectorEndpointVersion& version,
     const bool shared_span_context) {

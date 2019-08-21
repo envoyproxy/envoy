@@ -62,13 +62,8 @@ public:
   uint64_t pendingSpans() { return span_buffer_.size(); }
 
   /**
-   * @return the contents of the buffer as a stringified array of JSONs, where
-   * each JSON in the array corresponds to one Zipkin span.
-   */
-  std::string toStringifiedJsonArray();
-
-  /**
-   * @return std::string
+   * @return std::string the contents of the buffer, a collection of serialized pending Zipkin
+   * spans.
    */
   std::string serialize() { return serializer_->serialize(std::move(span_buffer_)); }
 
@@ -84,17 +79,33 @@ private:
 
 using SpanBufferPtr = std::unique_ptr<SpanBuffer>;
 
+/**
+ * JsonV2Serializer implements Zipkin::Serializer that serializes list of Zipkin spans into JSON
+ * Zipkin v1 array.
+ */
 class JsonV1Serializer : public Serializer {
 public:
   JsonV1Serializer() = default;
 
+  /**
+   * Serialize list of Zipkin spans into Zipkin v1 JSON array.
+   * @return std::string serialized pending spans as Zipkin v1 JSON array.
+   */
   std::string serialize(std::vector<Span>&& pending_spans) override;
 };
 
+/**
+ * JsonV2Serializer implements Zipkin::Serializer that serializes list of Zipkin spans into JSON
+ * Zipkin v2 array.
+ */
 class JsonV2Serializer : public Serializer {
 public:
   JsonV2Serializer(const bool shared_span_context);
 
+  /**
+   * Serialize list of Zipkin spans into Zipkin v2 JSON array.
+   * @return std::string serialized pending spans as Zipkin v2 JSON array.
+   */
   std::string serialize(std::vector<Span>&& pending_spans) override;
 
 private:
@@ -104,10 +115,18 @@ private:
   const bool shared_span_context_;
 };
 
+/**
+ * JsonV2Serializer implements Zipkin::Serializer that serializes list of Zipkin spans into
+ * stringified (SerializeToString) protobuf message.
+ */
 class ProtobufSerializer : public Serializer {
 public:
   ProtobufSerializer(const bool shared_span_context);
 
+  /**
+   * Serialize list of Zipkin spans into Zipkin v2 zipkin::proto3::ListOfSpans.
+   * @return std::string serialized pending spans as Zipkin zipkin::proto3::ListOfSpans.
+   */
   std::string serialize(std::vector<Span>&& pending_spans) override;
 
 private:

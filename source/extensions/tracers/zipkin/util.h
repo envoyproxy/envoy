@@ -52,7 +52,7 @@ public:
   static uint64_t generateRandom64(TimeSource& time_source);
 
   /**
-   * Returns byte string representation of an number.
+   * Returns byte string representation of a number.
    *
    * @param value Number that will be represented in byte string.
    * @return std::string byte string representation of a number.
@@ -62,14 +62,14 @@ public:
   }
 
   /**
-   * Returns byte string representation of an number.
+   * Returns big endian byte string representation of a number.
    *
    * @param value Number that will be represented in byte string.
    * @param flip indicates to flip order or not.
    * @return std::string byte string representation of a number.
    */
-  template <typename Type> static std::string toFlipableByteString(Type value, bool flip) {
-    auto bytes = flip ? toEndianness<ByteOrder::BigEndian>(value) : value;
+  template <typename Type> static std::string toBigEndianByteString(Type value) {
+    auto bytes = toEndianness<ByteOrder::BigEndian>(value);
     return std::string(reinterpret_cast<const char*>(&bytes), sizeof(Type));
   }
 };
