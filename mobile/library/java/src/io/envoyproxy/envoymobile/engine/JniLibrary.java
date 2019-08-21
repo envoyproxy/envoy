@@ -1,8 +1,10 @@
 package io.envoyproxy.envoymobile.engine;
 
-import io.envoyproxy.envoymobile.engine.types.EnvoyData;
-import io.envoyproxy.envoymobile.engine.types.EnvoyHeaders;
 import io.envoyproxy.envoymobile.engine.types.EnvoyObserver;
+
+import java.nio.ByteBuffer;
+import java.util.List;
+import java.util.Map;
 
 class JniLibrary {
 
@@ -61,7 +63,8 @@ class JniLibrary {
    * @param endStream, supplies whether this is headers only.
    * @return int, the resulting status of the operation.
    */
-  protected static native int sendHeaders(long stream, EnvoyHeaders headers, boolean endStream);
+  protected static native int sendHeaders(long stream, Map<String, List<String>> headers,
+                                          boolean endStream);
 
   /**
    * Send data over an open HTTP stream. This method can be invoked multiple times.
@@ -71,7 +74,7 @@ class JniLibrary {
    * @param endStream, supplies whether this is the last data in the stream.
    * @return int, the resulting status of the operation.
    */
-  protected static native int sendData(long stream, EnvoyData data, boolean endStream);
+  protected static native int sendData(long stream, ByteBuffer data, boolean endStream);
 
   /**
    * Send metadata over an HTTP stream. This method can be invoked multiple times.
@@ -80,7 +83,7 @@ class JniLibrary {
    * @param metadata, the metadata to send.
    * @return int, the resulting status of the operation.
    */
-  protected static native int sendMetadata(long stream, EnvoyHeaders metadata);
+  protected static native int sendMetadata(long stream, Map<String, List<String>> metadata);
 
   /**
    * Send trailers over an open HTTP stream. This method can only be invoked once per stream.
@@ -90,7 +93,7 @@ class JniLibrary {
    * @param trailers, the trailers to send.
    * @return int, the resulting status of the operation.
    */
-  protected static native int sendTrailers(long stream, EnvoyHeaders trailers);
+  protected static native int sendTrailers(long stream, Map<String, List<String>> trailers);
 
   /**
    * Detach all observers from a stream and send an interrupt upstream if supported by transport.

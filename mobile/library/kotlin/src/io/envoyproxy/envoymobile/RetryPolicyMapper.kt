@@ -5,15 +5,15 @@ package io.envoyproxy.envoymobile
  *
  * @return The header representation of the retry policy.
  */
-internal fun RetryPolicy.outboundHeaders(): Map<String, String> {
+internal fun RetryPolicy.outboundHeaders(): Map<String, List<String>> {
 
   val headers = mutableMapOf(
-      "x-envoy-max-retries" to "$maxRetryCount",
-      "x-envoy-retry-on" to retryOn.joinToString(separator = ",") { elm -> elm.stringValue() }
+      "x-envoy-max-retries" to listOf("$maxRetryCount"),
+      "x-envoy-retry-on" to retryOn.map { elm -> elm.stringValue() }
   )
 
   if (perRetryTimeoutMs != null) {
-    headers["x-envoy-upstream-rq-per-try-timeout-ms"] = "$perRetryTimeoutMs"
+    headers["x-envoy-upstream-rq-per-try-timeout-ms"] = listOf("$perRetryTimeoutMs")
   }
   return headers
 }

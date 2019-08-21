@@ -1,19 +1,15 @@
 package io.envoyproxy.envoymobile
 
-internal fun Request.outboundHeaders(): Map<String, String> {
-  val validHeaders = headers
-    .filter { entry -> !entry.key.startsWith(":") }
-    .mapValues { entry -> entry.value.joinToString(separator = ",") }
-
+internal fun Request.outboundHeaders(): Map<String, List<String>> {
   val retryPolicyHeaders = retryPolicy?.outboundHeaders() ?: emptyMap()
 
-  val result = mutableMapOf<String, String>()
-  result.putAll(validHeaders)
+  val result = mutableMapOf<String, List<String>>()
+  result.putAll(headers.filter { entry -> !entry.key.startsWith(":") })
   result.putAll(retryPolicyHeaders)
-  result[":method"] = method.stringValue()
-  result[":scheme"] = scheme
-  result[":authority"] = authority
-  result[":path"] = path
+  result[":method"] = listOf(method.stringValue())
+  result[":scheme"] = listOf(scheme)
+  result[":authority"] = listOf(authority)
+  result[":path"] = listOf(path)
 
   return result
 }
