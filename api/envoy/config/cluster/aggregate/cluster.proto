@@ -7,7 +7,7 @@ option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.cluster.aggregate";
 option go_package = "v2";
 
-import "envoy/api/v2/cds.proto";
+import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
 
@@ -15,10 +15,12 @@ import "validate/validate.proto";
 message ClusterConfig {
   // Load balancing cluster.
   message LbCluster {
-    api.v2.Cluster cluster = 1;
+    // The name of the cluster to be included in the aggregate cluster.
+    string cluster_name = 1 [(validate.rules).string.min_bytes = 1];
 
-    // The priority of the cluster. The field will be used for selecting cluster.
-    int32 priority = 2;
+    // The priority of the cluster. The field will be used for selecting cluster. If priority is not
+    // set, defaults to 0 (highest priority).
+    google.protobuf.UInt32Value priority = 2;
   }
 
   // Load balancing clusters in aggregated cluster.

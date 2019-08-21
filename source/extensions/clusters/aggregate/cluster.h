@@ -16,8 +16,7 @@ namespace Aggregate {
 class Cluster : public Upstream::BaseDynamicClusterImpl {
 public:
   Cluster(const envoy::api::v2::Cluster& cluster,
-          const envoy::config::cluster::aggregate::ClusterConfig& config,
-          Upstream::ClusterManager& clusterManager, Runtime::Loader& runtime,
+          const envoy::config::cluster::aggregate::ClusterConfig& config, Runtime::Loader& runtime,
           Server::Configuration::TransportSocketFactoryContext& factory_context,
           Stats::ScopePtr&& stats_scope, bool added_via_api);
 
@@ -37,8 +36,6 @@ private:
     onPreInitComplete();
   }
 
-  Upstream::ClusterManager& cluster_manager_;
-  absl::flat_hash_map<int, std::vector<std::string>> priority_to_names_;
   std::vector<ClusterVector> clusters_per_priority_;
 };
 
