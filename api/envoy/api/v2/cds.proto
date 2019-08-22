@@ -553,7 +553,8 @@ message Cluster {
     // the first update happens. This is useful for big clusters, with potentially noisy deploys
     // that might trigger excessive CPU usage due to a constant stream of healthcheck state changes
     // or metadata updates. The first set of updates to be seen apply immediately (e.g.: a new
-    // cluster).
+    // cluster). Please always keep in mind that the use of sandbox technologies may change this
+    // behavior.
     //
     // If this is not set, we default to a merge window of 1000ms. To disable it, set the merge
     // window to 0.
