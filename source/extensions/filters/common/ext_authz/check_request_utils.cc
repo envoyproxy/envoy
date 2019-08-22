@@ -39,14 +39,14 @@ void CheckRequestUtils::setAttrContextPeer(envoy::service::auth::v2::AttributeCo
 
   // Set the principal. Preferably the URI SAN, DNS SAN or Subject in that order from the peer's
   // cert.
-  Ssl::ConnectionInfo* ssl = const_cast<Ssl::ConnectionInfo*>(connection.ssl());
+  auto ssl = connection.ssl();
   if (ssl != nullptr) {
     if (local) {
       const auto uri_sans = ssl->uriSanLocalCertificate();
       if (uri_sans.empty()) {
         const auto dns_sans = ssl->dnsSansLocalCertificate();
         if (dns_sans.empty()) {
-          peer.set_principal(ssl->subjectLocalCertificate());
+          peer.set_principal(std::string(ssl->subjectLocalCertificate()));
         } else {
           peer.set_principal(dns_sans[0]);
         }
@@ -58,7 +58,7 @@ void CheckRequestUtils::setAttrContextPeer(envoy::service::auth::v2::AttributeCo
       if (uri_sans.empty()) {
         const auto dns_sans = ssl->dnsSansPeerCertificate();
         if (dns_sans.empty()) {
-          peer.set_principal(ssl->subjectPeerCertificate());
+          peer.set_principal(std::string(ssl->subjectPeerCertificate()));
         } else {
           peer.set_principal(dns_sans[0]);
         }

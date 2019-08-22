@@ -181,8 +181,8 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeer) {
 TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerUriSans) {
   expectBasicHttp();
 
-  EXPECT_CALL(ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
-  EXPECT_CALL(ssl_, uriSanLocalCertificate())
+  EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
+  EXPECT_CALL(*ssl_, uriSanLocalCertificate())
       .WillOnce(Return(std::vector<std::string>{"destination"}));
 
   callHttpCheckAndValidateRequestAttributes();
@@ -193,11 +193,11 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerUriSans) {
 TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerDnsSans) {
   expectBasicHttp();
 
-  EXPECT_CALL(ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{}));
-  EXPECT_CALL(ssl_, dnsSansPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
+  EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{}));
+  EXPECT_CALL(*ssl_, dnsSansPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
 
-  EXPECT_CALL(ssl_, uriSanLocalCertificate()).WillOnce(Return(std::vector<std::string>{}));
-  EXPECT_CALL(ssl_, dnsSansLocalCertificate())
+  EXPECT_CALL(*ssl_, uriSanLocalCertificate()).WillOnce(Return(std::vector<std::string>{}));
+  EXPECT_CALL(*ssl_, dnsSansLocalCertificate())
       .WillOnce(Return(std::vector<std::string>{"destination"}));
 
   Protobuf::Map<std::string, std::string> context_extensions;
@@ -211,13 +211,13 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerDnsSans) {
 TEST_F(CheckRequestUtilsTest, CheckAttrContextSubject) {
   expectBasicHttp();
 
-  EXPECT_CALL(ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{}));
-  EXPECT_CALL(ssl_, dnsSansPeerCertificate()).WillOnce(Return(std::vector<std::string>{}));
-  EXPECT_CALL(ssl_, subjectPeerCertificate()).WillOnce(Return("source"));
+  EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{}));
+  EXPECT_CALL(*ssl_, dnsSansPeerCertificate()).WillOnce(Return(std::vector<std::string>{}));
+  EXPECT_CALL(*ssl_, subjectPeerCertificate()).WillOnce(Return("source"));
 
-  EXPECT_CALL(ssl_, uriSanLocalCertificate()).WillOnce(Return(std::vector<std::string>{}));
-  EXPECT_CALL(ssl_, dnsSansLocalCertificate()).WillOnce(Return(std::vector<std::string>{}));
-  EXPECT_CALL(ssl_, subjectLocalCertificate()).WillOnce(Return("destination"));
+  EXPECT_CALL(*ssl_, uriSanLocalCertificate()).WillOnce(Return(std::vector<std::string>{}));
+  EXPECT_CALL(*ssl_, dnsSansLocalCertificate()).WillOnce(Return(std::vector<std::string>{}));
+  EXPECT_CALL(*ssl_, subjectLocalCertificate()).WillOnce(Return("destination"));
 
   callHttpCheckAndValidateRequestAttributes();
 }
