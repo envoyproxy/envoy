@@ -154,8 +154,8 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithFullBody) {
                          Http::Headers::get().EnvoyAuthPartialBody.get()));
 }
 
-// Verify that createHttpCheck extract the attributes from the http request into CheckRequest
-// proto object and Uri SAN is used as principal if present.
+// Verify that createHttpCheck extract the attributes from the HTTP request into CheckRequest
+// proto object and URI SAN is used as principal if present.
 TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerUriSans) {
   expectBasicHttp();
 
@@ -166,8 +166,8 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerUriSans) {
   callHttpCheckAndValidateRequestAttributes();
 }
 
-// Verify that createHttpCheck extract the attributes from the http request into CheckRequest
-// proto object and Dns SAN is used as principal if Uri SAN is absent.
+// Verify that createHttpCheck extract the attributes from the HTTP request into CheckRequest
+// proto object and DNS SAN is used as principal if URI SAN is absent.
 TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerDnsSans) {
   expectBasicHttp();
 
@@ -184,8 +184,8 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerDnsSans) {
   callHttpCheckAndValidateRequestAttributes();
 }
 
-// Verify that createHttpCheck extract the attributes from the http request into CheckRequest
-// proto object and Subject is used as principal if both Uri SAN and Dns SAN are absent.
+// Verify that createHttpCheck extract the attributes from the HTTP request into CheckRequest
+// proto object and Subject is used as principal if both URI SAN and DNS SAN are absent.
 TEST_F(CheckRequestUtilsTest, CheckAttrContextSubject) {
   expectBasicHttp();
 
