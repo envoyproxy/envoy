@@ -9,7 +9,6 @@
 #include "extensions/access_loggers/well_known_names.h"
 
 #include "test/mocks/server/mocks.h"
-#include "test/test_common/environment.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -19,8 +18,6 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace File {
 namespace {
-
-using testing::ReturnRef;
 
 TEST(FileAccessLogConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
@@ -157,34 +154,6 @@ TEST(FileAccessLogConfigTest, FileAccessLogJsonWithNestedKeyTest) {
                               EnvoyException,
                               "Only string values are supported in the JSON access log format.");
   }
-}
-
-TEST(FileAccessLogConfigTest, FileAccessPermissionTest) {
-  auto factory =
-      Registry::FactoryRegistry<Server::Configuration::AccessLogInstanceFactory>::getFactory(
-          AccessLogNames::get().File);
-  ASSERT_NE(nullptr, factory);
-
-  ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
-  ASSERT_NE(nullptr, message);
-
-  std::string log_file =
-      absl::StrCat(TestEnvironment::temporaryDirectory(), "/log_file_permission_test.txt");
-
-  TestEnvironment::exec({"touch", log_file});
-  TestEnvironment::exec({"chmod", "000", log_file});
-
-  auto& fs = Filesystem::fileSystemForTest();
-  auto& file_access_log = dynamic_cast<envoy::config::accesslog::v2::FileAccessLog&>(*message);
-  file_access_log.set_path("log_file");
-  file_access_log.set_format("%START_TIME%");
-
-  NiceMock<Server::Configuration::MockFactoryContext> context;
-  ON_CALL(context.api_, fileSystem()).WillByDefault(ReturnRef(fs));
-  AccessLog::InstanceSharedPtr instance =
-      factory->createAccessLogInstance(*message, nullptr, context);
-  EXPECT_NE(nullptr, instance);
-  EXPECT_NE(nullptr, dynamic_cast<FileAccessLog*>(instance.get()));
 }
 
 } // namespace
