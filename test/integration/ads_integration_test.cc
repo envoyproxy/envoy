@@ -200,8 +200,8 @@ TEST_P(AdsIntegrationTest, DuplicateInitialClusters) {
   test_server_->waitForCounterGe("cluster_manager.cds.update_rejected", 1);
 }
 
-// Validates that removing a redis cluster does not crash Envoy. Regression test for issue
-// https://github.com/envoyproxy/envoy/issues/7990
+// Validates that removing a redis cluster does not crash Envoy.
+// Regression test for issue https://github.com/envoyproxy/envoy/issues/7990.
 TEST_P(AdsIntegrationTest, RedisClusterRemoval) {
   initialize();
 
