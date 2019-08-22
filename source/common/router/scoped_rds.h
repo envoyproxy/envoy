@@ -118,13 +118,13 @@ private:
     ScopedRdsConfigSubscription& parent_;
     std::string scope_name_;
     std::unique_ptr<RdsRouteConfigProviderImpl> route_provider_;
-    // This handle_ is owned by the route config provider's RDS subscrption, when the helper
+    // This handle_ is owned by the route config provider's RDS subscription, when the helper
     // destructs, the handle is deleted as well.
     Common::CallbackHandle* rds_update_callback_handle_;
   };
 
   // Adds or updates scopes, create a new RDS provider for each resource, if an exception is thrown
-  // during updating, the exception message is collected via the exception_msgs vector.
+  // during updating, the exception message is collected via the exception messages vector.
   // Returns true if any scope updated, false otherwise.
   bool addOrUpdateScopes(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& resources,
                          Init::Manager& init_manager, const std::string& version_info,
