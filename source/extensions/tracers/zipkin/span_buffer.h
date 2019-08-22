@@ -87,7 +87,7 @@ private:
 using SpanBufferPtr = std::unique_ptr<SpanBuffer>;
 
 /**
- * JsonV2Serializer implements Zipkin::Serializer that serializes list of Zipkin spans into JSON
+ * JsonV1Serializer implements Zipkin::Serializer that serializes list of Zipkin spans into JSON
  * Zipkin v1 array.
  */
 class JsonV1Serializer : public Serializer {
@@ -123,7 +123,7 @@ private:
 };
 
 /**
- * JsonV2Serializer implements Zipkin::Serializer that serializes list of Zipkin spans into
+ * ProtobufSerializer implements Zipkin::Serializer that serializes list of Zipkin spans into
  * stringified (SerializeToString) protobuf message.
  */
 class ProtobufSerializer : public Serializer {
