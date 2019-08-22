@@ -10,7 +10,10 @@ objc_library(
     # twice due to the way they're pulled into our swift framework rule. We should fix this to
     # maintain a valid objc target.
     srcs = [
-        "EnvoyEngine.m",
+        "EnvoyConfiguration.m",
+        "EnvoyEngineImpl.m",
+        "EnvoyHTTPStream.m",
+        "EnvoyObserver.m",
     ],
     hdrs = [
         "EnvoyEngine.h",
