@@ -57,8 +57,9 @@ STAT_FROM_STRING_WHITELIST = ("./source/extensions/filters/http/fault/fault_filt
                               "./source/server/overload_manager_impl.cc")
 
 # Files in these paths can use MessageLite::SerializeAsString
-SERIALIZE_AS_STRING_WHITELIST = ("./test/common/protobuf/utility_test.cc",
-                                 "./test/common/grpc/codec_test.cc")
+SERIALIZE_AS_STRING_WHITELIST = (
+    "./source/extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.cc",
+    "./test/common/protobuf/utility_test.cc", "./test/common/grpc/codec_test.cc")
 
 # Files in these paths can use Protobuf::util::JsonStringToMessage
 JSON_STRING_TO_MESSAGE_WHITELIST = ("./source/common/protobuf/utility.cc")

@@ -315,6 +315,7 @@ private:
   HEADER_FUNC(GrpcAcceptEncoding)                                                                  \
   HEADER_FUNC(GrpcMessage)                                                                         \
   HEADER_FUNC(GrpcStatus)                                                                          \
+  HEADER_FUNC(GrpcStatusDetailsBin)                                                                \
   HEADER_FUNC(GrpcTimeout)                                                                         \
   HEADER_FUNC(Host)                                                                                \
   HEADER_FUNC(KeepAlive)                                                                           \

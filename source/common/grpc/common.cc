@@ -10,6 +10,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/common/assert.h"
+#include "common/common/base64.h"
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
@@ -66,6 +67,27 @@ absl::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap& 
 std::string Common::getGrpcMessage(const Http::HeaderMap& trailers) {
   const auto entry = trailers.GrpcMessage();
   return entry ? std::string(entry->value().getStringView()) : EMPTY_STRING;
+}
+
+absl::optional<google::rpc::Status>
+Common::getGrpcStatusDetailsBin(const Http::HeaderMap& trailers) {
+  const Http::HeaderEntry* details_header = trailers.GrpcStatusDetailsBin();
+  if (!details_header) {
+    return {};
+  }
+
+  // Some implementations use non-padded base64 encoding for grpc-status-details-bin.
+  auto decoded_value = Base64::decodeWithoutPadding(details_header->value().getStringView());
+  if (decoded_value.empty()) {
+    return {};
+  }
+
+  google::rpc::Status status;
+  if (!status.ParseFromString(decoded_value)) {
+    return {};
+  }
+
+  return {std::move(status)};
 }
 
 Buffer::InstancePtr Common::serializeToGrpcFrame(const Protobuf::Message& message) {

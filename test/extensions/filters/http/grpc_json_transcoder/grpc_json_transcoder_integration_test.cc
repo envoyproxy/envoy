@@ -47,89 +47,91 @@ public:
    * Global destructor for all integration tests.
    */
   void TearDown() override {
+    closeConnection();
     test_server_.reset();
     fake_upstream_connection_.reset();
     fake_upstreams_.clear();
   }
 
 protected:
-  template <class RequestType, class ResponseType>
-  void testTranscoding(Http::HeaderMap&& request_headers, const std::string& request_body,
-                       const std::vector<std::string>& grpc_request_messages,
-                       const std::vector<std::string>& grpc_response_messages,
-                       const Status& grpc_status, Http::HeaderMap&& response_headers,
-                       const std::string& response_body, bool full_response = true) {
+  void sendRequest(Http::HeaderMap&& request_headers, const std::string& request_body) {
     codec_client_ = makeHttpConnection(lookupPort("http"));
 
-    IntegrationStreamDecoderPtr response;
     if (!request_body.empty()) {
       auto encoder_decoder = codec_client_->startRequest(request_headers);
       request_encoder_ = &encoder_decoder.first;
-      response = std::move(encoder_decoder.second);
+      response_ = std::move(encoder_decoder.second);
       Buffer::OwnedImpl body(request_body);
       codec_client_->sendData(*request_encoder_, body, true);
     } else {
-      response = codec_client_->makeHeaderOnlyRequest(request_headers);
+      response_ = codec_client_->makeHeaderOnlyRequest(request_headers);
     }
 
     ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-    if (!grpc_request_messages.empty()) {
-      ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-      ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  }
 
-      Grpc::Decoder grpc_decoder;
-      std::vector<Grpc::Frame> frames;
-      EXPECT_TRUE(grpc_decoder.decode(upstream_request_->body(), frames));
-      EXPECT_EQ(grpc_request_messages.size(), frames.size());
+  template <class RequestType>
+  void expectGrpcRequest(const std::vector<std::string>& grpc_request_messages) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+    ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
-      for (size_t i = 0; i < grpc_request_messages.size(); ++i) {
-        RequestType actual_message;
-        if (frames[i].length_ > 0) {
-          EXPECT_TRUE(actual_message.ParseFromString(frames[i].data_->toString()));
-        }
-        RequestType expected_message;
-        EXPECT_TRUE(TextFormat::ParseFromString(grpc_request_messages[i], &expected_message));
+    Grpc::Decoder grpc_decoder;
+    std::vector<Grpc::Frame> frames;
+    EXPECT_TRUE(grpc_decoder.decode(upstream_request_->body(), frames));
+    EXPECT_EQ(grpc_request_messages.size(), frames.size());
 
-        EXPECT_TRUE(MessageDifferencer::Equivalent(expected_message, actual_message));
+    for (size_t i = 0; i < grpc_request_messages.size(); ++i) {
+      RequestType actual_message;
+      if (frames[i].length_ > 0) {
+        EXPECT_TRUE(actual_message.ParseFromString(frames[i].data_->toString()));
       }
+      RequestType expected_message;
+      EXPECT_TRUE(TextFormat::ParseFromString(grpc_request_messages[i], &expected_message));
 
-      Http::TestHeaderMapImpl response_headers;
-      response_headers.insertStatus().value(200);
-      response_headers.insertContentType().value(std::string("application/grpc"));
-      if (grpc_response_messages.empty()) {
-        response_headers.insertGrpcStatus().value(static_cast<uint64_t>(grpc_status.error_code()));
-        response_headers.insertGrpcMessage().value(absl::string_view(
-            grpc_status.error_message().data(), grpc_status.error_message().size()));
-        upstream_request_->encodeHeaders(response_headers, true);
-      } else {
-        response_headers.addCopy(Http::LowerCaseString("trailer"), "Grpc-Status");
-        response_headers.addCopy(Http::LowerCaseString("trailer"), "Grpc-Message");
-        upstream_request_->encodeHeaders(response_headers, false);
-        for (const auto& response_message_str : grpc_response_messages) {
-          ResponseType response_message;
-          EXPECT_TRUE(TextFormat::ParseFromString(response_message_str, &response_message));
-          auto buffer = Grpc::Common::serializeToGrpcFrame(response_message);
-          upstream_request_->encodeData(*buffer, false);
-        }
-        Http::TestHeaderMapImpl response_trailers;
-        response_trailers.insertGrpcStatus().value(static_cast<uint64_t>(grpc_status.error_code()));
-        response_trailers.insertGrpcMessage().value(absl::string_view(
-            grpc_status.error_message().data(), grpc_status.error_message().size()));
-        upstream_request_->encodeTrailers(response_trailers);
-      }
-      EXPECT_TRUE(upstream_request_->complete());
+      EXPECT_TRUE(MessageDifferencer::Equivalent(expected_message, actual_message));
     }
+  }
 
-    response->waitForEndStream();
-    EXPECT_TRUE(response->complete());
+  template <class ResponseType>
+  void sendGrpcResponse(const std::vector<std::string>& grpc_response_messages,
+                        const Status& grpc_status) {
+    Http::TestHeaderMapImpl response_headers;
+    response_headers.insertStatus().value(200);
+    response_headers.insertContentType().value(std::string("application/grpc"));
+    if (grpc_response_messages.empty()) {
+      response_headers.insertGrpcStatus().value(static_cast<uint64_t>(grpc_status.error_code()));
+      response_headers.insertGrpcMessage().value(absl::string_view(
+          grpc_status.error_message().data(), grpc_status.error_message().size()));
+      upstream_request_->encodeHeaders(response_headers, true);
+    } else {
+      response_headers.addCopy(Http::LowerCaseString("trailer"), "Grpc-Status");
+      response_headers.addCopy(Http::LowerCaseString("trailer"), "Grpc-Message");
+      upstream_request_->encodeHeaders(response_headers, false);
+      for (const auto& response_message_str : grpc_response_messages) {
+        ResponseType response_message;
+        EXPECT_TRUE(TextFormat::ParseFromString(response_message_str, &response_message));
+        auto buffer = Grpc::Common::serializeToGrpcFrame(response_message);
+        upstream_request_->encodeData(*buffer, false);
+      }
+      Http::TestHeaderMapImpl response_trailers;
+      response_trailers.insertGrpcStatus().value(static_cast<uint64_t>(grpc_status.error_code()));
+      response_trailers.insertGrpcMessage().value(absl::string_view(
+          grpc_status.error_message().data(), grpc_status.error_message().size()));
+      upstream_request_->encodeTrailers(response_trailers);
+    }
+  }
 
-    if (response->headers().get(Http::LowerCaseString("transfer-encoding")) == nullptr ||
-        !absl::StartsWith(response->headers()
+  void expectResponseHeaders(Http::HeaderMap&& response_headers) {
+    response_->waitForEndStream();
+    EXPECT_TRUE(response_->complete());
+
+    if (response_->headers().get(Http::LowerCaseString("transfer-encoding")) == nullptr ||
+        !absl::StartsWith(response_->headers()
                               .get(Http::LowerCaseString("transfer-encoding"))
                               ->value()
                               .getStringView(),
                           "chunked")) {
-      EXPECT_EQ(response->headers().get(Http::LowerCaseString("trailer")), nullptr);
+      EXPECT_EQ(response_->headers().get(Http::LowerCaseString("trailer")), nullptr);
     }
 
     response_headers.iterate(
@@ -140,19 +142,49 @@ protected:
                     response->headers().get(lower_key)->value().getStringView());
           return Http::HeaderMap::Iterate::Continue;
         },
-        response.get());
-    if (!response_body.empty()) {
-      if (full_response) {
-        EXPECT_EQ(response_body, response->body());
-      } else {
-        EXPECT_TRUE(absl::StartsWith(response->body(), response_body));
-      }
+        response_.get());
+  }
+
+  void expectResponseBody(const std::string& response_body, bool full_response = true) {
+    if (full_response) {
+      EXPECT_EQ(response_body, response_->body());
+    } else {
+      EXPECT_TRUE(absl::StartsWith(response_->body(), response_body));
+    }
+  }
+
+  void closeConnection() {
+    if (response_) {
+      codec_client_->close();
+      ASSERT_TRUE(fake_upstream_connection_->close());
+      ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+    }
+    response_.reset();
+  }
+
+  template <class RequestType, class ResponseType>
+  void testTranscoding(Http::HeaderMap&& request_headers, const std::string& request_body,
+                       const std::vector<std::string>& grpc_request_messages,
+                       const std::vector<std::string>& grpc_response_messages,
+                       const Status& grpc_status, Http::HeaderMap&& response_headers,
+                       const std::string& response_body, bool full_response = true) {
+    sendRequest(std::move(request_headers), request_body);
+
+    if (!grpc_request_messages.empty()) {
+      expectGrpcRequest<RequestType>(grpc_request_messages);
+      sendGrpcResponse<ResponseType>(grpc_response_messages, grpc_status);
+      EXPECT_TRUE(upstream_request_->complete());
     }
 
-    codec_client_->close();
-    ASSERT_TRUE(fake_upstream_connection_->close());
-    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+    expectResponseHeaders(std::move(response_headers));
+    if (!response_body.empty()) {
+      expectResponseBody(response_body, full_response);
+    }
+
+    closeConnection();
   }
+
+  IntegrationStreamDecoderPtr response_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, GrpcJsonTranscoderIntegrationTest,
@@ -343,6 +375,60 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetError1) {
       Http::TestHeaderMapImpl{
           {":status", "404"}, {"grpc-status", "5"}, {"grpc-message", "Shelf 9999 Not Found"}},
       "");
+}
+
+TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetErrorConvertedToJson) {
+  const std::string filter =
+      R"EOF(
+            name: envoy.grpc_json_transcoder
+            config:
+              proto_descriptor: "{}"
+              services: "bookstore.Bookstore"
+              convert_grpc_status: true
+            )EOF";
+  config_helper_.addFilter(
+      fmt::format(filter, TestEnvironment::runfilesPath("/test/proto/bookstore.descriptor")));
+  HttpIntegrationTest::initialize();
+  testTranscoding<bookstore::GetShelfRequest, bookstore::Shelf>(
+      Http::TestHeaderMapImpl{
+          {":method", "GET"}, {":path", "/shelves/100"}, {":authority", "host"}},
+      "", {"shelf: 100"}, {}, Status(Code::NOT_FOUND, "Shelf 100 Not Found"),
+      Http::TestHeaderMapImpl{{":status", "404"}}, R"({"code":5,"message":"Shelf 100 Not Found"})");
+}
+
+// Test an upstream that immediately returns status 200, and then returns an error in trailer.
+TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetErrorInTrailerConvertedToJson) {
+  const std::string filter =
+      R"EOF(
+            name: envoy.grpc_json_transcoder
+            config:
+              proto_descriptor: "{}"
+              services: "bookstore.Bookstore"
+              convert_grpc_status: true
+            )EOF";
+  config_helper_.addFilter(
+      fmt::format(filter, TestEnvironment::runfilesPath("/test/proto/bookstore.descriptor")));
+  HttpIntegrationTest::initialize();
+  sendRequest(Http::TestHeaderMapImpl{{":method", "GET"},
+                                      {":path", "/shelves/100"},
+                                      {":authority", "host"}},
+              "");
+  expectGrpcRequest<bookstore::GetShelfRequest>({"shelf: 100"});
+
+  upstream_request_->encodeHeaders(
+      Http::TestHeaderMapImpl{
+          {":status", "200"},
+          {"content-type", "application/grpc"},
+          {"trailer", "rpc-status,grpc-status-details-bin"},
+      },
+      false);
+  upstream_request_->encodeTrailers(Http::TestHeaderMapImpl{
+      {"grpc-status", "5"},
+      {"grpc-status-details-bin", "CAUSE1NoZWxmIDEwMCBOb3QgRm91bmQ"},
+  });
+  EXPECT_TRUE(upstream_request_->complete());
+  expectResponseHeaders(Http::TestHeaderMapImpl{{":status", "404"}});
+  expectResponseBody(R"({"code":5,"message":"Shelf 100 Not Found"})");
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryDelete) {

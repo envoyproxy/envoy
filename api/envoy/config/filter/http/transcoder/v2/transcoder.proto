@@ -120,4 +120,12 @@ message GrpcJsonTranscoder {
   // not know them beforehand. Otherwise use ``ignored_query_parameters``.
   // Defaults to false.
   bool ignore_unknown_query_parameters = 8;
+
+  // Whether to convert gRPC status headers to JSON.
+  // When trailer indicates a gRPC error and there was no HTTP body, take ``google.rpc.Status``
+  // from the ``grpc-status-details-bin`` header and use it as JSON body.
+  // If there was no such header, make ``google.rpc.Status`` out of the ``grpc-status`` and
+  // ``grpc-message`` headers.
+  // This also adds ``google.rpc.Status`` to user-provided protobuf descriptor.
+  bool convert_grpc_status = 9;
 }
