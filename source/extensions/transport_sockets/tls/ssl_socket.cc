@@ -46,7 +46,7 @@ SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
                      const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
     : transport_socket_options_(transport_socket_options),
       ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)),
-      ssl_(ctx_->newSsl(transport_socket_options_.get())) {
+      ssl_(ctx_->newSsl(transport_socket_options_.get())), state_(SocketState::PreHandshake) {
   if (state == InitialState::Client) {
     SSL_set_connect_state(ssl_.get());
   } else {
@@ -58,6 +58,12 @@ SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
 void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) {
   ASSERT(!callbacks_);
   callbacks_ = &callbacks;
+
+  // Associate this SSL connection with all the certificates (with their potentially different
+  // private key methods).
+  for (auto const& provider : ctx_->getPrivateKeyMethodProviders()) {
+    provider->registerPrivateKeyMethod(ssl_.get(), *this, callbacks_->connection().dispatcher());
+  }
 
   BIO* bio = BIO_new_socket(callbacks_->ioHandle().fd(), 0);
   SSL_set_bio(ssl_.get(), bio, bio);
@@ -88,9 +94,9 @@ SslSocket::ReadResult SslSocket::sslReadIntoSlice(Buffer::RawSlice& slice) {
 }
 
 Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
-  if (!handshake_complete_) {
+  if (state_ != SocketState::HandshakeComplete && state_ != SocketState::ShutdownSent) {
     PostIoAction action = doHandshake();
-    if (action == PostIoAction::Close || !handshake_complete_) {
+    if (action == PostIoAction::Close || state_ != SocketState::HandshakeComplete) {
       // end_stream is false because either a hard error occurred (action == Close) or
       // the handshake isn't complete, so a half-close cannot occur yet.
       return {action, 0, false};
@@ -149,12 +155,24 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
   return {action, bytes_read, end_stream};
 }
 
+void SslSocket::onPrivateKeyMethodComplete() {
+  ASSERT(isThreadSafe());
+  ASSERT(state_ == SocketState::HandshakeInProgress);
+
+  // Resume handshake.
+  PostIoAction action = doHandshake();
+  if (action == PostIoAction::Close) {
+    ENVOY_CONN_LOG(debug, "async handshake completion error", callbacks_->connection());
+    callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+  }
+}
+
 PostIoAction SslSocket::doHandshake() {
-  ASSERT(!handshake_complete_);
+  ASSERT(state_ != SocketState::HandshakeComplete && state_ != SocketState::ShutdownSent);
   int rc = SSL_do_handshake(ssl_.get());
   if (rc == 1) {
     ENVOY_CONN_LOG(debug, "handshake complete", callbacks_->connection());
-    handshake_complete_ = true;
+    state_ = SocketState::HandshakeComplete;
     ctx_->logHandshake(ssl_.get());
     callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
 
@@ -164,12 +182,18 @@ PostIoAction SslSocket::doHandshake() {
                : PostIoAction::Close;
   } else {
     int err = SSL_get_error(ssl_.get(), rc);
-    ENVOY_CONN_LOG(debug, "handshake error: {}", callbacks_->connection(), err);
     switch (err) {
     case SSL_ERROR_WANT_READ:
     case SSL_ERROR_WANT_WRITE:
+      ENVOY_CONN_LOG(debug, "handshake expecting {}", callbacks_->connection(),
+                     err == SSL_ERROR_WANT_READ ? "read" : "write");
+      return PostIoAction::KeepOpen;
+    case SSL_ERROR_WANT_PRIVATE_KEY_OPERATION:
+      ENVOY_CONN_LOG(debug, "handshake continued asynchronously", callbacks_->connection());
+      state_ = SocketState::HandshakeInProgress;
       return PostIoAction::KeepOpen;
     default:
+      ENVOY_CONN_LOG(debug, "handshake error: {}", callbacks_->connection(), err);
       drainErrorQueue();
       return PostIoAction::Close;
     }
@@ -204,10 +228,10 @@ void SslSocket::drainErrorQueue() {
 }
 
 Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer, bool end_stream) {
-  ASSERT(!shutdown_sent_ || write_buffer.length() == 0);
-  if (!handshake_complete_) {
+  ASSERT(state_ != SocketState::ShutdownSent || write_buffer.length() == 0);
+  if (state_ != SocketState::HandshakeComplete && state_ != SocketState::ShutdownSent) {
     PostIoAction action = doHandshake();
-    if (action == PostIoAction::Close || !handshake_complete_) {
+    if (action == PostIoAction::Close || state_ != SocketState::HandshakeComplete) {
       return {action, 0, false};
     }
   }
@@ -260,15 +284,16 @@ Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer, bool end_st
   return {PostIoAction::KeepOpen, total_bytes_written, false};
 }
 
-void SslSocket::onConnected() { ASSERT(!handshake_complete_); }
+void SslSocket::onConnected() { ASSERT(state_ == SocketState::PreHandshake); }
 
 void SslSocket::shutdownSsl() {
-  ASSERT(handshake_complete_);
-  if (!shutdown_sent_ && callbacks_->connection().state() != Network::Connection::State::Closed) {
+  ASSERT(state_ != SocketState::PreHandshake);
+  if (state_ != SocketState::ShutdownSent &&
+      callbacks_->connection().state() != Network::Connection::State::Closed) {
     int rc = SSL_shutdown(ssl_.get());
     ENVOY_CONN_LOG(debug, "SSL shutdown: rc={}", callbacks_->connection(), rc);
     drainErrorQueue();
-    shutdown_sent_ = true;
+    state_ = SocketState::ShutdownSent;
   }
 }
 
@@ -381,10 +406,15 @@ std::vector<std::string> SslSocket::dnsSansPeerCertificate() const {
 }
 
 void SslSocket::closeSocket(Network::ConnectionEvent) {
+  // Unregister the SSL connection object from private key method providers.
+  for (auto const& provider : ctx_->getPrivateKeyMethodProviders()) {
+    provider->unregisterPrivateKeyMethod(ssl_.get());
+  }
+
   // Attempt to send a shutdown before closing the socket. It's possible this won't go out if
   // there is no room on the socket. We can extend the state machine to handle this at some point
   // if needed.
-  if (handshake_complete_) {
+  if (state_ == SocketState::HandshakeInProgress || state_ == SocketState::HandshakeComplete) {
     shutdownSsl();
   }
 }
