@@ -9,6 +9,7 @@ import android.support.v7.widget.DividerItemDecoration;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.Log;
+import io.envoyproxy.envoymobile.AndroidEnvoyBuilder;
 import io.envoyproxy.envoymobile.Envoy;
 import io.envoyproxy.envoymobile.engine.AndroidEngineImpl;
 import io.envoyproxy.envoymobile.engine.EnvoyEngine;
@@ -44,19 +45,7 @@ public class MainActivity extends Activity {
     super.onCreate(savedInstanceState);
     setContentView(R.layout.activity_main);
 
-    Context context = getBaseContext();
-
-    // Create envoy instance with config.
-    String config;
-    try {
-      config = loadEnvoyConfig(getBaseContext(), R.raw.config);
-    } catch (RuntimeException e) {
-      Log.d("MainActivity", "exception getting config.", e);
-      throw new RuntimeException("Can't get config to run envoy.");
-    }
-
-    EnvoyEngine envoyEngine = new AndroidEngineImpl(context);
-    envoy = new Envoy(envoyEngine, config);
+    this.envoy = new AndroidEnvoyBuilder(getBaseContext()).build();
 
     recyclerView = (RecyclerView)findViewById(R.id.recycler_view);
     recyclerView.setLayoutManager(new LinearLayoutManager(this));
@@ -120,23 +109,5 @@ public class MainActivity extends Activity {
     }
     bufferedReader.close();
     return stringBuilder.toString();
-  }
-
-  private String loadEnvoyConfig(Context context, int configResourceId) throws RuntimeException {
-    InputStream inputStream = context.getResources().openRawResource(configResourceId);
-    InputStreamReader inputReader = new InputStreamReader(inputStream);
-    BufferedReader bufReader = new BufferedReader(inputReader);
-    StringBuilder text = new StringBuilder();
-
-    try {
-      String line;
-      while ((line = bufReader.readLine()) != null) {
-        text.append(line);
-        text.append('\n');
-      }
-    } catch (IOException e) {
-      return null;
-    }
-    return text.toString();
   }
 }

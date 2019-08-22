@@ -64,11 +64,12 @@ class Envoy constructor(
   }
 
   override fun send(request: Request, data: ByteBuffer?, trailers: Map<String, List<String>>, responseHandler: ResponseHandler): CancelableStream {
-    val stream = engine.startStream(responseHandler.underlyingObserver)
-    stream.sendHeaders(request.headers, false)
-    stream.sendData(data, false)
-    stream.sendTrailers(trailers)
-    return EnvoyStreamEmitter(stream)
+    val stream = send(request, responseHandler)
+    if (data != null) {
+      stream.sendData(data)
+    }
+    stream.close(trailers)
+    return stream
   }
 
   override fun send(request: Request, body: ByteBuffer?, responseHandler: ResponseHandler): CancelableStream {
