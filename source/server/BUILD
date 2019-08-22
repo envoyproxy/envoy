@@ -261,6 +261,7 @@ envoy_cc_library(
         ":filter_chain_manager_lib",
         ":lds_api_lib",
         ":transport_socket_config_lib",
+        ":well_known_names_lib",
         "//include/envoy/server:active_udp_listener_config_interface",
         "//include/envoy/server:filter_config_interface",
         "//include/envoy/server:listener_manager_interface",
@@ -444,11 +445,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "well_known_names_lib",
+    hdrs = ["well_known_names.h"],
+)
+
+envoy_cc_library(
     name = "active_raw_udp_listener_config",
     srcs = ["active_raw_udp_listener_config.cc"],
     hdrs = ["active_raw_udp_listener_config.h"],
     deps = [
         ":connection_handler_lib",
+        ":well_known_names_lib",
         "//include/envoy/registry",
         "//include/envoy/server:active_udp_listener_config_interface",
     ],

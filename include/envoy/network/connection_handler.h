@@ -103,6 +103,10 @@ public:
    * Creates an ActiveUdpListener object and a corresponding UdpListener
    * according to given config.
    * @param parent is the owner of the created ActiveListener objects.
+   * @param dispatcher is used to create actual UDP listener.
+   * @param logger might not need to be passed in.
+   * TODO(danzh): investigate if possible to use statically defined logger in ActiveUdpListener
+   * implementation instead.
    * @param config provides information needed to create ActiveUdpListener and
    * UdpListener objects.
    * @return the ActiveUdpListener created.

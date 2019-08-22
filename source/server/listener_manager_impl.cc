@@ -24,6 +24,7 @@
 #include "server/drain_manager_impl.h"
 #include "server/filter_chain_manager_impl.h"
 #include "server/transport_socket_config_impl.h"
+#include "server/well_known_names.h"
 
 #include "extensions/filters/listener/well_known_names.h"
 #include "extensions/transport_sockets/well_known_names.h"
@@ -230,7 +231,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
     std::string listener_name =
         config.has_udp_listener_config() ? config.udp_listener_config().udp_listener_name() : "";
     if (listener_name.empty()) {
-      listener_name = "raw_udp_listener";
+      listener_name = UdpListenerNames::get().RawUdp;
     }
     udp_listener_factory_ =
         Config::Utility::getAndCheckFactory<ActiveUdpListenerConfigFactory>(listener_name)
