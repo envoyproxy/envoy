@@ -257,8 +257,8 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // A unique instance of ClusterMemoryTest allows for multiple runs of Envoy with
   // differing configuration. This is necessary for measuring the memory consumption
   // between the different instances within the same test.
-  const size_t m1 = ClusterMemoryTestHelper::computeMemory(1);
-  const size_t m1001 = ClusterMemoryTestHelper::computeMemory(1001);
+  const size_t m1 = ClusterMemoryTestHelper::computeMemory(1, 0, true);
+  const size_t m1001 = ClusterMemoryTestHelper::computeMemory(1001, 0, true);
   const size_t m_per_cluster = (m1001 - m1) / 1000;
 
   // Note: if you are increasing this golden value because you are adding a
