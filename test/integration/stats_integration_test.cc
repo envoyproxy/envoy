@@ -146,9 +146,9 @@ public:
   ClusterMemoryTestHelper()
       : BaseIntegrationTest(testing::TestWithParam<Network::Address::IpVersion>::GetParam()) {}
 
-  static size_t computeMemory(int num_clusters) {
+  static size_t computeMemory(int num_clusters, int num_hosts, bool allow_stats) {
     ClusterMemoryTestHelper helper;
-    return helper.clusterMemoryHelper(num_clusters, true);
+    return helper.clusterMemoryHelper(num_clusters, num_hosts, allow_stats);
   }
 
 private:
@@ -157,15 +157,28 @@ private:
    * @param allow_stats if false, enable set_reject_all in stats_config
    * @return size_t the total memory allocated
    */
-  size_t clusterMemoryHelper(int num_clusters, bool allow_stats) {
+  size_t clusterMemoryHelper(int num_clusters, int num_hosts, bool allow_stats) {
     Stats::TestUtil::MemoryTest memory_test;
     config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       if (!allow_stats) {
         bootstrap.mutable_stats_config()->mutable_stats_matcher()->set_reject_all(true);
       }
+      if (num_hosts > 0) {
+        setUpstreamCount(num_clusters * num_hosts);
+      }
       for (int i = 1; i < num_clusters; i++) {
-        auto* c = bootstrap.mutable_static_resources()->add_clusters();
-        c->set_name(fmt::format("cluster_{}", i));
+        auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
+        cluster->set_name(fmt::format("cluster_{}", i));
+        for (int j = 0; j < num_hosts; j++) {
+          auto* host = cluster->add_hosts();
+          auto* socket_address = host->mutable_socket_address();
+          socket_address->set_protocol(envoy::api::v2::core::SocketAddress::TCP);
+          socket_address->set_address("0.0.0.0");
+          //fake_upstreams_.emplace_back(
+          //    new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
+          //host->set_address(fmt::format("host_{}", i));
+          std::cout << host->DebugString() << "\n";
+        }
       }
     });
     initialize();
@@ -194,8 +207,8 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // A unique instance of ClusterMemoryTest allows for multiple runs of Envoy with
   // differing configuration. This is necessary for measuring the memory consumption
   // between the different instances within the same test.
-  const size_t m1 = ClusterMemoryTestHelper::computeMemory(1);
-  const size_t m1001 = ClusterMemoryTestHelper::computeMemory(1001);
+  const size_t m1 = ClusterMemoryTestHelper::computeMemory(1, 0, true);
+  const size_t m1001 = ClusterMemoryTestHelper::computeMemory(1001, 0, true);
   const size_t m_per_cluster = (m1001 - m1) / 1000;
 
   // Note: if you are increasing this golden value because you are adding a
@@ -271,6 +284,39 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // vary.
   EXPECT_MEMORY_EQ(m_per_cluster, 35489); // 104 bytes higher than a debug build.
   EXPECT_MEMORY_LE(m_per_cluster, 36000);
+}
+
+TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
+  // A unique instance of ClusterMemoryTest allows for multiple runs of Envoy with
+  // differing configuration. This is necessary for measuring the memory consumption
+  // between the different instances within the same test.
+  const size_t m1 = ClusterMemoryTestHelper::computeMemory(1, 1, true);
+  const size_t m1001 = ClusterMemoryTestHelper::computeMemory(1, 1001, true);
+  const size_t m_per_cluster = (m1001 - m1) / 1000;
+
+  // Note: if you are increasing this golden value because you are adding a
+  // stat, please confirm that this will be generally useful to most Envoy
+  // users. Otherwise you are adding to the per-cluster memory overhead, which
+  // will be significant for Envoy installations that are massively
+  // multi-tenant.
+  //
+  // History of golden values:
+  //
+  // Date        PR       Bytes Per Cluster   Notes
+  //                      exact upper-bound
+  // ----------  -----    -----------------   -----
+  // 2019/07/27  xxx      42806       43000   static link libstdc++ in tests
+
+  // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
+  // 'release' builds, where we control the platform and tool-chain. So you
+  // will need to find the correct value only after failing CI and looking
+  // at the logs.
+  //
+  // On a local clang8/libstdc++/linux flow, the memory usage was observed in
+  // June 2019 to be 64 bytes higher than it is in CI/release. Your mileage may
+  // vary.
+  EXPECT_MEMORY_EQ(m_per_cluster, 42806); // 104 bytes higher than a debug build.
+  EXPECT_MEMORY_LE(m_per_cluster, 43000);
 }
 
 } // namespace
