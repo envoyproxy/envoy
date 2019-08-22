@@ -26,7 +26,8 @@ void ConnectionHandlerImpl::addListener(Network::ListenerConfig& config) {
   } else {
     ASSERT(socket_type == Network::Address::SocketType::Datagram,
            "Only datagram/stream listener supported");
-    listener = config.udpListenerFactory()->createActiveUdpListener(*this, config);
+    listener =
+        config.udpListenerFactory()->createActiveUdpListener(*this, dispatcher_, logger_, config);
   }
 
   if (disable_listeners_) {
@@ -83,9 +84,8 @@ void ConnectionHandlerImpl::ActiveTcpListener::removeConnection(ActiveConnection
 }
 
 ConnectionHandlerImpl::ActiveListenerImplBase::ActiveListenerImplBase(
-    ConnectionHandlerImpl& parent, Network::ListenerPtr&& listener, Network::ListenerConfig& config)
-    : parent_(parent), listener_(std::move(listener)),
-      stats_(generateStats(config.listenerScope())),
+    Network::ListenerPtr&& listener, Network::ListenerConfig& config)
+    : listener_(std::move(listener)), stats_(generateStats(config.listenerScope())),
       listener_filters_timeout_(config.listenerFiltersTimeout()),
       continue_on_listener_filters_timeout_(config.continueOnListenerFiltersTimeout()),
       listener_tag_(config.listenerTag()), config_(config) {}
@@ -101,7 +101,7 @@ ConnectionHandlerImpl::ActiveTcpListener::ActiveTcpListener(ConnectionHandlerImp
 ConnectionHandlerImpl::ActiveTcpListener::ActiveTcpListener(ConnectionHandlerImpl& parent,
                                                             Network::ListenerPtr&& listener,
                                                             Network::ListenerConfig& config)
-    : ConnectionHandlerImpl::ActiveListenerImplBase(parent, std::move(listener), config) {}
+    : ConnectionHandlerImpl::ActiveListenerImplBase(std::move(listener), config), parent_(parent) {}
 
 ConnectionHandlerImpl::ActiveTcpListener::~ActiveTcpListener() {
   // Purge sockets that have not progressed to connections. This should only happen when
@@ -315,15 +315,12 @@ ListenerStats ConnectionHandlerImpl::generateStats(Stats::Scope& scope) {
   return {ALL_LISTENER_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope), POOL_HISTOGRAM(scope))};
 }
 
-ConnectionHandlerImpl::ActiveUdpListener::ActiveUdpListener(ConnectionHandlerImpl& parent,
-                                                            Network::ListenerConfig& config)
-    : ActiveUdpListener(parent, parent.dispatcher_.createUdpListener(config.socket(), *this),
-                        config) {}
+ActiveUdpListener::ActiveUdpListener(Event::Dispatcher& dispatcher, Network::ListenerConfig& config)
+    : ActiveUdpListener(dispatcher.createUdpListener(config.socket(), *this), config) {}
 
-ConnectionHandlerImpl::ActiveUdpListener::ActiveUdpListener(ConnectionHandlerImpl& parent,
-                                                            Network::ListenerPtr&& listener,
-                                                            Network::ListenerConfig& config)
-    : ConnectionHandlerImpl::ActiveListenerImplBase(parent, std::move(listener), config),
+ActiveUdpListener::ActiveUdpListener(Network::ListenerPtr&& listener,
+                                     Network::ListenerConfig& config)
+    : ConnectionHandlerImpl::ActiveListenerImplBase(std::move(listener), config),
       udp_listener_(dynamic_cast<Network::UdpListener*>(listener_.get())), read_filter_(nullptr) {
   // TODO(sumukhs): Try to avoid dynamic_cast by coming up with a better interface design
   ASSERT(udp_listener_ != nullptr, "");
@@ -339,32 +336,27 @@ ConnectionHandlerImpl::ActiveUdpListener::ActiveUdpListener(ConnectionHandlerImp
   }
 }
 
-void ConnectionHandlerImpl::ActiveUdpListener::onData(Network::UdpRecvData& data) {
-  read_filter_->onData(data);
-}
+void ActiveUdpListener::onData(Network::UdpRecvData& data) { read_filter_->onData(data); }
 
-void ConnectionHandlerImpl::ActiveUdpListener::onWriteReady(const Network::Socket&) {
+void ActiveUdpListener::onWriteReady(const Network::Socket&) {
   // TODO(sumukhs): This is not used now. When write filters are implemented, this is a
   // trigger to invoke the on write ready API on the filters which is when they can write
   // data
 }
 
-void ConnectionHandlerImpl::ActiveUdpListener::onReceiveError(
-    const Network::UdpListenerCallbacks::ErrorCode&, Api::IoError::IoErrorCode) {
+void ActiveUdpListener::onReceiveError(const Network::UdpListenerCallbacks::ErrorCode&,
+                                       Api::IoError::IoErrorCode) {
   // TODO(sumukhs): Determine what to do on receive error.
   // Would the filters need to know on error? Can't foresee a scenario where they
   // would take an action
 }
 
-void ConnectionHandlerImpl::ActiveUdpListener::addReadFilter(
-    Network::UdpListenerReadFilterPtr&& filter) {
+void ActiveUdpListener::addReadFilter(Network::UdpListenerReadFilterPtr&& filter) {
   ASSERT(read_filter_ == nullptr, "Cannot add a 2nd UDP read filter");
   read_filter_ = std::move(filter);
 }
 
-Network::UdpListener& ConnectionHandlerImpl::ActiveUdpListener::udpListener() {
-  return *udp_listener_;
-}
+Network::UdpListener& ActiveUdpListener::udpListener() { return *udp_listener_; }
 
 } // namespace Server
 } // namespace Envoy

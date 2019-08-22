@@ -5,11 +5,10 @@
 namespace Envoy {
 namespace Server {
 
-Network::ConnectionHandler::ActiveListenerPtr
-ActiveRawUdpListenerFactory::createActiveUdpListener(Network::ConnectionHandler& parent,
-                                                     Network::ListenerConfig& config) const {
-  return std::make_unique<ConnectionHandlerImpl::ActiveUdpListener>(
-      dynamic_cast<ConnectionHandlerImpl&>(parent), config);
+Network::ConnectionHandler::ActiveListenerPtr ActiveRawUdpListenerFactory::createActiveUdpListener(
+    Network::ConnectionHandler& /*parent*/, Event::Dispatcher& dispatcher,
+    spdlog::logger& /*logger*/, Network::ListenerConfig& config) const {
+  return std::make_unique<ActiveUdpListener>(dispatcher, config);
 }
 
 Network::ActiveUdpListenerFactoryPtr

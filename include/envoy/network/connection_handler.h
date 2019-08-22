@@ -107,8 +107,9 @@ public:
    * UdpListener objects.
    * @return the ActiveUdpListener created.
    */
-  virtual Network::ConnectionHandler::ActiveListenerPtr
-  createActiveUdpListener(ConnectionHandler& parent, Network::ListenerConfig& config) const PURE;
+  virtual ConnectionHandler::ActiveListenerPtr
+  createActiveUdpListener(ConnectionHandler& parent, Event::Dispatcher& disptacher,
+                          spdlog::logger& logger, Network::ListenerConfig& config) const PURE;
 };
 
 using ActiveUdpListenerFactoryPtr = std::unique_ptr<ActiveUdpListenerFactory>;
