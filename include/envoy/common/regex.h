@@ -13,10 +13,7 @@ namespace Regex {
  * NOTE: Currently this is the same as StringMatcher, however has been split out as in the future
  *       we are likely to add other methods such as returning captures, etc.
  */
-class CompiledMatcher : public Matchers::StringMatcher {
-public:
-  virtual ~CompiledMatcher() = default;
-};
+class CompiledMatcher : public Matchers::StringMatcher {};
 
 using CompiledMatcherPtr = std::unique_ptr<const CompiledMatcher>;
 
