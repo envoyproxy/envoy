@@ -207,11 +207,7 @@ public:
   }
 
   static void checkUnknownFields(const Protobuf::Message& message,
-                                 ProtobufMessage::ValidationVisitor& validation_visitor) {
-    if (!message.GetReflection()->GetUnknownFields(message).empty()) {
-      validation_visitor.onUnknownField("type " + message.GetTypeName());
-    }
-  }
+                                 ProtobufMessage::ValidationVisitor& validation_visitor);
 
   static void loadFromJson(const std::string& json, Protobuf::Message& message,
                            ProtobufMessage::ValidationVisitor& validation_visitor);

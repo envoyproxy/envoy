@@ -34,7 +34,10 @@ public:
 private:
   TimerCb cb_;
   Dispatcher& dispatcher_;
-  const ScopeTrackedObject* object_{};
+  // This has to be atomic for alarms which are handled out of thread, for
+  // example if the DispatcherImpl::post is called by two threads, they race to
+  // both set this to null.
+  std::atomic<const ScopeTrackedObject*> object_{};
 };
 
 } // namespace Event

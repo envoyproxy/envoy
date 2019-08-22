@@ -61,6 +61,7 @@ envoy_cc_test_library(
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/memory:stats_lib",
+        "//source/common/stats:symbol_table_creator_lib",
     ],
 )
 

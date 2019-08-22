@@ -13,6 +13,7 @@ Deprecated items below are listed in chronological order.
 Version 1.12.0 (pending)
 ========================
 * The ORIGINAL_DST_LB :ref:`load balancing policy <envoy_api_field_Cluster.lb_policy>` is deprecated, use CLUSTER_PROVIDED policy instead when configuring an :ref:`original destination cluster <envoy_api_field_Cluster.type>`.
+* The :option:`--allow-unknown-fields` command-line option, use :option:`--allow-unknown-static-fields` instead.
 
 Version 1.11.0 (July 11, 2019)
 ==============================
