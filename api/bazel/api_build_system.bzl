@@ -40,7 +40,7 @@ def api_py_proto_library(name, srcs = [], deps = [], external_py_proto_deps = []
         visibility = ["//visibility:public"],
     )
 
-def api_proto_package(name, srcs = [], deps = [], visibility = ["//visibility:private"]):
+def api_proto_package(name, srcs = [], deps = [], has_services = False, visibility = ["//visibility:public"]):
     native.proto_library(
         name = name,
         srcs = srcs,
@@ -60,12 +60,18 @@ def api_proto_package(name, srcs = [], deps = [], visibility = ["//visibility:pr
         ],
         visibility = visibility,
     )
+
+    compilers = ["@io_bazel_rules_go//proto:go_proto"]
+    if has_services:
+        compilers = ["@io_bazel_rules_go//proto:go_grpc"]
+
     go_proto_library(
         name = _Suffix(name, _GO_PROTO_SUFFIX),
+        compilers = compilers,
         importpath = _Suffix(_GO_IMPORTPATH_PREFIX, name),
         proto = name,
         visibility = ["//visibility:public"],
-        deps = [_Suffix(dep, _GO_PROTO_SUFFIX) for dep in deps] + [
+        deps = [_Suffix("//" + Label(dep).package + ":" + Label(dep).name, _GO_PROTO_SUFFIX) for dep in deps] + [
             "@com_github_gogo_protobuf//:gogo_proto_go",
             "@io_bazel_rules_go//proto/wkt:any_go_proto",
             "@io_bazel_rules_go//proto/wkt:duration_go_proto",
@@ -73,6 +79,7 @@ def api_proto_package(name, srcs = [], deps = [], visibility = ["//visibility:pr
             "@io_bazel_rules_go//proto/wkt:timestamp_go_proto",
             "@io_bazel_rules_go//proto/wkt:wrappers_go_proto",
             "@com_envoyproxy_protoc_gen_validate//validate:go_default_library",
+            "@com_google_googleapis//google/api:annotations_go_proto",
             "@com_google_googleapis//google/rpc:status_go_proto",
         ],
     )

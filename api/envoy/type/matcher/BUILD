@@ -1,6 +1,12 @@
-load("@envoy_api//bazel:api_build_system.bzl", "api_go_proto_library", "api_proto_library_internal")
+load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library_internal", "api_proto_package")
 
 licenses(["notice"])  # Apache 2
+
+api_proto_package(
+    name = "matcher",
+    srcs = glob(["*.proto"]),
+    deps = ["//envoy/type"],
+)
 
 api_proto_library_internal(
     name = "metadata",
@@ -8,14 +14,6 @@ api_proto_library_internal(
     visibility = ["//visibility:public"],
     deps = [
         ":value",
-    ],
-)
-
-api_go_proto_library(
-    name = "metadata",
-    proto = ":metadata",
-    deps = [
-        ":value_go_proto",
     ],
 )
 
@@ -28,23 +26,10 @@ api_proto_library_internal(
     ],
 )
 
-api_go_proto_library(
-    name = "number",
-    proto = ":number",
-    deps = [
-        "//envoy/type:range_go_proto",
-    ],
-)
-
 api_proto_library_internal(
     name = "string",
     srcs = ["string.proto"],
     visibility = ["//visibility:public"],
-)
-
-api_go_proto_library(
-    name = "string",
-    proto = ":string",
 )
 
 api_proto_library_internal(
@@ -57,11 +42,3 @@ api_proto_library_internal(
     ],
 )
 
-api_go_proto_library(
-    name = "value",
-    proto = ":value",
-    deps = [
-        ":number_go_proto",
-        ":string_go_proto",
-    ],
-)
