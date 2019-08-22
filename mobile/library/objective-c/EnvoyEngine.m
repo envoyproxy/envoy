@@ -1,7 +1,7 @@
 #import "library/objective-c/EnvoyEngine.h"
 
 #import "library/common/main_interface.h"
-#import "library/common/include/c_types.h"
+#import "library/common/types/c_types.h"
 
 #import <stdatomic.h>
 

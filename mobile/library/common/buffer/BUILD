@@ -10,7 +10,7 @@ envoy_cc_library(
     hdrs = ["utility.h"],
     repository = "@envoy",
     deps = [
-        "//library/common/include:c_types_interface",
+        "//library/common/types:c_types_lib",
         "@envoy//include/envoy/buffer:buffer_interface",
     ],
 )

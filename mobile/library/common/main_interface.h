@@ -3,7 +3,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "library/common/include/c_types.h"
+#include "library/common/types/c_types.h"
 
 // NOLINT(namespace-envoy)
 

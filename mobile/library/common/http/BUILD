@@ -12,7 +12,7 @@ envoy_cc_library(
     deps = [
         "//library/common/buffer:utility_lib",
         "//library/common/http:header_utility_lib",
-        "//library/common/include:c_types_interface",
+        "//library/common/types:c_types_lib",
         "@envoy//include/envoy/buffer:buffer_interface",
         "@envoy//include/envoy/event:dispatcher_interface",
         "@envoy//include/envoy/http:async_client_interface",
@@ -28,7 +28,7 @@ envoy_cc_library(
     hdrs = ["header_utility.h"],
     repository = "@envoy",
     deps = [
-        "//library/common/include:c_types_interface",
+        "//library/common/types:c_types_lib",
         "@envoy//include/envoy/buffer:buffer_interface",
         "@envoy//include/envoy/http:header_map_interface",
         "@envoy//source/common/http:header_map_lib",
