@@ -285,7 +285,7 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
     auto scoped_route = MessageUtil::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(
         resource_any, validation_visitor_);
     MessageUtil::validate(scoped_route);
-    const std::string& scope_name = scoped_route.name();
+    const std::string scope_name = scoped_route.name();
     auto scope_config_inserted = scoped_routes.try_emplace(scope_name, std::move(scoped_route));
     if (!scope_config_inserted.second) {
       throw EnvoyException(
