@@ -368,6 +368,31 @@ TEST(StringUtil, StringViewSplit) {
   }
 }
 
+TEST(StringUtil, StringViewRemoveTokens) {
+  // Basic cases.
+  EXPECT_EQ(StringUtil::removeTokens("", ",", {"two"}, ","), "");
+  EXPECT_EQ(StringUtil::removeTokens("one", ",", {"two"}, ","), "one");
+  EXPECT_EQ(StringUtil::removeTokens("one,two ", ",", {"two"}, ","), "one");
+  EXPECT_EQ(StringUtil::removeTokens("one,two,three ", ",", {"two"}, ","), "one,three");
+  EXPECT_EQ(StringUtil::removeTokens(" one , two , three ", ",", {"two"}, ","), "one,three");
+  EXPECT_EQ(StringUtil::removeTokens(" one , two , three ", ",", {"three"}, ","), "one,two");
+  EXPECT_EQ(StringUtil::removeTokens(" one , two , three ", ",", {"three"}, ", "), "one, two");
+  EXPECT_EQ(StringUtil::removeTokens("one,two,three", ",", {"two", "three"}, ","), "one");
+  EXPECT_EQ(StringUtil::removeTokens("one,two,three,four", ",", {"two", "three"}, ","), "one,four");
+  // Ignore case.
+  EXPECT_EQ(StringUtil::removeTokens("One,Two,Three,Four", ",", {"two", "three"}, ","), "One,Four");
+  // Longer joiner.
+  EXPECT_EQ(StringUtil::removeTokens("one,two,three,four", ",", {"two", "three"}, " , "),
+            "one , four");
+  // Delimiters.
+  EXPECT_EQ(StringUtil::removeTokens("one,two;three ", ",;", {"two"}, ","), "one,three");
+  // No trimming
+  EXPECT_EQ(StringUtil::removeTokens("one, two, three ", ",", {" two"}, ",", false), "one, three ");
+  // No ignore case.
+  EXPECT_EQ(StringUtil::removeTokens("one, Two, three", ",", {"two"}, ",", true, false),
+            "one,Two,three");
+}
+
 TEST(StringUtil, removeCharacters) {
   IntervalSetImpl<size_t> removals;
   removals.insert(3, 5);

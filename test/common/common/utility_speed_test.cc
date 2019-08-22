@@ -1,6 +1,7 @@
 // Note: this should be run with --compilation_mode=opt, and would benefit from a
 // quiescent system with disabled cstate power management.
 
+#include <iostream>
 #include <random>
 
 #include "common/common/assert.h"
@@ -205,6 +206,28 @@ static void BM_FindTokenValueNoSplit(benchmark::State& state) {
   }
 }
 BENCHMARK(BM_FindTokenValueNoSplit);
+
+static void BM_RemoveTokensLong(benchmark::State& state) {
+  auto size = state.range(0);
+  std::string input(size, ',');
+  std::vector<std::string> to_remove;
+  std::set<absl::string_view> to_remove_set;
+  for (int i = 0; i < size; i++) {
+    to_remove.push_back(std::to_string(i));
+  }
+  for (int i = 0; i < size; i++) {
+    if (i & 1) {
+      to_remove_set.insert(to_remove[i]);
+    }
+    input.append(",");
+    input.append(to_remove[i]);
+  }
+  for (auto _ : state) {
+    Envoy::StringUtil::removeTokens(input, ",", to_remove_set, ",");
+    state.SetBytesProcessed(static_cast<int64_t>(state.iterations()) * input.size());
+  }
+}
+BENCHMARK(BM_RemoveTokensLong)->Range(8, 8 << 10);
 
 static void BM_IntervalSetInsert17(benchmark::State& state) {
   for (auto _ : state) {
