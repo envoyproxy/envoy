@@ -539,6 +539,39 @@ TEST_P(FailoverTest, PriorityUpdatesWithLocalHostSet) {
   EXPECT_EQ(tertiary_host_set_.hosts_[0], lb_->chooseHost(nullptr));
 }
 
+// Test that extending the priority set with an existing LB causes the correct updates when the
+// cluster is configured to disable on panic.
+TEST_P(FailoverTest, PriorityUpdatesWithLocalHostSetDisableOnPanic) {
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
+  failover_host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:81")};
+  common_config_.mutable_zone_aware_lb_config()->set_disable_cluster_on_panic(true);
+
+  init(false);
+  // With both the primary and failover hosts unhealthy, we should select no host.
+  EXPECT_EQ(nullptr, lb_->chooseHost(nullptr));
+
+  // Update the priority set with a new priority level P=2 and ensure the host
+  // is chosen
+  MockHostSet& tertiary_host_set_ = *priority_set_.getMockHostSet(2);
+  HostVectorSharedPtr hosts(new HostVector({makeTestHost(info_, "tcp://127.0.0.1:82")}));
+  tertiary_host_set_.hosts_ = *hosts;
+  tertiary_host_set_.healthy_hosts_ = tertiary_host_set_.hosts_;
+  HostVector add_hosts;
+  add_hosts.push_back(tertiary_host_set_.hosts_[0]);
+  tertiary_host_set_.runCallbacks(add_hosts, {});
+  EXPECT_EQ(tertiary_host_set_.hosts_[0], lb_->chooseHost(nullptr));
+
+  // Now add a healthy host in P=0 and make sure it is immediately selected.
+  host_set_.healthy_hosts_ = host_set_.hosts_;
+  host_set_.runCallbacks(add_hosts, {});
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr));
+
+  // Remove the healthy host and ensure we fail back over to tertiary_host_set_
+  host_set_.healthy_hosts_ = {};
+  host_set_.runCallbacks({}, {});
+  EXPECT_EQ(tertiary_host_set_.hosts_[0], lb_->chooseHost(nullptr));
+}
+
 // Test extending the priority set.
 TEST_P(FailoverTest, ExtendPrioritiesUpdatingPrioritySet) {
   host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
@@ -827,6 +860,32 @@ TEST_P(RoundRobinLoadBalancerTest, MaxUnhealthyPanic) {
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
 
   EXPECT_EQ(3UL, stats_.lb_healthy_panic_.value());
+}
+
+// Test that no hosts are selected when disable_cluster_on_panic is enabled.
+TEST_P(RoundRobinLoadBalancerTest, MaxUnhealthyPanicDisableOnPanic) {
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
+                              makeTestHost(info_, "tcp://127.0.0.1:81")};
+  hostSet().hosts_ = {
+      makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81"),
+      makeTestHost(info_, "tcp://127.0.0.1:82"), makeTestHost(info_, "tcp://127.0.0.1:83"),
+      makeTestHost(info_, "tcp://127.0.0.1:84"), makeTestHost(info_, "tcp://127.0.0.1:85")};
+
+  common_config_.mutable_zone_aware_lb_config()->set_disable_cluster_on_panic(true);
+
+  init(false);
+  EXPECT_EQ(nullptr, lb_->chooseHost(nullptr));
+
+  // Take the threshold back above the panic threshold.
+  hostSet().healthy_hosts_ = {
+      makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81"),
+      makeTestHost(info_, "tcp://127.0.0.1:82"), makeTestHost(info_, "tcp://127.0.0.1:83")};
+  hostSet().runCallbacks({}, {});
+
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+
+  EXPECT_EQ(1UL, stats_.lb_healthy_panic_.value());
 }
 
 // Ensure if the panic threshold is 0%, panic mode is disabled.

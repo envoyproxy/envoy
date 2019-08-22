@@ -180,6 +180,8 @@ protected:
       LocalityHealthyHosts,
       // Degraded hosts for locality @ locality_index.
       LocalityDegradedHosts,
+      // No hosts in the host set.
+      NoHosts,
     };
 
     HostsSource() = default;
@@ -187,7 +189,7 @@ protected:
     HostsSource(uint32_t priority, SourceType source_type)
         : priority_(priority), source_type_(source_type) {
       ASSERT(source_type == SourceType::AllHosts || source_type == SourceType::HealthyHosts ||
-             source_type == SourceType::DegradedHosts);
+             source_type == SourceType::DegradedHosts || source_type == SourceType::NoHosts);
     }
 
     HostsSource(uint32_t priority, SourceType source_type, uint32_t locality_index)
@@ -230,6 +232,8 @@ protected:
    * Index into priority_set via hosts source descriptor.
    */
   const HostVector& hostSourceToHosts(HostsSource hosts_source);
+
+  const HostVector dummy_empty_host_vector;
 
 private:
   enum class LocalityRoutingState {
@@ -300,6 +304,7 @@ private:
 
   const uint32_t routing_enabled_;
   const uint64_t min_cluster_size_;
+  const bool disable_cluster_on_panic_;
 
   struct PerPriorityState {
     // The percent of requests which can be routed to the local locality.
