@@ -106,13 +106,13 @@ public:
 
   void expectResponseTimerCreate() {
     response_timeout_ = new Event::MockTimer(&callbacks_.dispatcher_);
-    EXPECT_CALL(*response_timeout_, enableTimer(_));
+    EXPECT_CALL(*response_timeout_, enableTimer(_, _));
     EXPECT_CALL(*response_timeout_, disableTimer());
   }
 
   void expectPerTryTimerCreate() {
     per_try_timeout_ = new Event::MockTimer(&callbacks_.dispatcher_);
-    EXPECT_CALL(*per_try_timeout_, enableTimer(_));
+    EXPECT_CALL(*per_try_timeout_, enableTimer(_, _));
     EXPECT_CALL(*per_try_timeout_, disableTimer());
   }
 
@@ -1491,7 +1491,7 @@ TEST_F(RouterTest, UpstreamPerTryTimeoutExcludesNewStream) {
       }));
 
   response_timeout_ = new Event::MockTimer(&callbacks_.dispatcher_);
-  EXPECT_CALL(*response_timeout_, enableTimer(_));
+  EXPECT_CALL(*response_timeout_, enableTimer(_, _));
 
   EXPECT_CALL(callbacks_.stream_info_, onUpstreamHostSelected(_))
       .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host) -> void {
@@ -1506,7 +1506,7 @@ TEST_F(RouterTest, UpstreamPerTryTimeoutExcludesNewStream) {
   router_.decodeData(data, true);
 
   per_try_timeout_ = new Event::MockTimer(&callbacks_.dispatcher_);
-  EXPECT_CALL(*per_try_timeout_, enableTimer(_));
+  EXPECT_CALL(*per_try_timeout_, enableTimer(_, _));
   // The per try timeout timer should not be started yet.
   pool_callbacks->onPoolReady(encoder, cm_.conn_pool_.host_);
 

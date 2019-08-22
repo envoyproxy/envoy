@@ -34,7 +34,7 @@ public:
 
   void initLogger(std::chrono::milliseconds buffer_flush_interval_msec, size_t buffer_size_bytes) {
     timer_ = new Event::MockTimer(&dispatcher_);
-    EXPECT_CALL(*timer_, enableTimer(buffer_flush_interval_msec));
+    EXPECT_CALL(*timer_, enableTimer(buffer_flush_interval_msec, _));
     logger_ = std::make_unique<GrpcAccessLoggerImpl>(Grpc::RawAsyncClientPtr{async_client_},
                                                      log_name_, buffer_flush_interval_msec,
                                                      buffer_size_bytes, dispatcher_, local_info_);
@@ -202,7 +202,7 @@ TEST_F(GrpcAccessLoggerImplTest, Flushing) {
   initLogger(FlushInterval, 100);
 
   // Nothing to do yet.
-  EXPECT_CALL(*timer_, enableTimer(FlushInterval));
+  EXPECT_CALL(*timer_, enableTimer(FlushInterval, _));
   timer_->invokeCallback();
 
   envoy::data::accesslog::v2::HTTPAccessLogEntry entry;
@@ -227,11 +227,11 @@ TEST_F(GrpcAccessLoggerImplTest, Flushing) {
     - request:
         path: /test/path1
   )EOF"));
-  EXPECT_CALL(*timer_, enableTimer(FlushInterval));
+  EXPECT_CALL(*timer_, enableTimer(FlushInterval, _));
   timer_->invokeCallback();
 
   // Flush on empty message does nothing.
-  EXPECT_CALL(*timer_, enableTimer(FlushInterval));
+  EXPECT_CALL(*timer_, enableTimer(FlushInterval, _));
   timer_->invokeCallback();
 }
 

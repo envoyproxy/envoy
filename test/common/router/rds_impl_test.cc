@@ -295,7 +295,7 @@ envoy::api::v2::RouteConfiguration parseRouteConfigurationFromV2Yaml(const std::
 TEST_F(RouteConfigProviderManagerImplTest, ConfigDump) {
   auto message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"]();
   const auto& route_config_dump =
-      MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::RoutesConfigDump&>(
+      TestUtility::downcastAndValidate<const envoy::admin::v2alpha::RoutesConfigDump&>(
           *message_ptr);
 
   // No routes at all, no last_updated timestamp
@@ -325,7 +325,7 @@ virtual_hosts:
           parseRouteConfigurationFromV2Yaml(config_yaml), factory_context_);
   message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"]();
   const auto& route_config_dump2 =
-      MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::RoutesConfigDump&>(
+      TestUtility::downcastAndValidate<const envoy::admin::v2alpha::RoutesConfigDump&>(
           *message_ptr);
   TestUtility::loadFromYaml(R"EOF(
 static_route_configs:
@@ -368,7 +368,7 @@ dynamic_route_configs:
   rds_callbacks_->onConfigUpdate(response1.resources(), response1.version_info());
   message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"]();
   const auto& route_config_dump3 =
-      MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::RoutesConfigDump&>(
+      TestUtility::downcastAndValidate<const envoy::admin::v2alpha::RoutesConfigDump&>(
           *message_ptr);
   TestUtility::loadFromYaml(R"EOF(
 static_route_configs:
@@ -497,7 +497,7 @@ TEST_F(RouteConfigProviderManagerImplTest, onConfigUpdateWrongSize) {
 TEST_F(RouteConfigProviderManagerImplTest, ConfigDumpAfterConfigRejected) {
   auto message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"]();
   const auto& route_config_dump =
-      MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::RoutesConfigDump&>(
+      TestUtility::downcastAndValidate<const envoy::admin::v2alpha::RoutesConfigDump&>(
           *message_ptr);
 
   // No routes at all, no last_updated timestamp
@@ -549,7 +549,7 @@ resources:
 
   message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"]();
   const auto& route_config_dump3 =
-      MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::RoutesConfigDump&>(
+      TestUtility::downcastAndValidate<const envoy::admin::v2alpha::RoutesConfigDump&>(
           *message_ptr);
   TestUtility::loadFromYaml(R"EOF(
 static_route_configs:

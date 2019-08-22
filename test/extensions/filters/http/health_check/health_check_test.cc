@@ -37,7 +37,7 @@ public:
 
     if (caching) {
       cache_timer_ = new Event::MockTimer(&dispatcher_);
-      EXPECT_CALL(*cache_timer_, enableTimer(_));
+      EXPECT_CALL(*cache_timer_, enableTimer(_, _));
       cache_manager_.reset(new HealthCheckCacheManager(dispatcher_, std::chrono::milliseconds(1)));
     }
 
@@ -359,7 +359,7 @@ TEST_F(HealthCheckFilterCachingTest, All) {
             filter_->decodeHeaders(request_headers_, true));
 
   // Fire the timer, this should result in the next request going through.
-  EXPECT_CALL(*cache_timer_, enableTimer(_));
+  EXPECT_CALL(*cache_timer_, enableTimer(_, _));
   cache_timer_->invokeCallback();
   prepareFilter(true);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
@@ -393,7 +393,7 @@ TEST_F(HealthCheckFilterCachingTest, DegradedHeader) {
             filter_->decodeHeaders(request_headers_, true));
 
   // Fire the timer, this should result in the next request going through.
-  EXPECT_CALL(*cache_timer_, enableTimer(_));
+  EXPECT_CALL(*cache_timer_, enableTimer(_, _));
   cache_timer_->invokeCallback();
   prepareFilter(true);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));

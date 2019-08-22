@@ -34,7 +34,11 @@ public:
             auto* route = virtual_host->add_routes();
             route->mutable_match()->set_prefix("/no-cors");
             route->mutable_route()->set_cluster("cluster_0");
-            route->mutable_route()->mutable_cors()->mutable_enabled()->set_value(false);
+            route->mutable_route()
+                ->mutable_cors()
+                ->mutable_filter_enabled()
+                ->mutable_default_value()
+                ->set_numerator(0);
           }
 
           {
