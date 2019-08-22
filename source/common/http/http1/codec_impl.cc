@@ -481,7 +481,7 @@ int ConnectionImpl::onHeadersCompleteBase() {
             current_header_map_->Connection()->value().getStringView(), ",",
             {Http::Headers::get().ConnectionValues.Upgrade,
              Http::Headers::get().ConnectionValues.Http2Settings},
-            ", ");
+            ",");
         if (new_value.empty()) {
           current_header_map_->removeConnection();
         } else {
