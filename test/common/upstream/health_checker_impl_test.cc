@@ -4087,7 +4087,7 @@ TEST(HealthCheckProto, Validation) {
       service_name: locations
       path: /healthcheck
     )EOF";
-    EXPECT_THROW_WITH_REGEX(MessageUtil::validate(parseHealthCheckFromV2Yaml(yaml)), EnvoyException,
+    EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV2Yaml(yaml)), EnvoyException,
                             "Proto constraint validation failed.*value must be greater than.*");
   }
   {
@@ -4099,7 +4099,7 @@ TEST(HealthCheckProto, Validation) {
       service_name: locations
       path: /healthcheck
     )EOF";
-    EXPECT_THROW_WITH_REGEX(MessageUtil::validate(parseHealthCheckFromV2Yaml(yaml)), EnvoyException,
+    EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV2Yaml(yaml)), EnvoyException,
                             "Proto constraint validation failed.*value must be greater than.*");
   }
   {
@@ -4111,7 +4111,7 @@ TEST(HealthCheckProto, Validation) {
       service_name: locations
       path: /healthcheck
     )EOF";
-    EXPECT_THROW_WITH_REGEX(MessageUtil::validate(parseHealthCheckFromV2Yaml(yaml)), EnvoyException,
+    EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV2Yaml(yaml)), EnvoyException,
                             "Proto constraint validation failed.*value must be greater than.*");
   }
   {
@@ -4123,7 +4123,7 @@ TEST(HealthCheckProto, Validation) {
       service_name: locations
       path: /healthcheck
     )EOF";
-    EXPECT_THROW_WITH_REGEX(MessageUtil::validate(parseHealthCheckFromV2Yaml(yaml)), EnvoyException,
+    EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV2Yaml(yaml)), EnvoyException,
                             "Proto constraint validation failed.*value must be greater than.*");
   }
 }

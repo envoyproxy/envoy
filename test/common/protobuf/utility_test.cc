@@ -123,13 +123,26 @@ TEST_F(ProtobufUtilityTest, RepeatedPtrUtilDebugString) {
   EXPECT_EQ("[value: 10\n, value: 20\n]", RepeatedPtrUtil::debugString(repeated));
 }
 
-TEST_F(ProtobufUtilityTest, DowncastAndValidate) {
+// Validated exception thrown when downcastAndValidate observes a PGV failures.
+TEST_F(ProtobufUtilityTest, DowncastAndValidateFailedValidation) {
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
   bootstrap.mutable_static_resources()->add_clusters();
-  EXPECT_THROW(MessageUtil::validate(bootstrap), ProtoValidationException);
+  EXPECT_THROW(TestUtility::validate(bootstrap), ProtoValidationException);
   EXPECT_THROW(
-      MessageUtil::downcastAndValidate<const envoy::config::bootstrap::v2::Bootstrap&>(bootstrap),
+      TestUtility::downcastAndValidate<const envoy::config::bootstrap::v2::Bootstrap&>(bootstrap),
       ProtoValidationException);
+}
+
+// Validated exception thrown when downcastAndValidate observes a unknown field.
+TEST_F(ProtobufUtilityTest, DowncastAndValidateUnknownFields) {
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  bootstrap.GetReflection()->MutableUnknownFields(&bootstrap)->AddVarint(1, 0);
+  EXPECT_THROW_WITH_MESSAGE(TestUtility::validate(bootstrap), EnvoyException,
+                            "Protobuf message (type envoy.config.bootstrap.v2.Bootstrap with "
+                            "unknown field set {1}) has unknown fields");
+  EXPECT_THROW_WITH_MESSAGE(TestUtility::validate(bootstrap), EnvoyException,
+                            "Protobuf message (type envoy.config.bootstrap.v2.Bootstrap with "
+                            "unknown field set {1}) has unknown fields");
 }
 
 TEST_F(ProtobufUtilityTest, LoadBinaryProtoFromFile) {
@@ -340,17 +353,6 @@ TEST_F(ProtobufUtilityTest, AnyConvertWrongType) {
   source_any.PackFrom(source_duration);
   EXPECT_THROW_WITH_REGEX(TestUtility::anyConvert<ProtobufWkt::Timestamp>(source_any),
                           EnvoyException, "Unable to unpack .*");
-}
-
-TEST_F(ProtobufUtilityTest, AnyConvertWrongFields) {
-  const ProtobufWkt::Struct obj = MessageUtil::keyValueStruct("test_key", "test_value");
-  ProtobufWkt::Any source_any;
-  source_any.PackFrom(obj);
-  source_any.set_type_url("type.google.com/google.protobuf.Timestamp");
-  EXPECT_THROW_WITH_MESSAGE(TestUtility::anyConvert<ProtobufWkt::Timestamp>(source_any),
-                            EnvoyException,
-                            "Protobuf message (type google.protobuf.Timestamp with unknown "
-                            "field set {1}) has unknown fields");
 }
 
 TEST_F(ProtobufUtilityTest, JsonConvertSuccess) {

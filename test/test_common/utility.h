@@ -499,8 +499,7 @@ public:
 
   template <class MessageType>
   static inline MessageType anyConvert(const ProtobufWkt::Any& message) {
-    return MessageUtil::anyConvert<MessageType>(message,
-                                                ProtobufMessage::getStrictValidationVisitor());
+    return MessageUtil::anyConvert<MessageType>(message);
   }
 
   template <class MessageType>
@@ -513,6 +512,16 @@ public:
   static void loadFromYamlAndValidate(const std::string& yaml, MessageType& message) {
     return MessageUtil::loadFromYamlAndValidate(yaml, message,
                                                 ProtobufMessage::getStrictValidationVisitor());
+  }
+
+  template <class MessageType> static void validate(const MessageType& message) {
+    return MessageUtil::validate(message, ProtobufMessage::getStrictValidationVisitor());
+  }
+
+  template <class MessageType>
+  static const MessageType& downcastAndValidate(const Protobuf::Message& config) {
+    return MessageUtil::downcastAndValidate<MessageType>(
+        config, ProtobufMessage::getStrictValidationVisitor());
   }
 
   static void jsonConvert(const Protobuf::Message& source, Protobuf::Message& dest) {

@@ -306,7 +306,7 @@ TEST_F(HttpFilterTest, BadConfig) {
   envoy::config::filter::http::ext_authz::v2::ExtAuthz proto_config{};
   TestUtility::loadFromYaml(filter_config, proto_config);
   EXPECT_THROW(
-      MessageUtil::downcastAndValidate<const envoy::config::filter::http::ext_authz::v2::ExtAuthz&>(
+      TestUtility::downcastAndValidate<const envoy::config::filter::http::ext_authz::v2::ExtAuthz&>(
           proto_config),
       ProtoValidationException);
 }

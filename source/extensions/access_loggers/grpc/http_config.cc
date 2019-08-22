@@ -29,7 +29,8 @@ HttpGrpcAccessLogFactory::createAccessLogInstance(const Protobuf::Message& confi
   validateProtoDescriptors();
 
   const auto& proto_config = MessageUtil::downcastAndValidate<
-      const envoy::config::accesslog::v2::HttpGrpcAccessLogConfig&>(config);
+      const envoy::config::accesslog::v2::HttpGrpcAccessLogConfig&>(
+      config, context.messageValidationVisitor());
   std::shared_ptr<GrpcCommon::GrpcAccessLoggerCache> grpc_access_logger_cache =
       context.singletonManager().getTyped<GrpcCommon::GrpcAccessLoggerCache>(
           SINGLETON_MANAGER_REGISTERED_NAME(grpc_access_logger_cache), [&context] {
