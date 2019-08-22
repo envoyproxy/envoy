@@ -512,7 +512,7 @@ public:
    * @return the span's trace id as a byte string.
    */
   const std::string traceIdAsByteString() const {
-    // https://github.com/apache/incubator-zipkin-api/blob/v0.2.1/zipkin.proto#L60-L61.
+    // https://github.com/openzipkin/zipkin-api/blob/v0.2.1/zipkin.proto#L60-L61.
     return trace_id_high_.has_value() ? Util::toBigEndianByteString(trace_id_high_.value()) +
                                             Util::toBigEndianByteString(trace_id_)
                                       : Util::toBigEndianByteString(trace_id_);
