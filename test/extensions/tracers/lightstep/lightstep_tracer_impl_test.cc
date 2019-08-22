@@ -45,7 +45,7 @@ namespace {
 
 class LightStepDriverTest : public testing::Test {
 public:
-  LightStepDriverTest() : grpc_context_(*symbol_table_), stats_(*symbol_table_) {}
+  LightStepDriverTest() : grpc_context_(*symbol_table_) {}
 
   void setup(envoy::config::trace::v2::LightstepConfig& lightstep_config, bool init_timer,
              Common::Ot::OpenTracingDriver::PropagationMode propagation_mode =

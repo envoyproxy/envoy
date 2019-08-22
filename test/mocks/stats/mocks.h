@@ -296,13 +296,13 @@ public:
   MOCK_CONST_METHOD1(findHistogram, OptionalHistogram(StatName));
 
   Counter& counterFromStatName(StatName name) override {
-    return counter(symbolTable().toString(name));
+    return counter(symbol_table_->toString(name));
   }
   Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override {
-    return gauge(symbolTable().toString(name), import_mode);
+    return gauge(symbol_table_->toString(name), import_mode);
   }
   Histogram& histogramFromStatName(StatName name) override {
-    return histogram(symbolTable().toString(name));
+    return histogram(symbol_table_->toString(name));
   }
 
   TestSymbolTable symbol_table_;
