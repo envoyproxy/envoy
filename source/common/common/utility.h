@@ -283,6 +283,21 @@ public:
                                                    bool keep_empty_string = false);
 
   /**
+   * Remove tokens from a delimiter-separated string view.
+   * @param source supplies the delimiter-separated string view.
+   * @param multi-delimiter supplies chars used to split the delimiter-separated string view.
+   * @param tokens_to_remove supplies a set of tokens which should not appear in the result.
+   * @param joiner contains a string used between tokens in the result.
+   * @param trim_tokens trims the the tokens before comparing to 'tokens_to_remove'.
+   * @param ignore_case compares the tokens in a case-insensitive way to tokens_to_remove'.
+   * @return string of the remaining joined tokens.
+   */
+  static std::string removeTokens(absl::string_view source, absl::string_view delimiters,
+                                  std::set<absl::string_view> tokens_to_remove,
+                                  absl::string_view joiner, bool trim_tokens = true,
+                                  bool ignore_case = true);
+
+  /**
    * Size-bounded string copying and concatenation
    */
   static size_t strlcpy(char* dst, const char* src, size_t size);

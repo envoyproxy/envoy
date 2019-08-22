@@ -477,27 +477,15 @@ int ConnectionImpl::onHeadersCompleteBase() {
       ENVOY_CONN_LOG(trace, "removing unsupported h2c upgrade headers.", connection_);
       current_header_map_->removeUpgrade();
       if (current_header_map_->Connection()) {
-        auto values = Envoy::StringUtil::splitToken(
-            current_header_map_->Connection()->value().getStringView(), ",");
-        std::string new_values;
-        for (auto& v : values) {
-          auto value = StringUtil::trim(v);
-          auto lowercase_value = StringUtil::toLower(value);
-          if (lowercase_value == Http::Headers::get().ConnectionValues.Upgrade) {
-            continue;
-          }
-          if (lowercase_value == Http::Headers::get().ConnectionValues.Http2Settings) {
-            continue;
-          }
-          if (!new_values.empty()) {
-            new_values += ", ";
-          }
-          new_values.append(value.data(), value.size());
-        }
-        if (new_values.empty()) {
+        auto new_value = StringUtil::removeTokens(
+            current_header_map_->Connection()->value().getStringView(), ",",
+            {Http::Headers::get().ConnectionValues.Upgrade,
+             Http::Headers::get().ConnectionValues.Http2Settings},
+            ", ");
+        if (new_value.empty()) {
           current_header_map_->removeConnection();
         } else {
-          current_header_map_->Connection()->value(new_values);
+          current_header_map_->Connection()->value(new_value);
         }
       }
       current_header_map_->remove(Headers::get().Http2Settings);
