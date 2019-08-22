@@ -34,6 +34,8 @@ std::shared_ptr<grpc::ChannelCredentials> AwsIamGrpcCredentialsFactory::getChann
     case envoy::api::v2::core::GrpcService::GoogleGrpc::CallCredentials::kFromPlugin: {
       if (credential.from_plugin().name() == GrpcCredentialsNames::get().AwsIam) {
         AwsIamGrpcCredentialsFactory credentials_factory;
+        // We don't deal with validation failures here at runtime today, see
+        // https://github.com/envoyproxy/envoy/issues/8010.
         const Envoy::ProtobufTypes::MessagePtr config_message =
             Envoy::Config::Utility::translateToFactoryConfig(
                 credential.from_plugin(), ProtobufMessage::getNullValidationVisitor(),
