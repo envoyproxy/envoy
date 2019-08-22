@@ -19,6 +19,7 @@ envoy_mobile_kt_aar_android_library(
     manifest = "EnvoyManifest.xml",
     visibility = ["//visibility:public"],
     deps = [
+        ":envoy_interfaces_lib",
         "//library/java/src/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib",
         "//library/java/src/io/envoyproxy/envoymobile/engine:envoy_engine_lib",
         "//library/java/src/io/envoyproxy/envoymobile/engine/types:envoy_c_types_lib",
@@ -33,6 +34,7 @@ envoy_mobile_kt_library(
         "Envoy.kt",
         "EnvoyBuilder.kt",
         "EnvoyException.kt",
+        "EnvoyStreamEmitter.kt",
         "Request.kt",
         "RequestBuilder.kt",
         "RequestMapper.kt",

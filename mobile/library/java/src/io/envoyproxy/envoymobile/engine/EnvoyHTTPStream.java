@@ -62,4 +62,10 @@ public class EnvoyHTTPStream {
    * @return Success, unless the streamHandle has already been canceled.
    */
   public int resetStream() { return JniLibrary.resetStream(streamHandle); }
+
+  /**
+   * Cancel the stream. This functions as an interrupt, and aborts further callbacks and
+   * handling of the stream.
+   */
+  public void cancel() { JniLibrary.cancel(); }
 }
