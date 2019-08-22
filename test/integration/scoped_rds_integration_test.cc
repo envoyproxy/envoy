@@ -219,8 +219,6 @@ key:
   // RDS updates won't affect SRDS.
   test_server_->waitForGaugeEq("http.config_test.scoped_rds.foo-scoped-routes.version",
                                6927017134761466251UL);
-  // TODO(AndresGuedez): test actual scoped routing logic; only the config handling is implemented
-  // at this point.
 }
 
 // Test that a bad config update updates the corresponding stats.

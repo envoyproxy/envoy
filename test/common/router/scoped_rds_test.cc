@@ -25,6 +25,7 @@ using testing::DoAll;
 using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
+using testing::IsNull;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRefOfCopy;
@@ -309,9 +310,9 @@ key:
       2UL,
       factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload").value());
   // now scope key "x-bar-key" points to nowhere.
-  EXPECT_EQ(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
-                TestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}),
-            nullptr);
+  EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+                  TestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}),
+              IsNull());
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
                 ->getRouteConfig(TestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
@@ -388,9 +389,9 @@ key:
       2UL,
       factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload").value());
   // now scope key "x-bar-key" points to nowhere.
-  EXPECT_EQ(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
-                TestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}),
-            nullptr);
+  EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+                  TestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}),
+              IsNull());
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
                 ->getRouteConfig(TestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
@@ -429,9 +430,9 @@ key:
   // Scope key "x-foo-key" points to nowhere.
   EXPECT_NE(getScopedRdsProvider(), nullptr);
   EXPECT_NE(getScopedRdsProvider()->config<ScopedConfigImpl>(), nullptr);
-  EXPECT_EQ(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
-                TestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}),
-            nullptr);
+  EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+                  TestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}),
+              IsNull());
   factory_context_.init_manager_.initialize(init_watcher_);
   init_watcher_.expectReady().Times(
       1); // Just SRDS, RDS "foo_routes" will initialized by the noop init-manager.

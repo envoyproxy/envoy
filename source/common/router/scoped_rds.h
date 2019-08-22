@@ -105,7 +105,7 @@ public:
   const ScopedRouteMap& scopedRouteMap() const { return scoped_route_map_; }
 
 private:
-  // A helper class that takes care the life circle management of a RDS route provider and the
+  // A helper class that takes care the life cycle management of a RDS route provider and the
   // update callback handle.
   struct RdsRouteConfigProviderHelper {
     RdsRouteConfigProviderHelper(
@@ -118,6 +118,8 @@ private:
     ScopedRdsConfigSubscription& parent_;
     std::string scope_name_;
     std::unique_ptr<RdsRouteConfigProviderImpl> route_provider_;
+    // This handle_ is owned by the route config provider's RDS subscrption, when the helper
+    // destructs, the handle is deleted as well.
     Common::CallbackHandle* rds_update_callback_handle_;
   };
 
