@@ -85,11 +85,11 @@ public:
         admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_store_,
         singleton_manager_, tls_, validation_visitor_, *api_);
 
-    cluster_ = std::make_shared<Cluster>(cluster_config, config, cm_, runtime_, factory_context,
+    cluster_ = std::make_shared<Cluster>(cluster_config, config, runtime_, factory_context,
                                          std::move(scope), false);
 
     thread_aware_lb_ = std::make_unique<AggregateThreadAwareLoadBalancer>(
-        *cluster_, stats_, runtime_, random_, common_config_);
+        *cluster_, cm_, stats_, runtime_, random_, common_config_);
     lb_factory_ = thread_aware_lb_->factory();
 
     EXPECT_CALL(cm_, get(Eq("primary"))).WillRepeatedly(Return(&primary_));
@@ -141,13 +141,13 @@ public:
 TEST_F(ClusterTest, BasicFlow) {
   initialize(default_yaml_config_);
   EXPECT_EQ(cluster_->initializePhase(), Upstream::Cluster::InitializePhase::Secondary);
-  auto primary = cluster_->getThreadLocalCluster("primary");
-  auto secondary = cluster_->getThreadLocalCluster("secondary");
+  auto primary = ClusterUtil::getThreadLocalCluster(cm_, "primary");
+  auto secondary = ClusterUtil::getThreadLocalCluster(cm_, "secondary");
   EXPECT_NE(nullptr, primary);
-  EXPECT_NE(nullptr, cluster_->getThreadLocalCluster("secondary"));
+  EXPECT_NE(nullptr, secondary);
 
   std::pair<Upstream::PrioritySetImpl, std::vector<Upstream::ThreadLocalCluster*>> pair =
-      cluster_->linearizePrioritySet();
+      ClusterUtil::linearizePrioritySet(cm_, {"primary", "secondary"});
 
   EXPECT_EQ(pair.first.hostSetsPerPriority().size(), 4);
   EXPECT_EQ(pair.second.size(), 4);

@@ -7,19 +7,17 @@
 #include "common/upstream/upstream_impl.h"
 
 #include "extensions/clusters/aggregate/cluster_lb.h"
+#include "extensions/clusters/aggregate/cluster_util.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Clusters {
 namespace Aggregate {
 
-using ClusterVector = std::vector<std::string>;
-
 class Cluster : public Upstream::BaseDynamicClusterImpl {
 public:
   Cluster(const envoy::api::v2::Cluster& cluster,
-          const envoy::config::cluster::aggregate::ClusterConfig& config,
-          Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime,
+          const envoy::config::cluster::aggregate::ClusterConfig& config, Runtime::Loader& runtime,
           Server::Configuration::TransportSocketFactoryContext& factory_context,
           Stats::ScopePtr&& stats_scope, bool added_via_api);
 
@@ -29,10 +27,6 @@ public:
     return Upstream::Cluster::InitializePhase::Secondary;
   }
 
-  Upstream::ThreadLocalCluster* getThreadLocalCluster(const std::string& name) const;
-  std::pair<Upstream::PrioritySetImpl, std::vector<Upstream::ThreadLocalCluster*>>
-  linearizePrioritySet() const;
-
 private:
   // Upstream::ClusterImplBase
   void startPreInit() override {
@@ -41,26 +35,29 @@ private:
     onPreInitComplete();
   }
 
-  ClusterVector clusters_;
-  Upstream::ClusterManager& cluster_manager_;
+  std::vector<std::string> clusters_;
+
+  friend class AggregateLoadBalancerFactory;
 };
 
-struct AggregateLoadBalancerFactory : public Upstream::LoadBalancerFactory {
-  AggregateLoadBalancerFactory(Cluster& cluster, Upstream::ClusterStats& stats,
-                               Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+class AggregateLoadBalancerFactory : public Upstream::LoadBalancerFactory {
+public:
+  AggregateLoadBalancerFactory(Cluster& cluster, Upstream::ClusterManager& cluster_manager,
+                               Upstream::ClusterStats& stats, Runtime::Loader& runtime,
+                               Runtime::RandomGenerator& random,
                                const envoy::api::v2::Cluster::CommonLbConfig& common_config)
-      : cluster_(cluster), stats_(stats), runtime_(runtime), random_(random),
-        common_config_(common_config) {}
+      : cluster_(cluster), cluster_manager_(cluster_manager), stats_(stats), runtime_(runtime),
+        random_(random), common_config_(common_config) {}
 
   // Upstream::LoadBalancerFactory
   Upstream::LoadBalancerPtr create() override {
-    std::pair<Upstream::PrioritySetImpl, std::vector<Upstream::ThreadLocalCluster*>> pair =
-        cluster_.linearizePrioritySet();
     return std::make_unique<AggregateClusterLoadBalancer>(
-        std::move(pair.second), std::move(pair.first), stats_, runtime_, random_, common_config_);
+        cluster_manager_, cluster_.clusters_, stats_, runtime_, random_, common_config_);
   }
 
+private:
   Cluster& cluster_;
+  Upstream::ClusterManager& cluster_manager_;
   Upstream::ClusterStats& stats_;
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
@@ -69,21 +66,23 @@ struct AggregateLoadBalancerFactory : public Upstream::LoadBalancerFactory {
 
 class AggregateThreadAwareLoadBalancer : public Upstream::ThreadAwareLoadBalancer {
 public:
-  AggregateThreadAwareLoadBalancer(Cluster& cluster, Upstream::ClusterStats& stats,
-                                   Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+  AggregateThreadAwareLoadBalancer(Cluster& cluster, Upstream::ClusterManager& cluster_manager,
+                                   Upstream::ClusterStats& stats, Runtime::Loader& runtime,
+                                   Runtime::RandomGenerator& random,
                                    const envoy::api::v2::Cluster::CommonLbConfig& common_config)
-      : cluster_(cluster), stats_(stats), runtime_(runtime), random_(random),
-        common_config_(common_config) {}
+      : cluster_(cluster), cluster_manager_(cluster_manager), stats_(stats), runtime_(runtime),
+        random_(random), common_config_(common_config) {}
 
   // Upstream::ThreadAwareLoadBalancer
   Upstream::LoadBalancerFactorySharedPtr factory() override {
-    return std::make_shared<AggregateLoadBalancerFactory>(cluster_, stats_, runtime_, random_,
-                                                          common_config_);
+    return std::make_shared<AggregateLoadBalancerFactory>(cluster_, cluster_manager_, stats_,
+                                                          runtime_, random_, common_config_);
   }
   void initialize() override {}
 
 private:
   Cluster& cluster_;
+  Upstream::ClusterManager& cluster_manager_;
   Upstream::ClusterStats& stats_;
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
