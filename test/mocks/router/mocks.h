@@ -24,6 +24,7 @@
 
 #include "common/stats/fake_symbol_table_impl.h"
 
+#include "test/mocks/stats/mocks.h"
 #include "test/test_common/global.h"
 
 #include "gmock/gmock.h"
@@ -199,7 +200,7 @@ public:
   // Router::VirtualCluster
   Stats::StatName statName() const override { return stat_name_.statName(); }
 
-  Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
+  Stats::TestSymbolTable symbol_table_;
   Stats::StatNameManagedStorage stat_name_{"fake_virtual_cluster", *symbol_table_};
 };
 
@@ -223,7 +224,7 @@ public:
     return stat_name_->statName();
   }
 
-  mutable Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
+  mutable Stats::TestSymbolTable symbol_table_;
   std::string name_{"fake_vhost"};
   mutable std::unique_ptr<Stats::StatNameManagedStorage> stat_name_;
   testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;
