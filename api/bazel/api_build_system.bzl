@@ -1,6 +1,7 @@
 load("@com_google_protobuf//:protobuf.bzl", _py_proto_library = "py_proto_library")
 load("@com_envoyproxy_protoc_gen_validate//bazel:pgv_proto_library.bzl", "pgv_cc_proto_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_grpc_library", "go_proto_library")
+load("@io_bazel_rules_go//proto:compiler.bzl", "go_proto_compiler")
 load("@io_bazel_rules_go//go:def.bzl", "go_test")
 
 _PY_SUFFIX = "_py"
@@ -214,9 +215,9 @@ def api_proto_package(name, srcs = [], deps = [], has_services = False, visibili
         visibility = visibility,
     )
 
-    compilers = ["@io_bazel_rules_go//proto:go_proto"]
+    compilers = ["@io_bazel_rules_go//proto:go_proto", "//bazel:pgv_plugin_go"]
     if has_services:
-        compilers = ["@io_bazel_rules_go//proto:go_grpc"]
+        compilers = ["@io_bazel_rules_go//proto:go_grpc", "//bazel:pgv_plugin_go"]
 
     go_proto_library(
         name = _Suffix(name, _GO_PROTO_SUFFIX),
@@ -226,11 +227,12 @@ def api_proto_package(name, srcs = [], deps = [], has_services = False, visibili
         visibility = ["//visibility:public"],
         deps = [go_proto_mapping(dep) for dep in deps] + [
             "@com_github_gogo_protobuf//:gogo_proto_go",
-            "@io_bazel_rules_go//proto/wkt:any_go_proto",
-            "@io_bazel_rules_go//proto/wkt:duration_go_proto",
-            "@io_bazel_rules_go//proto/wkt:struct_go_proto",
-            "@io_bazel_rules_go//proto/wkt:timestamp_go_proto",
-            "@io_bazel_rules_go//proto/wkt:wrappers_go_proto",
+            "@com_github_golang_protobuf//ptypes:go_default_library",
+            "@com_github_golang_protobuf//ptypes/any:go_default_library",
+            "@com_github_golang_protobuf//ptypes/duration:go_default_library",
+            "@com_github_golang_protobuf//ptypes/struct:go_default_library",
+            "@com_github_golang_protobuf//ptypes/timestamp:go_default_library",
+            "@com_github_golang_protobuf//ptypes/wrappers:go_default_library",
             "@com_envoyproxy_protoc_gen_validate//validate:go_default_library",
             "@com_google_googleapis//google/api:annotations_go_proto",
             "@com_google_googleapis//google/rpc:status_go_proto",
