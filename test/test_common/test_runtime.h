@@ -5,6 +5,9 @@
 //  TestScopedRuntime scoped_runtime;
 //  Runtime::LoaderSingleton::getExisting()->mergeValues(
 //      {{"envoy.reloadable_features.test_feature_true", "false"}});
+//
+//  As long as a TestScopedRuntime exists, Runtime::LoaderSingleton::getExisting()->mergeValues()
+//  can safely be called to override runtime values.
 
 #pragma once
 
@@ -29,9 +32,9 @@ public:
     envoy::config::bootstrap::v2::LayeredRuntime config;
     config.add_layers()->mutable_admin_layer();
 
-    loader_ = std::make_unique<Runtime::ScopedLoaderSingleton>(Runtime::LoaderPtr{
-        new Runtime::LoaderImpl(dispatcher_, tls_, config, local_info_, init_manager_, store_,
-                                generator_, validation_visitor_, *api_)});
+    loader_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
+        std::make_unique<Runtime::LoaderImpl>(dispatcher_, tls_, config, local_info_, init_manager_,
+                                              store_, generator_, validation_visitor_, *api_));
   }
 
 private:

@@ -85,7 +85,7 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
   Network::Address::InstanceConstSharedPtr final_remote_address;
   bool single_xff_address;
   const uint32_t xff_num_trusted_hops = config.xffNumTrustedHops();
-  bool trusted_forwarded_proto =
+  const bool trusted_forwarded_proto =
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.trusted_forwarded_proto");
 
   if (config.useRemoteAddress()) {
@@ -111,13 +111,17 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
       }
     }
     if (trusted_forwarded_proto) {
-      // Set x-forwarded-proto unless it already exists and was forwarded on by a trusted proxy.
+      // If the prior hop is not a trusted proxy, overwrite any x-forwarded-proto value it set as
+      // untrusted. Alternately if no x-forwarded-proto header exists, add one.
       if (xff_num_trusted_hops == 0 || request_headers.ForwardedProto() == nullptr) {
         request_headers.insertForwardedProto().value().setReference(
             connection.ssl() ? Headers::get().SchemeValues.Https
                              : Headers::get().SchemeValues.Http);
       }
     } else {
+      // Previously, before the trusted_forwarded_proto logic, Envoy would always overwrite the
+      // x-forwarded-proto header even if it was set by a trusted proxy. This code path is
+      // deprecated and will be removed.
       request_headers.insertForwardedProto().value().setReference(
           connection.ssl() ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http);
     }
@@ -130,8 +134,8 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
     single_xff_address = ret.single_address_;
   }
 
-  // If we didn't already replace x-forwarded-proto because we are using the remote address, and
-  // remote hasn't set it (trusted proxy), we set it, since we then use this for setting scheme.
+  // If the x-forwarded-proto header is not set, set it here, since Envoy uses it for determining
+  // scheme and communicating it upstream.
   if (!request_headers.ForwardedProto()) {
     request_headers.insertForwardedProto().value().setReference(
         connection.ssl() ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http);
