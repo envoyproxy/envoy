@@ -133,9 +133,9 @@ bool ScopedRdsConfigSubscription::addOrUpdateScopes(
   for (const auto& resource : resources) {
     envoy::api::v2::ScopedRouteConfiguration scoped_route_config;
     try {
-      scoped_route_config = MessageUtil::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(
-          resource.resource(), validation_visitor_);
-      MessageUtil::validate(scoped_route_config);
+      scoped_route_config =
+          MessageUtil::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(resource.resource());
+      MessageUtil::validate(scoped_route_config, validation_visitor_);
       const std::string scope_name = scoped_route_config.name();
       if (!unique_resource_names.insert(scope_name).second) {
         throw EnvoyException(
@@ -282,9 +282,9 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   absl::flat_hash_map<uint64_t, std::string> scope_name_by_key_hash;
   for (const auto& resource_any : resources) {
     // Throws (thus rejects all) on any error.
-    auto scoped_route = MessageUtil::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(
-        resource_any, validation_visitor_);
-    MessageUtil::validate(scoped_route);
+    auto scoped_route =
+        MessageUtil::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(resource_any);
+    MessageUtil::validate(scoped_route, validation_visitor_);
     const std::string scope_name = scoped_route.name();
     auto scope_config_inserted = scoped_routes.try_emplace(scope_name, std::move(scoped_route));
     if (!scope_config_inserted.second) {

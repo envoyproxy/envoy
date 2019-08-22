@@ -506,7 +506,7 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
 DEFINE_PROTO_FUZZER(const test::common::http::CodecImplFuzzTestCase& input) {
   try {
     // Validate input early.
-    MessageUtil::validate(input);
+    TestUtility::validate(input);
     codecFuzz(input, HttpVersion::Http1);
     codecFuzz(input, HttpVersion::Http2);
   } catch (const EnvoyException& e) {

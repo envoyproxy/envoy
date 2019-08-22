@@ -543,7 +543,7 @@ TEST_F(ScopedRdsTest, ConfigDump) {
   auto message_ptr =
       factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"]();
   const auto& scoped_routes_config_dump =
-      MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::ScopedRoutesConfigDump&>(
+      TestUtility::downcastAndValidate<const envoy::admin::v2alpha::ScopedRoutesConfigDump&>(
           *message_ptr);
 
   // No routes at all(no SRDS push yet), no last_updated timestamp
@@ -591,7 +591,7 @@ $1
       factory_context_, "foo.", *config_provider_manager_);
   message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"]();
   const auto& scoped_routes_config_dump2 =
-      MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::ScopedRoutesConfigDump&>(
+      TestUtility::downcastAndValidate<const envoy::admin::v2alpha::ScopedRoutesConfigDump&>(
           *message_ptr);
   TestUtility::loadFromYaml(R"EOF(
 inline_scoped_route_configs:
@@ -655,7 +655,7 @@ dynamic_scoped_route_configs:
                             expected_config_dump);
   message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"]();
   const auto& scoped_routes_config_dump3 =
-      MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::ScopedRoutesConfigDump&>(
+      TestUtility::downcastAndValidate<const envoy::admin::v2alpha::ScopedRoutesConfigDump&>(
           *message_ptr);
   EXPECT_TRUE(TestUtility::protoEqual(expected_config_dump, scoped_routes_config_dump3));
 
@@ -686,7 +686,7 @@ dynamic_scoped_route_configs:
                             expected_config_dump);
   message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"]();
   const auto& scoped_routes_config_dump4 =
-      MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::ScopedRoutesConfigDump&>(
+      TestUtility::downcastAndValidate<const envoy::admin::v2alpha::ScopedRoutesConfigDump&>(
           *message_ptr);
   EXPECT_TRUE(TestUtility::protoEqual(expected_config_dump, scoped_routes_config_dump4));
 }

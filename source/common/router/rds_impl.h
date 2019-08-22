@@ -70,6 +70,7 @@ public:
   }
   SystemTime lastUpdated() const override { return last_updated_; }
   void onConfigUpdate() override {}
+  void validateConfig(const envoy::api::v2::RouteConfiguration&) const override {}
 
 private:
   ConfigConstSharedPtr config_;
@@ -121,9 +122,7 @@ private:
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::api::v2::RouteConfiguration>(resource,
-                                                                       validation_visitor_)
-        .name();
+    return MessageUtil::anyConvert<envoy::api::v2::RouteConfiguration>(resource).name();
   }
 
   Common::CallbackHandle* addUpdateCallback(std::function<void()> callback) {
@@ -170,7 +169,6 @@ public:
   ~RdsRouteConfigProviderImpl() override;
 
   RdsRouteConfigSubscription& subscription() { return *subscription_; }
-  void onConfigUpdate() override;
 
   // Router::RouteConfigProvider
   Router::ConfigConstSharedPtr config() override;
@@ -178,6 +176,8 @@ public:
     return config_update_info_->configInfo();
   }
   SystemTime lastUpdated() const override { return config_update_info_->lastUpdated(); }
+  void onConfigUpdate() override;
+  void validateConfig(const envoy::api::v2::RouteConfiguration& config) const override;
 
 private:
   struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {

@@ -153,9 +153,7 @@ private:
     DeltaConfigSubscriptionInstance::onConfigUpdateFailed();
   }
   std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(resource,
-                                                                             validation_visitor_)
-        .name();
+    return MessageUtil::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(resource).name();
   }
   // Propagate RDS updates to ScopeConfigImpl in workers.
   void onRdsConfigUpdate(const std::string& scope_name,
