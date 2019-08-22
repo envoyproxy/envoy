@@ -10,7 +10,7 @@ namespace Redis {
 
 RedisCommandStats::RedisCommandStats(Stats::Scope& scope, const std::string& prefix, bool enabled)
     : scope_(scope), stat_name_set_(scope.symbolTable()), prefix_(stat_name_set_.add(prefix)),
-      enabled_(enabled) {
+      enabled_(enabled), upstream_rq_time_(stat_name_set_.getStatName(upstream_rq_time_metric_)) {
   // Note: Even if this is disabled, we track the upstream_rq_time.
   stat_name_set_.rememberBuiltin(upstream_rq_time_metric_);
 

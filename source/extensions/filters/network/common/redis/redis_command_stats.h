@@ -46,8 +46,6 @@ private:
   const std::string null_metric_ = "null";
   const std::string unknown_metric_ = "unknown";
   const std::string upstream_rq_time_metric_ = "upstream_rq_time";
-
-public:
   const Stats::StatName upstream_rq_time_;
 };
 using RedisCommandStatsPtr = std::shared_ptr<RedisCommandStats>;
