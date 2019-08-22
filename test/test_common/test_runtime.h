@@ -30,6 +30,7 @@ class TestScopedRuntime {
 public:
   TestScopedRuntime() : api_(Api::createApiForTest()) {
     envoy::config::bootstrap::v2::LayeredRuntime config;
+    // The existence of an admin layer is required for mergeValues() to work.
     config.add_layers()->mutable_admin_layer();
 
     loader_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
