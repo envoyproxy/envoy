@@ -1396,7 +1396,7 @@ message QueryParameterMatcher {
 
   oneof query_parameter_match_specifier {
     // Specifies whether a query parameter value should match against a string.
-    type.matcher.StringMatcher string_match = 5;
+    type.matcher.StringMatcher string_match = 5 [(validate.rules).message.required = true];
 
     // Specifies whether a query parameter should be present.
     bool present_match = 6;
