@@ -234,7 +234,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // On a local clang8/libstdc++/linux flow, the memory usage was observed in
   // June 2019 to be 64 bytes higher than it is in CI/release. Your mileage may
   // vary.
-  EXPECT_MEMORY_EQ(m_per_cluster, 42838); // 104 bytes higher than a debug build.
+  EXPECT_MEMORY_EQ(m_per_cluster, 42830); // 104 bytes higher than a debug build.
   EXPECT_MEMORY_LE(m_per_cluster, 44000);
 }
 
@@ -259,7 +259,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // Date        PR       Bytes Per Cluster   Notes
   //                      exact upper-bound
   // ----------  -----    -----------------   -----
-  // 2019/08/09  7882     35489       36000   Initial version
+  // 2019/08/09  7882     34585       36000   Initial version
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -269,7 +269,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // On a local clang8/libstdc++/linux flow, the memory usage was observed in
   // June 2019 to be 64 bytes higher than it is in CI/release. Your mileage may
   // vary.
-  EXPECT_MEMORY_EQ(m_per_cluster, 35489); // 104 bytes higher than a debug build.
+  EXPECT_MEMORY_EQ(m_per_cluster, 34585); // 104 bytes higher than a debug build.
   EXPECT_MEMORY_LE(m_per_cluster, 36000);
 }
 
