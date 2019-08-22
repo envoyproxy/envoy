@@ -23,6 +23,13 @@ ClusterUtil::linearizePrioritySet(Upstream::ClusterManager& cluster_manager,
   std::vector<Upstream::ThreadLocalCluster*> priority_to_cluster;
   int next_priority = 0;
 
+  // Linearize the priority set. e.g. for clusters [C_0, C_1, C_2] referred in aggregate cluster
+  //    C_0 [P_0, P_1, P_2]
+  //    C_1 [P_0, P_1]
+  //    C_2 [P_0, P_1, P_2, P_3]
+  // The linearization result is:
+  //    [C_0.P_0, C_0.P_1, C_0.P_2, C_1.P_0, C_1.P_1, C_2.P_0, C_2.P_1, C_2.P_2, C_2.P_3]
+  // and the traffic will be distributed among these priorities.
   for (const auto& cluster : clusters) {
     auto tlc = getThreadLocalCluster(cluster_manager, cluster);
     for (const auto& host_set : tlc->prioritySet().hostSetsPerPriority()) {
