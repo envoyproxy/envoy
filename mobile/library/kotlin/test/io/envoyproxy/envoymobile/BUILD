@@ -61,3 +61,13 @@ envoy_mobile_kt_test(
         "//library/kotlin/src/io/envoyproxy/envoymobile:envoy_interfaces_lib",
     ],
 )
+
+envoy_mobile_kt_test(
+    name = "envoy_client_test",
+    srcs = [
+        "EnvoyTest.kt",
+    ],
+    deps = [
+        "//library/kotlin/src/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+    ],
+)
