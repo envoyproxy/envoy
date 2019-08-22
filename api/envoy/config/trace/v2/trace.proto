@@ -8,7 +8,6 @@ package envoy.config.trace.v2;
 option java_outer_classname = "TraceProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.trace.v2";
-option go_package = "v2";
 
 import "envoy/api/v2/core/grpc_service.proto";
 import "opencensus/proto/trace/v1/trace_config.proto";

@@ -41,4 +41,3 @@ api_proto_library_internal(
         ":string",
     ],
 )
-

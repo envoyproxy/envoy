@@ -40,50 +40,6 @@ def api_py_proto_library(name, srcs = [], deps = [], external_py_proto_deps = []
         visibility = ["//visibility:public"],
     )
 
-def api_proto_package(name, srcs = [], deps = [], has_services = False, visibility = ["//visibility:public"]):
-    native.proto_library(
-        name = name,
-        srcs = srcs,
-        deps = deps + [
-            "@com_google_protobuf//:any_proto",
-            "@com_google_protobuf//:descriptor_proto",
-            "@com_google_protobuf//:duration_proto",
-            "@com_google_protobuf//:empty_proto",
-            "@com_google_protobuf//:struct_proto",
-            "@com_google_protobuf//:timestamp_proto",
-            "@com_google_protobuf//:wrappers_proto",
-            "@com_google_googleapis//google/api:http_proto",
-            "@com_google_googleapis//google/api:annotations_proto",
-            "@com_google_googleapis//google/rpc:status_proto",
-            "@com_github_gogo_protobuf//:gogo_proto",
-            "@com_envoyproxy_protoc_gen_validate//validate:validate_proto",
-        ],
-        visibility = visibility,
-    )
-
-    compilers = ["@io_bazel_rules_go//proto:go_proto"]
-    if has_services:
-        compilers = ["@io_bazel_rules_go//proto:go_grpc"]
-
-    go_proto_library(
-        name = _Suffix(name, _GO_PROTO_SUFFIX),
-        compilers = compilers,
-        importpath = _Suffix(_GO_IMPORTPATH_PREFIX, name),
-        proto = name,
-        visibility = ["//visibility:public"],
-        deps = [_Suffix("//" + Label(dep).package + ":" + Label(dep).name, _GO_PROTO_SUFFIX) for dep in deps] + [
-            "@com_github_gogo_protobuf//:gogo_proto_go",
-            "@io_bazel_rules_go//proto/wkt:any_go_proto",
-            "@io_bazel_rules_go//proto/wkt:duration_go_proto",
-            "@io_bazel_rules_go//proto/wkt:struct_go_proto",
-            "@io_bazel_rules_go//proto/wkt:timestamp_go_proto",
-            "@io_bazel_rules_go//proto/wkt:wrappers_go_proto",
-            "@com_envoyproxy_protoc_gen_validate//validate:go_default_library",
-            "@com_google_googleapis//google/api:annotations_go_proto",
-            "@com_google_googleapis//google/rpc:status_go_proto",
-        ],
-    )
-
 # This defines googleapis py_proto_library. The repository does not provide its definition and requires
 # overriding it in the consuming project (see https://github.com/grpc/grpc/issues/19255 for more details).
 def py_proto_library(name, deps = []):
@@ -223,4 +179,60 @@ def api_go_test(name, size, importpath, srcs = [], deps = []):
         srcs = srcs,
         importpath = importpath,
         deps = deps,
+    )
+
+_GO_BAZEL_RULE_MAPPING = {
+    "@opencensus_proto//opencensus/proto/trace/v1:trace_proto": "@opencensus_proto//opencensus/proto/trace/v1:trace_proto_go",
+    "@opencensus_proto//opencensus/proto/trace/v1:trace_config_proto": "@opencensus_proto//opencensus/proto/trace/v1:trace_and_config_proto_go",
+    "@com_google_googleapis//google/api/expr/v1alpha1:syntax_proto": "@com_google_googleapis//google/api/expr/v1alpha1:cel_go_proto",
+}
+
+def go_proto_mapping(dep):
+    mapped = _GO_BAZEL_RULE_MAPPING.get(dep)
+    if mapped == None:
+        return _Suffix("@" + Label(dep).workspace_name + "//" + Label(dep).package + ":" + Label(dep).name, _GO_PROTO_SUFFIX)
+    return mapped
+
+def api_proto_package(name, srcs = [], deps = [], has_services = False, visibility = ["//visibility:public"]):
+    native.proto_library(
+        name = name,
+        srcs = srcs,
+        deps = deps + [
+            "@com_google_protobuf//:any_proto",
+            "@com_google_protobuf//:descriptor_proto",
+            "@com_google_protobuf//:duration_proto",
+            "@com_google_protobuf//:empty_proto",
+            "@com_google_protobuf//:struct_proto",
+            "@com_google_protobuf//:timestamp_proto",
+            "@com_google_protobuf//:wrappers_proto",
+            "@com_google_googleapis//google/api:http_proto",
+            "@com_google_googleapis//google/api:annotations_proto",
+            "@com_google_googleapis//google/rpc:status_proto",
+            "@com_github_gogo_protobuf//:gogo_proto",
+            "@com_envoyproxy_protoc_gen_validate//validate:validate_proto",
+        ],
+        visibility = visibility,
+    )
+
+    compilers = ["@io_bazel_rules_go//proto:go_proto"]
+    if has_services:
+        compilers = ["@io_bazel_rules_go//proto:go_grpc"]
+
+    go_proto_library(
+        name = _Suffix(name, _GO_PROTO_SUFFIX),
+        compilers = compilers,
+        importpath = _Suffix(_GO_IMPORTPATH_PREFIX, native.package_name()),
+        proto = name,
+        visibility = ["//visibility:public"],
+        deps = [go_proto_mapping(dep) for dep in deps] + [
+            "@com_github_gogo_protobuf//:gogo_proto_go",
+            "@io_bazel_rules_go//proto/wkt:any_go_proto",
+            "@io_bazel_rules_go//proto/wkt:duration_go_proto",
+            "@io_bazel_rules_go//proto/wkt:struct_go_proto",
+            "@io_bazel_rules_go//proto/wkt:timestamp_go_proto",
+            "@io_bazel_rules_go//proto/wkt:wrappers_go_proto",
+            "@com_envoyproxy_protoc_gen_validate//validate:go_default_library",
+            "@com_google_googleapis//google/api:annotations_go_proto",
+            "@com_google_googleapis//google/rpc:status_go_proto",
+        ],
     )

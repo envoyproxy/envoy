@@ -1,6 +1,16 @@
-load("@envoy_api//bazel:api_build_system.bzl", "api_go_proto_library", "api_proto_library_internal")
+load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library_internal", "api_proto_package")
 
 licenses(["notice"])  # Apache 2
+
+api_proto_package(
+    name = "accesslog_filter_config",
+    srcs = glob(["*.proto"]),
+    deps = [
+        "//envoy/api/v2/core",
+        "//envoy/api/v2/route:route_protos",
+        "//envoy/type",
+    ],
+)
 
 api_proto_library_internal(
     name = "accesslog",
@@ -14,15 +24,5 @@ api_proto_library_internal(
         "//envoy/api/v2/core:base",
         "//envoy/api/v2/route",
         "//envoy/type:percent",
-    ],
-)
-
-api_go_proto_library(
-    name = "accesslog",
-    proto = ":accesslog",
-    deps = [
-        "//envoy/api/v2/core:base_go_proto",
-        "//envoy/api/v2/route:route_go_proto",
-        "//envoy/type:percent_go_proto",
     ],
 )

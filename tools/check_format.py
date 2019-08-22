@@ -626,6 +626,17 @@ def checkBuildPath(file_path):
     command = "%s %s | diff %s -" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)
     error_messages += executeCommand(command, "envoy_build_fixer check failed", file_path)
 
+  if isBuildFile(file_path) and file_path.startswith(args.api_prefix + "envoy"):
+    found = False
+    finput = fileinput.input(file_path)
+    for line in finput:
+      if "api_proto_package(" in line:
+        found = True
+        break
+    finput.close()
+    if not found:
+      error_messages += ["API build file does not provide api_proto_package()"]
+
   command = "%s -mode=diff %s" % (BUILDIFIER_PATH, file_path)
   error_messages += executeCommand(command, "buildifier check failed", file_path)
   error_messages += checkFileContents(file_path, checkBuildLine)

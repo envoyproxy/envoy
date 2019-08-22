@@ -9,7 +9,8 @@ api_proto_package(
         "//envoy/api/v2",
         "//envoy/api/v2/auth",
         "//envoy/api/v2/core",
-        "//envoy/config/bootstrap/v2",
+        "//envoy/config/bootstrap/v2:bootstrap_config",
+        "//envoy/service/tap/v2alpha:tap_service",
         "//envoy/type",
     ],
 )
@@ -25,7 +26,6 @@ api_proto_library_internal(
         "//envoy/api/v2:srds",
         "//envoy/api/v2/auth:cert",
         "//envoy/config/bootstrap/v2:bootstrap",
-        "//envoy/service/tap/v2alpha",
     ],
 )
 
