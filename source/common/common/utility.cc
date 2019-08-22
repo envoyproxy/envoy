@@ -326,7 +326,7 @@ std::vector<absl::string_view> StringUtil::splitToken(absl::string_view source,
 std::string StringUtil::removeTokens(absl::string_view source, absl::string_view delimiters,
                                      std::set<absl::string_view> tokens_to_remove,
                                      absl::string_view joiner, bool trim_tokens, bool ignore_case) {
-  auto values = Envoy::StringUtil::splitToken(source, delimiters);
+  const auto values = Envoy::StringUtil::splitToken(source, delimiters);
   std::string new_value;
   for (auto& v : values) {
     absl::string_view token_for_compare = v;
