@@ -39,7 +39,7 @@ struct SslSocketFactoryStats {
 };
 
 enum class InitialState { Client, Server };
-enum class SocketState { PreHandshake, HandshakeInProgress, HandShakeComplete, ShutdownSent };
+enum class SocketState { PreHandshake, HandshakeInProgress, HandshakeComplete, ShutdownSent };
 
 class SslSocket : public Network::TransportSocket,
                   public Envoy::Ssl::ConnectionInfo,
@@ -73,7 +73,7 @@ public:
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
   std::string protocol() const override;
   absl::string_view failureReason() const override;
-  bool canFlushClose() override { return state_ == SocketState::HandShakeComplete; }
+  bool canFlushClose() override { return state_ == SocketState::HandshakeComplete; }
   void closeSocket(Network::ConnectionEvent close_type) override;
   Network::IoResult doRead(Buffer::Instance& read_buffer) override;
   Network::IoResult doWrite(Buffer::Instance& write_buffer, bool end_stream) override;

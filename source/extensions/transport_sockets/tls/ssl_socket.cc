@@ -94,9 +94,9 @@ SslSocket::ReadResult SslSocket::sslReadIntoSlice(Buffer::RawSlice& slice) {
 }
 
 Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
-  if (state_ != SocketState::HandShakeComplete && state_ != SocketState::ShutdownSent) {
+  if (state_ != SocketState::HandshakeComplete && state_ != SocketState::ShutdownSent) {
     PostIoAction action = doHandshake();
-    if (action == PostIoAction::Close || state_ != SocketState::HandShakeComplete) {
+    if (action == PostIoAction::Close || state_ != SocketState::HandshakeComplete) {
       // end_stream is false because either a hard error occurred (action == Close) or
       // the handshake isn't complete, so a half-close cannot occur yet.
       return {action, 0, false};
@@ -168,11 +168,11 @@ void SslSocket::onPrivateKeyMethodComplete() {
 }
 
 PostIoAction SslSocket::doHandshake() {
-  ASSERT(state_ != SocketState::HandShakeComplete && state_ != SocketState::ShutdownSent);
+  ASSERT(state_ != SocketState::HandshakeComplete && state_ != SocketState::ShutdownSent);
   int rc = SSL_do_handshake(ssl_.get());
   if (rc == 1) {
     ENVOY_CONN_LOG(debug, "handshake complete", callbacks_->connection());
-    state_ = SocketState::HandShakeComplete;
+    state_ = SocketState::HandshakeComplete;
     ctx_->logHandshake(ssl_.get());
     callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
 
@@ -229,9 +229,9 @@ void SslSocket::drainErrorQueue() {
 
 Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer, bool end_stream) {
   ASSERT(state_ != SocketState::ShutdownSent || write_buffer.length() == 0);
-  if (state_ != SocketState::HandShakeComplete && state_ != SocketState::ShutdownSent) {
+  if (state_ != SocketState::HandshakeComplete && state_ != SocketState::ShutdownSent) {
     PostIoAction action = doHandshake();
-    if (action == PostIoAction::Close || state_ != SocketState::HandShakeComplete) {
+    if (action == PostIoAction::Close || state_ != SocketState::HandshakeComplete) {
       return {action, 0, false};
     }
   }
@@ -414,7 +414,7 @@ void SslSocket::closeSocket(Network::ConnectionEvent) {
   // Attempt to send a shutdown before closing the socket. It's possible this won't go out if
   // there is no room on the socket. We can extend the state machine to handle this at some point
   // if needed.
-  if (state_ == SocketState::HandshakeInProgress || state_ == SocketState::HandShakeComplete) {
+  if (state_ == SocketState::HandshakeInProgress || state_ == SocketState::HandshakeComplete) {
     shutdownSsl();
   }
 }

@@ -12,10 +12,9 @@ namespace Tls {
 class PrivateKeyMethodManagerImpl : public virtual Ssl::PrivateKeyMethodManager {
 public:
   // Ssl::PrivateKeyMethodManager
-  Ssl::PrivateKeyMethodProviderSharedPtr
-  createPrivateKeyMethodProvider(const envoy::api::v2::auth::PrivateKeyProvider& message,
-                                 Server::Configuration::TransportSocketFactoryContext&
-                                     private_key_method_provider_context) override;
+  Ssl::PrivateKeyMethodProviderSharedPtr createPrivateKeyMethodProvider(
+      const envoy::api::v2::auth::PrivateKeyProvider& config,
+      Server::Configuration::TransportSocketFactoryContext& factory_context) override;
 };
 
 } // namespace Tls

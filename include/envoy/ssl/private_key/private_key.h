@@ -70,17 +70,15 @@ public:
   /**
    * Finds and returns a private key operations provider for BoringSSL.
    *
-   * @param message a protobuf message object containing a
-   * PrivateKeyProvider message.
-   * @param private_key_method_provider_context context that provides components for creating and
-   * initializing connections for keyless TLS etc.
+   * @param config a protobuf message object containing a PrivateKeyProvider message.
+   * @param factory_context context that provides components for creating and
+   * initializing connections using asynchronous private key operations.
    * @return PrivateKeyMethodProvider the private key operations provider, or nullptr if
    * no provider can be used with the context configuration.
    */
-  virtual PrivateKeyMethodProviderSharedPtr
-  createPrivateKeyMethodProvider(const envoy::api::v2::auth::PrivateKeyProvider& message,
-                                 Envoy::Server::Configuration::TransportSocketFactoryContext&
-                                     private_key_method_provider_context) PURE;
+  virtual PrivateKeyMethodProviderSharedPtr createPrivateKeyMethodProvider(
+      const envoy::api::v2::auth::PrivateKeyProvider& config,
+      Envoy::Server::Configuration::TransportSocketFactoryContext& factory_context) PURE;
 };
 
 } // namespace Ssl

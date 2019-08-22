@@ -114,11 +114,10 @@ public:
   MockPrivateKeyMethodManager();
   ~MockPrivateKeyMethodManager() override;
 
-  MOCK_METHOD2(
-      createPrivateKeyMethodProvider,
-      PrivateKeyMethodProviderSharedPtr(const envoy::api::v2::auth::PrivateKeyProvider& message,
-                                        Envoy::Server::Configuration::TransportSocketFactoryContext&
-                                            private_key_method_provider_context));
+  MOCK_METHOD2(createPrivateKeyMethodProvider,
+               PrivateKeyMethodProviderSharedPtr(
+                   const envoy::api::v2::auth::PrivateKeyProvider& config,
+                   Envoy::Server::Configuration::TransportSocketFactoryContext& factory_context));
 };
 
 class MockPrivateKeyMethodProvider : public PrivateKeyMethodProvider {

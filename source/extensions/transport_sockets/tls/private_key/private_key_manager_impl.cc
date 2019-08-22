@@ -9,17 +9,16 @@ namespace Tls {
 
 Envoy::Ssl::PrivateKeyMethodProviderSharedPtr
 PrivateKeyMethodManagerImpl::createPrivateKeyMethodProvider(
-    const envoy::api::v2::auth::PrivateKeyProvider& message,
-    Server::Configuration::TransportSocketFactoryContext& private_key_method_provider_context) {
+    const envoy::api::v2::auth::PrivateKeyProvider& config,
+    Server::Configuration::TransportSocketFactoryContext& factory_context) {
 
   Ssl::PrivateKeyMethodProviderInstanceFactory* factory =
       Registry::FactoryRegistry<Ssl::PrivateKeyMethodProviderInstanceFactory>::getFactory(
-          message.provider_name());
+          config.provider_name());
 
   // Create a new provider instance with the configuration.
   if (factory) {
-    return factory->createPrivateKeyMethodProviderInstance(message,
-                                                           private_key_method_provider_context);
+    return factory->createPrivateKeyMethodProviderInstance(config, factory_context);
   }
 
   return nullptr;

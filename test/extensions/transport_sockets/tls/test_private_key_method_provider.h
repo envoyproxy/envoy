@@ -82,12 +82,10 @@ private:
 class TestPrivateKeyMethodFactory : public Ssl::PrivateKeyMethodProviderInstanceFactory {
 public:
   // Ssl::PrivateKeyMethodProviderInstanceFactory
-  Ssl::PrivateKeyMethodProviderSharedPtr
-  createPrivateKeyMethodProviderInstance(const envoy::api::v2::auth::PrivateKeyProvider& message,
-                                         Server::Configuration::TransportSocketFactoryContext&
-                                             private_key_method_provider_context) override {
-    return std::make_shared<TestPrivateKeyMethodProvider>(message.config(),
-                                                          private_key_method_provider_context);
+  Ssl::PrivateKeyMethodProviderSharedPtr createPrivateKeyMethodProviderInstance(
+      const envoy::api::v2::auth::PrivateKeyProvider& config,
+      Server::Configuration::TransportSocketFactoryContext& factory_context) override {
+    return std::make_shared<TestPrivateKeyMethodProvider>(config.config(), factory_context);
   }
 
   std::string name() const override { return std::string("test"); };

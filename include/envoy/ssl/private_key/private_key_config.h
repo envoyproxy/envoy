@@ -12,10 +12,9 @@ namespace Ssl {
 class PrivateKeyMethodProviderInstanceFactory {
 public:
   virtual ~PrivateKeyMethodProviderInstanceFactory() = default;
-  virtual PrivateKeyMethodProviderSharedPtr
-  createPrivateKeyMethodProviderInstance(const envoy::api::v2::auth::PrivateKeyProvider& message,
-                                         Server::Configuration::TransportSocketFactoryContext&
-                                             private_key_method_provider_context) PURE;
+  virtual PrivateKeyMethodProviderSharedPtr createPrivateKeyMethodProviderInstance(
+      const envoy::api::v2::auth::PrivateKeyProvider& config,
+      Server::Configuration::TransportSocketFactoryContext& factory_context) PURE;
   virtual std::string name() const PURE;
 };
 
