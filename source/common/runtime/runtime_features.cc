@@ -26,6 +26,7 @@ constexpr const char* runtime_features[] = {
     // Enabled
     "envoy.reloadable_features.test_feature_true",
     "envoy.reloadable_features.buffer_filter_populate_content_length",
+    "envoy.reloadable_features.trusted_forwarded_proto",
 };
 
 // This is a list of configuration fields which are disallowed by default in Envoy

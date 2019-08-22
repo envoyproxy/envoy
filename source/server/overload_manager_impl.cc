@@ -93,7 +93,7 @@ OverloadManagerImpl::OverloadManagerImpl(
     : started_(false), dispatcher_(dispatcher), tls_(slot_allocator.allocateSlot()),
       refresh_interval_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, refresh_interval, 1000))) {
-  Configuration::ResourceMonitorFactoryContextImpl context(dispatcher, api);
+  Configuration::ResourceMonitorFactoryContextImpl context(dispatcher, api, validation_visitor);
   for (const auto& resource : config.resource_monitors()) {
     const auto& name = resource.name();
     ENVOY_LOG(debug, "Adding resource monitor for {}", name);

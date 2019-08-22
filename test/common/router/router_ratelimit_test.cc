@@ -31,7 +31,7 @@ namespace {
 envoy::api::v2::route::RateLimit parseRateLimitFromV2Yaml(const std::string& yaml_string) {
   envoy::api::v2::route::RateLimit rate_limit;
   TestUtility::loadFromYaml(yaml_string, rate_limit);
-  MessageUtil::validate(rate_limit);
+  TestUtility::validate(rate_limit);
   return rate_limit;
 }
 

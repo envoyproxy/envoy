@@ -11,7 +11,7 @@ namespace {
 
 DEFINE_PROTO_FUZZER(const test::common::router::TestCase& input) {
   try {
-    MessageUtil::validate(input);
+    TestUtility::validate(input);
     auto headers_to_add = replaceInvalidHeaders(input.headers_to_add());
     Protobuf::RepeatedPtrField<std::string> headers_to_remove;
     for (const auto& s : input.headers_to_remove()) {

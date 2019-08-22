@@ -57,6 +57,9 @@ def envoy_copts(repository, test = False):
                repository + "//bazel:disable_object_dump_on_signal_trace": [],
                "//conditions:default": ["-DENVOY_OBJECT_TRACE_ON_DUMP"],
            }) + select({
+               repository + "//bazel:disable_deprecated_features": ["-DENVOY_DISABLE_DEPRECATED_FEATURES"],
+               "//conditions:default": [],
+           }) + select({
                repository + "//bazel:enable_log_debug_assert_in_release": ["-DENVOY_LOG_DEBUG_ASSERT_IN_RELEASE"],
                "//conditions:default": [],
            }) + select({

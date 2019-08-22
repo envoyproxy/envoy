@@ -1074,7 +1074,7 @@ TEST_F(ServerContextConfigImplTest, MultiSdsConfig) {
   tls_context.mutable_common_tls_context()->add_tls_certificate_sds_secret_configs();
   tls_context.mutable_common_tls_context()->add_tls_certificate_sds_secret_configs();
   EXPECT_THROW_WITH_REGEX(
-      MessageUtil::validate<envoy::api::v2::auth::DownstreamTlsContext>(tls_context),
+      TestUtility::validate<envoy::api::v2::auth::DownstreamTlsContext>(tls_context),
       EnvoyException, "Proto constraint validation failed");
 }
 
