@@ -170,12 +170,12 @@ protected:
   }
 
   void expectClusterSlotResponse(NetworkFilters::Common::Redis::RespValuePtr&& response) {
-    EXPECT_CALL(*resolve_timer_, enableTimer(_));
+    EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
     pool_callbacks_->onResponse(std::move(response));
   }
 
   void expectClusterSlotFailure() {
-    EXPECT_CALL(*resolve_timer_, enableTimer(_));
+    EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
     pool_callbacks_->onFailure();
   }
 
@@ -646,7 +646,7 @@ TEST_F(RedisClusterTest, EmptyDnsResponse) {
   Event::MockTimer* dns_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
   setupFromV2Yaml(BasicConfig);
   const std::list<std::string> resolved_addresses{};
-  EXPECT_CALL(*dns_timer, enableTimer(_));
+  EXPECT_CALL(*dns_timer, enableTimer(_, _));
   expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
 
   EXPECT_CALL(initialized_, ready());
@@ -657,7 +657,7 @@ TEST_F(RedisClusterTest, EmptyDnsResponse) {
   EXPECT_EQ(1U, cluster_->info()->stats().update_empty_.value());
 
   // Does not recreate the timer on subsequent DNS resolve calls.
-  EXPECT_CALL(*dns_timer, enableTimer(_));
+  EXPECT_CALL(*dns_timer, enableTimer(_, _));
   expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
   dns_timer->invokeCallback();
 
