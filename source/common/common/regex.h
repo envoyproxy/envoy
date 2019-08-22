@@ -25,8 +25,10 @@ public:
                                   std::regex::flag_type flags = std::regex::optimize);
 
   /**
-   * Construct an std::regex compiled regex matcher. In general this is only currently used in
-   * deprecated code paths and can be removed once all of those code paths are removed.
+   * Construct an std::regex compiled regex matcher.
+   *
+   * TODO(mattklein123): In general this is only currently used in deprecated code paths and can be
+   * removed once all of those code paths are removed.
    */
   static CompiledMatcherPtr
   parseStdRegexAsCompiledMatcher(const std::string& regex,

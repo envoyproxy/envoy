@@ -253,8 +253,8 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/cel-cpp/archive/d9d02b20ab85da2444dbdd03410bac6822141364.tar.gz"],
     ),
     com_googlesource_code_re2 = dict(
-        sha256 = "de6c3ee49b2cecdfd2936af18d6947db36726590e566b5915db3746784c55745",
-        strip_prefix = "re2-2019-07-01",
-        urls = ["https://github.com/google/re2/archive/2019-07-01.tar.gz"],
+        sha256 = "38bc0426ee15b5ed67957017fd18201965df0721327be13f60496f2b356e3e01",
+        strip_prefix = "re2-2019-08-01",
+        urls = ["https://github.com/google/re2/archive/2019-08-01.tar.gz"],
     ),
 )

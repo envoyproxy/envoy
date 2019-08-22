@@ -2,24 +2,20 @@
 
 #include <memory>
 
-#include "envoy/common/pure.h"
-
-#include "absl/strings/string_view.h"
+#include "envoy/common/matchers.h"
 
 namespace Envoy {
 namespace Regex {
 
 /**
  * A compiled regex expression matcher which uses an abstract regex engine.
+ *
+ * NOTE: Currently this is the same as StringMatcher, however has been split out as in the future
+ *       we are likely to add other methods such as returning captures, etc.
  */
-class CompiledMatcher {
+class CompiledMatcher : public Matchers::StringMatcher {
 public:
   virtual ~CompiledMatcher() = default;
-
-  /**
-   * @return whether the value matches the compiled regex expression.
-   */
-  virtual bool match(absl::string_view value) const PURE;
 };
 
 using CompiledMatcherPtr = std::unique_ptr<const CompiledMatcher>;

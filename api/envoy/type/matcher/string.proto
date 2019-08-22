@@ -57,7 +57,7 @@ message StringMatcher {
     string regex = 4 [(validate.rules).string.max_bytes = 1024, deprecated = true];
 
     // The input string must match the regular expression specified here.
-    RegexMatcher safe_regex = 5;
+    RegexMatcher safe_regex = 5 [(validate.rules).message.required = true];
   }
 }
 
