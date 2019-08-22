@@ -22,6 +22,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
 
+#include "common/common/callback_impl.h"
 #include "common/common/logger.h"
 #include "common/init/target_impl.h"
 #include "common/protobuf/utility.h"
@@ -30,6 +31,9 @@
 
 namespace Envoy {
 namespace Router {
+
+// For friend class declaration in RdsRouteConfigSubscription.
+class ScopedRdsConfigSubscription;
 
 /**
  * Route configuration provider utilities.
@@ -121,6 +125,10 @@ private:
     return MessageUtil::anyConvert<envoy::api::v2::RouteConfiguration>(resource).name();
   }
 
+  Common::CallbackHandle* addUpdateCallback(std::function<void()> callback) {
+    return update_callback_manager_.add(callback);
+  }
+
   RdsRouteConfigSubscription(
       const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
       const uint64_t manager_identifier, Server::Configuration::FactoryContext& factory_context,
@@ -142,8 +150,11 @@ private:
   VhdsSubscriptionPtr vhds_subscription_;
   RouteConfigUpdatePtr config_update_info_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
+  Common::CallbackManager<> update_callback_manager_;
 
   friend class RouteConfigProviderManagerImpl;
+  // Access to addUpdateCallback
+  friend class ScopedRdsConfigSubscription;
 };
 
 using RdsRouteConfigSubscriptionSharedPtr = std::shared_ptr<RdsRouteConfigSubscription>;
@@ -195,8 +206,8 @@ public:
   // RouteConfigProviderManager
   RouteConfigProviderPtr createRdsRouteConfigProvider(
       const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
-      Server::Configuration::FactoryContext& factory_context,
-      const std::string& stat_prefix) override;
+      Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
+      Init::Manager& init_manager) override;
 
   RouteConfigProviderPtr
   createStaticRouteConfigProvider(const envoy::api::v2::RouteConfiguration& route_config,

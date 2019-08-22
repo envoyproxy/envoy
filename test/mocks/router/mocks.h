@@ -8,6 +8,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/time.h"
+#include "envoy/config/config_provider.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/json/json_object.h"
@@ -31,6 +33,7 @@
 
 namespace Envoy {
 namespace Router {
+using ::testing::NiceMock;
 
 class MockDirectResponseEntry : public DirectResponseEntry {
 public:
@@ -380,16 +383,29 @@ public:
   std::string name_{"fake_config"};
 };
 
+class MockRouteConfigProvider : public RouteConfigProvider {
+public:
+  MockRouteConfigProvider();
+  ~MockRouteConfigProvider() override;
+
+  MOCK_METHOD0(config, ConfigConstSharedPtr());
+  MOCK_CONST_METHOD0(configInfo, absl::optional<ConfigInfo>());
+  MOCK_CONST_METHOD0(lastUpdated, SystemTime());
+  MOCK_METHOD0(onConfigUpdate, void());
+
+  std::shared_ptr<NiceMock<MockConfig>> route_config_{new NiceMock<MockConfig>()};
+};
+
 class MockRouteConfigProviderManager : public RouteConfigProviderManager {
 public:
   MockRouteConfigProviderManager();
   ~MockRouteConfigProviderManager() override;
 
-  MOCK_METHOD3(createRdsRouteConfigProvider,
+  MOCK_METHOD4(createRdsRouteConfigProvider,
                RouteConfigProviderPtr(
                    const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
                    Server::Configuration::FactoryContext& factory_context,
-                   const std::string& stat_prefix));
+                   const std::string& stat_prefix, Init::Manager& init_manager));
   MOCK_METHOD2(createStaticRouteConfigProvider,
                RouteConfigProviderPtr(const envoy::api::v2::RouteConfiguration& route_config,
                                       Server::Configuration::FactoryContext& factory_context));
@@ -401,6 +417,23 @@ public:
   ~MockScopedConfig() override;
 
   MOCK_CONST_METHOD1(getRouteConfig, ConfigConstSharedPtr(const Http::HeaderMap& headers));
+
+  std::shared_ptr<MockConfig> route_config_{new NiceMock<MockConfig>()};
+};
+
+class MockScopedRouteConfigProvider : public Envoy::Config::ConfigProvider {
+public:
+  MockScopedRouteConfigProvider();
+  ~MockScopedRouteConfigProvider() override;
+
+  // Config::ConfigProvider
+  MOCK_CONST_METHOD0(lastUpdated, SystemTime());
+  MOCK_CONST_METHOD0(getConfigProto, Protobuf::Message*());
+  MOCK_CONST_METHOD0(getConfigProtos, Envoy::Config::ConfigProvider::ConfigProtoVector());
+  MOCK_CONST_METHOD0(getConfig, ConfigConstSharedPtr());
+  MOCK_CONST_METHOD0(apiType, ApiType());
+
+  std::shared_ptr<MockScopedConfig> config_;
 };
 
 } // namespace Router
