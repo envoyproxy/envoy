@@ -182,9 +182,14 @@ bool SnapshotImpl::deprecatedFeatureEnabled(const std::string& key) const {
     // If either disallowed by default or configured off, the feature is not enabled.
     return false;
   }
+
   // The feature is allowed. It is assumed this check is called when the feature
   // is about to be used, so increment the feature use stat.
   stats_.deprecated_feature_use_.inc();
+#ifdef ENVOY_DISABLE_DEPRECATED_FEATURES
+  return false;
+#endif
+
   return true;
 }
 

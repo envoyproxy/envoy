@@ -197,6 +197,7 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
     --define log_debug_assert_in_release=enabled \
     --define quiche=enabled \
     --define path_normalization_by_default=true \
+    --define deprecated_features=disabled \
   "
   setup_clang_libcxx_toolchain
   # This doesn't go into CI but is available for developer convenience.
