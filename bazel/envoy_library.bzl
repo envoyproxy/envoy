@@ -69,6 +69,8 @@ def envoy_cc_library(
         }),
         strip_include_prefix = strip_include_prefix,
     )
+    # Intended for usage by external consumers. This allows them to disambiguate
+    # include paths via `external/envoy...`
     native.cc_library(
         name = name + "_with_external_headers",
         hdrs = hdrs,
