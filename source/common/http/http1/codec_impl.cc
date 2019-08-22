@@ -481,7 +481,8 @@ int ConnectionImpl::onHeadersCompleteBase() {
             current_header_map_->Connection()->value().getStringView(), ",");
         std::string new_values;
         for (auto& v : values) {
-          auto value = StringUtil::toLower(StringUtil::trim(v));
+          auto trimed_v = StringUtil::trim(v);
+          auto value = StringUtil::toLower(trimed_v);
           if (value == Http::Headers::get().ConnectionValues.Upgrade) {
             continue;
           }
@@ -491,10 +492,10 @@ int ConnectionImpl::onHeadersCompleteBase() {
           if (!new_values.empty()) {
             new_values += ", ";
           }
-          new_values.append(value.data(), value.size());
+          new_values.append(trimed_v.data(), trimed_v.size());
         }
         if (new_values.empty()) {
-          current_header_map_->removeConnecton();
+          current_header_map_->removeConnection();
         } else {
           current_header_map_->Connection()->value(new_values);
         }
