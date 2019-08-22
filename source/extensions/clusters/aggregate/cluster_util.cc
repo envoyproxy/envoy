@@ -18,7 +18,7 @@ ClusterUtil::getThreadLocalCluster(Upstream::ClusterManager& cluster_manager,
 
 std::pair<Upstream::PrioritySetImpl, std::vector<Upstream::ThreadLocalCluster*>>
 ClusterUtil::linearizePrioritySet(Upstream::ClusterManager& cluster_manager,
-                                  std::vector<std::string> clusters) {
+                                  const std::vector<std::string>& clusters) {
   Upstream::PrioritySetImpl priority_set;
   std::vector<Upstream::ThreadLocalCluster*> priority_to_cluster;
   int next_priority = 0;

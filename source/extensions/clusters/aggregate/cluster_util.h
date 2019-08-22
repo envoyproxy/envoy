@@ -23,7 +23,7 @@ public:
   // map from priority to cluster.
   static std::pair<Upstream::PrioritySetImpl, std::vector<Upstream::ThreadLocalCluster*>>
   linearizePrioritySet(Upstream::ClusterManager& cluster_manager,
-                       std::vector<std::string> clusters);
+                       const std::vector<std::string>& clusters);
 };
 } // namespace Aggregate
 } // namespace Clusters
