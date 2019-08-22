@@ -1,7 +1,6 @@
 package io.envoyproxy.envoymobile.helloenvoykotlin
 
 import android.app.Activity
-import android.content.Context
 import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
@@ -9,8 +8,8 @@ import android.support.v7.widget.DividerItemDecoration
 import android.support.v7.widget.LinearLayoutManager
 import android.support.v7.widget.RecyclerView
 import android.util.Log
+import io.envoyproxy.envoymobile.AndroidEnvoyBuilder
 import io.envoyproxy.envoymobile.Envoy
-import io.envoyproxy.envoymobile.engine.AndroidEngineImpl
 import io.envoyproxy.envoymobile.shared.Failure
 import io.envoyproxy.envoymobile.shared.Response
 import io.envoyproxy.envoymobile.shared.ResponseRecyclerViewAdapter
@@ -34,9 +33,7 @@ class MainActivity : Activity() {
     super.onCreate(savedInstanceState)
     setContentView(R.layout.activity_main)
 
-    // Create Envoy instance with config.
-    val envoyEngine = AndroidEngineImpl(baseContext)
-    envoy = Envoy(envoyEngine, loadEnvoyConfig(baseContext, R.raw.config))
+    envoy = AndroidEnvoyBuilder(baseContext).build()
 
     recyclerView = findViewById(R.id.recycler_view) as RecyclerView
     recyclerView.layoutManager = LinearLayoutManager(this)
@@ -70,7 +67,7 @@ class MainActivity : Activity() {
   }
 
   private fun makeRequest(): Response {
-    return  try {
+    return try {
       val url = URL(ENDPOINT)
       // Open connection to the envoy thread listening locally on port 9001
       val connection = url.openConnection() as HttpURLConnection
@@ -91,11 +88,6 @@ class MainActivity : Activity() {
   }
 
   private fun deserialize(inputStream: InputStream): String {
-    return inputStream.bufferedReader().use { reader -> reader.readText() }
-  }
-
-  private fun loadEnvoyConfig(context: Context, configResourceId: Int): String {
-    val inputStream = context.getResources().openRawResource(configResourceId)
     return inputStream.bufferedReader().use { reader -> reader.readText() }
   }
 }
