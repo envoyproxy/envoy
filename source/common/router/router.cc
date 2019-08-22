@@ -250,9 +250,15 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
                                 const Http::HeaderMap& response_headers,
                                 Upstream::HostDescriptionConstSharedPtr upstream_host,
                                 bool dropped) {
+  uint64_t status_code_from_response_headers = Http::Utility::getResponseStatus(response_headers);
+  absl::optional<Grpc::Status::GrpcStatus> grpc_status =
+      Grpc::Common::getGrpcStatus(response_headers);
+  if (grpc_status.has_value()) {
+    status_code_from_response_headers = Grpc::Utility::grpcToHttpStatus(grpc_status.value());
+  }
   // Passing the response_status_code explicitly is an optimization to avoid
   // multiple calls to slow Http::Utility::getResponseStatus.
-  ASSERT(response_status_code == Http::Utility::getResponseStatus(response_headers));
+  ASSERT(response_status_code == status_code_from_response_headers);
   if (config_.emit_dynamic_stats_ && !callbacks_->streamInfo().healthCheck()) {
     const Http::HeaderEntry* upstream_canary_header = response_headers.EnvoyUpstreamCanary();
     const Http::HeaderEntry* internal_request_header = downstream_headers_->EnvoyInternalRequest();
@@ -875,12 +881,6 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
   ENVOY_STREAM_LOG(debug, "upstream reset: reset reason {}", *callbacks_,
                    Http::Utility::resetReasonToString(reset_reason));
 
-  // If gRPC request is finished without grpc-status code, use the one from the
-  // response headers.
-  if (grpc_request_ && http_status_code_ != 0) {
-    upstream_request.upstream_host_->outlierDetector().putHttpResponseCode(http_status_code_);
-  }
-
   // TODO: The reset may also come from upstream over the wire. In this case it should be
   // treated as external origin error and distinguished from local origin error.
   // This matters only when running OutlierDetection with split_external_local_origin_errors config
@@ -1003,34 +1003,17 @@ void Filter::resetOtherUpstreams(UpstreamRequest& upstream_request) {
   final_upstream_request->moveIntoList(std::move(final_upstream_request), upstream_requests_);
 }
 
-void Filter::maybeSetGrpcStatusToOutlierDetection(
-    UpstreamRequest& upstream_request, absl::optional<Grpc::Status::GrpcStatus> grpc_status) {
-  if (grpc_status) {
-    if (Http::CodeUtility::is5xx(Grpc::Utility::grpcToHttpStatus(grpc_status.value()))) {
-      // For gRPC request, use the grpc status code for outlier detector when the mapped
-      // http code is 5xx.
-      upstream_request.upstream_host_->outlierDetector().putHttpResponseCode(
-          Grpc::Utility::grpcToHttpStatus(grpc_status.value()));
-    } else {
-      upstream_request.upstream_host_->outlierDetector().putHttpResponseCode(http_status_code_);
-    }
-    http_status_code_ = 0;
-  }
-}
-
 void Filter::onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& headers,
                                UpstreamRequest& upstream_request, bool end_stream) {
   ENVOY_STREAM_LOG(debug, "upstream headers complete: end_stream={}", *callbacks_, end_stream);
 
   modify_headers_(*headers);
 
-  if (grpc_request_) {
-    http_status_code_ = response_code;
-    absl::optional<Grpc::Status::GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(*headers);
-    maybeSetGrpcStatusToOutlierDetection(upstream_request, grpc_status);
-  } else {
-    upstream_request.upstream_host_->outlierDetector().putHttpResponseCode(response_code);
+  absl::optional<Grpc::Status::GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(*headers);
+  if (grpc_status.has_value()) {
+    response_code = Grpc::Utility::grpcToHttpStatus(grpc_status.value());
   }
+  upstream_request.upstream_host_->outlierDetector().putHttpResponseCode(response_code);
 
   if (headers->EnvoyImmediateHealthCheckFail() != nullptr) {
     upstream_request.upstream_host_->healthChecker().setUnhealthy();
@@ -1175,11 +1158,6 @@ void Filter::onUpstreamTrailers(Http::HeaderMapPtr&& trailers, UpstreamRequest& 
     }
   }
 
-  if (grpc_request_) {
-    absl::optional<Grpc::Status::GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(*trailers);
-    maybeSetGrpcStatusToOutlierDetection(upstream_request, grpc_status);
-  }
-
   onUpstreamComplete(upstream_request);
 
   callbacks_->encodeTrailers(std::move(trailers));
@@ -1193,13 +1171,6 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
   if (!downstream_end_stream_) {
     upstream_request.resetStream();
   }
-
-  // If gRPC request is finished without grpc-status code, use the one from the
-  // response headers.
-  if (grpc_request_ && http_status_code_ != 0) {
-    upstream_request.upstream_host_->outlierDetector().putHttpResponseCode(http_status_code_);
-  }
-
   callbacks_->streamInfo().setUpstreamTiming(final_upstream_request_->upstream_timing_);
 
   if (config_.emit_dynamic_stats_ && !callbacks_->streamInfo().healthCheck() &&

@@ -1194,7 +1194,7 @@ TEST_F(RouterTest, GrpcAlreadyExistsTrailersOnly) {
 
   Http::HeaderMapPtr response_headers(
       new Http::TestHeaderMapImpl{{":status", "200"}, {"grpc-status", "6"}});
-  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(409));
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 }
@@ -1351,10 +1351,10 @@ TEST_F(RouterTest, GrpcInternal) {
   router_.decodeHeaders(headers, true);
 
   Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
   response_decoder->decodeHeaders(std::move(response_headers), false);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   Http::HeaderMapPtr response_trailers(new Http::TestHeaderMapImpl{{"grpc-status", "13"}});
-  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(500));
   response_decoder->decodeTrailers(std::move(response_trailers));
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
@@ -2802,7 +2802,7 @@ TEST_F(RouterTest, RetryUpstreamGrpcCancelled) {
   router_.retry_state_->expectHeadersRetry();
   Http::HeaderMapPtr response_headers1(
       new Http::TestHeaderMapImpl{{":status", "200"}, {"grpc-status", "1"}});
-  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(499));
   response_decoder->decodeHeaders(std::move(response_headers1), true);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 
