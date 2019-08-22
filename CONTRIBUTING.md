@@ -74,7 +74,7 @@ maximize the chances of your PR being merged.
   field to describe HTTP/2 window settings is valid if a more comprehensive
   HTTP/2 protocol options field is being introduced to replace it. The PR author
   deprecating the old configuration is responsible for updating all tests and
-  canonical configuration, or guarding them with ifndef ENVOY_DISABLE_DEPRECATED_FEATURES.
+  canonical configuration, or guarding them with the DEPRECATED_FEATURE_TEST() macro.
   This will be validated by the bazel.compile_time_options target, which will hard-fail when
   deprecated configuration is used.
 * For configuration deprecations that are not covered by the above semantic
