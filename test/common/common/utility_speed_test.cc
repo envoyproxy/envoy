@@ -212,7 +212,7 @@ static void BM_RemoveTokensLong(benchmark::State& state) {
   std::string input(size, ',');
   std::vector<std::string> to_remove;
   std::set<absl::string_view> to_remove_set;
-  for (int i = 0; i < size; i++) {
+  for (decltype(size) i = 0; i < size; i++) {
     to_remove.push_back(std::to_string(i));
   }
   for (int i = 0; i < size; i++) {
