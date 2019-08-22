@@ -2827,6 +2827,10 @@ TEST_F(ClusterManagerInitHelperTest, UpdateAlreadyInitialized) {
   cluster2.initialize_callback_();
 }
 
+// If secondary clusters initialization triggered outside of CdsApiImpl::onConfigUpdate()'s
+// callback flows, sending ClusterLoadAssignment should not be paused before calling
+// ClusterManagerInitHelper::maybeFinishInitialize(). This case tests that
+// ClusterLoadAssignment request is paused and resumed properly.
 TEST_F(ClusterManagerInitHelperTest, InitSecondaryWithoutEdsPaused) {
   InSequence s;
 
@@ -2850,6 +2854,10 @@ TEST_F(ClusterManagerInitHelperTest, InitSecondaryWithoutEdsPaused) {
   cluster1.initialize_callback_();
 }
 
+// If secondary clusters initialization triggered inside of CdsApiImpl::onConfigUpdate()'s
+// callback flows, that's, the CDS response didn't have any primary cluster, sending
+// ClusterLoadAssignment should be already paused by CdsApiImpl::onConfigUpdate().
+// This case tests that ClusterLoadAssignment request isn't paused again.
 TEST_F(ClusterManagerInitHelperTest, InitSecondaryWithEdsPaused) {
   InSequence s;
 
