@@ -2,7 +2,7 @@
 
 #include "envoy/buffer/buffer.h"
 
-#include "library/common/include/c_types.h"
+#include "library/common/types/c_types.h"
 
 namespace Envoy {
 namespace Buffer {

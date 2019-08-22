@@ -11,7 +11,7 @@ envoy_cc_test(
     deps = [
         "//library/common/http:dispatcher_lib",
         "//library/common/http:header_utility_lib",
-        "//library/common/include:c_types_interface",
+        "//library/common/types:c_types_lib",
         "@envoy//source/common/http:async_client_lib",
         "@envoy//source/common/http:context_lib",
         "@envoy//test/common/http:common_lib",
@@ -27,7 +27,7 @@ envoy_cc_test(
     repository = "@envoy",
     deps = [
         "//library/common/http:header_utility_lib",
-        "//library/common/include:c_types_interface",
+        "//library/common/types:c_types_lib",
         "@envoy//source/common/http:header_map_lib",
     ],
 )

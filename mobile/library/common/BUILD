@@ -16,7 +16,7 @@ envoy_cc_library(
         "//library/common/buffer:utility_lib",
         "//library/common/http:dispatcher_lib",
         "//library/common/http:header_utility_lib",
-        "//library/common/include:c_types_interface",
+        "//library/common/types:c_types_lib",
         "@envoy//source/exe:envoy_main_common_lib",
     ],
 )
