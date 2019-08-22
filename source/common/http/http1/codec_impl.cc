@@ -481,18 +481,18 @@ int ConnectionImpl::onHeadersCompleteBase() {
             current_header_map_->Connection()->value().getStringView(), ",");
         std::string new_values;
         for (auto& v : values) {
-          auto trimed_v = StringUtil::trim(v);
-          auto value = StringUtil::toLower(trimed_v);
-          if (value == Http::Headers::get().ConnectionValues.Upgrade) {
+          auto value = StringUtil::trim(v);
+          auto lowercase_value = StringUtil::toLower(value);
+          if (lowercase_value == Http::Headers::get().ConnectionValues.Upgrade) {
             continue;
           }
-          if (value == Http::Headers::get().ConnectionValues.Http2Settings) {
+          if (lowercase_value == Http::Headers::get().ConnectionValues.Http2Settings) {
             continue;
           }
           if (!new_values.empty()) {
             new_values += ", ";
           }
-          new_values.append(trimed_v.data(), trimed_v.size());
+          new_values.append(value.data(), value.size());
         }
         if (new_values.empty()) {
           current_header_map_->removeConnection();
