@@ -1,32 +1,37 @@
 #pragma once
 
 #include "envoy/upstream/cluster_manager.h"
-#include "envoy/upstream/load_balancer.h"
+
+#include "common/upstream/load_balancer_impl.h"
+#include "common/upstream/upstream_impl.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Clusters {
 namespace Aggregate {
 
-using ClusterVector = std::vector<std::string>;
-
-class AggregateClusterLoadBalancer : public Upstream::LoadBalancer {
+class AggregateClusterLoadBalancer : public Upstream::LoadBalancerBase {
 public:
-  AggregateClusterLoadBalancer(Upstream::ClusterManager& cluster_manager,
+  AggregateClusterLoadBalancer(std::vector<Upstream::ThreadLocalCluster*>&& priority_to_cluster,
+                               const Upstream::PrioritySet& priority_set,
+                               Upstream::ClusterStats& stats, Runtime::Loader& runtime,
                                Runtime::RandomGenerator& random,
-                               std::vector<ClusterVector>&& clusters_per_priority)
-      : cluster_manager_(cluster_manager), random_(random),
-        clusters_per_priority_(std::move(clusters_per_priority)) {}
+                               const envoy::api::v2::Cluster::CommonLbConfig& common_config)
+      : Upstream::LoadBalancerBase(priority_set, stats, runtime, random, common_config),
+        priority_to_cluster_(std::move(priority_to_cluster)) {}
 
   // Upstream::LoadBalancer
   Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext* context) override;
 
-private:
-  int calculateAvailability(const std::string& cluster_name) const;
+  // Upstream::LoadBalancerBase
+  Upstream::HostConstSharedPtr chooseHostOnce(Upstream::LoadBalancerContext*) override {
+    // The aggregate load balancer has implemented chooseHost, return nullptr directly.
+    return nullptr;
+  }
 
-  Upstream::ClusterManager& cluster_manager_;
-  Runtime::RandomGenerator& random_;
-  std::vector<ClusterVector> clusters_per_priority_;
+private:
+  Upstream::ThreadLocalCluster* chooseCluster() const;
+  std::vector<Upstream::ThreadLocalCluster*> priority_to_cluster_;
 };
 
 } // namespace Aggregate

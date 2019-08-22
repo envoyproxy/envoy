@@ -13,10 +13,13 @@ namespace Extensions {
 namespace Clusters {
 namespace Aggregate {
 
+using ClusterVector = std::vector<std::string>;
+
 class Cluster : public Upstream::BaseDynamicClusterImpl {
 public:
   Cluster(const envoy::api::v2::Cluster& cluster,
-          const envoy::config::cluster::aggregate::ClusterConfig& config, Runtime::Loader& runtime,
+          const envoy::config::cluster::aggregate::ClusterConfig& config,
+          Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime,
           Server::Configuration::TransportSocketFactoryContext& factory_context,
           Stats::ScopePtr&& stats_scope, bool added_via_api);
 
@@ -26,7 +29,9 @@ public:
     return Upstream::Cluster::InitializePhase::Secondary;
   }
 
-  std::vector<ClusterVector> getClustersPerPriority() const { return clusters_per_priority_; };
+  Upstream::ThreadLocalCluster* getThreadLocalCluster(const std::string& name) const;
+  std::pair<Upstream::PrioritySetImpl, std::vector<Upstream::ThreadLocalCluster*>>
+  linearizePrioritySet() const;
 
 private:
   // Upstream::ClusterImplBase
@@ -36,46 +41,55 @@ private:
     onPreInitComplete();
   }
 
-  std::vector<ClusterVector> clusters_per_priority_;
+  ClusterVector clusters_;
+  Upstream::ClusterManager& cluster_manager_;
 };
 
 struct AggregateLoadBalancerFactory : public Upstream::LoadBalancerFactory {
-  AggregateLoadBalancerFactory(Cluster& cluster, Upstream::ClusterManager& cluster_manager,
-                               Runtime::RandomGenerator& random)
-      : cluster_(cluster), cluster_manager_(cluster_manager), random_(random) {}
+  AggregateLoadBalancerFactory(Cluster& cluster, Upstream::ClusterStats& stats,
+                               Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                               const envoy::api::v2::Cluster::CommonLbConfig& common_config)
+      : cluster_(cluster), stats_(stats), runtime_(runtime), random_(random),
+        common_config_(common_config) {}
 
   // Upstream::LoadBalancerFactory
   Upstream::LoadBalancerPtr create() override {
-    return std::make_unique<AggregateClusterLoadBalancer>(cluster_manager_, random_,
-                                                          cluster_.getClustersPerPriority());
+    std::pair<Upstream::PrioritySetImpl, std::vector<Upstream::ThreadLocalCluster*>> pair =
+        cluster_.linearizePrioritySet();
+    return std::make_unique<AggregateClusterLoadBalancer>(
+        std::move(pair.second), std::move(pair.first), stats_, runtime_, random_, common_config_);
   }
 
   Cluster& cluster_;
-  Upstream::ClusterManager& cluster_manager_;
+  Upstream::ClusterStats& stats_;
+  Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
+  const envoy::api::v2::Cluster::CommonLbConfig& common_config_;
 };
 
 class AggregateThreadAwareLoadBalancer : public Upstream::ThreadAwareLoadBalancer {
 public:
-  AggregateThreadAwareLoadBalancer(Cluster& cluster, Upstream::ClusterManager& cluster_manager,
-                                   Runtime::RandomGenerator& random)
-      : cluster_(cluster), cluster_manager_(cluster_manager), random_(random) {}
+  AggregateThreadAwareLoadBalancer(Cluster& cluster, Upstream::ClusterStats& stats,
+                                   Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                                   const envoy::api::v2::Cluster::CommonLbConfig& common_config)
+      : cluster_(cluster), stats_(stats), runtime_(runtime), random_(random),
+        common_config_(common_config) {}
 
   // Upstream::ThreadAwareLoadBalancer
   Upstream::LoadBalancerFactorySharedPtr factory() override {
-    return std::make_shared<AggregateLoadBalancerFactory>(cluster_, cluster_manager_, random_);
+    return std::make_shared<AggregateLoadBalancerFactory>(cluster_, stats_, runtime_, random_,
+                                                          common_config_);
   }
   void initialize() override {}
 
 private:
   Cluster& cluster_;
-  Upstream::ClusterManager& cluster_manager_;
+  Upstream::ClusterStats& stats_;
+  Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
+  const envoy::api::v2::Cluster::CommonLbConfig& common_config_;
 };
 
-/**
- * Factory for AggregateCluster
- */
 class ClusterFactory : public Upstream::ConfigurableClusterFactoryBase<
                            envoy::config::cluster::aggregate::ClusterConfig> {
 public:

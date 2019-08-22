@@ -13,16 +13,6 @@ import "validate/validate.proto";
 
 // Configuration for the aggregate cluster.
 message ClusterConfig {
-  // Load balancing cluster.
-  message LbCluster {
-    // The name of the cluster to be included in the aggregate cluster.
-    string cluster_name = 1 [(validate.rules).string.min_bytes = 1];
-
-    // The priority of the cluster. The field will be used for selecting cluster. If priority is not
-    // set, defaults to 0 (highest priority).
-    google.protobuf.UInt32Value priority = 2;
-  }
-
   // Load balancing clusters in aggregated cluster.
-  repeated LbCluster lb_clusters = 1 [(validate.rules).repeated .min_items = 2];
+  repeated string clusters = 1 [(validate.rules).repeated .min_items = 2];
 }
