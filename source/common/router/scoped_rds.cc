@@ -144,7 +144,6 @@ bool ScopedRdsConfigSubscription::addOrUpdateScopes(
       // TODO(stevenzzz): Creating a new RdsRouteConfigProvider likely expensive, migrate RDS to
       // config-provider-framework to make it light weight.
       rds.set_route_config_name(scoped_route_config.route_configuration_name());
-      // Delete previous route provider if any.
       auto rds_config_provider_helper =
           std::make_unique<RdsRouteConfigProviderHelper>(*this, scope_name, rds, init_manager);
       auto scoped_route_info = std::make_shared<ScopedRouteInfo>(
@@ -159,6 +158,7 @@ bool ScopedRdsConfigSubscription::addOrUpdateScopes(
                           iter->second, scoped_route_info->scopeName()));
         }
       }
+      // NOTE: delete previous route provider if any.
       route_provider_by_scope_.insert({scope_name, std::move(rds_config_provider_helper)});
       scope_name_by_hash_[scoped_route_info->scopeKey().hash()] = scoped_route_info->scopeName();
       scoped_route_map_[scoped_route_info->scopeName()] = scoped_route_info;
@@ -285,7 +285,7 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
     auto scoped_route = MessageUtil::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(
         resource_any, validation_visitor_);
     MessageUtil::validate(scoped_route);
-    const std::string scope_name = scoped_route.name();
+    const std::string& scope_name = scoped_route.name();
     auto scope_config_inserted = scoped_routes.try_emplace(scope_name, std::move(scoped_route));
     if (!scope_config_inserted.second) {
       throw EnvoyException(
