@@ -19,9 +19,7 @@ import github
 
 def GetConfirmation():
   """Obtain stdin confirmation to add users in GH."""
-  return input(
-      'Add users to envoyproxy/assignable ? [yN] ').strip().lower() in ('y',
-                                                                        'yes')
+  return input('Add users to envoyproxy/assignable ? [yN] ').strip().lower() in ('y', 'yes')
 
 
 def SyncAssignable(access_token):
@@ -35,9 +33,7 @@ def SyncAssignable(access_token):
     print('envoyproxy/assignable is consistent with organization membership.')
     return 0
 
-  print(
-      'The following organization members are missing from envoyproxy/assignable:'
-  )
+  print('The following organization members are missing from envoyproxy/assignable:')
   for m in missing:
     print(m.login)
 
