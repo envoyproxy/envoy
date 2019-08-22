@@ -103,6 +103,19 @@ void ClusterManagerInitHelper::removeCluster(Cluster& cluster) {
   maybeFinishInitialize();
 }
 
+void ClusterManagerInitHelper::initializeSecondaryClusters() {
+  started_secondary_initialize_ = true;
+  // Cluster::initialize() method can modify the list of secondary_init_clusters_ to remove
+  // the item currently being initialized, so we eschew range-based-for and do this complicated
+  // dance to increment the iterator before calling initialize.
+  for (auto iter = secondary_init_clusters_.begin(); iter != secondary_init_clusters_.end();) {
+    Cluster* cluster = *iter;
+    ++iter;
+    ENVOY_LOG(debug, "initializing secondary cluster {}", cluster->info()->name());
+    cluster->initialize([cluster, this] { onClusterInit(*cluster); });
+  }
+}
+
 void ClusterManagerInitHelper::maybeFinishInitialize() {
   // Do not do anything if we are still doing the initial static load or if we are waiting for
   // CDS initialize.
@@ -121,19 +134,16 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
   if (!secondary_init_clusters_.empty()) {
     if (!started_secondary_initialize_) {
       ENVOY_LOG(info, "cm init: initializing secondary clusters");
-      cm_.adsMux().pause(Config::TypeUrl::get().ClusterLoadAssignment);
-      Cleanup eds_resume(
-          [this] { cm_.adsMux().resume(Config::TypeUrl::get().ClusterLoadAssignment); });
-
-      started_secondary_initialize_ = true;
-      // Cluster::initialize() method can modify the list of secondary_init_clusters_ to remove
-      // the item currently being initialized, so we eschew range-based-for and do this complicated
-      // dance to increment the iterator before calling initialize.
-      for (auto iter = secondary_init_clusters_.begin(); iter != secondary_init_clusters_.end();) {
-        Cluster* cluster = *iter;
-        ++iter;
-        ENVOY_LOG(debug, "initializing secondary cluster {}", cluster->info()->name());
-        cluster->initialize([cluster, this] { onClusterInit(*cluster); });
+      // If the first CDS response doesn't have any primary cluster, ClusterLoadAssignment
+      // should be already paused by CdsApiImpl::onConfigUpdate(). Need to check that to
+      // avoid double pause ClusterLoadAssignment.
+      if (cm_.adsMux().paused(Config::TypeUrl::get().ClusterLoadAssignment)) {
+        initializeSecondaryClusters();
+      } else {
+        cm_.adsMux().pause(Config::TypeUrl::get().ClusterLoadAssignment);
+        Cleanup eds_resume(
+            [this] { cm_.adsMux().resume(Config::TypeUrl::get().ClusterLoadAssignment); });
+        initializeSecondaryClusters();
       }
     }
 

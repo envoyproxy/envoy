@@ -129,6 +129,7 @@ public:
   State state() const { return state_; }
 
 private:
+  void initializeSecondaryClusters();
   void maybeFinishInitialize();
   void onClusterInit(Cluster& cluster);
 

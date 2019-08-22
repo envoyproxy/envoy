@@ -42,6 +42,8 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::ByRef;
+using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
 using testing::Mock;
@@ -2823,6 +2825,52 @@ TEST_F(ClusterManagerInitHelperTest, UpdateAlreadyInitialized) {
   EXPECT_CALL(*this, onClusterInit(Ref(cluster2)));
   EXPECT_CALL(cm_initialized, ready());
   cluster2.initialize_callback_();
+}
+
+TEST_F(ClusterManagerInitHelperTest, InitSecondaryWithoutEdsPaused) {
+  InSequence s;
+
+  ReadyWatcher cm_initialized;
+  init_helper_.setInitializedCb([&]() -> void { cm_initialized.ready(); });
+
+  NiceMock<MockClusterMockPrioritySet> cluster1;
+  ON_CALL(cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
+  init_helper_.addCluster(cluster1);
+
+  const auto& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  EXPECT_CALL(cm_.ads_mux_, paused(Eq(ByRef(type_url)))).Times(1).WillRepeatedly(Return(false));
+  EXPECT_CALL(cm_.ads_mux_, pause(Eq(ByRef(type_url)))).Times(1);
+  EXPECT_CALL(cluster1, initialize(_));
+  EXPECT_CALL(cm_.ads_mux_, resume(Eq(ByRef(type_url)))).Times(1);
+
+  init_helper_.onStaticLoadComplete();
+
+  EXPECT_CALL(*this, onClusterInit(Ref(cluster1)));
+  EXPECT_CALL(cm_initialized, ready());
+  cluster1.initialize_callback_();
+}
+
+TEST_F(ClusterManagerInitHelperTest, InitSecondaryWithEdsPaused) {
+  InSequence s;
+
+  ReadyWatcher cm_initialized;
+  init_helper_.setInitializedCb([&]() -> void { cm_initialized.ready(); });
+
+  NiceMock<MockClusterMockPrioritySet> cluster1;
+  ON_CALL(cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
+  init_helper_.addCluster(cluster1);
+
+  const auto& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  EXPECT_CALL(cm_.ads_mux_, paused(Eq(ByRef(type_url)))).Times(1).WillRepeatedly(Return(true));
+  EXPECT_CALL(cm_.ads_mux_, pause(Eq(ByRef(type_url)))).Times(0);
+  EXPECT_CALL(cluster1, initialize(_));
+  EXPECT_CALL(cm_.ads_mux_, resume(Eq(ByRef(type_url)))).Times(0);
+
+  init_helper_.onStaticLoadComplete();
+
+  EXPECT_CALL(*this, onClusterInit(Ref(cluster1)));
+  EXPECT_CALL(cm_initialized, ready());
+  cluster1.initialize_callback_();
 }
 
 TEST_F(ClusterManagerInitHelperTest, AddSecondaryAfterSecondaryInit) {
