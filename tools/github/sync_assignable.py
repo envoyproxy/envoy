@@ -1,14 +1,15 @@
 # Sync envoyproxy organization users to envoyproxy/assignable team.
 #
-# This can be used for bulk cleanups if envoyproxy/assignable is not consistent with organizaiton
-# member. In general, prefer to add new members by editing the envoyproxy/assignable in the GitHub
-# UI, which will also cause an organization invite to be sent; this reduces the need to manually
-# manage access tokens.
+# This can be used for bulk cleanups if envoyproxy/assignable is not consistent
+# with organization membership. In general, prefer to add new members by editing
+# the envoyproxy/assignable in the GitHub UI, which will also cause an
+# organization invite to be sent; this reduces the need to manually manage
+# access tokens.
 #
 # Note: the access token supplied must have admin:org (write:org, read:org)
-# permissions (and ideally be scoped no more widely than this). See Settings -> Developer settings
-# -> Personal access tokens for access token generation. Ideally, these should be cleaned up after
-# use.
+# permissions (and ideally be scoped no more widely than this). See Settings ->
+# Developer settings -> Personal access tokens for access token generation.
+# Ideally, these should be cleaned up after use.
 
 import os
 import sys
@@ -18,8 +19,9 @@ import github
 
 def GetConfirmation():
   """Obtain stdin confirmation to add users in GH."""
-  return input('Add users to envoyproxy/assignable ? [yN] ').strip().lower() in (
-      'y', 'yes')
+  return input(
+      'Add users to envoyproxy/assignable ? [yN] ').strip().lower() in ('y',
+                                                                        'yes')
 
 
 def SyncAssignable(access_token):
