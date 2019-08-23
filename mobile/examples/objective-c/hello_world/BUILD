@@ -7,7 +7,7 @@ objc_library(
     name = "appmain",
     srcs = glob([
         "*.h",
-        "*.mm",
+        "*.m",
     ]),
     deps = ["//dist:envoy_mobile_ios"],
 )

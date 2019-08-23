@@ -1,28 +1,19 @@
+#import <Envoy/Envoy-Swift.h>
 #import <UIKit/UIKit.h>
+#import "Result.h"
 #import "ViewController.h"
 
 #pragma mark - Constants
 
 NSString *_CELL_ID = @"cell-id";
-NSString *_ENDPOINT = @"http://localhost:9001/api.lyft.com/static/demo/hello_world.txt";
-
-#pragma mark - Result
-
-/// Represents a response from the server or an error.
-@interface Result : NSObject
-@property (nonatomic, assign) int identifier;
-@property (nonatomic, strong) NSString *body;
-@property (nonatomic, strong) NSString *serverHeader;
-@property (nonatomic, strong) NSString *error;
-@end
-
-@implementation Result
-@end
+NSString *_REQUEST_AUTHORITY = @"s3.amazonaws.com";
+NSString *_REQUEST_PATH = @"/api.lyft.com/static/demo/hello_world.txt";
+NSString *_REQUEST_SCHEME = @"http";
 
 #pragma mark - ViewController
 
 @interface ViewController ()
-@property (nonatomic, strong) NSURLSession *session;
+@property (nonatomic, strong) Envoy *envoy;
 @property (nonatomic, assign) int requestCount;
 @property (nonatomic, strong) NSMutableArray<Result *> *results;
 @property (nonatomic, weak) NSTimer *requestTimer;
@@ -35,26 +26,28 @@ NSString *_ENDPOINT = @"http://localhost:9001/api.lyft.com/static/demo/hello_wor
 - (instancetype)init {
   self = [super init];
   if (self) {
-    NSURLSessionConfiguration *configuration =
-        [NSURLSessionConfiguration defaultSessionConfiguration];
-    configuration.URLCache = nil;
-    configuration.timeoutIntervalForRequest = 10;
-    self.session = [NSURLSession sessionWithConfiguration:configuration];
-
     self.results = [NSMutableArray new];
     self.tableView.allowsSelection = NO;
+    [self startEnvoy];
   }
   return self;
+}
+
+- (void)startEnvoy {
+  NSLog(@"Starting Envoy...");
+  NSError *error;
+  self.envoy = [[EnvoyBuilder new] buildAndReturnError:&error];
+  if (error) {
+    NSLog(@"Starting Envoy failed: %@", error);
+  } else {
+    NSLog(@"Started Envoy, beginning requests...");
+    [self startRequests];
+  }
 }
 
 - (void)dealloc {
   [self.requestTimer invalidate];
   self.requestTimer = nil;
-}
-
-- (void)viewDidLoad {
-  [super viewDidLoad];
-  [self startRequests];
 }
 
 #pragma mark - Requests
@@ -69,56 +62,37 @@ NSString *_ENDPOINT = @"http://localhost:9001/api.lyft.com/static/demo/hello_wor
 }
 
 - (void)performRequest {
-  // Note that the request is sent to the envoy thread listening locally on port 9001.
-  NSURL *url = [NSURL URLWithString:_ENDPOINT];
-  NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
-  [request addValue:@"s3.amazonaws.com" forHTTPHeaderField:@"host"];
-  NSLog(@"Starting request to '%@'", url.path);
-
   self.requestCount++;
+  NSLog(@"Starting request to '%@'", _REQUEST_PATH);
+
   int requestID = self.requestCount;
+  RequestBuilder *builder = [[RequestBuilder alloc] initWithMethod:RequestMethodGet
+                                                            scheme:_REQUEST_SCHEME
+                                                         authority:_REQUEST_AUTHORITY
+                                                              path:_REQUEST_PATH];
+  Request *request = [builder build];
+  ResponseHandler *handler = [[ResponseHandler alloc] initWithQueue:dispatch_get_main_queue()];
 
   __weak ViewController *weakSelf = self;
-  NSURLSessionDataTask *task =
-      [self.session dataTaskWithRequest:request
-                      completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
-                        dispatch_async(dispatch_get_main_queue(), ^{
-                          [weakSelf handleResponse:(NSHTTPURLResponse *)response
-                                              data:data
-                                        identifier:requestID
-                                             error:error];
-                        });
-                      }];
-  [task resume];
-}
+  [handler onHeaders:^(NSDictionary<NSString *, NSArray<NSString *> *> *headers,
+                       NSInteger statusCode, BOOL endStream) {
+    NSLog(@"Response status (%i): %ld\n%@", requestID, statusCode, headers);
+    NSString *body = [NSString stringWithFormat:@"Status: %ld", statusCode];
+    [weakSelf addResponseBody:body
+                 serverHeader:[headers[@"server"] firstObject]
+                   identifier:requestID
+                        error:nil];
+  }];
 
-- (void)handleResponse:(NSHTTPURLResponse *)response
-                  data:(NSData *)data
-            identifier:(int)identifier
-                 error:(NSError *)error {
-  if (error != nil) {
-    NSLog(@"Received error: %@", error);
-    [self addResponseBody:nil serverHeader:nil identifier:identifier error:error.description];
-    return;
-  }
+  [handler onData:^(NSData *data, BOOL endStream) {
+    NSLog(@"Response data (%i): %ld bytes", requestID, data.length);
+  }];
 
-  if (response.statusCode != 200) {
-    NSString *message = [NSString stringWithFormat:@"failed with status: %ld", response.statusCode];
-    [self addResponseBody:nil serverHeader:nil identifier:identifier error:message];
-    return;
-  }
+  [handler onError:^{
+    NSLog(@"Error (%i): Request failed", requestID);
+  }];
 
-  NSString *body = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
-  if (body == nil) {
-    NSString *message = @"failed to deserialize body";
-    [self addResponseBody:nil serverHeader:nil identifier:identifier error:message];
-    return;
-  }
-
-  // Deserialize the response, which will include a `Server` header set by Envoy.
-  NSString *serverHeader = [[response allHeaderFields] valueForKey:@"Server"];
-  NSLog(@"Response:\n%ld bytes\n%@\n%@", data.length, body, [response allHeaderFields]);
-  [self addResponseBody:body serverHeader:serverHeader identifier:identifier error:nil];
+  [self.envoy send:request data:nil trailers:[NSDictionary new] handler:handler];
 }
 
 - (void)addResponseBody:(NSString *)body

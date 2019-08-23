@@ -52,4 +52,18 @@ extension Envoy: Client {
     httpStream.sendHeaders(request.outboundHeaders(), close: false)
     return EnvoyStreamEmitter(stream: httpStream)
   }
+
+  @discardableResult
+  public func send(_ request: Request, data: Data?,
+                   trailers: [String: [String]] = [:], handler: ResponseHandler)
+    -> CancelableStream
+  {
+    let emitter = self.send(request, handler: handler)
+    if let data = data {
+      emitter.sendData(data)
+    }
+
+    emitter.close(trailers: trailers)
+    return emitter
+  }
 }
