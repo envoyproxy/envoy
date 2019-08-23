@@ -33,7 +33,8 @@ struct RcDetailsValues {
 using RcDetails = ConstSingleton<RcDetailsValues>;
 
 FaultSettings::FaultSettings(const envoy::config::filter::http::fault::v2::HTTPFault& fault)
-    : delay_percent_runtime_(PROTOBUF_GET_STRING_OR_DEFAULT(fault, delay_percent_runtime,
+    : fault_filter_headers_(Http::HeaderUtility::buildHeaderDataVector(fault.headers())),
+      delay_percent_runtime_(PROTOBUF_GET_STRING_OR_DEFAULT(fault, delay_percent_runtime,
                                                             RuntimeKeys::get().DelayPercentKey)),
       abort_percent_runtime_(PROTOBUF_GET_STRING_OR_DEFAULT(fault, abort_percent_runtime,
                                                             RuntimeKeys::get().AbortPercentKey)),
@@ -55,10 +56,6 @@ FaultSettings::FaultSettings(const envoy::config::filter::http::fault::v2::HTTPF
   if (fault.has_delay()) {
     request_delay_config_ =
         std::make_unique<Filters::Common::Fault::FaultDelayConfig>(fault.delay());
-  }
-
-  for (const Http::HeaderUtility::HeaderData& header_map : fault.headers()) {
-    fault_filter_headers_.push_back(header_map);
   }
 
   upstream_cluster_ = fault.upstream_cluster();
