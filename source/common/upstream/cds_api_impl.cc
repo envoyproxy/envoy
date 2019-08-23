@@ -35,8 +35,7 @@ void CdsApiImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::An
   ClusterManager::ClusterInfoMap clusters_to_remove = cm_.clusters();
   std::vector<envoy::api::v2::Cluster> clusters;
   for (const auto& cluster_blob : resources) {
-    clusters.push_back(
-        MessageUtil::anyConvert<envoy::api::v2::Cluster>(cluster_blob, validation_visitor_));
+    clusters.push_back(MessageUtil::anyConvert<envoy::api::v2::Cluster>(cluster_blob));
     clusters_to_remove.erase(clusters.back().name());
   }
   Protobuf::RepeatedPtrField<std::string> to_remove_repeated;
@@ -66,9 +65,8 @@ void CdsApiImpl::onConfigUpdate(
   for (const auto& resource : added_resources) {
     envoy::api::v2::Cluster cluster;
     try {
-      cluster = MessageUtil::anyConvert<envoy::api::v2::Cluster>(resource.resource(),
-                                                                 validation_visitor_);
-      MessageUtil::validate(cluster);
+      cluster = MessageUtil::anyConvert<envoy::api::v2::Cluster>(resource.resource());
+      MessageUtil::validate(cluster, validation_visitor_);
       if (!cluster_names.insert(cluster.name()).second) {
         // NOTE: at this point, the first of these duplicates has already been successfully applied.
         throw EnvoyException(fmt::format("duplicate cluster {} found", cluster.name()));

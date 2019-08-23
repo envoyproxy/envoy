@@ -27,7 +27,8 @@ HttpGrpcAccessLogFactory::createAccessLogInstance(const Protobuf::Message& confi
   GrpcCommon::validateProtoDescriptors();
 
   const auto& proto_config = MessageUtil::downcastAndValidate<
-      const envoy::config::accesslog::v2::HttpGrpcAccessLogConfig&>(config);
+      const envoy::config::accesslog::v2::HttpGrpcAccessLogConfig&>(
+      config, context.messageValidationVisitor());
 
   return std::make_shared<HttpGrpcAccessLog>(
       std::move(filter), proto_config, context.threadLocal(),

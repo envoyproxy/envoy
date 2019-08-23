@@ -601,7 +601,7 @@ TEST_F(ConnectionHandlerTest, ListenerFilterTimeout) {
         return Network::FilterStatus::StopIteration;
       }));
   Event::MockTimer* timeout = new Event::MockTimer(&dispatcher_);
-  EXPECT_CALL(*timeout, enableTimer(std::chrono::milliseconds(15000)));
+  EXPECT_CALL(*timeout, enableTimer(std::chrono::milliseconds(15000), _));
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
   listener_callbacks->onAccept(Network::ConnectionSocketPtr{accepted_socket}, true);
   Stats::Gauge& downstream_pre_cx_active =
@@ -609,7 +609,7 @@ TEST_F(ConnectionHandlerTest, ListenerFilterTimeout) {
   EXPECT_EQ(1UL, downstream_pre_cx_active.value());
 
   EXPECT_CALL(*timeout, disableTimer());
-  timeout->callback_();
+  timeout->invokeCallback();
   dispatcher_.clearDeferredDeleteList();
   EXPECT_EQ(0UL, downstream_pre_cx_active.value());
   EXPECT_EQ(1UL, stats_store_.counter("downstream_pre_cx_timeout").value());
@@ -649,7 +649,7 @@ TEST_F(ConnectionHandlerTest, ContinueOnListenerFilterTimeout) {
         return Network::FilterStatus::StopIteration;
       }));
   Event::MockTimer* timeout = new Event::MockTimer(&dispatcher_);
-  EXPECT_CALL(*timeout, enableTimer(std::chrono::milliseconds(15000)));
+  EXPECT_CALL(*timeout, enableTimer(std::chrono::milliseconds(15000), _));
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
   listener_callbacks->onAccept(Network::ConnectionSocketPtr{accepted_socket}, true);
   Stats::Gauge& downstream_pre_cx_active =
@@ -658,7 +658,7 @@ TEST_F(ConnectionHandlerTest, ContinueOnListenerFilterTimeout) {
 
   EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(nullptr));
   EXPECT_CALL(*timeout, disableTimer());
-  timeout->callback_();
+  timeout->invokeCallback();
   dispatcher_.clearDeferredDeleteList();
   EXPECT_EQ(0UL, downstream_pre_cx_active.value());
   EXPECT_EQ(1UL, stats_store_.counter("downstream_pre_cx_timeout").value());
@@ -698,7 +698,7 @@ TEST_F(ConnectionHandlerTest, ListenerFilterTimeoutResetOnSuccess) {
         return Network::FilterStatus::StopIteration;
       }));
   Event::MockTimer* timeout = new Event::MockTimer(&dispatcher_);
-  EXPECT_CALL(*timeout, enableTimer(std::chrono::milliseconds(15000)));
+  EXPECT_CALL(*timeout, enableTimer(std::chrono::milliseconds(15000), _));
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
   listener_callbacks->onAccept(Network::ConnectionSocketPtr{accepted_socket}, true);
 

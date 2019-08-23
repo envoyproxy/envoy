@@ -28,7 +28,7 @@ TcpGrpcAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config
 
   const auto& proto_config =
       MessageUtil::downcastAndValidate<const envoy::config::accesslog::v2::TcpGrpcAccessLogConfig&>(
-          config);
+          config, context.messageValidationVisitor());
 
   return std::make_shared<TcpGrpcAccessLog>(std::move(filter), proto_config, context.threadLocal(),
                                             GrpcCommon::getGrpcAccessLoggerCacheSingleton(context));
