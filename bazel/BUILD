@@ -54,7 +54,7 @@ cc_library(
 cc_library(
     name = "static_stdlib",
     linkopts = select({
-        "@envoy//bazel:linux": ["-static-libgcc"],
+        "//bazel:linux": ["-static-libgcc"],
         "//conditions:default": [],
     }),
 )
