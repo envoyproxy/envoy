@@ -33,6 +33,7 @@ envoy_cc_test_library(
         "//source/common/config:protobuf_link_hacks",
         "//source/common/config:resources_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/extensions/filters/network/redis_proxy:config",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",

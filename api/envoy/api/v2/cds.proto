@@ -583,6 +583,10 @@ message Cluster {
     // If panic mode is triggered, new hosts are still eligible for traffic; they simply do not
     // contribute to the calculation when deciding whether panic mode is enabled or not.
     bool ignore_new_hosts_until_first_hc = 5;
+
+    // If set to `true`, the cluster manager will drain all existing
+    // connections to upstream hosts whenever hosts are added or removed from the cluster.
+    bool close_connections_on_host_set_change = 6;
   }
 
   // Common configuration for all load balancer implementations.
