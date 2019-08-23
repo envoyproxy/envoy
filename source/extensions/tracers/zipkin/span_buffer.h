@@ -23,7 +23,8 @@ public:
    * Constructor that creates an empty buffer. Space needs to be allocated by invoking
    * the method allocateBuffer(size).
    *
-   * @param version The selected Zipkin collector version.
+   * @param version The selected Zipkin collector version. @see
+   * api/envoy/config/trace/v2/trace.proto.
    * @param shared_span_context To determine whether client and server spans will shared the same
    * span id.
    */
@@ -33,7 +34,7 @@ public:
   /**
    * Constructor that initializes a buffer with the given size.
    *
-   * @param version The selected Zipkin collector version.
+   * @param version The selected Zipkin collector version. @see api/envoy/config/trace/v2/trace.proto.
    * @param shared_span_context To determine whether client and server spans will shared the same
    * span id.
    * @param size The desired buffer size.
