@@ -93,6 +93,7 @@ message HttpConnectionManager {
     // The span name will be derived from this field. If
     // :ref:`traffic_direction <envoy_api_field_Listener.traffic_direction>` is
     // specified on the parent listener, then it is used instead of this field.
+    //
     // .. attention::
     //  This field has been deprecated in favor of `traffic_direction`.
     OperationName operation_name = 1 [(validate.rules).enum.defined_only = true, deprecated = true];
