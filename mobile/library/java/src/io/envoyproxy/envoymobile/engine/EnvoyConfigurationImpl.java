@@ -9,6 +9,7 @@ public class EnvoyConfigurationImpl implements EnvoyConfiguration {
    */
   @Override
   public String templateString() {
+    JniLibrary.load();
     return JniLibrary.templateString();
   }
 }
