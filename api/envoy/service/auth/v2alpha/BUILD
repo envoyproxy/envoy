@@ -4,7 +4,6 @@ licenses(["notice"])  # Apache 2
 
 api_proto_package(
     name = "external_auth_v2alpha",
-    srcs = glob(["*.proto"]),
     has_services = True,
     deps = [
         "//envoy/service/auth/v2:external_auth_service",

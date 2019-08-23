@@ -4,7 +4,6 @@ licenses(["notice"])  # Apache 2
 
 api_proto_package(
     name = "load_stats_service",
-    srcs = glob(["*.proto"]),
     has_services = True,
     deps = [
         "//envoy/api/v2/core",

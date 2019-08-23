@@ -4,7 +4,6 @@ licenses(["notice"])  # Apache 2
 
 api_proto_package(
     name = "network_rate_limit",
-    srcs = glob(["*.proto"]),
     deps = [
         "//envoy/api/v2/ratelimit:ratelimit_protos",
         "//envoy/config/ratelimit/v2:ratelimit_config",

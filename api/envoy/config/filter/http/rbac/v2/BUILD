@@ -4,7 +4,6 @@ licenses(["notice"])  # Apache 2
 
 api_proto_package(
     name = "http_rbac",
-    srcs = glob(["*.proto"]),
     deps = [
         "//envoy/config/rbac/v2:rbac_config",
     ],

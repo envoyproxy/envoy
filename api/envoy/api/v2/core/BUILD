@@ -18,7 +18,6 @@ package_group(
 
 api_proto_package(
     name = "core",
-    srcs = glob(["*.proto"]),
     deps = [
         "//envoy/type",
     ],

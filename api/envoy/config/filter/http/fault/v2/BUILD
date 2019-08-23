@@ -4,7 +4,6 @@ licenses(["notice"])  # Apache 2
 
 api_proto_package(
     name = "http_fault",
-    srcs = glob(["*.proto"]),
     deps = [
         "//envoy/api/v2/route:route_protos",
         "//envoy/config/filter/fault/v2:fault_config",

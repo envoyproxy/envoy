@@ -17,7 +17,6 @@ package_group(
 
 api_proto_package(
     name = "auth",
-    srcs = glob(["*.proto"]),
     deps = [
         "//envoy/api/v2/core",
     ],

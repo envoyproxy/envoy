@@ -194,7 +194,10 @@ def go_proto_mapping(dep):
         return _Suffix("@" + Label(dep).workspace_name + "//" + Label(dep).package + ":" + Label(dep).name, _GO_PROTO_SUFFIX)
     return mapped
 
-def api_proto_package(name, srcs = [], deps = [], has_services = False, visibility = ["//visibility:public"]):
+def api_proto_package(name = "pkg", srcs = [], deps = [], has_services = False, visibility = ["//visibility:public"]):
+    if srcs == []:
+        srcs = native.glob(["*.proto"])
+
     native.proto_library(
         name = name,
         srcs = srcs,

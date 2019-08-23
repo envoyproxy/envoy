@@ -4,7 +4,6 @@ licenses(["notice"])  # Apache 2
 
 api_proto_package(
     name = "network_tcp_proxy",
-    srcs = glob(["*.proto"]),
     deps = [
         "//envoy/api/v2/core",
         "//envoy/config/filter/accesslog/v2:accesslog_filter_config",

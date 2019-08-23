@@ -4,7 +4,6 @@ licenses(["notice"])  # Apache 2
 
 api_proto_package(
     name = "network_client_ssl_auth",
-    srcs = glob(["*.proto"]),
     deps = [
         "//envoy/api/v2/core",
     ],

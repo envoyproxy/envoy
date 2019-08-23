@@ -4,7 +4,6 @@ licenses(["notice"])  # Apache 2
 
 api_proto_package(
     name = "dynamic_forward_proxy",
-    srcs = glob(["*.proto"]),
     deps = [
         "//envoy/api/v2",
     ],

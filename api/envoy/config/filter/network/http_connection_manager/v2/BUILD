@@ -4,7 +4,6 @@ licenses(["notice"])  # Apache 2
 
 api_proto_package(
     name = "network_hcm",
-    srcs = glob(["*.proto"]),
     deps = [
         "//envoy/api/v2",
         "//envoy/api/v2/core",

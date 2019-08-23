@@ -4,7 +4,6 @@ licenses(["notice"])  # Apache 2
 
 api_proto_package(
     name = "tap_transport_socket",
-    srcs = glob(["*.proto"]),
     deps = [
         "//envoy/api/v2/core",
         "//envoy/config/common/tap/v2alpha:tap_config",

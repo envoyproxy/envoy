@@ -4,7 +4,6 @@ licenses(["notice"])  # Apache 2
 
 api_proto_package(
     name = "network_mongo_proxy",
-    srcs = glob(["*.proto"]),
     deps = [
         "//envoy/config/filter/fault/v2:fault_config",
     ],

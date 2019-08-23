@@ -4,7 +4,6 @@ licenses(["notice"])  # Apache 2
 
 api_proto_package(
     name = "http_header_to_metadata",
-    srcs = glob(["*.proto"]),
 )
 
 api_proto_library_internal(

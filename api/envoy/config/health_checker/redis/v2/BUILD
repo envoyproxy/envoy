@@ -4,7 +4,6 @@ licenses(["notice"])  # Apache 2
 
 api_proto_package(
     name = "redis_health_checker_config",
-    srcs = glob(["*.proto"]),
 )
 
 api_proto_library_internal(

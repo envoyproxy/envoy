@@ -4,7 +4,6 @@ licenses(["notice"])  # Apache 2
 
 api_proto_package(
     name = "http_router",
-    srcs = glob(["*.proto"]),
     deps = [
         "//envoy/config/filter/accesslog/v2:accesslog_filter_config",
     ],

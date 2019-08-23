@@ -4,7 +4,6 @@ licenses(["notice"])  # Apache 2
 
 api_proto_package(
     name = "trace_config",
-    srcs = glob(["*.proto"]),
     deps = [
         "//envoy/api/v2/core",
         "@opencensus_proto//opencensus/proto/trace/v1:trace_config_proto",

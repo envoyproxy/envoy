@@ -4,7 +4,6 @@ licenses(["notice"])  # Apache 2
 
 api_proto_package(
     name = "network_health_check_event",
-    srcs = glob(["*.proto"]),
     deps = [
         "//envoy/api/v2/core",
     ],
