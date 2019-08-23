@@ -931,15 +931,14 @@ Filter::streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason) {
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-void Filter::handleNon5xxResponseHeaders(const Http::HeaderMap& headers,
-                                         UpstreamRequest& upstream_request, bool end_stream) {
+void Filter::handleNon5xxResponseHeaders(const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                                         UpstreamRequest& upstream_request, bool end_stream,
+                                         uint64_t grpc_to_http_status) {
   // We need to defer gRPC success until after we have processed grpc-status in
   // the trailers.
   if (grpc_request_) {
     if (end_stream) {
-      absl::optional<Grpc::Status::GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(headers);
-      if (grpc_status &&
-          !Http::CodeUtility::is5xx(Grpc::Utility::grpcToHttpStatus(grpc_status.value()))) {
+      if (grpc_status && !Http::CodeUtility::is5xx(grpc_to_http_status)) {
         upstream_request.upstream_host_->stats().rq_success_.inc();
       } else {
         upstream_request.upstream_host_->stats().rq_error_.inc();
@@ -1003,10 +1002,17 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& head
 
   modify_headers_(*headers);
 
-  absl::optional<Grpc::Status::GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(*headers);
+  absl::optional<Grpc::Status::GrpcStatus> grpc_status;
+  uint64_t grpc_to_http_status = 0;
+  if (grpc_request_) {
+    grpc_status = Grpc::Common::getGrpcStatus(*headers);
+    if (grpc_status.has_value()) {
+      grpc_to_http_status = Grpc::Utility::grpcToHttpStatus(grpc_status.value());
+    }
+  }
+
   if (grpc_status.has_value()) {
-    upstream_request.upstream_host_->outlierDetector().putHttpResponseCode(
-        Grpc::Utility::grpcToHttpStatus(grpc_status.value()));
+    upstream_request.upstream_host_->outlierDetector().putHttpResponseCode(grpc_to_http_status);
   } else {
     upstream_request.upstream_host_->outlierDetector().putHttpResponseCode(response_code);
   }
@@ -1096,7 +1102,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& head
       upstream_request.upstream_host_->canary();
   chargeUpstreamCode(response_code, *headers, upstream_request.upstream_host_, false);
   if (!Http::CodeUtility::is5xx(response_code)) {
-    handleNon5xxResponseHeaders(*headers, upstream_request, end_stream);
+    handleNon5xxResponseHeaders(grpc_status, upstream_request, end_stream, grpc_to_http_status);
   }
 
   // Append routing cookies
