@@ -100,6 +100,10 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RetryPolicy& retry
     retriable_status_codes_.emplace_back(code);
   }
 
+  for (auto& header : retry_policy.retriable_headers()) {
+    retriable_headers_.emplace_back(header);
+  }
+
   if (retry_policy.has_retry_back_off()) {
     base_interval_ = std::chrono::milliseconds(
         PROTOBUF_GET_MS_REQUIRED(retry_policy.retry_back_off(), base_interval));

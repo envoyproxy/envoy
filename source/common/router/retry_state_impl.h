@@ -108,6 +108,7 @@ private:
   Upstream::RetryPrioritySharedPtr retry_priority_;
   uint32_t host_selection_max_attempts_;
   std::vector<uint32_t> retriable_status_codes_;
+  std::vector<Http::LowerCaseString> retriable_headers_;
 };
 
 } // namespace Router

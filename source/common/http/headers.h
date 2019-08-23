@@ -97,6 +97,7 @@ public:
   const LowerCaseString EnvoyRetryGrpcOn{absl::StrCat(prefix(), "-retry-grpc-on")};
   const LowerCaseString EnvoyRetriableStatusCodes{
       absl::StrCat(prefix(), "-retriable-status-codes")};
+  const LowerCaseString EnvoyRetriableHeaders{absl::StrCat(prefix(), "-retriable-headers")};
   const LowerCaseString EnvoyUpstreamAltStatName{absl::StrCat(prefix(), "-upstream-alt-stat-name")};
   const LowerCaseString EnvoyUpstreamCanary{absl::StrCat(prefix(), "-upstream-canary")};
   const LowerCaseString EnvoyUpstreamHostAddress{absl::StrCat(prefix(), "-upstream-host-address")};
@@ -208,6 +209,7 @@ public:
     const std::string RefusedStream{"refused-stream"};
     const std::string Retriable4xx{"retriable-4xx"};
     const std::string RetriableStatusCodes{"retriable-status-codes"};
+    const std::string RetriableHeaders{"retriable-headers"};
     const std::string Reset{"reset"};
   } EnvoyRetryOnValues;
 
