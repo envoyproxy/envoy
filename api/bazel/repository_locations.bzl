@@ -18,9 +18,8 @@ PROMETHEUS_SHA = "783bdaf8ee0464b35ec0c8704871e1e72afa0005c3f3587f65d9d6694bf391
 
 KAFKA_SOURCE_SHA = "ae7a1696c0a0302b43c5b21e515c37e6ecd365941f68a510a7e442eebddf39a1"  # 2.2.0-rc2
 
-# ZIPKINAPI_RELEASE = "0.2.2"
-ZIPKINAPI_GIT_SHA = "821bc013ecc730f4c76f33c50bd5e8f4b6fa8446"
-ZIPKINAPI_SHA256 = "f4ee5f8f87d95393fd7e4440ff8c0dbe49405cf16cab8c34eec37106551c3e46"
+ZIPKINAPI_RELEASE = "0.2.2" # Aug 23, 2019
+ZIPKINAPI_SHA256 = "688c4fe170821dd589f36ec45aaadc03a618a40283bc1f97da8fa11686fc816b"
 
 REPOSITORY_LOCATIONS = dict(
     bazel_skylib = dict(
@@ -60,7 +59,7 @@ REPOSITORY_LOCATIONS = dict(
     ),
     com_github_openzipkin_zipkinapi = dict(
         sha256 = ZIPKINAPI_SHA256,
-        strip_prefix = "zipkin-api-" + ZIPKINAPI_GIT_SHA,
-        urls = ["https://github.com/openzipkin/zipkin-api/archive/" + ZIPKINAPI_GIT_SHA + ".tar.gz"],
+        strip_prefix = "zipkin-api-" + ZIPKINAPI_RELEASE,
+        urls = ["https://github.com/openzipkin/zipkin-api/archive/" + ZIPKINAPI_RELEASE + ".tar.gz"],
     ),
 )
