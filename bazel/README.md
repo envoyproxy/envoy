@@ -407,6 +407,8 @@ The following optional features can be disabled on the Bazel build command-line:
 * Backtracing on signals with `--define signal_trace=disabled`
 * Active stream state dump on signals with `--define signal_trace=disabled` or `--define disable_object_dump_on_signal_trace=disabled`
 * tcmalloc with `--define tcmalloc=disabled`
+* deprecated features with `--define deprecated_features=disabled`
+
 
 ## Enabling optional features
 
