@@ -72,7 +72,7 @@ public:
   /**
    * Used by ConnectionHandler to manage listeners.
    */
-  class ActiveListener : public Listener {
+  class ActiveListener {
   public:
     virtual ~ActiveListener() = default;
 
@@ -84,7 +84,14 @@ public:
      * @return the actual Listener object.
      */
     virtual Listener* listener() PURE;
-
+    /**
+     * Disable the actual Listener.
+     */
+    virtual void disable() PURE;
+    /**
+     * enable the actual Listener.
+     */
+    virtual void enable() PURE;
     /**
      * Destroy the actual Listener it wraps.
      */

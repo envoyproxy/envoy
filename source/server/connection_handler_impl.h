@@ -74,8 +74,6 @@ public:
     uint64_t listenerTag() override { return listener_tag_; }
     Network::Listener* listener() override { return listener_.get(); }
     void destroy() override { listener_.reset(); }
-
-    // Network::Listener.
     void enable() override { listener_->enable(); }
     void disable() override { listener_->disable(); }
 

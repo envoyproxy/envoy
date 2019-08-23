@@ -447,6 +447,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "well_known_names_lib",
     hdrs = ["well_known_names.h"],
+    deps = ["//source/common/singleton:const_singleton"],
 )
 
 envoy_cc_library(
