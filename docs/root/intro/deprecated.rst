@@ -14,6 +14,7 @@ Version 1.12.0 (pending)
 ========================
 * The ORIGINAL_DST_LB :ref:`load balancing policy <envoy_api_field_Cluster.lb_policy>` is deprecated, use CLUSTER_PROVIDED policy instead when configuring an :ref:`original destination cluster <envoy_api_field_Cluster.type>`.
 * The :option:`--allow-unknown-fields` command-line option, use :option:`--allow-unknown-static-fields` instead.
+* The use of HTTP_JSON_V1 :ref:`Zipkin collector endpoint version <envoy_api_field_config.trace.v2.ZipkinConfig.collector_endpoint_version>` or not explicitly specifying it is deprecated, use HTTP_JSON or HTTP_PROTO instead.
 
 Version 1.11.0 (July 11, 2019)
 ==============================

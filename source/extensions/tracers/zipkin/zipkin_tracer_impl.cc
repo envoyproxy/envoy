@@ -80,14 +80,8 @@ Driver::Driver(const envoy::config::trace::v2::ZipkinConfig& zipkin_config,
   if (!zipkin_config.collector_endpoint().empty()) {
     collector.endpoint = zipkin_config.collector_endpoint();
   }
-
-  if (zipkin_config.collector_endpoint_version() !=
-      envoy::config::trace::v2::ZipkinConfig::NOT_SET) {
-    // TODO(dio): Throw an error when we require user to explicitly setting up the collector
-    // endpoint version.
-    collector.version = zipkin_config.collector_endpoint_version();
-  }
-
+  // The current default version of collector_endpoint_version is HTTP_JSON_V1.
+  collector.version = zipkin_config.collector_endpoint_version();
   const bool trace_id_128bit = zipkin_config.trace_id_128bit();
 
   const bool shared_span_context = PROTOBUF_GET_WRAPPED_OR_DEFAULT(

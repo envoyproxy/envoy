@@ -25,8 +25,8 @@ public:
    *
    * @param version The selected Zipkin collector version. @see
    * api/envoy/config/trace/v2/trace.proto.
-   * @param shared_span_context To determine whether client and server spans will shared the same
-   * span id.
+   * @param shared_span_context To determine whether client and server spans will share the same
+   * span context.
    */
   SpanBuffer(const envoy::config::trace::v2::ZipkinConfig::CollectorEndpointVersion& version,
              const bool shared_span_context);
@@ -36,8 +36,8 @@ public:
    *
    * @param version The selected Zipkin collector version. @see
    * api/envoy/config/trace/v2/trace.proto.
-   * @param shared_span_context To determine whether client and server spans will shared the same
-   * span id.
+   * @param shared_span_context To determine whether client and server spans will share the same
+   * span context.
    * @param size The desired buffer size.
    */
   SpanBuffer(const envoy::config::trace::v2::ZipkinConfig::CollectorEndpointVersion& version,
