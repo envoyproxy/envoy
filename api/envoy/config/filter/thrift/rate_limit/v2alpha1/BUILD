@@ -3,10 +3,9 @@ load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library_internal", "ap
 licenses(["notice"])  # Apache 2
 
 api_proto_package(
-    name = "thrift_rate_limit",
     deps = [
         "//envoy/api/v2/ratelimit:ratelimit_protos",
-        "//envoy/config/ratelimit/v2:ratelimit_config",
+        "//envoy/config/ratelimit/v2:pkg",
     ],
 )
 

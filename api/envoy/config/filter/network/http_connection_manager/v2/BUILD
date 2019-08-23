@@ -3,11 +3,10 @@ load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library_internal", "ap
 licenses(["notice"])  # Apache 2
 
 api_proto_package(
-    name = "network_hcm",
     deps = [
         "//envoy/api/v2",
         "//envoy/api/v2/core",
-        "//envoy/config/filter/accesslog/v2:accesslog_filter_config",
+        "//envoy/config/filter/accesslog/v2:pkg",
         "//envoy/type",
     ],
 )

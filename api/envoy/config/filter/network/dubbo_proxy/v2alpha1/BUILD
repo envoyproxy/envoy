@@ -3,7 +3,6 @@ load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library_internal", "ap
 licenses(["notice"])  # Apache 2
 
 api_proto_package(
-    name = "network_dubbo",
     deps = [
         "//envoy/api/v2/core",
         "//envoy/api/v2/route:route_protos",

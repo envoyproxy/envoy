@@ -8,7 +8,6 @@ _PY_SUFFIX = "_py"
 _CC_SUFFIX = "_cc"
 _CC_EXPORT_SUFFIX = "_export_cc"
 _GO_PROTO_SUFFIX = "_go_proto"
-_GO_GRPC_SUFFIX = "_go_grpc"
 _GO_IMPORTPATH_PREFIX = "github.com/envoyproxy/data-plane-api/api/"
 
 def _Suffix(d, suffix):
@@ -62,41 +61,6 @@ def py_proto_library(name, deps = []):
         visibility = ["//visibility:public"],
     )
 
-def api_go_proto_library(name, proto, deps = []):
-    go_proto_library(
-        name = _Suffix(name, _GO_PROTO_SUFFIX),
-        importpath = _Suffix(_GO_IMPORTPATH_PREFIX, name),
-        proto = proto,
-        visibility = ["//visibility:public"],
-        deps = deps + [
-            "@com_github_gogo_protobuf//:gogo_proto_go",
-            "@io_bazel_rules_go//proto/wkt:any_go_proto",
-            "@io_bazel_rules_go//proto/wkt:duration_go_proto",
-            "@io_bazel_rules_go//proto/wkt:struct_go_proto",
-            "@io_bazel_rules_go//proto/wkt:timestamp_go_proto",
-            "@io_bazel_rules_go//proto/wkt:wrappers_go_proto",
-            "@com_envoyproxy_protoc_gen_validate//validate:go_default_library",
-            "@com_google_googleapis//google/rpc:status_go_proto",
-        ],
-    )
-
-def api_go_grpc_library(name, proto, deps = []):
-    go_grpc_library(
-        name = _Suffix(name, _GO_GRPC_SUFFIX),
-        importpath = _Suffix(_GO_IMPORTPATH_PREFIX, name),
-        proto = proto,
-        visibility = ["//visibility:public"],
-        deps = deps + [
-            "@com_github_gogo_protobuf//:gogo_proto_go",
-            "@io_bazel_rules_go//proto/wkt:any_go_proto",
-            "@io_bazel_rules_go//proto/wkt:duration_go_proto",
-            "@io_bazel_rules_go//proto/wkt:struct_go_proto",
-            "@io_bazel_rules_go//proto/wkt:wrappers_go_proto",
-            "@com_envoyproxy_protoc_gen_validate//validate:go_default_library",
-            "@com_google_googleapis//google/api:annotations_go_proto",
-        ],
-    )
-
 # This is api_proto_library plus some logic internal to //envoy/api.
 def api_proto_library_internal(visibility = ["//visibility:private"], **kwargs):
     # //envoy/docs/build.sh needs visibility in order to generate documents.
@@ -109,8 +73,6 @@ def api_proto_library_internal(visibility = ["//visibility:private"], **kwargs):
 
 # TODO(htuch): has_services is currently ignored but will in future support
 # gRPC stub generation.
-# TODO(htuch): Automatically generate go_proto_library and go_grpc_library
-# from api_proto_library.
 def api_proto_library(
         name,
         visibility = ["//visibility:private"],

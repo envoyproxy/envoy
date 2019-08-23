@@ -28,11 +28,11 @@ api_go_test(
     deps = [
         "//envoy/api/v2:v2_go_proto",
         "//envoy/api/v2/auth:auth_go_proto",
-        "//envoy/config/bootstrap/v2:bootstrap_config_go_proto",
-        "//envoy/service/accesslog/v2:accesslog_service_go_proto",
-        "//envoy/service/discovery/v2:discovery_service_go_proto",
-        "//envoy/service/metrics/v2:metrics_service_protos_go_proto",
-        "//envoy/service/ratelimit/v2:ratelimit_service_go_proto",
-        "//envoy/service/trace/v2:trace_service_protos_go_proto",
+        "//envoy/config/bootstrap/v2:pkg_go_proto",
+        "//envoy/service/accesslog/v2:pkg_go_proto",
+        "//envoy/service/discovery/v2:pkg_go_proto",
+        "//envoy/service/metrics/v2:pkg_go_proto",
+        "//envoy/service/ratelimit/v2:pkg_go_proto",
+        "//envoy/service/trace/v2:pkg_go_proto",
     ],
 )
