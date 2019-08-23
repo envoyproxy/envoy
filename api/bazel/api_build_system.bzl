@@ -102,7 +102,7 @@ def api_proto_library(
     native.proto_library(
         name = name,
         srcs = srcs,
-        deps = deps + external_proto_deps + COMMON_PROTO_DEPS,
+        deps = deps + external_proto_deps + _COMMON_PROTO_DEPS,
         visibility = visibility,
     )
     pgv_cc_proto_library(
@@ -166,7 +166,7 @@ def api_proto_package(name = "pkg", srcs = [], deps = [], has_services = False, 
     native.proto_library(
         name = name,
         srcs = srcs,
-        deps = deps + COMMON_PROTO_DEPS,
+        deps = deps + _COMMON_PROTO_DEPS,
         visibility = visibility,
     )
 
