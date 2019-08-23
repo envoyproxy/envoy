@@ -4,6 +4,7 @@ load(
     ":envoy_internal.bzl",
     "envoy_copts",
     "envoy_external_dep_path",
+    "envoy_stdlib_deps",
     "tcmalloc_external_dep",
 )
 
@@ -24,7 +25,7 @@ def envoy_cc_binary(
     if stamped:
         linkopts = linkopts + _envoy_stamped_linkopts()
         deps = deps + _envoy_stamped_deps()
-    deps = deps + [envoy_external_dep_path(dep) for dep in external_deps]
+    deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + envoy_stdlib_deps()
     native.cc_binary(
         name = name,
         srcs = srcs,
