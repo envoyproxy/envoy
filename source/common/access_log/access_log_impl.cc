@@ -193,13 +193,12 @@ bool NotHealthCheckFilter::evaluate(const StreamInfo::StreamInfo& info, const Ht
   return !info.healthCheck();
 }
 
-HeaderFilter::HeaderFilter(const envoy::config::filter::accesslog::v2::HeaderFilter& config) {
-  header_data_.push_back(Http::HeaderUtility::HeaderData(config.header()));
-}
+HeaderFilter::HeaderFilter(const envoy::config::filter::accesslog::v2::HeaderFilter& config)
+    : header_data_(std::make_unique<Http::HeaderUtility::HeaderData>(config.header())) {}
 
 bool HeaderFilter::evaluate(const StreamInfo::StreamInfo&, const Http::HeaderMap& request_headers,
                             const Http::HeaderMap&, const Http::HeaderMap&) {
-  return Http::HeaderUtility::matchHeaders(request_headers, header_data_);
+  return Http::HeaderUtility::matchHeaders(request_headers, *header_data_);
 }
 
 ResponseFlagFilter::ResponseFlagFilter(

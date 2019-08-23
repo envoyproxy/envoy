@@ -63,6 +63,16 @@ SERIALIZE_AS_STRING_WHITELIST = ("./test/common/protobuf/utility_test.cc",
 # Files in these paths can use Protobuf::util::JsonStringToMessage
 JSON_STRING_TO_MESSAGE_WHITELIST = ("./source/common/protobuf/utility.cc")
 
+# Files in these paths can use std::regex
+STD_REGEX_WHITELIST = ("./source/common/common/utility.cc", "./source/common/common/regex.h",
+                       "./source/common/common/regex.cc",
+                       "./source/common/stats/tag_extractor_impl.h",
+                       "./source/common/stats/tag_extractor_impl.cc",
+                       "./source/common/access_log/access_log_formatter.cc",
+                       "./source/extensions/filters/http/squash/squash_filter.h",
+                       "./source/extensions/filters/http/squash/squash_filter.cc",
+                       "./source/server/http/admin.h", "./source/server/http/admin.cc")
+
 CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-8")
 BUILDIFIER_PATH = os.getenv("BUILDIFIER_BIN", "$GOPATH/bin/buildifier")
 ENVOY_BUILD_FIXER_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])),
@@ -333,6 +343,10 @@ def whitelistedForStatFromString(file_path):
   return file_path in STAT_FROM_STRING_WHITELIST
 
 
+def whitelistedForStdRegex(file_path):
+  return file_path.startswith("./test") or file_path in STD_REGEX_WHITELIST
+
+
 def findSubstringAndReturnError(pattern, file_path, error_message):
   with open(file_path) as f:
     text = f.read()
@@ -580,6 +594,9 @@ def checkSourceLine(line, file_path, reportError):
      not whitelistedForStatFromString(file_path) and \
      ('.counter(' in line or '.gauge(' in line or '.histogram(' in line):
     reportError("Don't lookup stats by name at runtime; use StatName saved during construction")
+
+  if not whitelistedForStdRegex(file_path) and "std::regex" in line:
+    reportError("Don't use std::regex in code that handles untrusted input. Use RegexMatcher")
 
 
 def checkBuildLine(line, file_path, reportError):

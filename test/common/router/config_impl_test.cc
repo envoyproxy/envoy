@@ -175,7 +175,9 @@ virtual_hosts:
     route:
       cluster: clock
   - match:
-      regex: "/baa+"
+      safe_regex:
+        google_re2: {}
+        regex: "/baa+"
     route:
       cluster: sheep
   - match:
@@ -295,8 +297,13 @@ virtual_hosts:
   - pattern: "^/users/\\d+$"
     method: PUT
     name: update_user
-  - pattern: "^/users/\\d+/location$"
-    method: POST
+  - headers:
+    - name: ":path"
+      safe_regex_match:
+        google_re2: {}
+        regex: "^/users/\\d+/location$"
+    - name: ":method"
+      exact_match: POST
     name: ulu
   )EOF";
 
@@ -641,6 +648,26 @@ virtual_hosts:
   EXPECT_THROW_WITH_REGEX(TestConfigImpl(parseRouteConfigurationFromV2Yaml(invalid_virtual_cluster),
                                          factory_context_, true),
                           EnvoyException, "Invalid regex '\\^/\\(\\+invalid\\)':");
+}
+
+// Virtual cluster that contains neither pattern nor regex. This must be checked while pattern is
+// deprecated.
+TEST_F(RouteMatcherTest, TestRoutesWithInvalidVirtualCluster) {
+  const std::string invalid_virtual_cluster = R"EOF(
+virtual_hosts:
+  - name: regex
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: "regex" }
+    virtual_clusters:
+      - name: "invalid"
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(TestConfigImpl(parseRouteConfigurationFromV2Yaml(invalid_virtual_cluster),
+                                         factory_context_, true),
+                          EnvoyException,
+                          "virtual clusters must define either 'pattern' or 'headers'");
 }
 
 // Validates behavior of request_headers_to_add at router, vhost, and route levels.
@@ -1327,6 +1354,21 @@ virtual_hosts:
       cluster: local_service_with_valueless_query_parameter
   - match:
       prefix: "/"
+      query_parameters:
+      - name: debug2
+        present_match: true
+    route:
+      cluster: local_service_with_present_match_query_parameter
+  - match:
+      prefix: "/"
+      query_parameters:
+      - name: debug3
+        string_match:
+          exact: foo
+    route:
+      cluster: local_service_with_string_match_query_parameter
+  - match:
+      prefix: "/"
     route:
       cluster: local_service_without_query_parameters
 
@@ -1361,6 +1403,18 @@ virtual_hosts:
   {
     Http::TestHeaderMapImpl headers = genHeaders("example.com", "/?debug", "GET");
     EXPECT_EQ("local_service_with_valueless_query_parameter",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("example.com", "/?debug2", "GET");
+    EXPECT_EQ("local_service_with_present_match_query_parameter",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("example.com", "/?debug3=foo", "GET");
+    EXPECT_EQ("local_service_with_string_match_query_parameter",
               config.route(headers, 0)->routeEntry()->clusterName());
   }
 
@@ -4217,6 +4271,12 @@ virtual_hosts:
     domains: ["*"]
     cors:
       allow_origin: ["test-origin"]
+      allow_origin_regex:
+      - .*\.envoyproxy\.io
+      allow_origin_string_match:
+      - safe_regex:
+          google_re2: {}
+          regex: .*\.envoyproxy\.io
       allow_methods: "test-methods"
       allow_headers: "test-headers"
       expose_headers: "test-expose-headers"
@@ -4258,7 +4318,7 @@ virtual_hosts:
 
   EXPECT_EQ(cors_policy->enabled(), false);
   EXPECT_EQ(cors_policy->shadowEnabled(), true);
-  EXPECT_THAT(cors_policy->allowOrigins(), ElementsAreArray({"test-origin"}));
+  EXPECT_EQ(3, cors_policy->allowOrigins().size());
   EXPECT_EQ(cors_policy->allowMethods(), "test-methods");
   EXPECT_EQ(cors_policy->allowHeaders(), "test-headers");
   EXPECT_EQ(cors_policy->exposeHeaders(), "test-expose-headers");
@@ -4311,7 +4371,7 @@ virtual_hosts:
 
   EXPECT_EQ(cors_policy->enabled(), false);
   EXPECT_EQ(cors_policy->shadowEnabled(), true);
-  EXPECT_THAT(cors_policy->allowOrigins(), ElementsAreArray({"test-origin"}));
+  EXPECT_EQ(1, cors_policy->allowOrigins().size());
   EXPECT_EQ(cors_policy->allowMethods(), "test-methods");
   EXPECT_EQ(cors_policy->allowHeaders(), "test-headers");
   EXPECT_EQ(cors_policy->exposeHeaders(), "test-expose-headers");
@@ -4350,7 +4410,7 @@ virtual_hosts:
 
   EXPECT_EQ(cors_policy->enabled(), true);
   EXPECT_EQ(cors_policy->shadowEnabled(), false);
-  EXPECT_THAT(cors_policy->allowOrigins(), ElementsAreArray({"test-origin"}));
+  EXPECT_EQ(1, cors_policy->allowOrigins().size());
   EXPECT_EQ(cors_policy->allowMethods(), "test-methods");
   EXPECT_EQ(cors_policy->allowHeaders(), "test-headers");
   EXPECT_EQ(cors_policy->exposeHeaders(), "test-expose-headers");
@@ -4386,7 +4446,7 @@ virtual_hosts:
 
   EXPECT_EQ(cors_policy->enabled(), true);
   EXPECT_EQ(cors_policy->shadowEnabled(), false);
-  EXPECT_THAT(cors_policy->allowOrigins(), ElementsAreArray({"test-origin"}));
+  EXPECT_EQ(1, cors_policy->allowOrigins().size());
   EXPECT_EQ(cors_policy->allowMethods(), "test-methods");
   EXPECT_EQ(cors_policy->allowHeaders(), "test-headers");
   EXPECT_EQ(cors_policy->exposeHeaders(), "test-expose-headers");

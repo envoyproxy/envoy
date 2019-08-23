@@ -314,12 +314,21 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
   // Now setup for cross-thread updates.
   cluster.prioritySet().addMemberUpdateCb(
       [&cluster, this](const HostVector&, const HostVector& hosts_removed) -> void {
-        // TODO(snowp): Should this be subject to merge windows?
+        if (cluster.info()->lbConfig().close_connections_on_host_set_change()) {
+          for (const auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
+            // This will drain all tcp and http connection pools.
+            postThreadLocalDrainConnections(cluster, host_set->hosts());
+          }
+        } else {
+          // TODO(snowp): Should this be subject to merge windows?
 
-        // Whenever hosts are removed from the cluster, we make each TLS cluster drain it's
-        // connection pools for the removed hosts.
-        if (!hosts_removed.empty()) {
-          postThreadLocalHostRemoval(cluster, hosts_removed);
+          // Whenever hosts are removed from the cluster, we make each TLS cluster drain it's
+          // connection pools for the removed hosts. If `close_connections_on_host_set_change` is
+          // enabled, this case will be covered by first `if` statement, where all
+          // connection pools are drained.
+          if (!hosts_removed.empty()) {
+            postThreadLocalDrainConnections(cluster, hosts_removed);
+          }
         }
       });
 
@@ -553,10 +562,10 @@ bool ClusterManagerImpl::removeCluster(const std::string& cluster_name) {
 
       ASSERT(cluster_manager.thread_local_clusters_.count(cluster_name) == 1);
       ENVOY_LOG(debug, "removing TLS cluster {}", cluster_name);
-      cluster_manager.thread_local_clusters_.erase(cluster_name);
       for (auto& cb : cluster_manager.update_callbacks_) {
         cb->onClusterRemoval(cluster_name);
       }
+      cluster_manager.thread_local_clusters_.erase(cluster_name);
     });
   }
 
@@ -712,8 +721,8 @@ Tcp::ConnectionPool::Instance* ClusterManagerImpl::tcpConnPoolForCluster(
   return entry->second->tcpConnPool(priority, context, transport_socket_options);
 }
 
-void ClusterManagerImpl::postThreadLocalHostRemoval(const Cluster& cluster,
-                                                    const HostVector& hosts_removed) {
+void ClusterManagerImpl::postThreadLocalDrainConnections(const Cluster& cluster,
+                                                         const HostVector& hosts_removed) {
   tls_->runOnAllThreads([this, name = cluster.info()->name(), hosts_removed]() {
     ThreadLocalClusterManagerImpl::removeHosts(name, hosts_removed, *tls_);
   });
