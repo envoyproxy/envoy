@@ -142,7 +142,9 @@ class MockRetryPriorityFactory : public RetryPriorityFactory {
 public:
   MockRetryPriorityFactory(const MockRetryPriority& retry_priority)
       : retry_priority_(retry_priority) {}
-  RetryPrioritySharedPtr createRetryPriority(const Protobuf::Message&, uint32_t) override {
+  RetryPrioritySharedPtr createRetryPriority(const Protobuf::Message&,
+                                             ProtobufMessage::ValidationVisitor&,
+                                             uint32_t) override {
     return std::make_shared<NiceMock<MockRetryPriority>>(retry_priority_);
   }
 

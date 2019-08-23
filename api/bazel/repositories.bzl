@@ -16,6 +16,10 @@ def api_dependencies():
         locations = REPOSITORY_LOCATIONS,
     )
     envoy_http_archive(
+        name = "com_github_cncf_udpa",
+        locations = REPOSITORY_LOCATIONS,
+    )
+    envoy_http_archive(
         name = "com_github_gogo_protobuf",
         locations = REPOSITORY_LOCATIONS,
         build_file_content = GOGOPROTO_BUILD_CONTENT,

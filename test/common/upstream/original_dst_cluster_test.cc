@@ -167,7 +167,7 @@ TEST_F(OriginalDstClusterTest, CleanupInterval) {
 
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(membership_updated_, ready()).Times(0);
-  EXPECT_CALL(*cleanup_timer_, enableTimer(std::chrono::milliseconds(1000)));
+  EXPECT_CALL(*cleanup_timer_, enableTimer(std::chrono::milliseconds(1000), _));
   setupFromYaml(yaml);
 
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
@@ -184,7 +184,7 @@ TEST_F(OriginalDstClusterTest, NoContext) {
 
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(membership_updated_, ready()).Times(0);
-  EXPECT_CALL(*cleanup_timer_, enableTimer(_));
+  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
   setupFromYaml(yaml);
 
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
@@ -241,7 +241,7 @@ TEST_F(OriginalDstClusterTest, Membership) {
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
-  EXPECT_CALL(*cleanup_timer_, enableTimer(_));
+  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
   setupFromYaml(yaml);
 
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
@@ -289,7 +289,7 @@ TEST_F(OriginalDstClusterTest, Membership) {
   // Make host time out, no membership changes happen on the first timeout.
   ASSERT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(true, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->used());
-  EXPECT_CALL(*cleanup_timer_, enableTimer(_));
+  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
   cleanup_timer_->invokeCallback();
   EXPECT_EQ(
       cluster_hosts,
@@ -299,7 +299,7 @@ TEST_F(OriginalDstClusterTest, Membership) {
   ASSERT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(false, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->used());
 
-  EXPECT_CALL(*cleanup_timer_, enableTimer(_));
+  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
   EXPECT_CALL(membership_updated_, ready());
   cleanup_timer_->invokeCallback();
   EXPECT_NE(cluster_hosts,
@@ -332,7 +332,7 @@ TEST_F(OriginalDstClusterTest, Membership2) {
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
-  EXPECT_CALL(*cleanup_timer_, enableTimer(_));
+  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
   setupFromYaml(yaml);
 
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
@@ -391,7 +391,7 @@ TEST_F(OriginalDstClusterTest, Membership2) {
   ASSERT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(true, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->used());
   EXPECT_EQ(true, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[1]->used());
-  EXPECT_CALL(*cleanup_timer_, enableTimer(_));
+  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
   cleanup_timer_->invokeCallback();
   EXPECT_EQ(
       cluster_hosts,
@@ -402,7 +402,7 @@ TEST_F(OriginalDstClusterTest, Membership2) {
   EXPECT_EQ(false, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->used());
   EXPECT_EQ(false, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[1]->used());
 
-  EXPECT_CALL(*cleanup_timer_, enableTimer(_));
+  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
   EXPECT_CALL(membership_updated_, ready());
   cleanup_timer_->invokeCallback();
   EXPECT_NE(cluster_hosts,
@@ -420,7 +420,7 @@ TEST_F(OriginalDstClusterTest, Connection) {
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
-  EXPECT_CALL(*cleanup_timer_, enableTimer(_));
+  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
   setupFromYaml(yaml);
 
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
@@ -460,7 +460,7 @@ TEST_F(OriginalDstClusterTest, MultipleClusters) {
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
-  EXPECT_CALL(*cleanup_timer_, enableTimer(_));
+  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
   setupFromYaml(yaml);
 
   PrioritySetImpl second;
@@ -514,7 +514,7 @@ TEST_F(OriginalDstClusterTest, UseHttpHeaderEnabled) {
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
-  EXPECT_CALL(*cleanup_timer_, enableTimer(_));
+  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
   setupFromYaml(yaml);
 
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
@@ -585,7 +585,7 @@ TEST_F(OriginalDstClusterTest, UseHttpHeaderDisabled) {
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
-  EXPECT_CALL(*cleanup_timer_, enableTimer(_));
+  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
   setupFromYaml(yaml);
 
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());

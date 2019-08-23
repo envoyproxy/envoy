@@ -66,7 +66,8 @@ HedgePolicyImpl::HedgePolicyImpl()
     : initial_requests_(1), additional_request_chance_({}), hedge_on_per_try_timeout_(false) {}
 
 RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RetryPolicy& retry_policy,
-                                 ProtobufMessage::ValidationVisitor& validation_visitor) {
+                                 ProtobufMessage::ValidationVisitor& validation_visitor)
+    : validation_visitor_(&validation_visitor) {
   per_try_timeout_ =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(retry_policy, per_try_timeout, 0));
   num_retries_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(retry_policy, num_retries, 1);
@@ -141,7 +142,8 @@ Upstream::RetryPrioritySharedPtr RetryPolicyImpl::retryPriority() const {
   auto& factory = Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryPriorityFactory>(
       retry_priority_config_.first);
 
-  return factory.createRetryPriority(*retry_priority_config_.second, num_retries_);
+  return factory.createRetryPriority(*retry_priority_config_.second, *validation_visitor_,
+                                     num_retries_);
 }
 
 CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config,
