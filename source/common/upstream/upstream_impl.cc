@@ -140,7 +140,7 @@ createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typ
   Envoy::Config::Utility::translateOpaqueConfig(typed_config, config, validation_visitor,
                                                 *proto_config);
 
-  return factory->createProtocolOptionsConfig(*proto_config);
+  return factory->createProtocolOptionsConfig(*proto_config, validation_visitor);
 }
 
 std::map<std::string, ProtocolOptionsConfigConstSharedPtr>

@@ -142,7 +142,7 @@ public:
 
   void expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds timeout) override {
     init_timeout_timer_ = new Event::MockTimer(&dispatcher_);
-    EXPECT_CALL(*init_timeout_timer_, enableTimer(std::chrono::milliseconds(timeout)));
+    EXPECT_CALL(*init_timeout_timer_, enableTimer(std::chrono::milliseconds(timeout), _));
   }
 
   void expectDisableInitFetchTimeoutTimer() override {

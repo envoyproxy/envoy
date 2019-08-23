@@ -9,10 +9,10 @@ namespace Filesystem {
 MockFile::MockFile() : num_opens_(0), num_writes_(0), is_open_(false) {}
 MockFile::~MockFile() = default;
 
-Api::IoCallBoolResult MockFile::open(FlagSet) {
+Api::IoCallBoolResult MockFile::open(FlagSet flag) {
   Thread::LockGuard lock(open_mutex_);
 
-  Api::IoCallBoolResult result = open_();
+  Api::IoCallBoolResult result = open_(flag);
   is_open_ = result.rc_;
   num_opens_++;
   open_event_.notifyOne();

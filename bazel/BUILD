@@ -121,6 +121,11 @@ config_setting(
 )
 
 config_setting(
+    name = "disable_deprecated_features",
+    values = {"define": "deprecated_features=disabled"},
+)
+
+config_setting(
     name = "disable_hot_restart",
     values = {"define": "hot_restart=disabled"},
 )
