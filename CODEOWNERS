@@ -43,7 +43,7 @@ extensions/filters/common/original_src @snowp @klarose
 # dynamic forward proxy
 /*/extensions/clusters/dynamic_forward_proxy @mattklein123 @alyssawilk
 /*/extensions/common/dynamic_forward_proxy @mattklein123 @alyssawilk
-# wasm common extension
+# web assembly common extension
 /*/extensions/common/wasm @jplevayk @PiotrSikora
 /*/extensions/filters/http/dynamic_forward_proxy @mattklein123 @alyssawilk
 # omit_canary_hosts retry predicate
