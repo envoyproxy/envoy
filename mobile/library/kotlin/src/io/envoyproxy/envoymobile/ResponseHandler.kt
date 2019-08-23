@@ -7,7 +7,7 @@ import java.nio.ByteBuffer
 /**
  * Callback interface for receiving stream events.
  */
-class ResponseHandler {
+class ResponseHandler() {
 
   class EnvoyObserverAdapter(
       internal val responseHandler: ResponseHandler
@@ -15,7 +15,7 @@ class ResponseHandler {
 
     override fun onHeaders(headers: Map<String, List<String>>?, endStream: Boolean) {
       val statusCode = headers!![":status"]?.first()?.toIntOrNull() ?: 0
-      responseHandler.onHeadersClosure(headers, statusCode)
+      responseHandler.onHeadersClosure(headers, statusCode, endStream)
     }
 
     override fun onData(byteBuffer: ByteBuffer?, endStream: Boolean) {
@@ -41,7 +41,7 @@ class ResponseHandler {
 
   internal val underlyingObserver = EnvoyObserverAdapter(this)
 
-  private var onHeadersClosure: (headers: Map<String, List<String>>, statusCode: Int) -> Unit = { _, _ -> Unit }
+  private var onHeadersClosure: (headers: Map<String, List<String>>, statusCode: Int, endStream: Boolean) -> Unit = { _, _, _ -> Unit }
   private var onDataClosure: (byteBuffer: ByteBuffer?, endStream: Boolean) -> Unit = { _, _ -> Unit }
   private var onMetadataClosure: (metadata: Map<String, List<String>>) -> Unit = { Unit }
   private var onTrailersClosure: (trailers: Map<String, List<String>>) -> Unit = { Unit }
@@ -53,11 +53,10 @@ class ResponseHandler {
    * If `endStream` is `true`, the stream is complete.
    *
    * @param closure: Closure which will receive the headers, status code,
-   *                 and flag indicating if the stream is headers-only.
-   * @param statusCode the status code of the response.
+   *                 and flag indicating if the stream is complete.
    * @return ResponseHandler, this ResponseHandler.
    */
-  fun onHeaders(closure: (headers: Map<String, List<String>>, statusCode: Int) -> Unit): ResponseHandler {
+  fun onHeaders(closure: (headers: Map<String, List<String>>, statusCode: Int, endStream: Boolean) -> Unit): ResponseHandler {
     this.onHeadersClosure = closure
     return this
   }
