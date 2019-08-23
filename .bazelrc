@@ -33,6 +33,8 @@ build:sanitizer --test_tag_filters=-no_san
 
 # Basic ASAN/UBSAN that works for gcc
 build:asan --config=sanitizer
+# ASAN install its signal handler, disable ours so the stacktrace will be printed by ASAN
+build:asan --define signal_trace=disabled
 build:asan --define ENVOY_CONFIG_ASAN=1
 build:asan --copt -fsanitize=address,undefined
 build:asan --linkopt -fsanitize=address,undefined
