@@ -42,17 +42,6 @@ REAL_TIME_WHITELIST = ("./source/common/common/utility.h",
                        "./test/test_common/utility.cc", "./test/test_common/utility.h",
                        "./test/integration/integration.h")
 
-# Files matching these directories can use stats by string for now. These should
-# be eliminated but for now we don't want to grow this work. The goal for this
-# whitelist is to eliminate it by making code transformations similar to
-# https://github.com/envoyproxy/envoy/pull/7573 and others.
-#
-# TODO(#4196): Eliminate this list completely and then merge #4980.
-#
-# Note that until https://github.com/envoyproxy/envoy-wasm/issues/93 is
-# resolved, WASM will require the whitelist. No other files should be added.
-STAT_FROM_STRING_WHITELIST = ("")
-
 # Files in these paths can use MessageLite::SerializeAsString
 SERIALIZE_AS_STRING_WHITELIST = ("./test/common/protobuf/utility_test.cc",
                                  "./test/common/grpc/codec_test.cc")
@@ -326,10 +315,6 @@ def whitelistedForJsonStringToMessage(file_path):
   return file_path in JSON_STRING_TO_MESSAGE_WHITELIST
 
 
-def whitelistedForStatFromString(file_path):
-  return file_path in STAT_FROM_STRING_WHITELIST
-
-
 def findSubstringAndReturnError(pattern, file_path, error_message):
   with open(file_path) as f:
     text = f.read()
@@ -574,7 +559,6 @@ def checkSourceLine(line, file_path, reportError):
     reportError("Don't use Protobuf::util::JsonStringToMessage, use TestUtility::loadFromJson.")
 
   if isInSubdir(file_path, 'source') and file_path.endswith('.cc') and \
-     not whitelistedForStatFromString(file_path) and \
      ('.counter(' in line or '.gauge(' in line or '.histogram(' in line):
     reportError("Don't lookup stats by name at runtime; use StatName saved during construction")
 
