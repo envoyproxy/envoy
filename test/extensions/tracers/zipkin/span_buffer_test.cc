@@ -79,7 +79,7 @@ void expectSerializedBuffer(SpanBuffer& buffer, const bool delay_allocation,
 
   // Add a valid span. Valid means can be serialized to v2.
   EXPECT_TRUE(buffer.addSpan(createSpan({"cs"}, IpType::V4)));
-  // While the span is vald, buffer is full.
+  // While the span is valid, however the buffer is full.
   EXPECT_FALSE(buffer.addSpan(createSpan({"cs", "sr"}, IpType::V4)));
 
   buffer.clear();
