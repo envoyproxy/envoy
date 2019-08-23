@@ -54,6 +54,8 @@ public:
           }
 
           {
+            // TODO(mattklein123): When deprecated config is removed, remove DEPRECATED_FEATURE_TEST
+            // from all tests below.
             auto* route = virtual_host->add_routes();
             route->mutable_match()->set_prefix("/cors-credentials-allowed");
             route->mutable_route()->set_cluster("cluster_0");
@@ -118,7 +120,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, CorsFilterIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(CorsFilterIntegrationTest, TestVHostConfigSuccess) {
+TEST_P(CorsFilterIntegrationTest, DEPRECATED_FEATURE_TEST(TestVHostConfigSuccess)) {
   testPreflight(
       Http::TestHeaderMapImpl{
           {":method", "OPTIONS"},
@@ -138,7 +140,7 @@ TEST_P(CorsFilterIntegrationTest, TestVHostConfigSuccess) {
       });
 }
 
-TEST_P(CorsFilterIntegrationTest, TestRouteConfigSuccess) {
+TEST_P(CorsFilterIntegrationTest, DEPRECATED_FEATURE_TEST(TestRouteConfigSuccess)) {
   testPreflight(
       Http::TestHeaderMapImpl{
           {":method", "OPTIONS"},
@@ -159,7 +161,7 @@ TEST_P(CorsFilterIntegrationTest, TestRouteConfigSuccess) {
       });
 }
 
-TEST_P(CorsFilterIntegrationTest, TestRouteConfigBadOrigin) {
+TEST_P(CorsFilterIntegrationTest, DEPRECATED_FEATURE_TEST(TestRouteConfigBadOrigin)) {
   testNormalRequest(
       Http::TestHeaderMapImpl{
           {":method", "OPTIONS"},
@@ -176,7 +178,7 @@ TEST_P(CorsFilterIntegrationTest, TestRouteConfigBadOrigin) {
       });
 }
 
-TEST_P(CorsFilterIntegrationTest, TestCorsDisabled) {
+TEST_P(CorsFilterIntegrationTest, DEPRECATED_FEATURE_TEST(TestCorsDisabled)) {
   testNormalRequest(
       Http::TestHeaderMapImpl{
           {":method", "OPTIONS"},
@@ -193,7 +195,7 @@ TEST_P(CorsFilterIntegrationTest, TestCorsDisabled) {
       });
 }
 
-TEST_P(CorsFilterIntegrationTest, TestEncodeHeaders) {
+TEST_P(CorsFilterIntegrationTest, DEPRECATED_FEATURE_TEST(TestEncodeHeaders)) {
   testNormalRequest(
       Http::TestHeaderMapImpl{
           {":method", "GET"},
@@ -210,7 +212,7 @@ TEST_P(CorsFilterIntegrationTest, TestEncodeHeaders) {
       });
 }
 
-TEST_P(CorsFilterIntegrationTest, TestEncodeHeadersCredentialsAllowed) {
+TEST_P(CorsFilterIntegrationTest, DEPRECATED_FEATURE_TEST(TestEncodeHeadersCredentialsAllowed)) {
   testNormalRequest(
       Http::TestHeaderMapImpl{
           {":method", "GET"},
@@ -228,7 +230,7 @@ TEST_P(CorsFilterIntegrationTest, TestEncodeHeadersCredentialsAllowed) {
       });
 }
 
-TEST_P(CorsFilterIntegrationTest, TestAllowedOriginRegex) {
+TEST_P(CorsFilterIntegrationTest, DEPRECATED_FEATURE_TEST(TestAllowedOriginRegex)) {
   testNormalRequest(
       Http::TestHeaderMapImpl{
           {":method", "GET"},
@@ -246,7 +248,7 @@ TEST_P(CorsFilterIntegrationTest, TestAllowedOriginRegex) {
       });
 }
 
-TEST_P(CorsFilterIntegrationTest, TestExposeHeaders) {
+TEST_P(CorsFilterIntegrationTest, DEPRECATED_FEATURE_TEST(TestExposeHeaders)) {
   testNormalRequest(
       Http::TestHeaderMapImpl{
           {":method", "GET"},
