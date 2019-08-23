@@ -266,8 +266,8 @@ public:
     // Get a RouteConfigProvider. This one should create an entry in the RouteConfigProviderManager.
     rds_.set_route_config_name("foo_route_config");
     rds_.mutable_config_source()->set_path("foo_path");
-    provider_ = route_config_provider_manager_->createRdsRouteConfigProvider(rds_, factory_context_,
-                                                                             "foo_prefix.");
+    provider_ = route_config_provider_manager_->createRdsRouteConfigProvider(
+        rds_, factory_context_, "foo_prefix.", factory_context_.initManager());
     rds_callbacks_ = factory_context_.cluster_manager_.subscription_factory_.callbacks_;
   }
 
@@ -295,7 +295,7 @@ envoy::api::v2::RouteConfiguration parseRouteConfigurationFromV2Yaml(const std::
 TEST_F(RouteConfigProviderManagerImplTest, ConfigDump) {
   auto message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"]();
   const auto& route_config_dump =
-      MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::RoutesConfigDump&>(
+      TestUtility::downcastAndValidate<const envoy::admin::v2alpha::RoutesConfigDump&>(
           *message_ptr);
 
   // No routes at all, no last_updated timestamp
@@ -325,7 +325,7 @@ virtual_hosts:
           parseRouteConfigurationFromV2Yaml(config_yaml), factory_context_);
   message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"]();
   const auto& route_config_dump2 =
-      MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::RoutesConfigDump&>(
+      TestUtility::downcastAndValidate<const envoy::admin::v2alpha::RoutesConfigDump&>(
           *message_ptr);
   TestUtility::loadFromYaml(R"EOF(
 static_route_configs:
@@ -368,7 +368,7 @@ dynamic_route_configs:
   rds_callbacks_->onConfigUpdate(response1.resources(), response1.version_info());
   message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"]();
   const auto& route_config_dump3 =
-      MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::RoutesConfigDump&>(
+      TestUtility::downcastAndValidate<const envoy::admin::v2alpha::RoutesConfigDump&>(
           *message_ptr);
   TestUtility::loadFromYaml(R"EOF(
 static_route_configs:
@@ -419,7 +419,7 @@ virtual_hosts:
                                                                                      "1");
 
   RouteConfigProviderPtr provider2 = route_config_provider_manager_->createRdsRouteConfigProvider(
-      rds_, factory_context_, "foo_prefix");
+      rds_, factory_context_, "foo_prefix", factory_context_.initManager());
 
   // provider2 should have route config immediately after create
   EXPECT_TRUE(provider2->configInfo().has_value());
@@ -433,7 +433,7 @@ virtual_hosts:
   rds2.set_route_config_name("foo_route_config");
   rds2.mutable_config_source()->set_path("bar_path");
   RouteConfigProviderPtr provider3 = route_config_provider_manager_->createRdsRouteConfigProvider(
-      rds2, factory_context_, "foo_prefix");
+      rds2, factory_context_, "foo_prefix", factory_context_.initManager());
   EXPECT_NE(provider3, provider_);
   factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(route_configs,
                                                                                      "provider3");
@@ -497,7 +497,7 @@ TEST_F(RouteConfigProviderManagerImplTest, onConfigUpdateWrongSize) {
 TEST_F(RouteConfigProviderManagerImplTest, ConfigDumpAfterConfigRejected) {
   auto message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"]();
   const auto& route_config_dump =
-      MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::RoutesConfigDump&>(
+      TestUtility::downcastAndValidate<const envoy::admin::v2alpha::RoutesConfigDump&>(
           *message_ptr);
 
   // No routes at all, no last_updated timestamp
@@ -549,7 +549,7 @@ resources:
 
   message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"]();
   const auto& route_config_dump3 =
-      MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::RoutesConfigDump&>(
+      TestUtility::downcastAndValidate<const envoy::admin::v2alpha::RoutesConfigDump&>(
           *message_ptr);
   TestUtility::loadFromYaml(R"EOF(
 static_route_configs:

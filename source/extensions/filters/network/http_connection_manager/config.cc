@@ -89,10 +89,12 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
             return std::make_shared<Router::RouteConfigProviderManagerImpl>(context.admin());
           });
 
-  std::shared_ptr<Config::ConfigProviderManager> scoped_routes_config_provider_manager =
-      context.singletonManager().getTyped<Config::ConfigProviderManager>(
-          SINGLETON_MANAGER_REGISTERED_NAME(scoped_routes_config_provider_manager), [&context] {
-            return std::make_shared<Router::ScopedRoutesConfigProviderManager>(context.admin());
+  std::shared_ptr<Router::ScopedRoutesConfigProviderManager> scoped_routes_config_provider_manager =
+      context.singletonManager().getTyped<Router::ScopedRoutesConfigProviderManager>(
+          SINGLETON_MANAGER_REGISTERED_NAME(scoped_routes_config_provider_manager),
+          [&context, route_config_provider_manager] {
+            return std::make_shared<Router::ScopedRoutesConfigProviderManager>(
+                context.admin(), *route_config_provider_manager);
           });
 
   std::shared_ptr<HttpConnectionManagerConfig> filter_config(new HttpConnectionManagerConfig(
@@ -100,10 +102,11 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
       *scoped_routes_config_provider_manager));
 
   // This lambda captures the shared_ptrs created above, thus preserving the
-  // reference count. Moreover, keep in mind the capture list determines
-  // destruction order.
-  return [route_config_provider_manager, scoped_routes_config_provider_manager, filter_config,
-          &context, date_provider](Network::FilterManager& filter_manager) -> void {
+  // reference count.
+  // Keep in mind the lambda capture list **doesn't** determine the destruction order, but it's fine
+  // as these captured objects are also global singletons.
+  return [scoped_routes_config_provider_manager, route_config_provider_manager, date_provider,
+          filter_config, &context](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
         *filter_config, context.drainDecision(), context.random(), context.httpContext(),
         context.runtime(), context.localInfo(), context.clusterManager(),
@@ -183,8 +186,6 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     break;
   case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
       kScopedRoutes:
-    ENVOY_LOG(warn, "Scoped routing has been enabled but it is not yet fully implemented! HTTP "
-                    "request routing DOES NOT work (yet) with this configuration.");
     scoped_routes_config_provider_ = Router::ScopedRoutesConfigProviderUtil::create(
         config, context_, stats_prefix_, scoped_routes_config_provider_manager_);
     break;

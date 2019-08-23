@@ -719,7 +719,7 @@ TEST_F(AsyncClientImplTest, StreamTimeout) {
 
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&message_->headers()), true));
   timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(40)));
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(40), _));
   EXPECT_CALL(stream_encoder_.stream_, resetStream(_));
 
   TestHeaderMapImpl expected_timeout{
@@ -754,7 +754,7 @@ TEST_F(AsyncClientImplTest, StreamTimeoutHeadReply) {
   HttpTestUtility::addDefaultHeaders(message->headers(), "HEAD");
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&message->headers()), true));
   timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(40)));
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(40), _));
   EXPECT_CALL(stream_encoder_.stream_, resetStream(_));
 
   TestHeaderMapImpl expected_timeout{
@@ -779,7 +779,7 @@ TEST_F(AsyncClientImplTest, RequestTimeout) {
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&message_->headers()), true));
   expectSuccess(504);
   timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(40)));
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(40), _));
   EXPECT_CALL(stream_encoder_.stream_, resetStream(_));
   client_.send(std::move(message_), callbacks_,
                AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(40)));
@@ -804,7 +804,7 @@ TEST_F(AsyncClientImplTest, DisableTimer) {
 
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&message_->headers()), true));
   timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(200)));
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(200), _));
   EXPECT_CALL(*timer_, disableTimer());
   EXPECT_CALL(stream_encoder_.stream_, resetStream(_));
   AsyncClient::Request* request =
@@ -823,7 +823,7 @@ TEST_F(AsyncClientImplTest, DisableTimerWithStream) {
 
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&message_->headers()), true));
   timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(40)));
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(40), _));
   EXPECT_CALL(*timer_, disableTimer());
   EXPECT_CALL(stream_encoder_.stream_, resetStream(_));
   EXPECT_CALL(stream_callbacks_, onReset());

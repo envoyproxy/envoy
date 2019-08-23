@@ -43,7 +43,7 @@ private:
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::api::v2::Cluster>(resource, validation_visitor_).name();
+    return MessageUtil::anyConvert<envoy::api::v2::Cluster>(resource).name();
   }
 
   CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm,
