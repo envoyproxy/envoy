@@ -349,7 +349,7 @@ key:
   verifyResponse(std::move(response), "404", Http::TestHeaderMapImpl{}, "");
   cleanupUpstreamAndDownstream();
 
-  // RDS updated foo_route4, requests with socpe key "xyz-route" now hit cluster_1.
+  // RDS updated foo_route4, requests with scope key "xyz-route" now hit cluster_1.
   test_server_->waitForCounterGe("http.config_test.rds.foo_route4.update_attempt", 1);
   createRdsStream("foo_route4");
   sendRdsResponse(fmt::format(route_config_tmpl, "foo_route4", "cluster_1"), "3");
