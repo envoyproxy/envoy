@@ -45,7 +45,7 @@ public:
 SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
                      const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
     : transport_socket_options_(transport_socket_options),
-      ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)), state_(SocketState::PreHandshake){
+      ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)), state_(SocketState::PreHandshake) {
   bssl::UniquePtr<SSL> ssl = ctx_->newSsl(transport_socket_options_.get());
   ssl_ = ssl.get();
   info_ = std::make_shared<SslSocketInfo>(std::move(ssl));
