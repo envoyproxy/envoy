@@ -245,7 +245,7 @@ TEST_F(OptionsImplTest, OptionsAreInSyncWithProto) {
   Server::CommandLineOptionsPtr command_line_options = options->toCommandLineOptions();
   // Failure of this condition indicates that the server_info proto is not in sync with the options.
   // If an option is added/removed, please update server_info proto as well to keep it in sync.
-  // Currently the following 7 options are not defined in proto, hence the count differs by 5.
+  // Currently the following 7 options are not defined in proto, hence the count differs by 7.
   // 1. version        - default TCLAP argument.
   // 2. help           - default TCLAP argument.
   // 3. ignore_rest    - default TCLAP argument.
