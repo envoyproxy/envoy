@@ -116,7 +116,7 @@ public:
   std::string serialize(std::vector<Span>&& pending_spans) override;
 
 private:
-  const zipkin::jsonv2::ListOfSpans toListOfSpans(const Span& zipkin_span) const;
+  const std::vector<zipkin::jsonv2::Span> toListOfSpans(const Span& zipkin_span) const;
   const zipkin::jsonv2::Endpoint toProtoEndpoint(const Endpoint& zipkin_endpoint) const;
 
   const bool shared_span_context_;

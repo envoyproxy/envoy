@@ -66,20 +66,22 @@ JsonV2Serializer::JsonV2Serializer(const bool shared_span_context)
     : shared_span_context_{shared_span_context} {}
 
 std::string JsonV2Serializer::serialize(std::vector<Span>&& zipkin_spans) {
-  zipkin::jsonv2::ListOfSpans spans;
+  std::vector<zipkin::jsonv2::Span> spans;
+  spans.reserve(zipkin_spans.size() * 2);
   for (const Span& zipkin_span : zipkin_spans) {
-    spans.MergeFrom(toListOfSpans(zipkin_span));
+    const std::vector<zipkin::jsonv2::Span>& converted = toListOfSpans(zipkin_span);
+    std::copy(converted.begin(), converted.end(), std::back_inserter(spans));
   }
 
   std::string stringified_json_array = "[";
-  const ssize_t spans_size = spans.spans_size();
+  const uint64_t spans_size = spans.size();
   if (spans_size > 0) {
     std::string entry;
-    Protobuf::util::MessageToJsonString(spans.spans()[0], &entry);
+    Protobuf::util::MessageToJsonString(spans.at(0), &entry);
     absl::StrAppend(&stringified_json_array, entry);
-    for (ssize_t i = 1; i < spans_size; i++) {
+    for (uint64_t i = 1; i < spans_size; i++) {
       entry.clear();
-      Protobuf::util::MessageToJsonString(spans.spans()[i], &entry);
+      Protobuf::util::MessageToJsonString(spans.at(i), &entry);
       absl::StrAppend(&stringified_json_array, ",", entry);
     }
   }
@@ -88,8 +90,10 @@ std::string JsonV2Serializer::serialize(std::vector<Span>&& zipkin_spans) {
   return stringified_json_array;
 }
 
-const zipkin::jsonv2::ListOfSpans JsonV2Serializer::toListOfSpans(const Span& zipkin_span) const {
-  zipkin::jsonv2::ListOfSpans spans;
+const std::vector<zipkin::jsonv2::Span>
+JsonV2Serializer::toListOfSpans(const Span& zipkin_span) const {
+  std::vector<zipkin::jsonv2::Span> spans;
+  spans.reserve(zipkin_span.annotations().size());
   for (const auto& annotation : zipkin_span.annotations()) {
     zipkin::jsonv2::Span span;
 
@@ -124,8 +128,7 @@ const zipkin::jsonv2::ListOfSpans JsonV2Serializer::toListOfSpans(const Span& zi
       tags[binary_annotation.key()] = binary_annotation.value();
     }
 
-    auto* mutable_span = spans.add_spans();
-    mutable_span->MergeFrom(span);
+    spans.push_back(span);
   }
   return spans;
 }
