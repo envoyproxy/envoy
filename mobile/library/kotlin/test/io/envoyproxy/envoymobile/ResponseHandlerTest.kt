@@ -11,7 +11,7 @@ class ResponseHandlerTest {
     val responseHandler = ResponseHandler()
     responseHandler.underlyingObserver.onHeaders(headers, false)
 
-    responseHandler.onHeaders { _, statusCode -> assertThat(statusCode).isEqualTo(204) }
+    responseHandler.onHeaders { _, statusCode, _ -> assertThat(statusCode).isEqualTo(204) }
   }
 
   @Test
@@ -20,7 +20,7 @@ class ResponseHandlerTest {
     val responseHandler = ResponseHandler()
     responseHandler.underlyingObserver.onHeaders(headers, false)
 
-    responseHandler.onHeaders { _, statusCode -> assertThat(statusCode).isEqualTo(0) }
+    responseHandler.onHeaders { _, statusCode, _ -> assertThat(statusCode).isEqualTo(0) }
 
   }
 
@@ -30,6 +30,6 @@ class ResponseHandlerTest {
     val responseHandler = ResponseHandler()
     responseHandler.underlyingObserver.onHeaders(headers, false)
 
-    responseHandler.onHeaders { _, statusCode -> assertThat(statusCode).isEqualTo(0) }
+    responseHandler.onHeaders { _, statusCode, _ -> assertThat(statusCode).isEqualTo(0) }
   }
 }
