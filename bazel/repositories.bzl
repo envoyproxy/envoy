@@ -147,6 +147,7 @@ def envoy_dependencies(skip_targets = []):
     _com_google_googletest()
     _com_google_protobuf()
     _io_opencensus_cpp()
+    _grpc_java()
     _com_github_curl()
     _com_github_envoyproxy_sqlparser()
     _com_googlesource_quiche()
@@ -564,6 +565,14 @@ def _io_opencensus_cpp():
     native.bind(
         name = "opencensus_exporter_zipkin",
         actual = "@io_opencensus_cpp//opencensus/exporters/trace/zipkin:zipkin_exporter",
+    )
+
+def _grpc_java():
+    # Used by @io_opencensus_proto.
+    location = REPOSITORY_LOCATIONS["grpc_java"]
+    http_archive(
+        name = "grpc_java",
+        **location
     )
 
 def _com_github_curl():

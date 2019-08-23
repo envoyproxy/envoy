@@ -237,6 +237,11 @@ REPOSITORY_LOCATIONS = dict(
         # 2019-07-31
         urls = ["https://github.com/census-instrumentation/opencensus-cpp/archive/cad0d03ff3474cf14389fc249e16847ab7b6895f.tar.gz"],
     ),
+    grpc_java = dict(
+        sha256 = "9618a6f4ec0f2bdb77d9b6e01865af9796f370e63e1352210798bacfc99ccdac",
+        strip_prefix = "grpc-java-1.23.0",
+        urls = ["https://github.com/grpc/grpc-java/archive/v1.23.0.tar.gz"],
+    ),
     com_github_curl = dict(
         sha256 = "4376ac72b95572fb6c4fbffefb97c7ea0dd083e1974c0e44cd7e49396f454839",
         strip_prefix = "curl-7.65.3",

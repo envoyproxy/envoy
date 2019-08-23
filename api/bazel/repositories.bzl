@@ -26,7 +26,7 @@ def api_dependencies():
         build_file_content = PROMETHEUSMETRICS_BUILD_CONTENT,
     )
     envoy_http_archive(
-        name = "opencensus_proto",
+        name = "io_opencensus_proto",
         locations = REPOSITORY_LOCATIONS,
     )
     envoy_http_archive(

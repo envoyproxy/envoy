@@ -44,7 +44,7 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "client_model-" + PROMETHEUS_GIT_SHA,
         urls = ["https://github.com/prometheus/client_model/archive/" + PROMETHEUS_GIT_SHA + ".tar.gz"],
     ),
-    opencensus_proto = dict(
+    io_opencensus_proto = dict(
         sha256 = OPENCENSUS_PROTO_SHA256,
         strip_prefix = "opencensus-proto-" + OPENCENSUS_PROTO_RELEASE + "/src",
         urls = ["https://github.com/census-instrumentation/opencensus-proto/archive/v" + OPENCENSUS_PROTO_RELEASE + ".tar.gz"],
