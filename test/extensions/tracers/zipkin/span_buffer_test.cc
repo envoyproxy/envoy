@@ -2,7 +2,6 @@
 
 #include "extensions/tracers/zipkin/span_buffer.h"
 
-#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_time.h"
 
 #include "gtest/gtest.h"
@@ -42,7 +41,7 @@ BinaryAnnotation createTag() {
 
 Span createSpan(const std::vector<absl::string_view>& annotation_values, const IpType ip_type) {
   DangerousDeprecatedTestTime test_time;
-  Span span = Span(test_time.timeSystem());
+  Span span(test_time.timeSystem());
   span.setId(1);
   span.setTraceId(1);
   span.setDuration(100);
@@ -57,33 +56,31 @@ Span createSpan(const std::vector<absl::string_view>& annotation_values, const I
 }
 
 void expectSerializedBuffer(SpanBuffer& buffer, const bool delay_allocation,
-                            const std::vector<std::string>& expected) {
+                            const std::vector<std::string>& expected_list) {
   DangerousDeprecatedTestTime test_time;
 
   EXPECT_EQ(0ULL, buffer.pendingSpans());
   EXPECT_EQ("[]", buffer.serialize());
 
   if (delay_allocation) {
-    EXPECT_FALSE(buffer.addSpan(Span(test_time.timeSystem())));
-    buffer.allocateBuffer(2);
+    EXPECT_FALSE(buffer.addSpan(createSpan({"cs", "sr"}, IpType::V4)));
+    buffer.allocateBuffer(expected_list.size() + 1);
   }
 
-  EXPECT_EQ(0ULL, buffer.pendingSpans());
-  EXPECT_EQ("[]", buffer.serialize());
+  // Add span after allocation, but missing required annotations should be false.
+  EXPECT_FALSE(buffer.addSpan(Span(test_time.timeSystem())));
+  EXPECT_FALSE(buffer.addSpan(createSpan({"aa"}, IpType::V4)));
 
-  buffer.addSpan(Span(test_time.timeSystem()));
-  EXPECT_EQ(1ULL, buffer.pendingSpans());
-  EXPECT_EQ(expected.at(0), buffer.serialize());
+  for (uint64_t i = 0; i < expected_list.size(); i++) {
+    buffer.addSpan(createSpan({"cs", "sr"}, IpType::V4));
+    EXPECT_EQ(i + 1, buffer.pendingSpans());
+    EXPECT_EQ(expected_list.at(i), buffer.serialize());
+  }
 
-  buffer.clear();
-  EXPECT_EQ(0ULL, buffer.pendingSpans());
-  EXPECT_EQ("[]", buffer.serialize());
-
-  buffer.addSpan(Span(test_time.timeSystem()));
-  buffer.addSpan(Span(test_time.timeSystem()));
-
-  EXPECT_EQ(2ULL, buffer.pendingSpans());
-  EXPECT_EQ(expected.at(1), buffer.serialize());
+  // Add a valid span. Valid means can be serialized to v2.
+  EXPECT_TRUE(buffer.addSpan(createSpan({"cs"}, IpType::V4)));
+  // While the span is vald, buffer is full.
+  EXPECT_FALSE(buffer.addSpan(createSpan({"cs", "sr"}, IpType::V4)));
 
   buffer.clear();
   EXPECT_EQ(0ULL, buffer.pendingSpans());
@@ -99,62 +96,64 @@ template <typename Type> std::string serializedMessageToJson(const std::string& 
 }
 
 TEST(ZipkinSpanBufferTest, ConstructBuffer) {
+  const std::string expected1 = R"([{"traceId":"0000000000000001",)"
+                                R"("name":"",)"
+                                R"("id":"0000000000000001",)"
+                                R"("duration":100,)"
+                                R"("annotations":[{"timestamp":1566058071601051,)"
+                                R"("value":"cs",)"
+                                R"("endpoint":{"ipv4":"1.2.3.4",)"
+                                R"("port":8080,)"
+                                R"("serviceName":"service1"}},)"
+                                R"({"timestamp":1566058071601051,)"
+                                R"("value":"sr",)"
+                                R"("endpoint":{"ipv4":"1.2.3.4",)"
+                                R"("port":8080,)"
+                                R"("serviceName":"service1"}}],)"
+                                R"("binaryAnnotations":[{"key":"component",)"
+                                R"("value":"proxy"}]}])";
+
+  const std::string expected2 = R"([{"traceId":"0000000000000001",)"
+                                R"("name":"",)"
+                                R"("id":"0000000000000001",)"
+                                R"("duration":100,)"
+                                R"("annotations":[{"timestamp":1566058071601051,)"
+                                R"("value":"cs",)"
+                                R"("endpoint":{"ipv4":"1.2.3.4",)"
+                                R"("port":8080,)"
+                                R"("serviceName":"service1"}},)"
+                                R"({"timestamp":1566058071601051,)"
+                                R"("value":"sr",)"
+                                R"("endpoint":{"ipv4":"1.2.3.4",)"
+                                R"("port":8080,)"
+                                R"("serviceName":"service1"}}],)"
+                                R"("binaryAnnotations":[{"key":"component",)"
+                                R"("value":"proxy"}]},)"
+                                R"({"traceId":"0000000000000001",)"
+                                R"("name":"",)"
+                                R"("id":"0000000000000001",)"
+                                R"("duration":100,)"
+                                R"("annotations":[{"timestamp":1566058071601051,)"
+                                R"("value":"cs",)"
+                                R"("endpoint":{"ipv4":"1.2.3.4",)"
+                                R"("port":8080,)"
+                                R"("serviceName":"service1"}},)"
+                                R"({"timestamp":1566058071601051,)"
+                                R"("value":"sr",)"
+                                R"("endpoint":{"ipv4":"1.2.3.4",)"
+                                R"("port":8080,)"
+                                R"("serviceName":"service1"}}],)"
+                                R"("binaryAnnotations":[{"key":"component",)"
+                                R"("value":"proxy"}]}])";
   const bool shared = true;
   const bool delay_allocation = true;
+
   SpanBuffer buffer1(envoy::config::trace::v2::ZipkinConfig::HTTP_JSON_V1, shared);
-  expectSerializedBuffer(buffer1, delay_allocation,
-                         {"[{"
-                          R"("traceId":"0000000000000000",)"
-                          R"("name":"",)"
-                          R"("id":"0000000000000000",)"
-                          R"("annotations":[],)"
-                          R"("binaryAnnotations":[])"
-                          "}]",
-                          "["
-                          "{"
-                          R"("traceId":"0000000000000000",)"
-                          R"("name":"",)"
-                          R"("id":"0000000000000000",)"
-                          R"("annotations":[],)"
-                          R"("binaryAnnotations":[])"
-                          "},"
-                          "{"
-                          R"("traceId":"0000000000000000",)"
-                          R"("name":"",)"
-                          R"("id":"0000000000000000",)"
-                          R"("annotations":[],)"
-                          R"("binaryAnnotations":[])"
-                          "}"
-                          "]"});
+  expectSerializedBuffer(buffer1, delay_allocation, {expected1, expected2});
 
-  SpanBuffer buffer2(envoy::config::trace::v2::ZipkinConfig::HTTP_JSON_V1, shared, 2);
-  expectSerializedBuffer(buffer2, !delay_allocation,
-                         {"[{"
-                          R"("traceId":"0000000000000000",)"
-                          R"("name":"",)"
-                          R"("id":"0000000000000000",)"
-                          R"("annotations":[],)"
-                          R"("binaryAnnotations":[])"
-                          "}]",
-                          "["
-                          "{"
-                          R"("traceId":"0000000000000000",)"
-                          R"("name":"",)"
-                          R"("id":"0000000000000000",)"
-                          R"("annotations":[],)"
-                          R"("binaryAnnotations":[])"
-                          "},"
-                          "{"
-                          R"("traceId":"0000000000000000",)"
-                          R"("name":"",)"
-                          R"("id":"0000000000000000",)"
-                          R"("annotations":[],)"
-                          R"("binaryAnnotations":[])"
-                          "}"
-                          "]"});
-
-  SpanBuffer buffer3(envoy::config::trace::v2::ZipkinConfig::HTTP_JSON, shared);
-  expectSerializedBuffer(buffer3, delay_allocation, {"[]", "[]"});
+  // Prepare 3 slots, since we will add one more inside the `expectSerializedBuffer` function.
+  SpanBuffer buffer2(envoy::config::trace::v2::ZipkinConfig::HTTP_JSON_V1, shared, 3);
+  expectSerializedBuffer(buffer2, !delay_allocation, {expected1, expected2});
 }
 
 TEST(ZipkinSpanBufferTest, SerializeSpan) {

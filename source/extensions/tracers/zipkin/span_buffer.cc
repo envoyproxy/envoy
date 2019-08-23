@@ -5,6 +5,8 @@
 #include "extensions/tracers/zipkin/util.h"
 #include "extensions/tracers/zipkin/zipkin_core_constants.h"
 
+#include "absl/strings/str_join.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
@@ -24,10 +26,18 @@ SpanBuffer::SpanBuffer(
 
 // TODO(fabolive): Need to avoid the copy to improve performance.
 bool SpanBuffer::addSpan(Span&& span) {
-  if (span_buffer_.size() == span_buffer_.capacity()) {
-    // Buffer full
+  const auto& annotations = span.annotations();
+  if (span_buffer_.size() == span_buffer_.capacity() || annotations.empty() ||
+      annotations.end() ==
+          std::find_if(annotations.begin(), annotations.end(), [](const auto& annotation) {
+            return annotation.value() == ZipkinCoreConstants::get().CLIENT_SEND ||
+                   annotation.value() == ZipkinCoreConstants::get().SERVER_RECV;
+          })) {
+
+    // Buffer full or invalid span.
     return false;
   }
+
   span_buffer_.push_back(std::move(span));
 
   return true;
@@ -49,45 +59,28 @@ SerializerPtr SpanBuffer::makeSerializer(
 }
 
 std::string JsonV1Serializer::serialize(std::vector<Span>&& zipkin_spans) {
-  std::string stringified_json_array = "[";
-
-  if (!zipkin_spans.empty()) {
-    absl::StrAppend(&stringified_json_array, zipkin_spans[0].toJson());
-    for (uint64_t i = 1; i < zipkin_spans.size(); i++) {
-      absl::StrAppend(&stringified_json_array, ",", zipkin_spans[i].toJson());
-    }
-  }
-  absl::StrAppend(&stringified_json_array, "]");
-
-  return stringified_json_array;
+  const std::string serialized_elements =
+      absl::StrJoin(zipkin_spans, ",", [](std::string* element, Span zipkin_span) {
+        absl::StrAppend(element, zipkin_span.toJson());
+      });
+  return absl::StrCat("[", serialized_elements, "]");
 }
 
 JsonV2Serializer::JsonV2Serializer(const bool shared_span_context)
     : shared_span_context_{shared_span_context} {}
 
 std::string JsonV2Serializer::serialize(std::vector<Span>&& zipkin_spans) {
-  std::vector<zipkin::jsonv2::Span> spans;
-  spans.reserve(zipkin_spans.size() * 2);
-  for (const Span& zipkin_span : zipkin_spans) {
-    const std::vector<zipkin::jsonv2::Span>& converted = toListOfSpans(zipkin_span);
-    std::copy(converted.begin(), converted.end(), std::back_inserter(spans));
-  }
-
-  std::string stringified_json_array = "[";
-  const uint64_t spans_size = spans.size();
-  if (spans_size > 0) {
-    std::string entry;
-    Protobuf::util::MessageToJsonString(spans.at(0), &entry);
-    absl::StrAppend(&stringified_json_array, entry);
-    for (uint64_t i = 1; i < spans_size; i++) {
-      entry.clear();
-      Protobuf::util::MessageToJsonString(spans.at(i), &entry);
-      absl::StrAppend(&stringified_json_array, ",", entry);
-    }
-  }
-  absl::StrAppend(&stringified_json_array, "]");
-
-  return stringified_json_array;
+  const std::string serialized_elements =
+      absl::StrJoin(zipkin_spans, ",", [this](std::string* out, const Span& zipkin_span) {
+        absl::StrAppend(out,
+                        absl::StrJoin(toListOfSpans(zipkin_span), ",",
+                                      [](std::string* element, const zipkin::jsonv2::Span& span) {
+                                        std::string entry;
+                                        Protobuf::util::MessageToJsonString(span, &entry);
+                                        absl::StrAppend(element, entry);
+                                      }));
+      });
+  return absl::StrCat("[", serialized_elements, "]");
 }
 
 const std::vector<zipkin::jsonv2::Span>
