@@ -45,14 +45,14 @@ struct NullVm : public WasmVm {
   FOR_ALL_WASM_VM_EXPORTS(_FORWARD_GET_FUNCTION)
 #undef _FORWARD_GET_FUNCTION
 
-  // These are noops for NullVm.
+  // These are not needed for NullVm which invokes the handlers directly.
 #define _REGISTER_CALLBACK(_type)                                                                  \
   void registerCallback(absl::string_view, absl::string_view, _type,                               \
                         typename ConvertFunctionTypeWordToUint32<_type>::type) override{};
   FOR_ALL_WASM_VM_IMPORTS(_REGISTER_CALLBACK)
 #undef _REGISTER_CALLBACK
 
-  // NullVm does not advertize code as emscripten so this will not get called.
+  // NullVm does not advertise code as emscripten so this will not get called.
   std::unique_ptr<Global<double>> makeGlobal(absl::string_view, absl::string_view,
                                              double) override {
     NOT_REACHED_GCOVR_EXCL_LINE;

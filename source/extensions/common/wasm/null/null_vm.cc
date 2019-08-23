@@ -32,7 +32,7 @@ bool NullVm::load(const std::string& name, bool /* allow_precompiled */) {
 void NullVm::link(absl::string_view /* name */, bool /* needs_emscripten */) {}
 
 void NullVm::makeModule(absl::string_view /* name */) {
-  // NullVm does not advertize code as emscripten so this will not get called.
+  // NullVm does not advertise code as emscripten so this will not get called.
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
