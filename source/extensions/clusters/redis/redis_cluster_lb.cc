@@ -75,6 +75,11 @@ void RedisClusterLoadBalancerFactory::onHostHealthUpdate() {
     current_shard_vector = shard_vector_;
   }
 
+  // This can get called by cluster initialization before the Redis Cluster topology is resolved.
+  if (!current_shard_vector) {
+    return;
+  }
+
   auto shard_vector = std::make_shared<std::vector<RedisShardSharedPtr>>();
 
   for (auto const& shard : *current_shard_vector) {
