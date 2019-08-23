@@ -99,7 +99,25 @@ envoy_status_t Dispatcher::sendData(envoy_stream_t, envoy_headers, bool) { retur
 envoy_status_t Dispatcher::sendMetadata(envoy_stream_t, envoy_headers, bool) {
   return ENVOY_FAILURE;
 }
-envoy_status_t Dispatcher::sendTrailers(envoy_stream_t, envoy_headers) { return ENVOY_FAILURE; }
+envoy_status_t Dispatcher::sendTrailers(envoy_stream_t stream, envoy_headers trailers) {
+  event_dispatcher_.post([this, stream, trailers]() -> void {
+    DirectStream* direct_stream = getStream(stream);
+    // If direct_stream is not found, it means the stream has already closed or been reset
+    // and the appropriate callback has been issued to the caller. There's nothing to do here
+    // except silently swallow this.
+    // TODO: handle potential race condition with cancellation or failure get a stream in the
+    // first place. Additionally it is possible to get a nullptr due to bogus envoy_stream_t
+    // from the caller.
+    // https://github.com/lyft/envoy-mobile/issues/301
+    if (direct_stream != nullptr) {
+      direct_stream->trailers_ = Utility::toInternalHeaders(trailers);
+      ENVOY_LOG(debug, "[S{}] request trailers for stream:\n{}", stream, *direct_stream->trailers_);
+      direct_stream->underlying_stream_.sendTrailers(*direct_stream->trailers_);
+    }
+  });
+
+  return ENVOY_SUCCESS;
+}
 
 envoy_status_t Dispatcher::resetStream(envoy_stream_t stream) {
   event_dispatcher_.post([this, stream]() -> void {
