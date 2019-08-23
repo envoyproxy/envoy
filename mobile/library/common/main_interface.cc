@@ -38,7 +38,10 @@ envoy_status_t send_headers(envoy_stream_t stream, envoy_headers headers, bool e
 // TODO: implement.
 envoy_status_t send_data(envoy_stream_t, envoy_data, bool) { return ENVOY_FAILURE; }
 envoy_status_t send_metadata(envoy_stream_t, envoy_headers) { return ENVOY_FAILURE; }
-envoy_status_t send_trailers(envoy_stream_t, envoy_headers) { return ENVOY_FAILURE; }
+
+envoy_status_t send_trailers(envoy_stream_t stream, envoy_headers trailers) {
+  return http_dispatcher_->sendTrailers(stream, trailers);
+}
 
 envoy_status_t reset_stream(envoy_stream_t stream) { return http_dispatcher_->resetStream(stream); }
 
