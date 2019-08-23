@@ -15,8 +15,10 @@ namespace Priority {
 
 class PreviousPrioritiesRetryPriorityFactory : public Upstream::RetryPriorityFactory {
 public:
-  Upstream::RetryPrioritySharedPtr createRetryPriority(const Protobuf::Message& config,
-                                                       uint32_t max_retries) override;
+  Upstream::RetryPrioritySharedPtr
+  createRetryPriority(const Protobuf::Message& config,
+                      ProtobufMessage::ValidationVisitor& validation_visitor,
+                      uint32_t max_retries) override;
 
   std::string name() const override {
     return RetryPriorityValues::get().PreviousPrioritiesRetryPriority;

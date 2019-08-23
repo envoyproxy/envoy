@@ -9,8 +9,8 @@ if [[ "$(uname -m)" == "x86_64" ]]; then
     && chmod +x /usr/local/bin/buildifier
 
   # bazelisk
-  VERSION=0.0.8
-  SHA256=5fced4fec06bf24beb631837fa9497b6698f34041463d9188610dfa7b91f4f8d
+  VERSION=1.0
+  SHA256=820f1432bb729cf1d51697a64ce57c0cff7ea4013acaf871b8c24b6388174d0d
   curl --location --output /usr/local/bin/bazel https://github.com/bazelbuild/bazelisk/releases/download/v${VERSION}/bazelisk-linux-amd64 \
     && echo "$SHA256  /usr/local/bin/bazel" | sha256sum --check \
     && chmod +x /usr/local/bin/bazel

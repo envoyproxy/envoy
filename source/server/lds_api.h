@@ -39,7 +39,7 @@ private:
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::api::v2::Listener>(resource, validation_visitor_).name();
+    return MessageUtil::anyConvert<envoy::api::v2::Listener>(resource).name();
   }
 
   std::unique_ptr<Config::Subscription> subscription_;

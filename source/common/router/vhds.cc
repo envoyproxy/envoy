@@ -28,8 +28,7 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
       stats_({ALL_VHDS_STATS(POOL_COUNTER(*scope_))}),
       init_target_(fmt::format("VhdsConfigSubscription {}", config_update_info_->routeConfigName()),
                    [this]() { subscription_->start({}); }),
-      route_config_providers_(route_config_providers),
-      validation_visitor_(factory_context.messageValidationVisitor()) {
+      route_config_providers_(route_config_providers) {
   const auto& config_source = config_update_info_->routeConfiguration()
                                   .vhds()
                                   .config_source()

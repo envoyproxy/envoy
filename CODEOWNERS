@@ -26,6 +26,8 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/http/header_to_metadata @rgs1 @zuercher
 # alts transport socket extension
 /*/extensions/transport_sockets/alts @htuch @yangminzhu
+# tls transport socket extension
+/*/extensions/transport_sockets/tls @PiotrSikora @lizan
 # sni_cluster extension
 /*/extensions/filters/network/sni_cluster @rshriram @lizan
 # tracers.datadog extension
@@ -51,3 +53,5 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/http/adaptive_concurrency @tonya11en @mattklein123
 # http inspector
 /*/extensions/filters/listener/http_inspector @crazyxy @PiotrSikora @lizan
+# attribute context
+/*/extensions/filters/common/expr @kyessenov @yangminzhu

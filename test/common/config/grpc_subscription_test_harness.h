@@ -147,14 +147,14 @@ public:
 
   void expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds timeout) override {
     init_timeout_timer_ = new Event::MockTimer(&dispatcher_);
-    EXPECT_CALL(*init_timeout_timer_, enableTimer(timeout));
+    EXPECT_CALL(*init_timeout_timer_, enableTimer(timeout, _));
   }
 
   void expectDisableInitFetchTimeoutTimer() override {
     EXPECT_CALL(*init_timeout_timer_, disableTimer());
   }
 
-  void callInitFetchTimeoutCb() override { init_timeout_timer_->callback_(); }
+  void callInitFetchTimeoutCb() override { init_timeout_timer_->invokeCallback(); }
 
   std::string version_;
   const Protobuf::MethodDescriptor* method_descriptor_;

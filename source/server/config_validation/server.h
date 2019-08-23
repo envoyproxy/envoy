@@ -104,16 +104,16 @@ public:
     return config_.statsFlushInterval();
   }
 
-  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
-    return options_.allowUnknownFields() ? ProtobufMessage::getStrictValidationVisitor()
-                                         : ProtobufMessage::getNullValidationVisitor();
+  ProtobufMessage::ValidationContext& messageValidationContext() override {
+    return validation_context_;
   }
 
   // Server::ListenerComponentFactory
   LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config,
                          bool is_delta) override {
-    return std::make_unique<LdsApiImpl>(lds_config, clusterManager(), initManager(), stats(),
-                                        listenerManager(), messageValidationVisitor(), is_delta);
+    return std::make_unique<LdsApiImpl>(
+        lds_config, clusterManager(), initManager(), stats(), listenerManager(),
+        messageValidationContext().dynamicValidationVisitor(), is_delta);
   }
   std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
@@ -174,6 +174,7 @@ private:
   // - There may be active connections referencing it.
   std::unique_ptr<Secret::SecretManager> secret_manager_;
   const Options& options_;
+  ProtobufMessage::ProdValidationContextImpl validation_context_;
   Stats::IsolatedStoreImpl& stats_store_;
   ThreadLocal::InstanceImpl thread_local_;
   Api::ApiPtr api_;

@@ -42,9 +42,9 @@ AccessLogFileImpl::AccessLogFileImpl(Filesystem::FilePtr&& file, Event::Dispatch
 }
 
 Filesystem::FlagSet AccessLogFileImpl::defaultFlags() {
-  static constexpr Filesystem::FlagSet default_flags{
-      1 << Filesystem::File::Operation::Read | 1 << Filesystem::File::Operation::Write |
-      1 << Filesystem::File::Operation::Create | 1 << Filesystem::File::Operation::Append};
+  static constexpr Filesystem::FlagSet default_flags{1 << Filesystem::File::Operation::Write |
+                                                     1 << Filesystem::File::Operation::Create |
+                                                     1 << Filesystem::File::Operation::Append};
 
   return default_flags;
 }
