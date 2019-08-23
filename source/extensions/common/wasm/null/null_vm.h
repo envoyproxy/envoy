@@ -20,7 +20,6 @@ namespace Null {
 struct NullVm : public WasmVm {
   NullVm() = default;
   NullVm(const NullVm& other) { load(other.plugin_name_, false /* unused */); }
-  ~NullVm() override{};
 
   // WasmVm
   absl::string_view vm() override { return WasmVmNames::get().Null; }
