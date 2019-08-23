@@ -6,7 +6,7 @@ api_proto_package(
     has_services = True,
     deps = [
         "//envoy/api/v2/core",
-        "//envoy/data/accesslog/v2:accesslog_data",
+        "//envoy/data/accesslog/v2:pkg",
     ],
 )
 

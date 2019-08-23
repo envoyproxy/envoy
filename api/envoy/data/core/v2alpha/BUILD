@@ -3,7 +3,6 @@ load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library", "api_proto_p
 licenses(["notice"])  # Apache 2
 
 api_proto_package(
-    name = "network_health_check_event",
     deps = [
         "//envoy/api/v2/core",
     ],

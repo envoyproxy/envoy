@@ -8,7 +8,7 @@ api_proto_package(
         "//envoy/api/v2",
         "//envoy/api/v2/core",
         "//envoy/api/v2/route:pkg",
-        "//envoy/data/tap/v2alpha:tap_data",
+        "//envoy/data/tap/v2alpha:pkg",
     ],
 )
 
