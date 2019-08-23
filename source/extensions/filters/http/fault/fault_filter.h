@@ -144,12 +144,13 @@ public:
    *                    trailers that have been paused during body flush.
    * @param time_source the time source to run the token bucket with.
    * @param dispatcher the stream's dispatcher to use for creating timers.
+   * @param scope the stream's scope
    */
   StreamRateLimiter(uint64_t max_kbps, uint64_t max_buffered_data,
                     std::function<void()> pause_data_cb, std::function<void()> resume_data_cb,
                     std::function<void(Buffer::Instance&, bool)> write_data_cb,
                     std::function<void()> continue_cb, TimeSource& time_source,
-                    Event::Dispatcher& dispatcher);
+                    Event::Dispatcher& dispatcher, const ScopeTrackedObject& scope);
 
   /**
    * Called by the stream to write data. All data writes happen asynchronously, the stream should
@@ -180,6 +181,7 @@ private:
   const uint64_t bytes_per_time_slice_;
   const std::function<void(Buffer::Instance&, bool)> write_data_cb_;
   const std::function<void()> continue_cb_;
+  const ScopeTrackedObject& scope_;
   TokenBucketImpl token_bucket_;
   Event::TimerPtr token_timer_;
   bool saw_data_{};

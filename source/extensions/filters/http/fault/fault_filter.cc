@@ -148,7 +148,7 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::HeaderMap& headers, b
     delay_timer_ =
         decoder_callbacks_->dispatcher().createTimer([this]() -> void { postDelayInjection(); });
     ENVOY_LOG(debug, "fault: delaying request {}ms", duration.value().count());
-    delay_timer_->enableTimer(duration.value());
+    delay_timer_->enableTimer(duration.value(), &decoder_callbacks_->scope());
     recordDelaysInjectedStats();
     decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::DelayInjected);
     return Http::FilterHeadersStatus::StopIteration;
@@ -192,7 +192,7 @@ void FaultFilter::maybeSetupResponseRateLimit(const Http::HeaderMap& request_hea
         encoder_callbacks_->injectEncodedDataToFilterChain(data, end_stream);
       },
       [this] { encoder_callbacks_->continueEncoding(); }, config_->timeSource(),
-      decoder_callbacks_->dispatcher());
+      decoder_callbacks_->dispatcher(), decoder_callbacks_->scope());
 }
 
 bool FaultFilter::faultOverflow() {
@@ -423,10 +423,10 @@ StreamRateLimiter::StreamRateLimiter(uint64_t max_kbps, uint64_t max_buffered_da
                                      std::function<void()> resume_data_cb,
                                      std::function<void(Buffer::Instance&, bool)> write_data_cb,
                                      std::function<void()> continue_cb, TimeSource& time_source,
-                                     Event::Dispatcher& dispatcher)
+                                     Event::Dispatcher& dispatcher, const ScopeTrackedObject& scope)
     : // bytes_per_time_slice is KiB converted to bytes divided by the number of ticks per second.
       bytes_per_time_slice_((max_kbps * 1024) / SecondDivisor), write_data_cb_(write_data_cb),
-      continue_cb_(continue_cb),
+      continue_cb_(continue_cb), scope_(scope),
       // The token bucket is configured with a max token count of the number of ticks per second,
       // and refills at the same rate, so that we have a per second limit which refills gradually in
       // ~63ms intervals.
@@ -472,7 +472,7 @@ void StreamRateLimiter::onTokenTimer() {
     const std::chrono::milliseconds ms = token_bucket_.nextTokenAvailable();
     if (ms.count() > 0) {
       ENVOY_LOG(trace, "limiter: scheduling wakeup for {}ms", ms.count());
-      token_timer_->enableTimer(ms);
+      token_timer_->enableTimer(ms, &scope_);
     }
   }
 
@@ -498,7 +498,7 @@ void StreamRateLimiter::writeData(Buffer::Instance& incoming_buffer, bool end_st
     // The filter API does not currently support that and it will not be a trivial change to add.
     // Instead we cheat here by scheduling the token timer to run immediately after the stack is
     // unwound, at which point we can directly called encode/decodeData.
-    token_timer_->enableTimer(std::chrono::milliseconds(0));
+    token_timer_->enableTimer(std::chrono::milliseconds(0), &scope_);
   }
 }
 
