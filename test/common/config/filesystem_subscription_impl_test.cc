@@ -20,7 +20,7 @@ TEST_F(FilesystemSubscriptionImplTest, BadJsonRecovery) {
   startSubscription({"cluster0", "cluster1"});
   EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0));
   EXPECT_CALL(callbacks_,
-              onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, _));
+              onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, _));
   updateFile(";!@#badjso n");
   EXPECT_TRUE(statsAre(2, 0, 0, 1, 0, 0));
   deliverConfigUpdate({"cluster0", "cluster1"}, "0", true);

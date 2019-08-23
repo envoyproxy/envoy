@@ -604,21 +604,18 @@ TEST_F(ConnectionHandlerTest, ListenerFilterTimeout) {
       .WillOnce(Invoke([&](Network::ListenerFilterCallbacks&) -> Network::FilterStatus {
         return Network::FilterStatus::StopIteration;
       }));
-
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
   Network::IoSocketHandleImpl io_handle{42};
   EXPECT_CALL(*accepted_socket, ioHandle()).WillRepeatedly(ReturnRef(io_handle));
-
   Event::MockTimer* timeout = new Event::MockTimer(&dispatcher_);
-  EXPECT_CALL(*timeout, enableTimer(std::chrono::milliseconds(15000)));
-
+  EXPECT_CALL(*timeout, enableTimer(std::chrono::milliseconds(15000), _));
   listener_callbacks->onAccept(Network::ConnectionSocketPtr{accepted_socket}, true);
   Stats::Gauge& downstream_pre_cx_active =
       stats_store_.gauge("downstream_pre_cx_active", Stats::Gauge::ImportMode::Accumulate);
   EXPECT_EQ(1UL, downstream_pre_cx_active.value());
 
   EXPECT_CALL(*timeout, disableTimer());
-  timeout->callback_();
+  timeout->invokeCallback();
   dispatcher_.clearDeferredDeleteList();
   EXPECT_EQ(0UL, downstream_pre_cx_active.value());
   EXPECT_EQ(1UL, stats_store_.counter("downstream_pre_cx_timeout").value());
@@ -657,14 +654,11 @@ TEST_F(ConnectionHandlerTest, ContinueOnListenerFilterTimeout) {
       .WillOnce(Invoke([&](Network::ListenerFilterCallbacks&) -> Network::FilterStatus {
         return Network::FilterStatus::StopIteration;
       }));
-
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
   Network::IoSocketHandleImpl io_handle{42};
   EXPECT_CALL(*accepted_socket, ioHandle()).WillRepeatedly(ReturnRef(io_handle));
-
   Event::MockTimer* timeout = new Event::MockTimer(&dispatcher_);
-  EXPECT_CALL(*timeout, enableTimer(std::chrono::milliseconds(15000)));
-
+  EXPECT_CALL(*timeout, enableTimer(std::chrono::milliseconds(15000), _));
   listener_callbacks->onAccept(Network::ConnectionSocketPtr{accepted_socket}, true);
   Stats::Gauge& downstream_pre_cx_active =
       stats_store_.gauge("downstream_pre_cx_active", Stats::Gauge::ImportMode::Accumulate);
@@ -672,7 +666,7 @@ TEST_F(ConnectionHandlerTest, ContinueOnListenerFilterTimeout) {
 
   EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(nullptr));
   EXPECT_CALL(*timeout, disableTimer());
-  timeout->callback_();
+  timeout->invokeCallback();
   dispatcher_.clearDeferredDeleteList();
   EXPECT_EQ(0UL, downstream_pre_cx_active.value());
   EXPECT_EQ(1UL, stats_store_.counter("downstream_pre_cx_timeout").value());
@@ -714,9 +708,9 @@ TEST_F(ConnectionHandlerTest, ListenerFilterTimeoutResetOnSuccess) {
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
   Network::IoSocketHandleImpl io_handle{42};
   EXPECT_CALL(*accepted_socket, ioHandle()).WillRepeatedly(ReturnRef(io_handle));
-  Event::MockTimer* timeout = new Event::MockTimer(&dispatcher_);
-  EXPECT_CALL(*timeout, enableTimer(std::chrono::milliseconds(15000)));
 
+  Event::MockTimer* timeout = new Event::MockTimer(&dispatcher_);
+  EXPECT_CALL(*timeout, enableTimer(std::chrono::milliseconds(15000), _));
   listener_callbacks->onAccept(Network::ConnectionSocketPtr{accepted_socket}, true);
 
   EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(nullptr));

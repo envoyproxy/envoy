@@ -407,6 +407,8 @@ The following optional features can be disabled on the Bazel build command-line:
 * Backtracing on signals with `--define signal_trace=disabled`
 * Active stream state dump on signals with `--define signal_trace=disabled` or `--define disable_object_dump_on_signal_trace=disabled`
 * tcmalloc with `--define tcmalloc=disabled`
+* deprecated features with `--define deprecated_features=disabled`
+
 
 ## Enabling optional features
 
@@ -506,7 +508,7 @@ have seen some issues with seeing the artifacts tab. If you can't see it, log ou
 then log back in and it should start working.
 
 The latest coverage report for master is available
-[here](https://s3.amazonaws.com/lyft-envoy/coverage/report-master/index.html).
+[here](https://storage.googleapis.com/envoy-coverage/report-master/index.html).
 
 It's also possible to specialize the coverage build to a specified test or test dir. This is useful
 when doing things like exploring the coverage of a fuzzer over its corpus. This can be done by

@@ -1,0 +1,5 @@
+static_resources:
+  clusters:
+    name: foo
+    connect_timeout: { seconds: 5 }
+    foo: bar

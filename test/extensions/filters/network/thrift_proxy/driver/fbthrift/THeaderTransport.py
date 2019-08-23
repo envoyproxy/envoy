@@ -521,8 +521,9 @@ class THeaderTransport(TTransportBase, CReadableTransport):
 
     # We don't include the framing bytes as part of the frame size check
     frame_size = buf.tell() - (4 if wsz < MAX_FRAME_SIZE else 12)
-    _frame_size_check(
-        frame_size, self.__max_frame_size, header=self.__client_type == CLIENT_TYPE.HEADER)
+    _frame_size_check(frame_size,
+                      self.__max_frame_size,
+                      header=self.__client_type == CLIENT_TYPE.HEADER)
     self.getTransport().write(buf.getvalue())
     if oneway:
       self.getTransport().onewayFlush()

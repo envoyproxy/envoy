@@ -67,10 +67,10 @@ public:
 protected:
   ProcessWide process_wide_; // Process-wide state setup/teardown.
   const Envoy::OptionsImpl& options_;
-  Stats::FakeSymbolTableImpl symbol_table_;
   Server::ComponentFactory& component_factory_;
   Thread::ThreadFactory& thread_factory_;
   Filesystem::Instance& file_system_;
+  Stats::SymbolTablePtr symbol_table_;
   Stats::AllocatorImpl stats_allocator_;
 
   std::unique_ptr<ThreadLocal::InstanceImpl> tls_;

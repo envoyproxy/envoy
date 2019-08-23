@@ -5,6 +5,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_test")
 
 _PY_SUFFIX = "_py"
 _CC_SUFFIX = "_cc"
+_CC_EXPORT_SUFFIX = "_export_cc"
 _GO_PROTO_SUFFIX = "_go_proto"
 _GO_GRPC_SUFFIX = "_go_grpc"
 _GO_IMPORTPATH_PREFIX = "github.com/envoyproxy/data-plane-api/api/"
@@ -23,13 +24,13 @@ def _LibrarySuffix(library_name, suffix):
 # TODO(htuch): Convert this to native py_proto_library once
 # https://github.com/bazelbuild/bazel/issues/3935 and/or
 # https://github.com/bazelbuild/bazel/issues/2626 are resolved.
-def api_py_proto_library(name, srcs = [], deps = [], has_services = 0):
+def api_py_proto_library(name, srcs = [], deps = [], external_py_proto_deps = [], has_services = 0):
     _py_proto_library(
         name = _Suffix(name, _PY_SUFFIX),
         srcs = srcs,
         default_runtime = "@com_google_protobuf//:protobuf_python",
         protoc = "@com_google_protobuf//:protoc",
-        deps = [_LibrarySuffix(d, _PY_SUFFIX) for d in deps] + [
+        deps = [_LibrarySuffix(d, _PY_SUFFIX) for d in deps] + external_py_proto_deps + [
             "@com_envoyproxy_protoc_gen_validate//validate:validate_py",
             "@com_google_googleapis//google/rpc:status_py_proto",
             "@com_google_googleapis//google/api:annotations_py_proto",
@@ -116,6 +117,7 @@ def api_proto_library(
         deps = [],
         external_proto_deps = [],
         external_cc_proto_deps = [],
+        external_py_proto_deps = [],
         has_services = 0,
         linkstatic = None,
         require_py = 1):
@@ -152,7 +154,7 @@ def api_proto_library(
     )
     py_export_suffixes = []
     if (require_py == 1):
-        api_py_proto_library(name, srcs, deps, has_services)
+        api_py_proto_library(name, srcs, deps, external_py_proto_deps, has_services)
         py_export_suffixes = ["_py", "_py_genproto"]
 
     # Allow unlimited visibility for consumers
@@ -168,7 +170,7 @@ def api_cc_test(name, srcs, proto_deps):
     native.cc_test(
         name = name,
         srcs = srcs,
-        deps = [_LibrarySuffix(d, _CC_SUFFIX) for d in proto_deps],
+        deps = [_LibrarySuffix(d, _CC_EXPORT_SUFFIX) for d in proto_deps],
     )
 
 def api_go_test(name, size, importpath, srcs = [], deps = []):

@@ -28,7 +28,8 @@ TEST(InjectedResourceMonitorFactoryTest, CreateMonitor) {
   config.set_filename(TestEnvironment::temporaryPath("injected_resource"));
   Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherPtr dispatcher(api->allocateDispatcher());
-  Server::Configuration::ResourceMonitorFactoryContextImpl context(*dispatcher, *api);
+  Server::Configuration::ResourceMonitorFactoryContextImpl context(
+      *dispatcher, *api, ProtobufMessage::getStrictValidationVisitor());
   Server::ResourceMonitorPtr monitor = factory->createResourceMonitor(config, context);
   EXPECT_NE(monitor, nullptr);
 }

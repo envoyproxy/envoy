@@ -183,7 +183,7 @@ ClusterManagerImpl::ClusterManagerImpl(
     Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
     Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
     AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
-    Server::Admin& admin, ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
+    Server::Admin& admin, ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
     Http::Context& http_context)
     : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls.allocateSlot()),
       random_(random), bind_config_(bootstrap.cluster_manager().upstream_bind_config()),
@@ -192,8 +192,9 @@ ClusterManagerImpl::ClusterManagerImpl(
       config_tracker_entry_(
           admin.getConfigTracker().add("clusters", [this] { return dumpClusterConfigs(); })),
       time_source_(main_thread_dispatcher.timeSource()), dispatcher_(main_thread_dispatcher),
-      http_context_(http_context), subscription_factory_(local_info, main_thread_dispatcher, *this,
-                                                         random, validation_visitor, api) {
+      http_context_(http_context),
+      subscription_factory_(local_info, main_thread_dispatcher, *this, random,
+                            validation_context.dynamicValidationVisitor(), api) {
   async_client_manager_ =
       std::make_unique<Grpc::AsyncClientManagerImpl>(*this, tls, time_source_, api);
   const auto& cm_config = bootstrap.cluster_manager();
@@ -313,12 +314,21 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
   // Now setup for cross-thread updates.
   cluster.prioritySet().addMemberUpdateCb(
       [&cluster, this](const HostVector&, const HostVector& hosts_removed) -> void {
-        // TODO(snowp): Should this be subject to merge windows?
+        if (cluster.info()->lbConfig().close_connections_on_host_set_change()) {
+          for (const auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
+            // This will drain all tcp and http connection pools.
+            postThreadLocalDrainConnections(cluster, host_set->hosts());
+          }
+        } else {
+          // TODO(snowp): Should this be subject to merge windows?
 
-        // Whenever hosts are removed from the cluster, we make each TLS cluster drain it's
-        // connection pools for the removed hosts.
-        if (!hosts_removed.empty()) {
-          postThreadLocalHostRemoval(cluster, hosts_removed);
+          // Whenever hosts are removed from the cluster, we make each TLS cluster drain it's
+          // connection pools for the removed hosts. If `close_connections_on_host_set_change` is
+          // enabled, this case will be covered by first `if` statement, where all
+          // connection pools are drained.
+          if (!hosts_removed.empty()) {
+            postThreadLocalDrainConnections(cluster, hosts_removed);
+          }
         }
       });
 
@@ -552,10 +562,10 @@ bool ClusterManagerImpl::removeCluster(const std::string& cluster_name) {
 
       ASSERT(cluster_manager.thread_local_clusters_.count(cluster_name) == 1);
       ENVOY_LOG(debug, "removing TLS cluster {}", cluster_name);
-      cluster_manager.thread_local_clusters_.erase(cluster_name);
       for (auto& cb : cluster_manager.update_callbacks_) {
         cb->onClusterRemoval(cluster_name);
       }
+      cluster_manager.thread_local_clusters_.erase(cluster_name);
     });
   }
 
@@ -711,8 +721,8 @@ Tcp::ConnectionPool::Instance* ClusterManagerImpl::tcpConnPoolForCluster(
   return entry->second->tcpConnPool(priority, context, transport_socket_options);
 }
 
-void ClusterManagerImpl::postThreadLocalHostRemoval(const Cluster& cluster,
-                                                    const HostVector& hosts_removed) {
+void ClusterManagerImpl::postThreadLocalDrainConnections(const Cluster& cluster,
+                                                         const HostVector& hosts_removed) {
   tls_->runOnAllThreads([this, name = cluster.info()->name(), hosts_removed]() {
     ThreadLocalClusterManagerImpl::removeHosts(name, hosts_removed, *tls_);
   });
@@ -1231,7 +1241,7 @@ ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
     const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
   return ClusterManagerPtr{new ClusterManagerImpl(
       bootstrap, *this, stats_, tls_, runtime_, random_, local_info_, log_manager_,
-      main_thread_dispatcher_, admin_, validation_visitor_, api_, http_context_)};
+      main_thread_dispatcher_, admin_, validation_context_, api_, http_context_)};
 }
 
 Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
@@ -1261,13 +1271,16 @@ std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ProdClusterManagerFactor
   return ClusterFactoryImplBase::create(
       cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_, random_,
       main_thread_dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
-      outlier_event_logger, added_via_api, validation_visitor_, api_);
+      outlier_event_logger, added_via_api,
+      added_via_api ? validation_context_.dynamicValidationVisitor()
+                    : validation_context_.staticValidationVisitor(),
+      api_);
 }
 
 CdsApiPtr ProdClusterManagerFactory::createCds(const envoy::api::v2::core::ConfigSource& cds_config,
                                                ClusterManager& cm) {
   // TODO(htuch): Differentiate static vs. dynamic validation visitors.
-  return CdsApiImpl::create(cds_config, cm, stats_, validation_visitor_);
+  return CdsApiImpl::create(cds_config, cm, stats_, validation_context_.dynamicValidationVisitor());
 }
 
 } // namespace Upstream

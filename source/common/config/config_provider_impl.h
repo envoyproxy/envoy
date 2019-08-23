@@ -1,7 +1,5 @@
 #pragma once
 
-#include <memory>
-
 #include "envoy/config/config_provider.h"
 #include "envoy/config/config_provider_manager.h"
 #include "envoy/init/manager.h"
@@ -146,9 +144,7 @@ class MutableConfigProviderCommonBase;
  * shared ownership of the underlying subscription.
  *
  */
-class ConfigSubscriptionCommonBase
-    : protected Logger::Loggable<Logger::Id::config>,
-      public std::enable_shared_from_this<ConfigSubscriptionCommonBase> {
+class ConfigSubscriptionCommonBase : protected Logger::Loggable<Logger::Id::config> {
 public:
   // Callback for updating a Config implementation held in each worker thread, the callback is
   // called in applyConfigUpdate() with the current version Config, and is expected to return the
@@ -224,21 +220,14 @@ protected:
    */
   void applyConfigUpdate(
       const ConfigUpdateCb& update_fn, const Event::PostCb& complete_cb = []() {}) {
-    // It is safe to call shared_from_this here as this is in main thread, and destruction of a
-    // ConfigSubscriptionCommonBase owner (i.e., a provider) happens in main thread as well.
-    auto shared_this = shared_from_this();
     tls_->runOnAllThreads(
         [this, update_fn]() {
-          tls_->getTyped<ThreadLocalConfig>().config_ = update_fn(this->getConfig());
+          // NOTE: there is a known race condition between *this* subscription being teared down in
+          // main thread and the posted callback being executed before the destruction. See more
+          // details in https://github.com/envoyproxy/envoy/issues/7902
+          tls_->getTyped<ThreadLocalConfig>().config_ = update_fn(getConfig());
         },
-        // During the update propagation, a subscription may get teared down in main thread due to
-        // all owners/providers destructed in a xDS update (e.g. LDS demolishes a
-        // RouteConfigProvider and its subscription).
-        // If such a race condition happens, holding a reference to the "*this" subscription
-        // instance in this cb will ensure the shared "*this" gets posted back to main thread, after
-        // all the workers finish calling the update_fn, at which point it's safe to destruct
-        // "*this" instance.
-        [shared_this, complete_cb]() { complete_cb(); });
+        complete_cb);
   }
 
   void setLastUpdated() { last_updated_ = time_source_.systemTime(); }
@@ -287,8 +276,8 @@ public:
 
   /**
    * Must be called by the derived class' constructor.
-   * @param initial_config supplies an initial Envoy::Config::ConfigProvider::Config associated with
-   *                       the underlying subscription, shared across all providers and workers.
+   * @param initial_config supplies an initial Envoy::Config::ConfigProvider::Config associated
+   * with the underlying subscription, shared across all providers and workers.
    */
   void initialize(const ConfigProvider::ConfigConstSharedPtr& initial_config) {
     tls_->set([initial_config](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
@@ -302,7 +291,8 @@ public:
    * @param config_proto supplies the newly received config proto.
    * @param config_name supplies the name associated with the config.
    * @param version_info supplies the version associated with the config.
-   * @return bool false when the config proto has no delta from the previous config, true otherwise.
+   * @return bool false when the config proto has no delta from the previous config, true
+   * otherwise.
    */
   bool checkAndApplyConfigUpdate(const Protobuf::Message& config_proto,
                                  const std::string& config_name, const std::string& version_info);
@@ -369,8 +359,8 @@ private:
 };
 
 /**
- * Provides generic functionality required by all config provider managers, such as managing shared
- * lifetime of subscriptions and dynamic config providers, along with determining which
+ * Provides generic functionality required by all config provider managers, such as managing
+ * shared lifetime of subscriptions and dynamic config providers, along with determining which
  * subscriptions should be associated with newly instantiated providers.
  *
  * The implementation of this class is not thread safe. Note that ImmutableConfigProviderBase
@@ -379,9 +369,9 @@ private:
  *
  * All config processing is done on the main thread, so instantiation of *ConfigProvider* objects
  * via createStaticConfigProvider() and createXdsConfigProvider() is naturally thread safe. Care
- * must be taken with regards to destruction of these objects, since it must also happen on the main
- * thread _prior_ to destruction of the ConfigProviderManagerImplBase object from which they were
- * created.
+ * must be taken with regards to destruction of these objects, since it must also happen on the
+ * main thread _prior_ to destruction of the ConfigProviderManagerImplBase object from which they
+ * were created.
  *
  * This class can not be instantiated directly; instead, it provides the foundation for
  * dynamic config provider implementations which derive from it.
@@ -415,8 +405,8 @@ protected:
   const ConfigProviderSet& immutableConfigProviders(ConfigProviderInstanceType type) const;
 
   /**
-   * Returns the subscription associated with the config_source_proto; if none exists, a new one is
-   * allocated according to the subscription_factory_fn.
+   * Returns the subscription associated with the config_source_proto; if none exists, a new one
+   * is allocated according to the subscription_factory_fn.
    * @param config_source_proto supplies the proto specifying the config subscription parameters.
    * @param init_manager supplies the init manager.
    * @param subscription_factory_fn supplies a function to be called when a new subscription needs
