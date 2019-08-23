@@ -10,6 +10,21 @@ _CC_EXPORT_SUFFIX = "_export_cc"
 _GO_PROTO_SUFFIX = "_go_proto"
 _GO_IMPORTPATH_PREFIX = "github.com/envoyproxy/data-plane-api/api/"
 
+_COMMON_PROTO_DEPS = [
+    "@com_google_protobuf//:any_proto",
+    "@com_google_protobuf//:descriptor_proto",
+    "@com_google_protobuf//:duration_proto",
+    "@com_google_protobuf//:empty_proto",
+    "@com_google_protobuf//:struct_proto",
+    "@com_google_protobuf//:timestamp_proto",
+    "@com_google_protobuf//:wrappers_proto",
+    "@com_google_googleapis//google/api:http_proto",
+    "@com_google_googleapis//google/api:annotations_proto",
+    "@com_google_googleapis//google/rpc:status_proto",
+    "@com_github_gogo_protobuf//:gogo_proto",
+    "@com_envoyproxy_protoc_gen_validate//validate:validate_proto",
+]
+
 def _Suffix(d, suffix):
     return d + suffix
 
@@ -87,20 +102,7 @@ def api_proto_library(
     native.proto_library(
         name = name,
         srcs = srcs,
-        deps = deps + external_proto_deps + [
-            "@com_google_protobuf//:any_proto",
-            "@com_google_protobuf//:descriptor_proto",
-            "@com_google_protobuf//:duration_proto",
-            "@com_google_protobuf//:empty_proto",
-            "@com_google_protobuf//:struct_proto",
-            "@com_google_protobuf//:timestamp_proto",
-            "@com_google_protobuf//:wrappers_proto",
-            "@com_google_googleapis//google/api:http_proto",
-            "@com_google_googleapis//google/api:annotations_proto",
-            "@com_google_googleapis//google/rpc:status_proto",
-            "@com_github_gogo_protobuf//:gogo_proto",
-            "@com_envoyproxy_protoc_gen_validate//validate:validate_proto",
-        ],
+        deps = deps + external_proto_deps + COMMON_PROTO_DEPS,
         visibility = visibility,
     )
     pgv_cc_proto_library(
@@ -164,20 +166,7 @@ def api_proto_package(name = "pkg", srcs = [], deps = [], has_services = False, 
     native.proto_library(
         name = name,
         srcs = srcs,
-        deps = deps + [
-            "@com_google_protobuf//:any_proto",
-            "@com_google_protobuf//:descriptor_proto",
-            "@com_google_protobuf//:duration_proto",
-            "@com_google_protobuf//:empty_proto",
-            "@com_google_protobuf//:struct_proto",
-            "@com_google_protobuf//:timestamp_proto",
-            "@com_google_protobuf//:wrappers_proto",
-            "@com_google_googleapis//google/api:http_proto",
-            "@com_google_googleapis//google/api:annotations_proto",
-            "@com_google_googleapis//google/rpc:status_proto",
-            "@com_github_gogo_protobuf//:gogo_proto",
-            "@com_envoyproxy_protoc_gen_validate//validate:validate_proto",
-        ],
+        deps = deps + COMMON_PROTO_DEPS,
         visibility = visibility,
     )
 
