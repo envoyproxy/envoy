@@ -54,7 +54,7 @@ struct ToolConfig {
 
 private:
   ToolConfig(std::unique_ptr<Http::TestHeaderMapImpl> headers, int random_value);
-  Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
+  Stats::TestSymbolTable symbol_table_;
 };
 
 /**

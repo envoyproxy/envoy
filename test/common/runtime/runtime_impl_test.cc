@@ -179,6 +179,15 @@ TEST_F(DiskLoaderImplTest, All) {
   // test_feature_false is not in runtime_features.cc and so is false by default.
   EXPECT_EQ(false, snapshot->runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
 
+  // Deprecation
+#ifdef ENVOY_DISABLE_DEPRECATED_FEATURES
+  EXPECT_EQ(false, snapshot->deprecatedFeatureEnabled("random_string_should_be_enabled"));
+#else
+  EXPECT_EQ(true, snapshot->deprecatedFeatureEnabled("random_string_should_be_enabled"));
+#endif
+  EXPECT_EQ(false, snapshot->deprecatedFeatureEnabled(
+                       "envoy.deprecated_features.deprecated.proto:is_deprecated_fatal"));
+
   // Feature defaults via helper function.
   EXPECT_EQ(false, runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
   EXPECT_EQ(true, runtimeFeatureEnabled("envoy.reloadable_features.test_feature_true"));

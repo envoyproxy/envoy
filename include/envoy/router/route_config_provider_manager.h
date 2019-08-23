@@ -33,10 +33,13 @@ public:
    * @param rds supplies the proto configuration of an RDS-configured RouteConfigProvider.
    * @param factory_context is the context to use for the route config provider.
    * @param stat_prefix supplies the stat_prefix to use for the provider stats.
+   * @param init_manager the Init::Manager used to coordinate initialization of a the underlying RDS
+   * subscription.
    */
   virtual RouteConfigProviderPtr createRdsRouteConfigProvider(
       const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
-      Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix) PURE;
+      Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
+      Init::Manager& init_manager) PURE;
 
   /**
    * Get a RouteConfigSharedPtr for a statically defined route. Ownership is as described for

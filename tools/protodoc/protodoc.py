@@ -552,8 +552,8 @@ def FormatFieldAsDefinitionListItem(outer_type_context, type_context, field):
 
   comment = '(%s) ' % ', '.join([FormatFieldType(type_context, field)] +
                                 annotations) + leading_comment
-  return anchor + field.name + '\n' + MapLines(
-      functools.partial(Indent, 2), comment + oneof_comment)
+  return anchor + field.name + '\n' + MapLines(functools.partial(Indent, 2),
+                                               comment + oneof_comment)
 
 
 def FormatMessageAsDefinitionList(type_context, msg):
@@ -599,8 +599,8 @@ def FormatMessage(type_context, msg):
   # We need to do some extra work to recover the map type annotation from the
   # synthesized messages.
   type_context.map_typenames = {
-      '%s.%s' % (type_context.name, nested_msg.name): 'map<%s, %s>' % tuple(
-          map(functools.partial(FormatFieldType, type_context), nested_msg.field))
+      '%s.%s' % (type_context.name, nested_msg.name):
+      'map<%s, %s>' % tuple(map(functools.partial(FormatFieldType, type_context), nested_msg.field))
       for nested_msg in msg.nested_type
       if nested_msg.options.map_entry
   }
@@ -650,8 +650,8 @@ def FormatEnumAsDefinitionList(type_context, enum):
     RST formatted definition list item.
   """
   return '\n'.join(
-      FormatEnumValueAsDefinitionListItem(
-          type_context.ExtendEnumValue(index, enum_value.name), enum_value)
+      FormatEnumValueAsDefinitionListItem(type_context.ExtendEnumValue(index, enum_value.name),
+                                          enum_value)
       for index, enum_value in enumerate(enum.value)) + '\n'
 
 
@@ -720,8 +720,8 @@ def Main():
     if cprofile_enabled:
       pr.disable()
       stats_stream = StringIO.StringIO()
-      ps = pstats.Stats(
-          pr, stream=stats_stream).sort_stats(os.getenv('CPROFILE_SORTBY', 'cumulative'))
+      ps = pstats.Stats(pr,
+                        stream=stats_stream).sort_stats(os.getenv('CPROFILE_SORTBY', 'cumulative'))
       stats_file = response.file.add()
       stats_file.name = proto_file.name + '.rst.profile'
       ps.print_stats()
