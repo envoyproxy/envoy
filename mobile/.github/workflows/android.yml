@@ -6,6 +6,7 @@ jobs:
   linuxdist:
     name: linux_dist
     runs-on: ubuntu-18.04
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v1
         with:
@@ -31,6 +32,7 @@ jobs:
   macdist:
     name: mac_dist
     runs-on: macOS-10.14
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v1
         with:
@@ -47,6 +49,7 @@ jobs:
     name: mac_java_helloworld
     needs: macdist
     runs-on: macOS-10.14
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v1
         with:
@@ -68,6 +71,7 @@ jobs:
     name: mac_kotlin_helloworld
     needs: macdist
     runs-on: macOS-10.14
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v1
         with:
@@ -88,6 +92,7 @@ jobs:
   kotlintests:
     name: kotlin_tests
     runs-on: ubuntu-18.04
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v1
         with:
