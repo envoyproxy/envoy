@@ -246,7 +246,7 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerFingerprint) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   std::string expected_sha = "685a2db593d5f86d346cb1a297009c3b467ad77f1944aa799039a2fb3d531f3f";
-  ON_CALL(*connection_info, sha256PeerCertificateDigest()).WillByDefault(Return(expected_sha));
+  ON_CALL(*connection_info, sha256PeerCertificateDigest()).WillByDefault(ReturnRef(expected_sha));
   EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
   testFormatting(stream_info, "DOWNSTREAM_PEER_FINGERPRINT_256",
                  "685a2db593d5f86d346cb1a297009c3b467ad77f1944aa799039a2fb3d531f3f");
@@ -256,7 +256,7 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerFingerprintEmp
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   std::string expected_sha;
-  ON_CALL(*connection_info, sha256PeerCertificateDigest()).WillByDefault(Return(expected_sha));
+  ON_CALL(*connection_info, sha256PeerCertificateDigest()).WillByDefault(ReturnRef(expected_sha));
   EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
   testFormatting(stream_info, "DOWNSTREAM_PEER_FINGERPRINT_256", EMPTY_STRING);
 }
@@ -345,7 +345,7 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerCert) {
   auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   std::string expected_cert = "<some cert>";
   ON_CALL(*connection_info, urlEncodedPemEncodedPeerCertificate())
-      .WillByDefault(Return(expected_cert));
+      .WillByDefault(ReturnRef(expected_cert));
   EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
   testFormatting(stream_info, "DOWNSTREAM_PEER_CERT", expected_cert);
 }
@@ -355,7 +355,7 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerCertEmpty) {
   auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   std::string expected_cert;
   ON_CALL(*connection_info, urlEncodedPemEncodedPeerCertificate())
-      .WillByDefault(Return(expected_cert));
+      .WillByDefault(ReturnRef(expected_cert));
   EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
   testFormatting(stream_info, "DOWNSTREAM_PEER_CERT", EMPTY_STRING);
 }

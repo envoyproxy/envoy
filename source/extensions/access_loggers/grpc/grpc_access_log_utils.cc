@@ -15,7 +15,7 @@ using namespace envoy::data::accesslog::v2;
 
 // Helper function to convert from a BoringSSL textual representation of the
 // TLS version to the corresponding enum value used in gRPC access logs.
-TLSProperties_TLSVersion tlsVersionStringToEnum(absl::string_view tls_version) {
+TLSProperties_TLSVersion tlsVersionStringToEnum(const std::string& tls_version) {
   if (tls_version == "TLSv1") {
     return TLSProperties_TLSVersion_TLSv1;
   } else if (tls_version == "TLSv1.1") {
@@ -138,8 +138,7 @@ void Utility::extractCommonAccessLogProperties(
       auto* local_san = local_properties->add_subject_alt_name();
       local_san->set_uri(uri_san);
     }
-    local_properties->set_subject(
-        std::string(downstream_ssl_connection->subjectLocalCertificate()));
+    local_properties->set_subject(downstream_ssl_connection->subjectLocalCertificate());
 
     auto* peer_properties = tls_properties->mutable_peer_certificate_properties();
     for (const auto& uri_san : downstream_ssl_connection->uriSanPeerCertificate()) {
@@ -147,8 +146,8 @@ void Utility::extractCommonAccessLogProperties(
       peer_san->set_uri(uri_san);
     }
 
-    peer_properties->set_subject(std::string(downstream_ssl_connection->subjectPeerCertificate()));
-    tls_properties->set_tls_session_id(std::string(downstream_ssl_connection->sessionId()));
+    peer_properties->set_subject(downstream_ssl_connection->subjectPeerCertificate());
+    tls_properties->set_tls_session_id(downstream_ssl_connection->sessionId());
     tls_properties->set_tls_version(
         tlsVersionStringToEnum(downstream_ssl_connection->tlsVersion()));
 

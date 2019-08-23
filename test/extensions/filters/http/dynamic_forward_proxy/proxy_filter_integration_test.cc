@@ -198,7 +198,11 @@ TEST_P(ProxyFilterIntegrationTest, UpstreamTls) {
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
   waitForNextUpstreamRequest();
 
-  EXPECT_EQ("localhost", fake_upstream_connection_->connection().ssl()->serverName());
+  const Extensions::TransportSockets::Tls::SslSocketInfo* ssl_socket =
+      dynamic_cast<const Extensions::TransportSockets::Tls::SslSocketInfo*>(
+          fake_upstream_connection_->connection().ssl().get());
+  EXPECT_STREQ("localhost",
+               SSL_get_servername(ssl_socket->rawSslForTest(), TLSEXT_NAMETYPE_host_name));
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
   response->waitForEndStream();
@@ -220,7 +224,10 @@ TEST_P(ProxyFilterIntegrationTest, UpstreamTlsWithIpHost) {
   waitForNextUpstreamRequest();
 
   // No SNI for IP hosts.
-  EXPECT_EQ("", fake_upstream_connection_->connection().ssl()->serverName());
+  const Extensions::TransportSockets::Tls::SslSocketInfo* ssl_socket =
+      dynamic_cast<const Extensions::TransportSockets::Tls::SslSocketInfo*>(
+          fake_upstream_connection_->connection().ssl().get());
+  EXPECT_STREQ(nullptr, SSL_get_servername(ssl_socket->rawSslForTest(), TLSEXT_NAMETYPE_host_name));
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
   response->waitForEndStream();

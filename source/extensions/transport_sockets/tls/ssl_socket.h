@@ -44,24 +44,23 @@ struct SslSocketInfo : public Envoy::Ssl::ConnectionInfo {
 
   // Ssl::ConnectionInfo
   bool peerCertificatePresented() const override;
-  absl::Span<const std::string> uriSanLocalCertificate() const override;
-  absl::string_view sha256PeerCertificateDigest() const override;
-  absl::string_view serialNumberPeerCertificate() const override;
-  absl::string_view issuerPeerCertificate() const override;
-  absl::string_view subjectPeerCertificate() const override;
-  absl::string_view subjectLocalCertificate() const override;
-  absl::Span<const std::string> uriSanPeerCertificate() const override;
-  absl::string_view urlEncodedPemEncodedPeerCertificate() const override;
-  absl::string_view urlEncodedPemEncodedPeerCertificateChain() const override;
-  absl::Span<const std::string> dnsSansPeerCertificate() const override;
-  absl::Span<const std::string> dnsSansLocalCertificate() const override;
+  std::vector<std::string> uriSanLocalCertificate() const override;
+  const std::string& sha256PeerCertificateDigest() const override;
+  std::string serialNumberPeerCertificate() const override;
+  std::string issuerPeerCertificate() const override;
+  std::string subjectPeerCertificate() const override;
+  std::string subjectLocalCertificate() const override;
+  std::vector<std::string> uriSanPeerCertificate() const override;
+  const std::string& urlEncodedPemEncodedPeerCertificate() const override;
+  const std::string& urlEncodedPemEncodedPeerCertificateChain() const override;
+  std::vector<std::string> dnsSansPeerCertificate() const override;
+  std::vector<std::string> dnsSansLocalCertificate() const override;
   absl::optional<SystemTime> validFromPeerCertificate() const override;
   absl::optional<SystemTime> expirationPeerCertificate() const override;
-  absl::string_view sessionId() const override;
+  std::string sessionId() const override;
   uint16_t ciphersuiteId() const override;
-  absl::string_view ciphersuiteString() const override;
-  absl::string_view tlsVersion() const override;
-  absl::string_view serverName() const override;
+  std::string ciphersuiteString() const override;
+  std::string tlsVersion() const override;
 
   SSL* rawSslForTest() const { return ssl_.get(); }
 

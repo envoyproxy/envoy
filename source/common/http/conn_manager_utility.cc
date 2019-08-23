@@ -315,21 +315,21 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(HeaderMap& request_header
     if (!uri_sans_local_cert.empty()) {
       client_cert_details.push_back(absl::StrCat("By=", uri_sans_local_cert[0]));
     }
-    const auto cert_digest = connection.ssl()->sha256PeerCertificateDigest();
+    const std::string cert_digest = connection.ssl()->sha256PeerCertificateDigest();
     if (!cert_digest.empty()) {
       client_cert_details.push_back(absl::StrCat("Hash=", cert_digest));
     }
     for (const auto& detail : config.setCurrentClientCertDetails()) {
       switch (detail) {
       case ClientCertDetailsType::Cert: {
-        const auto peer_cert = connection.ssl()->urlEncodedPemEncodedPeerCertificate();
+        const std::string peer_cert = connection.ssl()->urlEncodedPemEncodedPeerCertificate();
         if (!peer_cert.empty()) {
           client_cert_details.push_back(absl::StrCat("Cert=\"", peer_cert, "\""));
         }
         break;
       }
       case ClientCertDetailsType::Chain: {
-        const auto peer_chain = connection.ssl()->urlEncodedPemEncodedPeerCertificateChain();
+        const std::string peer_chain = connection.ssl()->urlEncodedPemEncodedPeerCertificateChain();
         if (!peer_chain.empty()) {
           client_cert_details.push_back(absl::StrCat("Chain=\"", peer_chain, "\""));
         }
@@ -348,9 +348,9 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(HeaderMap& request_header
         break;
       }
       case ClientCertDetailsType::DNS: {
-        const auto& dns_sans = connection.ssl()->dnsSansPeerCertificate();
+        const std::vector<std::string> dns_sans = connection.ssl()->dnsSansPeerCertificate();
         if (!dns_sans.empty()) {
-          for (const auto& dns : dns_sans) {
+          for (const std::string& dns : dns_sans) {
             client_cert_details.push_back(absl::StrCat("DNS=", dns));
           }
         }

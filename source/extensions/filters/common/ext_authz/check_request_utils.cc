@@ -46,7 +46,7 @@ void CheckRequestUtils::setAttrContextPeer(envoy::service::auth::v2::AttributeCo
       if (uri_sans.empty()) {
         const auto dns_sans = ssl->dnsSansLocalCertificate();
         if (dns_sans.empty()) {
-          peer.set_principal(std::string(ssl->subjectLocalCertificate()));
+          peer.set_principal(ssl->subjectLocalCertificate());
         } else {
           peer.set_principal(dns_sans[0]);
         }
@@ -58,7 +58,7 @@ void CheckRequestUtils::setAttrContextPeer(envoy::service::auth::v2::AttributeCo
       if (uri_sans.empty()) {
         const auto dns_sans = ssl->dnsSansPeerCertificate();
         if (dns_sans.empty()) {
-          peer.set_principal(std::string(ssl->subjectPeerCertificate()));
+          peer.set_principal(ssl->subjectPeerCertificate());
         } else {
           peer.set_principal(dns_sans[0]);
         }

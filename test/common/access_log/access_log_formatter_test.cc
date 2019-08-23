@@ -379,7 +379,7 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     std::string expected_sha = "685a2db593d5f86d346cb1a297009c3b467ad77f1944aa799039a2fb3d531f3f";
     EXPECT_CALL(*connection_info, sha256PeerCertificateDigest())
-        .WillRepeatedly(Return(expected_sha));
+        .WillRepeatedly(ReturnRef(expected_sha));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
     EXPECT_EQ(expected_sha, upstream_format.format(header, header, header, stream_info));
   }
@@ -388,7 +388,7 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     std::string expected_sha;
     EXPECT_CALL(*connection_info, sha256PeerCertificateDigest())
-        .WillRepeatedly(Return(expected_sha));
+        .WillRepeatedly(ReturnRef(expected_sha));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
   }
@@ -466,7 +466,7 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     std::string expected_cert = "<some cert>";
     EXPECT_CALL(*connection_info, urlEncodedPemEncodedPeerCertificate())
-        .WillRepeatedly(Return(expected_cert));
+        .WillRepeatedly(ReturnRef(expected_cert));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
     EXPECT_EQ(expected_cert, upstream_format.format(header, header, header, stream_info));
   }
@@ -475,7 +475,7 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     std::string expected_cert = "";
     EXPECT_CALL(*connection_info, urlEncodedPemEncodedPeerCertificate())
-        .WillRepeatedly(Return(expected_cert));
+        .WillRepeatedly(ReturnRef(expected_cert));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
   }

@@ -610,8 +610,9 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
       absl::optional<std::string> server_ssl_requested_server_name;
       const SslSocketInfo* server_ssl_socket =
           dynamic_cast<const SslSocketInfo*>(server_connection->ssl().get());
-      auto requested_server_name = server_ssl_socket->serverName();
-      if (!requested_server_name.empty()) {
+      SSL* server_ssl = server_ssl_socket->rawSslForTest();
+      auto requested_server_name = SSL_get_servername(server_ssl, TLSEXT_NAMETYPE_host_name);
+      if (requested_server_name != nullptr) {
         server_ssl_requested_server_name = std::string(requested_server_name);
       }
 

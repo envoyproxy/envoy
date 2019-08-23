@@ -28,11 +28,10 @@ Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bo
       callbacks_->connection().remoteAddress()->asString(),
       callbacks_->connection().localAddress()->asString(),
       callbacks_->connection().ssl()
-          ? absl::StrCat(
-                "uriSanPeerCertificate: ",
-                absl::StrJoin(callbacks_->connection().ssl()->uriSanPeerCertificate(), ","),
-                ", subjectPeerCertificate: ",
-                callbacks_->connection().ssl()->subjectPeerCertificate())
+          ? "uriSanPeerCertificate: " +
+                absl::StrJoin(callbacks_->connection().ssl()->uriSanPeerCertificate(), ",") +
+                ", subjectPeerCertificate: " +
+                callbacks_->connection().ssl()->subjectPeerCertificate()
           : "none",
       callbacks_->connection().streamInfo().dynamicMetadata().DebugString());
 

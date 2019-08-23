@@ -141,7 +141,7 @@ bool AuthenticatedMatcher::matches(const Network::Connection& connection,
   }
 
   const auto uriSans = ssl->uriSanPeerCertificate();
-  absl::string_view principal;
+  std::string principal;
   // If set, The URI SAN  or DNS SAN in that order is used as Principal, otherwise the subject field
   // is used.
   if (!uriSans.empty()) {

@@ -18,8 +18,6 @@
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 
-#include "absl/container/flat_hash_set.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -54,13 +52,13 @@ public:
       allowed_sha256_digests_.emplace(sha256_digest);
     }
   }
-  bool allowed(absl::string_view sha256_digest) const {
+  bool allowed(const std::string& sha256_digest) const {
     return allowed_sha256_digests_.count(sha256_digest) != 0;
   }
   size_t size() const { return allowed_sha256_digests_.size(); }
 
 private:
-  absl::flat_hash_set<std::string> allowed_sha256_digests_;
+  std::unordered_set<std::string> allowed_sha256_digests_;
 };
 
 using AllowedPrincipalsSharedPtr = std::shared_ptr<AllowedPrincipals>;
