@@ -232,7 +232,8 @@ public:
   std::size_t warmingClusterCount() const override { return warming_clusters_.size(); }
 
 protected:
-  virtual void postThreadLocalHostRemoval(const Cluster& cluster, const HostVector& hosts_removed);
+  virtual void postThreadLocalDrainConnections(const Cluster& cluster,
+                                               const HostVector& hosts_removed);
   virtual void postThreadLocalClusterUpdate(const Cluster& cluster, uint32_t priority,
                                             const HostVector& hosts_added,
                                             const HostVector& hosts_removed);
