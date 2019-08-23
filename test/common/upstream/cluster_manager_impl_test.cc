@@ -1330,9 +1330,9 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   // tcp connections.
   Http::ConnectionPool::Instance::DrainedCb drained_cb;
   Tcp::ConnectionPool::Instance::DrainedCb drained_cb2;
+  EXPECT_CALL(*callbacks, onClusterRemoval(_)).Times(1);
   EXPECT_CALL(*cp, addDrainedCallback(_)).WillOnce(SaveArg<0>(&drained_cb));
   EXPECT_CALL(*cp2, addDrainedCallback(_)).WillOnce(SaveArg<0>(&drained_cb2));
-  EXPECT_CALL(*callbacks, onClusterRemoval(_)).Times(1);
   EXPECT_TRUE(cluster_manager_->removeCluster("fake_cluster"));
   EXPECT_EQ(nullptr, cluster_manager_->get("fake_cluster"));
   EXPECT_EQ(0UL, cluster_manager_->clusters().size());
