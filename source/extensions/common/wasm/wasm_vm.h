@@ -103,6 +103,8 @@ using WasmCallback_WWm = Word (*)(void*, Word, uint64_t);
 // Wasm VM instance. Provides the low level WASM interface.
 class WasmVm : public Logger::Loggable<Logger::Id::wasm> {
 public:
+  using WasmVmPtr = std::unique_ptr<WasmVm>;
+
   virtual ~WasmVm() {}
   virtual absl::string_view vm() PURE;
 
@@ -110,7 +112,7 @@ public:
   virtual bool clonable() PURE;
   // Make a thread-specific copy. This may not be supported by the underlying VM system in which
   // case it will return nullptr and the caller will need to create a new VM from scratch.
-  virtual std::unique_ptr<WasmVm> clone() PURE;
+  virtual WasmVmPtr clone() PURE;
 
   // Load the WASM code from a file. Return true on success.
   virtual bool load(const std::string& code, bool allow_precompiled) PURE;
@@ -159,6 +161,7 @@ public:
   virtual std::unique_ptr<Global<double>>
   makeGlobal(absl::string_view module_name, absl::string_view name, double initial_value) PURE;
 };
+using WasmVmPtr = std::unique_ptr<WasmVm>;
 
 // Exceptions for issues with the WasmVm.
 class WasmVmException : public EnvoyException {
@@ -191,7 +194,7 @@ struct SaveRestoreContext {
 };
 
 // Create a new low-level WASM VM of the give type (e.g. "envoy.wasm.vm.wavm").
-std::unique_ptr<WasmVm> createWasmVm(absl::string_view vm);
+WasmVmPtr createWasmVm(absl::string_view vm);
 
 } // namespace Wasm
 } // namespace Common

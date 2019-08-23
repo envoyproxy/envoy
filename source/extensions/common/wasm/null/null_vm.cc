@@ -17,7 +17,7 @@ namespace Common {
 namespace Wasm {
 namespace Null {
 
-std::unique_ptr<WasmVm> NullVm::clone() { return std::make_unique<NullVm>(*this); }
+WasmVmPtr NullVm::clone() { return std::make_unique<NullVm>(*this); }
 
 bool NullVm::load(const std::string& name, bool /* allow_precompiled */) {
   auto factory = Registry::FactoryRegistry<NullVmPluginFactory>::getFactory(name);

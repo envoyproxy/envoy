@@ -13,7 +13,7 @@ namespace Wasm {
 thread_local Envoy::Extensions::Common::Wasm::Context* current_context_ = nullptr;
 thread_local uint32_t effective_context_id_ = 0;
 
-std::unique_ptr<WasmVm> createWasmVm(absl::string_view wasm_vm) {
+WasmVmPtr createWasmVm(absl::string_view wasm_vm) {
   if (wasm_vm.empty()) {
     throw WasmException("Failed to create WASM VM with unspecified runtime.");
   } else if (wasm_vm == WasmVmNames::get().Null) {
