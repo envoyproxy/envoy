@@ -93,7 +93,6 @@ void HeaderString::freeDynamic() {
 bool HeaderString::valid() const { return validHeaderString(getStringView()); }
 
 void HeaderString::append(const char* data, uint32_t size) {
-  ASSERT(validHeaderString(absl::string_view(data, size)));
   switch (type_) {
   case Type::Reference: {
     // Rather than be too clever and optimize this uncommon case, we dynamically
@@ -146,7 +145,7 @@ void HeaderString::append(const char* data, uint32_t size) {
     }
   }
   }
-
+  ASSERT(validHeaderString(absl::string_view(data, size)));
   memcpy(buffer_.dynamic_ + string_length_, data, size);
   string_length_ += size;
 }
