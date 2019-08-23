@@ -232,10 +232,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://files.pythonhosted.org/packages/b3/b2/238e2590826bfdd113244a40d9d3eb26918bd798fc187e2360a8367068db/six-1.10.0.tar.gz"],
     ),
     io_opencensus_cpp = dict(
-        sha256 = "8d6016e47c2e19e7acbadb6f905b8c422748c64299d71101ac8f28151677e195",
-        strip_prefix = "opencensus-cpp-cad0d03ff3474cf14389fc249e16847ab7b6895f",
-        # 2019-07-31
-        urls = ["https://github.com/census-instrumentation/opencensus-cpp/archive/cad0d03ff3474cf14389fc249e16847ab7b6895f.tar.gz"],
+        sha256 = "b5fcc36a994a4ecb6e53c901e33579ed1ac238cff9975807db760918a15f43ff",
+        strip_prefix = "opencensus-cpp-8058a1b8efe6a63bd18673abc51223917d12d45d",
+        # 2019-08-22
+        urls = ["https://github.com/census-instrumentation/opencensus-cpp/archive/8058a1b8efe6a63bd18673abc51223917d12d45d.tar.gz"],
     ),
     grpc_java = dict(
         sha256 = "9618a6f4ec0f2bdb77d9b6e01865af9796f370e63e1352210798bacfc99ccdac",
