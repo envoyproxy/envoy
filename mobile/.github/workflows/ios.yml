@@ -76,6 +76,7 @@ jobs:
   swifttests:
     name: swift_tests
     runs-on: macOS-10.14
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v1
     # TODO(rebello95): to fill out.
