@@ -26,13 +26,13 @@
 
 #include "extensions/access_loggers/file/file_access_log_impl.h"
 
-#include "test/common/http/conn_manager_impl_common.h"
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/common.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
@@ -69,9 +69,7 @@ namespace Http {
 class HttpConnectionManagerImplTest : public testing::Test, public ConnectionManagerConfig {
 public:
   HttpConnectionManagerImplTest()
-      : route_config_provider_(test_time_.timeSystem()),
-        scoped_route_config_provider_(test_time_.timeSystem()),
-        http_context_(fake_stats_.symbolTable()), access_log_path_("dummy_path"),
+      : http_context_(fake_stats_.symbolTable()), access_log_path_("dummy_path"),
         access_logs_{
             AccessLog::InstanceSharedPtr{new Extensions::AccessLoggers::File::FileAccessLog(
                 access_log_path_, {}, AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter(),
@@ -86,6 +84,10 @@ public:
 
     http_context_.setTracer(tracer_);
 
+    ON_CALL(route_config_provider_, lastUpdated())
+        .WillByDefault(Return(test_time_.timeSystem().systemTime()));
+    ON_CALL(scoped_route_config_provider_, lastUpdated())
+        .WillByDefault(Return(test_time_.timeSystem().systemTime()));
     // response_encoder_ is not a NiceMock on purpose. This prevents complaining about this
     // method only.
     EXPECT_CALL(response_encoder_, getStream()).Times(AtLeast(0));
@@ -95,7 +97,8 @@ public:
     filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   }
 
-  void setup(bool ssl, const std::string& server_name, bool tracing = true) {
+  void setup(bool ssl, const std::string& server_name, bool tracing = true, bool use_srds = false) {
+    use_srds_ = use_srds;
     if (ssl) {
       ssl_connection_ = std::make_unique<Ssl::MockConnectionInfo>();
     }
@@ -256,9 +259,18 @@ public:
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
   std::chrono::milliseconds requestTimeout() const override { return request_timeout_; }
   std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
-  Router::RouteConfigProvider* routeConfigProvider() override { return &route_config_provider_; }
+  bool use_srds_{};
+  Router::RouteConfigProvider* routeConfigProvider() override {
+    if (use_srds_) {
+      return nullptr;
+    }
+    return &route_config_provider_;
+  }
   Config::ConfigProvider* scopedRouteConfigProvider() override {
-    return &scoped_route_config_provider_;
+    if (use_srds_) {
+      return &scoped_route_config_provider_;
+    }
+    return nullptr;
   }
   const std::string& serverName() override { return server_name_; }
   ConnectionManagerStats& stats() override { return stats_; }
@@ -284,8 +296,9 @@ public:
   bool shouldMergeSlashes() const override { return merge_slashes_; }
 
   DangerousDeprecatedTestTime test_time_;
-  ConnectionManagerImplHelper::RouteConfigProvider route_config_provider_;
-  ConnectionManagerImplHelper::ScopedRouteConfigProvider scoped_route_config_provider_;
+  NiceMock<Router::MockRouteConfigProvider> route_config_provider_;
+  std::shared_ptr<Router::MockConfig> route_config_{new NiceMock<Router::MockConfig>()};
+  NiceMock<Router::MockScopedRouteConfigProvider> scoped_route_config_provider_;
   NiceMock<Tracing::MockHttpTracer> tracer_;
   Stats::IsolatedStoreImpl fake_stats_;
   Http::ContextImpl http_context_;
@@ -1811,7 +1824,7 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterBidiData) {
 TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisabledByDefault) {
   setup(false, "");
 
-  EXPECT_CALL(*codec_, dispatch(_)).Times(1).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, createTimer_).Times(0);
     conn_manager_->newStream(response_encoder_);
   }));
@@ -1824,7 +1837,7 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisabledIfSetToZero) {
   request_timeout_ = std::chrono::milliseconds(0);
   setup(false, "");
 
-  EXPECT_CALL(*codec_, dispatch(_)).Times(1).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, createTimer_).Times(0);
     conn_manager_->newStream(response_encoder_);
   }));
@@ -1837,7 +1850,7 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutValidlyConfigured) {
   request_timeout_ = std::chrono::milliseconds(10);
   setup(false, "");
 
-  EXPECT_CALL(*codec_, dispatch(_)).Times(1).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     Event::MockTimer* request_timer = setUpTimer();
     EXPECT_CALL(*request_timer, enableTimer(request_timeout_, _));
 
@@ -1853,7 +1866,7 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutCallbackDisarmsAndReturns408
   setup(false, "");
 
   std::string response_body;
-  EXPECT_CALL(*codec_, dispatch(_)).Times(1).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     Event::MockTimer* request_timer = setUpTimer();
     EXPECT_CALL(*request_timer, enableTimer(request_timeout_, _)).Times(1);
     EXPECT_CALL(*request_timer, disableTimer()).Times(AtLeast(1));
@@ -1879,7 +1892,7 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsNotDisarmedOnIncompleteReq
   request_timeout_ = std::chrono::milliseconds(10);
   setup(false, "");
 
-  EXPECT_CALL(*codec_, dispatch(_)).Times(1).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     Event::MockTimer* request_timer = setUpTimer();
     EXPECT_CALL(*request_timer, enableTimer(request_timeout_, _)).Times(1);
     EXPECT_CALL(*request_timer, disableTimer()).Times(0);
@@ -1902,7 +1915,7 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsDisarmedOnCompleteRequestW
   request_timeout_ = std::chrono::milliseconds(10);
   setup(false, "");
 
-  EXPECT_CALL(*codec_, dispatch(_)).Times(1).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     Event::MockTimer* request_timer = setUpTimer();
     EXPECT_CALL(*request_timer, enableTimer(request_timeout_, _)).Times(1);
 
@@ -1978,7 +1991,7 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsDisarmedOnEncodeHeaders) {
       }));
   EXPECT_CALL(response_encoder_, encodeHeaders(_, _));
 
-  EXPECT_CALL(*codec_, dispatch(_)).Times(1).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     Event::MockTimer* request_timer = setUpTimer();
     EXPECT_CALL(*request_timer, enableTimer(request_timeout_, _)).Times(1);
 
@@ -2004,7 +2017,7 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsDisarmedOnConnectionTermin
   setup(false, "");
 
   Event::MockTimer* request_timer = setUpTimer();
-  EXPECT_CALL(*codec_, dispatch(_)).Times(1).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
     HeaderMapPtr headers{
         new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
@@ -4194,7 +4207,7 @@ TEST_F(HttpConnectionManagerImplTest, OverlyLongHeadersRejected) {
 
   std::string response_code;
   std::string response_body;
-  EXPECT_CALL(*codec_, dispatch(_)).Times(1).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
     HeaderMapPtr headers{
         new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
@@ -4219,7 +4232,7 @@ TEST_F(HttpConnectionManagerImplTest, OverlyLongHeadersAcceptedIfConfigured) {
   max_request_headers_kb_ = 62;
   setup(false, "");
 
-  EXPECT_CALL(*codec_, dispatch(_)).Times(1).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
     HeaderMapPtr headers{
         new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
@@ -4411,6 +4424,192 @@ TEST_F(HttpConnectionManagerImplTest, TestSessionTrace) {
         .WillOnce(Return(FilterTrailersStatus::StopIteration));
     decoder->decodeTrailers(std::move(trailers));
   }
+}
+
+TEST_F(HttpConnectionManagerImplTest, TestSRDSRouteNotFound) {
+  setup(false, "", true, true);
+
+  EXPECT_CALL(*static_cast<const Router::MockScopedConfig*>(
+                  scopedRouteConfigProvider()->config<Router::ScopedConfig>().get()),
+              getRouteConfig(_))
+      .WillOnce(Return(nullptr));
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
+    StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+    HeaderMapPtr headers{
+        new TestHeaderMapImpl{{":authority", "host"}, {":method", "GET"}, {":path", "/foo"}}};
+    decoder->decodeHeaders(std::move(headers), true);
+    data.drain(4);
+  }));
+
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false))
+      .WillOnce(Invoke([](const HeaderMap& headers, bool) -> void {
+        EXPECT_EQ("404", headers.Status()->value().getStringView());
+      }));
+
+  std::string response_body;
+  EXPECT_CALL(response_encoder_, encodeData(_, true)).WillOnce(AddBufferToString(&response_body));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+  EXPECT_EQ(response_body, "route scope not found");
+}
+
+TEST_F(HttpConnectionManagerImplTest, TestNoSRDSRouteConfig) {
+  setup(false, "", true, true);
+
+  EXPECT_CALL(*static_cast<Router::MockScopedRouteConfigProvider*>(scopedRouteConfigProvider()),
+              getConfig())
+      .WillOnce(Return(nullptr));
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
+    StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+    HeaderMapPtr headers{
+        new TestHeaderMapImpl{{":authority", "host"}, {":method", "GET"}, {":path", "/foo"}}};
+    decoder->decodeHeaders(std::move(headers), true);
+    data.drain(4);
+  }));
+
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false))
+      .WillOnce(Invoke([](const HeaderMap& headers, bool) -> void {
+        EXPECT_EQ("500", headers.Status()->value().getStringView());
+      }));
+
+  std::string response_body;
+  EXPECT_CALL(response_encoder_, encodeData(_, true)).WillOnce(AddBufferToString(&response_body));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+  EXPECT_EQ(response_body, "unable to get route configuration");
+}
+
+TEST_F(HttpConnectionManagerImplTest, TestSRDSUpdate) {
+  setup(false, "", true, true);
+
+  EXPECT_CALL(*static_cast<const Router::MockScopedConfig*>(
+                  scopedRouteConfigProvider()->config<Router::ScopedConfig>().get()),
+              getRouteConfig(_))
+      .Times(2)
+      .WillOnce(Return(nullptr))
+      .WillOnce(Return(route_config_));
+  EXPECT_CALL(*codec_, dispatch(_))
+      .Times(2) // Once for no scoped routes, once for scoped routing
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
+        StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+        HeaderMapPtr headers{
+            new TestHeaderMapImpl{{":authority", "host"}, {":method", "GET"}, {":path", "/foo"}}};
+        decoder->decodeHeaders(std::move(headers), true);
+        data.drain(4);
+      }));
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false))
+      .WillOnce(Invoke([](const HeaderMap& headers, bool) -> void {
+        EXPECT_EQ("404", headers.Status()->value().getStringView());
+      }));
+
+  std::string response_body;
+  EXPECT_CALL(response_encoder_, encodeData(_, true)).WillOnce(AddBufferToString(&response_body));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+  EXPECT_EQ(response_body, "route scope not found");
+
+  // Now route config provider returns something.
+  setupFilterChain(1, 0); // Recreate the chain for second stream.
+  const std::string fake_cluster1_name = "fake_cluster1";
+  std::shared_ptr<Router::MockRoute> route1 = std::make_shared<NiceMock<Router::MockRoute>>();
+  EXPECT_CALL(route1->route_entry_, clusterName()).WillRepeatedly(ReturnRef(fake_cluster1_name));
+  std::shared_ptr<Upstream::MockThreadLocalCluster> fake_cluster1 =
+      std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager_, get(_)).WillOnce(Return(fake_cluster1.get()));
+  EXPECT_CALL(*route_config_, route(_, _)).WillOnce(Return(route1));
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
+        EXPECT_EQ(route1, decoder_filters_[0]->callbacks_->route());
+        EXPECT_EQ(route1->routeEntry(), decoder_filters_[0]->callbacks_->streamInfo().routeEntry());
+        EXPECT_EQ(fake_cluster1->info(), decoder_filters_[0]->callbacks_->clusterInfo());
+        return FilterHeadersStatus::StopIteration;
+      }));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+  Buffer::OwnedImpl fake_input2("1234");
+  conn_manager_->onData(fake_input2, false);
+}
+
+TEST_F(HttpConnectionManagerImplTest, TestSRDSRouteFound) {
+  setup(false, "", true, true);
+  setupFilterChain(1, 0);
+
+  const std::string fake_cluster1_name = "fake_cluster1";
+  std::shared_ptr<Router::MockRoute> route1 = std::make_shared<NiceMock<Router::MockRoute>>();
+  EXPECT_CALL(route1->route_entry_, clusterName()).WillRepeatedly(ReturnRef(fake_cluster1_name));
+  std::shared_ptr<Upstream::MockThreadLocalCluster> fake_cluster1 =
+      std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager_, get(_)).WillOnce(Return(fake_cluster1.get()));
+  EXPECT_CALL(*scopedRouteConfigProvider()->config<Router::MockScopedConfig>(), getRouteConfig(_))
+      .Times(1);
+  EXPECT_CALL(
+      *static_cast<const Router::MockConfig*>(
+          scopedRouteConfigProvider()->config<Router::MockScopedConfig>()->route_config_.get()),
+      route(_, _))
+      .WillOnce(Return(route1));
+  StreamDecoder* decoder = nullptr;
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
+    decoder = &conn_manager_->newStream(response_encoder_);
+    HeaderMapPtr headers{
+        new TestHeaderMapImpl{{":authority", "host"}, {":method", "GET"}, {":path", "/foo"}}};
+    decoder->decodeHeaders(std::move(headers), true);
+    data.drain(4);
+  }));
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
+        EXPECT_EQ(route1, decoder_filters_[0]->callbacks_->route());
+        EXPECT_EQ(route1->routeEntry(), decoder_filters_[0]->callbacks_->streamInfo().routeEntry());
+        EXPECT_EQ(fake_cluster1->info(), decoder_filters_[0]->callbacks_->clusterInfo());
+        return FilterHeadersStatus::StopIteration;
+      }));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
+class HttpConnectionManagerImplDeathTest : public HttpConnectionManagerImplTest {
+public:
+  Router::RouteConfigProvider* routeConfigProvider() override {
+    return route_config_provider2_.get();
+  }
+  Config::ConfigProvider* scopedRouteConfigProvider() override {
+    return scoped_route_config_provider2_.get();
+  }
+
+  std::shared_ptr<NiceMock<Router::MockRouteConfigProvider>> route_config_provider2_;
+  std::shared_ptr<NiceMock<Router::MockScopedRouteConfigProvider>> scoped_route_config_provider2_;
+};
+
+TEST_F(HttpConnectionManagerImplDeathTest, InvalidConnectionManagerConfig) {
+  setup(false, "");
+
+  Buffer::OwnedImpl fake_input("1234");
+  EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance&) -> void {
+    conn_manager_->newStream(response_encoder_);
+  }));
+  // Either RDS or SRDS should be set.
+  EXPECT_DEBUG_DEATH(conn_manager_->onData(fake_input, false),
+                     "Either routeConfigProvider or scopedRouteConfigProvider should be set in "
+                     "ConnectionManagerImpl.");
+
+  route_config_provider2_ = std::make_shared<NiceMock<Router::MockRouteConfigProvider>>();
+
+  // Only route config provider valid.
+  EXPECT_NO_THROW(conn_manager_->onData(fake_input, false));
+
+  scoped_route_config_provider2_ =
+      std::make_shared<NiceMock<Router::MockScopedRouteConfigProvider>>();
+  // Can't have RDS and SRDS provider in the same time.
+  EXPECT_DEBUG_DEATH(conn_manager_->onData(fake_input, false),
+                     "Either routeConfigProvider or scopedRouteConfigProvider should be set in "
+                     "ConnectionManagerImpl.");
+
+  route_config_provider2_.reset();
+  // Only scoped route config provider valid.
+  EXPECT_NO_THROW(conn_manager_->onData(fake_input, false));
 }
 
 } // namespace Http

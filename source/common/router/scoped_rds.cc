@@ -316,7 +316,7 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
     *to_remove_repeated.Add() = scoped_route.first;
   }
   onConfigUpdate(to_add_repeated, to_remove_repeated, version_info);
-} // namespace Router
+}
 
 ScopedRdsConfigProvider::ScopedRdsConfigProvider(
     ScopedRdsConfigSubscriptionSharedPtr&& subscription)

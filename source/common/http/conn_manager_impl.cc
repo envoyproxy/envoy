@@ -12,6 +12,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/router/router.h"
+#include "envoy/server/admin.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/stats/scope.h"
 #include "envoy/tracing/http_tracer.h"
@@ -431,12 +432,25 @@ void ConnectionManagerImpl::chargeTracingStats(const Tracing::Reason& tracing_re
 
 ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connection_manager)
     : connection_manager_(connection_manager),
-      snapped_route_config_(connection_manager.config_.routeConfigProvider()->config()),
       stream_id_(connection_manager.random_generator_.random()),
       request_response_timespan_(new Stats::Timespan(
           connection_manager_.stats_.named_.downstream_rq_time_, connection_manager_.timeSource())),
       stream_info_(connection_manager_.codec_->protocol(), connection_manager_.timeSource()),
       upstream_options_(std::make_shared<Network::Socket::Options>()) {
+  // For Admin thread, we don't use routeConfigProvider or SRDS route provider.
+  ASSERT(dynamic_cast<Server::Admin*>(&connection_manager_.config_) != nullptr ||
+             ((connection_manager.config_.routeConfigProvider() == nullptr &&
+               connection_manager.config_.scopedRouteConfigProvider() != nullptr) ||
+              (connection_manager.config_.routeConfigProvider() != nullptr &&
+               connection_manager.config_.scopedRouteConfigProvider() == nullptr)),
+         "Either routeConfigProvider or scopedRouteConfigProvider should be set in "
+         "ConnectionManagerImpl.");
+  if (connection_manager.config_.routeConfigProvider() != nullptr) {
+    snapped_route_config_ = connection_manager.config_.routeConfigProvider()->config();
+  } else if (connection_manager.config_.scopedRouteConfigProvider() != nullptr) {
+    snapped_scoped_routes_config_ =
+        connection_manager_.config_.scopedRouteConfigProvider()->config<Router::ScopedConfig>();
+  }
   ScopeTrackerScopeState scope(this,
                                connection_manager_.read_callbacks_->connection().dispatcher());
 
@@ -612,6 +626,35 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   ScopeTrackerScopeState scope(this,
                                connection_manager_.read_callbacks_->connection().dispatcher());
   request_headers_ = std::move(headers);
+  // For Admin thread, we don't use routeConfigProvider or SRDS route provider.
+  if (dynamic_cast<Server::Admin*>(&connection_manager_.config_) == nullptr &&
+      connection_manager_.config_.scopedRouteConfigProvider() != nullptr) {
+    ASSERT(snapped_route_config_ == nullptr,
+           "Route config already latched to the active stream when scoped RDS is enabled.");
+    if (snapped_scoped_routes_config_ == nullptr) {
+      ENVOY_STREAM_LOG(trace, "snapped scoped routes config is null when SRDS is enabled.", *this);
+      // Stop decoding now.
+      maybeEndDecode(true);
+      sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_),
+                     Http::Code::InternalServerError, "unable to get route configuration", nullptr,
+                     is_head_request_, absl::nullopt,
+                     StreamInfo::ResponseCodeDetails::get().RouteConfigurationNotFound);
+      return;
+    }
+    snapped_route_config_ = snapped_scoped_routes_config_->getRouteConfig(*request_headers_);
+    // NOTE: if a RDS subscription hasn't got a RouteConfiguration back, a Router::NullConfigImpl is
+    // returned, in that case we let it pass.
+    if (snapped_route_config_ == nullptr) {
+      ENVOY_STREAM_LOG(trace, "can't find SRDS scope.", *this);
+      // Stop decoding now.
+      maybeEndDecode(true);
+      sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Http::Code::NotFound,
+                     "route scope not found", nullptr, is_head_request_, absl::nullopt,
+                     StreamInfo::ResponseCodeDetails::get().RouteConfigurationNotFound);
+      return;
+    }
+  }
+
   if (Http::Headers::get().MethodValues.Head ==
       request_headers_->Method()->value().getStringView()) {
     is_head_request_ = true;
