@@ -30,7 +30,7 @@ public:
     buffer_ = CheckRequestUtilsTest::newTestBuffer(8192);
   };
 
-  void ExpectBasicHttp() {
+  void expectBasicHttp() {
     EXPECT_CALL(callbacks_, connection()).Times(2).WillRepeatedly(Return(&connection_));
     EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
     EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
@@ -39,6 +39,33 @@ public:
     EXPECT_CALL(callbacks_, decodingBuffer()).WillOnce(Return(buffer_.get()));
     EXPECT_CALL(callbacks_, streamInfo()).Times(3).WillRepeatedly(ReturnRef(req_info_));
     EXPECT_CALL(req_info_, protocol()).Times(2).WillRepeatedly(ReturnPointee(&protocol_));
+  }
+
+  void callHttpCheckAndValidateRequestAttributes() {
+    Http::TestHeaderMapImpl request_headers{{"x-envoy-downstream-service-cluster", "foo"},
+                                            {":path", "/bar"}};
+    envoy::service::auth::v2::CheckRequest request;
+    Protobuf::Map<std::string, std::string> context_extensions;
+    context_extensions["key"] = "value";
+
+    envoy::api::v2::core::Metadata metadata_context;
+    auto metadata_val = MessageUtil::keyValueStruct("foo", "bar");
+    (*metadata_context.mutable_filter_metadata())["meta.key"] = metadata_val;
+
+    CheckRequestUtils::createHttpCheck(&callbacks_, request_headers, std::move(context_extensions),
+                                       std::move(metadata_context), request, false);
+
+    EXPECT_EQ("source", request.attributes().source().principal());
+    EXPECT_EQ("destination", request.attributes().destination().principal());
+    EXPECT_EQ("foo", request.attributes().source().service());
+    EXPECT_EQ("value", request.attributes().context_extensions().at("key"));
+    EXPECT_EQ("bar", request.attributes()
+                         .metadata_context()
+                         .filter_metadata()
+                         .at("meta.key")
+                         .fields()
+                         .at("foo")
+                         .string_value());
   }
 
   static Buffer::InstancePtr newTestBuffer(uint64_t size) {
@@ -84,7 +111,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttp) {
   // A client supplied EnvoyAuthPartialBody header should be ignored.
   Http::TestHeaderMapImpl request_headers{{Http::Headers::get().EnvoyAuthPartialBody.get(), "1"}};
 
-  ExpectBasicHttp();
+  expectBasicHttp();
   CheckRequestUtils::createHttpCheck(&callbacks_, request_headers,
                                      Protobuf::Map<std::string, std::string>(),
                                      envoy::api::v2::core::Metadata(), request_, size);
@@ -101,7 +128,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithPartialBody) {
   Http::HeaderMapImpl headers_;
   envoy::service::auth::v2::CheckRequest request_;
 
-  ExpectBasicHttp();
+  expectBasicHttp();
   CheckRequestUtils::createHttpCheck(&callbacks_, headers_,
                                      Protobuf::Map<std::string, std::string>(),
                                      envoy::api::v2::core::Metadata(), request_, size);
@@ -116,7 +143,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithFullBody) {
   Http::HeaderMapImpl headers_;
   envoy::service::auth::v2::CheckRequest request_;
 
-  ExpectBasicHttp();
+  expectBasicHttp();
   CheckRequestUtils::createHttpCheck(&callbacks_, headers_,
                                      Protobuf::Map<std::string, std::string>(),
                                      envoy::api::v2::core::Metadata(), request_, buffer_->length());
@@ -127,45 +154,50 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithFullBody) {
                          Http::Headers::get().EnvoyAuthPartialBody.get()));
 }
 
-// Verify that createHttpCheck extract the proper attributes from the http request into CheckRequest
-// proto object.
-TEST_F(CheckRequestUtilsTest, CheckAttrContextPeer) {
-  Http::TestHeaderMapImpl request_headers{{"x-envoy-downstream-service-cluster", "foo"},
-                                          {":path", "/bar"}};
-  envoy::service::auth::v2::CheckRequest request;
-  EXPECT_CALL(callbacks_, connection()).WillRepeatedly(Return(&connection_));
-  EXPECT_CALL(connection_, remoteAddress()).WillRepeatedly(ReturnRef(addr_));
-  EXPECT_CALL(connection_, localAddress()).WillRepeatedly(ReturnRef(addr_));
-  EXPECT_CALL(Const(connection_), ssl()).WillRepeatedly(Return(&ssl_));
-  EXPECT_CALL(callbacks_, streamId()).WillRepeatedly(Return(0));
-  EXPECT_CALL(callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
-  EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
-  EXPECT_CALL(req_info_, protocol()).WillRepeatedly(ReturnPointee(&protocol_));
+// Verify that createHttpCheck extract the attributes from the HTTP request into CheckRequest
+// proto object and URI SAN is used as principal if present.
+TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerUriSans) {
+  expectBasicHttp();
+
   EXPECT_CALL(ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
   EXPECT_CALL(ssl_, uriSanLocalCertificate())
+      .WillOnce(Return(std::vector<std::string>{"destination"}));
+
+  callHttpCheckAndValidateRequestAttributes();
+}
+
+// Verify that createHttpCheck extract the attributes from the HTTP request into CheckRequest
+// proto object and DNS SAN is used as principal if URI SAN is absent.
+TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerDnsSans) {
+  expectBasicHttp();
+
+  EXPECT_CALL(ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{}));
+  EXPECT_CALL(ssl_, dnsSansPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
+
+  EXPECT_CALL(ssl_, uriSanLocalCertificate()).WillOnce(Return(std::vector<std::string>{}));
+  EXPECT_CALL(ssl_, dnsSansLocalCertificate())
       .WillOnce(Return(std::vector<std::string>{"destination"}));
 
   Protobuf::Map<std::string, std::string> context_extensions;
   context_extensions["key"] = "value";
 
-  envoy::api::v2::core::Metadata metadata_context;
-  auto metadata_val = MessageUtil::keyValueStruct("foo", "bar");
-  (*metadata_context.mutable_filter_metadata())["meta.key"] = metadata_val;
+  callHttpCheckAndValidateRequestAttributes();
+}
 
-  CheckRequestUtils::createHttpCheck(&callbacks_, request_headers, std::move(context_extensions),
-                                     std::move(metadata_context), request, false);
+// Verify that createHttpCheck extract the attributes from the HTTP request into CheckRequest
+// proto object and Subject is used as principal if both URI SAN and DNS SAN are absent.
+TEST_F(CheckRequestUtilsTest, CheckAttrContextSubject) {
+  expectBasicHttp();
 
-  EXPECT_EQ("source", request.attributes().source().principal());
-  EXPECT_EQ("destination", request.attributes().destination().principal());
-  EXPECT_EQ("foo", request.attributes().source().service());
-  EXPECT_EQ("value", request.attributes().context_extensions().at("key"));
-  EXPECT_EQ("bar", request.attributes()
-                       .metadata_context()
-                       .filter_metadata()
-                       .at("meta.key")
-                       .fields()
-                       .at("foo")
-                       .string_value());
+  EXPECT_CALL(ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{}));
+  EXPECT_CALL(ssl_, dnsSansPeerCertificate()).WillOnce(Return(std::vector<std::string>{}));
+  EXPECT_CALL(ssl_, subjectPeerCertificate()).WillOnce(Return("source"));
+
+  EXPECT_CALL(ssl_, uriSanLocalCertificate()).WillOnce(Return(std::vector<std::string>{}));
+  EXPECT_CALL(ssl_, dnsSansLocalCertificate()).WillOnce(Return(std::vector<std::string>{}));
+  EXPECT_CALL(ssl_, subjectLocalCertificate()).WillOnce(Return("destination"));
+
+  callHttpCheckAndValidateRequestAttributes();
 }
 
 } // namespace
