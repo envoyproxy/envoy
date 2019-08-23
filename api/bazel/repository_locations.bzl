@@ -18,6 +18,9 @@ PROMETHEUS_SHA = "783bdaf8ee0464b35ec0c8704871e1e72afa0005c3f3587f65d9d6694bf391
 
 KAFKA_SOURCE_SHA = "ae7a1696c0a0302b43c5b21e515c37e6ecd365941f68a510a7e442eebddf39a1"  # 2.2.0-rc2
 
+UDPA_GIT_SHA = "4cbdcb9931ca743a915a7c5fda51b2ee793ed157"  # Aug 22, 2019
+UDPA_SHA256 = "6291d0c0e3a4d5f08057ea7a00ed0b0ec3dd4e5a3b1cf20f803774680b5a806f"
+
 REPOSITORY_LOCATIONS = dict(
     bazel_skylib = dict(
         sha256 = BAZEL_SKYLIB_SHA256,
@@ -33,6 +36,11 @@ REPOSITORY_LOCATIONS = dict(
         sha256 = GOOGLEAPIS_SHA,
         strip_prefix = "googleapis-" + GOOGLEAPIS_GIT_SHA,
         urls = ["https://github.com/googleapis/googleapis/archive/" + GOOGLEAPIS_GIT_SHA + ".tar.gz"],
+    ),
+    com_github_cncf_udpa = dict(
+        sha256 = UDPA_SHA256,
+        strip_prefix = "udpa-" + UDPA_GIT_SHA,
+        urls = ["https://github.com/cncf/udpa/archive/" + UDPA_GIT_SHA + ".tar.gz"],
     ),
     com_github_gogo_protobuf = dict(
         sha256 = GOGOPROTO_SHA256,
