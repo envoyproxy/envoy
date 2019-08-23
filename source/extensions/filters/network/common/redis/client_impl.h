@@ -72,6 +72,9 @@ public:
                           EncoderPtr&& encoder, DecoderFactory& decoder_factory,
                           const Config& config);
 
+  ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
+             DecoderFactory& decoder_factory, const Config& config,
+             RedisCommandStatsPtr&& redis_command_stats);
   ~ClientImpl() override;
 
   // Client
@@ -113,9 +116,6 @@ private:
     Stats::CompletableTimespanPtr command_request_timer_;
   };
 
-  ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
-             DecoderFactory& decoder_factory, const Config& config,
-             RedisCommandStatsPtr&& redis_command_stats);
   void onConnectOrOpTimeout();
   void onData(Buffer::Instance& data);
   void putOutlierEvent(Upstream::Outlier::Result result);

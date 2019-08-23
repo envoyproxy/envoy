@@ -52,9 +52,9 @@ ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatche
                              const Config& config) {
   auto redis_command_stats = std::make_shared<RedisCommandStats>(
       host->cluster().statsScope(), "upstream_commands", config.enableCommandStats());
-  std::unique_ptr<ClientImpl> client(new ClientImpl(host, dispatcher, std::move(encoder),
+  auto client = std::make_unique<ClientImpl>(host, dispatcher, std::move(encoder),
                                                     decoder_factory, config,
-                                                    std::move(redis_command_stats)));
+                                                    std::move(redis_command_stats));
   client->connection_ = host->createConnection(dispatcher, nullptr, nullptr).connection_;
   client->connection_->addConnectionCallbacks(*client);
   client->connection_->addReadFilter(Network::ReadFilterSharedPtr{new UpstreamReadFilter(*client)});
@@ -68,8 +68,8 @@ ClientImpl::ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dis
                        RedisCommandStatsPtr&& redis_command_stats)
     : host_(host), encoder_(std::move(encoder)), decoder_(decoder_factory.create(*this)),
       config_(config),
-      connect_or_op_timer_(dispatcher.createTimer([this]() -> void { onConnectOrOpTimeout(); })),
-      flush_timer_(dispatcher.createTimer([this]() -> void { flushBufferAndResetTimer(); })),
+      connect_or_op_timer_(dispatcher.createTimer([this]() { onConnectOrOpTimeout(); })),
+      flush_timer_(dispatcher.createTimer([this]() { flushBufferAndResetTimer(); })),
       time_source_(dispatcher.timeSource()), redis_command_stats_(redis_command_stats) {
   host->cluster().stats().upstream_cx_total_.inc();
   host->stats().cx_total_.inc();
