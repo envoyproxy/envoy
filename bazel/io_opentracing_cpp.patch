@@ -8,7 +8,7 @@ index 17e08fd..d25e0c8 100644
 
 -  const auto handle = dlopen(shared_library, RTLD_NOW | RTLD_LOCAL);
 +  const auto handle = dlopen(shared_library, RTLD_NOW | RTLD_LOCAL
-+#if defined(__has_feature) && __has_feature(address_sanitizer)
++#if defined(__SANITIZE_ADDRESS__) || (defined(__clang__) && __has_feature(address_sanitizer))
 +      | RTLD_NODELETE
 +#endif
 +  );
