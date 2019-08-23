@@ -29,6 +29,9 @@ api_proto_library_internal(
     name = "string",
     srcs = ["string.proto"],
     visibility = ["//visibility:public"],
+    deps = [
+        ":regex",
+    ],
 )
 
 api_proto_library_internal(
@@ -39,4 +42,10 @@ api_proto_library_internal(
         ":number",
         ":string",
     ],
+)
+
+api_proto_library_internal(
+    name = "regex",
+    srcs = ["regex.proto"],
+    visibility = ["//visibility:public"],
 )

@@ -1,12 +1,14 @@
 #pragma once
 
-#include <regex>
 #include <vector>
 
 #include "envoy/api/v2/route/route.pb.h"
+#include "envoy/common/regex.h"
 #include "envoy/http/header_map.h"
 #include "envoy/json/json_object.h"
 #include "envoy/type/range.pb.h"
+
+#include "common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Http {
@@ -18,7 +20,8 @@ class HeaderUtility {
 public:
   enum class HeaderMatchType { Value, Regex, Range, Present, Prefix, Suffix };
 
-  /* Get all instances of the header key specified, and return the values in the vector provided.
+  /**
+   * Get all instances of the header key specified, and return the values in the vector provided.
    *
    * This should not be used for inline headers, as it turns a constant time lookup into O(n).
    *
@@ -26,7 +29,7 @@ public:
    * @param key the header key to return values for
    * @param out the vector to return values in
    */
-  static void getAllOfHeader(const Http::HeaderMap& headers, absl::string_view key,
+  static void getAllOfHeader(const HeaderMap& headers, absl::string_view key,
                              std::vector<absl::string_view>& out);
 
   // A HeaderData specifies one of exact value or regex or range element
@@ -36,13 +39,27 @@ public:
     HeaderData(const envoy::api::v2::route::HeaderMatcher& config);
     HeaderData(const Json::Object& config);
 
-    const Http::LowerCaseString name_;
+    const LowerCaseString name_;
     HeaderMatchType header_match_type_;
     std::string value_;
-    std::regex regex_pattern_;
+    Regex::CompiledMatcherPtr regex_;
     envoy::type::Int64Range range_;
     const bool invert_match_;
   };
+
+  using HeaderDataPtr = std::unique_ptr<HeaderData>;
+
+  /**
+   * Build a vector of HeaderData given input config.
+   */
+  static std::vector<HeaderUtility::HeaderDataPtr> buildHeaderDataVector(
+      const Protobuf::RepeatedPtrField<envoy::api::v2::route::HeaderMatcher>& header_matchers) {
+    std::vector<HeaderUtility::HeaderDataPtr> ret;
+    for (const auto& header_match : header_matchers) {
+      ret.emplace_back(std::make_unique<HeaderUtility::HeaderData>(header_match));
+    }
+    return ret;
+  }
 
   /**
    * See if the headers specified in the config are present in a request.
@@ -51,10 +68,10 @@ public:
    * @return bool true if all the headers (and values) in the config_headers are found in the
    *         request_headers. If no config_headers are specified, returns true.
    */
-  static bool matchHeaders(const Http::HeaderMap& request_headers,
-                           const std::vector<HeaderData>& config_headers);
+  static bool matchHeaders(const HeaderMap& request_headers,
+                           const std::vector<HeaderDataPtr>& config_headers);
 
-  static bool matchHeaders(const Http::HeaderMap& request_headers, const HeaderData& config_header);
+  static bool matchHeaders(const HeaderMap& request_headers, const HeaderData& config_header);
 
   /**
    * Validates that a header value is valid, according to RFC 7230, section 3.2.
@@ -68,7 +85,7 @@ public:
    * @param headers target where headers will be added
    * @param headers_to_add supplies the headers to be added
    */
-  static void addHeaders(Http::HeaderMap& headers, const Http::HeaderMap& headers_to_add);
+  static void addHeaders(HeaderMap& headers, const HeaderMap& headers_to_add);
 };
 } // namespace Http
 } // namespace Envoy
