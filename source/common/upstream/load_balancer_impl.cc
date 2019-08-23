@@ -540,7 +540,7 @@ uint32_t ZoneAwareLoadBalancerBase::tryChooseLocalLocalityHosts(const HostSet& h
   return i;
 }
 
-ZoneAwareLoadBalancerBase::HostsSource
+absl::optional<ZoneAwareLoadBalancerBase::HostsSource>
 ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context) {
   auto host_set_and_source = chooseHostSet(context);
 
@@ -554,11 +554,11 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context) {
   if (per_priority_panic_[hosts_source.priority_]) {
     stats_.lb_healthy_panic_.inc();
     if (disable_cluster_on_panic_) {
-      hosts_source.source_type_ = HostsSource::SourceType::NoHosts;
+      return absl::nullopt;
     } else {
       hosts_source.source_type_ = HostsSource::SourceType::AllHosts;
+      return hosts_source;
     }
-    return hosts_source;
   }
 
   // If we're doing locality weighted balancing, pick locality.
@@ -594,11 +594,11 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context) {
     // If the local Envoy instances are in global panic, and we should not disable the cluster, do
     // not do locality based routing.
     if (disable_cluster_on_panic_) {
-      hosts_source.source_type_ = HostsSource::SourceType::NoHosts;
+      return absl::nullopt;
     } else {
       hosts_source.source_type_ = sourceType(host_availability);
+      return hosts_source;
     }
-    return hosts_source;
   }
 
   hosts_source.source_type_ = localitySourceType(host_availability);
@@ -619,8 +619,6 @@ const HostVector& ZoneAwareLoadBalancerBase::hostSourceToHosts(HostsSource hosts
     return host_set.healthyHostsPerLocality().get()[hosts_source.locality_index_];
   case HostsSource::SourceType::LocalityDegradedHosts:
     return host_set.degradedHostsPerLocality().get()[hosts_source.locality_index_];
-  case HostsSource::SourceType::NoHosts:
-    return dummy_empty_host_vector;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
@@ -707,13 +705,14 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
         HostsSource(priority, HostsSource::SourceType::LocalityDegradedHosts, locality_index),
         host_set->degradedHostsPerLocality().get()[locality_index]);
   }
-  add_hosts_source(HostsSource(priority, HostsSource::SourceType::NoHosts),
-                   dummy_empty_host_vector);
 }
 
 HostConstSharedPtr EdfLoadBalancerBase::chooseHostOnce(LoadBalancerContext* context) {
-  const HostsSource hosts_source = hostSourceToUse(context);
-  auto scheduler_it = scheduler_.find(hosts_source);
+  const absl::optional<HostsSource> hosts_source = hostSourceToUse(context);
+  if (!hosts_source) {
+    return nullptr;
+  }
+  auto scheduler_it = scheduler_.find(*hosts_source);
   // We should always have a scheduler for any return value from
   // hostSourceToUse() via the construction in refresh();
   ASSERT(scheduler_it != scheduler_.end());
@@ -730,11 +729,11 @@ HostConstSharedPtr EdfLoadBalancerBase::chooseHostOnce(LoadBalancerContext* cont
     }
     return host;
   } else {
-    const HostVector& hosts_to_use = hostSourceToHosts(hosts_source);
+    const HostVector& hosts_to_use = hostSourceToHosts(*hosts_source);
     if (hosts_to_use.empty()) {
       return nullptr;
     }
-    return unweightedHostPick(hosts_to_use, hosts_source);
+    return unweightedHostPick(hosts_to_use, *hosts_source);
   }
 }
 
@@ -762,7 +761,12 @@ HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector
 }
 
 HostConstSharedPtr RandomLoadBalancer::chooseHostOnce(LoadBalancerContext* context) {
-  const HostVector& hosts_to_use = hostSourceToHosts(hostSourceToUse(context));
+  const absl::optional<HostsSource> hosts_source = hostSourceToUse(context);
+  if (!hosts_source) {
+    return nullptr;
+  }
+
+  const HostVector& hosts_to_use = hostSourceToHosts(*hosts_source);
   if (hosts_to_use.empty()) {
     return nullptr;
   }

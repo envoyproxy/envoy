@@ -180,8 +180,6 @@ protected:
       LocalityHealthyHosts,
       // Degraded hosts for locality @ locality_index.
       LocalityDegradedHosts,
-      // No hosts in the host set.
-      NoHosts,
     };
 
     HostsSource() = default;
@@ -189,7 +187,7 @@ protected:
     HostsSource(uint32_t priority, SourceType source_type)
         : priority_(priority), source_type_(source_type) {
       ASSERT(source_type == SourceType::AllHosts || source_type == SourceType::HealthyHosts ||
-             source_type == SourceType::DegradedHosts || source_type == SourceType::NoHosts);
+             source_type == SourceType::DegradedHosts);
     }
 
     HostsSource(uint32_t priority, SourceType source_type, uint32_t locality_index)
@@ -226,14 +224,12 @@ protected:
   /**
    * Pick the host source to use, doing zone aware routing when the hosts are sufficiently healthy.
    */
-  HostsSource hostSourceToUse(LoadBalancerContext* context);
+  absl::optional<HostsSource> hostSourceToUse(LoadBalancerContext* context);
 
   /**
    * Index into priority_set via hosts source descriptor.
    */
   const HostVector& hostSourceToHosts(HostsSource hosts_source);
-
-  const HostVector dummy_empty_host_vector;
 
 private:
   enum class LocalityRoutingState {
