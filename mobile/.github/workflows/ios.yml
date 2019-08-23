@@ -3,11 +3,10 @@ name: ios
 on: [push]
 
 jobs:
-  # TODO: need to add back objc demo once https://github.com/lyft/envoy-mobile/issues/230
-  # is closed.
   macdist:
     name: mac_dist
     runs-on: macOS-10.14
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v1
         with:
@@ -15,12 +14,34 @@ jobs:
       - name: 'Install dependencies'
         run: ./ci/mac_ci_setup.sh
       - name: 'Build Envoy.framework distributable'
-        run: |
-          ./bazelw build --config=ios //:ios_dist
-      - run: ./bazelw build --config=ios //examples/swift/hello_world:app
-        name: 'Build swift app'
+        run: ./bazelw build --config=ios //:ios_dist
+      - name: 'Zip Envoy.framework.zip distributable'
+        run: zip -r dist/Envoy.framework.zip dist/Envoy.framework
+      - run: ls -lh dist/
+      - uses: actions/upload-artifact@v1
+        with:
+          name: Envoy.framework.zip
+          path: dist/Envoy.framework.zip
+  macswift:
+    name: mac_swift_helloworld
+    needs: macdist
+    runs-on: macOS-10.14
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          submodules: true
+      - name: 'Install dependencies'
+        run: ./ci/mac_ci_setup.sh
+      - uses: actions/download-artifact@v1
+        with:
+          name: Envoy.framework.zip
+          path: dist/
+      - run: unzip dist/Envoy.framework.zip
+      - run: ls -lh dist/
+      - name: 'Build swift app'
+        run: ./bazelw build --config=ios //examples/swift/hello_world:app
       # TODO: re-enable liveliness test.
-      # TODO: re-enable objc app once https://github.com/lyft/envoy-mobile/issues/230 closes.
       # - run: npm install -g ios-sim && ios-sim start --devicetypeid "iPhone-X, 12.2"
       #   name: 'Start the iOS simulator'
       # # Run the app in the background and redirect logs.
@@ -32,6 +53,26 @@ jobs:
       # # Check for the sentinel value that shows the app is alive and well.
       # - run: cat /tmp/envoy.log | grep 'Hello, world!'
       #   name: 'Check liveliness'
+  macobjc:
+    name: mac_objc_helloworld
+    needs: macdist
+    runs-on: macOS-10.14
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          submodules: true
+      - name: 'Install dependencies'
+        run: ./ci/mac_ci_setup.sh
+      - uses: actions/download-artifact@v1
+        with:
+          name: Envoy.framework.zip
+          path: dist/
+      - run: unzip dist/Envoy.framework.zip
+      - run: ls -lh dist/
+      - name: 'Build objective-c app'
+        run: ./bazelw build --config=ios //examples/objective-c/hello_world:app
+      # TODO: re-enable liveliness test (same as swift).
   swifttests:
     name: swift_tests
     runs-on: macOS-10.14
