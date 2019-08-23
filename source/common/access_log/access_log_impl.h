@@ -28,7 +28,8 @@ public:
    * Read a filter definition from proto and instantiate a concrete filter class.
    */
   static FilterPtr fromProto(const envoy::config::filter::accesslog::v2::AccessLogFilter& config,
-                             Runtime::Loader& runtime, Runtime::RandomGenerator& random);
+                             Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                             ProtobufMessage::ValidationVisitor& validation_visitor);
 };
 
 /**
@@ -82,7 +83,8 @@ class OperatorFilter : public Filter {
 public:
   OperatorFilter(const Protobuf::RepeatedPtrField<
                      envoy::config::filter::accesslog::v2::AccessLogFilter>& configs,
-                 Runtime::Loader& runtime, Runtime::RandomGenerator& random);
+                 Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                 ProtobufMessage::ValidationVisitor& validation_visitor);
 
 protected:
   std::vector<FilterPtr> filters_;
@@ -94,7 +96,8 @@ protected:
 class AndFilter : public OperatorFilter {
 public:
   AndFilter(const envoy::config::filter::accesslog::v2::AndFilter& config, Runtime::Loader& runtime,
-            Runtime::RandomGenerator& random);
+            Runtime::RandomGenerator& random,
+            ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // AccessLog::Filter
   bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
@@ -108,7 +111,8 @@ public:
 class OrFilter : public OperatorFilter {
 public:
   OrFilter(const envoy::config::filter::accesslog::v2::OrFilter& config, Runtime::Loader& runtime,
-           Runtime::RandomGenerator& random);
+           Runtime::RandomGenerator& random,
+           ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // AccessLog::Filter
   bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,

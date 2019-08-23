@@ -106,12 +106,12 @@ public:
         .WillOnce(Invoke(
             [&](Network::ReadFilterSharedPtr filter) -> void { test_conn.filter_ = filter; }));
     EXPECT_CALL(*test_conn.connection_, connect());
-    EXPECT_CALL(*test_conn.connect_timer_, enableTimer(_));
+    EXPECT_CALL(*test_conn.connect_timer_, enableTimer(_, _));
   }
 
   void expectEnableUpstreamReady() {
     EXPECT_FALSE(upstream_ready_enabled_);
-    EXPECT_CALL(*mock_upstream_ready_timer_, enableTimer(_)).Times(1).RetiresOnSaturation();
+    EXPECT_CALL(*mock_upstream_ready_timer_, enableTimer(_, _)).Times(1).RetiresOnSaturation();
   }
 
   void expectAndRunUpstreamReady() {
@@ -186,7 +186,7 @@ public:
     connection_ = new NiceMock<Network::MockClientConnection>();
     connect_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
     EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillOnce(Return(connection_));
-    EXPECT_CALL(*connect_timer_, enableTimer(_));
+    EXPECT_CALL(*connect_timer_, enableTimer(_, _));
 
     callbacks_ = std::make_unique<ConnPoolCallbacks>();
     ConnectionPool::Cancellable* handle = conn_pool_->newConnection(*callbacks_);
@@ -921,7 +921,7 @@ TEST_F(TcpConnPoolImplDestructorTest, TestPendingConnectionsAreClosed) {
   connection_ = new NiceMock<Network::MockClientConnection>();
   connect_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
   EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillOnce(Return(connection_));
-  EXPECT_CALL(*connect_timer_, enableTimer(_));
+  EXPECT_CALL(*connect_timer_, enableTimer(_, _));
 
   callbacks_ = std::make_unique<ConnPoolCallbacks>();
   ConnectionPool::Cancellable* handle = conn_pool_->newConnection(*callbacks_);

@@ -49,7 +49,7 @@ public:
 
     if (init_timer) {
       timer_ = new NiceMock<Event::MockTimer>(&tls_.dispatcher_);
-      EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5000)));
+      EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5000), _));
     }
 
     driver_ = std::make_unique<Driver>(zipkin_config, cm_, stats_, tls_, runtime_, local_info_,
@@ -240,7 +240,7 @@ TEST_F(ZipkinDriverTest, FlushSpansTimer) {
   span->finishSpan();
 
   // Timer should be re-enabled.
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5000)));
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5000), _));
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.request_timeout", 5000U))
       .WillOnce(Return(5000U));
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.flush_interval_ms", 5000U))

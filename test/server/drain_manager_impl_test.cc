@@ -33,7 +33,7 @@ TEST_F(DrainManagerImplTest, Default) {
 
   // Test parent shutdown.
   Event::MockTimer* shutdown_timer = new Event::MockTimer(&server_.dispatcher_);
-  EXPECT_CALL(*shutdown_timer, enableTimer(std::chrono::milliseconds(900000)));
+  EXPECT_CALL(*shutdown_timer, enableTimer(std::chrono::milliseconds(900000), _));
   drain_manager.startParentShutdownSequence();
 
   EXPECT_CALL(server_.hot_restart_, sendParentTerminateRequest());
@@ -47,14 +47,14 @@ TEST_F(DrainManagerImplTest, Default) {
 
   // Test drain sequence.
   Event::MockTimer* drain_timer = new Event::MockTimer(&server_.dispatcher_);
-  EXPECT_CALL(*drain_timer, enableTimer(_));
+  EXPECT_CALL(*drain_timer, enableTimer(_, _));
   ReadyWatcher drain_complete;
   drain_manager.startDrainSequence([&drain_complete]() -> void { drain_complete.ready(); });
 
   // 600s which is the default drain time.
   for (size_t i = 0; i < 599; i++) {
     if (i < 598) {
-      EXPECT_CALL(*drain_timer, enableTimer(_));
+      EXPECT_CALL(*drain_timer, enableTimer(_, _));
     } else {
       EXPECT_CALL(drain_complete, ready());
     }

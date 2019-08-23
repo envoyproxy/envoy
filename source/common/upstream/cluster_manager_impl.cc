@@ -553,10 +553,10 @@ bool ClusterManagerImpl::removeCluster(const std::string& cluster_name) {
 
       ASSERT(cluster_manager.thread_local_clusters_.count(cluster_name) == 1);
       ENVOY_LOG(debug, "removing TLS cluster {}", cluster_name);
-      cluster_manager.thread_local_clusters_.erase(cluster_name);
       for (auto& cb : cluster_manager.update_callbacks_) {
         cb->onClusterRemoval(cluster_name);
       }
+      cluster_manager.thread_local_clusters_.erase(cluster_name);
     });
   }
 

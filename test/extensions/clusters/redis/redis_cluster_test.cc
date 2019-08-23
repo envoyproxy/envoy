@@ -55,6 +55,8 @@ const std::string BasicConfig = R"EOF(
   )EOF";
 }
 
+static const int ResponseFlagSize = 11;
+static const int ResponseReplicaFlagSize = 4;
 class RedisClusterTest : public testing::Test,
                          public Extensions::NetworkFilters::Common::Redis::Client::ClientFactory {
 public:
@@ -99,7 +101,7 @@ protected:
     cluster_callback_ = std::make_shared<NiceMock<MockClusterSlotUpdateCallBack>>();
     cluster_.reset(new RedisCluster(
         cluster_config,
-        MessageUtil::downcastAndValidate<const envoy::config::cluster::redis::RedisClusterConfig&>(
+        TestUtility::downcastAndValidate<const envoy::config::cluster::redis::RedisClusterConfig&>(
             config),
         *this, cm, runtime_, *api_, dns_resolver_, factory_context, std::move(scope), false,
         cluster_callback_));
@@ -168,12 +170,12 @@ protected:
   }
 
   void expectClusterSlotResponse(NetworkFilters::Common::Redis::RespValuePtr&& response) {
-    EXPECT_CALL(*resolve_timer_, enableTimer(_));
+    EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
     pool_callbacks_->onResponse(std::move(response));
   }
 
   void expectClusterSlotFailure() {
-    EXPECT_CALL(*resolve_timer_, enableTimer(_));
+    EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
     pool_callbacks_->onFailure();
   }
 
@@ -192,7 +194,7 @@ protected:
     replica_1[1].type(NetworkFilters::Common::Redis::RespType::Integer);
     replica_1[1].asInteger() = port;
 
-    std::vector<NetworkFilters::Common::Redis::RespValue> slot_1(4);
+    std::vector<NetworkFilters::Common::Redis::RespValue> slot_1(ResponseReplicaFlagSize);
     slot_1[0].type(NetworkFilters::Common::Redis::RespType::Integer);
     slot_1[0].asInteger() = 0;
     slot_1[1].type(NetworkFilters::Common::Redis::RespType::Integer);
@@ -280,7 +282,7 @@ protected:
     replica_2[1].type(NetworkFilters::Common::Redis::RespType::Integer);
     replica_2[1].asInteger() = 22120;
 
-    std::vector<NetworkFilters::Common::Redis::RespValue> slot_1(4);
+    std::vector<NetworkFilters::Common::Redis::RespValue> slot_1(ResponseReplicaFlagSize);
     slot_1[0].type(NetworkFilters::Common::Redis::RespType::Integer);
     slot_1[0].asInteger() = 0;
     slot_1[1].type(NetworkFilters::Common::Redis::RespType::Integer);
@@ -290,7 +292,7 @@ protected:
     slot_1[3].type(NetworkFilters::Common::Redis::RespType::Array);
     slot_1[3].asArray().swap(replica_1);
 
-    std::vector<NetworkFilters::Common::Redis::RespValue> slot_2(4);
+    std::vector<NetworkFilters::Common::Redis::RespValue> slot_2(ResponseReplicaFlagSize);
     slot_2[0].type(NetworkFilters::Common::Redis::RespType::Integer);
     slot_2[0].asInteger() = 10000;
     slot_2[1].type(NetworkFilters::Common::Redis::RespType::Integer);
@@ -321,7 +323,7 @@ protected:
       respValue.asString() = correct_value;
     } else {
       respValue.type(NetworkFilters::Common::Redis::RespType::Integer);
-      respValue.asInteger() = 10;
+      respValue.asInteger() = ResponseFlagSize;
     }
     return respValue;
   }
@@ -355,8 +357,9 @@ protected:
 
   // Create a redis cluster slot response. If a bit is set in the bitset, then that part of
   // of the response is correct, otherwise it's incorrect.
-  NetworkFilters::Common::Redis::RespValuePtr createResponse(std::bitset<10> flags,
-                                                             std::bitset<3> replica_flags) const {
+  NetworkFilters::Common::Redis::RespValuePtr
+  createResponse(std::bitset<ResponseFlagSize> flags,
+                 std::bitset<ResponseReplicaFlagSize> replica_flags) const {
     int64_t idx(0);
     int64_t slots_type = idx++;
     int64_t slots_size = idx++;
@@ -367,16 +370,22 @@ protected:
     int64_t master_type = idx++;
     int64_t master_size = idx++;
     int64_t master_ip_type = idx++;
+    int64_t master_ip_value = idx++;
     int64_t master_port_type = idx++;
     idx = 0;
     int64_t replica_size = idx++;
     int64_t replica_ip_type = idx++;
+    int64_t replica_ip_value = idx++;
     int64_t replica_port_type = idx++;
 
     std::vector<NetworkFilters::Common::Redis::RespValue> master_1_array;
     if (flags.test(master_size)) {
       // Ip field.
-      master_1_array.push_back(createStringField(flags.test(master_ip_type), "127.0.0.1"));
+      if (flags.test(master_ip_value)) {
+        master_1_array.push_back(createStringField(flags.test(master_ip_type), "127.0.0.1"));
+      } else {
+        master_1_array.push_back(createStringField(flags.test(master_ip_type), "bad ip foo"));
+      }
       // Port field.
       master_1_array.push_back(createIntegerField(flags.test(master_port_type), 22120));
     }
@@ -384,8 +393,13 @@ protected:
     std::vector<NetworkFilters::Common::Redis::RespValue> replica_1_array;
     if (replica_flags.any()) {
       // Ip field.
-      replica_1_array.push_back(
-          createStringField(replica_flags.test(replica_ip_type), "127.0.0.2"));
+      if (replica_flags.test(replica_ip_value)) {
+        replica_1_array.push_back(
+            createStringField(replica_flags.test(replica_ip_type), "127.0.0.2"));
+      } else {
+        replica_1_array.push_back(
+            createStringField(replica_flags.test(replica_ip_type), "bad ip bar"));
+      }
       // Port field.
       replica_1_array.push_back(createIntegerField(replica_flags.test(replica_port_type), 22120));
     }
@@ -632,7 +646,7 @@ TEST_F(RedisClusterTest, EmptyDnsResponse) {
   Event::MockTimer* dns_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
   setupFromV2Yaml(BasicConfig);
   const std::list<std::string> resolved_addresses{};
-  EXPECT_CALL(*dns_timer, enableTimer(_));
+  EXPECT_CALL(*dns_timer, enableTimer(_, _));
   expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
 
   EXPECT_CALL(initialized_, ready());
@@ -643,7 +657,7 @@ TEST_F(RedisClusterTest, EmptyDnsResponse) {
   EXPECT_EQ(1U, cluster_->info()->stats().update_empty_.value());
 
   // Does not recreate the timer on subsequent DNS resolve calls.
-  EXPECT_CALL(*dns_timer, enableTimer(_));
+  EXPECT_CALL(*dns_timer, enableTimer(_, _));
   expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
   dns_timer->invokeCallback();
 
@@ -771,8 +785,8 @@ TEST_F(RedisClusterTest, RedisErrorResponse) {
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(1);
-  std::bitset<10> single_slot_master(0x7ff);
-  std::bitset<3> no_replica(0);
+  std::bitset<ResponseFlagSize> single_slot_master(0xfff);
+  std::bitset<ResponseReplicaFlagSize> no_replica(0);
   expectClusterSlotResponse(createResponse(single_slot_master, no_replica));
   expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
 
@@ -780,8 +794,8 @@ TEST_F(RedisClusterTest, RedisErrorResponse) {
   uint64_t update_attempt = 2;
   uint64_t update_failure = 1;
   // Test every combination the cluster slots response.
-  for (uint64_t i = 0; i < (1 << 10); i++) {
-    std::bitset<10> flags(i);
+  for (uint64_t i = 0; i < (1 << ResponseFlagSize); i++) {
+    std::bitset<ResponseFlagSize> flags(i);
     expectRedisResolve();
     resolve_timer_->invokeCallback();
     if (flags.all()) {
@@ -807,8 +821,8 @@ TEST_F(RedisClusterTest, RedisReplicaErrorResponse) {
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(1);
-  std::bitset<10> single_slot_master(0x7ff);
-  std::bitset<3> no_replica(0);
+  std::bitset<ResponseFlagSize> single_slot_master(0xfff);
+  std::bitset<ResponseReplicaFlagSize> no_replica(0);
   expectClusterSlotResponse(createResponse(single_slot_master, no_replica));
   expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
 
@@ -816,8 +830,8 @@ TEST_F(RedisClusterTest, RedisReplicaErrorResponse) {
   uint64_t update_attempt = 1;
   uint64_t update_failure = 0;
   // Test every combination the replica error response.
-  for (uint64_t i = 1; i < (1 << 3); i++) {
-    std::bitset<3> replica_flags(i);
+  for (uint64_t i = 1; i < (1 << ResponseReplicaFlagSize); i++) {
+    std::bitset<ResponseReplicaFlagSize> replica_flags(i);
     expectRedisResolve();
     resolve_timer_->invokeCallback();
     if (replica_flags.all()) {
