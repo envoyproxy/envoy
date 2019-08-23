@@ -53,7 +53,10 @@ cc_library(
 
 cc_library(
     name = "static_stdlib",
-    linkopts = ["-static-libgcc"],
+    linkopts = select({
+        "@envoy//bazel:linux": ["-static-libgcc"],
+        "//conditions:default": [],
+    }),
 )
 
 config_setting(
