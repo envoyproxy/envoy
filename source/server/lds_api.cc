@@ -49,9 +49,8 @@ void LdsApiImpl::onConfigUpdate(
   for (const auto& resource : added_resources) {
     envoy::api::v2::Listener listener;
     try {
-      listener = MessageUtil::anyConvert<envoy::api::v2::Listener>(resource.resource(),
-                                                                   validation_visitor_);
-      MessageUtil::validate(listener);
+      listener = MessageUtil::anyConvert<envoy::api::v2::Listener>(resource.resource());
+      MessageUtil::validate(listener, validation_visitor_);
       if (!listener_names.insert(listener.name()).second) {
         // NOTE: at this point, the first of these duplicates has already been successfully applied.
         throw EnvoyException(fmt::format("duplicate listener {} found", listener.name()));
@@ -91,8 +90,7 @@ void LdsApiImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::An
     // Add this resource to our delta added/updated pile...
     envoy::api::v2::Resource* to_add = to_add_repeated.Add();
     const std::string listener_name =
-        MessageUtil::anyConvert<envoy::api::v2::Listener>(listener_blob, validation_visitor_)
-            .name();
+        MessageUtil::anyConvert<envoy::api::v2::Listener>(listener_blob).name();
     to_add->set_name(listener_name);
     to_add->set_version(version_info);
     to_add->mutable_resource()->MergeFrom(listener_blob);

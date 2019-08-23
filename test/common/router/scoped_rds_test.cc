@@ -25,6 +25,7 @@ using testing::DoAll;
 using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
+using testing::IsNull;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRefOfCopy;
@@ -313,9 +314,9 @@ key:
       2UL,
       factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload").value());
   // now scope key "x-bar-key" points to nowhere.
-  EXPECT_EQ(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
-                TestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}),
-            nullptr);
+  EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+                  TestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}),
+              IsNull());
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
                 ->getRouteConfig(TestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
@@ -350,6 +351,7 @@ key:
   EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(anyToResource(resources, "2"), {}, "1"));
   factory_context_.init_manager_.initialize(init_watcher_);
   EXPECT_EQ(
+      // Partial reject.
       1UL,
       factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload").value());
   EXPECT_EQ(getScopedRouteMap().size(), 2);
@@ -392,9 +394,9 @@ key:
       2UL,
       factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload").value());
   // now scope key "x-bar-key" points to nowhere.
-  EXPECT_EQ(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
-                TestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}),
-            nullptr);
+  EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+                  TestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}),
+              IsNull());
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
                 ->getRouteConfig(TestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
@@ -420,7 +422,82 @@ name: foo_scope2
 route_configuration_name: foo_routes
 key:
   fragments:
+    - string_key: x-bar-key
+)EOF";
+  parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml2);
+  EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(resources, "1"));
+  factory_context_.init_manager_.initialize(init_watcher_);
+  init_watcher_.expectReady().Times(2); // SRDS and RDS "foo_routes"
+  EXPECT_EQ(
+      1UL,
+      factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload").value());
+
+  // Verify the config is a ScopedConfigImpl instance, both scopes point to "" as RDS hasn't kicked
+  // in yet(NullConfigImpl returned).
+  EXPECT_NE(getScopedRdsProvider(), nullptr);
+  EXPECT_NE(getScopedRdsProvider()->config<ScopedConfigImpl>(), nullptr);
+  EXPECT_EQ(getScopedRdsProvider()
+                ->config<ScopedConfigImpl>()
+                ->getRouteConfig(TestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->name(),
+            "");
+  EXPECT_EQ(getScopedRdsProvider()
+                ->config<ScopedConfigImpl>()
+                ->getRouteConfig(TestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})
+                ->name(),
+            "");
+  // RDS updates foo_routes.
+  pushRdsConfig("foo_routes", "111");
+  EXPECT_EQ(getScopedRdsProvider()
+                ->config<ScopedConfigImpl>()
+                ->getRouteConfig(TestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->name(),
+            "foo_routes");
+  EXPECT_EQ(getScopedRdsProvider()
+                ->config<ScopedConfigImpl>()
+                ->getRouteConfig(TestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})
+                ->name(),
+            "foo_routes");
+
+  // Delete foo_scope2.
+  resources.RemoveLast();
+  EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(resources, "3"));
+  EXPECT_EQ(getScopedRouteMap().size(), 1);
+  EXPECT_EQ(getScopedRouteMap().count("foo_scope"), 1);
+  EXPECT_EQ(
+      2UL,
+      factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload").value());
+  // now scope key "x-bar-key" points to nowhere.
+  EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+                  TestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}),
+              IsNull());
+  EXPECT_EQ(getScopedRdsProvider()
+                ->config<ScopedConfigImpl>()
+                ->getRouteConfig(TestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->name(),
+            "foo_routes");
+}
+
+// Tests that multiple uniquely named non-conflict resources are allowed in config updates.
+TEST_F(ScopedRdsTest, MultipleResourcesDelta) {
+  setup();
+  init_watcher_.expectReady().Times(2); // SRDS and RDS "foo_routes"
+
+  const std::string config_yaml = R"EOF(
+name: foo_scope
+route_configuration_name: foo_routes
+key:
+  fragments:
     - string_key: x-foo-key
+)EOF";
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
+  parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml);
+  const std::string config_yaml2 = R"EOF(
+name: foo_scope2
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: x-bar-key
 )EOF";
   parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml2);
   EXPECT_THROW_WITH_REGEX(
@@ -433,9 +510,9 @@ key:
   // Scope key "x-foo-key" points to nowhere.
   EXPECT_NE(getScopedRdsProvider(), nullptr);
   EXPECT_NE(getScopedRdsProvider()->config<ScopedConfigImpl>(), nullptr);
-  EXPECT_EQ(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
-                TestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}),
-            nullptr);
+  EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+                  TestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}),
+              IsNull());
   factory_context_.init_manager_.initialize(init_watcher_);
   init_watcher_.expectReady().Times(
       1); // Just SRDS, RDS "foo_routes" will initialized by the noop init-manager.
@@ -546,7 +623,7 @@ TEST_F(ScopedRdsTest, ConfigDump) {
   auto message_ptr =
       factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"]();
   const auto& scoped_routes_config_dump =
-      MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::ScopedRoutesConfigDump&>(
+      TestUtility::downcastAndValidate<const envoy::admin::v2alpha::ScopedRoutesConfigDump&>(
           *message_ptr);
 
   // No routes at all(no SRDS push yet), no last_updated timestamp
@@ -594,7 +671,7 @@ $1
       factory_context_, "foo.", *config_provider_manager_);
   message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"]();
   const auto& scoped_routes_config_dump2 =
-      MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::ScopedRoutesConfigDump&>(
+      TestUtility::downcastAndValidate<const envoy::admin::v2alpha::ScopedRoutesConfigDump&>(
           *message_ptr);
   TestUtility::loadFromYaml(R"EOF(
 inline_scoped_route_configs:
@@ -658,7 +735,7 @@ dynamic_scoped_route_configs:
                             expected_config_dump);
   message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"]();
   const auto& scoped_routes_config_dump3 =
-      MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::ScopedRoutesConfigDump&>(
+      TestUtility::downcastAndValidate<const envoy::admin::v2alpha::ScopedRoutesConfigDump&>(
           *message_ptr);
   EXPECT_TRUE(TestUtility::protoEqual(expected_config_dump, scoped_routes_config_dump3));
 
@@ -689,7 +766,7 @@ dynamic_scoped_route_configs:
                             expected_config_dump);
   message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"]();
   const auto& scoped_routes_config_dump4 =
-      MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::ScopedRoutesConfigDump&>(
+      TestUtility::downcastAndValidate<const envoy::admin::v2alpha::ScopedRoutesConfigDump&>(
           *message_ptr);
   EXPECT_TRUE(TestUtility::protoEqual(expected_config_dump, scoped_routes_config_dump4));
 }

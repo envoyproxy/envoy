@@ -19,6 +19,7 @@ envoy_cc_test(
         "//source/common/profiler:profiler_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
+        "//source/common/stats:symbol_table_creator_lib",
         "//source/common/stats:thread_local_store_lib",
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "//source/server/http:admin_lib",

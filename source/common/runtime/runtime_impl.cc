@@ -182,9 +182,14 @@ bool SnapshotImpl::deprecatedFeatureEnabled(const std::string& key) const {
     // If either disallowed by default or configured off, the feature is not enabled.
     return false;
   }
+
   // The feature is allowed. It is assumed this check is called when the feature
   // is about to be used, so increment the feature use stat.
   stats_.deprecated_feature_use_.inc();
+#ifdef ENVOY_DISABLE_DEPRECATED_FEATURES
+  return false;
+#endif
+
   return true;
 }
 
@@ -517,9 +522,8 @@ RtdsSubscription::RtdsSubscription(
 void RtdsSubscription::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                                       const std::string&) {
   validateUpdateSize(resources.size());
-  auto runtime = MessageUtil::anyConvert<envoy::service::discovery::v2::Runtime>(
-      resources[0], validation_visitor_);
-  MessageUtil::validate(runtime);
+  auto runtime = MessageUtil::anyConvert<envoy::service::discovery::v2::Runtime>(resources[0]);
+  MessageUtil::validate(runtime, validation_visitor_);
   if (runtime.name() != resource_name_) {
     throw EnvoyException(
         fmt::format("Unexpected RTDS runtime (expecting {}): {}", resource_name_, runtime.name()));

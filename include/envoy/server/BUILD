@@ -234,6 +234,7 @@ envoy_cc_library(
         ":resource_monitor_interface",
         "//include/envoy/api:api_interface",
         "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/protobuf:message_validator_interface",
     ],
 )
 

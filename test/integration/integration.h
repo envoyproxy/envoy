@@ -327,6 +327,8 @@ protected:
 
   bool initialized() const { return initialized_; }
 
+  std::unique_ptr<Stats::Scope> upstream_stats_store_;
+
   // The IpVersion (IPv4, IPv6) to use.
   Network::Address::IpVersion version_;
   // IP Address to use when binding sockets on upstreams.

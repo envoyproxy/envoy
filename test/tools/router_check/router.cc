@@ -165,7 +165,7 @@ bool RouterCheckTool::compareEntries(const std::string& expected_routes) {
   auto api = Api::createApiForTest(*stats);
   const std::string contents = api->fileSystem().fileReadToEnd(expected_routes);
   TestUtility::loadFromFile(expected_routes, validation_config, *api);
-  MessageUtil::validate(validation_config);
+  TestUtility::validate(validation_config);
 
   bool no_failures = true;
   for (const envoy::RouterCheckToolSchema::ValidationItem& check_config :

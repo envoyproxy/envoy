@@ -152,13 +152,13 @@ public:
   ScopedRouteInfo(envoy::api::v2::ScopedRouteConfiguration&& config_proto,
                   ConfigConstSharedPtr&& route_config);
 
-  ConfigConstSharedPtr routeConfig() const { return route_config_; }
+  const ConfigConstSharedPtr& routeConfig() const { return route_config_; }
   const ScopeKey& scopeKey() const { return scope_key_; }
   const envoy::api::v2::ScopedRouteConfiguration& configProto() const { return config_proto_; }
   const std::string& scopeName() const { return config_proto_.name(); }
 
 private:
-  const envoy::api::v2::ScopedRouteConfiguration config_proto_;
+  envoy::api::v2::ScopedRouteConfiguration config_proto_;
   ScopeKey scope_key_;
   ConfigConstSharedPtr route_config_;
 };

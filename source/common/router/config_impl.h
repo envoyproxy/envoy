@@ -258,6 +258,7 @@ private:
   std::vector<uint32_t> retriable_status_codes_;
   absl::optional<std::chrono::milliseconds> base_interval_;
   absl::optional<std::chrono::milliseconds> max_interval_;
+  ProtobufMessage::ValidationVisitor* validation_visitor_{};
 };
 
 /**

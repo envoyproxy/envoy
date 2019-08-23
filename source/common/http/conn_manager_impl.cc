@@ -635,10 +635,10 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
       ENVOY_STREAM_LOG(trace, "snapped scoped routes config is null when SRDS is enabled.", *this);
       // Stop decoding now.
       maybeEndDecode(true);
-      sendLocalReply(
-          Grpc::Common::hasGrpcContentType(*request_headers_), Http::Code::InternalServerError,
-          "scoped routes config not set when SRDS is enabled", nullptr, is_head_request_,
-          absl::nullopt, StreamInfo::ResponseCodeDetails::get().RouteConfigurationNotFound);
+      sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_),
+                     Http::Code::InternalServerError, "unable to get route configuration", nullptr,
+                     is_head_request_, absl::nullopt,
+                     StreamInfo::ResponseCodeDetails::get().RouteConfigurationNotFound);
       return;
     }
     snapped_route_config_ = snapped_scoped_routes_config_->getRouteConfig(*request_headers_);

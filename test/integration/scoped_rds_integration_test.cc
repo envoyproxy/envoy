@@ -68,7 +68,7 @@ fragments:
               scope_key_builder;
           TestUtility::loadFromYaml(scope_key_builder_config_yaml, scope_key_builder);
           auto* scoped_routes = http_connection_manager.mutable_scoped_routes();
-          scoped_routes->set_name("foo-scoped-routes");
+          scoped_routes->set_name(srds_config_name_);
           *scoped_routes->mutable_scope_key_builder() = scope_key_builder;
 
           envoy::api::v2::core::ApiConfigSource* rds_api_config_source =
@@ -180,7 +180,7 @@ fragments:
   }
 
   void createScopedRdsStream() {
-    createStream(&scoped_rds_upstream_info_, getScopedRdsFakeUpstream(), "foo-scoped-routes");
+    createStream(&scoped_rds_upstream_info_, getScopedRdsFakeUpstream(), srds_config_name_);
   }
 
   void sendRdsResponse(const std::string& route_config, const std::string& version) {
@@ -195,18 +195,9 @@ fragments:
         response);
   }
 
-  void sendRdsResponse(const std::string& route_config, const std::string& version) {
-    envoy::api::v2::DiscoveryResponse response;
-    response.set_version_info(version);
-    response.set_type_url(Config::TypeUrl::get().RouteConfiguration);
-    response.add_resources()->PackFrom(
-        TestUtility::parseYaml<envoy::api::v2::RouteConfiguration>(route_config));
-    rds_upstream_info_.stream_->sendGrpcMessage(response);
-  }
-
   void sendScopedRdsResponse(const std::vector<std::string>& resource_protos,
                              const std::string& version) {
-    ASSERT(scoped_rds_upstream_info_.stream_by_resource_name_["foo-scoped-routes"] != nullptr);
+    ASSERT(scoped_rds_upstream_info_.stream_by_resource_name_[srds_config_name_] != nullptr);
 
     envoy::api::v2::DiscoveryResponse response;
     response.set_version_info(version);
@@ -217,10 +208,11 @@ fragments:
       TestUtility::loadFromYaml(resource_proto, scoped_route_proto);
       response.add_resources()->PackFrom(scoped_route_proto);
     }
-    scoped_rds_upstream_info_.stream_by_resource_name_["foo-scoped-routes"]->sendGrpcMessage(
+    scoped_rds_upstream_info_.stream_by_resource_name_[srds_config_name_]->sendGrpcMessage(
         response);
   }
 
+  const std::string srds_config_name_{"foo-scoped-routes"};
   FakeUpstreamInfo scoped_rds_upstream_info_;
   FakeUpstreamInfo rds_upstream_info_;
 };

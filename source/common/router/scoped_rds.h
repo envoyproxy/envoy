@@ -105,7 +105,7 @@ public:
   const ScopedRouteMap& scopedRouteMap() const { return scoped_route_map_; }
 
 private:
-  // A helper class that takes care the life circle management of a RDS route provider and the
+  // A helper class that takes care the life cycle management of a RDS route provider and the
   // update callback handle.
   struct RdsRouteConfigProviderHelper {
     RdsRouteConfigProviderHelper(
@@ -118,11 +118,13 @@ private:
     ScopedRdsConfigSubscription& parent_;
     std::string scope_name_;
     std::unique_ptr<RdsRouteConfigProviderImpl> route_provider_;
+    // This handle_ is owned by the route config provider's RDS subscription, when the helper
+    // destructs, the handle is deleted as well.
     Common::CallbackHandle* rds_update_callback_handle_;
   };
 
   // Adds or updates scopes, create a new RDS provider for each resource, if an exception is thrown
-  // during updating, the exception message is collected via the exception_msgs vector.
+  // during updating, the exception message is collected via the exception messages vector.
   // Returns true if any scope updated, false otherwise.
   bool addOrUpdateScopes(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& resources,
                          Init::Manager& init_manager, const std::string& version_info,
@@ -151,9 +153,7 @@ private:
     DeltaConfigSubscriptionInstance::onConfigUpdateFailed();
   }
   std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(resource,
-                                                                             validation_visitor_)
-        .name();
+    return MessageUtil::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(resource).name();
   }
   // Propagate RDS updates to ScopeConfigImpl in workers.
   void onRdsConfigUpdate(const std::string& scope_name,

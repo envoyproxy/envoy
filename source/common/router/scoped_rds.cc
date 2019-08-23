@@ -133,9 +133,9 @@ bool ScopedRdsConfigSubscription::addOrUpdateScopes(
   for (const auto& resource : resources) {
     envoy::api::v2::ScopedRouteConfiguration scoped_route_config;
     try {
-      scoped_route_config = MessageUtil::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(
-          resource.resource(), validation_visitor_);
-      MessageUtil::validate(scoped_route_config);
+      scoped_route_config =
+          MessageUtil::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(resource.resource());
+      MessageUtil::validate(scoped_route_config, validation_visitor_);
       const std::string scope_name = scoped_route_config.name();
       if (!unique_resource_names.insert(scope_name).second) {
         throw EnvoyException(
@@ -144,7 +144,6 @@ bool ScopedRdsConfigSubscription::addOrUpdateScopes(
       // TODO(stevenzzz): Creating a new RdsRouteConfigProvider likely expensive, migrate RDS to
       // config-provider-framework to make it light weight.
       rds.set_route_config_name(scoped_route_config.route_configuration_name());
-      // Delete previous route provider if any.
       auto rds_config_provider_helper =
           std::make_unique<RdsRouteConfigProviderHelper>(*this, scope_name, rds, init_manager);
       auto scoped_route_info = std::make_shared<ScopedRouteInfo>(
@@ -159,6 +158,7 @@ bool ScopedRdsConfigSubscription::addOrUpdateScopes(
                           iter->second, scoped_route_info->scopeName()));
         }
       }
+      // NOTE: delete previous route provider if any.
       route_provider_by_scope_.insert({scope_name, std::move(rds_config_provider_helper)});
       scope_name_by_hash_[scoped_route_info->scopeKey().hash()] = scoped_route_info->scopeName();
       scoped_route_map_[scoped_route_info->scopeName()] = scoped_route_info;
@@ -282,9 +282,9 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   absl::flat_hash_map<uint64_t, std::string> scope_name_by_key_hash;
   for (const auto& resource_any : resources) {
     // Throws (thus rejects all) on any error.
-    auto scoped_route = MessageUtil::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(
-        resource_any, validation_visitor_);
-    MessageUtil::validate(scoped_route);
+    auto scoped_route =
+        MessageUtil::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(resource_any);
+    MessageUtil::validate(scoped_route, validation_visitor_);
     const std::string scope_name = scoped_route.name();
     auto scope_config_inserted = scoped_routes.try_emplace(scope_name, std::move(scoped_route));
     if (!scope_config_inserted.second) {
@@ -316,7 +316,8 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
     *to_remove_repeated.Add() = scoped_route.first;
   }
   onConfigUpdate(to_add_repeated, to_remove_repeated, version_info);
-} // namespace Router
+}
+
 ScopedRdsConfigProvider::ScopedRdsConfigProvider(
     ScopedRdsConfigSubscriptionSharedPtr&& subscription)
     : MutableConfigProviderCommonBase(std::move(subscription), ConfigProvider::ApiType::Delta) {}
