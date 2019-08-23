@@ -610,7 +610,7 @@ static_resources:
   factory_.tls_.shutdownThread();
 }
 
-TEST_F(ClusterManagerImplTest, SubsetLoadBalancerRestriction) {
+TEST_F(ClusterManagerImplTest, SubsetLoadBalancerOriginalDstRestriction) {
   const std::string yaml = R"EOF(
 static_resources:
   clusters:
@@ -629,6 +629,27 @@ static_resources:
   EXPECT_THROW_WITH_MESSAGE(
       create(bootstrap), EnvoyException,
       "cluster: cluster type 'original_dst' may not be used with lb_subset_config");
+}
+
+TEST_F(ClusterManagerImplTest, SubsetLoadBalancerClusterProvidedLbRestriction) {
+  const std::string yaml = R"EOF(
+static_resources:
+  clusters:
+  - name: cluster_1
+    connect_timeout: 0.250s
+    type: static
+    lb_policy: cluster_provided
+  )EOF";
+
+  envoy::config::bootstrap::v2::Bootstrap bootstrap = parseBootstrapFromV2Yaml(yaml);
+  envoy::api::v2::Cluster::LbSubsetConfig* subset_config =
+      bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_lb_subset_config();
+  subset_config->set_fallback_policy(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT);
+  subset_config->add_subset_selectors()->add_keys("x");
+
+  EXPECT_THROW_WITH_MESSAGE(
+      create(bootstrap), EnvoyException,
+      "cluster: LB policy CLUSTER_PROVIDED cannot be combined with lb_subset_config");
 }
 
 TEST_F(ClusterManagerImplTest, SubsetLoadBalancerLocalityAware) {
