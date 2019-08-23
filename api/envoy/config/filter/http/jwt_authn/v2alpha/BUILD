@@ -5,7 +5,7 @@ load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library_internal", "ap
 api_proto_package(
     deps = [
         "//envoy/api/v2/core",
-        "//envoy/api/v2/route:route_protos",
+        "//envoy/api/v2/route:pkg",
     ],
 )
 

@@ -7,7 +7,7 @@ api_proto_package(
     deps = [
         "//envoy/api/v2",
         "//envoy/api/v2/core",
-        "//envoy/api/v2/endpoint:endpoint_protos",
+        "//envoy/api/v2/endpoint:pkg",
     ],
 )
 

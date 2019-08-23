@@ -4,7 +4,7 @@ licenses(["notice"])  # Apache 2
 
 api_proto_package(
     deps = [
-        "//envoy/api/v2/ratelimit:ratelimit_protos",
+        "//envoy/api/v2/ratelimit:pkg",
         "//envoy/config/ratelimit/v2:pkg",
     ],
 )

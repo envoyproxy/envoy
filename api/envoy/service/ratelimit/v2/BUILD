@@ -6,7 +6,7 @@ api_proto_package(
     has_services = True,
     deps = [
         "//envoy/api/v2/core",
-        "//envoy/api/v2/ratelimit:ratelimit_protos",
+        "//envoy/api/v2/ratelimit:pkg",
     ],
 )
 

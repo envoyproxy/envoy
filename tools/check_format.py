@@ -76,6 +76,7 @@ X_ENVOY_USED_DIRECTLY_REGEX = re.compile(r'.*\"x-envoy-.*\".*')
 PROTO_OPTION_JAVA_PACKAGE = "option java_package = \""
 PROTO_OPTION_JAVA_OUTER_CLASSNAME = "option java_outer_classname = \""
 PROTO_OPTION_JAVA_MULTIPLE_FILES = "option java_multiple_files = "
+PROTO_OPTION_GO_PACKAGE = "option go_package = \""
 
 # yapf: disable
 PROTOBUF_TYPE_ERRORS = {
@@ -685,6 +686,9 @@ def checkSourcePath(file_path):
                                                 "Java proto option 'java_outer_classname' not set")
       error_messages += errorIfNoSubstringFound("\n" + PROTO_OPTION_JAVA_MULTIPLE_FILES, file_path,
                                                 "Java proto option 'java_multiple_files' not set")
+    with open(file_path) as f:
+      if PROTO_OPTION_GO_PACKAGE in f.read():
+        error_messages += ["go_package option should not be set in %s" % file_path]
   return error_messages
 
 
