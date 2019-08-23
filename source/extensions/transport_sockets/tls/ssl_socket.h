@@ -6,6 +6,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/secret/secret_callbacks.h"
+#include "envoy/ssl/private_key/private_key_callbacks.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
@@ -38,6 +39,7 @@ struct SslSocketFactoryStats {
 };
 
 enum class InitialState { Client, Server };
+enum class SocketState { PreHandshake, HandshakeInProgress, HandshakeComplete, ShutdownSent };
 
 struct SslSocketInfo : public Envoy::Ssl::ConnectionInfo {
   SslSocketInfo(bssl::UniquePtr<SSL> ssl) : ssl_(std::move(ssl)) {}
@@ -80,6 +82,7 @@ struct SslSocketInfo : public Envoy::Ssl::ConnectionInfo {
 };
 
 class SslSocket : public Network::TransportSocket,
+                  public Envoy::Ssl::PrivateKeyConnectionCallbacks,
                   protected Logger::Loggable<Logger::Id::connection> {
 public:
   SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
@@ -89,12 +92,14 @@ public:
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
   std::string protocol() const override;
   absl::string_view failureReason() const override;
-  bool canFlushClose() override { return handshake_complete_; }
+  bool canFlushClose() override { return state_ == SocketState::HandshakeComplete; }
   void closeSocket(Network::ConnectionEvent close_type) override;
   Network::IoResult doRead(Buffer::Instance& read_buffer) override;
   Network::IoResult doWrite(Buffer::Instance& write_buffer, bool end_stream) override;
   void onConnected() override;
   Ssl::ConnectionInfoConstSharedPtr ssl() const override;
+  // Ssl::PrivateKeyConnectionCallbacks
+  void onPrivateKeyMethodComplete() override;
 
   SSL* rawSslForTest() const { return ssl_; }
 
@@ -108,14 +113,16 @@ private:
   Network::PostIoAction doHandshake();
   void drainErrorQueue();
   void shutdownSsl();
+  bool isThreadSafe() const {
+    return callbacks_ != nullptr && callbacks_->connection().dispatcher().isThreadSafe();
+  }
 
   const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
   Network::TransportSocketCallbacks* callbacks_{};
   ContextImplSharedPtr ctx_;
-  bool handshake_complete_{};
-  bool shutdown_sent_{};
   uint64_t bytes_to_retry_{};
   std::string failure_reason_;
+  SocketState state_;
 
   SSL* ssl_;
   Ssl::ConnectionInfoConstSharedPtr info_;

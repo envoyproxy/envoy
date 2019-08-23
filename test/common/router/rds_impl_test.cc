@@ -266,8 +266,8 @@ public:
     // Get a RouteConfigProvider. This one should create an entry in the RouteConfigProviderManager.
     rds_.set_route_config_name("foo_route_config");
     rds_.mutable_config_source()->set_path("foo_path");
-    provider_ = route_config_provider_manager_->createRdsRouteConfigProvider(rds_, factory_context_,
-                                                                             "foo_prefix.");
+    provider_ = route_config_provider_manager_->createRdsRouteConfigProvider(
+        rds_, factory_context_, "foo_prefix.", factory_context_.initManager());
     rds_callbacks_ = factory_context_.cluster_manager_.subscription_factory_.callbacks_;
   }
 
@@ -419,7 +419,7 @@ virtual_hosts:
                                                                                      "1");
 
   RouteConfigProviderPtr provider2 = route_config_provider_manager_->createRdsRouteConfigProvider(
-      rds_, factory_context_, "foo_prefix");
+      rds_, factory_context_, "foo_prefix", factory_context_.initManager());
 
   // provider2 should have route config immediately after create
   EXPECT_TRUE(provider2->configInfo().has_value());
@@ -433,7 +433,7 @@ virtual_hosts:
   rds2.set_route_config_name("foo_route_config");
   rds2.mutable_config_source()->set_path("bar_path");
   RouteConfigProviderPtr provider3 = route_config_provider_manager_->createRdsRouteConfigProvider(
-      rds2, factory_context_, "foo_prefix");
+      rds2, factory_context_, "foo_prefix", factory_context_.initManager());
   EXPECT_NE(provider3, provider_);
   factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(route_configs,
                                                                                      "provider3");
