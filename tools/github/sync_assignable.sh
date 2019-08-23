@@ -4,4 +4,4 @@
 
 set -e
 
-python_venv deprecate_version
+python_venv sync_assignable
