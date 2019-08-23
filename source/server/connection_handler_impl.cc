@@ -31,7 +31,7 @@ void ConnectionHandlerImpl::addListener(Network::ListenerConfig& config) {
   }
 
   if (disable_listeners_) {
-    listener->listener()->disable();
+    listener->disable();
   }
   listeners_.emplace_back(config.socket().localAddress(), std::move(listener));
 }
@@ -49,28 +49,28 @@ void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
 void ConnectionHandlerImpl::stopListeners(uint64_t listener_tag) {
   for (auto& listener : listeners_) {
     if (listener.second->listenerTag() == listener_tag) {
-      listener.second->listener().reset();
+      listener.second->destroy();
     }
   }
 }
 
 void ConnectionHandlerImpl::stopListeners() {
   for (auto& listener : listeners_) {
-    listener.second->listener().reset();
+    listener.second->destroy();
   }
 }
 
 void ConnectionHandlerImpl::disableListeners() {
   disable_listeners_ = true;
   for (auto& listener : listeners_) {
-    listener.second->listener()->disable();
+    listener.second->disable();
   }
 }
 
 void ConnectionHandlerImpl::enableListeners() {
   disable_listeners_ = false;
   for (auto& listener : listeners_) {
-    listener.second->listener()->enable();
+    listener.second->enable();
   }
 }
 
@@ -121,7 +121,7 @@ ConnectionHandlerImpl::ActiveTcpListener::~ActiveTcpListener() {
 Network::Listener*
 ConnectionHandlerImpl::findListenerByAddress(const Network::Address::Instance& address) {
   Network::ConnectionHandler::ActiveListener* listener = findActiveListenerByAddress(address);
-  return listener ? listener->listener().get() : nullptr;
+  return listener ? listener->listener() : nullptr;
 }
 
 Network::ConnectionHandler::ActiveListener*

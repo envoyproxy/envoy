@@ -72,7 +72,7 @@ public:
   /**
    * Used by ConnectionHandler to manage listeners.
    */
-  class ActiveListener {
+  class ActiveListener : public Listener {
   public:
     virtual ~ActiveListener() = default;
 
@@ -83,7 +83,12 @@ public:
     /**
      * @return the actual Listener object.
      */
-    virtual ListenerPtr& listener() PURE;
+    virtual Listener* listener() PURE;
+
+    /**
+     * Destroy the actual Listener it wraps.
+     */
+    virtual void destroy() PURE;
   };
 
   using ActiveListenerPtr = std::unique_ptr<ActiveListener>;
