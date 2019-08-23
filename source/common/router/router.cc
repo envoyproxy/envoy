@@ -250,15 +250,9 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
                                 const Http::HeaderMap& response_headers,
                                 Upstream::HostDescriptionConstSharedPtr upstream_host,
                                 bool dropped) {
-  uint64_t status_code_from_response_headers = Http::Utility::getResponseStatus(response_headers);
-  absl::optional<Grpc::Status::GrpcStatus> grpc_status =
-      Grpc::Common::getGrpcStatus(response_headers);
-  if (grpc_status.has_value()) {
-    status_code_from_response_headers = Grpc::Utility::grpcToHttpStatus(grpc_status.value());
-  }
   // Passing the response_status_code explicitly is an optimization to avoid
   // multiple calls to slow Http::Utility::getResponseStatus.
-  ASSERT(response_status_code == status_code_from_response_headers);
+  ASSERT(response_status_code == Http::Utility::getResponseStatus(response_headers));
   if (config_.emit_dynamic_stats_ && !callbacks_->streamInfo().healthCheck()) {
     const Http::HeaderEntry* upstream_canary_header = response_headers.EnvoyUpstreamCanary();
     const Http::HeaderEntry* internal_request_header = downstream_headers_->EnvoyInternalRequest();
@@ -1011,9 +1005,11 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& head
 
   absl::optional<Grpc::Status::GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(*headers);
   if (grpc_status.has_value()) {
-    response_code = Grpc::Utility::grpcToHttpStatus(grpc_status.value());
+    upstream_request.upstream_host_->outlierDetector().putHttpResponseCode(
+        Grpc::Utility::grpcToHttpStatus(grpc_status.value()));
+  } else {
+    upstream_request.upstream_host_->outlierDetector().putHttpResponseCode(response_code);
   }
-  upstream_request.upstream_host_->outlierDetector().putHttpResponseCode(response_code);
 
   if (headers->EnvoyImmediateHealthCheckFail() != nullptr) {
     upstream_request.upstream_host_->healthChecker().setUnhealthy();
