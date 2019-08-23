@@ -6,6 +6,7 @@
 #include "envoy/init/manager.h"
 #include "envoy/stats/scope.h"
 
+#include "common/config/grpc_mux_impl.h"
 #include "common/router/scoped_rds.h"
 
 #include "test/mocks/config/mocks.h"
@@ -97,8 +98,10 @@ protected:
 class ScopedRdsTest : public ScopedRoutesTestBase {
 protected:
   void setup() {
-    InSequence s;
+    ON_CALL(factory_context_.cluster_manager_, adsMux())
+        .WillByDefault(Return(std::make_shared<::Envoy::Config::NullGrpcMuxImpl>()));
 
+    InSequence s;
     // Since factory_context_.cluster_manager_.subscription_factory_.callbacks_ is taken by the SRDS
     // subscription. We need to return a different MockSubscription here for each RDS subscription.
     // To build the map from RDS route_config_name to the RDS subscription, we need to get the
