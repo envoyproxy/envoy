@@ -232,7 +232,8 @@ public:
   std::size_t warmingClusterCount() const override { return warming_clusters_.size(); }
 
 protected:
-  virtual void postThreadLocalHostRemoval(const Cluster& cluster, const HostVector& hosts_removed);
+  virtual void postThreadLocalDrainConnections(const Cluster& cluster,
+                                               const HostVector& hosts_removed);
   virtual void postThreadLocalClusterUpdate(const Cluster& cluster, uint32_t priority,
                                             const HostVector& hosts_added,
                                             const HostVector& hosts_removed);
@@ -419,9 +420,13 @@ private:
     // This is default constructed to the clock's epoch:
     // https://en.cppreference.com/w/cpp/chrono/time_point/time_point
     //
-    // This will usually be the computer's boot time, which means that given a not very large
-    // `Cluster.CommonLbConfig.update_merge_window`, the first update will trigger immediately
-    // (the expected behavior).
+    // Depending on your execution environment this value can be different.
+    // When running as host process: This will usually be the computer's boot time, which means that
+    // given a not very large `Cluster.CommonLbConfig.update_merge_window`, the first update will
+    // trigger immediately (the expected behavior). When running in some sandboxed environment this
+    // value can be set to the start time of the sandbox, which means that the delta calculated
+    // between now and the start time may fall within the
+    // `Cluster.CommonLbConfig.update_merge_window`, with the side effect to delay the first update.
     MonotonicTime last_updated_;
   };
 
