@@ -14,4 +14,12 @@ if [[ "$(uname -m)" == "x86_64" ]]; then
   curl --location --output /usr/local/bin/bazel https://github.com/bazelbuild/bazelisk/releases/download/v${VERSION}/bazelisk-linux-amd64 \
     && echo "$SHA256  /usr/local/bin/bazel" | sha256sum --check \
     && chmod +x /usr/local/bin/bazel
+
+  # ninja
+  VERSION=1.8.2
+  SHA256=d2fea9ff33b3ef353161ed906f260d565ca55b8ca0568fa07b1d2cab90a84a07
+  curl -sLo ninja-"$VERSION".zip https://github.com/ninja-build/ninja/releases/download/v"$VERSION"/ninja-linux.zip \
+    && echo "$SHA256" ninja-"$VERSION".zip | sha256sum --check \
+    && unzip ninja-"$VERSION".zip \
+    && mv ninja /usr/bin
 fi
