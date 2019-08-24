@@ -389,7 +389,7 @@ TEST(HttpConnManFinalizerImpl, GrpcOkStatus) {
                                   stream_info, config);
 }
 
-TEST(HttpConnManFinalizerImpl, GrpcError) {
+TEST(HttpConnManFinalizerImpl, GrpcErrorTag) {
   const std::string path_prefix = "http://";
   NiceMock<MockSpan> span;
 
@@ -400,14 +400,14 @@ TEST(HttpConnManFinalizerImpl, GrpcError) {
                                           {"content-type", "application/grpc"},
                                           {"te", "trailers"}};
 
-  Http::TestHeaderMapImpl response_headers{{":status", "403"},
+  Http::TestHeaderMapImpl response_headers{{":status", "200"},
                                            {"content-type", "application/grpc"}};
   Http::TestHeaderMapImpl response_trailers{{"grpc-status", "7"},
                                             {"grpc-message", "permission denied"}};
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
 
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http2;
-  absl::optional<uint32_t> response_code(403);
+  absl::optional<uint32_t> response_code(200);
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
   EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(10));
   EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(11));
@@ -417,7 +417,45 @@ TEST(HttpConnManFinalizerImpl, GrpcError) {
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpMethod), Eq("POST")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/2")));
-  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("403")));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("7")));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcMessage), Eq("permission denied")));
+
+  NiceMock<MockConfig> config;
+  HttpTracerUtility::finalizeSpan(span, &request_headers, &response_headers, &response_trailers,
+                                  stream_info, config);
+}
+
+TEST(HttpConnManFinalizerImpl, GrpcTrailersOnly) {
+  const std::string path_prefix = "http://";
+  NiceMock<MockSpan> span;
+
+  Http::TestHeaderMapImpl request_headers{{":method", "POST"},
+                                          {":scheme", "http"},
+                                          {":path", "/pb.Foo/Bar"},
+                                          {":authority", "example.com:80"},
+                                          {"content-type", "application/grpc"},
+                                          {"te", "trailers"}};
+
+  Http::TestHeaderMapImpl response_headers{{":status", "200"},
+                                           {"content-type", "application/grpc"},
+                                           {"grpc-status", "7"},
+                                           {"grpc-message", "permission denied"}};
+  Http::TestHeaderMapImpl response_trailers;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+
+  absl::optional<Http::Protocol> protocol = Http::Protocol::Http2;
+  absl::optional<uint32_t> response_code(200);
+  EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
+  EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(10));
+  EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(11));
+  EXPECT_CALL(stream_info, protocol()).WillRepeatedly(ReturnPointee(&protocol));
+
+  EXPECT_CALL(span, setTag(_, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpMethod), Eq("POST")));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/2")));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("7")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcMessage), Eq("permission denied")));
 

@@ -82,6 +82,22 @@ Decision HttpTracerUtility::isTracing(const StreamInfo::StreamInfo& stream_info,
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
+static void addGrpcTags(Span& span, const Http::HeaderMap& headers) {
+  const Http::HeaderEntry* grpc_status_header = headers.GrpcStatus();
+  if (grpc_status_header) {
+    span.setTag(Tracing::Tags::get().GrpcStatusCode, grpc_status_header->value().getStringView());
+  }
+  const Http::HeaderEntry* grpc_message_header = headers.GrpcMessage();
+  if (grpc_message_header) {
+    span.setTag(Tracing::Tags::get().GrpcMessage, grpc_message_header->value().getStringView());
+  }
+  absl::optional<Grpc::Status::GrpcStatus> grpc_status_code = Grpc::Common::getGrpcStatus(headers);
+  // Set error tag when status is not OK.
+  if (grpc_status_code && grpc_status_code.value() != Grpc::Status::GrpcStatus::Ok) {
+    span.setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+  }
+}
+
 static void annotateVerbose(Span& span, const StreamInfo::StreamInfo& stream_info) {
   const auto start_time = stream_info.startTime();
   if (stream_info.lastDownstreamRxByteReceived()) {
@@ -167,22 +183,10 @@ void HttpTracerUtility::finalizeSpan(Span& span, const Http::HeaderMap* request_
               StreamInfo::ResponseFlagUtils::toShortString(stream_info));
 
   // GRPC data.
-  if (response_headers && response_trailers && stream_info.protocol() == Http::Protocol::Http2 &&
-      Grpc::Common::hasGrpcContentType(*response_headers)) {
-    const Http::HeaderEntry* grpc_status_header = response_trailers->GrpcStatus();
-    if (grpc_status_header) {
-      span.setTag(Tracing::Tags::get().GrpcStatusCode, grpc_status_header->value().getStringView());
-    }
-    const Http::HeaderEntry* grpc_message_header = response_trailers->GrpcMessage();
-    if (grpc_message_header) {
-      span.setTag(Tracing::Tags::get().GrpcMessage, grpc_message_header->value().getStringView());
-    }
-    absl::optional<Grpc::Status::GrpcStatus> grpc_status_code =
-        Grpc::Common::getGrpcStatus(*response_trailers);
-    // Set error tag when status is not OK.
-    if (grpc_status_code && grpc_status_code.value() != Grpc::Status::GrpcStatus::Ok) {
-      span.setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
-    }
+  if (response_trailers && response_trailers->GrpcStatus() != nullptr) {
+    addGrpcTags(span, *response_trailers);
+  } else if (response_headers && response_headers->GrpcStatus() != nullptr) {
+    addGrpcTags(span, *response_headers);
   }
 
   if (tracing_config.verbose()) {
