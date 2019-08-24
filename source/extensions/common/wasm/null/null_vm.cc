@@ -56,8 +56,12 @@ bool NullVm::getMemoryOffset(void* host_pointer, uint64_t* vm_pointer) {
 }
 
 bool NullVm::setMemory(uint64_t pointer, uint64_t size, const void* data) {
-  if ((pointer == 0 || data == nullptr) && size != 0) {
-    return false;
+  if ((pointer == 0 || data == nullptr)) {
+    if (size != 0) {
+      return false;
+    } else {
+      return true;
+    }
   }
   auto p = reinterpret_cast<char*>(pointer);
   memcpy(p, data, size);

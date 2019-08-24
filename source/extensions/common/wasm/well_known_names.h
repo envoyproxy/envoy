@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "common/singleton/const_singleton.h"
 
 namespace Envoy {
@@ -18,7 +20,7 @@ public:
   const std::string Null = "envoy.wasm.vm.null";
 };
 
-typedef ConstSingleton<WasmVmValues> WasmVmNames;
+using WasmVmNames = ConstSingleton<WasmVmValues>;
 
 } // namespace Wasm
 } // namespace Common

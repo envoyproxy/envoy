@@ -35,7 +35,7 @@ template <typename R, typename... Args> struct ConvertFunctionTypeWordToUint32<R
 };
 
 template <typename T> struct Global {
-  virtual ~Global() {}
+  virtual ~Global() = default;
   virtual T get() PURE;
   virtual void set(const T& t) PURE;
 };
@@ -105,7 +105,7 @@ class WasmVm : public Logger::Loggable<Logger::Id::wasm> {
 public:
   using WasmVmPtr = std::unique_ptr<WasmVm>;
 
-  virtual ~WasmVm() {}
+  virtual ~WasmVm() = default;
   virtual absl::string_view vm() PURE;
 
   // Whether or not the VM implementation supports cloning.

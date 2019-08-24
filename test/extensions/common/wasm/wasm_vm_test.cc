@@ -16,15 +16,15 @@ namespace {
 
 class TestNullVmPlugin : public Null::NullVmPlugin {
 public:
-  TestNullVmPlugin() {}
-  ~TestNullVmPlugin() {}
+  TestNullVmPlugin() = default;
+  ~TestNullVmPlugin() override = default;
 
   MOCK_METHOD0(start, void());
 };
 
 class PluginFactory : public Null::NullVmPluginFactory {
 public:
-  PluginFactory() {}
+  PluginFactory() = default;
 
   const std::string name() const override { return "test_null_vm_plugin"; }
   std::unique_ptr<Null::NullVmPlugin> create() const override;

@@ -21,6 +21,7 @@ envoy_cc_library(
     hdrs = ["wasm_vm.h"],
     deps = [
         ":well_known_names",
+        "//source/common/common:minimal_logger_lib",
     ],
 )
 
