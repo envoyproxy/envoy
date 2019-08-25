@@ -225,8 +225,8 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key,
   }
 
   const bool use_crc16 = is_redis_cluster_;
-  Clusters::Redis::RedisLoadBalancerContextImpl lb_context(key, parent_.config_.enableHashtagging(),
-                                                           use_crc16, request);
+  Clusters::Redis::RedisLoadBalancerContextImpl lb_context(
+      key, parent_.config_.enableHashtagging(), use_crc16, request, parent_.config_.readPolicy());
   Upstream::HostConstSharedPtr host = cluster_->loadBalancer().chooseHost(&lb_context);
   if (!host) {
     return nullptr;
