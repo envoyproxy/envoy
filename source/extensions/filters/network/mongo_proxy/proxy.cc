@@ -180,11 +180,16 @@ void ProxyFilter::decodeQuery(QueryMessagePtr&& message) {
 
 void ProxyFilter::chargeQueryStats(Stats::StatNameVec& names,
                                    QueryMessageInfo::QueryType query_type) {
-  ASSERT(names.capacity() - names.size() >= 2); // Ensures the caller has reserved() enough memory.
+  // names come in containing {"collection", collection}. Report stats for 1 or
+  // 2 variations on this array, and then return with the array in the same
+  // state it had on entry. Both of these variations by appending {"query", "total"}.
+  size_t orig_size = names.size();
+  ASSERT(names.capacity() - orig_size >= 2); // Ensures the caller has reserved() enough memory.
   names.push_back(mongo_stats_->query_);
   names.push_back(mongo_stats_->total_);
   mongo_stats_->incCounter(names);
 
+  // And now replace "total" with either "scatter_get" or "multi_get" if depending on query_type.
   if (query_type == QueryMessageInfo::QueryType::ScatterGet) {
     names.back() = mongo_stats_->scatter_get_;
     mongo_stats_->incCounter(names);
@@ -192,7 +197,7 @@ void ProxyFilter::chargeQueryStats(Stats::StatNameVec& names,
     names.back() = mongo_stats_->multi_get_;
     mongo_stats_->incCounter(names);
   }
-  names.resize(names.size() - 2);
+  names.resize(orig_size);
 }
 
 void ProxyFilter::decodeReply(ReplyMessagePtr&& message) {
