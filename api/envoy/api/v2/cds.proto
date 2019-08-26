@@ -553,7 +553,8 @@ message Cluster {
     // the first update happens. This is useful for big clusters, with potentially noisy deploys
     // that might trigger excessive CPU usage due to a constant stream of healthcheck state changes
     // or metadata updates. The first set of updates to be seen apply immediately (e.g.: a new
-    // cluster).
+    // cluster). Please always keep in mind that the use of sandbox technologies may change this
+    // behavior.
     //
     // If this is not set, we default to a merge window of 1000ms. To disable it, set the merge
     // window to 0.
@@ -583,6 +584,10 @@ message Cluster {
     // If panic mode is triggered, new hosts are still eligible for traffic; they simply do not
     // contribute to the calculation when deciding whether panic mode is enabled or not.
     bool ignore_new_hosts_until_first_hc = 5;
+
+    // If set to `true`, the cluster manager will drain all existing
+    // connections to upstream hosts whenever hosts are added or removed from the cluster.
+    bool close_connections_on_host_set_change = 6;
   }
 
   // Common configuration for all load balancer implementations.

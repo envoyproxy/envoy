@@ -205,6 +205,7 @@ public:
             [&](Http::StreamDecoder& decoder,
                 Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
               response_decoder_ = &decoder;
+              EXPECT_CALL(callbacks_.dispatcher_, setTrackedObject(_)).Times(testing::AtLeast(2));
               callbacks.onPoolReady(original_encoder_, cm_.conn_pool_.host_);
               return nullptr;
             }));

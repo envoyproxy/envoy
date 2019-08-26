@@ -245,14 +245,15 @@ TEST_F(OptionsImplTest, OptionsAreInSyncWithProto) {
   Server::CommandLineOptionsPtr command_line_options = options->toCommandLineOptions();
   // Failure of this condition indicates that the server_info proto is not in sync with the options.
   // If an option is added/removed, please update server_info proto as well to keep it in sync.
-  // Currently the following 5 options are not defined in proto, hence the count differs by 5.
+  // Currently the following 7 options are not defined in proto, hence the count differs by 7.
   // 1. version        - default TCLAP argument.
   // 2. help           - default TCLAP argument.
   // 3. ignore_rest    - default TCLAP argument.
   // 4. use-libevent-buffers  - short-term override for rollout of new buffer implementation.
   // 5. allow-unknown-fields  - deprecated alias of allow-unknown-static-fields.
   // 6. use-fake-symbol-table - short-term override for rollout of real symbol-table implementation.
-  EXPECT_EQ(options->count() - 6, command_line_options->GetDescriptor()->field_count());
+  // 7. hot restart version - print the hot restart version and exit.
+  EXPECT_EQ(options->count() - 7, command_line_options->GetDescriptor()->field_count());
 }
 
 TEST_F(OptionsImplTest, BadCliOption) {
