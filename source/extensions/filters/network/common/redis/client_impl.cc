@@ -52,9 +52,8 @@ ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatche
                              const Config& config) {
   auto redis_command_stats = std::make_shared<RedisCommandStats>(
       host->cluster().statsScope(), "upstream_commands", config.enableCommandStats());
-  auto client = std::make_unique<ClientImpl>(host, dispatcher, std::move(encoder),
-                                                    decoder_factory, config,
-                                                    std::move(redis_command_stats));
+  auto client = std::make_unique<ClientImpl>(host, dispatcher, std::move(encoder), decoder_factory,
+                                             config, std::move(redis_command_stats));
   client->connection_ = host->createConnection(dispatcher, nullptr, nullptr).connection_;
   client->connection_->addConnectionCallbacks(*client);
   client->connection_->addReadFilter(Network::ReadFilterSharedPtr{new UpstreamReadFilter(*client)});

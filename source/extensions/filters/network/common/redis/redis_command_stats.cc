@@ -10,67 +10,54 @@ namespace Redis {
 
 RedisCommandStats::RedisCommandStats(Stats::Scope& scope, const std::string& prefix, bool enabled)
     : scope_(scope), stat_name_set_(scope.symbolTable()), prefix_(stat_name_set_.add(prefix)),
-      enabled_(enabled), upstream_rq_time_(stat_name_set_.getStatName(upstream_rq_time_metric_)) {
+      enabled_(enabled), upstream_rq_time_(stat_name_set_.add("upstream_rq_time")),
+      latency_(stat_name_set_.add("latency")), total_(stat_name_set_.add("total")),
+      success_(stat_name_set_.add("success")), error_(stat_name_set_.add("error")) {
   // Note: Even if this is disabled, we track the upstream_rq_time.
-  stat_name_set_.rememberBuiltin(upstream_rq_time_metric_);
-
   if (enabled_) {
     // Create StatName for each Redis command. Note that we don't include Auth or Ping.
     for (const std::string& command :
          Extensions::NetworkFilters::Common::Redis::SupportedCommands::simpleCommands()) {
-      createStats(command);
+      stat_name_set_.rememberBuiltin(command);
     }
     for (const std::string& command :
          Extensions::NetworkFilters::Common::Redis::SupportedCommands::evalCommands()) {
-      createStats(command);
+      stat_name_set_.rememberBuiltin(command);
     }
     for (const std::string& command : Extensions::NetworkFilters::Common::Redis::SupportedCommands::
              hashMultipleSumResultCommands()) {
-      createStats(command);
+      stat_name_set_.rememberBuiltin(command);
     }
-    createStats(Extensions::NetworkFilters::Common::Redis::SupportedCommands::mget());
-    createStats(Extensions::NetworkFilters::Common::Redis::SupportedCommands::mset());
+    stat_name_set_.rememberBuiltin(
+        Extensions::NetworkFilters::Common::Redis::SupportedCommands::mget());
+    stat_name_set_.rememberBuiltin(
+        Extensions::NetworkFilters::Common::Redis::SupportedCommands::mset());
   }
 }
 
-void RedisCommandStats::createStats(std::string name) {
-  stat_name_set_.rememberBuiltin(name + ".total");
-  stat_name_set_.rememberBuiltin(name + ".success");
-  stat_name_set_.rememberBuiltin(name + ".error");
-  stat_name_set_.rememberBuiltin(name + ".latency");
+Stats::Counter& RedisCommandStats::counter(const Stats::StatNameVec& stat_names) {
+  const Stats::SymbolTable::StoragePtr storage_ptr = scope_.symbolTable().join(stat_names);
+  Stats::StatName full_stat_name = Stats::StatName(storage_ptr.get());
+  return scope_.counterFromStatName(full_stat_name);
 }
 
-Stats::SymbolTable::StoragePtr RedisCommandStats::addPrefix(const Stats::StatName name) {
-  return scope_.symbolTable().join({prefix_, name});
-}
-
-Stats::Counter& RedisCommandStats::counter(std::string name) {
-  Stats::StatName stat_name = stat_name_set_.getStatName(name);
-  const Stats::SymbolTable::StoragePtr stat_name_storage = addPrefix(stat_name);
-  return scope_.counterFromStatName(Stats::StatName(stat_name_storage.get()));
-}
-
-Stats::Histogram& RedisCommandStats::histogram(std::string name) {
-  Stats::StatName stat_name = stat_name_set_.getStatName(name);
-  return histogram(stat_name);
-}
-
-Stats::Histogram& RedisCommandStats::histogram(Stats::StatName stat_name) {
-  const Stats::SymbolTable::StoragePtr stat_name_storage = addPrefix(stat_name);
-  return scope_.histogramFromStatName(Stats::StatName(stat_name_storage.get()));
+Stats::Histogram& RedisCommandStats::histogram(const Stats::StatNameVec& stat_names) {
+  const Stats::SymbolTable::StoragePtr storage_ptr = scope_.symbolTable().join(stat_names);
+  Stats::StatName full_stat_name = Stats::StatName(storage_ptr.get());
+  return scope_.histogramFromStatName(full_stat_name);
 }
 
 Stats::CompletableTimespanPtr
-RedisCommandStats::createCommandTimer(std::string name, Envoy::TimeSource& time_source) {
-  Stats::StatName stat_name = stat_name_set_.getStatName(name + latency_suffix_);
-  return std::make_unique<Stats::TimespanWithUnit<std::chrono::microseconds>>(histogram(stat_name),
-                                                                              time_source);
+RedisCommandStats::createCommandTimer(std::string command, Envoy::TimeSource& time_source) {
+  Stats::StatName stat_name = stat_name_set_.getStatName(command);
+  return std::make_unique<Stats::TimespanWithUnit<std::chrono::microseconds>>(
+      histogram({prefix_, stat_name, latency_}), time_source);
 }
 
 Stats::CompletableTimespanPtr
 RedisCommandStats::createAggregateTimer(Envoy::TimeSource& time_source) {
   return std::make_unique<Stats::TimespanWithUnit<std::chrono::microseconds>>(
-      histogram(upstream_rq_time_), time_source);
+      histogram({prefix_, upstream_rq_time_}), time_source);
 }
 
 std::string RedisCommandStats::getCommandFromRequest(const RespValue& request) {
@@ -87,15 +74,17 @@ std::string RedisCommandStats::getCommandFromRequest(const RespValue& request) {
   }
 }
 
-void RedisCommandStats::updateStatsTotal(std::string command) {
-  counter(command + total_suffix_).inc();
+void RedisCommandStats::updateStatsTotal(const std::string& command) {
+  Stats::StatName stat_name = stat_name_set_.getStatName(command);
+  counter({prefix_, stat_name, total_}).inc();
 }
 
-void RedisCommandStats::updateStats(const bool success, std::string command) {
+void RedisCommandStats::updateStats(const bool success, const std::string& command) {
+  Stats::StatName stat_name = stat_name_set_.getStatName(command);
   if (success) {
-    counter(command + success_suffix_).inc();
+    counter({prefix_, stat_name, success_}).inc();
   } else {
-    counter(command + error_suffix_).inc();
+    counter({prefix_, stat_name, success_}).inc();
   }
 }
 
