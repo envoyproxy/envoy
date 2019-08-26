@@ -217,10 +217,24 @@ issue fixed for your respective distribution's users.
 Before any information from the list is shared with respective members of your team required to fix
 said issue, they must agree to the same terms and only find out information on a need-to-know basis.
 
+We typically expect a single point-of-contact (PoC) at any given legal entity. Within the
+organization, it is the responsibility of the PoC to share CVE and related patches internally. This
+should be performed on a strictly need-to-know basis with affected groups to the extent that this is
+technically plausible. All teams should be aware of the embargo conditions and accept them.
+Ultimately, if an organization breaks embargo transitively through such sharing, they will lose
+the early disclosure privilege, so it's in their best interest to carefully share information internally,
+following best practices and use their judgement in balancing the tradeoff between protecting users
+and maintaining confidentiality.
+
 The embargo applies to information shared, source code and binary images. **It is a violation of the
 embargo policy to share binary distributions of the security fixes before the public release date.**
 This includes, but is not limited to, Envoy binaries and Docker images. It is expected that
 distributors have a method to stage and validate new binaries without exposing them publicly.
+
+If the information shared is under embargo from a third party, where Envoy is one of many projects
+that a disclosure is shared with, it is critical to consider that the ramifications of any leak will
+extend beyond the Envoy community and will leave us in a position in which we will be less likely to
+receive embargoed reports in the future.
 
 In the unfortunate event you share the information beyond what is allowed by this policy, you _must_
 urgently inform the envoy-security@googlegroups.com mailing list of exactly what information leaked
@@ -329,7 +343,8 @@ customers, of which approximately 400 are using Seven in production. [links]
 We announce on our blog all upstream patches we apply to "Seven." [link to blog
 posts]
 
-> 4. Not be a downstream or rebuild of another distribution.
+> 4. Not be a downstream or rebuild of another distribution. If you offer Envoy as a publicly
+>    available infrastructure or platform service, this condition does not need to apply.
 
 This does not apply, "Seven" is a unique snowflake distribution.
 
@@ -368,16 +383,17 @@ CrashOverride will vouch for the "Seven" distribution joining the distribution l
 
 ### Members
 
-| E-mail                                    | Organization  |
-|-------------------------------------------|:-------------:|
-| envoy-security-team@aspenmesh.io          | Aspen Mesh    |
-| aws-app-mesh-security@amazon.com          | AWS           |
-| security@cilium.io                        | Cilium        |
-| vulnerabilityreports@cloudfoundry.org     | Cloud Foundry |
-| secalert@datawire.io                      | Datawire      |
-| google-internal-envoy-security@google.com | Google        |
-| vulnerabilities@discuss.istio.io          | Istio         |
-| secalert@redhat.com                       | Red Hat       |
-| envoy-security@solo.io                    | solo.io       |
-| envoy-security@tetrate.io                 | Tetrate       |
-| security@vmware.com                       | VMware        |
+| E-mail                                                | Organization  |
+|-------------------------------------------------------|:-------------:|
+| envoy-security-team@aspenmesh.io                      | Aspen Mesh    |
+| aws-app-mesh-security@amazon.com                      | AWS           |
+| security@cilium.io                                    | Cilium        |
+| vulnerabilityreports@cloudfoundry.org                 | Cloud Foundry |
+| secalert@datawire.io                                  | Datawire      |
+| google-internal-envoy-security@google.com             | Google        |
+| argoprod@us.ibm.com                                   | IBM           |
+| istio-security-vulnerability-reports@googlegroups.com | Istio         |
+| secalert@redhat.com                                   | Red Hat       |
+| envoy-security@solo.io                                | solo.io       |
+| envoy-security@tetrate.io                             | Tetrate       |
+| security@vmware.com                                   | VMware        |

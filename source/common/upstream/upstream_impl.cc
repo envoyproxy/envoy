@@ -140,7 +140,7 @@ createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typ
   Envoy::Config::Utility::translateOpaqueConfig(typed_config, config, validation_visitor,
                                                 *proto_config);
 
-  return factory->createProtocolOptionsConfig(*proto_config);
+  return factory->createProtocolOptionsConfig(*proto_config, validation_visitor);
 }
 
 std::map<std::string, ProtocolOptionsConfigConstSharedPtr>
@@ -637,13 +637,13 @@ ClusterInfoImpl::ClusterInfoImpl(
     break;
   case envoy::api::v2::Cluster::ORIGINAL_DST_LB:
     if (config.type() != envoy::api::v2::Cluster::ORIGINAL_DST) {
-      throw EnvoyException(fmt::format(
-          "cluster: LB policy {} is not valid for Cluster type {}. Only 'original_dst_lb' "
-          "is allowed with cluster type 'original_dst'",
-          envoy::api::v2::Cluster_LbPolicy_Name(config.lb_policy()),
-          envoy::api::v2::Cluster_DiscoveryType_Name(config.type())));
+      throw EnvoyException(
+          fmt::format("cluster: LB policy {} is not valid for Cluster type {}. 'ORIGINAL_DST_LB' "
+                      "is allowed only with cluster type 'ORIGINAL_DST'",
+                      envoy::api::v2::Cluster_LbPolicy_Name(config.lb_policy()),
+                      envoy::api::v2::Cluster_DiscoveryType_Name(config.type())));
     }
-    lb_type_ = LoadBalancerType::OriginalDst;
+    lb_type_ = LoadBalancerType::ClusterProvided;
     break;
   case envoy::api::v2::Cluster::MAGLEV:
     lb_type_ = LoadBalancerType::Maglev;
@@ -1311,12 +1311,6 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
 
   // At this point we've accounted for all the new hosts as well the hosts that previously
   // existed in this priority.
-
-  // TODO(mattklein123): This stat is used by both the RR and LR load balancer to decide at
-  // runtime whether to use either the weighted or unweighted mode. If we extend weights to
-  // static clusters or DNS SRV clusters we need to make sure this gets set. Better, we should
-  // avoid pivoting on this entirely and probably just force a host set refresh if any weights
-  // change.
   info_->stats().max_host_weight_.set(max_host_weight);
 
   // Whatever remains in current_priority_hosts should be removed.

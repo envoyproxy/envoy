@@ -35,6 +35,17 @@ bool runtimeFeatureEnabled(absl::string_view feature) {
   return RuntimeFeaturesDefaults::get().enabledByDefault(feature);
 }
 
+uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
+  ASSERT(absl::StartsWith(feature, "envoy.reloadable_features"));
+  if (Runtime::LoaderSingleton::getExisting()) {
+    return Runtime::LoaderSingleton::getExisting()->threadsafeSnapshot()->getInteger(
+        std::string(feature), default_value);
+  }
+  ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::runtime), warn,
+                      "Unable to use runtime singleton for feature {}", feature);
+  return default_value;
+}
+
 const size_t RandomGeneratorImpl::UUID_LENGTH = 36;
 
 uint64_t RandomGeneratorImpl::random() {
@@ -171,9 +182,14 @@ bool SnapshotImpl::deprecatedFeatureEnabled(const std::string& key) const {
     // If either disallowed by default or configured off, the feature is not enabled.
     return false;
   }
+
   // The feature is allowed. It is assumed this check is called when the feature
   // is about to be used, so increment the feature use stat.
   stats_.deprecated_feature_use_.inc();
+#ifdef ENVOY_DISABLE_DEPRECATED_FEATURES
+  return false;
+#endif
+
   return true;
 }
 
@@ -463,6 +479,9 @@ LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator
       throw EnvoyException(absl::StrCat("Duplicate layer name: ", layer.name()));
     }
     switch (layer.layer_specifier_case()) {
+    case envoy::config::bootstrap::v2::RuntimeLayer::kStaticLayer:
+      // Nothing needs to be done here.
+      break;
     case envoy::config::bootstrap::v2::RuntimeLayer::kAdminLayer:
       if (admin_layer_ != nullptr) {
         throw EnvoyException(
@@ -483,8 +502,7 @@ LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator
       init_manager.add(subscriptions_.back()->init_target_);
       break;
     default:
-      ENVOY_LOG(warn, "Skipping unsupported runtime layer: {}", layer.DebugString());
-      break;
+      NOT_REACHED_GCOVR_EXCL_LINE;
     }
   }
 
@@ -504,9 +522,8 @@ RtdsSubscription::RtdsSubscription(
 void RtdsSubscription::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                                       const std::string&) {
   validateUpdateSize(resources.size());
-  auto runtime = MessageUtil::anyConvert<envoy::service::discovery::v2::Runtime>(
-      resources[0], validation_visitor_);
-  MessageUtil::validate(runtime);
+  auto runtime = MessageUtil::anyConvert<envoy::service::discovery::v2::Runtime>(resources[0]);
+  MessageUtil::validate(runtime, validation_visitor_);
   if (runtime.name() != resource_name_) {
     throw EnvoyException(
         fmt::format("Unexpected RTDS runtime (expecting {}): {}", resource_name_, runtime.name()));
@@ -526,7 +543,8 @@ void RtdsSubscription::onConfigUpdate(
   onConfigUpdate(unwrapped_resource, resources[0].version());
 }
 
-void RtdsSubscription::onConfigUpdateFailed(const EnvoyException*) {
+void RtdsSubscription::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason,
+                                            const EnvoyException*) {
   // We need to allow server startup to continue, even if we have a bad
   // config.
   init_target_.ready();

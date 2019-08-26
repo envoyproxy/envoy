@@ -143,6 +143,7 @@ public:
   bool proxy100Continue() const override { return false; }
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   bool shouldNormalizePath() const override { return true; }
+  bool shouldMergeSlashes() const override { return true; }
   Http::Code request(absl::string_view path_and_query, absl::string_view method,
                      Http::HeaderMap& response_headers, std::string& body) override;
   void closeSocket();
@@ -171,6 +172,7 @@ private:
     absl::optional<ConfigInfo> configInfo() const override { return {}; }
     SystemTime lastUpdated() const override { return time_source_.systemTime(); }
     void onConfigUpdate() override {}
+    void validateConfig(const envoy::api::v2::RouteConfiguration&) const override {}
 
     Router::ConfigConstSharedPtr config_;
     TimeSource& time_source_;
@@ -314,6 +316,7 @@ private:
     std::chrono::milliseconds listenerFiltersTimeout() const override {
       return std::chrono::milliseconds();
     }
+    bool continueOnListenerFiltersTimeout() const override { return false; }
     Stats::Scope& listenerScope() override { return *scope_; }
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }

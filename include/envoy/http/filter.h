@@ -610,6 +610,13 @@ public:
   virtual HeaderMap& addEncodedTrailers() PURE;
 
   /**
+   * Adds new metadata to be encoded.
+   *
+   * @param metadata_map supplies the unique_ptr of the metadata to be encoded.
+   */
+  virtual void addEncodedMetadata(MetadataMapPtr&& metadata_map) PURE;
+
+  /**
    * Called when an encoder filter goes over its high watermark.
    */
   virtual void onEncoderFilterAboveWriteBufferHighWatermark() PURE;

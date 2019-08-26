@@ -13,6 +13,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -83,6 +84,7 @@ public:
   MOCK_CONST_METHOD0(proxy100Continue, bool());
   MOCK_CONST_METHOD0(http1Settings, const Http::Http1Settings&());
   MOCK_CONST_METHOD0(shouldNormalizePath, bool());
+  MOCK_CONST_METHOD0(shouldMergeSlashes, bool());
 
   std::unique_ptr<Http::InternalAddressConfig> internal_address_config_ =
       std::make_unique<DefaultInternalAddressConfig>();
@@ -223,6 +225,50 @@ TEST_F(ConnectionManagerUtilityTest, SkipXffAppendPassThruUseRemoteAddress) {
   EXPECT_EQ((MutateRequestRet{"12.12.12.12:0", false}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ("198.51.100.1", headers.ForwardedFor()->value().getStringView());
+}
+
+TEST_F(ConnectionManagerUtilityTest, ForwardedProtoLegacyBehavior) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.trusted_forwarded_proto", "false"}});
+
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(1));
+  EXPECT_CALL(config_, skipXffAppend()).WillOnce(Return(true));
+  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12");
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  TestHeaderMapImpl headers{{"x-forwarded-proto", "https"}};
+
+  callMutateRequestHeaders(headers, Protocol::Http2);
+  EXPECT_EQ("http", headers.ForwardedProto()->value().getStringView());
+}
+
+TEST_F(ConnectionManagerUtilityTest, PreserveForwardedProtoWhenInternal) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.trusted_forwarded_proto", "true"}});
+
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(1));
+  EXPECT_CALL(config_, skipXffAppend()).WillOnce(Return(true));
+  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12");
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  TestHeaderMapImpl headers{{"x-forwarded-proto", "https"}};
+
+  callMutateRequestHeaders(headers, Protocol::Http2);
+  EXPECT_EQ("https", headers.ForwardedProto()->value().getStringView());
+}
+
+TEST_F(ConnectionManagerUtilityTest, OverwriteForwardedProtoWhenExternal) {
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(0));
+  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1");
+  TestHeaderMapImpl headers{{"x-forwarded-proto", "https"}};
+  Network::Address::Ipv4Instance local_address("10.3.2.1");
+  ON_CALL(config_, localAddress()).WillByDefault(ReturnRef(local_address));
+
+  callMutateRequestHeaders(headers, Protocol::Http2);
+  EXPECT_EQ("http", headers.ForwardedProto()->value().getStringView());
 }
 
 // Verify internal request and XFF is set when we are using remote address and the address is
@@ -1222,6 +1268,42 @@ TEST_F(ConnectionManagerUtilityTest, SanitizePathRelativePAth) {
   HeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
   ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
   EXPECT_EQ(header_map.Path()->value().getStringView(), "/abc");
+}
+
+// maybeNormalizePath() does not touch adjacent slashes by default.
+TEST_F(ConnectionManagerUtilityTest, MergeSlashesDefaultOff) {
+  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
+  ON_CALL(config_, shouldMergeSlashes()).WillByDefault(Return(false));
+  HeaderMapImpl original_headers;
+  original_headers.insertPath().value(std::string("/xyz///abc"));
+
+  HeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
+  ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
+  EXPECT_EQ(header_map.Path()->value().getStringView(), "/xyz///abc");
+}
+
+// maybeNormalizePath() merges adjacent slashes.
+TEST_F(ConnectionManagerUtilityTest, MergeSlashes) {
+  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
+  ON_CALL(config_, shouldMergeSlashes()).WillByDefault(Return(true));
+  HeaderMapImpl original_headers;
+  original_headers.insertPath().value(std::string("/xyz///abc"));
+
+  HeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
+  ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
+  EXPECT_EQ(header_map.Path()->value().getStringView(), "/xyz/abc");
+}
+
+// maybeNormalizePath() merges adjacent slashes if normalization if off.
+TEST_F(ConnectionManagerUtilityTest, MergeSlashesWithoutNormalization) {
+  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(false));
+  ON_CALL(config_, shouldMergeSlashes()).WillByDefault(Return(true));
+  HeaderMapImpl original_headers;
+  original_headers.insertPath().value(std::string("/xyz/..//abc"));
+
+  HeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
+  ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
+  EXPECT_EQ(header_map.Path()->value().getStringView(), "/xyz/../abc");
 }
 
 // test preserve_external_request_id true does not reset the passed requestId if passed

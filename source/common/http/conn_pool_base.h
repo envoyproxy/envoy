@@ -48,6 +48,9 @@ protected:
   const Upstream::HostConstSharedPtr host_;
   const Upstream::ResourcePriority priority_;
   std::list<PendingRequestPtr> pending_requests_;
+  // When calling purgePendingRequests, this list will be used to hold the requests we are about
+  // to purge. We need this if one cancelled requests cancels a different pending request
+  std::list<PendingRequestPtr> pending_requests_to_purge_;
 };
 } // namespace Http
 } // namespace Envoy

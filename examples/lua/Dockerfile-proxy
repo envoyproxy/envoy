@@ -1,2 +1,3 @@
 FROM envoyproxy/envoy-dev:latest
+ADD ./lib/mylibrary.lua /lib/mylibrary.lua
 CMD /usr/local/bin/envoy -c /etc/envoy.yaml -l debug --service-cluster proxy
