@@ -185,6 +185,40 @@ TEST_F(DispatcherImplTest, Timer) {
   }
 }
 
+TEST_F(DispatcherImplTest, TimerWithScope) {
+  TimerPtr timer;
+  MockScopedTrackedObject scope;
+  dispatcher_->post([this, &timer, &scope]() {
+    {
+      // Expect a call to dumpState. The timer will call onFatalError during
+      // the alarm interval, and if the scope is tracked correctly this will
+      // result in a dumpState call.
+      EXPECT_CALL(scope, dumpState(_, _));
+      Thread::LockGuard lock(mu_);
+      timer = dispatcher_->createTimer([this]() {
+        {
+          Thread::LockGuard lock(mu_);
+          static_cast<DispatcherImpl*>(dispatcher_.get())->onFatalError();
+          work_finished_ = true;
+        }
+        cv_.notifyOne();
+      });
+      EXPECT_FALSE(timer->enabled());
+    }
+    cv_.notifyOne();
+  });
+
+  Thread::LockGuard lock(mu_);
+  while (timer == nullptr) {
+    cv_.wait(mu_);
+  }
+  timer->enableTimer(std::chrono::milliseconds(50), &scope);
+
+  while (!work_finished_) {
+    cv_.wait(mu_);
+  }
+}
+
 TEST_F(DispatcherImplTest, IsThreadSafe) {
   dispatcher_->post([this]() {
     {

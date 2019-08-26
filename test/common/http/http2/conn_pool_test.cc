@@ -96,7 +96,7 @@ public:
         .WillOnce(Invoke([this](Upstream::Host::CreateConnectionData&) -> CodecClient* {
           return test_clients_.back().codec_client_;
         }));
-    EXPECT_CALL(*test_client.connect_timer_, enableTimer(_));
+    EXPECT_CALL(*test_client.connect_timer_, enableTimer(_, _));
   }
 
   // Connects a pending connection for client with the given index, asserting

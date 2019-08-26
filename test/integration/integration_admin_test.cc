@@ -500,9 +500,14 @@ TEST_F(IntegrationAdminIpv4Ipv6Test, Ipv4Ipv6Listen) {
 
 // Testing the behavior of StatsMatcher, which allows/denies the  instantiation of stats based on
 // restrictions on their names.
+//
+// Note: using 'Event::TestUsingSimulatedTime' appears to conflict with LDS in
+// StatsMatcherIntegrationTest.IncludeExact, which manifests in a coverage test
+// crash, which is really difficult to debug. See #7215. It's possible this is
+// due to a bad interaction between the wait-for constructs in the integration
+// test framework with sim-time.
 class StatsMatcherIntegrationTest
     : public testing::Test,
-      public Event::TestUsingSimulatedTime,
       public HttpIntegrationTest,
       public testing::WithParamInterface<Network::Address::IpVersion> {
 public:

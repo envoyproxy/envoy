@@ -10,6 +10,8 @@ jobs:
         CI_TARGET: 'bazel.gcc'
       compile_time_options:
         CI_TARGET: 'bazel.compile_time_options'
+      fuzz:
+        CI_TARGET: 'bazel.fuzz'
   dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
   timeoutInMinutes: 360
   pool:

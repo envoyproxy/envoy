@@ -115,7 +115,7 @@ def envoy_cc_fuzz_test(name, corpus, deps = [], tags = [], **kwargs):
         tags = ["manual"] + tags,
     )
 
-    native.cc_binary(
+    native.cc_test(
         name = name + "_with_libfuzzer",
         copts = envoy_copts("@envoy", test = True),
         linkopts = ["-fsanitize=fuzzer"] + _envoy_test_linkopts(),
@@ -123,7 +123,7 @@ def envoy_cc_fuzz_test(name, corpus, deps = [], tags = [], **kwargs):
         testonly = 1,
         data = [corpus_name],
         deps = [":" + test_lib_name],
-        tags = ["manual"] + tags,
+        tags = ["manual", "fuzzer"] + tags,
     )
 
 # Envoy C++ test targets should be specified with this function.
