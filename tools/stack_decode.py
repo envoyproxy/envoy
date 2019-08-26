@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 # Call addr2line as needed to resolve addresses in a stack trace. The addresses
 # will be replaced if they can be resolved into file and line numbers. The
