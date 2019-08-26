@@ -21,9 +21,9 @@ namespace Extensions {
 namespace Clusters {
 namespace Aggregate {
 
-class ClusterTest : public testing::Test {
+class AggregateClusterTest : public testing::Test {
 public:
-  ClusterTest() : stats_(Upstream::ClusterInfoImpl::generateStats(stats_store_)) {}
+  AggregateClusterTest() : stats_(Upstream::ClusterInfoImpl::generateStats(stats_store_)) {}
 
   void setupPrioritySet() {
     // Set up the HostSet with 1 healthy, 1 degraded and 1 unhealthy.
@@ -138,7 +138,7 @@ public:
 )EOF";
 };
 
-TEST_F(ClusterTest, BasicFlow) {
+TEST_F(AggregateClusterTest, BasicFlow) {
   initialize(default_yaml_config_);
   EXPECT_EQ(cluster_->initializePhase(), Upstream::Cluster::InitializePhase::Secondary);
   auto primary = ClusterUtil::getThreadLocalCluster(cm_, "primary");
@@ -163,7 +163,7 @@ TEST_F(ClusterTest, BasicFlow) {
   }
 }
 
-TEST_F(ClusterTest, InvalidClusterName) {
+TEST_F(AggregateClusterTest, InvalidClusterName) {
   const std::string invalid_yaml_config = R"EOF(
     name: aggregate_cluster
     connect_timeout: 0.25s
@@ -182,7 +182,7 @@ TEST_F(ClusterTest, InvalidClusterName) {
                             "no thread local cluster with name tertiary");
 }
 
-TEST_F(ClusterTest, LoadBalancerTest) {
+TEST_F(AggregateClusterTest, LoadBalancerTest) {
   initialize(default_yaml_config_);
   // Health value:
   // Cluster 1:

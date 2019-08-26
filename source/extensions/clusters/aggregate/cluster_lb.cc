@@ -43,15 +43,10 @@ void AggregateClusterLoadBalancer::onClusterRemoval(const std::string& cluster_n
 
 Upstream::HostConstSharedPtr
 AggregateClusterLoadBalancer::LoadBalancerImpl::chooseHost(Upstream::LoadBalancerContext* context) {
-  return chooseCluster()->loadBalancer().chooseHost(context);
-}
-
-Upstream::ThreadLocalCluster*
-AggregateClusterLoadBalancer::LoadBalancerImpl::chooseCluster() const {
   auto priority_pair = choosePriority(random_.random(), per_priority_load_.healthy_priority_load_,
                                       per_priority_load_.degraded_priority_load_);
-
-  return priority_to_cluster_[priority_pair.first];
+  AggregateLoadBalancerContext aggr_context(context, priority_pair.second);
+  return priority_to_cluster_[priority_pair.first]->loadBalancer().chooseHost(&aggr_context);
 }
 
 } // namespace Aggregate
