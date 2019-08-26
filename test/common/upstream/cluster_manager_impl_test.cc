@@ -2,6 +2,7 @@
 #include <string>
 
 #include "envoy/admin/v2alpha/config_dump.pb.h"
+#include "envoy/api/v2/cds.pb.h"
 #include "envoy/api/v2/core/base.pb.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/upstream/upstream.h"
@@ -17,6 +18,7 @@
 #include "common/singleton/manager_impl.h"
 #include "common/upstream/cluster_factory_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
+#include "common/upstream/subset_lb.h"
 
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 
@@ -38,6 +40,7 @@
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/str_replace.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -575,14 +578,45 @@ static_resources:
       "'ORIGINAL_DST_LB' is allowed only with cluster type 'ORIGINAL_DST'");
 }
 
-TEST_F(ClusterManagerImplTest, SubsetLoadBalancerInitialization) {
-  const std::string yaml = R"EOF(
+class ClusterManagerSubsetInitializationTest
+    : public ClusterManagerImplTest,
+      public testing::WithParamInterface<envoy::api::v2::Cluster_LbPolicy> {
+public:
+  ClusterManagerSubsetInitializationTest() {}
+
+  static std::vector<envoy::api::v2::Cluster_LbPolicy> lbPolicies() {
+    int first = static_cast<int>(envoy::api::v2::Cluster_LbPolicy_LbPolicy_MIN);
+    int last = static_cast<int>(envoy::api::v2::Cluster_LbPolicy_LbPolicy_MAX);
+    ASSERT(first < last);
+
+    std::vector<envoy::api::v2::Cluster_LbPolicy> policies;
+    for (int i = first; i <= last; i++) {
+      if (envoy::api::v2::Cluster_LbPolicy_IsValid(i)) {
+        auto policy = static_cast<envoy::api::v2::Cluster_LbPolicy>(i);
+        policies.push_back(policy);
+      }
+    }
+    return policies;
+  }
+
+  static std::string paramName(const testing::TestParamInfo<ParamType>& info) {
+    std::string name = envoy::api::v2::Cluster_LbPolicy_Name(info.param);
+    return absl::StrReplaceAll(name, {{"_", ""}});
+  }
+};
+
+TEST_P(ClusterManagerSubsetInitializationTest, SubsetLoadBalancerInitialization) {
+  const std::string yamlPattern = R"EOF(
 static_resources:
   clusters:
   - name: cluster_1
     connect_timeout: 0.250s
     type: static
-    lb_policy: round_robin
+    lb_policy: "{}"
+    lb_subset_config:
+      fallback_policy: ANY_ENDPOINT
+      subset_selectors:
+        - keys: [ "x" ]
     load_assignment:
       endpoints:
         - lb_endpoints:
@@ -598,17 +632,32 @@ static_resources:
                   port_value: 8001
   )EOF";
 
-  envoy::config::bootstrap::v2::Bootstrap bootstrap = parseBootstrapFromV2Yaml(yaml);
-  envoy::api::v2::Cluster::LbSubsetConfig* subset_config =
-      bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_lb_subset_config();
-  subset_config->set_fallback_policy(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT);
-  subset_config->add_subset_selectors()->add_keys("x");
+  const std::string policy_name = envoy::api::v2::Cluster_LbPolicy_Name(GetParam());
+  const std::string yaml = fmt::format(yamlPattern, policy_name);
 
-  create(bootstrap);
-  checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
+  if (GetParam() == envoy::api::v2::Cluster_LbPolicy_ORIGINAL_DST_LB ||
+      GetParam() == envoy::api::v2::Cluster_LbPolicy_CLUSTER_PROVIDED) {
+    EXPECT_THROW(create(parseBootstrapFromV2Yaml(yaml)), EnvoyException);
+  } else {
+    create(parseBootstrapFromV2Yaml(yaml));
+    checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
 
-  factory_.tls_.shutdownThread();
+    Upstream::ThreadLocalCluster* tlc = cluster_manager_->get("cluster_1");
+    EXPECT_NE(nullptr, tlc);
+
+    if (tlc) {
+      Upstream::LoadBalancer& lb = tlc->loadBalancer();
+      EXPECT_NE(nullptr, dynamic_cast<Upstream::SubsetLoadBalancer*>(&lb));
+    }
+
+    factory_.tls_.shutdownThread();
+  }
 }
+
+INSTANTIATE_TEST_SUITE_P(ClusterManagerSubsetInitializationTest,
+                         ClusterManagerSubsetInitializationTest,
+                         testing::ValuesIn(ClusterManagerSubsetInitializationTest::lbPolicies()),
+                         ClusterManagerSubsetInitializationTest::paramName);
 
 TEST_F(ClusterManagerImplTest, SubsetLoadBalancerOriginalDstRestriction) {
   const std::string yaml = R"EOF(
@@ -618,16 +667,14 @@ static_resources:
     connect_timeout: 0.250s
     type: original_dst
     lb_policy: original_dst_lb
+    lb_subset_config:
+      fallback_policy: ANY_ENDPOINT
+      subset_selectors:
+        - keys: [ "x" ]
   )EOF";
 
-  envoy::config::bootstrap::v2::Bootstrap bootstrap = parseBootstrapFromV2Yaml(yaml);
-  envoy::api::v2::Cluster::LbSubsetConfig* subset_config =
-      bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_lb_subset_config();
-  subset_config->set_fallback_policy(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT);
-  subset_config->add_subset_selectors()->add_keys("x");
-
   EXPECT_THROW_WITH_MESSAGE(
-      create(bootstrap), EnvoyException,
+      create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
       "cluster: cluster type 'original_dst' may not be used with lb_subset_config");
 }
 
@@ -639,16 +686,14 @@ static_resources:
     connect_timeout: 0.250s
     type: static
     lb_policy: cluster_provided
+    lb_subset_config:
+      fallback_policy: ANY_ENDPOINT
+      subset_selectors:
+        - keys: [ "x" ]
   )EOF";
 
-  envoy::config::bootstrap::v2::Bootstrap bootstrap = parseBootstrapFromV2Yaml(yaml);
-  envoy::api::v2::Cluster::LbSubsetConfig* subset_config =
-      bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_lb_subset_config();
-  subset_config->set_fallback_policy(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT);
-  subset_config->add_subset_selectors()->add_keys("x");
-
   EXPECT_THROW_WITH_MESSAGE(
-      create(bootstrap), EnvoyException,
+      create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
       "cluster: LB policy CLUSTER_PROVIDED cannot be combined with lb_subset_config");
 }
 
@@ -660,6 +705,11 @@ static_resources:
     connect_timeout: 0.250s
     type: STATIC
     lb_policy: ROUND_ROBIN
+    lb_subset_config:
+      fallback_policy: ANY_ENDPOINT
+      subset_selectors:
+        - keys: [ "x" ]
+      locality_weight_aware: true
     load_assignment:
       endpoints:
         - lb_endpoints:
@@ -675,12 +725,7 @@ static_resources:
                   port_value: 8001
   )EOF";
 
-  envoy::config::bootstrap::v2::Bootstrap bootstrap = parseBootstrapFromV2Yaml(yaml);
-  envoy::api::v2::Cluster::LbSubsetConfig* subset_config =
-      bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_lb_subset_config();
-  subset_config->set_locality_weight_aware(true);
-
-  EXPECT_THROW_WITH_MESSAGE(create(bootstrap), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
                             "Locality weight aware subset LB requires that a "
                             "locality_weighted_lb_config be set in cluster_1");
 }
