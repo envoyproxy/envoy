@@ -4,18 +4,15 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_binary",
     "envoy_cc_library",
-    "envoy_cc_platform_dep",
-    "envoy_cc_posix_library",
-    "envoy_cc_win32_library",
     "envoy_google_grpc_external_deps",
     "envoy_package",
 )
+load("//bazel:repositories.bzl", "NOBORINGSSL_SKIP_TARGETS", "PPC_SKIP_TARGETS")
 load(
     "//source/extensions:all_extensions.bzl",
     "envoy_all_extensions",
     "envoy_windows_extensions",
 )
-load("//bazel:repositories.bzl", "NOBORINGSSL_SKIP_TARGETS", "PPC_SKIP_TARGETS")
 
 envoy_package()
 
@@ -42,9 +39,9 @@ envoy_cc_library(
         "//source/server:server_lib",
         "//source/server:listener_hooks_lib",
     ] + select({
-        "//bazel:windows_x86_64": envoy_windows_extensions(),
-        "//bazel:linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),
         "//bazel:boringssl_disabled": envoy_all_extensions(NOBORINGSSL_SKIP_TARGETS),
+        "//bazel:linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),
+        "//bazel:windows_x86_64": envoy_windows_extensions(),
         "//conditions:default": envoy_all_extensions(),
     }),
 )
@@ -57,7 +54,8 @@ envoy_cc_library(
     ],
     deps = [
         ":envoy_main_common_lib",
-    ] + envoy_cc_platform_dep("platform_impl_lib"),
+        ":platform_impl_lib",
+    ],
 )
 
 envoy_cc_library(
@@ -74,13 +72,14 @@ envoy_cc_library(
         "//source/server:hot_restart_lib",
         "//source/server:hot_restart_nop_lib",
         "//source/server/config_validation:server_lib",
+        ":platform_impl_lib",
     ] + select({
         "//bazel:disable_signal_trace": [],
         "//conditions:default": [
             "//source/common/signal:sigaction_lib",
             ":terminate_handler_lib",
         ],
-    }) + envoy_cc_platform_dep("platform_impl_lib"),
+    }),
 )
 
 envoy_cc_library(
@@ -96,25 +95,20 @@ envoy_cc_library(
     ] + envoy_google_grpc_external_deps(),
 )
 
-envoy_cc_posix_library(
+envoy_cc_library(
     name = "platform_impl_lib",
-    hdrs = ["posix/platform_impl.h"],
-    strip_include_prefix = "posix",
+    srcs = select({
+        "//conditions:default": ["platform_impl_posix.cc"],
+        "//bazel:windows_x86_64": ["platform_impl_win32.cc"],
+    }),
+    hdrs = ["platform_impl.h"],
     deps = [
         "//source/common/common:thread_lib",
         "//source/common/filesystem:filesystem_lib",
-    ],
-)
-
-envoy_cc_win32_library(
-    name = "platform_impl_lib",
-    hdrs = ["win32/platform_impl.h"],
-    strip_include_prefix = "win32",
-    deps = [
-        "//source/common/common:assert_lib",
-        "//source/common/common:thread_lib",
-        "//source/common/filesystem:filesystem_lib",
-    ],
+    ] + select({
+        "//conditions:default": [],
+        "//bazel:windows_x86_64": ["//source/common/common:assert_lib"],
+    }),
 )
 
 envoy_cc_library(
