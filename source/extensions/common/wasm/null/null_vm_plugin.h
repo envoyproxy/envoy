@@ -8,6 +8,7 @@ namespace Common {
 namespace Wasm {
 namespace Null {
 
+// A wrapper for the natively compiled NullVm plugin which implements the WASM ABI.
 class NullVmPlugin {
 public:
   NullVmPlugin() = default;

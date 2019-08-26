@@ -19,6 +19,7 @@ namespace Null {
 
 WasmVmPtr NullVm::clone() { return std::make_unique<NullVm>(*this); }
 
+// "Load" the plugin by obtaining a pointer to it from the factory.
 bool NullVm::load(const std::string& name, bool /* allow_precompiled */) {
   auto factory = Registry::FactoryRegistry<NullVmPluginFactory>::getFactory(name);
   if (!factory) {
@@ -43,6 +44,7 @@ void NullVm::start(Common::Wasm::Context* context) {
 
 uint64_t NullVm::getMemorySize() { return std::numeric_limits<uint64_t>::max(); }
 
+// NulVm pointers are just native pointers.
 absl::optional<absl::string_view> NullVm::getMemory(uint64_t pointer, uint64_t size) {
   if (pointer == 0 && size != 0) {
     return absl::nullopt;

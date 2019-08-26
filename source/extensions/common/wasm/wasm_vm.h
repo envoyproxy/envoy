@@ -18,22 +18,23 @@ class Context;
 // Represents a WASM-native word-sized datum. On 32-bit VMs, the high bits are always zero.
 // The WASM/VM API treats all bits as significant.
 struct Word {
-  Word(uint64_t w) : u64(w) {}              // Implicit conversion into Word.
-  operator uint64_t() const { return u64; } // Implicit conversion into uint64_t.
-  // Note: no implicit conversion to uint32_t as it is lossy.
+  Word(uint64_t w) : u64(w) {} // Implicit conversion into Word.
   uint32_t u32() const { return static_cast<uint32_t>(u64); }
   uint64_t u64;
 };
 
+// Convert Word type for use by 32-bit VMs.
 template <typename T> struct ConvertWordTypeToUint32 { using type = T; };
 template <> struct ConvertWordTypeToUint32<Word> { using type = uint32_t; };
 
+// Convert Word-based function types for 32-bit VMs.
 template <typename F> struct ConvertFunctionTypeWordToUint32 {};
 template <typename R, typename... Args> struct ConvertFunctionTypeWordToUint32<R (*)(Args...)> {
   using type = typename ConvertWordTypeToUint32<R>::type (*)(
       typename ConvertWordTypeToUint32<Args>::type...);
 };
 
+// A wrapper for a global variable within the VM.
 template <typename T> struct Global {
   virtual ~Global() = default;
   virtual T get() PURE;
@@ -175,9 +176,19 @@ public:
   using EnvoyException::EnvoyException;
 };
 
+// Thread local state set during a call into a WASM VM so that calls coming out of the
+// VM can be attributed correctly to calling Filter. We use thread_local instead of ThreadLocal
+// because this state is live only during the calls and does not need to be initialized consistently
+// over all workers as with ThreadLocal data.
 extern thread_local Envoy::Extensions::Common::Wasm::Context* current_context_;
+// Requested effective context set by code within the VM to request that the calls coming out of the
+// VM be attributed to another filter, for example if a constrol plane gRPC comes comes back to the
+// RootContext which effects some set of waiting filters.
 extern thread_local uint32_t effective_context_id_;
 
+// Helper to save and restore thread local VM call context information to support reentrant calls.
+// NB: this happens for example when a call from the VM invokes a handler which needs to _malloc
+// memory in the VM.
 struct SaveRestoreContext {
   explicit SaveRestoreContext(Context* context) {
     saved_context = current_context_;
