@@ -17,7 +17,6 @@
 #include "common/network/utility.h"
 #include "common/protobuf/protobuf.h"
 
-#include "server/backtrace.h"
 #include "server/configuration_impl.h"
 #include "server/listener_manager_impl.h"
 
@@ -253,12 +252,6 @@ public:
         .Times(expected_num_calls)
         .WillRepeatedly(Invoke(
             [expected_value](int fd, int level, int name, const void* optval, socklen_t) -> int {
-              Envoy::BackwardsTrace t;
-              t.capture();
-              std::ostringstream os;
-              t.printTrace(os);
-              std::cerr << "============ setsockopt fd " << fd << " level " << level
-                        << " option name " << name << os.str() << "\n";
               EXPECT_EQ(expected_value, *static_cast<const int*>(optval));
               return 0;
             }));

@@ -228,6 +228,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
     addListenSocketOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
     // Needed to return receive buffer overflown indicator.
     addListenSocketOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
+<<<<<<< HEAD
     std::string listener_name =
         config.has_udp_listener_config() ? config.udp_listener_config().udp_listener_name() : "";
     if (listener_name.empty()) {
@@ -238,6 +239,8 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
             .createActiveUdpListenerFactory(config.has_udp_listener_config()
                                                 ? config.udp_listener_config()
                                                 : envoy::api::v2::listener::UdpListenerConfig());
+=======
+>>>>>>> format
   }
 
   if (!config.listener_filters().empty()) {
@@ -300,9 +303,9 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
       parent_.server_.threadLocal(), validation_visitor, parent_.server_.api());
   factory_context.setInitManager(initManager());
   bool is_quic =
-      socket_type_ ==
-      Network::Address::SocketType::Datagram; //&& config.has_udp_factory_config() &&
-                                              //config.udp_factory_config.name() == "quic_listener";
+      socket_type_ == Network::Address::SocketType::Datagram; //&& config.has_udp_factory_config()
+                                                              //&& config.udp_factory_config.name()
+                                                              // == "quic_listener";
   ListenerFilterChainFactoryBuilder builder(*this, factory_context, is_quic);
   filter_chain_manager_.addFilterChain(config.filter_chains(), builder);
   const bool need_tls_inspector =
@@ -431,8 +434,6 @@ void ListenerImpl::setSocket(const Network::SocketSharedPtr& socket) {
       throw EnvoyException(message);
     } else {
       ENVOY_LOG(debug, "{}", message);
-      std::cerr << "=========== listen_socket_options_ size " << listen_socket_options_->size()
-                << "\n";
     }
 
     // Add the options to the socket_ so that STATE_LISTENING options can be
