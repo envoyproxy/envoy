@@ -99,7 +99,13 @@ message Bootstrap {
   // performance reasons Envoy latches counters and only flushes counters and
   // gauges at a periodic interval. If not specified the default is 5000ms (5
   // seconds).
-  google.protobuf.Duration stats_flush_interval = 7 [(gogoproto.stdduration) = true];
+  google.protobuf.Duration stats_flush_interval = 7 [
+    (validate.rules).duration = {
+      lt: {seconds: 5},
+      gte: {nanos: 1000000}
+    },
+    (gogoproto.stdduration) = true
+  ];
 
   // Optional watchdog configuration.
   Watchdog watchdog = 8;

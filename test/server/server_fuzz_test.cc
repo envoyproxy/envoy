@@ -1,5 +1,7 @@
 #include <fstream>
 
+#include "envoy/config/bootstrap/v2/bootstrap.pb.validate.h"
+
 #include "common/network/address_impl.h"
 #include "common/thread_local/thread_local_impl.h"
 
@@ -61,6 +63,14 @@ class AllFeaturesHooks : public DefaultListenerHooks {
 };
 
 DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v2::Bootstrap& input) {
+  try {
+    // Validate the input early.
+    TestUtility::validate(input);
+  } catch (const EnvoyException& ex) {
+    ENVOY_LOG_MISC(debug, "Controlled EnvoyException exit: {}", ex.what());
+    return;
+  }
+
   testing::NiceMock<MockOptions> options;
   AllFeaturesHooks hooks;
   testing::NiceMock<MockHotRestart> restart;
