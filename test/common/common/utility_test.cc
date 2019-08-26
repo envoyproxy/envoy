@@ -386,11 +386,6 @@ TEST(StringUtil, StringViewRemoveTokens) {
             "one , four");
   // Delimiters.
   EXPECT_EQ(StringUtil::removeTokens("one,two;three ", ",;", {"two"}, ","), "one,three");
-  // No trimming
-  EXPECT_EQ(StringUtil::removeTokens("one, two, three ", ",", {" two"}, ",", false), "one, three ");
-  // No ignore case.
-  EXPECT_EQ(StringUtil::removeTokens("one, Two, three", ",", {"two"}, ",", true, false),
-            "one,Two,three");
 }
 
 TEST(StringUtil, removeCharacters) {

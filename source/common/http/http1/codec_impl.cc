@@ -477,11 +477,13 @@ int ConnectionImpl::onHeadersCompleteBase() {
       ENVOY_CONN_LOG(trace, "removing unsupported h2c upgrade headers.", connection_);
       current_header_map_->removeUpgrade();
       if (current_header_map_->Connection()) {
-        auto new_value = StringUtil::removeTokens(
-            current_header_map_->Connection()->value().getStringView(), ",",
-            {Http::Headers::get().ConnectionValues.Upgrade,
-             Http::Headers::get().ConnectionValues.Http2Settings},
-            ",");
+        // Construct on first use idiom.
+        static const auto* tokens_to_remove =
+            new StringUtil::CaseUnorderedSet{Http::Headers::get().ConnectionValues.Upgrade,
+                                             Http::Headers::get().ConnectionValues.Http2Settings};
+        auto new_value =
+            StringUtil::removeTokens(current_header_map_->Connection()->value().getStringView(),
+                                     ",", *tokens_to_remove, ",");
         if (new_value.empty()) {
           current_header_map_->removeConnection();
         } else {

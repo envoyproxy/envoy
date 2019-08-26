@@ -325,21 +325,13 @@ std::vector<absl::string_view> StringUtil::splitToken(absl::string_view source,
 }
 
 std::string StringUtil::removeTokens(absl::string_view source, absl::string_view delimiters,
-                                     std::set<absl::string_view> tokens_to_remove,
-                                     absl::string_view joiner, bool trim_tokens, bool ignore_case) {
+                                     const CaseUnorderedSet& tokens_to_remove,
+                                     absl::string_view joiner) {
   const auto values = Envoy::StringUtil::splitToken(source, delimiters);
   std::string new_value;
   for (auto& v : values) {
-    absl::string_view token_for_compare = v;
-    absl::string_view token_for_result = v;
-    if (trim_tokens) {
-      token_for_result = token_for_compare = StringUtil::trim(v);
-    }
-    std::string lower_value;
-    if (ignore_case) {
-      lower_value = StringUtil::toLower(token_for_compare);
-      token_for_compare = lower_value;
-    }
+    absl::string_view token_for_result = StringUtil::trim(v);
+    std::string token_for_compare = StringUtil::toLower(token_for_result);
     if (tokens_to_remove.count(token_for_compare) != 0) {
       continue;
     }
