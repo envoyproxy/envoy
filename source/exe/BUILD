@@ -58,7 +58,7 @@ envoy_cc_library(
     deps = [
         ":envoy_main_common_lib",
         ":platform_impl_lib",
-    ]
+    ],
 )
 
 envoy_cc_library(
@@ -100,15 +100,20 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "platform_impl_lib",
+    deps = [":platform_header_lib"] +
+           envoy_cc_platform_dep("platform_impl_lib"),
+)
+
+envoy_cc_library(
+    name = "platform_header_lib",
     hdrs = ["platform_impl.h"],
-    deps = envoy_cc_platform_dep("platform_impl_lib"),
 )
 
 envoy_cc_posix_library(
     name = "platform_impl_lib",
     srcs = ["posix/platform_impl.cc"],
-    hdrs = ["platform_impl.h"],
     deps = [
+        ":platform_header_lib",
         "//source/common/common:thread_lib",
         "//source/common/filesystem:filesystem_lib",
     ],
@@ -117,8 +122,8 @@ envoy_cc_posix_library(
 envoy_cc_win32_library(
     name = "platform_impl_lib",
     srcs = ["win32/platform_impl.cc"],
-    hdrs = ["platform_impl.h"],
     deps = [
+        ":platform_header_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:thread_lib",
         "//source/common/filesystem:filesystem_lib",
