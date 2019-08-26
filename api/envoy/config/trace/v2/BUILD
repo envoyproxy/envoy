@@ -10,7 +10,7 @@ api_proto_library_internal(
     ],
     deps = [
         "//envoy/api/v2/core:grpc_service",
-        "@opencensus_proto//opencensus/proto/trace/v1:trace_config_proto",
+        "@io_opencensus_proto//opencensus/proto/trace/v1:trace_config_proto",
     ],
 )
 
@@ -19,6 +19,6 @@ api_go_proto_library(
     proto = ":trace",
     deps = [
         "//envoy/api/v2/core:grpc_service_go_proto",
-        "@opencensus_proto//opencensus/proto/trace/v1:trace_and_config_proto_go",
+        "@io_opencensus_proto//opencensus/proto/trace/v1:trace_and_config_proto_go",
     ],
 )
