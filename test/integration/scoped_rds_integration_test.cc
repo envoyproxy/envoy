@@ -13,7 +13,7 @@ namespace Envoy {
 namespace {
 
 class ScopedRdsIntegrationTest : public HttpIntegrationTest,
-                                 public Grpc::GrpcClientIntegrationParamTest {
+                                 public Grpc::DeltaStowGrpcClientIntegrationParamTest {
 protected:
   struct FakeUpstreamInfo {
     FakeHttpConnectionPtr connection_;
@@ -82,7 +82,11 @@ fragments:
               scoped_routes->mutable_scoped_rds()
                   ->mutable_scoped_rds_config_source()
                   ->mutable_api_config_source();
-          srds_api_config_source->set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
+          if (isDelta()) {
+            srds_api_config_source->set_api_type(envoy::api::v2::core::ApiConfigSource::DELTA_GRPC);
+          } else {
+            srds_api_config_source->set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
+          }
           grpc_service = srds_api_config_source->add_grpc_services();
           setGrpcService(*grpc_service, "srds_cluster", getScopedRdsFakeUpstream().localAddress());
         });
@@ -195,8 +199,32 @@ fragments:
         response);
   }
 
-  void sendScopedRdsResponse(const std::vector<std::string>& resource_protos,
-                             const std::string& version) {
+  void sendDeltaScopedRdsResponse(const std::vector<std::string>& to_add_list,
+                                  const std::vector<std::string>& to_delete_list,
+                                  const std::string& version) {
+    ASSERT(scoped_rds_upstream_info_.stream_by_resource_name_[srds_config_name_] != nullptr);
+
+    envoy::api::v2::DeltaDiscoveryResponse response;
+    response.set_system_version_info(version);
+    response.set_type_url(Config::TypeUrl::get().ScopedRouteConfiguration);
+
+    for (const auto& scope_name : to_delete_list) {
+      *response.add_removed_resources() = scope_name;
+    }
+    for (const auto& resource_proto : to_add_list) {
+      envoy::api::v2::ScopedRouteConfiguration scoped_route_proto;
+      TestUtility::loadFromYaml(resource_proto, scoped_route_proto);
+      auto resource = response.add_resources();
+      resource->set_name(scoped_route_proto.name());
+      resource->set_version(version);
+      resource->mutable_resource()->PackFrom(scoped_route_proto);
+    }
+    scoped_rds_upstream_info_.stream_by_resource_name_[srds_config_name_]->sendGrpcMessage(
+        response);
+  }
+
+  void sendSotwScopedRdsResponse(const std::vector<std::string>& resource_protos,
+                                 const std::string& version) {
     ASSERT(scoped_rds_upstream_info_.stream_by_resource_name_[srds_config_name_] != nullptr);
 
     envoy::api::v2::DiscoveryResponse response;
@@ -218,7 +246,7 @@ fragments:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, ScopedRdsIntegrationTest,
-                         GRPC_CLIENT_INTEGRATION_PARAMS);
+                         DLETA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Test that a SRDS DiscoveryResponse is successfully processed.
 TEST_P(ScopedRdsIntegrationTest, BasicSuccess) {
@@ -244,7 +272,11 @@ key:
 
   on_server_init_function_ = [&]() {
     createScopedRdsStream();
-    sendScopedRdsResponse({scope_route1, scope_route2}, "1");
+    if (isDelta()) {
+      sendDeltaScopedRdsResponse({scope_route1, scope_route2}, {}, "1");
+    } else {
+      sendSotwScopedRdsResponse({scope_route1, scope_route2}, "1");
+    }
     createRdsStream("foo_route1");
     // CreateRdsStream waits for connection which is fired by RDS subscription.
     sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1", "cluster_0"), "1");
@@ -276,7 +308,9 @@ key:
         456, Http::TestHeaderMapImpl{{":status", "200"}, {"service", scope_key}}, 123,
         /*cluster_0*/ 0);
   }
-  test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_attempt", 2);
+  test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_attempt",
+                                 // update_attempt only increase after a response
+                                 isDelta() ? 1 : 2);
   test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_success", 1);
   // The version gauge should be set to xxHash64("1").
   test_server_->waitForGaugeEq("http.config_test.scoped_rds.foo-scoped-routes.version",
@@ -285,19 +319,25 @@ key:
   // Add a new scope scope_route3 with a brand new RouteConfiguration foo_route2.
   const std::string scope_route3 = fmt::format(scope_tmpl, "foo_scope3", "foo_route2", "baz-route");
 
-  sendScopedRdsResponse({scope_route3, scope_route1, scope_route2}, "2");
+  if (isDelta()) {
+    sendDeltaScopedRdsResponse({scope_route3}, {}, "2");
+
+  } else {
+    sendSotwScopedRdsResponse({scope_route3, scope_route1, scope_route2}, "2");
+  }
   test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_attempt", 2);
   sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1", "cluster_1"), "3");
+  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 2);
   createRdsStream("foo_route2");
   test_server_->waitForCounterGe("http.config_test.rds.foo_route2.update_attempt", 1);
   sendRdsResponse(fmt::format(route_config_tmpl, "foo_route2", "cluster_0"), "1");
-  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 2);
   test_server_->waitForCounterGe("http.config_test.rds.foo_route2.update_success", 1);
   test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_success", 2);
   // The version gauge should be set to xxHash64("2").
   test_server_->waitForGaugeEq("http.config_test.scoped_rds.foo-scoped-routes.version",
                                6927017134761466251UL);
-  // After RDS update, requests within scope 'foo_scope1' or 'foo_scope2' get routed to 'cluster_1'.
+  // After RDS update, requests within scope 'foo_scope1' or 'foo_scope2' get routed to
+  // 'cluster_1'.
   for (const std::string& scope_key : std::vector<std::string>{"foo-route", "bar-route"}) {
     sendRequestAndVerifyResponse(
         Http::TestHeaderMapImpl{{":method", "GET"},
@@ -309,17 +349,21 @@ key:
         /*cluster_1*/ 1);
   }
   // Now requests within scope 'foo_scope3' get routed to 'cluster_0'.
-  test_server_->waitForCounterGe("http.config_test.rds.foo_route2.update_success", 1);
   sendRequestAndVerifyResponse(
       Http::TestHeaderMapImpl{{":method", "GET"},
                               {":path", "/meh"},
                               {":authority", "host"},
                               {":scheme", "http"},
                               {"Addr", fmt::format("x-foo-key={}", "baz-route")}},
-      456, Http::TestHeaderMapImpl{{":status", "200"}, {"service", "bluh"}}, 123, /*cluster_0*/ 0);
+      456, Http::TestHeaderMapImpl{{":status", "200"}, {"service", "bluh"}}, 123,
+      /*cluster_0*/ 0);
 
   // Delete foo_scope1 and requests within the scope gets 400s.
-  sendScopedRdsResponse({scope_route3, scope_route2}, "3");
+  if (isDelta()) {
+    sendDeltaScopedRdsResponse({}, {"foo_scope1"}, "3");
+  } else {
+    sendSotwScopedRdsResponse({scope_route3, scope_route2}, "3");
+  }
   test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_success", 3);
   codec_client_ = makeHttpConnection(lookupPort("http"));
   response = codec_client_->makeHeaderOnlyRequest(
@@ -334,7 +378,11 @@ key:
   // Add a new scope foo_scope4.
   const std::string& scope_route4 =
       fmt::format(scope_tmpl, "foo_scope4", "foo_route4", "xyz-route");
-  sendScopedRdsResponse({scope_route3, scope_route2, scope_route4}, "4");
+  if (isDelta()) {
+    sendDeltaScopedRdsResponse({scope_route4}, {}, "4");
+  } else {
+    sendSotwScopedRdsResponse({scope_route3, scope_route2, scope_route4}, "4");
+  }
   test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_success", 4);
   codec_client_ = makeHttpConnection(lookupPort("http"));
   response = codec_client_->makeHeaderOnlyRequest(
@@ -376,7 +424,11 @@ key:
 )EOF";
   on_server_init_function_ = [this, &scope_route1]() {
     createScopedRdsStream();
-    sendScopedRdsResponse({scope_route1}, "1");
+    if (isDelta()) {
+      sendDeltaScopedRdsResponse({scope_route1}, {}, "1");
+    } else {
+      sendSotwScopedRdsResponse({scope_route1}, "1");
+    }
   };
   initialize();
 
@@ -401,7 +453,11 @@ key:
   fragments:
     - string_key: foo
 )EOF";
-  sendScopedRdsResponse({scope_route2}, "2");
+  if (isDelta()) {
+    sendDeltaScopedRdsResponse({scope_route2}, {}, "1");
+  } else {
+    sendSotwScopedRdsResponse({scope_route2}, "2");
+  }
   test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_attempt", 1);
   createRdsStream("foo_route1");
   const std::string route_config_tmpl = R"EOF(

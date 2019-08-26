@@ -54,6 +54,24 @@ public:
   ClientType clientType() const override { return std::get<1>(GetParam()); }
 };
 
+class DeltaStowGrpcClientIntegrationParamTest
+    : public BaseGrpcClientIntegrationParamTest,
+      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, ClientType, bool>> {
+public:
+  ~DeltaStowGrpcClientIntegrationParamTest() override = default;
+  static std::string protocolTestParamsToString(
+      const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, ClientType, bool>>&
+          p) {
+    return fmt::format("{}_{}",
+                       std::get<0>(p.param) == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
+                       std::get<1>(p.param) == ClientType::GoogleGrpc ? "GoogleGrpc" : "EnvoyGrpc",
+                       std::get<2>(p.param) ? "Stow" : "Delta");
+  }
+  Network::Address::IpVersion ipVersion() const override { return std::get<0>(GetParam()); }
+  ClientType clientType() const override { return std::get<1>(GetParam()); }
+  bool isDelta() { return std::get<2>(GetParam()); }
+};
+
 class DeltaSotwIntegrationParamTest
     : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, SotwOrDelta>> {
 public:
@@ -84,10 +102,17 @@ public:
 #define GRPC_CLIENT_INTEGRATION_PARAMS                                                             \
   testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
                    testing::Values(Grpc::ClientType::EnvoyGrpc, Grpc::ClientType::GoogleGrpc))
+#define DLETA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS                                                  \
+  testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
+                   testing::Values(Grpc::ClientType::EnvoyGrpc, Grpc::ClientType::GoogleGrpc),     \
+                   testing::Bool())
 #else
 #define GRPC_CLIENT_INTEGRATION_PARAMS                                                             \
   testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
                    testing::Values(Grpc::ClientType::EnvoyGrpc))
+#define DLETA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS                                                  \
+  testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
+                   testing::Values(Grpc::ClientType::EnvoyGrpc), testing::Bool())
 #endif // ENVOY_GOOGLE_GRPC
 
 #define DELTA_INTEGRATION_PARAMS                                                                   \
