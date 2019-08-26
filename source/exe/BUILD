@@ -7,12 +7,12 @@ load(
     "envoy_google_grpc_external_deps",
     "envoy_package",
 )
-load("//bazel:repositories.bzl", "NOBORINGSSL_SKIP_TARGETS", "PPC_SKIP_TARGETS")
 load(
     "//source/extensions:all_extensions.bzl",
     "envoy_all_extensions",
     "envoy_windows_extensions",
 )
+load("//bazel:repositories.bzl", "NOBORINGSSL_SKIP_TARGETS", "PPC_SKIP_TARGETS")
 
 envoy_package()
 
@@ -39,9 +39,9 @@ envoy_cc_library(
         "//source/server:server_lib",
         "//source/server:listener_hooks_lib",
     ] + select({
-        "//bazel:boringssl_disabled": envoy_all_extensions(NOBORINGSSL_SKIP_TARGETS),
-        "//bazel:linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),
         "//bazel:windows_x86_64": envoy_windows_extensions(),
+        "//bazel:linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),
+        "//bazel:boringssl_disabled": envoy_all_extensions(NOBORINGSSL_SKIP_TARGETS),
         "//conditions:default": envoy_all_extensions(),
     }),
 )
@@ -64,6 +64,7 @@ envoy_cc_library(
     hdrs = ["main_common.h"],
     deps = [
         ":envoy_common_lib",
+        ":platform_impl_lib",
         ":process_wide_lib",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:compiler_requirements_lib",
@@ -72,7 +73,6 @@ envoy_cc_library(
         "//source/server:hot_restart_lib",
         "//source/server:hot_restart_nop_lib",
         "//source/server/config_validation:server_lib",
-        ":platform_impl_lib",
     ] + select({
         "//bazel:disable_signal_trace": [],
         "//conditions:default": [
@@ -98,16 +98,16 @@ envoy_cc_library(
 envoy_cc_library(
     name = "platform_impl_lib",
     srcs = select({
-        "//conditions:default": ["platform_impl_posix.cc"],
-        "//bazel:windows_x86_64": ["platform_impl_win32.cc"],
+        "//bazel:windows_x86_64": ["win32/platform_impl.cc"],
+        "//conditions:default": ["posix/platform_impl.cc"],
     }),
     hdrs = ["platform_impl.h"],
     deps = [
         "//source/common/common:thread_lib",
         "//source/common/filesystem:filesystem_lib",
     ] + select({
-        "//conditions:default": [],
         "//bazel:windows_x86_64": ["//source/common/common:assert_lib"],
+        "//conditions:default": [],
     }),
 )
 
