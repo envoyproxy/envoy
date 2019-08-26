@@ -542,7 +542,7 @@ message Cluster {
 
       // If set to true, Envoy will not consider any hosts when the cluster is in panic mode.
       // Instead, the cluster will fail all requests as if all hosts are unhealthy.
-      bool disable_cluster_on_panic = 3;
+      bool fail_traffic_on_panic = 3;
     }
     // Configuration for :ref:`locality weighted load balancing
     // <arch_overview_load_balancing_locality_weighted_lb>`

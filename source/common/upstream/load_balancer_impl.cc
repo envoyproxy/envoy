@@ -283,7 +283,7 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
           common_config.zone_aware_lb_config(), routing_enabled, 100, 100)),
       min_cluster_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(common_config.zone_aware_lb_config(),
                                                         min_cluster_size, 6U)),
-      disable_cluster_on_panic_(common_config.zone_aware_lb_config().disable_cluster_on_panic()) {
+      fail_traffic_on_panic_(common_config.zone_aware_lb_config().fail_traffic_on_panic()) {
   ASSERT(!priority_set.hostSetsPerPriority().empty());
   resizePerPriorityState();
   priority_set_.addPriorityUpdateCb(
@@ -553,7 +553,7 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context) {
   // If the selected host set has insufficient healthy hosts, return all hosts.
   if (per_priority_panic_[hosts_source.priority_]) {
     stats_.lb_healthy_panic_.inc();
-    if (disable_cluster_on_panic_) {
+    if (fail_traffic_on_panic_) {
       return absl::nullopt;
     } else {
       hosts_source.source_type_ = HostsSource::SourceType::AllHosts;
@@ -591,9 +591,9 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context) {
 
   if (isGlobalPanic(localHostSet())) {
     stats_.lb_local_cluster_not_ok_.inc();
-    // If the local Envoy instances are in global panic, and we should not disable the cluster, do
+    // If the local Envoy instances are in global panic, and we should not fail traffic, do
     // not do locality based routing.
-    if (disable_cluster_on_panic_) {
+    if (fail_traffic_on_panic_) {
       return absl::nullopt;
     } else {
       hosts_source.source_type_ = sourceType(host_availability);

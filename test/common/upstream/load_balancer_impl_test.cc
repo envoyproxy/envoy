@@ -544,7 +544,7 @@ TEST_P(FailoverTest, PriorityUpdatesWithLocalHostSet) {
 TEST_P(FailoverTest, PriorityUpdatesWithLocalHostSetDisableOnPanic) {
   host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
   failover_host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:81")};
-  common_config_.mutable_zone_aware_lb_config()->set_disable_cluster_on_panic(true);
+  common_config_.mutable_zone_aware_lb_config()->set_fail_traffic_on_panic(true);
 
   init(false);
   // With both the primary and failover hosts unhealthy, we should select no host.
@@ -862,7 +862,7 @@ TEST_P(RoundRobinLoadBalancerTest, MaxUnhealthyPanic) {
   EXPECT_EQ(3UL, stats_.lb_healthy_panic_.value());
 }
 
-// Test that no hosts are selected when disable_cluster_on_panic is enabled.
+// Test that no hosts are selected when fail_cluster_on_panic is enabled.
 TEST_P(RoundRobinLoadBalancerTest, MaxUnhealthyPanicDisableOnPanic) {
   hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
                               makeTestHost(info_, "tcp://127.0.0.1:81")};
@@ -871,7 +871,7 @@ TEST_P(RoundRobinLoadBalancerTest, MaxUnhealthyPanicDisableOnPanic) {
       makeTestHost(info_, "tcp://127.0.0.1:82"), makeTestHost(info_, "tcp://127.0.0.1:83"),
       makeTestHost(info_, "tcp://127.0.0.1:84"), makeTestHost(info_, "tcp://127.0.0.1:85")};
 
-  common_config_.mutable_zone_aware_lb_config()->set_disable_cluster_on_panic(true);
+  common_config_.mutable_zone_aware_lb_config()->set_fail_cluster_on_panic(true);
 
   init(false);
   EXPECT_EQ(nullptr, lb_->chooseHost(nullptr));

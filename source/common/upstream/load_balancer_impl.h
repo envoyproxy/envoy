@@ -300,7 +300,7 @@ private:
 
   const uint32_t routing_enabled_;
   const uint64_t min_cluster_size_;
-  const bool disable_cluster_on_panic_;
+  const bool fail_traffic_on_panic_;
 
   struct PerPriorityState {
     // The percent of requests which can be routed to the local locality.

@@ -12,6 +12,10 @@ as the *panic threshold*. The default panic threshold is 50%. This is
 The panic threshold is used to avoid a situation in which host failures cascade throughout the
 cluster as load increases.
 
+There are two modes Envoy can choose from when in a panic state: traffic will either be sent to all
+hosts, or will be sent to no hosts (and therefore will always fail). This is configured in the
+:ref:`cluster configuration <envoy_api_field_Cluster.CommonLbConfig.ZoneAwareLbConfig.fail_traffic_on_panic>`.
+
 Panic thresholds work in conjunction with priorities. If the number of available hosts in a given
 priority goes down, Envoy will try to shift some traffic to lower priorities. If it succeeds in
 finding enough available hosts in lower priorities, Envoy will disregard panic thresholds. In
@@ -22,10 +26,6 @@ However, when normalized total availability drops below 100%, Envoy assumes that
 available hosts across all priority levels. It continues to distribute traffic load across priorities,
 but if a given priority level's availability is below the panic threshold, traffic will go to all
 (or no) hosts in that priority level regardless of their availability.
-
-There are two modes Envoy can choose from when in a panic state: traffic will either be sent to all
-hosts, or will be sent to no hosts (and therefore will always fail). This is configured in the
-:ref:`cluster configuration <envoy_api_field_Cluster.CommonLbConfig.ZoneAwareLbConfig.disable_cluster_on_panic>`.
 
 The following examples explain the relationship between normalized total availability and panic threshold.
 It is assumed that the default value of 50% is used for the panic threshold.
