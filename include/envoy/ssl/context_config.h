@@ -140,9 +140,11 @@ class ContextConfigFactory {
 public:
   virtual ~ContextConfigFactory() = default;
 
-  virtual ContextConfigPtr createSslContextConfig(const Protobuf::Message& config, Server::Configuration::TransportSocketFactoryContext& context) PURE;
+  virtual ContextConfigPtr
+  createSslContextConfig(const Protobuf::Message& config,
+                         Server::Configuration::TransportSocketFactoryContext& context) PURE;
 
-   virtual std::string name() const PURE;
+  virtual std::string name() const PURE;
 };
 
 } // namespace Ssl

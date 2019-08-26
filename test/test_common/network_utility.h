@@ -133,8 +133,8 @@ public:
       : transport_socket_factory_(std::move(transport_socket_factory)) {}
 
   // Network::FilterChain
-  const Network::TransportSocketFactory& transportSocketFactory() const override {
-    return *transport_socket_factory_;
+  const Network::TransportSocketFactory* transportSocketFactory() const override {
+    return transport_socket_factory_.get();
   }
 
   const std::vector<FilterFactoryCb>& networkFilterFactories() const override {
