@@ -180,7 +180,7 @@ message Cluster {
     // deprecating the lb_policy field and instead using the new
     // load_balancing_policy field as the one and only mechanism for
     // configuring this.]
-    NEW_POLICY_CONFIG = 7;
+    LOAD_BALANCING_POLICY_CONFIG = 7;
   }
   // The :ref:`load balancer type <arch_overview_load_balancing_types>` to use
   // when picking a host in the cluster.
@@ -644,7 +644,9 @@ message Cluster {
 
   // New mechanism for LB policy configuration. Used only if the
   // :ref:`lb_policy<envoy_api_field_Cluster.lb_policy>` field has the value
-  // :ref:`NEW_POLICY_CONFIG<envoy_api_enum_value_Cluster.LbPolicy.NEW_POLICY_CONFIG>`.
+  // :ref:`LOAD_BALANCING_POLICY_CONFIG
+  // <envoy_api_enum_value_Cluster.LbPolicy.LOAD_BALANCING_POLICY_CONFIG>`.
+  // [#not-implemented-yet: This is not yet implemented in Envoy.]
   LoadBalancingPolicy load_balancing_policy = 40;
 }
 
