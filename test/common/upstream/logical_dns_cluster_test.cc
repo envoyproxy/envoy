@@ -75,7 +75,7 @@ protected:
 
     EXPECT_CALL(membership_updated_, ready());
     EXPECT_CALL(initialized_, ready());
-    EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000)));
+    EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000), _));
     dns_callback_(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
 
     EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
@@ -104,7 +104,7 @@ protected:
     resolve_timer_->invokeCallback();
 
     // Should not cause any changes.
-    EXPECT_CALL(*resolve_timer_, enableTimer(_));
+    EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
     dns_callback_(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2", "127.0.0.3"}));
 
     EXPECT_EQ("127.0.0.1:" + std::to_string(expected_hc_port),
@@ -136,7 +136,7 @@ protected:
     resolve_timer_->invokeCallback();
 
     // Should cause a change.
-    EXPECT_CALL(*resolve_timer_, enableTimer(_));
+    EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
     dns_callback_(TestUtility::makeDnsResponse({"127.0.0.3", "127.0.0.1", "127.0.0.2"}));
 
     EXPECT_EQ("127.0.0.3:" + std::to_string(expected_hc_port),
@@ -154,7 +154,7 @@ protected:
     resolve_timer_->invokeCallback();
 
     // Empty should not cause any change.
-    EXPECT_CALL(*resolve_timer_, enableTimer(_));
+    EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
     dns_callback_({});
 
     EXPECT_EQ(logical_host, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
@@ -255,7 +255,7 @@ TEST_P(LogicalDnsParamTest, ImmediateResolve) {
   EXPECT_CALL(*dns_resolver_, resolve("foo.bar.com", std::get<1>(GetParam()), _))
       .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
                            Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
-        EXPECT_CALL(*resolve_timer_, enableTimer(_));
+        EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
         cb(TestUtility::makeDnsResponse(std::get<2>(GetParam())));
         return nullptr;
       }));

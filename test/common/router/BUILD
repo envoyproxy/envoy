@@ -85,6 +85,7 @@ envoy_cc_test(
     ],
     deps = [
         "//source/common/router:scoped_config_lib",
+        "//test/mocks/router:router_mocks",
         "//test/test_common:utility_lib",
     ],
 )
@@ -96,12 +97,16 @@ envoy_cc_test(
         "abseil_strings",
     ],
     deps = [
+        "//include/envoy/config:subscription_interface",
+        "//include/envoy/init:manager_interface",
         "//source/common/config:utility_lib",
         "//source/common/http:message_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/router:scoped_rds_lib",
         "//source/server/http:admin_lib",
+        "//test/mocks/config:config_mocks",
         "//test/mocks/init:init_mocks",
+        "//test/mocks/router:router_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",

@@ -3,6 +3,8 @@
 #include <string>
 
 #include "envoy/api/v2/core/base.pb.h"
+#include "envoy/common/matchers.h"
+#include "envoy/common/regex.h"
 #include "envoy/type/matcher/metadata.pb.h"
 #include "envoy/type/matcher/number.pb.h"
 #include "envoy/type/matcher/string.pb.h"
@@ -70,21 +72,16 @@ private:
   const envoy::type::matcher::DoubleMatcher matcher_;
 };
 
-class StringMatcher : public ValueMatcher {
+class StringMatcherImpl : public ValueMatcher, public StringMatcher {
 public:
-  StringMatcher(const envoy::type::matcher::StringMatcher& matcher) : matcher_(matcher) {
-    if (matcher.match_pattern_case() == envoy::type::matcher::StringMatcher::kRegex) {
-      regex_ = RegexUtil::parseRegex(matcher_.regex());
-    }
-  }
+  explicit StringMatcherImpl(const envoy::type::matcher::StringMatcher& matcher);
 
-  bool match(const absl::string_view value) const;
-
+  bool match(const absl::string_view value) const override;
   bool match(const ProtobufWkt::Value& value) const override;
 
 private:
   const envoy::type::matcher::StringMatcher matcher_;
-  std::regex regex_;
+  Regex::CompiledMatcherPtr regex_;
 };
 
 class LowerCaseStringMatcher : public ValueMatcher {
@@ -100,8 +97,10 @@ private:
   envoy::type::matcher::StringMatcher
   toLowerCase(const envoy::type::matcher::StringMatcher& matcher);
 
-  const StringMatcher matcher_;
+  const StringMatcherImpl matcher_;
 };
+
+using LowerCaseStringMatcherPtr = std::unique_ptr<LowerCaseStringMatcher>;
 
 class ListMatcher : public ValueMatcher {
 public:

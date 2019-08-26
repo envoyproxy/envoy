@@ -196,7 +196,7 @@ protected:
 
     expectAsyncClientSend();
 
-    EXPECT_CALL(*attachmentTimeout_timer_, enableTimer(config_->attachmentTimeout()));
+    EXPECT_CALL(*attachmentTimeout_timer_, enableTimer(config_->attachmentTimeout(), _));
 
     Envoy::Http::TestHeaderMapImpl headers{{":method", "GET"},
                                            {":authority", "www.solo.io"},
@@ -330,6 +330,7 @@ TEST_F(SquashFilterTest, Timeout) {
   EXPECT_CALL(request_, cancel());
   EXPECT_CALL(filter_callbacks_, continueDecoding());
 
+  EXPECT_CALL(filter_callbacks_.dispatcher_, setTrackedObject(_)).Times(2);
   attachmentTimeout_timer_->invokeCallback();
 
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(buffer, false));
@@ -354,11 +355,12 @@ TEST_F(SquashFilterTest, CheckRetryPollingAttachment) {
   NiceMock<Envoy::Event::MockTimer>* retry_timer;
   retry_timer = new NiceMock<Envoy::Event::MockTimer>(&filter_callbacks_.dispatcher_);
 
-  EXPECT_CALL(*retry_timer, enableTimer(config_->attachmentPollPeriod()));
+  EXPECT_CALL(*retry_timer, enableTimer(config_->attachmentPollPeriod(), _));
   completeGetStatusRequest("attaching");
 
   // Expect the second get attachment request
   expectAsyncClientSend();
+  EXPECT_CALL(filter_callbacks_.dispatcher_, setTrackedObject(_)).Times(2);
   retry_timer->invokeCallback();
   EXPECT_CALL(filter_callbacks_, continueDecoding());
   completeGetStatusRequest("attached");
@@ -372,12 +374,13 @@ TEST_F(SquashFilterTest, CheckRetryPollingAttachmentOnFailure) {
 
   NiceMock<Envoy::Event::MockTimer>* retry_timer;
   retry_timer = new NiceMock<Envoy::Event::MockTimer>(&filter_callbacks_.dispatcher_);
-  EXPECT_CALL(*retry_timer, enableTimer(config_->attachmentPollPeriod()));
+  EXPECT_CALL(*retry_timer, enableTimer(config_->attachmentPollPeriod(), _));
   popPendingCallback()->onFailure(Envoy::Http::AsyncClient::FailureReason::Reset);
 
   // Expect the second get attachment request
   expectAsyncClientSend();
 
+  EXPECT_CALL(filter_callbacks_.dispatcher_, setTrackedObject(_)).Times(2);
   retry_timer->invokeCallback();
 
   EXPECT_CALL(filter_callbacks_, continueDecoding());
@@ -391,7 +394,7 @@ TEST_F(SquashFilterTest, DestroyedInTheMiddle) {
   completeCreateRequest();
 
   auto retry_timer = new NiceMock<Envoy::Event::MockTimer>(&filter_callbacks_.dispatcher_);
-  EXPECT_CALL(*retry_timer, enableTimer(config_->attachmentPollPeriod()));
+  EXPECT_CALL(*retry_timer, enableTimer(config_->attachmentPollPeriod(), _));
   completeGetStatusRequest("attaching");
 
   EXPECT_CALL(*attachmentTimeout_timer_, disableTimer());
@@ -413,7 +416,7 @@ TEST_F(SquashFilterTest, InvalidJsonForGetAttachment) {
   completeCreateRequest();
 
   auto retry_timer = new NiceMock<Envoy::Event::MockTimer>(&filter_callbacks_.dispatcher_);
-  EXPECT_CALL(*retry_timer, enableTimer(config_->attachmentPollPeriod()));
+  EXPECT_CALL(*retry_timer, enableTimer(config_->attachmentPollPeriod(), _));
   completeRequest("200", "This is not a JSON object");
 }
 
@@ -430,12 +433,12 @@ TEST_F(SquashFilterTest, TimerExpiresInline) {
   initFilter();
 
   attachmentTimeout_timer_ = new NiceMock<Envoy::Event::MockTimer>(&filter_callbacks_.dispatcher_);
-  // TODO: this is a really synthetic test as the callback can't actually be called under the stack
-  // of enableTimer. It'd be good to clean this up.
-  EXPECT_CALL(*attachmentTimeout_timer_, enableTimer(config_->attachmentTimeout()))
-      .WillOnce(Invoke([&](const std::chrono::milliseconds&) {
+  EXPECT_CALL(*attachmentTimeout_timer_, enableTimer(config_->attachmentTimeout(), _))
+      .WillOnce(Invoke([&](const std::chrono::milliseconds&, const ScopeTrackedObject* scope) {
+        attachmentTimeout_timer_->scope_ = scope;
         attachmentTimeout_timer_->enabled_ = true;
         // timer expires inline
+        EXPECT_CALL(filter_callbacks_.dispatcher_, setTrackedObject(_)).Times(2);
         attachmentTimeout_timer_->invokeCallback();
       }));
 

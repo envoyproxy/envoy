@@ -50,8 +50,8 @@ message AttributeContext {
     // The authenticated identity of this peer.
     // For example, the identity associated with the workload such as a service account.
     // If an X.509 certificate is used to assert the identity this field should be sourced from
-    // `Subject` or `Subject Alternative Names`. The primary identity should be the principal.
-    // The principal format is issuer specific.
+    // `URI Subject Alternative Names`, `DNS Subject Alternate Names` or `Subject` in that order.
+    // The primary identity should be the principal. The principal format is issuer specific.
     //
     // Example:
     // *    SPIFFE format is `spiffe://trust-domain/path`
