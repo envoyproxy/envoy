@@ -31,7 +31,7 @@ void ConnectionHandlerImpl::addListener(Network::ListenerConfig& config) {
   }
 
   if (disable_listeners_) {
-    listener->disable();
+    listener->listener()->disable();
   }
   listeners_.emplace_back(config.socket().localAddress(), std::move(listener));
 }
@@ -63,14 +63,14 @@ void ConnectionHandlerImpl::stopListeners() {
 void ConnectionHandlerImpl::disableListeners() {
   disable_listeners_ = true;
   for (auto& listener : listeners_) {
-    listener.second->disable();
+    listener.second->listener()->disable();
   }
 }
 
 void ConnectionHandlerImpl::enableListeners() {
   disable_listeners_ = false;
   for (auto& listener : listeners_) {
-    listener.second->enable();
+    listener.second->listener()->enable();
   }
 }
 

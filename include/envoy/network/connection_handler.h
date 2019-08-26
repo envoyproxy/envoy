@@ -85,14 +85,6 @@ public:
      */
     virtual Listener* listener() PURE;
     /**
-     * Disable the actual Listener.
-     */
-    virtual void disable() PURE;
-    /**
-     * enable the actual Listener.
-     */
-    virtual void enable() PURE;
-    /**
      * Destroy the actual Listener it wraps.
      */
     virtual void destroy() PURE;
