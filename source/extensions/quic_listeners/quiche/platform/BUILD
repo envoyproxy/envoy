@@ -277,6 +277,7 @@ envoy_cc_library(
         "spdy_flags_impl.h",
         "spdy_logging_impl.h",
         "spdy_macros_impl.h",
+        "spdy_map_util_impl.h",
         "spdy_mem_slice_impl.h",
         "spdy_ptr_util_impl.h",
         "spdy_string_impl.h",
