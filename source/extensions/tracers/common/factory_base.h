@@ -17,8 +17,10 @@ public:
   // Server::Configuration::TracerFactory
   Tracing::HttpTracerPtr createHttpTracer(const Protobuf::Message& config,
                                           Server::Instance& server) override {
-    return createHttpTracerTyped(MessageUtil::downcastAndValidate<const ConfigProto&>(config),
-                                 server);
+    return createHttpTracerTyped(
+        MessageUtil::downcastAndValidate<const ConfigProto&>(
+            config, server.messageValidationContext().staticValidationVisitor()),
+        server);
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

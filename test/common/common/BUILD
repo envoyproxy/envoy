@@ -144,6 +144,15 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "regex_test",
+    srcs = ["regex_test.cc"],
+    deps = [
+        "//source/common/common:regex_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "perf_annotation_test",
     srcs = ["perf_annotation_test.cc"],
     deps = [

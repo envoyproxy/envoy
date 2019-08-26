@@ -1,5 +1,7 @@
 #pragma once
 
+#include <regex>
+
 #include "envoy/config/filter/http/squash/v2/squash.pb.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/filter.h"

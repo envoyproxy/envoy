@@ -59,9 +59,7 @@ private:
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::api::v2::route::VirtualHost>(resource,
-                                                                       validation_visitor_)
-        .name();
+    return MessageUtil::anyConvert<envoy::api::v2::route::VirtualHost>(resource).name();
   }
 
   RouteConfigUpdatePtr& config_update_info_;
@@ -70,7 +68,6 @@ private:
   Stats::ScopePtr scope_;
   VhdsStats stats_;
   std::unordered_set<RouteConfigProvider*>& route_config_providers_;
-  ProtobufMessage::ValidationVisitor& validation_visitor_;
 };
 
 using VhdsSubscriptionPtr = std::unique_ptr<VhdsSubscription>;
