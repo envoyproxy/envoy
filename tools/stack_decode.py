@@ -24,9 +24,11 @@ import sys
 # any nonmatching lines unmodified. End when EOF received.
 def decode_stacktrace_log(object_file, input_source):
   traces = {}
-  # Match something like [backtrace]
-  # bazel-out/local-dbg/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:84]
+  # Match something like:
+  #     [backtrace] bazel-out/local-dbg/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:84]
   backtrace_marker = "\[backtrace\] [^\s]+"
+  # Match something like:
+  #     ${backtrace_marker} #10: SYMBOL [0xADDR]
   stackaddr_re = re.compile("%s #\d+: .* \[(0x[0-9a-fA-F]+)\]$" % backtrace_marker)
 
   try:
