@@ -18,45 +18,53 @@ public:
 
   // Upstream::LoadBalancerContext
   absl::optional<uint64_t> computeHashKey() override {
-    if (context_)
+    if (context_) {
       return context_->computeHashKey();
+    }
     return {};
   }
   const Network::Connection* downstreamConnection() const override {
-    if (context_)
+    if (context_) {
       return context_->downstreamConnection();
+    }
     return nullptr;
   }
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override {
-    if (context_)
+    if (context_) {
       return context_->metadataMatchCriteria();
+    }
     return nullptr;
   }
   const Http::HeaderMap* downstreamHeaders() const override {
-    if (context_)
+    if (context_) {
       return context_->downstreamHeaders();
+    }
     return nullptr;
   }
   const Upstream::HealthyAndDegradedLoad&
   determinePriorityLoad(const Upstream::PrioritySet& priority_set,
                         const Upstream::HealthyAndDegradedLoad& original_priority_load) override {
-    if (context_)
+    if (context_) {
       return context_->determinePriorityLoad(priority_set, original_priority_load);
+    }
     return original_priority_load;
   }
   bool shouldSelectAnotherHost(const Upstream::Host& host) override {
-    if (context_)
+    if (context_) {
       return context_->shouldSelectAnotherHost(host) || host.health() != host_health_;
+    }
     return host.health() != host_health_;
   }
   uint32_t hostSelectionRetryCount() const override {
-    if (context_)
+    if (context_) {
       return context_->hostSelectionRetryCount();
+    }
     return 1;
   }
   Network::Socket::OptionsSharedPtr upstreamSocketOptions() const override {
-    if (context_)
+    if (context_) {
       return context_->upstreamSocketOptions();
+    }
     return {};
   }
 
