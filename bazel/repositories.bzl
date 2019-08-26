@@ -153,6 +153,8 @@ def envoy_dependencies(skip_targets = []):
     _com_lightstep_tracer_cpp()
     _io_opentracing_cpp()
     _net_zlib()
+    _repository_impl("com_googlesource_code_re2")
+    _com_google_cel_cpp()
     _repository_impl("bazel_toolchains")
 
     _python_deps()
@@ -314,6 +316,9 @@ def _net_zlib():
         name = "zlib",
         actual = "@envoy//bazel/foreign_cc:zlib",
     )
+
+def _com_google_cel_cpp():
+    _repository_impl("com_google_cel_cpp")
 
 def _com_github_nghttp2_nghttp2():
     location = REPOSITORY_LOCATIONS["com_github_nghttp2_nghttp2"]
@@ -529,6 +534,10 @@ def _io_opencensus_cpp():
         actual = "@io_opencensus_cpp//opencensus/trace",
     )
     native.bind(
+        name = "opencensus_trace_b3",
+        actual = "@io_opencensus_cpp//opencensus/trace:b3",
+    )
+    native.bind(
         name = "opencensus_trace_cloud_trace_context",
         actual = "@io_opencensus_cpp//opencensus/trace:cloud_trace_context",
     )
@@ -596,7 +605,17 @@ def _com_googlesource_quiche():
     )
 
 def _com_github_grpc_grpc():
-    _repository_impl("com_github_grpc_grpc")
+    _repository_impl(
+        "com_github_grpc_grpc",
+        patches = [
+            # Workaround for https://github.com/envoyproxy/envoy/issues/7863
+            "@envoy//bazel:grpc-protoinfo-1.patch",
+            "@envoy//bazel:grpc-protoinfo-2.patch",
+            # Pre-integration of https://github.com/grpc/grpc/pull/19860
+            "@envoy//bazel:grpc-protoinfo-3.patch",
+        ],
+        patch_args = ["-p1"],
+    )
 
     # Rebind some stuff to match what the gRPC Bazel is expecting.
     native.bind(

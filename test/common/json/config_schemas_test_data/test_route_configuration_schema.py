@@ -5,12 +5,10 @@ ROUTE_CONFIGURATION_BLOB = {
     "virtual_hosts": [{
         "domains": ["production.example.com"],
         "require_ssl": "all",
-        "routes": [
-            {
-                "host_redirect": "example.com",
-                "prefix": "/"
-            },
-        ],
+        "routes": [{
+            "host_redirect": "example.com",
+            "prefix": "/"
+        },],
         "name": "production_redirect"
     }],
     "internal_only_headers": ["x-role", "x-source"],

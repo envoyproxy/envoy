@@ -135,7 +135,14 @@ versioning across resource types. When ADS is not used, even each
 resource of a given resource type may have a distinct version, since the
 Envoy API allows distinct EDS/RDS resources to point at different :ref:`ConfigSources <envoy_api_msg_core.ConfigSource>`.
 
-.. xds_protocol_resource_update:
+Only the first request on a stream is guaranteed to carry the node identifier.
+The subsequent discovery requests on the same stream may carry an empty node
+identifier. This holds true regardless of the acceptance of the discovery
+responses on the same stream. The node identifier should always be identical if
+present more than once on the stream. It is sufficient to only check the first
+message for the node identifier as a result.
+
+.. _xds_protocol_resource_update:
 
 Resource Update
 ~~~~~~~~~~~~~~~
@@ -463,7 +470,7 @@ messages. ADS is not available for REST-JSON polling.
 When the poll period is set to a small value, with the intention of long
 polling, then there is also a requirement to avoid sending a
 :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>` unless a change to the underlying resources has
-occurred <Resource Update>.
+occurred via a :ref:`resource update <xds_protocol_resource_update>`.
 
 .. |Multiple EDS requests on the same stream| image:: diagrams/eds-same-stream.svg
 .. |Multiple EDS requests on distinct streams| image:: diagrams/eds-distinct-stream.svg

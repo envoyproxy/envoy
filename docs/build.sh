@@ -76,6 +76,7 @@ PROTO_RST="
   /envoy/api/v2/cds/envoy/api/v2/cds.proto.rst
   /envoy/api/v2/cluster/outlier_detection/envoy/api/v2/cluster/outlier_detection.proto.rst
   /envoy/api/v2/cluster/circuit_breaker/envoy/api/v2/cluster/circuit_breaker.proto.rst
+  /envoy/api/v2/cluster/filter/envoy/api/v2/cluster/filter.proto.rst
   /envoy/api/v2/rds/envoy/api/v2/rds.proto.rst
   /envoy/api/v2/route/route/envoy/api/v2/route/route.proto.rst
   /envoy/api/v2/srds/envoy/api/v2/srds.proto.rst
@@ -129,6 +130,7 @@ PROTO_RST="
   /envoy/config/filter/network/thrift_proxy/v2alpha1/thrift_proxy/envoy/config/filter/network/thrift_proxy/v2alpha1/route.proto.rst
   /envoy/config/filter/thrift/rate_limit/v2alpha1/rate_limit/envoy/config/filter/thrift/rate_limit/v2alpha1/rate_limit.proto.rst
   /envoy/config/filter/thrift/router/v2alpha1/router/envoy/config/filter/thrift/router/v2alpha1/router.proto.rst
+  /envoy/config/grpc_credential/v2alpha/aws_iam/envoy/config/grpc_credential/v2alpha/aws_iam.proto.rst
   /envoy/config/health_checker/redis/v2/redis/envoy/config/health_checker/redis/v2/redis.proto.rst
   /envoy/config/overload/v2alpha/overload/envoy/config/overload/v2alpha/overload.proto.rst
   /envoy/config/rbac/v2/rbac/envoy/config/rbac/v2/rbac.proto.rst
@@ -154,6 +156,7 @@ PROTO_RST="
   /envoy/type/matcher/metadata/envoy/type/matcher/metadata.proto.rst
   /envoy/type/matcher/value/envoy/type/matcher/value.proto.rst
   /envoy/type/matcher/number/envoy/type/matcher/number.proto.rst
+  /envoy/type/matcher/regex/envoy/type/matcher/regex.proto.rst
   /envoy/type/matcher/string/envoy/type/matcher/string.proto.rst
 "
 

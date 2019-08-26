@@ -18,6 +18,8 @@ public:
   const std::string AccessTokenExample = "envoy.grpc_credentials.access_token_example";
   // File Based Metadata credentials
   const std::string FileBasedMetadata = "envoy.grpc_credentials.file_based_metadata";
+  // AWS IAM
+  const std::string AwsIam = "envoy.grpc_credentials.aws_iam";
 };
 
 using GrpcCredentialsNames = ConstSingleton<GrpcCredentialsNameValues>;

@@ -59,7 +59,7 @@ protected:
                                  server_.threadLocal(), server_.random(), server_.dnsResolver(),
                                  server_.sslContextManager(), server_.dispatcher(),
                                  server_.localInfo(), server_.secretManager(),
-                                 server_.messageValidationVisitor(), *api_, server_.httpContext(),
+                                 server_.messageValidationContext(), *api_, server_.httpContext(),
                                  server_.accessLogManager(), server_.singletonManager()) {}
 
   Api::ApiPtr api_;

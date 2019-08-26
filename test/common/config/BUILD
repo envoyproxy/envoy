@@ -275,6 +275,17 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "watch_map_test",
+    srcs = ["watch_map_test.cc"],
+    deps = [
+        "//source/common/config:watch_map_lib",
+        "//test/mocks/config:config_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2:eds_cc",
+    ],
+)
+
+envoy_cc_test(
     name = "filter_json_test",
     srcs = ["filter_json_test.cc"],
     deps = [

@@ -505,7 +505,7 @@ TEST_F(StreamInfoHeaderFormatterTest, ValidateLimitsOnUserDefinedHeaders) {
     header->mutable_header()->set_key("header_name");
     header->mutable_header()->set_value(long_string);
     header->mutable_append()->set_value(true);
-    EXPECT_THROW_WITH_REGEX(MessageUtil::validate(route), ProtoValidationException,
+    EXPECT_THROW_WITH_REGEX(TestUtility::validate(route), ProtoValidationException,
                             "Proto constraint validation failed.*");
   }
   {
@@ -516,7 +516,7 @@ TEST_F(StreamInfoHeaderFormatterTest, ValidateLimitsOnUserDefinedHeaders) {
       header->mutable_header()->set_key("header_name");
       header->mutable_header()->set_value("value");
     }
-    EXPECT_THROW_WITH_REGEX(MessageUtil::validate(route), ProtoValidationException,
+    EXPECT_THROW_WITH_REGEX(TestUtility::validate(route), ProtoValidationException,
                             "Proto constraint validation failed.*");
   }
 }

@@ -236,9 +236,9 @@ ProdClusterInfoFactory::createClusterInfo(const CreateClusterInfoParams& params)
   Network::TransportSocketFactoryPtr socket_factory =
       Upstream::createTransportSocketFactory(params.cluster_, factory_context);
 
-  return std::make_unique<ClusterInfoImpl>(params.cluster_, params.bind_config_, params.runtime_,
-                                           std::move(socket_factory), std::move(scope),
-                                           params.added_via_api_, params.validation_visitor_);
+  return std::make_unique<ClusterInfoImpl>(
+      params.cluster_, params.bind_config_, params.runtime_, std::move(socket_factory),
+      std::move(scope), params.added_via_api_, params.validation_visitor_, factory_context);
 }
 
 void HdsCluster::startHealthchecks(AccessLog::AccessLogManager& access_log_manager,

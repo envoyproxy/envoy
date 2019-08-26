@@ -25,7 +25,7 @@ import "gogoproto/gogo.proto";
 // [#protodoc-title: HTTP connection manager]
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 
-// [#comment:next free field: 33]
+// [#comment:next free field: 34]
 message HttpConnectionManager {
   enum CodecType {
     option (gogoproto.goproto_enum_prefix) = false;
@@ -80,6 +80,7 @@ message HttpConnectionManager {
   google.protobuf.BoolValue add_user_agent = 6;
 
   message Tracing {
+    // [#comment:TODO(kyessenov): Align this field with listener traffic direction field.]
     enum OperationName {
       option (gogoproto.goproto_enum_prefix) = false;
 
@@ -424,12 +425,18 @@ message HttpConnectionManager {
   // Note that Envoy does not perform
   // `case normalization <https://tools.ietf.org/html/rfc3986#section-6.2.2.1>`
   google.protobuf.BoolValue normalize_path = 30;
+
+  // Determines if adjacent slashes in the path are merged into one before any processing of
+  // requests by HTTP filters or routing. This affects the upstream *:path* header as well. Without
+  // setting this option, incoming requests with path `//dir///file` will not match against route
+  // with `prefix` match set to `/dir`. Defaults to `false`. Note that slash merging is not part of
+  // `HTTP spec <https://tools.ietf.org/html/rfc3986>` and is provided for convenience.
+  bool merge_slashes = 33;
 }
 
 message Rds {
   // Configuration source specifier for RDS.
-  envoy.api.v2.core.ConfigSource config_source = 1
-      [(validate.rules).message.required = true, (gogoproto.nullable) = false];
+  envoy.api.v2.core.ConfigSource config_source = 1 [(validate.rules).message.required = true];
 
   // The name of the route configuration. This name will be passed to the RDS
   // API. This allows an Envoy configuration with multiple HTTP listeners (and
@@ -529,8 +536,7 @@ message ScopedRoutes {
   // Configuration source specifier for RDS.
   // This config source is used to subscribe to RouteConfiguration resources specified in
   // ScopedRouteConfiguration messages.
-  envoy.api.v2.core.ConfigSource rds_config_source = 3
-      [(validate.rules).message.required = true, (gogoproto.nullable) = false];
+  envoy.api.v2.core.ConfigSource rds_config_source = 3 [(validate.rules).message.required = true];
 
   oneof config_specifier {
     option (validate.required) = true;
@@ -554,7 +560,7 @@ message ScopedRoutes {
 message ScopedRds {
   // Configuration source specifier for scoped RDS.
   envoy.api.v2.core.ConfigSource scoped_rds_config_source = 1
-      [(validate.rules).message.required = true, (gogoproto.nullable) = false];
+      [(validate.rules).message.required = true];
 }
 
 message HttpFilter {

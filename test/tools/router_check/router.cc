@@ -74,15 +74,15 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_file) {
   auto config = std::make_unique<Router::ConfigImpl>(route_config, *factory_context, false);
 
   return RouterCheckTool(std::move(factory_context), std::move(config), std::move(stats),
-                         std::move(api));
+                         std::move(api), Coverage(route_config));
 }
 
 RouterCheckTool::RouterCheckTool(
     std::unique_ptr<NiceMock<Server::Configuration::MockFactoryContext>> factory_context,
     std::unique_ptr<Router::ConfigImpl> config, std::unique_ptr<Stats::IsolatedStoreImpl> stats,
-    Api::ApiPtr api)
+    Api::ApiPtr api, Coverage coverage)
     : factory_context_(std::move(factory_context)), config_(std::move(config)),
-      stats_(std::move(stats)), api_(std::move(api)) {
+      stats_(std::move(stats)), api_(std::move(api)), coverage_(std::move(coverage)) {
   ON_CALL(factory_context_->runtime_loader_.snapshot_,
           featureEnabled(_, testing::An<const envoy::type::FractionalPercent&>(),
                          testing::An<uint64_t>()))
@@ -165,7 +165,7 @@ bool RouterCheckTool::compareEntries(const std::string& expected_routes) {
   auto api = Api::createApiForTest(*stats);
   const std::string contents = api->fileSystem().fileReadToEnd(expected_routes);
   TestUtility::loadFromFile(expected_routes, validation_config, *api);
-  MessageUtil::validate(validation_config);
+  TestUtility::validate(validation_config);
 
   bool no_failures = true;
   for (const envoy::RouterCheckToolSchema::ValidationItem& check_config :
@@ -211,7 +211,11 @@ bool RouterCheckTool::compareCluster(ToolConfig& tool_config, const std::string&
   if (tool_config.route_->routeEntry() != nullptr) {
     actual = tool_config.route_->routeEntry()->clusterName();
   }
-  return compareResults(actual, expected, "cluster_name");
+  const bool matches = compareResults(actual, expected, "cluster_name");
+  if (matches && tool_config.route_->routeEntry() != nullptr) {
+    coverage_.markClusterCovered(*tool_config.route_->routeEntry());
+  }
+  return matches;
 }
 
 bool RouterCheckTool::compareCluster(
@@ -234,7 +238,11 @@ bool RouterCheckTool::compareVirtualCluster(ToolConfig& tool_config, const std::
         tool_config.route_->routeEntry()->virtualCluster(*tool_config.headers_)->statName();
     actual = tool_config.symbolTable().toString(stat_name);
   }
-  return compareResults(actual, expected, "virtual_cluster_name");
+  const bool matches = compareResults(actual, expected, "virtual_cluster_name");
+  if (matches && tool_config.route_->routeEntry() != nullptr) {
+    coverage_.markVirtualClusterCovered(*tool_config.route_->routeEntry());
+  }
+  return matches;
 }
 
 bool RouterCheckTool::compareVirtualCluster(
@@ -254,7 +262,11 @@ bool RouterCheckTool::compareVirtualHost(ToolConfig& tool_config, const std::str
     Stats::StatName stat_name = tool_config.route_->routeEntry()->virtualHost().statName();
     actual = tool_config.symbolTable().toString(stat_name);
   }
-  return compareResults(actual, expected, "virtual_host_name");
+  const bool matches = compareResults(actual, expected, "virtual_host_name");
+  if (matches && tool_config.route_->routeEntry() != nullptr) {
+    coverage_.markVirtualHostCovered(*tool_config.route_->routeEntry());
+  }
+  return matches;
 }
 
 bool RouterCheckTool::compareVirtualHost(
@@ -281,7 +293,11 @@ bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config, const std::str
 
     actual = tool_config.headers_->get_(Http::Headers::get().Path);
   }
-  return compareResults(actual, expected, "path_rewrite");
+  const bool matches = compareResults(actual, expected, "path_rewrite");
+  if (matches && tool_config.route_->routeEntry() != nullptr) {
+    coverage_.markPathRewriteCovered(*tool_config.route_->routeEntry());
+  }
+  return matches;
 }
 
 bool RouterCheckTool::compareRewritePath(
@@ -308,7 +324,11 @@ bool RouterCheckTool::compareRewriteHost(ToolConfig& tool_config, const std::str
 
     actual = tool_config.headers_->get_(Http::Headers::get().Host);
   }
-  return compareResults(actual, expected, "host_rewrite");
+  const bool matches = compareResults(actual, expected, "host_rewrite");
+  if (matches && tool_config.route_->routeEntry() != nullptr) {
+    coverage_.markHostRewriteCovered(*tool_config.route_->routeEntry());
+  }
+  return matches;
 }
 
 bool RouterCheckTool::compareRewriteHost(
@@ -328,7 +348,11 @@ bool RouterCheckTool::compareRedirectPath(ToolConfig& tool_config, const std::st
     actual = tool_config.route_->directResponseEntry()->newPath(*tool_config.headers_);
   }
 
-  return compareResults(actual, expected, "path_redirect");
+  const bool matches = compareResults(actual, expected, "path_redirect");
+  if (matches && tool_config.route_->routeEntry() != nullptr) {
+    coverage_.markRedirectPathCovered(*tool_config.route_->routeEntry());
+  }
+  return matches;
 }
 
 bool RouterCheckTool::compareRedirectPath(
@@ -415,6 +439,11 @@ Options::Options(int argc, char** argv) {
   TCLAP::CmdLine cmd("router_check_tool", ' ', "none", true);
   TCLAP::SwitchArg is_proto("p", "useproto", "Use Proto test file schema", cmd, false);
   TCLAP::SwitchArg is_detailed("d", "details", "Show detailed test execution results", cmd, false);
+  TCLAP::ValueArg<double> fail_under("f", "fail-under",
+                                     "Fail if test coverage is under a specified amount", false,
+                                     0.0, "float", cmd);
+  TCLAP::SwitchArg comprehensive_coverage(
+      "", "covall", "Measure coverage by checking all route fields", cmd, false);
   TCLAP::ValueArg<std::string> config_path("c", "config-path", "Path to configuration file.", false,
                                            "", "string", cmd);
   TCLAP::ValueArg<std::string> test_path("t", "test-path", "Path to test file.", false, "",
@@ -430,6 +459,8 @@ Options::Options(int argc, char** argv) {
 
   is_proto_ = is_proto.getValue();
   is_detailed_ = is_detailed.getValue();
+  fail_under_ = fail_under.getValue();
+  comprehensive_coverage_ = comprehensive_coverage.getValue();
 
   if (is_proto_) {
     config_path_ = config_path.getValue();

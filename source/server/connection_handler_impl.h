@@ -89,6 +89,7 @@ private:
     Network::ListenerPtr listener_;
     ListenerStats stats_;
     const std::chrono::milliseconds listener_filters_timeout_;
+    const bool continue_on_listener_filters_timeout_;
     const uint64_t listener_tag_;
     Network::ListenerConfig& config_;
   };
@@ -200,6 +201,7 @@ private:
     void onTimeout();
     void startTimer();
     void unlink();
+    void newConnection();
 
     // Network::ListenerFilterManager
     void addAcceptFilter(Network::ListenerFilterPtr&& filter) override {

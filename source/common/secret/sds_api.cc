@@ -30,9 +30,8 @@ SdsApi::SdsApi(envoy::api::v2::core::ConfigSource sds_config, absl::string_view 
 void SdsApi::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                             const std::string& version_info) {
   validateUpdateSize(resources.size());
-  auto secret =
-      MessageUtil::anyConvert<envoy::api::v2::auth::Secret>(resources[0], validation_visitor_);
-  MessageUtil::validate(secret);
+  auto secret = MessageUtil::anyConvert<envoy::api::v2::auth::Secret>(resources[0]);
+  MessageUtil::validate(secret, validation_visitor_);
 
   if (secret.name() != sds_config_name_) {
     throw EnvoyException(
@@ -59,7 +58,7 @@ void SdsApi::onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Res
   onConfigUpdate(unwrapped_resource, resources[0].version());
 }
 
-void SdsApi::onConfigUpdateFailed(const EnvoyException*) {
+void SdsApi::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason, const EnvoyException*) {
   // We need to allow server startup to continue, even if we have a bad config.
   init_target_.ready();
 }

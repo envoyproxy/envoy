@@ -138,8 +138,10 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
 
         std::chrono::milliseconds final_refresh_rate = parent_.dns_refresh_rate_ms_;
 
-        if (parent_.respect_dns_ttl_ && ttl_refresh_rate != std::chrono::seconds(0)) {
+        if (parent_.respect_dns_ttl_ && ttl_refresh_rate != std::chrono::seconds(0) &&
+            !response.empty()) {
           final_refresh_rate = ttl_refresh_rate;
+          ASSERT(ttl_refresh_rate != std::chrono::seconds::max() && final_refresh_rate.count() > 0);
           ENVOY_LOG(debug, "DNS refresh rate reset for {}, refresh rate {} ms", dns_address_,
                     final_refresh_rate.count());
         }

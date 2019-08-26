@@ -127,8 +127,11 @@ def run_envoy(envoy_shcmd_args, envoy_log_path, admin_address_path, dump_handler
 
   # Launch Envoy, register for SIGINT, and wait for the child process to exit.
   with open(envoy_log_path, 'w') as envoy_log:
-    envoy_proc = sp.Popen(
-        envoy_shcmd, stdin=sp.PIPE, stderr=envoy_log, preexec_fn=envoy_preexec_fn, shell=True)
+    envoy_proc = sp.Popen(envoy_shcmd,
+                          stdin=sp.PIPE,
+                          stderr=envoy_log,
+                          preexec_fn=envoy_preexec_fn,
+                          shell=True)
 
     def signal_handler(signum, frame):
       # The read is deferred until the signal so that the Envoy process gets a
@@ -227,17 +230,18 @@ if __name__ == '__main__':
   # We either need to interpret or override these, so we declare them in
   # envoy_collect.py and always parse and present them again when invoking
   # Envoy.
-  parser.add_argument(
-      '--config-path', '-c', required=True, help='Path to Envoy configuration file.')
-  parser.add_argument(
-      '--log-level', '-l', help='Envoy log level. This will be overridden when invoking Envoy.')
+  parser.add_argument('--config-path',
+                      '-c',
+                      required=True,
+                      help='Path to Envoy configuration file.')
+  parser.add_argument('--log-level',
+                      '-l',
+                      help='Envoy log level. This will be overridden when invoking Envoy.')
   # envoy_collect specific args.
-  parser.add_argument(
-      '--performance',
-      action='store_true',
-      help='Performance mode (collect perf trace, minimize log verbosity).')
-  parser.add_argument(
-      '--envoy-binary',
-      default=DEFAULT_ENVOY_PATH,
-      help='Path to Envoy binary (%s by default).' % DEFAULT_ENVOY_PATH)
+  parser.add_argument('--performance',
+                      action='store_true',
+                      help='Performance mode (collect perf trace, minimize log verbosity).')
+  parser.add_argument('--envoy-binary',
+                      default=DEFAULT_ENVOY_PATH,
+                      help='Path to Envoy binary (%s by default).' % DEFAULT_ENVOY_PATH)
   sys.exit(envoy_collect(*parser.parse_known_args(sys.argv)))
