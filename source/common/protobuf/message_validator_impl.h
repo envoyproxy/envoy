@@ -3,6 +3,8 @@
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/stats/stats.h"
 
+#include "common/common/logger.h"
+
 #include "absl/container/flat_hash_set.h"
 
 namespace Envoy {

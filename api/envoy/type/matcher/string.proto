@@ -7,6 +7,8 @@ option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.type.matcher";
 option go_package = "matcher";
 
+import "envoy/type/matcher/regex.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: StringMatcher]
@@ -48,7 +50,14 @@ message StringMatcher {
     // * The regex *\d{3}* matches the value *123*
     // * The regex *\d{3}* does not match the value *1234*
     // * The regex *\d{3}* does not match the value *123.456*
-    string regex = 4 [(validate.rules).string.max_bytes = 1024];
+    //
+    // .. attention::
+    //   This field has been deprecated in favor of `safe_regex` as it is not safe for use with
+    //   untrusted input in all cases.
+    string regex = 4 [(validate.rules).string.max_bytes = 1024, deprecated = true];
+
+    // The input string must match the regular expression specified here.
+    RegexMatcher safe_regex = 5 [(validate.rules).message.required = true];
   }
 }
 

@@ -25,6 +25,7 @@ struct RouteConfigProvider : public Router::RouteConfigProvider {
   absl::optional<ConfigInfo> configInfo() const override { return {}; }
   SystemTime lastUpdated() const override { return time_source_.systemTime(); }
   void onConfigUpdate() override {}
+  void validateConfig(const envoy::api::v2::RouteConfiguration&) const override {}
 
   TimeSource& time_source_;
   std::shared_ptr<Router::MockConfig> route_config_{new NiceMock<Router::MockConfig>()};

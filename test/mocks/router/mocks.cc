@@ -116,11 +116,25 @@ MockRoute::MockRoute() {
 }
 MockRoute::~MockRoute() = default;
 
+MockRouteConfigProvider::MockRouteConfigProvider() {
+  ON_CALL(*this, config()).WillByDefault(Return(route_config_));
+}
+MockRouteConfigProvider::~MockRouteConfigProvider() = default;
+
 MockRouteConfigProviderManager::MockRouteConfigProviderManager() = default;
 MockRouteConfigProviderManager::~MockRouteConfigProviderManager() = default;
 
-MockScopedConfig::MockScopedConfig() = default;
+MockScopedConfig::MockScopedConfig() {
+  ON_CALL(*this, getRouteConfig(_)).WillByDefault(Return(route_config_));
+}
 MockScopedConfig::~MockScopedConfig() = default;
+
+MockScopedRouteConfigProvider::MockScopedRouteConfigProvider()
+    : config_(std::make_shared<MockScopedConfig>()) {
+  ON_CALL(*this, getConfig()).WillByDefault(Return(config_));
+  ON_CALL(*this, apiType()).WillByDefault(Return(ApiType::Delta));
+}
+MockScopedRouteConfigProvider::~MockScopedRouteConfigProvider() = default;
 
 } // namespace Router
 } // namespace Envoy

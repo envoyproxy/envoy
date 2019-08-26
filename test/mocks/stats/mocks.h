@@ -18,6 +18,7 @@
 #include "common/stats/histogram_impl.h"
 #include "common/stats/isolated_store_impl.h"
 #include "common/stats/store_impl.h"
+#include "common/stats/symbol_table_creator.h"
 
 #include "test/test_common/global.h"
 
@@ -25,6 +26,25 @@
 
 namespace Envoy {
 namespace Stats {
+
+class TestSymbolTableHelper {
+public:
+  TestSymbolTableHelper() : symbol_table_(SymbolTableCreator::makeSymbolTable()) {}
+  SymbolTable& symbolTable() { return *symbol_table_; }
+  const SymbolTable& constSymbolTable() const { return *symbol_table_; }
+
+private:
+  SymbolTablePtr symbol_table_;
+};
+
+class TestSymbolTable {
+public:
+  SymbolTable& operator*() { return global_.get().symbolTable(); }
+  const SymbolTable& operator*() const { return global_.get().constSymbolTable(); }
+  SymbolTable* operator->() { return &global_.get().symbolTable(); }
+  const SymbolTable* operator->() const { return &global_.get().constSymbolTable(); }
+  Envoy::Test::Global<TestSymbolTableHelper> global_;
+};
 
 template <class BaseClass> class MockMetric : public BaseClass {
 public:
@@ -39,7 +59,7 @@ public:
     explicit MetricName(MockMetric& mock_metric) : mock_metric_(mock_metric) {}
     ~MetricName() {
       if (stat_name_storage_ != nullptr) {
-        stat_name_storage_->free(*mock_metric_.symbol_table_);
+        stat_name_storage_->free(mock_metric_.symbolTable());
       }
     }
 
@@ -57,8 +77,8 @@ public:
     std::unique_ptr<StatNameStorage> stat_name_storage_;
   };
 
-  SymbolTable& symbolTable() override { return symbol_table_.get(); }
-  const SymbolTable& constSymbolTable() const override { return symbol_table_.get(); }
+  SymbolTable& symbolTable() override { return *symbol_table_; }
+  const SymbolTable& constSymbolTable() const override { return *symbol_table_; }
 
   // Note: cannot be mocked because it is accessed as a Property in a gmock EXPECT_CALL. This
   // creates a deadlock in gmock and is an unintended use of mock functions.
@@ -90,7 +110,7 @@ public:
     }
   }
 
-  Test::Global<FakeSymbolTableImpl> symbol_table_; // Must outlive name_.
+  TestSymbolTable symbol_table_; // Must outlive name_.
   MetricName name_;
 
   void setTags(const std::vector<Tag>& tags) {
@@ -251,7 +271,7 @@ public:
 
 class SymbolTableProvider {
 public:
-  Test::Global<FakeSymbolTableImpl> fake_symbol_table_;
+  TestSymbolTable global_symbol_table_;
 };
 
 class MockStore : public SymbolTableProvider, public StoreImpl {
@@ -285,7 +305,7 @@ public:
     return histogram(symbol_table_->toString(name));
   }
 
-  Test::Global<FakeSymbolTableImpl> symbol_table_;
+  TestSymbolTable symbol_table_;
   testing::NiceMock<MockCounter> counter_;
   std::vector<std::unique_ptr<MockHistogram>> histograms_;
 };
@@ -294,8 +314,7 @@ public:
  * With IsolatedStoreImpl it's hard to test timing stats.
  * MockIsolatedStatsStore mocks only deliverHistogramToSinks for better testing.
  */
-class MockIsolatedStatsStore : private Test::Global<Stats::FakeSymbolTableImpl>,
-                               public IsolatedStoreImpl {
+class MockIsolatedStatsStore : public SymbolTableProvider, public IsolatedStoreImpl {
 public:
   MockIsolatedStatsStore();
   ~MockIsolatedStatsStore() override;

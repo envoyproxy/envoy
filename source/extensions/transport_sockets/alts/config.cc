@@ -79,7 +79,7 @@ Network::TransportSocketFactoryPtr createTransportSocketFactoryHelper(
       [] { return std::make_shared<AltsSharedState>(); });
   auto config =
       MessageUtil::downcastAndValidate<const envoy::config::transport_socket::alts::v2alpha::Alts&>(
-          message);
+          message, factory_ctxt.messageValidationVisitor());
   HandshakeValidator validator = createHandshakeValidator(config);
 
   const std::string& handshaker_service = config.handshaker_service();

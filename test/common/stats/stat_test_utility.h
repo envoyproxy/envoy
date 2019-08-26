@@ -2,6 +2,7 @@
 
 #include "common/common/logger.h"
 #include "common/memory/stats.h"
+#include "common/stats/symbol_table_creator.h"
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
@@ -103,6 +104,13 @@ private:
           upper_bound);                                                                            \
     }                                                                                              \
   } while (false)
+
+class SymbolTableCreatorTestPeer {
+public:
+  static void setUseFakeSymbolTables(bool use_fakes) {
+    SymbolTableCreator::setUseFakeSymbolTables(use_fakes);
+  }
+};
 
 } // namespace TestUtil
 } // namespace Stats

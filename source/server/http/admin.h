@@ -172,6 +172,7 @@ private:
     absl::optional<ConfigInfo> configInfo() const override { return {}; }
     SystemTime lastUpdated() const override { return time_source_.systemTime(); }
     void onConfigUpdate() override {}
+    void validateConfig(const envoy::api::v2::RouteConfiguration&) const override {}
 
     Router::ConfigConstSharedPtr config_;
     TimeSource& time_source_;
