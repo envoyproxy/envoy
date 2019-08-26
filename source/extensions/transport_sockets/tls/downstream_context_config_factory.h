@@ -1,6 +1,5 @@
-#include "envoy/ssl/context_config.h"
-
 #include "envoy/registry/registry.h"
+#include "envoy/ssl/context_config.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -8,10 +7,12 @@ namespace TransportSockets {
 namespace Tls {
 
 class DownstreamContextConfigFactory : public Ssl::ContextConfigFactory {
- public:
+public:
   ~DownstreamContextConfigFactory() override = default;
 
-  Ssl::ContextConfigPtr createSslContextConfig(const Protobuf::Message& config, Server::Configuration::TransportSocketFactoryContext& context) override;
+  Ssl::ContextConfigPtr
+  createSslContextConfig(const Protobuf::Message& config,
+                         Server::Configuration::TransportSocketFactoryContext& context) override;
 
   std::string name() const override { return "downstream_tls_context"; }
 };

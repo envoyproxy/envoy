@@ -7,10 +7,11 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
-Ssl::ContextConfigPtr DownstreamContextConfigFactory::createSslContextConfig(const Protobuf::Message& config, Server::Configuration::TransportSocketFactoryContext& context) {
-   return std::make_unique<ServerContextConfigImpl>(
-      dynamic_cast<const envoy::api::v2::auth::DownstreamTlsContext&>(config),
-      context);
+Ssl::ContextConfigPtr DownstreamContextConfigFactory::createSslContextConfig(
+    const Protobuf::Message& config,
+    Server::Configuration::TransportSocketFactoryContext& context) {
+  return std::make_unique<ServerContextConfigImpl>(
+      dynamic_cast<const envoy::api::v2::auth::DownstreamTlsContext&>(config), context);
 }
 
 REGISTER_FACTORY(DownstreamContextConfigFactory, Ssl::ContextConfigFactory);

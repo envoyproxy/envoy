@@ -187,7 +187,7 @@ public:
   ~MockFilterChain() override;
 
   // Network::FilterChain
-  MOCK_CONST_METHOD0(transportSocketFactory, const TransportSocketFactory&());
+  MOCK_CONST_METHOD0(transportSocketFactory, const TransportSocketFactory*());
   MOCK_CONST_METHOD0(networkFilterFactories, const std::vector<FilterFactoryCb>&());
 };
 

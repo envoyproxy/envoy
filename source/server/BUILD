@@ -290,6 +290,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/network:cidr_range_lib",
         "//source/common/network:lc_trie_lib",
+        "//source/extensions/transport_sockets/tls:context_config_lib",
         "//source/server:configuration_lib",
     ],
 )

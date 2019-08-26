@@ -225,6 +225,8 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
     addListenSocketOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
     // Needed to return receive buffer overflown indicator.
     addListenSocketOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
+    std::cerr << "======= set IP_PKTOINFO listen_socket_options_.size "
+              << listen_socket_options_->size() << "\n";
   }
 
   if (!config.listener_filters().empty()) {
@@ -287,7 +289,11 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
       parent_.server_.threadLocal(), parent_.server_.messageValidationVisitor(),
       parent_.server_.api());
   factory_context.setInitManager(initManager());
-  ListenerFilterChainFactoryBuilder builder(*this, factory_context);
+  bool is_quic =
+      socket_type_ ==
+      Network::Address::SocketType::Datagram; //&& config.has_udp_factory_config() &&
+                                              //config.udp_factory_config.name() == "quic_listener";
+  ListenerFilterChainFactoryBuilder builder(*this, factory_context, is_quic);
   filter_chain_manager_.addFilterChain(config.filter_chains(), builder);
   const bool need_tls_inspector =
       std::any_of(
@@ -415,6 +421,8 @@ void ListenerImpl::setSocket(const Network::SocketSharedPtr& socket) {
       throw EnvoyException(message);
     } else {
       ENVOY_LOG(debug, "{}", message);
+      std::cerr << "=========== listen_socket_options_ size " << listen_socket_options_->size()
+                << "\n";
     }
 
     // Add the options to the socket_ so that STATE_LISTENING options can be
@@ -813,37 +821,36 @@ std::unique_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFi
   std::vector<std::string> server_names(filter_chain.filter_chain_match().server_names().begin(),
                                         filter_chain.filter_chain_match().server_names().end());
   if (!is_quic_) {
-  // If the cluster doesn't have transport socket configured, then use the default "raw_buffer"
-  // transport socket or BoringSSL-based "tls" transport socket if TLS settings are configured.
-  // We copy by value first then override if necessary.
-  auto transport_socket = filter_chain.transport_socket();
-  if (!filter_chain.has_transport_socket()) {
-    if (filter_chain.has_tls_context()) {
-      transport_socket.set_name(Extensions::TransportSockets::TransportSocketNames::get().Tls);
-      MessageUtil::jsonConvert(filter_chain.tls_context(), *transport_socket.mutable_config());
-    } else {
-      transport_socket.set_name(
-          Extensions::TransportSockets::TransportSocketNames::get().RawBuffer);
+    // If the cluster doesn't have transport socket configured, then use the default "raw_buffer"
+    // transport socket or BoringSSL-based "tls" transport socket if TLS settings are configured.
+    // We copy by value first then override if necessary.
+    auto transport_socket = filter_chain.transport_socket();
+    if (!filter_chain.has_transport_socket()) {
+      if (filter_chain.has_tls_context()) {
+        transport_socket.set_name(Extensions::TransportSockets::TransportSocketNames::get().Tls);
+        MessageUtil::jsonConvert(filter_chain.tls_context(), *transport_socket.mutable_config());
+      } else {
+        transport_socket.set_name(
+            Extensions::TransportSockets::TransportSocketNames::get().RawBuffer);
+      }
     }
-  }
 
-  auto& config_factory = Config::Utility::getAndCheckFactory<
-      Server::Configuration::DownstreamTransportSocketConfigFactory>(transport_socket.name());
-  ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-      transport_socket, parent_.messageValidationVisitor(), config_factory);
+    auto& config_factory = Config::Utility::getAndCheckFactory<
+        Server::Configuration::DownstreamTransportSocketConfigFactory>(transport_socket.name());
+    ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
+        transport_socket, parent_.messageValidationVisitor(), config_factory);
 
-
-  return std::make_unique<TcpFilterChainImpl>(
-      config_factory.createTransportSocketFactory(*message, factory_context_,
-                                                  std::move(server_names)),
-      parent_.parent_.factory_.createNetworkFilterFactoryList(filter_chain.filters(), parent_));
+    return std::make_unique<TcpFilterChainImpl>(
+        config_factory.createTransportSocketFactory(*message, factory_context_,
+                                                    std::move(server_names)),
+        parent_.parent_.factory_.createNetworkFilterFactoryList(filter_chain.filters(), parent_));
   }
 
   if (!filter_chain.has_tls_context()) {
     return nullptr;
   }
-  auto tls_context_factory =
-      Config::Uitility::getAndCheckFactory<Ssl::ContextConfigFactory>("downstream_tls_context");
+  auto& tls_context_factory =
+      Config::Utility::getAndCheckFactory<Ssl::ContextConfigFactory>("downstream_tls_context");
   return std::make_unique<QuicFilterChainImpl>(
       tls_context_factory.createSslContextConfig(filter_chain.tls_context(), factory_context_),
       parent_.parent_.factory_.createNetworkFilterFactoryList(filter_chain.filters(), parent_));
