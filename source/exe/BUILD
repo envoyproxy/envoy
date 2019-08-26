@@ -4,6 +4,9 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_binary",
     "envoy_cc_library",
+    "envoy_cc_platform_dep",
+    "envoy_cc_posix_library",
+    "envoy_cc_win32_library",
     "envoy_google_grpc_external_deps",
     "envoy_package",
 )
@@ -55,7 +58,7 @@ envoy_cc_library(
     deps = [
         ":envoy_main_common_lib",
         ":platform_impl_lib",
-    ],
+    ]
 )
 
 envoy_cc_library(
@@ -97,18 +100,29 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "platform_impl_lib",
-    srcs = select({
-        "//bazel:windows_x86_64": ["win32/platform_impl.cc"],
-        "//conditions:default": ["posix/platform_impl.cc"],
-    }),
+    hdrs = ["platform_impl.h"],
+    deps = envoy_cc_platform_dep("platform_impl_lib"),
+)
+
+envoy_cc_posix_library(
+    name = "platform_impl_lib",
+    srcs = ["posix/platform_impl.cc"],
     hdrs = ["platform_impl.h"],
     deps = [
         "//source/common/common:thread_lib",
         "//source/common/filesystem:filesystem_lib",
-    ] + select({
-        "//bazel:windows_x86_64": ["//source/common/common:assert_lib"],
-        "//conditions:default": [],
-    }),
+    ],
+)
+
+envoy_cc_win32_library(
+    name = "platform_impl_lib",
+    srcs = ["win32/platform_impl.cc"],
+    hdrs = ["platform_impl.h"],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/common:thread_lib",
+        "//source/common/filesystem:filesystem_lib",
+    ],
 )
 
 envoy_cc_library(
