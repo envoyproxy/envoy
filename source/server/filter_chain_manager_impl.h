@@ -136,6 +136,9 @@ private:
   const Network::Address::InstanceConstSharedPtr address_;
 };
 
+/**
+ * Base implementation for TCP and QUIC filter chain.
+ */
 class FilterChainImplBase : public Network::FilterChain {
 public:
   FilterChainImplBase(std::vector<Network::FilterFactoryCb>&& filters_factory)
@@ -157,6 +160,7 @@ public:
       : FilterChainImplBase(std::move(filters_factory)),
         transport_socket_factory_(std::move(transport_socket_factory)) {}
 
+  // Network::FilterChain
   const Network::TransportSocketFactory* transportSocketFactory() const override {
     return transport_socket_factory_.get();
   }
@@ -172,6 +176,7 @@ public:
       : FilterChainImplBase(std::move(filters_factory)),
         tls_context_config_(std::move(tls_context_config)) {}
 
+  // Network::FilterChain
   const Network::TransportSocketFactory* transportSocketFactory() const override { return nullptr; }
 
   Ssl::ContextConfig* tls_context_config() const { return tls_context_config_.get(); }

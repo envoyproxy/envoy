@@ -39,7 +39,6 @@ UdpListenerImpl::UdpListenerImpl(Event::DispatcherImpl& dispatcher, Socket& sock
 
   ASSERT(file_event_);
 
-  std::cerr << "=========== UdpListenerImpl\n";
   if (!Network::Socket::applyOptions(socket.options(), socket,
                                      envoy::api::v2::core::SocketOption::STATE_BOUND)) {
     throw CreateListenerException(fmt::format("cannot set post-bound socket option on socket: {}",

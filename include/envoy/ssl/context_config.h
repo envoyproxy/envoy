@@ -136,6 +136,9 @@ public:
 
 using ServerContextConfigPtr = std::unique_ptr<ServerContextConfig>;
 
+/**
+ * Interface of registered factory to create TLS context config.
+ */
 class ContextConfigFactory {
 public:
   virtual ~ContextConfigFactory() = default;

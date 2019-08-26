@@ -6,6 +6,9 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
+/**
+ * A factory to create server side Tls context config from a protobuf.
+ */
 class DownstreamContextConfigFactory : public Ssl::ContextConfigFactory {
 public:
   ~DownstreamContextConfigFactory() override = default;
