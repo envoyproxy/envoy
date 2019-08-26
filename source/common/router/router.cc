@@ -931,7 +931,7 @@ Filter::streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason) {
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-void Filter::handleNon5xxResponseHeaders(const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+void Filter::handleNon5xxResponseHeaders(absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                                          UpstreamRequest& upstream_request, bool end_stream,
                                          uint64_t grpc_to_http_status) {
   // We need to defer gRPC success until after we have processed grpc-status in
@@ -1001,7 +1001,9 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& head
   ENVOY_STREAM_LOG(debug, "upstream headers complete: end_stream={}", *callbacks_, end_stream);
 
   modify_headers_(*headers);
-
+  // When grpc-status appears in response headers, convert grpc-status to HTTP status code
+  // for outlier detection. This does not currently change any stats or logging and does not
+  // handle the case when an error grpc-status is sent as a trailer.
   absl::optional<Grpc::Status::GrpcStatus> grpc_status;
   uint64_t grpc_to_http_status = 0;
   if (grpc_request_) {
