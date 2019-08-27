@@ -107,6 +107,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "platform_header_lib",
     hdrs = ["platform_impl.h"],
+    deps = [
+        "//include/envoy/filesystem:filesystem_interface",
+        "//include/envoy/thread:thread_interface",
+    ],
 )
 
 envoy_cc_posix_library(
