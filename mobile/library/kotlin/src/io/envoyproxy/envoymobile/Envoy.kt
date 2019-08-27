@@ -28,9 +28,9 @@ class Envoy constructor(
   constructor(engine: EnvoyEngine, config: String) : this(engine, config, LogLevel.INFO)
 
   // Dedicated thread for running this instance of Envoy.
-  private val runner: Thread = Thread(Runnable {
+  private val runner: Thread = Thread(ThreadGroup("Envoy"), Runnable {
     engine.runWithConfig(config.trim(), logLevel.level)
-  })
+  });
 
   /**
    * Create a new Envoy instance. The Envoy runner Thread is started as part of instance
@@ -59,7 +59,7 @@ class Envoy constructor(
 
   override fun send(request: Request, responseHandler: ResponseHandler): StreamEmitter {
     val stream = engine.startStream(responseHandler.underlyingObserver)
-    stream.sendHeaders(request.headers, false)
+    stream.sendHeaders(request.outboundHeaders(), false)
     return EnvoyStreamEmitter(stream)
   }
 
