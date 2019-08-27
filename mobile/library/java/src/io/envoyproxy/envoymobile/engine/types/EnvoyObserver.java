@@ -1,10 +1,14 @@
 package io.envoyproxy.envoymobile.engine.types;
 
 import java.nio.ByteBuffer;
+import java.util.concurrent.Executor;
 import java.util.List;
 import java.util.Map;
 
 public interface EnvoyObserver {
+
+  Executor getExecutor();
+
   /**
    * Called when all headers get received on the async HTTP stream.
    *
