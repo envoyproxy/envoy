@@ -136,7 +136,8 @@ public:
   /**
    * Link to registered function.
    * @param debug_name user-provided name for use in error messages.
-   * @param needs_emscripten whether emscripten support should be provided (e.g. _emscripten_memcpy_bigHandler).
+   * @param needs_emscripten whether emscripten support should be provided (e.g.
+   * _emscripten_memcpy_bigHandler).
    */
   virtual void link(absl::string_view debug_name, bool needs_emscripten) PURE;
 
@@ -171,7 +172,8 @@ public:
   /**
    * Convert a host pointer to memory in the VM into a VM "pointer" (an offset into the Memory).
    * @param host_pointer a pointer to host memory to be converted into a VM offset (pointer).
-   * @param vm_pointer a pointer to an uint64_t to be filled with the offset in VM memory corresponding to 'host_pointer'.
+   * @param vm_pointer a pointer to an uint64_t to be filled with the offset in VM memory
+   * corresponding to 'host_pointer'.
    * @result whether or not the host_pointer was a valid VM memory offset.
    */
   virtual bool getMemoryOffset(void* host_pointer, uint64_t* vm_pointer) PURE;
@@ -237,7 +239,7 @@ public:
 // over all workers as with ThreadLocal data.
 extern thread_local Envoy::Extensions::Common::Wasm::Context* current_context_;
 // Requested effective context set by code within the VM to request that the calls coming out of the
-// VM be attributed to another filter, for example if a constrol plane gRPC comes comes back to the
+// VM be attributed to another filter, for example if a control plane gRPC comes back to the
 // RootContext which effects some set of waiting filters.
 extern thread_local uint32_t effective_context_id_;
 
