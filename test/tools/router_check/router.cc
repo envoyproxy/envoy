@@ -444,7 +444,7 @@ Options::Options(int argc, char** argv) {
   TCLAP::SwitchArg is_proto("p", "useproto", "Use Proto test file schema", cmd, false);
   TCLAP::SwitchArg is_detailed("d", "details", "Show detailed test execution results", cmd, false);
   TCLAP::SwitchArg disable_deprecation_check("", "disable-deprecation-check",
-                                             "Disable deprecated fields check", cmd, true);
+                                             "Disable deprecated fields check", cmd, false);
   TCLAP::ValueArg<double> fail_under("f", "fail-under",
                                      "Fail if test coverage is under a specified amount", false,
                                      0.0, "float", cmd);

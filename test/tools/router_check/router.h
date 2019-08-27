@@ -201,7 +201,7 @@ public:
   bool isDetailed() const { return is_detailed_; }
 
   /**
-   * @return true if the deprecated field check is disabled.
+   * @return true if the deprecated field check for RouteConfiguration is disabled.
    */
   bool disableDeprecationCheck() const { return disable_deprecation_check_; }
 

@@ -10,9 +10,9 @@ int main(int argc, char* argv[]) {
   const bool enforce_coverage = options.failUnder() != 0.0;
   try {
     Envoy::RouterCheckTool checktool =
-        options.isProto() ? Envoy::RouterCheckTool::create(options.configPath(), true)
-                          : Envoy::RouterCheckTool::create(options.unlabelledConfigPath(),
-                                                           options.disableDeprecationCheck());
+        options.isProto() ? Envoy::RouterCheckTool::create(options.configPath(),
+                                                           options.disableDeprecationCheck())
+                          : Envoy::RouterCheckTool::create(options.unlabelledConfigPath(), true);
 
     if (options.isDetailed()) {
       checktool.setShowDetails();
