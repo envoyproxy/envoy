@@ -9,6 +9,8 @@ option go_package = "route";
 option java_generic_services = true;
 
 import "envoy/api/v2/core/base.proto";
+import "envoy/type/matcher/regex.proto";
+import "envoy/type/matcher/string.proto";
 import "envoy/type/percent.proto";
 import "envoy/type/range.proto";
 
@@ -349,7 +351,25 @@ message RouteMatch {
     // * The regex */b[io]t* matches the path */bot*
     // * The regex */b[io]t* does not match the path */bite*
     // * The regex */b[io]t* does not match the path */bit/bot*
-    string regex = 3 [(validate.rules).string.max_bytes = 1024];
+    //
+    // .. attention::
+    //   This field has been deprecated in favor of `safe_regex` as it is not safe for use with
+    //   untrusted input in all cases.
+    string regex = 3 [(validate.rules).string.max_bytes = 1024, deprecated = true];
+
+    // If specified, the route is a regular expression rule meaning that the
+    // regex must match the *:path* header once the query string is removed. The entire path
+    // (without the query string) must match the regex. The rule will not match if only a
+    // subsequence of the *:path* header matches the regex.
+    //
+    // [#next-major-version: In the v3 API we should redo how path specification works such
+    // that we utilize StringMatcher, and additionally have consistent options around whether we
+    // strip query strings, do a case sensitive match, etc. In the interim it will be too disruptive
+    // to deprecate the existing options. We should even consider whether we want to do away with
+    // path_specifier entirely and just rely on a set of header matchers which can already match
+    // on :path, etc. The issue with that is it is unclear how to generically deal with query string
+    // stripping. This needs more thought.]
+    type.matcher.RegexMatcher safe_regex = 10 [(validate.rules).message.required = true];
   }
 
   // Indicates that prefix/path matching should be case insensitive. The default
@@ -404,12 +424,24 @@ message CorsPolicy {
   // Specifies the origins that will be allowed to do CORS requests.
   //
   // An origin is allowed if either allow_origin or allow_origin_regex match.
-  repeated string allow_origin = 1;
+  //
+  // .. attention::
+  //  This field has been deprecated in favor of `allow_origin_string_match`.
+  repeated string allow_origin = 1 [deprecated = true];
 
   // Specifies regex patterns that match allowed origins.
   //
   // An origin is allowed if either allow_origin or allow_origin_regex match.
-  repeated string allow_origin_regex = 8 [(validate.rules).repeated .items.string.max_bytes = 1024];
+  //
+  // .. attention::
+  //   This field has been deprecated in favor of `allow_origin_string_match` as it is not safe for
+  //   use with untrusted input in all cases.
+  repeated string allow_origin_regex = 8
+      [(validate.rules).repeated .items.string.max_bytes = 1024, deprecated = true];
+
+  // Specifies string patterns that match allowed origins. An origin is allowed if any of the
+  // string matchers match.
+  repeated type.matcher.StringMatcher allow_origin_string_match = 11;
 
   // Specifies the content for the *access-control-allow-methods* header.
   string allow_methods = 2;
@@ -1077,18 +1109,28 @@ message VirtualCluster {
   // * The regex */rides/\d+* matches the path */rides/0*
   // * The regex */rides/\d+* matches the path */rides/123*
   // * The regex */rides/\d+* does not match the path */rides/123/456*
-  string pattern = 1 [(validate.rules).string = {min_bytes: 1, max_bytes: 1024}];
+  //
+  // .. attention::
+  //   This field has been deprecated in favor of `headers` as it is not safe for use with
+  //   untrusted input in all cases.
+  string pattern = 1 [(validate.rules).string.max_bytes = 1024, deprecated = true];
 
-  //  Specifies the name of the virtual cluster. The virtual cluster name as well
+  // Specifies a list of header matchers to use for matching requests. Each specified header must
+  // match. The pseudo-headers `:path` and `:method` can be used to match the request path and
+  // method, respectively.
+  repeated HeaderMatcher headers = 4;
+
+  // Specifies the name of the virtual cluster. The virtual cluster name as well
   // as the virtual host name are used when emitting statistics. The statistics are emitted by the
   // router filter and are documented :ref:`here <config_http_filters_router_stats>`.
   string name = 2 [(validate.rules).string.min_bytes = 1];
 
   // Optionally specifies the HTTP method to match on. For example GET, PUT,
   // etc.
-  // [#comment:TODO(htuch): add (validate.rules).enum.defined_only = true once
-  // https://github.com/lyft/protoc-gen-validate/issues/42 is resolved.]
-  core.RequestMethod method = 3;
+  //
+  // .. attention::
+  //   This field has been deprecated in favor of `headers`.
+  core.RequestMethod method = 3 [deprecated = true];
 }
 
 // Global rate limiting :ref:`architecture overview <arch_overview_rate_limit>`.
@@ -1248,6 +1290,7 @@ message RateLimit {
 //   <envoy_api_field_route.HeaderMatcher.name>` header will match, regardless of the header's
 //   value.
 //
+//  [#next-major-version: HeaderMatcher should be refactored to use StringMatcher.]
 message HeaderMatcher {
   // Specifies the name of the header in the request.
   string name = 1 [(validate.rules).string.min_bytes = 1];
@@ -1273,7 +1316,16 @@ message HeaderMatcher {
     // * The regex *\d{3}* matches the value *123*
     // * The regex *\d{3}* does not match the value *1234*
     // * The regex *\d{3}* does not match the value *123.456*
-    string regex_match = 5 [(validate.rules).string.max_bytes = 1024];
+    //
+    // .. attention::
+    //   This field has been deprecated in favor of `safe_regex_match` as it is not safe for use
+    //   with untrusted input in all cases.
+    string regex_match = 5 [(validate.rules).string.max_bytes = 1024, deprecated = true];
+
+    // If specified, this regex string is a regular expression rule which implies the entire request
+    // header value must match the regex. The rule will not match if only a subsequence of the
+    // request header value matches the regex.
+    type.matcher.RegexMatcher safe_regex_match = 11;
 
     // If specified, header match will be performed based on range.
     // The rule will match if the request header value is within this range.
@@ -1328,11 +1380,25 @@ message QueryParameterMatcher {
   // Specifies the value of the key. If the value is absent, a request
   // that contains the key in its query string will match, whether the
   // key appears with a value (e.g., "?debug=true") or not (e.g., "?debug")
-  string value = 3;
+  //
+  // ..attention::
+  //   This field is deprecated. Use an `exact` match inside the `string_match` field.
+  string value = 3 [deprecated = true];
 
   // Specifies whether the query parameter value is a regular expression.
   // Defaults to false. The entire query parameter value (i.e., the part to
   // the right of the equals sign in "key=value") must match the regex.
   // E.g., the regex "\d+$" will match "123" but not "a123" or "123a".
-  google.protobuf.BoolValue regex = 4;
+  //
+  // ..attention::
+  //   This field is deprecated. Use a `safe_regex` match inside the `string_match` field.
+  google.protobuf.BoolValue regex = 4 [deprecated = true];
+
+  oneof query_parameter_match_specifier {
+    // Specifies whether a query parameter value should match against a string.
+    type.matcher.StringMatcher string_match = 5 [(validate.rules).message.required = true];
+
+    // Specifies whether a query parameter should be present.
+    bool present_match = 6;
+  }
 }

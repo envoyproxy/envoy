@@ -104,8 +104,9 @@ public:
   CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config, Runtime::Loader& loader);
 
   // Router::CorsPolicy
-  const std::list<std::string>& allowOrigins() const override { return allow_origin_; };
-  const std::list<std::regex>& allowOriginRegexes() const override { return allow_origin_regex_; }
+  const std::vector<Matchers::StringMatcherPtr>& allowOrigins() const override {
+    return allow_origins_;
+  };
   const std::string& allowMethods() const override { return allow_methods_; };
   const std::string& allowHeaders() const override { return allow_headers_; };
   const std::string& exposeHeaders() const override { return expose_headers_; };
@@ -131,8 +132,7 @@ public:
 private:
   const envoy::api::v2::route::CorsPolicy config_;
   Runtime::Loader& loader_;
-  std::list<std::string> allow_origin_;
-  std::list<std::regex> allow_origin_regex_;
+  std::vector<Matchers::StringMatcherPtr> allow_origins_;
   const std::string allow_methods_;
   const std::string allow_headers_;
   const std::string expose_headers_;
@@ -182,9 +182,8 @@ private:
     // Router::VirtualCluster
     Stats::StatName statName() const override { return stat_name_; }
 
-    const std::regex pattern_;
-    absl::optional<std::string> method_;
     const Stats::StatName stat_name_;
+    std::vector<Http::HeaderUtility::HeaderDataPtr> headers_;
   };
 
   class CatchAllVirtualCluster : public VirtualCluster {
@@ -480,7 +479,7 @@ protected:
     return (isRedirect()) ? prefix_rewrite_redirect_ : prefix_rewrite_;
   }
 
-  void finalizePathHeader(Http::HeaderMap& headers, const std::string& matched_path,
+  void finalizePathHeader(Http::HeaderMap& headers, absl::string_view matched_path,
                           bool insert_envoy_original_path) const;
 
 private:
@@ -670,8 +669,8 @@ private:
   const RateLimitPolicyImpl rate_limit_policy_;
   const ShadowPolicyImpl shadow_policy_;
   const Upstream::ResourcePriority priority_;
-  std::vector<Http::HeaderUtility::HeaderData> config_headers_;
-  std::vector<ConfigUtility::QueryParameterMatcher> config_query_parameters_;
+  std::vector<Http::HeaderUtility::HeaderDataPtr> config_headers_;
+  std::vector<ConfigUtility::QueryParameterMatcherPtr> config_query_parameters_;
   std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
 
   UpgradeMap upgrade_map_;
@@ -760,8 +759,10 @@ public:
   void rewritePathHeader(Http::HeaderMap& headers, bool insert_envoy_original_path) const override;
 
 private:
-  const std::regex regex_;
-  const std::string regex_str_;
+  absl::string_view pathOnly(const Http::HeaderMap& headers) const;
+
+  Regex::CompiledMatcherPtr regex_;
+  std::string regex_str_;
 };
 
 /**

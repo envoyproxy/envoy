@@ -59,10 +59,9 @@ static CsrfStats generateStats(const std::string& prefix, Stats::Scope& scope) {
   return CsrfStats{ALL_CSRF_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
 }
 
-static const CsrfPolicy
-generatePolicy(const envoy::config::filter::http::csrf::v2::CsrfPolicy& policy,
-               Runtime::Loader& runtime) {
-  return CsrfPolicy(policy, runtime);
+static CsrfPolicyPtr generatePolicy(const envoy::config::filter::http::csrf::v2::CsrfPolicy& policy,
+                                    Runtime::Loader& runtime) {
+  return std::make_unique<CsrfPolicy>(policy, runtime);
 }
 } // namespace
 
@@ -128,7 +127,7 @@ bool CsrfFilter::isValid(const absl::string_view source_origin, Http::HeaderMap&
   }
 
   for (const auto& additional_origin : policy_->additional_origins()) {
-    if (additional_origin.match(source_origin)) {
+    if (additional_origin->match(source_origin)) {
       return true;
     }
   }

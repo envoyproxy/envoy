@@ -39,7 +39,9 @@ public:
                     - name: "x-header-1"
                       exact_match: "x-value-1"
                     - name: "x-header-2"
-                      regex_match: "0.[5-9]"
+                      safe_regex_match:
+                        google_re2: {}
+                        regex: "0.[5-9]"
                     - name: "x-header-3"
                       range_match:
                         start: 100

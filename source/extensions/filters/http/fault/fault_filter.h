@@ -48,7 +48,7 @@ class FaultSettings : public Router::RouteSpecificFilterConfig {
 public:
   FaultSettings(const envoy::config::filter::http::fault::v2::HTTPFault& fault);
 
-  const std::vector<Http::HeaderUtility::HeaderData>& filterHeaders() const {
+  const std::vector<Http::HeaderUtility::HeaderDataPtr>& filterHeaders() const {
     return fault_filter_headers_;
   }
   envoy::type::FractionalPercent abortPercentage() const { return abort_percentage_; }
@@ -88,7 +88,7 @@ private:
   uint64_t http_status_{}; // HTTP or gRPC return codes
   Filters::Common::Fault::FaultDelayConfigPtr request_delay_config_;
   std::string upstream_cluster_; // restrict faults to specific upstream cluster
-  std::vector<Http::HeaderUtility::HeaderData> fault_filter_headers_;
+  const std::vector<Http::HeaderUtility::HeaderDataPtr> fault_filter_headers_;
   absl::flat_hash_set<std::string> downstream_nodes_{}; // Inject failures for specific downstream
   absl::optional<uint64_t> max_active_faults_;
   Filters::Common::Fault::FaultRateLimitConfigPtr response_rate_limit_;
