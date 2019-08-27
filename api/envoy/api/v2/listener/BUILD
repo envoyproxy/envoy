@@ -22,3 +22,20 @@ api_go_proto_library(
         "//envoy/api/v2/core:base_go_proto",
     ],
 )
+
+api_proto_library_internal(
+    name = "udp_listener_config",
+    srcs = ["udp_listener_config.proto"],
+    visibility = ["//envoy/api/v2:friends"],
+    deps = [
+        "//envoy/api/v2/core:base",
+    ],
+)
+
+api_go_proto_library(
+    name = "udp_listener_config",
+    proto = ":udp_listener_config",
+    deps = [
+        "//envoy/api/v2/core:base_go_proto",
+    ],
+)
