@@ -2,16 +2,19 @@ package io.envoyproxy.envoymobile
 
 import io.envoyproxy.envoymobile.engine.types.EnvoyObserver
 import java.nio.ByteBuffer
+import java.util.concurrent.Executor;
 
 
 /**
  * Callback interface for receiving stream events.
  */
-class ResponseHandler() {
+class ResponseHandler(val executor: Executor) {
 
   class EnvoyObserverAdapter(
       internal val responseHandler: ResponseHandler
   ) : EnvoyObserver {
+
+    override fun getExecutor() : Executor = executor
 
     override fun onHeaders(headers: Map<String, List<String>>?, endStream: Boolean) {
       val statusCode = headers!![":status"]?.first()?.toIntOrNull() ?: 0

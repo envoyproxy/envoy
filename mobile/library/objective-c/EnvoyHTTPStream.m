@@ -46,7 +46,7 @@ static envoy_headers toNativeHeaders(EnvoyHeaders *headers) {
       header_array[header_index++] = new_header;
     }
   }
-  // ASSERT(header_index == length);
+  // TODO: ASSERT(header_index == length);
   envoy_headers ret = {length, header_array};
   return ret;
 }

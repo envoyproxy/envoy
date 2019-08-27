@@ -12,6 +12,7 @@ import org.mockito.Mockito.`when`
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import java.nio.ByteBuffer
+import java.util.concurrent.Executor;
 
 class EnvoyTest {
 
@@ -32,7 +33,7 @@ class EnvoyTest {
             path = "foo")
             .setHeaders(headers)
             .build(),
-        ResponseHandler())
+        ResponseHandler(Executor {}))
 
     verify(stream).sendHeaders(headers, false)
   }
@@ -49,7 +50,7 @@ class EnvoyTest {
             authority = "api.foo.com",
             path = "foo")
             .build(),
-        ResponseHandler())
+        ResponseHandler(Executor {}))
 
     val data = ByteBuffer.allocate(0)
 
@@ -71,7 +72,7 @@ class EnvoyTest {
             authority = "api.foo.com",
             path = "foo")
             .build(),
-        ResponseHandler())
+        ResponseHandler(Executor {}))
 
     emitter.sendMetadata(metadata)
 
@@ -90,7 +91,7 @@ class EnvoyTest {
             authority = "api.foo.com",
             path = "foo")
             .build(),
-        ResponseHandler())
+        ResponseHandler(Executor {}))
 
     emitter.close()
 
@@ -110,7 +111,7 @@ class EnvoyTest {
             authority = "api.foo.com",
             path = "foo")
             .build(),
-        ResponseHandler())
+        ResponseHandler(Executor {}))
 
     emitter.close(trailers)
 
@@ -132,7 +133,7 @@ class EnvoyTest {
             .setHeaders(headers)
             .build(),
         ByteBuffer.allocate(0),
-        ResponseHandler())
+        ResponseHandler(Executor {}))
 
     verify(stream).sendHeaders(headers, false)
   }
@@ -151,7 +152,7 @@ class EnvoyTest {
             path = "foo")
             .build(),
         body,
-        ResponseHandler())
+        ResponseHandler(Executor {}))
 
     verify(stream).sendData(body, false)
   }
@@ -170,7 +171,7 @@ class EnvoyTest {
             path = "foo")
             .build(),
         body,
-        ResponseHandler())
+        ResponseHandler(Executor {}))
 
     verify(stream).sendTrailers(emptyMap())
   }
@@ -190,7 +191,7 @@ class EnvoyTest {
             .build(),
         ByteBuffer.allocate(0),
         trailers,
-        ResponseHandler())
+        ResponseHandler(Executor {}))
 
     verify(stream).sendTrailers(trailers)
   }
@@ -210,7 +211,7 @@ class EnvoyTest {
             .build(),
         ByteBuffer.allocate(0),
         trailers,
-        ResponseHandler())
+        ResponseHandler(Executor {}))
 
     emitter.cancel()
 
