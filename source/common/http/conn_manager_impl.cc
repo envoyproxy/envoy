@@ -1276,7 +1276,7 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
   if (request_headers_ != nullptr) {
     if (dynamic_cast<Server::Admin*>(&connection_manager_.config_) == nullptr &&
         connection_manager_.config_.scopedRouteConfigProvider() != nullptr) {
-      // NOTE: repick scope as well in case the scope header is changed by a filter.
+      // NOTE: re-select scope as well in case the scope key header has been changed by a filter.
       snapScopedRouteConfig();
     }
     if (snapped_route_config_ != nullptr) {
