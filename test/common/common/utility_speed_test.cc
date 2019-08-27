@@ -211,7 +211,7 @@ static void BM_RemoveTokensLong(benchmark::State& state) {
   auto size = state.range(0);
   std::string input(size, ',');
   std::vector<std::string> to_remove;
-  std::set<absl::string_view> to_remove_set;
+  StringUtil::CaseUnorderedSet to_remove_set;
   for (decltype(size) i = 0; i < size; i++) {
     to_remove.push_back(std::to_string(i));
   }
