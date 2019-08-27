@@ -23,7 +23,7 @@ namespace Http {
 namespace Http1 {
 namespace {
 
-StringUtil::CaseUnorderedSet caseUnorderdSetContainingUpgradeAndHttp2Settings() {
+const StringUtil::CaseUnorderedSet& caseUnorderdSetContainingUpgradeAndHttp2Settings() {
   CONSTRUCT_ON_FIRST_USE(StringUtil::CaseUnorderedSet,
                          Http::Headers::get().ConnectionValues.Upgrade,
                          Http::Headers::get().ConnectionValues.Http2Settings);
