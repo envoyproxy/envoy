@@ -107,56 +107,111 @@ public:
   using WasmVmPtr = std::unique_ptr<WasmVm>;
 
   virtual ~WasmVm() = default;
+  /**
+   * Return the VM identifier.
+   * @return one of WasmVmValues from well_known_names.h e.g. "envoy.wasm.vm.null".
+   */
   virtual absl::string_view vm() PURE;
 
-  // Whether or not the VM implementation supports cloning.
+  /**
+   * Whether or not the VM implementation supports cloning.
+   * @return true if the VM is clonable.
+   */
   virtual bool clonable() PURE;
-  // Make a thread-specific copy. This may not be supported by the underlying VM system in which
-  // case it will return nullptr and the caller will need to create a new VM from scratch.
-  virtual WasmVmPtr clone() PURE;
 
-  // Load the WASM code from a file. Return true on success.
+  /**
+   * Make a thread-specific copy. This may not be supported by the underlying VM system in which
+   * case it will return nullptr and the caller will need to create a new VM from scratch.
+   * @return a clone of 'this' (e.g. for a different Worker/thread).
+   */
+  virtual WasmVmPtr clone() PURE;
+  /**
+   * Load the WASM code from a file. Return true on success.
+   * @param code the WASM binary code (or registered NullVm plugin name).
+   * @param allow_precompiled if true, allows suporting VMs (e.g. WAVM) to load the binary
+   * machine code from a user-defined section of the WASM file.
+   * @return whether or not the load was successful.
+   */
   virtual bool load(const std::string& code, bool allow_precompiled) PURE;
-  // Link to registered function.
+  /**
+   * Link to registered function.
+   * @param debug_name user-provided name for use in error messages.
+   * @param needs_emscripten whether emscripten support should be provided (e.g. _emscripten_memcpy_bigHandler).
+   */
   virtual void link(absl::string_view debug_name, bool needs_emscripten) PURE;
 
-  // Set memory layout (start of dynamic heap base, etc.) in the VM.
+  /**
+   * Set memory layout (start of dynamic heap base, etc.) in the VM.
+   * @param stack_base the location in VM memory of the stack.
+   * @param heap_base the location in VM memory of the heap.
+   * @param heap_base_ptr the location in VM memory of a location to store the heap pointer.
+   */
   virtual void setMemoryLayout(uint64_t stack_base, uint64_t heap_base,
                                uint64_t heap_base_pointer) PURE;
 
-  // Call the 'start' function and initialize globals.
-  virtual void start(Context*) PURE;
+  /**
+   * Call the 'start' function and initialize globals.
+   * @param vm_context a context which represents the caller: in this case Envoy itself.
+   */
+  virtual void start(Context* vm_context) PURE;
 
-  // Get size of the currently allocated memory in the VM.
+  /**
+   * Get size of the currently allocated memory in the VM.
+   * @result the size of memory in bytes.
+   */
   virtual uint64_t getMemorySize() PURE;
-  // Convert a block of memory in the VM to a string_view. Returns 'false' in second if the
-  // pointer/size is invalid.
+  /**
+   * Convert a block of memory in the VM to a string_view.
+   * @param pointer the offset into VM memory of the requested VM memory block.
+   * @param size the size of the requested VM memory block.
+   * @result if std::nullopt then the pointer/size pair were invalid, otherwise returns
+   * a host string_view pointing to the pointer/size pair in VM memory.
+   */
   virtual absl::optional<absl::string_view> getMemory(uint64_t pointer, uint64_t size) PURE;
-  // Convert a host pointer to memory in the VM into a VM "pointer" (an offset into the Memory).
+  /**
+   * Convert a host pointer to memory in the VM into a VM "pointer" (an offset into the Memory).
+   * @param host_pointer a pointer to host memory to be converted into a VM offset (pointer).
+   * @param vm_pointer a pointer to an uint64_t to be filled with the offset in VM memory corresponding to 'host_pointer'.
+   * @result whether or not the host_pointer was a valid VM memory offset.
+   */
   virtual bool getMemoryOffset(void* host_pointer, uint64_t* vm_pointer) PURE;
-  // Set a block of memory in the VM, returns true on success, false if the pointer/size is invalid.
+  /**
+   * Set a block of memory in the VM, returns true on success, false if the pointer/size is invalid.
+   */
   virtual bool setMemory(uint64_t pointer, uint64_t size, const void* data) PURE;
-  // Set a Word in the VM, returns true on success, false if the pointer is invalid.
+  /**
+   * Set a Word in the VM, returns true on success, false if the pointer is invalid.
+   */
   virtual bool setWord(uint64_t pointer, Word data) PURE;
-  // Make a new intrinsic module (e.g. for Emscripten support).
+  /**
+   * Make a new intrinsic module (e.g. for Emscripten support).
+   */
   virtual void makeModule(absl::string_view name) PURE;
 
-  // Get the contents of the user section with the given name or "" if it does not exist.
+  /**
+   * Get the contents of the user section with the given name or "" if it does not exist.
+   */
   virtual absl::string_view getUserSection(absl::string_view name) PURE;
 
-  // Get typed function exported by the WASM module.
+  /**
+   * Get typed function exported by the WASM module.
+   */
 #define _GET_FUNCTION(_T) virtual void getFunction(absl::string_view functionName, _T* f) PURE;
   FOR_ALL_WASM_VM_EXPORTS(_GET_FUNCTION)
 #undef _GET_FUNCTION
 
-  // Register typed callbacks exported by the host environment.
+  /**
+   * Register typed callbacks exported by the host environment.
+   */
 #define _REGISTER_CALLBACK(_T)                                                                     \
   virtual void registerCallback(absl::string_view moduleName, absl::string_view functionName,      \
                                 _T f, typename ConvertFunctionTypeWordToUint32<_T>::type) PURE;
   FOR_ALL_WASM_VM_IMPORTS(_REGISTER_CALLBACK)
 #undef _REGISTER_CALLBACK
 
-  // Register typed value exported by the host environment.
+  /**
+   * Register typed value exported by the host environment.
+   */
   virtual std::unique_ptr<Global<Word>> makeGlobal(absl::string_view module_name,
                                                    absl::string_view name, Word initial_value) PURE;
   virtual std::unique_ptr<Global<double>>
