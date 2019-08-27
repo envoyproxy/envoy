@@ -25,4 +25,6 @@ build:android --fat_apk_cpu=x86_64
 
 build:device --ios_multi_cpus=armv7,arm64 --fat_apk_cpu=armeabi-v7a,arm64-v8a
 
+build:sim --ios_multi_cpus=i386,x86_64 --fat_apk_cpu=x86,x86_64
+
 build:fat --ios_multi_cpus=i386,x86_64,armv7,arm64 --fat_apk_cpu=x86,x86_64,armeabi-v7a,arm64-v8a
