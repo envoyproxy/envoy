@@ -913,6 +913,40 @@ TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest, SkipTranscodingStatusIfBod
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(response_trailers));
 }
 
+TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest, TranscodingStatusOnEndStream) {
+  EXPECT_CALL(decoder_callbacks_, clearRouteCache());
+
+  Http::TestHeaderMapImpl request_headers{
+      {"content-type", "application/json"}, {":method", "POST"}, {":path", "/shelf"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+
+  Buffer::OwnedImpl request_data{R"({"theme": "Children"})"};
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(request_data, true));
+
+  Http::TestHeaderMapImpl continue_headers{{":status", "000"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_.encode100ContinueHeaders(continue_headers));
+
+  std::string status_data(R"({"code":5,"message":"Resource not found"})");
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
+      .WillOnce(Invoke([&status_data](Buffer::Instance& data, bool) {
+        EXPECT_EQ(status_data, data.toString());
+      }));
+
+  Http::TestHeaderMapImpl response_headers{
+      {":status", "200"},
+      {"content-type", "application/grpc"},
+      {"grpc-status", "5"},
+      {"grpc-message", "unused"},
+      {"grpc-status-details-bin", "CAUSElJlc291cmNlIG5vdCBmb3VuZA"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, true));
+  EXPECT_EQ("404", response_headers.get_(":status"));
+  EXPECT_EQ("application/json", response_headers.get_("content-type"));
+  EXPECT_FALSE(response_headers.has("grpc-status"));
+  EXPECT_FALSE(response_headers.has("grpc-message"));
+  EXPECT_FALSE(response_headers.has("grpc-status-details-bin"));
+}
+
 struct GrpcJsonTranscoderFilterPrintTestParam {
   std::string config_json_;
   std::string expected_response_;

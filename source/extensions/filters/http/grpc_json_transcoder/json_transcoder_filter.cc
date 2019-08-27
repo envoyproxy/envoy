@@ -466,6 +466,10 @@ Http::FilterTrailersStatus JsonTranscoderFilter::encodeTrailers(Http::HeaderMap&
     return Http::FilterTrailersStatus::Continue;
   }
 
+  // If there was no previous headers frame, this |trailers| map is our |response_headers_|,
+  // so there is no need to copy headers from one to the other.
+  bool is_trailers_only_response = response_headers_ == &trailers;
+
   const absl::optional<Grpc::Status::GrpcStatus> grpc_status =
       Grpc::Common::getGrpcStatus(trailers);
   bool status_converted_to_json = grpc_status && maybeConvertGrpcStatus(*grpc_status, trailers);
@@ -474,14 +478,22 @@ Http::FilterTrailersStatus JsonTranscoderFilter::encodeTrailers(Http::HeaderMap&
     response_headers_->Status()->value(enumToInt(Http::Code::ServiceUnavailable));
   } else {
     response_headers_->Status()->value(Grpc::Utility::grpcToHttpStatus(grpc_status.value()));
-    if (!status_converted_to_json) {
+    if (!status_converted_to_json && !is_trailers_only_response) {
       response_headers_->insertGrpcStatus().value(enumToInt(grpc_status.value()));
     }
   }
 
-  const Http::HeaderEntry* grpc_message_header = trailers.GrpcMessage();
-  if (grpc_message_header && !status_converted_to_json) {
-    response_headers_->insertGrpcMessage().value(*grpc_message_header);
+  if (status_converted_to_json && is_trailers_only_response) {
+    // Drop the gRPC status headers, we already have them in the JSON body.
+    response_headers_->removeGrpcStatus();
+    response_headers_->removeGrpcMessage();
+    response_headers_->removeGrpcStatusDetailsBin();
+  } else if (!status_converted_to_json && !is_trailers_only_response) {
+    // Copy the grpc-message header if it exists.
+    const Http::HeaderEntry* grpc_message_header = trailers.GrpcMessage();
+    if (grpc_message_header) {
+      response_headers_->insertGrpcMessage().value(*grpc_message_header);
+    }
   }
 
   // remove Trailer headers if the client connection was http/1
@@ -576,6 +588,8 @@ bool JsonTranscoderFilter::maybeConvertGrpcStatus(Grpc::Status::GrpcStatus grpc_
     return false;
   }
 
+  response_headers_->insertContentType().value().setReference(
+      Http::Headers::get().ContentTypeValues.Json);
   Buffer::OwnedImpl status_data(json_status);
   encoder_callbacks_->addEncodedData(status_data, false);
   return true;

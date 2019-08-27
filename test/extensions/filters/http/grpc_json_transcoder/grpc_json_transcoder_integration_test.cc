@@ -21,6 +21,8 @@ using Envoy::ProtobufWkt::Empty;
 namespace Envoy {
 namespace {
 
+constexpr char UnexpectedHeader[] = "Unexpected Header";
+
 class GrpcJsonTranscoderIntegrationTest
     : public testing::TestWithParam<Network::Address::IpVersion>,
       public HttpIntegrationTest {
@@ -138,8 +140,12 @@ protected:
         [](const Http::HeaderEntry& entry, void* context) -> Http::HeaderMap::Iterate {
           auto* response = static_cast<IntegrationStreamDecoder*>(context);
           Http::LowerCaseString lower_key{std::string(entry.key().getStringView())};
-          EXPECT_EQ(entry.value().getStringView(),
-                    response->headers().get(lower_key)->value().getStringView());
+          if (entry.value() == UnexpectedHeader) {
+            EXPECT_FALSE(response->headers().get(lower_key));
+          } else {
+            EXPECT_EQ(entry.value().getStringView(),
+                      response->headers().get(lower_key)->value().getStringView());
+          }
           return Http::HeaderMap::Iterate::Continue;
         },
         response_.get());
@@ -377,6 +383,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetError1) {
       "");
 }
 
+// Test an upstream that returns a trailer-only response.
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetErrorConvertedToJson) {
   const std::string filter =
       R"EOF(
@@ -393,7 +400,13 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetErrorConvertedToJson) {
       Http::TestHeaderMapImpl{
           {":method", "GET"}, {":path", "/shelves/100"}, {":authority", "host"}},
       "", {"shelf: 100"}, {}, Status(Code::NOT_FOUND, "Shelf 100 Not Found"),
-      Http::TestHeaderMapImpl{{":status", "404"}}, R"({"code":5,"message":"Shelf 100 Not Found"})");
+      Http::TestHeaderMapImpl{
+          {":status", "404"},
+          {"content-type", "application/json"},
+          {"grpc-status", UnexpectedHeader},
+          {"grpc-message", UnexpectedHeader},
+      },
+      R"({"code":5,"message":"Shelf 100 Not Found"})");
 }
 
 // Test an upstream that immediately returns status 200, and then returns an error in trailer.
@@ -419,7 +432,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetErrorInTrailerConvertedToJson)
       Http::TestHeaderMapImpl{
           {":status", "200"},
           {"content-type", "application/grpc"},
-          {"trailer", "rpc-status,grpc-status-details-bin"},
+          {"trailer", "grpc-status,grpc-status-details-bin"},
       },
       false);
   upstream_request_->encodeTrailers(Http::TestHeaderMapImpl{
@@ -427,7 +440,12 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetErrorInTrailerConvertedToJson)
       {"grpc-status-details-bin", "CAUSE1NoZWxmIDEwMCBOb3QgRm91bmQ"},
   });
   EXPECT_TRUE(upstream_request_->complete());
-  expectResponseHeaders(Http::TestHeaderMapImpl{{":status", "404"}});
+  expectResponseHeaders(Http::TestHeaderMapImpl{
+      {":status", "404"},
+      {"content-type", "application/json"},
+      {"grpc-status", UnexpectedHeader},
+      {"grpc-status-details-bin", UnexpectedHeader},
+  });
   expectResponseBody(R"({"code":5,"message":"Shelf 100 Not Found"})");
 }
 
