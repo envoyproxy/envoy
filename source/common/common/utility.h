@@ -315,7 +315,7 @@ public:
    * they are compared ignoring case with the elements of 'tokens_to_remove'. The output is
    * built from the trimmed tokens preserving case.
    * @param source supplies the delimiter-separated string view.
-   * @param multi-delimiter supplies chars used to split the delimiter-separated string view.
+   * @param multi-delimiters supplies chars used to split the delimiter-separated string view.
    * @param tokens_to_remove supplies a set of tokens which should not appear in the result.
    * @param joiner contains a string used between tokens in the result.
    * @return string of the remaining joined tokens.
