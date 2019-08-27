@@ -21,6 +21,15 @@
 namespace Envoy {
 namespace Http {
 namespace Http1 {
+namespace {
+
+StringUtil::CaseUnorderedSet caseUnorderdSetContainingUpgradeAndHttp2Settings() {
+  CONSTRUCT_ON_FIRST_USE(StringUtil::CaseUnorderedSet,
+                         {Http::Headers::get().ConnectionValues.Upgrade,
+                          Http::Headers::get().ConnectionValues.Http2Settings});
+}
+
+} // namespace
 
 const std::string StreamEncoderImpl::CRLF = "\r\n";
 const std::string StreamEncoderImpl::LAST_CHUNK = "0\r\n\r\n";
@@ -477,13 +486,9 @@ int ConnectionImpl::onHeadersCompleteBase() {
       ENVOY_CONN_LOG(trace, "removing unsupported h2c upgrade headers.", connection_);
       current_header_map_->removeUpgrade();
       if (current_header_map_->Connection()) {
-        // Construct on first use idiom.
-        static const auto* tokens_to_remove =
-            new StringUtil::CaseUnorderedSet{Http::Headers::get().ConnectionValues.Upgrade,
-                                             Http::Headers::get().ConnectionValues.Http2Settings};
-        auto new_value =
-            StringUtil::removeTokens(current_header_map_->Connection()->value().getStringView(),
-                                     ",", *tokens_to_remove, ",");
+        const auto& tokens_to_remove = caseUnorderdSetContainingUpgradeAndHttp2Settings();
+        auto new_value = StringUtil::removeTokens(
+            current_header_map_->Connection()->value().getStringView(), ",", tokens_to_remove, ",");
         if (new_value.empty()) {
           current_header_map_->removeConnection();
         } else {
