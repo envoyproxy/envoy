@@ -158,14 +158,14 @@ public:
 
   /**
    * Get size of the currently allocated memory in the VM.
-   * @result the size of memory in bytes.
+   * @return the size of memory in bytes.
    */
   virtual uint64_t getMemorySize() PURE;
   /**
    * Convert a block of memory in the VM to a string_view.
    * @param pointer the offset into VM memory of the requested VM memory block.
    * @param size the size of the requested VM memory block.
-   * @result if std::nullopt then the pointer/size pair were invalid, otherwise returns
+   * @return if std::nullopt then the pointer/size pair were invalid, otherwise returns
    * a host string_view pointing to the pointer/size pair in VM memory.
    */
   virtual absl::optional<absl::string_view> getMemory(uint64_t pointer, uint64_t size) PURE;
@@ -174,24 +174,34 @@ public:
    * @param host_pointer a pointer to host memory to be converted into a VM offset (pointer).
    * @param vm_pointer a pointer to an uint64_t to be filled with the offset in VM memory
    * corresponding to 'host_pointer'.
-   * @result whether or not the host_pointer was a valid VM memory offset.
+   * @return whether or not the host_pointer was a valid VM memory offset.
    */
   virtual bool getMemoryOffset(void* host_pointer, uint64_t* vm_pointer) PURE;
   /**
    * Set a block of memory in the VM, returns true on success, false if the pointer/size is invalid.
+   * @param pointer the offset into VM memory describing the start of a region of VM memory.
+   * @param size the size of the region of VM memory.
+   * @return whether or not the pointer/size pair was a valid VM memory block.
    */
   virtual bool setMemory(uint64_t pointer, uint64_t size, const void* data) PURE;
   /**
    * Set a Word in the VM, returns true on success, false if the pointer is invalid.
+   * @param pointer the offset into VM memory describing the start of VM native word size block.
+   * @param data a Word whose contents will be written in VM native word size at 'pointer.
+   * @return whether or not the pointer was to a valid VM memory block of VM native word size.
    */
   virtual bool setWord(uint64_t pointer, Word data) PURE;
   /**
    * Make a new intrinsic module (e.g. for Emscripten support).
+   * @param name the name of the module to make.
    */
   virtual void makeModule(absl::string_view name) PURE;
 
   /**
    * Get the contents of the user section with the given name or "" if it does not exist.
+   * @param name the name of the user section to get.
+   * @return the contents of the user section (if any).  The result will be empty() if there
+   * is no such section.
    */
   virtual absl::string_view getUserSection(absl::string_view name) PURE;
 
@@ -213,9 +223,20 @@ public:
 
   /**
    * Register typed value exported by the host environment.
+   * @param module_name the name of the module to which to export the global.
+   * @param name the name of the global variable to export.
+   * @param initial_value the initial value of the global.
+   * @return a Global object which can be used to access the exported global.
    */
   virtual std::unique_ptr<Global<Word>> makeGlobal(absl::string_view module_name,
                                                    absl::string_view name, Word initial_value) PURE;
+  /**
+   * Register typed value exported by the host environment.
+   * @param module_name the name of the module to which to export the global.
+   * @param name the name of the global variable to export.
+   * @param initial_value the initial value of the global.
+   * @return a Global object which can be used to access the exported global.
+   */
   virtual std::unique_ptr<Global<double>>
   makeGlobal(absl::string_view module_name, absl::string_view name, double initial_value) PURE;
 };
