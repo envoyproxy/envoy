@@ -1865,6 +1865,7 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutCallbackDisarmsAndReturns408
     EXPECT_CALL(response_encoder_, encodeData(_, true)).WillOnce(AddBufferToString(&response_body));
 
     conn_manager_->newStream(response_encoder_);
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, setTrackedObject(_)).Times(2);
     request_timer->invokeCallback();
   }));
 

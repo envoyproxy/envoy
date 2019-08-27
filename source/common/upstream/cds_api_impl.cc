@@ -59,6 +59,9 @@ void CdsApiImpl::onConfigUpdate(
   cm_.adsMux().pause(Config::TypeUrl::get().ClusterLoadAssignment);
   Cleanup eds_resume([this] { cm_.adsMux().resume(Config::TypeUrl::get().ClusterLoadAssignment); });
 
+  ENVOY_LOG(info, "cds: add {} cluster(s), remove {} cluster(s)", added_resources.size(),
+            removed_resources.size());
+
   std::vector<std::string> exception_msgs;
   std::unordered_set<std::string> cluster_names;
   bool any_applied = false;

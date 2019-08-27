@@ -29,6 +29,7 @@ public:
                                       const std::vector<std::string>& server_names));
   MOCK_CONST_METHOD0(daysUntilFirstCertExpires, size_t());
   MOCK_METHOD1(iterateContexts, void(std::function<void(const Context&)> callback));
+  MOCK_METHOD0(privateKeyMethodManager, Ssl::PrivateKeyMethodManager&());
 };
 
 class MockConnectionInfo : public ConnectionInfo {
@@ -106,6 +107,29 @@ public:
 
   MOCK_CONST_METHOD0(requireClientCertificate, bool());
   MOCK_CONST_METHOD0(sessionTicketKeys, const std::vector<SessionTicketKey>&());
+};
+
+class MockPrivateKeyMethodManager : public PrivateKeyMethodManager {
+public:
+  MockPrivateKeyMethodManager();
+  ~MockPrivateKeyMethodManager() override;
+
+  MOCK_METHOD2(createPrivateKeyMethodProvider,
+               PrivateKeyMethodProviderSharedPtr(
+                   const envoy::api::v2::auth::PrivateKeyProvider& config,
+                   Envoy::Server::Configuration::TransportSocketFactoryContext& factory_context));
+};
+
+class MockPrivateKeyMethodProvider : public PrivateKeyMethodProvider {
+public:
+  MockPrivateKeyMethodProvider();
+  ~MockPrivateKeyMethodProvider() override;
+
+  MOCK_METHOD3(registerPrivateKeyMethod,
+               void(SSL* ssl, PrivateKeyConnectionCallbacks& cb, Event::Dispatcher& dispatcher));
+  MOCK_METHOD1(unregisterPrivateKeyMethod, void(SSL* ssl));
+  MOCK_METHOD0(checkFips, bool());
+  MOCK_METHOD0(getBoringSslPrivateKeyMethod, BoringSslPrivateKeyMethodSharedPtr());
 };
 
 } // namespace Ssl

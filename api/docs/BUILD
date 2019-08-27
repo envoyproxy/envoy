@@ -102,6 +102,7 @@ proto_library(
         "//envoy/type:range",
         "//envoy/type/matcher:metadata",
         "//envoy/type/matcher:number",
+        "//envoy/type/matcher:regex",
         "//envoy/type/matcher:string",
     ],
 )

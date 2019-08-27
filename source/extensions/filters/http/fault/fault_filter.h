@@ -48,7 +48,7 @@ class FaultSettings : public Router::RouteSpecificFilterConfig {
 public:
   FaultSettings(const envoy::config::filter::http::fault::v2::HTTPFault& fault);
 
-  const std::vector<Http::HeaderUtility::HeaderData>& filterHeaders() const {
+  const std::vector<Http::HeaderUtility::HeaderDataPtr>& filterHeaders() const {
     return fault_filter_headers_;
   }
   envoy::type::FractionalPercent abortPercentage() const { return abort_percentage_; }
@@ -88,7 +88,7 @@ private:
   uint64_t http_status_{}; // HTTP or gRPC return codes
   Filters::Common::Fault::FaultDelayConfigPtr request_delay_config_;
   std::string upstream_cluster_; // restrict faults to specific upstream cluster
-  std::vector<Http::HeaderUtility::HeaderData> fault_filter_headers_;
+  const std::vector<Http::HeaderUtility::HeaderDataPtr> fault_filter_headers_;
   absl::flat_hash_set<std::string> downstream_nodes_{}; // Inject failures for specific downstream
   absl::optional<uint64_t> max_active_faults_;
   Filters::Common::Fault::FaultRateLimitConfigPtr response_rate_limit_;
@@ -144,12 +144,13 @@ public:
    *                    trailers that have been paused during body flush.
    * @param time_source the time source to run the token bucket with.
    * @param dispatcher the stream's dispatcher to use for creating timers.
+   * @param scope the stream's scope
    */
   StreamRateLimiter(uint64_t max_kbps, uint64_t max_buffered_data,
                     std::function<void()> pause_data_cb, std::function<void()> resume_data_cb,
                     std::function<void(Buffer::Instance&, bool)> write_data_cb,
                     std::function<void()> continue_cb, TimeSource& time_source,
-                    Event::Dispatcher& dispatcher);
+                    Event::Dispatcher& dispatcher, const ScopeTrackedObject& scope);
 
   /**
    * Called by the stream to write data. All data writes happen asynchronously, the stream should
@@ -180,6 +181,7 @@ private:
   const uint64_t bytes_per_time_slice_;
   const std::function<void(Buffer::Instance&, bool)> write_data_cb_;
   const std::function<void()> continue_cb_;
+  const ScopeTrackedObject& scope_;
   TokenBucketImpl token_bucket_;
   Event::TimerPtr token_timer_;
   bool saw_data_{};

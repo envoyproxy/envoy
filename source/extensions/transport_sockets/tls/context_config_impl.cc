@@ -25,7 +25,8 @@ std::vector<Secret::TlsCertificateConfigProviderSharedPtr> getTlsCertificateConf
   if (!config.tls_certificates().empty()) {
     std::vector<Secret::TlsCertificateConfigProviderSharedPtr> providers;
     for (const auto& tls_certificate : config.tls_certificates()) {
-      if (!tls_certificate.has_certificate_chain() && !tls_certificate.has_private_key()) {
+      if (!tls_certificate.has_private_key_provider() && !tls_certificate.has_certificate_chain() &&
+          !tls_certificate.has_private_key()) {
         continue;
       }
       providers.push_back(
@@ -143,7 +144,7 @@ ContextConfigImpl::ContextConfigImpl(
   if (!tls_certificate_providers_.empty()) {
     for (auto& provider : tls_certificate_providers_) {
       if (provider->secret() != nullptr) {
-        tls_certificate_configs_.emplace_back(*provider->secret(), api_);
+        tls_certificate_configs_.emplace_back(*provider->secret(), &factory_context, api_);
       }
     }
   }
@@ -174,7 +175,8 @@ void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) 
           // This breaks multiple certificate support, but today SDS is only single cert.
           // TODO(htuch): Fix this when SDS goes multi-cert.
           tls_certificate_configs_.clear();
-          tls_certificate_configs_.emplace_back(*tls_certificate_providers_[0]->secret(), api_);
+          tls_certificate_configs_.emplace_back(*tls_certificate_providers_[0]->secret(), nullptr,
+                                                api_);
           callback();
         });
   }
