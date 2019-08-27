@@ -1,7 +1,6 @@
 // Note: this should be run with --compilation_mode=opt, and would benefit from a
 // quiescent system with disabled cstate power management.
 
-#include <iostream>
 #include <random>
 
 #include "common/common/assert.h"
