@@ -25,8 +25,8 @@ namespace {
 
 StringUtil::CaseUnorderedSet caseUnorderdSetContainingUpgradeAndHttp2Settings() {
   CONSTRUCT_ON_FIRST_USE(StringUtil::CaseUnorderedSet,
-                         {Http::Headers::get().ConnectionValues.Upgrade,
-                          Http::Headers::get().ConnectionValues.Http2Settings});
+                         Http::Headers::get().ConnectionValues.Upgrade,
+                         Http::Headers::get().ConnectionValues.Http2Settings);
 }
 
 } // namespace
