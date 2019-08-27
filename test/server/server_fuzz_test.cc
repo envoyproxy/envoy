@@ -63,14 +63,6 @@ class AllFeaturesHooks : public DefaultListenerHooks {
 };
 
 DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v2::Bootstrap& input) {
-  try {
-    // Validate the input early.
-    TestUtility::validate(input);
-  } catch (const EnvoyException& ex) {
-    ENVOY_LOG_MISC(debug, "Controlled EnvoyException exit: {}", ex.what());
-    return;
-  }
-
   testing::NiceMock<MockOptions> options;
   AllFeaturesHooks hooks;
   testing::NiceMock<MockHotRestart> restart;
