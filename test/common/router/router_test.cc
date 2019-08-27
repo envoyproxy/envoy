@@ -4125,6 +4125,9 @@ TEST(RouterFilterUtilityTest, ShouldShadow) {
 }
 
 TEST_F(RouterTest, CanaryStatusTrue) {
+  EXPECT_CALL(callbacks_.route_->route_entry_, noop())
+      .WillOnce(Return(true))
+      .WillOnce(Return(false));
   EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
       .WillOnce(Return(std::chrono::milliseconds(0)));
   EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(0);
@@ -4155,6 +4158,40 @@ TEST_F(RouterTest, CanaryStatusTrue) {
   EXPECT_EQ(1U,
             cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("canary.upstream_rq_200")
                 .value());
+}
+
+TEST_F(RouterTest, NoopRoutesToStreamInfo) {
+  EXPECT_CALL(callbacks_.route_->route_entry_, noop())
+      .WillOnce(Return(true))
+      .WillOnce(Return(false));
+
+  std::string noop_routename = "noop-route-1";
+  EXPECT_CALL(callbacks_.route_->route_entry_, routeName())
+      .WillRepeatedly(ReturnRef(noop_routename));
+
+  EXPECT_CALL(callbacks_.route_->route_entry_, addRouteNameToStreamInfo())
+      .WillOnce(Return(true));
+
+  std::string expected_routes = "noop-route-1;";
+  EXPECT_CALL(callbacks_.stream_info_, setNoopRouteNames(expected_routes));
+
+  NiceMock<Http::MockStreamEncoder> encoder;
+  Http::StreamDecoder* response_decoder = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
+
+  Http::TestHeaderMapImpl headers{{"x-envoy-upstream-alt-stat-name", "alt_stat"},
+                                  {"x-envoy-internal", "true"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+  Http::HeaderMapPtr response_headers(
+      new Http::TestHeaderMapImpl{{":status", "200"}});
+  response_decoder->decodeHeaders(std::move(response_headers), true);
 }
 
 TEST_F(RouterTest, CanaryStatusFalse) {

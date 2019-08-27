@@ -763,7 +763,7 @@ TEST_F(HttpConnectionManagerImplTest, RouteShouldUseSantizedPath) {
 
   EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _))
       .WillOnce(
-          Invoke([&](const Http::HeaderMap& header_map, const StreamInfo::StreamInfo&, uint64_t) {
+          Invoke([&](const Http::HeaderMap& header_map, const StreamInfo::StreamInfo&, uint64_t, uint32_t) {
             EXPECT_EQ(normalized_path, header_map.Path()->value().getStringView());
             return route;
           }));
@@ -3186,8 +3186,10 @@ TEST_F(HttpConnectionManagerImplTest, FilterClearRouteCache) {
 
   std::shared_ptr<Router::MockRoute> route1 = std::make_shared<NiceMock<Router::MockRoute>>();
   EXPECT_CALL(route1->route_entry_, clusterName()).WillRepeatedly(ReturnRef(fake_cluster1_name));
+  EXPECT_CALL(route1->route_entry_, noop()).WillRepeatedly(Return(false));
   std::shared_ptr<Router::MockRoute> route2 = std::make_shared<NiceMock<Router::MockRoute>>();
   EXPECT_CALL(route2->route_entry_, clusterName()).WillRepeatedly(ReturnRef(fake_cluster2_name));
+  EXPECT_CALL(route2->route_entry_, noop()).WillRepeatedly(Return(false));
 
   EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _))
       .WillOnce(Return(route1))
@@ -3221,7 +3223,6 @@ TEST_F(HttpConnectionManagerImplTest, FilterClearRouteCache) {
         return FilterHeadersStatus::StopIteration;
       }));
   EXPECT_CALL(*decoder_filters_[2], decodeComplete());
-
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);

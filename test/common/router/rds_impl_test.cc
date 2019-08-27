@@ -111,12 +111,13 @@ http_filters:
   RouteConstSharedPtr route(Http::TestHeaderMapImpl headers) {
     NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
     headers.addCopy("x-forwarded-proto", "http");
-    return rds_->config()->route(headers, stream_info, 0);
+    return rds_->config()->route(headers, stream_info, 0, route_index_ = 0);
   }
 
   NiceMock<Server::MockInstance> server_;
   std::unique_ptr<RouteConfigProviderManagerImpl> route_config_provider_manager_;
   RouteConfigProviderPtr rds_;
+  uint32_t route_index_{0};
 };
 
 TEST_F(RdsImplTest, RdsAndStatic) {
@@ -150,7 +151,6 @@ TEST_F(RdsImplTest, Basic) {
   Buffer::OwnedImpl data;
 
   setup();
-
   // Make sure the initial empty route table works.
   EXPECT_EQ(nullptr, route(Http::TestHeaderMapImpl{{":authority", "foo"}}));
 

@@ -370,6 +370,24 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   // Determine if there is a route entry or a direct response for the request.
   route_ = callbacks_->route();
+  
+  // Contains all noop route names we hit while routing this request
+  std::string no_op_route_names("");
+  // if this is the noop route then keep on picking routes till we find non-noop route or run out of the routes
+  while (route_ && route_->routeEntry() && route_->routeEntry()->noop()) {
+         if (route_->routeEntry()->addRouteNameToStreamInfo()) {
+           no_op_route_names.append(route_->routeEntry()->routeName() + ";"); 
+         }
+         route_ = callbacks_->route();
+  }
+
+  ENVOY_STREAM_LOG(trace, "noop route names={}", *callbacks_, no_op_route_names);
+
+  // Add to access logs if we have encountered some noop routes
+  if (no_op_route_names.length() != 0) {
+    callbacks_->streamInfo().setNoopRouteNames(no_op_route_names);
+  }
+
   if (!route_) {
     config_.stats_.no_route_.inc();
     ENVOY_STREAM_LOG(debug, "no cluster match for URL '{}'", *callbacks_,

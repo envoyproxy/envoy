@@ -498,7 +498,12 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
         return UnspecifiedValueString;
       }
     };
-  } else {
+  } else if (field_name == "NOOP_ROUTE_NAME") {
+    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
+      std::string noop_route_names = stream_info.getNoopRouteNames();
+      return noop_route_names.empty() ? UnspecifiedValueString : noop_route_names;
+    };
+   }  else {
     throw EnvoyException(fmt::format("Not supported field in StreamInfo: {}", field_name));
   }
 }

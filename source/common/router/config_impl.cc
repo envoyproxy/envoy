@@ -281,6 +281,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       decorator_(parseDecorator(route)), route_tracing_(parseRouteTracing(route)),
       direct_response_code_(ConfigUtility::parseDirectResponseCode(route)),
       direct_response_body_(ConfigUtility::parseDirectResponseBody(route, factory_context.api())),
+      has_noop_(route.has_noop()),
+      add_route_name_to_stream_info_(route.has_noop() && route.noop().add_route_name_to_stream_info()),
       per_filter_configs_(route.typed_per_filter_config(), route.per_filter_config(),
                           factory_context, validator),
       route_name_(route.name()), time_source_(factory_context.dispatcher().timeSource()),
@@ -670,7 +672,7 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& head
   // Gets the route object chosen from the list of weighted clusters
   // (if there is one) or returns self.
   if (weighted_clusters_.empty()) {
-    if (!cluster_name_.empty() || isDirectResponse()) {
+    if (!cluster_name_.empty() || isDirectResponse() || noop()) {
       return shared_from_this();
     } else {
       ASSERT(!cluster_header_name_.get().empty());
@@ -1032,14 +1034,13 @@ RouteMatcher::RouteMatcher(const envoy::api::v2::RouteConfiguration& route_confi
 
 RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const Http::HeaderMap& headers,
                                                          const StreamInfo::StreamInfo& stream_info,
-                                                         uint64_t random_value) const {
+                                                         uint64_t random_value, uint32_t &route_index) const {
   // No x-forwarded-proto header. This normally only happens when ActiveStream::decodeHeaders
   // bails early (as it rejects a request), so there is no routing is going to happen anyway.
   const auto* forwarded_proto_header = headers.ForwardedProto();
   if (forwarded_proto_header == nullptr) {
     return nullptr;
   }
-
   // First check for ssl redirect.
   if (ssl_requirements_ == SslRequirements::ALL && forwarded_proto_header->value() != "https") {
     return SSL_REDIRECT_ROUTE;
@@ -1048,16 +1049,17 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const Http::HeaderMap& 
              !Http::HeaderUtility::isEnvoyInternalRequest(headers)) {
     return SSL_REDIRECT_ROUTE;
   }
-
   // Check for a route that matches the request.
-  for (const RouteEntryImplBaseConstSharedPtr& route : routes_) {
-    RouteConstSharedPtr route_entry = route->matches(headers, stream_info, random_value);
-    if (nullptr != route_entry) {
-      return route_entry;
-    }
-  }
 
-  return nullptr;
+  while( route_index <routes_.size() ) {
+       RouteEntryImplBaseConstSharedPtr route = routes_[route_index]; 
+       RouteConstSharedPtr route_entry = route->matches(headers, random_value);
+       route_index++;
+       if (nullptr != route_entry) {
+          return route_entry;
+       }
+  }
+    return nullptr;
 }
 
 const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::HeaderMap& headers) const {
@@ -1095,11 +1097,18 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::HeaderMap& head
 }
 
 RouteConstSharedPtr RouteMatcher::route(const Http::HeaderMap& headers,
+<<<<<<< d4fa470da75791976807d911333f066ecfcd09b8
                                         const StreamInfo::StreamInfo& stream_info,
                                         uint64_t random_value) const {
   const VirtualHostImpl* virtual_host = findVirtualHost(headers);
   if (virtual_host) {
     return virtual_host->getRouteFromEntries(headers, stream_info, random_value);
+=======
+                                        uint64_t random_value, uint32_t &route_index) const {
+  const VirtualHostImpl* virtual_host = findVirtualHost(headers);
+  if (virtual_host) {
+    return virtual_host->getRouteFromEntries(headers, random_value, route_index);
+>>>>>>> noop changes
   } else {
     return nullptr;
   }

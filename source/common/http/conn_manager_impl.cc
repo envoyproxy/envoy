@@ -1302,7 +1302,7 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
       snapScopedRouteConfig();
     }
     if (snapped_route_config_ != nullptr) {
-      route = snapped_route_config_->route(*request_headers_, stream_info_, stream_id_);
+      route = snapped_route_config_->route(*request_headers_, stream_info_, stream_id_, route_index_);
     }
   }
   stream_info_.route_entry_ = route ? route->routeEntry() : nullptr;
@@ -2032,25 +2032,32 @@ Tracing::Span& ConnectionManagerImpl::ActiveStreamFilterBase::activeSpan() {
 Tracing::Config& ConnectionManagerImpl::ActiveStreamFilterBase::tracingConfig() { return parent_; }
 
 Upstream::ClusterInfoConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::clusterInfo() {
-  // NOTE: Refreshing route caches clusterInfo as well.
-  if (!parent_.cached_route_.has_value()) {
-    parent_.refreshCachedRoute();
-  }
-
+  if ( parent_.cached_route_.has_value()) {
+      if( parent_.cached_route_.value() != nullptr && parent_.cached_route_.value()->routeEntry() && parent_.cached_route_.value()->routeEntry()->noop()) {
+          parent_.refreshCachedRoute();
+       }
+  } else {
+     // NOTE: Refreshing route caches clusterInfo as well.
+     parent_.refreshCachedRoute();
+  } 
   return parent_.cached_cluster_info_.value();
 }
 
 Router::RouteConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::route() {
-  if (!parent_.cached_route_.has_value()) {
-    parent_.refreshCachedRoute();
-  }
-
+  if ( parent_.cached_route_.has_value()) {
+      if( parent_.cached_route_.value() != nullptr && parent_.cached_route_.value()->routeEntry() && parent_.cached_route_.value()->routeEntry()->noop()) {
+          parent_.refreshCachedRoute();
+       }
+  } else {
+     parent_.refreshCachedRoute();
+  } 
   return parent_.cached_route_.value();
 }
 
 void ConnectionManagerImpl::ActiveStreamFilterBase::clearRouteCache() {
   parent_.cached_route_ = absl::optional<Router::RouteConstSharedPtr>();
   parent_.cached_cluster_info_ = absl::optional<Upstream::ClusterInfoConstSharedPtr>();
+  parent_.route_index_ = 0;
 }
 
 Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamDecoderFilter::createBuffer() {

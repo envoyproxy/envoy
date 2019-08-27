@@ -217,6 +217,11 @@ public:
    * @return std::string& the name of the route.
    */
   virtual const std::string& getRouteName() const PURE;
+  
+  virtual void setNoopRouteNames(std::string name) PURE;
+
+  virtual const std::string& getNoopRouteNames() const PURE;
+
   /**
    * @param bytes_received denotes number of bytes to add to total received bytes.
    */

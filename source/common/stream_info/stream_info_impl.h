@@ -132,6 +132,10 @@ struct StreamInfoImpl : public StreamInfo {
   void setRouteName(absl::string_view route_name) override {
     route_name_ = std::string(route_name);
   }
+  
+  void setNoopRouteNames(std::string noop_route_names) { noop_route_names_ = noop_route_names; }
+
+  const std::string& getNoopRouteNames() const { return noop_route_names_; }
 
   const std::string& getRouteName() const override { return route_name_; }
 
@@ -244,6 +248,7 @@ struct StreamInfoImpl : public StreamInfo {
   envoy::api::v2::core::Metadata metadata_{};
   FilterStateImpl filter_state_{};
   std::string route_name_;
+  std::string noop_route_names_;
 
 private:
   uint64_t bytes_received_{};

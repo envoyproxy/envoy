@@ -93,6 +93,10 @@ public:
    * @return std::string& the name of the route.
    */
   virtual const std::string& routeName() const PURE;
+  
+  virtual  bool noop() const PURE;
+
+  virtual bool addRouteNameToStreamInfo() const PURE;
 };
 
 /**
@@ -766,6 +770,10 @@ public:
    * @return std::string& the name of the route.
    */
   virtual const std::string& routeName() const PURE;
+  
+  virtual  bool noop() const  PURE;
+
+  virtual bool addRouteNameToStreamInfo() const PURE;
 };
 
 /**
@@ -880,7 +888,7 @@ public:
    */
   virtual RouteConstSharedPtr route(const Http::HeaderMap& headers,
                                     const StreamInfo::StreamInfo& stream_info,
-                                    uint64_t random_value) const PURE;
+                                    uint64_t random_value, uint32_t &) const PURE;
 
   /**
    * Return a list of headers that will be cleaned from any requests that are not from an internal

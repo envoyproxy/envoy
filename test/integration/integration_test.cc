@@ -128,6 +128,10 @@ TEST_P(IntegrationTest, AdminDrainDrainsListeners) {
   test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
 }
 
+TEST_P(IntegrationTest, RouterNoop) { testRouterNoop(); }
+
+TEST_P(IntegrationTest, RouterSingleNoopRoute) { testRouterSingleNoopRoute(); }
+
 TEST_P(IntegrationTest, RouterDirectResponse) {
   const std::string body = "Response body";
   const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", body);

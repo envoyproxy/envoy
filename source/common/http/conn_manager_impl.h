@@ -631,6 +631,7 @@ private:
     // Whether a filter has indicated that the response should be treated as a headers only
     // response.
     bool encoding_headers_only_{};
+    uint32_t route_index_{0};
     Network::Socket::OptionsSharedPtr upstream_options_;
   };
 

@@ -95,7 +95,8 @@ DEFINE_PROTO_FUZZER(const test::common::router::RouteTestCase& input) {
     if (headers.ForwardedProto() == nullptr) {
       headers.insertForwardedProto().value(std::string("http"));
     }
-    auto route = config.route(headers, stream_info, input.random_value());
+    uint32_t route_index = 0;
+    auto route = config.route(headers, stream_info, input.random_value(), route_index);
     if (route != nullptr && route->routeEntry() != nullptr) {
       route->routeEntry()->finalizeRequestHeaders(headers, stream_info, true);
     }

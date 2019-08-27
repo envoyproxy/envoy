@@ -79,6 +79,7 @@ public:
     TestUtility::loadFromYaml(yaml, route_config);
     config_ =
         std::make_unique<ConfigImpl>(route_config, factory_context_, any_validation_visitor_, true);
+    route_index_ = 0;
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
@@ -87,6 +88,7 @@ public:
   Http::TestHeaderMapImpl header_;
   const RouteEntry* route_;
   Network::Address::Ipv4Instance default_remote_address_{"10.0.0.1"};
+  uint32_t route_index_{0};
 };
 
 TEST_F(RateLimitConfiguration, NoApplicableRateLimit) {
@@ -110,9 +112,10 @@ virtual_hosts:
   )EOF";
 
   setupTest(yaml);
+<<<<<<< d4fa470da75791976807d911333f066ecfcd09b8
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  EXPECT_EQ(0U, config_->route(genHeaders("www.lyft.com", "/bar", "GET"), stream_info, 0)
+  EXPECT_EQ(0U, config_->route(genHeaders("www.lyft.com", "/bar", "GET"), stream_info, 0, route_index_)
                     ->routeEntry()
                     ->rateLimitPolicy()
                     .getApplicableRateLimit(0)
@@ -135,7 +138,7 @@ virtual_hosts:
   setupTest(yaml);
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  route_ = config_->route(genHeaders("www.lyft.com", "/bar", "GET"), stream_info, 0)->routeEntry();
+  route_ = config_->route(genHeaders("www.lyft.com", "/bar", "GET"), stream_info, 0, route_index_)->routeEntry();
   EXPECT_EQ(0U, route_->rateLimitPolicy().getApplicableRateLimit(0).size());
   EXPECT_TRUE(route_->rateLimitPolicy().empty());
 }
@@ -159,7 +162,7 @@ virtual_hosts:
   setupTest(yaml);
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  route_ = config_->route(genHeaders("www.lyft.com", "/foo", "GET"), stream_info, 0)->routeEntry();
+  route_ = config_->route(genHeaders("www.lyft.com", "/foo", "GET"), stream_info, 0, route_index_)->routeEntry();
   EXPECT_FALSE(route_->rateLimitPolicy().empty());
   std::vector<std::reference_wrapper<const RateLimitPolicyEntry>> rate_limits =
       route_->rateLimitPolicy().getApplicableRateLimit(0);
@@ -192,7 +195,7 @@ virtual_hosts:
   setupTest(yaml);
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  route_ = config_->route(genHeaders("www.lyft.com", "/bar", "GET"), stream_info, 0)->routeEntry();
+  route_ = config_->route(genHeaders("www.lyft.com", "/bar", "GET"), stream_info, 0, route_index_)->routeEntry();
   std::vector<std::reference_wrapper<const RateLimitPolicyEntry>> rate_limits =
       route_->virtualHost().rateLimitPolicy().getApplicableRateLimit(0);
   EXPECT_EQ(1U, rate_limits.size());
@@ -231,7 +234,7 @@ virtual_hosts:
   setupTest(yaml);
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  route_ = config_->route(genHeaders("www.lyft.com", "/foo", "GET"), stream_info, 0)->routeEntry();
+  route_ = config_->route(genHeaders("www.lyft.com", "/foo", "GET"), stream_info, 0, route_index_)->routeEntry();
   std::vector<std::reference_wrapper<const RateLimitPolicyEntry>> rate_limits =
       route_->rateLimitPolicy().getApplicableRateLimit(0);
   EXPECT_EQ(2U, rate_limits.size());

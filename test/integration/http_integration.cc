@@ -446,6 +446,79 @@ void HttpIntegrationTest::testRouterNotFoundWithBody() {
   EXPECT_EQ("404", response->headers().Status()->value().getStringView());
 }
 
+void HttpIntegrationTest::testRouterNoop() {
+  const std::string body = "Response body";
+  const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", body);
+  static const std::string domain("direct.example.com");
+  static const std::string prefix("/");
+  static const Http::Code status(Http::Code::OK);
+  config_helper_.addConfigModifier(
+      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void {
+        auto* route_config = hcm.mutable_route_config();
+        auto* header_value_option = route_config->mutable_response_headers_to_add()->Add();
+        header_value_option->mutable_header()->set_key("x-additional-header");
+        header_value_option->mutable_header()->set_value("example-value");
+        header_value_option->mutable_append()->set_value(false);
+        header_value_option = route_config->mutable_response_headers_to_add()->Add();
+        header_value_option->mutable_header()->set_key("content-type");
+        header_value_option->mutable_header()->set_value("text/html");
+        header_value_option->mutable_append()->set_value(false);
+        auto* virtual_host = route_config->add_virtual_hosts();
+        virtual_host->set_name(domain);
+        virtual_host->add_domains(domain);
+        virtual_host->add_routes()->mutable_match()->set_prefix(prefix);
+        virtual_host->mutable_routes(0)->mutable_noop();
+        virtual_host->add_routes()->mutable_match()->set_prefix(prefix);
+        virtual_host->mutable_routes(1)->mutable_direct_response()->set_status(
+            static_cast<uint32_t>(status));
+        virtual_host->mutable_routes(1)->mutable_direct_response()->mutable_body()->set_filename(
+            file_path);
+      });
+  initialize();
+
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("http"), "GET", "/", "", downstream_protocol_, version_, "direct.example.com");
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("example-value", response->headers()
+                                    .get(Envoy::Http::LowerCaseString("x-additional-header"))
+                                    ->value()
+                                    .getStringView());
+  EXPECT_EQ("text/html", response->headers().ContentType()->value().getStringView());
+  EXPECT_EQ(body, response->body());
+}
+
+void HttpIntegrationTest::testRouterSingleNoopRoute() {
+  static const std::string domain("noop.example.com");
+  static const std::string prefix("/");
+  //static const Http::Code status(Http::Code::OK);
+  config_helper_.addConfigModifier(
+      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void {
+        auto* route_config = hcm.mutable_route_config();
+        auto* header_value_option = route_config->mutable_response_headers_to_add()->Add();
+        header_value_option->mutable_header()->set_key("x-additional-header");
+        header_value_option->mutable_header()->set_value("example-value");
+        header_value_option->mutable_append()->set_value(false);
+        header_value_option = route_config->mutable_response_headers_to_add()->Add();
+        header_value_option->mutable_header()->set_key("content-type");
+        header_value_option->mutable_header()->set_value("text/html");
+        header_value_option->mutable_append()->set_value(false);
+        auto* virtual_host = route_config->add_virtual_hosts();
+        virtual_host->set_name(domain);
+        virtual_host->add_domains(domain);
+        virtual_host->add_routes()->mutable_match()->set_prefix(prefix);
+        virtual_host->mutable_routes(0)->mutable_noop();
+      });
+  initialize();
+
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("http"), "GET", "/", "", downstream_protocol_, version_, "noop.example.com");
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("404", response->headers().Status()->value().getStringView());
+}
+
 void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeRequestComplete() {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));

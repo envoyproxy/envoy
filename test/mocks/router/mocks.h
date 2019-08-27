@@ -49,6 +49,8 @@ public:
   MOCK_CONST_METHOD0(responseCode, Http::Code());
   MOCK_CONST_METHOD0(responseBody, const std::string&());
   MOCK_CONST_METHOD0(routeName, const std::string&());
+  MOCK_CONST_METHOD0(noop, bool());
+  MOCK_CONST_METHOD0(addRouteNameToStreamInfo, bool());
 };
 
 class TestCorsPolicy : public CorsPolicy {
@@ -330,6 +332,8 @@ public:
   MOCK_CONST_METHOD0(upgradeMap, const UpgradeMap&());
   MOCK_CONST_METHOD0(internalRedirectAction, InternalRedirectAction());
   MOCK_CONST_METHOD0(routeName, const std::string&());
+  MOCK_CONST_METHOD0(noop, bool());
+  MOCK_CONST_METHOD0(addRouteNameToStreamInfo, bool());
 
   std::string cluster_name_{"fake_cluster"};
   std::string route_name_{"fake_route_name"};
@@ -397,7 +401,7 @@ public:
   // Router::Config
   MOCK_CONST_METHOD3(route, RouteConstSharedPtr(const Http::HeaderMap&,
                                                 const Envoy::StreamInfo::StreamInfo&,
-                                                uint64_t random_value));
+                                                uint64_t random_value, uint32_t&));
   MOCK_CONST_METHOD0(internalOnlyHeaders, const std::list<Http::LowerCaseString>&());
   MOCK_CONST_METHOD0(name, const std::string&());
   MOCK_CONST_METHOD0(usesVhds, bool());

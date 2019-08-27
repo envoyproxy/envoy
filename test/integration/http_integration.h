@@ -165,6 +165,8 @@ protected:
                                                     int upstream_index,
                                                     const std::string& path = "/test/long/url",
                                                     const std::string& authority = "host");
+  void testRouterNoop();
+  void testRouterSingleNoopRoute();
   void testRouterNotFound();
   void testRouterNotFoundWithBody();
 
