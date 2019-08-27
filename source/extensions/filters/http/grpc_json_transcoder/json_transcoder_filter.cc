@@ -111,13 +111,13 @@ JsonTranscoderConfig::JsonTranscoderConfig(
   }
 
   for (const auto& file : descriptor_set.file()) {
-    AddFileDescriptor(file);
+    addFileDescriptor(file);
   }
 
   convert_grpc_status_ = proto_config.convert_grpc_status();
   if (convert_grpc_status_) {
-    AddBuiltinSymbolDescriptor("google.protobuf.Any");
-    AddBuiltinSymbolDescriptor("google.rpc.Status");
+    addBuiltinSymbolDescriptor("google.protobuf.Any");
+    addBuiltinSymbolDescriptor("google.rpc.Status");
   }
 
   PathMatcherBuilder<const Protobuf::MethodDescriptor*> pmb;
@@ -168,13 +168,13 @@ JsonTranscoderConfig::JsonTranscoderConfig(
   ignore_unknown_query_parameters_ = proto_config.ignore_unknown_query_parameters();
 }
 
-void JsonTranscoderConfig::AddFileDescriptor(const Protobuf::FileDescriptorProto& file) {
+void JsonTranscoderConfig::addFileDescriptor(const Protobuf::FileDescriptorProto& file) {
   if (descriptor_pool_.BuildFile(file) == nullptr) {
     throw EnvoyException("transcoding_filter: Unable to build proto descriptor pool");
   }
 }
 
-void JsonTranscoderConfig::AddBuiltinSymbolDescriptor(const std::string& symbol_name) {
+void JsonTranscoderConfig::addBuiltinSymbolDescriptor(const std::string& symbol_name) {
   if (descriptor_pool_.FindFileContainingSymbol(symbol_name) != nullptr) {
     return;
   }
@@ -187,7 +187,7 @@ void JsonTranscoderConfig::AddBuiltinSymbolDescriptor(const std::string& symbol_
   Protobuf::DescriptorPoolDatabase pool_database(*builtin_pool);
   Protobuf::FileDescriptorProto file_proto;
   pool_database.FindFileContainingSymbol(symbol_name, &file_proto);
-  AddFileDescriptor(file_proto);
+  addFileDescriptor(file_proto);
 }
 
 bool JsonTranscoderConfig::matchIncomingRequestInfo() const {

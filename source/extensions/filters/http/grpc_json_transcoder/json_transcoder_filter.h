@@ -95,8 +95,8 @@ private:
                                            google::grpc::transcoding::RequestInfo* info);
 
 private:
-  void AddFileDescriptor(const Protobuf::FileDescriptorProto& file);
-  void AddBuiltinSymbolDescriptor(const std::string& symbol_name);
+  void addFileDescriptor(const Protobuf::FileDescriptorProto& file);
+  void addBuiltinSymbolDescriptor(const std::string& symbol_name);
 
   Protobuf::DescriptorPool descriptor_pool_;
   google::grpc::transcoding::PathMatcherPtr<const Protobuf::MethodDescriptor*> path_matcher_;

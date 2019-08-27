@@ -55,7 +55,7 @@ absl::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap& 
 
   uint64_t grpc_status_code;
   if (!grpc_status_header || grpc_status_header->value().empty()) {
-    return {};
+    return absl::nullopt;
   }
   if (!absl::SimpleAtoi(grpc_status_header->value().getStringView(), &grpc_status_code) ||
       grpc_status_code > Status::GrpcStatus::MaximumValid) {
@@ -73,18 +73,18 @@ absl::optional<google::rpc::Status>
 Common::getGrpcStatusDetailsBin(const Http::HeaderMap& trailers) {
   const Http::HeaderEntry* details_header = trailers.GrpcStatusDetailsBin();
   if (!details_header) {
-    return {};
+    return absl::nullopt;
   }
 
   // Some implementations use non-padded base64 encoding for grpc-status-details-bin.
   auto decoded_value = Base64::decodeWithoutPadding(details_header->value().getStringView());
   if (decoded_value.empty()) {
-    return {};
+    return absl::nullopt;
   }
 
   google::rpc::Status status;
   if (!status.ParseFromString(decoded_value)) {
-    return {};
+    return absl::nullopt;
   }
 
   return {std::move(status)};
