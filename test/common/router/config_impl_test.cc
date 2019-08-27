@@ -2195,7 +2195,7 @@ virtual_hosts:
             config.route(headers, 0)->routeEntry()->clusterNotFoundResponseCode());
 }
 
-TEST_F(RouteMatcherTest, Shadow) {
+TEST_F(RouteMatcherTest, DEPRECATED_FEATURE_TEST(Shadow)) {
   const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
@@ -2253,7 +2253,7 @@ virtual_hosts:
 
 class RouteConfigurationV2 : public testing::Test, public ConfigImplTestBase {};
 
-TEST_F(RouteConfigurationV2, RequestMirrorPolicy) {
+TEST_F(RouteConfigurationV2, DEPRECATED_FEATURE_TEST(RequestMirrorPolicy)) {
   const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
