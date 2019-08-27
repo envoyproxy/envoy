@@ -29,8 +29,8 @@ void PerfOperation::record(absl::string_view category, absl::string_view descrip
 
 // The ctor is explicitly declared private to encourage clients to use getOrCreate(), at
 // least for now. Given that it's declared it must be instantiated. It's not inlined
-// because the contructor is non-trivial due to the contained unordered_map.
-PerfAnnotationContext::PerfAnnotationContext() {}
+// because the constructor is non-trivial due to the contained unordered_map.
+PerfAnnotationContext::PerfAnnotationContext() = default;
 
 void PerfAnnotationContext::record(std::chrono::nanoseconds duration, absl::string_view category,
                                    absl::string_view description) {
@@ -146,7 +146,7 @@ void PerfAnnotationContext::clear() {
 }
 
 PerfAnnotationContext* PerfAnnotationContext::getOrCreate() {
-  static PerfAnnotationContext* context = new PerfAnnotationContext();
+  static auto* context = new PerfAnnotationContext();
   return context;
 }
 

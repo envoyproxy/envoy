@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/api/v2/endpoint/load_report.pb.h"
 
@@ -7,6 +9,7 @@
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -22,14 +25,13 @@ using testing::Return;
 // for the happy path for LoadStatsReporter is provided in //test/integration:load_stats_reporter.
 namespace Envoy {
 namespace Upstream {
+namespace {
 
 class LoadStatsReporterTest : public testing::Test {
 public:
   LoadStatsReporterTest()
       : retry_timer_(new Event::MockTimer()), response_timer_(new Event::MockTimer()),
-        async_client_(new Grpc::MockAsyncClient()) {
-    dispatcher_.setTimeSystem(time_system_);
-  }
+        async_client_(new Grpc::MockAsyncClient()) {}
 
   void createLoadStatsReporter() {
     InSequence s;
@@ -41,8 +43,8 @@ public:
       response_timer_cb_ = timer_cb;
       return response_timer_;
     }));
-    load_stats_reporter_.reset(new LoadStatsReporter(
-        local_info_, cm_, stats_store_, Grpc::AsyncClientPtr(async_client_), dispatcher_));
+    load_stats_reporter_ = std::make_unique<LoadStatsReporter>(
+        local_info_, cm_, stats_store_, Grpc::RawAsyncClientPtr(async_client_), dispatcher_);
   }
 
   void expectSendMessage(
@@ -51,7 +53,7 @@ public:
     expected_request.mutable_node()->MergeFrom(local_info_.node());
     std::copy(expected_cluster_stats.begin(), expected_cluster_stats.end(),
               Protobuf::RepeatedPtrFieldBackInserter(expected_request.mutable_cluster_stats()));
-    EXPECT_CALL(async_stream_, sendMessage(ProtoEq(expected_request), false));
+    EXPECT_CALL(async_stream_, sendMessageRaw_(Grpc::ProtoBufferEq(expected_request), false));
   }
 
   void deliverLoadStatsResponse(const std::vector<std::string>& cluster_names) {
@@ -61,10 +63,11 @@ public:
     std::copy(cluster_names.begin(), cluster_names.end(),
               Protobuf::RepeatedPtrFieldBackInserter(response->mutable_clusters()));
 
-    EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000)));
+    EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
     load_stats_reporter_->onReceiveMessage(std::move(response));
   }
 
+  Event::SimulatedTimeSystem time_system_;
   NiceMock<Upstream::MockClusterManager> cm_;
   Event::MockDispatcher dispatcher_;
   Stats::IsolatedStoreImpl stats_store_;
@@ -75,67 +78,64 @@ public:
   Event::TimerCb response_timer_cb_;
   Grpc::MockAsyncStream async_stream_;
   Grpc::MockAsyncClient* async_client_;
-  MockTimeSystem time_system_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
 };
 
 // Validate that stream creation results in a timer based retry.
 TEST_F(LoadStatsReporterTest, StreamCreationFailure) {
-  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(nullptr));
-  EXPECT_CALL(*retry_timer_, enableTimer(_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(nullptr));
+  EXPECT_CALL(*retry_timer_, enableTimer(_, _));
   createLoadStatsReporter();
-  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
   retry_timer_cb_();
 }
 
 TEST_F(LoadStatsReporterTest, TestPubSub) {
-  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
-  EXPECT_CALL(async_stream_, sendMessage(_, _));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createLoadStatsReporter();
-  EXPECT_CALL(time_system_, monotonicTime());
   deliverLoadStatsResponse({"foo"});
 
-  EXPECT_CALL(async_stream_, sendMessage(_, _));
-  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000)));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
   response_timer_cb_();
 
-  EXPECT_CALL(time_system_, monotonicTime());
   deliverLoadStatsResponse({"bar"});
 
-  EXPECT_CALL(async_stream_, sendMessage(_, _));
-  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000)));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
   response_timer_cb_();
 }
 
 // Validate treatment of existing clusters across updates.
 TEST_F(LoadStatsReporterTest, ExistingClusters) {
-  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
   // Initially, we have no clusters to report on.
   expectSendMessage({});
   createLoadStatsReporter();
-  EXPECT_CALL(time_system_, monotonicTime())
-      .WillOnce(Return(MonotonicTime(std::chrono::microseconds(3))));
+  time_system_.setMonotonicTime(std::chrono::microseconds(3));
   // Start reporting on foo.
-  NiceMock<MockCluster> foo_cluster;
+  NiceMock<MockClusterMockPrioritySet> foo_cluster;
   foo_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(2);
-  NiceMock<MockCluster> bar_cluster;
+  foo_cluster.info_->eds_service_name_ = "bar";
+  NiceMock<MockClusterMockPrioritySet> bar_cluster;
   MockClusterManager::ClusterInfoMap cluster_info{{"foo", foo_cluster}, {"bar", bar_cluster}};
   ON_CALL(cm_, clusters()).WillByDefault(Return(cluster_info));
   deliverLoadStatsResponse({"foo"});
   // Initial stats report for foo on timer tick.
   foo_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(5);
-  EXPECT_CALL(time_system_, monotonicTime())
-      .WillOnce(Return(MonotonicTime(std::chrono::microseconds(4))));
+  time_system_.setMonotonicTime(std::chrono::microseconds(4));
   {
     envoy::api::v2::endpoint::ClusterStats foo_cluster_stats;
     foo_cluster_stats.set_cluster_name("foo");
+    foo_cluster_stats.set_cluster_service_name("bar");
     foo_cluster_stats.set_total_dropped_requests(5);
     foo_cluster_stats.mutable_load_report_interval()->MergeFrom(
         Protobuf::util::TimeUtil::MicrosecondsToDuration(1));
     expectSendMessage({foo_cluster_stats});
   }
-  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000)));
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
   response_timer_cb_();
 
   // Some traffic on foo/bar in between previous request and next response.
@@ -143,18 +143,16 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
   bar_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(1);
 
   // Start reporting on bar.
-  EXPECT_CALL(time_system_, monotonicTime())
-      .WillOnce(Return(MonotonicTime(std::chrono::microseconds(6))));
+  time_system_.setMonotonicTime(std::chrono::microseconds(6));
   deliverLoadStatsResponse({"foo", "bar"});
   // Stats report foo/bar on timer tick.
   foo_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(1);
   bar_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(1);
-  EXPECT_CALL(time_system_, monotonicTime())
-      .Times(2)
-      .WillRepeatedly(Return(MonotonicTime(std::chrono::microseconds(28))));
+  time_system_.setMonotonicTime(std::chrono::microseconds(28));
   {
     envoy::api::v2::endpoint::ClusterStats foo_cluster_stats;
     foo_cluster_stats.set_cluster_name("foo");
+    foo_cluster_stats.set_cluster_service_name("bar");
     foo_cluster_stats.set_total_dropped_requests(2);
     foo_cluster_stats.mutable_load_report_interval()->MergeFrom(
         Protobuf::util::TimeUtil::MicrosecondsToDuration(24));
@@ -165,7 +163,7 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
         Protobuf::util::TimeUtil::MicrosecondsToDuration(22));
     expectSendMessage({bar_cluster_stats, foo_cluster_stats});
   }
-  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000)));
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
   response_timer_cb_();
 
   // Some traffic on foo/bar in between previous request and next response.
@@ -177,8 +175,7 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
   // Stats report for bar on timer tick.
   foo_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(5);
   bar_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(5);
-  EXPECT_CALL(time_system_, monotonicTime())
-      .WillOnce(Return(MonotonicTime(std::chrono::microseconds(33))));
+  time_system_.setMonotonicTime(std::chrono::microseconds(33));
   {
     envoy::api::v2::endpoint::ClusterStats bar_cluster_stats;
     bar_cluster_stats.set_cluster_name("bar");
@@ -187,7 +184,7 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
         Protobuf::util::TimeUtil::MicrosecondsToDuration(5));
     expectSendMessage({bar_cluster_stats});
   }
-  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000)));
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
   response_timer_cb_();
 
   // Some traffic on foo/bar in between previous request and next response.
@@ -195,18 +192,16 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
   bar_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(1);
 
   // Start tracking foo again, we should forget earlier history for foo.
-  EXPECT_CALL(time_system_, monotonicTime())
-      .WillOnce(Return(MonotonicTime(std::chrono::microseconds(43))));
+  time_system_.setMonotonicTime(std::chrono::microseconds(43));
   deliverLoadStatsResponse({"foo", "bar"});
   // Stats report foo/bar on timer tick.
   foo_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(1);
   bar_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(1);
-  EXPECT_CALL(time_system_, monotonicTime())
-      .Times(2)
-      .WillRepeatedly(Return(MonotonicTime(std::chrono::microseconds(47))));
+  time_system_.setMonotonicTime(std::chrono::microseconds(47));
   {
     envoy::api::v2::endpoint::ClusterStats foo_cluster_stats;
     foo_cluster_stats.set_cluster_name("foo");
+    foo_cluster_stats.set_cluster_service_name("bar");
     foo_cluster_stats.set_total_dropped_requests(1);
     foo_cluster_stats.mutable_load_report_interval()->MergeFrom(
         Protobuf::util::TimeUtil::MicrosecondsToDuration(4));
@@ -217,22 +212,23 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
         Protobuf::util::TimeUtil::MicrosecondsToDuration(14));
     expectSendMessage({bar_cluster_stats, foo_cluster_stats});
   }
-  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000)));
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
   response_timer_cb_();
 }
 
 // Validate that the client can recover from a remote stream closure via retry.
 TEST_F(LoadStatsReporterTest, RemoteStreamClose) {
-  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
   createLoadStatsReporter();
   EXPECT_CALL(*response_timer_, disableTimer());
-  EXPECT_CALL(*retry_timer_, enableTimer(_));
+  EXPECT_CALL(*retry_timer_, enableTimer(_, _));
   load_stats_reporter_->onRemoteClose(Grpc::Status::GrpcStatus::Canceled, "");
-  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
   retry_timer_cb_();
 }
 
+} // namespace
 } // namespace Upstream
 } // namespace Envoy

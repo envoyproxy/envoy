@@ -14,7 +14,7 @@ namespace Secret {
 class MockSecretManager : public SecretManager {
 public:
   MockSecretManager();
-  ~MockSecretManager();
+  ~MockSecretManager() override;
 
   MOCK_METHOD1(addStaticSecret, void(const envoy::api::v2::auth::Secret& secret));
   MOCK_CONST_METHOD1(findStaticTlsCertificateProvider,
@@ -32,12 +32,17 @@ public:
                TlsCertificateConfigProviderSharedPtr(
                    const envoy::api::v2::core::ConfigSource&, const std::string&,
                    Server::Configuration::TransportSocketFactoryContext&));
+  MOCK_METHOD3(findOrCreateCertificateValidationContextProvider,
+               CertificateValidationContextConfigProviderSharedPtr(
+                   const envoy::api::v2::core::ConfigSource& config_source,
+                   const std::string& config_name,
+                   Server::Configuration::TransportSocketFactoryContext& secret_provider_context));
 };
 
 class MockSecretCallbacks : public SecretCallbacks {
 public:
   MockSecretCallbacks();
-  ~MockSecretCallbacks();
+  ~MockSecretCallbacks() override;
   MOCK_METHOD0(onAddOrUpdateSecret, void());
 };
 

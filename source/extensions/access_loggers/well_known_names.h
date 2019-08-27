@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "common/singleton/const_singleton.h"
 
 namespace Envoy {
@@ -16,9 +18,11 @@ public:
   const std::string File = "envoy.file_access_log";
   // HTTP gRPC access log
   const std::string HttpGrpc = "envoy.http_grpc_access_log";
+  // TCP gRPC access log
+  const std::string TcpGrpc = "envoy.tcp_grpc_access_log";
 };
 
-typedef ConstSingleton<AccessLogNameValues> AccessLogNames;
+using AccessLogNames = ConstSingleton<AccessLogNameValues>;
 
 } // namespace AccessLoggers
 } // namespace Extensions

@@ -1,11 +1,6 @@
 FROM ubuntu:xenial
 
-COPY ./build_and_install_deps.sh ./recipe_wrapper.sh ./Makefile ./build_container_common.sh /
-COPY WORKSPACE /bazel-prebuilt/
-COPY ./api /bazel-prebuilt/api
-COPY ./bazel /bazel-prebuilt/bazel
-COPY ./build_recipes/*.sh /build_recipes/
-
+COPY ./build_container_common.sh /
 COPY ./build_container_ubuntu.sh /
 
 RUN ./build_container_ubuntu.sh

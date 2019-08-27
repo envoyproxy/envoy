@@ -7,6 +7,7 @@
 #include "envoy/stats/scope.h"
 
 #include "common/network/utility.h"
+#include "common/singleton/manager_impl.h"
 #include "common/upstream/logical_dns_cluster.h"
 
 #include "server/transport_socket_config_impl.h"
@@ -15,7 +16,9 @@
 #include "test/mocks/common.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -30,28 +33,11 @@ using testing::NiceMock;
 
 namespace Envoy {
 namespace Upstream {
-
-enum class ConfigType { V2_YAML, V1_JSON };
+namespace {
 
 class LogicalDnsClusterTest : public testing::Test {
-public:
-  void setupFromV1Json(const std::string& json) {
-    resolve_timer_ = new Event::MockTimer(&dispatcher_);
-    NiceMock<MockClusterManager> cm;
-    envoy::api::v2::Cluster cluster_config = parseClusterFromJson(json);
-    Envoy::Stats::ScopePtr scope = stats_store_.createScope(fmt::format(
-        "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
-                                                              : cluster_config.alt_stat_name()));
-    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_);
-    cluster_.reset(new LogicalDnsCluster(cluster_config, runtime_, dns_resolver_, tls_,
-                                         factory_context, std::move(scope), false));
-    cluster_->prioritySet().addMemberUpdateCb(
-        [&](uint32_t, const HostVector&, const HostVector&) -> void {
-          membership_updated_.ready();
-        });
-    cluster_->initialize([&]() -> void { initialized_.ready(); });
-  }
+protected:
+  LogicalDnsClusterTest() : api_(Api::createApiForTest(stats_store_)) {}
 
   void setupFromV2Yaml(const std::string& yaml) {
     resolve_timer_ = new Event::MockTimer(&dispatcher_);
@@ -61,10 +47,11 @@ public:
         "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                               : cluster_config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_);
-    cluster_.reset(new LogicalDnsCluster(cluster_config, runtime_, dns_resolver_, tls_,
-                                         factory_context, std::move(scope), false));
-    cluster_->prioritySet().addMemberUpdateCb(
+        admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_,
+        singleton_manager_, tls_, validation_visitor_, *api_);
+    cluster_.reset(new LogicalDnsCluster(cluster_config, runtime_, dns_resolver_, factory_context,
+                                         std::move(scope), false));
+    cluster_->prioritySet().addPriorityUpdateCb(
         [&](uint32_t, const HostVector&, const HostVector&) -> void {
           membership_updated_.ready();
         });
@@ -82,17 +69,13 @@ public:
   }
 
   void testBasicSetup(const std::string& config, const std::string& expected_address,
-                      const uint32_t expected_port, ConfigType config_type = ConfigType::V2_YAML) {
+                      uint32_t expected_port, uint32_t expected_hc_port) {
     expectResolve(Network::DnsLookupFamily::V4Only, expected_address);
-    if (config_type == ConfigType::V1_JSON) {
-      setupFromV1Json(config);
-    } else {
-      setupFromV2Yaml(config);
-    }
+    setupFromV2Yaml(config);
 
     EXPECT_CALL(membership_updated_, ready());
     EXPECT_CALL(initialized_, ready());
-    EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000)));
+    EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000), _));
     dns_callback_(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
 
     EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
@@ -106,36 +89,34 @@ public:
               cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts()[0]);
     HostSharedPtr logical_host = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
 
-    // Regression test for issue #3908. Make sure we do not get "0.0.0.0:0" as the logical host's
-    // health check address.
-    EXPECT_NE("0.0.0.0:0", logical_host->healthCheckAddress()->asString());
-    EXPECT_EQ(fmt::format("127.0.0.1:{}", expected_port),
+    EXPECT_EQ("127.0.0.1:" + std::to_string(expected_hc_port),
               logical_host->healthCheckAddress()->asString());
+    EXPECT_EQ("127.0.0.1:" + std::to_string(expected_port), logical_host->address()->asString());
 
     EXPECT_CALL(dispatcher_,
                 createClientConnection_(
                     PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:443")), _, _, _))
         .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
-    logical_host->createConnection(dispatcher_, nullptr);
+    logical_host->createConnection(dispatcher_, nullptr, nullptr);
     logical_host->outlierDetector().putHttpResponseCode(200);
 
     expectResolve(Network::DnsLookupFamily::V4Only, expected_address);
-    resolve_timer_->callback_();
+    resolve_timer_->invokeCallback();
 
     // Should not cause any changes.
-    EXPECT_CALL(*resolve_timer_, enableTimer(_));
+    EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
     dns_callback_(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2", "127.0.0.3"}));
 
-    EXPECT_NE("0.0.0.0:0", logical_host->healthCheckAddress()->asString());
-    EXPECT_EQ(fmt::format("127.0.0.1:{}", expected_port),
+    EXPECT_EQ("127.0.0.1:" + std::to_string(expected_hc_port),
               logical_host->healthCheckAddress()->asString());
+    EXPECT_EQ("127.0.0.1:" + std::to_string(expected_port), logical_host->address()->asString());
 
     EXPECT_EQ(logical_host, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
     EXPECT_CALL(dispatcher_,
                 createClientConnection_(
                     PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:443")), _, _, _))
         .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
-    Host::CreateConnectionData data = logical_host->createConnection(dispatcher_, nullptr);
+    Host::CreateConnectionData data = logical_host->createConnection(dispatcher_, nullptr, nullptr);
     EXPECT_FALSE(data.host_description_->canary());
     EXPECT_EQ(&cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->cluster(),
               &data.host_description_->cluster());
@@ -152,28 +133,28 @@ public:
     data.host_description_->healthChecker().setUnhealthy();
 
     expectResolve(Network::DnsLookupFamily::V4Only, expected_address);
-    resolve_timer_->callback_();
+    resolve_timer_->invokeCallback();
 
     // Should cause a change.
-    EXPECT_CALL(*resolve_timer_, enableTimer(_));
+    EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
     dns_callback_(TestUtility::makeDnsResponse({"127.0.0.3", "127.0.0.1", "127.0.0.2"}));
 
-    EXPECT_NE("0.0.0.0:0", logical_host->healthCheckAddress()->asString());
-    EXPECT_EQ(fmt::format("127.0.0.3:{}", expected_port),
+    EXPECT_EQ("127.0.0.3:" + std::to_string(expected_hc_port),
               logical_host->healthCheckAddress()->asString());
+    EXPECT_EQ("127.0.0.3:" + std::to_string(expected_port), logical_host->address()->asString());
 
     EXPECT_EQ(logical_host, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
     EXPECT_CALL(dispatcher_,
                 createClientConnection_(
                     PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.3:443")), _, _, _))
         .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
-    logical_host->createConnection(dispatcher_, nullptr);
+    logical_host->createConnection(dispatcher_, nullptr, nullptr);
 
     expectResolve(Network::DnsLookupFamily::V4Only, expected_address);
-    resolve_timer_->callback_();
+    resolve_timer_->invokeCallback();
 
     // Empty should not cause any change.
-    EXPECT_CALL(*resolve_timer_, enableTimer(_));
+    EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
     dns_callback_({});
 
     EXPECT_EQ(logical_host, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
@@ -181,12 +162,12 @@ public:
                 createClientConnection_(
                     PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.3:443")), _, _, _))
         .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
-    logical_host->createConnection(dispatcher_, nullptr);
+    logical_host->createConnection(dispatcher_, nullptr, nullptr);
 
     // Make sure we cancel.
     EXPECT_CALL(active_dns_query_, cancel());
     expectResolve(Network::DnsLookupFamily::V4Only, expected_address);
-    resolve_timer_->callback_();
+    resolve_timer_->invokeCallback();
 
     tls_.shutdownThread();
   }
@@ -206,35 +187,42 @@ public:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  NiceMock<Server::MockAdmin> admin_;
+  Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
+  Api::ApiPtr api_;
 };
 
-typedef std::tuple<std::string, Network::DnsLookupFamily, std::list<std::string>>
-    LogicalDnsConfigTuple;
+using LogicalDnsConfigTuple =
+    std::tuple<std::string, Network::DnsLookupFamily, std::list<std::string>>;
 std::vector<LogicalDnsConfigTuple> generateLogicalDnsParams() {
   std::vector<LogicalDnsConfigTuple> dns_config;
   {
-    std::string family_json("");
-    Network::DnsLookupFamily family(Network::DnsLookupFamily::V4Only);
+    std::string family_yaml("");
+    Network::DnsLookupFamily family(Network::DnsLookupFamily::Auto);
     std::list<std::string> dns_response{"127.0.0.1", "127.0.0.2"};
-    dns_config.push_back(std::make_tuple(family_json, family, dns_response));
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response));
   }
   {
-    std::string family_json(R"EOF("dns_lookup_family": "v4_only",)EOF");
+    std::string family_yaml(R"EOF(dns_lookup_family: v4_only
+                            )EOF");
     Network::DnsLookupFamily family(Network::DnsLookupFamily::V4Only);
     std::list<std::string> dns_response{"127.0.0.1", "127.0.0.2"};
-    dns_config.push_back(std::make_tuple(family_json, family, dns_response));
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response));
   }
   {
-    std::string family_json(R"EOF("dns_lookup_family": "v6_only",)EOF");
+    std::string family_yaml(R"EOF(dns_lookup_family: v6_only
+                            )EOF");
     Network::DnsLookupFamily family(Network::DnsLookupFamily::V6Only);
     std::list<std::string> dns_response{"::1", "::2"};
-    dns_config.push_back(std::make_tuple(family_json, family, dns_response));
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response));
   }
   {
-    std::string family_json(R"EOF("dns_lookup_family": "auto",)EOF");
+    std::string family_yaml(R"EOF(dns_lookup_family: auto
+                            )EOF");
     Network::DnsLookupFamily family(Network::DnsLookupFamily::Auto);
     std::list<std::string> dns_response{"::1"};
-    dns_config.push_back(std::make_tuple(family_json, family, dns_response));
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response));
   }
   return dns_config;
 }
@@ -242,23 +230,24 @@ std::vector<LogicalDnsConfigTuple> generateLogicalDnsParams() {
 class LogicalDnsParamTest : public LogicalDnsClusterTest,
                             public testing::WithParamInterface<LogicalDnsConfigTuple> {};
 
-INSTANTIATE_TEST_CASE_P(DnsParam, LogicalDnsParamTest,
-                        testing::ValuesIn(generateLogicalDnsParams()));
+INSTANTIATE_TEST_SUITE_P(DnsParam, LogicalDnsParamTest,
+                         testing::ValuesIn(generateLogicalDnsParams()));
 
 // Validate that if the DNS resolves immediately, during the LogicalDnsCluster
 // constructor, we have the expected host state and initialization callback
 // invocation.
 TEST_P(LogicalDnsParamTest, ImmediateResolve) {
-  const std::string json = R"EOF(
-  {
-    "name": "name",
-    "connect_timeout_ms": 250,
-    "type": "logical_dns",
-    "lb_type": "round_robin",
+  const std::string yaml = R"EOF(
+  name: name
+  connect_timeout: 0.25s
+  type: logical_dns
+  lb_policy: round_robin
   )EOF" + std::get<0>(GetParam()) +
                            R"EOF(
-    "hosts": [{"url": "tcp://foo.bar.com:443"}]
-  }
+  hosts:
+  - socket_address:
+      address: foo.bar.com
+      port_value: 443
   )EOF";
 
   EXPECT_CALL(membership_updated_, ready());
@@ -266,11 +255,11 @@ TEST_P(LogicalDnsParamTest, ImmediateResolve) {
   EXPECT_CALL(*dns_resolver_, resolve("foo.bar.com", std::get<1>(GetParam()), _))
       .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
                            Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
-        EXPECT_CALL(*resolve_timer_, enableTimer(_));
+        EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
         cb(TestUtility::makeDnsResponse(std::get<2>(GetParam())));
         return nullptr;
       }));
-  setupFromV1Json(json);
+  setupFromV2Yaml(yaml);
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ("foo.bar.com",
@@ -280,17 +269,22 @@ TEST_P(LogicalDnsParamTest, ImmediateResolve) {
 }
 
 TEST_F(LogicalDnsClusterTest, BadConfig) {
-  const std::string multiple_hosts_json = R"EOF(
-  {
-    "name": "name",
-    "connect_timeout_ms": 250,
-    "type": "logical_dns",
-    "lb_type": "round_robin",
-    "hosts": [{"url": "tcp://foo.bar.com:443"}, {"url": "tcp://foo2.bar.com:443"}]
-  }
+  const std::string multiple_hosts_yaml = R"EOF(
+  name: name
+  type: LOGICAL_DNS
+  dns_refresh_rate: 4s
+  connect_timeout: 0.25s
+  lb_policy: ROUND_ROBIN
+  hosts:
+  - socket_address:
+      address: foo.bar.com
+      port_value: 443
+  - socket_address:
+      address: foo2.bar.com
+      port_value: 443
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(setupFromV1Json(multiple_hosts_json), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(setupFromV2Yaml(multiple_hosts_yaml), EnvoyException,
                             "LOGICAL_DNS clusters must have a single host");
 
   const std::string multiple_lb_endpoints_yaml = R"EOF(
@@ -356,20 +350,33 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
   EXPECT_THROW_WITH_MESSAGE(
       setupFromV2Yaml(multiple_endpoints_yaml), EnvoyException,
       "LOGICAL_DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
+
+  const std::string custom_resolver_yaml = R"EOF(
+  name: name
+  type: LOGICAL_DNS
+  dns_refresh_rate: 4s
+  connect_timeout: 0.25s
+  lb_policy: ROUND_ROBIN
+  dns_lookup_family: V4_ONLY
+  load_assignment:
+    cluster_name: name
+    endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: hello.world.com
+                port_value: 443
+                resolver_name: customresolver
+            health_check_config:
+              port_value: 8000
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(setupFromV2Yaml(custom_resolver_yaml), EnvoyException,
+                            "LOGICAL_DNS clusters must NOT have a custom resolver name set");
 }
 
 TEST_F(LogicalDnsClusterTest, Basic) {
-  const std::string json = R"EOF(
-  {
-    "name": "name",
-    "connect_timeout_ms": 250,
-    "type": "logical_dns",
-    "lb_type": "round_robin",
-    "hosts": [{"url": "tcp://foo.bar.com:443"}],
-    "dns_refresh_rate_ms": 4000
-  }
-  )EOF";
-
   const std::string basic_yaml_hosts = R"EOF(
   name: name
   type: LOGICAL_DNS
@@ -407,11 +414,11 @@ TEST_F(LogicalDnsClusterTest, Basic) {
               port_value: 8000
   )EOF";
 
-  testBasicSetup(json, "foo.bar.com", 443, ConfigType::V1_JSON);
-  testBasicSetup(basic_yaml_hosts, "foo.bar.com", 443);
+  testBasicSetup(basic_yaml_hosts, "foo.bar.com", 443, 443);
   // Expect to override the health check address port value.
-  testBasicSetup(basic_yaml_load_assignment, "foo.bar.com", 8000);
+  testBasicSetup(basic_yaml_load_assignment, "foo.bar.com", 443, 8000);
 }
 
+} // namespace
 } // namespace Upstream
 } // namespace Envoy

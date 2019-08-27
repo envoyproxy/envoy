@@ -1,10 +1,11 @@
-load("@com_google_protobuf//:protobuf.bzl", "py_proto_library")
-load("@com_lyft_protoc_gen_validate//bazel:pgv_proto_library.bzl", "pgv_cc_proto_library")
+load("@com_google_protobuf//:protobuf.bzl", _py_proto_library = "py_proto_library")
+load("@com_envoyproxy_protoc_gen_validate//bazel:pgv_proto_library.bzl", "pgv_cc_proto_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_grpc_library", "go_proto_library")
 load("@io_bazel_rules_go//go:def.bzl", "go_test")
 
 _PY_SUFFIX = "_py"
 _CC_SUFFIX = "_cc"
+_CC_EXPORT_SUFFIX = "_export_cc"
 _GO_PROTO_SUFFIX = "_go_proto"
 _GO_GRPC_SUFFIX = "_go_grpc"
 _GO_IMPORTPATH_PREFIX = "github.com/envoyproxy/data-plane-api/api/"
@@ -23,19 +24,40 @@ def _LibrarySuffix(library_name, suffix):
 # TODO(htuch): Convert this to native py_proto_library once
 # https://github.com/bazelbuild/bazel/issues/3935 and/or
 # https://github.com/bazelbuild/bazel/issues/2626 are resolved.
-def api_py_proto_library(name, srcs = [], deps = [], has_services = 0):
-    py_proto_library(
+def api_py_proto_library(name, srcs = [], deps = [], external_py_proto_deps = [], has_services = 0):
+    _py_proto_library(
         name = _Suffix(name, _PY_SUFFIX),
         srcs = srcs,
         default_runtime = "@com_google_protobuf//:protobuf_python",
         protoc = "@com_google_protobuf//:protoc",
-        deps = [_LibrarySuffix(d, _PY_SUFFIX) for d in deps] + [
-            "@com_lyft_protoc_gen_validate//validate:validate_py",
-            "@googleapis//:api_httpbody_protos_py",
-            "@googleapis//:http_api_protos_py",
-            "@googleapis//:rpc_status_protos_py",
+        deps = [_LibrarySuffix(d, _PY_SUFFIX) for d in deps] + external_py_proto_deps + [
+            "@com_envoyproxy_protoc_gen_validate//validate:validate_py",
+            "@com_google_googleapis//google/rpc:status_py_proto",
+            "@com_google_googleapis//google/api:annotations_py_proto",
+            "@com_google_googleapis//google/api:http_py_proto",
+            "@com_google_googleapis//google/api:httpbody_py_proto",
             "@com_github_gogo_protobuf//:gogo_proto_py",
         ],
+        visibility = ["//visibility:public"],
+    )
+
+# This defines googleapis py_proto_library. The repository does not provide its definition and requires
+# overriding it in the consuming project (see https://github.com/grpc/grpc/issues/19255 for more details).
+def py_proto_library(name, deps = []):
+    srcs = [dep[:-6] + ".proto" if dep.endswith("_proto") else dep for dep in deps]
+    proto_deps = []
+
+    # py_proto_library in googleapis specifies *_proto rules in dependencies.
+    # By rewriting *_proto to *.proto above, the dependencies in *_proto rules are not preserved.
+    # As a workaround, manually specify the proto dependencies for the imported python rules.
+    if name == "annotations_py_proto":
+        proto_deps = proto_deps + [":http_py_proto"]
+    _py_proto_library(
+        name = name,
+        srcs = srcs,
+        default_runtime = "@com_google_protobuf//:protobuf_python",
+        protoc = "@com_google_protobuf//:protoc",
+        deps = proto_deps + ["@com_google_protobuf//:protobuf_python"],
         visibility = ["//visibility:public"],
     )
 
@@ -47,13 +69,13 @@ def api_go_proto_library(name, proto, deps = []):
         visibility = ["//visibility:public"],
         deps = deps + [
             "@com_github_gogo_protobuf//:gogo_proto_go",
-            "@com_github_golang_protobuf//ptypes/duration:go_default_library",
-            "@com_github_golang_protobuf//ptypes/struct:go_default_library",
-            "@com_github_golang_protobuf//ptypes/timestamp:go_default_library",
-            "@com_github_golang_protobuf//ptypes/wrappers:go_default_library",
-            "@com_github_golang_protobuf//ptypes/any:go_default_library",
-            "@com_lyft_protoc_gen_validate//validate:go_default_library",
-            "@googleapis//:rpc_status_go_proto",
+            "@io_bazel_rules_go//proto/wkt:any_go_proto",
+            "@io_bazel_rules_go//proto/wkt:duration_go_proto",
+            "@io_bazel_rules_go//proto/wkt:struct_go_proto",
+            "@io_bazel_rules_go//proto/wkt:timestamp_go_proto",
+            "@io_bazel_rules_go//proto/wkt:wrappers_go_proto",
+            "@com_envoyproxy_protoc_gen_validate//validate:go_default_library",
+            "@com_google_googleapis//google/rpc:status_go_proto",
         ],
     )
 
@@ -65,12 +87,12 @@ def api_go_grpc_library(name, proto, deps = []):
         visibility = ["//visibility:public"],
         deps = deps + [
             "@com_github_gogo_protobuf//:gogo_proto_go",
-            "@com_github_golang_protobuf//ptypes/duration:go_default_library",
-            "@com_github_golang_protobuf//ptypes/struct:go_default_library",
-            "@com_github_golang_protobuf//ptypes/wrappers:go_default_library",
-            "@com_github_golang_protobuf//ptypes/any:go_default_library",
-            "@com_lyft_protoc_gen_validate//validate:go_default_library",
-            "@googleapis//:http_api_go_proto",
+            "@io_bazel_rules_go//proto/wkt:any_go_proto",
+            "@io_bazel_rules_go//proto/wkt:duration_go_proto",
+            "@io_bazel_rules_go//proto/wkt:struct_go_proto",
+            "@io_bazel_rules_go//proto/wkt:wrappers_go_proto",
+            "@com_envoyproxy_protoc_gen_validate//validate:go_default_library",
+            "@com_google_googleapis//google/api:annotations_go_proto",
         ],
     )
 
@@ -95,16 +117,10 @@ def api_proto_library(
         deps = [],
         external_proto_deps = [],
         external_cc_proto_deps = [],
+        external_py_proto_deps = [],
         has_services = 0,
         linkstatic = None,
         require_py = 1):
-    # This is now vestigial, since there are no direct consumers in
-    # the data plane API. However, we want to maintain native proto_library support
-    # in the proto graph to (1) support future C++ use of native rules with
-    # cc_proto_library (or some Bazel aspect that works on proto_library) when
-    # it can play well with the PGV plugin and (2) other language support that
-    # can make use of native proto_library.
-
     native.proto_library(
         name = name,
         srcs = srcs,
@@ -116,38 +132,33 @@ def api_proto_library(
             "@com_google_protobuf//:struct_proto",
             "@com_google_protobuf//:timestamp_proto",
             "@com_google_protobuf//:wrappers_proto",
-            "@googleapis//:http_api_protos_proto",
-            "@googleapis//:rpc_status_protos_lib",
+            "@com_google_googleapis//google/api:http_proto",
+            "@com_google_googleapis//google/api:annotations_proto",
+            "@com_google_googleapis//google/rpc:status_proto",
             "@com_github_gogo_protobuf//:gogo_proto",
-            "@com_lyft_protoc_gen_validate//validate:validate_proto",
+            "@com_envoyproxy_protoc_gen_validate//validate:validate_proto",
         ],
         visibility = visibility,
     )
-
-    # Under the hood, this is just an extension of the Protobuf library's
-    # bespoke cc_proto_library. It doesn't consume proto_library as a proto
-    # provider. Hopefully one day we can move to a model where this target and
-    # the proto_library above are aligned.
     pgv_cc_proto_library(
         name = _Suffix(name, _CC_SUFFIX),
-        srcs = srcs,
         linkstatic = linkstatic,
-        deps = [_LibrarySuffix(d, _CC_SUFFIX) for d in deps],
-        external_deps = external_cc_proto_deps + [
-            "@com_google_protobuf//:cc_wkt_protos",
-            "@googleapis//:http_api_protos",
-            "@googleapis//:rpc_status_protos",
+        cc_deps = [_LibrarySuffix(d, _CC_SUFFIX) for d in deps] + external_cc_proto_deps + [
             "@com_github_gogo_protobuf//:gogo_proto_cc",
+            "@com_google_googleapis//google/api:http_cc_proto",
+            "@com_google_googleapis//google/api:annotations_cc_proto",
+            "@com_google_googleapis//google/rpc:status_cc_proto",
         ],
+        deps = [":" + name],
         visibility = ["//visibility:public"],
     )
     py_export_suffixes = []
     if (require_py == 1):
-        api_py_proto_library(name, srcs, deps, has_services)
+        api_py_proto_library(name, srcs, deps, external_py_proto_deps, has_services)
         py_export_suffixes = ["_py", "_py_genproto"]
 
     # Allow unlimited visibility for consumers
-    export_suffixes = ["", "_cc", "_cc_validate", "_cc_proto", "_cc_proto_genproto"] + py_export_suffixes
+    export_suffixes = ["", "_cc", "_cc_validate"] + py_export_suffixes
     for s in export_suffixes:
         native.alias(
             name = name + "_export" + s,
@@ -159,7 +170,7 @@ def api_cc_test(name, srcs, proto_deps):
     native.cc_test(
         name = name,
         srcs = srcs,
-        deps = [_LibrarySuffix(d, _CC_SUFFIX) for d in proto_deps],
+        deps = [_LibrarySuffix(d, _CC_EXPORT_SUFFIX) for d in proto_deps],
     )
 
 def api_go_test(name, size, importpath, srcs = [], deps = []):

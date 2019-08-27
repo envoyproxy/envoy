@@ -21,6 +21,8 @@
 namespace Envoy {
 namespace Network {
 namespace Address {
+namespace {
+
 class IpResolverTest : public testing::Test {
 public:
   Resolver* resolver_{Registry::FactoryRegistry<Resolver>::getFactory("envoy.ip")};
@@ -83,7 +85,7 @@ class TestResolver : public Resolver {
 public:
   InstanceConstSharedPtr
   resolve(const envoy::api::v2::core::SocketAddress& socket_address) override {
-    const std::string logical = socket_address.address();
+    const std::string& logical = socket_address.address();
     const std::string physical = getPhysicalName(logical);
     const std::string port = getPort(socket_address);
     return InstanceConstSharedPtr{new MockResolvedAddress(fmt::format("{}:{}", logical, port),
@@ -167,6 +169,7 @@ TEST(ResolverTest, NoSuchResolver) {
                             "Unknown address resolver: envoy.test.resolver");
 }
 
+} // namespace
 } // namespace Address
 } // namespace Network
 } // namespace Envoy

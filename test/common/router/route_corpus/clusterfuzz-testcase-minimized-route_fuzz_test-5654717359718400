@@ -1,0 +1,1 @@
+config {   virtual_hosts {     name: " "     domains: "*"     routes {       match {         path: "/"       }       route {         cluster: " "         host_rewrite: " "       }     }   }   request_headers_to_remove: "host" }

@@ -1,9 +1,10 @@
 #pragma once
 
-#include <backward.hpp>
+#include <functional>
 
 #include "common/common/logger.h"
 
+#include "absl/debugging/stacktrace.h"
 #include "absl/debugging/symbolize.h"
 
 namespace Envoy {
@@ -15,7 +16,7 @@ namespace Envoy {
   } while (0)
 
 /**
- * Use the Backward library ( https://github.com/bombela/backward-cpp ) to log
+ * Use absl::Stacktrace and absl::Symbolize to log resolved symbols
  * stack traces on demand. To use this just do:
  *
  * BackwardsTrace tracer;
@@ -29,104 +30,91 @@ namespace Envoy {
  * For convenience a macro is provided BACKTRACE_LOG() which performs the
  * construction, capture, and log in one shot.
  *
- * To resolve the addresses in the backtrace output and de-interleave
- * multithreaded output use the tools/stack_decode.py command and pass the
- * log/stderr output to stdin of the tool. Backtrace lines will be resolved,
- * other lines will be passed through and echo'd unchanged.
- *
- * The stack_decode.py tool can also run envoy or a test as a child process if
- * you pass the command and arguments as arguments to the tool. This enables
- * you to run tests containing backtrace commands added for debugging and see
- * the output like this:
- *
- *     bazel test -c dbg //test/server:backtrace_test
- *      --run_under=`pwd`/tools/stack_decode.py
- *      --strategy=TestRunner=standalone --cache_test_results=no
- *      --test_output=all
+ * If the symbols cannot be resolved by absl::Symbolize then the raw address
+ * will be printed instead.
  */
 class BackwardsTrace : Logger::Loggable<Logger::Id::backtrace> {
 public:
-  BackwardsTrace() {}
+  BackwardsTrace() = default;
 
   /**
    * Capture a stack trace.
    *
    * The trace will begin with the call to capture().
    */
-  void capture() { stack_trace_.load_here(MAX_STACK_DEPTH); }
+  void capture() {
+    // Skip of one means we exclude the last call, which must be to capture().
+    stack_depth_ = absl::GetStackTrace(stack_trace_, MaxStackDepth, /* skip_count = */ 1);
+  }
 
   /**
-   * Capture a stack trace from a particular address.
+   * Capture a stack trace from a particular context.
    *
    * This can be used to capture a useful stack trace from a fatal signal
-   * handler.
+   * handler. The context argument should be a pointer to the context passed
+   * to a signal handler registered via a sigaction struct.
    *
-   * @param address The stack trace will begin from this address.
+   * @param context A pointer to ucontext_t obtained from a sigaction handler.
    */
-  void captureFrom(void* address) { stack_trace_.load_from(address, MAX_STACK_DEPTH); }
+  void captureFrom(const void* context) {
+    stack_depth_ =
+        absl::GetStackTraceWithContext(stack_trace_, MaxStackDepth, /* skip_count = */ 1, context,
+                                       /* min_dropped_frames = */ nullptr);
+  }
 
   /**
    * Log the stack trace.
    */
   void logTrace() {
-    backward::TraceResolver resolver;
-    resolver.load_stacktrace(stack_trace_);
-    // If there's nothing in the captured trace we cannot do anything.
-    // The size must be at least two for useful info - there is a sentinel frame
-    // at the end that we ignore.
-    if (stack_trace_.size() < 2) {
-      ENVOY_LOG(critical, "Back trace attempt failed");
-      return;
-    }
+    ENVOY_LOG(critical, "Backtrace (use tools/stack_decode.py to get line numbers):");
 
-    const auto thread_id = stack_trace_.thread_id();
-    backward::ResolvedTrace first_frame_trace = resolver.resolve(stack_trace_[0]);
-    auto obj_name = first_frame_trace.object_filename;
-
-#ifdef __APPLE__
-    // The stack_decode.py script uses addr2line which isn't readily available and doesn't seem to
-    // work when installed.
-    ENVOY_LOG(critical, "Backtrace thr<{}> obj<{}>:", thread_id, obj_name);
-#else
-    char out[200];
-    ENVOY_LOG(critical,
-              "Backtrace thr<{}> obj<{}> (If unsymbolized, use tools/stack_decode.py):", thread_id,
-              obj_name);
-#endif
-
-    // Backtrace gets tagged by ASAN when we try the object name resolution for the last
-    // frame on stack, so skip the last one. It has no useful info anyway.
-
-    for (unsigned int i = 0; i < stack_trace_.size() - 1; ++i) {
-      backward::ResolvedTrace trace = resolver.resolve(stack_trace_[i]);
-      if (trace.object_filename != obj_name) {
-        obj_name = trace.object_filename;
-        ENVOY_LOG(critical, "thr<{}> obj<{}>", thread_id, obj_name);
-      }
-
-#ifdef __APPLE__
-      // In the absence of stack_decode.py, print the function name.
-      ENVOY_LOG(critical, "thr<{}> #{} {} {}", thread_id, stack_trace_[i].idx, stack_trace_[i].addr,
-                trace.object_function);
-#else
-      if (absl::Symbolize(stack_trace_[i].addr, out, sizeof(out))) {
-        ENVOY_LOG(critical, "thr<{}> #{} {} {}", thread_id, stack_trace_[i].idx,
-                  stack_trace_[i].addr, out);
+    visitTrace([](int index, const char* symbol, void* address) {
+      if (symbol != nullptr) {
+        ENVOY_LOG(critical, "#{}: {} [{}]", index, symbol, address);
       } else {
-        ENVOY_LOG(critical, "thr<{}> #{} {} (unknown)", thread_id, stack_trace_[i].idx,
-                  stack_trace_[i].addr);
+        ENVOY_LOG(critical, "#{}: [{}]", index, address);
       }
-#endif
-    }
-    ENVOY_LOG(critical, "end backtrace thread {}", stack_trace_.thread_id());
+    });
   }
 
   void logFault(const char* signame, const void* addr) {
     ENVOY_LOG(critical, "Caught {}, suspect faulting address {}", signame, addr);
   }
 
+  void printTrace(std::ostream& os) {
+    visitTrace([&](int index, const char* symbol, void* address) {
+      if (symbol != nullptr) {
+        os << "#" << index << " " << symbol << " [" << address << "]\n";
+      } else {
+        os << "#" << index << " [" << address << "]\n";
+      }
+    });
+  }
+
 private:
-  static const int MAX_STACK_DEPTH = 64;
-  backward::StackTrace stack_trace_;
+  /**
+   * Visit the previously captured stack trace.
+   *
+   * The visitor function is called once per frame, with 3 parameters:
+   * 1. (int) The index of the current frame.
+   * 2. (const char*) The symbol name for the address of the current frame. nullptr means
+   * symbolization failed.
+   * 3. (void*) The address of the current frame.
+   */
+  void visitTrace(const std::function<void(int, const char*, void*)>& visitor) {
+    for (int i = 0; i < stack_depth_; ++i) {
+      char out[1024];
+      const bool success = absl::Symbolize(stack_trace_[i], out, sizeof(out));
+      if (success) {
+        visitor(i, out, stack_trace_[i]);
+      } else {
+        visitor(i, nullptr, stack_trace_[i]);
+      }
+    }
+  }
+
+  static constexpr int MaxStackDepth = 64;
+  void* stack_trace_[MaxStackDepth];
+  int stack_depth_{0};
 };
 } // namespace Envoy

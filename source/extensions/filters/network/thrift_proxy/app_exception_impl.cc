@@ -10,8 +10,9 @@ static const std::string MessageField = "message";
 static const std::string TypeField = "type";
 static const std::string StopField = "";
 
-void AppException::encode(MessageMetadata& metadata, ThriftProxy::Protocol& proto,
-                          Buffer::Instance& buffer) const {
+DirectResponse::ResponseType AppException::encode(MessageMetadata& metadata,
+                                                  ThriftProxy::Protocol& proto,
+                                                  Buffer::Instance& buffer) const {
   // Handle cases where the exception occurs before the message name (e.g. some header transport
   // errors).
   if (!metadata.hasMethodName()) {
@@ -38,6 +39,8 @@ void AppException::encode(MessageMetadata& metadata, ThriftProxy::Protocol& prot
 
   proto.writeStructEnd(buffer);
   proto.writeMessageEnd(buffer);
+
+  return DirectResponse::ResponseType::Exception;
 }
 
 } // namespace ThriftProxy

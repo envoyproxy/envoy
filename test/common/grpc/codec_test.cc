@@ -13,6 +13,7 @@
 
 namespace Envoy {
 namespace Grpc {
+namespace {
 
 TEST(GrpcCodecTest, encodeHeader) {
   Encoder encoder;
@@ -168,5 +169,6 @@ TEST(GrpcCodecTest, decodeMultipleFrame) {
   }
 }
 
+} // namespace
 } // namespace Grpc
 } // namespace Envoy

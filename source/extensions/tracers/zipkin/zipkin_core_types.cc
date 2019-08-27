@@ -93,7 +93,7 @@ const std::string Annotation::toJson() {
 
   if (endpoint_) {
     Util::mergeJsons(json_string, static_cast<Endpoint>(endpoint_.value()).toJson(),
-                     ZipkinJsonFieldNames::get().ANNOTATION_ENDPOINT.c_str());
+                     ZipkinJsonFieldNames::get().ANNOTATION_ENDPOINT);
   }
 
   return json_string;
@@ -133,7 +133,7 @@ const std::string BinaryAnnotation::toJson() {
 
   if (endpoint_) {
     Util::mergeJsons(json_string, static_cast<Endpoint>(endpoint_.value()).toJson(),
-                     ZipkinJsonFieldNames::get().BINARY_ANNOTATION_ENDPOINT.c_str());
+                     ZipkinJsonFieldNames::get().BINARY_ANNOTATION_ENDPOINT);
   }
 
   return json_string;
@@ -166,8 +166,8 @@ Span::Span(const Span& span) : time_source_(span.time_source_) {
 }
 
 void Span::setServiceName(const std::string& service_name) {
-  for (auto it = annotations_.begin(); it != annotations_.end(); it++) {
-    it->changeEndpointServiceName(service_name);
+  for (auto& annotation : annotations_) {
+    annotation.changeEndpointServiceName(service_name);
   }
 }
 
@@ -203,18 +203,18 @@ const std::string Span::toJson() {
 
   std::vector<std::string> annotation_json_vector;
 
-  for (auto it = annotations_.begin(); it != annotations_.end(); it++) {
-    annotation_json_vector.push_back(it->toJson());
+  for (auto& annotation : annotations_) {
+    annotation_json_vector.push_back(annotation.toJson());
   }
   Util::addArrayToJson(json_string, annotation_json_vector,
-                       ZipkinJsonFieldNames::get().SPAN_ANNOTATIONS.c_str());
+                       ZipkinJsonFieldNames::get().SPAN_ANNOTATIONS);
 
   std::vector<std::string> binary_annotation_json_vector;
-  for (auto it = binary_annotations_.begin(); it != binary_annotations_.end(); it++) {
-    binary_annotation_json_vector.push_back(it->toJson());
+  for (auto& binary_annotation : binary_annotations_) {
+    binary_annotation_json_vector.push_back(binary_annotation.toJson());
   }
   Util::addArrayToJson(json_string, binary_annotation_json_vector,
-                       ZipkinJsonFieldNames::get().SPAN_BINARY_ANNOTATIONS.c_str());
+                       ZipkinJsonFieldNames::get().SPAN_BINARY_ANNOTATIONS);
 
   return json_string;
 }
@@ -252,10 +252,18 @@ void Span::finish() {
   }
 }
 
-void Span::setTag(const std::string& name, const std::string& value) {
-  if (name.size() > 0 && value.size() > 0) {
+void Span::setTag(absl::string_view name, absl::string_view value) {
+  if (!name.empty() && !value.empty()) {
     addBinaryAnnotation(BinaryAnnotation(name, value));
   }
+}
+
+void Span::log(SystemTime timestamp, const std::string& event) {
+  Annotation annotation;
+  annotation.setTimestamp(
+      std::chrono::duration_cast<std::chrono::microseconds>(timestamp.time_since_epoch()).count());
+  annotation.setValue(event);
+  addAnnotation(std::move(annotation));
 }
 
 } // namespace Zipkin

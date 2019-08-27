@@ -22,5 +22,6 @@ filegroup(
     srcs = glob([
         "config/*.yaml",
         "config/*.json",
+        "config/*.pb_text",
     ]),
 )

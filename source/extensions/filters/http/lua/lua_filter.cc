@@ -1,10 +1,13 @@
 #include "extensions/filters/http/lua/lua_filter.h"
 
+#include <memory>
+
 #include "envoy/http/codes.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
+#include "common/crypto/utility.h"
 #include "common/http/message_impl.h"
 
 namespace Envoy {
@@ -116,14 +119,14 @@ int StreamHandleWrapper::luaRespond(lua_State* state) {
 
   uint64_t status;
   if (headers->Status() == nullptr ||
-      !StringUtil::atoul(headers->Status()->value().c_str(), status) || status < 200 ||
+      !absl::SimpleAtoi(headers->Status()->value().getStringView(), &status) || status < 200 ||
       status >= 600) {
     luaL_error(state, ":status must be between 200-599");
   }
 
   Buffer::InstancePtr body;
   if (raw_body != nullptr) {
-    body.reset(new Buffer::OwnedImpl(raw_body, body_size));
+    body = std::make_unique<Buffer::OwnedImpl>(raw_body, body_size);
     headers->insertContentLength().value(body_size);
   }
 
@@ -143,9 +146,19 @@ Http::HeaderMapPtr StreamHandleWrapper::buildHeadersFromTable(lua_State* state, 
   while (lua_next(state, table_index) != 0) {
     // Uses 'key' (at index -2) and 'value' (at index -1).
     const char* key = luaL_checkstring(state, -2);
-    const char* value = luaL_checkstring(state, -1);
-    headers->addCopy(Http::LowerCaseString(key), value);
-
+    // Check if the current value is a table, we iterate through the table and add each element of
+    // it as a header entry value for the current key.
+    if (lua_istable(state, -1)) {
+      lua_pushnil(state);
+      while (lua_next(state, -2) != 0) {
+        const char* value = luaL_checkstring(state, -1);
+        headers->addCopy(Http::LowerCaseString(key), value);
+        lua_pop(state, 1);
+      }
+    } else {
+      const char* value = luaL_checkstring(state, -1);
+      headers->addCopy(Http::LowerCaseString(key), value);
+    }
     // Removes 'value'; keeps 'key' for next iteration. This is the input for lua_next() so that
     // it can push the next key/value pair onto the stack.
     lua_pop(state, 1);
@@ -179,7 +192,7 @@ int StreamHandleWrapper::luaHttpCall(lua_State* state) {
   }
 
   if (body != nullptr) {
-    message->body().reset(new Buffer::OwnedImpl(body, body_size));
+    message->body() = std::make_unique<Buffer::OwnedImpl>(body, body_size);
     message->headers().insertContentLength().value(body_size);
   }
 
@@ -189,7 +202,7 @@ int StreamHandleWrapper::luaHttpCall(lua_State* state) {
   }
 
   http_request_ = filter_.clusterManager().httpAsyncClientForCluster(cluster).send(
-      std::move(message), *this, timeout);
+      std::move(message), *this, Http::AsyncClient::RequestOptions().setTimeout(timeout));
   if (http_request_) {
     state_ = State::HttpCall;
     return lua_yield(state, 0);
@@ -210,8 +223,10 @@ void StreamHandleWrapper::onSuccess(Http::MessagePtr&& response) {
   response->headers().iterate(
       [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
         lua_State* state = static_cast<lua_State*>(context);
-        lua_pushstring(state, header.key().c_str());
-        lua_pushstring(state, header.value().c_str());
+        lua_pushlstring(state, header.key().getStringView().data(),
+                        header.key().getStringView().length());
+        lua_pushlstring(state, header.value().getStringView().data(),
+                        header.value().getStringView().length());
         lua_settable(state, -3);
         return Http::HeaderMap::Iterate::Continue;
       },
@@ -252,7 +267,7 @@ void StreamHandleWrapper::onFailure(Http::AsyncClient::FailureReason) {
   Http::MessagePtr response_message(new Http::ResponseMessageImpl(Http::HeaderMapPtr{
       new Http::HeaderMapImpl{{Http::Headers::get().Status,
                                std::to_string(enumToInt(Http::Code::ServiceUnavailable))}}}));
-  response_message->body().reset(new Buffer::OwnedImpl("upstream failure"));
+  response_message->body() = std::make_unique<Buffer::OwnedImpl>("upstream failure");
   onSuccess(std::move(response_message));
 }
 
@@ -367,12 +382,12 @@ int StreamHandleWrapper::luaMetadata(lua_State* state) {
   return 1;
 }
 
-int StreamHandleWrapper::luaRequestInfo(lua_State* state) {
+int StreamHandleWrapper::luaStreamInfo(lua_State* state) {
   ASSERT(state_ == State::Running);
-  if (request_info_wrapper_.get() != nullptr) {
-    request_info_wrapper_.pushStack();
+  if (stream_info_wrapper_.get() != nullptr) {
+    stream_info_wrapper_.pushStack();
   } else {
-    request_info_wrapper_.reset(RequestInfoWrapper::create(state, callbacks_.requestInfo()), true);
+    stream_info_wrapper_.reset(StreamInfoWrapper::create(state, callbacks_.streamInfo()), true);
   }
   return 1;
 }
@@ -424,6 +439,52 @@ int StreamHandleWrapper::luaLogCritical(lua_State* state) {
   return 0;
 }
 
+int StreamHandleWrapper::luaVerifySignature(lua_State* state) {
+  // Step 1: get hash function
+  absl::string_view hash = luaL_checkstring(state, 2);
+
+  // Step 2: get key pointer
+  auto ptr = lua_touserdata(state, 3);
+
+  // Step 3: get signature
+  const char* signature = luaL_checkstring(state, 4);
+  int sig_len = luaL_checknumber(state, 5);
+  const std::vector<uint8_t> sig_vec(signature, signature + sig_len);
+
+  // Step 4: get clear text
+  const char* clear_text = luaL_checkstring(state, 6);
+  int text_len = luaL_checknumber(state, 7);
+  const std::vector<uint8_t> text_vec(clear_text, clear_text + text_len);
+
+  // Step 5: verify signature
+  auto output = Common::Crypto::Utility::verifySignature(hash, reinterpret_cast<EVP_PKEY*>(ptr),
+                                                         sig_vec, text_vec);
+
+  lua_pushboolean(state, output.result_);
+  if (output.result_) {
+    lua_pushnil(state);
+  } else {
+    lua_pushlstring(state, output.error_message_.data(), output.error_message_.length());
+  }
+  return 2;
+}
+
+int StreamHandleWrapper::luaImportPublicKey(lua_State* state) {
+  // Get byte array and the length.
+  const char* str = luaL_checkstring(state, 2);
+  int n = luaL_checknumber(state, 3);
+  std::vector<uint8_t> key(str, str + n);
+
+  if (public_key_wrapper_.get() != nullptr) {
+    public_key_wrapper_.pushStack();
+  } else {
+    public_key_wrapper_.reset(
+        PublicKeyWrapper::create(state, Common::Crypto::Utility::importPublicKey(key)), true);
+  }
+
+  return 1;
+}
+
 FilterConfig::FilterConfig(const std::string& lua_code, ThreadLocal::SlotAllocator& tls,
                            Upstream::ClusterManager& cluster_manager)
     : cluster_manager_(cluster_manager), lua_state_(lua_code, tls) {
@@ -434,10 +495,11 @@ FilterConfig::FilterConfig(const std::string& lua_code, ThreadLocal::SlotAllocat
   lua_state_.registerType<Filters::Common::Lua::SslConnectionWrapper>();
   lua_state_.registerType<HeaderMapWrapper>();
   lua_state_.registerType<HeaderMapIterator>();
-  lua_state_.registerType<RequestInfoWrapper>();
+  lua_state_.registerType<StreamInfoWrapper>();
   lua_state_.registerType<DynamicMetadataMapWrapper>();
   lua_state_.registerType<DynamicMetadataMapIterator>();
   lua_state_.registerType<StreamHandleWrapper>();
+  lua_state_.registerType<PublicKeyWrapper>();
 
   request_function_slot_ = lua_state_.registerGlobal("envoy_on_request");
   if (lua_state_.getGlobalRef(request_function_slot_) == LUA_REFNIL) {

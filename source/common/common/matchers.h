@@ -3,6 +3,8 @@
 #include <string>
 
 #include "envoy/api/v2/core/base.pb.h"
+#include "envoy/common/matchers.h"
+#include "envoy/common/regex.h"
 #include "envoy/type/matcher/metadata.pb.h"
 #include "envoy/type/matcher/number.pb.h"
 #include "envoy/type/matcher/string.pb.h"
@@ -15,11 +17,11 @@ namespace Envoy {
 namespace Matchers {
 
 class ValueMatcher;
-typedef std::shared_ptr<const ValueMatcher> ValueMatcherConstSharedPtr;
+using ValueMatcherConstSharedPtr = std::shared_ptr<const ValueMatcher>;
 
 class ValueMatcher {
 public:
-  virtual ~ValueMatcher() {}
+  virtual ~ValueMatcher() = default;
 
   /**
    * Check whether the value is matched to the matcher.
@@ -70,28 +72,41 @@ private:
   const envoy::type::matcher::DoubleMatcher matcher_;
 };
 
-class StringMatcher : public ValueMatcher {
+class StringMatcherImpl : public ValueMatcher, public StringMatcher {
 public:
-  StringMatcher(const envoy::type::matcher::StringMatcher& matcher) : matcher_(matcher) {
-    if (matcher.match_pattern_case() == envoy::type::matcher::StringMatcher::kRegex) {
-      regex_ = RegexUtil::parseRegex(matcher_.regex());
-    }
-  }
+  explicit StringMatcherImpl(const envoy::type::matcher::StringMatcher& matcher);
 
-  bool match(const std::string& value) const;
-
+  bool match(const absl::string_view value) const override;
   bool match(const ProtobufWkt::Value& value) const override;
 
 private:
   const envoy::type::matcher::StringMatcher matcher_;
-  std::regex regex_;
+  Regex::CompiledMatcherPtr regex_;
 };
+
+class LowerCaseStringMatcher : public ValueMatcher {
+public:
+  LowerCaseStringMatcher(const envoy::type::matcher::StringMatcher& matcher)
+      : matcher_(toLowerCase(matcher)) {}
+
+  bool match(const absl::string_view value) const;
+
+  bool match(const ProtobufWkt::Value& value) const override;
+
+private:
+  envoy::type::matcher::StringMatcher
+  toLowerCase(const envoy::type::matcher::StringMatcher& matcher);
+
+  const StringMatcherImpl matcher_;
+};
+
+using LowerCaseStringMatcherPtr = std::unique_ptr<LowerCaseStringMatcher>;
 
 class ListMatcher : public ValueMatcher {
 public:
   ListMatcher(const envoy::type::matcher::ListMatcher& matcher);
 
-  bool match(const ProtobufWkt::Value& value) const;
+  bool match(const ProtobufWkt::Value& value) const override;
 
 private:
   const envoy::type::matcher::ListMatcher matcher_;

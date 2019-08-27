@@ -3,8 +3,6 @@
 #include <algorithm>
 #include <fstream>
 
-#include "common/filesystem/filesystem_impl.h"
-
 #include "test/test_common/environment.h"
 
 namespace Envoy {
@@ -44,6 +42,8 @@ std::string PayloadOptions::protocolName() const {
     return "binary";
   case ProtocolType::Compact:
     return "compact";
+  case ProtocolType::Twitter:
+    return "finagle";
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
@@ -67,7 +67,7 @@ void BaseThriftIntegrationTest::preparePayloads(const PayloadOptions& options,
     args.push_back(*options.service_name_);
   }
 
-  if (options.headers_.size() > 0) {
+  if (!options.headers_.empty()) {
     args.push_back("-H");
 
     std::vector<std::string> headers;
@@ -98,7 +98,7 @@ void BaseThriftIntegrationTest::preparePayloads(const PayloadOptions& options,
 void BaseThriftIntegrationTest::readAll(std::string file, Buffer::Instance& buffer) {
   file = TestEnvironment::substitute(file, version_);
 
-  std::string data = Filesystem::fileReadToEnd(file);
+  std::string data = api_->fileSystem().fileReadToEnd(file);
   buffer.add(data);
 }
 

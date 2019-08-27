@@ -1,7 +1,7 @@
 #include "common/network/lc_trie.h"
 #include "common/network/utility.h"
 
-#include "testing/base/public/benchmark.h"
+#include "benchmark/benchmark.h"
 
 namespace {
 

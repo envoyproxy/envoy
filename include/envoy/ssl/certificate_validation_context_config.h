@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -10,7 +11,7 @@ namespace Ssl {
 
 class CertificateValidationContextConfig {
 public:
-  virtual ~CertificateValidationContextConfig() {}
+  virtual ~CertificateValidationContextConfig() = default;
 
   /**
    * @return The CA certificate to use for peer validation.
@@ -55,7 +56,7 @@ public:
   virtual bool allowExpiredCertificate() const PURE;
 };
 
-typedef std::unique_ptr<CertificateValidationContextConfig> CertificateValidationContextConfigPtr;
+using CertificateValidationContextConfigPtr = std::unique_ptr<CertificateValidationContextConfig>;
 
 } // namespace Ssl
 } // namespace Envoy

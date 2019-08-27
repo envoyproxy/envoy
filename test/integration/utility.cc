@@ -18,10 +18,13 @@
 #include "common/upstream/upstream_impl.h"
 
 #include "test/common/upstream/utility.h"
+#include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
+
+#include "absl/strings/match.h"
 
 namespace Envoy {
 void BufferingStreamDecoder::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
@@ -51,9 +54,9 @@ void BufferingStreamDecoder::onComplete() {
   on_complete_cb_();
 }
 
-void BufferingStreamDecoder::onResetStream(Http::StreamResetReason) { ADD_FAILURE(); }
-
-DangerousDeprecatedTestTime IntegrationUtil::evil_singleton_test_time_;
+void BufferingStreamDecoder::onResetStream(Http::StreamResetReason, absl::string_view) {
+  ADD_FAILURE();
+}
 
 BufferingStreamDecoderPtr
 IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPtr& addr,
@@ -61,8 +64,11 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
                                    const std::string& body, Http::CodecClient::Type type,
                                    const std::string& host, const std::string& content_type) {
 
-  Api::Impl api(std::chrono::milliseconds(9000));
-  Event::DispatcherPtr dispatcher(api.allocateDispatcher(evil_singleton_test_time_.timeSource()));
+  NiceMock<Stats::MockIsolatedStatsStore> mock_stats_store;
+  Event::GlobalTimeSystem time_system;
+  Api::Impl api(Thread::threadFactoryForTest(), mock_stats_store, time_system,
+                Filesystem::fileSystemForTest());
+  Event::DispatcherPtr dispatcher(api.allocateDispatcher());
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostDescriptionConstSharedPtr host_description{
       Upstream::makeTestHostDescription(cluster, "tcp://127.0.0.1:80")};
@@ -109,8 +115,9 @@ IntegrationUtil::makeSingleRequest(uint32_t port, const std::string& method, con
 RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& initial_data,
                                          ReadCallback data_callback,
                                          Network::Address::IpVersion version) {
-  api_.reset(new Api::Impl(std::chrono::milliseconds(10000)));
-  dispatcher_ = api_->allocateDispatcher(IntegrationUtil::evil_singleton_test_time_.timeSource());
+  api_ = Api::createApiForTest(stats_store_);
+  Event::GlobalTimeSystem time_system;
+  dispatcher_ = api_->allocateDispatcher();
   callbacks_ = std::make_unique<ConnectionCallbacks>();
   client_ = dispatcher_->createClientConnection(
       Network::Utility::resolveUrl(
@@ -122,7 +129,7 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& initia
   client_->connect();
 }
 
-RawConnectionDriver::~RawConnectionDriver() {}
+RawConnectionDriver::~RawConnectionDriver() = default;
 
 void RawConnectionDriver::run(Event::Dispatcher::RunType run_type) { dispatcher_->run(run_type); }
 
@@ -135,9 +142,14 @@ Network::FilterStatus WaitForPayloadReader::onData(Buffer::Instance& data, bool 
   data_.append(data.toString());
   data.drain(data.length());
   read_end_stream_ = end_stream;
-  if ((!data_to_wait_for_.empty() && data_.find(data_to_wait_for_) == 0) ||
+  if ((!data_to_wait_for_.empty() && absl::StartsWith(data_, data_to_wait_for_)) ||
       (exact_match_ == false && data_.find(data_to_wait_for_) != std::string::npos) || end_stream) {
     data_to_wait_for_.clear();
+    dispatcher_.exit();
+  }
+
+  if (wait_for_length_ && data_.size() >= length_to_wait_for_) {
+    wait_for_length_ = false;
     dispatcher_.exit();
   }
 

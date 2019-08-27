@@ -25,9 +25,9 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
-void CheckRequestUtils::setAttrContextPeer(
-    envoy::service::auth::v2alpha::AttributeContext_Peer& peer,
-    const Network::Connection& connection, const std::string& service, const bool local) {
+void CheckRequestUtils::setAttrContextPeer(envoy::service::auth::v2::AttributeContext_Peer& peer,
+                                           const Network::Connection& connection,
+                                           const std::string& service, const bool local) {
 
   // Set the address
   auto addr = peer.mutable_address();
@@ -37,22 +37,33 @@ void CheckRequestUtils::setAttrContextPeer(
     Envoy::Network::Utility::addressToProtobufAddress(*connection.remoteAddress(), *addr);
   }
 
-  // Set the principal
-  // Preferably the SAN from the peer's cert or
-  // Subject from the peer's cert.
-  Ssl::Connection* ssl = const_cast<Ssl::Connection*>(connection.ssl());
+  // Set the principal. Preferably the URI SAN, DNS SAN or Subject in that order from the peer's
+  // cert.
+  Ssl::ConnectionInfo* ssl = const_cast<Ssl::ConnectionInfo*>(connection.ssl());
   if (ssl != nullptr) {
     if (local) {
-      peer.set_principal(ssl->uriSanLocalCertificate());
-
-      if (peer.principal().empty()) {
-        peer.set_principal(ssl->subjectLocalCertificate());
+      const auto uri_sans = ssl->uriSanLocalCertificate();
+      if (uri_sans.empty()) {
+        const auto dns_sans = ssl->dnsSansLocalCertificate();
+        if (dns_sans.empty()) {
+          peer.set_principal(ssl->subjectLocalCertificate());
+        } else {
+          peer.set_principal(dns_sans[0]);
+        }
+      } else {
+        peer.set_principal(uri_sans[0]);
       }
     } else {
-      peer.set_principal(ssl->uriSanPeerCertificate());
-
-      if (peer.principal().empty()) {
-        peer.set_principal(ssl->subjectPeerCertificate());
+      const auto uri_sans = ssl->uriSanPeerCertificate();
+      if (uri_sans.empty()) {
+        const auto dns_sans = ssl->dnsSansPeerCertificate();
+        if (dns_sans.empty()) {
+          peer.set_principal(ssl->subjectPeerCertificate());
+        } else {
+          peer.set_principal(dns_sans[0]);
+        }
+      } else {
+        peer.set_principal(uri_sans[0]);
       }
     }
   }
@@ -72,9 +83,9 @@ std::string CheckRequestUtils::getHeaderStr(const Envoy::Http::HeaderEntry* entr
 }
 
 void CheckRequestUtils::setHttpRequest(
-    ::envoy::service::auth::v2alpha::AttributeContext_HttpRequest& httpreq,
+    ::envoy::service::auth::v2::AttributeContext_HttpRequest& httpreq,
     const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
-    const Envoy::Http::HeaderMap& headers) {
+    const Envoy::Http::HeaderMap& headers, uint64_t max_request_bytes) {
 
   // Set id
   // The streamId is not qualified as a const. Although it is as it does not modify the object.
@@ -93,39 +104,56 @@ void CheckRequestUtils::setHttpRequest(
 
   // Set size
   // need to convert to google buffer 64t;
-  httpreq.set_size(sdfc->requestInfo().bytesReceived());
+  httpreq.set_size(sdfc->streamInfo().bytesReceived());
 
   // Set protocol
-  if (sdfc->requestInfo().protocol()) {
+  if (sdfc->streamInfo().protocol()) {
     httpreq.set_protocol(
-        Envoy::Http::Utility::getProtocolString(sdfc->requestInfo().protocol().value()));
+        Envoy::Http::Utility::getProtocolString(sdfc->streamInfo().protocol().value()));
   }
 
   // Fill in the headers
   auto mutable_headers = httpreq.mutable_headers();
   headers.iterate(
       [](const Envoy::Http::HeaderEntry& e, void* ctx) {
-        Envoy::Protobuf::Map<Envoy::ProtobufTypes::String, Envoy::ProtobufTypes::String>*
-            mutable_headers = static_cast<
-                Envoy::Protobuf::Map<Envoy::ProtobufTypes::String, Envoy::ProtobufTypes::String>*>(
-                ctx);
-        (*mutable_headers)[std::string(e.key().getStringView())] =
-            std::string(e.value().getStringView());
+        // Skip any client EnvoyAuthPartialBody header, which could interfere with internal use.
+        if (e.key().getStringView() != Http::Headers::get().EnvoyAuthPartialBody.get()) {
+          Envoy::Protobuf::Map<std::string, std::string>* mutable_headers =
+              static_cast<Envoy::Protobuf::Map<std::string, std::string>*>(ctx);
+          (*mutable_headers)[std::string(e.key().getStringView())] =
+              std::string(e.value().getStringView());
+        }
         return Envoy::Http::HeaderMap::Iterate::Continue;
       },
       mutable_headers);
+
+  // Set request body.
+  const Buffer::Instance* buffer = sdfc->decodingBuffer();
+  if (max_request_bytes > 0 && buffer != nullptr) {
+    const uint64_t length = std::min(buffer->length(), max_request_bytes);
+    std::string data(length, 0);
+    buffer->copyOut(0, length, &data[0]);
+    httpreq.set_body(std::move(data));
+
+    // Add in a header to detect when a partial body is used.
+    (*mutable_headers)[Http::Headers::get().EnvoyAuthPartialBody.get()] =
+        length != buffer->length() ? "true" : "false";
+  }
 }
 
 void CheckRequestUtils::setAttrContextRequest(
-    ::envoy::service::auth::v2alpha::AttributeContext_Request& req,
+    ::envoy::service::auth::v2::AttributeContext_Request& req,
     const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
-    const Envoy::Http::HeaderMap& headers) {
-  setHttpRequest(*req.mutable_http(), callbacks, headers);
+    const Envoy::Http::HeaderMap& headers, uint64_t max_request_bytes) {
+  setHttpRequest(*req.mutable_http(), callbacks, headers, max_request_bytes);
 }
 
-void CheckRequestUtils::createHttpCheck(const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
-                                        const Envoy::Http::HeaderMap& headers,
-                                        envoy::service::auth::v2alpha::CheckRequest& request) {
+void CheckRequestUtils::createHttpCheck(
+    const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
+    const Envoy::Http::HeaderMap& headers,
+    Protobuf::Map<std::string, std::string>&& context_extensions,
+    envoy::api::v2::core::Metadata&& metadata_context,
+    envoy::service::auth::v2::CheckRequest& request, uint64_t max_request_bytes) {
 
   auto attrs = request.mutable_attributes();
 
@@ -136,11 +164,15 @@ void CheckRequestUtils::createHttpCheck(const Envoy::Http::StreamDecoderFilterCa
 
   setAttrContextPeer(*attrs->mutable_source(), *cb->connection(), service, false);
   setAttrContextPeer(*attrs->mutable_destination(), *cb->connection(), "", true);
-  setAttrContextRequest(*attrs->mutable_request(), callbacks, headers);
+  setAttrContextRequest(*attrs->mutable_request(), callbacks, headers, max_request_bytes);
+
+  // Fill in the context extensions:
+  (*attrs->mutable_context_extensions()) = std::move(context_extensions);
+  (*attrs->mutable_metadata_context()) = std::move(metadata_context);
 }
 
 void CheckRequestUtils::createTcpCheck(const Network::ReadFilterCallbacks* callbacks,
-                                       envoy::service::auth::v2alpha::CheckRequest& request) {
+                                       envoy::service::auth::v2::CheckRequest& request) {
 
   auto attrs = request.mutable_attributes();
 

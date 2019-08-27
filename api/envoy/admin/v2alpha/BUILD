@@ -1,4 +1,4 @@
-load("//bazel:api_build_system.bzl", "api_proto_library_internal")
+load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library_internal")
 
 licenses(["notice"])  # Apache 2
 
@@ -10,6 +10,8 @@ api_proto_library_internal(
         "//envoy/api/v2:cds",
         "//envoy/api/v2:lds",
         "//envoy/api/v2:rds",
+        "//envoy/api/v2:srds",
+        "//envoy/api/v2/auth:cert",
         "//envoy/config/bootstrap/v2:bootstrap",
     ],
 )
@@ -27,7 +29,48 @@ api_proto_library_internal(
 )
 
 api_proto_library_internal(
+    name = "listeners",
+    srcs = ["listeners.proto"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//envoy/api/v2/core:address",
+    ],
+)
+
+api_proto_library_internal(
     name = "metrics",
     srcs = ["metrics.proto"],
     visibility = ["//visibility:public"],
+)
+
+api_proto_library_internal(
+    name = "memory",
+    srcs = ["memory.proto"],
+    visibility = ["//visibility:public"],
+)
+
+api_proto_library_internal(
+    name = "mutex_stats",
+    srcs = ["mutex_stats.proto"],
+    visibility = ["//visibility:public"],
+)
+
+api_proto_library_internal(
+    name = "certs",
+    srcs = ["certs.proto"],
+    visibility = ["//visibility:public"],
+)
+
+api_proto_library_internal(
+    name = "server_info",
+    srcs = ["server_info.proto"],
+    visibility = ["//visibility:public"],
+)
+
+api_proto_library_internal(
+    name = "tap",
+    srcs = ["tap.proto"],
+    deps = [
+        "//envoy/service/tap/v2alpha:common",
+    ],
 )

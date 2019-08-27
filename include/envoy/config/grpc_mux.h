@@ -2,15 +2,33 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
+#include "envoy/config/subscription.h"
+#include "envoy/stats/stats_macros.h"
 
 #include "common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Config {
 
+/**
+ * All control plane related stats. @see stats_macros.h
+ */
+#define ALL_CONTROL_PLANE_STATS(COUNTER, GAUGE)                                                    \
+  COUNTER(rate_limit_enforced)                                                                     \
+  GAUGE(connected_state, NeverImport)                                                              \
+  GAUGE(pending_requests, Accumulate)
+
+/**
+ * Struct definition for all control plane stats. @see stats_macros.h
+ */
+struct ControlPlaneStats {
+  ALL_CONTROL_PLANE_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
+};
+
+// TODO(fredlas) redundant to SubscriptionCallbacks; remove this one.
 class GrpcMuxCallbacks {
 public:
-  virtual ~GrpcMuxCallbacks() {}
+  virtual ~GrpcMuxCallbacks() = default;
 
   /**
    * Called when a configuration update is received.
@@ -26,9 +44,11 @@ public:
   /**
    * Called when either the subscription is unable to fetch a config update or when onConfigUpdate
    * invokes an exception.
+   * @param reason supplies the update failure reason.
    * @param e supplies any exception data on why the fetch failed. May be nullptr.
    */
-  virtual void onConfigUpdateFailed(const EnvoyException* e) PURE;
+  virtual void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
+                                    const EnvoyException* e) PURE;
 
   /**
    * Obtain the "name" of a v2 API resource in a google.protobuf.Any, e.g. the route config name for
@@ -42,10 +62,10 @@ public:
  */
 class GrpcMuxWatch {
 public:
-  virtual ~GrpcMuxWatch() {}
+  virtual ~GrpcMuxWatch() = default;
 };
 
-typedef std::unique_ptr<GrpcMuxWatch> GrpcMuxWatchPtr;
+using GrpcMuxWatchPtr = std::unique_ptr<GrpcMuxWatch>;
 
 /**
  * Manage one or more gRPC subscriptions on a single stream to management server. This can be used
@@ -53,7 +73,7 @@ typedef std::unique_ptr<GrpcMuxWatch> GrpcMuxWatchPtr;
  */
 class GrpcMux {
 public:
-  virtual ~GrpcMux() {}
+  virtual ~GrpcMux() = default;
 
   /**
    * Initiate stream with management server.
@@ -64,7 +84,7 @@ public:
    * Start a configuration subscription asynchronously for some API type and resources.
    * @param type_url type URL corresponding to xDS API, e.g.
    * type.googleapis.com/envoy.api.v2.Cluster.
-   * @param resources vector of resource names to watch for. If this is empty, then all
+   * @param resources set of resource names to watch for. If this is empty, then all
    *                  resources for type_url will result in callbacks.
    * @param callbacks the callbacks to be notified of configuration updates. These must be valid
    *                  until GrpcMuxWatch is destroyed.
@@ -72,7 +92,7 @@ public:
    * away, its EDS updates should be cancelled by destroying the GrpcMuxWatchPtr.
    */
   virtual GrpcMuxWatchPtr subscribe(const std::string& type_url,
-                                    const std::vector<std::string>& resources,
+                                    const std::set<std::string>& resources,
                                     GrpcMuxCallbacks& callbacks) PURE;
 
   /**
@@ -87,13 +107,20 @@ public:
   /**
    * Resume discovery requests for a given API type. This will send a discovery request if one would
    * have been sent during the pause.
-   * @param type_url type URL corresponding to xDS API,
-   * e.g.type.googleapis.com/envoy.api.v2.Cluster.
+   * @param type_url type URL corresponding to xDS API e.g. type.googleapis.com/envoy.api.v2.Cluster
    */
   virtual void resume(const std::string& type_url) PURE;
+
+  /**
+   * Retrieves the current pause state as set by pause()/resume().
+   * @param type_url type URL corresponding to xDS API, e.g.
+   * type.googleapis.com/envoy.api.v2.Cluster
+   * @return bool whether the API is paused.
+   */
+  virtual bool paused(const std::string& type_url) const PURE;
 };
 
-typedef std::unique_ptr<GrpcMux> GrpcMuxPtr;
+using GrpcMuxPtr = std::unique_ptr<GrpcMux>;
 
 } // namespace Config
 } // namespace Envoy

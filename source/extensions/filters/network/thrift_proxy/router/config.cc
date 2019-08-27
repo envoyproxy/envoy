@@ -11,7 +11,7 @@ namespace ThriftProxy {
 namespace Router {
 
 ThriftFilters::FilterFactoryCb RouterFilterConfig::createFilterFactoryFromProtoTyped(
-    const envoy::config::filter::network::thrift_proxy::v2alpha1::router::Router& proto_config,
+    const envoy::config::filter::thrift::router::v2alpha1::Router& proto_config,
     const std::string& stat_prefix, Server::Configuration::FactoryContext& context) {
   UNREFERENCED_PARAMETER(proto_config);
   UNREFERENCED_PARAMETER(stat_prefix);
@@ -24,8 +24,7 @@ ThriftFilters::FilterFactoryCb RouterFilterConfig::createFilterFactoryFromProtoT
 /**
  * Static registration for the router filter. @see RegisterFactory.
  */
-static Registry::RegisterFactory<RouterFilterConfig, ThriftFilters::NamedThriftFilterConfigFactory>
-    register_;
+REGISTER_FACTORY(RouterFilterConfig, ThriftFilters::NamedThriftFilterConfigFactory);
 
 } // namespace Router
 } // namespace ThriftProxy

@@ -18,7 +18,7 @@ DrainManagerImpl::DrainManagerImpl(Instance& server, envoy::api::v2::Listener::D
     : server_(server), drain_type_(drain_type) {}
 
 bool DrainManagerImpl::drainClose() const {
-  // If we are actively HC failed and the drain type is default, always drain close.
+  // If we are actively health check failed and the drain type is default, always drain close.
   //
   // TODO(mattklein123): In relation to x-envoy-immediate-health-check-fail, it would be better
   // if even in the case of server health check failure we had some period of drain ramp up. This
@@ -61,7 +61,7 @@ void DrainManagerImpl::startParentShutdownSequence() {
   parent_shutdown_timer_ = server_.dispatcher().createTimer([this]() -> void {
     // Shut down the parent now. It should have already been draining.
     ENVOY_LOG(info, "shutting down parent after drain");
-    server_.hotRestart().terminateParent();
+    server_.hotRestart().sendParentTerminateRequest();
   });
 
   parent_shutdown_timer_->enableTimer(std::chrono::duration_cast<std::chrono::milliseconds>(

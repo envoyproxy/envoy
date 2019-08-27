@@ -1,7 +1,6 @@
 #pragma once
 
 #include <netinet/in.h>
-#include <netinet/ip.h>
 #include <sys/socket.h>
 
 #include "envoy/network/listen_socket.h"
@@ -20,14 +19,18 @@ public:
   AddrFamilyAwareSocketOptionImpl(envoy::api::v2::core::SocketOption::SocketState in_state,
                                   SocketOptionName ipv4_optname, SocketOptionName ipv6_optname,
                                   int value)
-      : ipv4_option_(absl::make_unique<SocketOptionImpl>(in_state, ipv4_optname, value)),
-        ipv6_option_(absl::make_unique<SocketOptionImpl>(in_state, ipv6_optname, value)) {}
+      : ipv4_option_(std::make_unique<SocketOptionImpl>(in_state, ipv4_optname, value)),
+        ipv6_option_(std::make_unique<SocketOptionImpl>(in_state, ipv6_optname, value)) {}
 
   // Socket::Option
   bool setOption(Socket& socket,
                  envoy::api::v2::core::SocketOption::SocketState state) const override;
   // The common socket options don't require a hash key.
   void hashKey(std::vector<uint8_t>&) const override {}
+
+  absl::optional<Details>
+  getOptionDetails(const Socket& socket,
+                   envoy::api::v2::core::SocketOption::SocketState state) const override;
 
   /**
    * Set a socket option that applies at both IPv4 and IPv6 socket levels. When the underlying FD

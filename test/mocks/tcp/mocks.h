@@ -18,16 +18,16 @@ namespace ConnectionPool {
 class MockCancellable : public Cancellable {
 public:
   MockCancellable();
-  ~MockCancellable();
+  ~MockCancellable() override;
 
   // Tcp::ConnectionPool::Cancellable
-  MOCK_METHOD0(cancel, void());
+  MOCK_METHOD1(cancel, void(CancelPolicy cancel_policy));
 };
 
 class MockUpstreamCallbacks : public UpstreamCallbacks {
 public:
   MockUpstreamCallbacks();
-  ~MockUpstreamCallbacks();
+  ~MockUpstreamCallbacks() override;
 
   // Tcp::ConnectionPool::UpstreamCallbacks
   MOCK_METHOD2(onUpstreamData, void(Buffer::Instance& data, bool end_stream));
@@ -39,7 +39,7 @@ public:
 class MockConnectionData : public ConnectionData {
 public:
   MockConnectionData();
-  ~MockConnectionData();
+  ~MockConnectionData() override;
 
   // Tcp::ConnectionPool::ConnectionData
   MOCK_METHOD0(connection, Network::ClientConnection&());
@@ -50,14 +50,14 @@ public:
   MOCK_METHOD1(setConnectionState_, void(ConnectionPool::ConnectionStatePtr& state));
 
   // If set, invoked in ~MockConnectionData, which indicates that the connection pool
-  // caller has relased a connection.
+  // caller has released a connection.
   std::function<void()> release_callback_;
 };
 
 class MockInstance : public Instance {
 public:
   MockInstance();
-  ~MockInstance();
+  ~MockInstance() override;
 
   // Tcp::ConnectionPool::Instance
   MOCK_METHOD1(addDrainedCallback, void(DrainedCb cb));

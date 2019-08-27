@@ -16,9 +16,9 @@ Http::FilterFactoryCb FaultFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::http::fault::v2::HTTPFault& config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
   FaultFilterConfigSharedPtr filter_config(new FaultFilterConfig(
-      config, context.runtime(), stats_prefix, context.scope(), context.random()));
+      config, context.runtime(), stats_prefix, context.scope(), context.timeSource()));
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamDecoderFilter(std::make_shared<FaultFilter>(filter_config));
+    callbacks.addStreamFilter(std::make_shared<FaultFilter>(filter_config));
   };
 }
 
@@ -41,9 +41,7 @@ FaultFilterFactory::createRouteSpecificFilterConfigTyped(
 /**
  * Static registration for the fault filter. @see RegisterFactory.
  */
-static Registry::RegisterFactory<FaultFilterFactory,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
-    register_;
+REGISTER_FACTORY(FaultFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
 
 } // namespace Fault
 } // namespace HttpFilters

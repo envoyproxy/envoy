@@ -2,6 +2,7 @@
 
 #include <functional>
 
+#include "envoy/api/v2/auth/cert.pb.h"
 #include "envoy/common/callback.h"
 #include "envoy/common/pure.h"
 #include "envoy/ssl/certificate_validation_context_config.h"
@@ -15,7 +16,7 @@ namespace Secret {
  */
 template <class SecretType> class SecretProvider {
 public:
-  virtual ~SecretProvider() {}
+  virtual ~SecretProvider() = default;
 
   /**
    * @return the secret. Returns nullptr if the secret is not ready.
@@ -32,13 +33,17 @@ public:
   virtual Common::CallbackHandle* addUpdateCallback(std::function<void()> callback) PURE;
 };
 
-typedef SecretProvider<Ssl::TlsCertificateConfig> TlsCertificateConfigProvider;
-typedef std::shared_ptr<TlsCertificateConfigProvider> TlsCertificateConfigProviderSharedPtr;
+using TlsCertificatePtr = std::unique_ptr<envoy::api::v2::auth::TlsCertificate>;
+using CertificateValidationContextPtr =
+    std::unique_ptr<envoy::api::v2::auth::CertificateValidationContext>;
 
-typedef SecretProvider<Ssl::CertificateValidationContextConfig>
-    CertificateValidationContextConfigProvider;
-typedef std::shared_ptr<CertificateValidationContextConfigProvider>
-    CertificateValidationContextConfigProviderSharedPtr;
+using TlsCertificateConfigProvider = SecretProvider<envoy::api::v2::auth::TlsCertificate>;
+using TlsCertificateConfigProviderSharedPtr = std::shared_ptr<TlsCertificateConfigProvider>;
+
+using CertificateValidationContextConfigProvider =
+    SecretProvider<envoy::api::v2::auth::CertificateValidationContext>;
+using CertificateValidationContextConfigProviderSharedPtr =
+    std::shared_ptr<CertificateValidationContextConfigProvider>;
 
 } // namespace Secret
 } // namespace Envoy

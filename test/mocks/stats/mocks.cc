@@ -1,5 +1,9 @@
 #include "mocks.h"
 
+#include <memory>
+
+#include "common/stats/fake_symbol_table_impl.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -14,21 +18,18 @@ namespace Envoy {
 namespace Stats {
 
 MockCounter::MockCounter() {
-  ON_CALL(*this, tagExtractedName()).WillByDefault(ReturnRef(name_));
-  ON_CALL(*this, tags()).WillByDefault(ReturnRef(tags_));
   ON_CALL(*this, used()).WillByDefault(ReturnPointee(&used_));
   ON_CALL(*this, value()).WillByDefault(ReturnPointee(&value_));
   ON_CALL(*this, latch()).WillByDefault(ReturnPointee(&latch_));
 }
-MockCounter::~MockCounter() {}
+MockCounter::~MockCounter() = default;
 
-MockGauge::MockGauge() {
-  ON_CALL(*this, tagExtractedName()).WillByDefault(ReturnRef(name_));
-  ON_CALL(*this, tags()).WillByDefault(ReturnRef(tags_));
+MockGauge::MockGauge() : used_(false), value_(0), import_mode_(ImportMode::Accumulate) {
   ON_CALL(*this, used()).WillByDefault(ReturnPointee(&used_));
   ON_CALL(*this, value()).WillByDefault(ReturnPointee(&value_));
+  ON_CALL(*this, importMode()).WillByDefault(ReturnPointee(&import_mode_));
 }
-MockGauge::~MockGauge() {}
+MockGauge::~MockGauge() = default;
 
 MockHistogram::MockHistogram() {
   ON_CALL(*this, recordValue(_)).WillByDefault(Invoke([this](uint64_t value) {
@@ -36,11 +37,8 @@ MockHistogram::MockHistogram() {
       store_->deliverHistogramToSinks(*this, value);
     }
   }));
-  ON_CALL(*this, tagExtractedName()).WillByDefault(ReturnRef(name_));
-  ON_CALL(*this, tags()).WillByDefault(ReturnRef(tags_));
 }
-
-MockHistogram::~MockHistogram() {}
+MockHistogram::~MockHistogram() = default;
 
 MockParentHistogram::MockParentHistogram() {
   ON_CALL(*this, recordValue(_)).WillByDefault(Invoke([this](uint64_t value) {
@@ -48,41 +46,40 @@ MockParentHistogram::MockParentHistogram() {
       store_->deliverHistogramToSinks(*this, value);
     }
   }));
-  ON_CALL(*this, tagExtractedName()).WillByDefault(ReturnRef(name_));
-  ON_CALL(*this, tags()).WillByDefault(ReturnRef(tags_));
   ON_CALL(*this, intervalStatistics()).WillByDefault(ReturnRef(*histogram_stats_));
   ON_CALL(*this, cumulativeStatistics()).WillByDefault(ReturnRef(*histogram_stats_));
   ON_CALL(*this, used()).WillByDefault(ReturnPointee(&used_));
 }
+MockParentHistogram::~MockParentHistogram() = default;
 
-MockParentHistogram::~MockParentHistogram() {}
-
-MockSource::MockSource() {
-  ON_CALL(*this, cachedCounters()).WillByDefault(ReturnRef(counters_));
-  ON_CALL(*this, cachedGauges()).WillByDefault(ReturnRef(gauges_));
-  ON_CALL(*this, cachedHistograms()).WillByDefault(ReturnRef(histograms_));
+MockMetricSnapshot::MockMetricSnapshot() {
+  ON_CALL(*this, counters()).WillByDefault(ReturnRef(counters_));
+  ON_CALL(*this, gauges()).WillByDefault(ReturnRef(gauges_));
+  ON_CALL(*this, histograms()).WillByDefault(ReturnRef(histograms_));
 }
 
-MockSource::~MockSource() {}
+MockMetricSnapshot::~MockMetricSnapshot() = default;
 
-MockSink::MockSink() {}
-MockSink::~MockSink() {}
+MockSink::MockSink() = default;
+MockSink::~MockSink() = default;
 
-MockStore::MockStore() {
+MockStore::MockStore() : StoreImpl(*global_symbol_table_) {
   ON_CALL(*this, counter(_)).WillByDefault(ReturnRef(counter_));
   ON_CALL(*this, histogram(_)).WillByDefault(Invoke([this](const std::string& name) -> Histogram& {
-    auto* histogram = new NiceMock<MockHistogram>;
+    auto* histogram = new NiceMock<MockHistogram>(); // symbol_table_);
     histogram->name_ = name;
     histogram->store_ = this;
     histograms_.emplace_back(histogram);
     return *histogram;
   }));
-  ON_CALL(*this, statsOptions()).WillByDefault(ReturnRef(stats_options_));
 }
-MockStore::~MockStore() {}
+MockStore::~MockStore() = default;
 
-MockIsolatedStatsStore::MockIsolatedStatsStore() {}
-MockIsolatedStatsStore::~MockIsolatedStatsStore() {}
+MockIsolatedStatsStore::MockIsolatedStatsStore() : IsolatedStoreImpl(*global_symbol_table_) {}
+MockIsolatedStatsStore::~MockIsolatedStatsStore() = default;
+
+MockStatsMatcher::MockStatsMatcher() = default;
+MockStatsMatcher::~MockStatsMatcher() = default;
 
 } // namespace Stats
 } // namespace Envoy

@@ -1,3 +1,11 @@
+# Choosing tarballs
+
+Where the dependency maintainer provides a tarball, prefer that over the
+automatically generated Github tarball. Github generated tarball SHA256
+values can change when Github change their tar/gzip libraries breaking
+builds. Maintainer provided tarballs are more stable and the maintainer
+can provide the SHA256.
+
 # Adding external dependencies to Envoy (native Bazel)
 
 This is the preferred style of adding dependencies that use Bazel for their
@@ -8,6 +16,18 @@ build process.
 2. Reference your new external dependency in some `envoy_cc_library` via the
    `external_deps` attribute.
 3. `bazel test //test/...`
+
+# Adding external dependencies to Envoy (external CMake)
+
+This is the preferred style of adding dependencies that use CMake for their build system.
+
+1. Define a the source Bazel repository in [`bazel/repositories.bzl`](repositories.bzl), in the
+   `envoy_dependencies()` function.
+2. Add a `cmake_external` rule to [`bazel/foreign_cc/BUILD`](bazel/foreign_cc/BUILD). This will
+   reference the source repository in step 1.
+3. Reference your new external dependency in some `envoy_cc_library` via the name bound in step 1
+   `external_deps` attribute.
+4. `bazel test //test/...`
 
 # Adding external dependencies to Envoy (genrule repository)
 
@@ -34,27 +54,11 @@ Dependencies between external libraries can use the standard Bazel dependency
 resolution logic, using the `$(location)` shell extension to resolve paths
 to binaries, libraries, headers, etc.
 
-# Adding external dependencies to Envoy (build recipe)
-
-This is the older style of adding dependencies. It uses shell scripts to build
-and install dependencies into a shared directory prefix.
-
-1. Add a build recipe X in [`ci/build_container/build_recipes`](../ci/build_container/build_recipes)
-   for developer-local and CI external dependency build flows.
-2. Add a build target Y in [`ci/prebuilt/BUILD`](../ci/prebuilt/BUILD) to consume the headers and
-   libraries produced by the build recipe X.
-3. Add a map from target Y to build recipe X in [`target_recipes.bzl`](target_recipes.bzl).
-4. Reference your new external dependency in some `envoy_cc_library` via Y in the `external_deps`
-   attribute.
-5. `bazel test //test/...`
-
 # Updating an external dependency version
 
-1. If the dependency is a build recipe, update the build recipe in
-[`ci/build_container/build_recipes`](../ci/build_container/build_recipes).
-2. If not, update the corresponding entry in
+1. Update the corresponding entry in
 [the repository locations file.](https://github.com/envoyproxy/envoy/blob/master/bazel/repository_locations.bzl)
-3. `bazel test //test/...`
+2. `bazel test //test/...`
 
 # Overriding an external dependency temporarily
 
@@ -65,3 +69,33 @@ to point to a local copy. The option can used multiple times to override multipl
 The name of the dependency can be found in
 [the repository locations file.](https://github.com/envoyproxy/envoy/blob/master/bazel/repository_locations.bzl)
 The path of the local copy has to be absolute path.
+
+# Distdir - prefetching dependencies
+
+Usually Bazel downloads all dependencies during build time. But there is a
+possibility to prefetch dependencies and point Bazel to them by using `--distdir`
+option and providing a path to directory which contains tarballs with exactly
+the same name and the same SHA256 sum that are defined in repositories
+definitions.
+
+For example, let's assume that your distdir location is `$HOME/envoy_distdir`.
+To prefetch `boringssl` which is defined in `bazel/repository_locations.bzl` as:
+
+```
+boringssl = dict(
+    # Use commits from branch "chromium-stable-with-bazel"
+    sha256 = "d1700e0455f5f918f8a85ff3ce6cd684d05c766200ba6bdb18c77d5dcadc05a1",
+    strip_prefix = "boringssl-060e9a583976e73d1ea8b2bfe8b9cab33c62fa17",
+    # chromium-70.0.3538.67
+    urls = ["https://github.com/google/boringssl/archive/060e9a583976e73d1ea8b2bfe8b9cab33c62fa17.tar.gz"],
+),
+```
+
+`$HOME/envoy_distdir` needs to contain `060e9a583976e73d1ea8b2bfe8b9cab33c62fa17.tar.gz`
+file.
+
+Then Envoy needs to be built with the following command:
+
+```
+bazel build --distdir=$HOME/envoy_distdir //source/exe:envoy
+```

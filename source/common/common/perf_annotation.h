@@ -15,12 +15,12 @@
 //   bazel --define=perf_annotation=enabled ...
 // or, in individual .cc files:
 //   #define ENVOY_PERF_ANNOTATION
-// In the absense of such directives, the support classes are built and tested.
+// In the absence of such directives, the support classes are built and tested.
 // However, the macros for instrumenting code for performance analysis will expand
 // to nothing.
 //
 // See also: https://github.com/LLNL/Caliper -- it may be worth integrating with
-// that for added functionality, partiicularly around loops.
+// that for added functionality, particularly around loops.
 //
 // See also, for a much more comprehensive study in performance annotation:
 // https://labs.vmware.com/vmtj/methodology-for-performance-analysis-of-vmware-vsphere-under-tier-1-applications
@@ -59,8 +59,8 @@
 #define PERF_CLEAR() Envoy::PerfAnnotationContext::clear()
 
 /**
- * Controls whether performacne collection and reporting is thread safe. For now,
- * leaving this enabled for predictability across multiiple applications, on the assumption
+ * Controls whether performances collection and reporting is thread safe. For now,
+ * leaving this enabled for predictability across multiple applications, on the assumption
  * that an uncontended mutex lock has vanishingly small cost. In the future we may try
  * to make this system thread-unsafe if mutex contention disturbs the metrics.
  */

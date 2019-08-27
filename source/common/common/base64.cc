@@ -4,6 +4,7 @@
 #include <string>
 
 #include "common/common/empty_string.h"
+#include "common/common/stack_array.h"
 
 namespace Envoy {
 namespace {
@@ -140,21 +141,34 @@ inline void encodeLast(uint64_t pos, uint8_t last_char, std::string& ret,
 } // namespace
 
 std::string Base64::decode(const std::string& input) {
-  if (input.length() % 4 || input.empty()) {
+  if (input.length() % 4) {
+    return EMPTY_STRING;
+  }
+  return decodeWithoutPadding(input);
+}
+
+std::string Base64::decodeWithoutPadding(absl::string_view input) {
+  if (input.empty()) {
     return EMPTY_STRING;
   }
 
-  // Last position before "valid" padding character.
-  uint64_t last = input.length() - 1;
-  size_t max_length = input.length() / 4 * 3;
   // At most last two chars can be '='.
-  if (input[input.length() - 1] == '=') {
-    max_length--;
-    last = input.length() - 2;
-    if (input[input.length() - 2] == '=') {
-      max_length--;
-      last = input.length() - 3;
+  size_t n = input.length();
+  if (input[n - 1] == '=') {
+    n--;
+    if (n > 0 && input[n - 1] == '=') {
+      n--;
     }
+  }
+  // Last position before "valid" padding character.
+  uint64_t last = n - 1;
+  // Determine output length.
+  size_t max_length = (n + 3) / 4 * 3;
+  if (n % 4 == 3) {
+    max_length -= 1;
+  }
+  if (n % 4 == 2) {
+    max_length -= 2;
   }
 
   std::string ret;
@@ -169,6 +183,7 @@ std::string Base64::decode(const std::string& input) {
     return EMPTY_STRING;
   }
 
+  ASSERT(ret.size() == max_length);
   return ret;
 }
 
@@ -178,12 +193,12 @@ std::string Base64::encode(const Buffer::Instance& buffer, uint64_t length) {
   ret.reserve(output_length);
 
   uint64_t num_slices = buffer.getRawSlices(nullptr, 0);
-  Buffer::RawSlice slices[num_slices];
-  buffer.getRawSlices(slices, num_slices);
+  STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
+  buffer.getRawSlices(slices.begin(), num_slices);
 
   uint64_t j = 0;
   uint8_t next_c = 0;
-  for (Buffer::RawSlice& slice : slices) {
+  for (const Buffer::RawSlice& slice : slices) {
     const uint8_t* slice_mem = static_cast<const uint8_t*>(slice.mem_);
 
     for (uint64_t i = 0; i < slice.len_ && j < length; ++i, ++j) {
@@ -201,6 +216,10 @@ std::string Base64::encode(const Buffer::Instance& buffer, uint64_t length) {
 }
 
 std::string Base64::encode(const char* input, uint64_t length) {
+  return encode(input, length, true);
+}
+
+std::string Base64::encode(const char* input, uint64_t length, bool add_padding) {
   uint64_t output_length = (length + 2) / 3 * 4;
   std::string ret;
   ret.reserve(output_length);
@@ -212,7 +231,7 @@ std::string Base64::encode(const char* input, uint64_t length) {
     encodeBase(input[i], pos++, next_c, ret, CHAR_TABLE);
   }
 
-  encodeLast(pos, next_c, ret, CHAR_TABLE, true);
+  encodeLast(pos, next_c, ret, CHAR_TABLE, add_padding);
 
   return ret;
 }

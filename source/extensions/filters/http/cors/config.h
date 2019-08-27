@@ -13,12 +13,12 @@ namespace Cors {
 /**
  * Config registration for the cors filter. @see NamedHttpFilterConfigFactory.
  */
-class CorsFilterConfig : public Common::EmptyHttpFilterConfig {
+class CorsFilterFactory : public Common::EmptyHttpFilterConfig {
 public:
-  CorsFilterConfig() : Common::EmptyHttpFilterConfig(HttpFilterNames::get().Cors) {}
+  CorsFilterFactory() : Common::EmptyHttpFilterConfig(HttpFilterNames::get().Cors) {}
 
-  Http::FilterFactoryCb createFilter(const std::string&,
-                                     Server::Configuration::FactoryContext&) override;
+  Http::FilterFactoryCb createFilter(const std::string& stats_prefix,
+                                     Server::Configuration::FactoryContext& context) override;
 };
 
 } // namespace Cors

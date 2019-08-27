@@ -15,8 +15,8 @@
 namespace Envoy {
 
 class UdsUpstreamIntegrationTest
-    : public HttpIntegrationTest,
-      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>> {
+    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
+      public HttpIntegrationTest {
 public:
   UdsUpstreamIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, std::get<0>(GetParam())),
@@ -25,7 +25,7 @@ public:
   void createUpstreams() override {
     fake_upstreams_.emplace_back(new FakeUpstream(
         TestEnvironment::unixDomainSocketPath("udstest.1.sock", abstract_namespace_),
-        FakeHttpConnection::Type::HTTP1));
+        FakeHttpConnection::Type::HTTP1, timeSystem()));
 
     config_helper_.addConfigModifier(
         [&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
@@ -46,8 +46,8 @@ protected:
 };
 
 class UdsListenerIntegrationTest
-    : public HttpIntegrationTest,
-      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>> {
+    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
+      public HttpIntegrationTest {
 public:
   UdsListenerIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, std::get<0>(GetParam())),

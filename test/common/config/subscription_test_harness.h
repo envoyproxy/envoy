@@ -18,27 +18,28 @@ namespace Config {
 class SubscriptionTestHarness {
 public:
   SubscriptionTestHarness() : stats_(Utility::generateStats(stats_store_)) {}
-  virtual ~SubscriptionTestHarness() {}
+  virtual ~SubscriptionTestHarness() = default;
 
   /**
    * Start subscription and set related expectations.
    * @param cluster_names initial cluster names to request via EDS.
    */
-  virtual void startSubscription(const std::vector<std::string>& cluster_names) PURE;
+  virtual void startSubscription(const std::set<std::string>& cluster_names) PURE;
 
   /**
    * Update cluster names to be delivered via EDS.
    * @param cluster_names cluster names.
    */
-  virtual void updateResources(const std::vector<std::string>& cluster_names) PURE;
+  virtual void updateResources(const std::set<std::string>& cluster_names) PURE;
 
   /**
    * Expect that an update request is sent by the Subscription implementation.
    * @param cluster_names cluster names to expect in the request.
    * @param version version_info to expect in the request.
+   * @param expect_node whether the node information should be expected
    */
-  virtual void expectSendMessage(const std::vector<std::string>& cluster_names,
-                                 const std::string& version) PURE;
+  virtual void expectSendMessage(const std::set<std::string>& cluster_names,
+                                 const std::string& version, bool expect_node) PURE;
 
   /**
    * Deliver a response to the Subscription implementation and validate.
@@ -49,16 +50,51 @@ public:
   virtual void deliverConfigUpdate(const std::vector<std::string>& cluster_names,
                                    const std::string& version, bool accept) PURE;
 
-  virtual void verifyStats(uint32_t attempt, uint32_t success, uint32_t rejected, uint32_t failure,
-                           uint64_t version) {
-    EXPECT_EQ(attempt, stats_.update_attempt_.value());
-    EXPECT_EQ(success, stats_.update_success_.value());
-    EXPECT_EQ(rejected, stats_.update_rejected_.value());
-    EXPECT_EQ(failure, stats_.update_failure_.value());
-    EXPECT_EQ(version, stats_.version_.value());
+  virtual testing::AssertionResult statsAre(uint32_t attempt, uint32_t success, uint32_t rejected,
+                                            uint32_t failure, uint32_t init_fetch_timeout,
+                                            uint64_t version) {
+    // TODO(fredlas) rework update_success_ to make sense across all xDS carriers. Its value in
+    // statsAre() calls in many tests will probably have to be changed.
+    UNREFERENCED_PARAMETER(attempt);
+    if (success != stats_.update_success_.value()) {
+      return testing::AssertionFailure() << "update_success: expected " << success << ", got "
+                                         << stats_.update_success_.value();
+    }
+    if (rejected != stats_.update_rejected_.value()) {
+      return testing::AssertionFailure() << "update_rejected: expected " << rejected << ", got "
+                                         << stats_.update_rejected_.value();
+    }
+    if (failure != stats_.update_failure_.value()) {
+      return testing::AssertionFailure() << "update_failure: expected " << failure << ", got "
+                                         << stats_.update_failure_.value();
+    }
+    if (init_fetch_timeout != stats_.init_fetch_timeout_.value()) {
+      return testing::AssertionFailure() << "init_fetch_timeout: expected " << init_fetch_timeout
+                                         << ", got " << stats_.init_fetch_timeout_.value();
+    }
+    if (version != stats_.version_.value()) {
+      return testing::AssertionFailure()
+             << "version: expected " << version << ", got " << stats_.version_.value();
+    }
+    return testing::AssertionSuccess();
   }
 
-  Stats::MockIsolatedStatsStore stats_store_;
+  virtual void verifyControlPlaneStats(uint32_t connected_state) {
+    EXPECT_EQ(
+        connected_state,
+        stats_store_.gauge("control_plane.connected_state", Stats::Gauge::ImportMode::NeverImport)
+            .value());
+  }
+
+  virtual void expectConfigUpdateFailed() PURE;
+
+  virtual void expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds timeout) PURE;
+
+  virtual void expectDisableInitFetchTimeoutTimer() PURE;
+
+  virtual void callInitFetchTimeoutCb() PURE;
+
+  Stats::IsolatedStoreImpl stats_store_;
   SubscriptionStats stats_;
 };
 

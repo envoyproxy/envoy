@@ -1,6 +1,10 @@
 syntax = "proto3";
 
 package envoy.config.ratelimit.v2;
+
+option java_outer_classname = "RlsProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.config.ratelimit.v2";
 option go_package = "v2";
 
 import "envoy/api/v2/core/grpc_service.proto";
@@ -11,36 +15,12 @@ import "validate/validate.proto";
 
 // Rate limit :ref:`configuration overview <config_rate_limit_service>`.
 message RateLimitServiceConfig {
-  oneof service_specifier {
-    option (validate.required) = true;
+  reserved 1;
 
-    // Specifies the cluster manager cluster name that hosts the rate limit
-    // service. The client will connect to this cluster when it needs to make
-    // rate limit service requests. This field is deprecated and `grpc_service`
-    // should be used instead. The :ref:`Envoy gRPC client
-    // <envoy_api_field_core.GrpcService.envoy_grpc>` will be used when this field is
-    // specified.
-    string cluster_name = 1 [(validate.rules).string.min_bytes = 1, deprecated = true];
+  // Specifies the gRPC service that hosts the rate limit service. The client
+  // will connect to this cluster when it needs to make rate limit service
+  // requests.
+  envoy.api.v2.core.GrpcService grpc_service = 2 [(validate.rules).message.required = true];
 
-    // Specifies the gRPC service that hosts the rate limit service. The client
-    // will connect to this cluster when it needs to make rate limit service
-    // requests.
-    envoy.api.v2.core.GrpcService grpc_service = 2;
-  }
-
-  // Specifies if Envoy should use the data-plane-api client
-  // :repo:`api/envoy/service/ratelimit/v2/rls.proto` or the legacy
-  // client :repo:`source/common/ratelimit/ratelimit.proto` when
-  // making requests to the rate limit service.
-  //
-  // .. note::
-  //
-  //   The legacy client will be used by
-  //   default until the start of the 1.9.0 release cycle. At the start of the
-  //   1.9.0 release cycle this field will be removed and only the data-plane-api
-  //   proto will be supported. This means that your rate limit service needs to
-  //   have support for the data-plane-api proto by the start of the 1.9.0 release cycle.
-  //   Lyft's `reference implementation <https://github.com/lyft/ratelimit>`_
-  //   supports the data-plane-api version as of v1.1.0.
-  bool use_data_plane_proto = 3 [deprecated = true];
+  reserved 3;
 }

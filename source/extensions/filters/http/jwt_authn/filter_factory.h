@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.h"
+#include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.validate.h"
 #include "envoy/server/filter_config.h"
 
 #include "extensions/filters/http/common/factory_base.h"

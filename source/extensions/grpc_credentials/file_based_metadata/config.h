@@ -24,7 +24,8 @@ namespace FileBasedMetadata {
 class FileBasedMetadataGrpcCredentialsFactory : public Grpc::GoogleGrpcCredentialsFactory {
 public:
   std::shared_ptr<grpc::ChannelCredentials>
-  getChannelCredentials(const envoy::api::v2::core::GrpcService& grpc_service_config) override;
+  getChannelCredentials(const envoy::api::v2::core::GrpcService& grpc_service_config,
+                        Api::Api& api) override;
 
   Envoy::ProtobufTypes::MessagePtr createEmptyConfigProto() {
     return std::make_unique<envoy::config::grpc_credential::v2alpha::FileBasedMetadataConfig>();
@@ -36,14 +37,15 @@ public:
 class FileBasedMetadataAuthenticator : public grpc::MetadataCredentialsPlugin {
 public:
   FileBasedMetadataAuthenticator(
-      const envoy::config::grpc_credential::v2alpha::FileBasedMetadataConfig config)
-      : config_(config) {}
+      const envoy::config::grpc_credential::v2alpha::FileBasedMetadataConfig& config, Api::Api& api)
+      : config_(config), api_(api) {}
 
   grpc::Status GetMetadata(grpc::string_ref, grpc::string_ref, const grpc::AuthContext&,
                            std::multimap<grpc::string, grpc::string>* metadata) override;
 
 private:
   const envoy::config::grpc_credential::v2alpha::FileBasedMetadataConfig config_;
+  Api::Api& api_;
 };
 
 } // namespace FileBasedMetadata

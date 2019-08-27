@@ -9,8 +9,7 @@
 #include "gtest/gtest.h"
 
 using testing::Combine;
-using testing::TestParamInfo;
-using testing::TestWithParam;
+using ::testing::TestParamInfo;
 using testing::Values;
 
 namespace Envoy {
@@ -19,10 +18,11 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 
 class ThriftTranslationIntegrationTest
-    : public BaseThriftIntegrationTest,
-      public TestWithParam<std::tuple<TransportType, ProtocolType, TransportType, ProtocolType>> {
+    : public testing::TestWithParam<
+          std::tuple<TransportType, ProtocolType, TransportType, ProtocolType>>,
+      public BaseThriftIntegrationTest {
 public:
-  static void SetUpTestCase() {
+  static void SetUpTestSuite() {
     thrift_config_ = ConfigHelper::BASE_CONFIG + R"EOF(
     filter_chains:
       filters:
@@ -53,7 +53,7 @@ public:
     proto_opts.set_protocol(upstream_protocol_proto);
 
     ProtobufWkt::Struct struct_opts;
-    MessageUtil::jsonConvert(proto_opts, struct_opts);
+    TestUtility::jsonConvert(proto_opts, struct_opts);
 
     config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       auto* opts = bootstrap.mutable_static_resources()
@@ -108,7 +108,7 @@ static std::string paramToString(
                      protocolNameForTest(upstream_protocol));
 }
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     TransportsAndProtocols, ThriftTranslationIntegrationTest,
     Combine(Values(TransportType::Framed, TransportType::Unframed, TransportType::Header),
             Values(ProtocolType::Binary, ProtocolType::Compact),

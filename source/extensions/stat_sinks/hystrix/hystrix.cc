@@ -11,6 +11,7 @@
 #include "common/common/logger.h"
 #include "common/config/well_known_names.h"
 #include "common/http/headers.h"
+#include "common/stats/utility.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
@@ -38,9 +39,8 @@ void ClusterStatsCache::printToStream(std::stringstream& out_str) {
 void ClusterStatsCache::printRollingWindow(absl::string_view name, RollingWindow rolling_window,
                                            std::stringstream& out_str) {
   out_str << name << " | ";
-  for (auto specific_stat_vec_itr = rolling_window.begin();
-       specific_stat_vec_itr != rolling_window.end(); ++specific_stat_vec_itr) {
-    out_str << *specific_stat_vec_itr << " | ";
+  for (uint64_t& specific_stat_vec_itr : rolling_window) {
+    out_str << specific_stat_vec_itr << " | ";
   }
   out_str << std::endl;
 }
@@ -83,7 +83,6 @@ uint64_t HystrixSink::getRollingValue(RollingWindow rolling_window) {
 
 void HystrixSink::updateRollingWindowMap(const Upstream::ClusterInfo& cluster_info,
                                          ClusterStatsCache& cluster_stats_cache) {
-  const std::string cluster_name = cluster_info.name();
   Upstream::ClusterStats& cluster_stats = cluster_info.stats();
   Stats::Scope& cluster_stats_scope = cluster_info.statsScope();
 
@@ -98,15 +97,15 @@ void HystrixSink::updateRollingWindowMap(const Upstream::ClusterInfo& cluster_in
   // (alternative: each request including the retries counted as 1)
   // since timeouts are 504 (or 408), deduce them from here ("-" sign).
   // Timeout retries were not counted here anyway.
-  uint64_t errors = cluster_stats_scope.counter("upstream_rq_5xx").value() +
-                    cluster_stats_scope.counter("retry.upstream_rq_5xx").value() +
-                    cluster_stats_scope.counter("upstream_rq_4xx").value() +
-                    cluster_stats_scope.counter("retry.upstream_rq_4xx").value() -
+  uint64_t errors = cluster_stats_scope.counterFromStatName(upstream_rq_5xx_).value() +
+                    cluster_stats_scope.counterFromStatName(retry_upstream_rq_5xx_).value() +
+                    cluster_stats_scope.counterFromStatName(upstream_rq_4xx_).value() +
+                    cluster_stats_scope.counterFromStatName(retry_upstream_rq_4xx_).value() -
                     cluster_stats.upstream_rq_timeout_.value();
 
   pushNewValue(cluster_stats_cache.errors_, errors);
 
-  uint64_t success = cluster_stats_scope.counter("upstream_rq_2xx").value();
+  uint64_t success = cluster_stats_scope.counterFromStatName(upstream_rq_2xx_).value();
   pushNewValue(cluster_stats_cache.success_, success);
 
   uint64_t rejected = cluster_stats.upstream_rq_pending_overflow_.value();
@@ -153,7 +152,7 @@ void HystrixSink::addHystrixCommand(ClusterStatsCache& cluster_stats_cache,
                                     std::chrono::milliseconds rolling_window_ms,
                                     const QuantileLatencyMap& histogram, std::stringstream& ss) {
 
-  std::time_t currentTime = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+  std::time_t currentTime = std::chrono::system_clock::to_time_t(server_.timeSource().systemTime());
 
   ss << "data: {";
   addStringToStream("type", "HystrixCommand", ss, true);
@@ -267,7 +266,15 @@ const std::string HystrixSink::printRollingWindows() {
 
 HystrixSink::HystrixSink(Server::Instance& server, const uint64_t num_buckets)
     : server_(server), current_index_(num_buckets > 0 ? num_buckets : DEFAULT_NUM_BUCKETS),
-      window_size_(current_index_ + 1) {
+      window_size_(current_index_ + 1), stat_name_pool_(server.stats().symbolTable()),
+      cluster_name_(stat_name_pool_.add(Config::TagNames::get().CLUSTER_NAME)),
+      cluster_upstream_rq_time_(stat_name_pool_.add("cluster.upstream_rq_time")),
+      membership_total_(stat_name_pool_.add("membership_total")),
+      retry_upstream_rq_4xx_(stat_name_pool_.add("retry.upstream_rq_4xx")),
+      retry_upstream_rq_5xx_(stat_name_pool_.add("retry.upstream_rq_5xx")),
+      upstream_rq_2xx_(stat_name_pool_.add("upstream_rq_2xx")),
+      upstream_rq_4xx_(stat_name_pool_.add("upstream_rq_4xx")),
+      upstream_rq_5xx_(stat_name_pool_.add("upstream_rq_5xx")) {
   Server::Admin& admin = server_.admin();
   ENVOY_LOG(debug,
             "adding hystrix_event_stream endpoint to enable connection to hystrix dashboard");
@@ -290,7 +297,7 @@ Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
       AccessControlAllowHeadersValue.AllowHeadersHystrix);
   response_headers.insertAccessControlAllowOrigin().value().setReference(
       Http::Headers::get().AccessControlAllowOriginValue.All);
-  response_headers.insertNoChunks().value().setReference("0");
+  response_headers.insertNoChunks().value().setInteger(0);
 
   Http::StreamDecoderFilterCallbacks& stream_decoder_filter_callbacks =
       admin_stream.getDecoderFilterCallbacks();
@@ -316,7 +323,7 @@ Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
   return Http::Code::OK;
 }
 
-void HystrixSink::flush(Stats::Source& source) {
+void HystrixSink::flush(Stats::MetricSnapshot& snapshot) {
   if (callbacks_list_.empty()) {
     return;
   }
@@ -326,28 +333,25 @@ void HystrixSink::flush(Stats::Source& source) {
 
   // Save a map of the relevant histograms per cluster in a convenient format.
   std::unordered_map<std::string, QuantileLatencyMap> time_histograms;
-  for (const Stats::ParentHistogramSharedPtr& histogram : source.cachedHistograms()) {
-    if (histogram->tagExtractedName() == "cluster.upstream_rq_time") {
-      // TODO(mrice32): add an Envoy utility function to look up and return a tag for a metric.
-      auto it = std::find_if(histogram->tags().begin(), histogram->tags().end(),
-                             [](const Stats::Tag& tag) {
-                               return (tag.name_ == Config::TagNames::get().CLUSTER_NAME);
-                             });
-
+  for (const auto& histogram : snapshot.histograms()) {
+    if (histogram.get().tagExtractedStatName() == cluster_upstream_rq_time_) {
+      absl::optional<Stats::StatName> value =
+          Stats::Utility::findTag(histogram.get(), cluster_name_);
       // Make sure we found the cluster name tag
-      ASSERT(it != histogram->tags().end());
-      auto it_bool_pair = time_histograms.emplace(std::make_pair(it->value_, QuantileLatencyMap()));
+      ASSERT(value);
+      std::string value_str = server_.stats().symbolTable().toString(*value);
+      auto it_bool_pair = time_histograms.emplace(std::make_pair(value_str, QuantileLatencyMap()));
       // Make sure histogram with this name was not already added
       ASSERT(it_bool_pair.second);
       QuantileLatencyMap& hist_map = it_bool_pair.first->second;
 
       const std::vector<double>& supported_quantiles =
-          histogram->intervalStatistics().supportedQuantiles();
+          histogram.get().intervalStatistics().supportedQuantiles();
       for (size_t i = 0; i < supported_quantiles.size(); ++i) {
         // binary-search here is likely not worth it, as hystrix_quantiles has <10 elements.
         if (std::find(hystrix_quantiles.begin(), hystrix_quantiles.end(), supported_quantiles[i]) !=
             hystrix_quantiles.end()) {
-          const double value = histogram->intervalStatistics().computedQuantiles()[i];
+          const double value = histogram.get().intervalStatistics().computedQuantiles()[i];
           if (!std::isnan(value)) {
             hist_map[supported_quantiles[i]] = value;
           }
@@ -372,8 +376,10 @@ void HystrixSink::flush(Stats::Source& source) {
     addClusterStatsToStream(
         *cluster_stats_cache_ptr, cluster_info->name(),
         cluster_info->resourceManager(Upstream::ResourcePriority::Default).pendingRequests().max(),
-        cluster_info->statsScope().gauge("membership_total").value(), server_.statsFlushInterval(),
-        time_histograms[cluster_info->name()], ss);
+        cluster_info->statsScope()
+            .gaugeFromStatName(membership_total_, Stats::Gauge::ImportMode::Accumulate)
+            .value(),
+        server_.statsFlushInterval(), time_histograms[cluster_info->name()], ss);
   }
 
   Buffer::OwnedImpl data;

@@ -1,11 +1,13 @@
 #include "test/integration/tcp_proxy_integration_test.h"
 
+#include <memory>
+
 #include "envoy/config/accesslog/v2/file.pb.h"
 #include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.validate.h"
 
-#include "common/filesystem/filesystem_impl.h"
 #include "common/network/utility.h"
-#include "common/ssl/context_manager_impl.h"
+
+#include "extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/integration/ssl_utility.h"
 #include "test/integration/utility.h"
@@ -20,9 +22,9 @@ using testing::NiceMock;
 namespace Envoy {
 namespace {
 
-INSTANTIATE_TEST_CASE_P(IpVersions, TcpProxyIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, TcpProxyIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 void TcpProxyIntegrationTest::initialize() {
   config_helper_.renameListener("tcp_proxy");
@@ -40,6 +42,15 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
   tcp_client->waitForData("hello");
   // Make sure inexact matches work also on data already received.
   tcp_client->waitForData("ello", false);
+
+  // Make sure length based wait works for the data already received
+  tcp_client->waitForData(5);
+  tcp_client->waitForData(4);
+
+  // Drain part of the received message
+  tcp_client->clearData(2);
+  tcp_client->waitForData("llo");
+  tcp_client->waitForData(3);
 
   tcp_client->write("hello");
   ASSERT_TRUE(fake_upstream_connection->waitForData(5));
@@ -182,11 +193,12 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamFlush) {
   test_server_->waitForGaugeEq("tcp.tcp_stats.upstream_flush_active", 1);
   ASSERT_TRUE(fake_upstream_connection->readDisable(false));
   ASSERT_TRUE(fake_upstream_connection->waitForData(data.size()));
+  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   tcp_client->waitForHalfClose();
 
   EXPECT_EQ(test_server_->counter("tcp.tcp_stats.upstream_flush_total")->value(), 1);
-  EXPECT_EQ(test_server_->gauge("tcp.tcp_stats.upstream_flush_active")->value(), 0);
+  test_server_->waitForGaugeEq("tcp.tcp_stats.upstream_flush_active", 0);
 }
 
 // Test that Envoy doesn't crash or assert when shutting down with an upstream flush active
@@ -226,7 +238,7 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
     auto* config_blob = filter_chain->mutable_filters(0)->mutable_config();
 
     envoy::config::filter::network::tcp_proxy::v2::TcpProxy tcp_proxy_config;
-    MessageUtil::jsonConvert(*config_blob, tcp_proxy_config);
+    TestUtility::jsonConvert(*config_blob, tcp_proxy_config);
 
     auto* access_log = tcp_proxy_config.add_access_log();
     access_log->set_name("envoy.file_access_log");
@@ -235,9 +247,9 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
     access_log_config.set_format(
         "upstreamlocal=%UPSTREAM_LOCAL_ADDRESS% "
         "upstreamhost=%UPSTREAM_HOST% downstream=%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%\n");
-    MessageUtil::jsonConvert(access_log_config, *access_log->mutable_config());
+    TestUtility::jsonConvert(access_log_config, *access_log->mutable_config());
 
-    MessageUtil::jsonConvert(tcp_proxy_config, *config_blob);
+    TestUtility::jsonConvert(tcp_proxy_config, *config_blob);
   });
   initialize();
 
@@ -257,7 +269,7 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
   std::string log_result;
   // Access logs only get flushed to disk periodically, so poll until the log is non-empty
   do {
-    log_result = Filesystem::fileReadToEnd(access_log_path);
+    log_result = api_->fileSystem().fileReadToEnd(access_log_path);
   } while (log_result.empty());
 
   // Regex matching localhost:port
@@ -314,11 +326,11 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithNoData) {
     auto* config_blob = filter_chain->mutable_filters(0)->mutable_config();
 
     envoy::config::filter::network::tcp_proxy::v2::TcpProxy tcp_proxy_config;
-    MessageUtil::jsonConvert(*config_blob, tcp_proxy_config);
+    TestUtility::jsonConvert(*config_blob, tcp_proxy_config);
     tcp_proxy_config.mutable_idle_timeout()->set_nanos(
         std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(100))
             .count());
-    MessageUtil::jsonConvert(tcp_proxy_config, *config_blob);
+    TestUtility::jsonConvert(tcp_proxy_config, *config_blob);
   });
 
   initialize();
@@ -335,11 +347,11 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
     auto* config_blob = filter_chain->mutable_filters(0)->mutable_config();
 
     envoy::config::filter::network::tcp_proxy::v2::TcpProxy tcp_proxy_config;
-    MessageUtil::jsonConvert(*config_blob, tcp_proxy_config);
+    TestUtility::jsonConvert(*config_blob, tcp_proxy_config);
     tcp_proxy_config.mutable_idle_timeout()->set_nanos(
         std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(500))
             .count());
-    MessageUtil::jsonConvert(tcp_proxy_config, *config_blob);
+    TestUtility::jsonConvert(tcp_proxy_config, *config_blob);
   });
 
   initialize();
@@ -355,15 +367,16 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect(true));
 }
 
-INSTANTIATE_TEST_CASE_P(IpVersions, TcpProxySslIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, TcpProxySslIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 void TcpProxySslIntegrationTest::initialize() {
   config_helper_.addSslConfig();
   TcpProxyIntegrationTest::initialize();
 
-  context_manager_.reset(new Ssl::ContextManagerImpl(runtime_));
+  context_manager_ =
+      std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(timeSystem());
   payload_reader_.reset(new WaitForPayloadReader(*dispatcher_));
 }
 
@@ -384,13 +397,13 @@ void TcpProxySslIntegrationTest::setupConnections() {
             .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackDrains));
         return client_write_buffer_;
       }));
-  // Set up the SSl client.
+  // Set up the SSL client.
   Network::Address::InstanceConstSharedPtr address =
       Ssl::getSslAddress(version_, lookupPort("tcp_proxy"));
-  context_ = Ssl::createClientSslTransportSocketFactory(false, false, *context_manager_);
+  context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_, *api_);
   ssl_client_ =
       dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
-                                          context_->createTransportSocket(), nullptr);
+                                          context_->createTransportSocket(nullptr), nullptr);
 
   // Perform the SSL handshake. Loopback is whitelisted in tcp_proxy.json for the ssl_auth
   // filter so there will be no pause waiting on auth data.

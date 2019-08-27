@@ -6,6 +6,10 @@
 syntax = "proto3";
 
 package envoy.config.bootstrap.v2;
+
+option java_outer_classname = "BootstrapProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.config.bootstrap.v2";
 option go_package = "v2";
 
 import "envoy/api/v2/core/address.proto";
@@ -17,9 +21,9 @@ import "envoy/api/v2/lds.proto";
 import "envoy/config/trace/v2/trace.proto";
 import "envoy/config/metrics/v2/stats.proto";
 import "envoy/config/overload/v2alpha/overload.proto";
-import "envoy/config/ratelimit/v2/rls.proto";
 
 import "google/protobuf/duration.proto";
+import "google/protobuf/struct.proto";
 
 import "validate/validate.proto";
 import "gogoproto/gogo.proto";
@@ -33,18 +37,19 @@ message Bootstrap {
   message StaticResources {
     // Static :ref:`Listeners <envoy_api_msg_Listener>`. These listeners are
     // available regardless of LDS configuration.
-    repeated envoy.api.v2.Listener listeners = 1 [(gogoproto.nullable) = false];
+    repeated envoy.api.v2.Listener listeners = 1;
 
     // If a network based configuration source is specified for :ref:`cds_config
     // <envoy_api_field_config.bootstrap.v2.Bootstrap.DynamicResources.cds_config>`, it's necessary
     // to have some initial cluster definitions available to allow Envoy to know
     // how to speak to the management server. These cluster definitions may not
-    // use :ref:`EDS <arch_overview_dynamic_config_sds>` (i.e. they should be static
+    // use :ref:`EDS <arch_overview_dynamic_config_eds>` (i.e. they should be static
     // IP or DNS-based).
-    repeated envoy.api.v2.Cluster clusters = 2 [(gogoproto.nullable) = false];
+    repeated envoy.api.v2.Cluster clusters = 2;
 
-    // [#not-implemented-hide:]
-    repeated envoy.api.v2.auth.Secret secrets = 3 [(gogoproto.nullable) = false];
+    // These static secrets can be used by :ref:`SdsSecretConfig
+    // <envoy_api_msg_auth.SdsSecretConfig>`
+    repeated envoy.api.v2.auth.Secret secrets = 3;
   }
   // Statically specified resources.
   StaticResources static_resources = 2;
@@ -68,17 +73,7 @@ message Bootstrap {
     // streamed on the ADS channel.
     envoy.api.v2.core.ApiConfigSource ads_config = 3;
 
-    // [#not-implemented-hide:] Hide from docs.
-    message DeprecatedV1 {
-      // This is the global :ref:`SDS <arch_overview_dynamic_config_sds>` config
-      // when using v1 REST for :ref:`CDS
-      // <arch_overview_dynamic_config_cds>`/:ref:`EDS
-      // <arch_overview_dynamic_config_sds>`.
-      envoy.api.v2.core.ConfigSource sds_config = 1;
-    }
-
-    // [#not-implemented-hide:] Hide from docs.
-    DeprecatedV1 deprecated_v1 = 4 [deprecated = true];
+    reserved 4;
   }
   // xDS configuration sources.
   DynamicResources dynamic_resources = 3;
@@ -104,7 +99,14 @@ message Bootstrap {
   // performance reasons Envoy latches counters and only flushes counters and
   // gauges at a periodic interval. If not specified the default is 5000ms (5
   // seconds).
-  google.protobuf.Duration stats_flush_interval = 7 [(gogoproto.stdduration) = true];
+  // Duration must be at least 1ms and at most 5 min.
+  google.protobuf.Duration stats_flush_interval = 7 [
+    (validate.rules).duration = {
+      lt: {seconds: 300},
+      gte: {nanos: 1000000}
+    },
+    (gogoproto.stdduration) = true
+  ];
 
   // Optional watchdog configuration.
   Watchdog watchdog = 8;
@@ -113,36 +115,63 @@ message Bootstrap {
   // tracing will be performed.
   envoy.config.trace.v2.Tracing tracing = 9;
 
-  // Configuration for an external rate limit service provider. If not
-  // specified, any calls to the rate limit service will immediately return
-  // success.
-  envoy.config.ratelimit.v2.RateLimitServiceConfig rate_limit_service = 10;
+  reserved 10;
 
-  // Configuration for the runtime configuration provider. If not specified, a
-  // “null” provider will be used which will result in all defaults being used.
-  Runtime runtime = 11;
+  // Configuration for the runtime configuration provider (deprecated). If not
+  // specified, a “null” provider will be used which will result in all defaults
+  // being used.
+  Runtime runtime = 11 [deprecated = true];
+
+  // Configuration for the runtime configuration provider. If not
+  // specified, a “null” provider will be used which will result in all defaults
+  // being used.
+  LayeredRuntime layered_runtime = 17;
 
   // Configuration for the local administration HTTP server.
-  Admin admin = 12 [(validate.rules).message.required = true, (gogoproto.nullable) = false];
+  Admin admin = 12;
 
   // Optional overload manager configuration.
   envoy.config.overload.v2alpha.OverloadManager overload_manager = 15;
+
+  // Enable :ref:`stats for event dispatcher <operations_performance>`, defaults to false.
+  // Note that this records a value for each iteration of the event loop on every thread. This
+  // should normally be minimal overhead, but when using
+  // :ref:`statsd <envoy_api_msg_config.metrics.v2.StatsdSink>`, it will send each observed value
+  // over the wire individually because the statsd protocol doesn't have any way to represent a
+  // histogram summary. Be aware that this can be a very large volume of data.
+  bool enable_dispatcher_stats = 16;
+
+  // Optional string which will be used in lieu of x-envoy in prefixing headers.
+  //
+  // For example, if this string is present and set to X-Foo, then x-envoy-retry-on will be
+  // transformed into x-foo-retry-on etc.
+  //
+  // Note this applies to the headers Envoy will generate, the headers Envoy will sanitize, and the
+  // headers Envoy will trust for core code and core extensions only. Be VERY careful making
+  // changes to this string, especially in multi-layer Envoy deployments or deployments using
+  // extensions which are not upstream.
+  string header_prefix = 18;
 }
 
 // Administration interface :ref:`operations documentation
 // <operations_admin_interface>`.
 message Admin {
   // The path to write the access log for the administration server. If no
-  // access log is desired specify ‘/dev/null’.
-  string access_log_path = 1 [(validate.rules).string.min_bytes = 1];
+  // access log is desired specify ‘/dev/null’. This is only required if
+  // :ref:`address <envoy_api_field_config.bootstrap.v2.Admin.address>` is set.
+  string access_log_path = 1;
 
   // The cpu profiler output path for the administration server. If no profile
   // path is specified, the default is ‘/var/log/envoy/envoy.prof’.
   string profile_path = 2;
 
   // The TCP address that the administration server will listen on.
-  envoy.api.v2.core.Address address = 3
-      [(validate.rules).message.required = true, (gogoproto.nullable) = false];
+  // If not specified, Envoy will not start an administration server.
+  envoy.api.v2.core.Address address = 3;
+
+  // Additional socket options that may not be present in Envoy source code or
+  // precompiled binaries.
+  repeated envoy.api.v2.core.SocketOption socket_options = 4;
 }
 
 // Cluster manager :ref:`architecture overview <arch_overview_cluster_manager>`.
@@ -151,7 +180,7 @@ message ClusterManager {
   // this configuration). In order to enable :ref:`zone aware routing
   // <arch_overview_load_balancing_zone_aware_routing>` this option must be set.
   // If *local_cluster_name* is defined then :ref:`clusters
-  // <config_cluster_manager_clusters>` must be defined in the :ref:`Bootstrap
+  // <envoy_api_msg_Cluster>` must be defined in the :ref:`Bootstrap
   // static cluster resources
   // <envoy_api_field_config.bootstrap.v2.Bootstrap.StaticResources.clusters>`. This is unrelated to
   // the :option:`--service-cluster` option which does not `affect zone aware
@@ -199,14 +228,15 @@ message Watchdog {
   google.protobuf.Duration multikill_timeout = 4;
 }
 
-// Runtime :ref:`configuration overview <config_runtime>`.
+// Runtime :ref:`configuration overview <config_runtime>` (deprecated).
 message Runtime {
   // The implementation assumes that the file system tree is accessed via a
   // symbolic link. An atomic link swap is used when a new tree should be
   // switched to. This parameter specifies the path to the symbolic link. Envoy
   // will watch the location for changes and reload the file system tree when
-  // they happen.
-  string symlink_root = 1 [(validate.rules).string.min_bytes = 1];
+  // they happen. If this parameter is not set, there will be no disk based
+  // runtime.
+  string symlink_root = 1;
 
   // Specifies the subdirectory to load within the root directory. This is
   // useful if multiple systems share the same delivery mechanism. Envoy
@@ -220,4 +250,70 @@ message Runtime {
   // Sometimes it is useful to have a per service cluster directory for runtime
   // configuration. See below for exactly how the override directory is used.
   string override_subdirectory = 3;
+
+  // Static base runtime. This will be :ref:`overridden
+  // <config_runtime_layering>` by other runtime layers, e.g.
+  // disk or admin. This follows the :ref:`runtime protobuf JSON representation
+  // encoding <config_runtime_proto_json>`.
+  google.protobuf.Struct base = 4;
+}
+
+message RuntimeLayer {
+  // :ref:`Disk runtime <config_runtime_local_disk>` layer.
+  message DiskLayer {
+    // The implementation assumes that the file system tree is accessed via a
+    // symbolic link. An atomic link swap is used when a new tree should be
+    // switched to. This parameter specifies the path to the symbolic link.
+    // Envoy will watch the location for changes and reload the file system tree
+    // when they happen. See documentation on runtime :ref:`atomicity
+    // <config_runtime_atomicity>` for further details on how reloads are
+    // treated.
+    string symlink_root = 1;
+
+    // Specifies the subdirectory to load within the root directory. This is
+    // useful if multiple systems share the same delivery mechanism. Envoy
+    // configuration elements can be contained in a dedicated subdirectory.
+    string subdirectory = 3;
+
+    // :ref:`Append <config_runtime_local_disk_service_cluster_subdirs>` the
+    // service cluster to the path under symlink root.
+    bool append_service_cluster = 2;
+  }
+
+  // :ref:`Admin console runtime <config_runtime_admin>` layer.
+  message AdminLayer {
+  }
+
+  // :ref:`Runtime Discovery Service (RTDS) <config_runtime_rtds>` layer.
+  message RtdsLayer {
+    // Resource to subscribe to at *rtds_config* for the RTDS layer.
+    string name = 1;
+
+    // RTDS configuration source.
+    envoy.api.v2.core.ConfigSource rtds_config = 2;
+  }
+
+  // Descriptive name for the runtime layer. This is only used for the runtime
+  // :http:get:`/runtime` output.
+  string name = 1 [(validate.rules).string.min_bytes = 1];
+
+  oneof layer_specifier {
+    // :ref:`Static runtime <config_runtime_bootstrap>` layer.
+    // This follows the :ref:`runtime protobuf JSON representation encoding
+    // <config_runtime_proto_json>`. Unlike static xDS resources, this static
+    // layer is overridable by later layers in the runtime virtual filesystem.
+    option (validate.required) = true;
+
+    google.protobuf.Struct static_layer = 2;
+    DiskLayer disk_layer = 3;
+    AdminLayer admin_layer = 4;
+    RtdsLayer rtds_layer = 5;
+  }
+}
+
+// Runtime :ref:`configuration overview <config_runtime>`.
+message LayeredRuntime {
+  // The :ref:`layers <config_runtime_layering>` of the runtime. This is ordered
+  // such that later layers in the list overlay earlier entries.
+  repeated RuntimeLayer layers = 1;
 }

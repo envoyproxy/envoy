@@ -18,9 +18,12 @@ int main(int argc, char* argv[]) {
       "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources",
       "envoy.service.discovery.v2.HealthDiscoveryService.FetchHealthCheck",
       "envoy.service.discovery.v2.HealthDiscoveryService.StreamHealthCheck",
+      "envoy.service.discovery.v2.RuntimeDiscoveryService.FetchRuntime",
+      "envoy.service.discovery.v2.RuntimeDiscoveryService.StreamRuntime",
       "envoy.service.accesslog.v2.AccessLogService.StreamAccessLogs",
       "envoy.service.metrics.v2.MetricsService.StreamMetrics",
       "envoy.service.ratelimit.v2.RateLimitService.ShouldRateLimit",
+      "udpa.service.orca.v1.OpenRcaService.StreamCoreMetrics",
   };
 
   for (const auto& method : methods) {

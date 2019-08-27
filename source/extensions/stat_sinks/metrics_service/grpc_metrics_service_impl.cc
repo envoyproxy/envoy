@@ -3,7 +3,6 @@
 #include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/stats/histogram.h"
-#include "envoy/stats/source.h"
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -17,47 +16,19 @@ namespace StatSinks {
 namespace MetricsService {
 
 GrpcMetricsStreamerImpl::GrpcMetricsStreamerImpl(Grpc::AsyncClientFactoryPtr&& factory,
-                                                 ThreadLocal::SlotAllocator& tls,
                                                  const LocalInfo::LocalInfo& local_info)
-    : tls_slot_(tls.allocateSlot()) {
-  SharedStateSharedPtr shared_state = std::make_shared<SharedState>(std::move(factory), local_info);
-  tls_slot_->set([shared_state](Event::Dispatcher&) {
-    return ThreadLocal::ThreadLocalObjectSharedPtr{new ThreadLocalStreamer(shared_state)};
-  });
-}
+    : client_(factory->create()), local_info_(local_info) {}
 
-void GrpcMetricsStreamerImpl::ThreadLocalStream::onRemoteClose(Grpc::Status::GrpcStatus,
-                                                               const std::string&) {
-  // Only erase if we have a stream. Otherwise we had an inline failure and we will clear the
-  // stream data in send().
-  if (parent_.thread_local_stream_->stream_ != nullptr) {
-    parent_.thread_local_stream_ = nullptr;
-  }
-}
-
-GrpcMetricsStreamerImpl::ThreadLocalStreamer::ThreadLocalStreamer(
-    const SharedStateSharedPtr& shared_state)
-    : client_(shared_state->factory_->create()), shared_state_(shared_state) {}
-
-void GrpcMetricsStreamerImpl::ThreadLocalStreamer::send(
-    envoy::service::metrics::v2::StreamMetricsMessage& message) {
-  if (thread_local_stream_ == nullptr) {
-    thread_local_stream_ = std::make_shared<ThreadLocalStream>(*this);
-  }
-
-  if (thread_local_stream_->stream_ == nullptr) {
-    thread_local_stream_->stream_ =
-        client_->start(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-                           "envoy.service.metrics.v2.MetricsService.StreamMetrics"),
-                       *thread_local_stream_);
+void GrpcMetricsStreamerImpl::send(envoy::service::metrics::v2::StreamMetricsMessage& message) {
+  if (stream_ == nullptr) {
+    stream_ = client_->start(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+                                 "envoy.service.metrics.v2.MetricsService.StreamMetrics"),
+                             *this);
     auto* identifier = message.mutable_identifier();
-    *identifier->mutable_node() = shared_state_->local_info_.node();
+    *identifier->mutable_node() = local_info_.node();
   }
-
-  if (thread_local_stream_->stream_ != nullptr) {
-    thread_local_stream_->stream_->sendMessage(message, false);
-  } else {
-    thread_local_stream_ = nullptr;
+  if (stream_ != nullptr) {
+    stream_->sendMessage(message, false);
   }
 }
 
@@ -88,6 +59,7 @@ void MetricsServiceSink::flushGauge(const Stats::Gauge& gauge) {
   auto* gauage_metric = metric->mutable_gauge();
   gauage_metric->set_value(gauge.value());
 }
+
 void MetricsServiceSink::flushHistogram(const Stats::ParentHistogram& histogram) {
   io::prometheus::client::MetricFamily* metrics_family = message_.add_envoy_metrics();
   metrics_family->set_type(io::prometheus::client::MetricType::SUMMARY);
@@ -105,35 +77,34 @@ void MetricsServiceSink::flushHistogram(const Stats::ParentHistogram& histogram)
   }
 }
 
-void MetricsServiceSink::flush(Stats::Source& source) {
+void MetricsServiceSink::flush(Stats::MetricSnapshot& snapshot) {
   message_.clear_envoy_metrics();
-  const std::vector<Stats::CounterSharedPtr>& counters = source.cachedCounters();
-  const std::vector<Stats::GaugeSharedPtr>& gauges = source.cachedGauges();
-  const std::vector<Stats::ParentHistogramSharedPtr>& histograms = source.cachedHistograms();
+
   // TODO(mrice32): there's probably some more sophisticated preallocation we can do here where we
   // actually preallocate the submessages and then pass ownership to the proto (rather than just
   // preallocating the pointer array).
-  message_.mutable_envoy_metrics()->Reserve(counters.size() + gauges.size() + histograms.size());
-  for (const Stats::CounterSharedPtr& counter : counters) {
-    if (counter->used()) {
-      flushCounter(*counter);
+  message_.mutable_envoy_metrics()->Reserve(snapshot.counters().size() + snapshot.gauges().size() +
+                                            snapshot.histograms().size());
+  for (const auto& counter : snapshot.counters()) {
+    if (counter.counter_.get().used()) {
+      flushCounter(counter.counter_.get());
     }
   }
 
-  for (const Stats::GaugeSharedPtr& gauge : gauges) {
-    if (gauge->used()) {
-      flushGauge(*gauge);
+  for (const auto& gauge : snapshot.gauges()) {
+    if (gauge.get().used()) {
+      flushGauge(gauge.get());
     }
   }
 
-  for (const Stats::ParentHistogramSharedPtr& histogram : histograms) {
-    if (histogram->used()) {
-      flushHistogram(*histogram);
+  for (const auto& histogram : snapshot.histograms()) {
+    if (histogram.get().used()) {
+      flushHistogram(histogram.get());
     }
   }
 
   grpc_metrics_streamer_->send(message_);
-  // for perf reasons, clear the identifer after the first flush.
+  // for perf reasons, clear the identifier after the first flush.
   if (message_.has_identifier()) {
     message_.clear_identifier();
   }

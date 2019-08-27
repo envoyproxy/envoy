@@ -11,7 +11,7 @@
 #include "common/common/c_smart_ptr.h"
 #include "common/common/logger.h"
 
-#include "luajit-2.0/lua.hpp"
+#include "luajit-2.1/lua.hpp"
 
 namespace Envoy {
 namespace Extensions {
@@ -44,7 +44,8 @@ namespace Lua {
  */
 #define DECLARE_LUA_FUNCTION_EX(Class, Name, Index)                                                \
   static int static_##Name(lua_State* state) {                                                     \
-    Class* object = static_cast<Class*>(luaL_checkudata(state, Index, typeid(Class).name()));      \
+    Class* object = ::Envoy::Extensions::Filters::Common::Lua::alignAndCast<Class>(                \
+        luaL_checkudata(state, Index, typeid(Class).name()));                                      \
     object->checkDead(state);                                                                      \
     return object->Name(state);                                                                    \
   }                                                                                                \
@@ -59,6 +60,32 @@ namespace Lua {
  * Declare a Lua function in which userdata is in upvalue slot 1. See DECLARE_LUA_FUNCTION_EX()
  */
 #define DECLARE_LUA_CLOSURE(Class, Name) DECLARE_LUA_FUNCTION_EX(Class, Name, lua_upvalueindex(1))
+
+/**
+ * Calculate the maximum space needed to be aligned.
+ */
+template <typename T> constexpr size_t maximumSpaceNeededToAlign() {
+  // The allocated memory can be misaligned up to `alignof(T) - 1` bytes. Adding it to the size to
+  // allocate.
+  return sizeof(T) + alignof(T) - 1;
+}
+
+template <typename T> inline T* alignAndCast(void* mem) {
+  size_t size = maximumSpaceNeededToAlign<T>();
+  return static_cast<T*>(std::align(alignof(T), sizeof(T), mem, size));
+}
+
+/**
+ * Create a new user data and assign its metatable.
+ */
+template <typename T> inline T* allocateLuaUserData(lua_State* state) {
+  void* mem = lua_newuserdata(state, maximumSpaceNeededToAlign<T>());
+  luaL_getmetatable(state, typeid(T).name());
+  ASSERT(lua_istable(state, -1));
+  lua_setmetatable(state, -2);
+
+  return alignAndCast<T>(mem);
+}
 
 /**
  * This is the base class for all C++ objects that we expose out to Lua. The goal is to hide as
@@ -76,9 +103,9 @@ namespace Lua {
  */
 template <class T> class BaseLuaObject : protected Logger::Loggable<Logger::Id::lua> {
 public:
-  typedef std::vector<std::pair<const char*, lua_CFunction>> ExportedFunctions;
+  using ExportedFunctions = std::vector<std::pair<const char*, lua_CFunction>>;
 
-  virtual ~BaseLuaObject() {}
+  virtual ~BaseLuaObject() = default;
 
   /**
    * Create a new object of this type, owned by Lua. This type must have previously been registered
@@ -90,14 +117,9 @@ public:
    */
   template <typename... ConstructorArgs>
   static std::pair<T*, lua_State*> create(lua_State* state, ConstructorArgs&&... args) {
-    // Create a new user data and assign its metatable.
-    void* mem = lua_newuserdata(state, sizeof(T));
-    luaL_getmetatable(state, typeid(T).name());
-    ASSERT(lua_istable(state, -1));
-    lua_setmetatable(state, -2);
-
     // Memory is allocated via Lua and it is raw. We use placement new to run the constructor.
-    ENVOY_LOG(trace, "creating {} at {}", typeid(T).name(), mem);
+    T* mem = allocateLuaUserData<T>(state);
+    ENVOY_LOG(trace, "creating {} at {}", typeid(T).name(), static_cast<void*>(mem));
     return {new (mem) T(std::forward<ConstructorArgs>(args)...), state};
   }
 
@@ -119,7 +141,7 @@ public:
     // manually because the memory is raw and was allocated by Lua.
     to_register.push_back(
         {"__gc", [](lua_State* state) {
-           T* object = static_cast<T*>(luaL_checkudata(state, 1, typeid(T).name()));
+           T* object = alignAndCast<T>(luaL_checkudata(state, 1, typeid(T).name()));
            ENVOY_LOG(trace, "destroying {} at {}", typeid(T).name(), static_cast<void*>(object));
            object->~T();
            return 0;
@@ -295,7 +317,7 @@ public:
 };
 
 /**
- * This is a wraper for a Lua coroutine. Lua intermixes coroutine and "thread." Lua does not have
+ * This is a wrapper for a Lua coroutine. Lua intermixes coroutine and "thread." Lua does not have
  * real threads, only cooperatively scheduled coroutines.
  */
 class Coroutine : Logger::Loggable<Logger::Id::lua> {
@@ -312,7 +334,7 @@ public:
    *        ThreadLocalState::registerGlobal().
    * @param num_args supplies the number of arguments to start the coroutine with. They should be
    *        on the stack already.
-   * @param yield_callback supplies a callback that wil be invoked if the coroutine yields.
+   * @param yield_callback supplies a callback that will be invoked if the coroutine yields.
    */
   void start(int function_ref, int num_args, const std::function<void()>& yield_callback);
 
@@ -320,7 +342,7 @@ public:
    * Resume a previously yielded coroutine.
    * @param num_args supplies the number of arguments to resume the coroutine with. They should be
    *        on the stack already.
-   * @param yield_callback supplies a callback that wil be invoked if the coroutine yields.
+   * @param yield_callback supplies a callback that will be invoked if the coroutine yields.
    */
   void resume(int num_args, const std::function<void()>& yield_callback);
 
@@ -329,7 +351,7 @@ private:
   State state_{State::NotStarted};
 };
 
-typedef std::unique_ptr<Coroutine> CoroutinePtr;
+using CoroutinePtr = std::unique_ptr<Coroutine>;
 
 /**
  * This class wraps a Lua state that can be used safely across threads. The model is that every

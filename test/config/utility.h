@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/api.h"
 #include "envoy/api/v2/cds.pb.h"
 #include "envoy/api/v2/core/base.pb.h"
 #include "envoy/api/v2/core/protocol.pb.h"
@@ -25,21 +26,53 @@ namespace Envoy {
 
 class ConfigHelper {
 public:
+  struct ServerSslOptions {
+    ServerSslOptions& setRsaCert(bool rsa_cert) {
+      rsa_cert_ = rsa_cert;
+      return *this;
+    }
+
+    ServerSslOptions& setEcdsaCert(bool ecdsa_cert) {
+      ecdsa_cert_ = ecdsa_cert;
+      return *this;
+    }
+
+    ServerSslOptions& setTlsV13(bool tlsv1_3) {
+      tlsv1_3_ = tlsv1_3;
+      return *this;
+    }
+
+    ServerSslOptions& setExpectClientEcdsaCert(bool expect_client_ecdsa_cert) {
+      expect_client_ecdsa_cert_ = expect_client_ecdsa_cert;
+      return *this;
+    }
+
+    bool rsa_cert_{true};
+    bool ecdsa_cert_{false};
+    bool tlsv1_3_{false};
+    bool expect_client_ecdsa_cert_{false};
+  };
+
   // Set up basic config, using the specified IpVersion for all connections: listeners, upstream,
   // and admin connections.
   //
   // By default, this runs with an L7 proxy config, but config can be set to TCP_PROXY_CONFIG
   // to test L4 proxying.
-  ConfigHelper(const Network::Address::IpVersion version,
+  ConfigHelper(const Network::Address::IpVersion version, Api::Api& api,
                const std::string& config = HTTP_PROXY_CONFIG);
 
-  typedef std::function<void(envoy::config::bootstrap::v2::Bootstrap&)> ConfigModifierFunction;
-  typedef std::function<void(
-      envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&)>
-      HttpModifierFunction;
+  static void initializeTls(const ServerSslOptions& options,
+                            envoy::api::v2::auth::CommonTlsContext& common_context);
+
+  using ConfigModifierFunction = std::function<void(envoy::config::bootstrap::v2::Bootstrap&)>;
+  using HttpModifierFunction = std::function<void(
+      envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&)>;
 
   // A basic configuration (admin port, cluster_0, one listener) with no network filters.
   static const std::string BASE_CONFIG;
+
+  // A basic configuration (admin port, cluster_0, one udp listener) with no network filters.
+  static const std::string BASE_UDP_LISTENER_CONFIG;
 
   // A basic configuration for L4 proxying.
   static const std::string TCP_PROXY_CONFIG;
@@ -54,6 +87,13 @@ public:
   static const std::string DEFAULT_HEALTH_CHECK_FILTER;
   // a string for a squash filter which can be used with addFilter()
   static const std::string DEFAULT_SQUASH_FILTER;
+
+  // Configuration for L7 proxying, with clusters cluster_1 and cluster_2 meant to be added via CDS.
+  // api_type should be REST, GRPC, or DELTA_GRPC.
+  static std::string discoveredClustersBootstrap(const std::string& api_type);
+  // Builds a standard Cluster config fragment, with a single endpoint (at loopback:port).
+  static envoy::api::v2::Cluster buildCluster(const std::string& name, int port,
+                                              const std::string& ip_version);
 
   // Run the final config modifiers, and then set the upstream ports based on upstream connections.
   // This is the last operation run on |bootstrap_| before it is handed to Envoy.
@@ -73,12 +113,10 @@ public:
   // Set the connect timeout on upstream connections.
   void setConnectTimeout(std::chrono::milliseconds timeout);
 
-  // Add an additional route to the configuration.
-  void addRoute(const std::string& host, const std::string& route, const std::string& cluster,
-                bool validate_clusters,
-                envoy::api::v2::route::RouteAction::ClusterNotFoundResponseCode code,
-                envoy::api::v2::route::VirtualHost::TlsRequirementType type =
-                    envoy::api::v2::route::VirtualHost::NONE);
+  envoy::api::v2::route::VirtualHost createVirtualHost(const char* host, const char* route = "/",
+                                                       const char* cluster = "cluster_0");
+
+  void addVirtualHost(const envoy::api::v2::route::VirtualHost& vhost);
 
   // Add an HTTP filter prior to existing filters.
   void addFilter(const std::string& filter_yaml);
@@ -89,7 +127,12 @@ public:
           type);
 
   // Add the default SSL configuration.
-  void addSslConfig();
+  void addSslConfig(const ServerSslOptions& options);
+  void addSslConfig() { addSslConfig({}); }
+
+  // Set the HTTP access log for the first HCM (if present) to a given file. The default is
+  // /dev/null.
+  bool setAccessLog(const std::string& filename);
 
   // Renames the first listener to the name specified.
   void renameListener(const std::string& name);
@@ -102,14 +145,24 @@ public:
   // Modifiers will be applied just before ports are modified in finalize
   void addConfigModifier(HttpModifierFunction function);
 
+  // Apply any outstanding config modifiers, stick all the listeners in a discovery response message
+  // and write it to the lds file.
+  void setLds(absl::string_view version_info);
+
+  // Set limits on pending outbound frames.
+  void setOutboundFramesLimits(uint32_t max_all_frames, uint32_t max_control_frames);
+
   // Return the bootstrap configuration for hand-off to Envoy.
   const envoy::config::bootstrap::v2::Bootstrap& bootstrap() { return bootstrap_; }
+
+  // Allow a finalized configuration to be edited for generating xDS responses
+  void applyConfigModifiers();
 
 private:
   // Load the first HCM struct from the first listener into a parsed proto.
   bool loadHttpConnectionManager(
       envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm);
-  // Stick the contents of the procided HCM proto and stuff them into the first HCM
+  // Take the contents of the provided HCM proto and stuff them into the first HCM
   // struct of the first listener.
   void storeHttpConnectionManager(
       const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
@@ -118,10 +171,10 @@ private:
   // Finds the filter named 'name' from the first filter chain from the first listener.
   envoy::api::v2::listener::Filter* getFilterFromListener(const std::string& name);
 
-  // Configure a capture transport socket for a cluster/filter chain.
-  void setCaptureTransportSocket(const std::string& capture_path, const std::string& type,
-                                 envoy::api::v2::core::TransportSocket& transport_socket,
-                                 const absl::optional<ProtobufWkt::Struct>& tls_config);
+  // Configure a tap transport socket for a cluster/filter chain.
+  void setTapTransportSocket(const std::string& tap_path, const std::string& type,
+                             envoy::api::v2::core::TransportSocket& transport_socket,
+                             const absl::optional<ProtobufWkt::Struct>& tls_config);
 
   // The bootstrap proto Envoy will start up with.
   envoy::config::bootstrap::v2::Bootstrap bootstrap_;
@@ -137,14 +190,29 @@ private:
   bool finalized_{false};
 };
 
+class CdsHelper {
+public:
+  CdsHelper();
+
+  // Set CDS contents on filesystem.
+  void setCds(const std::vector<envoy::api::v2::Cluster>& cluster);
+  const std::string& cds_path() const { return cds_path_; }
+
+private:
+  const std::string cds_path_;
+  uint32_t cds_version_{};
+};
+
 // Common code for tests that deliver EDS update via the filesystem.
 class EdsHelper {
 public:
   EdsHelper();
 
   // Set EDS contents on filesystem and wait for Envoy to pick this up.
-  void setEds(const std::vector<envoy::api::v2::ClusterLoadAssignment>& cluster_load_assignments,
-              IntegrationTestServerStats& server_stats);
+  void setEds(const std::vector<envoy::api::v2::ClusterLoadAssignment>& cluster_load_assignments);
+  void
+  setEdsAndWait(const std::vector<envoy::api::v2::ClusterLoadAssignment>& cluster_load_assignments,
+                IntegrationTestServerStats& server_stats);
   const std::string& eds_path() const { return eds_path_; }
 
 private:

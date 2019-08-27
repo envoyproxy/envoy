@@ -2,17 +2,14 @@
 
 #include "common/json/json_loader.h"
 
-#include "test/integration/http_integration.h"
+#include "test/integration/http_protocol_integration.h"
 
 #include "gtest/gtest.h"
 
 namespace Envoy {
 
-class IntegrationAdminTest : public HttpIntegrationTest,
-                             public testing::TestWithParam<Network::Address::IpVersion> {
+class IntegrationAdminTest : public HttpProtocolIntegrationTest {
 public:
-  IntegrationAdminTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
-
   void initialize() override {
     config_helper_.addFilter(ConfigHelper::DEFAULT_HEALTH_CHECK_FILTER);
     HttpIntegrationTest::initialize();
@@ -33,7 +30,7 @@ public:
     Json::ObjectSharedPtr statsjson = Json::Factory::loadFromString(stats_json);
     EXPECT_TRUE(statsjson->hasObject("stats"));
     uint64_t histogram_count = 0;
-    for (Json::ObjectSharedPtr obj_ptr : statsjson->getObjectArray("stats")) {
+    for (const Json::ObjectSharedPtr& obj_ptr : statsjson->getObjectArray("stats")) {
       if (obj_ptr->hasObject("histograms")) {
         histogram_count++;
         const Json::ObjectSharedPtr& histograms_ptr = obj_ptr->getObject("histograms");

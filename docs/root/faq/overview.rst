@@ -13,3 +13,6 @@ FAQ
   zipkin_tracing
   lb_panic_threshold
   concurrency_lb
+  disable_circuit_breaking
+  configure_flow_control
+  transient_failures

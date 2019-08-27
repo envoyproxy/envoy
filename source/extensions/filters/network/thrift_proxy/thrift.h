@@ -51,12 +51,13 @@ public:
   }
 };
 
-typedef ConstSingleton<TransportNameValues> TransportNames;
+using TransportNames = ConstSingleton<TransportNameValues>;
 
 enum class ProtocolType {
   Binary,
   LaxBinary,
   Compact,
+  Twitter,
   Auto,
 
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST PROTOCOL TYPE
@@ -77,6 +78,9 @@ public:
   // Compact protocol
   const std::string COMPACT = "compact";
 
+  // Twitter protocol
+  const std::string TWITTER = "twitter";
+
   // Auto-detection protocol
   const std::string AUTO = "auto";
 
@@ -88,6 +92,8 @@ public:
       return LAX_BINARY;
     case ProtocolType::Compact:
       return COMPACT;
+    case ProtocolType::Twitter:
+      return TWITTER;
     case ProtocolType::Auto:
       return AUTO;
     default:
@@ -96,7 +102,7 @@ public:
   }
 };
 
-typedef ConstSingleton<ProtocolNameValues> ProtocolNames;
+using ProtocolNames = ConstSingleton<ProtocolNameValues>;
 
 /**
  * Thrift protocol message types.

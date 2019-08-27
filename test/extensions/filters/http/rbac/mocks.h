@@ -1,6 +1,7 @@
 #pragma once
 
 #include "extensions/filters/common/rbac/utility.h"
+#include "extensions/filters/http/rbac/rbac_filter.h"
 
 #include "gmock/gmock.h"
 

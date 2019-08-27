@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
@@ -9,8 +10,11 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/access_log_config.h"
 
+#include "common/grpc/status.h"
 #include "common/http/header_utility.h"
 #include "common/protobuf/protobuf.h"
+
+#include "absl/hash/hash.h"
 
 namespace Envoy {
 namespace AccessLog {
@@ -24,7 +28,8 @@ public:
    * Read a filter definition from proto and instantiate a concrete filter class.
    */
   static FilterPtr fromProto(const envoy::config::filter::accesslog::v2::AccessLogFilter& config,
-                             Runtime::Loader& runtime, Runtime::RandomGenerator& random);
+                             Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                             ProtobufMessage::ValidationVisitor& validation_visitor);
 };
 
 /**
@@ -51,8 +56,9 @@ public:
       : ComparisonFilter(config.comparison(), runtime) {}
 
   // AccessLog::Filter
-  bool evaluate(const RequestInfo::RequestInfo& info,
-                const Http::HeaderMap& request_headers) override;
+  bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
+                const Http::HeaderMap& response_headers,
+                const Http::HeaderMap& response_trailers) override;
 };
 
 /**
@@ -65,8 +71,9 @@ public:
       : ComparisonFilter(config.comparison(), runtime) {}
 
   // AccessLog::Filter
-  bool evaluate(const RequestInfo::RequestInfo& info,
-                const Http::HeaderMap& request_headers) override;
+  bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
+                const Http::HeaderMap& response_headers,
+                const Http::HeaderMap& response_trailers) override;
 };
 
 /**
@@ -76,7 +83,8 @@ class OperatorFilter : public Filter {
 public:
   OperatorFilter(const Protobuf::RepeatedPtrField<
                      envoy::config::filter::accesslog::v2::AccessLogFilter>& configs,
-                 Runtime::Loader& runtime, Runtime::RandomGenerator& random);
+                 Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                 ProtobufMessage::ValidationVisitor& validation_visitor);
 
 protected:
   std::vector<FilterPtr> filters_;
@@ -88,11 +96,13 @@ protected:
 class AndFilter : public OperatorFilter {
 public:
   AndFilter(const envoy::config::filter::accesslog::v2::AndFilter& config, Runtime::Loader& runtime,
-            Runtime::RandomGenerator& random);
+            Runtime::RandomGenerator& random,
+            ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // AccessLog::Filter
-  bool evaluate(const RequestInfo::RequestInfo& info,
-                const Http::HeaderMap& request_headers) override;
+  bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
+                const Http::HeaderMap& response_headers,
+                const Http::HeaderMap& response_trailers) override;
 };
 
 /**
@@ -101,23 +111,26 @@ public:
 class OrFilter : public OperatorFilter {
 public:
   OrFilter(const envoy::config::filter::accesslog::v2::OrFilter& config, Runtime::Loader& runtime,
-           Runtime::RandomGenerator& random);
+           Runtime::RandomGenerator& random,
+           ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // AccessLog::Filter
-  bool evaluate(const RequestInfo::RequestInfo& info,
-                const Http::HeaderMap& request_headers) override;
+  bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
+                const Http::HeaderMap& response_headers,
+                const Http::HeaderMap& response_trailers) override;
 };
 
 /**
- * Filter out HC requests.
+ * Filter out health check requests.
  */
 class NotHealthCheckFilter : public Filter {
 public:
-  NotHealthCheckFilter() {}
+  NotHealthCheckFilter() = default;
 
   // AccessLog::Filter
-  bool evaluate(const RequestInfo::RequestInfo& info,
-                const Http::HeaderMap& request_headers) override;
+  bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
+                const Http::HeaderMap& response_headers,
+                const Http::HeaderMap& response_trailers) override;
 };
 
 /**
@@ -126,8 +139,9 @@ public:
 class TraceableRequestFilter : public Filter {
 public:
   // AccessLog::Filter
-  bool evaluate(const RequestInfo::RequestInfo& info,
-                const Http::HeaderMap& request_headers) override;
+  bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
+                const Http::HeaderMap& response_headers,
+                const Http::HeaderMap& response_trailers) override;
 };
 
 /**
@@ -139,8 +153,9 @@ public:
                 Runtime::Loader& runtime, Runtime::RandomGenerator& random);
 
   // AccessLog::Filter
-  bool evaluate(const RequestInfo::RequestInfo& info,
-                const Http::HeaderMap& request_headers) override;
+  bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
+                const Http::HeaderMap& response_headers,
+                const Http::HeaderMap& response_trailers) override;
 
 private:
   Runtime::Loader& runtime_;
@@ -158,11 +173,12 @@ public:
   HeaderFilter(const envoy::config::filter::accesslog::v2::HeaderFilter& config);
 
   // AccessLog::Filter
-  bool evaluate(const RequestInfo::RequestInfo& info,
-                const Http::HeaderMap& request_headers) override;
+  bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
+                const Http::HeaderMap& response_headers,
+                const Http::HeaderMap& response_trailers) override;
 
 private:
-  std::vector<Http::HeaderUtility::HeaderData> header_data_;
+  const Http::HeaderUtility::HeaderDataPtr header_data_;
 };
 
 /**
@@ -173,11 +189,75 @@ public:
   ResponseFlagFilter(const envoy::config::filter::accesslog::v2::ResponseFlagFilter& config);
 
   // AccessLog::Filter
-  bool evaluate(const RequestInfo::RequestInfo& info,
-                const Http::HeaderMap& request_headers) override;
+  bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
+                const Http::HeaderMap& response_headers,
+                const Http::HeaderMap& response_trailers) override;
 
 private:
   uint64_t configured_flags_{};
+};
+
+/**
+ * Filters requests that have a response with a gRPC status. Because the gRPC protocol does not
+ * guarantee a gRPC status code, if a gRPC status code is not available, then the filter will infer
+ * the gRPC status code from an HTTP status code if available.
+ */
+class GrpcStatusFilter : public Filter {
+public:
+  using GrpcStatusHashSet =
+      std::unordered_set<Grpc::Status::GrpcStatus, absl::Hash<Grpc::Status::GrpcStatus>>;
+
+  GrpcStatusFilter(const envoy::config::filter::accesslog::v2::GrpcStatusFilter& config);
+
+  // AccessLog::Filter
+  bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
+                const Http::HeaderMap& response_headers,
+                const Http::HeaderMap& response_trailers) override;
+
+private:
+  GrpcStatusHashSet statuses_;
+  bool exclude_;
+
+  /**
+   * Converts a Protobuf representation of a gRPC status into the equivalent code version of a gRPC
+   * status.
+   */
+  Grpc::Status::GrpcStatus
+  protoToGrpcStatus(envoy::config::filter::accesslog::v2::GrpcStatusFilter_Status status) const;
+};
+
+/**
+ * Extension filter factory that reads from ExtensionFilter proto.
+ */
+class ExtensionFilterFactory {
+public:
+  virtual ~ExtensionFilterFactory() = default;
+
+  /**
+   * Create a particular extension filter implementation from a config proto. If the
+   * implementation is unable to produce a filter with the provided parameters, it should throw an
+   * EnvoyException. The returned pointer should never be nullptr.
+   * @param config supplies the custom configuration for this filter type.
+   * @param runtime supplies the runtime loader.
+   * @param random supplies the random generator.
+   * @return an instance of extension filter implementation from a config proto.
+   */
+  virtual FilterPtr
+  createFilter(const envoy::config::filter::accesslog::v2::ExtensionFilter& config,
+               Runtime::Loader& runtime, Runtime::RandomGenerator& random) PURE;
+
+  /**
+   * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The config, which
+   * arrives in an opaque google.protobuf.Struct message, will be converted to JSON and then parsed
+   * into this empty proto.
+   */
+  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
+
+  /**
+   * @return std::string the identifying name for a particular Filter implementation
+   * produced by the factory.
+   */
+  virtual std::string name() const PURE;
 };
 
 /**

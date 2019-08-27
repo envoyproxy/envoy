@@ -11,17 +11,6 @@ namespace Config {
 class AddressJson {
 public:
   /**
-   * Translate a v1 JSON address to v2 envoy::api::v2::core::Address.
-   * @param json_address source address.
-   * @param url is json_address a URL? E.g. tcp://<ip>:<port>. If not, it is
-   *            treated as <ip>:<port>.
-   * @param resolved is json_address a concrete IP/pipe or unresolved hostname?
-   * @param address destination envoy::api::v2::core::Address.
-   */
-  static void translateAddress(const std::string& json_address, bool url, bool resolved,
-                               envoy::api::v2::core::Address& address);
-
-  /**
    * Translate a v1 JSON array of IP ranges to v2
    * Protobuf::RepeatedPtrField<envoy::api::v2::core::CidrRange>.
    * @param json_ip_list List of IP ranges, such as "1.1.1.1/24"

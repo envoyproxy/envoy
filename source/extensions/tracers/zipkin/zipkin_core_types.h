@@ -11,6 +11,7 @@
 #include "extensions/tracers/zipkin/tracer_interface.h"
 #include "extensions/tracers/zipkin/util.h"
 
+#include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -27,7 +28,7 @@ public:
   /**
    * Destructor.
    */
-  virtual ~ZipkinBase() {}
+  virtual ~ZipkinBase() = default;
 
   /**
    * All classes defining Zipkin abstractions need to implement this method to convert
@@ -55,7 +56,7 @@ public:
   /**
    * Default constructor. Creates an empty Endpoint.
    */
-  Endpoint() : service_name_(), address_(nullptr) {}
+  Endpoint() : address_(nullptr) {}
 
   /**
    * Constructor that initializes an endpoint with the given attributes.
@@ -117,12 +118,12 @@ public:
   /**
    * Default constructor. Creates an empty annotation.
    */
-  Annotation() : timestamp_(0), value_() {}
+  Annotation() = default;
 
   /**
    * Constructor that creates an annotation based on the given parameters.
    *
-   * @param timestamp A 64-bit integer containing the annotation timestasmp attribute.
+   * @param timestamp A 64-bit integer containing the annotation timestamp attribute.
    * @param value A string containing the annotation's value attribute. Valid values
    * appear on ZipkinCoreConstants. The most commonly used values are "cs", "cr", "ss" and "sr".
    * @param endpoint The endpoint object representing the annotation's endpoint attribute.
@@ -186,7 +187,7 @@ public:
   const std::string toJson() override;
 
 private:
-  uint64_t timestamp_;
+  uint64_t timestamp_{0};
   std::string value_;
   absl::optional<Endpoint> endpoint_;
 };
@@ -216,7 +217,7 @@ public:
   /**
    * Default constructor. Creates an empty binary annotation.
    */
-  BinaryAnnotation() : key_(), value_(), annotation_type_(STRING) {}
+  BinaryAnnotation() : annotation_type_(STRING) {}
 
   /**
    * Constructor that creates a binary annotation based on the given parameters.
@@ -224,7 +225,7 @@ public:
    * @param key The key name of the annotation.
    * @param value The value associated with the key.
    */
-  BinaryAnnotation(const std::string& key, const std::string& value)
+  BinaryAnnotation(absl::string_view key, absl::string_view value)
       : key_(key), value_(value), annotation_type_(STRING) {}
 
   /**
@@ -287,10 +288,10 @@ private:
   std::string key_;
   std::string value_;
   absl::optional<Endpoint> endpoint_;
-  AnnotationType annotation_type_;
+  AnnotationType annotation_type_{};
 };
 
-typedef std::unique_ptr<Span> SpanPtr;
+using SpanPtr = std::unique_ptr<Span>;
 
 /**
  * Represents a Zipkin span. This class is based on Zipkin's Thrift definition of a span.
@@ -306,7 +307,7 @@ public:
    * Default constructor. Creates an empty span.
    */
   explicit Span(TimeSource& time_source)
-      : trace_id_(0), name_(), id_(0), debug_(false), sampled_(false), monotonic_start_time_(0),
+      : trace_id_(0), id_(0), debug_(false), sampled_(false), monotonic_start_time_(0),
         tracer_(nullptr), time_source_(time_source) {}
 
   /**
@@ -357,7 +358,7 @@ public:
   /**
    * Adds an annotation to the span (move semantics).
    */
-  void addAnnotation(const Annotation&& ann) { annotations_.push_back(ann); }
+  void addAnnotation(Annotation&& ann) { annotations_.emplace_back(std::move(ann)); }
 
   /**
    * Sets the span's binary annotations all at once.
@@ -372,7 +373,9 @@ public:
   /**
    * Adds a binary annotation to the span (move semantics).
    */
-  void addBinaryAnnotation(const BinaryAnnotation&& bann) { binary_annotations_.push_back(bann); }
+  void addBinaryAnnotation(BinaryAnnotation&& bann) {
+    binary_annotations_.emplace_back(std::move(bann));
+  }
 
   /**
    * Sets the span's debug attribute.
@@ -545,7 +548,15 @@ public:
    * @param name The binary annotation's key.
    * @param value The binary annotation's value.
    */
-  void setTag(const std::string& name, const std::string& value);
+  void setTag(absl::string_view name, absl::string_view value);
+
+  /**
+   * Adds an annotation to the span
+   *
+   * @param timestamp The annotation's timestamp.
+   * @param event The annotation's value.
+   */
+  void log(SystemTime timestamp, const std::string& event);
 
 private:
   static const std::string EMPTY_HEX_STRING_;

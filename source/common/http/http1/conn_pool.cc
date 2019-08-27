@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <list>
+#include <memory>
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
@@ -13,7 +14,10 @@
 #include "common/http/codes.h"
 #include "common/http/headers.h"
 #include "common/network/utility.h"
+#include "common/runtime/runtime_impl.h"
 #include "common/upstream/upstream_impl.h"
+
+#include "absl/strings/match.h"
 
 namespace Envoy {
 namespace Http {
@@ -22,7 +26,8 @@ namespace Http1 {
 ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                            Upstream::ResourcePriority priority,
                            const Network::ConnectionSocket::OptionsSharedPtr& options)
-    : dispatcher_(dispatcher), host_(host), priority_(priority), socket_options_(options),
+    : ConnPoolImplBase(std::move(host), std::move(priority)), dispatcher_(dispatcher),
+      socket_options_(options),
       upstream_ready_timer_(dispatcher_.createTimer([this]() { onUpstreamReady(); })) {}
 
 ConnPoolImpl::~ConnPoolImpl() {
@@ -55,10 +60,16 @@ void ConnPoolImpl::addDrainedCallback(DrainedCb cb) {
   checkForDrained();
 }
 
+bool ConnPoolImpl::hasActiveConnections() const {
+  return !pending_requests_.empty() || !busy_clients_.empty();
+}
+
 void ConnPoolImpl::attachRequestToClient(ActiveClient& client, StreamDecoder& response_decoder,
                                          ConnectionPool::Callbacks& callbacks) {
   ASSERT(!client.stream_wrapper_);
-  client.stream_wrapper_.reset(new StreamWrapper(response_decoder, client));
+  host_->cluster().stats().upstream_rq_total_.inc();
+  host_->stats().rq_total_.inc();
+  client.stream_wrapper_ = std::make_unique<StreamWrapper>(response_decoder, client);
   callbacks.onPoolReady(*client.stream_wrapper_, client.real_host_description_);
 }
 
@@ -82,8 +93,6 @@ void ConnPoolImpl::createNewConnection() {
 
 ConnectionPool::Cancellable* ConnPoolImpl::newStream(StreamDecoder& response_decoder,
                                                      ConnectionPool::Callbacks& callbacks) {
-  host_->cluster().stats().upstream_rq_total_.inc();
-  host_->stats().rq_total_.inc();
   if (!ready_clients_.empty()) {
     ready_clients_.front()->moveBetweenLists(ready_clients_, busy_clients_);
     ENVOY_CONN_LOG(debug, "using existing connection", *busy_clients_.front()->codec_client_);
@@ -99,17 +108,15 @@ ConnectionPool::Cancellable* ConnPoolImpl::newStream(StreamDecoder& response_dec
     }
 
     // If we have no connections at all, make one no matter what so we don't starve.
-    if ((ready_clients_.size() == 0 && busy_clients_.size() == 0) || can_create_connection) {
+    if ((ready_clients_.empty() && busy_clients_.empty()) || can_create_connection) {
       createNewConnection();
     }
 
-    ENVOY_LOG(debug, "queueing request due to no available connections");
-    PendingRequestPtr pending_request(new PendingRequest(*this, response_decoder, callbacks));
-    pending_request->moveIntoList(std::move(pending_request), pending_requests_);
-    return pending_requests_.front().get();
+    return newPendingRequest(response_decoder, callbacks);
   } else {
     ENVOY_LOG(debug, "max pending requests overflow");
-    callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::Overflow, nullptr);
+    callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::Overflow, absl::string_view(),
+                            nullptr);
     host_->cluster().stats().upstream_rq_pending_overflow_.inc();
     return nullptr;
   }
@@ -119,18 +126,15 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEv
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
     // The client died.
-    ENVOY_CONN_LOG(debug, "client disconnected", *client.codec_client_);
+    ENVOY_CONN_LOG(debug, "client disconnected, failure reason: {}", *client.codec_client_,
+                   client.codec_client_->connectionFailureReason());
+
+    Envoy::Upstream::reportUpstreamCxDestroy(host_, event);
     ActiveClientPtr removed;
     bool check_for_drained = true;
     if (client.stream_wrapper_) {
       if (!client.stream_wrapper_->decode_complete_) {
-        if (event == Network::ConnectionEvent::LocalClose) {
-          host_->cluster().stats().upstream_cx_destroy_local_with_active_rq_.inc();
-        }
-        if (event == Network::ConnectionEvent::RemoteClose) {
-          host_->cluster().stats().upstream_cx_destroy_remote_with_active_rq_.inc();
-        }
-        host_->cluster().stats().upstream_cx_destroy_with_active_rq_.inc();
+        Envoy::Upstream::reportUpstreamCxDestroyActiveRequest(host_, event);
       }
 
       // There is an active request attached to this client. The underlying codec client will
@@ -153,16 +157,10 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEv
       // that is behaving badly, requests can get stuck here in the pending state. If we see a
       // connect failure, we purge all pending requests so that calling code can determine what to
       // do with the request.
-      // NOTE: We move the existing pending requests to a temporary list. This is done so that
-      //       if retry logic submits a new request to the pool, we don't fail it inline.
-      std::list<PendingRequestPtr> pending_requests_to_purge(std::move(pending_requests_));
-      while (!pending_requests_to_purge.empty()) {
-        PendingRequestPtr request =
-            pending_requests_to_purge.front()->removeFromList(pending_requests_to_purge);
-        host_->cluster().stats().upstream_rq_pending_failure_eject_.inc();
-        request->callbacks_.onPoolFailure(ConnectionPool::PoolFailureReason::ConnectionFailure,
-                                          client.real_host_description_);
-      }
+      ENVOY_CONN_LOG(debug, "purge pending, failure reason: {}", *client.codec_client_,
+                     client.codec_client_->connectionFailureReason());
+      purgePendingRequests(client.real_host_description_,
+                           client.codec_client_->connectionFailureReason());
     }
 
     dispatcher_.deferredDelete(std::move(removed));
@@ -197,20 +195,13 @@ void ConnPoolImpl::onDownstreamReset(ActiveClient& client) {
   client.codec_client_->close();
 }
 
-void ConnPoolImpl::onPendingRequestCancel(PendingRequest& request) {
-  ENVOY_LOG(debug, "cancelling pending request");
-  request.removeFromList(pending_requests_);
-  host_->cluster().stats().upstream_rq_cancelled_.inc();
-  checkForDrained();
-}
-
 void ConnPoolImpl::onResponseComplete(ActiveClient& client) {
   ENVOY_CONN_LOG(debug, "response complete", *client.codec_client_);
   if (!client.stream_wrapper_->encode_complete_) {
     ENVOY_CONN_LOG(debug, "response before request complete", *client.codec_client_);
     onDownstreamReset(client);
-  } else if (client.stream_wrapper_->saw_close_header_ || client.codec_client_->remoteClosed()) {
-    ENVOY_CONN_LOG(debug, "saw upstream connection: close", *client.codec_client_);
+  } else if (client.stream_wrapper_->close_connection_ || client.codec_client_->remoteClosed()) {
+    ENVOY_CONN_LOG(debug, "saw upstream close connection", *client.codec_client_);
     onDownstreamReset(client);
   } else if (client.remaining_requests_ > 0 && --client.remaining_requests_ == 0) {
     ENVOY_CONN_LOG(debug, "maximum requests per connection", *client.codec_client_);
@@ -279,11 +270,21 @@ ConnPoolImpl::StreamWrapper::~StreamWrapper() {
 void ConnPoolImpl::StreamWrapper::onEncodeComplete() { encode_complete_ = true; }
 
 void ConnPoolImpl::StreamWrapper::decodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
-  if (headers->Connection() &&
-      0 == StringUtil::caseInsensitiveCompare(headers->Connection()->value().c_str(),
-                                              Headers::get().ConnectionValues.Close.c_str())) {
-    saw_close_header_ = true;
+  // If Connection: close OR
+  //    Http/1.0 and not Connection: keep-alive OR
+  //    Proxy-Connection: close
+  if ((headers->Connection() &&
+       (absl::EqualsIgnoreCase(headers->Connection()->value().getStringView(),
+                               Headers::get().ConnectionValues.Close))) ||
+      (parent_.codec_client_->protocol() == Protocol::Http10 &&
+       (!headers->Connection() ||
+        !absl::EqualsIgnoreCase(headers->Connection()->value().getStringView(),
+                                Headers::get().ConnectionValues.KeepAlive))) ||
+      (headers->ProxyConnection() &&
+       (absl::EqualsIgnoreCase(headers->ProxyConnection()->value().getStringView(),
+                               Headers::get().ConnectionValues.Close)))) {
     parent_.parent_.host_->cluster().stats().upstream_cx_close_notify_.inc();
+    close_connection_ = true;
   }
 
   StreamDecoderWrapper::decodeHeaders(std::move(headers), end_stream);
@@ -294,28 +295,15 @@ void ConnPoolImpl::StreamWrapper::onDecodeComplete() {
   parent_.parent_.onResponseComplete(parent_);
 }
 
-ConnPoolImpl::PendingRequest::PendingRequest(ConnPoolImpl& parent, StreamDecoder& decoder,
-                                             ConnectionPool::Callbacks& callbacks)
-    : parent_(parent), decoder_(decoder), callbacks_(callbacks) {
-  parent_.host_->cluster().stats().upstream_rq_pending_total_.inc();
-  parent_.host_->cluster().stats().upstream_rq_pending_active_.inc();
-  parent_.host_->cluster().resourceManager(parent_.priority_).pendingRequests().inc();
-}
-
-ConnPoolImpl::PendingRequest::~PendingRequest() {
-  parent_.host_->cluster().stats().upstream_rq_pending_active_.dec();
-  parent_.host_->cluster().resourceManager(parent_.priority_).pendingRequests().dec();
-}
-
 ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
     : parent_(parent),
       connect_timer_(parent_.dispatcher_.createTimer([this]() -> void { onConnectTimeout(); })),
       remaining_requests_(parent_.host_->cluster().maxRequestsPerConnection()) {
 
-  parent_.conn_connect_ms_.reset(
-      new Stats::Timespan(parent_.host_->cluster().stats().upstream_cx_connect_ms_));
+  parent_.conn_connect_ms_ = std::make_unique<Stats::Timespan>(
+      parent_.host_->cluster().stats().upstream_cx_connect_ms_, parent_.dispatcher_.timeSource());
   Upstream::Host::CreateConnectionData data =
-      parent_.host_->createConnection(parent_.dispatcher_, parent_.socket_options_);
+      parent_.host_->createConnection(parent_.dispatcher_, parent_.socket_options_, nullptr);
   real_host_description_ = data.host_description_;
   codec_client_ = parent_.createCodecClient(data);
   codec_client_->addConnectionCallbacks(*this);
@@ -325,7 +313,8 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
   parent_.host_->cluster().stats().upstream_cx_http1_total_.inc();
   parent_.host_->stats().cx_total_.inc();
   parent_.host_->stats().cx_active_.inc();
-  conn_length_.reset(new Stats::Timespan(parent_.host_->cluster().stats().upstream_cx_length_ms_));
+  conn_length_ = std::make_unique<Stats::Timespan>(
+      parent_.host_->cluster().stats().upstream_cx_length_ms_, parent_.dispatcher_.timeSource());
   connect_timer_->enableTimer(parent_.host_->cluster().connectTimeout());
   parent_.host_->cluster().resourceManager(parent_.priority_).connections().inc();
 
@@ -334,7 +323,7 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
        parent_.host_->cluster().stats().upstream_cx_rx_bytes_buffered_,
        parent_.host_->cluster().stats().upstream_cx_tx_bytes_total_,
        parent_.host_->cluster().stats().upstream_cx_tx_bytes_buffered_,
-       &parent_.host_->cluster().stats().bind_errors_});
+       &parent_.host_->cluster().stats().bind_errors_, nullptr});
 }
 
 ConnPoolImpl::ActiveClient::~ActiveClient() {
@@ -352,7 +341,7 @@ void ConnPoolImpl::ActiveClient::onConnectTimeout() {
   codec_client_->close();
 }
 
-CodecClientPtr ConnPoolImplProd::createCodecClient(Upstream::Host::CreateConnectionData& data) {
+CodecClientPtr ProdConnPoolImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {
   CodecClientPtr codec{new CodecClientProd(CodecClient::Type::HTTP1, std::move(data.connection_),
                                            data.host_description_, dispatcher_)};
   return codec;

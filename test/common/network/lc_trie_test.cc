@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/cidr_range.h"
@@ -19,16 +21,17 @@ public:
     for (size_t i = 0; i < cidr_range_strings.size(); i++) {
       std::pair<std::string, std::vector<Address::CidrRange>> ip_tags;
       ip_tags.first = fmt::format("tag_{0}", i);
-      for (size_t j = 0; j < cidr_range_strings[i].size(); j++) {
-        ip_tags.second.push_back(Address::CidrRange::create(cidr_range_strings[i][j]));
+      for (const auto& j : cidr_range_strings[i]) {
+        ip_tags.second.push_back(Address::CidrRange::create(j));
       }
       output.push_back(ip_tags);
     }
     // Use custom fill factors and root branch factors if they are in the valid range.
     if ((fill_factor > 0) && (fill_factor <= 1) && (root_branch_factor > 0)) {
-      trie_.reset(new LcTrie<std::string>(output, exclusive, fill_factor, root_branch_factor));
+      trie_ =
+          std::make_unique<LcTrie<std::string>>(output, exclusive, fill_factor, root_branch_factor);
     } else {
-      trie_.reset(new LcTrie<std::string>(output, exclusive));
+      trie_ = std::make_unique<LcTrie<std::string>>(output, exclusive);
     }
   }
 

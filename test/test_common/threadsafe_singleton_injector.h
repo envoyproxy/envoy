@@ -1,3 +1,5 @@
+#pragma once
+
 #include "common/singleton/threadsafe_singleton.h"
 
 namespace Envoy {

@@ -4,22 +4,24 @@
 #include <memory>
 #include <string>
 
+#include "envoy/api/io_error.h"
 #include "envoy/common/exception.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/listen_socket.h"
-#include "envoy/network/transport_socket.h"
-#include "envoy/ssl/context.h"
 #include "envoy/stats/scope.h"
 
 namespace Envoy {
 namespace Network {
+
+class UdpListenerFilterManager;
+class ActiveUdpListenerFactory;
 
 /**
  * A configuration for an individual listener.
  */
 class ListenerConfig {
 public:
-  virtual ~ListenerConfig() {}
+  virtual ~ListenerConfig() = default;
 
   /**
    * @return FilterChainManager& the factory for adding and searching through configured
@@ -38,6 +40,7 @@ public:
    *         different from configured if for example the configured address binds to port zero.
    */
   virtual Socket& socket() PURE;
+  virtual const Socket& socket() const PURE;
 
   /**
    * @return bool specifies whether the listener should actually listen on the port.
@@ -58,7 +61,21 @@ public:
    * @return uint32_t providing a soft limit on size of the listener's new connection read and write
    *         buffers.
    */
-  virtual uint32_t perConnectionBufferLimitBytes() PURE;
+  virtual uint32_t perConnectionBufferLimitBytes() const PURE;
+
+  /**
+   * @return std::chrono::milliseconds the time to wait for all listener filters to complete
+   *         operation. If the timeout is reached, the accepted socket is closed without a
+   *         connection being created unless continueOnListenerFiltersTimeout() returns true.
+   *         0 specifies a disabled timeout.
+   */
+  virtual std::chrono::milliseconds listenerFiltersTimeout() const PURE;
+
+  /**
+   * @return bool whether the listener should try to create a connection when listener filters
+   *         time out.
+   */
+  virtual bool continueOnListenerFiltersTimeout() const PURE;
 
   /**
    * @return Stats::Scope& the stats scope to use for all listener specific stats.
@@ -74,6 +91,12 @@ public:
    * @return const std::string& the listener's name.
    */
   virtual const std::string& name() const PURE;
+
+  /**
+   * @return factory pointer if listening on UDP socket, otherwise return
+   * nullptr.
+   */
+  virtual const ActiveUdpListenerFactory* udpListenerFactory() PURE;
 };
 
 /**
@@ -81,14 +104,14 @@ public:
  */
 class ListenerCallbacks {
 public:
-  virtual ~ListenerCallbacks() {}
+  virtual ~ListenerCallbacks() = default;
 
   /**
    * Called when a new connection is accepted.
    * @param socket supplies the socket that is moved into the callee.
-   * @param redirected is true when the socket was first accepted by another listener
-   * and is redirected to a new listener. The recipient should not redirect
-   * the socket any further.
+   * @param hand_off_restored_destination_connections is true when the socket was first accepted by
+   * another listener and is redirected to a new listener. The recipient should not redirect the
+   * socket any further.
    */
   virtual void onAccept(ConnectionSocketPtr&& socket,
                         bool hand_off_restored_destination_connections = true) PURE;
@@ -101,14 +124,123 @@ public:
 };
 
 /**
+ * Utility struct that encapsulates the information from a udp socket's
+ * recvfrom/recvmmsg call.
+ *
+ * TODO(conqerAtapple): Maybe this belongs inside the UdpListenerCallbacks
+ * class.
+ */
+struct UdpRecvData {
+  Address::InstanceConstSharedPtr local_address_;
+  Address::InstanceConstSharedPtr peer_address_; // TODO(conquerAtapple): Fix ownership semantics.
+  Buffer::InstancePtr buffer_;
+  MonotonicTime receive_time_;
+
+  // TODO(conquerAtapple):
+  // Add UdpReader here so that the callback handler can
+  // then use the reader to do multiple reads(recvmmsg) once the OS notifies it
+  // has data. We could also just return a `ReaderFactory` that returns either a
+  // `recvfrom` reader (with peer information) or a `read/recvmmsg` reader. This
+  // is still being flushed out (Jan, 2019).
+};
+
+/**
+ * Encapsulates the information needed to send a udp packet to a target
+ */
+struct UdpSendData {
+  const Address::Ip* local_ip_;
+  const Address::Instance& peer_address_;
+
+  // The buffer is a reference so that it can be reused by the sender to send different
+  // messages
+  Buffer::Instance& buffer_;
+};
+
+/**
+ * UDP listener callbacks.
+ */
+class UdpListenerCallbacks {
+public:
+  enum class ErrorCode { SyscallError, UnknownError };
+
+  virtual ~UdpListenerCallbacks() = default;
+
+  /**
+   * Called whenever data is received by the underlying udp socket.
+   *
+   * @param data UdpRecvData from the underlying socket.
+   */
+  virtual void onData(UdpRecvData& data) PURE;
+
+  /**
+   * Called when the underlying socket is ready for write.
+   *
+   * @param socket Underlying server socket for the listener.
+   *
+   * TODO(conqerAtapple): Maybe we need a UdpWriter here instead of Socket.
+   */
+  virtual void onWriteReady(const Socket& socket) PURE;
+
+  /**
+   * Called when there is an error event in the receive data path.
+   * The send side error is a return type on the send method.
+   *
+   * @param error_code ErrorCode for the error event.
+   * @param error_number System error number.
+   */
+  virtual void onReceiveError(const ErrorCode& error_code, Api::IoError::IoErrorCode err) PURE;
+};
+
+/**
  * An abstract socket listener. Free the listener to stop listening on the socket.
  */
 class Listener {
 public:
-  virtual ~Listener() {}
+  virtual ~Listener() = default;
+
+  /**
+   * Temporarily disable accepting new connections.
+   */
+  virtual void disable() PURE;
+
+  /**
+   * Enable accepting new connections.
+   */
+  virtual void enable() PURE;
 };
 
-typedef std::unique_ptr<Listener> ListenerPtr;
+using ListenerPtr = std::unique_ptr<Listener>;
+
+/**
+ * A UDP listener interface.
+ */
+class UdpListener : public virtual Listener {
+public:
+  ~UdpListener() override = default;
+
+  /**
+   * @return Event::Dispatcher& the dispatcher backing this listener.
+   */
+  virtual Event::Dispatcher& dispatcher() PURE;
+
+  /**
+   * @return the local address of the socket.
+   */
+  virtual const Network::Address::InstanceConstSharedPtr& localAddress() const PURE;
+
+  /**
+   * Send data through the underlying udp socket. If the send buffer of the socket FD is full, an
+   * error code is returned.
+   * TODO(sumukhs): We do not currently handle max MTU size of the datagram. Determine if we could
+   * expose the path MTU information to the caller.
+   *
+   * @param data Supplies the data to send to a target using udp.
+   * @return the error code of the underlying send api. On successfully sending 'n' bytes, the
+   * underlying buffers in the data  are drained by 'n' bytes. The remaining can be retried by the
+   * sender.
+   */
+  virtual Api::IoCallUint64Result send(const UdpSendData& data) PURE;
+};
 
 /**
  * Thrown when there is a runtime error creating/binding a listener.

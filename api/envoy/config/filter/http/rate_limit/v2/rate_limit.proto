@@ -1,7 +1,13 @@
 syntax = "proto3";
 
 package envoy.config.filter.http.rate_limit.v2;
+
+option java_outer_classname = "RateLimitProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.config.filter.http.rate_limit.v2";
 option go_package = "v2";
+
+import "envoy/config/ratelimit/v2/rls.proto";
 
 import "google/protobuf/duration.proto";
 
@@ -40,4 +46,15 @@ message RateLimit {
   // communication failure between rate limiting service and the proxy.
   // Defaults to false.
   bool failure_mode_deny = 5;
+
+  // Specifies whether a `RESOURCE_EXHAUSTED` gRPC code must be returned instead
+  // of the default `UNAVAILABLE` gRPC code for a rate limited gRPC call. The
+  // HTTP code will be 200 for a gRPC response.
+  bool rate_limited_as_resource_exhausted = 6;
+
+  // Configuration for an external rate limit service provider. If not
+  // specified, any calls to the rate limit service will immediately return
+  // success.
+  envoy.config.ratelimit.v2.RateLimitServiceConfig rate_limit_service = 7
+      [(validate.rules).message.required = true];
 }

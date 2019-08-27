@@ -11,3 +11,6 @@ Extensions
   health_checker/health_checker
   transport_socket/transport_socket
   resource_monitor/resource_monitor
+  common/common
+  cluster/cluster
+  grpc_credential/grpc_credential

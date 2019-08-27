@@ -49,10 +49,10 @@ public:
     )EOF";
 
     envoy::config::filter::network::ext_authz::v2::ExtAuthz proto_config{};
-    MessageUtil::loadFromJson(json, proto_config);
+    TestUtility::loadFromJson(json, proto_config);
     config_.reset(new Config(proto_config, stats_store_));
     client_ = new Filters::Common::ExtAuthz::MockClient();
-    filter_.reset(new Filter(config_, Filters::Common::ExtAuthz::ClientPtr{client_}));
+    filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_});
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
     addr_ = std::make_shared<Network::Address::PipeInstance>("/test/test.sock");
 
@@ -69,7 +69,7 @@ public:
     return response;
   }
 
-  ~ExtAuthzFilterTest() {
+  ~ExtAuthzFilterTest() override {
     for (const Stats::GaugeSharedPtr& gauge : stats_store_.gauges()) {
       EXPECT_EQ(0U, gauge->value());
     }
@@ -93,9 +93,9 @@ TEST_F(ExtAuthzFilterTest, BadExtAuthzConfig) {
   )EOF";
 
   envoy::config::filter::network::ext_authz::v2::ExtAuthz proto_config{};
-  MessageUtil::loadFromJson(json_string, proto_config);
+  TestUtility::loadFromJson(json_string, proto_config);
 
-  EXPECT_THROW(MessageUtil::downcastAndValidate<
+  EXPECT_THROW(TestUtility::downcastAndValidate<
                    const envoy::config::filter::network::ext_authz::v2::ExtAuthz&>(proto_config),
                ProtoValidationException);
 }
@@ -114,12 +114,16 @@ TEST_F(ExtAuthzFilterTest, OKWithOnData) {
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
   // Confirm that the invocation of onNewConnection did NOT increment the active or total count!
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.total").value());
-  EXPECT_EQ(0U, stats_store_.gauge("ext_authz.name.active").value());
+  EXPECT_EQ(
+      0U,
+      stats_store_.gauge("ext_authz.name.active", Stats::Gauge::ImportMode::Accumulate).value());
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
   // Confirm that the invocation of onData does increment the active and total count!
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
-  EXPECT_EQ(1U, stats_store_.gauge("ext_authz.name.active").value());
+  EXPECT_EQ(
+      1U,
+      stats_store_.gauge("ext_authz.name.active", Stats::Gauge::ImportMode::Accumulate).value());
 
   EXPECT_CALL(filter_callbacks_, continueReading());
   request_callbacks_->onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::OK));
@@ -151,12 +155,16 @@ TEST_F(ExtAuthzFilterTest, DeniedWithOnData) {
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
   // Confirm that the invocation of onNewConnection did NOT increment the active or total count!
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.total").value());
-  EXPECT_EQ(0U, stats_store_.gauge("ext_authz.name.active").value());
+  EXPECT_EQ(
+      0U,
+      stats_store_.gauge("ext_authz.name.active", Stats::Gauge::ImportMode::Accumulate).value());
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
   // Confirm that the invocation of onData does increment the active and total count!
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
-  EXPECT_EQ(1U, stats_store_.gauge("ext_authz.name.active").value());
+  EXPECT_EQ(
+      1U,
+      stats_store_.gauge("ext_authz.name.active", Stats::Gauge::ImportMode::Accumulate).value());
 
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(*client_, cancel()).Times(0);
@@ -204,7 +212,7 @@ TEST_F(ExtAuthzFilterTest, FailOpen) {
 
 TEST_F(ExtAuthzFilterTest, FailClose) {
   InSequence s;
-  // Explicitily set the failure_mode_allow to false.
+  // Explicitly set the failure_mode_allow to false.
   config_->setFailModeAllow(false);
 
   EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
@@ -323,7 +331,7 @@ TEST_F(ExtAuthzFilterTest, ImmediateOK) {
 }
 
 // Test to verify that on stack denied response from the authorization service does
-// result in stopage of the filter chain.
+// result in stoppage of the filter chain.
 TEST_F(ExtAuthzFilterTest, ImmediateNOK) {
   InSequence s;
 

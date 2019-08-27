@@ -2,8 +2,13 @@ syntax = "proto3";
 
 package envoy.api.v2.core;
 
+option java_outer_classname = "GrpcServiceProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.api.v2.core";
+
 import "envoy/api/v2/core/base.proto";
 
+import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/empty.proto";
@@ -44,6 +49,11 @@ message GrpcService {
       DataSource cert_chain = 3;
     }
 
+    // Local channel credentials. Only UDS is supported for now.
+    // See https://github.com/grpc/grpc/pull/15909.
+    message GoogleLocalCredentials {
+    }
+
     // See https://grpc.io/docs/guides/auth.html#credential-types to understand Channel and Call
     // credential types.
     message ChannelCredentials {
@@ -53,6 +63,8 @@ message GrpcService {
 
         // https://grpc.io/grpc/cpp/namespacegrpc.html#a6beb3ac70ff94bd2ebbd89b8f21d1f61
         google.protobuf.Empty google_default = 2;
+
+        GoogleLocalCredentials local_credentials = 3;
       }
     }
 
@@ -71,7 +83,11 @@ message GrpcService {
 
       message MetadataCredentialsFromPlugin {
         string name = 1;
-        google.protobuf.Struct config = 2;
+        oneof config_type {
+          google.protobuf.Struct config = 2;
+
+          google.protobuf.Any typed_config = 3;
+        }
       }
 
       oneof credential_specifier {

@@ -1,8 +1,6 @@
 #pragma once
 
 #include <netinet/in.h>
-#include <netinet/ip.h>
-#include <netinet/tcp.h>
 #include <sys/socket.h>
 
 #include "envoy/api/v2/core/address.pb.h"
@@ -29,9 +27,12 @@ public:
   buildTcpKeepaliveOptions(Network::TcpKeepaliveConfig keepalive_config);
   static std::unique_ptr<Socket::Options> buildIpFreebindOptions();
   static std::unique_ptr<Socket::Options> buildIpTransparentOptions();
+  static std::unique_ptr<Socket::Options> buildSocketMarkOptions(uint32_t mark);
   static std::unique_ptr<Socket::Options> buildTcpFastOpenOptions(uint32_t queue_length);
   static std::unique_ptr<Socket::Options> buildLiteralOptions(
       const Protobuf::RepeatedPtrField<envoy::api::v2::core::SocketOption>& socket_options);
+  static std::unique_ptr<Socket::Options> buildIpPacketInfoOptions();
+  static std::unique_ptr<Socket::Options> buildRxQueueOverFlowOptions();
 };
 } // namespace Network
 } // namespace Envoy

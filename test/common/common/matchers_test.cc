@@ -117,7 +117,6 @@ TEST(MetadataTest, MatchStringSuffixValue) {
   EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
   matcher.mutable_value()->mutable_string_match()->set_suffix("prod");
   EXPECT_TRUE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
-  ;
 }
 
 TEST(MetadataTest, MatchBoolValue) {
@@ -256,6 +255,47 @@ TEST(MetadataTest, MatchDoubleListValue) {
 
   values->clear_values();
   metadataValue.Clear();
+}
+
+TEST(StringMatcher, SafeRegexValue) {
+  envoy::type::matcher::StringMatcher matcher;
+  matcher.mutable_safe_regex()->mutable_google_re2();
+  matcher.mutable_safe_regex()->set_regex("foo.*");
+  EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("foo"));
+  EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("foobar"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("bar"));
+}
+
+TEST(LowerCaseStringMatcher, MatchExactValue) {
+  envoy::type::matcher::StringMatcher matcher;
+  matcher.set_exact("Foo");
+
+  EXPECT_FALSE(Envoy::Matchers::LowerCaseStringMatcher(matcher).match("Foo"));
+  EXPECT_TRUE(Envoy::Matchers::LowerCaseStringMatcher(matcher).match("foo"));
+}
+
+TEST(LowerCaseStringMatcher, MatchPrefixValue) {
+  envoy::type::matcher::StringMatcher matcher;
+  matcher.set_prefix("Foo.");
+
+  EXPECT_TRUE(Envoy::Matchers::LowerCaseStringMatcher(matcher).match("foo.bar"));
+  EXPECT_FALSE(Envoy::Matchers::LowerCaseStringMatcher(matcher).match("Foo."));
+}
+
+TEST(LowerCaseStringMatcher, MatchSuffixValue) {
+  envoy::type::matcher::StringMatcher matcher;
+  matcher.set_suffix(".Bar");
+
+  EXPECT_TRUE(Envoy::Matchers::LowerCaseStringMatcher(matcher).match("foo.bar"));
+  EXPECT_FALSE(Envoy::Matchers::LowerCaseStringMatcher(matcher).match(".Bar"));
+}
+
+TEST(LowerCaseStringMatcher, MatchRegexValue) {
+  envoy::type::matcher::StringMatcher matcher;
+  matcher.set_regex("Foo.*");
+
+  EXPECT_TRUE(Envoy::Matchers::LowerCaseStringMatcher(matcher).match("foo.bar"));
+  EXPECT_FALSE(Envoy::Matchers::LowerCaseStringMatcher(matcher).match("Foo.Bar"));
 }
 
 } // namespace
