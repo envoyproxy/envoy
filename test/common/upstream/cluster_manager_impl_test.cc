@@ -584,7 +584,7 @@ class ClusterManagerSubsetInitializationTest
     : public ClusterManagerImplTest,
       public testing::WithParamInterface<envoy::api::v2::Cluster_LbPolicy> {
 public:
-  ClusterManagerSubsetInitializationTest() {}
+  ClusterManagerSubsetInitializationTest() = default;
 
   static std::vector<envoy::api::v2::Cluster_LbPolicy> lbPolicies() {
     int first = static_cast<int>(envoy::api::v2::Cluster_LbPolicy_LbPolicy_MIN);
@@ -602,7 +602,7 @@ public:
   }
 
   static std::string paramName(const testing::TestParamInfo<ParamType>& info) {
-    std::string name = envoy::api::v2::Cluster_LbPolicy_Name(info.param);
+    const std::string& name = envoy::api::v2::Cluster_LbPolicy_Name(info.param);
     return absl::StrReplaceAll(name, {{"_", ""}});
   }
 };
@@ -634,7 +634,7 @@ static_resources:
                   port_value: 8001
   )EOF";
 
-  const std::string policy_name = envoy::api::v2::Cluster_LbPolicy_Name(GetParam());
+  const std::string& policy_name = envoy::api::v2::Cluster_LbPolicy_Name(GetParam());
   const std::string yaml = fmt::format(yamlPattern, policy_name);
 
   if (GetParam() == envoy::api::v2::Cluster_LbPolicy_ORIGINAL_DST_LB ||
