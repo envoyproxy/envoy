@@ -14,6 +14,7 @@
 
 using namespace std::chrono_literals;
 using testing::_;
+using testing::An;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
@@ -25,18 +26,22 @@ namespace AccessLoggers {
 namespace HttpGrpc {
 namespace {
 
+using envoy::data::accesslog::v2::HTTPAccessLogEntry;
+
 class MockGrpcAccessLogger : public GrpcCommon::GrpcAccessLogger {
 public:
   // GrpcAccessLogger
-  MOCK_METHOD1(log, void(envoy::data::accesslog::v2::HTTPAccessLogEntry&& entry));
+  MOCK_METHOD1(log, void(HTTPAccessLogEntry&& entry));
+  MOCK_METHOD1(log, void(envoy::data::accesslog::v2::TCPAccessLogEntry&& entry));
 };
 
 class MockGrpcAccessLoggerCache : public GrpcCommon::GrpcAccessLoggerCache {
 public:
   // GrpcAccessLoggerCache
-  MOCK_METHOD1(getOrCreateLogger,
+  MOCK_METHOD2(getOrCreateLogger,
                GrpcCommon::GrpcAccessLoggerSharedPtr(
-                   const ::envoy::config::accesslog::v2::CommonGrpcAccessLogConfig& config));
+                   const ::envoy::config::accesslog::v2::CommonGrpcAccessLogConfig& config,
+                   GrpcCommon::GrpcAccessLoggerType logger_type));
 };
 
 class HttpGrpcAccessLogTest : public testing::Test {
@@ -44,9 +49,11 @@ public:
   void init() {
     ON_CALL(*filter_, evaluate(_, _, _, _)).WillByDefault(Return(true));
     config_.mutable_common_config()->set_log_name("hello_log");
-    EXPECT_CALL(*logger_cache_, getOrCreateLogger(_))
-        .WillOnce([this](const ::envoy::config::accesslog::v2::CommonGrpcAccessLogConfig& config) {
+    EXPECT_CALL(*logger_cache_, getOrCreateLogger(_, _))
+        .WillOnce([this](const ::envoy::config::accesslog::v2::CommonGrpcAccessLogConfig& config,
+                         GrpcCommon::GrpcAccessLoggerType logger_type) {
           EXPECT_EQ(config.DebugString(), config_.common_config().DebugString());
+          EXPECT_EQ(GrpcCommon::GrpcAccessLoggerType::HTTP, logger_type);
           return logger_;
         });
     access_log_ = std::make_unique<HttpGrpcAccessLog>(AccessLog::FilterPtr{filter_}, config_, tls_,
@@ -58,9 +65,9 @@ public:
       init();
     }
 
-    envoy::data::accesslog::v2::HTTPAccessLogEntry expected_log_entry;
+    HTTPAccessLogEntry expected_log_entry;
     TestUtility::loadFromYaml(expected_log_entry_yaml, expected_log_entry);
-    EXPECT_CALL(*logger_, log(_))
+    EXPECT_CALL(*logger_, log(An<HTTPAccessLogEntry&&>()))
         .WillOnce(
             Invoke([expected_log_entry](envoy::data::accesslog::v2::HTTPAccessLogEntry&& entry) {
               EXPECT_EQ(entry.DebugString(), expected_log_entry.DebugString());
