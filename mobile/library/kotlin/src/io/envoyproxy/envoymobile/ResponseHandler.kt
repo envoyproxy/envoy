@@ -14,7 +14,7 @@ class ResponseHandler(val executor: Executor) {
       internal val responseHandler: ResponseHandler
   ) : EnvoyObserver {
 
-    override fun getExecutor() : Executor = executor
+    override fun getExecutor() : Executor = responseHandler.executor
 
     override fun onHeaders(headers: Map<String, List<String>>?, endStream: Boolean) {
       val statusCode = headers!![":status"]?.first()?.toIntOrNull() ?: 0

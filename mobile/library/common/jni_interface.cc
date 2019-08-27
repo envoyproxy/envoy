@@ -1,15 +1,20 @@
+#include <android/log.h>
 #include <ares.h>
 #include <jni.h>
-#include <string.h>
+
+#include <string>
 
 #include "main_interface.h"
 
-static JNIEnv* env = nullptr;
+static JavaVM* static_jvm = nullptr;
+static JNIEnv* static_env = nullptr;
+const static jint JNI_VERSION = JNI_VERSION_1_6;
 
 // NOLINT(namespace-envoy)
 
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
-  if (vm->GetEnv((void**)&env, JNI_VERSION_1_6) != JNI_OK) {
+  static_jvm = vm;
+  if (vm->GetEnv((void**)&static_env, JNI_VERSION) != JNI_OK) {
     return -1;
   }
 
@@ -17,7 +22,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
   // More information can be found at:
   // https://c-ares.haxx.se/ares_library_init_android.html
   ares_library_init_jvm(vm);
-  return JNI_VERSION_1_6;
+  return JNI_VERSION;
 }
 
 // JniLibrary
@@ -31,7 +36,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
 
 extern "C" JNIEXPORT jint JNICALL
 Java_io_envoyproxy_envoymobile_engine_JniLibrary_runEngine(JNIEnv* env,
-                                                           jobject, // this
+                                                           jclass, // class
                                                            jstring config, jstring log_level) {
   return run_engine(env->GetStringUTFChars(config, nullptr),
                     env->GetStringUTFChars(log_level, nullptr));
@@ -62,9 +67,9 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_templateString(JNIEnv* env,
   return result;
 }
 
-// EnvoyHttpStream
+// JvmObserverContext
 
-static void pass_headers(envoy_headers headers, jobject j_context) {
+static void pass_headers(JNIEnv* env, envoy_headers headers, jobject j_context) {
   jclass jcls_JvmObserverContext = env->GetObjectClass(j_context);
   jmethodID jmid_passHeader = env->GetMethodID(jcls_JvmObserverContext, "passHeader", "([B[BZ)V");
   env->PushLocalFrame(headers.length * 2);
@@ -77,32 +82,84 @@ static void pass_headers(envoy_headers headers, jobject j_context) {
 
     // Create platform byte array for header key
     jbyteArray key = env->NewByteArray(headers.headers[i].key.length);
-    void* critical_key = env->GetPrimitiveArrayCritical(key, 0);
+    // FIXME: check if copied via isCopy
+    void* critical_key = env->GetPrimitiveArrayCritical(key, nullptr); // FIXME: check for NULL
     memcpy(critical_key, headers.headers[i].key.bytes, headers.headers[i].key.length);
+    // Here '0' (for which there is no named constant) indicates we want to commit the changes back
+    // to the JVM and free the c array, where applicable.
     env->ReleasePrimitiveArrayCritical(key, critical_key, 0);
 
     // Create platform byte array for header value
     jbyteArray value = env->NewByteArray(headers.headers[i].value.length);
-    void* critical_value = env->GetPrimitiveArrayCritical(value, 0);
+    void* critical_value = env->GetPrimitiveArrayCritical(value, nullptr); // FIXME: check for NULL
     memcpy(critical_value, headers.headers[i].value.bytes, headers.headers[i].value.length);
     env->ReleasePrimitiveArrayCritical(value, critical_value, 0);
 
     // Pass this header pair to the platform
-    env->CallVoidMethod(j_context, jmid_passHeader, key, value, i != headers.length - 1);
+    jboolean end_headers = i == headers.length - 1 ? JNI_TRUE : JNI_FALSE;
+    env->CallVoidMethod(j_context, jmid_passHeader, key, value, end_headers);
+
+    // We don't release local refs currently because we've pushed a large enough frame, but we could
+    // consider this and/or periodically popping the frame.
   }
   env->PopLocalFrame(nullptr);
+  env->DeleteLocalRef(jcls_JvmObserverContext);
   release_envoy_headers(headers);
 }
 
+// Platform callback implementation
+
 static void jvm_on_headers(envoy_headers headers, bool end_stream, void* context) {
+  JNIEnv* env = nullptr;
+  int get_env_res = static_jvm->GetEnv((void**)&env, JNI_VERSION);
+  if (get_env_res == JNI_EDETACHED) {
+    __android_log_write(ANDROID_LOG_ERROR, "jni_lib", "equals JNI_EDETACHED");
+  }
   jobject j_context = static_cast<jobject>(context);
+
   jclass jcls_JvmObserverContext = env->GetObjectClass(j_context);
   jmethodID jmid_onHeaders = env->GetMethodID(jcls_JvmObserverContext, "onHeaders", "(JZ)V");
-  env->CallVoidMethod(j_context, jmid_onHeaders, headers.length);
-  pass_headers(headers, j_context);
+  // Note: be careful of JVM types
+  // FIXME: make this cast safer
+  env->CallVoidMethod(j_context, jmid_onHeaders, (jlong)headers.length,
+                      end_stream ? JNI_TRUE : JNI_FALSE);
+
+  env->DeleteLocalRef(jcls_JvmObserverContext);
+  pass_headers(env, headers, j_context);
 }
 
-static envoy_headers to_native_headers(jobjectArray headers) {
+static void jvm_on_data(envoy_data data, bool end_stream, void* context) {
+  __android_log_write(ANDROID_LOG_ERROR, "jni_lib", "jvm_on_data");
+}
+
+static void jvm_on_metadata(envoy_headers metadata, void* context) {
+  __android_log_write(ANDROID_LOG_ERROR, "jni_lib", "jvm_on_metadata");
+  __android_log_write(ANDROID_LOG_ERROR, "jni_lib", std::to_string(metadata.length).c_str());
+}
+
+static void jvm_on_trailers(envoy_headers trailers, void* context) {
+  __android_log_write(ANDROID_LOG_ERROR, "jni_lib", "jvm_on_trailers");
+  __android_log_write(ANDROID_LOG_ERROR, "jni_lib", std::to_string(trailers.length).c_str());
+}
+
+static void jvm_on_error(envoy_error error, void* context) {
+  __android_log_write(ANDROID_LOG_ERROR, "jni_lib", "jvm_on_error");
+  JNIEnv* env = nullptr;
+  static_jvm->GetEnv((void**)&env, JNI_VERSION);
+  jobject j_context = static_cast<jobject>(context);
+  env->DeleteGlobalRef(j_context);
+}
+
+static void jvm_on_complete(void* context) {
+  JNIEnv* env = nullptr;
+  static_jvm->GetEnv((void**)&env, JNI_VERSION);
+  jobject j_context = static_cast<jobject>(context);
+  env->DeleteGlobalRef(j_context);
+}
+
+// Utility functions
+
+static envoy_headers to_native_headers(JNIEnv* env, jobjectArray headers) {
   // Note that headers is a flattened array of key/value pairs.
   // Therefore, the length of the native header array is n envoy_data or n/2 envoy_header.
   envoy_header_size_t length = env->GetArrayLength(headers);
@@ -134,26 +191,38 @@ static envoy_headers to_native_headers(jobjectArray headers) {
   return native_headers;
 }
 
-extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envomobile_engine_JniLibrary_initStream(
-    JNIEnv* env, jlong engine_handle,
-    jclass // class
-) {
+// EnvoyHTTPStream
+
+extern "C" JNIEXPORT jlong JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_initStream(JNIEnv* env,
+                                                            jclass, // class
+                                                            jlong engine_handle) {
   return init_stream(static_cast<envoy_engine_t>(engine_handle));
 }
 
-extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envomobile_engine_JniLibrary_startStream(
-    JNIEnv* env, jlong stream_handle, jobject j_context,
-    jclass // class
+extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_startStream(
+    JNIEnv* env, jclass, // class
+    jlong stream_handle, jobject j_context
+
 ) {
-  envoy_observer native_obs = {jvm_on_headers, nullptr, nullptr,  nullptr,
-                               nullptr,        nullptr, j_context};
+  jclass jcls_JvmObserverContext = env->GetObjectClass(j_context);
+  jmethodID jmid_onHeaders = env->GetMethodID(jcls_JvmObserverContext, "onHeaders", "(JZ)V");
+  jobject retained_context = env->NewGlobalRef(j_context);
+  envoy_observer native_obs = {jvm_on_headers, jvm_on_data,     jvm_on_metadata, jvm_on_trailers,
+                               jvm_on_error,   jvm_on_complete, retained_context};
   return start_stream(static_cast<envoy_stream_t>(stream_handle), native_obs);
 }
 
-extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envomobile_engine_JniLibrary_sendHeaders(
-    JNIEnv* env, jlong stream_handle, jobjectArray headers, jboolean end_stream,
-    jclass // class
-) {
-  return send_headers(static_cast<envoy_stream_t>(stream_handle), to_native_headers(headers),
+extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_sendHeaders(
+    JNIEnv* env, jclass, // class
+    jlong stream_handle, jobjectArray headers, jboolean end_stream) {
+  return send_headers(static_cast<envoy_stream_t>(stream_handle), to_native_headers(env, headers),
                       end_stream);
+}
+
+extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_sendTrailers(
+    JNIEnv* env, jclass, // class
+    jlong stream_handle, jobjectArray trailers) {
+  return send_trailers(static_cast<envoy_stream_t>(stream_handle),
+                       to_native_headers(env, trailers));
 }

@@ -87,7 +87,7 @@ class JniLibrary {
    * @param metadata, the metadata to send.
    * @return int, the resulting status of the operation.
    */
-  protected static native int sendMetadata(long stream, Map<String, List<String>> metadata);
+  protected static native int sendMetadata(long stream, byte[][] metadata);
 
   /**
    * Send trailers over an open HTTP stream. This method can only be invoked once
@@ -97,7 +97,7 @@ class JniLibrary {
    * @param trailers, the trailers to send.
    * @return int, the resulting status of the operation.
    */
-  protected static native int sendTrailers(long stream, Map<String, List<String>> trailers);
+  protected static native int sendTrailers(long stream, byte[][] trailers);
 
   /**
    * Detach all observers from a stream and send an interrupt upstream if
