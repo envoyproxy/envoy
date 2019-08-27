@@ -374,6 +374,15 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
 
   parsed_alpn_protocols_ = parseAlpnProtocols(config.alpnProtocols());
 
+  // To enumerate the required builtin ciphers, curves, algorithms, and
+  // versions, uncomment '#define LOG_BUILTIN_STAT_NAMES' below, and run
+  //  bazel test //test/extensions/transport_sockets/tls/... --test_output=streamed
+  //      | grep " Builtin ssl." | sort | uniq
+  // #define LOG_BUILTIN_STAT_NAMES
+  //
+  // TODO(#8035): improve tooling to find any other built-ins needed to avoid
+  // contention.
+
   // Ciphers
   stat_name_set_.rememberBuiltin("AEAD-AES128-GCM-SHA256");
   stat_name_set_.rememberBuiltin("ECDHE-ECDSA-AES128-GCM-SHA256");
@@ -382,10 +391,9 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   stat_name_set_.rememberBuiltin("ECDHE-RSA-CHACHA20-POLY1305");
 
   // Curves
-  stat_name_set_.rememberBuiltin("\\25519");
+  stat_name_set_.rememberBuiltin("X25519");
 
   // Algorithms
-  stat_name_set_.rememberBuiltin("rsa_pss_rsae_sha256");
   stat_name_set_.rememberBuiltin("ecdsa_secp256r1_sha256");
   stat_name_set_.rememberBuiltin("rsa_pss_rsae_sha256");
 
@@ -503,9 +511,15 @@ int ContextImpl::verifyCertificate(X509* cert, const std::vector<std::string>& v
 }
 
 void ContextImpl::incCounter(const Stats::StatName name, absl::string_view value) const {
+  Stats::SymbolTable& symbol_table = scope_.symbolTable();
   Stats::SymbolTable::StoragePtr storage =
-      scope_.symbolTable().join({name, stat_name_set_.getStatName(value)});
+      symbol_table.join({name, stat_name_set_.getStatName(value)});
   scope_.counterFromStatName(Stats::StatName(storage.get())).inc();
+
+#ifdef LOG_BUILTIN_STAT_NAMES
+  std::cerr << absl::StrCat("Builtin ", symbol_table.toString(name), ": ", value, "\n")
+            << std::flush;
+#endif
 }
 
 void ContextImpl::logHandshake(SSL* ssl) const {
@@ -520,7 +534,7 @@ void ContextImpl::logHandshake(SSL* ssl) const {
 
   uint16_t curve_id = SSL_get_curve_id(ssl);
   if (curve_id) {
-    // Note: in the unit tests, this curve name is always literal "\25519" (6 chars).
+    // Note: in the unit tests, this curve name is always literal "X25519"
     incCounter(ssl_curves_, SSL_get_curve_name(curve_id));
   }
 
