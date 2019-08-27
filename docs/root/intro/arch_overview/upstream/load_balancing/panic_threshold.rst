@@ -15,6 +15,8 @@ cluster as load increases.
 There are two modes Envoy can choose from when in a panic state: traffic will either be sent to all
 hosts, or will be sent to no hosts (and therefore will always fail). This is configured in the
 :ref:`cluster configuration <envoy_api_field_Cluster.CommonLbConfig.ZoneAwareLbConfig.fail_traffic_on_panic>`.
+Choosing to fail traffic during panic scenarios can help avoid overwhelming potentially failing
+upstream services.
 
 Panic thresholds work in conjunction with priorities. If the number of available hosts in a given
 priority goes down, Envoy will try to shift some traffic to lower priorities. If it succeeds in
