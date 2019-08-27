@@ -4490,9 +4490,10 @@ TEST_F(HttpConnectionManagerImplTest, TestSRDSUpdate) {
   EXPECT_CALL(*static_cast<const Router::MockScopedConfig*>(
                   scopedRouteConfigProvider()->config<Router::ScopedConfig>().get()),
               getRouteConfig(_))
-      .Times(2)
+      .Times(3)
       .WillOnce(Return(nullptr))
-      .WillOnce(Return(route_config_));
+      .WillOnce(Return(route_config_))
+      .WillOnce(Return(route_config_)); // refreshCachedRoute
   EXPECT_CALL(*codec_, dispatch(_))
       .Times(2) // Once for no scoped routes, once for scoped routing
       .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
@@ -4535,6 +4536,64 @@ TEST_F(HttpConnectionManagerImplTest, TestSRDSUpdate) {
   conn_manager_->onData(fake_input2, false);
 }
 
+// SRDS Scope header update cause cross-scope reroute.
+TEST_F(HttpConnectionManagerImplTest, TestSRDSCrossScopeReroute) {
+  setup(false, "", true, true);
+
+  std::shared_ptr<Router::MockConfig> route_config1 =
+      std::make_shared<NiceMock<Router::MockConfig>>();
+  std::shared_ptr<Router::MockConfig> route_config2 =
+      std::make_shared<NiceMock<Router::MockConfig>>();
+  std::shared_ptr<Router::MockRoute> route1 = std::make_shared<NiceMock<Router::MockRoute>>();
+  std::shared_ptr<Router::MockRoute> route2 = std::make_shared<NiceMock<Router::MockRoute>>();
+  EXPECT_CALL(*route_config1, route(_, _)).WillRepeatedly(Return(route1));
+  EXPECT_CALL(*route_config2, route(_, _)).WillRepeatedly(Return(route2));
+  EXPECT_CALL(*static_cast<const Router::MockScopedConfig*>(
+                  scopedRouteConfigProvider()->config<Router::ScopedConfig>().get()),
+              getRouteConfig(_))
+      // 1. Snap scoped route config;
+      // 2. refreshCachedRoute (both in decodeHeaders(headers,end_stream);
+      // 3. then refreshCachedRoute triggered by decoder_filters_[1]->callbacks_->route().
+      .Times(3)
+      .WillRepeatedly(Invoke([&](const HeaderMap& headers) -> Router::ConfigConstSharedPtr {
+        auto& test_headers = static_cast<const TestHeaderMapImpl&>(headers);
+        if (test_headers.get_("scope_key") == "foo") {
+          return route_config1;
+        }
+        return route_config2;
+      }));
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
+    StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+    HeaderMapPtr headers{new TestHeaderMapImpl{
+        {":authority", "host"}, {":method", "GET"}, {"scope_key", "foo"}, {":path", "/foo"}}};
+    decoder->decodeHeaders(std::move(headers), false);
+    data.drain(4);
+  }));
+  setupFilterChain(2, 0);
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+      .WillOnce(Invoke([&](Http::HeaderMap& headers, bool) -> FilterHeadersStatus {
+        EXPECT_EQ(route1, decoder_filters_[0]->callbacks_->route());
+        auto& test_headers = static_cast<TestHeaderMapImpl&>(headers);
+        // Clear cached route and change scope key to "bar".
+        decoder_filters_[0]->callbacks_->clearRouteCache();
+        test_headers.remove("scope_key");
+        test_headers.addCopy("scope_key", "bar");
+        return FilterHeadersStatus::Continue;
+      }));
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, false))
+      .WillOnce(Invoke([&](Http::HeaderMap& headers, bool) -> FilterHeadersStatus {
+        auto& test_headers = static_cast<TestHeaderMapImpl&>(headers);
+        EXPECT_EQ(test_headers.get_("scope_key"), "bar");
+        // Route now switched to route2 as header "scope_key" has changed.
+        EXPECT_EQ(route2, decoder_filters_[1]->callbacks_->route());
+        EXPECT_EQ(route2->routeEntry(), decoder_filters_[1]->callbacks_->streamInfo().routeEntry());
+        return FilterHeadersStatus::StopIteration;
+      }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
 // SRDS scoped RouteConfiguration found and route found.
 TEST_F(HttpConnectionManagerImplTest, TestSRDSRouteFound) {
   setup(false, "", true, true);
@@ -4547,7 +4606,9 @@ TEST_F(HttpConnectionManagerImplTest, TestSRDSRouteFound) {
       std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
   EXPECT_CALL(cluster_manager_, get(_)).WillOnce(Return(fake_cluster1.get()));
   EXPECT_CALL(*scopedRouteConfigProvider()->config<Router::MockScopedConfig>(), getRouteConfig(_))
-      .Times(1);
+      // 1. decodeHeaders() snaping route config.
+      // 2. refreshCachedRoute() later in the same decodeHeaders().
+      .Times(2);
   EXPECT_CALL(
       *static_cast<const Router::MockConfig*>(
           scopedRouteConfigProvider()->config<Router::MockScopedConfig>()->route_config_.get()),

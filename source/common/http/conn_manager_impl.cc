@@ -631,26 +631,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
       connection_manager_.config_.scopedRouteConfigProvider() != nullptr) {
     ASSERT(snapped_route_config_ == nullptr,
            "Route config already latched to the active stream when scoped RDS is enabled.");
-    if (snapped_scoped_routes_config_ == nullptr) {
-      ENVOY_STREAM_LOG(trace, "snapped scoped routes config is null when SRDS is enabled.", *this);
-      // Stop decoding now.
-      maybeEndDecode(true);
-      sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_),
-                     Http::Code::InternalServerError, "unable to get route configuration", nullptr,
-                     is_head_request_, absl::nullopt,
-                     StreamInfo::ResponseCodeDetails::get().RouteConfigurationNotFound);
-      return;
-    }
-    snapped_route_config_ = snapped_scoped_routes_config_->getRouteConfig(*request_headers_);
-    // NOTE: if a RDS subscription hasn't got a RouteConfiguration back, a Router::NullConfigImpl is
-    // returned, in that case we let it pass.
-    if (snapped_route_config_ == nullptr) {
-      ENVOY_STREAM_LOG(trace, "can't find SRDS scope.", *this);
-      // Stop decoding now.
-      maybeEndDecode(true);
-      sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Http::Code::NotFound,
-                     "route scope not found", nullptr, is_head_request_, absl::nullopt,
-                     StreamInfo::ResponseCodeDetails::get().RouteConfigurationNotFound);
+    if (!snapScopedRouteConfig()) {
       return;
     }
   }
@@ -1262,10 +1243,45 @@ void ConnectionManagerImpl::startDrainSequence() {
   drain_timer_->enableTimer(config_.drainTimeout());
 }
 
+bool ConnectionManagerImpl::ActiveStream::snapScopedRouteConfig() {
+  ASSERT(request_headers_ != nullptr,
+         "Try to snap scoped route config when there is no request headers.");
+  if (snapped_scoped_routes_config_ == nullptr) {
+    ENVOY_STREAM_LOG(trace, "snapped scoped routes config is null when SRDS is enabled.", *this);
+    // Stop decoding now.
+    maybeEndDecode(true);
+    sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_),
+                   Http::Code::InternalServerError, "unable to get route configuration", nullptr,
+                   is_head_request_, absl::nullopt,
+                   StreamInfo::ResponseCodeDetails::get().RouteConfigurationNotFound);
+    return false;
+  }
+  snapped_route_config_ = snapped_scoped_routes_config_->getRouteConfig(*request_headers_);
+  // NOTE: if a RDS subscription hasn't got a RouteConfiguration back, a Router::NullConfigImpl is
+  // returned, in that case we let it pass.
+  if (snapped_route_config_ == nullptr) {
+    ENVOY_STREAM_LOG(trace, "can't find SRDS scope.", *this);
+    // Stop decoding now.
+    maybeEndDecode(true);
+    sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Http::Code::NotFound,
+                   "route scope not found", nullptr, is_head_request_, absl::nullopt,
+                   StreamInfo::ResponseCodeDetails::get().RouteConfigurationNotFound);
+    return false;
+  }
+  return true;
+}
+
 void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
   Router::RouteConstSharedPtr route;
   if (request_headers_ != nullptr) {
-    route = snapped_route_config_->route(*request_headers_, stream_id_);
+    if (dynamic_cast<Server::Admin*>(&connection_manager_.config_) == nullptr &&
+        connection_manager_.config_.scopedRouteConfigProvider() != nullptr) {
+      // NOTE: repick scope as well in case the scope header is changed by a filter.
+      snapScopedRouteConfig();
+    }
+    if (snapped_route_config_ != nullptr) {
+      route = snapped_route_config_->route(*request_headers_, stream_id_);
+    }
   }
   stream_info_.route_entry_ = route ? route->routeEntry() : nullptr;
   cached_route_ = std::move(route);

@@ -496,6 +496,11 @@ private:
 
     void traceRequest();
 
+    // Updates the snapped_route_config_ if scope found, or ends the stream by
+    // sending local reply.
+    // Returns true if scoped route config snapped, false otherwise.
+    bool snapScopedRouteConfig();
+
     void refreshCachedRoute();
 
     // Pass on watermark callbacks to watermark subscribers. This boils down to passing watermark
