@@ -13,7 +13,7 @@ namespace Envoy {
 namespace {
 
 class ScopedRdsIntegrationTest : public HttpIntegrationTest,
-                                 public Grpc::DeltaStowGrpcClientIntegrationParamTest {
+                                 public Grpc::DeltaSotwGrpcClientIntegrationParamTest {
 protected:
   struct FakeUpstreamInfo {
     FakeHttpConnectionPtr connection_;
@@ -94,6 +94,7 @@ fragments:
     HttpIntegrationTest::initialize();
   }
 
+  // TODO(stevenzzzz): move these utility methods to base classes to share with other tests.
   // Helper that verifies if given headers are in the response header map.
   void verifyResponse(IntegrationStreamDecoderPtr response, const std::string& response_code,
                       const Http::TestHeaderMapImpl& expected_headers,

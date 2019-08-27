@@ -437,7 +437,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
           connection_manager_.stats_.named_.downstream_rq_time_, connection_manager_.timeSource())),
       stream_info_(connection_manager_.codec_->protocol(), connection_manager_.timeSource()),
       upstream_options_(std::make_shared<Network::Socket::Options>()) {
-  // For Admin thread, we don't use routeConfigProvider or SRDS route provider.
+  // For Server::Admin, no routeConfigProvider or SRDS route provider is used.
   ASSERT(dynamic_cast<Server::Admin*>(&connection_manager_.config_) != nullptr ||
              ((connection_manager.config_.routeConfigProvider() == nullptr &&
                connection_manager.config_.scopedRouteConfigProvider() != nullptr) ||

@@ -54,18 +54,18 @@ public:
   ClientType clientType() const override { return std::get<1>(GetParam()); }
 };
 
-class DeltaStowGrpcClientIntegrationParamTest
+class DeltaSotwGrpcClientIntegrationParamTest
     : public BaseGrpcClientIntegrationParamTest,
       public testing::TestWithParam<std::tuple<Network::Address::IpVersion, ClientType, bool>> {
 public:
-  ~DeltaStowGrpcClientIntegrationParamTest() override = default;
+  ~DeltaSotwGrpcClientIntegrationParamTest() override = default;
   static std::string protocolTestParamsToString(
       const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, ClientType, bool>>&
           p) {
     return fmt::format("{}_{}",
                        std::get<0>(p.param) == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
                        std::get<1>(p.param) == ClientType::GoogleGrpc ? "GoogleGrpc" : "EnvoyGrpc",
-                       std::get<2>(p.param) ? "Stow" : "Delta");
+                       std::get<2>(p.param) ? "Delta" : "StateOfTheWorld");
   }
   Network::Address::IpVersion ipVersion() const override { return std::get<0>(GetParam()); }
   ClientType clientType() const override { return std::get<1>(GetParam()); }

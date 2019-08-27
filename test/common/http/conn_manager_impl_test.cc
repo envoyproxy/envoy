@@ -4426,6 +4426,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSessionTrace) {
   }
 }
 
+// SRDS no scope found.
 TEST_F(HttpConnectionManagerImplTest, TestSRDSRouteNotFound) {
   setup(false, "", true, true);
 
@@ -4454,6 +4455,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSRDSRouteNotFound) {
   EXPECT_EQ(response_body, "route scope not found");
 }
 
+// SRDS provider not returning a ScopedConfig.
 TEST_F(HttpConnectionManagerImplTest, TestNoSRDSRouteConfig) {
   setup(false, "", true, true);
 
@@ -4481,6 +4483,7 @@ TEST_F(HttpConnectionManagerImplTest, TestNoSRDSRouteConfig) {
   EXPECT_EQ(response_body, "unable to get route configuration");
 }
 
+// SRDS updating scopes affects routing.
 TEST_F(HttpConnectionManagerImplTest, TestSRDSUpdate) {
   setup(false, "", true, true);
 
@@ -4532,6 +4535,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSRDSUpdate) {
   conn_manager_->onData(fake_input2, false);
 }
 
+// SRDS scoped RouteConfiguration found and route found.
 TEST_F(HttpConnectionManagerImplTest, TestSRDSRouteFound) {
   setup(false, "", true, true);
   setupFilterChain(1, 0);
@@ -4583,6 +4587,7 @@ public:
   std::shared_ptr<NiceMock<Router::MockScopedRouteConfigProvider>> scoped_route_config_provider2_;
 };
 
+// HCM config can only have either RouteConfigProvider or ScopedRoutesConfigProvider.
 TEST_F(HttpConnectionManagerImplDeathTest, InvalidConnectionManagerConfig) {
   setup(false, "");
 
