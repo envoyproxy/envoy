@@ -383,8 +383,8 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetError1) {
       "");
 }
 
-// Test an upstream that returns a trailer-only response.
-TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetErrorConvertedToJson) {
+// Test an upstream that returns an error in a trailer-only response.
+TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryErrorConvertedToJson) {
   const std::string filter =
       R"EOF(
             name: envoy.grpc_json_transcoder
@@ -400,17 +400,15 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetErrorConvertedToJson) {
       Http::TestHeaderMapImpl{
           {":method", "GET"}, {":path", "/shelves/100"}, {":authority", "host"}},
       "", {"shelf: 100"}, {}, Status(Code::NOT_FOUND, "Shelf 100 Not Found"),
-      Http::TestHeaderMapImpl{
-          {":status", "404"},
-          {"content-type", "application/json"},
-          {"grpc-status", UnexpectedHeader},
-          {"grpc-message", UnexpectedHeader},
-      },
+      Http::TestHeaderMapImpl{{":status", "404"},
+                              {"content-type", "application/json"},
+                              {"grpc-status", UnexpectedHeader},
+                              {"grpc-message", UnexpectedHeader}},
       R"({"code":5,"message":"Shelf 100 Not Found"})");
 }
 
-// Test an upstream that immediately returns status 200, and then returns an error in trailer.
-TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetErrorInTrailerConvertedToJson) {
+// Upstream sends headers (e.g. sends metadata), and then sends trailer with an error.
+TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryErrorInTrailerConvertedToJson) {
   const std::string filter =
       R"EOF(
             name: envoy.grpc_json_transcoder
@@ -429,23 +427,17 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetErrorInTrailerConvertedToJson)
   expectGrpcRequest<bookstore::GetShelfRequest>({"shelf: 100"});
 
   upstream_request_->encodeHeaders(
-      Http::TestHeaderMapImpl{
-          {":status", "200"},
-          {"content-type", "application/grpc"},
-          {"trailer", "grpc-status,grpc-status-details-bin"},
-      },
+      Http::TestHeaderMapImpl{{":status", "200"},
+                              {"content-type", "application/grpc"},
+                              {"trailer", "grpc-status,grpc-status-details-bin"}},
       false);
   upstream_request_->encodeTrailers(Http::TestHeaderMapImpl{
-      {"grpc-status", "5"},
-      {"grpc-status-details-bin", "CAUSE1NoZWxmIDEwMCBOb3QgRm91bmQ"},
-  });
+      {"grpc-status", "5"}, {"grpc-status-details-bin", "CAUSE1NoZWxmIDEwMCBOb3QgRm91bmQ"}});
   EXPECT_TRUE(upstream_request_->complete());
-  expectResponseHeaders(Http::TestHeaderMapImpl{
-      {":status", "404"},
-      {"content-type", "application/json"},
-      {"grpc-status", UnexpectedHeader},
-      {"grpc-status-details-bin", UnexpectedHeader},
-  });
+  expectResponseHeaders(Http::TestHeaderMapImpl{{":status", "404"},
+                                                {"content-type", "application/json"},
+                                                {"grpc-status", UnexpectedHeader},
+                                                {"grpc-status-details-bin", UnexpectedHeader}});
   expectResponseBody(R"({"code":5,"message":"Shelf 100 Not Found"})");
 }
 
