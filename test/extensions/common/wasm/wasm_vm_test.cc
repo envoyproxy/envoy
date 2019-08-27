@@ -67,7 +67,7 @@ TEST(WasmVmTest, NullVmMemory) {
   EXPECT_EQ(c, z);
   Word w(0);
   wasm_vm->setWord(reinterpret_cast<uint64_t>(&w), std::numeric_limits<uint64_t>::max());
-  EXPECT_EQ(w.u64, std::numeric_limits<uint64_t>::max());
+  EXPECT_EQ(w.u64_, std::numeric_limits<uint64_t>::max());
 }
 
 TEST(WasmVmTest, NullVmStart) {

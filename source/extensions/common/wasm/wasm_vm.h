@@ -18,9 +18,9 @@ class Context;
 // Represents a WASM-native word-sized datum. On 32-bit VMs, the high bits are always zero.
 // The WASM/VM API treats all bits as significant.
 struct Word {
-  Word(uint64_t w) : u64(w) {} // Implicit conversion into Word.
-  uint32_t u32() const { return static_cast<uint32_t>(u64); }
-  uint64_t u64;
+  Word(uint64_t w) : u64_(w) {} // Implicit conversion into Word.
+  uint32_t u32() const { return static_cast<uint32_t>(u64_); }
+  uint64_t u64_;
 };
 
 // Convert Word type for use by 32-bit VMs.

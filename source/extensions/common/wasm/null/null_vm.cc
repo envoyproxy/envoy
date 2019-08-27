@@ -75,7 +75,7 @@ bool NullVm::setWord(uint64_t pointer, Word data) {
     return false;
   }
   auto p = reinterpret_cast<char*>(pointer);
-  memcpy(p, &data.u64, sizeof(data.u64));
+  memcpy(p, &data.u64_, sizeof(data.u64_));
   return true;
 }
 
