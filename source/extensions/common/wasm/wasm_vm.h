@@ -115,7 +115,7 @@ public:
 
   /**
    * Whether or not the VM implementation supports cloning.
-   * @return true if the VM is clonable.
+   * @return true if the VM is clone-able.
    */
   virtual bool clonable() PURE;
 
@@ -128,7 +128,7 @@ public:
   /**
    * Load the WASM code from a file. Return true on success.
    * @param code the WASM binary code (or registered NullVm plugin name).
-   * @param allow_precompiled if true, allows suporting VMs (e.g. WAVM) to load the binary
+   * @param allow_precompiled if true, allows supporting VMs (e.g. WAVM) to load the binary
    * machine code from a user-defined section of the WASM file.
    * @return whether or not the load was successful.
    */
