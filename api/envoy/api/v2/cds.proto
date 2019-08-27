@@ -655,11 +655,10 @@ message Cluster {
   // processed sequentially as connection events happen.
   repeated cluster.Filter filters = 40;
 
-  // New mechanism for LB policy configuration. Used only if the
-  // :ref:`lb_policy<envoy_api_field_Cluster.lb_policy>` field has the value
-  // :ref:`LOAD_BALANCING_POLICY_CONFIG
+  // [#not-implemented-hide:] New mechanism for LB policy configuration.
+  // Used only if the :ref:`lb_policy<envoy_api_field_Cluster.lb_policy>`
+  // field has the value :ref:`LOAD_BALANCING_POLICY_CONFIG
   // <envoy_api_enum_value_Cluster.LbPolicy.LOAD_BALANCING_POLICY_CONFIG>`.
-  // [#not-implemented-yet: This is not yet implemented in Envoy.]
   LoadBalancingPolicy load_balancing_policy = 41;
 }
 
