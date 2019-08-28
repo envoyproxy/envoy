@@ -79,6 +79,7 @@ public:
     listen_socket_ = std::make_unique<Network::NetworkListenSocket<
         Network::NetworkSocketTrait<Network::Address::SocketType::Datagram>>>(
         Network::Test::getCanonicalLoopbackAddress(version_), nullptr, /*bind*/ true);
+    // Advance time a bit because QuicTime regards 0 as uninitialize timestamp.
     time_system_.sleep(std::chrono::milliseconds(100));
     EXPECT_CALL(listener_config_, socket()).WillRepeatedly(ReturnRef(*listen_socket_));
   }
@@ -195,7 +196,6 @@ TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponCHLO) {
 }
 
 TEST_P(EnvoyQuicDispatcherTest, CloseConnectionDueToMissingFilterChain) {
-  //  quic::SetVerbosityLogThreshold(2);
   quic::QuicSocketAddress peer_addr(version_ == Network::Address::IpVersion::v4
                                         ? quic::QuicIpAddress::Loopback4()
                                         : quic::QuicIpAddress::Loopback6(),
