@@ -41,15 +41,15 @@ struct NullVm : public WasmVm {
   absl::string_view getUserSection(absl::string_view name) override;
 
 #define _FORWARD_GET_FUNCTION(_T)                                                                  \
-  void getFunction(absl::string_view function_name, _T* f) override {                               \
-    plugin_->getFunction(function_name, f);                                                         \
+  void getFunction(absl::string_view function_name, _T* f) override {                              \
+    plugin_->getFunction(function_name, f);                                                        \
   }
   FOR_ALL_WASM_VM_EXPORTS(_FORWARD_GET_FUNCTION)
 #undef _FORWARD_GET_FUNCTION
 
   // These are not needed for NullVm which invokes the handlers directly.
-#define _REGISTER_CALLBACK(_T)                                                                  \
-  void registerCallback(absl::string_view, absl::string_view, _T,                               \
+#define _REGISTER_CALLBACK(_T)                                                                     \
+  void registerCallback(absl::string_view, absl::string_view, _T,                                  \
                         typename ConvertFunctionTypeWordToUint32<_T>::type) override{};
   FOR_ALL_WASM_VM_IMPORTS(_REGISTER_CALLBACK)
 #undef _REGISTER_CALLBACK

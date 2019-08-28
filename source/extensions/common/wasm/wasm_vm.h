@@ -214,7 +214,7 @@ public:
    * Register typed callbacks exported by the host environment.
    */
 #define _REGISTER_CALLBACK(_T)                                                                     \
-  virtual void registerCallback(absl::string_view moduleName, absl::string_view function_name,      \
+  virtual void registerCallback(absl::string_view moduleName, absl::string_view function_name,     \
                                 _T f, typename ConvertFunctionTypeWordToUint32<_T>::type) PURE;
   FOR_ALL_WASM_VM_IMPORTS(_REGISTER_CALLBACK)
 #undef _REGISTER_CALLBACK
