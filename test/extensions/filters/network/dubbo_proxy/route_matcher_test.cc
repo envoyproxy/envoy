@@ -38,7 +38,8 @@ parseDubboProxyFromV2Yaml(const std::string& yaml) {
 
 } // namespace
 
-TEST(DubboRouteMatcherTest, RouteByServiceNameWithAnyMethod) {
+// TODO(alyssawilk) update.
+TEST(DubboRouteMatcherTest, DEPRECATED_FEATURE_TEST(RouteByServiceNameWithAnyMethod)) {
   {
     const std::string yaml = R"EOF(
 name: local_route
@@ -291,7 +292,8 @@ routes:
   EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
 }
 
-TEST(DubboRouteMatcherTest, RouteByMethodWithRegexMatch) {
+// TODO(alyssawilk) update.
+TEST(DubboRouteMatcherTest, DEPRECATED_FEATURE_TEST(RouteByMethodWithRegexMatch)) {
   const std::string yaml = R"EOF(
 name: local_route
 interface: org.apache.dubbo.demo.DemoService
