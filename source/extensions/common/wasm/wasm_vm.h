@@ -109,9 +109,10 @@ public:
   virtual bool clonable() PURE;
 
   /**
-   * Make a thread-specific copy. This may not be supported by the underlying VM system in which
-   * case it will return nullptr and the caller will need to create a new VM from scratch.
-   * @return a clone of 'this' (e.g. for a different Worker/thread).
+   * Make a worker/thread-specific copy if supported by the underlying VM system (see clonable()
+   * above). If not supported, the caller will need to create a new VM from scratch. If supported,
+   * the clone may share compiled code and other read-only data with the source VM.
+   * @return a clone of 'this' (e.g. for a different worker/thread).
    */
   virtual WasmVmPtr clone() PURE;
 
