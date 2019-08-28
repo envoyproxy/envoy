@@ -33,7 +33,7 @@ public:
    */
   envoy_status_t startStream(envoy_stream_t stream, envoy_observer observer);
   envoy_status_t sendHeaders(envoy_stream_t stream, envoy_headers headers, bool end_stream);
-  envoy_status_t sendData(envoy_stream_t stream, envoy_headers headers, bool end_stream);
+  envoy_status_t sendData(envoy_stream_t stream, envoy_data data, bool end_stream);
   envoy_status_t sendMetadata(envoy_stream_t stream, envoy_headers headers, bool end_stream);
   envoy_status_t sendTrailers(envoy_stream_t stream, envoy_headers headers);
   // TODO: when implementing this function we have to make sure to prevent races with already

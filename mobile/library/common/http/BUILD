@@ -10,6 +10,7 @@ envoy_cc_library(
     hdrs = ["dispatcher.h"],
     repository = "@envoy",
     deps = [
+        "//library/common/buffer:bridge_fragment_lib",
         "//library/common/buffer:utility_lib",
         "//library/common/http:header_utility_lib",
         "//library/common/types:c_types_lib",
@@ -18,6 +19,7 @@ envoy_cc_library(
         "@envoy//include/envoy/http:async_client_interface",
         "@envoy//include/envoy/http:header_map_interface",
         "@envoy//include/envoy/upstream:cluster_manager_interface",
+        "@envoy//source/common/buffer:buffer_lib",
         "@envoy//source/common/common:minimal_logger_lib",
     ],
 )
