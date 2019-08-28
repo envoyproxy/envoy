@@ -200,6 +200,17 @@ fragments:
         response);
   }
 
+  void sendSrdsResponse(const std::vector<std::string>& sotw_list,
+                        const std::vector<std::string>& to_add_list,
+                        const std::vector<std::string>& to_delete_list,
+                        const std::string& version) {
+    if (isDelta()) {
+      sendDeltaScopedRdsResponse(to_add_list, to_delete_list, version);
+    } else {
+      sendSotwScopedRdsResponse(sotw_list, version);
+    }
+  }
+
   void sendDeltaScopedRdsResponse(const std::vector<std::string>& to_add_list,
                                   const std::vector<std::string>& to_delete_list,
                                   const std::string& version) {
@@ -273,11 +284,7 @@ key:
 
   on_server_init_function_ = [&]() {
     createScopedRdsStream();
-    if (isDelta()) {
-      sendDeltaScopedRdsResponse({scope_route1, scope_route2}, {}, "1");
-    } else {
-      sendSotwScopedRdsResponse({scope_route1, scope_route2}, "1");
-    }
+    sendSrdsResponse({scope_route1, scope_route2}, {scope_route1, scope_route2}, {}, "1");
     createRdsStream("foo_route1");
     // CreateRdsStream waits for connection which is fired by RDS subscription.
     sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1", "cluster_0"), "1");
@@ -320,12 +327,7 @@ key:
   // Add a new scope scope_route3 with a brand new RouteConfiguration foo_route2.
   const std::string scope_route3 = fmt::format(scope_tmpl, "foo_scope3", "foo_route2", "baz-route");
 
-  if (isDelta()) {
-    sendDeltaScopedRdsResponse({scope_route3}, {}, "2");
-
-  } else {
-    sendSotwScopedRdsResponse({scope_route3, scope_route1, scope_route2}, "2");
-  }
+  sendSrdsResponse({scope_route1, scope_route2, scope_route3}, /*added*/ {scope_route3}, {}, "2");
   test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_attempt", 2);
   sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1", "cluster_1"), "3");
   test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 2);
@@ -360,11 +362,7 @@ key:
       /*cluster_0*/ 0);
 
   // Delete foo_scope1 and requests within the scope gets 400s.
-  if (isDelta()) {
-    sendDeltaScopedRdsResponse({}, {"foo_scope1"}, "3");
-  } else {
-    sendSotwScopedRdsResponse({scope_route3, scope_route2}, "3");
-  }
+  sendSrdsResponse({scope_route2, scope_route3}, {}, {"foo_scope1"}, "3");
   test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_success", 3);
   codec_client_ = makeHttpConnection(lookupPort("http"));
   response = codec_client_->makeHeaderOnlyRequest(
@@ -379,11 +377,7 @@ key:
   // Add a new scope foo_scope4.
   const std::string& scope_route4 =
       fmt::format(scope_tmpl, "foo_scope4", "foo_route4", "xyz-route");
-  if (isDelta()) {
-    sendDeltaScopedRdsResponse({scope_route4}, {}, "4");
-  } else {
-    sendSotwScopedRdsResponse({scope_route3, scope_route2, scope_route4}, "4");
-  }
+  sendSrdsResponse({scope_route3, scope_route2, scope_route4}, {scope_route4}, {}, "4");
   test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_success", 4);
   codec_client_ = makeHttpConnection(lookupPort("http"));
   response = codec_client_->makeHeaderOnlyRequest(
@@ -425,11 +419,7 @@ key:
 )EOF";
   on_server_init_function_ = [this, &scope_route1]() {
     createScopedRdsStream();
-    if (isDelta()) {
-      sendDeltaScopedRdsResponse({scope_route1}, {}, "1");
-    } else {
-      sendSotwScopedRdsResponse({scope_route1}, "1");
-    }
+    sendSrdsResponse({scope_route1}, {scope_route1}, {}, "1");
   };
   initialize();
 
@@ -454,11 +444,7 @@ key:
   fragments:
     - string_key: foo
 )EOF";
-  if (isDelta()) {
-    sendDeltaScopedRdsResponse({scope_route2}, {}, "1");
-  } else {
-    sendSotwScopedRdsResponse({scope_route2}, "2");
-  }
+  sendSrdsResponse({scope_route2}, {scope_route2}, {}, "1");
   test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_attempt", 1);
   createRdsStream("foo_route1");
   const std::string route_config_tmpl = R"EOF(
