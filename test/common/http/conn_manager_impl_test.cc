@@ -276,7 +276,9 @@ public:
     return &scoped_route_config_provider_;
   }
   const std::string& serverName() override { return server_name_; }
-  HeaderTransformation serverHeaderTransformation() override { return server_transformation_; }
+  HttpConnectionManagerProto::ServerHeaderTransformation serverHeaderTransformation() override {
+    return server_transformation_;
+  }
   ConnectionManagerStats& stats() override { return stats_; }
   ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() override { return use_remote_address_; }
@@ -317,7 +319,8 @@ public:
   NiceMock<Network::MockDrainDecision> drain_close_;
   std::unique_ptr<ConnectionManagerImpl> conn_manager_;
   std::string server_name_;
-  HeaderTransformation server_transformation_{HeaderTransformation::OVERWRITE};
+  HttpConnectionManagerProto::ServerHeaderTransformation server_transformation_{
+      HttpConnectionManagerProto::OVERWRITE};
   Network::Address::Ipv4Instance local_address_{"127.0.0.1"};
   bool use_remote_address_{true};
   Http::DefaultInternalAddressConfig internal_address_config_;
@@ -567,7 +570,7 @@ TEST_F(HttpConnectionManagerImplTest, ServerHeaderOverwritten) {
 
 // When configured APPEND_IF_ABSENT if the server header is present it will be retained.
 TEST_F(HttpConnectionManagerImplTest, ServerHeaderAppendPresent) {
-  server_transformation_ = HeaderTransformation::APPEND_IF_ABSENT;
+  server_transformation_ = HttpConnectionManagerProto::APPEND_IF_ABSENT;
   setup(false, "custom-value", false);
   setUpEncoderAndDecoder(false, false);
 
@@ -579,7 +582,7 @@ TEST_F(HttpConnectionManagerImplTest, ServerHeaderAppendPresent) {
 
 // When configured APPEND_IF_ABSENT if the server header is absent the server name will be set.
 TEST_F(HttpConnectionManagerImplTest, ServerHeaderAppendAbsent) {
-  server_transformation_ = HeaderTransformation::APPEND_IF_ABSENT;
+  server_transformation_ = HttpConnectionManagerProto::APPEND_IF_ABSENT;
   setup(false, "custom-value", false);
   setUpEncoderAndDecoder(false, false);
 
@@ -591,7 +594,7 @@ TEST_F(HttpConnectionManagerImplTest, ServerHeaderAppendAbsent) {
 
 // When configured PASS_THROUGH, the server name will pass through.
 TEST_F(HttpConnectionManagerImplTest, ServerHeaderPassthroughPresent) {
-  server_transformation_ = HeaderTransformation::PASS_THROUGH;
+  server_transformation_ = HttpConnectionManagerProto::PASS_THROUGH;
   setup(false, "custom-value", false);
   setUpEncoderAndDecoder(false, false);
 
@@ -603,7 +606,7 @@ TEST_F(HttpConnectionManagerImplTest, ServerHeaderPassthroughPresent) {
 
 // When configured PASS_THROUGH, the server header will not be added if absent.
 TEST_F(HttpConnectionManagerImplTest, ServerHeaderPassthroughAbsent) {
-  server_transformation_ = HeaderTransformation::PASS_THROUGH;
+  server_transformation_ = HttpConnectionManagerProto::PASS_THROUGH;
   setup(false, "custom-value", false);
   setUpEncoderAndDecoder(false, false);
 

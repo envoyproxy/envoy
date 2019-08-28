@@ -286,22 +286,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     access_logs_.push_back(current_access_log);
   }
 
-  switch (config.server_header_transformation()) {
-  case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
-      OVERWRITE:
-    server_transformation_ = HeaderTransformation::OVERWRITE;
-    break;
-  case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
-      APPEND_IF_ABSENT:
-    server_transformation_ = HeaderTransformation::APPEND_IF_ABSENT;
-    break;
-  case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
-      PASS_THROUGH:
-    server_transformation_ = HeaderTransformation::PASS_THROUGH;
-    break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
+  server_transformation_ = config.server_header_transformation();
 
   if (!config.server_name().empty()) {
     server_name_ = config.server_name();

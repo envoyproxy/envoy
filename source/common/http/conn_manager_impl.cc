@@ -1354,8 +1354,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
   connection_manager_.config_.dateProvider().setDateHeader(headers);
   // Following setReference() is safe because serverName() is constant for the life of the listener.
   const auto transformation = connection_manager_.config_.serverHeaderTransformation();
-  if (transformation == ConnectionManagerConfig::HeaderTransformation::OVERWRITE ||
-      (transformation == ConnectionManagerConfig::HeaderTransformation::APPEND_IF_ABSENT &&
+  if (transformation == ConnectionManagerConfig::HttpConnectionManagerProto::OVERWRITE ||
+      (transformation == ConnectionManagerConfig::HttpConnectionManagerProto::APPEND_IF_ABSENT &&
        headers.Server() == nullptr)) {
     headers.insertServer().value().setReference(connection_manager_.config_.serverName());
   }

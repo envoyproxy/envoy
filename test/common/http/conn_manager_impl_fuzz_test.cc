@@ -91,7 +91,9 @@ public:
     return &scoped_route_config_provider_;
   }
   const std::string& serverName() override { return server_name_; }
-  HeaderTransformation serverHeaderTransformation() override { return server_transformation_; }
+  HttpConnectionManagerProto::ServerHeaderTransformation serverHeaderTransformation() override {
+    return server_transformation_;
+  }
   ConnectionManagerStats& stats() override { return stats_; }
   ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() override { return use_remote_address_; }
@@ -125,7 +127,8 @@ public:
   ConnectionManagerImplHelper::RouteConfigProvider route_config_provider_;
   ConnectionManagerImplHelper::ScopedRouteConfigProvider scoped_route_config_provider_;
   std::string server_name_;
-  HeaderTransformation server_transformation_{HeaderTransformation::OVERWRITE};
+  HttpConnectionManagerProto::ServerHeaderTransformation server_transformation_{
+      HttpConnectionManagerProto::OVERWRITE};
   Stats::IsolatedStoreImpl fake_stats_;
   ConnectionManagerStats stats_;
   ConnectionManagerTracingStats tracing_stats_;

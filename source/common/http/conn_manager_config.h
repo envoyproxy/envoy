@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/config/config_provider.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/router/rds.h"
 #include "envoy/stats/scope.h"
@@ -170,7 +171,8 @@ public:
  */
 class ConnectionManagerConfig {
 public:
-  enum class HeaderTransformation { OVERWRITE, APPEND_IF_ABSENT, PASS_THROUGH };
+  using HttpConnectionManagerProto =
+      envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager;
 
   virtual ~ConnectionManagerConfig() = default;
 
@@ -268,9 +270,9 @@ public:
   virtual const std::string& serverName() PURE;
 
   /**
-   * @return HeaderTransformation the transformation to apply to Server response headers.
+   * @return ServerHeaderTransformation the transformation to apply to Server response headers.
    */
-  virtual HeaderTransformation serverHeaderTransformation() PURE;
+  virtual HttpConnectionManagerProto::ServerHeaderTransformation serverHeaderTransformation() PURE;
 
   /**
    * @return ConnectionManagerStats& the stats to write to.

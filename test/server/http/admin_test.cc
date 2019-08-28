@@ -97,7 +97,7 @@ TEST_P(AdminFilterTest, MiscFunctions) {
   EXPECT_EQ(false,
             admin_.createUpgradeFilterChain("", nullptr, mock_filter_chain_factory_callbacks));
   EXPECT_TRUE(nullptr != admin_.scopedRouteConfigProvider());
-  EXPECT_EQ(Http::ConnectionManagerConfig::HeaderTransformation::OVERWRITE,
+  EXPECT_EQ(Http::ConnectionManagerConfig::HttpConnectionManagerProto::OVERWRITE,
             admin_.serverHeaderTransformation());
 }
 

@@ -237,7 +237,7 @@ http_filters:
               ContainerEq(config.tracingConfig()->request_headers_for_tags_));
   EXPECT_EQ(*context_.local_info_.address_, config.localAddress());
   EXPECT_EQ("foo", config.serverName());
-  EXPECT_EQ(HttpConnectionManagerConfig::HeaderTransformation::OVERWRITE,
+  EXPECT_EQ(HttpConnectionManagerConfig::HttpConnectionManagerProto::OVERWRITE,
             config.serverHeaderTransformation());
   EXPECT_EQ(5 * 60 * 1000, config.streamIdleTimeout().count());
 }
@@ -406,7 +406,7 @@ TEST_F(HttpConnectionManagerConfigTest, ServerOverwrite) {
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_);
-  EXPECT_EQ(HttpConnectionManagerConfig::HeaderTransformation::OVERWRITE,
+  EXPECT_EQ(HttpConnectionManagerConfig::HttpConnectionManagerProto::OVERWRITE,
             config.serverHeaderTransformation());
 }
 
@@ -426,7 +426,7 @@ TEST_F(HttpConnectionManagerConfigTest, ServerAppendIfAbsent) {
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_);
-  EXPECT_EQ(HttpConnectionManagerConfig::HeaderTransformation::APPEND_IF_ABSENT,
+  EXPECT_EQ(HttpConnectionManagerConfig::HttpConnectionManagerProto::APPEND_IF_ABSENT,
             config.serverHeaderTransformation());
 }
 
@@ -446,7 +446,7 @@ TEST_F(HttpConnectionManagerConfigTest, ServerPassThrough) {
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_);
-  EXPECT_EQ(HttpConnectionManagerConfig::HeaderTransformation::PASS_THROUGH,
+  EXPECT_EQ(HttpConnectionManagerConfig::HttpConnectionManagerProto::PASS_THROUGH,
             config.serverHeaderTransformation());
 }
 
