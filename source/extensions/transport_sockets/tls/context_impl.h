@@ -12,6 +12,8 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
+#include "common/stats/symbol_table_impl.h"
+
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "absl/synchronization/mutex.h"
@@ -126,6 +128,7 @@ protected:
   static SslStats generateStats(Stats::Scope& scope);
 
   std::string getCaFileName() const { return ca_file_path_; };
+  void incCounter(const Stats::StatName name, absl::string_view value) const;
 
   Envoy::Ssl::CertificateDetailsPtr certificateDetails(X509* cert, const std::string& path) const;
 
@@ -167,6 +170,11 @@ protected:
   std::string cert_chain_file_path_;
   TimeSource& time_source_;
   const unsigned tls_max_version_;
+  mutable Stats::StatNameSet stat_name_set_;
+  const Stats::StatName ssl_ciphers_;
+  const Stats::StatName ssl_versions_;
+  const Stats::StatName ssl_curves_;
+  const Stats::StatName ssl_sigalgs_;
 };
 
 using ContextImplSharedPtr = std::shared_ptr<ContextImpl>;

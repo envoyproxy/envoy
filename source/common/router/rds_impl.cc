@@ -30,8 +30,8 @@ RouteConfigProviderPtr RouteConfigProviderUtil::create(
     return route_config_provider_manager.createStaticRouteConfigProvider(config.route_config(),
                                                                          factory_context);
   case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::kRds:
-    return route_config_provider_manager.createRdsRouteConfigProvider(config.rds(), factory_context,
-                                                                      stat_prefix);
+    return route_config_provider_manager.createRdsRouteConfigProvider(
+        config.rds(), factory_context, stat_prefix, factory_context.initManager());
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
@@ -124,6 +124,7 @@ void RdsRouteConfigSubscription::onConfigUpdate(
       }
       vhds_subscription_.release();
     }
+    update_callback_manager_.runCallbacks();
   }
 
   init_target_.ready();
@@ -218,8 +219,8 @@ RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(Server::Admin& ad
 
 Router::RouteConfigProviderPtr RouteConfigProviderManagerImpl::createRdsRouteConfigProvider(
     const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
-    Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix) {
-
+    Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
+    Init::Manager& init_manager) {
   // RdsRouteConfigSubscriptions are unique based on their serialized RDS config.
   const uint64_t manager_identifier = MessageUtil::hash(rds);
 
@@ -232,9 +233,7 @@ Router::RouteConfigProviderPtr RouteConfigProviderManagerImpl::createRdsRouteCon
     // of simplicity.
     subscription.reset(new RdsRouteConfigSubscription(rds, manager_identifier, factory_context,
                                                       stat_prefix, *this));
-
-    factory_context.initManager().add(subscription->init_target_);
-
+    init_manager.add(subscription->init_target_);
     route_config_subscriptions_.insert({manager_identifier, subscription});
   } else {
     // Because the RouteConfigProviderManager's weak_ptrs only get cleaned up

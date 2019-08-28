@@ -212,10 +212,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v3.8.0/protobuf-all-3.8.0.tar.gz"],
     ),
     grpc_httpjson_transcoding = dict(
-        sha256 = "dedd76b0169eb8c72e479529301a1d9b914a4ccb4d2b5ddb4ebe92d63a7b2152",
-        strip_prefix = "grpc-httpjson-transcoding-64d6ac985360b624d8e95105701b64a3814794cd",
-        # 2018-12-19
-        urls = ["https://github.com/grpc-ecosystem/grpc-httpjson-transcoding/archive/64d6ac985360b624d8e95105701b64a3814794cd.tar.gz"],
+        sha256 = "a447458b47ea4dc1d31499f555769af437c5d129d988ec1e13d5fdd0a6a36b4e",
+        strip_prefix = "grpc-httpjson-transcoding-2feabd5d64436e670084091a937855972ee35161",
+        # 2019-08-28
+        urls = ["https://github.com/grpc-ecosystem/grpc-httpjson-transcoding/archive/2feabd5d64436e670084091a937855972ee35161.tar.gz"],
     ),
     io_bazel_rules_go = dict(
         sha256 = "96b1f81de5acc7658e1f5a86d7dc9e1b89bc935d83799b711363a748652c471a",
@@ -232,10 +232,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://files.pythonhosted.org/packages/b3/b2/238e2590826bfdd113244a40d9d3eb26918bd798fc187e2360a8367068db/six-1.10.0.tar.gz"],
     ),
     io_opencensus_cpp = dict(
-        sha256 = "8d6016e47c2e19e7acbadb6f905b8c422748c64299d71101ac8f28151677e195",
-        strip_prefix = "opencensus-cpp-cad0d03ff3474cf14389fc249e16847ab7b6895f",
-        # 2019-07-31
-        urls = ["https://github.com/census-instrumentation/opencensus-cpp/archive/cad0d03ff3474cf14389fc249e16847ab7b6895f.tar.gz"],
+        sha256 = "b5fcc36a994a4ecb6e53c901e33579ed1ac238cff9975807db760918a15f43ff",
+        strip_prefix = "opencensus-cpp-8058a1b8efe6a63bd18673abc51223917d12d45d",
+        # 2019-08-22
+        urls = ["https://github.com/census-instrumentation/opencensus-cpp/archive/8058a1b8efe6a63bd18673abc51223917d12d45d.tar.gz"],
     ),
     com_github_curl = dict(
         sha256 = "4376ac72b95572fb6c4fbffefb97c7ea0dd083e1974c0e44cd7e49396f454839",
@@ -253,8 +253,8 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/cel-cpp/archive/d9d02b20ab85da2444dbdd03410bac6822141364.tar.gz"],
     ),
     com_googlesource_code_re2 = dict(
-        sha256 = "f31db9cd224d018a7e4fe88ef84aaa874b0b3ed91d4d98ee5a1531101d3fdc64",
-        strip_prefix = "re2-87e2ad45e7b18738e1551474f7ee5886ff572059",
-        urls = ["https://github.com/google/re2/archive/87e2ad45e7b18738e1551474f7ee5886ff572059.tar.gz"],
+        sha256 = "38bc0426ee15b5ed67957017fd18201965df0721327be13f60496f2b356e3e01",
+        strip_prefix = "re2-2019-08-01",
+        urls = ["https://github.com/google/re2/archive/2019-08-01.tar.gz"],
     ),
 )

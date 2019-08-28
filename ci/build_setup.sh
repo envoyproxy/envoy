@@ -95,6 +95,7 @@ if [ "$1" != "-nofetch" ]; then
   # This is the hash on https://github.com/envoyproxy/envoy-filter-example.git we pin to.
   (cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git fetch origin && git checkout -f 1995c1e0eccea84bbb39f64e75ef3e9102d1ae82)
   sed -e "s|{ENVOY_SRCDIR}|${ENVOY_SRCDIR}|" "${ENVOY_SRCDIR}"/ci/WORKSPACE.filter.example > "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/WORKSPACE
+  cp -f "${ENVOY_SRCDIR}"/.bazelversion "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/.bazelversion
 fi
 
 # Also setup some space for building Envoy standalone.
