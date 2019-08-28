@@ -121,6 +121,9 @@ public:
     return &scoped_route_config_provider_;
   }
   const std::string& serverName() override { return Http::DefaultServerString::get(); }
+  HttpConnectionManagerProto::ServerHeaderTransformation serverHeaderTransformation() override {
+    return HttpConnectionManagerProto::OVERWRITE;
+  }
   Http::ConnectionManagerStats& stats() override { return stats_; }
   Http::ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() override { return true; }

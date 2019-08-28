@@ -116,6 +116,9 @@ public:
     return scoped_routes_config_provider_.get();
   }
   const std::string& serverName() override { return server_name_; }
+  HttpConnectionManagerProto::ServerHeaderTransformation serverHeaderTransformation() override {
+    return server_transformation_;
+  }
   Http::ConnectionManagerStats& stats() override { return stats_; }
   Http::ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() override { return use_remote_address_; }
@@ -166,6 +169,8 @@ private:
   CodecType codec_type_;
   const Http::Http2Settings http2_settings_;
   const Http::Http1Settings http1_settings_;
+  HttpConnectionManagerProto::ServerHeaderTransformation server_transformation_{
+      HttpConnectionManagerProto::OVERWRITE};
   std::string server_name_;
   Http::TracingConnectionManagerConfigPtr tracing_config_;
   absl::optional<std::string> user_agent_;
