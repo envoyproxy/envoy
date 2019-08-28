@@ -1,4 +1,4 @@
-#!/bin/bash -eu
+#!/bin/bash -eux
 
 # Dynamically source fuzzing targets
 declare -r FUZZER_TARGETS_CC=$(find . -name *_fuzz_test.cc)
@@ -15,9 +15,11 @@ do
   fi
 done
 
+
 # run fuzzing regression or upload to Fuzzit for long running fuzzing job ($1 is either local-regression or fuzzing)
-wget -O fuzzit https://github.com/fuzzitdev/fuzzit/releases/download/v2.4.35/fuzzit_Linux_x86_64
+wget -O fuzzit https://github.com/fuzzitdev/fuzzit/releases/download/v2.4.55/fuzzit_Linux_x86_64
 chmod a+x fuzzit
+
 PREFIX=$(realpath /build/tmp/_bazel_bazel/*/execroot/envoy/bazel-out/k8-fastbuild/bin)
 for t in ${FILTERED_FUZZER_TARGETS}
 do

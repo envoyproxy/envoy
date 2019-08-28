@@ -125,28 +125,6 @@ jobs:
        - run: ci/do_circle_ci.sh check_repositories
        - run: ci/do_circle_ci.sh check_spelling
        - run: ci/do_circle_ci.sh check_spelling_pedantic
-   fuzzit_regression:
-     executor: ubuntu-build
-     working_directory: /src/envoy
-     resource_class: xlarge
-     steps:
-       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
-       - checkout
-       - setup_remote_docker
-       - run: mkdir /build
-       - run: ci/do_circle_ci.sh bazel.fuzz
-       - run: ci/run_fuzzit.sh local-regression
-   fuzzit_fuzzing:
-     executor: ubuntu-build
-     working_directory: /src/envoy
-     resource_class: xlarge
-     steps:
-       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
-       - checkout
-       - setup_remote_docker
-       - run: mkdir /build
-       - run: ci/do_circle_ci.sh bazel.fuzz
-       - run: ci/run_fuzzit.sh fuzzing
    build_image:
      docker:
        - image: google/cloud-sdk
@@ -187,7 +165,6 @@ workflows:
       - coverage
       - coverage_publish:
           requires: [coverage]
-      - fuzzit_regression
       - format
       - clang_tidy
       - build_image
@@ -195,14 +172,3 @@ workflows:
           filters:
             tags:
               only: /^v.*/
-  nightly:
-    triggers:
-      - schedule:
-          cron: "0 0 * * *"
-          filters:
-            branches:
-              only:
-                - master
-    jobs:
-      - fuzzit_fuzzing
-
