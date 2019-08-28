@@ -5,5 +5,4 @@ licenses(["notice"])  # Apache 2
 api_proto_library_internal(
     name = "cluster",
     srcs = ["cluster.proto"],
-    deps = [],
 )
