@@ -48,19 +48,20 @@
 namespace Envoy  {
 namespace Upstream {
 
+// TODO: rename to factory selector something.
 class TransportSocketOverrides {
+public:
   TransportSocketOverrides(Network::TransportSocketFactoryPtr&& socket_factory,
       std::map<std::string, Network::TransportSocketFactoryPtr>&& socket_factory_overrides);
 
-  Network::TransportSocketPtr createTransportSocket(Network::TransportSocketOptionsSharedPtr options);
-
-  Network::TransportSocketPtr createTransportSocket(
-      const std::string& label, Network::TransportSocketOptionsSharedPtr options);
+  Network::TransportSocketFactory& resolve(const envoy::api::v2::core::Metadata& metadata);
 
 protected:
+  // TODO: how to handle this, who owns the factory?
   Network::TransportSocketFactoryPtr default_socket_factory_;
   std::map<std::string, Network::TransportSocketFactoryPtr> socket_overrides_;
 };
 
+using TransportSocketOverridesPtr = std::unique_ptr<TransportSocketOverrides>;
 } // namespace Upstream
 } // namespace Envoy

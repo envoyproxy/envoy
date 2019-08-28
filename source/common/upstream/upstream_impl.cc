@@ -266,9 +266,11 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
     connection_options = options;
   }
 
+  Network::TransportSocketFactory& socket_factory = cluster.resolveTransportSocketFactory(*metadata_);
   Network::ClientConnectionPtr connection = dispatcher.createClientConnection(
       address, cluster.sourceAddress(),
-      cluster.transportSocketFactory().createTransportSocket(transport_socket_options),
+      //cluster.transportSocketFactory().createTransportSocket(transport_socket_options),
+      socket_factory.createTransportSocket(transport_socket_options),
       connection_options);
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());
   cluster.createNetworkFilterChain(*connection);
@@ -587,6 +589,7 @@ private:
 ClusterInfoImpl::ClusterInfoImpl(
     const envoy::api::v2::Cluster& config, const envoy::api::v2::core::BindConfig& bind_config,
     Runtime::Loader& runtime, Network::TransportSocketFactoryPtr&& socket_factory,
+    TransportSocketOverridePtr&& socket_overrides,
     Stats::ScopePtr&& stats_scope, bool added_via_api,
     ProtobufMessage::ValidationVisitor& validation_visitor,
     Server::Configuration::TransportSocketFactoryContext& factory_context)
@@ -598,6 +601,7 @@ ClusterInfoImpl::ClusterInfoImpl(
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       transport_socket_factory_(std::move(socket_factory)), stats_scope_(std::move(stats_scope)),
+      socket_overrides_(std::move(socket_overrides)),
       stats_(generateStats(*stats_scope_)),
       load_report_stats_(generateLoadReportStats(load_report_stats_store_)),
       features_(parseFeatures(config)),
@@ -739,6 +743,33 @@ Network::TransportSocketFactoryPtr createTransportSocketFactory(
   return config_factory.createTransportSocketFactory(*message, factory_context);
 }
 
+// TODO(icnfly): figure out here, what's about factory context.
+TransportSocketOverridePtr createTransportSocketOverrides(
+    const envoy::api::v2::Cluster& config,
+    Server::Configuration::TransportSocketFactoryContext& factory_context) {
+  TransportSocketOverridePtr socket_overrides;
+  return socket_overrides;
+  // If the cluster config doesn't have a transport socket configured, override with the default
+  // transport socket implementation based on the tls_context. We copy by value first then override
+  // if necessary.
+  //auto transport_socket = config.transport_socket();
+  //if (!config.has_transport_socket()) {
+    //if (config.has_tls_context()) {
+      //transport_socket.set_name(Extensions::TransportSockets::TransportSocketNames::get().Tls);
+      //MessageUtil::jsonConvert(config.tls_context(), *transport_socket.mutable_config());
+    //} else {
+      //transport_socket.set_name(
+          //Extensions::TransportSockets::TransportSocketNames::get().RawBuffer);
+    //}
+  //}
+
+  //auto& config_factory = Config::Utility::getAndCheckFactory<
+      //Server::Configuration::UpstreamTransportSocketConfigFactory>(transport_socket.name());
+  //ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
+      //transport_socket, factory_context.messageValidationVisitor(), config_factory);
+  //return config_factory.createTransportSocketFactory(*message, factory_context);
+}
+
 void ClusterInfoImpl::createNetworkFilterChain(Network::Connection& connection) const {
   for (const auto& factory : filter_factories_) {
     factory(connection);
@@ -754,10 +785,11 @@ ClusterImplBase::ClusterImplBase(
       symbol_table_(stats_scope->symbolTable()) {
   factory_context.setInitManager(init_manager_);
   auto socket_factory = createTransportSocketFactory(cluster, factory_context);
+  auto socket_overrides = createTransportSocketOverrides(cluster, factory_context);
   info_ = std::make_unique<ClusterInfoImpl>(
       cluster, factory_context.clusterManager().bindConfig(), runtime, std::move(socket_factory),
-      std::move(stats_scope), added_via_api, factory_context.messageValidationVisitor(),
-      factory_context);
+      std::move(socket_overrides), std::move(stats_scope), added_via_api,
+      factory_context.messageValidationVisitor(), factory_context);
   // Create the default (empty) priority set before registering callbacks to
   // avoid getting an update the first time it is accessed.
   priority_set_.getOrCreateHostSet(0);

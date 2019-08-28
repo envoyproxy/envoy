@@ -10,17 +10,18 @@ TransportSocketOverrides::TransportSocketOverrides(
   socket_overrides_(std::move(socket_factory_overrides)) {
 }
 
-Network::TransportSocketPtr TransportSocketOverrides::createTransportSocket(
-    Network::TransportSocketOptionsSharedPtr options) {
-  return default_socket_factory_->createTransportSocket(options);
-}
-
-Network::TransportSocketPtr TransportSocketOverrides::createTransportSocket(
-    const std::string& label, Network::TransportSocketOptionsSharedPtr options) {
-  if (socket_overrides_.find(label) == socket_overrides_.end()) {
-    return default_socket_factory_->createTransportSocket(options);
+Network::TransportSocketFactory& TransportSocketOverrides::resolve(
+    const envoy::api::v2::core::Metadata& metadata) {
+  // TODO(incfly): here, check ProtobufWkt::Value& Metadata::metadataValue
+  const auto& filter_metadata = metadata.filter_metadata();
+  if (ilter_metadata.find("hard-code-metadata-key") == filter_metadata.end()) {
+    return *default_socket_factory_;
   }
-  return socket_overrides_[label]->createTransportSocket(options);
+  const auto& socket_label = filter_metadata["hard-code-metadata-key"];
+  if (socket_label == "" || socket_overrides_.find(socket_label) == socket_overrides_.end()) {
+    return *default_socket_factory_;
+  }
+  return *socket_overrides_[socket_label];
 }
 
 } // namespace Upstream

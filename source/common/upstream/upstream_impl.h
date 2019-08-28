@@ -42,6 +42,7 @@
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/outlier_detection_impl.h"
 #include "common/upstream/resource_manager_impl.h"
+#include "common/upstream/transport_socket_overrides.h"
 
 #include "absl/synchronization/mutex.h"
 
@@ -556,8 +557,13 @@ public:
   uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
   const std::string& name() const override { return name_; }
   ResourceManager& resourceManager(ResourcePriority priority) const override;
+
   Network::TransportSocketFactory& transportSocketFactory() const override {
     return *transport_socket_factory_;
+  }
+  Network::TransportSocketFactory& resolveTransportSocketFactory(
+      const envoy::api::v2::core::Metadata& metadata) {
+    return socket_overrides_->resolve(metadata);
   }
   ClusterStats& stats() const override { return stats_; }
   Stats::Scope& statsScope() const override { return *stats_scope_; }
@@ -601,6 +607,7 @@ private:
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   const uint32_t per_connection_buffer_limit_bytes_;
   Network::TransportSocketFactoryPtr transport_socket_factory_;
+  TransportSocketOverridesPtr socket_overrides_;
   Stats::ScopePtr stats_scope_;
   mutable ClusterStats stats_;
   Stats::IsolatedStoreImpl load_report_stats_store_;
@@ -637,6 +644,11 @@ private:
 Network::TransportSocketFactoryPtr
 createTransportSocketFactory(const envoy::api::v2::Cluster& config,
                              Server::Configuration::TransportSocketFactoryContext& factory_context);
+
+
+TransportSocketOverridesPtr createTransportSocketOverrides(
+    const envoy::api::v2::Cluster& config,
+    Server::Configuration::TransportSocketFactoryContext& factory_context);
 
 /**
  * Base class all primary clusters.
