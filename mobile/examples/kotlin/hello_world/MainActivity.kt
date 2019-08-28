@@ -9,21 +9,16 @@ import android.support.v7.widget.LinearLayoutManager
 import android.support.v7.widget.RecyclerView
 import android.util.Log
 import io.envoyproxy.envoymobile.AndroidEnvoyBuilder
-import io.envoyproxy.envoymobile.CancelableStream
 import io.envoyproxy.envoymobile.Envoy
 import io.envoyproxy.envoymobile.RequestBuilder
-import io.envoyproxy.envoymobile.ResponseHandler
 import io.envoyproxy.envoymobile.RequestMethod
+import io.envoyproxy.envoymobile.ResponseHandler
 import io.envoyproxy.envoymobile.shared.Failure
-import io.envoyproxy.envoymobile.shared.Response
 import io.envoyproxy.envoymobile.shared.ResponseRecyclerViewAdapter
 import io.envoyproxy.envoymobile.shared.Success
 import java.io.IOException
-import java.io.InputStream
-import java.net.HttpURLConnection
-import java.net.URL
+import java.util.concurrent.Executor
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.Executor;
 
 
 private const val REQUEST_HANDLER_THREAD_NAME = "hello_envoy_kt"
@@ -74,28 +69,24 @@ class MainActivity : Activity() {
     thread.quit()
   }
 
-  private fun makeRequest(): Unit {
+  private fun makeRequest() {
     val request = RequestBuilder(RequestMethod.GET, REQUEST_SCHEME,
-                                 REQUEST_AUTHORITY, REQUEST_PATH).build()
-    val handler = ResponseHandler(object : Executor {
-      override fun execute(r : Runnable) {
-        r.run()
-      }
-    })
-    .onHeaders({ headers, status, _ ->
-      if (status == 200) {
-        val serverHeaderField = headers[ENVOY_SERVER_HEADER]?.first() ?: ""
-        val body = "" // fake data
-        recyclerView.post { viewAdapter.add(Success(body, serverHeaderField)) }
-      } else {
-        recyclerView.post { viewAdapter.add(Failure("failed with status: $status")) }
-      }
-    })
+        REQUEST_AUTHORITY, REQUEST_PATH).build()
+
+    val handler = ResponseHandler(Executor { r -> r.run() })
+        .onHeaders { headers, status, _ ->
+          if (status == 200) {
+            val serverHeaderField = headers[ENVOY_SERVER_HEADER]?.first() ?: ""
+            val body = "" // fake data
+            recyclerView.post { viewAdapter.add(Success(body, serverHeaderField)) }
+          } else {
+            recyclerView.post { viewAdapter.add(Failure("failed with status: $status")) }
+          }
+        }
+        .onError {
+          recyclerView.post { viewAdapter.add(Failure("failed with error ")) }
+        }
 
     envoy.send(request, null, emptyMap(), handler)
-  }
-
-  private fun deserialize(inputStream: InputStream): String {
-    return inputStream.bufferedReader().use { reader -> reader.readText() }
   }
 }

@@ -38,5 +38,5 @@ touch $@
 
 define_kt_toolchain(
     name = "kotlin_toolchain",
-    jvm_target = "1.6",
+    jvm_target = "1.8",
 )

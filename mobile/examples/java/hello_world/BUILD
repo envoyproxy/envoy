@@ -1,8 +1,22 @@
 licenses(["notice"])  # Apache 2
 
+load("@io_bazel_rules_kotlin//kotlin:kotlin.bzl", "kt_android_library")
+
 android_binary(
     name = "hello_envoy",
+    custom_package = "io.envoyproxy.envoymobile.helloenvoy",
+    manifest = "AndroidManifest.xml",
+    deps = [
+        "hello_envoy_java_lib",
+    ],
+)
+
+# We'll use the kotlin rule here to avoid having an explicit dependency on
+# kotlin runtime.
+kt_android_library(
+    name = "hello_envoy_java_lib",
     srcs = [
+        "EmptyFile.kt",  # Needed for the kotlin rule
         "MainActivity.java",
     ],
     custom_package = "io.envoyproxy.envoymobile.helloenvoy",
