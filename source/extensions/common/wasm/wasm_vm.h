@@ -41,58 +41,39 @@ template <typename T> struct Global {
   virtual void set(const T& t) PURE;
 };
 
+// Templates for constructing signatures of functions calling into and out of WASM VMs.
+template <size_t N, class ReturnType, class ContextType, class ParamType,
+          class FuncBase = ReturnType(ContextType)>
+struct WasmFuncTypeHelper {};
+
+template <size_t N, class ReturnType, class ContextType, class ParamType, class... Args>
+struct WasmFuncTypeHelper<N, ReturnType, ContextType, ParamType, ReturnType(ContextType, Args...)> {
+  using type = typename WasmFuncTypeHelper<N - 1, ReturnType, ContextType, ParamType,
+                                           ReturnType(ContextType, Args..., ParamType)>::type;
+};
+
+template <class ReturnType, class ContextType, class ParamType, class... Args>
+struct WasmFuncTypeHelper<0, ReturnType, ContextType, ParamType, ReturnType(ContextType, Args...)> {
+  using type = ReturnType(ContextType, Args...);
+};
+
+template <size_t N, class ReturnType, class ContextType, class ParamType>
+using WasmFuncType = typename WasmFuncTypeHelper<N, ReturnType, ContextType, ParamType>::type;
+
 // Calls into the WASM VM.
 // 1st arg is always a pointer to Context (Context*).
-using WasmCall0Void = std::function<void(Context*)>;
-using WasmCall1Void = std::function<void(Context*, Word)>;
-using WasmCall2Void = std::function<void(Context*, Word, Word)>;
-using WasmCall3Void = std::function<void(Context*, Word, Word, Word)>;
-using WasmCall4Void = std::function<void(Context*, Word, Word, Word, Word)>;
-using WasmCall5Void = std::function<void(Context*, Word, Word, Word, Word, Word)>;
-using WasmCall6Void = std::function<void(Context*, Word, Word, Word, Word, Word, Word)>;
-using WasmCall7Void = std::function<void(Context*, Word, Word, Word, Word, Word, Word, Word)>;
-using WasmCall8Void = std::function<void(Context*, Word, Word, Word, Word, Word, Word, Word, Word)>;
-using WasmCall0Word = std::function<Word(Context*)>;
-using WasmCall1Word = std::function<Word(Context*, Word)>;
-using WasmCall2Word = std::function<Word(Context*, Word, Word)>;
-using WasmCall3Word = std::function<Word(Context*, Word, Word, Word)>;
-using WasmCall4Word = std::function<Word(Context*, Word, Word, Word, Word)>;
-using WasmCall5Word = std::function<Word(Context*, Word, Word, Word, Word, Word)>;
-using WasmCall6Word = std::function<Word(Context*, Word, Word, Word, Word, Word, Word)>;
-using WasmCall7Word = std::function<Word(Context*, Word, Word, Word, Word, Word, Word, Word)>;
-using WasmCall8Word = std::function<Word(Context*, Word, Word, Word, Word, Word, Word, Word, Word)>;
+template <size_t N> using WasmCallVoid = std::function<WasmFuncType<N, void, Context*, Word>>;
+template <size_t N> using WasmCallWord = std::function<WasmFuncType<N, Word, Context*, Word>>;
+
 #define FOR_ALL_WASM_VM_EXPORTS(_f)                                                                \
-  _f(WasmCall0Void) _f(WasmCall1Void) _f(WasmCall2Void) _f(WasmCall3Void) _f(WasmCall4Void)        \
-      _f(WasmCall5Void) _f(WasmCall8Void) _f(WasmCall0Word) _f(WasmCall1Word) _f(WasmCall3Word)
+  _f(WasmCallVoid<0>) _f(WasmCallVoid<1>) _f(WasmCallVoid<2>) _f(WasmCallVoid<3>)                  \
+      _f(WasmCallVoid<4>) _f(WasmCallVoid<5>) _f(WasmCallVoid<8>) _f(WasmCallWord<0>)              \
+          _f(WasmCallWord<1>) _f(WasmCallWord<3>)
 
 // Calls out of the WASM VM.
 // 1st arg is always a pointer to raw_context (void*).
-using WasmCallback0Void = void (*)(void*);
-using WasmCallback1Void = void (*)(void*, Word);
-using WasmCallback2Void = void (*)(void*, Word, Word);
-using WasmCallback3Void = void (*)(void*, Word, Word, Word);
-using WasmCallback4Void = void (*)(void*, Word, Word, Word, Word);
-using WasmCallback5Void = void (*)(void*, Word, Word, Word, Word, Word);
-using WasmCallback6Void = void (*)(void*, Word, Word, Word, Word, Word, Word);
-using WasmCallback7Void = void (*)(void*, Word, Word, Word, Word, Word, Word, Word);
-using WasmCallback8Void = void (*)(void*, Word, Word, Word, Word, Word, Word, Word, Word);
-using WasmCallback0Word = Word (*)(void*);
-using WasmCallback1Word = Word (*)(void*, Word);
-using WasmCallback2Word = Word (*)(void*, Word, Word);
-using WasmCallback3Word = Word (*)(void*, Word, Word, Word);
-using WasmCallback4Word = Word (*)(void*, Word, Word, Word, Word);
-using WasmCallback5Word = Word (*)(void*, Word, Word, Word, Word, Word);
-using WasmCallback6Word = Word (*)(void*, Word, Word, Word, Word, Word, Word);
-using WasmCallback7Word = Word (*)(void*, Word, Word, Word, Word, Word, Word, Word, Word);
-using WasmCallback8Word = Word (*)(void*, Word, Word, Word, Word, Word, Word, Word, Word, Word);
-using WasmCallback9Word = Word (*)(void*, Word, Word, Word, Word, Word, Word, Word, Word, Word,
-                                   Word);
-#define FOR_ALL_WASM_VM_IMPORTS(_f)                                                                \
-  _f(WasmCallback0Void) _f(WasmCallback1Void) _f(WasmCallback2Void) _f(WasmCallback3Void)          \
-      _f(WasmCallback4Void) _f(WasmCallback0Word) _f(WasmCallback1Word) _f(WasmCallback2Word)      \
-          _f(WasmCallback3Word) _f(WasmCallback4Word) _f(WasmCallback5Word) _f(WasmCallback6Word)  \
-              _f(WasmCallback7Word) _f(WasmCallback8Word) _f(WasmCallback9Word)                    \
-                  _f(WasmCallback_WWl) _f(WasmCallback_WWm)
+template <size_t N> using WasmCallbackVoid = WasmFuncType<N, void, void*, Word>*;
+template <size_t N> using WasmCallbackWord = WasmFuncType<N, Word, void*, Word>*;
 
 // Using the standard g++/clang mangling algorithm:
 // https://itanium-cxx-abi.github.io/cxx-abi/abi.html#mangling-builtin
@@ -100,6 +81,14 @@ using WasmCallback9Word = Word (*)(void*, Word, Word, Word, Word, Word, Word, Wo
 // Z = void, j = uint32_t, l = int64_t, m = uint64_t
 using WasmCallback_WWl = Word (*)(void*, Word, int64_t);
 using WasmCallback_WWm = Word (*)(void*, Word, uint64_t);
+
+#define FOR_ALL_WASM_VM_IMPORTS(_f)                                                                \
+  _f(WasmCallbackVoid<0>) _f(WasmCallbackVoid<1>) _f(WasmCallbackVoid<2>) _f(WasmCallbackVoid<3>)  \
+      _f(WasmCallbackVoid<4>) _f(WasmCallbackWord<0>) _f(WasmCallbackWord<1>)                      \
+          _f(WasmCallbackWord<2>) _f(WasmCallbackWord<3>) _f(WasmCallbackWord<4>)                  \
+              _f(WasmCallbackWord<5>) _f(WasmCallbackWord<6>) _f(WasmCallbackWord<7>)              \
+                  _f(WasmCallbackWord<8>) _f(WasmCallbackWord<9>) _f(WasmCallback_WWl)             \
+                      _f(WasmCallback_WWm)
 
 // Wasm VM instance. Provides the low level WASM interface.
 class WasmVm : public Logger::Loggable<Logger::Id::wasm> {

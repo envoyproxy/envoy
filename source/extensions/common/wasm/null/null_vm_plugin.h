@@ -30,7 +30,7 @@ public:
  */
 class NullVmPluginFactory {
 public:
-  virtual ~NullVmPluginFactory() {}
+  virtual ~NullVmPluginFactory() = default;
 
   /**
    * Name of the plugin.

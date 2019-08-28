@@ -17,7 +17,11 @@ namespace Common {
 namespace Wasm {
 namespace Null {
 
-WasmVmPtr NullVm::clone() { return std::make_unique<NullVm>(*this); }
+WasmVmPtr NullVm::clone() {
+  auto cloned_null_vm = std::make_unique<NullVm>(*this);
+  cloned_null_vm->load(plugin_name_, false /* unused */);
+  return cloned_null_vm;
+}
 
 // "Load" the plugin by obtaining a pointer to it from the factory.
 bool NullVm::load(const std::string& name, bool /* allow_precompiled */) {

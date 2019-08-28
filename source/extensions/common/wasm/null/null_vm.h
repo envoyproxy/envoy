@@ -22,7 +22,7 @@ namespace Null {
 // in that it permits the debugger to set breakpoints in both Envoy and the plugin.
 struct NullVm : public WasmVm {
   NullVm() = default;
-  NullVm(const NullVm& other) { load(other.plugin_name_, false /* unused */); }
+  NullVm(const NullVm& other) : plugin_name_(other.plugin_name_) {}
 
   // WasmVm
   absl::string_view vm() override { return WasmVmNames::get().Null; }
