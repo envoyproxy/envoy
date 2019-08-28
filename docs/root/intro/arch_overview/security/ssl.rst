@@ -23,6 +23,10 @@ requirements (TLS1.2, SNI, etc.). Envoy supports the following TLS features:
   tickets (see `RFC 5077 <https://www.ietf.org/rfc/rfc5077.txt>`_). Resumption can be performed
   across hot restarts and between parallel Envoy instances (typically useful in a front proxy
   configuration).
+* **BoringSSL private key methods**: TLS private key operations (signing and decrypting) can be
+  performed asynchronously from an extension. This allows extending Envoy to support various key
+  management schemes (such as TPM) and TLS acceleration. This mechanism uses
+  `BoringSSL private key method interface <https://github.com/google/boringssl/blob/c0b4c72b6d4c6f4828a373ec454bd646390017d4/include/openssl/ssl.h#L1169>`_.
 
 Underlying implementation
 -------------------------

@@ -217,6 +217,8 @@ if __name__ == "__main__":
   errors += checkUnfixableError(
       "histogram_from_string.cc",
       "Don't lookup stats by name at runtime; use StatName saved during construction")
+  errors += checkUnfixableError(
+      "regex.cc", "Don't use std::regex in code that handles untrusted input. Use RegexMatcher")
 
   errors += fixFileExpectingFailure(
       "api/missing_package.proto",

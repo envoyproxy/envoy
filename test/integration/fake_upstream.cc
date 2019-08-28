@@ -73,30 +73,22 @@ void FakeStream::decodeMetadata(Http::MetadataMapPtr&& metadata_map_ptr) {
 }
 
 void FakeStream::encode100ContinueHeaders(const Http::HeaderMapImpl& headers) {
-  // TSan complains about thread-safety of std::shared_ptr when linked against libc++.
-  // See: https://github.com/envoyproxy/envoy/pull/7929
-  std::unique_ptr<Http::HeaderMapImpl> headers_copy(
+  std::shared_ptr<Http::HeaderMapImpl> headers_copy(
       new Http::HeaderMapImpl(static_cast<const Http::HeaderMap&>(headers)));
-  parent_.connection().dispatcher().post([this, headers = headers_copy.release()]() -> void {
-    encoder_.encode100ContinueHeaders(*headers);
-    delete headers;
-  });
+  parent_.connection().dispatcher().post(
+      [this, headers_copy]() -> void { encoder_.encode100ContinueHeaders(*headers_copy); });
 }
 
 void FakeStream::encodeHeaders(const Http::HeaderMapImpl& headers, bool end_stream) {
-  // TSan complains about thread-safety of std::shared_ptr when linked against libc++.
-  // See: https://github.com/envoyproxy/envoy/pull/7929
-  std::unique_ptr<Http::HeaderMapImpl> headers_copy(
+  std::shared_ptr<Http::HeaderMapImpl> headers_copy(
       new Http::HeaderMapImpl(static_cast<const Http::HeaderMap&>(headers)));
   if (add_served_by_header_) {
     headers_copy->addCopy(Http::LowerCaseString("x-served-by"),
                           parent_.connection().localAddress()->asString());
   }
-  parent_.connection().dispatcher().post(
-      [this, headers = headers_copy.release(), end_stream]() -> void {
-        encoder_.encodeHeaders(*headers, end_stream);
-        delete headers;
-      });
+  parent_.connection().dispatcher().post([this, headers_copy, end_stream]() -> void {
+    encoder_.encodeHeaders(*headers_copy, end_stream);
+  });
 }
 
 void FakeStream::encodeData(absl::string_view data, bool end_stream) {
@@ -114,24 +106,16 @@ void FakeStream::encodeData(uint64_t size, bool end_stream) {
 }
 
 void FakeStream::encodeData(Buffer::Instance& data, bool end_stream) {
-  // TSan complains about thread-safety of std::shared_ptr when linked against libc++.
-  // See: https://github.com/envoyproxy/envoy/pull/7929
-  std::unique_ptr<Buffer::Instance> data_copy(new Buffer::OwnedImpl(data));
-  parent_.connection().dispatcher().post([this, data = data_copy.release(), end_stream]() -> void {
-    encoder_.encodeData(*data, end_stream);
-    delete data;
-  });
+  std::shared_ptr<Buffer::Instance> data_copy(new Buffer::OwnedImpl(data));
+  parent_.connection().dispatcher().post(
+      [this, data_copy, end_stream]() -> void { encoder_.encodeData(*data_copy, end_stream); });
 }
 
 void FakeStream::encodeTrailers(const Http::HeaderMapImpl& trailers) {
-  // TSan complains about thread-safety of std::shared_ptr when linked against libc++.
-  // See: https://github.com/envoyproxy/envoy/pull/7929
-  std::unique_ptr<Http::HeaderMapImpl> trailers_copy(
+  std::shared_ptr<Http::HeaderMapImpl> trailers_copy(
       new Http::HeaderMapImpl(static_cast<const Http::HeaderMap&>(trailers)));
-  parent_.connection().dispatcher().post([this, trailers = trailers_copy.release()]() -> void {
-    encoder_.encodeTrailers(*trailers);
-    delete trailers;
-  });
+  parent_.connection().dispatcher().post(
+      [this, trailers_copy]() -> void { encoder_.encodeTrailers(*trailers_copy); });
 }
 
 void FakeStream::encodeResetStream() {

@@ -5,8 +5,9 @@
 
 #include "envoy/common/exception.h"
 
+#include "common/common/fmt.h"
 #include "common/common/perf_annotation.h"
-#include "common/common/utility.h"
+#include "common/common/regex.h"
 
 #include "absl/strings/ascii.h"
 #include "absl/strings/match.h"
@@ -25,7 +26,7 @@ bool regexStartsWithDot(absl::string_view regex) {
 TagExtractorImpl::TagExtractorImpl(const std::string& name, const std::string& regex,
                                    const std::string& substr)
     : name_(name), prefix_(std::string(extractRegexPrefix(regex))), substr_(substr),
-      regex_(RegexUtil::parseRegex(regex)) {}
+      regex_(Regex::Utility::parseStdRegex(regex)) {}
 
 std::string TagExtractorImpl::extractRegexPrefix(absl::string_view regex) {
   std::string prefix;

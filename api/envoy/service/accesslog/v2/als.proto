@@ -53,7 +53,6 @@ message StreamAccessLogsMessage {
         [(validate.rules).repeated .min_items = 1];
   }
 
-  // [#not-implemented-hide:]
   // Wrapper for batches of TCP access log entries.
   message TCPAccessLogEntries {
     repeated envoy.data.accesslog.v2.TCPAccessLogEntry log_entry = 1
@@ -67,7 +66,6 @@ message StreamAccessLogsMessage {
 
     HTTPAccessLogEntries http_logs = 2;
 
-    // [#not-implemented-hide:]
     TCPAccessLogEntries tcp_logs = 3;
   }
 }
