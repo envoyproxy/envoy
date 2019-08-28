@@ -1249,7 +1249,7 @@ bool ConnectionManagerImpl::ActiveStream::snapScopedRouteConfig() {
   if (snapped_scoped_routes_config_ == nullptr) {
     ENVOY_STREAM_LOG(trace, "snapped scoped routes config is null when SRDS is enabled.", *this);
     // Stop decoding now.
-    // NOTE(stevenzzzz,alyssar): also look into the order priority of this sendLocalReply,
+    // TODO(stevenzzzz): also look into the order priority of this sendLocalReply,
     // connection should be closed properly here.
     maybeEndDecode(true);
     sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_),
