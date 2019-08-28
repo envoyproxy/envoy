@@ -130,10 +130,11 @@ bool InstanceImplPosix::illegalPath(const std::string& path) {
   // instances poking in bad places. We may have to consider conditioning on
   // platform in the future, growing these or relaxing some constraints (e.g.
   // there are valid reasons to go via /proc for file paths).
-  static std::vector<std::string> paths = {"/dev", "/sys", "/proc"};
-  auto offset = canonical_path.rc_.find('/', 1);
-  for (const auto& p : paths) {
-    if (canonical_path.rc_.compare(0, offset, p) == 0) {
+  static const char* const paths[] = {"/dev", "/sys", "/proc"};
+  absl::string_view canonical(canonical_path.rc_);
+  const auto offset = canonical.find('/', 1);
+  for (const auto& path : paths) {
+    if (canonical.compare(0, offset, path) == 0) {
       return true;
     }
   }
