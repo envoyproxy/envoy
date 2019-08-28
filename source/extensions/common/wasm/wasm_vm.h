@@ -127,7 +127,9 @@ public:
    * Load the WASM code from a file. Return true on success.
    * @param code the WASM binary code (or registered NullVm plugin name).
    * @param allow_precompiled if true, allows supporting VMs (e.g. WAVM) to load the binary
-   * machine code from a user-defined section of the WASM file.
+   * machine code from a user-defined section of the WASM file. Because that code is not verified by
+   * the envoy process it is up to the user to ensure that the code is both safe and is built for
+   * the linked in version of WAVM.
    * @return whether or not the load was successful.
    */
   virtual bool load(const std::string& code, bool allow_precompiled) PURE;
