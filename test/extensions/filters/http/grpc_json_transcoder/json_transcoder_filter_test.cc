@@ -816,7 +816,7 @@ TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest,
 }
 
 // Trailer-only response with grpc-status-details-bin header with details.
-// Also tests that a user-defined type from proto descriptor in cofing can be used in details.
+// Also tests that a user-defined type from a proto descriptor in config can be used in details.
 TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest,
        TranscodingBinaryHeaderWithDetailsInTrailerOnlyResponse) {
   std::string expected_response(
