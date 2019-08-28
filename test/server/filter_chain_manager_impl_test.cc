@@ -56,7 +56,7 @@ MATCHER_P(containsServerName, name, "") {
 class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
 public:
   MockFilterChainFactoryBuilder() {
-    EXPECT_CALL(*this, buildFilterChain(_)).WillRepeatedly(Invoke([](auto) {
+    ON_CALL(*this, buildFilterChain(_)).WillByDefault(Invoke([](auto) {
       return std::make_unique<Network::MockFilterChain>();
     }));
   }
@@ -132,7 +132,7 @@ public:
           - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
   )EOF";
   envoy::api::v2::listener::FilterChain filter_chain_template_;
-  MockFilterChainFactoryBuilder filter_chain_factory_builder_;
+  NiceMock<MockFilterChainFactoryBuilder> filter_chain_factory_builder_;
 
   // Test target.
   FilterChainManagerImpl filter_chain_manager_{
@@ -151,14 +151,14 @@ TEST_F(FilterChainManagerImplTest, AddSingleFilterChain) {
 }
 
 TEST_F(FilterChainManagerImplTest, EmptyDstAddressAndCatchAllAddress) {
-  const std::string filter_chain_yaml0 = R"EOF(
+  const std::string filter_chain_yaml_0 = R"EOF(
       filter_chain_match:
           destination_port: 443
           server_names:
           - "*.foo.com"
       filters:
   )EOF";
-  const std::string filter_chain_yaml1 = R"EOF(
+  const std::string filter_chain_yaml_1 = R"EOF(
       filter_chain_match:
           destination_port: 443
           prefix_ranges:
@@ -170,24 +170,20 @@ TEST_F(FilterChainManagerImplTest, EmptyDstAddressAndCatchAllAddress) {
   )EOF";
 
   envoy::api::v2::listener::FilterChain filter_chain_0, filter_chain_1;
-  TestUtility::loadFromYaml(
-      TestEnvironment::substitute(filter_chain_yaml0, Network::Address::IpVersion::v4),
-      filter_chain_0);
-  TestUtility::loadFromYaml(
-      TestEnvironment::substitute(filter_chain_yaml1, Network::Address::IpVersion::v4),
-      filter_chain_1);
+  TestUtility::loadFromYaml(filter_chain_yaml_0, filter_chain_0);
+  TestUtility::loadFromYaml(filter_chain_yaml_1, filter_chain_1);
   std::vector<Network::FilterFactoryCb> ref0, ref1;
 
   EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(containsServerName("*.foo.com")))
       .WillRepeatedly(Invoke([&ref0](auto) {
         auto res = std::make_unique<Network::MockFilterChain>();
-        EXPECT_CALL(*res, networkFilterFactories()).Times(1).WillRepeatedly(ReturnRef(ref0));
+        EXPECT_CALL(*res, networkFilterFactories()).WillOnce(ReturnRef(ref0));
         return res;
       }));
   EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(containsServerName("*.bar.com")))
       .WillRepeatedly(Invoke([&ref1](auto) {
         auto res = std::make_unique<Network::MockFilterChain>();
-        EXPECT_CALL(*res, networkFilterFactories()).Times(1).WillRepeatedly(ReturnRef(ref1));
+        EXPECT_CALL(*res, networkFilterFactories()).WillOnce(ReturnRef(ref1));
         return res;
       }));
   filter_chain_manager_.addFilterChain(
@@ -205,14 +201,14 @@ TEST_F(FilterChainManagerImplTest, EmptyDstAddressAndCatchAllAddress) {
 }
 
 TEST_F(FilterChainManagerImplTest, EmptyDstAddressIsSuperSetOfCatchAllAddress) {
-  const std::string filter_chain_yaml0 = R"EOF(
+  const std::string filter_chain_yaml_0 = R"EOF(
       filter_chain_match:
           destination_port: 443
           server_names:
           - "*.foo.com"
       filters:
   )EOF";
-  const std::string filter_chain_yaml1 = R"EOF(
+  const std::string filter_chain_yaml_1 = R"EOF(
       filter_chain_match:
           destination_port: 443
           prefix_ranges:
@@ -224,12 +220,8 @@ TEST_F(FilterChainManagerImplTest, EmptyDstAddressIsSuperSetOfCatchAllAddress) {
   )EOF";
 
   envoy::api::v2::listener::FilterChain filter_chain_0, filter_chain_1;
-  TestUtility::loadFromYaml(
-      TestEnvironment::substitute(filter_chain_yaml0, Network::Address::IpVersion::v4),
-      filter_chain_0);
-  TestUtility::loadFromYaml(
-      TestEnvironment::substitute(filter_chain_yaml1, Network::Address::IpVersion::v4),
-      filter_chain_1);
+  TestUtility::loadFromYaml(filter_chain_yaml_0, filter_chain_0);
+  TestUtility::loadFromYaml(filter_chain_yaml_1, filter_chain_1);
   EXPECT_THROW_WITH_MESSAGE(filter_chain_manager_.addFilterChain(
                                 std::vector<const envoy::api::v2::listener::FilterChain*>{
                                     &filter_chain_0, &filter_chain_1},
