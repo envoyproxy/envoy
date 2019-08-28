@@ -1,15 +1,19 @@
 version_info: "0"
 resources:
 - "@type": type.googleapis.com/envoy.api.v2.ClusterLoadAssignment
-  cluster_name: tls_by_label
+  cluster_name: mtls_by_label
   endpoints:
   - lb_endpoints:
     - endpoint:
+        metadata:
+          envoy_transport_socket_selector: "mtlsReady"
         address:
           socket_address:
             address: 127.0.0.1
             port_value: 9000
     - endpoint:
+        metadata:
+          envoy_transport_socket_selector: "mtlsDisable"
         address:
           socket_address:
             address: 127.0.0.1

@@ -1,0 +1,66 @@
+---
+admin:
+  access_log_path: "/dev/null"
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 9001
+static_resources:
+  listeners:
+  - address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 9000
+    filter_chains:
+    - tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { filename: "./test/config/integration/certs/servercert.pem" }
+              private_key: { filename: "./test/config/integration/certs/serverkey.pem" }
+      filters:
+      - config:
+          codec_type: auto
+          http_filters:
+          - config: {}
+            name: envoy.router
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - domains:
+              - "*"
+              name: service
+              routes:
+              - match:
+                  prefix: "/"
+                direct_response:
+                  status: 200
+                  body: { inline_string: "hello world from 9000, mtls" }
+          stat_prefix: tls_by_label
+        name: envoy.http_connection_manager
+  - address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 9090
+    filter_chains:
+    - filter_chain_match: {}
+      filters:
+      - config:
+          codec_type: auto
+          http_filters:
+          - config: {}
+            name: envoy.router
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - domains:
+              - "*"
+              name: service
+              routes:
+              - match:
+                  prefix: "/"
+                direct_response:
+                  status: 200
+                  body: { inline_string: "hello world from 9090, plaintext" }
+          stat_prefix: tls_no_mtls 
+        name: envoy.http_connection_manager
+
