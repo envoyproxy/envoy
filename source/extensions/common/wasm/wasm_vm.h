@@ -134,7 +134,7 @@ public:
 
   /**
    * Link the WASM code to the host-provided functions and globals, e.g. the ABI.
-   * @param debug_name user-provided name for use in error messages.
+   * @param debug_name user-provided name for use in log and error messages.
    * @param needs_emscripten whether emscripten support should be provided (e.g.
    * _emscripten_memcpy_bigHandler). Emscripten (http://https://emscripten.org/) is
    * a C++ WebAssembly tool chain.
