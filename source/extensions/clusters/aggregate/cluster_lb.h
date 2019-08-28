@@ -13,76 +13,65 @@ namespace Aggregate {
 class AggregateLoadBalancerContext : public Upstream::LoadBalancerContext {
 public:
   AggregateLoadBalancerContext(Upstream::LoadBalancerContext* context,
-                               Upstream::LoadBalancerBase::HostAvailability host_avail)
-      : host_health_(hostHealthType(host_avail)), context_(context) {}
+                               Upstream::LoadBalancerBase::HostAvailability host_avail,
+                               uint32_t host_priority)
+      : context_(context), host_avail_(host_avail), host_priority_(host_priority) {
+    if (context_ == nullptr) {
+      context_ = new Upstream::LoadBalancerContextBase();
+      own_context_ = true;
+    }
+  }
+
+  ~AggregateLoadBalancerContext() {
+    if (own_context_) {
+      delete context_;
+    }
+  }
 
   // Upstream::LoadBalancerContext
-  absl::optional<uint64_t> computeHashKey() override {
-    if (context_) {
-      return context_->computeHashKey();
-    }
-    return {};
-  }
+  absl::optional<uint64_t> computeHashKey() override { return context_->computeHashKey(); }
   const Network::Connection* downstreamConnection() const override {
-    if (context_) {
-      return context_->downstreamConnection();
-    }
-    return nullptr;
+    return context_->downstreamConnection();
   }
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override {
-    if (context_) {
-      return context_->metadataMatchCriteria();
-    }
-    return nullptr;
+    return context_->metadataMatchCriteria();
   }
   const Http::HeaderMap* downstreamHeaders() const override {
-    if (context_) {
-      return context_->downstreamHeaders();
-    }
-    return nullptr;
+    return context_->downstreamHeaders();
   }
   const Upstream::HealthyAndDegradedLoad&
-  determinePriorityLoad(const Upstream::PrioritySet& priority_set,
+  determinePriorityLoad(const Upstream::PrioritySet&,
                         const Upstream::HealthyAndDegradedLoad& original_priority_load) override {
-    if (context_) {
-      return context_->determinePriorityLoad(priority_set, original_priority_load);
+    priority_load_ = original_priority_load;
+
+    // Re-assign load. Set all traffic to the priority and availability selected in aggregate
+    // cluster.
+    size_t priorities = priority_load_.healthy_priority_load_.get().size();
+    priority_load_.healthy_priority_load_.get().assign(priorities, 0);
+    priority_load_.degraded_priority_load_.get().assign(priorities, 0);
+
+    if (host_avail_ == Upstream::LoadBalancerBase::HostAvailability::Healthy) {
+      priority_load_.healthy_priority_load_.get()[host_priority_] = 100;
+    } else {
+      priority_load_.degraded_priority_load_.get()[host_priority_] = 100;
     }
-    return original_priority_load;
+
+    return priority_load_;
   }
   bool shouldSelectAnotherHost(const Upstream::Host& host) override {
-    if (context_) {
-      return context_->shouldSelectAnotherHost(host) || host.health() != host_health_;
-    }
-    return host.health() != host_health_;
+    return context_->shouldSelectAnotherHost(host);
   }
-  uint32_t hostSelectionRetryCount() const override {
-    if (context_) {
-      return context_->hostSelectionRetryCount();
-    }
-    return 1;
-  }
+  uint32_t hostSelectionRetryCount() const override { return context_->hostSelectionRetryCount(); }
   Network::Socket::OptionsSharedPtr upstreamSocketOptions() const override {
-    if (context_) {
-      return context_->upstreamSocketOptions();
-    }
-    return {};
+    return context_->upstreamSocketOptions();
   }
 
 private:
-  Upstream::Host::Health
-  hostHealthType(Upstream::LoadBalancerBase::HostAvailability host_availability) {
-    switch (host_availability) {
-    case Upstream::LoadBalancerBase::HostAvailability::Healthy:
-      return Upstream::Host::Health::Healthy;
-    case Upstream::LoadBalancerBase::HostAvailability::Degraded:
-      return Upstream::Host::Health::Degraded;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
-    }
-  }
-
-  Upstream::Host::Health host_health_;
-  Upstream::LoadBalancerContext* context_;
+  Upstream::HealthyAndDegradedLoad priority_load_;
+  Upstream::LoadBalancerContext* context_{nullptr};
+  Upstream::LoadBalancerBase::HostAvailability host_avail_;
+  uint32_t host_priority_;
+  bool own_context_{false};
 };
 
 class AggregateClusterLoadBalancer : public Upstream::LoadBalancer,
@@ -109,23 +98,23 @@ private:
   class LoadBalancerImpl : public Upstream::LoadBalancerBase {
   public:
     LoadBalancerImpl(AggregateClusterLoadBalancer& parent,
-                     const Upstream::PrioritySetImpl& priority_set,
-                     std::vector<Upstream::ThreadLocalCluster*>&& priority_to_cluster)
-        : Upstream::LoadBalancerBase(priority_set, parent.stats_, parent.runtime_, parent.random_,
-                                     parent.common_config_),
-          priority_to_cluster_(std::move(priority_to_cluster)) {}
+                     std::pair<Upstream::PrioritySetImpl,
+                               std::vector<std::pair<uint32_t, Upstream::ThreadLocalCluster*>>>&&
+                         priority_setting)
+        : Upstream::LoadBalancerBase(std::move(priority_setting.first), parent.stats_,
+                                     parent.runtime_, parent.random_, parent.common_config_),
+          priority_to_cluster_(std::move(priority_setting.second)) {}
 
     // Upstream::LoadBalancer
     Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext* context) override;
 
     // Upstream::LoadBalancerBase
     Upstream::HostConstSharedPtr chooseHostOnce(Upstream::LoadBalancerContext*) override {
-      // The aggregate load balancer has implemented chooseHost, return nullptr directly.
-      return nullptr;
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE
     }
 
   private:
-    std::vector<Upstream::ThreadLocalCluster*> priority_to_cluster_;
+    std::vector<std::pair<uint32_t, Upstream::ThreadLocalCluster*>> priority_to_cluster_;
   };
 
   using LoadBalancerPtr = std::unique_ptr<LoadBalancerImpl>;

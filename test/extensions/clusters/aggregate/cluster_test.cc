@@ -146,8 +146,9 @@ TEST_F(AggregateClusterTest, BasicFlow) {
   EXPECT_NE(nullptr, primary);
   EXPECT_NE(nullptr, secondary);
 
-  std::pair<Upstream::PrioritySetImpl, std::vector<Upstream::ThreadLocalCluster*>> pair =
-      ClusterUtil::linearizePrioritySet(cm_, {"primary", "secondary"});
+  std::pair<Upstream::PrioritySetImpl,
+            std::vector<std::pair<uint32_t, Upstream::ThreadLocalCluster*>>>
+      pair = ClusterUtil::linearizePrioritySet(cm_, {"primary", "secondary"});
 
   EXPECT_EQ(pair.first.hostSetsPerPriority().size(), 4);
   EXPECT_EQ(pair.second.size(), 4);
@@ -159,7 +160,7 @@ TEST_F(AggregateClusterTest, BasicFlow) {
     EXPECT_EQ(expect_cnt[i][1], pair.first.hostSetsPerPriority()[i]->degradedHosts().size());
     EXPECT_EQ(expect_cnt[i][2], pair.first.hostSetsPerPriority()[i]->hosts().size());
     EXPECT_EQ(expect_cnt[i][3], pair.first.hostSetsPerPriority()[i]->priority());
-    EXPECT_EQ(expect_cluster[i], pair.second[i]);
+    EXPECT_EQ(expect_cluster[i], pair.second[i].second);
   }
 }
 

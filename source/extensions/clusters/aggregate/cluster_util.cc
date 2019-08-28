@@ -16,11 +16,12 @@ ClusterUtil::getThreadLocalCluster(Upstream::ClusterManager& cluster_manager,
   return tlc;
 }
 
-std::pair<Upstream::PrioritySetImpl, std::vector<Upstream::ThreadLocalCluster*>>
+std::pair<Upstream::PrioritySetImpl,
+          std::vector<std::pair<uint32_t, Upstream::ThreadLocalCluster*>>>
 ClusterUtil::linearizePrioritySet(Upstream::ClusterManager& cluster_manager,
                                   const std::vector<std::string>& clusters) {
   Upstream::PrioritySetImpl priority_set;
-  std::vector<Upstream::ThreadLocalCluster*> priority_to_cluster;
+  std::vector<std::pair<uint32_t, Upstream::ThreadLocalCluster*>> priority_to_cluster;
   int next_priority = 0;
 
   // Linearize the priority set. e.g. for clusters [C_0, C_1, C_2] referred in aggregate cluster
@@ -32,12 +33,13 @@ ClusterUtil::linearizePrioritySet(Upstream::ClusterManager& cluster_manager,
   // and the traffic will be distributed among these priorities.
   for (const auto& cluster : clusters) {
     auto tlc = getThreadLocalCluster(cluster_manager, cluster);
+    int priority = 0;
     for (const auto& host_set : tlc->prioritySet().hostSetsPerPriority()) {
       if (!host_set->hosts().empty()) {
         priority_set.updateHosts(
             next_priority++, Upstream::HostSetImpl::updateHostsParams(*host_set),
             host_set->localityWeights(), host_set->hosts(), {}, host_set->overprovisioningFactor());
-        priority_to_cluster.emplace_back(tlc);
+        priority_to_cluster.push_back({priority++, tlc});
       }
     }
   }

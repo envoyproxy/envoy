@@ -18,10 +18,8 @@ AggregateClusterLoadBalancer::AggregateClusterLoadBalancer(
 }
 
 void AggregateClusterLoadBalancer::refreshLoadBalancer() {
-  std::pair<Upstream::PrioritySetImpl, std::vector<Upstream::ThreadLocalCluster*>> pair =
-      ClusterUtil::linearizePrioritySet(cluster_manager_, clusters_);
   load_balancer_ = std::make_unique<AggregateClusterLoadBalancer::LoadBalancerImpl>(
-      *this, std::move(pair.first), std::move(pair.second));
+      *this, ClusterUtil::linearizePrioritySet(cluster_manager_, clusters_));
 }
 
 void AggregateClusterLoadBalancer::onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) {
@@ -45,8 +43,9 @@ Upstream::HostConstSharedPtr
 AggregateClusterLoadBalancer::LoadBalancerImpl::chooseHost(Upstream::LoadBalancerContext* context) {
   auto priority_pair = choosePriority(random_.random(), per_priority_load_.healthy_priority_load_,
                                       per_priority_load_.degraded_priority_load_);
-  AggregateLoadBalancerContext aggr_context(context, priority_pair.second);
-  return priority_to_cluster_[priority_pair.first]->loadBalancer().chooseHost(&aggr_context);
+  AggregateLoadBalancerContext aggr_context(context, priority_pair.second,
+                                            priority_to_cluster_[priority_pair.first].first);
+  return priority_to_cluster_[priority_pair.first].second->loadBalancer().chooseHost(&aggr_context);
 }
 
 } // namespace Aggregate

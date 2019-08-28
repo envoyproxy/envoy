@@ -21,7 +21,8 @@ public:
   // @param clusters clusters in aggregate cluster
   // @return a pair of linearization result. First element if the priority set, second element if a
   // map from priority to cluster.
-  static std::pair<Upstream::PrioritySetImpl, std::vector<Upstream::ThreadLocalCluster*>>
+  static std::pair<Upstream::PrioritySetImpl,
+                   std::vector<std::pair<uint32_t, Upstream::ThreadLocalCluster*>>>
   linearizePrioritySet(Upstream::ClusterManager& cluster_manager,
                        const std::vector<std::string>& clusters);
 };
