@@ -71,10 +71,14 @@ public:
   uint64_t pendingSpans() { return span_buffer_.size(); }
 
   /**
+   * Serializes std::vector<Span> span_buffer_ to std::string as payload for the reporter when the
+   * reporter does spans flushing. This function does only serialization and does not clear
+   * span_buffer_.
+   *
    * @return std::string the contents of the buffer, a collection of serialized pending Zipkin
    * spans.
    */
-  std::string serialize() { return serializer_->serialize(span_buffer_); }
+  std::string serialize() const { return serializer_->serialize(span_buffer_); }
 
 private:
   SerializerPtr
