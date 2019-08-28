@@ -200,7 +200,7 @@ public:
   /**
    * Get the contents of the user section with the given name or "" if it does not exist.
    * @param name the name of the user section to get.
-   * @return the contents of the user section (if any).  The result will be empty() if there
+   * @return the contents of the user section (if any). The result will be empty() if there
    * is no such section.
    */
   virtual absl::string_view getUserSection(absl::string_view name) PURE;
