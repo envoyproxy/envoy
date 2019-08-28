@@ -227,6 +227,21 @@ public:
     conn_manager_->onData(fake_input, false);
   }
 
+  HeaderMap* sendResponseHeaders(HeaderMapPtr&& response_headers) {
+    HeaderMap* altered_response_headers = nullptr;
+
+    EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, _))
+        .WillOnce(Invoke([&](HeaderMap& headers, bool) -> FilterHeadersStatus {
+          altered_response_headers = &headers;
+          return FilterHeadersStatus::Continue;
+        }));
+    EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, false))
+        .WillOnce(Return(FilterHeadersStatus::Continue));
+    EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
+    decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), false);
+    return altered_response_headers;
+  }
+
   void expectOnDestroy() {
     for (auto filter : decoder_filters_) {
       EXPECT_CALL(*filter, onDestroy());
@@ -261,6 +276,9 @@ public:
     return &scoped_route_config_provider_;
   }
   const std::string& serverName() override { return server_name_; }
+  HttpConnectionManagerProto::ServerHeaderTransformation serverHeaderTransformation() override {
+    return server_transformation_;
+  }
   ConnectionManagerStats& stats() override { return stats_; }
   ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() override { return use_remote_address_; }
@@ -301,6 +319,8 @@ public:
   NiceMock<Network::MockDrainDecision> drain_close_;
   std::unique_ptr<ConnectionManagerImpl> conn_manager_;
   std::string server_name_;
+  HttpConnectionManagerProto::ServerHeaderTransformation server_transformation_{
+      HttpConnectionManagerProto::OVERWRITE};
   Network::Address::Ipv4Instance local_address_{"127.0.0.1"};
   bool use_remote_address_{true};
   Http::DefaultInternalAddressConfig internal_address_config_;
@@ -535,6 +555,65 @@ TEST_F(HttpConnectionManagerImplTest, PauseResume100Continue) {
   EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
   HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
   decoder_filters_[1]->callbacks_->encodeHeaders(std::move(response_headers), false);
+}
+
+// By default, Envoy will set the server header to the server name, here "custom-value"
+TEST_F(HttpConnectionManagerImplTest, ServerHeaderOverwritten) {
+  setup(false, "custom-value", false);
+  setUpEncoderAndDecoder(false, false);
+
+  sendRequestHeadersAndData();
+  const HeaderMap* altered_headers = sendResponseHeaders(
+      HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}, {"server", "foo"}}});
+  EXPECT_EQ("custom-value", altered_headers->Server()->value().getStringView());
+}
+
+// When configured APPEND_IF_ABSENT if the server header is present it will be retained.
+TEST_F(HttpConnectionManagerImplTest, ServerHeaderAppendPresent) {
+  server_transformation_ = HttpConnectionManagerProto::APPEND_IF_ABSENT;
+  setup(false, "custom-value", false);
+  setUpEncoderAndDecoder(false, false);
+
+  sendRequestHeadersAndData();
+  const HeaderMap* altered_headers = sendResponseHeaders(
+      HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}, {"server", "foo"}}});
+  EXPECT_EQ("foo", altered_headers->Server()->value().getStringView());
+}
+
+// When configured APPEND_IF_ABSENT if the server header is absent the server name will be set.
+TEST_F(HttpConnectionManagerImplTest, ServerHeaderAppendAbsent) {
+  server_transformation_ = HttpConnectionManagerProto::APPEND_IF_ABSENT;
+  setup(false, "custom-value", false);
+  setUpEncoderAndDecoder(false, false);
+
+  sendRequestHeadersAndData();
+  const HeaderMap* altered_headers =
+      sendResponseHeaders(HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}});
+  EXPECT_EQ("custom-value", altered_headers->Server()->value().getStringView());
+}
+
+// When configured PASS_THROUGH, the server name will pass through.
+TEST_F(HttpConnectionManagerImplTest, ServerHeaderPassthroughPresent) {
+  server_transformation_ = HttpConnectionManagerProto::PASS_THROUGH;
+  setup(false, "custom-value", false);
+  setUpEncoderAndDecoder(false, false);
+
+  sendRequestHeadersAndData();
+  const HeaderMap* altered_headers = sendResponseHeaders(
+      HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}, {"server", "foo"}}});
+  EXPECT_EQ("foo", altered_headers->Server()->value().getStringView());
+}
+
+// When configured PASS_THROUGH, the server header will not be added if absent.
+TEST_F(HttpConnectionManagerImplTest, ServerHeaderPassthroughAbsent) {
+  server_transformation_ = HttpConnectionManagerProto::PASS_THROUGH;
+  setup(false, "custom-value", false);
+  setUpEncoderAndDecoder(false, false);
+
+  sendRequestHeadersAndData();
+  const HeaderMap* altered_headers =
+      sendResponseHeaders(HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}});
+  EXPECT_TRUE(altered_headers->Server() == nullptr);
 }
 
 TEST_F(HttpConnectionManagerImplTest, InvalidPathWithDualFilter) {

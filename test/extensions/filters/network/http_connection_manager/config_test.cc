@@ -237,6 +237,8 @@ http_filters:
               ContainerEq(config.tracingConfig()->request_headers_for_tags_));
   EXPECT_EQ(*context_.local_info_.address_, config.localAddress());
   EXPECT_EQ("foo", config.serverName());
+  EXPECT_EQ(HttpConnectionManagerConfig::HttpConnectionManagerProto::OVERWRITE,
+            config.serverHeaderTransformation());
   EXPECT_EQ(5 * 60 * 1000, config.streamIdleTimeout().count());
 }
 
@@ -386,6 +388,66 @@ TEST_F(HttpConnectionManagerConfigTest, DisabledStreamIdleTimeout) {
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_);
   EXPECT_EQ(0, config.streamIdleTimeout().count());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, ServerOverwrite) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  server_header_transformation: OVERWRITE
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
+      .WillOnce(Invoke(&context_.runtime_loader_.snapshot_,
+                       &Runtime::MockSnapshot::featureEnabledDefault));
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
+  EXPECT_EQ(HttpConnectionManagerConfig::HttpConnectionManagerProto::OVERWRITE,
+            config.serverHeaderTransformation());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, ServerAppendIfAbsent) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  server_header_transformation: APPEND_IF_ABSENT
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
+      .WillOnce(Invoke(&context_.runtime_loader_.snapshot_,
+                       &Runtime::MockSnapshot::featureEnabledDefault));
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
+  EXPECT_EQ(HttpConnectionManagerConfig::HttpConnectionManagerProto::APPEND_IF_ABSENT,
+            config.serverHeaderTransformation());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, ServerPassThrough) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  server_header_transformation: PASS_THROUGH
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
+      .WillOnce(Invoke(&context_.runtime_loader_.snapshot_,
+                       &Runtime::MockSnapshot::featureEnabledDefault));
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
+  EXPECT_EQ(HttpConnectionManagerConfig::HttpConnectionManagerProto::PASS_THROUGH,
+            config.serverHeaderTransformation());
 }
 
 // Validated that by default we don't normalize paths
