@@ -69,7 +69,7 @@ public:
     return std::any_of(data.begin(), data.end(), absl::ascii_isupper);
   }
 
-  static bool IsAllDigits(QuicStringPiece data) {
+  static bool IsAllDigits(QuicStringPieceImpl data) {
     return std::all_of(data.begin(), data.end(), absl::ascii_isdigit);
   }
 
