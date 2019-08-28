@@ -1,5 +1,8 @@
 #include "library/common/http/dispatcher.h"
 
+#include "common/buffer/buffer_impl.h"
+
+#include "library/common/buffer/bridge_fragment.h"
 #include "library/common/buffer/utility.h"
 #include "library/common/http/header_utility.h"
 
@@ -21,7 +24,7 @@ void Dispatcher::DirectStreamCallbacks::onHeaders(HeaderMapPtr&& headers, bool e
 void Dispatcher::DirectStreamCallbacks::onData(Buffer::Instance& data, bool end_stream) {
   ENVOY_LOG(debug, "[S{}] response data for stream (length={} end_stream={})", stream_handle_,
             data.length(), end_stream);
-  observer_.on_data(Envoy::Buffer::Utility::transformData(data), end_stream, observer_.context);
+  observer_.on_data(Buffer::Utility::toBridgeData(data), end_stream, observer_.context);
 }
 
 void Dispatcher::DirectStreamCallbacks::onTrailers(HeaderMapPtr&& trailers) {
@@ -94,8 +97,31 @@ envoy_status_t Dispatcher::sendHeaders(envoy_stream_t stream, envoy_headers head
   return ENVOY_SUCCESS;
 }
 
+envoy_status_t Dispatcher::sendData(envoy_stream_t stream, envoy_data data, bool end_stream) {
+  event_dispatcher_.post([this, stream, data, end_stream]() -> void {
+    DirectStream* direct_stream = getStream(stream);
+    // If direct_stream is not found, it means the stream has already closed or been reset
+    // and the appropriate callback has been issued to the caller. There's nothing to do here
+    // except silently swallow this.
+    // TODO: handle potential race condition with cancellation or failure get a stream in the
+    // first place. Additionally it is possible to get a nullptr due to bogus envoy_stream_t
+    // from the caller.
+    // https://github.com/lyft/envoy-mobile/issues/301
+    if (direct_stream != nullptr) {
+      // The buffer is moved internally, in a synchronous fashion, so we don't need the lifetime of
+      // the InstancePtr to outlive this function call.
+      Buffer::InstancePtr buf = Buffer::Utility::toInternalData(data);
+
+      ENVOY_LOG(debug, "[S{}] request data for stream (length={} end_stream={})\n", stream,
+                data.length, end_stream);
+      direct_stream->underlying_stream_.sendData(*buf, end_stream);
+    }
+  });
+
+  return ENVOY_SUCCESS;
+}
+
 // TODO: implement.
-envoy_status_t Dispatcher::sendData(envoy_stream_t, envoy_headers, bool) { return ENVOY_FAILURE; }
 envoy_status_t Dispatcher::sendMetadata(envoy_stream_t, envoy_headers, bool) {
   return ENVOY_FAILURE;
 }

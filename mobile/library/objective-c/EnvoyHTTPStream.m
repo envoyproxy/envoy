@@ -12,22 +12,18 @@ typedef struct {
   atomic_bool *canceled;
 } ios_context;
 
-// static envoy_data toUnmanagedNativeData(NSData *data) {
-//   // TODO: implement me
-//   return envoy_nodata;
-// }
-
-static void ios_free_native_data(void *context) { free(context); }
-
-// static void ios_release_native_data(void *context) {
-//   // TODO: implement me
-// }
+static envoy_data toNativeData(NSData *data) {
+  uint8_t *native_bytes = (uint8_t *)malloc(sizeof(uint8_t) * data.length);
+  memcpy(native_bytes, data.bytes, data.length);
+  envoy_data ret = {data.length, native_bytes, free, native_bytes};
+  return ret;
+}
 
 static envoy_data toManagedNativeString(NSString *s) {
   size_t length = s.length;
   uint8_t *native_string = (uint8_t *)malloc(sizeof(uint8_t) * length);
   memcpy(native_string, s.UTF8String, length);
-  envoy_data ret = {length, native_string, ios_free_native_data, native_string};
+  envoy_data ret = {length, native_string, free, native_string};
   return ret;
 }
 
@@ -52,10 +48,10 @@ static envoy_headers toNativeHeaders(EnvoyHeaders *headers) {
 }
 
 static NSData *to_ios_data(envoy_data data) {
-  // TODO: investigate buffer ownership
-  // Possibly extend/subclass NSData to call envoy_data.release on dealloc and have release drain
-  // the underlying Envoy buffer instance
-  return [NSData dataWithBytes:(void *)data.bytes length:data.length];
+  // TODO: we are copying from envoy_data to NSData.
+  NSData *platformData = [NSData dataWithBytes:(void *)data.bytes length:data.length];
+  data.release(data.context);
+  return platformData;
 }
 
 static EnvoyHeaders *to_ios_headers(envoy_headers headers) {
@@ -101,7 +97,6 @@ static void ios_on_data(envoy_data data, bool end_stream, void *context) {
     if (atomic_load(c->canceled)) {
       return;
     }
-    // TODO: retain data
     observer.onData(to_ios_data(data), end_stream);
   });
 }
@@ -213,8 +208,7 @@ static void ios_on_error(envoy_error error, void *context) {
 }
 
 - (void)sendData:(NSData *)data close:(BOOL)close {
-  // TODO: implement
-  // send_data(_streamHandle, toNativeData(data), close);
+  send_data(_streamHandle, toNativeData(data), close);
 }
 
 - (void)sendMetadata:(EnvoyHeaders *)metadata {
