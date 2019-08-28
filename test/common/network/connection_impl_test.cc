@@ -1236,7 +1236,7 @@ TEST_P(ConnectionImplTest, DelayedCloseTimerResetWithPendingWriteBufferFlushes) 
   Buffer::OwnedImpl data("data");
   server_connection->write(data, false);
 
-  EXPECT_CALL(*mocks.timer_, enableTimer(timeout)).Times(1);
+  EXPECT_CALL(*mocks.timer_, enableTimer(timeout, _)).Times(1);
   server_connection->close(ConnectionCloseType::FlushWriteAndDelay);
 
   // The write ready event cb (ConnectionImpl::onWriteReady()) will reset the timer to its original
@@ -1246,7 +1246,7 @@ TEST_P(ConnectionImplTest, DelayedCloseTimerResetWithPendingWriteBufferFlushes) 
         // Partial flush.
         return IoResult{PostIoAction::KeepOpen, 1, false};
       }));
-  EXPECT_CALL(*mocks.timer_, enableTimer(timeout)).Times(1);
+  EXPECT_CALL(*mocks.timer_, enableTimer(timeout, _)).Times(1);
   (*mocks.file_ready_cb_)(Event::FileReadyType::Write);
 
   EXPECT_CALL(*transport_socket, doWrite(BufferStringEqual("data"), _))
@@ -1255,7 +1255,7 @@ TEST_P(ConnectionImplTest, DelayedCloseTimerResetWithPendingWriteBufferFlushes) 
         buffer.drain(buffer.length());
         return IoResult{PostIoAction::KeepOpen, buffer.length(), false};
       }));
-  EXPECT_CALL(*mocks.timer_, enableTimer(timeout)).Times(1);
+  EXPECT_CALL(*mocks.timer_, enableTimer(timeout, _)).Times(1);
   (*mocks.file_ready_cb_)(Event::FileReadyType::Write);
 
   // Force the delayed close timeout to trigger so the connection is cleaned up.
@@ -1289,7 +1289,7 @@ TEST_P(ConnectionImplTest, DelayedCloseTimeoutDisableOnSocketClose) {
         return IoResult{PostIoAction::KeepOpen, buffer.length(), false};
       }));
   server_connection->write(data, false);
-  EXPECT_CALL(*mocks.timer_, enableTimer(_)).Times(1);
+  EXPECT_CALL(*mocks.timer_, enableTimer(_, _)).Times(1);
   // Enable the delayed close timer.
   server_connection->close(ConnectionCloseType::FlushWriteAndDelay);
   EXPECT_CALL(*mocks.timer_, disableTimer()).Times(1);
@@ -1330,7 +1330,7 @@ TEST_P(ConnectionImplTest, DelayedCloseTimeoutNullStats) {
       }));
   server_connection->write(data, false);
 
-  EXPECT_CALL(*mocks.timer_, enableTimer(_)).Times(1);
+  EXPECT_CALL(*mocks.timer_, enableTimer(_, _)).Times(1);
   server_connection->close(ConnectionCloseType::FlushWriteAndDelay);
   EXPECT_CALL(*mocks.timer_, disableTimer()).Times(1);
   // The following close() will call closeSocket() and reset internal data structures such as

@@ -89,7 +89,7 @@ Http::TestHeaderMapImpl genHeaders(const std::string& host, const std::string& p
 envoy::api::v2::RouteConfiguration parseRouteConfigurationFromV2Yaml(const std::string& yaml) {
   envoy::api::v2::RouteConfiguration route_config;
   TestUtility::loadFromYaml(yaml, route_config);
-  MessageUtil::validate(route_config);
+  TestUtility::validate(route_config);
   return route_config;
 }
 
@@ -109,14 +109,15 @@ protected:
     return factory_context_.scope().symbolTable().toString(name);
   }
 
-  Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
+  Stats::TestSymbolTable symbol_table_;
   Api::ApiPtr api_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
 };
 
 class RouteMatcherTest : public testing::Test, public ConfigImplTestBase {};
 
-TEST_F(RouteMatcherTest, TestRoutes) {
+// TODO(alyssawilk) go through all these tests and update or duplicate.
+TEST_F(RouteMatcherTest, DEPRECATED_FEATURE_TEST(TestRoutes)) {
   const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
@@ -175,7 +176,9 @@ virtual_hosts:
     route:
       cluster: clock
   - match:
-      regex: "/baa+"
+      safe_regex:
+        google_re2: {}
+        regex: "/baa+"
     route:
       cluster: sheep
   - match:
@@ -295,8 +298,13 @@ virtual_hosts:
   - pattern: "^/users/\\d+$"
     method: PUT
     name: update_user
-  - pattern: "^/users/\\d+/location$"
-    method: POST
+  - headers:
+    - name: ":path"
+      safe_regex_match:
+        google_re2: {}
+        regex: "^/users/\\d+/location$"
+    - name: ":method"
+      exact_match: POST
     name: ulu
   )EOF";
 
@@ -610,7 +618,7 @@ virtual_hosts:
             config.route(genHeaders("example.com", "/", "GET"), 0)->routeEntry()->clusterName());
 }
 
-TEST_F(RouteMatcherTest, TestRoutesWithInvalidRegex) {
+TEST_F(RouteMatcherTest, DEPRECATED_FEATURE_TEST(TestRoutesWithInvalidRegex)) {
   std::string invalid_route = R"EOF(
 virtual_hosts:
   - name: regex
@@ -641,6 +649,26 @@ virtual_hosts:
   EXPECT_THROW_WITH_REGEX(TestConfigImpl(parseRouteConfigurationFromV2Yaml(invalid_virtual_cluster),
                                          factory_context_, true),
                           EnvoyException, "Invalid regex '\\^/\\(\\+invalid\\)':");
+}
+
+// Virtual cluster that contains neither pattern nor regex. This must be checked while pattern is
+// deprecated.
+TEST_F(RouteMatcherTest, TestRoutesWithInvalidVirtualCluster) {
+  const std::string invalid_virtual_cluster = R"EOF(
+virtual_hosts:
+  - name: regex
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: "regex" }
+    virtual_clusters:
+      - name: "invalid"
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(TestConfigImpl(parseRouteConfigurationFromV2Yaml(invalid_virtual_cluster),
+                                         factory_context_, true),
+                          EnvoyException,
+                          "virtual clusters must define either 'pattern' or 'headers'");
 }
 
 // Validates behavior of request_headers_to_add at router, vhost, and route levels.
@@ -1050,7 +1078,7 @@ virtual_hosts:
   }
 }
 
-TEST_F(RouteMatcherTest, Priority) {
+TEST_F(RouteMatcherTest, DEPRECATED_FEATURE_TEST(Priority)) {
   const std::string yaml = R"EOF(
 virtual_hosts:
 - name: local_service
@@ -1137,7 +1165,7 @@ virtual_hosts:
                EnvoyException);
 }
 
-TEST_F(RouteMatcherTest, HeaderMatchedRouting) {
+TEST_F(RouteMatcherTest, DEPRECATED_FEATURE_TEST(HeaderMatchedRouting)) {
   const std::string yaml = R"EOF(
 virtual_hosts:
 - name: local_service
@@ -1261,7 +1289,7 @@ virtual_hosts:
 }
 
 // Verify the fixes for https://github.com/envoyproxy/envoy/issues/2406
-TEST_F(RouteMatcherTest, InvalidHeaderMatchedRoutingConfig) {
+TEST_F(RouteMatcherTest, DEPRECATED_FEATURE_TEST(InvalidHeaderMatchedRoutingConfig)) {
   std::string value_with_regex_chars = R"EOF(
 virtual_hosts:
   - name: local_service
@@ -1296,7 +1324,7 @@ virtual_hosts:
       EnvoyException, "Invalid regex");
 }
 
-TEST_F(RouteMatcherTest, QueryParamMatchedRouting) {
+TEST_F(RouteMatcherTest, DEPRECATED_FEATURE_TEST(QueryParamMatchedRouting)) {
   const std::string yaml = R"EOF(
 virtual_hosts:
 - name: local_service
@@ -1325,6 +1353,21 @@ virtual_hosts:
       - name: debug
     route:
       cluster: local_service_with_valueless_query_parameter
+  - match:
+      prefix: "/"
+      query_parameters:
+      - name: debug2
+        present_match: true
+    route:
+      cluster: local_service_with_present_match_query_parameter
+  - match:
+      prefix: "/"
+      query_parameters:
+      - name: debug3
+        string_match:
+          exact: foo
+    route:
+      cluster: local_service_with_string_match_query_parameter
   - match:
       prefix: "/"
     route:
@@ -1365,6 +1408,18 @@ virtual_hosts:
   }
 
   {
+    Http::TestHeaderMapImpl headers = genHeaders("example.com", "/?debug2", "GET");
+    EXPECT_EQ("local_service_with_present_match_query_parameter",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("example.com", "/?debug3=foo", "GET");
+    EXPECT_EQ("local_service_with_string_match_query_parameter",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
     Http::TestHeaderMapImpl headers = genHeaders("example.com", "/?debug=2", "GET");
     EXPECT_EQ("local_service_with_valueless_query_parameter",
               config.route(headers, 0)->routeEntry()->clusterName());
@@ -1384,7 +1439,7 @@ virtual_hosts:
 }
 
 // Verify the fixes for https://github.com/envoyproxy/envoy/issues/2406
-TEST_F(RouteMatcherTest, InvalidQueryParamMatchedRoutingConfig) {
+TEST_F(RouteMatcherTest, DEPRECATED_FEATURE_TEST(InvalidQueryParamMatchedRoutingConfig)) {
   std::string value_with_regex_chars = R"EOF(
 virtual_hosts:
   - name: local_service
@@ -2195,7 +2250,7 @@ virtual_hosts:
             config.route(headers, 0)->routeEntry()->clusterNotFoundResponseCode());
 }
 
-TEST_F(RouteMatcherTest, Shadow) {
+TEST_F(RouteMatcherTest, DEPRECATED_FEATURE_TEST(Shadow)) {
   const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
@@ -2253,7 +2308,7 @@ virtual_hosts:
 
 class RouteConfigurationV2 : public testing::Test, public ConfigImplTestBase {};
 
-TEST_F(RouteConfigurationV2, RequestMirrorPolicy) {
+TEST_F(RouteConfigurationV2, DEPRECATED_FEATURE_TEST(RequestMirrorPolicy)) {
   const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
@@ -4210,13 +4265,19 @@ virtual_hosts:
   EXPECT_TRUE(config_ptr->route(headers, 0)->routeEntry()->includeVirtualHostRateLimits());
 }
 
-TEST_F(RoutePropertyTest, TestVHostCorsConfig) {
+TEST_F(RoutePropertyTest, DEPRECATED_FEATURE_TEST(TestVHostCorsConfig)) {
   const std::string yaml = R"EOF(
 virtual_hosts:
   - name: "default"
     domains: ["*"]
     cors:
       allow_origin: ["test-origin"]
+      allow_origin_regex:
+      - .*\.envoyproxy\.io
+      allow_origin_string_match:
+      - safe_regex:
+          google_re2: {}
+          regex: .*\.envoyproxy\.io
       allow_methods: "test-methods"
       allow_headers: "test-headers"
       expose_headers: "test-expose-headers"
@@ -4258,7 +4319,7 @@ virtual_hosts:
 
   EXPECT_EQ(cors_policy->enabled(), false);
   EXPECT_EQ(cors_policy->shadowEnabled(), true);
-  EXPECT_THAT(cors_policy->allowOrigins(), ElementsAreArray({"test-origin"}));
+  EXPECT_EQ(3, cors_policy->allowOrigins().size());
   EXPECT_EQ(cors_policy->allowMethods(), "test-methods");
   EXPECT_EQ(cors_policy->allowHeaders(), "test-headers");
   EXPECT_EQ(cors_policy->exposeHeaders(), "test-expose-headers");
@@ -4266,7 +4327,7 @@ virtual_hosts:
   EXPECT_EQ(cors_policy->allowCredentials(), true);
 }
 
-TEST_F(RoutePropertyTest, TestRouteCorsConfig) {
+TEST_F(RoutePropertyTest, DEPRECATED_FEATURE_TEST(TestRouteCorsConfig)) {
   const std::string yaml = R"EOF(
 virtual_hosts:
   - name: "default"
@@ -4311,7 +4372,7 @@ virtual_hosts:
 
   EXPECT_EQ(cors_policy->enabled(), false);
   EXPECT_EQ(cors_policy->shadowEnabled(), true);
-  EXPECT_THAT(cors_policy->allowOrigins(), ElementsAreArray({"test-origin"}));
+  EXPECT_EQ(1, cors_policy->allowOrigins().size());
   EXPECT_EQ(cors_policy->allowMethods(), "test-methods");
   EXPECT_EQ(cors_policy->allowHeaders(), "test-headers");
   EXPECT_EQ(cors_policy->exposeHeaders(), "test-expose-headers");
@@ -4319,7 +4380,7 @@ virtual_hosts:
   EXPECT_EQ(cors_policy->allowCredentials(), true);
 }
 
-TEST_F(RoutePropertyTest, TestVHostCorsLegacyConfig) {
+TEST_F(RoutePropertyTest, DEPRECATED_FEATURE_TEST(TestVHostCorsLegacyConfig)) {
   const std::string yaml = R"EOF(
 virtual_hosts:
 - name: default
@@ -4350,7 +4411,7 @@ virtual_hosts:
 
   EXPECT_EQ(cors_policy->enabled(), true);
   EXPECT_EQ(cors_policy->shadowEnabled(), false);
-  EXPECT_THAT(cors_policy->allowOrigins(), ElementsAreArray({"test-origin"}));
+  EXPECT_EQ(1, cors_policy->allowOrigins().size());
   EXPECT_EQ(cors_policy->allowMethods(), "test-methods");
   EXPECT_EQ(cors_policy->allowHeaders(), "test-headers");
   EXPECT_EQ(cors_policy->exposeHeaders(), "test-expose-headers");
@@ -4358,7 +4419,7 @@ virtual_hosts:
   EXPECT_EQ(cors_policy->allowCredentials(), true);
 }
 
-TEST_F(RoutePropertyTest, TestRouteCorsLegacyConfig) {
+TEST_F(RoutePropertyTest, DEPRECATED_FEATURE_TEST(TestRouteCorsLegacyConfig)) {
   const std::string yaml = R"EOF(
 virtual_hosts:
 - name: default
@@ -4386,7 +4447,7 @@ virtual_hosts:
 
   EXPECT_EQ(cors_policy->enabled(), true);
   EXPECT_EQ(cors_policy->shadowEnabled(), false);
-  EXPECT_THAT(cors_policy->allowOrigins(), ElementsAreArray({"test-origin"}));
+  EXPECT_EQ(1, cors_policy->allowOrigins().size());
   EXPECT_EQ(cors_policy->allowMethods(), "test-methods");
   EXPECT_EQ(cors_policy->allowHeaders(), "test-headers");
   EXPECT_EQ(cors_policy->exposeHeaders(), "test-expose-headers");
@@ -4849,7 +4910,7 @@ virtual_hosts:
       Envoy::EnvoyException, "Cannot create a Baz when metadata is empty.");
 }
 
-TEST_F(RouteConfigurationV2, RouteConfigGetters) {
+TEST_F(RouteConfigurationV2, DEPRECATED_FEATURE_TEST(RouteConfigGetters)) {
   const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
@@ -4888,7 +4949,7 @@ virtual_hosts:
   EXPECT_EQ("foo", route_entry->virtualHost().routeConfig().name());
 }
 
-TEST_F(RouteConfigurationV2, RouteTracingConfig) {
+TEST_F(RouteConfigurationV2, DEPRECATED_FEATURE_TEST(RouteTracingConfig)) {
   const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
@@ -4943,7 +5004,7 @@ virtual_hosts:
 }
 
 // Test to check Prefix Rewrite for redirects
-TEST_F(RouteConfigurationV2, RedirectPrefixRewrite) {
+TEST_F(RouteConfigurationV2, DEPRECATED_FEATURE_TEST(RedirectPrefixRewrite)) {
   std::string RedirectPrefixRewrite = R"EOF(
 name: AllRedirects
 virtual_hosts:
@@ -5130,7 +5191,7 @@ virtual_hosts:
   }
 }
 
-TEST_F(RouteMatcherTest, HeaderMatchedRoutingV2) {
+TEST_F(RouteMatcherTest, DEPRECATED_FEATURE_TEST(HeaderMatchedRoutingV2)) {
   const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
@@ -5305,7 +5366,8 @@ virtual_hosts:
   }
 }
 
-TEST_F(RouteConfigurationV2, RegexPrefixWithNoRewriteWorksWhenPathChanged) {
+TEST_F(RouteConfigurationV2,
+       DEPRECATED_FEATURE_TEST(RegexPrefixWithNoRewriteWorksWhenPathChanged)) {
 
   // Setup regex route entry. the regex is trivial, that's ok as we only want to test that
   // path change works.
@@ -5336,7 +5398,7 @@ virtual_hosts:
   }
 }
 
-TEST_F(RouteConfigurationV2, NoIdleTimeout) {
+TEST_F(RouteConfigurationV2, DEPRECATED_FEATURE_TEST(NoIdleTimeout)) {
   const std::string NoIdleTimeout = R"EOF(
 name: NoIdleTimeout
 virtual_hosts:
@@ -5354,7 +5416,7 @@ virtual_hosts:
   EXPECT_EQ(absl::nullopt, route_entry->idleTimeout());
 }
 
-TEST_F(RouteConfigurationV2, ZeroIdleTimeout) {
+TEST_F(RouteConfigurationV2, DEPRECATED_FEATURE_TEST(ZeroIdleTimeout)) {
   const std::string ZeroIdleTimeout = R"EOF(
 name: ZeroIdleTimeout
 virtual_hosts:
@@ -5373,7 +5435,7 @@ virtual_hosts:
   EXPECT_EQ(0, route_entry->idleTimeout().value().count());
 }
 
-TEST_F(RouteConfigurationV2, ExplicitIdleTimeout) {
+TEST_F(RouteConfigurationV2, DEPRECATED_FEATURE_TEST(ExplicitIdleTimeout)) {
   const std::string ExplicitIdleTimeout = R"EOF(
 name: ExplicitIdleTimeout
 virtual_hosts:
@@ -5393,7 +5455,7 @@ virtual_hosts:
   EXPECT_EQ(7 * 1000, route_entry->idleTimeout().value().count());
 }
 
-TEST_F(RouteConfigurationV2, RetriableStatusCodes) {
+TEST_F(RouteConfigurationV2, DEPRECATED_FEATURE_TEST(RetriableStatusCodes)) {
   const std::string ExplicitIdleTimeout = R"EOF(
 name: RetriableStatusCodes
 virtual_hosts:
@@ -5415,7 +5477,7 @@ virtual_hosts:
   EXPECT_EQ(expected_codes, retry_policy.retriableStatusCodes());
 }
 
-TEST_F(RouteConfigurationV2, UpgradeConfigs) {
+TEST_F(RouteConfigurationV2, DEPRECATED_FEATURE_TEST(UpgradeConfigs)) {
   const std::string UpgradeYaml = R"EOF(
 name: RetriableStatusCodes
 virtual_hosts:
@@ -5439,7 +5501,7 @@ virtual_hosts:
   EXPECT_FALSE(upgrade_map.find("disabled")->second);
 }
 
-TEST_F(RouteConfigurationV2, DuplicateUpgradeConfigs) {
+TEST_F(RouteConfigurationV2, DEPRECATED_FEATURE_TEST(DuplicateUpgradeConfigs)) {
   const std::string yaml = R"EOF(
 name: RetriableStatusCodes
 virtual_hosts:
@@ -5462,7 +5524,7 @@ virtual_hosts:
 
 // Verifies that we're creating a new instance of the retry plugins on each call instead of always
 // returning the same one.
-TEST_F(RouteConfigurationV2, RetryPluginsAreNotReused) {
+TEST_F(RouteConfigurationV2, DEPRECATED_FEATURE_TEST(RetryPluginsAreNotReused)) {
   const std::string ExplicitIdleTimeout = R"EOF(
 name: RetriableStatusCodes
 virtual_hosts:

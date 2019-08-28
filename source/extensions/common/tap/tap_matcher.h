@@ -239,7 +239,7 @@ public:
 protected:
   void matchHeaders(const Http::HeaderMap& headers, MatchStatusVector& statuses) const;
 
-  std::vector<Http::HeaderUtility::HeaderData> headers_to_match_;
+  const std::vector<Http::HeaderUtility::HeaderDataPtr> headers_to_match_;
 };
 
 /**

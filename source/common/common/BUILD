@@ -165,12 +165,27 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         ":utility_lib",
+        "//include/envoy/common:matchers_interface",
+        "//source/common/common:regex_lib",
         "//source/common/config:metadata_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/type/matcher:metadata_cc",
         "@envoy_api//envoy/type/matcher:number_cc",
         "@envoy_api//envoy/type/matcher:string_cc",
         "@envoy_api//envoy/type/matcher:value_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "regex_lib",
+    srcs = ["regex.cc"],
+    hdrs = ["regex.h"],
+    deps = [
+        ":assert_lib",
+        "//include/envoy/common:regex_interface",
+        "//source/common/protobuf:utility_lib",
+        "@com_googlesource_code_re2//:re2",
+        "@envoy_api//envoy/type/matcher:regex_cc",
     ],
 )
 

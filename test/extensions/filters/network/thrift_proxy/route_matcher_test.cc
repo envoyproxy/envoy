@@ -22,7 +22,7 @@ envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration
 parseRouteConfigurationFromV2Yaml(const std::string& yaml) {
   envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration route_config;
   TestUtility::loadFromYaml(yaml, route_config);
-  MessageUtil::validate(route_config);
+  TestUtility::validate(route_config);
   return route_config;
 }
 
@@ -331,7 +331,8 @@ routes:
   EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
 }
 
-TEST(ThriftRouteMatcherTest, RouteByRegexHeaderMatcher) {
+// TODO(alyssawilk) update.
+TEST(ThriftRouteMatcherTest, DEPRECATED_FEATURE_TEST(RouteByRegexHeaderMatcher)) {
   const std::string yaml = R"EOF(
 name: config
 routes:
