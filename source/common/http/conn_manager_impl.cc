@@ -1501,8 +1501,7 @@ void ConnectionManagerImpl::ActiveStream::addEncodedData(ActiveStreamEncoderFilt
                                                          Buffer::Instance& data, bool streaming) {
   if (state_.filter_call_state_ == 0 ||
       (state_.filter_call_state_ & FilterCallState::EncodeHeaders) ||
-      (state_.filter_call_state_ & FilterCallState::EncodeData) ||
-      ((state_.filter_call_state_ & FilterCallState::EncodeTrailers) && !filter.canIterate())) {
+      (state_.filter_call_state_ & FilterCallState::EncodeData)) {
     // Make sure if this triggers watermarks, the correct action is taken.
     state_.encoder_filters_streaming_ = streaming;
     // If no call is happening or we are in the decode headers/data callback, buffer the data.
