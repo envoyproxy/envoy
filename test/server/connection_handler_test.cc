@@ -70,7 +70,6 @@ public:
 
     ConnectionHandlerTest& parent_;
     Network::MockListenSocket socket_;
-
     uint64_t tag_;
     bool bind_to_port_;
     const bool hand_off_restored_destination_connections_;
