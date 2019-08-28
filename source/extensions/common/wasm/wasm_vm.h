@@ -125,10 +125,11 @@ public:
   virtual bool load(const std::string& code, bool allow_precompiled) PURE;
 
   /**
-   * Link to registered function.
+   * Link the WASM code to the host-provided functions and globals, e.g. the ABI.
    * @param debug_name user-provided name for use in error messages.
    * @param needs_emscripten whether emscripten support should be provided (e.g.
-   * _emscripten_memcpy_bigHandler).
+   * _emscripten_memcpy_bigHandler). Emscripten (http://https://emscripten.org/) is
+   * a C++ WebAssembly tool chain.
    */
   virtual void link(absl::string_view debug_name, bool needs_emscripten) PURE;
 
