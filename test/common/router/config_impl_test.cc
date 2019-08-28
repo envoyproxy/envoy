@@ -155,6 +155,15 @@ virtual_hosts:
       regex: ".*"
     route:
       cluster: regex_default
+- name: default
+  domains:
+  - "*"
+  routes:
+  - match:
+      prefix: "/"
+    route:
+      cluster: instant-server
+      timeout: 30s
   virtual_clusters:
   - pattern: "^/rides$"
     method: POST
@@ -174,14 +183,6 @@ virtual_hosts:
   - pattern: "^/users/\\d+$"
     method: PUT
     name: update_user
-  - headers:
-    - name: ":path"
-      safe_regex_match:
-        google_re2: {}
-        regex: "^/users/\\d+/location$"
-    - name: ":method"
-      exact_match: POST
-    name: ulu
   )EOF";
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
@@ -270,10 +271,6 @@ virtual_hosts:
   {
     Http::TestHeaderMapImpl headers = genHeaders("api.lyft.com", "/users/123", "PUT");
     EXPECT_EQ("update_user", virtualClusterName(config.route(headers, 0)->routeEntry(), headers));
-  }
-  {
-    Http::TestHeaderMapImpl headers = genHeaders("api.lyft.com", "/users/123/location", "POST");
-    EXPECT_EQ("ulu", virtualClusterName(config.route(headers, 0)->routeEntry(), headers));
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("api.lyft.com", "/something/else", "GET");
