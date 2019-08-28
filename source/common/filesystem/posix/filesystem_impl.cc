@@ -130,12 +130,14 @@ bool InstanceImplPosix::illegalPath(const std::string& path) {
   // instances poking in bad places. We may have to consider conditioning on
   // platform in the future, growing these or relaxing some constraints (e.g.
   // there are valid reasons to go via /proc for file paths).
-  // TODO(htuch): Optimize this as a hash lookup if we grow any further.
-  if (absl::StartsWith(canonical_path.rc_, "/dev") ||
-      absl::StartsWith(canonical_path.rc_, "/sys") ||
-      absl::StartsWith(canonical_path.rc_, "/proc")) {
-    return true;
+  static std::vector<std::string> paths = {"/dev", "/sys", "/proc"};
+  auto offset = canonical_path.rc_.find('/', 1);
+  for (const auto& p : paths) {
+    if (canonical_path.rc_.compare(0, offset, p) == 0) {
+      return true;
+    }
   }
+
   return false;
 }
 
