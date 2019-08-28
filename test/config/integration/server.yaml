@@ -168,10 +168,19 @@ stats_sinks:
     "@type": type.googleapis.com/envoy.config.metrics.v2.StatsdSink
     tcp_cluster_name: statsd
 watchdog: {}
-runtime:
-  symlink_root: "{{ test_tmpdir }}/test/common/runtime/test_data/current"
-  subdirectory: envoy
-  override_subdirectory: envoy_override
+layered_runtime:
+  layers:
+    - name: root
+      disk_layer:
+        symlink_root: "{{ test_tmpdir }}/test/common/runtime/test_data/current"
+        subdirectory: envoy
+    - name: override
+      disk_layer:
+        symlink_root: "{{ test_tmpdir }}/test/common/runtime/test_data/current"
+        subdirectory: envoy_override
+        append_service_cluster: true
+    - name: admin
+      admin_layer: {}
 admin:
   access_log_path: "/dev/null"
   profile_path: "{{ test_tmpdir }}/envoy.prof"
