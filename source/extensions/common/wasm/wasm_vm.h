@@ -41,7 +41,14 @@ template <typename T> struct Global {
   virtual void set(const T& t) PURE;
 };
 
-// Templates for constructing signatures of functions calling into and out of WASM VMs.
+// These are templates and its helper for constructing signatures of functions calling into and out
+// of WASM VMs.
+// - WasmFuncTypeHelper is a helper for WasmFuncType and shouldn't be used anywhere else than
+// WasmFuncType definition.
+// - WasmFuncType takes 4 template parameter which are number of argument, return type, context type
+// and param type respectively, resolve to a function type.
+//   For example `WasmFuncType<3, void, Context*, Word>` resolves to `void(Context*, Word, Word,
+//   Word)`
 template <size_t N, class ReturnType, class ContextType, class ParamType,
           class FuncBase = ReturnType(ContextType)>
 struct WasmFuncTypeHelper {};
