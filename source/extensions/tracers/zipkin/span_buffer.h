@@ -29,7 +29,7 @@ public:
    * span context.
    */
   SpanBuffer(const envoy::config::trace::v2::ZipkinConfig::CollectorEndpointVersion& version,
-             const bool shared_span_context);
+             bool shared_span_context);
 
   /**
    * Constructor that initializes a buffer with the given size.
@@ -41,7 +41,7 @@ public:
    * @param size The desired buffer size.
    */
   SpanBuffer(const envoy::config::trace::v2::ZipkinConfig::CollectorEndpointVersion& version,
-             const bool shared_span_context, uint64_t size);
+             bool shared_span_context, uint64_t size);
 
   /**
    * Allocates space for an empty buffer or resizes a previously-allocated one.
@@ -74,12 +74,12 @@ public:
    * @return std::string the contents of the buffer, a collection of serialized pending Zipkin
    * spans.
    */
-  std::string serialize() { return serializer_->serialize(std::move(span_buffer_)); }
+  std::string serialize() { return serializer_->serialize(span_buffer_); }
 
 private:
   SerializerPtr
   makeSerializer(const envoy::config::trace::v2::ZipkinConfig::CollectorEndpointVersion& version,
-                 const bool shared_span_context);
+                 bool shared_span_context);
 
   // We use a pre-allocated vector to improve performance
   std::vector<Span> span_buffer_;
@@ -100,7 +100,7 @@ public:
    * Serialize list of Zipkin spans into Zipkin v1 JSON array.
    * @return std::string serialized pending spans as Zipkin v1 JSON array.
    */
-  std::string serialize(std::vector<Span>&& pending_spans) override;
+  std::string serialize(const std::vector<Span>& pending_spans) override;
 };
 
 /**
@@ -109,13 +109,13 @@ public:
  */
 class JsonV2Serializer : public Serializer {
 public:
-  JsonV2Serializer(const bool shared_span_context);
+  JsonV2Serializer(bool shared_span_context);
 
   /**
    * Serialize list of Zipkin spans into Zipkin v2 JSON array.
    * @return std::string serialized pending spans as Zipkin v2 JSON array.
    */
-  std::string serialize(std::vector<Span>&& pending_spans) override;
+  std::string serialize(const std::vector<Span>& pending_spans) override;
 
 private:
   const std::vector<zipkin::jsonv2::Span> toListOfSpans(const Span& zipkin_span) const;
@@ -130,13 +130,13 @@ private:
  */
 class ProtobufSerializer : public Serializer {
 public:
-  ProtobufSerializer(const bool shared_span_context);
+  ProtobufSerializer(bool shared_span_context);
 
   /**
    * Serialize list of Zipkin spans into Zipkin v2 zipkin::proto3::ListOfSpans.
    * @return std::string serialized pending spans as Zipkin zipkin::proto3::ListOfSpans.
    */
-  std::string serialize(std::vector<Span>&& pending_spans) override;
+  std::string serialize(const std::vector<Span>& pending_spans) override;
 
 private:
   const zipkin::proto3::ListOfSpans toListOfSpans(const Span& zipkin_span) const;

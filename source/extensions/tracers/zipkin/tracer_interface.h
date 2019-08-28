@@ -47,7 +47,7 @@ public:
    *
    * @return std::string serialized buffered pending spans.
    */
-  virtual std::string serialize(std::vector<Span>&& spans) PURE;
+  virtual std::string serialize(const std::vector<Span>& spans) PURE;
 };
 
 using SerializerPtr = std::unique_ptr<Serializer>;

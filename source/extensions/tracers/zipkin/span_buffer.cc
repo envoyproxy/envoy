@@ -58,7 +58,7 @@ SerializerPtr SpanBuffer::makeSerializer(
   }
 }
 
-std::string JsonV1Serializer::serialize(std::vector<Span>&& zipkin_spans) {
+std::string JsonV1Serializer::serialize(const std::vector<Span>& zipkin_spans) {
   const std::string serialized_elements =
       absl::StrJoin(zipkin_spans, ",", [](std::string* element, Span zipkin_span) {
         absl::StrAppend(element, zipkin_span.toJson());
@@ -69,7 +69,7 @@ std::string JsonV1Serializer::serialize(std::vector<Span>&& zipkin_spans) {
 JsonV2Serializer::JsonV2Serializer(const bool shared_span_context)
     : shared_span_context_{shared_span_context} {}
 
-std::string JsonV2Serializer::serialize(std::vector<Span>&& zipkin_spans) {
+std::string JsonV2Serializer::serialize(const std::vector<Span>& zipkin_spans) {
   const std::string serialized_elements =
       absl::StrJoin(zipkin_spans, ",", [this](std::string* out, const Span& zipkin_span) {
         absl::StrAppend(out,
@@ -121,7 +121,7 @@ JsonV2Serializer::toListOfSpans(const Span& zipkin_span) const {
       tags[binary_annotation.key()] = binary_annotation.value();
     }
 
-    spans.push_back(span);
+    spans.push_back(std::move(span));
   }
   return spans;
 }
@@ -150,7 +150,7 @@ JsonV2Serializer::toProtoEndpoint(const Endpoint& zipkin_endpoint) const {
 ProtobufSerializer::ProtobufSerializer(const bool shared_span_context)
     : shared_span_context_{shared_span_context} {}
 
-std::string ProtobufSerializer::serialize(std::vector<Span>&& zipkin_spans) {
+std::string ProtobufSerializer::serialize(const std::vector<Span>& zipkin_spans) {
   zipkin::proto3::ListOfSpans spans;
   for (const Span& zipkin_span : zipkin_spans) {
     spans.MergeFrom(toListOfSpans(zipkin_span));

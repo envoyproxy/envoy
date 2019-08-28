@@ -78,15 +78,15 @@ Driver::Driver(const envoy::config::trace::v2::ZipkinConfig& zipkin_config,
 
   CollectorInfo collector;
   if (!zipkin_config.collector_endpoint().empty()) {
-    collector.endpoint = zipkin_config.collector_endpoint();
+    collector.endpoint_ = zipkin_config.collector_endpoint();
   }
   // The current default version of collector_endpoint_version is HTTP_JSON_V1.
-  collector.version = zipkin_config.collector_endpoint_version();
+  collector.version_ = zipkin_config.collector_endpoint_version();
   const bool trace_id_128bit = zipkin_config.trace_id_128bit();
 
   const bool shared_span_context = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
       zipkin_config, shared_span_context, ZipkinCoreConstants::get().DEFAULT_SHARED_SPAN_CONTEXT);
-  collector.shared_span_context = shared_span_context;
+  collector.shared_span_context_ = shared_span_context;
 
   tls_->set([this, collector, &random_generator, trace_id_128bit, shared_span_context](
                 Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
@@ -129,8 +129,8 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMa
 ReporterImpl::ReporterImpl(Driver& driver, Event::Dispatcher& dispatcher,
                            const CollectorInfo& collector)
     : driver_(driver),
-      collector_(collector), span_buffer_{
-                                 new SpanBuffer(collector.version, collector.shared_span_context)} {
+      collector_(collector), span_buffer_{std::make_unique<SpanBuffer>(
+                                 collector.version_, collector.shared_span_context_)} {
   flush_timer_ = dispatcher.createTimer([this]() -> void {
     driver_.tracerStats().timer_flushed_.inc();
     flushSpans();
@@ -146,7 +146,7 @@ ReporterImpl::ReporterImpl(Driver& driver, Event::Dispatcher& dispatcher,
 
 ReporterPtr ReporterImpl::NewInstance(Driver& driver, Event::Dispatcher& dispatcher,
                                       const CollectorInfo& collector) {
-  return ReporterPtr(new ReporterImpl(driver, dispatcher, collector));
+  return ReporterPtr(std::make_unique<ReporterImpl>(driver, dispatcher, collector));
 }
 
 // TODO(fabolive): Need to avoid the copy to improve performance.
@@ -173,10 +173,10 @@ void ReporterImpl::flushSpans() {
     const std::string request_body = span_buffer_->serialize();
     Http::MessagePtr message(new Http::RequestMessageImpl());
     message->headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Post);
-    message->headers().insertPath().value(collector_.endpoint);
+    message->headers().insertPath().value(collector_.endpoint_);
     message->headers().insertHost().value(driver_.cluster()->name());
     message->headers().insertContentType().value().setReference(
-        collector_.version == envoy::config::trace::v2::ZipkinConfig::HTTP_PROTO
+        collector_.version_ == envoy::config::trace::v2::ZipkinConfig::HTTP_PROTO
             ? Http::Headers::get().ContentTypeValues.Protobuf
             : Http::Headers::get().ContentTypeValues.Json);
 

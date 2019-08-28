@@ -12,6 +12,7 @@
 #include "extensions/tracers/zipkin/tracer_interface.h"
 #include "extensions/tracers/zipkin/util.h"
 
+#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 
@@ -504,7 +505,7 @@ public:
    */
   const std::string traceIdAsHexString() const {
     return trace_id_high_.has_value()
-               ? Hex::uint64ToHex(trace_id_high_.value()) + Hex::uint64ToHex(trace_id_)
+               ? absl::StrCat(Hex::uint64ToHex(trace_id_high_.value()), Hex::uint64ToHex(trace_id_))
                : Hex::uint64ToHex(trace_id_);
   }
 
@@ -513,9 +514,10 @@ public:
    */
   const std::string traceIdAsByteString() const {
     // https://github.com/openzipkin/zipkin-api/blob/v0.2.1/zipkin.proto#L60-L61.
-    return trace_id_high_.has_value() ? Util::toBigEndianByteString(trace_id_high_.value()) +
-                                            Util::toBigEndianByteString(trace_id_)
-                                      : Util::toBigEndianByteString(trace_id_);
+    return trace_id_high_.has_value()
+               ? absl::StrCat(Util::toBigEndianByteString(trace_id_high_.value()),
+                              Util::toBigEndianByteString(trace_id_))
+               : Util::toBigEndianByteString(trace_id_);
   }
 
   /**
