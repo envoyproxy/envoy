@@ -127,6 +127,12 @@ test:remote --experimental_remote_download_outputs=minimal
 build:remote-clang --config=remote
 build:remote-clang --config=rbe-toolchain-clang
 
+build:remote-clang-libc++ --config=remote
+build:remote-clang-libc++ --config=rbe-toolchain-clang-libc++
+
+build:remote-gcc --config=remote
+build:remote-gcc --config=rbe-toolchain-gcc
+
 # Docker sandbox
 build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build:8246167b9d238797cbc6c03dccc9e3921c37617d
 build:docker-sandbox --spawn_strategy=docker
@@ -139,6 +145,12 @@ build:docker-sandbox --experimental_enable_docker_sandbox
 
 build:docker-clang --config=docker-sandbox
 build:docker-clang --config=rbe-toolchain-clang
+
+build:docker-clang-libc++ --config=docker-sandbox
+build:docker-clang-libc++ --config=rbe-toolchain-clang-libc++
+
+build:docker-gcc --config=docker-sandbox
+build:docker-gcc --config=rbe-toolchain-gcc
 
 # CI configurations
 build:remote-ci --remote_cache=grpcs://remotebuildexecution.googleapis.com
