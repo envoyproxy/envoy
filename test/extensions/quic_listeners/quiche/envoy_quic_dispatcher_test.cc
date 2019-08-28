@@ -79,7 +79,7 @@ public:
     listen_socket_ = std::make_unique<Network::NetworkListenSocket<
         Network::NetworkSocketTrait<Network::Address::SocketType::Datagram>>>(
         Network::Test::getCanonicalLoopbackAddress(version_), nullptr, /*bind*/ true);
-    // Advance time a bit because QuicTime regards 0 as uninitialize timestamp.
+    // Advance time a bit because QuicTime regards 0 as uninitialized timestamp.
     time_system_.sleep(std::chrono::milliseconds(100));
     EXPECT_CALL(listener_config_, socket()).WillRepeatedly(ReturnRef(*listen_socket_));
   }
