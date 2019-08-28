@@ -30,7 +30,7 @@ class Envoy constructor(
   // Dedicated thread for running this instance of Envoy.
   private val runner: Thread = Thread(ThreadGroup("Envoy"), Runnable {
     engine.runWithConfig(config.trim(), logLevel.level)
-  });
+  })
 
   /**
    * Create a new Envoy instance. The Envoy runner Thread is started as part of instance

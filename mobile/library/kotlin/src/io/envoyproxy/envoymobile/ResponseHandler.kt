@@ -11,10 +11,10 @@ import java.util.concurrent.Executor;
 class ResponseHandler(val executor: Executor) {
 
   class EnvoyObserverAdapter(
-      internal val responseHandler: ResponseHandler
+      private val responseHandler: ResponseHandler
   ) : EnvoyObserver {
 
-    override fun getExecutor() : Executor = responseHandler.executor
+    override fun getExecutor(): Executor = responseHandler.executor
 
     override fun onHeaders(headers: Map<String, List<String>>?, endStream: Boolean) {
       val statusCode = headers!![":status"]?.first()?.toIntOrNull() ?: 0
