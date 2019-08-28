@@ -43,8 +43,6 @@ extensions/filters/common/original_src @snowp @klarose
 # dynamic forward proxy
 /*/extensions/clusters/dynamic_forward_proxy @mattklein123 @alyssawilk
 /*/extensions/common/dynamic_forward_proxy @mattklein123 @alyssawilk
-# web assembly common extension
-/*/extensions/common/wasm @jplevayk @PiotrSikora
 /*/extensions/filters/http/dynamic_forward_proxy @mattklein123 @alyssawilk
 # omit_canary_hosts retry predicate
 /*/extensions/retry/host/omit_canary_hosts @sriduth @snowp
@@ -57,3 +55,5 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/listener/http_inspector @crazyxy @PiotrSikora @lizan
 # attribute context
 /*/extensions/filters/common/expr @kyessenov @yangminzhu
+# webassembly common extension
+/*/extensions/common/wasm @jplevyak @PiotrSikora

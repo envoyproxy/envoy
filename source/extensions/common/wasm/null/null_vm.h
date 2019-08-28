@@ -26,7 +26,7 @@ struct NullVm : public WasmVm {
 
   // WasmVm
   absl::string_view vm() override { return WasmVmNames::get().Null; }
-  bool clonable() override { return true; };
+  bool cloneable() override { return true; };
   WasmVmPtr clone() override;
   bool load(const std::string& code, bool allow_precompiled) override;
   void link(absl::string_view debug_name, bool needs_emscripten) override;

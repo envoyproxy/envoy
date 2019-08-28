@@ -111,12 +111,12 @@ public:
 
   /**
    * Whether or not the VM implementation supports cloning.
-   * @return true if the VM is clone-able.
+   * @return true if the VM is cloneable.
    */
-  virtual bool clonable() PURE;
+  virtual bool cloneable() PURE;
 
   /**
-   * Make a worker/thread-specific copy if supported by the underlying VM system (see clonable()
+   * Make a worker/thread-specific copy if supported by the underlying VM system (see cloneable()
    * above). If not supported, the caller will need to create a new VM from scratch. If supported,
    * the clone may share compiled code and other read-only data with the source VM.
    * @return a clone of 'this' (e.g. for a different worker/thread).
