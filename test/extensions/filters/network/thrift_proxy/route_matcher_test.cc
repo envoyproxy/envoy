@@ -331,7 +331,8 @@ routes:
   EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
 }
 
-TEST(ThriftRouteMatcherTest, RouteByRegexHeaderMatcher) {
+// TODO(alyssawilk) update.
+TEST(ThriftRouteMatcherTest, DEPRECATED_FEATURE_TEST(RouteByRegexHeaderMatcher)) {
   const std::string yaml = R"EOF(
 name: config
 routes:

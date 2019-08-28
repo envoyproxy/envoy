@@ -1156,7 +1156,8 @@ TEST_F(ConnectionManagerTest, PendingMessageEnd) {
   EXPECT_EQ(1U, store_.gauge("test.request_active", Stats::Gauge::ImportMode::Accumulate).value());
 }
 
-TEST_F(ConnectionManagerTest, Routing) {
+// TODO(alyssawilk) update.
+TEST_F(ConnectionManagerTest, DEPRECATED_FEATURE_TEST(Routing)) {
   const std::string yaml = R"EOF(
 stat_prefix: test
 protocol_type: Dubbo

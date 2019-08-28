@@ -12,7 +12,6 @@
 #include "envoy/config/config_provider.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/json/json_object.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/router/rds.h"
 #include "envoy/router/route_config_provider_manager.h"
@@ -54,8 +53,9 @@ public:
 class TestCorsPolicy : public CorsPolicy {
 public:
   // Router::CorsPolicy
-  const std::list<std::string>& allowOrigins() const override { return allow_origin_; };
-  const std::list<std::regex>& allowOriginRegexes() const override { return allow_origin_regex_; };
+  const std::vector<Matchers::StringMatcherPtr>& allowOrigins() const override {
+    return allow_origins_;
+  };
   const std::string& allowMethods() const override { return allow_methods_; };
   const std::string& allowHeaders() const override { return allow_headers_; };
   const std::string& exposeHeaders() const override { return expose_headers_; };
@@ -64,13 +64,12 @@ public:
   bool enabled() const override { return enabled_; };
   bool shadowEnabled() const override { return shadow_enabled_; };
 
-  std::list<std::string> allow_origin_{};
-  std::list<std::regex> allow_origin_regex_{};
-  std::string allow_methods_{};
-  std::string allow_headers_{};
-  std::string expose_headers_{};
+  std::vector<Matchers::StringMatcherPtr> allow_origins_;
+  std::string allow_methods_;
+  std::string allow_headers_;
+  std::string expose_headers_;
   std::string max_age_{};
-  absl::optional<bool> allow_credentials_{};
+  absl::optional<bool> allow_credentials_;
   bool enabled_{};
   bool shadow_enabled_{};
 };

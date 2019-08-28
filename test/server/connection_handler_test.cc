@@ -1,3 +1,4 @@
+#include "envoy/server/active_udp_listener_config.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/utility.h"
@@ -44,6 +45,12 @@ public:
           hand_off_restored_destination_connections_(hand_off_restored_destination_connections),
           name_(name), listener_filters_timeout_(listener_filters_timeout),
           continue_on_listener_filters_timeout_(continue_on_listener_filters_timeout) {
+      envoy::api::v2::listener::UdpListenerConfig dummy;
+      std::string listener_name("raw_udp_listener");
+      dummy.set_udp_listener_name(listener_name);
+      udp_listener_factory_ =
+          Config::Utility::getAndCheckFactory<ActiveUdpListenerConfigFactory>(listener_name)
+              .createActiveUdpListenerFactory(dummy);
       EXPECT_CALL(socket_, socketType()).WillOnce(Return(socket_type));
     }
 
@@ -66,6 +73,9 @@ public:
     Stats::Scope& listenerScope() override { return parent_.stats_store_; }
     uint64_t listenerTag() const override { return tag_; }
     const std::string& name() const override { return name_; }
+    const Network::ActiveUdpListenerFactory* udpListenerFactory() override {
+      return udp_listener_factory_.get();
+    }
 
     ConnectionHandlerTest& parent_;
     Network::MockListenSocket socket_;
@@ -75,6 +85,7 @@ public:
     const std::string name_;
     const std::chrono::milliseconds listener_filters_timeout_;
     const bool continue_on_listener_filters_timeout_;
+    std::unique_ptr<Network::ActiveUdpListenerFactory> udp_listener_factory_;
   };
 
   using TestListenerPtr = std::unique_ptr<TestListener>;

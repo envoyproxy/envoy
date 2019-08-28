@@ -46,6 +46,17 @@ envoy::api::v2::Cluster AdsIntegrationTest::buildCluster(const std::string& name
                                                                      name));
 }
 
+envoy::api::v2::Cluster AdsIntegrationTest::buildRedisCluster(const std::string& name) {
+  return TestUtility::parseYaml<envoy::api::v2::Cluster>(fmt::format(R"EOF(
+      name: {}
+      connect_timeout: 5s
+      type: EDS
+      eds_cluster_config: {{ eds_config: {{ ads: {{}} }} }}
+      lb_policy: MAGLEV
+    )EOF",
+                                                                     name));
+}
+
 envoy::api::v2::ClusterLoadAssignment
 AdsIntegrationTest::buildClusterLoadAssignment(const std::string& name) {
   return TestUtility::parseYaml<envoy::api::v2::ClusterLoadAssignment>(
@@ -85,6 +96,29 @@ envoy::api::v2::Listener AdsIntegrationTest::buildListener(const std::string& na
             http_filters: [{{ name: envoy.router }}]
     )EOF",
       name, Network::Test::getLoopbackAddressString(ipVersion()), stat_prefix, route_config));
+}
+
+envoy::api::v2::Listener AdsIntegrationTest::buildRedisListener(const std::string& name,
+                                                                const std::string& cluster) {
+  return TestUtility::parseYaml<envoy::api::v2::Listener>(fmt::format(
+      R"EOF(
+      name: {}
+      address:
+        socket_address:
+          address: {}
+          port_value: 0
+      filter_chains:
+        filters:
+        - name: envoy.redis_proxy
+          config:
+            settings: 
+              op_timeout: 1s
+            stat_prefix: {}
+            prefix_routes:
+              catch_all_route: 
+                cluster: {}
+    )EOF",
+      name, Network::Test::getLoopbackAddressString(ipVersion()), name, cluster));
 }
 
 envoy::api::v2::RouteConfiguration
