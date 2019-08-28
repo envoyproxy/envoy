@@ -114,6 +114,7 @@ public:
    * @return a clone of 'this' (e.g. for a different Worker/thread).
    */
   virtual WasmVmPtr clone() PURE;
+
   /**
    * Load the WASM code from a file. Return true on success.
    * @param code the WASM binary code (or registered NullVm plugin name).
@@ -122,6 +123,7 @@ public:
    * @return whether or not the load was successful.
    */
   virtual bool load(const std::string& code, bool allow_precompiled) PURE;
+
   /**
    * Link to registered function.
    * @param debug_name user-provided name for use in error messages.
@@ -150,6 +152,7 @@ public:
    * @return the size of memory in bytes.
    */
   virtual uint64_t getMemorySize() PURE;
+
   /**
    * Convert a block of memory in the VM to a string_view.
    * @param pointer the offset into VM memory of the requested VM memory block.
@@ -158,6 +161,7 @@ public:
    * a host string_view pointing to the pointer/size pair in VM memory.
    */
   virtual absl::optional<absl::string_view> getMemory(uint64_t pointer, uint64_t size) PURE;
+
   /**
    * Convert a host pointer to memory in the VM into a VM "pointer" (an offset into the Memory).
    * @param host_pointer a pointer to host memory to be converted into a VM offset (pointer).
@@ -166,6 +170,7 @@ public:
    * @return whether or not the host_pointer was a valid VM memory offset.
    */
   virtual bool getMemoryOffset(void* host_pointer, uint64_t* vm_pointer) PURE;
+
   /**
    * Set a block of memory in the VM, returns true on success, false if the pointer/size is invalid.
    * @param pointer the offset into VM memory describing the start of a region of VM memory.
@@ -173,6 +178,7 @@ public:
    * @return whether or not the pointer/size pair was a valid VM memory block.
    */
   virtual bool setMemory(uint64_t pointer, uint64_t size, const void* data) PURE;
+
   /**
    * Set a Word in the VM, returns true on success, false if the pointer is invalid.
    * @param pointer the offset into VM memory describing the start of VM native word size block.
@@ -180,6 +186,7 @@ public:
    * @return whether or not the pointer was to a valid VM memory block of VM native word size.
    */
   virtual bool setWord(uint64_t pointer, Word data) PURE;
+
   /**
    * Make a new intrinsic module (e.g. for Emscripten support).
    * @param name the name of the module to make.
@@ -219,6 +226,7 @@ public:
    */
   virtual std::unique_ptr<Global<Word>> makeGlobal(absl::string_view module_name,
                                                    absl::string_view name, Word initial_value) PURE;
+
   /**
    * Register typed value exported by the host environment.
    * @param module_name the name of the module to which to export the global.
@@ -248,6 +256,7 @@ public:
 // because this state is live only during the calls and does not need to be initialized consistently
 // over all workers as with ThreadLocal data.
 extern thread_local Envoy::Extensions::Common::Wasm::Context* current_context_;
+
 // Requested effective context set by code within the VM to request that the calls coming out of the
 // VM be attributed to another filter, for example if a control plane gRPC comes back to the
 // RootContext which effects some set of waiting filters.
