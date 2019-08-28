@@ -7,11 +7,10 @@
 #include "common/common/hex.h"
 #include "common/common/utility.h"
 
+#include "absl/strings/str_join.h"
 #include "rapidjson/document.h"
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
-
-#include "absl/strings/str_join.h"
 
 namespace Envoy {
 namespace Extensions {
