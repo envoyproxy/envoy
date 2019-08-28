@@ -22,7 +22,7 @@ public:
     }
   }
 
-  ~AggregateLoadBalancerContext() {
+  ~AggregateLoadBalancerContext() override {
     if (own_context_) {
       delete context_;
     }
@@ -46,6 +46,8 @@ public:
 
     // Re-assign load. Set all traffic to the priority and availability selected in aggregate
     // cluster.
+    // TODO(yxue): allow determinePriorityLoad to affect the load of top level cluster and verify it
+    // works with current retry plugin
     size_t priorities = priority_load_.healthy_priority_load_.get().size();
     priority_load_.healthy_priority_load_.get().assign(priorities, 0);
     priority_load_.degraded_priority_load_.get().assign(priorities, 0);
@@ -101,8 +103,8 @@ private:
                      std::pair<Upstream::PrioritySetImpl,
                                std::vector<std::pair<uint32_t, Upstream::ThreadLocalCluster*>>>&&
                          priority_setting)
-        : Upstream::LoadBalancerBase(std::move(priority_setting.first), parent.stats_,
-                                     parent.runtime_, parent.random_, parent.common_config_),
+        : Upstream::LoadBalancerBase(priority_setting.first, parent.stats_, parent.runtime_,
+                                     parent.random_, parent.common_config_),
           priority_to_cluster_(std::move(priority_setting.second)) {}
 
     // Upstream::LoadBalancer

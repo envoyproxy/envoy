@@ -39,8 +39,9 @@ ClusterUtil::linearizePrioritySet(Upstream::ClusterManager& cluster_manager,
         priority_set.updateHosts(
             next_priority++, Upstream::HostSetImpl::updateHostsParams(*host_set),
             host_set->localityWeights(), host_set->hosts(), {}, host_set->overprovisioningFactor());
-        priority_to_cluster.push_back({priority++, tlc});
+        priority_to_cluster.emplace_back(std::make_pair(priority, tlc));
       }
+      priority++;
     }
   }
 
