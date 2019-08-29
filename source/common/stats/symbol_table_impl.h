@@ -652,16 +652,19 @@ public:
   void rememberBuiltin(absl::string_view str);
 
   /**
-   * Finds a StatName by name. If 'str' has been remembered as a built-in, then
-   * no lock is required. Otherwise we first consult dynamic_stat_names_ under a
-   * lock that's private to the StatNameSet. If that's empty, we need to create
-   * the StatName in the pool, which requires taking a global lock.
+   * Finds a StatName by name. If 'token' has been remembered as a built-in,
+   * then no lock is required. Otherwise we must consult dynamic_stat_names_
+   * under a lock that's private to the StatNameSet. If that's empty, we need to
+   * create the StatName in the pool, which requires taking a global lock, and
+   * then remember the new StatName in the dynamic_stat_names_. This allows
+   * subsequent lookups of the same string to take only the set's lock, and not
+   * the whole symbol-table lock.
    *
    * TODO(jmarantz): Potential perf issue here with contention, both on this
    * set's mutex and also the SymbolTable mutex which must be taken during
    * StatNamePool::add().
    */
-  StatName getStatName(absl::string_view str);
+  StatName getStatName(absl::string_view token);
 
   /**
    * Adds a StatName using the pool, but without remembering it in any maps.

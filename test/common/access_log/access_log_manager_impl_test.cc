@@ -8,12 +8,15 @@
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
+#include "test/test_common/test_time.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::_;
 using testing::ByMove;
+using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnNew;
@@ -36,6 +39,14 @@ protected:
     EXPECT_CALL(api_, threadFactory()).WillRepeatedly(ReturnRef(thread_factory_));
   }
 
+  void waitForCounterEq(const std::string& name, uint64_t value) {
+    TestUtility::waitForCounterEq(store_, name, value, time_system_);
+  }
+
+  void waitForGaugeEq(const std::string& name, uint64_t value) {
+    TestUtility::waitForGaugeEq(store_, name, value, time_system_);
+  }
+
   NiceMock<Api::MockApi> api_;
   NiceMock<Filesystem::MockInstance> file_system_;
   NiceMock<Filesystem::MockFile>* file_;
@@ -45,23 +56,47 @@ protected:
   NiceMock<Event::MockDispatcher> dispatcher_;
   Thread::MutexBasicLockable lock_;
   AccessLogManagerImpl access_log_manager_;
+  Event::TestRealTimeSystem time_system_;
 };
 
 TEST_F(AccessLogManagerImplTest, BadFile) {
   EXPECT_CALL(dispatcher_, createTimer_(_));
-  EXPECT_CALL(*file_, open_()).WillOnce(Return(ByMove(Filesystem::resultFailure<bool>(false, 0))));
+  EXPECT_CALL(*file_, open_(_)).WillOnce(Return(ByMove(Filesystem::resultFailure<bool>(false, 0))));
   EXPECT_THROW(access_log_manager_.createAccessLog("foo"), EnvoyException);
+}
+
+TEST_F(AccessLogManagerImplTest, OpenFileWithRightFlags) {
+  EXPECT_CALL(dispatcher_, createTimer_(_));
+  EXPECT_CALL(*file_, open_(_))
+      .WillOnce(Invoke([](Filesystem::FlagSet flags) -> Api::IoCallBoolResult {
+        EXPECT_FALSE(flags[Filesystem::File::Operation::Read]);
+        EXPECT_TRUE(flags[Filesystem::File::Operation::Write]);
+        EXPECT_TRUE(flags[Filesystem::File::Operation::Append]);
+        EXPECT_TRUE(flags[Filesystem::File::Operation::Create]);
+        return Filesystem::resultSuccess<bool>(true);
+      }));
+  EXPECT_NE(nullptr, access_log_manager_.createAccessLog("foo"));
+  EXPECT_CALL(*file_, close_()).WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
 }
 
 TEST_F(AccessLogManagerImplTest, flushToLogFilePeriodically) {
   NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
 
-  EXPECT_CALL(*file_, open_()).WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
+  EXPECT_CALL(*file_, open_(_)).WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
   AccessLogFileSharedPtr log_file = access_log_manager_.createAccessLog("foo");
 
-  EXPECT_CALL(*timer, enableTimer(timeout_40ms_));
+  EXPECT_EQ(0UL, store_.counter("filesystem.write_failed").value());
+  EXPECT_EQ(0UL, store_.counter("filesystem.write_completed").value());
+  EXPECT_EQ(0UL, store_.counter("filesystem.flushed_by_timer").value());
+  EXPECT_EQ(0UL, store_.counter("filesystem.write_buffered").value());
+
+  EXPECT_CALL(*timer, enableTimer(timeout_40ms_, _));
   EXPECT_CALL(*file_, write_(_))
-      .WillOnce(Invoke([](absl::string_view data) -> Api::IoCallSizeResult {
+      .WillOnce(Invoke([&](absl::string_view data) -> Api::IoCallSizeResult {
+        EXPECT_EQ(
+            4UL,
+            store_.gauge("filesystem.write_total_buffered", Stats::Gauge::ImportMode::Accumulate)
+                .value());
         EXPECT_EQ(0, data.compare("test"));
         return Filesystem::resultSuccess<ssize_t>(static_cast<ssize_t>(data.length()));
       }));
@@ -75,16 +110,27 @@ TEST_F(AccessLogManagerImplTest, flushToLogFilePeriodically) {
     }
   }
 
+  waitForCounterEq("filesystem.write_completed", 1);
+  EXPECT_EQ(1UL, store_.counter("filesystem.write_buffered").value());
+  EXPECT_EQ(0UL, store_.counter("filesystem.flushed_by_timer").value());
+  waitForGaugeEq("filesystem.write_total_buffered", 0);
+
   EXPECT_CALL(*file_, write_(_))
-      .WillOnce(Invoke([](absl::string_view data) -> Api::IoCallSizeResult {
+      .WillOnce(Invoke([&](absl::string_view data) -> Api::IoCallSizeResult {
+        EXPECT_EQ(
+            5UL,
+            store_.gauge("filesystem.write_total_buffered", Stats::Gauge::ImportMode::Accumulate)
+                .value());
         EXPECT_EQ(0, data.compare("test2"));
         return Filesystem::resultSuccess<ssize_t>(static_cast<ssize_t>(data.length()));
       }));
 
-  // make sure timer is re-enabled on callback call
   log_file->write("test2");
-  EXPECT_CALL(*timer, enableTimer(timeout_40ms_));
-  timer->callback_();
+  EXPECT_EQ(2UL, store_.counter("filesystem.write_buffered").value());
+
+  // make sure timer is re-enabled on callback call
+  EXPECT_CALL(*timer, enableTimer(timeout_40ms_, _));
+  timer->invokeCallback();
 
   {
     Thread::LockGuard lock(file_->write_mutex_);
@@ -92,30 +138,40 @@ TEST_F(AccessLogManagerImplTest, flushToLogFilePeriodically) {
       file_->write_event_.wait(file_->write_mutex_);
     }
   }
+
+  waitForCounterEq("filesystem.write_completed", 2);
+  EXPECT_EQ(0UL, store_.counter("filesystem.write_failed").value());
+  EXPECT_EQ(1UL, store_.counter("filesystem.flushed_by_timer").value());
+  EXPECT_EQ(2UL, store_.counter("filesystem.write_buffered").value());
+  waitForGaugeEq("filesystem.write_total_buffered", 0);
+
   EXPECT_CALL(*file_, close_()).WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
 }
 
 TEST_F(AccessLogManagerImplTest, flushToLogFileOnDemand) {
   NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
 
-  EXPECT_CALL(*file_, open_()).WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
+  EXPECT_CALL(*file_, open_(_)).WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
   AccessLogFileSharedPtr log_file = access_log_manager_.createAccessLog("foo");
 
-  EXPECT_CALL(*timer, enableTimer(timeout_40ms_));
+  EXPECT_EQ(0UL, store_.counter("filesystem.flushed_by_timer").value());
 
-  // The first write to a given file will start the flush thread, which can flush
-  // immediately (race on whether it will or not). So do a write and flush to
-  // get that state out of the way, then test that small writes don't trigger a flush.
+  EXPECT_CALL(*timer, enableTimer(timeout_40ms_, _));
+
+  // The first write to a given file will start the flush thread. Because AccessManagerImpl::write
+  // holds the write_lock_ when the thread is started, the thread will flush on its first loop, once
+  // it obtains the write_lock_. Perform a write to get all that out of the way.
   EXPECT_CALL(*file_, write_(_))
       .WillOnce(Invoke([](absl::string_view data) -> Api::IoCallSizeResult {
         return Filesystem::resultSuccess<ssize_t>(static_cast<ssize_t>(data.length()));
       }));
   log_file->write("prime-it");
-  log_file->flush();
   uint32_t expected_writes = 1;
   {
     Thread::LockGuard lock(file_->write_mutex_);
-    EXPECT_EQ(expected_writes, file_->num_writes_);
+    while (file_->num_writes_ != expected_writes) {
+      file_->write_event_.wait(file_->write_mutex_);
+    }
   }
 
   EXPECT_CALL(*file_, write_(_))
@@ -135,8 +191,13 @@ TEST_F(AccessLogManagerImplTest, flushToLogFileOnDemand) {
   expected_writes++;
   {
     Thread::LockGuard lock(file_->write_mutex_);
-    EXPECT_EQ(expected_writes, file_->num_writes_);
+    while (file_->num_writes_ != expected_writes) {
+      file_->write_event_.wait(file_->write_mutex_);
+    }
   }
+
+  waitForCounterEq("filesystem.write_completed", 2);
+  EXPECT_EQ(0UL, store_.counter("filesystem.flushed_by_timer").value());
 
   EXPECT_CALL(*file_, write_(_))
       .WillOnce(Invoke([](absl::string_view data) -> Api::IoCallSizeResult {
@@ -146,8 +207,8 @@ TEST_F(AccessLogManagerImplTest, flushToLogFileOnDemand) {
 
   // make sure timer is re-enabled on callback call
   log_file->write("test2");
-  EXPECT_CALL(*timer, enableTimer(timeout_40ms_));
-  timer->callback_();
+  EXPECT_CALL(*timer, enableTimer(timeout_40ms_, _));
+  timer->invokeCallback();
   expected_writes++;
 
   {
@@ -159,11 +220,41 @@ TEST_F(AccessLogManagerImplTest, flushToLogFileOnDemand) {
   EXPECT_CALL(*file_, close_()).WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
 }
 
+TEST_F(AccessLogManagerImplTest, flushCountsIOErrors) {
+  NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
+
+  EXPECT_CALL(*file_, open_(_)).WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
+  AccessLogFileSharedPtr log_file = access_log_manager_.createAccessLog("foo");
+
+  EXPECT_EQ(0UL, store_.counter("filesystem.write_failed").value());
+
+  EXPECT_CALL(*timer, enableTimer(timeout_40ms_, _));
+  EXPECT_CALL(*file_, write_(_))
+      .WillOnce(Invoke([](absl::string_view data) -> Api::IoCallSizeResult {
+        EXPECT_EQ(0, data.compare("test"));
+        return Filesystem::resultFailure<ssize_t>(2UL, ENOSPC);
+      }));
+
+  log_file->write("test");
+
+  {
+    Thread::LockGuard lock(file_->write_mutex_);
+    while (file_->num_writes_ != 1) {
+      file_->write_event_.wait(file_->write_mutex_);
+    }
+  }
+
+  waitForCounterEq("filesystem.write_failed", 1);
+  EXPECT_EQ(0UL, store_.counter("filesystem.write_completed").value());
+
+  EXPECT_CALL(*file_, close_()).WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
+}
+
 TEST_F(AccessLogManagerImplTest, reopenFile) {
   NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
 
   Sequence sq;
-  EXPECT_CALL(*file_, open_())
+  EXPECT_CALL(*file_, open_(_))
       .InSequence(sq)
       .WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
   AccessLogFileSharedPtr log_file = access_log_manager_.createAccessLog("foo");
@@ -176,7 +267,7 @@ TEST_F(AccessLogManagerImplTest, reopenFile) {
       }));
 
   log_file->write("before");
-  timer->callback_();
+  timer->invokeCallback();
 
   {
     Thread::LockGuard lock(file_->write_mutex_);
@@ -188,7 +279,7 @@ TEST_F(AccessLogManagerImplTest, reopenFile) {
   EXPECT_CALL(*file_, close_())
       .InSequence(sq)
       .WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
-  EXPECT_CALL(*file_, open_())
+  EXPECT_CALL(*file_, open_(_))
       .InSequence(sq)
       .WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
 
@@ -205,7 +296,7 @@ TEST_F(AccessLogManagerImplTest, reopenFile) {
 
   log_file->reopen();
   log_file->write("reopened");
-  timer->callback_();
+  timer->invokeCallback();
 
   {
     Thread::LockGuard lock(file_->write_mutex_);
@@ -224,7 +315,7 @@ TEST_F(AccessLogManagerImplTest, reopenThrows) {
       }));
 
   Sequence sq;
-  EXPECT_CALL(*file_, open_())
+  EXPECT_CALL(*file_, open_(_))
       .InSequence(sq)
       .WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
 
@@ -232,12 +323,12 @@ TEST_F(AccessLogManagerImplTest, reopenThrows) {
   EXPECT_CALL(*file_, close_())
       .InSequence(sq)
       .WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
-  EXPECT_CALL(*file_, open_())
+  EXPECT_CALL(*file_, open_(_))
       .InSequence(sq)
       .WillOnce(Return(ByMove(Filesystem::resultFailure<bool>(false, 0))));
 
   log_file->write("test write");
-  timer->callback_();
+  timer->invokeCallback();
   {
     Thread::LockGuard lock(file_->write_mutex_);
     while (file_->num_writes_ != 1) {
@@ -247,7 +338,7 @@ TEST_F(AccessLogManagerImplTest, reopenThrows) {
   log_file->reopen();
 
   log_file->write("this is to force reopen");
-  timer->callback_();
+  timer->invokeCallback();
 
   {
     Thread::LockGuard lock(file_->open_mutex_);
@@ -258,11 +349,13 @@ TEST_F(AccessLogManagerImplTest, reopenThrows) {
 
   // write call should not cause any exceptions
   log_file->write("random data");
-  timer->callback_();
+  timer->invokeCallback();
+
+  waitForCounterEq("filesystem.reopen_failed", 1);
 }
 
 TEST_F(AccessLogManagerImplTest, bigDataChunkShouldBeFlushedWithoutTimer) {
-  EXPECT_CALL(*file_, open_()).WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
+  EXPECT_CALL(*file_, open_(_)).WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
   AccessLogFileSharedPtr log_file = access_log_manager_.createAccessLog("foo");
 
   EXPECT_CALL(*file_, write_(_))
@@ -305,7 +398,7 @@ TEST_F(AccessLogManagerImplTest, reopenAllFiles) {
   EXPECT_CALL(dispatcher_, createTimer_(_)).WillRepeatedly(ReturnNew<NiceMock<Event::MockTimer>>());
 
   Sequence sq;
-  EXPECT_CALL(*file_, open_())
+  EXPECT_CALL(*file_, open_(_))
       .InSequence(sq)
       .WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
   AccessLogFileSharedPtr log = access_log_manager_.createAccessLog("foo");
@@ -315,7 +408,7 @@ TEST_F(AccessLogManagerImplTest, reopenAllFiles) {
       .WillOnce(Return(ByMove(std::unique_ptr<NiceMock<Filesystem::MockFile>>(file2))));
 
   Sequence sq2;
-  EXPECT_CALL(*file2, open_())
+  EXPECT_CALL(*file2, open_(_))
       .InSequence(sq2)
       .WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
   AccessLogFileSharedPtr log2 = access_log_manager_.createAccessLog("bar");
@@ -342,10 +435,10 @@ TEST_F(AccessLogManagerImplTest, reopenAllFiles) {
       .InSequence(sq2)
       .WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
 
-  EXPECT_CALL(*file_, open_())
+  EXPECT_CALL(*file_, open_(_))
       .InSequence(sq)
       .WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
-  EXPECT_CALL(*file2, open_())
+  EXPECT_CALL(*file2, open_(_))
       .InSequence(sq2)
       .WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
 

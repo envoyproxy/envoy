@@ -146,9 +146,19 @@ Http::HeaderMapPtr StreamHandleWrapper::buildHeadersFromTable(lua_State* state, 
   while (lua_next(state, table_index) != 0) {
     // Uses 'key' (at index -2) and 'value' (at index -1).
     const char* key = luaL_checkstring(state, -2);
-    const char* value = luaL_checkstring(state, -1);
-    headers->addCopy(Http::LowerCaseString(key), value);
-
+    // Check if the current value is a table, we iterate through the table and add each element of
+    // it as a header entry value for the current key.
+    if (lua_istable(state, -1)) {
+      lua_pushnil(state);
+      while (lua_next(state, -2) != 0) {
+        const char* value = luaL_checkstring(state, -1);
+        headers->addCopy(Http::LowerCaseString(key), value);
+        lua_pop(state, 1);
+      }
+    } else {
+      const char* value = luaL_checkstring(state, -1);
+      headers->addCopy(Http::LowerCaseString(key), value);
+    }
     // Removes 'value'; keeps 'key' for next iteration. This is the input for lua_next() so that
     // it can push the next key/value pair onto the stack.
     lua_pop(state, 1);

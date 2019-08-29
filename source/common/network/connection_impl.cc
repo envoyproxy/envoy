@@ -118,6 +118,8 @@ void ConnectionImpl::close(ConnectionCloseType type) {
       if (!inDelayedClose()) {
         initializeDelayedCloseTimer();
         delayed_close_state_ = DelayedCloseState::CloseAfterFlushAndWait;
+        // Monitor for the peer closing the connection.
+        file_event_->setEnabled(enable_half_close_ ? 0 : Event::FileReadyType::Closed);
       }
     } else {
       closeSocket(ConnectionEvent::LocalClose);

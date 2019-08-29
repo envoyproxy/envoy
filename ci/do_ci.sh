@@ -197,6 +197,7 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
     --define log_debug_assert_in_release=enabled \
     --define quiche=enabled \
     --define path_normalization_by_default=true \
+    --define deprecated_features=disabled \
   "
   setup_clang_libcxx_toolchain
   # This doesn't go into CI but is available for developer convenience.
@@ -251,6 +252,13 @@ elif [[ "$CI_TARGET" == "bazel.coverity" ]]; then
   cp -f \
      "${ENVOY_BUILD_DIR}"/envoy-coverity-output.tgz \
      "${ENVOY_DELIVERY_DIR}"/envoy-coverity-output.tgz
+  exit 0
+elif [[ "$CI_TARGET" == "bazel.fuzz" ]]; then
+  setup_clang_toolchain
+  FUZZ_TEST_TARGETS="$(bazel query "attr('tags','fuzzer',${TEST_TARGETS})")"
+  echo "bazel ASAN libFuzzer build with fuzz tests ${FUZZ_TEST_TARGETS}"
+  echo "Building envoy fuzzers and executing 100 fuzz iterations..."
+  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} --config=asan-fuzzer ${FUZZ_TEST_TARGETS} --test_arg="-runs=10"
   exit 0
 elif [[ "$CI_TARGET" == "fix_format" ]]; then
   echo "fix_format..."

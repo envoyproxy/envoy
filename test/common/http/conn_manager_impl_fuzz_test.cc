@@ -19,6 +19,7 @@
 #include "common/http/exception.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
+#include "common/stats/symbol_table_creator.h"
 
 #include "test/common/http/conn_manager_impl_common.h"
 #include "test/common/http/conn_manager_impl_fuzz.pb.h"
@@ -90,6 +91,9 @@ public:
     return &scoped_route_config_provider_;
   }
   const std::string& serverName() override { return server_name_; }
+  HttpConnectionManagerProto::ServerHeaderTransformation serverHeaderTransformation() override {
+    return server_transformation_;
+  }
   ConnectionManagerStats& stats() override { return stats_; }
   ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() override { return use_remote_address_; }
@@ -123,6 +127,8 @@ public:
   ConnectionManagerImplHelper::RouteConfigProvider route_config_provider_;
   ConnectionManagerImplHelper::ScopedRouteConfigProvider scoped_route_config_provider_;
   std::string server_name_;
+  HttpConnectionManagerProto::ServerHeaderTransformation server_transformation_{
+      HttpConnectionManagerProto::OVERWRITE};
   Stats::IsolatedStoreImpl fake_stats_;
   ConnectionManagerStats stats_;
   ConnectionManagerTracingStats tracing_stats_;
@@ -382,8 +388,8 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
   FuzzConfig config;
   NiceMock<Network::MockDrainDecision> drain_close;
   NiceMock<Runtime::MockRandomGenerator> random;
-  Stats::FakeSymbolTableImpl symbol_table;
-  Http::ContextImpl http_context(symbol_table);
+  Stats::SymbolTablePtr symbol_table(Stats::SymbolTableCreator::makeSymbolTable());
+  Http::ContextImpl http_context(*symbol_table);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Upstream::MockClusterManager> cluster_manager;

@@ -31,6 +31,7 @@ namespace Envoy {
 namespace Runtime {
 
 bool runtimeFeatureEnabled(absl::string_view feature);
+uint64_t getInteger(absl::string_view feature, uint64_t default_value);
 
 using RuntimeSingleton = ThreadSafeSingleton<Loader>;
 
@@ -208,9 +209,7 @@ struct RtdsSubscription : Config::SubscriptionCallbacks, Logger::Loggable<Logger
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::service::discovery::v2::Runtime>(resource,
-                                                                           validation_visitor_)
-        .name();
+    return MessageUtil::anyConvert<envoy::service::discovery::v2::Runtime>(resource).name();
   }
 
   void start();

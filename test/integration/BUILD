@@ -33,6 +33,7 @@ envoy_cc_test_library(
         "//source/common/config:protobuf_link_hacks",
         "//source/common/config:resources_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/extensions/filters/network/redis_proxy:config",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
@@ -240,6 +241,7 @@ envoy_cc_test(
         "//source/extensions/filters/http/buffer:config",
         "//source/extensions/filters/http/dynamo:config",
         "//source/extensions/filters/http/health_check:config",
+        "//test/common/http/http2:http2_frame",
         "//test/integration/filters:metadata_stop_all_filter_config_lib",
         "//test/integration/filters:request_metadata_filter_config_lib",
         "//test/integration/filters:response_metadata_filter_config_lib",
@@ -433,6 +435,7 @@ envoy_cc_test_library(
         "//source/common/network:utility_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/stats:isolated_store_lib",
+        "//source/common/stats:symbol_table_creator_lib",
         "//source/common/stats:thread_local_store_lib",
         "//source/common/thread_local:thread_local_lib",
         "//source/common/upstream:upstream_includes",
@@ -535,6 +538,7 @@ envoy_cc_test(
     deps = [
         ":integration_lib",
         "//source/common/network:listen_socket_lib",
+        "//source/server:active_raw_udp_listener_config",
         "//test/integration/filters:udp_listener_echo_filter_lib",
         "//test/server:utility_lib",
         "//test/test_common:utility_lib",
@@ -547,6 +551,7 @@ envoy_cc_test(
     deps = [
         ":integration_lib",
         "//source/common/memory:stats_lib",
+        "//source/common/stats:symbol_table_creator_lib",
         "//source/extensions/filters/http/router:config",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//test/common/stats:stat_test_utility_lib",
@@ -768,6 +773,16 @@ envoy_cc_test(
         "//source/common/http:codec_client_lib",
         "//source/common/stats:stats_lib",
         "//test/test_common:environment_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "dynamic_validation_integration_test",
+    srcs = ["dynamic_validation_integration_test.cc"],
+    data = ["//test/config/integration:server_xds_files"],
+    deps = [
+        ":http_integration_lib",
+        "//source/common/stats:stats_lib",
     ],
 )
 

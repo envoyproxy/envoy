@@ -225,7 +225,7 @@ RetryStatus RetryStateImpl::shouldHedgeRetryPerTryTimeout(DoRetryCallback callba
   // retries are associated with a stream reset which is analogous to a gateway
   // error. When hedging on per try timeout is enabled, however, there is no
   // stream reset.
-  return shouldRetry([]() -> bool { return true; }, callback);
+  return shouldRetry(true, callback);
 }
 
 bool RetryStateImpl::wouldRetryFromHeaders(const Http::HeaderMap& response_headers) {

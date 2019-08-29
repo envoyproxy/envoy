@@ -28,10 +28,12 @@ option (gogoproto.stable_marshaler_all) = true;
 // Fields describing *upstream* interaction will explicitly include ``upstream``
 // in their name.
 
-// [#not-implemented-hide:]
 message TCPAccessLogEntry {
   // Common properties shared by all Envoy access logs.
   AccessLogCommon common_properties = 1;
+
+  // Properties of the TCP connection.
+  ConnectionProperties connection_properties = 2;
 }
 
 message HTTPAccessLogEntry {
@@ -52,6 +54,15 @@ message HTTPAccessLogEntry {
 
   // Description of the outgoing HTTP response.
   HTTPResponseProperties response = 4;
+}
+
+// Defines fields for a connection
+message ConnectionProperties {
+  // Number of bytes received from downstream.
+  uint64 received_bytes = 1;
+
+  // Number of bytes sent to downstream.
+  uint64 sent_bytes = 2;
 }
 
 // Defines fields that are shared by all Envoy access logs.

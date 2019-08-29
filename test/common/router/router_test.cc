@@ -106,13 +106,13 @@ public:
 
   void expectResponseTimerCreate() {
     response_timeout_ = new Event::MockTimer(&callbacks_.dispatcher_);
-    EXPECT_CALL(*response_timeout_, enableTimer(_));
+    EXPECT_CALL(*response_timeout_, enableTimer(_, _));
     EXPECT_CALL(*response_timeout_, disableTimer());
   }
 
   void expectPerTryTimerCreate() {
     per_try_timeout_ = new Event::MockTimer(&callbacks_.dispatcher_);
-    EXPECT_CALL(*per_try_timeout_, enableTimer(_));
+    EXPECT_CALL(*per_try_timeout_, enableTimer(_, _));
     EXPECT_CALL(*per_try_timeout_, disableTimer());
   }
 
@@ -205,6 +205,7 @@ public:
             [&](Http::StreamDecoder& decoder,
                 Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
               response_decoder_ = &decoder;
+              EXPECT_CALL(callbacks_.dispatcher_, setTrackedObject(_)).Times(testing::AtLeast(2));
               callbacks.onPoolReady(original_encoder_, cm_.conn_pool_.host_);
               return nullptr;
             }));
@@ -1142,7 +1143,7 @@ TEST_F(RouterTest, UpstreamTimeout) {
   EXPECT_CALL(*router_.retry_state_, shouldRetryReset(_, _)).Times(0);
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, _));
-  response_timeout_->callback_();
+  response_timeout_->invokeCallback();
 
   EXPECT_EQ(1U,
             cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_timeout")
@@ -1392,7 +1393,7 @@ TEST_F(RouterTest, UpstreamTimeoutWithAltResponse) {
   EXPECT_CALL(
       cm_.conn_pool_.host_->outlier_detector_,
       putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, absl::optional<uint64_t>(204)));
-  response_timeout_->callback_();
+  response_timeout_->invokeCallback();
 
   EXPECT_EQ(1U,
             cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_timeout")
@@ -1440,7 +1441,7 @@ TEST_F(RouterTest, UpstreamPerTryTimeout) {
   EXPECT_CALL(
       cm_.conn_pool_.host_->outlier_detector_,
       putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, absl::optional<uint64_t>(504)));
-  per_try_timeout_->callback_();
+  per_try_timeout_->invokeCallback();
 
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_rq_per_try_timeout")
@@ -1491,7 +1492,7 @@ TEST_F(RouterTest, UpstreamPerTryTimeoutDelayedPoolReady) {
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, _));
-  per_try_timeout_->callback_();
+  per_try_timeout_->invokeCallback();
 
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_rq_per_try_timeout")
@@ -1516,7 +1517,7 @@ TEST_F(RouterTest, UpstreamPerTryTimeoutExcludesNewStream) {
       }));
 
   response_timeout_ = new Event::MockTimer(&callbacks_.dispatcher_);
-  EXPECT_CALL(*response_timeout_, enableTimer(_));
+  EXPECT_CALL(*response_timeout_, enableTimer(_, _));
 
   EXPECT_CALL(callbacks_.stream_info_, onUpstreamHostSelected(_))
       .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host) -> void {
@@ -1531,7 +1532,7 @@ TEST_F(RouterTest, UpstreamPerTryTimeoutExcludesNewStream) {
   router_.decodeData(data, true);
 
   per_try_timeout_ = new Event::MockTimer(&callbacks_.dispatcher_);
-  EXPECT_CALL(*per_try_timeout_, enableTimer(_));
+  EXPECT_CALL(*per_try_timeout_, enableTimer(_, _));
   // The per try timeout timer should not be started yet.
   pool_callbacks->onPoolReady(encoder, cm_.conn_pool_.host_);
 
@@ -1546,7 +1547,7 @@ TEST_F(RouterTest, UpstreamPerTryTimeoutExcludesNewStream) {
       {":status", "504"}, {"content-length", "24"}, {"content-type", "text/plain"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
-  per_try_timeout_->callback_();
+  per_try_timeout_->invokeCallback();
 
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_rq_per_try_timeout")
@@ -1589,7 +1590,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutFirstRequestSucceeds) {
   NiceMock<Http::MockStreamEncoder> encoder2;
   Http::StreamDecoder* response_decoder2 = nullptr;
   router_.retry_state_->expectHedgedPerTryTimeoutRetry();
-  per_try_timeout_->callback_();
+  per_try_timeout_->invokeCallback();
 
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
@@ -1662,7 +1663,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutResetsOnBadHeaders) {
   NiceMock<Http::MockStreamEncoder> encoder2;
   Http::StreamDecoder* response_decoder2 = nullptr;
   router_.retry_state_->expectHedgedPerTryTimeoutRetry();
-  per_try_timeout_->callback_();
+  per_try_timeout_->invokeCallback();
 
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
@@ -1775,7 +1776,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutThirdRequestSucceeds) {
       }));
 
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _)).Times(0);
-  per_try_timeout_->callback_();
+  per_try_timeout_->invokeCallback();
   expectPerTryTimerCreate();
   router_.retry_state_->callback_();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
@@ -1832,7 +1833,7 @@ TEST_F(RouterTest, RetryOnlyOnceForSameUpstreamRequest) {
       cm_.conn_pool_.host_->outlier_detector_,
       putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, absl::optional<uint64_t>(504)));
   router_.retry_state_->expectHedgedPerTryTimeoutRetry();
-  per_try_timeout_->callback_();
+  per_try_timeout_->invokeCallback();
 
   NiceMock<Http::MockStreamEncoder> encoder2;
   Http::StreamDecoder* response_decoder2 = nullptr;
@@ -1859,7 +1860,7 @@ TEST_F(RouterTest, RetryOnlyOnceForSameUpstreamRequest) {
       cm_.conn_pool_.host_->outlier_detector_,
       putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, absl::optional<uint64_t>(504)));
 
-  response_timeout_->callback_();
+  response_timeout_->invokeCallback();
 }
 
 // Sequence: upstream request hits soft per try timeout and is retried, and
@@ -1896,7 +1897,7 @@ TEST_F(RouterTest, BadHeadersDroppedIfPreviousRetryScheduled) {
       cm_.conn_pool_.host_->outlier_detector_,
       putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, absl::optional<uint64_t>(504)));
   router_.retry_state_->expectHedgedPerTryTimeoutRetry();
-  per_try_timeout_->callback_();
+  per_try_timeout_->invokeCallback();
 
   expectPerTryTimerCreate();
 
@@ -1994,7 +1995,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutGlobalTimeout) {
   EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _)).Times(0);
   router_.retry_state_->expectHedgedPerTryTimeoutRetry();
-  per_try_timeout_->callback_();
+  per_try_timeout_->invokeCallback();
 
   NiceMock<Http::MockStreamEncoder> encoder2;
   Http::StreamDecoder* response_decoder2 = nullptr;
@@ -2022,7 +2023,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutGlobalTimeout) {
       .WillOnce(Invoke([&](Http::HeaderMap& headers, bool) -> void {
         EXPECT_EQ(headers.Status()->value(), "504");
       }));
-  response_timeout_->callback_();
+  response_timeout_->invokeCallback();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 2));
   EXPECT_EQ(2, cm_.conn_pool_.host_->stats_store_.counter("rq_timeout").value());
   // TODO: Verify hedge stats here once they are implemented.
@@ -2060,7 +2061,7 @@ TEST_F(RouterTest, HedgingRetriesExhaustedBadResponse) {
   EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _)).Times(0);
   router_.retry_state_->expectHedgedPerTryTimeoutRetry();
-  per_try_timeout_->callback_();
+  per_try_timeout_->invokeCallback();
 
   NiceMock<Http::MockStreamEncoder> encoder2;
   Http::StreamDecoder* response_decoder2 = nullptr;
@@ -2144,7 +2145,7 @@ TEST_F(RouterTest, HedgingRetriesProceedAfterReset) {
   EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _)).Times(0);
   router_.retry_state_->expectHedgedPerTryTimeoutRetry();
-  per_try_timeout_->callback_();
+  per_try_timeout_->invokeCallback();
 
   NiceMock<Http::MockStreamEncoder> encoder2;
   Http::StreamDecoder* response_decoder2 = nullptr;
@@ -2224,7 +2225,7 @@ TEST_F(RouterTest, HedgingRetryImmediatelyReset) {
       putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, absl::optional<uint64_t>(504)));
   EXPECT_CALL(encoder.stream_, resetStream(_)).Times(0);
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _)).Times(0);
-  per_try_timeout_->callback_();
+  per_try_timeout_->invokeCallback();
 
   NiceMock<Http::MockStreamEncoder> encoder2;
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
@@ -2367,7 +2368,7 @@ TEST_F(RouterTest, RetryUpstreamPerTryTimeout) {
   router_.retry_state_->expectResetRetry();
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, _));
-  per_try_timeout_->callback_();
+  per_try_timeout_->invokeCallback();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 
   // We expect this reset to kick off a new request.
@@ -2463,7 +2464,7 @@ TEST_F(RouterTest, DontResetStartedResponseOnUpstreamPerTryTimeout) {
   Buffer::OwnedImpl body("test body");
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
   response_decoder->decodeHeaders(std::move(response_headers), false);
-  per_try_timeout_->callback_();
+  per_try_timeout_->invokeCallback();
   EXPECT_CALL(callbacks_, encodeData(_, true));
   response_decoder->decodeData(body, true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
@@ -2611,7 +2612,7 @@ TEST_F(RouterTest, RetryTimeoutDuringRetryDelay) {
       {":status", "504"}, {"content-length", "24"}, {"content-type", "text/plain"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
-  response_timeout_->callback_();
+  response_timeout_->invokeCallback();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
 
@@ -2657,7 +2658,7 @@ TEST_F(RouterTest, RetryTimeoutDuringRetryDelayWithUpstreamRequestNoHost) {
       {":status", "504"}, {"content-length", "24"}, {"content-type", "text/plain"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
-  response_timeout_->callback_();
+  response_timeout_->invokeCallback();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
 
@@ -2704,7 +2705,7 @@ TEST_F(RouterTest, RetryTimeoutDuringRetryDelayWithUpstreamRequestNoHostAltRespo
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putResponseTime(_)).Times(0);
   Http::TestHeaderMapImpl response_headers{{":status", "204"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
-  response_timeout_->callback_();
+  response_timeout_->invokeCallback();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
 
@@ -3439,7 +3440,7 @@ TEST_F(RouterTest, UpstreamTimingTimeout) {
   response_decoder->decodeHeaders(std::move(response_headers), false);
 
   test_time_.sleep(std::chrono::milliseconds(99));
-  response_timeout_->callback_();
+  response_timeout_->invokeCallback();
 
   EXPECT_TRUE(stream_info.firstUpstreamTxByteSent().has_value());
   EXPECT_TRUE(stream_info.lastUpstreamTxByteSent().has_value());
