@@ -4696,8 +4696,8 @@ public:
     return scoped_route_config_provider2_.get();
   }
 
-  std::shared_ptr<NiceMock<Router::MockRouteConfigProvider>> route_config_provider2_;
-  std::shared_ptr<NiceMock<Router::MockScopedRouteConfigProvider>> scoped_route_config_provider2_;
+  std::shared_ptr<Router::MockRouteConfigProvider> route_config_provider2_;
+  std::shared_ptr<Router::MockScopedRouteConfigProvider> scoped_route_config_provider2_;
 };
 
 // HCM config can only have either RouteConfigProvider or ScopedRoutesConfigProvider.
@@ -4730,8 +4730,8 @@ TEST_F(HttpConnectionManagerImplDeathTest, InvalidConnectionManagerConfig) {
   EXPECT_NO_THROW(conn_manager_->onData(fake_input, false));
 
 #if !defined(NDEBUG)
+  EXPECT_CALL(*scoped_route_config_provider2_, getConfig()).WillRepeatedly(Return(nullptr));
   // ASSERT failure when SRDS provider returns a nullptr.
-  EXPECT_CALL(*scoped_route_config_provider2_, config()).WillOnce(Return(nullptr));
   EXPECT_DEBUG_DEATH(conn_manager_->onData(fake_input, false),
                      "Scoped rds provider returns null for scoped routes config.");
 #endif // !defined(NDEBUG)
