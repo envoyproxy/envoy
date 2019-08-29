@@ -56,9 +56,9 @@ void ZipkinSpan::setSampled(bool sampled) { span_.setSampled(sampled); }
 
 Tracing::SpanPtr ZipkinSpan::spawnChild(const Tracing::Config& config, const std::string& name,
                                         SystemTime start_time) {
-  SpanContext context(span_);
-  return Tracing::SpanPtr{
-      std::make_unique<ZipkinSpan>(*tracer_.startSpan(config, name, start_time, context), tracer_)};
+  SpanContext previous_context(span_);
+  return std::make_unique<ZipkinSpan>(
+      *tracer_.startSpan(config, name, start_time, previous_context), tracer_);
 }
 
 Driver::TlsTracer::TlsTracer(TracerPtr&& tracer, Driver& driver)
@@ -95,8 +95,7 @@ Driver::Driver(const envoy::config::trace::v2::ZipkinConfig& zipkin_config,
                                  trace_id_128bit, shared_span_context, time_source_);
     tracer->setReporter(
         ReporterImpl::NewInstance(std::ref(*this), std::ref(dispatcher), collector));
-    return ThreadLocal::ThreadLocalObjectSharedPtr{
-        std::make_shared<TlsTracer>(std::move(tracer), *this)};
+    return std::make_shared<TlsTracer>(std::move(tracer), *this);
   });
 }
 
@@ -121,11 +120,11 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMa
     }
 
   } catch (const ExtractorException& e) {
-    return Tracing::SpanPtr{std::make_unique<Tracing::NullSpan>()};
+    return std::make_unique<Tracing::NullSpan>();
   }
 
   // Return the active Zipkin span.
-  return ZipkinSpanPtr{std::make_unique<ZipkinSpan>(*new_zipkin_span, tracer)};
+  return std::make_unique<ZipkinSpan>(*new_zipkin_span, tracer);
 }
 
 ReporterImpl::ReporterImpl(Driver& driver, Event::Dispatcher& dispatcher,
@@ -148,7 +147,7 @@ ReporterImpl::ReporterImpl(Driver& driver, Event::Dispatcher& dispatcher,
 
 ReporterPtr ReporterImpl::NewInstance(Driver& driver, Event::Dispatcher& dispatcher,
                                       const CollectorInfo& collector) {
-  return ReporterPtr(std::make_unique<ReporterImpl>(driver, dispatcher, collector));
+  return std::make_unique<ReporterImpl>(driver, dispatcher, collector);
 }
 
 // TODO(fabolive): Need to avoid the copy to improve performance.

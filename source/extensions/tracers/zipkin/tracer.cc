@@ -56,7 +56,7 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
 }
 
 SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span_name,
-                          SystemTime timestamp, SpanContext& previous_context) {
+                          SystemTime timestamp, const SpanContext& previous_context) {
   SpanPtr span_ptr = std::make_unique<Span>(time_source_);
   Annotation annotation;
   uint64_t timestamp_micro;
