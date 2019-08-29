@@ -1,7 +1,9 @@
+#include "common/buffer/buffer_impl.h"
 #include "common/http/async_client_impl.h"
 #include "common/http/context_impl.h"
 
 #include "test/common/http/common.h"
+#include "test/mocks/buffer/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
@@ -9,6 +11,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "library/common/buffer/utility.h"
 #include "library/common/http/dispatcher.h"
 #include "library/common/http/header_utility.h"
 #include "library/common/types/c_types.h"
@@ -36,9 +39,10 @@ public:
   }
 
   typedef struct {
-    bool on_headers;
-    bool on_complete;
-    bool on_error;
+    uint32_t on_headers_calls;
+    uint32_t on_data_calls;
+    uint32_t on_complete_calls;
+    uint32_t on_error_calls;
   } callbacks_called;
 
   Stats::MockIsolatedStatsStore stats_store_;
@@ -62,18 +66,18 @@ TEST_F(DispatcherTest, BasicStreamHeadersOnly) {
   envoy_stream_t stream = 1;
   // Setup observer to handle the response headers.
   envoy_observer observer;
-  callbacks_called cc = {false, false, false};
+  callbacks_called cc = {0, 0, 0, 0};
   observer.context = &cc;
   observer.on_headers = [](envoy_headers c_headers, bool end_stream, void* context) -> void {
     ASSERT_TRUE(end_stream);
     HeaderMapPtr response_headers = Utility::toInternalHeaders(c_headers);
     EXPECT_EQ(response_headers->Status()->value().getStringView(), "200");
     callbacks_called* cc = static_cast<callbacks_called*>(context);
-    cc->on_headers = true;
+    cc->on_headers_calls++;
   };
   observer.on_complete = [](void* context) -> void {
     callbacks_called* cc = static_cast<callbacks_called*>(context);
-    cc->on_complete = true;
+    cc->on_complete_calls++;
   };
 
   // Grab the response decoder in order to dispatch responses on the stream.
@@ -111,7 +115,6 @@ TEST_F(DispatcherTest, BasicStreamHeadersOnly) {
   // Decode response headers. decodeHeaders with true will bubble up to onHeaders, which will in
   // turn cause closeRemote. Because closeLocal has already been called, cleanup will happen; hence
   // the second call to isThreadSafe.
-  // TODO: find a way to make the fact that the stream is correctly closed more explicit.
   EXPECT_CALL(event_dispatcher_, isThreadSafe()).Times(1).WillRepeatedly(Return(true));
   response_decoder_->decode100ContinueHeaders(
       HeaderMapPtr(new TestHeaderMapImpl{{":status", "100"}}));
@@ -124,25 +127,116 @@ TEST_F(DispatcherTest, BasicStreamHeadersOnly) {
                      .counter("internal.upstream_rq_200")
                      .value());
 
-  // Ensure that the on_headers on the observer was called.
-  ASSERT_TRUE(cc.on_headers);
-  ASSERT_TRUE(cc.on_complete);
+  // Ensure that the callbacks on the observer were called.
+  ASSERT_EQ(cc.on_headers_calls, 1);
+  ASSERT_EQ(cc.on_complete_calls, 1);
+  ASSERT_EQ(cc.on_data_calls, 0);
+}
+
+TEST_F(DispatcherTest, BasicStream) {
+  envoy_stream_t stream = 1;
+  // Setup observer to handle the response.
+  envoy_observer observer;
+  callbacks_called cc = {0, 0, 0, 0};
+  observer.context = &cc;
+  observer.on_headers = [](envoy_headers c_headers, bool end_stream, void* context) -> void {
+    ASSERT_FALSE(end_stream);
+    HeaderMapPtr response_headers = Utility::toInternalHeaders(c_headers);
+    EXPECT_EQ(response_headers->Status()->value().getStringView(), "200");
+    callbacks_called* cc = static_cast<callbacks_called*>(context);
+    cc->on_headers_calls++;
+  };
+  observer.on_data = [](envoy_data c_data, bool end_stream, void* context) -> void {
+    ASSERT_TRUE(end_stream);
+    ASSERT_EQ(Http::Utility::convertToString(c_data), "response body");
+    callbacks_called* cc = static_cast<callbacks_called*>(context);
+    cc->on_data_calls++;
+  };
+  observer.on_complete = [](void* context) -> void {
+    callbacks_called* cc = static_cast<callbacks_called*>(context);
+    cc->on_complete_calls++;
+  };
+
+  // Grab the response decoder in order to dispatch responses on the stream.
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](StreamDecoder& decoder,
+                           ConnectionPool::Callbacks& callbacks) -> ConnectionPool::Cancellable* {
+        callbacks.onPoolReady(stream_encoder_, cm_.conn_pool_.host_);
+        response_decoder_ = &decoder;
+        return nullptr;
+      }));
+
+  // Build a set of request headers.
+  TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  envoy_headers c_headers = Utility::toBridgeHeaders(headers);
+
+  // Build body data
+  Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
+  envoy_data c_data = Buffer::Utility::toBridgeData(request_data);
+
+  // Create a stream.
+  EXPECT_CALL(cm_, httpAsyncClientForCluster("base")).WillOnce(ReturnRef(cm_.async_client_));
+  EXPECT_CALL(cm_.async_client_, start(_, _))
+      .WillOnce(
+          WithArg<0>(Invoke([&](AsyncClient::StreamCallbacks& callbacks) -> AsyncClient::Stream* {
+            return client_.start(callbacks, AsyncClient::StreamOptions());
+          })));
+  EXPECT_EQ(http_dispatcher_.startStream(stream, observer), ENVOY_SUCCESS);
+
+  // Send request headers.
+  Event::PostCb headers_post_cb;
+  EXPECT_CALL(event_dispatcher_, post(_)).WillOnce(SaveArg<0>(&headers_post_cb));
+  http_dispatcher_.sendHeaders(stream, c_headers, false);
+
+  EXPECT_CALL(event_dispatcher_, isThreadSafe()).Times(1).WillRepeatedly(Return(true));
+  EXPECT_CALL(stream_encoder_, encodeHeaders(_, false));
+  headers_post_cb();
+
+  // Send request data.
+  Event::PostCb data_post_cb;
+  EXPECT_CALL(event_dispatcher_, post(_)).WillOnce(SaveArg<0>(&data_post_cb));
+  http_dispatcher_.sendData(stream, c_data, true);
+
+  EXPECT_CALL(event_dispatcher_, isThreadSafe()).Times(1).WillRepeatedly(Return(true));
+  EXPECT_CALL(stream_encoder_, encodeData(BufferStringEqual("request body"), true));
+  data_post_cb();
+
+  // Decode response headers and data.
+  EXPECT_CALL(event_dispatcher_, isThreadSafe()).Times(1).WillRepeatedly(Return(true));
+  response_decoder_->decode100ContinueHeaders(
+      HeaderMapPtr(new TestHeaderMapImpl{{":status", "100"}}));
+  response_decoder_->decodeHeaders(HeaderMapPtr(new TestHeaderMapImpl{{":status", "200"}}), false);
+  Buffer::InstancePtr response_data{new Buffer::OwnedImpl("response body")};
+  response_decoder_->decodeData(*response_data, true);
+
+  EXPECT_EQ(
+      1UL,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_200").value());
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                     .counter("internal.upstream_rq_200")
+                     .value());
+
+  // Ensure that the callbacks on the observer were called.
+  ASSERT_EQ(cc.on_headers_calls, 1);
+  ASSERT_EQ(cc.on_data_calls, 1);
+  ASSERT_EQ(cc.on_complete_calls, 1);
 }
 
 TEST_F(DispatcherTest, ResetStream) {
   envoy_stream_t stream = 1;
   envoy_observer observer;
-  callbacks_called cc = {false, false, false};
+  callbacks_called cc = {0, 0, 0, 0};
   observer.context = &cc;
   observer.on_error = [](envoy_error actual_error, void* context) -> void {
     envoy_error expected_error = {ENVOY_STREAM_RESET, envoy_nodata};
     ASSERT_EQ(actual_error.error_code, expected_error.error_code);
     callbacks_called* cc = static_cast<callbacks_called*>(context);
-    cc->on_error = true;
+    cc->on_error_calls++;
   };
   observer.on_complete = [](void* context) -> void {
     callbacks_called* cc = static_cast<callbacks_called*>(context);
-    cc->on_complete = true;
+    cc->on_complete_calls++;
   };
 
   EXPECT_CALL(cm_, httpAsyncClientForCluster("base")).WillOnce(ReturnRef(cm_.async_client_));
@@ -161,8 +255,8 @@ TEST_F(DispatcherTest, ResetStream) {
   post_cb();
 
   // Ensure that the on_error on the observer was called.
-  ASSERT_TRUE(cc.on_error);
-  ASSERT_FALSE(cc.on_complete);
+  ASSERT_EQ(cc.on_error_calls, 1);
+  ASSERT_EQ(cc.on_complete_calls, 0);
 }
 
 TEST_F(DispatcherTest, MultipleStreams) {
@@ -171,18 +265,18 @@ TEST_F(DispatcherTest, MultipleStreams) {
   // Start stream1.
   // Setup observer to handle the response headers.
   envoy_observer observer;
-  callbacks_called cc = {false, false, false};
+  callbacks_called cc = {0, 0, 0, 0};
   observer.context = &cc;
   observer.on_headers = [](envoy_headers c_headers, bool end_stream, void* context) -> void {
     ASSERT_TRUE(end_stream);
     HeaderMapPtr response_headers = Utility::toInternalHeaders(c_headers);
     EXPECT_EQ(response_headers->Status()->value().getStringView(), "200");
     callbacks_called* cc = static_cast<callbacks_called*>(context);
-    cc->on_headers = true;
+    cc->on_headers_calls++;
   };
   observer.on_complete = [](void* context) -> void {
     callbacks_called* cc = static_cast<callbacks_called*>(context);
-    cc->on_complete = true;
+    cc->on_complete_calls++;
   };
 
   // Grab the response decoder in order to dispatch responses on the stream.
@@ -222,7 +316,7 @@ TEST_F(DispatcherTest, MultipleStreams) {
   NiceMock<MockStreamEncoder> stream_encoder2;
   StreamDecoder* response_decoder2{};
   envoy_observer observer2;
-  callbacks_called cc2 = {false, false, false};
+  callbacks_called cc2 = {false, 0, false, false};
   observer2.context = &cc2;
   observer2.on_headers = [](envoy_headers c_headers, bool end_stream, void* context) -> void {
     ASSERT_TRUE(end_stream);
@@ -233,7 +327,7 @@ TEST_F(DispatcherTest, MultipleStreams) {
   };
   observer2.on_complete = [](void* context) -> void {
     callbacks_called* cc = static_cast<callbacks_called*>(context);
-    cc->on_complete = true;
+    cc->on_complete_calls++;
   };
 
   // Grab the response decoder in order to dispatch responses on the stream.
@@ -274,39 +368,39 @@ TEST_F(DispatcherTest, MultipleStreams) {
   HeaderMapPtr response_headers2(new TestHeaderMapImpl{{":status", "503"}});
   response_decoder2->decodeHeaders(std::move(response_headers2), true);
   // Ensure that the on_headers on the observer was called.
-  ASSERT_TRUE(cc2.on_headers);
-  ASSERT_TRUE(cc2.on_complete);
+  ASSERT_EQ(cc2.on_headers_calls, 1);
+  ASSERT_EQ(cc2.on_complete_calls, 1);
 
   // Finish stream 1.
   EXPECT_CALL(event_dispatcher_, isThreadSafe()).Times(1).WillRepeatedly(Return(true));
   HeaderMapPtr response_headers(new TestHeaderMapImpl{{":status", "200"}});
   response_decoder_->decodeHeaders(std::move(response_headers), true);
-  ASSERT_TRUE(cc.on_headers);
-  ASSERT_TRUE(cc.on_complete);
+  ASSERT_EQ(cc.on_headers_calls, 1);
+  ASSERT_EQ(cc.on_complete_calls, 1);
 }
 
 TEST_F(DispatcherTest, LocalResetAfterStreamStart) {
   envoy_stream_t stream = 1;
   envoy_observer observer;
-  callbacks_called cc = {false, false, false};
+  callbacks_called cc = {0, 0, 0, 0};
   observer.context = &cc;
 
   observer.on_error = [](envoy_error actual_error, void* context) -> void {
     envoy_error expected_error = {ENVOY_STREAM_RESET, envoy_nodata};
     ASSERT_EQ(actual_error.error_code, expected_error.error_code);
     callbacks_called* cc = static_cast<callbacks_called*>(context);
-    cc->on_error = true;
+    cc->on_error_calls++;
   };
   observer.on_headers = [](envoy_headers c_headers, bool end_stream, void* context) -> void {
     ASSERT_FALSE(end_stream);
     HeaderMapPtr response_headers = Utility::toInternalHeaders(c_headers);
     EXPECT_EQ(response_headers->Status()->value().getStringView(), "200");
     callbacks_called* cc = static_cast<callbacks_called*>(context);
-    cc->on_headers = true;
+    cc->on_headers_calls++;
   };
   observer.on_complete = [](void* context) -> void {
     callbacks_called* cc = static_cast<callbacks_called*>(context);
-    cc->on_complete = true;
+    cc->on_complete_calls++;
   };
 
   // Grab the response decoder in order to dispatch responses on the stream.
@@ -343,7 +437,7 @@ TEST_F(DispatcherTest, LocalResetAfterStreamStart) {
 
   response_decoder_->decodeHeaders(HeaderMapPtr(new TestHeaderMapImpl{{":status", "200"}}), false);
   // Ensure that the on_headers on the observer was called.
-  ASSERT_TRUE(cc.on_headers);
+  ASSERT_EQ(cc.on_headers_calls, 1);
 
   Event::PostCb reset_post_cb;
   EXPECT_CALL(event_dispatcher_, post(_)).WillOnce(SaveArg<0>(&reset_post_cb));
@@ -353,32 +447,32 @@ TEST_F(DispatcherTest, LocalResetAfterStreamStart) {
   reset_post_cb();
 
   // Ensure that the on_error on the observer was called.
-  ASSERT_TRUE(cc.on_error);
-  ASSERT_FALSE(cc.on_complete);
+  ASSERT_EQ(cc.on_error_calls, 1);
+  ASSERT_EQ(cc.on_complete_calls, 0);
 }
 
 TEST_F(DispatcherTest, RemoteResetAfterStreamStart) {
   envoy_stream_t stream = 1;
   envoy_observer observer;
-  callbacks_called cc = {false, false, false};
+  callbacks_called cc = {0, 0, 0, 0};
   observer.context = &cc;
 
   observer.on_error = [](envoy_error actual_error, void* context) -> void {
     envoy_error expected_error = {ENVOY_STREAM_RESET, envoy_nodata};
     ASSERT_EQ(actual_error.error_code, expected_error.error_code);
     callbacks_called* cc = static_cast<callbacks_called*>(context);
-    cc->on_error = true;
+    cc->on_error_calls++;
   };
   observer.on_headers = [](envoy_headers c_headers, bool end_stream, void* context) -> void {
     ASSERT_FALSE(end_stream);
     HeaderMapPtr response_headers = Utility::toInternalHeaders(c_headers);
     EXPECT_EQ(response_headers->Status()->value().getStringView(), "200");
     callbacks_called* cc = static_cast<callbacks_called*>(context);
-    cc->on_headers = true;
+    cc->on_headers_calls++;
   };
   observer.on_complete = [](void* context) -> void {
     callbacks_called* cc = static_cast<callbacks_called*>(context);
-    cc->on_complete = true;
+    cc->on_complete_calls++;
   };
 
   // Grab the response decoder in order to dispatch responses on the stream.
@@ -415,12 +509,12 @@ TEST_F(DispatcherTest, RemoteResetAfterStreamStart) {
 
   response_decoder_->decodeHeaders(HeaderMapPtr(new TestHeaderMapImpl{{":status", "200"}}), false);
   // Ensure that the on_headers on the observer was called.
-  ASSERT_TRUE(cc.on_headers);
+  ASSERT_EQ(cc.on_headers_calls, 1);
 
   stream_encoder_.getStream().resetStream(StreamResetReason::RemoteReset);
   // Ensure that the on_error on the observer was called.
-  ASSERT_TRUE(cc.on_error);
-  ASSERT_FALSE(cc.on_complete);
+  ASSERT_EQ(cc.on_error_calls, 1);
+  ASSERT_EQ(cc.on_complete_calls, 0);
 }
 
 TEST_F(DispatcherTest, DestroyWithActiveStream) {
@@ -622,6 +716,110 @@ TEST_F(DispatcherTest, DisableTimerWithStream) {
   send_headers_post_cb();
   EXPECT_CALL(event_dispatcher_, isThreadSafe()).Times(1).WillRepeatedly(Return(true));
   reset_stream_post_cb();
+}
+
+TEST_F(DispatcherTest, MultipleDataStream) {
+  envoy_stream_t stream = 1;
+  // Setup observer to handle the response.
+  envoy_observer observer;
+  callbacks_called cc = {0, 0, 0, 0};
+  observer.context = &cc;
+  observer.on_headers = [](envoy_headers c_headers, bool end_stream, void* context) -> void {
+    ASSERT_FALSE(end_stream);
+    HeaderMapPtr response_headers = Utility::toInternalHeaders(c_headers);
+    EXPECT_EQ(response_headers->Status()->value().getStringView(), "200");
+    callbacks_called* cc = static_cast<callbacks_called*>(context);
+    cc->on_headers_calls++;
+  };
+  observer.on_data = [](envoy_data, bool, void* context) -> void {
+    // TODO: assert end_stream and contents of c_data for multiple calls of on_data.
+    callbacks_called* cc = static_cast<callbacks_called*>(context);
+    cc->on_data_calls++;
+  };
+  observer.on_complete = [](void* context) -> void {
+    callbacks_called* cc = static_cast<callbacks_called*>(context);
+    cc->on_complete_calls++;
+  };
+
+  // Grab the response decoder in order to dispatch responses on the stream.
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](StreamDecoder& decoder,
+                           ConnectionPool::Callbacks& callbacks) -> ConnectionPool::Cancellable* {
+        callbacks.onPoolReady(stream_encoder_, cm_.conn_pool_.host_);
+        response_decoder_ = &decoder;
+        return nullptr;
+      }));
+
+  // Build a set of request headers.
+  TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  envoy_headers c_headers = Utility::toBridgeHeaders(headers);
+
+  // Build first body data
+  Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
+  envoy_data c_data = Buffer::Utility::toBridgeData(request_data);
+
+  // Build second body data
+  Buffer::OwnedImpl request_data2 = Buffer::OwnedImpl("request body2");
+  envoy_data c_data2 = Buffer::Utility::toBridgeData(request_data2);
+
+  // Create a stream.
+  EXPECT_CALL(cm_, httpAsyncClientForCluster("base")).WillOnce(ReturnRef(cm_.async_client_));
+  EXPECT_CALL(cm_.async_client_, start(_, _))
+      .WillOnce(
+          WithArg<0>(Invoke([&](AsyncClient::StreamCallbacks& callbacks) -> AsyncClient::Stream* {
+            return client_.start(callbacks, AsyncClient::StreamOptions());
+          })));
+  EXPECT_EQ(http_dispatcher_.startStream(stream, observer), ENVOY_SUCCESS);
+
+  // Send request headers.
+  Event::PostCb headers_post_cb;
+  EXPECT_CALL(event_dispatcher_, post(_)).WillOnce(SaveArg<0>(&headers_post_cb));
+  http_dispatcher_.sendHeaders(stream, c_headers, false);
+
+  EXPECT_CALL(event_dispatcher_, isThreadSafe()).Times(1).WillRepeatedly(Return(true));
+  EXPECT_CALL(stream_encoder_, encodeHeaders(_, false));
+  headers_post_cb();
+
+  // Send request data.
+  Event::PostCb data_post_cb;
+  EXPECT_CALL(event_dispatcher_, post(_)).WillOnce(SaveArg<0>(&data_post_cb));
+  http_dispatcher_.sendData(stream, c_data, false);
+
+  EXPECT_CALL(event_dispatcher_, isThreadSafe()).Times(1).WillRepeatedly(Return(true));
+  EXPECT_CALL(stream_encoder_, encodeData(BufferStringEqual("request body"), false));
+  data_post_cb();
+
+  // Send second request data.
+  Event::PostCb data_post_cb2;
+  EXPECT_CALL(event_dispatcher_, post(_)).WillOnce(SaveArg<0>(&data_post_cb2));
+  http_dispatcher_.sendData(stream, c_data2, true);
+
+  EXPECT_CALL(event_dispatcher_, isThreadSafe()).Times(1).WillRepeatedly(Return(true));
+  EXPECT_CALL(stream_encoder_, encodeData(BufferStringEqual("request body2"), true));
+  data_post_cb2();
+
+  // Decode response headers and data.
+  EXPECT_CALL(event_dispatcher_, isThreadSafe()).Times(1).WillRepeatedly(Return(true));
+  response_decoder_->decode100ContinueHeaders(
+      HeaderMapPtr(new TestHeaderMapImpl{{":status", "100"}}));
+  response_decoder_->decodeHeaders(HeaderMapPtr(new TestHeaderMapImpl{{":status", "200"}}), false);
+  Buffer::InstancePtr response_data{new Buffer::OwnedImpl("response body")};
+  response_decoder_->decodeData(*response_data, false);
+  Buffer::InstancePtr response_data2{new Buffer::OwnedImpl("response body2")};
+  response_decoder_->decodeData(*response_data2, true);
+
+  EXPECT_EQ(
+      1UL,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_200").value());
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                     .counter("internal.upstream_rq_200")
+                     .value());
+
+  // Ensure that the callbacks on the observer were called.
+  ASSERT_EQ(cc.on_headers_calls, 1);
+  ASSERT_EQ(cc.on_data_calls, 2);
+  ASSERT_EQ(cc.on_complete_calls, 1);
 }
 
 } // namespace Http
