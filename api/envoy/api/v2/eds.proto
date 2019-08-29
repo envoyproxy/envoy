@@ -123,6 +123,8 @@ message ClusterLoadAssignment {
     // failover as certain priority level or locality become unhealthy slowly.
     // Otherwise Envoy will do graceful failover as overprovisioning_factor
     // suggests.
+    // [#next-major-version: Unify with overprovisioning config as a single message.]
+    // [#not-implemented-hide:]
     bool disable_overprovisioning = 5;
   }
 
