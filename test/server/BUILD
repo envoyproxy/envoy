@@ -58,6 +58,7 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:network_utility_lib",
+        "//test/test_common:threadsafe_singleton_injector_lib",
     ],
 )
 
