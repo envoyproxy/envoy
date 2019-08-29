@@ -5,8 +5,8 @@ use("github.com/repokitteh/modules/circleci.star", secret_token=get_secret('circ
 use(
   "github.com/repokitteh/modules/ownerscheck.star#itay/s",
   paths=[
-    ("rktest1", "api/"),
-    ("itayd", ""),
+    ("rktest1!", "api/"),
+    ("itayd!", ""),
   ],
 )
 
