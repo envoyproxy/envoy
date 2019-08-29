@@ -233,11 +233,16 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
     if (listener_name.empty()) {
       listener_name = UdpListenerNames::get().RawUdp;
     }
-    udp_listener_factory_ =
-        Config::Utility::getAndCheckFactory<ActiveUdpListenerConfigFactory>(listener_name)
-            .createActiveUdpListenerFactory(config.has_udp_listener_config()
-                                                ? config.udp_listener_config()
-                                                : envoy::api::v2::listener::UdpListenerConfig());
+    try {
+      udp_listener_factory_ =
+          Config::Utility::getAndCheckFactory<ActiveUdpListenerConfigFactory>(listener_name)
+              .createActiveUdpListenerFactory(config.has_udp_listener_config()
+                                                  ? config.udp_listener_config()
+                                                  : envoy::api::v2::listener::UdpListenerConfig());
+    } catch (EnvoyException ex) {
+      // TODO(danzh): add implementation for quic_listener.
+      ENVOY_LOG(error, "{}", ex.what());
+    }
   }
 
   if (!config.listener_filters().empty()) {
@@ -299,10 +304,9 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
       parent_.server_.random(), parent_.server_.stats(), parent_.server_.singletonManager(),
       parent_.server_.threadLocal(), validation_visitor, parent_.server_.api());
   factory_context.setInitManager(initManager());
-  bool is_quic =
-      socket_type_ == Network::Address::SocketType::Datagram; //&& config.has_udp_factory_config()
-                                                              //&& config.udp_factory_config.name()
-                                                              // == "quic_listener";
+  bool is_quic = socket_type_ == Network::Address::SocketType::Datagram &&
+                 config.has_udp_listener_config() &&
+                 config.udp_listener_config().udp_listener_name() == UdpListenerNames::get().Quic;
   ListenerFilterChainFactoryBuilder builder(*this, factory_context, is_quic);
   filter_chain_manager_.addFilterChain(config.filter_chains(), builder);
   const bool need_tls_inspector =
@@ -856,6 +860,7 @@ std::unique_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFi
         parent_.parent_.factory_.createNetworkFilterFactoryList(filter_chain.filters(), parent_));
   }
 
+  // Initialize filter chain for QUIC.
   if (!filter_chain.has_tls_context()) {
     return nullptr;
   }

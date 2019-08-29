@@ -249,8 +249,8 @@ public:
     EXPECT_CALL(os_sys_calls,
                 setsockopt_(_, expected_sockopt_level, expected_sockopt_name, _, sizeof(int)))
         .Times(expected_num_calls)
-        .WillRepeatedly(Invoke(
-            [expected_value](int fd, int level, int name, const void* optval, socklen_t) -> int {
+        .WillRepeatedly(
+            Invoke([expected_value](int, int, int, const void* optval, socklen_t) -> int {
               EXPECT_EQ(expected_value, *static_cast<const int*>(optval));
               return 0;
             }));
@@ -373,7 +373,7 @@ filter_chains:
   EXPECT_TRUE(filter_chain->transportSocketFactory()->implementsSecureTransport());
 }
 
-TEST_F(ListenerManagerImplWithRealFiltersTest, UdpUsesSslContext) {
+TEST_F(ListenerManagerImplWithRealFiltersTest, QuicUsesSslContext) {
   NiceMock<Api::MockOsSysCalls> os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
   const std::string yaml = TestEnvironment::substitute(R"EOF(
@@ -399,8 +399,11 @@ filter_chains:
         verify_subject_alt_name:
         - localhost
         - 127.0.0.1
+udp_listener_config:
+  udp_listener_name: "quic_listener"
   )EOF",
                                                        Network::Address::IpVersion::v4);
+  std::cerr << "yaml " << yaml << "\n";
 
   expectCreateListenSocket(envoy::api::v2::core::SocketOption::STATE_PREBIND,
 #ifdef SO_RXQ_OVFL
@@ -428,9 +431,9 @@ filter_chains:
 
   auto filter_chain = dynamic_cast<const QuicFilterChainImpl*>(
       findFilterChain(1234, "127.0.0.1", "", "quic", {}, "8.8.8.8", 111));
-  ASSERT_NE(filter_chain, nullptr);
+  ASSERT_NE(nullptr, filter_chain);
   EXPECT_EQ(nullptr, filter_chain->transportSocketFactory());
-  EXPECT_NE(nullptr, filter_chain->tls_context_config());
+  EXPECT_NE(nullptr, filter_chain->tlsContextConfig());
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
