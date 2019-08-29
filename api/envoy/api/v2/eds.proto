@@ -117,6 +117,13 @@ message ClusterLoadAssignment {
     // are considered stale and should be marked unhealthy.
     // Defaults to 0 which means endpoints never go stale.
     google.protobuf.Duration endpoint_stale_after = 4 [(validate.rules).duration.gt.seconds = 0];
+
+    // The flag to disable overprovisioning. If it is set to true,
+    // overprovisioning_factor will be ignored and Envoy will not do graceful
+    // failover as certain priority level or locality become unhealthy slowly.
+    // Otherwise Envoy will do graceful failover as overprovisioning_factor
+    // suggests.
+    bool disable_overprovisioning = 5;
   }
 
   // Load balancing policy settings.
