@@ -64,7 +64,7 @@ InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_syste
       api_(new Api::Impl(thread_factory, store, time_system, file_system)),
       dispatcher_(api_->allocateDispatcher()),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
-      handler_(new ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
+      handler_(new ConnectionHandlerImpl(*dispatcher_, "main_thread")),
       random_generator_(std::move(random_generator)), listener_component_factory_(*this),
       worker_factory_(thread_local_, *api_, hooks),
       dns_resolver_(dispatcher_->createDnsResolver({})),
@@ -530,7 +530,8 @@ void InstanceImpl::run() {
 
   // Run the main dispatch loop waiting to exit.
   ENVOY_LOG(info, "starting main dispatch loop");
-  auto watchdog = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId());
+  auto watchdog =
+      guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "main_thread");
   watchdog->startWatchdog(*dispatcher_);
   dispatcher_->post([this] { notifyCallbacksForStage(Stage::Startup); });
   dispatcher_->run(Event::Dispatcher::RunType::Block);

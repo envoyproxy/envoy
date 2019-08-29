@@ -52,6 +52,25 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, IntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+// Make sure we have correctly specified per-worker performance stats.
+TEST_P(IntegrationTest, PerWorkerStats) {
+  initialize();
+
+  // Per-worker listener stats.
+  if (GetParam() == Network::Address::IpVersion::v4) {
+    EXPECT_NE(nullptr, test_server_->counter("listener.127.0.0.1_0.worker_0.downstream_cx_total"));
+  } else {
+    EXPECT_NE(nullptr, test_server_->counter("listener.[__1]_0.worker_0.downstream_cx_total"));
+  }
+
+  // Main thread admin listener stats.
+  EXPECT_NE(nullptr, test_server_->counter("listener.admin.main_thread.downstream_cx_total"));
+
+  // Per-thread watchdog stats.
+  EXPECT_NE(nullptr, test_server_->counter("server.main_thread.watchdog_miss"));
+  EXPECT_NE(nullptr, test_server_->counter("server.worker_0.watchdog_miss"));
+}
+
 TEST_P(IntegrationTest, RouterDirectResponse) {
   const std::string body = "Response body";
   const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", body);

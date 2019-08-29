@@ -193,7 +193,8 @@ public:
   ~MockGuardDog() override;
 
   // Server::GuardDog
-  MOCK_METHOD1(createWatchDog, WatchDogSharedPtr(Thread::ThreadId));
+  MOCK_METHOD2(createWatchDog,
+               WatchDogSharedPtr(Thread::ThreadId thread_id, const std::string& thread_name));
   MOCK_METHOD1(stopWatching, void(WatchDogSharedPtr wd));
 
   std::shared_ptr<MockWatchDog> watch_dog_;
@@ -293,7 +294,9 @@ public:
   ~MockWorkerFactory() override;
 
   // Server::WorkerFactory
-  WorkerPtr createWorker(OverloadManager&) override { return WorkerPtr{createWorker_()}; }
+  WorkerPtr createWorker(OverloadManager&, const std::string&) override {
+    return WorkerPtr{createWorker_()};
+  }
 
   MOCK_METHOD0(createWorker_, Worker*());
 };

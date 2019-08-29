@@ -11,7 +11,7 @@ class ActiveRawUdpListenerFactory : public Network::ActiveUdpListenerFactory {
 public:
   Network::ConnectionHandler::ActiveListenerPtr
   createActiveUdpListener(Network::ConnectionHandler& parent, Event::Dispatcher& disptacher,
-                          spdlog::logger& logger, Network::ListenerConfig& config) const override;
+                          Network::ListenerConfig& config) const override;
 };
 
 // This class uses a protobuf config to create a UDP listener factory which
