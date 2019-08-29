@@ -86,6 +86,7 @@ PROTO_RST="
   /envoy/config/accesslog/v2/als/envoy/config/accesslog/v2/als.proto.rst
   /envoy/config/accesslog/v2/file/envoy/config/accesslog/v2/file.proto.rst
   /envoy/config/bootstrap/v2/bootstrap/envoy/config/bootstrap/v2/bootstrap.proto.rst
+  /envoy/config/cluster/aggregate/cluster/envoy/config/cluster/aggregate/cluster.proto.rst
   /envoy/config/cluster/dynamic_forward_proxy/v2alpha/cluster/envoy/config/cluster/dynamic_forward_proxy/v2alpha/cluster.proto.rst
   /envoy/config/cluster/redis/redis_cluster/envoy/config/cluster/redis/redis_cluster.proto.rst
   /envoy/config/common/dynamic_forward_proxy/v2alpha/dns_cache/envoy/config/common/dynamic_forward_proxy/v2alpha/dns_cache.proto.rst
