@@ -26,6 +26,7 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_dispatcher.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_fake_proof_source.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_alarm_factory.h"
+#include "extensions/transport_sockets/well_known_names.h"
 #include "server/configuration_impl.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -154,6 +155,8 @@ TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponCHLO) {
   EXPECT_CALL(filter_chain_manager, findFilterChain(_))
       .WillOnce(Invoke([&](const Network::ConnectionSocket& socket) {
         EXPECT_EQ(*listen_socket_->localAddress(), *socket.localAddress());
+        EXPECT_EQ(Extensions::TransportSockets::TransportSocketNames::get().Quic,
+                  socket.detectedTransportProtocol());
         EXPECT_EQ(peer_addr, envoyAddressInstanceToQuicSocketAddress(socket.remoteAddress()));
         return &filter_chain;
       }));

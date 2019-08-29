@@ -4,6 +4,7 @@
 
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
 #include "extensions/quic_listeners/quiche/quic_io_handle_wrapper.h"
+#include "extensions/transport_sockets/well_known_names.h"
 
 namespace Envoy {
 namespace Quic {
@@ -31,6 +32,8 @@ bool EnvoyQuicConnection::OnPacketHeader(const quic::QuicPacketHeader& header) {
         // the real IoHandle won't be affected.
         std::make_unique<QuicIoHandleWrapper>(listener_config_.socket().ioHandle()),
         std::move(local_addr), std::move(remote_addr));
+    connection_socket_->setDetectedTransportProtocol(
+        Extensions::TransportSockets::TransportSocketNames::get().Quic);
 
     filter_chain_ = listener_config_.filterChainManager().findFilterChain(*connection_socket_);
     if (filter_chain_ == nullptr) {

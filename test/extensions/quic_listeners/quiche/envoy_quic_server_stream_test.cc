@@ -165,7 +165,16 @@ TEST_P(EnvoyQuicServerStreamTest, DecodeHeadersBodyAndTrailers) {
   quic_stream_.OnStreamHeaderList(/*fin=*/false, headers_.uncompressed_header_bytes(), headers_);
   EXPECT_TRUE(quic_stream_.FinishedReadingHeaders());
 
-  quic::QuicStreamFrame frame(stream_id_, false, 0, request_body_);
+  std::string data = request_body_;
+  if (quic_version_.transport_version == quic::QUIC_VERSION_99) {
+    std::unique_ptr<char[]> data_buffer;
+    quic::HttpEncoder encoder;
+    quic::QuicByteCount data_frame_header_length =
+        encoder.SerializeDataFrameHeader(request_body_.length(), &data_buffer);
+    quic::QuicStringPiece data_frame_header(data_buffer.get(), data_frame_header_length);
+    data = absl::StrCat(data_frame_header, request_body_);
+  }
+  quic::QuicStreamFrame frame(stream_id_, false, 0, data);
   EXPECT_CALL(stream_decoder_, decodeData(_, _))
       .Times(testing::AtMost(2))
       .WillOnce(Invoke([this](Buffer::Instance& buffer, bool finished_reading) {
