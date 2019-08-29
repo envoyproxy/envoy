@@ -15,6 +15,7 @@ envoy_cc_test(
         "@envoy//source/common/http:async_client_lib",
         "@envoy//source/common/http:context_lib",
         "@envoy//test/common/http:common_lib",
+        "@envoy//test/mocks/buffer:buffer_mocks",
         "@envoy//test/mocks/event:event_mocks",
         "@envoy//test/mocks/local_info:local_info_mocks",
         "@envoy//test/mocks/upstream:upstream_mocks",
@@ -26,8 +27,10 @@ envoy_cc_test(
     srcs = ["header_utility_test.cc"],
     repository = "@envoy",
     deps = [
+        "//library/common/buffer:utility_lib",
         "//library/common/http:header_utility_lib",
         "//library/common/types:c_types_lib",
+        "@envoy//source/common/buffer:buffer_lib",
         "@envoy//source/common/http:header_map_lib",
     ],
 )
