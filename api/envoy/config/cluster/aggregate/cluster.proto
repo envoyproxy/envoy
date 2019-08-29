@@ -12,6 +12,7 @@ import "google/protobuf/wrappers.proto";
 import "validate/validate.proto";
 
 // [#protodoc-title: Aggregate cluster configuration]
+
 // Configuration for the aggregate cluster. See the :ref:`architecture overview
 // <arch_overview_aggregate_cluster>` for more information.
 message ClusterConfig {

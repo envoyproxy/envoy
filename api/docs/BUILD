@@ -34,6 +34,7 @@ proto_library(
         "//envoy/config/accesslog/v2:als",
         "//envoy/config/accesslog/v2:file",
         "//envoy/config/bootstrap/v2:bootstrap",
+        "//envoy/config/cluster/aggregate:cluster",
         "//envoy/config/cluster/dynamic_forward_proxy/v2alpha:cluster",
         "//envoy/config/cluster/redis:redis_cluster",
         "//envoy/config/common/dynamic_forward_proxy/v2alpha:dns_cache",
