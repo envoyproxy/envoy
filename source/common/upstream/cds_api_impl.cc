@@ -68,6 +68,9 @@ void CdsApiImpl::onConfigUpdate(
     }
   });
 
+  ENVOY_LOG(info, "cds: add {} cluster(s), remove {} cluster(s)", added_resources.size(),
+            removed_resources.size());
+
   std::vector<std::string> exception_msgs;
   std::unordered_set<std::string> cluster_names;
   bool any_applied = false;

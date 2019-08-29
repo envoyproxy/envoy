@@ -287,6 +287,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     access_logs_.push_back(current_access_log);
   }
 
+  server_transformation_ = config.server_header_transformation();
+
   if (!config.server_name().empty()) {
     server_name_ = config.server_name();
   } else {

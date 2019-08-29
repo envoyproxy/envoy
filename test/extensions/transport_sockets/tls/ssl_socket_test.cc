@@ -699,7 +699,8 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
   dispatcher->run(Event::Dispatcher::RunType::Block);
 
   if (!options.expectedServerStats().empty()) {
-    EXPECT_EQ(1UL, server_stats_store.counter(options.expectedServerStats()).value());
+    EXPECT_EQ(1UL, server_stats_store.counter(options.expectedServerStats()).value())
+        << options.expectedServerStats();
   }
 
   if (!options.expectedClientStats().empty()) {

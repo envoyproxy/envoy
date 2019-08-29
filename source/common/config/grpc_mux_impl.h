@@ -135,7 +135,7 @@ public:
   }
   void pause(const std::string&) override {}
   void resume(const std::string&) override {}
-  bool paused(const std::string&) const override { NOT_REACHED_GCOVR_EXCL_LINE; }
+  bool paused(const std::string&) const override { false; }
 
   Watch* addOrUpdateWatch(const std::string&, Watch*, const std::set<std::string>&,
                           SubscriptionCallbacks&, std::chrono::milliseconds) override {

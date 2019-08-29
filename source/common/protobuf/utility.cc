@@ -192,7 +192,11 @@ void MessageUtil::checkForDeprecation(const Protobuf::Message& message, Runtime:
       continue;
     }
 
+#ifdef ENVOY_DISABLE_DEPRECATED_FEATURES
+    bool warn_only = false;
+#else
     bool warn_only = true;
+#endif
     absl::string_view filename = filenameFromPath(field->file()->name());
     // Allow runtime to be null both to not crash if this is called before server initialization,
     // and so proto validation works in context where runtime singleton is not set up (e.g.
