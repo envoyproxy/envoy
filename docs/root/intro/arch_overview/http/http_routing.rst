@@ -58,9 +58,24 @@ Scoped routing enables Envoy to put constraints on search space of domains and r
 A :ref:`Routeing Scope<envoy_api_msg_ScopedRouteConfiguration>` associates a key with a :ref:`route table <arch_overview_http_routing_route_table>`.
 For each request, a scope key is computed dynamically by the HTTP connection manager to pick the :ref:`route table<envoy_api_msg_RouteConfiguration>`.
 
-The Scoped RDS (SRDS) API contains a set of Scopes resources, each defining independent routing configuration,
+The Scoped RDS (SRDS) API contains a set of :ref:`Scopes <envoy_api_msg_ScopedRouteConfiguration>` resources, each defining independent routing configuration,
 along with a :ref:`ScopeKeyBuilder <envoy_api_msg_config.filter.network.http_connection_manager.v2.ScopedRoutes.ScopeKeyBuilder>`
 defining the key construction algorithm used by Envoy to look up the scope corresponding to each request.
+
+For example, for the following scoped route configuration, Envoy  will look into the "addr" header value, split the header value by ";" first, and use the first value for key 'x-foo-key' as the scope key.
+If the "addr" header value is "foo=1;x-foo-key=127.0.0.1;x-bar-key=1.1.1.1", then "127.0.0.1" will be computed as the scope key to look up for corresponding route configuration.
+
+.. code-block:: yaml
+
+name: 'scope_by_addr'
+fragments:
+  - header_value_extractor:
+      name: Addr
+      element_separator: ;
+      element:
+        key: x-foo-key
+        separator: =
+
 
 .. _arch_overview_http_routing_route_table:
 

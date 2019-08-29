@@ -4535,34 +4535,6 @@ TEST_F(HttpConnectionManagerImplTest, TestSRDSRouteNotFound) {
   EXPECT_EQ(response_body, "route scope not found");
 }
 
-// SRDS provider not returning a ScopedConfig.
-TEST_F(HttpConnectionManagerImplTest, TestNoSRDSRouteConfig) {
-  setup(false, "", true, true);
-
-  EXPECT_CALL(*static_cast<Router::MockScopedRouteConfigProvider*>(scopedRouteConfigProvider()),
-              getConfig())
-      .WillOnce(Return(nullptr));
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
-    StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
-    HeaderMapPtr headers{
-        new TestHeaderMapImpl{{":authority", "host"}, {":method", "GET"}, {":path", "/foo"}}};
-    decoder->decodeHeaders(std::move(headers), true);
-    data.drain(4);
-  }));
-
-  EXPECT_CALL(response_encoder_, encodeHeaders(_, false))
-      .WillOnce(Invoke([](const HeaderMap& headers, bool) -> void {
-        EXPECT_EQ("500", headers.Status()->value().getStringView());
-      }));
-
-  std::string response_body;
-  EXPECT_CALL(response_encoder_, encodeData(_, true)).WillOnce(AddBufferToString(&response_body));
-
-  Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input, false);
-  EXPECT_EQ(response_body, "unable to get route configuration");
-}
-
 // SRDS updating scopes affects routing.
 TEST_F(HttpConnectionManagerImplTest, TestSRDSUpdate) {
   setup(false, "", true, true);
@@ -4756,6 +4728,13 @@ TEST_F(HttpConnectionManagerImplDeathTest, InvalidConnectionManagerConfig) {
   route_config_provider2_.reset();
   // Only scoped route config provider valid.
   EXPECT_NO_THROW(conn_manager_->onData(fake_input, false));
+
+#if !defined(NDEBUG)
+  // ASSERT faiure when SRDS provider returns a nullptr.
+  EXPECT_CALL(*scoped_route_config_provider2_, config()).WillOnce(Return(nullptr));
+  EXPECT_DEBUG_DEATH(conn_manager_->onData(fake_input, false),
+                     "Scoped rds provider returns null for scoped routes config.");
+#endif // !defined(NDEBUG)
 }
 
 } // namespace Http

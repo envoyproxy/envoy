@@ -450,6 +450,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   } else if (connection_manager.config_.scopedRouteConfigProvider() != nullptr) {
     snapped_scoped_routes_config_ =
         connection_manager_.config_.scopedRouteConfigProvider()->config<Router::ScopedConfig>();
+    ASSERT(snapped_scoped_routes_config_ != nullptr,
+           "Scoped rds provider returns null for scoped routes config.");
   }
   ScopeTrackerScopeState scope(this,
                                connection_manager_.read_callbacks_->connection().dispatcher());
@@ -1247,18 +1249,7 @@ void ConnectionManagerImpl::startDrainSequence() {
 bool ConnectionManagerImpl::ActiveStream::snapScopedRouteConfig() {
   ASSERT(request_headers_ != nullptr,
          "Try to snap scoped route config when there is no request headers.");
-  if (snapped_scoped_routes_config_ == nullptr) {
-    ENVOY_STREAM_LOG(trace, "snapped scoped routes config is null when SRDS is enabled.", *this);
-    // Stop decoding now.
-    // TODO(stevenzzzz): also look into the order priority of this sendLocalReply,
-    // connection should be closed properly here.
-    maybeEndDecode(true);
-    sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_),
-                   Http::Code::InternalServerError, "unable to get route configuration", nullptr,
-                   is_head_request_, absl::nullopt,
-                   StreamInfo::ResponseCodeDetails::get().RouteConfigurationNotFound);
-    return false;
-  }
+
   snapped_route_config_ = snapped_scoped_routes_config_->getRouteConfig(*request_headers_);
   // NOTE: if a RDS subscription hasn't got a RouteConfiguration back, a Router::NullConfigImpl is
   // returned, in that case we let it pass.
