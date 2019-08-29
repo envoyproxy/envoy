@@ -219,7 +219,7 @@ HostVector filterHosts(const std::unordered_set<HostSharedPtr>& hosts,
 Host::CreateConnectionData HostImpl::createConnection(
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsSharedPtr transport_socket_options) const {
-  return {createConnection(dispatcher, *cluster_, address_, *metadata_, options, transport_socket_options),
+  return {createConnection(dispatcher, *cluster_, address_, *metadata(), options, transport_socket_options),
           shared_from_this()};
 }
 
@@ -243,7 +243,7 @@ void HostImpl::setEdsHealthFlag(envoy::api::v2::core::HealthStatus health_status
 
 Host::CreateConnectionData
 HostImpl::createHealthCheckConnection(Event::Dispatcher& dispatcher) const {
-  return {createConnection(dispatcher, *cluster_, healthCheckAddress(), metadata_, nullptr, nullptr),
+  return {createConnection(dispatcher, *cluster_, healthCheckAddress(), *metadata(), nullptr, nullptr),
           shared_from_this()};
 }
 
@@ -590,7 +590,7 @@ private:
 ClusterInfoImpl::ClusterInfoImpl(
     const envoy::api::v2::Cluster& config, const envoy::api::v2::core::BindConfig& bind_config,
     Runtime::Loader& runtime, Network::TransportSocketFactoryPtr&& socket_factory,
-    TransportSocketOverridePtr&& socket_overrides,
+    TransportSocketOverridesPtr&& socket_overrides,
     Stats::ScopePtr&& stats_scope, bool added_via_api,
     ProtobufMessage::ValidationVisitor& validation_visitor,
     Server::Configuration::TransportSocketFactoryContext& factory_context)
@@ -601,8 +601,9 @@ ClusterInfoImpl::ClusterInfoImpl(
           std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(config, connect_timeout))),
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
-      transport_socket_factory_(std::move(socket_factory)), stats_scope_(std::move(stats_scope)),
+      transport_socket_factory_(std::move(socket_factory)),
       socket_overrides_(std::move(socket_overrides)),
+      stats_scope_(std::move(stats_scope)),
       stats_(generateStats(*stats_scope_)),
       load_report_stats_(generateLoadReportStats(load_report_stats_store_)),
       features_(parseFeatures(config)),
@@ -748,33 +749,28 @@ Network::TransportSocketFactoryPtr createTransportSocketFactory(
 TransportSocketOverridesPtr createTransportSocketOverrides(
     const envoy::api::v2::Cluster& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context) {
+  // If the cluster config doesn't have a transport socket configured, override with the default
+  // transport socket implementation based on the tls_context. We copy by value first then override
+  // if necessary.
+  auto transport_socket = config.transport_socket();
+  if (!config.has_transport_socket()) {
+    if (config.has_tls_context()) {
+      transport_socket.set_name(Extensions::TransportSockets::TransportSocketNames::get().Tls);
+      MessageUtil::jsonConvert(config.tls_context(), *transport_socket.mutable_config());
+    } else {
+      transport_socket.set_name(
+          Extensions::TransportSockets::TransportSocketNames::get().RawBuffer);
+    }
+  }
   auto& config_factory = Config::Utility::getAndCheckFactory<
       Server::Configuration::UpstreamTransportSocketConfigFactory>(transport_socket.name());
   ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
       transport_socket, factory_context.messageValidationVisitor(), config_factory);
-  auto default_transport_socket = config_factory.createTransportSocketFactory(*message, factory_context);
-  std::map<std::string, Network::TransportSocketFactoryPtr>&& factory_overrides;
-  TransportSocketOverridesPtr socket_overrides(default_socket_factory, std::move(factory_overrides));
-  return socket_overrides;
-  // If the cluster config doesn't have a transport socket configured, override with the default
-  // transport socket implementation based on the tls_context. We copy by value first then override
-  // if necessary.
-  //auto transport_socket = config.transport_socket();
-  //if (!config.has_transport_socket()) {
-    //if (config.has_tls_context()) {
-      //transport_socket.set_name(Extensions::TransportSockets::TransportSocketNames::get().Tls);
-      //MessageUtil::jsonConvert(config.tls_context(), *transport_socket.mutable_config());
-    //} else {
-      //transport_socket.set_name(
-          //Extensions::TransportSockets::TransportSocketNames::get().RawBuffer);
-    //}
-  //}
-
-  //auto& config_factory = Config::Utility::getAndCheckFactory<
-      //Server::Configuration::UpstreamTransportSocketConfigFactory>(transport_socket.name());
-  //ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-      //transport_socket, factory_context.messageValidationVisitor(), config_factory);
-  //return config_factory.createTransportSocketFactory(*message, factory_context);
+  // TODO(incfly): later, use the only one default factory, not over creating.
+  auto default_socket_factory = config_factory.createTransportSocketFactory(*message, factory_context);
+  // TODO implement this.
+  return std::make_unique<TransportSocketOverrides>(std::move(default_socket_factory),
+        std::map<std::string, Network::TransportSocketFactoryPtr>());
 }
 
 void ClusterInfoImpl::createNetworkFilterChain(Network::Connection& connection) const {

@@ -782,6 +782,13 @@ public:
   virtual Network::TransportSocketFactory& transportSocketFactory() const PURE;
 
   /**
+   * @return Network::TransportSocketFactory& the factory of transport socket to use when
+   *         communicating with the cluster.
+   */
+  virtual Network::TransportSocketFactory& resolveTransportSocketFactory(
+      const envoy::api::v2::core::Metadata& metadata) const PURE;
+
+  /**
    * @return ClusterStats& strongly named stats for this cluster.
    */
   virtual ClusterStats& stats() const PURE;

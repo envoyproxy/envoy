@@ -52,7 +52,7 @@ service ClusterDiscoveryService {
 // [#protodoc-title: Clusters]
 
 // Configuration for a single upstream cluster.
-// [#comment:next free field: 41]
+// [#comment:next free field: 42]
 message Cluster {
   // Supplies the name of the cluster which must be unique across all clusters.
   // The cluster name is used when emitting
@@ -233,6 +233,8 @@ message Cluster {
   //   :ref:`trusted_ca<envoy_api_field_auth.CertificateValidationContext.trusted_ca>` to enable
   //   verification.
   auth.UpstreamTlsContext tls_context = 11;
+
+  map<string, auth.UpstreamTlsContext> tls_context_overrides = 41;
 
   reserved 12;
 

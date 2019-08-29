@@ -511,6 +511,7 @@ public:
   ClusterInfoImpl(const envoy::api::v2::Cluster& config,
                   const envoy::api::v2::core::BindConfig& bind_config, Runtime::Loader& runtime,
                   Network::TransportSocketFactoryPtr&& socket_factory,
+                  TransportSocketOverridesPtr&& socket_overrides,
                   Stats::ScopePtr&& stats_scope, bool added_via_api,
                   ProtobufMessage::ValidationVisitor& validation_visitor,
                   Server::Configuration::TransportSocketFactoryContext&);
@@ -563,7 +564,7 @@ public:
     return *transport_socket_factory_;
   }
   Network::TransportSocketFactory& resolveTransportSocketFactory(
-      const envoy::api::v2::core::Metadata& metadata) {
+      const envoy::api::v2::core::Metadata& metadata) const override {
     return socket_overrides_->resolve(metadata);
   }
   ClusterStats& stats() const override { return stats_; }
