@@ -65,10 +65,12 @@ class RouterCheckTool : Logger::Loggable<Logger::Id::testing> {
 public:
   /**
    * @param router_config_file v2 router config file.
+   * @param disableDeprecationCheck flag to disable the RouteConfig deprecated field check
    * @return RouterCheckTool a RouterCheckTool instance with member variables set by the router
    * config file.
    * */
-  static RouterCheckTool create(const std::string& router_config_file);
+  static RouterCheckTool create(const std::string& router_config_file,
+                                const bool disableDeprecationCheck);
 
   /**
    * TODO(tonya11en): Use a YAML format for the expected routes. This will require a proto.
@@ -198,6 +200,11 @@ public:
    */
   bool isDetailed() const { return is_detailed_; }
 
+  /**
+   * @return true if the deprecated field check for RouteConfiguration is disabled.
+   */
+  bool disableDeprecationCheck() const { return disable_deprecation_check_; }
+
 private:
   std::string test_path_;
   std::string config_path_;
@@ -207,5 +214,6 @@ private:
   bool comprehensive_coverage_;
   bool is_proto_;
   bool is_detailed_;
+  bool disable_deprecation_check_;
 };
 } // namespace Envoy
