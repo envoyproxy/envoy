@@ -4,6 +4,8 @@
 
 #include "common/common/non_copyable.h"
 
+#include "library/common/types/c_types.h"
+
 namespace Envoy {
 namespace Buffer {
 
@@ -12,7 +14,8 @@ namespace Buffer {
  */
 class BridgeFragment : NonCopyable, public BufferFragment {
 public:
-  BridgeFragment(envoy_data data) : data_(data) {}
+  // TODO: Consider moving this to a BridgeFragmentFactory class.
+  static BridgeFragment* createBridgeFragment(envoy_data data) { return new BridgeFragment(data); }
 
   // Buffer::BufferFragment
   const void* data() const override { return data_.bytes; }
@@ -23,6 +26,8 @@ public:
   }
 
 private:
+  BridgeFragment(envoy_data data) : data_(data) {}
+  ~BridgeFragment() {}
   envoy_data data_;
 };
 
