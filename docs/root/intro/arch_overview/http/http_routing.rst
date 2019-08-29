@@ -67,15 +67,14 @@ If the "addr" header value is "foo=1;x-foo-key=127.0.0.1;x-bar-key=1.1.1.1", the
 
 .. code-block:: yaml
 
-name: 'scope_by_addr'
-fragments:
-  - header_value_extractor:
-      name: Addr
-      element_separator: ;
-      element:
-        key: x-foo-key
-        separator: =
-
+  name: 'scope_by_addr'
+  fragments:
+    - header_value_extractor:
+        name: Addr
+        element_separator: ;
+        element:
+          key: x-foo-key
+          separator: =
 
 .. _arch_overview_http_routing_route_table:
 
