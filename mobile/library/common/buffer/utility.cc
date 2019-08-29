@@ -13,7 +13,7 @@ Buffer::InstancePtr toInternalData(envoy_data data) {
   // Therefore, it is sufficient to allocate on the heap, and delete in the done method.
   // TODO: this method leaks the implementation of Buffer::BridgeFragment and could be improved to
   // avoid new.
-  Buffer::BridgeFragment* fragment = new Buffer::BridgeFragment(data);
+  Buffer::BridgeFragment* fragment = Buffer::BridgeFragment::createBridgeFragment(data);
   InstancePtr buf = std::make_unique<Buffer::OwnedImpl>();
   buf->addBufferFragment(*fragment);
   return buf;
