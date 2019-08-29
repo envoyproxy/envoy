@@ -119,10 +119,12 @@ message ClusterLoadAssignment {
     google.protobuf.Duration endpoint_stale_after = 4 [(validate.rules).duration.gt.seconds = 0];
 
     // The flag to disable overprovisioning. If it is set to true,
-    // overprovisioning_factor will be ignored and Envoy will not do graceful
-    // failover as certain priority level or locality become unhealthy slowly.
-    // Otherwise Envoy will do graceful failover as overprovisioning_factor
-    // suggests.
+    // :ref:`overprovisioning factor
+    // <arch_overview_load_balancing_overprovisioning_factor>` will be ignored
+    // and Envoy will not perform graceful failover between priority levels or
+    // localities as endpoints become unhealthy. Otherwise Envoy will perform
+    // graceful failover as :ref:`overprovisioning factor
+    // <arch_overview_load_balancing_overprovisioning_factor>` suggests.
     // [#next-major-version: Unify with overprovisioning config as a single message.]
     // [#not-implemented-hide:]
     bool disable_overprovisioning = 5;
