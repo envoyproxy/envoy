@@ -49,7 +49,7 @@ namespace Envoy  {
 namespace Upstream {
 
 // TODO: rename to factory selector something.
-class TransportSocketOverrides {
+class TransportSocketOverrides : Logger::Loggable<Logger::Id::upstream> {
 public:
   TransportSocketOverrides(Network::TransportSocketFactoryPtr&& socket_factory,
       std::map<std::string, Network::TransportSocketFactoryPtr>&& socket_factory_overrides);

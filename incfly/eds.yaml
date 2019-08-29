@@ -6,14 +6,16 @@ resources:
   - lb_endpoints:
     - endpoint:
         metadata:
-          envoy_transport_socket_selector: "mtlsReady"
+          envoy.transport_socket_selector:
+            label: "mtlsReady"
         address:
           socket_address:
             address: 127.0.0.1
             port_value: 9000
     - endpoint:
         metadata:
-          envoy_transport_socket_selector: "mtlsDisable"
+          envoy.transport_socket_selector:
+            label: "mtlsDisable"
         address:
           socket_address:
             address: 127.0.0.1

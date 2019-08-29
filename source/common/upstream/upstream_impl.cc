@@ -219,7 +219,7 @@ HostVector filterHosts(const std::unordered_set<HostSharedPtr>& hosts,
 Host::CreateConnectionData HostImpl::createConnection(
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsSharedPtr transport_socket_options) const {
-  return {createConnection(dispatcher, *cluster_, address_, options, transport_socket_options),
+  return {createConnection(dispatcher, *cluster_, address_, *metadata_, options, transport_socket_options),
           shared_from_this()};
 }
 
@@ -243,13 +243,14 @@ void HostImpl::setEdsHealthFlag(envoy::api::v2::core::HealthStatus health_status
 
 Host::CreateConnectionData
 HostImpl::createHealthCheckConnection(Event::Dispatcher& dispatcher) const {
-  return {createConnection(dispatcher, *cluster_, healthCheckAddress(), nullptr, nullptr),
+  return {createConnection(dispatcher, *cluster_, healthCheckAddress(), metadata_, nullptr, nullptr),
           shared_from_this()};
 }
 
 Network::ClientConnectionPtr
 HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
                            Network::Address::InstanceConstSharedPtr address,
+                           const envoy::api::v2::core::Metadata& metadata,
                            const Network::ConnectionSocket::OptionsSharedPtr& options,
                            Network::TransportSocketOptionsSharedPtr transport_socket_options) {
   Network::ConnectionSocket::OptionsSharedPtr connection_options;
@@ -266,7 +267,7 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
     connection_options = options;
   }
 
-  Network::TransportSocketFactory& socket_factory = cluster.resolveTransportSocketFactory(*metadata_);
+  Network::TransportSocketFactory& socket_factory = cluster.resolveTransportSocketFactory(metadata);
   Network::ClientConnectionPtr connection = dispatcher.createClientConnection(
       address, cluster.sourceAddress(),
       //cluster.transportSocketFactory().createTransportSocket(transport_socket_options),
@@ -744,10 +745,16 @@ Network::TransportSocketFactoryPtr createTransportSocketFactory(
 }
 
 // TODO(icnfly): figure out here, what's about factory context.
-TransportSocketOverridePtr createTransportSocketOverrides(
+TransportSocketOverridesPtr createTransportSocketOverrides(
     const envoy::api::v2::Cluster& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context) {
-  TransportSocketOverridePtr socket_overrides;
+  auto& config_factory = Config::Utility::getAndCheckFactory<
+      Server::Configuration::UpstreamTransportSocketConfigFactory>(transport_socket.name());
+  ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
+      transport_socket, factory_context.messageValidationVisitor(), config_factory);
+  auto default_transport_socket = config_factory.createTransportSocketFactory(*message, factory_context);
+  std::map<std::string, Network::TransportSocketFactoryPtr>&& factory_overrides;
+  TransportSocketOverridesPtr socket_overrides(default_socket_factory, std::move(factory_overrides));
   return socket_overrides;
   // If the cluster config doesn't have a transport socket configured, override with the default
   // transport socket implementation based on the tls_context. We copy by value first then override

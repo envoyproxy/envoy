@@ -234,6 +234,7 @@ protected:
   static Network::ClientConnectionPtr
   createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
                    Network::Address::InstanceConstSharedPtr address,
+                   const envoy::api::v2::core::Metadata& metadata,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    Network::TransportSocketOptionsSharedPtr transport_socket_options);
 
