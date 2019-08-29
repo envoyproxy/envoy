@@ -26,6 +26,8 @@ void ConnectionHandlerImpl::addListener(Network::ListenerConfig& config) {
   } else {
     ASSERT(socket_type == Network::Address::SocketType::Datagram,
            "Only datagram/stream listener supported");
+    RELEASE_ASSERT(config.udpListenerFactory() != nullptr,
+                   "UDP listner factory is not initialized.");
     listener =
         config.udpListenerFactory()->createActiveUdpListener(*this, dispatcher_, logger_, config);
   }
