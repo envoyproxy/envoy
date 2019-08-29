@@ -1156,8 +1156,7 @@ TEST_F(ConnectionManagerTest, PendingMessageEnd) {
   EXPECT_EQ(1U, store_.gauge("test.request_active", Stats::Gauge::ImportMode::Accumulate).value());
 }
 
-// TODO(alyssawilk) update.
-TEST_F(ConnectionManagerTest, DEPRECATED_FEATURE_TEST(Routing)) {
+TEST_F(ConnectionManagerTest, Routing) {
   const std::string yaml = R"EOF(
 stat_prefix: test
 protocol_type: Dubbo
@@ -1169,7 +1168,9 @@ route_config:
       - match:
           method:
             name:
-              regex: "(.*?)"
+              safe_regex:
+                google_re2: {}
+                regex: "(.*?)"
         route:
             cluster: user_service_dubbo_server
 )EOF";
