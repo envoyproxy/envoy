@@ -341,8 +341,8 @@ private:
     AdminFilterChain() {} // NOLINT(modernize-use-equals-default)
 
     // Network::FilterChain
-    const Network::TransportSocketFactory& transportSocketFactory() const override {
-      return transport_socket_factory_;
+    const Network::TransportSocketFactory* transportSocketFactory() const override {
+      return &transport_socket_factory_;
     }
 
     const std::vector<Network::FilterFactoryCb>& networkFilterFactories() const override {
