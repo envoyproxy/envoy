@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.api.v2.listener;
 
-option java_outer_classname = "ListenerProto";
+option java_outer_classname = "UdpListenerConfigProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.api.v2.listener";
 option go_package = "listener";

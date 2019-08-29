@@ -502,8 +502,9 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
   }
 
   if (active_span_) {
-    Tracing::HttpTracerUtility::finalizeSpan(*active_span_, request_headers_.get(), stream_info_,
-                                             *this);
+    Tracing::HttpTracerUtility::finalizeSpan(*active_span_, request_headers_.get(),
+                                             response_headers_.get(), response_trailers_.get(),
+                                             stream_info_, *this);
   }
   if (state_.successful_upgrade_) {
     connection_manager_.stats_.named_.downstream_cx_upgrades_active_.dec();
@@ -1352,7 +1353,12 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
   // Base headers.
   connection_manager_.config_.dateProvider().setDateHeader(headers);
   // Following setReference() is safe because serverName() is constant for the life of the listener.
-  headers.insertServer().value().setReference(connection_manager_.config_.serverName());
+  const auto transformation = connection_manager_.config_.serverHeaderTransformation();
+  if (transformation == ConnectionManagerConfig::HttpConnectionManagerProto::OVERWRITE ||
+      (transformation == ConnectionManagerConfig::HttpConnectionManagerProto::APPEND_IF_ABSENT &&
+       headers.Server() == nullptr)) {
+    headers.insertServer().value().setReference(connection_manager_.config_.serverName());
+  }
   ConnectionManagerUtility::mutateResponseHeaders(headers, request_headers_.get(),
                                                   connection_manager_.config_.via());
 

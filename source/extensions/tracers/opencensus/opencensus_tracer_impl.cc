@@ -8,6 +8,7 @@
 
 #include "absl/strings/str_cat.h"
 #include "google/devtools/cloudtrace/v2/tracing.grpc.pb.h"
+#include "opencensus/exporters/trace/ocagent/ocagent_exporter.h"
 #include "opencensus/exporters/trace/stackdriver/stackdriver_exporter.h"
 #include "opencensus/exporters/trace/stdout/stdout_exporter.h"
 #include "opencensus/exporters/trace/zipkin/zipkin_exporter.h"
@@ -256,6 +257,11 @@ Driver::Driver(const envoy::config::trace::v2::OpenCensusConfig& oc_config,
     ::opencensus::exporters::trace::ZipkinExporterOptions opts(oc_config.zipkin_url());
     opts.service_name = local_info_.clusterName();
     ::opencensus::exporters::trace::ZipkinExporter::Register(opts);
+  }
+  if (oc_config.ocagent_exporter_enabled()) {
+    ::opencensus::exporters::trace::OcAgentOptions opts;
+    opts.address = oc_config.ocagent_address();
+    ::opencensus::exporters::trace::OcAgentExporter::Register(std::move(opts));
   }
 }
 

@@ -1168,7 +1168,9 @@ route_config:
       - match:
           method:
             name:
-              regex: "(.*?)"
+              safe_regex:
+                google_re2: {}
+                regex: "(.*?)"
         route:
             cluster: user_service_dubbo_server
 )EOF";

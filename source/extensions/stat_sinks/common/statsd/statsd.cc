@@ -13,6 +13,7 @@
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/config/utility.h"
+#include "common/stats/symbol_table_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -99,8 +100,9 @@ TcpStatsdSink::TcpStatsdSink(const LocalInfo::LocalInfo& local_info,
                              Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
                              const std::string& prefix)
     : prefix_(prefix.empty() ? Statsd::getDefaultPrefix() : prefix), tls_(tls.allocateSlot()),
-      cluster_manager_(cluster_manager), cx_overflow_stat_(scope.counter("statsd.cx_overflow")) {
-
+      cluster_manager_(cluster_manager),
+      cx_overflow_stat_(scope.counterFromStatName(
+          Stats::StatNameManagedStorage("statsd.cx_overflow", scope.symbolTable()).statName())) {
   Config::Utility::checkClusterAndLocalInfo("tcp statsd", cluster_name, cluster_manager,
                                             local_info);
   cluster_info_ = cluster_manager.get(cluster_name)->info();
