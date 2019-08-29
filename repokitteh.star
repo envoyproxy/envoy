@@ -6,7 +6,7 @@ use(
   "github.com/repokitteh/modules/ownerscheck.star#itay/s",
   paths=[
     ("rktest1", "api/"),
-    ("itayd", "api/udpa/"),
+    ("itayd", "/"),
   ],
 )
 
