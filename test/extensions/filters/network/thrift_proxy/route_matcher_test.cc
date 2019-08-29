@@ -331,8 +331,7 @@ routes:
   EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
 }
 
-// TODO(alyssawilk) update.
-TEST(ThriftRouteMatcherTest, DEPRECATED_FEATURE_TEST(RouteByRegexHeaderMatcher)) {
+TEST(ThriftRouteMatcherTest, RouteByRegexHeaderMatcher) {
   const std::string yaml = R"EOF(
 name: config
 routes:
@@ -340,7 +339,9 @@ routes:
       method_name: "method1"
       headers:
       - name: "x-version"
-        regex_match: "0.[5-9]"
+        safe_regex_match:
+          google_re2: {}
+          regex: "0.[5-9]"
     route:
       cluster: "cluster1"
 )EOF";
