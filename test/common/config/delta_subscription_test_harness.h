@@ -157,14 +157,14 @@ public:
 
   void expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds timeout) override {
     init_timeout_timer_ = new Event::MockTimer(&dispatcher_);
-    EXPECT_CALL(*init_timeout_timer_, enableTimer(std::chrono::milliseconds(timeout)));
+    EXPECT_CALL(*init_timeout_timer_, enableTimer(std::chrono::milliseconds(timeout), _));
   }
 
   void expectDisableInitFetchTimeoutTimer() override {
     EXPECT_CALL(*init_timeout_timer_, disableTimer());
   }
 
-  void callInitFetchTimeoutCb() override { init_timeout_timer_->callback_(); }
+  void callInitFetchTimeoutCb() override { init_timeout_timer_->invokeCallback(); }
 
   const Protobuf::MethodDescriptor* method_descriptor_;
   Grpc::MockAsyncClient* async_client_;

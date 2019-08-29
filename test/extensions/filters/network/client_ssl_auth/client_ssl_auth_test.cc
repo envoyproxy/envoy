@@ -167,7 +167,7 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 
   // Respond.
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
   message->body() = std::make_unique<Buffer::OwnedImpl>(
@@ -221,20 +221,20 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
 
   // Interval timer fires.
   setupRequest();
-  interval_timer_->callback_();
+  interval_timer_->invokeCallback();
 
   // Error response.
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   message = std::make_unique<Http::ResponseMessageImpl>(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "503"}}});
   callbacks_->onSuccess(std::move(message));
 
   // Interval timer fires.
   setupRequest();
-  interval_timer_->callback_();
+  interval_timer_->invokeCallback();
 
   // Parsing error
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   message = std::make_unique<Http::ResponseMessageImpl>(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}});
   message->body() = std::make_unique<Buffer::OwnedImpl>("bad_json");
@@ -242,10 +242,10 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
 
   // Interval timer fires.
   setupRequest();
-  interval_timer_->callback_();
+  interval_timer_->invokeCallback();
 
   // No response failure.
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   callbacks_->onFailure(Http::AsyncClient::FailureReason::Reset);
 
   // Interval timer fires, cannot obtain async client.
@@ -258,8 +258,8 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
                 Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "503"}}})});
             return nullptr;
           }));
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
-  interval_timer_->callback_();
+  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
+  interval_timer_->invokeCallback();
 
   EXPECT_EQ(4U, stats_store_.counter("auth.clientssl.vpn.update_failure").value());
 }

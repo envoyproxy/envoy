@@ -39,7 +39,8 @@ const uint64_t MaxStatNameLength = 127;
 class StatsThreadLocalStoreTest : public testing::Test {
 public:
   StatsThreadLocalStoreTest()
-      : alloc_(symbol_table_), store_(std::make_unique<ThreadLocalStoreImpl>(alloc_)) {
+      : symbol_table_(SymbolTableCreator::makeSymbolTable()), alloc_(*symbol_table_),
+        store_(std::make_unique<ThreadLocalStoreImpl>(alloc_)) {
     store_->addSink(sink_);
   }
 
@@ -48,7 +49,7 @@ public:
     store_->addSink(sink_);
   }
 
-  Stats::FakeSymbolTableImpl symbol_table_;
+  SymbolTablePtr symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   AllocatorImpl alloc_;
@@ -78,7 +79,7 @@ class HistogramTest : public testing::Test {
 public:
   using NameHistogramMap = std::map<std::string, ParentHistogramSharedPtr>;
 
-  HistogramTest() : alloc_(symbol_table_) {}
+  HistogramTest() : symbol_table_(SymbolTableCreator::makeSymbolTable()), alloc_(*symbol_table_) {}
 
   void SetUp() override {
     store_ = std::make_unique<ThreadLocalStoreImpl>(alloc_);
@@ -166,7 +167,7 @@ public:
     }
   }
 
-  FakeSymbolTableImpl symbol_table_;
+  SymbolTablePtr symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   AllocatorImpl alloc_;
@@ -182,7 +183,7 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
 
   Counter& c1 = store_->counter("c1");
   EXPECT_EQ(&c1, &store_->counter("c1"));
-  StatNameManagedStorage c1_name("c1", symbol_table_);
+  StatNameManagedStorage c1_name("c1", *symbol_table_);
   c1.add(100);
   auto found_counter = store_->findCounter(c1_name.statName());
   ASSERT_TRUE(found_counter.has_value());
@@ -193,7 +194,7 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
 
   Gauge& g1 = store_->gauge("g1", Gauge::ImportMode::Accumulate);
   EXPECT_EQ(&g1, &store_->gauge("g1", Gauge::ImportMode::Accumulate));
-  StatNameManagedStorage g1_name("g1", symbol_table_);
+  StatNameManagedStorage g1_name("g1", *symbol_table_);
   g1.set(100);
   auto found_gauge = store_->findGauge(g1_name.statName());
   ASSERT_TRUE(found_gauge.has_value());
@@ -204,7 +205,7 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
 
   Histogram& h1 = store_->histogram("h1");
   EXPECT_EQ(&h1, &store_->histogram("h1"));
-  StatNameManagedStorage h1_name("h1", symbol_table_);
+  StatNameManagedStorage h1_name("h1", *symbol_table_);
   auto found_histogram = store_->findHistogram(h1_name.statName());
   ASSERT_TRUE(found_histogram.has_value());
   EXPECT_EQ(&h1, &found_histogram->get());
@@ -230,7 +231,7 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
 
   Counter& c1 = store_->counter("c1");
   EXPECT_EQ(&c1, &store_->counter("c1"));
-  StatNameManagedStorage c1_name("c1", symbol_table_);
+  StatNameManagedStorage c1_name("c1", *symbol_table_);
   c1.add(100);
   auto found_counter = store_->findCounter(c1_name.statName());
   ASSERT_TRUE(found_counter.has_value());
@@ -241,7 +242,7 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
 
   Gauge& g1 = store_->gauge("g1", Gauge::ImportMode::Accumulate);
   EXPECT_EQ(&g1, &store_->gauge("g1", Gauge::ImportMode::Accumulate));
-  StatNameManagedStorage g1_name("g1", symbol_table_);
+  StatNameManagedStorage g1_name("g1", *symbol_table_);
   g1.set(100);
   auto found_gauge = store_->findGauge(g1_name.statName());
   ASSERT_TRUE(found_gauge.has_value());
@@ -252,7 +253,7 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
 
   Histogram& h1 = store_->histogram("h1");
   EXPECT_EQ(&h1, &store_->histogram("h1"));
-  StatNameManagedStorage h1_name("h1", symbol_table_);
+  StatNameManagedStorage h1_name("h1", *symbol_table_);
   auto found_histogram = store_->findHistogram(h1_name.statName());
   ASSERT_TRUE(found_histogram.has_value());
   EXPECT_EQ(&h1, &found_histogram->get());
@@ -284,11 +285,11 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   Counter& c2 = scope1->counter("c2");
   EXPECT_EQ("c1", c1.name());
   EXPECT_EQ("scope1.c2", c2.name());
-  StatNameManagedStorage c1_name("c1", symbol_table_);
+  StatNameManagedStorage c1_name("c1", *symbol_table_);
   auto found_counter = store_->findCounter(c1_name.statName());
   ASSERT_TRUE(found_counter.has_value());
   EXPECT_EQ(&c1, &found_counter->get());
-  StatNameManagedStorage c2_name("scope1.c2", symbol_table_);
+  StatNameManagedStorage c2_name("scope1.c2", *symbol_table_);
   auto found_counter2 = store_->findCounter(c2_name.statName());
   ASSERT_TRUE(found_counter2.has_value());
   EXPECT_EQ(&c2, &found_counter2->get());
@@ -297,11 +298,11 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   Gauge& g2 = scope1->gauge("g2", Gauge::ImportMode::Accumulate);
   EXPECT_EQ("g1", g1.name());
   EXPECT_EQ("scope1.g2", g2.name());
-  StatNameManagedStorage g1_name("g1", symbol_table_);
+  StatNameManagedStorage g1_name("g1", *symbol_table_);
   auto found_gauge = store_->findGauge(g1_name.statName());
   ASSERT_TRUE(found_gauge.has_value());
   EXPECT_EQ(&g1, &found_gauge->get());
-  StatNameManagedStorage g2_name("scope1.g2", symbol_table_);
+  StatNameManagedStorage g2_name("scope1.g2", *symbol_table_);
   auto found_gauge2 = store_->findGauge(g2_name.statName());
   ASSERT_TRUE(found_gauge2.has_value());
   EXPECT_EQ(&g2, &found_gauge2->get());
@@ -314,11 +315,11 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   h1.recordValue(100);
   EXPECT_CALL(sink_, onHistogramComplete(Ref(h2), 200));
   h2.recordValue(200);
-  StatNameManagedStorage h1_name("h1", symbol_table_);
+  StatNameManagedStorage h1_name("h1", *symbol_table_);
   auto found_histogram = store_->findHistogram(h1_name.statName());
   ASSERT_TRUE(found_histogram.has_value());
   EXPECT_EQ(&h1, &found_histogram->get());
-  StatNameManagedStorage h2_name("scope1.h2", symbol_table_);
+  StatNameManagedStorage h2_name("scope1.h2", *symbol_table_);
   auto found_histogram2 = store_->findHistogram(h2_name.statName());
   ASSERT_TRUE(found_histogram2.has_value());
   EXPECT_EQ(&h2, &found_histogram2->get());
@@ -380,7 +381,7 @@ TEST_F(StatsThreadLocalStoreTest, NestedScopes) {
   ScopePtr scope1 = store_->createScope("scope1.");
   Counter& c1 = scope1->counter("foo.bar");
   EXPECT_EQ("scope1.foo.bar", c1.name());
-  StatNameManagedStorage c1_name("scope1.foo.bar", symbol_table_);
+  StatNameManagedStorage c1_name("scope1.foo.bar", *symbol_table_);
   auto found_counter = store_->findCounter(c1_name.statName());
   ASSERT_TRUE(found_counter.has_value());
   EXPECT_EQ(&c1, &found_counter->get());
@@ -389,7 +390,7 @@ TEST_F(StatsThreadLocalStoreTest, NestedScopes) {
   Counter& c2 = scope2->counter("bar");
   EXPECT_EQ(&c1, &c2);
   EXPECT_EQ("scope1.foo.bar", c2.name());
-  StatNameManagedStorage c2_name("scope1.foo.bar", symbol_table_);
+  StatNameManagedStorage c2_name("scope1.foo.bar", *symbol_table_);
   auto found_counter2 = store_->findCounter(c2_name.statName());
   ASSERT_TRUE(found_counter2.has_value());
 
@@ -455,12 +456,14 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
 
 class LookupWithStatNameTest : public testing::Test {
 public:
-  LookupWithStatNameTest() : alloc_(symbol_table_), store_(alloc_), pool_(symbol_table_) {}
+  LookupWithStatNameTest()
+      : symbol_table_(SymbolTableCreator::makeSymbolTable()), alloc_(*symbol_table_),
+        store_(alloc_), pool_(*symbol_table_) {}
   ~LookupWithStatNameTest() override { store_.shutdownThreading(); }
 
   StatName makeStatName(absl::string_view name) { return pool_.add(name); }
 
-  Stats::FakeSymbolTableImpl symbol_table_;
+  SymbolTablePtr symbol_table_;
   AllocatorImpl alloc_;
   ThreadLocalStoreImpl store_;
   StatNamePool pool_;
@@ -664,7 +667,8 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
 class RememberStatsMatcherTest : public testing::TestWithParam<bool> {
 public:
   RememberStatsMatcherTest()
-      : heap_alloc_(symbol_table_), store_(heap_alloc_), scope_(store_.createScope("scope.")) {
+      : symbol_table_(SymbolTableCreator::makeSymbolTable()), heap_alloc_(*symbol_table_),
+        store_(heap_alloc_), scope_(store_.createScope("scope.")) {
     if (GetParam()) {
       store_.initializeThreading(main_thread_dispatcher_, tls_);
     }
@@ -755,7 +759,7 @@ public:
     };
   }
 
-  Stats::FakeSymbolTableImpl symbol_table_;
+  Stats::SymbolTablePtr symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   AllocatorImpl heap_alloc_;
@@ -845,46 +849,85 @@ TEST_F(StatsThreadLocalStoreTest, NonHotRestartNoTruncation) {
   tls_.shutdownThread();
 }
 
+class StatsThreadLocalStoreTestNoFixture : public testing::Test {
+protected:
+  StatsThreadLocalStoreTestNoFixture()
+      : save_use_fakes_(SymbolTableCreator::useFakeSymbolTables()) {}
+  ~StatsThreadLocalStoreTestNoFixture() override {
+    TestUtil::SymbolTableCreatorTestPeer::setUseFakeSymbolTables(save_use_fakes_);
+    if (threading_enabled_) {
+      store_->shutdownThreading();
+      tls_.shutdownThread();
+    }
+  }
+
+  void init(bool use_fakes) {
+    TestUtil::SymbolTableCreatorTestPeer::setUseFakeSymbolTables(use_fakes);
+    symbol_table_ = SymbolTableCreator::makeSymbolTable();
+    alloc_ = std::make_unique<AllocatorImpl>(*symbol_table_);
+    store_ = std::make_unique<ThreadLocalStoreImpl>(*alloc_);
+    store_->addSink(sink_);
+
+    // Use a tag producer that will produce tags.
+    envoy::config::metrics::v2::StatsConfig stats_config;
+    store_->setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
+  }
+
+  void initThreading() {
+    threading_enabled_ = true;
+    store_->initializeThreading(main_thread_dispatcher_, tls_);
+  }
+
+  static constexpr size_t million_ = 1000 * 1000;
+
+  MockSink sink_;
+  SymbolTablePtr symbol_table_;
+  std::unique_ptr<AllocatorImpl> alloc_;
+  std::unique_ptr<ThreadLocalStoreImpl> store_;
+  NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
+  NiceMock<ThreadLocal::MockInstance> tls_;
+  const bool save_use_fakes_;
+  bool threading_enabled_{false};
+};
+
 // Tests how much memory is consumed allocating 100k stats.
-TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTls) {
-  MockSink sink;
-  Stats::FakeSymbolTableImpl symbol_table;
-  AllocatorImpl alloc(symbol_table);
-  ThreadLocalStoreImpl store(alloc);
-  store.addSink(sink);
-
-  // Use a tag producer that will produce tags.
-  envoy::config::metrics::v2::StatsConfig stats_config;
-  store.setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
-
+TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTlsFakeSymbolTable) {
+  init(true);
   TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(
-      1000, [&store](absl::string_view name) { store.counter(std::string(name)); });
-  const size_t million = 1000 * 1000;
+      1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
   EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 15268336); // June 30, 2019
-  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 16 * million);
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 16 * million_);
 }
 
-TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithTls) {
-  Stats::FakeSymbolTableImpl symbol_table;
-  AllocatorImpl alloc(symbol_table);
-  NiceMock<Event::MockDispatcher> main_thread_dispatcher;
-  NiceMock<ThreadLocal::MockInstance> tls;
-  ThreadLocalStoreImpl store(alloc);
-
-  // Use a tag producer that will produce tags.
-  envoy::config::metrics::v2::StatsConfig stats_config;
-  store.setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
-
-  store.initializeThreading(main_thread_dispatcher, tls);
+TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithTlsFakeSymbolTable) {
+  init(true);
+  initThreading();
   TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(
-      1000, [&store](absl::string_view name) { store.counter(std::string(name)); });
-  const size_t million = 1000 * 1000;
+      1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
   EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 17496848); // June 30, 2019
-  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 18 * million);
-  store.shutdownThreading();
-  tls.shutdownThread();
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 18 * million_);
+}
+
+// Tests how much memory is consumed allocating 100k stats.
+TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTlsRealSymbolTable) {
+  init(false);
+  TestUtil::MemoryTest memory_test;
+  TestUtil::forEachSampleStat(
+      1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
+  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 9139120); // Aug 9, 2019
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 10 * million_);
+}
+
+TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithTlsRealSymbolTable) {
+  init(false);
+  initThreading();
+  TestUtil::MemoryTest memory_test;
+  TestUtil::forEachSampleStat(
+      1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
+  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 11367632); // Aug 9, 2019
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 12 * million_);
 }
 
 TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
@@ -929,11 +972,11 @@ TEST_F(StatsThreadLocalStoreTest, MergeDuringShutDown) {
 }
 
 TEST(ThreadLocalStoreThreadTest, ConstructDestruct) {
-  Stats::FakeSymbolTableImpl symbol_table;
+  SymbolTablePtr symbol_table(SymbolTableCreator::makeSymbolTable());
   Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherPtr dispatcher = api->allocateDispatcher();
   NiceMock<ThreadLocal::MockInstance> tls;
-  AllocatorImpl alloc(symbol_table);
+  AllocatorImpl alloc(*symbol_table);
   ThreadLocalStoreImpl store(alloc);
 
   store.initializeThreading(*dispatcher, tls);
