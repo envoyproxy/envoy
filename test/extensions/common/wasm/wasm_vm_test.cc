@@ -44,7 +44,7 @@ TEST(WasmVmTest, BadVmType) { EXPECT_THROW(createWasmVm("bad.vm"), WasmException
 TEST(WasmVmTest, NullVmStartup) {
   auto wasm_vm = createWasmVm("envoy.wasm.vm.null");
   EXPECT_TRUE(wasm_vm != nullptr);
-  EXPECT_TRUE(wasm_vm->clonable());
+  EXPECT_TRUE(wasm_vm->cloneable());
   auto wasm_vm_clone = wasm_vm->clone();
   EXPECT_TRUE(wasm_vm_clone != nullptr);
   EXPECT_TRUE(wasm_vm->getUserSection("user").empty());
