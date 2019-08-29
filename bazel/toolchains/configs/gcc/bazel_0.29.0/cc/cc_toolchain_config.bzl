@@ -74,6 +74,12 @@ all_link_actions = [
     ACTION_NAMES.cpp_link_nodeps_dynamic_library,
 ]
 
+lto_index_actions = [
+    ACTION_NAMES.lto_index_for_executable,
+    ACTION_NAMES.lto_index_for_dynamic_library,
+    ACTION_NAMES.lto_index_for_nodeps_dynamic_library,
+]
+
 def _impl(ctx):
     tool_paths = [
         tool_path(name = name, path = path)
@@ -95,18 +101,7 @@ def _impl(ctx):
         enabled = True,
         flag_sets = [
             flag_set(
-                actions = [
-                    ACTION_NAMES.assemble,
-                    ACTION_NAMES.preprocess_assemble,
-                    ACTION_NAMES.linkstamp_compile,
-                    ACTION_NAMES.c_compile,
-                    ACTION_NAMES.cpp_compile,
-                    ACTION_NAMES.cpp_header_parsing,
-                    ACTION_NAMES.cpp_module_compile,
-                    ACTION_NAMES.cpp_module_codegen,
-                    ACTION_NAMES.lto_backend,
-                    ACTION_NAMES.clif_match,
-                ],
+                actions = all_compile_actions,
                 flag_groups = ([
                     flag_group(
                         flags = ctx.attr.compile_flags,
@@ -114,18 +109,7 @@ def _impl(ctx):
                 ] if ctx.attr.compile_flags else []),
             ),
             flag_set(
-                actions = [
-                    ACTION_NAMES.assemble,
-                    ACTION_NAMES.preprocess_assemble,
-                    ACTION_NAMES.linkstamp_compile,
-                    ACTION_NAMES.c_compile,
-                    ACTION_NAMES.cpp_compile,
-                    ACTION_NAMES.cpp_header_parsing,
-                    ACTION_NAMES.cpp_module_compile,
-                    ACTION_NAMES.cpp_module_codegen,
-                    ACTION_NAMES.lto_backend,
-                    ACTION_NAMES.clif_match,
-                ],
+                actions = all_compile_actions,
                 flag_groups = ([
                     flag_group(
                         flags = ctx.attr.dbg_compile_flags,
@@ -134,18 +118,7 @@ def _impl(ctx):
                 with_features = [with_feature_set(features = ["dbg"])],
             ),
             flag_set(
-                actions = [
-                    ACTION_NAMES.assemble,
-                    ACTION_NAMES.preprocess_assemble,
-                    ACTION_NAMES.linkstamp_compile,
-                    ACTION_NAMES.c_compile,
-                    ACTION_NAMES.cpp_compile,
-                    ACTION_NAMES.cpp_header_parsing,
-                    ACTION_NAMES.cpp_module_compile,
-                    ACTION_NAMES.cpp_module_codegen,
-                    ACTION_NAMES.lto_backend,
-                    ACTION_NAMES.clif_match,
-                ],
+                actions = all_compile_actions,
                 flag_groups = ([
                     flag_group(
                         flags = ctx.attr.opt_compile_flags,
@@ -154,15 +127,7 @@ def _impl(ctx):
                 with_features = [with_feature_set(features = ["opt"])],
             ),
             flag_set(
-                actions = [
-                    ACTION_NAMES.linkstamp_compile,
-                    ACTION_NAMES.cpp_compile,
-                    ACTION_NAMES.cpp_header_parsing,
-                    ACTION_NAMES.cpp_module_compile,
-                    ACTION_NAMES.cpp_module_codegen,
-                    ACTION_NAMES.lto_backend,
-                    ACTION_NAMES.clif_match,
-                ],
+                actions = all_cpp_compile_actions + [ACTION_NAMES.lto_backend],
                 flag_groups = ([
                     flag_group(
                         flags = ctx.attr.cxx_flags,
@@ -177,7 +142,7 @@ def _impl(ctx):
         enabled = True,
         flag_sets = [
             flag_set(
-                actions = all_link_actions,
+                actions = all_link_actions + lto_index_actions,
                 flag_groups = ([
                     flag_group(
                         flags = ctx.attr.link_flags,
@@ -185,7 +150,7 @@ def _impl(ctx):
                 ] if ctx.attr.link_flags else []),
             ),
             flag_set(
-                actions = all_link_actions,
+                actions = all_link_actions + lto_index_actions,
                 flag_groups = ([
                     flag_group(
                         flags = ctx.attr.opt_link_flags,
@@ -215,10 +180,7 @@ def _impl(ctx):
                     ACTION_NAMES.cpp_module_codegen,
                     ACTION_NAMES.lto_backend,
                     ACTION_NAMES.clif_match,
-                    ACTION_NAMES.cpp_link_executable,
-                    ACTION_NAMES.cpp_link_dynamic_library,
-                    ACTION_NAMES.cpp_link_nodeps_dynamic_library,
-                ],
+                ] + all_link_actions + lto_index_actions,
                 flag_groups = [
                     flag_group(
                         flags = ["--sysroot=%{sysroot}"],
@@ -255,18 +217,7 @@ def _impl(ctx):
         enabled = True,
         flag_sets = [
             flag_set(
-                actions = [
-                    ACTION_NAMES.assemble,
-                    ACTION_NAMES.preprocess_assemble,
-                    ACTION_NAMES.linkstamp_compile,
-                    ACTION_NAMES.c_compile,
-                    ACTION_NAMES.cpp_compile,
-                    ACTION_NAMES.cpp_header_parsing,
-                    ACTION_NAMES.cpp_module_compile,
-                    ACTION_NAMES.cpp_module_codegen,
-                    ACTION_NAMES.lto_backend,
-                    ACTION_NAMES.clif_match,
-                ],
+                actions = all_compile_actions,
                 flag_groups = [
                     flag_group(
                         flags = ["%{user_compile_flags}"],
@@ -283,18 +234,7 @@ def _impl(ctx):
         enabled = True,
         flag_sets = [
             flag_set(
-                actions = [
-                    ACTION_NAMES.assemble,
-                    ACTION_NAMES.preprocess_assemble,
-                    ACTION_NAMES.linkstamp_compile,
-                    ACTION_NAMES.c_compile,
-                    ACTION_NAMES.cpp_compile,
-                    ACTION_NAMES.cpp_header_parsing,
-                    ACTION_NAMES.cpp_module_compile,
-                    ACTION_NAMES.cpp_module_codegen,
-                    ACTION_NAMES.lto_backend,
-                    ACTION_NAMES.clif_match,
-                ],
+                actions = all_compile_actions,
                 flag_groups = ([
                     flag_group(
                         flags = ctx.attr.unfiltered_compile_flags,
@@ -308,7 +248,7 @@ def _impl(ctx):
         name = "library_search_directories",
         flag_sets = [
             flag_set(
-                actions = all_link_actions,
+                actions = all_link_actions + lto_index_actions,
                 flag_groups = [
                     flag_group(
                         flags = ["-L%{library_search_directories}"],
@@ -328,6 +268,8 @@ def _impl(ctx):
                 actions = [
                     ACTION_NAMES.cpp_link_executable,
                     ACTION_NAMES.cpp_link_dynamic_library,
+                    ACTION_NAMES.lto_index_for_executable,
+                    ACTION_NAMES.lto_index_for_dynamic_library,
                 ],
                 flag_groups = [flag_group(flags = ["-static-libgcc"])],
                 with_features = [
@@ -447,7 +389,7 @@ def _impl(ctx):
         name = "runtime_library_search_directories",
         flag_sets = [
             flag_set(
-                actions = all_link_actions,
+                actions = all_link_actions + lto_index_actions,
                 flag_groups = [
                     flag_group(
                         iterate_over = "runtime_library_search_directories",
@@ -474,7 +416,7 @@ def _impl(ctx):
                 ],
             ),
             flag_set(
-                actions = all_link_actions,
+                actions = all_link_actions + lto_index_actions,
                 flag_groups = [
                     flag_group(
                         iterate_over = "runtime_library_search_directories",
@@ -502,7 +444,7 @@ def _impl(ctx):
         name = "fission_support",
         flag_sets = [
             flag_set(
-                actions = all_link_actions,
+                actions = all_link_actions + lto_index_actions,
                 flag_groups = [
                     flag_group(
                         flags = ["-Wl,--gdb-index"],
@@ -520,6 +462,8 @@ def _impl(ctx):
                 actions = [
                     ACTION_NAMES.cpp_link_dynamic_library,
                     ACTION_NAMES.cpp_link_nodeps_dynamic_library,
+                    ACTION_NAMES.lto_index_for_dynamic_library,
+                    ACTION_NAMES.lto_index_for_nodeps_dynamic_library,
                 ],
                 flag_groups = [flag_group(flags = ["-shared"])],
             ),
@@ -581,10 +525,7 @@ def _impl(ctx):
                 actions = [
                     ACTION_NAMES.c_compile,
                     ACTION_NAMES.cpp_compile,
-                    ACTION_NAMES.cpp_link_dynamic_library,
-                    ACTION_NAMES.cpp_link_nodeps_dynamic_library,
-                    ACTION_NAMES.cpp_link_executable,
-                ],
+                ] + all_link_actions + lto_index_actions,
                 flag_groups = [
                     flag_group(
                         flags = [
@@ -607,10 +548,7 @@ def _impl(ctx):
                     ACTION_NAMES.c_compile,
                     ACTION_NAMES.cpp_compile,
                     ACTION_NAMES.lto_backend,
-                    ACTION_NAMES.cpp_link_dynamic_library,
-                    ACTION_NAMES.cpp_link_nodeps_dynamic_library,
-                    ACTION_NAMES.cpp_link_executable,
-                ],
+                ] + all_link_actions + lto_index_actions,
                 flag_groups = [
                     flag_group(
                         flags = [
@@ -662,7 +600,7 @@ def _impl(ctx):
         name = "symbol_counts",
         flag_sets = [
             flag_set(
-                actions = all_link_actions,
+                actions = all_link_actions + lto_index_actions,
                 flag_groups = [
                     flag_group(
                         flags = [
@@ -697,10 +635,7 @@ def _impl(ctx):
                 ],
             ),
             flag_set(
-                actions = [
-                    ACTION_NAMES.cpp_link_dynamic_library,
-                    ACTION_NAMES.cpp_link_nodeps_dynamic_library,
-                    ACTION_NAMES.cpp_link_executable,
+                actions = all_link_actions + lto_index_actions + [
                     "objc-executable",
                     "objc++-executable",
                 ],
@@ -717,7 +652,7 @@ def _impl(ctx):
         name = "strip_debug_symbols",
         flag_sets = [
             flag_set(
-                actions = all_link_actions,
+                actions = all_link_actions + lto_index_actions,
                 flag_groups = [
                     flag_group(
                         flags = ["-Wl,-S"],
@@ -735,6 +670,8 @@ def _impl(ctx):
                 actions = [
                     ACTION_NAMES.cpp_link_dynamic_library,
                     ACTION_NAMES.cpp_link_nodeps_dynamic_library,
+                    ACTION_NAMES.lto_index_for_dynamic_library,
+                    ACTION_NAMES.lto_index_for_nodeps_dynamic_library,
                 ],
                 flag_groups = [
                     flag_group(
@@ -760,7 +697,7 @@ def _impl(ctx):
         name = "libraries_to_link",
         flag_sets = [
             flag_set(
-                actions = all_link_actions,
+                actions = all_link_actions + lto_index_actions,
                 flag_groups = [
                     flag_group(
                         iterate_over = "libraries_to_link",
@@ -847,7 +784,7 @@ def _impl(ctx):
         name = "user_link_flags",
         flag_sets = [
             flag_set(
-                actions = all_link_actions,
+                actions = all_link_actions + lto_index_actions,
                 flag_groups = [
                     flag_group(
                         flags = ["%{user_link_flags}"],
@@ -885,7 +822,7 @@ def _impl(ctx):
         name = "linkstamps",
         flag_sets = [
             flag_set(
-                actions = all_link_actions,
+                actions = all_link_actions + lto_index_actions,
                 flag_groups = [
                     flag_group(
                         flags = ["%{linkstamp_paths}"],
@@ -919,11 +856,7 @@ def _impl(ctx):
                 ],
             ),
             flag_set(
-                actions = [
-                    ACTION_NAMES.cpp_link_dynamic_library,
-                    ACTION_NAMES.cpp_link_nodeps_dynamic_library,
-                    ACTION_NAMES.cpp_link_executable,
-                ],
+                actions = all_link_actions + lto_index_actions,
                 flag_groups = [flag_group(flags = ["--coverage"])],
             ),
         ],
@@ -977,7 +910,10 @@ def _impl(ctx):
         name = "force_pic_flags",
         flag_sets = [
             flag_set(
-                actions = [ACTION_NAMES.cpp_link_executable],
+                actions = [
+                    ACTION_NAMES.cpp_link_executable,
+                    ACTION_NAMES.lto_index_for_executable,
+                ],
                 flag_groups = [
                     flag_group(
                         flags = ["-pie"],
@@ -1014,6 +950,7 @@ def _impl(ctx):
         ],
     )
 
+    dynamic_library_linker_tool_path = tool_paths
     dynamic_library_linker_tool_feature = feature(
         name = "dynamic_library_linker_tool",
         flag_sets = [
@@ -1021,6 +958,8 @@ def _impl(ctx):
                 actions = [
                     ACTION_NAMES.cpp_link_dynamic_library,
                     ACTION_NAMES.cpp_link_nodeps_dynamic_library,
+                    ACTION_NAMES.lto_index_for_dynamic_library,
+                    ACTION_NAMES.lto_index_for_nodeps_dynamic_library,
                 ],
                 flag_groups = [
                     flag_group(
@@ -1041,11 +980,7 @@ def _impl(ctx):
         name = "output_execpath_flags",
         flag_sets = [
             flag_set(
-                actions = [
-                    ACTION_NAMES.cpp_link_dynamic_library,
-                    ACTION_NAMES.cpp_link_nodeps_dynamic_library,
-                    ACTION_NAMES.cpp_link_executable,
-                ],
+                actions = all_link_actions + lto_index_actions,
                 flag_groups = [
                     flag_group(
                         flags = ["-o", "%{output_execpath}"],
@@ -1076,11 +1011,7 @@ def _impl(ctx):
                 ] if ctx.attr.coverage_compile_flags else []),
             ),
             flag_set(
-                actions = [
-                    ACTION_NAMES.cpp_link_dynamic_library,
-                    ACTION_NAMES.cpp_link_nodeps_dynamic_library,
-                    ACTION_NAMES.cpp_link_executable,
-                ],
+                actions = all_link_actions + lto_index_actions,
                 flag_groups = ([
                     flag_group(flags = ctx.attr.coverage_link_flags),
                 ] if ctx.attr.coverage_link_flags else []),
