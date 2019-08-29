@@ -23,7 +23,7 @@ bool MirrorPolicyImpl::shouldMirror(const std::string& command) const {
     return false;
   }
 
-  if (default_value_.numerator() > 0) {
+  if (default_value_.numerator() >= 0) {
     return runtime_.snapshot().featureEnabled(runtime_key_, default_value_);
   }
 
