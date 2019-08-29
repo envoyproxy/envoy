@@ -406,7 +406,6 @@ udp_listener_config:
   udp_listener_name: "quic_listener"
   )EOF",
                                                        Network::Address::IpVersion::v4);
-  std::cerr << "yaml " << yaml << "\n";
 
   expectCreateListenSocket(envoy::api::v2::core::SocketOption::STATE_PREBIND,
 #ifdef SO_RXQ_OVFL
