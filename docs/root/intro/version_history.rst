@@ -9,7 +9,7 @@ Version history
 * api: added ::ref:`set_node_on_first_message_only <envoy_api_field_core.ApiConfigSource.set_node_on_first_message_only>` option to omit the node identifier from the subsequent discovery requests on the same stream.
 * config: enforcing that terminal filters (e.g. HttpConnectionManager for L4, router for L7) be the last in their respective filter chains.
 * buffer filter: the buffer filter populates content-length header if not present, behavior can be disabled using the runtime feature `envoy.reloadable_features.buffer_filter_populate_content_length`.
-* config: added support for delta xDS (including ADS) delivery
+* config: added support for :ref:`delta xDS <arch_overview_dynamic_config_delta>` (including ADS) delivery
 * config: added access log :ref:`extension filter<envoy_api_field_config.filter.accesslog.v2.AccessLogFilter.extension_filter>`.
 * config: added support for :option:`--reject-unknown-dynamic-fields`, providing independent control
   over whether unknown fields are rejected in static and dynamic configuration. By default, unknown

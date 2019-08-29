@@ -130,13 +130,14 @@ public:
 };
 
 using GrpcMuxPtr = std::unique_ptr<GrpcMux>;
+using GrpcMuxSharedPtr = std::shared_ptr<GrpcMux>;
 
 /**
  * A grouping of callbacks that a GrpcMux should provide to its GrpcStream.
  */
 template <class ResponseProto> class GrpcStreamCallbacks {
 public:
-  virtual ~GrpcStreamCallbacks() {}
+  virtual ~GrpcStreamCallbacks() = default;
 
   /**
    * For the GrpcStream to prompt the context to take appropriate action in response to the

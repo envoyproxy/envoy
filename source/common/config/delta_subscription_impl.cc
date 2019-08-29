@@ -3,10 +3,12 @@
 namespace Envoy {
 namespace Config {
 
-DeltaSubscriptionImpl::DeltaSubscriptionImpl(
-    std::shared_ptr<GrpcMux> context, absl::string_view type_url, SubscriptionCallbacks& callbacks,
-    SubscriptionStats stats, std::chrono::milliseconds init_fetch_timeout, bool is_aggregated)
-    : context_(context), type_url_(type_url), callbacks_(callbacks), stats_(stats),
+DeltaSubscriptionImpl::DeltaSubscriptionImpl(GrpcMuxSharedPtr context, absl::string_view type_url,
+                                             SubscriptionCallbacks& callbacks,
+                                             SubscriptionStats stats,
+                                             std::chrono::milliseconds init_fetch_timeout,
+                                             bool is_aggregated)
+    : context_(std::move(context)), type_url_(type_url), callbacks_(callbacks), stats_(stats),
       init_fetch_timeout_(init_fetch_timeout), is_aggregated_(is_aggregated) {}
 
 DeltaSubscriptionImpl::~DeltaSubscriptionImpl() {

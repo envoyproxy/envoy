@@ -32,13 +32,12 @@ public:
   // is_aggregated: whether the underlying mux/context is providing ADS to us and others, or whether
   // it's all ours. The practical difference is that we ourselves must call start() on it only in
   // the latter case.
-  DeltaSubscriptionImpl(std::shared_ptr<GrpcMux> context, absl::string_view type_url,
+  DeltaSubscriptionImpl(GrpcMuxSharedPtr context, absl::string_view type_url,
                         SubscriptionCallbacks& callbacks, SubscriptionStats stats,
                         std::chrono::milliseconds init_fetch_timeout, bool is_aggregated);
   ~DeltaSubscriptionImpl();
 
   void pause();
-
   void resume();
 
   // Config::Subscription
@@ -54,10 +53,10 @@ public:
   void onConfigUpdateFailed(ConfigUpdateFailureReason reason, const EnvoyException* e) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override;
 
-  std::shared_ptr<GrpcMux> getContextForTest() { return context_; }
+  GrpcMuxSharedPtr getContextForTest() { return context_; }
 
 private:
-  std::shared_ptr<GrpcMux> context_;
+  GrpcMuxSharedPtr context_;
   const std::string type_url_;
   SubscriptionCallbacks& callbacks_;
   SubscriptionStats stats_;

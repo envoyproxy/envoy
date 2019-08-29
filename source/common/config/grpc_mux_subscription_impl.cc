@@ -9,7 +9,7 @@
 namespace Envoy {
 namespace Config {
 
-GrpcMuxSubscriptionImpl::GrpcMuxSubscriptionImpl(std::shared_ptr<Config::GrpcMux> grpc_mux,
+GrpcMuxSubscriptionImpl::GrpcMuxSubscriptionImpl(GrpcMuxSharedPtr grpc_mux,
                                                  SubscriptionCallbacks& callbacks,
                                                  SubscriptionStats stats,
                                                  absl::string_view type_url,

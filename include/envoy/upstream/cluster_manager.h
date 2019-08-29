@@ -187,7 +187,7 @@ public:
    *
    * @return GrpcMux& ADS API provider referencee.
    */
-  virtual std::shared_ptr<Config::GrpcMux> adsMux() PURE;
+  virtual GrpcMuxSharedPtr adsMux() PURE;
 
   /**
    * @return Grpc::AsyncClientManager& the cluster manager's gRPC client manager.

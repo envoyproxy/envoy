@@ -17,7 +17,7 @@ class GrpcMuxSubscriptionImpl : public Subscription,
                                 GrpcMuxCallbacks,
                                 Logger::Loggable<Logger::Id::config> {
 public:
-  GrpcMuxSubscriptionImpl(std::shared_ptr<GrpcMux> grpc_mux, SubscriptionCallbacks& callbacks,
+  GrpcMuxSubscriptionImpl(GrpcMuxSharedPtr grpc_mux, SubscriptionCallbacks& callbacks,
                           SubscriptionStats stats, absl::string_view type_url,
                           Event::Dispatcher& dispatcher,
                           std::chrono::milliseconds init_fetch_timeout);
@@ -36,7 +36,7 @@ public:
 private:
   void disableInitFetchTimeoutTimer();
 
-  std::shared_ptr<Config::GrpcMux> grpc_mux_;
+  GrpcMuxSharedPtr grpc_mux_;
   SubscriptionCallbacks& callbacks_;
   SubscriptionStats stats_;
   const std::string type_url_;

@@ -83,7 +83,7 @@ private:
   SubscriptionCallbacks& callbacks_;
   const LocalInfo::LocalInfo& local_info_;
   std::chrono::milliseconds init_fetch_timeout_;
-  Event::TimerPtr init_fetch_timeout_timer_{};
+  Event::TimerPtr init_fetch_timeout_timer_;
 
   bool any_request_sent_yet_in_current_stream_{};
 
