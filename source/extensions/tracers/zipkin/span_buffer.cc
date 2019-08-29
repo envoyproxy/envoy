@@ -24,7 +24,6 @@ SpanBuffer::SpanBuffer(
   allocateBuffer(size);
 }
 
-// TODO(fabolive): Need to avoid the copy to improve performance.
 bool SpanBuffer::addSpan(Span&& span) {
   const auto& annotations = span.annotations();
   if (span_buffer_.size() == span_buffer_.capacity() || annotations.empty() ||

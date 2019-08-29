@@ -150,7 +150,6 @@ ReporterPtr ReporterImpl::NewInstance(Driver& driver, Event::Dispatcher& dispatc
   return std::make_unique<ReporterImpl>(driver, dispatcher, collector);
 }
 
-// TODO(fabolive): Need to avoid the copy to improve performance.
 void ReporterImpl::reportSpan(Span&& span) {
   span_buffer_->addSpan(std::move(span));
 
