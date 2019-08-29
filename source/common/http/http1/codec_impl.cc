@@ -487,7 +487,7 @@ int ConnectionImpl::onHeadersCompleteBase() {
       current_header_map_->removeUpgrade();
       if (current_header_map_->Connection()) {
         const auto& tokens_to_remove = caseUnorderdSetContainingUpgradeAndHttp2Settings();
-        auto new_value = StringUtil::removeTokens(
+        std::string new_value = StringUtil::removeTokens(
             current_header_map_->Connection()->value().getStringView(), ",", tokens_to_remove, ",");
         if (new_value.empty()) {
           current_header_map_->removeConnection();

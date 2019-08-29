@@ -373,6 +373,8 @@ TEST(StringUtil, StringViewRemoveTokens) {
   EXPECT_EQ(StringUtil::removeTokens("", ",", {"two"}, ","), "");
   EXPECT_EQ(StringUtil::removeTokens("one", ",", {"two"}, ","), "one");
   EXPECT_EQ(StringUtil::removeTokens("one,two ", ",", {"two"}, ","), "one");
+  EXPECT_EQ(StringUtil::removeTokens("one,two ", ",", {"two","one"}, ","), "");
+  EXPECT_EQ(StringUtil::removeTokens("one,two ", ",", {"one"}, ","), "two");
   EXPECT_EQ(StringUtil::removeTokens("one,two,three ", ",", {"two"}, ","), "one,three");
   EXPECT_EQ(StringUtil::removeTokens(" one , two , three ", ",", {"two"}, ","), "one,three");
   EXPECT_EQ(StringUtil::removeTokens(" one , two , three ", ",", {"three"}, ","), "one,two");
