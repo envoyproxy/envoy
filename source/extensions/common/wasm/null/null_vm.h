@@ -37,6 +37,7 @@ struct NullVm : public WasmVm {
   bool getMemoryOffset(void* host_pointer, uint64_t* vm_pointer) override;
   bool setMemory(uint64_t pointer, uint64_t size, const void* data) override;
   bool setWord(uint64_t pointer, Word data) override;
+  bool getWord(uint64_t pointer, Word* data) override;
   void makeModule(absl::string_view name) override;
   absl::string_view getUserSection(absl::string_view name) override;
 

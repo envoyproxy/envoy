@@ -191,9 +191,18 @@ public:
   virtual bool setMemory(uint64_t pointer, uint64_t size, const void* data) PURE;
 
   /**
+   * Get a Word in the VM, returns true on success, false if the pointer is invalid.
+   * @param pointer the offset into VM memory describing the start of VM native word size block.
+   * @param data a pointer to a Word whose contents will be filled from the VM native word at
+   * 'pointer'.
+   * @return whether or not the pointer was to a valid VM memory block of VM native word size.
+   */
+  virtual bool getWord(uint64_t pointer, Word* data) PURE;
+
+  /**
    * Set a Word in the VM, returns true on success, false if the pointer is invalid.
    * @param pointer the offset into VM memory describing the start of VM native word size block.
-   * @param data a Word whose contents will be written in VM native word size at 'pointer.
+   * @param data a Word whose contents will be written in VM native word size at 'pointer'.
    * @return whether or not the pointer was to a valid VM memory block of VM native word size.
    */
   virtual bool setWord(uint64_t pointer, Word data) PURE;

@@ -83,6 +83,15 @@ bool NullVm::setWord(uint64_t pointer, Word data) {
   return true;
 }
 
+bool NullVm::getWord(uint64_t pointer, Word* data) {
+  if (pointer == 0) {
+    return false;
+  }
+  auto p = reinterpret_cast<char*>(pointer);
+  memcpy(&data->u64_, p, sizeof(data->u64_));
+  return true;
+}
+
 absl::string_view NullVm::getUserSection(absl::string_view /* name */) {
   // Return nothing: there is no WASM file.
   return {};

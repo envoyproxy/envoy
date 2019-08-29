@@ -59,15 +59,22 @@ TEST(WasmVmTest, NullVmMemory) {
   EXPECT_EQ(m.size(), d.size());
   uint64_t offset;
   char l;
-  wasm_vm->getMemoryOffset(&l, &offset);
+  EXPECT_TRUE(wasm_vm->getMemoryOffset(&l, &offset));
   EXPECT_EQ(offset, reinterpret_cast<uint64_t>(&l));
   char c;
   char z = 'z';
-  wasm_vm->setMemory(reinterpret_cast<uint64_t>(&c), 1, &z);
+  EXPECT_TRUE(wasm_vm->setMemory(reinterpret_cast<uint64_t>(&c), 1, &z));
   EXPECT_EQ(c, z);
-  Word w(0);
-  wasm_vm->setWord(reinterpret_cast<uint64_t>(&w), std::numeric_limits<uint64_t>::max());
+
+  Word w(13);
+  EXPECT_TRUE(
+      wasm_vm->setWord(reinterpret_cast<uint64_t>(&w), std::numeric_limits<uint64_t>::max()));
   EXPECT_EQ(w.u64_, std::numeric_limits<uint64_t>::max());
+
+  Word w2(0);
+  w.u64_ = 7;
+  EXPECT_TRUE(wasm_vm->getWord(reinterpret_cast<uint64_t>(&w), &w2));
+  EXPECT_EQ(w2.u64_, 7);
 }
 
 TEST(WasmVmTest, NullVmStart) {
