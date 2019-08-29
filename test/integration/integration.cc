@@ -442,7 +442,8 @@ void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootst
       if (!allow_lds_rejection) {
         RELEASE_ASSERT(test_server_->counter(rejected) == nullptr ||
                            test_server_->counter(rejected)->value() == 0,
-                       "Lds update failed");
+                       "Lds update failed. For details, run test with -l trace and look for "
+                       "\"Error adding/updating listener(s)\" in the logs.");
       }
       time_system_.sleep(std::chrono::milliseconds(10));
     }

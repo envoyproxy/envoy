@@ -31,14 +31,14 @@ ConfigImpl::ConfigImpl(
     break;
   case envoy::config::filter::network::redis_proxy::v2::
       RedisProxy_ConnPoolSettings_ReadPolicy_REPLICA:
-    read_policy_ = ReadPolicy::PreferMaster;
+    read_policy_ = ReadPolicy::Replica;
     break;
   case envoy::config::filter::network::redis_proxy::v2::
       RedisProxy_ConnPoolSettings_ReadPolicy_PREFER_REPLICA:
-    read_policy_ = ReadPolicy::PreferMaster;
+    read_policy_ = ReadPolicy::PreferReplica;
     break;
   case envoy::config::filter::network::redis_proxy::v2::RedisProxy_ConnPoolSettings_ReadPolicy_ANY:
-    read_policy_ = ReadPolicy::PreferMaster;
+    read_policy_ = ReadPolicy::Any;
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;

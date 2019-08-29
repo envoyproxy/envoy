@@ -782,6 +782,7 @@ uint
 un
 unacked
 unary
+uncomment
 unconfigurable
 unconfigured
 uncontended
@@ -797,6 +798,7 @@ unescaping
 unindexed
 uninsantiated
 uninstantiated
+uniq
 unix
 unlink
 unlinked

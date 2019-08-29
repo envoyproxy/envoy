@@ -33,6 +33,7 @@ envoy_cc_test_library(
         "//source/common/config:protobuf_link_hacks",
         "//source/common/config:resources_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/extensions/filters/network/redis_proxy:config",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
@@ -537,6 +538,7 @@ envoy_cc_test(
     deps = [
         ":integration_lib",
         "//source/common/network:listen_socket_lib",
+        "//source/server:active_raw_udp_listener_config",
         "//test/integration/filters:udp_listener_echo_filter_lib",
         "//test/server:utility_lib",
         "//test/test_common:utility_lib",

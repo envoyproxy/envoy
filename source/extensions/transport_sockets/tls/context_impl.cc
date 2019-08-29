@@ -51,7 +51,11 @@ bool cbsContainsU16(CBS& cbs, uint16_t n) {
 ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
                          TimeSource& time_source)
     : scope_(scope), stats_(generateStats(scope)), time_source_(time_source),
-      tls_max_version_(config.maxProtocolVersion()) {
+      tls_max_version_(config.maxProtocolVersion()), stat_name_set_(scope.symbolTable()),
+      ssl_ciphers_(stat_name_set_.add("ssl.ciphers")),
+      ssl_versions_(stat_name_set_.add("ssl.versions")),
+      ssl_curves_(stat_name_set_.add("ssl.curves")),
+      ssl_sigalgs_(stat_name_set_.add("ssl.sigalgs")) {
   const auto tls_certificates = config.tlsCertificates();
   tls_contexts_.resize(std::max(static_cast<size_t>(1), tls_certificates.size()));
 
@@ -369,6 +373,35 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   }
 
   parsed_alpn_protocols_ = parseAlpnProtocols(config.alpnProtocols());
+
+  // To enumerate the required builtin ciphers, curves, algorithms, and
+  // versions, uncomment '#define LOG_BUILTIN_STAT_NAMES' below, and run
+  //  bazel test //test/extensions/transport_sockets/tls/... --test_output=streamed
+  //      | grep " Builtin ssl." | sort | uniq
+  // #define LOG_BUILTIN_STAT_NAMES
+  //
+  // TODO(#8035): improve tooling to find any other built-ins needed to avoid
+  // contention.
+
+  // Ciphers
+  stat_name_set_.rememberBuiltin("AEAD-AES128-GCM-SHA256");
+  stat_name_set_.rememberBuiltin("ECDHE-ECDSA-AES128-GCM-SHA256");
+  stat_name_set_.rememberBuiltin("ECDHE-RSA-AES128-GCM-SHA256");
+  stat_name_set_.rememberBuiltin("ECDHE-RSA-AES128-SHA");
+  stat_name_set_.rememberBuiltin("ECDHE-RSA-CHACHA20-POLY1305");
+
+  // Curves
+  stat_name_set_.rememberBuiltin("X25519");
+
+  // Algorithms
+  stat_name_set_.rememberBuiltin("ecdsa_secp256r1_sha256");
+  stat_name_set_.rememberBuiltin("rsa_pss_rsae_sha256");
+
+  // Versions
+  stat_name_set_.rememberBuiltin("TLSv1");
+  stat_name_set_.rememberBuiltin("TLSv1.1");
+  stat_name_set_.rememberBuiltin("TLSv1.2");
+  stat_name_set_.rememberBuiltin("TLSv1.3");
 }
 
 int ServerContextImpl::alpnSelectCallback(const unsigned char** out, unsigned char* outlen,
@@ -477,6 +510,18 @@ int ContextImpl::verifyCertificate(X509* cert, const std::vector<std::string>& v
   return 1;
 }
 
+void ContextImpl::incCounter(const Stats::StatName name, absl::string_view value) const {
+  Stats::SymbolTable& symbol_table = scope_.symbolTable();
+  Stats::SymbolTable::StoragePtr storage =
+      symbol_table.join({name, stat_name_set_.getStatName(value)});
+  scope_.counterFromStatName(Stats::StatName(storage.get())).inc();
+
+#ifdef LOG_BUILTIN_STAT_NAMES
+  std::cerr << absl::StrCat("Builtin ", symbol_table.toString(name), ": ", value, "\n")
+            << std::flush;
+#endif
+}
+
 void ContextImpl::logHandshake(SSL* ssl) const {
   stats_.handshake_.inc();
 
@@ -484,22 +529,19 @@ void ContextImpl::logHandshake(SSL* ssl) const {
     stats_.session_reused_.inc();
   }
 
-  const char* cipher = SSL_get_cipher_name(ssl);
-  scope_.counter(fmt::format("ssl.ciphers.{}", std::string{cipher})).inc();
-
-  const char* version = SSL_get_version(ssl);
-  scope_.counter(fmt::format("ssl.versions.{}", std::string{version})).inc();
+  incCounter(ssl_ciphers_, SSL_get_cipher_name(ssl));
+  incCounter(ssl_versions_, SSL_get_version(ssl));
 
   uint16_t curve_id = SSL_get_curve_id(ssl);
   if (curve_id) {
-    const char* curve = SSL_get_curve_name(curve_id);
-    scope_.counter(fmt::format("ssl.curves.{}", std::string{curve})).inc();
+    // Note: in the unit tests, this curve name is always literal "X25519"
+    incCounter(ssl_curves_, SSL_get_curve_name(curve_id));
   }
 
   uint16_t sigalg_id = SSL_get_peer_signature_algorithm(ssl);
   if (sigalg_id) {
     const char* sigalg = SSL_get_signature_algorithm_name(sigalg_id, 1 /* include curve */);
-    scope_.counter(fmt::format("ssl.sigalgs.{}", std::string{sigalg})).inc();
+    incCounter(ssl_sigalgs_, sigalg);
   }
 
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
