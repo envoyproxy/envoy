@@ -4730,7 +4730,7 @@ TEST_F(HttpConnectionManagerImplDeathTest, InvalidConnectionManagerConfig) {
   EXPECT_NO_THROW(conn_manager_->onData(fake_input, false));
 
 #if !defined(NDEBUG)
-  // ASSERT faiure when SRDS provider returns a nullptr.
+  // ASSERT failure when SRDS provider returns a nullptr.
   EXPECT_CALL(*scoped_route_config_provider2_, config()).WillOnce(Return(nullptr));
   EXPECT_DEBUG_DEATH(conn_manager_->onData(fake_input, false),
                      "Scoped rds provider returns null for scoped routes config.");

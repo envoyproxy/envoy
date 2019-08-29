@@ -634,6 +634,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
       connection_manager_.config_.scopedRouteConfigProvider() != nullptr) {
     ASSERT(snapped_route_config_ == nullptr,
            "Route config already latched to the active stream when scoped RDS is enabled.");
+    // We need to snap snapped_route_config_ here as it's used in mutateRequestHeaders later.
     if (!snapScopedRouteConfig()) {
       return;
     }
