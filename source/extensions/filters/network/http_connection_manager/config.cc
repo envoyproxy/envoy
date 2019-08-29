@@ -274,10 +274,13 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     overall_sampling.set_numerator(
         tracing_config.has_overall_sampling() ? tracing_config.overall_sampling().value() : 100);
 
+    uint32_t max_path_tag_length =
+        tracing_config.max_path_tag_length() > 0 ? tracing_config.max_path_tag_length() : 256;
+
     tracing_config_ =
         std::make_unique<Http::TracingConnectionManagerConfig>(Http::TracingConnectionManagerConfig{
             tracing_operation_name, request_headers_for_tags, client_sampling, random_sampling,
-            overall_sampling, tracing_config.verbose()});
+            overall_sampling, tracing_config.verbose(), max_path_tag_length});
   }
 
   for (const auto& access_log : config.access_log()) {

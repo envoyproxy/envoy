@@ -58,6 +58,11 @@ public:
    * @return true if spans should be annotated with more detailed information.
    */
   virtual bool verbose() const PURE;
+
+  /**
+   * @return the maximum length allowed for paths in the extracted HttpUrl tag.
+   */
+  virtual uint32_t maxPathTagLength() const PURE;
 };
 
 class Span;
