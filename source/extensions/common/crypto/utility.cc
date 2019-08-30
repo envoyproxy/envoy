@@ -47,14 +47,9 @@ std::vector<uint8_t> getSha256Hmac(const std::vector<uint8_t>& key, absl::string
   return hmac;
 }
 
-const VerificationOutput verifySignature(absl::string_view hash, CryptoObjectPtr* pubKey,
+const VerificationOutput verifySignature(absl::string_view hash, CryptoObject& key,
                                          const std::vector<uint8_t>& signature,
                                          const std::vector<uint8_t>& text) {
-
-  if (pubKey == nullptr) {
-    return {false, "Failed to initialize digest verify."};
-  }
-
   // Step 1: initialize EVP_MD_CTX
   bssl::ScopedEVP_MD_CTX ctx;
 
@@ -64,10 +59,15 @@ const VerificationOutput verifySignature(absl::string_view hash, CryptoObjectPtr
   if (md == nullptr) {
     return {false, absl::StrCat(hash, " is not supported.")};
   }
-
   // Step 3: initialize EVP_DigestVerify
-  auto pkeyWrapper = Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyWrapper>(*pubKey);
+  auto pkeyWrapper = Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyWrapper>(key);
   EVP_PKEY* pkey = pkeyWrapper->getEVP_PKEY();
+
+  if (pkey == nullptr) {
+    free(pkeyWrapper);
+    return {false, "Failed to initialize digest verify."};
+  }
+
   int ok = EVP_DigestVerifyInit(ctx.get(), nullptr, md, nullptr, pkey);
   if (!ok) {
     return {false, "Failed to initialize digest verify."};

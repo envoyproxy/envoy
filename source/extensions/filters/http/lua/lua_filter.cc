@@ -458,8 +458,7 @@ int StreamHandleWrapper::luaVerifySignature(lua_State* state) {
 
   // Step 5: verify signature
   auto keyPtr = reinterpret_cast<Common::Crypto::CryptoObjectPtr*>(ptr);
-  auto output = Common::Crypto::Utility::verifySignature(hash, keyPtr, sig_vec, text_vec);
-
+  auto output = Common::Crypto::Utility::verifySignature(hash, *(keyPtr->get()), sig_vec, text_vec);
   lua_pushboolean(state, output.result_);
   if (output.result_) {
     lua_pushnil(state);

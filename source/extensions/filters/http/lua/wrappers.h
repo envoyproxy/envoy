@@ -221,7 +221,6 @@ private:
    */
   DECLARE_LUA_FUNCTION(PublicKeyWrapper, luaGet);
 
-  // PublicKeyPtr public_key_;
   Envoy::Common::Crypto::CryptoObjectPtr public_key_;
 };
 

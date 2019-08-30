@@ -19,9 +19,7 @@ using CryptoObjectPtr = std::unique_ptr<CryptoObject>;
 
 namespace Access {
 
-template <class T> T* getTyped(CryptoObjectPtr& cryptoPtr) {
-  return dynamic_cast<T*>(cryptoPtr.get());
-}
+template <class T> T* getTyped(CryptoObject& crypto) { return dynamic_cast<T*>(&crypto); }
 
 } // namespace Access
 
