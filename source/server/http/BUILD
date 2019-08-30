@@ -48,6 +48,7 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
         "//source/common/memory:stats_lib",
+        "//source/common/network:connection_balancer_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:raw_buffer_socket_lib",
         "//source/common/network:utility_lib",

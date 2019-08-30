@@ -32,7 +32,7 @@ namespace Server {
 OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::string& config_yaml,
                                   Network::Address::IpVersion ip_version,
                                   bool allow_unknown_static_fields,
-                                  bool reject_unknown_dynamic_fields) {
+                                  bool reject_unknown_dynamic_fields, uint32_t concurrency) {
   OptionsImpl test_options("cluster_name", "node_name", "zone_name", spdlog::level::info);
 
   test_options.setConfigPath(config_path);
@@ -43,6 +43,7 @@ OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::str
   test_options.setParentShutdownTime(std::chrono::seconds(2));
   test_options.setAllowUnkownFields(allow_unknown_static_fields);
   test_options.setRejectUnknownFieldsDynamic(reject_unknown_dynamic_fields);
+  test_options.setConcurrency(concurrency);
 
   return test_options;
 }
@@ -54,11 +55,12 @@ IntegrationTestServerPtr IntegrationTestServer::create(
     std::function<void()> on_server_init_function, bool deterministic,
     Event::TestTimeSystem& time_system, Api::Api& api, bool defer_listener_finalization,
     absl::optional<std::reference_wrapper<ProcessObject>> process_object,
-    bool allow_unknown_static_fields, bool reject_unknown_dynamic_fields) {
+    bool allow_unknown_static_fields, bool reject_unknown_dynamic_fields, uint32_t concurrency) {
   IntegrationTestServerPtr server{
       std::make_unique<IntegrationTestServerImpl>(time_system, api, config_path)};
   server->start(version, on_server_init_function, deterministic, defer_listener_finalization,
-                process_object, allow_unknown_static_fields, reject_unknown_dynamic_fields);
+                process_object, allow_unknown_static_fields, reject_unknown_dynamic_fields,
+                concurrency);
   return server;
 }
 
@@ -76,15 +78,15 @@ void IntegrationTestServer::start(
     const Network::Address::IpVersion version, std::function<void()> on_server_init_function,
     bool deterministic, bool defer_listener_finalization,
     absl::optional<std::reference_wrapper<ProcessObject>> process_object,
-    bool allow_unknown_static_fields, bool reject_unknown_dynamic_fields) {
+    bool allow_unknown_static_fields, bool reject_unknown_dynamic_fields, uint32_t concurrency) {
   ENVOY_LOG(info, "starting integration test server");
   ASSERT(!thread_);
-  thread_ = api_.threadFactory().createThread([version, deterministic, process_object,
-                                               allow_unknown_static_fields,
-                                               reject_unknown_dynamic_fields, this]() -> void {
-    threadRoutine(version, deterministic, process_object, allow_unknown_static_fields,
-                  reject_unknown_dynamic_fields);
-  });
+  thread_ = api_.threadFactory().createThread(
+      [version, deterministic, process_object, allow_unknown_static_fields,
+       reject_unknown_dynamic_fields, concurrency, this]() -> void {
+        threadRoutine(version, deterministic, process_object, allow_unknown_static_fields,
+                      reject_unknown_dynamic_fields, concurrency);
+      });
 
   // If any steps need to be done prior to workers starting, do them now. E.g., xDS pre-init.
   // Note that there is no synchronization guaranteeing this happens either
@@ -156,9 +158,10 @@ void IntegrationTestServer::serverReady() {
 void IntegrationTestServer::threadRoutine(
     const Network::Address::IpVersion version, bool deterministic,
     absl::optional<std::reference_wrapper<ProcessObject>> process_object,
-    bool allow_unknown_static_fields, bool reject_unknown_dynamic_fields) {
-  OptionsImpl options(Server::createTestOptionsImpl(
-      config_path_, "", version, allow_unknown_static_fields, reject_unknown_dynamic_fields));
+    bool allow_unknown_static_fields, bool reject_unknown_dynamic_fields, uint32_t concurrency) {
+  OptionsImpl options(Server::createTestOptionsImpl(config_path_, "", version,
+                                                    allow_unknown_static_fields,
+                                                    reject_unknown_dynamic_fields, concurrency));
   Thread::MutexBasicLockable lock;
 
   Runtime::RandomGeneratorPtr random_generator;
