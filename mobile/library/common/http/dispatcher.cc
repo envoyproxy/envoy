@@ -168,7 +168,6 @@ void Dispatcher::cleanup(envoy_stream_t stream_handle) {
   RELEASE_ASSERT(direct_stream,
                  "cleanup is a private method that is only called with stream ids that exist");
 
-  // TODO: think about thread safety of deleting the DirectStream immediately.
   size_t erased = streams_.erase(stream_handle);
   ASSERT(erased == 1, "cleanup should always remove one entry from the streams map");
   ENVOY_LOG(debug, "[S{}] remove stream", stream_handle);
