@@ -256,3 +256,9 @@ envoy_cc_library(
         "@envoy_api//envoy/config/trace/v2:trace_cc",
     ],
 )
+
+envoy_cc_library(
+    name = "active_udp_listener_config_interface",
+    hdrs = ["active_udp_listener_config.h"],
+    deps = ["//include/envoy/network:connection_handler_interface"],
+)

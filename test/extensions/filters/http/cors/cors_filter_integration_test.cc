@@ -195,6 +195,33 @@ TEST_P(CorsFilterIntegrationTest, DEPRECATED_FEATURE_TEST(TestCorsDisabled)) {
       });
 }
 
+TEST_P(CorsFilterIntegrationTest, DEPRECATED_FEATURE_TEST(TestLegacyCorsDisabled)) {
+  config_helper_.addConfigModifier(
+      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void {
+        auto* route_config = hcm.mutable_route_config();
+        auto* virtual_host = route_config->mutable_virtual_hosts(0);
+        auto* route = virtual_host->add_routes();
+        route->mutable_match()->set_prefix("/legacy-no-cors");
+        route->mutable_route()->set_cluster("cluster_0");
+        route->mutable_route()->mutable_cors()->mutable_enabled()->set_value(false);
+      });
+  testNormalRequest(
+      Http::TestHeaderMapImpl{
+          {":method", "OPTIONS"},
+          {":path", "/legacy-no-cors/test"},
+          {":scheme", "http"},
+          {":authority", "test-host"},
+          {"access-control-request-method", "GET"},
+          {"origin", "test-origin"},
+      },
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {":status", "200"},
+      });
+}
+
 TEST_P(CorsFilterIntegrationTest, DEPRECATED_FEATURE_TEST(TestEncodeHeaders)) {
   testNormalRequest(
       Http::TestHeaderMapImpl{
