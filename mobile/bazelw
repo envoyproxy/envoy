@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-readonly bazel_version="0.28.0"
+read -r bazel_version<.bazelversion
 if [[ $OSTYPE == darwin* ]]; then
   readonly bazel_platform="darwin"
   readonly bazel_version_sha="572a34b3aac1e891d6bc6d7b0c58ffcbd86eac52f8bcc02f069a8be5af44bf5e"
