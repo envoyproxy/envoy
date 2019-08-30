@@ -251,13 +251,8 @@ bool EdsClusterImpl::updateHostsPerLocality(
   return false;
 }
 
-void EdsClusterImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
+void EdsClusterImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason,
                                           const EnvoyException*) {
-  //  We should not call onPreInitComplete if this method is called because of stream disconnection.
-  // This might potentially hang the initialization forever, if init_fetch_timeout is disabled.
-  if (reason == Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure) {
-    return;
-  }
   // We need to allow server startup to continue, even if we have a bad config.
   onPreInitComplete();
 }

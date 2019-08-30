@@ -6,6 +6,7 @@
 #include <unordered_set>
 
 #include "envoy/config/filter/network/client_ssl_auth/v2/client_ssl_auth.pb.h"
+#include "envoy/config/subscription.h"
 #include "envoy/network/filter.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
@@ -94,7 +95,7 @@ private:
   void createRequest(Http::Message& request) override;
   void parseResponse(const Http::Message& response) override;
   void onFetchComplete() override {}
-  void onFetchFailure(const EnvoyException* e) override;
+  void onFetchFailure(Config::ConfigUpdateFailureReason reason, const EnvoyException* e) override;
 
   ThreadLocal::SlotPtr tls_;
   Network::Address::IpList ip_white_list_;
