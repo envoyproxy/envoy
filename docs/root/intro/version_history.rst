@@ -53,6 +53,7 @@ Version history
 * upstream: use p2c to select hosts for least-requests load balancers if all host weights are the same, even in cases where weights are not equal to 1.
 * upstream: added :ref:`an option <envoy_api_field_Cluster.CommonLbConfig.close_connections_on_host_set_change>` that allows draining HTTP, TCP connection pools on cluster membership change.
 * zookeeper: parse responses and emit latency stats.
+* router: :ref:`Scoped routing <arch_overview_http_routing_route_scope>` is supported.
 
 1.11.1 (August 13, 2019)
 ========================

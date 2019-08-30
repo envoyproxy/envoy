@@ -50,12 +50,13 @@ request. The router filter supports the following features:
 * :ref:`Hash policy <envoy_api_field_route.RouteAction.hash_policy>` based routing.
 * :ref:`Absolute urls <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.http_protocol_options>` are supported for non-tls forward proxies.
 
+.. _arch_overview_http_routing_route_scope:
 
-Routing Scope
+Route Scope
 --------------
 
 Scoped routing enables Envoy to put constraints on search space of domains and route rules.
-A :ref:`Routing Scope<envoy_api_msg_ScopedRouteConfiguration>` associates a key with a :ref:`route table <arch_overview_http_routing_route_table>`.
+A :ref:`Route Scope<envoy_api_msg_ScopedRouteConfiguration>` associates a key with a :ref:`route table <arch_overview_http_routing_route_table>`.
 For each request, a scope key is computed dynamically by the HTTP connection manager to pick the :ref:`route table<envoy_api_msg_RouteConfiguration>`.
 
 The Scoped RDS (SRDS) API contains a set of :ref:`Scopes <envoy_api_msg_ScopedRouteConfiguration>` resources, each defining independent routing configuration,
