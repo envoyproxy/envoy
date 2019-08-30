@@ -126,6 +126,19 @@ message GrpcJsonTranscoder {
   // from the ``grpc-status-details-bin`` header and use it as JSON body.
   // If there was no such header, make ``google.rpc.Status`` out of the ``grpc-status`` and
   // ``grpc-message`` headers.
-  // This also adds ``google.rpc.Status`` to user-provided protobuf descriptor.
+  // The error details types must be present in the ``proto_descriptor``.
+  //
+  // Example:
+  //
+  // .. code-block:: proto
+  //
+  //     import "google/rpc/error_details.proto";
+  //
+  //     message Dummy {
+  //       google.rpc.RequestInfo request_info = 1;
+  //     }
+  //
+  // If a gRPC service uses the types from the ``google/rpc/error_details.proto``, its proto files
+  // should reference at least one of those types.
   bool convert_grpc_status = 9;
 }
