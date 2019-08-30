@@ -45,6 +45,7 @@ Version history
 * router: added :ref:`rq_retry_skipped_request_not_complete <config_http_filters_router_stats>` counter stat to router stats.
 * router check tool: add coverage reporting & enforcement.
 * router check tool: add comprehensive coverage reporting.
+* tracing: added support to the Zipkin reporter for sending list of spans as Zipkin JSON v2 and protobuf message over HTTP.
 * router check tool: add deprecated field check.
 * tls: added verification of IP address SAN fields in certificates against configured SANs in the
   certificate validation context.
