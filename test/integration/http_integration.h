@@ -138,7 +138,7 @@ protected:
   // Close |codec_client_| and |fake_upstream_connection_| cleanly.
   void cleanupUpstreamAndDownstream();
 
-  // Verifie the response_headers contains the expected_headers, and response body matches given
+  // Verifies the response_headers contains the expected_headers, and response body matches given
   // body string.
   void verifyResponse(IntegrationStreamDecoderPtr response, const std::string& response_code,
                       const Http::TestHeaderMapImpl& expected_headers,
