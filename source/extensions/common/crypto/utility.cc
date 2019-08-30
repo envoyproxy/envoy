@@ -60,7 +60,7 @@ const VerificationOutput verifySignature(absl::string_view hash, CryptoObject& k
     return {false, absl::StrCat(hash, " is not supported.")};
   }
   // Step 3: initialize EVP_DigestVerify
-  auto pkeyWrapper = Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyWrapper>(key);
+  auto pkeyWrapper = Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(key);
   EVP_PKEY* pkey = pkeyWrapper->getEVP_PKEY();
 
   if (pkey == nullptr) {
@@ -89,10 +89,10 @@ CryptoObjectPtr importPublicKey(const std::vector<uint8_t>& key) {
 
   EVP_PKEY* pkey(EVP_parse_public_key(&cbs));
 
-  auto publicKeyWrapper = new PublicKeyWrapper();
+  auto publicKeyWrapper = new PublicKeyObject();
   publicKeyWrapper->setEVP_PKEY(pkey);
 
-  std::unique_ptr<PublicKeyWrapper> publicKeyPtr = std::make_unique<PublicKeyWrapper>();
+  std::unique_ptr<PublicKeyObject> publicKeyPtr = std::make_unique<PublicKeyObject>();
   publicKeyPtr.reset(publicKeyWrapper);
 
   return publicKeyPtr;

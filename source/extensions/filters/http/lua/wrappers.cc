@@ -179,12 +179,12 @@ int PublicKeyWrapper::luaGet(lua_State* state) {
     lua_pushnil(state);
   } else {
     auto wrapper =
-        Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyWrapper>(*(public_key_.get()));
+        Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*(public_key_.get()));
     EVP_PKEY* pkey = wrapper->getEVP_PKEY();
     if (pkey == nullptr) {
       lua_pushnil(state);
     } else {
-      lua_pushlightuserdata(state, &public_key_);
+      lua_pushlightuserdata(state, public_key_.get());
     }
   }
   return 1;

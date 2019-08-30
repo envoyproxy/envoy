@@ -8,9 +8,9 @@ namespace Envoy {
 namespace Common {
 namespace Crypto {
 
-EVP_PKEY* PublicKeyWrapper::getEVP_PKEY() const { return pkey_.get(); }
+EVP_PKEY* PublicKeyObject::getEVP_PKEY() const { return pkey_.get(); }
 
-void PublicKeyWrapper::setEVP_PKEY(EVP_PKEY* pkey) { pkey_.reset(pkey); }
+void PublicKeyObject::setEVP_PKEY(EVP_PKEY* pkey) { pkey_.reset(pkey); }
 
 } // namespace Crypto
 } // namespace Common

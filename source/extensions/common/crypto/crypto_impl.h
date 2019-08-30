@@ -14,11 +14,11 @@ namespace Envoy {
 namespace Common {
 namespace Crypto {
 
-class PublicKeyWrapper : public Envoy::Common::Crypto::CryptoObject {
+class PublicKeyObject : public Envoy::Common::Crypto::CryptoObject {
 public:
-  PublicKeyWrapper() = default;
-  PublicKeyWrapper(EVP_PKEY* pkey) : pkey_(pkey) {}
-  PublicKeyWrapper(const PublicKeyWrapper& pkeyWrapper);
+  PublicKeyObject() = default;
+  PublicKeyObject(EVP_PKEY* pkey) : pkey_(pkey) {}
+  PublicKeyObject(const PublicKeyObject& pkeyWrapper);
   EVP_PKEY* getEVP_PKEY() const;
   void setEVP_PKEY(EVP_PKEY* pkey);
 
