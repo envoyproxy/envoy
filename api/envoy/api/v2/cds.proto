@@ -669,6 +669,22 @@ message Cluster {
 // parameters, it must define a message for its own configuration, which will
 // be stored in the config field. The name of the policy will tell clients
 // which type of message they should expect to see in the config field.
+//
+// Note that there are cases where it is useful to be able to independently
+// select LB policies for choosing a locality and for choosing an
+// endpoint within that locality. For example, a given deployment may
+// always use the same policy to choose the locality, but for choosing the
+// endpoint within the locality, some clusters may use weighted-round-robin,
+// while others may use some sort of session-based balancing.
+//
+// This can be accomplished via hierarchical LB policies, where the parent
+// LB policy creates a child LB policy for each locality. For each request,
+// the parent chooses the locality and then delegates to the child policy
+// for that locality to choose the endpoint within the locality.
+//
+// To facilitate this, the config message for the top-level LB policy may
+// include a field of type LoadBalancingPolicy that specifies the child
+// policy.
 message LoadBalancingPolicy {
   message Policy {
     // Required. The name of the LB policy.
