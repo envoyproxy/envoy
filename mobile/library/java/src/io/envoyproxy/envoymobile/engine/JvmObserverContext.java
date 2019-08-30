@@ -1,5 +1,6 @@
 package io.envoyproxy.envoymobile.engine;
 
+import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -103,6 +104,24 @@ class JvmObserverContext {
     observer.getExecutor().execute(runnable);
 
     resetHeaderAccumulation();
+  }
+
+  /**
+   * Dispatches data received from the JNI layer up to the platform.
+   *
+   * @param data,      chunk of body data from the HTTP response.
+   * @param endStream, indicates this is the last remote frame of the stream.
+   */
+  public void onData(byte[] data, boolean endStream) {
+    observer.getExecutor().execute(new Runnable() {
+      public void run() {
+        if (canceled.get()) {
+          return;
+        }
+        ByteBuffer dataBuffer = ByteBuffer.wrap(data);
+        observer.onData(dataBuffer, endStream);
+      }
+    });
   }
 
   private void startAccumulation(FrameType type, long length, boolean endStream) {
