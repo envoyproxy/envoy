@@ -37,18 +37,17 @@ static_resources:
         name: envoy.http_connection_manager
   clusters:
   - connect_timeout: 0.25s
-    tls_context:
-      common_tls_context:
-        tls_certificates:
-          - certificate_chain: { filename: "./test/config/integration/certs/clientcert.pem" }
-            private_key: { filename: "./test/config/integration/certs/clientkey.pem" }
+    #tls_context:
+      #common_tls_context:
+        #tls_certificates:
+          #- certificate_chain: { filename: "./test/config/integration/certs/clientcert.pem" }
+            #private_key: { filename: "./test/config/integration/certs/clientkey.pem" }
     tls_context_overrides:
       mtlsReady:
         common_tls_context:
           tls_certificates:
             - certificate_chain: { filename: "./test/config/integration/certs/clientcert.pem" }
               private_key: { filename: "./test/config/integration/certs/clientkey.pem" }
-      mtlsDisable: {}
     name: mtls_by_label
     type: eds
     eds_cluster_config:

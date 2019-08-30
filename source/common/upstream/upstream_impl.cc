@@ -766,11 +766,29 @@ TransportSocketOverridesPtr createTransportSocketOverrides(
       Server::Configuration::UpstreamTransportSocketConfigFactory>(transport_socket.name());
   ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
       transport_socket, factory_context.messageValidationVisitor(), config_factory);
+
   // TODO(incfly): later, use the only one default factory, not over creating.
   auto default_socket_factory = config_factory.createTransportSocketFactory(*message, factory_context);
-  // TODO implement this.
-  return std::make_unique<TransportSocketOverrides>(std::move(default_socket_factory),
-        std::map<std::string, Network::TransportSocketFactoryPtr>());
+  auto socket_factory_map = std::make_unique<std::map<std::string,
+       Network::TransportSocketFactoryPtr>>();
+  for (const auto& socket_matcher_iter : config.tls_context_overrides()) {
+    const auto& label = socket_matcher_iter.first;
+    const auto& tls_config = socket_matcher_iter.second;
+
+    envoy::api::v2::core::TransportSocket socket;
+    socket.set_name("tls");
+
+    auto& tls_config_factory = Config::Utility::getAndCheckFactory<
+      Server::Configuration::UpstreamTransportSocketConfigFactory>("tls");
+    MessageUtil::jsonConvert(tls_config, *socket.mutable_config());
+
+    ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
+      socket, factory_context.messageValidationVisitor(), config_factory);
+    (*socket_factory_map)[label] = 
+        tls_config_factory.createTransportSocketFactory(*message, factory_context);
+  }
+  return std::make_unique<TransportSocketOverrides>(
+      std::move(default_socket_factory),  std::move(socket_factory_map));
 }
 
 void ClusterInfoImpl::createNetworkFilterChain(Network::Connection& connection) const {

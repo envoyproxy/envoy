@@ -5,10 +5,13 @@ namespace Upstream {
 
 TransportSocketOverrides::TransportSocketOverrides(
     Network::TransportSocketFactoryPtr&& socket_factory,
-    std::map<std::string, Network::TransportSocketFactoryPtr>&& socket_factory_overrides) :
+
+  TransportSocketFactoryMapPtr&& socket_factory_overrides):
+//      std::map<std::string, Network::TransportSocketFactoryPtr>&& socket_factory_overrides) :
+//    const Protobuf::Map<std::string, envoy::api::v2::auth::UpstreamTlsContext>& socket_matcher,
+//Server::Configuration::TransportSocketFactoryContext&  factory) : 
   default_socket_factory_(std::move(socket_factory)),
-  socket_overrides_(std::move(socket_factory_overrides)) {
-}
+  socket_factory_map_(std::move(socket_factory_overrides)) {}
 
 Network::TransportSocketFactory& TransportSocketOverrides::resolve(
     const envoy::api::v2::core::Metadata& metadata) {
@@ -26,12 +29,13 @@ Network::TransportSocketFactory& TransportSocketOverrides::resolve(
     return *default_socket_factory_;
   }
   const std::string& socket_label = socket_label_itr->second.string_value();
-  if (socket_label == "" || socket_overrides_.find(socket_label) == socket_overrides_.end()) {
+  if (socket_label == "" || socket_factory_map_->find(socket_label) == 
+      socket_factory_map_->end()) {
     ENVOY_LOG(info, "incfly debug, transport socket resolved default 3...");
     return *default_socket_factory_;
   }
   ENVOY_LOG(info, "incfly debug, transport socket resolved customized 1...");
-  return *socket_overrides_[socket_label];
+  return *((*socket_factory_map_)[socket_label]);
 }
 
 } // namespace Upstream

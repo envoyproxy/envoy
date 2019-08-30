@@ -38,6 +38,7 @@
 #include "common/config/well_known_names.h"
 #include "common/init/manager_impl.h"
 #include "common/network/utility.h"
+#include "common/protobuf/protobuf.h"
 #include "common/stats/isolated_store_impl.h"
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/outlier_detection_impl.h"
@@ -48,20 +49,25 @@
 namespace Envoy  {
 namespace Upstream {
 
-// TODO: rename to factory selector something.
+class TransportSocketOverrides;
+
+using TransportSocketOverridesPtr = std::unique_ptr<TransportSocketOverrides>;
+using TransportSocketFactoryMapPtr = std::unique_ptr<std::map<std::string, Network::TransportSocketFactoryPtr>>;
+
+// TODO: rename to matcher.
 class TransportSocketOverrides : Logger::Loggable<Logger::Id::upstream> {
 public:
   TransportSocketOverrides(Network::TransportSocketFactoryPtr&& socket_factory,
-      std::map<std::string, Network::TransportSocketFactoryPtr>&& socket_factory_overrides);
+//      const Protobuf::Map<std::string, envoy::api::v2::auth::UpstreamTlsContext>& socket_matcher);
+  TransportSocketFactoryMapPtr&& socket_factory_overrides);
 
   Network::TransportSocketFactory& resolve(const envoy::api::v2::core::Metadata& metadata);
 
 protected:
-  // TODO: how to handle this, who owns the factory?
   Network::TransportSocketFactoryPtr default_socket_factory_;
-  std::map<std::string, Network::TransportSocketFactoryPtr> socket_overrides_;
+  TransportSocketFactoryMapPtr socket_factory_map_;
+  //std::map<std::string, Network::TransportSocketFactoryPtr> socket_overrides_;
 };
 
-using TransportSocketOverridesPtr = std::unique_ptr<TransportSocketOverrides>;
 } // namespace Upstream
 } // namespace Envoy

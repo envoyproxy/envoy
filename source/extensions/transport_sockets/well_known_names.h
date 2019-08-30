@@ -20,6 +20,8 @@ public:
   const std::string Tls = "tls";
 };
 
+// TODO: move envoy.transport_socket_matcher definition here.
+
 using TransportSocketNames = ConstSingleton<TransportSocketNameValues>;
 
 } // namespace TransportSockets
