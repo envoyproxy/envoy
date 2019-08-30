@@ -287,7 +287,10 @@ TEST_P(ProxyProtocolTest, errorRecv_2) {
         const ssize_t rc = ::readv(fd, iov, iovcnt);
         return Api::SysCallSizeResult{rc, errno};
       }));
-
+  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([](int fd) {
+    const int rc = ::close(fd);
+    return Api::SysCallIntResult{rc, errno};
+  }));
   connect(false);
   write(buffer, sizeof(buffer));
 
@@ -316,7 +319,10 @@ TEST_P(ProxyProtocolTest, errorFIONREAD_1) {
         const ssize_t rc = ::readv(fd, iov, iovcnt);
         return Api::SysCallSizeResult{rc, errno};
       }));
-
+  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([](int fd) {
+    const int rc = ::close(fd);
+    return Api::SysCallIntResult{rc, errno};
+  }));
   connect(false);
   write(buffer, sizeof(buffer));
 
@@ -527,7 +533,10 @@ TEST_P(ProxyProtocolTest, v2ParseExtensionsIoctlError) {
         const ssize_t rc = ::readv(fd, iov, iovcnt);
         return Api::SysCallSizeResult{rc, errno};
       }));
-
+  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([](int fd) {
+    const int rc = ::close(fd);
+    return Api::SysCallIntResult{rc, errno};
+  }));
   connect(false);
   write(buffer, sizeof(buffer));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -656,7 +665,10 @@ TEST_P(ProxyProtocolTest, v2Fragmented3Error) {
         const ssize_t rc = ::readv(fd, iov, iovcnt);
         return Api::SysCallSizeResult{rc, errno};
       }));
-
+  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([](int fd) {
+    const int rc = ::close(fd);
+    return Api::SysCallIntResult{rc, errno};
+  }));
   connect(false);
   write(buffer, 17);
 
@@ -702,7 +714,10 @@ TEST_P(ProxyProtocolTest, v2Fragmented4Error) {
         const ssize_t rc = ::readv(fd, iov, iovcnt);
         return Api::SysCallSizeResult{rc, errno};
       }));
-
+  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([](int fd) {
+    const int rc = ::close(fd);
+    return Api::SysCallIntResult{rc, errno};
+  }));
   connect(false);
   write(buffer, 10);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);

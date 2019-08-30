@@ -29,7 +29,6 @@ Version history
 * http: added the ability to reject HTTP/1.1 requests with invalid HTTP header values, using the runtime feature `envoy.reloadable_features.strict_header_validation`.
 * http: changed Envoy to forward existing x-forwarded-proto from upstream trusted proxies. Guarded by `envoy.reloadable_features.trusted_forwarded_proto` which defaults true.
 * http: added the ability to configure the behavior of the server response header, via the :ref:`server_header_transformation<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.server_header_transformation>` field.
-* http: changed Envoy to forward existing x-forwarded-proto from downstream trusted proxies. Guarded by `envoy.reloadable_features.trusted_forwarded_proto` which defaults true.
 * http: added the ability to :ref:`merge adjacent slashes<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.merge_slashes>` in the path.
 * listeners: added :ref:`continue_on_listener_filters_timeout <envoy_api_field_Listener.continue_on_listener_filters_timeout>` to configure whether a listener will still create a connection when listener filters time out.
 * listeners: added :ref:`HTTP inspector listener filter <config_listener_filters_http_inspector>`.
@@ -47,6 +46,8 @@ Version history
 * router check tool: add coverage reporting & enforcement.
 * router check tool: add comprehensive coverage reporting.
 * router: :ref:`Scoped routing <arch_overview_http_routing_route_scope>` is supported.
+* tracing: added support to the Zipkin reporter for sending list of spans as Zipkin JSON v2 and protobuf message over HTTP.
+* router check tool: add deprecated field check.
 * tls: added verification of IP address SAN fields in certificates against configured SANs in the
   certificate validation context.
 * tracing: added tags for gRPC response status and meesage.

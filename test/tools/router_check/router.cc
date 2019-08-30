@@ -63,7 +63,8 @@ ToolConfig::ToolConfig(std::unique_ptr<Http::TestHeaderMapImpl> headers, int ran
     : headers_(std::move(headers)), random_value_(random_value) {}
 
 // static
-RouterCheckTool RouterCheckTool::create(const std::string& router_config_file) {
+RouterCheckTool RouterCheckTool::create(const std::string& router_config_file,
+                                        const bool disableDeprecationCheck) {
   // TODO(hennna): Allow users to load a full config and extract the route configuration from it.
   envoy::api::v2::RouteConfiguration route_config;
   auto stats = std::make_unique<Stats::IsolatedStoreImpl>();
@@ -72,6 +73,9 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_file) {
 
   auto factory_context = std::make_unique<NiceMock<Server::Configuration::MockFactoryContext>>();
   auto config = std::make_unique<Router::ConfigImpl>(route_config, *factory_context, false);
+  if (!disableDeprecationCheck) {
+    MessageUtil::checkForDeprecation(route_config, &factory_context->runtime_loader_);
+  }
 
   return RouterCheckTool(std::move(factory_context), std::move(config), std::move(stats),
                          std::move(api), Coverage(route_config));
@@ -439,6 +443,8 @@ Options::Options(int argc, char** argv) {
   TCLAP::CmdLine cmd("router_check_tool", ' ', "none", true);
   TCLAP::SwitchArg is_proto("p", "useproto", "Use Proto test file schema", cmd, false);
   TCLAP::SwitchArg is_detailed("d", "details", "Show detailed test execution results", cmd, false);
+  TCLAP::SwitchArg disable_deprecation_check("", "disable-deprecation-check",
+                                             "Disable deprecated fields check", cmd, false);
   TCLAP::ValueArg<double> fail_under("f", "fail-under",
                                      "Fail if test coverage is under a specified amount", false,
                                      0.0, "float", cmd);
@@ -461,6 +467,7 @@ Options::Options(int argc, char** argv) {
   is_detailed_ = is_detailed.getValue();
   fail_under_ = fail_under.getValue();
   comprehensive_coverage_ = comprehensive_coverage.getValue();
+  disable_deprecation_check_ = disable_deprecation_check.getValue();
 
   if (is_proto_) {
     config_path_ = config_path.getValue();
