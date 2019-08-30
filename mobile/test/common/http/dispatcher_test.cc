@@ -587,8 +587,6 @@ TEST_F(DispatcherTest, ResetInOnHeaders) {
   EXPECT_CALL(stream_callbacks_, onReset());
 
   response_decoder_->decodeHeaders(HeaderMapPtr(new TestHeaderMapImpl{{":status", "200"}}), false);
-  // TODO: Need to finish the data side (sendData, onData) in order to fully verify that onData was
-  // never called due to the reset.
 }
 
 TEST_F(DispatcherTest, StreamTimeout) {
