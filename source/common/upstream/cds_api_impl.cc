@@ -61,12 +61,9 @@ void CdsApiImpl::onConfigUpdate(
     const std::string& system_version_info) {
   if (cm_.adsMux()) {
     cm_.adsMux()->pause(Config::TypeUrl::get().ClusterLoadAssignment);
+    Cleanup eds_resume(
+        [this] { cm_.adsMux()->resume(Config::TypeUrl::get().ClusterLoadAssignment); });
   }
-  Cleanup eds_resume([this] {
-    if (cm_.adsMux()) {
-      cm_.adsMux()->resume(Config::TypeUrl::get().ClusterLoadAssignment);
-    }
-  });
 
   ENVOY_LOG(info, "cds: add {} cluster(s), remove {} cluster(s)", added_resources.size(),
             removed_resources.size());

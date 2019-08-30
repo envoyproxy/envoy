@@ -322,7 +322,7 @@ public:
   MOCK_METHOD1(removeCluster, bool(const std::string& cluster));
   MOCK_METHOD0(shutdown, void());
   MOCK_CONST_METHOD0(bindConfig, const envoy::api::v2::core::BindConfig&());
-  MOCK_METHOD0(adsMux, GrpcMuxSharedPtr());
+  MOCK_METHOD0(adsMux, Config::GrpcMuxSharedPtr());
   MOCK_METHOD0(grpcAsyncClientManager, Grpc::AsyncClientManager&());
   MOCK_CONST_METHOD0(versionInfo, const std::string());
   MOCK_CONST_METHOD0(localClusterName, const std::string&());

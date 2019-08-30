@@ -10,7 +10,8 @@
 namespace Envoy {
 namespace Config {
 
-NewGrpcMuxImpl::NewGrpcMuxImpl(Grpc::RawAsyncClientPtr async_client, Event::Dispatcher& dispatcher,
+NewGrpcMuxImpl::NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client,
+                               Event::Dispatcher& dispatcher,
                                const Protobuf::MethodDescriptor& service_method,
                                Runtime::RandomGenerator& random, Stats::Scope& scope,
                                const RateLimitSettings& rate_limit_settings,

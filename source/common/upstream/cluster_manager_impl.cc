@@ -138,16 +138,16 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
       // If the first CDS response doesn't have any primary cluster, ClusterLoadAssignment
       // should be already paused by CdsApiImpl::onConfigUpdate(). Need to check that to
       // avoid double pause ClusterLoadAssignment.
-      if (cm_.adsMux().paused(Config::TypeUrl::get().ClusterLoadAssignment)) {
+      if (cm_.adsMux() == nullptr ||
+          cm_.adsMux()->paused(Config::TypeUrl::get().ClusterLoadAssignment)) {
         initializeSecondaryClusters();
       } else {
-        cm_.adsMux().pause(Config::TypeUrl::get().ClusterLoadAssignment);
+        cm_.adsMux()->pause(Config::TypeUrl::get().ClusterLoadAssignment);
         Cleanup eds_resume(
-            [this] { cm_.adsMux().resume(Config::TypeUrl::get().ClusterLoadAssignment); });
+            [this] { cm_.adsMux()->resume(Config::TypeUrl::get().ClusterLoadAssignment); });
         initializeSecondaryClusters();
       }
     }
-
     return;
   }
 

@@ -33,12 +33,8 @@ void LdsApiImpl::onConfigUpdate(
     const std::string& system_version_info) {
   if (cm_.adsMux()) {
     cm_.adsMux()->pause(Config::TypeUrl::get().RouteConfiguration);
+    Cleanup rds_resume([this] { cm_.adsMux()->resume(Config::TypeUrl::get().RouteConfiguration); });
   }
-  Cleanup rds_resume([this] {
-    if (cm_.adsMux()) {
-      cm_.adsMux()->resume(Config::TypeUrl::get().RouteConfiguration);
-    }
-  });
 
   bool any_applied = false;
   // We do all listener removals before adding the new listeners. This allows adding a new listener

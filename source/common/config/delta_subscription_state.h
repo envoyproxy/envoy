@@ -37,7 +37,10 @@ public:
 
   void handleEstablishmentFailure();
 
+  // Returns the next gRPC request proto to be sent off to the server, based on this object's
+  // understanding of the current protocol state, and new resources that Envoy wants to request.
   envoy::api::v2::DeltaDiscoveryRequest getNextRequestAckless();
+  // The WithAck version first calls the Ackless version, then adds in the passed-in ack.
   envoy::api::v2::DeltaDiscoveryRequest getNextRequestWithAck(const UpdateAck& ack);
 
 private:
