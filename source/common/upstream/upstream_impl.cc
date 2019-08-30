@@ -590,7 +590,7 @@ private:
 ClusterInfoImpl::ClusterInfoImpl(
     const envoy::api::v2::Cluster& config, const envoy::api::v2::core::BindConfig& bind_config,
     Runtime::Loader& runtime, Network::TransportSocketFactoryPtr&& socket_factory,
-    TransportSocketOverridesPtr&& socket_overrides,
+    TransportSocketMatcherPtr&& socket_overrides,
     Stats::ScopePtr&& stats_scope, bool added_via_api,
     ProtobufMessage::ValidationVisitor& validation_visitor,
     Server::Configuration::TransportSocketFactoryContext& factory_context)
@@ -746,7 +746,7 @@ Network::TransportSocketFactoryPtr createTransportSocketFactory(
 }
 
 // TODO(icnfly): figure out here, what's about factory context.
-TransportSocketOverridesPtr createTransportSocketOverrides(
+TransportSocketMatcherPtr createTransportSocketMatcher(
     const envoy::api::v2::Cluster& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context) {
   // If the cluster config doesn't have a transport socket configured, override with the default
@@ -771,23 +771,28 @@ TransportSocketOverridesPtr createTransportSocketOverrides(
   auto default_socket_factory = config_factory.createTransportSocketFactory(*message, factory_context);
   auto socket_factory_map = std::make_unique<std::map<std::string,
        Network::TransportSocketFactoryPtr>>();
-  for (const auto& socket_matcher_iter : config.tls_context_overrides()) {
-    const auto& label = socket_matcher_iter.first;
-    const auto& tls_config = socket_matcher_iter.second;
+  //for (const auto& socket_matcher_iter : config.transport_socket_matchers()) {
+    //const auto& label = socket_matcher_iter.match();
+    //const auto& tls_config = socket_matcher_iter.tls_context();
+  {
+    const auto& label = config.transport_socket_matchers().match();
+    const auto& tls_config = config.transport_socket_matchers().tls_context();
 
     envoy::api::v2::core::TransportSocket socket;
     socket.set_name("tls");
 
+    // ENVOY_LOG(info, "incfly debug0 {}", tls_config.DebugString());
     auto& tls_config_factory = Config::Utility::getAndCheckFactory<
       Server::Configuration::UpstreamTransportSocketConfigFactory>("tls");
     MessageUtil::jsonConvert(tls_config, *socket.mutable_config());
+    // ENVOY_LOG(info, "incfly debug1");
 
     ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-      socket, factory_context.messageValidationVisitor(), config_factory);
+      socket, factory_context.messageValidationVisitor(), tls_config_factory);
     (*socket_factory_map)[label] = 
         tls_config_factory.createTransportSocketFactory(*message, factory_context);
   }
-  return std::make_unique<TransportSocketOverrides>(
+  return std::make_unique<TransportSocketMatcher>(
       std::move(default_socket_factory),  std::move(socket_factory_map));
 }
 
@@ -806,7 +811,7 @@ ClusterImplBase::ClusterImplBase(
       symbol_table_(stats_scope->symbolTable()) {
   factory_context.setInitManager(init_manager_);
   auto socket_factory = createTransportSocketFactory(cluster, factory_context);
-  auto socket_overrides = createTransportSocketOverrides(cluster, factory_context);
+  auto socket_overrides = createTransportSocketMatcher(cluster, factory_context);
   info_ = std::make_unique<ClusterInfoImpl>(
       cluster, factory_context.clusterManager().bindConfig(), runtime, std::move(socket_factory),
       std::move(socket_overrides), std::move(stats_scope), added_via_api,

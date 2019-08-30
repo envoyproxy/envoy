@@ -234,7 +234,14 @@ message Cluster {
   //   verification.
   auth.UpstreamTlsContext tls_context = 11;
 
-  map<string, auth.UpstreamTlsContext> tls_context_overrides = 41;
+  // map<string, auth.UpstreamTlsContext> tls_context_overrides = 41;
+  message TransportSocketMatcher {
+    string match = 1;
+    auth.UpstreamTlsContext tls_context = 2;
+  }
+
+
+  TransportSocketMatcher transport_socket_matchers = 41;
 
   reserved 12;
 

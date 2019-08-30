@@ -3,7 +3,7 @@
 namespace Envoy {
 namespace Upstream {
 
-TransportSocketOverrides::TransportSocketOverrides(
+TransportSocketMatcher::TransportSocketMatcher(
     Network::TransportSocketFactoryPtr&& socket_factory,
 
   TransportSocketFactoryMapPtr&& socket_factory_overrides):
@@ -13,9 +13,8 @@ TransportSocketOverrides::TransportSocketOverrides(
   default_socket_factory_(std::move(socket_factory)),
   socket_factory_map_(std::move(socket_factory_overrides)) {}
 
-Network::TransportSocketFactory& TransportSocketOverrides::resolve(
+Network::TransportSocketFactory& TransportSocketMatcher::resolve(
     const envoy::api::v2::core::Metadata& metadata) {
-  // TODO(incfly): here, check ProtobufWkt::Value& Metadata::metadataValue
   const auto& filter_metadata = metadata.filter_metadata();
   const auto envoy_tss_itr = metadata.filter_metadata().find("envoy.transport_socket_selector");
   ENVOY_LOG(info, "incfly debug, transport socket resolving...");

@@ -511,7 +511,7 @@ public:
   ClusterInfoImpl(const envoy::api::v2::Cluster& config,
                   const envoy::api::v2::core::BindConfig& bind_config, Runtime::Loader& runtime,
                   Network::TransportSocketFactoryPtr&& socket_factory,
-                  TransportSocketOverridesPtr&& socket_overrides,
+                  TransportSocketMatcherPtr&& socket_overrides,
                   Stats::ScopePtr&& stats_scope, bool added_via_api,
                   ProtobufMessage::ValidationVisitor& validation_visitor,
                   Server::Configuration::TransportSocketFactoryContext&);
@@ -609,7 +609,7 @@ private:
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   const uint32_t per_connection_buffer_limit_bytes_;
   Network::TransportSocketFactoryPtr transport_socket_factory_;
-  TransportSocketOverridesPtr socket_overrides_;
+  TransportSocketMatcherPtr socket_overrides_;
   Stats::ScopePtr stats_scope_;
   mutable ClusterStats stats_;
   Stats::IsolatedStoreImpl load_report_stats_store_;
@@ -648,7 +648,7 @@ createTransportSocketFactory(const envoy::api::v2::Cluster& config,
                              Server::Configuration::TransportSocketFactoryContext& factory_context);
 
 
-TransportSocketOverridesPtr createTransportSocketOverrides(
+TransportSocketMatcherPtr createTransportSocketMatcher(
     const envoy::api::v2::Cluster& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context);
 

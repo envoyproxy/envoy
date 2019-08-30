@@ -49,15 +49,15 @@
 namespace Envoy  {
 namespace Upstream {
 
-class TransportSocketOverrides;
+class TransportSocketMatcher;
 
-using TransportSocketOverridesPtr = std::unique_ptr<TransportSocketOverrides>;
+using TransportSocketMatcherPtr = std::unique_ptr<TransportSocketMatcher>;
 using TransportSocketFactoryMapPtr = std::unique_ptr<std::map<std::string, Network::TransportSocketFactoryPtr>>;
 
 // TODO: rename to matcher.
-class TransportSocketOverrides : Logger::Loggable<Logger::Id::upstream> {
+class TransportSocketMatcher : Logger::Loggable<Logger::Id::upstream> {
 public:
-  TransportSocketOverrides(Network::TransportSocketFactoryPtr&& socket_factory,
+  TransportSocketMatcher(Network::TransportSocketFactoryPtr&& socket_factory,
 //      const Protobuf::Map<std::string, envoy::api::v2::auth::UpstreamTlsContext>& socket_matcher);
   TransportSocketFactoryMapPtr&& socket_factory_overrides);
 
