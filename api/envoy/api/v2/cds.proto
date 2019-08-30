@@ -52,7 +52,7 @@ service ClusterDiscoveryService {
 // [#protodoc-title: Clusters]
 
 // Configuration for a single upstream cluster.
-// [#comment:next free field: 41]
+// [#comment:next free field: 42]
 message Cluster {
   // Supplies the name of the cluster which must be unique across all clusters.
   // The cluster name is used when emitting
@@ -233,6 +233,32 @@ message Cluster {
   //   :ref:`trusted_ca<envoy_api_field_auth.CertificateValidationContext.trusted_ca>` to enable
   //   verification.
   auth.UpstreamTlsContext tls_context = 11;
+
+  // UpstreamTransportSocket specifies the transport socket config used for upstream connection.
+  message UpstreamTransportSocket {
+    oneof socket_config {
+      core.TransportSocket transport_socket = 1;
+      auth.UpstreamTlsContext tls_context = 2;
+    }
+  }
+
+  // Configuration to use different transport sockets for different endpoints.
+  // This should only be used for EDS typed cluster.
+  // The value of LbEndpoint.Metadata configuration under the *envoy.transport_socket_matcher*
+  // is used to decide which transport socket to use when connecting to that particular endpoint.
+  // For example, an endpoint with metadata
+  //
+  // .. code-block:: json
+  //
+  //   {
+  //     "envoy.transport_socket_matcher_label":
+  //        { "label": "mtlsEnabled" }
+  //   }
+  //
+  // This endpoint will use the transport_socket_matcher["mtlsEnabled"] configuration.
+  // In case of of label is missing or the transport_socket_matcher does not have corresponding
+  // entry in the map, Envoy fallbacks to the *tls_context* or *transport_socket* in the cluster.
+  map<string, UpstreamTransportSocket> transport_socket_matcher = 41;
 
   reserved 12;
 
