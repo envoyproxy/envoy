@@ -176,7 +176,7 @@ message Cluster {
     // this option or not.
     CLUSTER_PROVIDED = 6;
 
-    // Use the new :ref:`load_balancing_policy
+    // [#not-implemented-hide:] Use the new :ref:`load_balancing_policy
     // <envoy_api_field_Cluster.load_balancing_policy>` field to
     // determine the LB policy.
     // [#next-major-version: In the v3 API, we should consider
