@@ -24,6 +24,12 @@ if [[ "${COVERAGE_OUTPUT}" != *"Current route coverage: "* ]] ; then
   exit 1
 fi
 
+COMP_COVERAGE_CMD="${PATH_BIN} -c ${PATH_CONFIG}/ComprehensiveRoutes.yaml -t ${PATH_CONFIG}/ComprehensiveRoutes.golden.proto.json --details --useproto -f "
+COVERAGE_OUTPUT=$($COMP_COVERAGE_CMD "100" "--covall" 2>&1) || echo "${COVERAGE_OUTPUT:-no-output}"
+if [[ "${COVERAGE_OUTPUT}" != *"Current route coverage: 100%"* ]] ; then
+  exit 1
+fi
+
 COMP_COVERAGE_CMD="${PATH_BIN} ${PATH_CONFIG}/ComprehensiveRoutes.yaml ${PATH_CONFIG}/ComprehensiveRoutes.golden.json --details -f "
 COVERAGE_OUTPUT=$($COMP_COVERAGE_CMD "100" "--covall" 2>&1) || echo "${COVERAGE_OUTPUT:-no-output}"
 if [[ "${COVERAGE_OUTPUT}" != *"Current route coverage: 100%"* ]] ; then

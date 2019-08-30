@@ -6,11 +6,13 @@
 #include "envoy/common/time.h"
 #include "envoy/network/address.h"
 
+#include "common/common/assert.h"
 #include "common/common/hex.h"
 
 #include "extensions/tracers/zipkin/tracer_interface.h"
 #include "extensions/tracers/zipkin/util.h"
 
+#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 
@@ -444,6 +446,11 @@ public:
   const std::string idAsHexString() const { return Hex::uint64ToHex(id_); }
 
   /**
+   * @return the span's id as a byte string.
+   */
+  const std::string idAsByteString() const { return Util::toByteString(id_); }
+
+  /**
    * @return the span's name.
    */
   const std::string& name() const { return name_; }
@@ -458,6 +465,14 @@ public:
    */
   const std::string parentIdAsHexString() const {
     return parent_id_ ? Hex::uint64ToHex(parent_id_.value()) : EMPTY_HEX_STRING_;
+  }
+
+  /**
+   * @return the span's parent id as a byte string.
+   */
+  const std::string parentIdAsByteString() const {
+    ASSERT(parent_id_);
+    return Util::toByteString(parent_id_.value());
   }
 
   /**
@@ -490,8 +505,19 @@ public:
    */
   const std::string traceIdAsHexString() const {
     return trace_id_high_.has_value()
-               ? Hex::uint64ToHex(trace_id_high_.value()) + Hex::uint64ToHex(trace_id_)
+               ? absl::StrCat(Hex::uint64ToHex(trace_id_high_.value()), Hex::uint64ToHex(trace_id_))
                : Hex::uint64ToHex(trace_id_);
+  }
+
+  /**
+   * @return the span's trace id as a byte string.
+   */
+  const std::string traceIdAsByteString() const {
+    // https://github.com/openzipkin/zipkin-api/blob/v0.2.1/zipkin.proto#L60-L61.
+    return trace_id_high_.has_value()
+               ? absl::StrCat(Util::toBigEndianByteString(trace_id_high_.value()),
+                              Util::toBigEndianByteString(trace_id_))
+               : Util::toBigEndianByteString(trace_id_);
   }
 
   /**
