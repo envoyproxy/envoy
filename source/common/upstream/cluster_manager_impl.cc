@@ -487,9 +487,12 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& clust
 
   if (existing_active_cluster != active_clusters_.end() ||
       existing_warming_cluster != warming_clusters_.end()) {
+    const auto cluster_it = (existing_active_cluster != active_clusters_.end())
+                                ? existing_active_cluster
+                                : existing_warming_cluster;
     // The following init manager remove call is a NOP in the case we are already initialized. It's
     // just kept here to avoid additional logic.
-    init_helper_.removeCluster(*existing_active_cluster->second->cluster_);
+    init_helper_.removeCluster(*cluster_it->second->cluster_);
     cm_stats_.cluster_modified_.inc();
   } else {
     cm_stats_.cluster_added_.inc();
