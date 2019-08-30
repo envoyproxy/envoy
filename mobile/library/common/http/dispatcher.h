@@ -36,10 +36,6 @@ public:
   envoy_status_t sendData(envoy_stream_t stream, envoy_data data, bool end_stream);
   envoy_status_t sendMetadata(envoy_stream_t stream, envoy_headers headers, bool end_stream);
   envoy_status_t sendTrailers(envoy_stream_t stream, envoy_headers headers);
-  // TODO: when implementing this function we have to make sure to prevent races with already
-  // scheduled and potentially scheduled callbacks. In order to do so the platform callbacks need to
-  // check for atomic state (boolean most likely) that will be updated here to mark the stream as
-  // closed.
   envoy_status_t resetStream(envoy_stream_t stream);
 
 private:
