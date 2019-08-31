@@ -72,6 +72,20 @@ message ExtAuthz {
   // Sets the HTTP status that is returned to the client when there is a network error between the
   // filter and the authorization server. The default status is HTTP 403 Forbidden.
   envoy.type.HttpStatus status_on_error = 7;
+
+  // Specifies a list of metadata namespaces whose values, if present, will be passed to the
+  // ext_authz service as an opaque *protobuf::Struct*.
+  //
+  // For example, if the *jwt_authn* filter is used and :ref:`payload_in_metadata
+  // <envoy_api_field_config.filter.http.jwt_authn.v2alpha.JwtProvider.payload_in_metadata>` is set,
+  // then the following will pass the jwt payload to the authorization server.
+  //
+  // .. code-block:: yaml
+  //
+  //    metadata_context_namespaces:
+  //    - envoy.filters.http.jwt_authn
+  //
+  repeated string metadata_context_namespaces = 8;
 }
 
 // Configuration for buffering the request data.

@@ -241,6 +241,9 @@ void Span::finish() {
     cr.setTimestamp(stop_timestamp);
     cr.setValue(ZipkinCoreConstants::get().CLIENT_RECV);
     annotations_.push_back(std::move(cr));
+  }
+
+  if (monotonic_start_time_) {
     const int64_t monotonic_stop_time = std::chrono::duration_cast<std::chrono::microseconds>(
                                             time_source_.monotonicTime().time_since_epoch())
                                             .count();

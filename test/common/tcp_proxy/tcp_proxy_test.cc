@@ -821,27 +821,27 @@ TEST_F(TcpProxyTest, IdleTimeout) {
   setup(1, config);
 
   Event::MockTimer* idle_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
-  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
   raiseEventUpstreamConnected(0);
 
   Buffer::OwnedImpl buffer("hello");
-  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
   filter_->onData(buffer, false);
 
   buffer.add("hello2");
-  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
   upstream_callbacks_->onUpstreamData(buffer, false);
 
-  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
   filter_callbacks_.connection_.raiseBytesSentCallbacks(1);
 
-  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
   upstream_connections_.at(0)->raiseBytesSentCallbacks(2);
 
   EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(*idle_timer, disableTimer());
-  idle_timer->callback_();
+  idle_timer->invokeCallback();
 }
 
 // Tests that the idle timer is disabled when the downstream connection is closed.
@@ -851,7 +851,7 @@ TEST_F(TcpProxyTest, IdleTimerDisabledDownstreamClose) {
   setup(1, config);
 
   Event::MockTimer* idle_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
-  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
   raiseEventUpstreamConnected(0);
 
   EXPECT_CALL(*idle_timer, disableTimer());
@@ -865,7 +865,7 @@ TEST_F(TcpProxyTest, IdleTimerDisabledUpstreamClose) {
   setup(1, config);
 
   Event::MockTimer* idle_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
-  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
   raiseEventUpstreamConnected(0);
 
   EXPECT_CALL(*idle_timer, disableTimer());
@@ -879,21 +879,21 @@ TEST_F(TcpProxyTest, IdleTimeoutWithOutstandingDataFlushed) {
   setup(1, config);
 
   Event::MockTimer* idle_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
-  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
   raiseEventUpstreamConnected(0);
 
   Buffer::OwnedImpl buffer("hello");
-  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
   filter_->onData(buffer, false);
 
   buffer.add("hello2");
-  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
   upstream_callbacks_->onUpstreamData(buffer, false);
 
-  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
   filter_callbacks_.connection_.raiseBytesSentCallbacks(1);
 
-  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
   upstream_connections_.at(0)->raiseBytesSentCallbacks(2);
 
   // Mark the upstream connection as blocked.
@@ -918,7 +918,7 @@ TEST_F(TcpProxyTest, IdleTimeoutWithOutstandingDataFlushed) {
 
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(*idle_timer, disableTimer());
-  idle_timer->callback_();
+  idle_timer->invokeCallback();
 }
 
 // Test that access log fields %UPSTREAM_HOST% and %UPSTREAM_CLUSTER% are correctly logged.
@@ -1043,7 +1043,7 @@ TEST_F(TcpProxyTest, UpstreamFlushTimeoutConfigured) {
 
   NiceMock<Event::MockTimer>* idle_timer =
       new NiceMock<Event::MockTimer>(&filter_callbacks_.connection_.dispatcher_);
-  EXPECT_CALL(*idle_timer, enableTimer(_));
+  EXPECT_CALL(*idle_timer, enableTimer(_, _));
   raiseEventUpstreamConnected(0);
 
   EXPECT_CALL(*upstream_connections_.at(0),
@@ -1056,7 +1056,7 @@ TEST_F(TcpProxyTest, UpstreamFlushTimeoutConfigured) {
   filter_.reset();
   EXPECT_EQ(1U, config_->stats().upstream_flush_active_.value());
 
-  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
   upstream_connections_.at(0)->raiseBytesSentCallbacks(1);
 
   // Simulate flush complete.
@@ -1075,7 +1075,7 @@ TEST_F(TcpProxyTest, UpstreamFlushTimeoutExpired) {
 
   NiceMock<Event::MockTimer>* idle_timer =
       new NiceMock<Event::MockTimer>(&filter_callbacks_.connection_.dispatcher_);
-  EXPECT_CALL(*idle_timer, enableTimer(_));
+  EXPECT_CALL(*idle_timer, enableTimer(_, _));
   raiseEventUpstreamConnected(0);
 
   EXPECT_CALL(*upstream_connections_.at(0),
@@ -1089,7 +1089,7 @@ TEST_F(TcpProxyTest, UpstreamFlushTimeoutExpired) {
   EXPECT_EQ(1U, config_->stats().upstream_flush_active_.value());
 
   EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush));
-  idle_timer->callback_();
+  idle_timer->invokeCallback();
   EXPECT_EQ(1U, config_->stats().upstream_flush_total_.value());
   EXPECT_EQ(0U, config_->stats().upstream_flush_active_.value());
   EXPECT_EQ(1U, config_->stats().idle_timeout_.value());

@@ -306,7 +306,7 @@ TEST_F(HttpFilterTest, BadConfig) {
   envoy::config::filter::http::ext_authz::v2::ExtAuthz proto_config{};
   TestUtility::loadFromYaml(filter_config, proto_config);
   EXPECT_THROW(
-      MessageUtil::downcastAndValidate<const envoy::config::filter::http::ext_authz::v2::ExtAuthz&>(
+      TestUtility::downcastAndValidate<const envoy::config::filter::http::ext_authz::v2::ExtAuthz&>(
           proto_config),
       ProtoValidationException);
 }
@@ -766,6 +766,68 @@ TEST_F(HttpFilterTest, NoClearCacheRouteDeniedResponse) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.denied").value());
   EXPECT_EQ("ext_authz_denied", filter_callbacks_.details_);
+}
+
+// Verifies that specified metadata is passed along in the check request
+TEST_F(HttpFilterTest, MetadataContext) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  metadata_context_namespaces:
+  - jazz.sax
+  - rock.guitar
+  - hiphop.drums
+  )EOF");
+
+  const std::string yaml = R"EOF(
+  filter_metadata:
+    jazz.sax:
+      coltrane: john
+      parker: charlie
+    jazz.piano:
+      monk: thelonious
+      hancock: herbie
+    rock.guitar:
+      hendrix: jimi
+      richards: keith
+  )EOF";
+
+  envoy::api::v2::core::Metadata metadata;
+  TestUtility::loadFromYaml(yaml, metadata);
+  ON_CALL(filter_callbacks_.stream_info_, dynamicMetadata()).WillByDefault(ReturnRef(metadata));
+
+  prepareCheck();
+
+  envoy::service::auth::v2::CheckRequest check_request;
+  EXPECT_CALL(*client_, check(_, _, _))
+      .WillOnce(WithArgs<1>(Invoke([&](const envoy::service::auth::v2::CheckRequest& check_param)
+                                       -> void { check_request = check_param; })));
+
+  filter_->decodeHeaders(request_headers_, false);
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
+
+  EXPECT_EQ("john", check_request.attributes()
+                        .metadata_context()
+                        .filter_metadata()
+                        .at("jazz.sax")
+                        .fields()
+                        .at("coltrane")
+                        .string_value());
+
+  EXPECT_EQ("jimi", check_request.attributes()
+                        .metadata_context()
+                        .filter_metadata()
+                        .at("rock.guitar")
+                        .fields()
+                        .at("hendrix")
+                        .string_value());
+
+  EXPECT_EQ(0, check_request.attributes().metadata_context().filter_metadata().count("jazz.piano"));
+
+  EXPECT_EQ(0,
+            check_request.attributes().metadata_context().filter_metadata().count("hiphop.drums"));
 }
 
 // -------------------

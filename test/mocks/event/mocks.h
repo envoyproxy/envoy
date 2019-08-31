@@ -17,6 +17,8 @@
 #include "envoy/network/transport_socket.h"
 #include "envoy/ssl/context.h"
 
+#include "common/common/scope_tracker.h"
+
 #include "test/mocks/buffer/mocks.h"
 #include "test/test_common/test_time.h"
 
@@ -116,6 +118,7 @@ public:
   MOCK_METHOD1(setTrackedObject, const ScopeTrackedObject*(const ScopeTrackedObject* object));
   MOCK_CONST_METHOD0(isThreadSafe, bool());
   Buffer::WatermarkFactory& getWatermarkFactory() override { return buffer_factory_; }
+  MOCK_METHOD0(getCurrentThreadId, Thread::ThreadId());
 
   GlobalTimeSystem time_system_;
   std::list<DeferredDeletablePtr> to_delete_;
@@ -131,18 +134,27 @@ public:
   void invokeCallback() {
     EXPECT_TRUE(enabled_);
     enabled_ = false;
+    if (scope_ == nullptr) {
+      callback_();
+      return;
+    }
+    ScopeTrackerScopeState scope(scope_, *dispatcher_);
+    scope_ = nullptr;
     callback_();
   }
 
   // Timer
   MOCK_METHOD0(disableTimer, void());
-  MOCK_METHOD1(enableTimer, void(const std::chrono::milliseconds&));
+  MOCK_METHOD2(enableTimer,
+               void(const std::chrono::milliseconds&, const ScopeTrackedObject* scope));
   MOCK_METHOD0(enabled, bool());
 
+  MockDispatcher* dispatcher_{};
+  const ScopeTrackedObject* scope_{};
   bool enabled_{};
-  Event::TimerCb callback_; // TODO(mattklein123): This should be private and only called via
-                            // invoke callback to clear enabled_, but that will break too many
-                            // tests and can be done later.
+
+private:
+  Event::TimerCb callback_;
 };
 
 class MockSignalEvent : public SignalEvent {

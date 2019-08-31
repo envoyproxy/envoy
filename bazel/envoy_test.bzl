@@ -8,6 +8,7 @@ load(
     "envoy_external_dep_path",
     "envoy_linkstatic",
     "envoy_select_force_libcpp",
+    "envoy_stdlib_deps",
     "tcmalloc_external_dep",
 )
 
@@ -80,7 +81,7 @@ def envoy_cc_fuzz_test(name, corpus, deps = [], tags = [], **kwargs):
     test_lib_name = name + "_lib"
     envoy_cc_test_library(
         name = test_lib_name,
-        deps = deps + ["//test/fuzz:fuzz_runner_lib"],
+        deps = deps + ["//test/fuzz:fuzz_runner_lib", "//bazel:dynamic_stdlib"],
         **kwargs
     )
     native.cc_test(
@@ -115,7 +116,7 @@ def envoy_cc_fuzz_test(name, corpus, deps = [], tags = [], **kwargs):
         tags = ["manual"] + tags,
     )
 
-    native.cc_binary(
+    native.cc_test(
         name = name + "_with_libfuzzer",
         copts = envoy_copts("@envoy", test = True),
         linkopts = ["-fsanitize=fuzzer"] + _envoy_test_linkopts(),
@@ -123,7 +124,7 @@ def envoy_cc_fuzz_test(name, corpus, deps = [], tags = [], **kwargs):
         testonly = 1,
         data = [corpus_name],
         deps = [":" + test_lib_name],
-        tags = ["manual"] + tags,
+        tags = ["manual", "fuzzer"] + tags,
     )
 
 # Envoy C++ test targets should be specified with this function.
@@ -163,7 +164,7 @@ def envoy_cc_test(
         linkopts = _envoy_test_linkopts(),
         linkstatic = envoy_linkstatic(),
         malloc = tcmalloc_external_dep(repository),
-        deps = [
+        deps = envoy_stdlib_deps() + [
             ":" + name + "_lib_internal_only",
             repository + "//test:main",
         ],

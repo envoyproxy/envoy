@@ -43,7 +43,7 @@ class ThriftProxyFilterConfigFactory
           envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy,
           envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProtocolOptions> {
 public:
-  ThriftProxyFilterConfigFactory() : FactoryBase(NetworkFilterNames::get().ThriftProxy) {}
+  ThriftProxyFilterConfigFactory() : FactoryBase(NetworkFilterNames::get().ThriftProxy, true) {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(

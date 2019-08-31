@@ -134,7 +134,7 @@ public:
 
     if (!yaml.empty()) {
       TestUtility::loadFromYaml(yaml, proto_config_);
-      MessageUtil::validate(proto_config_);
+      TestUtility::validate(proto_config_);
     }
 
     proto_config_.set_stat_prefix("test");
@@ -1168,7 +1168,9 @@ route_config:
       - match:
           method:
             name:
-              regex: "(.*?)"
+              safe_regex:
+                google_re2: {}
+                regex: "(.*?)"
         route:
             cluster: user_service_dubbo_server
 )EOF";

@@ -179,6 +179,15 @@ TEST_F(DiskLoaderImplTest, All) {
   // test_feature_false is not in runtime_features.cc and so is false by default.
   EXPECT_EQ(false, snapshot->runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
 
+  // Deprecation
+#ifdef ENVOY_DISABLE_DEPRECATED_FEATURES
+  EXPECT_EQ(false, snapshot->deprecatedFeatureEnabled("random_string_should_be_enabled"));
+#else
+  EXPECT_EQ(true, snapshot->deprecatedFeatureEnabled("random_string_should_be_enabled"));
+#endif
+  EXPECT_EQ(false, snapshot->deprecatedFeatureEnabled(
+                       "envoy.deprecated_features.deprecated.proto:is_deprecated_fatal"));
+
   // Feature defaults via helper function.
   EXPECT_EQ(false, runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
   EXPECT_EQ(true, runtimeFeatureEnabled("envoy.reloadable_features.test_feature_true"));
@@ -707,6 +716,16 @@ TEST(NoRuntime, FeatureEnabled) {
   // Feature defaults should still work.
   EXPECT_EQ(false, runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
   EXPECT_EQ(true, runtimeFeatureEnabled("envoy.reloadable_features.test_feature_true"));
+}
+
+TEST(NoRuntime, DefaultIntValues) {
+  // Make sure the registry is not set up.
+  ASSERT_TRUE(Runtime::LoaderSingleton::getExisting() == nullptr);
+
+  // Feature defaults should still work.
+  EXPECT_EQ(0x1230000ABCDULL,
+            getInteger("envoy.reloadable_features.test_int_feature_default", 0x1230000ABCDULL));
+  EXPECT_EQ(0, getInteger("envoy.reloadable_features.test_int_feature_zero", 0));
 }
 
 // Test RTDS layer(s).

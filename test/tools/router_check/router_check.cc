@@ -10,8 +10,9 @@ int main(int argc, char* argv[]) {
   const bool enforce_coverage = options.failUnder() != 0.0;
   try {
     Envoy::RouterCheckTool checktool =
-        options.isProto() ? Envoy::RouterCheckTool::create(options.configPath())
-                          : Envoy::RouterCheckTool::create(options.unlabelledConfigPath());
+        options.isProto() ? Envoy::RouterCheckTool::create(options.configPath(),
+                                                           options.disableDeprecationCheck())
+                          : Envoy::RouterCheckTool::create(options.unlabelledConfigPath(), true);
 
     if (options.isDetailed()) {
       checktool.setShowDetails();
@@ -25,8 +26,8 @@ int main(int argc, char* argv[]) {
       return EXIT_FAILURE;
     }
 
-    const double current_coverage = checktool.coverage();
-    std::cerr << "Current route coverage: " << current_coverage << "%" << std::endl;
+    const double current_coverage = checktool.coverage(options.comprehensiveCoverage());
+    std::cout << "Current route coverage: " << current_coverage << "%" << std::endl;
     if (enforce_coverage) {
       if (current_coverage < options.failUnder()) {
         std::cerr << "Failed to meet coverage requirement: " << options.failUnder() << "%"

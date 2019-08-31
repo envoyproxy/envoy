@@ -54,7 +54,7 @@ struct ToolConfig {
 
 private:
   ToolConfig(std::unique_ptr<Http::TestHeaderMapImpl> headers, int random_value);
-  Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
+  Stats::TestSymbolTable symbol_table_;
 };
 
 /**
@@ -65,10 +65,12 @@ class RouterCheckTool : Logger::Loggable<Logger::Id::testing> {
 public:
   /**
    * @param router_config_file v2 router config file.
+   * @param disableDeprecationCheck flag to disable the RouteConfig deprecated field check
    * @return RouterCheckTool a RouterCheckTool instance with member variables set by the router
    * config file.
    * */
-  static RouterCheckTool create(const std::string& router_config_file);
+  static RouterCheckTool create(const std::string& router_config_file,
+                                const bool disableDeprecationCheck);
 
   /**
    * TODO(tonya11en): Use a YAML format for the expected routes. This will require a proto.
@@ -89,7 +91,9 @@ public:
    */
   void setShowDetails() { details_ = true; }
 
-  float coverage() { return coverage_.report(); }
+  float coverage(bool detailed) {
+    return detailed ? coverage_.detailedReport() : coverage_.report();
+  }
 
 private:
   RouterCheckTool(
@@ -182,6 +186,11 @@ public:
   double failUnder() const { return fail_under_; }
 
   /**
+   * @return true if test coverage should be comprehensive.
+   */
+  bool comprehensiveCoverage() const { return comprehensive_coverage_; }
+
+  /**
    * @return true if proto schema test is used.
    */
   bool isProto() const { return is_proto_; }
@@ -191,13 +200,20 @@ public:
    */
   bool isDetailed() const { return is_detailed_; }
 
+  /**
+   * @return true if the deprecated field check for RouteConfiguration is disabled.
+   */
+  bool disableDeprecationCheck() const { return disable_deprecation_check_; }
+
 private:
   std::string test_path_;
   std::string config_path_;
   std::string unlabelled_test_path_;
   std::string unlabelled_config_path_;
   float fail_under_;
+  bool comprehensive_coverage_;
   bool is_proto_;
   bool is_detailed_;
+  bool disable_deprecation_check_;
 };
 } // namespace Envoy

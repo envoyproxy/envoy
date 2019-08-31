@@ -43,6 +43,13 @@ public:
     EXPECT_CALL(cb_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(socket_, ioHandle()).WillRepeatedly(ReturnRef(*io_handle_));
 
+    // Prepare the first recv attempt during
+    EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+        .WillOnce(
+            Invoke([](int fd, void* buffer, size_t length, int flag) -> Api::SysCallSizeResult {
+              ENVOY_LOG_MISC(error, "In mock syscall recv {} {} {} {}", fd, buffer, length, flag);
+              return Api::SysCallSizeResult{static_cast<ssize_t>(0), 0};
+            }));
     EXPECT_CALL(dispatcher_,
                 createFileEvent_(_, _, Event::FileTriggerType::Edge,
                                  Event::FileReadyType::Read | Event::FileReadyType::Closed))
@@ -231,6 +238,36 @@ TEST_F(TlsInspectorTest, NotSsl) {
   EXPECT_EQ(1, cfg_->stats().tls_not_found_.value());
 }
 
+TEST_F(TlsInspectorTest, InlineReadSucceed) {
+  filter_ = std::make_unique<Filter>(cfg_);
+
+  EXPECT_CALL(cb_, socket()).WillRepeatedly(ReturnRef(socket_));
+  EXPECT_CALL(cb_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
+  EXPECT_CALL(socket_, ioHandle()).WillRepeatedly(ReturnRef(*io_handle_));
+  const std::vector<absl::string_view> alpn_protos = {absl::string_view("h2")};
+  const std::string servername("example.com");
+  std::vector<uint8_t> client_hello = Tls::Test::generateClientHello(servername, "\x02h2");
+
+  EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+      .WillOnce(Invoke(
+          [&client_hello](int fd, void* buffer, size_t length, int flag) -> Api::SysCallSizeResult {
+            ENVOY_LOG_MISC(trace, "In mock syscall recv {} {} {} {}", fd, buffer, length, flag);
+            ASSERT(length >= client_hello.size());
+            memcpy(buffer, client_hello.data(), client_hello.size());
+            return Api::SysCallSizeResult{ssize_t(client_hello.size()), 0};
+          }));
+
+  // No event is created if the inline recv parse the hello.
+  EXPECT_CALL(dispatcher_,
+              createFileEvent_(_, _, Event::FileTriggerType::Edge,
+                               Event::FileReadyType::Read | Event::FileReadyType::Closed))
+      .Times(0);
+
+  EXPECT_CALL(socket_, setRequestedServerName(Eq(servername)));
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
+  EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onAccept(cb_));
+}
 } // namespace
 } // namespace TlsInspector
 } // namespace ListenerFilters

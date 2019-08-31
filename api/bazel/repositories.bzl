@@ -16,6 +16,10 @@ def api_dependencies():
         locations = REPOSITORY_LOCATIONS,
     )
     envoy_http_archive(
+        name = "com_github_cncf_udpa",
+        locations = REPOSITORY_LOCATIONS,
+    )
+    envoy_http_archive(
         name = "com_github_gogo_protobuf",
         locations = REPOSITORY_LOCATIONS,
         build_file_content = GOGOPROTO_BUILD_CONTENT,
@@ -33,6 +37,11 @@ def api_dependencies():
         name = "kafka_source",
         locations = REPOSITORY_LOCATIONS,
         build_file_content = KAFKASOURCE_BUILD_CONTENT,
+    )
+    envoy_http_archive(
+        name = "com_github_openzipkin_zipkinapi",
+        locations = REPOSITORY_LOCATIONS,
+        build_file_content = ZIPKINAPI_BUILD_CONTENT,
     )
 
 GOGOPROTO_BUILD_CONTENT = """
@@ -148,4 +157,24 @@ filegroup(
     visibility = ["//visibility:public"],
 )
 
+"""
+
+ZIPKINAPI_BUILD_CONTENT = """
+
+load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library", "api_go_proto_library")
+load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
+
+api_proto_library(
+    name = "zipkin",
+    srcs = [
+        "zipkin-jsonv2.proto",
+        "zipkin.proto",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+api_go_proto_library(
+    name = "zipkin",
+    proto = ":zipkin",
+)
 """

@@ -53,10 +53,9 @@ void FilesystemSubscriptionImpl::refresh() {
     } else {
       ENVOY_LOG(warn, "Filesystem config update failure: {}", e.what());
       stats_.update_failure_.inc();
-      // ConnectionFailure is not a meaningful error code for file system but it has been chosen so
-      // that the behaviour is uniform across all subscription types.
-      callbacks_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure,
-                                      &e);
+      // This could happen due to filesystem issues or a bad configuration (e.g. proto validation).
+      // Since the latter is more likely, for now we will treat it as rejection.
+      callbacks_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &e);
     }
   }
 }
