@@ -493,6 +493,7 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& clust
       init_helper_.removeCluster(*existing_active_cluster->second->cluster_);
     } else {
       // Validate that warming clusters are not added to the init_helper_.
+      // NOTE: This loop is compiled out in optimized builds.
       for (const std::list<Cluster*>& cluster_list :
            {std::cref(init_helper_.primary_init_clusters_),
             std::cref(init_helper_.secondary_init_clusters_)}) {
