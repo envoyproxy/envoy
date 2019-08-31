@@ -4,15 +4,15 @@ resources:
   cluster_name: mtls_by_label
   endpoints:
   - lb_endpoints:
-    - endpoint:
-        metadata:
-          envoy.transport_socket_selector:
-            fields:
-              label: "mtlsReady"
-        address:
-          socket_address:
-            address: 127.0.0.1
-            port_value: 9000
+    #- endpoint:
+        #address:
+          #socket_address:
+            #address: 127.0.0.1
+            #port_value: 9000
+       #metadata:
+          #envoy.transport_socket_selector:
+            #fields:
+              #label: "mtlsReady"
     - endpoint:
         address:
           socket_address:

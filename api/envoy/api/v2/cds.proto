@@ -241,7 +241,7 @@ message Cluster {
   }
 
 
-  TransportSocketMatcher transport_socket_matchers = 41;
+  repeated TransportSocketMatcher transport_socket_matchers = 41;
 
   reserved 12;
 

@@ -17,7 +17,7 @@ Network::TransportSocketFactory& TransportSocketMatcher::resolve(
     const envoy::api::v2::core::Metadata& metadata) {
   const auto& filter_metadata = metadata.filter_metadata();
   const auto envoy_tss_itr = metadata.filter_metadata().find("envoy.transport_socket_selector");
-  ENVOY_LOG(info, "incfly debug, transport socket resolving...");
+  ENVOY_LOG(info, "incfly debug, transport socket resolving... {}", metadata.DebugString());
   if (envoy_tss_itr == filter_metadata.end()) {
     ENVOY_LOG(info, "incfly debug, transport socket resolved default 1...");
     return *default_socket_factory_;

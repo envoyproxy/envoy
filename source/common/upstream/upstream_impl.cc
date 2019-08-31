@@ -219,6 +219,8 @@ HostVector filterHosts(const std::unordered_set<HostSharedPtr>& hosts,
 Host::CreateConnectionData HostImpl::createConnection(
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsSharedPtr transport_socket_options) const {
+
+  ENVOY_LOG(info, "incfly debug address {} metadata {}", address_->asString(), metadata()->DebugString());
   return {createConnection(dispatcher, *cluster_, address_, *metadata(), options, transport_socket_options),
           shared_from_this()};
 }
@@ -771,12 +773,11 @@ TransportSocketMatcherPtr createTransportSocketMatcher(
   auto default_socket_factory = config_factory.createTransportSocketFactory(*message, factory_context);
   auto socket_factory_map = std::make_unique<std::map<std::string,
        Network::TransportSocketFactoryPtr>>();
-  //for (const auto& socket_matcher_iter : config.transport_socket_matchers()) {
-    //const auto& label = socket_matcher_iter.match();
-    //const auto& tls_config = socket_matcher_iter.tls_context();
-  {
-    const auto& label = config.transport_socket_matchers().match();
-    const auto& tls_config = config.transport_socket_matchers().tls_context();
+  for (const auto& socket_matcher_iter : config.transport_socket_matchers()) {
+    const auto& label = socket_matcher_iter.match();
+    const auto& tls_config = socket_matcher_iter.tls_context();
+    //const auto& label = config.transport_socket_matchers().match();
+    //const auto& tls_config = config.transport_socket_matchers().tls_context();
 
     envoy::api::v2::core::TransportSocket socket;
     socket.set_name("tls");
