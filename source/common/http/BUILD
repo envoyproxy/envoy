@@ -237,6 +237,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "local_reply_lib",
+    hdrs = ["local_reply.h"],
+    deps = [
+        "//source/common/common:matchers_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "message_lib",
     srcs = ["message_impl.cc"],
     hdrs = ["message_impl.h"],
