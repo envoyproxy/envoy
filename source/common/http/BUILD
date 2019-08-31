@@ -124,6 +124,7 @@ envoy_cc_library(
         "//include/envoy/http:filter_interface",
         "//include/envoy/router:rds_interface",
         "//source/common/network:utility_lib",
+        "//source/common/http:local_reply_lib"
     ],
 )
 
