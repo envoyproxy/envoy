@@ -125,6 +125,8 @@ public:
     fn(toStringView(stat_name));
   }
 
+  void trackRecentLookups(TimeSource&) override {}
+
 private:
   absl::string_view toStringView(const StatName& stat_name) const {
     return {reinterpret_cast<const char*>(stat_name.data()),

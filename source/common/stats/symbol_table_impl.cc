@@ -187,25 +187,41 @@ void SymbolTableImpl::free(const StatName& stat_name) {
 
   Thread::LockGuard lock(lock_);
   for (Symbol symbol : symbols) {
-    auto decode_search = decode_map_.find(symbol);
-    ASSERT(decode_search != decode_map_.end());
-
-    auto encode_search = encode_map_.find(decode_search->second->toStringView());
-    ASSERT(encode_search != encode_map_.end());
-
-    // If that was the last remaining client usage of the symbol, erase the
-    // current mappings and add the now-unused symbol to the reuse pool.
-    //
-    // The "if (--EXPR.ref_count_)" pattern speeds up BM_CreateRace by 20% in
-    // symbol_table_speed_test.cc, relative to breaking out the decrement into a
-    // separate step, likely due to the non-trivial dereferences in EXPR.
-    if (--encode_search->second.ref_count_ == 0) {
-      decode_map_.erase(decode_search);
-      encode_map_.erase(encode_search);
-      pool_.push(symbol);
-    }
+    freeSymbolLockHeld(symbol);
   }
 }
+
+void SymbolTableImpl::freeSymbol(Symbol symbol) {
+  Thread::LockGuard lock(lock_);
+  freeSymbolLockHeld(symbol);
+}
+
+void SymbolTableImpl::freeSymbolLockHeld(Symbol symbol) {
+  auto decode_search = decode_map_.find(symbol);
+  ASSERT(decode_search != decode_map_.end());
+
+  auto encode_search = encode_map_.find(decode_search->second->toStringView());
+  ASSERT(encode_search != encode_map_.end());
+
+  // If that was the last remaining client usage of the symbol, erase the
+  // current mappings and add the now-unused symbol to the reuse pool.
+  //
+  // The "if (--EXPR.ref_count_)" pattern speeds up BM_CreateRace by 20% in
+  // symbol_table_speed_test.cc, relative to breaking out the decrement into a
+  // separate step, likely due to the non-trivial dereferences in EXPR.
+  if (--encode_search->second.ref_count_ == 0) {
+    decode_map_.erase(decode_search);
+    encode_map_.erase(encode_search);
+    pool_.push(symbol);
+  }
+}
+
+void SymbolTableImpl::trackRecentLookups(TimeSource& time_source) {
+  Thread::LockGuard lock(lock_);
+  recent_lookups_ = std::make_unique<RecentLookups<Symbol>>(time_source);
+  recent_lookups_->setFreeFn([this](Symbol symbol) { freeSymbol(symbol); });
+}
+
 Symbol SymbolTableImpl::toSymbol(absl::string_view sv) {
   Symbol result;
   auto encode_find = encode_map_.find(sv);

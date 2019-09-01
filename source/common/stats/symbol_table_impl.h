@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "envoy/common/exception.h"
+#include "envoy/common/time.h"
 #include "envoy/stats/symbol_table.h"
 
 #include "common/common/assert.h"
@@ -18,6 +19,7 @@
 #include "common/common/stack_array.h"
 #include "common/common/thread.h"
 #include "common/common/utility.h"
+#include "common/stats/recent_lookups.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/str_join.h"
@@ -159,6 +161,8 @@ public:
     return bytes;
   }
 
+  void trackRecentLookups(TimeSource& timeSource) override;
+
 private:
   friend class StatName;
   friend class StatNameTest;
@@ -205,6 +209,9 @@ private:
    */
   void newSymbol();
 
+  inline void freeSymbol(Symbol symbol);
+  void freeSymbolLockHeld(Symbol symbol) EXCLUSIVE_LOCKS_REQUIRED(lock_);
+
   /**
    * Tokenizes name, finds or allocates symbols for each token, and adds them
    * to encoding.
@@ -238,6 +245,7 @@ private:
   // TODO(ambuc): There might be an optimization here relating to storing ranges of freed symbols
   // using an Envoy::IntervalSet.
   std::stack<Symbol> pool_ GUARDED_BY(lock_);
+  std::unique_ptr<RecentLookups<Symbol>> recent_lookups_ GUARDED_BY(lock_);
 };
 
 /**

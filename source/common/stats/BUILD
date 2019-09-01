@@ -88,6 +88,12 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "recent_lookups_lib",
+    hdrs = ["recent_lookups.h"],
+    deps = ["//include/envoy/common:time_interface"],
+)
+
+envoy_cc_library(
     name = "store_impl_lib",
     hdrs = ["store_impl.h"],
     deps = [
@@ -147,6 +153,7 @@ envoy_cc_library(
     hdrs = ["symbol_table_impl.h"],
     external_deps = ["abseil_base"],
     deps = [
+        ":recent_lookups_lib",
         "//include/envoy/stats:symbol_table_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",

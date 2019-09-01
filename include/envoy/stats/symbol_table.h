@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/common/time.h"
 
 #include "absl/strings/string_view.h"
 
@@ -142,6 +143,8 @@ public:
    */
   virtual void callWithStringView(StatName stat_name,
                                   const std::function<void(absl::string_view)>& fn) const PURE;
+
+  virtual void trackRecentLookups(TimeSource&) PURE;
 
 private:
   friend struct HeapStatData;

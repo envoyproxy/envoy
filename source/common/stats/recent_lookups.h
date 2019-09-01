@@ -21,11 +21,15 @@ public:
   // are remembered.
   void lookup(T t) {
     if (queue_.size() >= Capacity) {
+      if (free_fn_) {
+        free_fn_(queue_.back().first);
+      }
       queue_.pop_back();
     }
     queue_.push_front(ItemTime(t, time_source_.systemTime()));
   }
 
+  using FreeFn = std::function<void(T)>;
   using IterFn = std::function<void(T, SystemTime, size_t)>;
 
   // Calls fn(item, timestmp, count) for each of the remembered
@@ -48,11 +52,13 @@ public:
   }
 
   void clear() { queue_.clear(); }
+  void setFreeFn(const FreeFn& free_fn) { free_fn_ = free_fn; }
 
 private:
   using ItemTime = std::pair<T, SystemTime>;
   std::deque<ItemTime> queue_;
   TimeSource& time_source_;
+  FreeFn free_fn_;
 };
 
 } // namespace Stats
