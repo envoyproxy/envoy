@@ -23,6 +23,7 @@ class StatName;
 using StatNameVec = std::vector<StatName>;
 
 class StatNameList;
+class StatNameSet;
 
 /**
  * SymbolTable manages a namespace optimized for stat names, exploiting their
@@ -145,6 +146,8 @@ public:
                                   const std::function<void(absl::string_view)>& fn) const PURE;
 
   virtual void trackRecentLookups(TimeSource&) PURE;
+  virtual void rememberSet(StatNameSet& stat_name_set) PURE;
+  virtual void forgetSet(StatNameSet& stat_name_set) PURE;
 
 private:
   friend struct HeapStatData;

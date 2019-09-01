@@ -162,6 +162,8 @@ public:
   }
 
   void trackRecentLookups(TimeSource& timeSource) override;
+  void rememberSet(StatNameSet& stat_name_set) override;
+  void forgetSet(StatNameSet& stat_name_set) override;
 
 private:
   friend class StatName;
@@ -246,6 +248,7 @@ private:
   // using an Envoy::IntervalSet.
   std::stack<Symbol> pool_ GUARDED_BY(lock_);
   std::unique_ptr<RecentLookups<Symbol>> recent_lookups_ GUARDED_BY(lock_);
+  absl::flat_hash_set<StatNameSet*> stat_name_sets_ GUARDED_BY(lock_);
 };
 
 /**
@@ -649,6 +652,7 @@ private:
 class StatNameSet {
 public:
   explicit StatNameSet(SymbolTable& symbol_table);
+  ~StatNameSet();
 
   /**
    * Adds a string to the builtin map, which is not mutex protected. This map is
@@ -679,12 +683,17 @@ public:
    */
   StatName add(absl::string_view str) { return pool_.add(str); }
 
+  void trackRecentLookups(TimeSource& time_source);
+  SymbolTable& symbolTable() { return symbol_table_; }
+
 private:
+  Stats::SymbolTable& symbol_table_;
   Stats::StatNamePool pool_;
   absl::Mutex mutex_;
   using StringStatNameMap = absl::flat_hash_map<std::string, Stats::StatName>;
   StringStatNameMap builtin_stat_names_;
   StringStatNameMap dynamic_stat_names_ GUARDED_BY(mutex_);
+  std::unique_ptr<RecentLookups<StatName>> recent_lookups_ GUARDED_BY(mutex_);
 };
 
 } // namespace Stats

@@ -222,6 +222,19 @@ void SymbolTableImpl::trackRecentLookups(TimeSource& time_source) {
   recent_lookups_->setFreeFn([this](Symbol symbol) { freeSymbol(symbol); });
 }
 
+void SymbolTableImpl::rememberSet(StatNameSet& stat_name_set) {
+  Thread::LockGuard lock(lock_);
+  if (recent_lookups_ != nullptr) {
+    stat_name_set.trackRecentLookups(recent_lookups_->timeSource());
+    stat_name_sets_.insert(&stat_name_set);
+  }
+}
+
+void SymbolTableImpl::forgetSet(StatNameSet& stat_name_set) {
+  Thread::LockGuard lock(lock_);
+  stat_name_sets_.erase(&stat_name_set);
+}
+
 Symbol SymbolTableImpl::toSymbol(absl::string_view sv) {
   Symbol result;
   auto encode_find = encode_map_.find(sv);
@@ -445,9 +458,13 @@ void StatNameList::clear(SymbolTable& symbol_table) {
   storage_.reset();
 }
 
-StatNameSet::StatNameSet(SymbolTable& symbol_table) : pool_(symbol_table) {
+StatNameSet::StatNameSet(SymbolTable& symbol_table)
+    : symbol_table_(symbol_table), pool_(symbol_table) {
   builtin_stat_names_[""] = StatName();
+  symbol_table.rememberSet(*this);
 }
+
+StatNameSet::~StatNameSet() { symbol_table_.forgetSet(*this); }
 
 void StatNameSet::rememberBuiltin(absl::string_view str) {
   StatName stat_name;
@@ -473,6 +490,11 @@ Stats::StatName StatNameSet::getStatName(absl::string_view token) {
     stat_name = pool_.add(token);
   }
   return stat_name;
+}
+
+void StatNameSet::trackRecentLookups(TimeSource& time_source) {
+  absl::MutexLock lock(&mutex_);
+  recent_lookups_ = std::make_unique<RecentLookups<StatName>>(time_source);
 }
 
 } // namespace Stats

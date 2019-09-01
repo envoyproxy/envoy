@@ -53,6 +53,7 @@ public:
 
   void clear() { queue_.clear(); }
   void setFreeFn(const FreeFn& free_fn) { free_fn_ = free_fn; }
+  TimeSource& timeSource() { return time_source_; }
 
 private:
   using ItemTime = std::pair<T, SystemTime>;
