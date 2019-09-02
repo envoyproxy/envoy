@@ -221,9 +221,20 @@ void SymbolTableImpl::freeSymbolLockHeld(Symbol symbol) {
 }
 
 void SymbolTableImpl::trackRecentLookups(TimeSource& time_source) {
-  Thread::LockGuard lock(lock_);
-  recent_lookups_ = std::make_unique<RecentLookups<Symbol>>(time_source);
-  recent_lookups_->setFreeFn([this](Symbol symbol) { freeSymbol(symbol); });
+  {
+    Thread::LockGuard lock(lock_);
+    recent_lookups_ = std::make_unique<RecentLookups<Symbol>>(time_source);
+    recent_lookups_->setFreeFn([this](Symbol symbol) NO_THREAD_SAFETY_ANALYSIS {
+                                 freeSymbolLockHeld(symbol);
+                               });
+  }
+
+  {
+    Thread::LockGuard lock(stat_name_set_mutex_);
+    for (StatNameSet* stat_name_set : stat_name_sets_) {
+      stat_name_set->trackRecentLookups(time_source);
+    }
+  }
 }
 
 bool SymbolTableImpl::getRecentLookups(const RecentLookupsFn& iter) {
@@ -231,7 +242,6 @@ bool SymbolTableImpl::getRecentLookups(const RecentLookupsFn& iter) {
     StatName stat_name_;
     Symbol symbol_; // Used if stat_name is empty, as 0 is a valid symbol.
     SystemTime time_;
-    size_t count_;
 
     std::string name(SymbolTableImpl& symbol_table) const {
       if (stat_name_.empty()) {
@@ -248,11 +258,10 @@ bool SymbolTableImpl::getRecentLookups(const RecentLookupsFn& iter) {
   {
     Thread::LockGuard lock(stat_name_set_mutex_);
     for (StatNameSet* stat_name_set : stat_name_sets_) {
-      stat_name_set->getRecentLookups(
-          [&lookup_data](StatName stat_name, SystemTime time, size_t count) {
-            ASSERT(!stat_name.empty());
-            lookup_data.push_back({stat_name, Symbol(0), time, count});
-          });
+      stat_name_set->getRecentLookups([&lookup_data](StatName stat_name, SystemTime time) {
+        ASSERT(!stat_name.empty());
+        lookup_data.push_back({stat_name, Symbol(0), time});
+      });
     }
   }
 
@@ -261,9 +270,9 @@ bool SymbolTableImpl::getRecentLookups(const RecentLookupsFn& iter) {
     if (recent_lookups_ == nullptr) {
       return false;
     }
-    recent_lookups_->forEach([&lookup_data](Symbol symbol, SystemTime time, size_t count)
+    recent_lookups_->forEach([&lookup_data](Symbol symbol, SystemTime time)
                                  NO_THREAD_SAFETY_ANALYSIS {
-                                   lookup_data.push_back({StatName(), symbol, time, count});
+                                   lookup_data.push_back({StatName(), symbol, time});
                                  });
   }
 
@@ -275,7 +284,7 @@ bool SymbolTableImpl::getRecentLookups(const RecentLookupsFn& iter) {
               return a.time_ > b.time_; // Sort latest first.
             });
   for (const LookupData& lookup : lookup_data) {
-    iter(lookup.name(*this), lookup.time_, lookup.count_);
+    iter(lookup.name(*this), lookup.time_);
   }
   return true;
 }
@@ -285,15 +294,16 @@ void SymbolTableImpl::rememberSet(StatNameSet& stat_name_set) {
   // stat_name_set.trackRecentLookups() below, as that will result in a
   // false-positive in absl::Mutex's detection analysis. It is easy enough to
   // work around by capturing the TimeSource and then releasing lock_.
-  TimeSource* time_source;
+  TimeSource* time_source = nullptr;
   {
     Thread::LockGuard lock(lock_);
-    if (recent_lookups_ == nullptr) {
-      return;
+    if (recent_lookups_ != nullptr) {
+      time_source = &recent_lookups_->timeSource();
     }
-    time_source = &recent_lookups_->timeSource();
   }
-  stat_name_set.trackRecentLookups(*time_source);
+  if (time_source != nullptr) {
+    stat_name_set.trackRecentLookups(*time_source);
+  }
   {
     Thread::LockGuard lock(stat_name_set_mutex_);
     stat_name_sets_.insert(&stat_name_set);

@@ -149,7 +149,7 @@ public:
   virtual void rememberSet(StatNameSet& stat_name_set) PURE;
   virtual void forgetSet(StatNameSet& stat_name_set) PURE;
 
-  using RecentLookupsFn = std::function<void(absl::string_view, SystemTime, size_t)>;
+  using RecentLookupsFn = std::function<void(absl::string_view, SystemTime)>;
   virtual bool getRecentLookups(const RecentLookupsFn&) PURE;
 
 private:

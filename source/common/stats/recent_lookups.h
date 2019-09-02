@@ -6,9 +6,6 @@
 
 #include "envoy/common/time.h"
 
-#include "absl/container/flat_hash_map.h"
-#include "absl/container/flat_hash_set.h"
-
 namespace Envoy {
 namespace Stats {
 
@@ -30,24 +27,12 @@ public:
   }
 
   using FreeFn = std::function<void(T)>;
-  using IterFn = std::function<void(T, SystemTime, size_t)>;
+  using IterFn = std::function<void(T, SystemTime)>;
 
-  // Calls fn(item, timestmp, count) for each of the remembered
-  // lookups. Duplicates are collated and provided with their timestamp and
-  // count.
+  // Calls fn(item, timestamp) for each of the remembered lookups.
   void forEach(IterFn fn) {
-    using TimeCount = std::pair<SystemTime, size_t>;
-    absl::flat_hash_map<T, TimeCount> entry_map;
     for (ItemTime& item_time : queue_) {
-      TimeCount& time_count = entry_map[item_time.first];
-      if ((time_count.second == 0) || (item_time.second > time_count.first)) {
-        time_count.first = item_time.second;
-      }
-      ++time_count.second;
-    }
-    for (auto& item_time_count : entry_map) {
-      TimeCount& time_count = item_time_count.second;
-      fn(item_time_count.first, time_count.first, time_count.second);
+      fn(item_time.first, item_time.second);
     }
   }
 

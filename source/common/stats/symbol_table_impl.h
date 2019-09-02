@@ -345,10 +345,6 @@ public:
     return HashUtil::xxHash64(absl::string_view(cdata, dataSize()));
   }
 
-  template <typename H> friend H AbslHashValue(H h, StatName stat_name) {
-    return H::combine(std::move(h), stat_name.hash());
-  }
-
   bool operator==(const StatName& rhs) const {
     const uint64_t sz = dataSize();
     return sz == rhs.dataSize() && memcmp(data(), rhs.data(), sz * sizeof(uint8_t)) == 0;
@@ -544,11 +540,22 @@ private:
   SymbolTable::StoragePtr storage_;
 };
 
+// Helper class for constructing hash-tables with StatName keys.
+struct StatNameCompare {
+  bool operator()(const StatName& a, const StatName& b) const { return a == b; }
+};
+
+// Helper class for constructing hash-tables with StatName keys.
+struct StatNameHash {
+  size_t operator()(const StatName& a) const { return a.hash(); }
+};
+
 // Value-templatized hash-map with StatName key.
-template <class T> using StatNameHashMap = absl::flat_hash_map<StatName, T>;
+template <class T>
+using StatNameHashMap = absl::flat_hash_map<StatName, T, StatNameHash, StatNameCompare>;
 
 // Hash-set of StatNames
-using StatNameHashSet = absl::flat_hash_set<StatName>;
+using StatNameHashSet = absl::flat_hash_set<StatName, StatNameHash, StatNameCompare>;
 
 // Helper class for sorting StatNames.
 struct StatNameLessThan {
