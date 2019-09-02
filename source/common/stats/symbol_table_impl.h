@@ -208,7 +208,8 @@ private:
    * @param symbol the individual symbol to be decoded.
    * @return absl::string_view the decoded string.
    */
-  absl::string_view fromSymbol(Symbol symbol) const EXCLUSIVE_LOCKS_REQUIRED(lock_);
+  absl::string_view fromSymbolLockHeld(Symbol symbol) const EXCLUSIVE_LOCKS_REQUIRED(lock_);
+  absl::string_view fromSymbol(Symbol symbol) const;
 
   /**
    * Stages a new symbol for use. To be called after a successful insertion.

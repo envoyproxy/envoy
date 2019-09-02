@@ -127,7 +127,11 @@ void SymbolTableImpl::addTokensToEncoding(const absl::string_view name, Encoding
   {
     Thread::LockGuard lock(lock_);
     for (auto& token : tokens) {
-      symbols.push_back(toSymbol(token));
+      Symbol symbol = toSymbol(token);
+      symbols.push_back(symbol);
+      if (recent_lookups_ != nullptr) {
+        recent_lookups_->lookup(symbol);
+      }
     }
   }
 
@@ -159,7 +163,7 @@ std::string SymbolTableImpl::decodeSymbolVec(const SymbolVec& symbols) const {
     // Hold the lock only while decoding symbols.
     Thread::LockGuard lock(lock_);
     for (Symbol symbol : symbols) {
-      name_tokens.push_back(fromSymbol(symbol));
+      name_tokens.push_back(fromSymbolLockHeld(symbol));
     }
   }
   return absl::StrJoin(name_tokens, ".");
@@ -224,16 +228,23 @@ void SymbolTableImpl::trackRecentLookups(TimeSource& time_source) {
 
 bool SymbolTableImpl::getRecentLookups(const RecentLookupsFn& iter) {
   struct LookupData {
-    StatName stat_name;
-    Symbol symbol; // Used if stat_name is empty, as 0 is a valid symbol.
-    SystemTime time;
-    size_t count;
+    StatName stat_name_;
+    Symbol symbol_; // Used if stat_name is empty, as 0 is a valid symbol.
+    SystemTime time_;
+    size_t count_;
+
+    std::string name(SymbolTableImpl& symbol_table) const {
+      if (stat_name_.empty()) {
+        return std::string(symbol_table.fromSymbol(symbol_));
+      }
+      return symbol_table.toString(stat_name_);
+    };
   };
   std::vector<LookupData> lookup_data;
 
   // We don't want to hold stat_name_set_mutex and lock_ at the same time.
   // StatNameSet::getRecentLookups does not take SymbolTableImpl::lock_, so we
-  // collect the lookups via StatName, and then later decode the collected data.
+  // collect the lookups via StatName, and decode the collected data below.
   {
     Thread::LockGuard lock(stat_name_set_mutex_);
     for (StatNameSet* stat_name_set : stat_name_sets_) {
@@ -257,30 +268,32 @@ bool SymbolTableImpl::getRecentLookups(const RecentLookupsFn& iter) {
   }
 
   std::sort(lookup_data.begin(), lookup_data.end(),
-            [](const LookupData& a, const LookupData& b) -> bool { return a.time < b.time; });
+            [this](const LookupData& a, const LookupData& b) -> bool {
+              if (a.time_ == b.time_) {
+                return a.name(*this) < b.name(*this);
+              }
+              return a.time_ > b.time_; // Sort latest first.
+            });
   for (const LookupData& lookup : lookup_data) {
-    if (lookup.stat_name.empty()) {
-      absl::string_view name;
-      {
-        Thread::LockGuard lock(lock_);
-        name = fromSymbol(lookup.symbol);
-      }
-      iter(name, lookup.time, lookup.count); // Hold no locks while iterating.
-    } else {
-      iter(toString(lookup.stat_name), lookup.time, lookup.count);
-    }
+    iter(lookup.name(*this), lookup.time_, lookup.count_);
   }
   return true;
 }
 
 void SymbolTableImpl::rememberSet(StatNameSet& stat_name_set) {
+  // We don't want to be holding lock_ when calling
+  // stat_name_set.trackRecentLookups() below, as that will result in a
+  // false-positive in absl::Mutex's detection analysis. It is easy enough to
+  // work around by capturing the TimeSource and then releasing lock_.
+  TimeSource* time_source;
   {
     Thread::LockGuard lock(lock_);
     if (recent_lookups_ == nullptr) {
       return;
     }
-    stat_name_set.trackRecentLookups(recent_lookups_->timeSource());
+    time_source = &recent_lookups_->timeSource();
   }
+  stat_name_set.trackRecentLookups(*time_source);
   {
     Thread::LockGuard lock(stat_name_set_mutex_);
     stat_name_sets_.insert(&stat_name_set);
@@ -318,11 +331,16 @@ Symbol SymbolTableImpl::toSymbol(absl::string_view sv) {
   return result;
 }
 
-absl::string_view SymbolTableImpl::fromSymbol(const Symbol symbol) const
+absl::string_view SymbolTableImpl::fromSymbolLockHeld(const Symbol symbol) const
     EXCLUSIVE_LOCKS_REQUIRED(lock_) {
   auto search = decode_map_.find(symbol);
   RELEASE_ASSERT(search != decode_map_.end(), "no such symbol");
   return search->second->toStringView();
+}
+
+absl::string_view SymbolTableImpl::fromSymbol(const Symbol symbol) const {
+  Thread::LockGuard lock(lock_);
+  return fromSymbolLockHeld(symbol);
 }
 
 void SymbolTableImpl::newSymbol() EXCLUSIVE_LOCKS_REQUIRED(lock_) {
@@ -349,7 +367,7 @@ bool SymbolTableImpl::lessThan(const StatName& a, const StatName& b) const {
   Thread::LockGuard lock(lock_);
   for (uint64_t i = 0, n = std::min(av.size(), bv.size()); i < n; ++i) {
     if (av[i] != bv[i]) {
-      bool ret = fromSymbol(av[i]) < fromSymbol(bv[i]);
+      bool ret = fromSymbolLockHeld(av[i]) < fromSymbolLockHeld(bv[i]);
       return ret;
     }
   }

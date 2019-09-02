@@ -8,6 +8,7 @@
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "absl/synchronization/blocking_counter.h"
@@ -563,6 +564,34 @@ TEST_P(StatNameTest, StatNameSet) {
   EXPECT_EQ("dynamic", table_->toString(dynamic2));
   EXPECT_EQ(dynamic2.data(), set2.getStatName("dynamic").data());
   EXPECT_NE(dynamic2.data(), dynamic.data());
+}
+
+TEST_P(StatNameTest, RecentLookups) {
+  if (GetParam() == SymbolTableType::Fake) {
+    return;
+  }
+
+  Event::SimulatedTimeSystem time_system;
+  const uint64_t years = 365 * 24 * 3600;
+  time_system.setSystemTime(SystemTime() + std::chrono::seconds(40 * years));
+  table_->trackRecentLookups(time_system);
+  StatNameSet set(*table_);
+  set.getStatName("dynamic.stat");
+  time_system.sleep(std::chrono::seconds(1));
+  encodeDecode("direct.stat");
+
+  std::vector<std::string> accum;
+  table_->getRecentLookups([&accum](absl::string_view name, SystemTime time, size_t count) {
+    DateFormatter formatter("%Y-%m-%d,%H:%M:%S");
+    accum.emplace_back(absl::StrCat(formatter.fromTime(time), ";Item=", name, ";Count=", count));
+  });
+  std::string recent_lookups_str = StringUtil::join(accum, " ");
+
+  EXPECT_EQ("2009-12-22,00:00:01;Item=direct;Count=1 "
+            "2009-12-22,00:00:01;Item=stat;Count=2 "
+            "2009-12-22,00:00:00;Item=dynamic;Count=1 "
+            "2009-12-22,00:00:00;Item=dynamic.stat;Count=1",
+            recent_lookups_str);
 }
 
 // Tests the memory savings realized from using symbol tables with 1k
