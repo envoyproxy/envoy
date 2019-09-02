@@ -144,9 +144,9 @@ envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromV2Yaml(const std::stri
   return bootstrap;
 }
 
-class AggregateClusterTest : public testing::Test {
+class AggregateClusterIntegrationTest : public testing::Test {
 public:
-  AggregateClusterTest() : http_context_(stats_store_.symbolTable()) {}
+  AggregateClusterIntegrationTest() : http_context_(stats_store_.symbolTable()) {}
 
   void initialize(const std::string& yaml_config) {
     cluster_manager_ = std::make_unique<TestClusterManagerImpl>(
@@ -186,12 +186,12 @@ public:
   )EOF";
 };
 
-TEST_F(AggregateClusterTest, NoHealthyUpstream) {
+TEST_F(AggregateClusterIntegrationTest, NoHealthyUpstream) {
   initialize(default_yaml_config_);
   EXPECT_EQ(nullptr, cluster_->loadBalancer().chooseHost(nullptr));
 }
 
-TEST_F(AggregateClusterTest, BasicFlow) {
+TEST_F(AggregateClusterIntegrationTest, BasicFlow) {
   initialize(default_yaml_config_);
 
   std::unique_ptr<Upstream::MockClusterUpdateCallbacks> callbacks(
