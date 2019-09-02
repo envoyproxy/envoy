@@ -239,10 +239,10 @@ bool SymbolTableImpl::getRecentLookups(const RecentLookupsFn& iter) {
       return false;
     }
     recent_lookups_->forEach([&lookup_data, this](Symbol symbol, SystemTime time, size_t count)
-                             NO_THREAD_SAFETY_ANALYSIS {
-                               absl::string_view name = fromSymbol(symbol);
-                               lookup_data.push_back({std::string(name), time, count});
-                             });
+                                 NO_THREAD_SAFETY_ANALYSIS {
+                                   absl::string_view name = fromSymbol(symbol);
+                                   lookup_data.push_back({std::string(name), time, count});
+                                 });
   }
   {
     Thread::LockGuard lock(stat_name_set_mutex_);
@@ -559,8 +559,8 @@ bool StatNameSet::getRecentLookups(const SymbolTable::RecentLookupsFn& iter) {
       return false;
     }
     recent_lookups_->forEach([&lookup_data](StatName stat_name, SystemTime time, size_t count) {
-                               lookup_data.push_back({stat_name, time, count});
-                             });
+      lookup_data.push_back({stat_name, time, count});
+    });
   }
   for (const LookupData& lookup : lookup_data) {
     iter(symbol_table_.toString(lookup.stat_name), lookup.time, lookup.count);

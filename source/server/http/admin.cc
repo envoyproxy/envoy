@@ -762,7 +762,7 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
         [&response](absl::string_view name, SystemTime time, size_t count) {
           DateFormatter formatter("%Y-%m-%d,%H:%M:%S");
           response.add(absl::StrCat("<tr><td>", formatter.fromTime(time), "</td><td>",
-                                    name,  // TODO(jmarantz): ESCAPE THIS BEFORE SUBMITTING
+                                    name, // TODO(jmarantz): ESCAPE THIS BEFORE SUBMITTING
                                     "</td><td>", count, "</td></tr>"));
         });
     response.add("</tbody></table>");
