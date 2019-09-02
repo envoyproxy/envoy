@@ -179,6 +179,15 @@ TEST_F(DiskLoaderImplTest, All) {
   // test_feature_false is not in runtime_features.cc and so is false by default.
   EXPECT_EQ(false, snapshot->runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
 
+  // Deprecation
+#ifdef ENVOY_DISABLE_DEPRECATED_FEATURES
+  EXPECT_EQ(false, snapshot->deprecatedFeatureEnabled("random_string_should_be_enabled"));
+#else
+  EXPECT_EQ(true, snapshot->deprecatedFeatureEnabled("random_string_should_be_enabled"));
+#endif
+  EXPECT_EQ(false, snapshot->deprecatedFeatureEnabled(
+                       "envoy.deprecated_features.deprecated.proto:is_deprecated_fatal"));
+
   // Feature defaults via helper function.
   EXPECT_EQ(false, runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
   EXPECT_EQ(true, runtimeFeatureEnabled("envoy.reloadable_features.test_feature_true"));
@@ -610,6 +619,63 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
   EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
 }
 
+TEST_F(StaticLoaderImplTest, RuntimeFromNonWorkerThreads) {
+  // Force the thread to be considered a non-worker thread.
+  tls_.registered_ = false;
+  setup();
+
+  // Set up foo -> bar
+  loader_->mergeValues({{"foo", "bar"}});
+  EXPECT_EQ("bar", loader_->threadsafeSnapshot()->get("foo"));
+  const Snapshot* original_snapshot_pointer = loader_->threadsafeSnapshot().get();
+
+  // Now set up a test thread which verifies foo -> bar
+  //
+  // Then change foo and make sure the test thread picks up the change.
+  bool read_bar = false;
+  bool updated_eep = false;
+  Thread::MutexBasicLockable mutex;
+  Thread::CondVar foo_read;
+  Thread::CondVar foo_changed;
+  const Snapshot* original_thread_snapshot_pointer = nullptr;
+  auto thread = Thread::threadFactoryForTest().createThread([&]() {
+    {
+      Thread::LockGuard lock(mutex);
+      EXPECT_EQ("bar", loader_->threadsafeSnapshot()->get("foo"));
+      read_bar = true;
+      original_thread_snapshot_pointer = loader_->threadsafeSnapshot().get();
+      EXPECT_EQ(original_thread_snapshot_pointer, loader_->threadsafeSnapshot().get());
+      foo_read.notifyOne();
+    }
+
+    {
+      Thread::LockGuard lock(mutex);
+      if (!updated_eep) {
+        foo_changed.wait(mutex);
+      }
+      EXPECT_EQ("eep", loader_->threadsafeSnapshot()->get("foo"));
+    }
+  });
+
+  {
+    Thread::LockGuard lock(mutex);
+    if (!read_bar) {
+      foo_read.wait(mutex);
+    }
+    loader_->mergeValues({{"foo", "eep"}});
+    updated_eep = true;
+  }
+
+  {
+    Thread::LockGuard lock(mutex);
+    foo_changed.notifyOne();
+    EXPECT_EQ("eep", loader_->threadsafeSnapshot()->get("foo"));
+  }
+
+  thread->join();
+  EXPECT_EQ(original_thread_snapshot_pointer, original_snapshot_pointer);
+}
+
 class DiskLayerTest : public testing::Test {
 protected:
   DiskLayerTest() : api_(Api::createApiForTest()) {}
@@ -650,6 +716,16 @@ TEST(NoRuntime, FeatureEnabled) {
   // Feature defaults should still work.
   EXPECT_EQ(false, runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
   EXPECT_EQ(true, runtimeFeatureEnabled("envoy.reloadable_features.test_feature_true"));
+}
+
+TEST(NoRuntime, DefaultIntValues) {
+  // Make sure the registry is not set up.
+  ASSERT_TRUE(Runtime::LoaderSingleton::getExisting() == nullptr);
+
+  // Feature defaults should still work.
+  EXPECT_EQ(0x1230000ABCDULL,
+            getInteger("envoy.reloadable_features.test_int_feature_default", 0x1230000ABCDULL));
+  EXPECT_EQ(0, getInteger("envoy.reloadable_features.test_int_feature_zero", 0));
 }
 
 // Test RTDS layer(s).
@@ -771,7 +847,8 @@ TEST_F(RtdsLoaderImplTest, FailureSubscription) {
   setup();
 
   EXPECT_CALL(init_watcher_, ready());
-  rtds_callbacks_[0]->onConfigUpdateFailed({});
+  rtds_callbacks_[0]->onConfigUpdateFailed(
+      Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, {});
 
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(1, store_.counter("runtime.load_success").value());

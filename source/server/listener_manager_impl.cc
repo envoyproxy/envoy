@@ -4,6 +4,7 @@
 
 #include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/registry/registry.h"
+#include "envoy/server/active_udp_listener_config.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/stats/scope.h"
 
@@ -23,6 +24,7 @@
 #include "server/drain_manager_impl.h"
 #include "server/filter_chain_manager_impl.h"
 #include "server/transport_socket_config_impl.h"
+#include "server/well_known_names.h"
 
 #include "extensions/filters/listener/well_known_names.h"
 #include "extensions/transport_sockets/well_known_names.h"
@@ -64,6 +66,10 @@ std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetwor
     auto& factory =
         Config::Utility::getAndCheckFactory<Configuration::NamedNetworkFilterConfigFactory>(
             string_name);
+
+    Config::Utility::validateTerminalFilters(filters[i].name(), "network",
+                                             factory.isTerminalFilter(), i == filters.size() - 1);
+
     Network::FilterFactoryCb callback;
     if (Config::Utility::allowDeprecatedV1Config(context.runtime(), *filter_config)) {
       callback = factory.createFilterFactory(*filter_config->getObject("value", true), context);
@@ -183,8 +189,9 @@ ProdListenerComponentFactory::createDrainManager(envoy::api::v2::Listener::Drain
 }
 
 ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::string& version_info,
-                           ListenerManagerImpl& parent, const std::string& name, bool modifiable,
-                           bool workers_started, uint64_t hash)
+                           ListenerManagerImpl& parent, const std::string& name, bool added_via_api,
+                           bool workers_started, uint64_t hash,
+                           ProtobufMessage::ValidationVisitor& validation_visitor)
     : parent_(parent), address_(Network::Address::resolveProtoAddress(config.address())),
       filter_chain_manager_(address_),
       socket_type_(Network::Utility::protobufAddressSocketType(config.address())),
@@ -196,15 +203,16 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)),
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
-      listener_tag_(parent_.factory_.nextListenerTag()), name_(name), modifiable_(modifiable),
-      workers_started_(workers_started), hash_(hash),
+      listener_tag_(parent_.factory_.nextListenerTag()), name_(name), added_via_api_(added_via_api),
+      workers_started_(workers_started), hash_(hash), validation_visitor_(validation_visitor),
       dynamic_init_manager_(fmt::format("Listener {}", name)),
       init_watcher_(std::make_unique<Init::WatcherImpl>(
           "ListenerImpl", [this] { parent_.onListenerWarmed(*this); })),
       local_drain_manager_(parent.factory_.createDrainManager(config.drain_type())),
       config_(config), version_info_(version_info),
       listener_filters_timeout_(
-          PROTOBUF_GET_MS_OR_DEFAULT(config, listener_filters_timeout, 15000)) {
+          PROTOBUF_GET_MS_OR_DEFAULT(config, listener_filters_timeout, 15000)),
+      continue_on_listener_filters_timeout_(config.continue_on_listener_filters_timeout()) {
   if (config.has_transparent()) {
     addListenSocketOptions(Network::SocketOptionFactory::buildIpTransparentOptions());
   }
@@ -220,6 +228,16 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
     addListenSocketOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
     // Needed to return receive buffer overflown indicator.
     addListenSocketOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
+    std::string listener_name =
+        config.has_udp_listener_config() ? config.udp_listener_config().udp_listener_name() : "";
+    if (listener_name.empty()) {
+      listener_name = UdpListenerNames::get().RawUdp;
+    }
+    udp_listener_factory_ =
+        Config::Utility::getAndCheckFactory<ActiveUdpListenerConfigFactory>(listener_name)
+            .createActiveUdpListenerFactory(config.has_udp_listener_config()
+                                                ? config.udp_listener_config()
+                                                : envoy::api::v2::listener::UdpListenerConfig());
   }
 
   if (!config.listener_filters().empty()) {
@@ -279,8 +297,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
       parent_.server_.admin(), parent_.server_.sslContextManager(), *listener_scope_,
       parent_.server_.clusterManager(), parent_.server_.localInfo(), parent_.server_.dispatcher(),
       parent_.server_.random(), parent_.server_.stats(), parent_.server_.singletonManager(),
-      parent_.server_.threadLocal(), parent_.server_.messageValidationVisitor(),
-      parent_.server_.api());
+      parent_.server_.threadLocal(), validation_visitor, parent_.server_.api());
   factory_context.setInitManager(initManager());
   ListenerFilterChainFactoryBuilder builder(*this, factory_context);
   filter_chain_manager_.addFilterChain(config.filter_chains(), builder);
@@ -483,7 +500,7 @@ ListenerManagerStats ListenerManagerImpl::generateStats(Stats::Scope& scope) {
 }
 
 bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& config,
-                                              const std::string& version_info, bool modifiable) {
+                                              const std::string& version_info, bool added_via_api) {
   std::string name;
   if (!config.name().empty()) {
     name = config.name();
@@ -506,8 +523,10 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
     return false;
   }
 
-  ListenerImplPtr new_listener(
-      new ListenerImpl(config, version_info, *this, name, modifiable, workers_started_, hash));
+  ListenerImplPtr new_listener(new ListenerImpl(
+      config, version_info, *this, name, added_via_api, workers_started_, hash,
+      added_via_api ? server_.messageValidationContext().dynamicValidationVisitor()
+                    : server_.messageValidationContext().staticValidationVisitor()));
   ListenerImpl& new_listener_ref = *new_listener;
 
   // We mandate that a listener with the same name must have the same configured address. This

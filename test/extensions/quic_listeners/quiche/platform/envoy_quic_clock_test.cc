@@ -4,6 +4,7 @@
 
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_time.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -13,7 +14,9 @@ namespace Quic {
 
 TEST(EnvoyQuicClockTest, TestNow) {
   Event::SimulatedTimeSystemHelper time_system;
-  EnvoyQuicClock clock(time_system);
+  Api::ApiPtr api = Api::createApiForTest(time_system);
+  Event::DispatcherPtr dispatcher = api->allocateDispatcher();
+  EnvoyQuicClock clock(*dispatcher);
   uint64_t mono_time = std::chrono::duration_cast<std::chrono::microseconds>(
                            time_system.monotonicTime().time_since_epoch())
                            .count();
@@ -41,7 +44,9 @@ TEST(EnvoyQuicClockTest, TestNow) {
 // Tests that Now() should never go back.
 TEST(EnvoyQuicClockTest, TestMonotonicityWithReadTimeSystem) {
   Event::TestRealTimeSystem time_system;
-  EnvoyQuicClock clock(time_system);
+  Api::ApiPtr api = Api::createApiForTest(time_system);
+  Event::DispatcherPtr dispatcher = api->allocateDispatcher();
+  EnvoyQuicClock clock(*dispatcher);
   quic::QuicTime last_now = clock.Now();
   for (int i = 0; i < 1000; ++i) {
     quic::QuicTime now = clock.Now();

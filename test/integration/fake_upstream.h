@@ -601,11 +601,16 @@ private:
     std::chrono::milliseconds listenerFiltersTimeout() const override {
       return std::chrono::milliseconds();
     }
+    bool continueOnListenerFiltersTimeout() const override { return false; }
     Stats::Scope& listenerScope() override { return parent_.stats_store_; }
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
+    Network::ActiveUdpListenerFactory* udpListenerFactory() override {
+      return udp_listener_factory_.get();
+    }
 
     FakeUpstream& parent_;
+    Network::ActiveUdpListenerFactoryPtr udp_listener_factory_;
     std::string name_;
   };
 

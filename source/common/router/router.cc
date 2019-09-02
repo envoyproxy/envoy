@@ -1217,6 +1217,7 @@ bool Filter::setupRetry() {
   // this filter which will make this a non-issue. The implementation of supporting retry in cases
   // where the request is not complete is more complicated so we will start with this for now.
   if (!downstream_end_stream_) {
+    config_.stats_.rq_retry_skipped_request_not_complete_.inc();
     return false;
   }
   pending_retries_++;
@@ -1538,6 +1539,8 @@ void Filter::UpstreamRequest::onPoolFailure(Http::ConnectionPool::PoolFailureRea
 
 void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
                                           Upstream::HostDescriptionConstSharedPtr host) {
+  // This may be called under an existing ScopeTrackerScopeState but it will unwind correctly.
+  ScopeTrackerScopeState scope(&parent_.callbacks_->scope(), parent_.callbacks_->dispatcher());
   ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks_);
 
   host->outlierDetector().putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS);

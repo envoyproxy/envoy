@@ -17,6 +17,7 @@
 #include "test/test_common/global.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
+#include "test/tools/router_check/coverage.h"
 #include "test/tools/router_check/json/tool_config_schemas.h"
 #include "test/tools/router_check/validation.pb.h"
 #include "test/tools/router_check/validation.pb.validate.h"
@@ -29,7 +30,7 @@ namespace Envoy {
  * input file.
  */
 struct ToolConfig {
-  ToolConfig() : random_value_(0){};
+  ToolConfig() = default;
 
   /**
    * @param check_config tool config json object pointer.
@@ -49,11 +50,11 @@ struct ToolConfig {
 
   std::unique_ptr<Http::TestHeaderMapImpl> headers_;
   Router::RouteConstSharedPtr route_;
-  int random_value_;
+  int random_value_{0};
 
 private:
   ToolConfig(std::unique_ptr<Http::TestHeaderMapImpl> headers, int random_value);
-  Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
+  Stats::TestSymbolTable symbol_table_;
 };
 
 /**
@@ -64,10 +65,12 @@ class RouterCheckTool : Logger::Loggable<Logger::Id::testing> {
 public:
   /**
    * @param router_config_file v2 router config file.
+   * @param disableDeprecationCheck flag to disable the RouteConfig deprecated field check
    * @return RouterCheckTool a RouterCheckTool instance with member variables set by the router
    * config file.
    * */
-  static RouterCheckTool create(const std::string& router_config_file);
+  static RouterCheckTool create(const std::string& router_config_file,
+                                const bool disableDeprecationCheck);
 
   /**
    * TODO(tonya11en): Use a YAML format for the expected routes. This will require a proto.
@@ -88,11 +91,15 @@ public:
    */
   void setShowDetails() { details_ = true; }
 
+  float coverage(bool detailed) {
+    return detailed ? coverage_.detailedReport() : coverage_.report();
+  }
+
 private:
   RouterCheckTool(
       std::unique_ptr<NiceMock<Server::Configuration::MockFactoryContext>> factory_context,
       std::unique_ptr<Router::ConfigImpl> config, std::unique_ptr<Stats::IsolatedStoreImpl> stats,
-      Api::ApiPtr api);
+      Api::ApiPtr api, Coverage coverage);
 
   bool compareCluster(ToolConfig& tool_config, const std::string& expected);
   bool compareCluster(ToolConfig& tool_config,
@@ -143,6 +150,7 @@ private:
   std::unique_ptr<Stats::IsolatedStoreImpl> stats_;
   Api::ApiPtr api_;
   std::string active_runtime;
+  Coverage coverage_;
 };
 
 /**
@@ -173,6 +181,16 @@ public:
   const std::string& unlabelledTestPath() const { return unlabelled_test_path_; }
 
   /**
+   * @return the minimum required percentage of routes coverage.
+   */
+  double failUnder() const { return fail_under_; }
+
+  /**
+   * @return true if test coverage should be comprehensive.
+   */
+  bool comprehensiveCoverage() const { return comprehensive_coverage_; }
+
+  /**
    * @return true if proto schema test is used.
    */
   bool isProto() const { return is_proto_; }
@@ -182,12 +200,20 @@ public:
    */
   bool isDetailed() const { return is_detailed_; }
 
+  /**
+   * @return true if the deprecated field check for RouteConfiguration is disabled.
+   */
+  bool disableDeprecationCheck() const { return disable_deprecation_check_; }
+
 private:
   std::string test_path_;
   std::string config_path_;
   std::string unlabelled_test_path_;
   std::string unlabelled_config_path_;
+  float fail_under_;
+  bool comprehensive_coverage_;
   bool is_proto_;
   bool is_detailed_;
+  bool disable_deprecation_check_;
 };
 } // namespace Envoy

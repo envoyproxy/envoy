@@ -106,13 +106,13 @@ public:
 
   void expectResponseTimerCreate() {
     response_timeout_ = new Event::MockTimer(&callbacks_.dispatcher_);
-    EXPECT_CALL(*response_timeout_, enableTimer(_));
+    EXPECT_CALL(*response_timeout_, enableTimer(_, _));
     EXPECT_CALL(*response_timeout_, disableTimer());
   }
 
   void expectPerTryTimerCreate() {
     per_try_timeout_ = new Event::MockTimer(&callbacks_.dispatcher_);
-    EXPECT_CALL(*per_try_timeout_, enableTimer(_));
+    EXPECT_CALL(*per_try_timeout_, enableTimer(_, _));
     EXPECT_CALL(*per_try_timeout_, disableTimer());
   }
 
@@ -176,7 +176,7 @@ public:
     router_->retry_state_->expectResetRetry();
     EXPECT_CALL(context_.cluster_manager_.conn_pool_.host_->outlier_detector_,
                 putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, _));
-    per_try_timeout_->callback_();
+    per_try_timeout_->invokeCallback();
 
     // We expect this reset to kick off a new request.
     NiceMock<Http::MockStreamEncoder> encoder2;

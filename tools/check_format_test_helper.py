@@ -210,13 +210,15 @@ if __name__ == "__main__":
       "check_format.py")
   errors += checkUnfixableError(
       "counter_from_string.cc",
-      "Don't lookup stats by name at runtime; used StatName saved during construction")
+      "Don't lookup stats by name at runtime; use StatName saved during construction")
   errors += checkUnfixableError(
       "gauge_from_string.cc",
-      "Don't lookup stats by name at runtime; used StatName saved during construction")
+      "Don't lookup stats by name at runtime; use StatName saved during construction")
   errors += checkUnfixableError(
       "histogram_from_string.cc",
-      "Don't lookup stats by name at runtime; used StatName saved during construction")
+      "Don't lookup stats by name at runtime; use StatName saved during construction")
+  errors += checkUnfixableError(
+      "regex.cc", "Don't use std::regex in code that handles untrusted input. Use RegexMatcher")
 
   errors += fixFileExpectingFailure(
       "api/missing_package.proto",

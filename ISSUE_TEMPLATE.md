@@ -1,3 +1,7 @@
+**WARNING: If you want to report crashes, leaking of sensitive information,
+and/or other security issues, please consider
+[reporting them using appropriate channels](https://github.com/envoyproxy/envoy#reporting-security-vulnerabilities).**
+
 **Issue Template**
 
 *Title*: *One line description*

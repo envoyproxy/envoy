@@ -31,6 +31,7 @@ namespace Envoy {
 namespace Runtime {
 
 bool runtimeFeatureEnabled(absl::string_view feature);
+uint64_t getInteger(absl::string_view feature, uint64_t default_value);
 
 using RuntimeSingleton = ThreadSafeSingleton<Loader>;
 
@@ -205,11 +206,10 @@ struct RtdsSubscription : Config::SubscriptionCallbacks, Logger::Loggable<Logger
                       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                       const std::string&) override;
 
-  void onConfigUpdateFailed(const EnvoyException* e) override;
+  void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
+                            const EnvoyException* e) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::service::discovery::v2::Runtime>(resource,
-                                                                           validation_visitor_)
-        .name();
+    return MessageUtil::anyConvert<envoy::service::discovery::v2::Runtime>(resource).name();
   }
 
   void start();
@@ -244,6 +244,7 @@ public:
   // Runtime::Loader
   void initialize(Upstream::ClusterManager& cm) override;
   const Snapshot& snapshot() override;
+  std::shared_ptr<const Snapshot> threadsafeSnapshot() override;
   void mergeValues(const std::unordered_map<std::string, std::string>& values) override;
 
 private:
@@ -265,6 +266,9 @@ private:
   Api::Api& api_;
   std::vector<RtdsSubscriptionPtr> subscriptions_;
   Upstream::ClusterManager* cm_{};
+
+  absl::Mutex snapshot_mutex_;
+  std::shared_ptr<const Snapshot> thread_safe_snapshot_ GUARDED_BY(snapshot_mutex_);
 };
 
 } // namespace Runtime

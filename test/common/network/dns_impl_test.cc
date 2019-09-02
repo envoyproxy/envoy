@@ -369,6 +369,7 @@ public:
     return asString() == rhs.asString();
   }
   const std::string& asString() const override { return antagonistic_name_; }
+  absl::string_view asStringView() const override { return antagonistic_name_; }
   const std::string& logicalName() const override { return antagonistic_name_; }
   Api::SysCallIntResult bind(int fd) const override { return instance_.bind(fd); }
   Api::SysCallIntResult connect(int fd) const override { return instance_.connect(fd); }
@@ -856,7 +857,7 @@ TEST(DnsImplUnitTest, PendingTimerEnable) {
   DnsResolverImpl resolver(dispatcher, {});
   Event::FileEvent* file_event = new NiceMock<Event::MockFileEvent>();
   EXPECT_CALL(dispatcher, createFileEvent_(_, _, _, _)).WillOnce(Return(file_event));
-  EXPECT_CALL(*timer, enableTimer(_));
+  EXPECT_CALL(*timer, enableTimer(_, _));
   EXPECT_NE(nullptr, resolver.resolve("some.bad.domain.invalid", DnsLookupFamily::V4Only,
                                       [&](std::list<DnsResponse>&& results) {
                                         UNREFERENCED_PARAMETER(results);

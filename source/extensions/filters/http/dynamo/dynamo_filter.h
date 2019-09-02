@@ -10,6 +10,7 @@
 #include "common/json/json_loader.h"
 
 #include "extensions/filters/http/dynamo/dynamo_request_parser.h"
+#include "extensions/filters/http/dynamo/dynamo_stats.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -24,10 +25,8 @@ namespace Dynamo {
  */
 class DynamoFilter : public Http::StreamFilter {
 public:
-  DynamoFilter(Runtime::Loader& runtime, const std::string& stat_prefix, Stats::Scope& scope,
-               TimeSource& time_system)
-      : runtime_(runtime), stat_prefix_(stat_prefix + "dynamodb."), scope_(scope),
-        time_source_(time_system) {
+  DynamoFilter(Runtime::Loader& runtime, const DynamoStatsSharedPtr& stats, TimeSource& time_source)
+      : runtime_(runtime), stats_(stats), time_source_(time_source) {
     enabled_ = runtime_.snapshot().featureEnabled("dynamodb.filter_enabled", 100);
   }
 
@@ -68,8 +67,7 @@ private:
   void chargeTablePartitionIdStats(const Json::Object& json_body);
 
   Runtime::Loader& runtime_;
-  std::string stat_prefix_;
-  Stats::Scope& scope_;
+  const DynamoStatsSharedPtr stats_;
 
   bool enabled_{};
   std::string operation_{};

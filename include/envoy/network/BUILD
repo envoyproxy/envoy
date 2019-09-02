@@ -100,6 +100,7 @@ envoy_cc_library(
         ":connection_interface",
         ":listen_socket_interface",
         "//include/envoy/stats:stats_interface",
+        "@envoy_api//envoy/api/v2:lds_cc",
     ],
 )
 

@@ -123,6 +123,11 @@ elif [[ "$CI_TARGET" == "bazel.sizeopt" ]]; then
   echo "Testing ${TEST_TARGETS}"
   bazel test ${BAZEL_BUILD_OPTIONS} --config=sizeopt ${TEST_TARGETS}
   exit 0
+elif [[ "$CI_TARGET" == "bazel.gcc" ]]; then
+  setup_gcc_toolchain
+  echo "bazel fastbuild build..."
+  bazel_binary_build fastbuild
+  exit 0
 elif [[ "$CI_TARGET" == "bazel.debug" ]]; then
   setup_clang_toolchain
   echo "bazel debug build with tests..."
@@ -185,7 +190,6 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   # changes, this build type may need to be broken up.
   # TODO(mpwarres): remove quiche=enabled once QUICHE is built by default.
   COMPILE_TIME_OPTIONS="\
-    --config libc++ \
     --define signal_trace=disabled \
     --define hot_restart=disabled \
     --define google_grpc=disabled \
@@ -193,8 +197,9 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
     --define log_debug_assert_in_release=enabled \
     --define quiche=enabled \
     --define path_normalization_by_default=true \
+    --define deprecated_features=disabled \
   "
-  setup_clang_toolchain
+  setup_clang_libcxx_toolchain
   # This doesn't go into CI but is available for developer convenience.
   echo "bazel with different compiletime options build with tests..."
   # Building all the dependencies from scratch to link them against libc++.
@@ -206,25 +211,6 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   # "--define log_debug_assert_in_release=enabled" must be tested with a release build, so run only
   # these tests under "-c opt" to save time in CI.
   bazel test ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c opt //test/common/common:assert_test //test/server:server_test
-  exit 0
-elif [[ "$CI_TARGET" == "bazel.ipv6_tests" ]]; then
-  # This is around until Circle supports IPv6. We try to run a limited set of IPv6 tests as fast
-  # as possible for basic sanity testing.
-
-  # Hack to avoid returning IPv6 DNS
-  sed -i 's_#precedence ::ffff:0:0/96  100_precedence ::ffff:0:0/96  100_' /etc/gai.conf
-  # Debug IPv6 network issues
-  apt-get update && apt-get install -y dnsutils net-tools curl && \
-    ifconfig && \
-    route -A inet -A inet6 && \
-    curl -v https://go.googlesource.com && \
-    curl -6 -v https://go.googlesource.com && \
-    dig go.googlesource.com A go.googlesource.com AAAA
-
-  setup_clang_toolchain
-  echo "Testing..."
-  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} --test_env=ENVOY_IP_TEST_VERSIONS=v6only -c fastbuild \
-    //test/integration/... //test/common/network/...
   exit 0
 elif [[ "$CI_TARGET" == "bazel.api" ]]; then
   setup_clang_toolchain
@@ -248,7 +234,7 @@ elif [[ "$CI_TARGET" == "bazel.coverage" ]]; then
   exit 0
 elif [[ "$CI_TARGET" == "bazel.clang_tidy" ]]; then
   setup_clang_toolchain
-  ci/run_clang_tidy.sh
+  NUM_CPUS=$NUM_CPUS ci/run_clang_tidy.sh 
   exit 0
 elif [[ "$CI_TARGET" == "bazel.coverity" ]]; then
   # Coverity Scan version 2017.07 fails to analyze the entirely of the Envoy
@@ -266,6 +252,13 @@ elif [[ "$CI_TARGET" == "bazel.coverity" ]]; then
   cp -f \
      "${ENVOY_BUILD_DIR}"/envoy-coverity-output.tgz \
      "${ENVOY_DELIVERY_DIR}"/envoy-coverity-output.tgz
+  exit 0
+elif [[ "$CI_TARGET" == "bazel.fuzz" ]]; then
+  setup_clang_toolchain
+  FUZZ_TEST_TARGETS="$(bazel query "attr('tags','fuzzer',${TEST_TARGETS})")"
+  echo "bazel ASAN libFuzzer build with fuzz tests ${FUZZ_TEST_TARGETS}"
+  echo "Building envoy fuzzers and executing 100 fuzz iterations..."
+  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} --config=asan-fuzzer ${FUZZ_TEST_TARGETS} --test_arg="-runs=10"
   exit 0
 elif [[ "$CI_TARGET" == "fix_format" ]]; then
   echo "fix_format..."
