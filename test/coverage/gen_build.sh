@@ -25,20 +25,23 @@ set -e
 
 rm -f "${BUILD_PATH}"
 
-TARGETS=$("${BAZEL_BIN}" query ${BAZEL_QUERY_OPTIONS} "attr('tags', 'coverage_test_lib', ${REPOSITORY}//test/...)" | grep "^//")
+if [[ $# -gt 0 ]]; then
+  COVERAGE_TARGETS=$*
+else
+  COVERAGE_TARGETS=//test/...
+fi
+
+for target in ${COVERAGE_TARGETS}; do
+  TARGETS="$TARGETS $("${BAZEL_BIN}" query ${BAZEL_QUERY_OPTIONS} "attr('tags', 'coverage_test_lib', ${REPOSITORY}${target})" | grep "^//")"
+done
 
 # Run the QUICHE platform api tests for coverage.
-TARGETS="$TARGETS $("${BAZEL_BIN}" query ${BAZEL_QUERY_OPTIONS} "attr('tags', 'coverage_test_lib', '@com_googlesource_quiche//:all')" | grep "^@com_googlesource_quiche")"
+if [[ "${COVERAGE_TARGETS}" == "//test/..." ]]; then
+  TARGETS="$TARGETS $("${BAZEL_BIN}" query ${BAZEL_QUERY_OPTIONS} "attr('tags', 'coverage_test_lib', '@com_googlesource_quiche//:all')" | grep "^@com_googlesource_quiche")"
+fi
 
 if [ -n "${EXTRA_QUERY_PATHS}" ]; then
   TARGETS="$TARGETS $("${BAZEL_BIN}" query ${BAZEL_QUERY_OPTIONS} "attr('tags', 'coverage_test_lib', ${EXTRA_QUERY_PATHS})" | grep "^//")"
-fi
-
-# gcov requires gcc
-if [ "${NO_GCOV}" != 1 ]
-then
-  # Here we use the synthetic library target created by envoy_build_system.bzl
-  TARGETS="${TARGETS} ${REPOSITORY}//test/coverage/gcc_only_test:gcc_only_test_lib_internal_only"
 fi
 
 (
@@ -64,10 +67,14 @@ EOF
   done
   cat << EOF
     ],
-    tags = ["manual"],
+    # no-remote due to https://github.com/bazelbuild/bazel/issues/4685
+    tags = ["manual", "no-remote"],
     coverage = False,
-    # Needed when invoking external shell tests etc.
-    local = True,
+    # Due to the nature of coverage_tests, the shard of coverage_tests are very uneven, some of
+    # shard can take 100s and some takes only 10s, so we use the maximum sharding to here to let
+    # Bazel scheduling them across CPU cores.
+    # Sharding can be disabled by --test_sharding_strategy=disabled.
+    shard_count = 50,
 )
 EOF
 

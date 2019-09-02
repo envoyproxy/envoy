@@ -4,6 +4,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
+    "envoy_cc_test_binary",
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_select_hot_restart",
@@ -52,10 +53,12 @@ envoy_cc_test(
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
         "//source/common/stats:stats_lib",
+        "//source/server:active_raw_udp_listener_config",
         "//source/server:connection_handler_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:network_utility_lib",
+        "//test/test_common:threadsafe_singleton_injector_lib",
     ],
 )
 
@@ -121,6 +124,7 @@ envoy_cc_test(
         "//test/test_common:logging_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
     ],
 )
 
@@ -149,6 +153,7 @@ envoy_cc_test(
     deps = [
         "//source/common/protobuf:utility_lib",
         "//source/server:lds_api_lib",
+        "//test/mocks/config:config_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
@@ -173,9 +178,42 @@ envoy_cc_test(
         "//source/extensions/filters/listener/original_dst:config",
         "//source/extensions/filters/listener/tls_inspector:config",
         "//source/extensions/filters/network/http_connection_manager:config",
+        "//source/extensions/filters/network/tcp_proxy:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:config",
         "//source/extensions/transport_sockets/tls:ssl_socket_lib",
+        "//source/server:active_raw_udp_listener_config",
+        "//source/server:listener_manager_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:registry_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_time_lib",
+        "//test/test_common:threadsafe_singleton_injector_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "filter_chain_manager_impl_test",
+    srcs = ["filter_chain_manager_impl_test.cc"],
+    data = ["//test/extensions/transport_sockets/tls/test_data:certs"],
+    deps = [
+        ":utility_lib",
+        "//source/common/api:os_sys_calls_lib",
+        "//source/common/config:metadata_lib",
+        "//source/common/network:addr_family_aware_socket_option_lib",
+        "//source/common/network:listen_socket_lib",
+        "//source/common/network:socket_option_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/protobuf",
+        "//source/extensions/filters/listener/original_dst:config",
+        "//source/extensions/filters/listener/tls_inspector:config",
+        "//source/extensions/filters/network/http_connection_manager:config",
+        "//source/extensions/transport_sockets/raw_buffer:config",
+        "//source/extensions/transport_sockets/tls:config",
+        "//source/extensions/transport_sockets/tls:ssl_socket_lib",
+        "//source/server:filter_chain_manager_lib",
         "//source/server:listener_manager_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
@@ -208,6 +246,11 @@ filegroup(
     srcs = glob(["test_data/runtime/**"]),
 )
 
+filegroup(
+    name = "static_validation_test_data",
+    srcs = glob(["test_data/static_validation/**"]),
+)
+
 envoy_cc_test(
     name = "server_test",
     srcs = ["server_test.cc"],
@@ -216,15 +259,20 @@ envoy_cc_test(
         ":cluster_health_check_bootstrap.yaml",
         ":empty_bootstrap.yaml",
         ":invalid_bootstrap.yaml",
+        ":invalid_layered_runtime_duplicate_name.yaml",
+        ":invalid_layered_runtime_missing_name.yaml",
+        ":invalid_layered_runtime_no_layer_specifier.yaml",
+        ":invalid_legacy_runtime_bootstrap.yaml",
         ":invalid_runtime_bootstrap.yaml",
         ":node_bootstrap.yaml",
         ":node_bootstrap_no_admin_port.yaml",
+        ":node_bootstrap_with_admin_socket_options.yaml",
         ":node_bootstrap_without_access_log.yaml",
         ":runtime_bootstrap.yaml",
         ":runtime_test_data",
+        ":static_validation_test_data",
+        ":stats_sink_bootstrap.yaml",
         ":zipkin_tracing.yaml",
-        "//test/config/integration:server.json",
-        "//test/config/integration:server_config_files",
     ],
     deps = [
         "//source/common/common:version_lib",
@@ -244,6 +292,18 @@ envoy_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:test_time_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "ssl_context_manager_test",
+    srcs = ["ssl_context_manager_test.cc"],
+    deps = [
+        "//source/server:ssl_context_manager_lib",
+        "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -269,5 +329,21 @@ envoy_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test_binary(
+    name = "filter_chain_benchmark_test",
+    srcs = ["filter_chain_benchmark_test.cc"],
+    external_deps = [
+        "benchmark",
+        "googletest",
+    ],
+    deps = [
+        "//source/server:filter_chain_manager_lib",
+        "//test/test_common:environment_lib",
+        "//test/mocks/network:network_mocks",
+        # tranport socket config registration
+        "//source/extensions/transport_sockets/tls:config",
     ],
 )

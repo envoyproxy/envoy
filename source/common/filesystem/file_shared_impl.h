@@ -13,7 +13,7 @@ class IoFileError : public Api::IoError {
 public:
   explicit IoFileError(int sys_errno) : errno_(sys_errno) {}
 
-  ~IoFileError() override {}
+  ~IoFileError() override = default;
 
   Api::IoError::IoErrorCode getErrorCode() const override;
   std::string getErrorDetails() const override;
@@ -37,19 +37,19 @@ template <typename T> Api::IoCallResult<T> resultSuccess(T result) {
 
 class FileSharedImpl : public File {
 public:
-  FileSharedImpl(const std::string& path) : fd_(-1), path_(path) {}
+  FileSharedImpl(std::string path) : fd_(-1), path_(std::move(path)) {}
 
-  virtual ~FileSharedImpl() {}
+  ~FileSharedImpl() override = default;
 
   // Filesystem::File
-  Api::IoCallBoolResult open() override;
+  Api::IoCallBoolResult open(FlagSet flag) override;
   Api::IoCallSizeResult write(absl::string_view buffer) override;
   Api::IoCallBoolResult close() override;
   bool isOpen() const override;
   std::string path() const override;
 
 protected:
-  virtual void openFile() PURE;
+  virtual void openFile(FlagSet in) PURE;
   virtual ssize_t writeFile(absl::string_view buffer) PURE;
   virtual bool closeFile() PURE;
 

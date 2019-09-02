@@ -2,102 +2,64 @@
 
 #include "common/common/macros.h"
 
-#include "extensions/filters/network/dubbo_proxy/heartbeat_response.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
 
 DecoderStateMachine::DecoderStatus
-DecoderStateMachine::onTransportBegin(Buffer::Instance& buffer, Protocol::Context& context) {
-  if (!protocol_.decode(buffer, &context, metadata_)) {
+DecoderStateMachine::onDecodeStreamHeader(Buffer::Instance& buffer) {
+  ASSERT(!active_stream_);
+
+  auto metadata = std::make_shared<MessageMetadata>();
+  auto ret = protocol_.decodeHeader(buffer, metadata);
+  if (!ret.second) {
     ENVOY_LOG(debug, "dubbo decoder: need more data for {} protocol", protocol_.name());
-    return DecoderStatus(ProtocolState::WaitForData);
+    return {ProtocolState::WaitForData};
   }
 
-  if (context.is_heartbeat_) {
+  // The heartbeat message has no body.
+  auto context = ret.first;
+  if (metadata->message_type() == MessageType::HeartbeatRequest ||
+      metadata->message_type() == MessageType::HeartbeatResponse) {
     ENVOY_LOG(debug, "dubbo decoder: this is the {} heartbeat message", protocol_.name());
-    buffer.drain(context.header_size_);
-    decoder_callbacks_.onHeartbeat(metadata_);
-    return DecoderStatus(ProtocolState::Done, Network::FilterStatus::Continue);
-  } else {
-    handler_ = decoder_callbacks_.newDecoderEventHandler();
-  }
-  return DecoderStatus(ProtocolState::OnTransferHeaderTo, handler_->transportBegin());
-}
-
-DecoderStateMachine::DecoderStatus DecoderStateMachine::onTransportEnd() {
-  ENVOY_LOG(debug, "dubbo decoder: complete protocol processing");
-  return DecoderStatus(ProtocolState::Done, handler_->transportEnd());
-}
-
-DecoderStateMachine::DecoderStatus DecoderStateMachine::onTransferHeaderTo(Buffer::Instance& buffer,
-                                                                           size_t length) {
-  ENVOY_LOG(debug, "dubbo decoder: transfer protocol header, buffer size {}, header size {}",
-            buffer.length(), length);
-  return DecoderStatus(ProtocolState::OnMessageBegin, handler_->transferHeaderTo(buffer, length));
-}
-
-DecoderStateMachine::DecoderStatus DecoderStateMachine::onTransferBodyTo(Buffer::Instance& buffer,
-                                                                         int32_t length) {
-  ENVOY_LOG(debug, "dubbo decoder: transfer protocol body, buffer size {}, body size {}",
-            buffer.length(), length);
-  return DecoderStatus(ProtocolState::OnTransportEnd, handler_->transferBodyTo(buffer, length));
-}
-
-DecoderStateMachine::DecoderStatus DecoderStateMachine::onMessageBegin() {
-  ENVOY_LOG(debug, "dubbo decoder: start deserializing messages, deserializer name {}",
-            deserializer_.name());
-  return DecoderStatus(ProtocolState::OnMessageEnd,
-                       handler_->messageBegin(metadata_->message_type(), metadata_->request_id(),
-                                              metadata_->serialization_type()));
-}
-
-DecoderStateMachine::DecoderStatus DecoderStateMachine::onMessageEnd(Buffer::Instance& buffer,
-                                                                     int32_t message_size) {
-  ENVOY_LOG(debug, "dubbo decoder: expected body size is {}", message_size);
-
-  if (buffer.length() < static_cast<uint64_t>(message_size)) {
-    ENVOY_LOG(debug, "dubbo decoder: need more data for {} deserialization, current size {}",
-              deserializer_.name(), buffer.length());
-    return DecoderStatus(ProtocolState::WaitForData);
+    buffer.drain(context->header_size());
+    delegate_.onHeartbeat(metadata);
+    return {ProtocolState::Done};
   }
 
-  switch (metadata_->message_type()) {
-  case MessageType::Oneway:
-  case MessageType::Request:
-    deserializer_.deserializeRpcInvocation(buffer, message_size, metadata_);
-    break;
-  case MessageType::Response: {
-    auto info = deserializer_.deserializeRpcResult(buffer, message_size);
-    if (info->hasException()) {
-      metadata_->setMessageType(MessageType::Exception);
-    }
-    break;
+  active_stream_ = delegate_.newStream(metadata, context);
+  ASSERT(active_stream_);
+  context->message_origin_data().move(buffer, context->header_size());
+
+  return {ProtocolState::OnDecodeStreamData};
+}
+
+DecoderStateMachine::DecoderStatus
+DecoderStateMachine::onDecodeStreamData(Buffer::Instance& buffer) {
+  ASSERT(active_stream_);
+
+  if (!protocol_.decodeData(buffer, active_stream_->context_, active_stream_->metadata_)) {
+    ENVOY_LOG(debug, "dubbo decoder: need more data for {} serialization, current size {}",
+              protocol_.serializer()->name(), buffer.length());
+    return {ProtocolState::WaitForData};
   }
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
+
+  active_stream_->context_->message_origin_data().move(buffer,
+                                                       active_stream_->context_->body_size());
+  active_stream_->onStreamDecoded();
+  active_stream_ = nullptr;
 
   ENVOY_LOG(debug, "dubbo decoder: ends the deserialization of the message");
-  return DecoderStatus(ProtocolState::OnTransferBodyTo, handler_->messageEnd(metadata_));
+  return {ProtocolState::Done};
 }
 
 DecoderStateMachine::DecoderStatus DecoderStateMachine::handleState(Buffer::Instance& buffer) {
   switch (state_) {
-  case ProtocolState::OnTransportBegin:
-    return onTransportBegin(buffer, context_);
-  case ProtocolState::OnTransferHeaderTo:
-    return onTransferHeaderTo(buffer, context_.header_size_);
-  case ProtocolState::OnMessageBegin:
-    return onMessageBegin();
-  case ProtocolState::OnMessageEnd:
-    return onMessageEnd(buffer, context_.body_size_);
-  case ProtocolState::OnTransferBodyTo:
-    return onTransferBodyTo(buffer, context_.body_size_);
-  case ProtocolState::OnTransportEnd:
-    return onTransportEnd();
+  case ProtocolState::OnDecodeStreamHeader:
+    return onDecodeStreamHeader(buffer);
+  case ProtocolState::OnDecodeStreamData:
+    return onDecodeStreamData(buffer);
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
@@ -114,23 +76,18 @@ ProtocolState DecoderStateMachine::run(Buffer::Instance& buffer) {
     }
 
     state_ = s.next_state_;
-
-    ASSERT(s.filter_status_.has_value());
-    if (s.filter_status_.value() == Network::FilterStatus::StopIteration) {
-      return ProtocolState::StopIteration;
-    }
   }
 
   return state_;
 }
 
-typedef std::unique_ptr<DecoderStateMachine> DecoderStateMachinePtr;
+using DecoderStateMachinePtr = std::unique_ptr<DecoderStateMachine>;
 
-Decoder::Decoder(Protocol& protocol, Deserializer& deserializer,
-                 DecoderCallbacks& decoder_callbacks)
-    : deserializer_(deserializer), protocol_(protocol), decoder_callbacks_(decoder_callbacks) {}
+DecoderBase::DecoderBase(Protocol& protocol) : protocol_(protocol) {}
 
-Network::FilterStatus Decoder::onData(Buffer::Instance& data, bool& buffer_underflow) {
+DecoderBase::~DecoderBase() { complete(); }
+
+FilterStatus DecoderBase::onData(Buffer::Instance& data, bool& buffer_underflow) {
   ENVOY_LOG(debug, "dubbo decoder: {} bytes available", data.length());
   buffer_underflow = false;
 
@@ -148,10 +105,7 @@ Network::FilterStatus Decoder::onData(Buffer::Instance& data, bool& buffer_under
   case ProtocolState::WaitForData:
     ENVOY_LOG(debug, "dubbo decoder: wait for data");
     buffer_underflow = true;
-    return Network::FilterStatus::Continue;
-  case ProtocolState::StopIteration:
-    ENVOY_LOG(debug, "dubbo decoder: wait for continuation");
-    return Network::FilterStatus::StopIteration;
+    return FilterStatus::Continue;
   default:
     break;
   }
@@ -161,21 +115,21 @@ Network::FilterStatus Decoder::onData(Buffer::Instance& data, bool& buffer_under
   complete();
   buffer_underflow = (data.length() == 0);
   ENVOY_LOG(debug, "dubbo decoder: data length {}", data.length());
-  return Network::FilterStatus::Continue;
+  return FilterStatus::Continue;
 }
 
-void Decoder::start() {
-  metadata_ = std::make_shared<MessageMetadata>();
-  state_machine_ = std::make_unique<DecoderStateMachine>(protocol_, deserializer_, metadata_,
-                                                         decoder_callbacks_);
+void DecoderBase::start() {
+  state_machine_ = std::make_unique<DecoderStateMachine>(protocol_, *this);
   decode_started_ = true;
 }
 
-void Decoder::complete() {
-  metadata_.reset();
+void DecoderBase::complete() {
   state_machine_.reset();
+  stream_.reset();
   decode_started_ = false;
 }
+
+void DecoderBase::reset() { complete(); }
 
 } // namespace DubboProxy
 } // namespace NetworkFilters

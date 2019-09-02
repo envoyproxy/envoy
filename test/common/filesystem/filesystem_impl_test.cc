@@ -12,6 +12,10 @@
 namespace Envoy {
 namespace Filesystem {
 
+static constexpr FlagSet DefaultFlags{
+    1 << Filesystem::File::Operation::Read | 1 << Filesystem::File::Operation::Write |
+    1 << Filesystem::File::Operation::Create | 1 << Filesystem::File::Operation::Append};
+
 class FileSystemImplTest : public testing::Test {
 protected:
   int getFd(File* file) {
@@ -131,6 +135,8 @@ TEST_F(FileSystemImplTest, IllegalPath) {
 #else
   EXPECT_TRUE(file_system_.illegalPath("/dev"));
   EXPECT_TRUE(file_system_.illegalPath("/dev/"));
+  // Exception to allow opening from file descriptors. See #7258.
+  EXPECT_FALSE(file_system_.illegalPath("/dev/fd/0"));
   EXPECT_TRUE(file_system_.illegalPath("/proc"));
   EXPECT_TRUE(file_system_.illegalPath("/proc/"));
   EXPECT_TRUE(file_system_.illegalPath("/sys"));
@@ -152,7 +158,7 @@ TEST_F(FileSystemImplTest, Open) {
   ::unlink(new_file_path.c_str());
 
   FilePtr file = file_system_.createFile(new_file_path);
-  const Api::IoCallBoolResult result = file->open();
+  const Api::IoCallBoolResult result = file->open(DefaultFlags);
   EXPECT_TRUE(result.rc_);
   EXPECT_TRUE(file->isOpen());
 }
@@ -164,13 +170,13 @@ TEST_F(FileSystemImplTest, OpenTwice) {
   FilePtr file = file_system_.createFile(new_file_path);
   EXPECT_EQ(getFd(file.get()), -1);
 
-  const Api::IoCallBoolResult result1 = file->open();
+  const Api::IoCallBoolResult result1 = file->open(DefaultFlags);
   const int initial_fd = getFd(file.get());
   EXPECT_TRUE(result1.rc_);
   EXPECT_TRUE(file->isOpen());
 
   // check that we don't leak a file descriptor
-  const Api::IoCallBoolResult result2 = file->open();
+  const Api::IoCallBoolResult result2 = file->open(DefaultFlags);
   EXPECT_EQ(initial_fd, getFd(file.get()));
   EXPECT_TRUE(result2.rc_);
   EXPECT_TRUE(file->isOpen());
@@ -178,7 +184,7 @@ TEST_F(FileSystemImplTest, OpenTwice) {
 
 TEST_F(FileSystemImplTest, OpenBadFilePath) {
   FilePtr file = file_system_.createFile("");
-  const Api::IoCallBoolResult result = file->open();
+  const Api::IoCallBoolResult result = file->open(DefaultFlags);
   EXPECT_FALSE(result.rc_);
 }
 
@@ -188,7 +194,7 @@ TEST_F(FileSystemImplTest, ExistingFile) {
 
   {
     FilePtr file = file_system_.createFile(file_path);
-    const Api::IoCallBoolResult open_result = file->open();
+    const Api::IoCallBoolResult open_result = file->open(DefaultFlags);
     EXPECT_TRUE(open_result.rc_);
     std::string data(" new data");
     const Api::IoCallSizeResult result = file->write(data);
@@ -205,7 +211,7 @@ TEST_F(FileSystemImplTest, NonExistingFile) {
 
   {
     FilePtr file = file_system_.createFile(new_file_path);
-    const Api::IoCallBoolResult open_result = file->open();
+    const Api::IoCallBoolResult open_result = file->open(DefaultFlags);
     EXPECT_TRUE(open_result.rc_);
     std::string data(" new data");
     const Api::IoCallSizeResult result = file->write(data);
@@ -221,7 +227,7 @@ TEST_F(FileSystemImplTest, Close) {
   ::unlink(new_file_path.c_str());
 
   FilePtr file = file_system_.createFile(new_file_path);
-  const Api::IoCallBoolResult result1 = file->open();
+  const Api::IoCallBoolResult result1 = file->open(DefaultFlags);
   EXPECT_TRUE(result1.rc_);
   EXPECT_TRUE(file->isOpen());
 
@@ -235,7 +241,7 @@ TEST_F(FileSystemImplTest, WriteAfterClose) {
   ::unlink(new_file_path.c_str());
 
   FilePtr file = file_system_.createFile(new_file_path);
-  const Api::IoCallBoolResult bool_result1 = file->open();
+  const Api::IoCallBoolResult bool_result1 = file->open(DefaultFlags);
   EXPECT_TRUE(bool_result1.rc_);
   const Api::IoCallBoolResult bool_result2 = file->close();
   EXPECT_TRUE(bool_result2.rc_);
@@ -243,6 +249,35 @@ TEST_F(FileSystemImplTest, WriteAfterClose) {
   EXPECT_EQ(-1, size_result.rc_);
   EXPECT_EQ(IoFileError::IoErrorCode::UnknownError, size_result.err_->getErrorCode());
   EXPECT_EQ("Bad file descriptor", size_result.err_->getErrorDetails());
+}
+
+TEST_F(FileSystemImplTest, NonExistingFileAndReadOnly) {
+  const std::string new_file_path = TestEnvironment::temporaryPath("envoy_this_not_exist");
+  ::unlink(new_file_path.c_str());
+
+  static constexpr FlagSet flag(static_cast<size_t>(Filesystem::File::Operation::Read));
+  FilePtr file = file_system_.createFile(new_file_path);
+  const Api::IoCallBoolResult open_result = file->open(flag);
+  EXPECT_FALSE(open_result.rc_);
+}
+
+TEST_F(FileSystemImplTest, ExistingReadOnlyFileAndWrite) {
+  const std::string file_path =
+      TestEnvironment::writeStringToFileForTest("test_envoy", "existing file");
+
+  {
+    static constexpr FlagSet flag(static_cast<size_t>(Filesystem::File::Operation::Read));
+    FilePtr file = file_system_.createFile(file_path);
+    const Api::IoCallBoolResult open_result = file->open(flag);
+    EXPECT_TRUE(open_result.rc_);
+    std::string data(" new data");
+    const Api::IoCallSizeResult result = file->write(data);
+    EXPECT_TRUE(result.rc_ < 0);
+    EXPECT_EQ(result.err_->getErrorDetails(), "Bad file descriptor");
+  }
+
+  auto contents = TestEnvironment::readFileToStringForTest(file_path);
+  EXPECT_EQ("existing file", contents);
 }
 
 } // namespace Filesystem

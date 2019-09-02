@@ -13,9 +13,10 @@ api_cc_test(
         "//envoy/service/accesslog/v2:als",
         "//envoy/service/discovery/v2:ads",
         "//envoy/service/discovery/v2:hds",
-        "//envoy/service/discovery/v2:tds",
+        "//envoy/service/discovery/v2:rtds",
         "//envoy/service/metrics/v2:metrics_service",
         "//envoy/service/ratelimit/v2:rls",
+        "@com_github_cncf_udpa//udpa/service/orca/v1:orca",
     ],
 )
 

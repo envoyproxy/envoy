@@ -46,7 +46,7 @@ public:
 protected:
   class ActiveHealthCheckSession : public Event::DeferredDeletable {
   public:
-    virtual ~ActiveHealthCheckSession();
+    ~ActiveHealthCheckSession() override;
     HealthTransition setUnhealthy(envoy::data::core::v2alpha::HealthCheckFailureType type);
     void onDeferredDeleteBase();
     void start() { onInitialInterval(); }
@@ -80,12 +80,12 @@ protected:
     bool first_check_{true};
   };
 
-  typedef std::unique_ptr<ActiveHealthCheckSession> ActiveHealthCheckSessionPtr;
+  using ActiveHealthCheckSessionPtr = std::unique_ptr<ActiveHealthCheckSession>;
 
   HealthCheckerImplBase(const Cluster& cluster, const envoy::api::v2::core::HealthCheck& config,
                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                         Runtime::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
-  ~HealthCheckerImplBase();
+  ~HealthCheckerImplBase() override;
 
   virtual ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) PURE;
   virtual envoy::data::core::v2alpha::HealthCheckerType healthCheckerType() const PURE;

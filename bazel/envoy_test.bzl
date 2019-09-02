@@ -8,7 +8,7 @@ load(
     "envoy_external_dep_path",
     "envoy_linkstatic",
     "envoy_select_force_libcpp",
-    "envoy_static_link_libstdcpp_linkopts",
+    "envoy_stdlib_deps",
     "tcmalloc_external_dep",
 )
 
@@ -60,7 +60,7 @@ def _envoy_test_linkopts():
         # TODO(mattklein123): It's not great that we universally link against the following libs.
         # In particular, -latomic and -lrt are not needed on all platforms. Make this more granular.
         "//conditions:default": ["-pthread", "-lrt", "-ldl"],
-    }) + envoy_select_force_libcpp(["-lc++fs"], ["-lstdc++fs", "-latomic"])
+    }) + envoy_select_force_libcpp([], ["-lstdc++fs", "-latomic"])
 
 # Envoy C++ fuzz test targets. These are not included in coverage runs.
 def envoy_cc_fuzz_test(name, corpus, deps = [], tags = [], **kwargs):
@@ -81,7 +81,7 @@ def envoy_cc_fuzz_test(name, corpus, deps = [], tags = [], **kwargs):
     test_lib_name = name + "_lib"
     envoy_cc_test_library(
         name = test_lib_name,
-        deps = deps + ["//test/fuzz:fuzz_runner_lib"],
+        deps = deps + ["//test/fuzz:fuzz_runner_lib", "//bazel:dynamic_stdlib"],
         **kwargs
     )
     native.cc_test(
@@ -116,6 +116,17 @@ def envoy_cc_fuzz_test(name, corpus, deps = [], tags = [], **kwargs):
         tags = ["manual"] + tags,
     )
 
+    native.cc_test(
+        name = name + "_with_libfuzzer",
+        copts = envoy_copts("@envoy", test = True),
+        linkopts = ["-fsanitize=fuzzer"] + _envoy_test_linkopts(),
+        linkstatic = 1,
+        testonly = 1,
+        data = [corpus_name],
+        deps = [":" + test_lib_name],
+        tags = ["manual", "fuzzer"] + tags,
+    )
+
 # Envoy C++ test targets should be specified with this function.
 def envoy_cc_test(
         name,
@@ -144,8 +155,8 @@ def envoy_cc_test(
         repository = repository,
         tags = test_lib_tags,
         copts = copts,
-        # Restrict only to the code coverage tools.
-        visibility = ["@envoy//test/coverage:__pkg__"],
+        # Allow public visibility so these can be consumed in coverage tests in external projects.
+        visibility = ["//visibility:public"],
     )
     native.cc_test(
         name = name,
@@ -153,7 +164,7 @@ def envoy_cc_test(
         linkopts = _envoy_test_linkopts(),
         linkstatic = envoy_linkstatic(),
         malloc = tcmalloc_external_dep(repository),
-        deps = [
+        deps = envoy_stdlib_deps() + [
             ":" + name + "_lib_internal_only",
             repository + "//test:main",
         ],
@@ -205,7 +216,7 @@ def envoy_cc_test_binary(
     envoy_cc_binary(
         name,
         testonly = 1,
-        linkopts = _envoy_test_linkopts() + envoy_static_link_libstdcpp_linkopts(),
+        linkopts = _envoy_test_linkopts(),
         **kargs
     )
 

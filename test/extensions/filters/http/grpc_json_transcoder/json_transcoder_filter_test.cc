@@ -249,6 +249,24 @@ TEST_F(GrpcJsonTranscoderConfigTest, InvalidQueryParameter) {
   EXPECT_FALSE(transcoder);
 }
 
+TEST_F(GrpcJsonTranscoderConfigTest, UnknownQueryParameterIsIgnored) {
+  auto proto_config = getProtoConfig(
+      TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"), "bookstore.Bookstore");
+  proto_config.set_ignore_unknown_query_parameters(true);
+  JsonTranscoderConfig config(proto_config, *api_);
+
+  Http::TestHeaderMapImpl headers{{":method", "GET"}, {":path", "/shelves?foo=bar"}};
+
+  TranscoderInputStreamImpl request_in, response_in;
+  std::unique_ptr<Transcoder> transcoder;
+  const MethodDescriptor* method_descriptor;
+  auto status =
+      config.createTranscoder(headers, request_in, response_in, transcoder, method_descriptor);
+
+  EXPECT_TRUE(status.ok());
+  EXPECT_TRUE(transcoder);
+}
+
 TEST_F(GrpcJsonTranscoderConfigTest, IgnoredQueryParameter) {
   std::vector<std::string> ignored_query_parameters = {"key"};
   JsonTranscoderConfig config(
@@ -335,6 +353,8 @@ TEST_F(GrpcJsonTranscoderFilterTest, NoTranscoding) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ(expected_request_headers, request_headers);
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.decodeMetadata(metadata_map));
 
   Buffer::OwnedImpl request_data{"{}"};
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(request_data, false));
@@ -738,7 +758,7 @@ protected:
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
-  ~GrpcJsonTranscoderFilterPrintTest() {
+  ~GrpcJsonTranscoderFilterPrintTest() override {
     delete filter_;
     delete config_;
   }

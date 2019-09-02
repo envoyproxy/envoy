@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/stats/refcount_ptr.h"
 #include "envoy/stats/stats.h"
 
 namespace Envoy {
@@ -15,7 +16,7 @@ namespace Stats {
  */
 class HistogramStatistics {
 public:
-  virtual ~HistogramStatistics() {}
+  virtual ~HistogramStatistics() = default;
 
   /**
    * Returns quantile summary representation of the histogram.
@@ -71,9 +72,9 @@ public:
  * class (Sinks, in particular) will need to explicitly differentiate between histograms
  * representing durations and histograms representing other types of data.
  */
-class Histogram : public virtual Metric {
+class Histogram : public Metric {
 public:
-  virtual ~Histogram() {}
+  ~Histogram() override = default;
 
   /**
    * Records an unsigned value. If a timer, values are in units of milliseconds.
@@ -81,14 +82,14 @@ public:
   virtual void recordValue(uint64_t value) PURE;
 };
 
-typedef std::shared_ptr<Histogram> HistogramSharedPtr;
+using HistogramSharedPtr = RefcountPtr<Histogram>;
 
 /**
  * A histogram that is stored in main thread and provides summary view of the histogram.
  */
-class ParentHistogram : public virtual Histogram {
+class ParentHistogram : public Histogram {
 public:
-  virtual ~ParentHistogram() {}
+  ~ParentHistogram() override = default;
 
   /**
    * This method is called during the main stats flush process for each of the histograms and used
@@ -117,7 +118,7 @@ public:
   virtual const std::string bucketSummary() const PURE;
 };
 
-typedef std::shared_ptr<ParentHistogram> ParentHistogramSharedPtr;
+using ParentHistogramSharedPtr = RefcountPtr<ParentHistogram>;
 
 } // namespace Stats
 } // namespace Envoy

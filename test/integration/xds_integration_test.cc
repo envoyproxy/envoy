@@ -28,7 +28,11 @@ public:
             "test/config/integration/server_xds.lds.yaml",
             "test/config/integration/server_xds.rds.yaml",
         },
-        {"http"});
+        {"http"}, false, false, false);
+    EXPECT_EQ(1, test_server_->counter("listener_manager.lds.update_success")->value());
+    EXPECT_EQ(1, test_server_->counter("http.router.rds.route_config_0.update_success")->value());
+    EXPECT_EQ(1, test_server_->counter("cluster_manager.cds.update_success")->value());
+    EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.update_success")->value());
   }
 };
 
@@ -40,7 +44,7 @@ TEST_P(XdsIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   testRouterRequestAndResponseWithBody(1024, 512, false);
 }
 
-typedef HttpProtocolIntegrationTest LdsIntegrationTest;
+using LdsIntegrationTest = HttpProtocolIntegrationTest;
 
 INSTANTIATE_TEST_SUITE_P(Protocols, LdsIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(

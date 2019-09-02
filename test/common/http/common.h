@@ -16,7 +16,7 @@ namespace Envoy {
  */
 class CodecClientForTest : public Http::CodecClient {
 public:
-  typedef std::function<void(CodecClient*)> DestroyCb;
+  using DestroyCb = std::function<void(CodecClient*)>;
   CodecClientForTest(Network::ClientConnectionPtr&& connection, Http::ClientConnection* codec,
                      DestroyCb destroy_cb, Upstream::HostDescriptionConstSharedPtr host,
                      Event::Dispatcher& dispatcher)
@@ -24,7 +24,7 @@ public:
         destroy_cb_(destroy_cb) {
     codec_.reset(codec);
   }
-  ~CodecClientForTest() {
+  ~CodecClientForTest() override {
     if (destroy_cb_) {
       destroy_cb_(this);
     }

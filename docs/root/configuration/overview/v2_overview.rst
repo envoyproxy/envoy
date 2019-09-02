@@ -496,6 +496,12 @@ is set in the :ref:`rds
 <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.rds>` field of the :ref:`HttpConnectionManager
 <envoy_api_msg_config.filter.network.http_connection_manager.v2.HttpConnectionManager>` config.
 
+.. note::
+
+    The management server responding to these endpoints must respond with a :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>`
+    along with a HTTP status of 200. Additionally, if the configuration that would be supplied has not changed (as indicated by the version
+    supplied by the Envoy client) then the management server can respond with an empty body and a HTTP status of 304.
+
 .. _config_overview_v2_ads:
 
 Aggregated Discovery Service
@@ -592,6 +598,30 @@ Management Server has a statistics tree rooted at *control_plane.* with the foll
    connected_state, Gauge, A boolean (1 for connected and 0 for disconnected) that indicates the current connection state with management server
    rate_limit_enforced, Counter, Total number of times rate limit was enforced for management server requests
    pending_requests, Gauge, Total number of pending requests when the rate limit was enforced
+
+.. _subscription_statistics:
+
+xDS subscription statistics
+---------------------------
+
+Envoy discovers its various dynamic resources via discovery
+services referred to as *xDS*. Resources are requested via :ref:`subscriptions <xds_protocol>`,
+by specifying a filesystem path to watch, initiating gRPC streams or polling a REST-JSON URL.
+
+The following statistics are generated for all subscriptions.
+
+.. csv-table::
+ :header: Name, Type, Description
+ :widths: 1, 1, 2
+
+ config_reload, Counter, Total API fetches that resulted in a config reload due to a different config
+ init_fetch_timeout, Counter, Total :ref:`initial fetch timeouts <envoy_api_field_core.ConfigSource.initial_fetch_timeout>`
+ update_attempt, Counter, Total API fetches attempted
+ update_success, Counter, Total API fetches completed successfully
+ update_failure, Counter, Total API fetches that failed because of network errors
+ update_rejected, Counter, Total API fetches that failed because of schema/validation errors
+ version, Gauge, Hash of the contents from the last successful API fetch
+ control_plane.connected_state, Gauge, A boolean (1 for connected and 0 for disconnected) that indicates the current connection state with management server
 
 .. _config_overview_v2_status:
 

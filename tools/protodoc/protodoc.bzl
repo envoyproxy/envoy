@@ -44,7 +44,7 @@ def _proto_doc_aspect_impl(target, ctx):
     # these don't include source_code_info, which we need for comment
     # extractions. See https://github.com/bazelbuild/bazel/issues/3971.
     import_paths = []
-    for f in target[ProtoInfo].transitive_sources:
+    for f in target[ProtoInfo].transitive_sources.to_list():
         if f.root.path:
             import_path = f.root.path + "/" + f.owner.workspace_root
         else:
@@ -64,10 +64,11 @@ def _proto_doc_aspect_impl(target, ctx):
     args += ["-I" + import_path for import_path in import_paths]
     args += ["--plugin=protoc-gen-protodoc=" + ctx.executable._protodoc.path, "--protodoc_out=" + output_path]
     args += [_proto_path(src) for src in target[ProtoInfo].direct_sources]
-    ctx.action(
+    ctx.actions.run(
         executable = ctx.executable._protoc,
         arguments = args,
-        inputs = [ctx.executable._protodoc] + target[ProtoInfo].transitive_sources.to_list(),
+        inputs = target[ProtoInfo].transitive_sources,
+        tools = [ctx.executable._protodoc],
         outputs = outputs,
         mnemonic = "ProtoDoc",
         use_default_shell_env = True,
@@ -81,12 +82,12 @@ proto_doc_aspect = aspect(
         "_protoc": attr.label(
             default = Label("@com_google_protobuf//:protoc"),
             executable = True,
-            cfg = "host",
+            cfg = "exec",
         ),
         "_protodoc": attr.label(
             default = Label("//tools/protodoc"),
             executable = True,
-            cfg = "host",
+            cfg = "exec",
         ),
     },
     implementation = _proto_doc_aspect_impl,

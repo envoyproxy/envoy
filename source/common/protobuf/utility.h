@@ -32,6 +32,10 @@
   ((message).has_##field_name() ? DurationUtil::durationToMilliseconds((message).field_name())     \
                                 : (default_value))
 
+// Obtain the string value if the field is set. Otherwise, return the default value.
+#define PROTOBUF_GET_STRING_OR_DEFAULT(message, field_name, default_value)                         \
+  (!(message).field_name().empty() ? (message).field_name() : (default_value))
+
 // Obtain the milliseconds value of a google.protobuf.Duration field if set. Otherwise, return
 // absl::nullopt.
 #define PROTOBUF_GET_OPTIONAL_MS(message, field_name)                                              \
@@ -142,22 +146,22 @@ public:
   }
 
   /**
-   * Converts a proto repeated field into a generic vector of const Protobuf::Message unique_ptr's.
+   * Converts a proto repeated field into a container of const Protobuf::Message unique_ptr's.
    *
    * @param repeated_field the proto repeated field to convert.
-   * @return ProtobufType::ConstMessagePtrVector the vector of const Message pointers.
+   * @return ReturnType the container of const Message pointers.
    */
-  template <typename ProtoType>
-  static ProtobufTypes::ConstMessagePtrVector
-  convertToConstMessagePtrVector(const Protobuf::RepeatedPtrField<ProtoType>& repeated_field) {
-    ProtobufTypes::ConstMessagePtrVector ret_vector;
-    std::transform(repeated_field.begin(), repeated_field.end(), std::back_inserter(ret_vector),
+  template <typename ProtoType, typename ReturnType>
+  static ReturnType
+  convertToConstMessagePtrContainer(const Protobuf::RepeatedPtrField<ProtoType>& repeated_field) {
+    ReturnType ret_container;
+    std::transform(repeated_field.begin(), repeated_field.end(), std::back_inserter(ret_container),
                    [](const ProtoType& proto_message) -> std::unique_ptr<const Protobuf::Message> {
                      Protobuf::Message* clone = proto_message.New();
                      clone->MergeFrom(proto_message);
                      return std::unique_ptr<const Protobuf::Message>(clone);
                    });
-    return ret_vector;
+    return ret_container;
   }
 };
 
@@ -185,7 +189,7 @@ public:
     const std::string Yaml = ".yaml";
   };
 
-  typedef ConstSingleton<FileExtensionValues> FileExtensions;
+  using FileExtensions = ConstSingleton<FileExtensionValues>;
 
   static std::size_t hash(const Protobuf::Message& message) {
     // Use Protobuf::io::CodedOutputStream to force deterministic serialization, so that the same
@@ -203,11 +207,7 @@ public:
   }
 
   static void checkUnknownFields(const Protobuf::Message& message,
-                                 ProtobufMessage::ValidationVisitor& validation_visitor) {
-    if (!message.GetReflection()->GetUnknownFields(message).empty()) {
-      validation_visitor.onUnknownField("type " + message.GetTypeName());
-    }
-  }
+                                 ProtobufMessage::ValidationVisitor& validation_visitor);
 
   static void loadFromJson(const std::string& json, Protobuf::Message& message,
                            ProtobufMessage::ValidationVisitor& validation_visitor);
@@ -235,9 +235,12 @@ public:
    * @param message message to validate.
    * @throw ProtoValidationException if the message does not satisfy its type constraints.
    */
-  template <class MessageType> static void validate(const MessageType& message) {
+  template <class MessageType>
+  static void validate(const MessageType& message,
+                       ProtobufMessage::ValidationVisitor& validation_visitor) {
     // Log warnings or throw errors if deprecated fields are in use.
     checkForDeprecation(message);
+    checkUnknownFields(message, validation_visitor);
 
     std::string err;
     if (!Validate(message, &err)) {
@@ -249,14 +252,14 @@ public:
   static void loadFromFileAndValidate(const std::string& path, MessageType& message,
                                       ProtobufMessage::ValidationVisitor& validation_visitor) {
     loadFromFile(path, message, validation_visitor);
-    validate(message);
+    validate(message, validation_visitor);
   }
 
   template <class MessageType>
   static void loadFromYamlAndValidate(const std::string& yaml, MessageType& message,
                                       ProtobufMessage::ValidationVisitor& validation_visitor) {
     loadFromYaml(yaml, message, validation_visitor);
-    validate(message);
+    validate(message, validation_visitor);
   }
 
   /**
@@ -268,9 +271,11 @@ public:
    * @throw ProtoValidationException if the message does not satisfy its type constraints.
    */
   template <class MessageType>
-  static const MessageType& downcastAndValidate(const Protobuf::Message& config) {
+  static const MessageType&
+  downcastAndValidate(const Protobuf::Message& config,
+                      ProtobufMessage::ValidationVisitor& validation_visitor) {
     const auto& typed_config = dynamic_cast<MessageType>(config);
-    validate(typed_config);
+    validate(typed_config, validation_visitor);
     return typed_config;
   }
 
@@ -282,13 +287,11 @@ public:
    * @return MessageType the typed message inside the Any.
    */
   template <class MessageType>
-  static inline MessageType anyConvert(const ProtobufWkt::Any& message,
-                                       ProtobufMessage::ValidationVisitor& validation_visitor) {
+  static inline MessageType anyConvert(const ProtobufWkt::Any& message) {
     MessageType typed_message;
     if (!message.UnpackTo(&typed_message)) {
       throw EnvoyException("Unable to unpack " + message.DebugString());
     }
-    checkUnknownFields(typed_message, validation_visitor);
     return typed_message;
   };
 
@@ -374,7 +377,7 @@ public:
 class HashedValue {
 public:
   HashedValue(const ProtobufWkt::Value& value) : value_(value), hash_(ValueUtil::hash(value)){};
-  HashedValue(const HashedValue& v) : value_(v.value_), hash_(v.hash_){};
+  HashedValue(const HashedValue& v) = default;
 
   const ProtobufWkt::Value& value() const { return value_; }
   std::size_t hash() const { return hash_; }

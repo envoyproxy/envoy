@@ -113,6 +113,22 @@ envoy_cc_test_library(
         "//source/common/stats:stats_lib",
         "//test/mocks/stats:stats_mocks",
         "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
+        "@envoy_api//envoy/service/discovery/v2:rtds_cc",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "test_runtime_lib",
+    hdrs = ["test_runtime.h"],
+    deps = [
+        "//source/common/runtime:runtime_lib",
+        "//source/common/stats:isolated_store_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/init:init_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/protobuf:protobuf_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
     ],
 )
 
@@ -230,6 +246,7 @@ envoy_cc_test(
         ":simulated_time_system_lib",
         ":utility_lib",
         "//source/common/event:libevent_scheduler_lib",
+        "//test/mocks/event:event_mocks",
     ],
 )
 

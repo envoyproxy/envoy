@@ -16,16 +16,17 @@ namespace Filesystem {
 class MockFile : public File {
 public:
   MockFile();
-  ~MockFile();
+  ~MockFile() override;
 
   // Filesystem::File
-  Api::IoCallBoolResult open() override;
+  Api::IoCallBoolResult open(FlagSet flag) override;
   Api::IoCallSizeResult write(absl::string_view buffer) override;
   Api::IoCallBoolResult close() override;
   bool isOpen() const override { return is_open_; };
   MOCK_CONST_METHOD0(path, std::string());
 
-  MOCK_METHOD0(open_, Api::IoCallBoolResult());
+  // The first parameter here must be `const FlagSet&` otherwise it doesn't compile with libstdc++
+  MOCK_METHOD1(open_, Api::IoCallBoolResult(const FlagSet& flag));
   MOCK_METHOD1(write_, Api::IoCallSizeResult(absl::string_view buffer));
   MOCK_METHOD0(close_, Api::IoCallBoolResult());
 
@@ -43,7 +44,7 @@ private:
 class MockInstance : public Instance {
 public:
   MockInstance();
-  ~MockInstance();
+  ~MockInstance() override;
 
   // Filesystem::Instance
   MOCK_METHOD1(createFile, FilePtr(const std::string&));
@@ -57,7 +58,7 @@ public:
 class MockWatcher : public Watcher {
 public:
   MockWatcher();
-  ~MockWatcher();
+  ~MockWatcher() override;
 
   MOCK_METHOD3(addWatch, void(const std::string&, uint32_t, OnChangedCb));
 };

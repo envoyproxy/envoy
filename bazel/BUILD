@@ -1,6 +1,10 @@
 licenses(["notice"])  # Apache 2
 
-package(default_visibility = ["//visibility:public"])
+load("//bazel:envoy_build_system.bzl", "envoy_package")
+
+envoy_package()
+
+load("//bazel:envoy_internal.bzl", "envoy_select_force_libcpp")
 
 exports_files([
     "gen_sh_test_runner.sh",
@@ -34,6 +38,25 @@ genrule(
     # Undocumented attr to depend on workspace status files.
     # https://github.com/bazelbuild/bazel/issues/4942
     stamp = 1,
+)
+
+# A target to optionally link C++ standard library dynamically in sanitizer runs.
+# TSAN doesn't support libc/libstdc++ static linking per doc:
+#   http://releases.llvm.org/8.0.1/tools/clang/docs/ThreadSanitizer.html
+cc_library(
+    name = "dynamic_stdlib",
+    linkopts = envoy_select_force_libcpp(
+        ["-lc++"],
+        ["-lstdc++"],
+    ),
+)
+
+cc_library(
+    name = "static_stdlib",
+    linkopts = select({
+        "//bazel:linux": ["-static-libgcc"],
+        "//conditions:default": [],
+    }),
 )
 
 config_setting(
@@ -81,8 +104,27 @@ config_setting(
 )
 
 config_setting(
+    name = "tsan_build",
+    values = {"define": "ENVOY_CONFIG_TSAN=1"},
+)
+
+config_setting(
     name = "coverage_build",
     values = {"define": "ENVOY_CONFIG_COVERAGE=1"},
+)
+
+config_setting(
+    name = "clang_build",
+    flag_values = {
+        "@bazel_tools//tools/cpp:compiler": "clang",
+    },
+)
+
+config_setting(
+    name = "gcc_build",
+    flag_values = {
+        "@bazel_tools//tools/cpp:compiler": "gcc",
+    },
 )
 
 config_setting(
@@ -98,6 +140,16 @@ config_setting(
 config_setting(
     name = "disable_signal_trace",
     values = {"define": "signal_trace=disabled"},
+)
+
+config_setting(
+    name = "disable_object_dump_on_signal_trace",
+    values = {"define": "object_dump_on_signal_trace=disabled"},
+)
+
+config_setting(
+    name = "disable_deprecated_features",
+    values = {"define": "deprecated_features=disabled"},
 )
 
 config_setting(
@@ -159,6 +211,11 @@ config_setting(
 )
 
 config_setting(
+    name = "boringssl_disabled",
+    values = {"define": "boringssl=disabled"},
+)
+
+config_setting(
     name = "enable_quiche",
     values = {"define": "quiche=enabled"},
 )
@@ -187,6 +244,11 @@ config_setting(
 config_setting(
     name = "linux_ppc",
     values = {"cpu": "ppc"},
+)
+
+config_setting(
+    name = "linux_mips64",
+    values = {"cpu": "mips64"},
 )
 
 config_setting(
@@ -267,9 +329,24 @@ alias(
             ":linux_x86_64": ":linux_x86_64",
             ":linux_aarch64": ":linux_aarch64",
             ":linux_ppc": ":linux_ppc",
+            ":linux_mips64": ":linux_mips64",
             # If we're not on an linux platform return a value that will never match in the select() statement calling this
             # since it would have already been matched above.
             "//conditions:default": ":linux_x86_64",
+        },
+    ),
+)
+
+alias(
+    name = "x86",
+    actual = select(
+        {
+            ":darwin_x86_64": ":darwin_x86_64",
+            ":ios_x86_64": "ios_x86_64",
+            "linux_x86_64": "linux_x86_64",
+            "windows_x86_64": "windows_x86_64",
+            # If we're not on an x86 platform return a value that will never match in the select() statement calling this since it would have already been matched above.
+            "//conditions:default": ":darwin_x86_64",
         },
     ),
 )

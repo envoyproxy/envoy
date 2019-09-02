@@ -28,7 +28,7 @@ public:
   const std::string RateLimit = "envoy.ratelimit";
   // Redis proxy filter
   const std::string RedisProxy = "envoy.redis_proxy";
-  // IP tagging filter
+  // TCP proxy filter
   const std::string TcpProxy = "envoy.tcp_proxy";
   // Authorization filter
   const std::string ExtAuthorization = "envoy.ext_authz";
@@ -50,7 +50,7 @@ public:
                        RedisProxy, TcpProxy, ExtAuthorization}) {}
 };
 
-typedef ConstSingleton<NetworkFilterNameValues> NetworkFilterNames;
+using NetworkFilterNames = ConstSingleton<NetworkFilterNameValues>;
 
 } // namespace NetworkFilters
 } // namespace Extensions

@@ -38,6 +38,8 @@ routing PRs, questions, etc. to the right place.
 
 * All maintainers
 * Piotr Sikora ([PiotrSikora](https://github.com/PiotrSikora)) (piotrsikora@google.com)
+* Yan Avlasov ([yanavlasov](https://github.com/yanavlasov)) (yavlasov@google.com)
+* Asra Ali ([asraa](https://github.com/asraa)) (asraa@google.com)
 
 # Emeritus maintainers
 
@@ -59,3 +61,5 @@ matter expert reviews. Feel free to loop them in as needed.
   * Bazel/build.
 * Daniel Hochman ([danielhochman](https://github.com/danielhochman)) (dhochman@lyft.com)
   * Redis, Python, configuration/operational questions.
+* Yuchen Dai ([lambdai](https://github.com/lambdai)) (lambdai@google.com)
+  * v2 xDS, listeners, filter chain discovery service.

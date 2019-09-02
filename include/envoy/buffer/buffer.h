@@ -33,6 +33,7 @@ struct RawSlice {
  */
 class BufferFragment {
 public:
+  virtual ~BufferFragment() = default;
   /**
    * @return const void* a pointer to the referenced data.
    */
@@ -47,9 +48,6 @@ public:
    * Called by a buffer when the referenced data is no longer needed.
    */
   virtual void done() PURE;
-
-protected:
-  virtual ~BufferFragment() {}
 };
 
 /**
@@ -57,7 +55,7 @@ protected:
  */
 class Instance {
 public:
-  virtual ~Instance() {}
+  virtual ~Instance() = default;
 
   /**
    * Copy data into the buffer (deprecated, use absl::string_view variant
@@ -357,14 +355,14 @@ public:
   }
 };
 
-typedef std::unique_ptr<Instance> InstancePtr;
+using InstancePtr = std::unique_ptr<Instance>;
 
 /**
  * A factory for creating buffers which call callbacks when reaching high and low watermarks.
  */
 class WatermarkFactory {
 public:
-  virtual ~WatermarkFactory() {}
+  virtual ~WatermarkFactory() = default;
 
   /**
    * Creates and returns a unique pointer to a new buffer.
@@ -378,7 +376,7 @@ public:
                              std::function<void()> above_high_watermark) PURE;
 };
 
-typedef std::unique_ptr<WatermarkFactory> WatermarkFactoryPtr;
+using WatermarkFactoryPtr = std::unique_ptr<WatermarkFactory>;
 
 } // namespace Buffer
 } // namespace Envoy

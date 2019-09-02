@@ -17,8 +17,10 @@
 #include "envoy/event/timer.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/dns.h"
+#include "envoy/network/filter.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/secret/secret_manager.h"
+#include "envoy/server/filter_config.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/scope.h"
@@ -105,7 +107,7 @@ public:
     absl::ReaderMutexLock lock(&metadata_mutex_);
     return metadata_;
   }
-  virtual void metadata(const envoy::api::v2::core::Metadata& new_metadata) override {
+  void metadata(const envoy::api::v2::core::Metadata& new_metadata) override {
     absl::WriterMutexLock lock(&metadata_mutex_);
     metadata_ = std::make_shared<envoy::api::v2::core::Metadata>(new_metadata);
   }
@@ -135,8 +137,6 @@ public:
   Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
     return health_check_address_;
   }
-  // Setting health check address is usually done at initialization. This is NOP by default.
-  void setHealthCheckAddress(Network::Address::InstanceConstSharedPtr) override {}
   const envoy::api::v2::core::Locality& locality() const override { return locality_; }
   Stats::StatName localityZoneStatName() const override {
     return locality_zone_stat_name_.statName();
@@ -419,7 +419,7 @@ private:
   std::unique_ptr<EdfScheduler<LocalityEntry>> degraded_locality_scheduler_;
 };
 
-typedef std::unique_ptr<HostSetImpl> HostSetImplPtr;
+using HostSetImplPtr = std::unique_ptr<HostSetImpl>;
 
 /**
  * A class for management of the set of hosts in a given cluster.
@@ -485,13 +485,12 @@ private:
       ASSERT(!parent_.batch_update_);
       parent_.batch_update_ = true;
     }
-    ~BatchUpdateScope() { parent_.batch_update_ = false; }
+    ~BatchUpdateScope() override { parent_.batch_update_ = false; }
 
-    virtual void updateHosts(uint32_t priority,
-                             PrioritySet::UpdateHostsParams&& update_hosts_params,
-                             LocalityWeightsConstSharedPtr locality_weights,
-                             const HostVector& hosts_added, const HostVector& hosts_removed,
-                             absl::optional<uint32_t> overprovisioning_factor) override;
+    void updateHosts(uint32_t priority, PrioritySet::UpdateHostsParams&& update_hosts_params,
+                     LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
+                     const HostVector& hosts_removed,
+                     absl::optional<uint32_t> overprovisioning_factor) override;
 
     std::unordered_set<HostSharedPtr> all_hosts_added_;
     std::unordered_set<HostSharedPtr> all_hosts_removed_;
@@ -505,13 +504,14 @@ private:
 /**
  * Implementation of ClusterInfo that reads from JSON.
  */
-class ClusterInfoImpl : public ClusterInfo {
+class ClusterInfoImpl : public ClusterInfo, protected Logger::Loggable<Logger::Id::upstream> {
 public:
   ClusterInfoImpl(const envoy::api::v2::Cluster& config,
                   const envoy::api::v2::core::BindConfig& bind_config, Runtime::Loader& runtime,
                   Network::TransportSocketFactoryPtr&& socket_factory,
                   Stats::ScopePtr&& stats_scope, bool added_via_api,
-                  ProtobufMessage::ValidationVisitor& validation_visitor);
+                  ProtobufMessage::ValidationVisitor& validation_visitor,
+                  Server::Configuration::TransportSocketFactoryContext&);
 
   static ClusterStats generateStats(Stats::Scope& scope);
   static ClusterLoadReportStats generateLoadReportStats(Stats::Scope& scope);
@@ -578,6 +578,8 @@ public:
 
   absl::optional<std::string> eds_service_name() const override { return eds_service_name_; }
 
+  void createNetworkFilterChain(Network::Connection&) const override;
+
 private:
   struct ResourceManagers {
     ResourceManagers(const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,
@@ -586,7 +588,7 @@ private:
                                 const std::string& cluster_name, Stats::Scope& stats_scope,
                                 const envoy::api::v2::core::RoutingPriority& priority);
 
-    typedef std::array<ResourceManagerImplPtr, NumResourcePriorities> Managers;
+    using Managers = std::array<ResourceManagerImplPtr, NumResourcePriorities>;
 
     Managers managers_;
   };
@@ -623,6 +625,8 @@ private:
   const bool warm_hosts_;
   absl::optional<std::string> eds_service_name_;
   const absl::optional<envoy::api::v2::Cluster::CustomClusterType> cluster_type_;
+  const std::unique_ptr<Server::Configuration::CommonFactoryContext> factory_context_;
+  std::vector<Network::FilterFactoryCb> filter_factories_;
 };
 
 /**
@@ -711,6 +715,8 @@ protected:
    */
   void onInitDone();
 
+  virtual void reloadHealthyHostsHelper(const HostSharedPtr& host);
+
   // This init manager is shared via TransportSocketFactoryContext. The initialization targets that
   // register with this init manager are expected to be for implementations of SdsApi (see
   // SdsApi::init_target_).
@@ -732,7 +738,6 @@ protected:
 private:
   void finishInitialization();
   void reloadHealthyHosts(const HostSharedPtr& host);
-  virtual void reloadHealthyHostsHelper(const HostSharedPtr& host);
 
   bool initialization_started_{};
   std::function<void()> initialization_complete_callback_;
@@ -791,7 +796,7 @@ private:
   PrioritySet::HostUpdateCb* update_cb_;
 };
 
-typedef std::unique_ptr<PriorityStateManager> PriorityStateManagerPtr;
+using PriorityStateManagerPtr = std::unique_ptr<PriorityStateManager>;
 
 /**
  * Base for all dynamic cluster types.
@@ -822,9 +827,11 @@ protected:
 };
 
 /**
- * Utility function to get Dns from cluster.
+ * Utility function to get Dns from cluster/enum.
  */
 Network::DnsLookupFamily getDnsLookupFamilyFromCluster(const envoy::api::v2::Cluster& cluster);
+Network::DnsLookupFamily
+getDnsLookupFamilyFromEnum(envoy::api::v2::Cluster::DnsLookupFamily family);
 
 /**
  * Utility function to report upstream cx destroy metrics

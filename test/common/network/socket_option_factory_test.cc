@@ -55,8 +55,8 @@ TEST_F(SocketOptionFactoryTest, TestBuildSocketMarkOptions) {
   const auto expected_option = ENVOY_SOCKET_SO_MARK;
   CHECK_OPTION_SUPPORTED(expected_option);
 
-  const int type = expected_option.value().first;
-  const int option = expected_option.value().second;
+  const int type = expected_option.level();
+  const int option = expected_option.option();
   EXPECT_CALL(os_sys_calls_mock_, setsockopt_(_, _, _, _, sizeof(int)))
       .WillOnce(Invoke([type, option](int, int input_type, int input_option, const void* optval,
                                       socklen_t) -> int {
@@ -79,8 +79,8 @@ TEST_F(SocketOptionFactoryTest, TestBuildIpv4TransparentOptions) {
   const auto expected_option = ENVOY_SOCKET_IP_TRANSPARENT;
   CHECK_OPTION_SUPPORTED(expected_option);
 
-  const int type = expected_option.value().first;
-  const int option = expected_option.value().second;
+  const int type = expected_option.level();
+  const int option = expected_option.option();
   EXPECT_CALL(os_sys_calls_mock_, setsockopt_(_, _, _, _, sizeof(int)))
       .Times(2)
       .WillRepeatedly(Invoke([type, option](int, int input_type, int input_option,
@@ -106,8 +106,8 @@ TEST_F(SocketOptionFactoryTest, TestBuildIpv6TransparentOptions) {
   const auto expected_option = ENVOY_SOCKET_IPV6_TRANSPARENT;
   CHECK_OPTION_SUPPORTED(expected_option);
 
-  const int type = expected_option.value().first;
-  const int option = expected_option.value().second;
+  const int type = expected_option.level();
+  const int option = expected_option.option();
   EXPECT_CALL(os_sys_calls_mock_, setsockopt_(_, _, _, _, sizeof(int)))
       .Times(2)
       .WillRepeatedly(Invoke([type, option](int, int input_type, int input_option,
@@ -152,22 +152,23 @@ TEST_F(SocketOptionFactoryTest, TestBuildLiteralOptions) {
   auto option_details = socket_options->at(0)->getOptionDetails(
       socket_mock_, envoy::api::v2::core::SocketOption::STATE_PREBIND);
   EXPECT_TRUE(option_details.has_value());
-  EXPECT_EQ(SOL_SOCKET, option_details->name_->first);
-  EXPECT_EQ(SO_LINGER, option_details->name_->second);
-  EXPECT_EQ(sizeof(struct linger), option_details->value_.size());
-  const struct linger* linger_ptr =
-      reinterpret_cast<const struct linger*>(option_details->value_.data());
-  EXPECT_EQ(1, linger_ptr->l_onoff);
-  EXPECT_EQ(3456, linger_ptr->l_linger);
+  EXPECT_EQ(SOL_SOCKET, option_details->name_.level());
+  EXPECT_EQ(SO_LINGER, option_details->name_.option());
+  struct linger expected_linger;
+  expected_linger.l_onoff = 1;
+  expected_linger.l_linger = 3456;
+  absl::string_view linger_bstr{reinterpret_cast<const char*>(&expected_linger),
+                                sizeof(struct linger)};
+  EXPECT_EQ(linger_bstr, option_details->value_);
 
   option_details = socket_options->at(1)->getOptionDetails(
       socket_mock_, envoy::api::v2::core::SocketOption::STATE_PREBIND);
   EXPECT_TRUE(option_details.has_value());
-  EXPECT_EQ(SOL_SOCKET, option_details->name_->first);
-  EXPECT_EQ(SO_KEEPALIVE, option_details->name_->second);
-  EXPECT_EQ(sizeof(int), option_details->value_.size());
-  const int* flag_ptr = reinterpret_cast<const int*>(option_details->value_.data());
-  EXPECT_EQ(1, *flag_ptr);
+  EXPECT_EQ(SOL_SOCKET, option_details->name_.level());
+  EXPECT_EQ(SO_KEEPALIVE, option_details->name_.option());
+  int value = 1;
+  absl::string_view value_bstr{reinterpret_cast<const char*>(&value), sizeof(int)};
+  EXPECT_EQ(value_bstr, option_details->value_);
 }
 
 } // namespace

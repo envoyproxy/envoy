@@ -1,5 +1,6 @@
 #pragma once
 
+#include <bitset>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -13,20 +14,29 @@
 namespace Envoy {
 namespace Filesystem {
 
+using FlagSet = std::bitset<4>;
+
 /**
  * Abstraction for a basic file on disk.
  */
 class File {
 public:
-  virtual ~File() {}
+  virtual ~File() = default;
+
+  enum Operation {
+    Read,
+    Write,
+    Create,
+    Append,
+  };
 
   /**
-   * Open the file with O_RDWR | O_APPEND | O_CREAT
+   * Open the file with Flag
    * The file will be closed when this object is destructed
    *
    * @return bool whether the open succeeded
    */
-  virtual Api::IoCallBoolResult open() PURE;
+  virtual Api::IoCallBoolResult open(FlagSet flags) PURE;
 
   /**
    * Write the buffer to the file. The file must be explicitly opened before writing.
@@ -60,7 +70,7 @@ using FilePtr = std::unique_ptr<File>;
  */
 class Instance {
 public:
-  virtual ~Instance() {}
+  virtual ~Instance() = default;
 
   /**
    *  @param path The path of the File
@@ -128,7 +138,7 @@ class DirectoryIteratorImpl;
 class DirectoryIterator {
 public:
   DirectoryIterator() : entry_({"", FileType::Other}) {}
-  virtual ~DirectoryIterator() {}
+  virtual ~DirectoryIterator() = default;
 
   const DirectoryEntry& operator*() const { return entry_; }
 

@@ -100,7 +100,7 @@ public:
 
   struct ClusterSlotsRequest : public Extensions::NetworkFilters::Common::Redis::RespValue {
   public:
-    ClusterSlotsRequest() : Extensions::NetworkFilters::Common::Redis::RespValue() {
+    ClusterSlotsRequest() {
       type(Extensions::NetworkFilters::Common::Redis::RespType::Array);
       std::vector<NetworkFilters::Common::Redis::RespValue> values(2);
       values[0].type(NetworkFilters::Common::Redis::RespType::BulkString);
@@ -122,7 +122,9 @@ private:
   void updateAllHosts(const Upstream::HostVector& hosts_added,
                       const Upstream::HostVector& hosts_removed, uint32_t priority);
 
-  void onClusterSlotUpdate(const std::vector<ClusterSlot>&);
+  void onClusterSlotUpdate(ClusterSlotsPtr&&);
+
+  void reloadHealthyHostsHelper(const Upstream::HostSharedPtr& host) override;
 
   const envoy::api::v2::endpoint::LocalityLbEndpoints& localityLbEndpoint() const {
     // Always use the first endpoint.
@@ -155,24 +157,21 @@ private:
 
   // Resolves the discovery endpoint.
   struct DnsDiscoveryResolveTarget {
-    DnsDiscoveryResolveTarget(
-        RedisCluster& parent, const std::string& dns_address, const uint32_t port,
-        const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
-        const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint);
+    DnsDiscoveryResolveTarget(RedisCluster& parent, const std::string& dns_address,
+                              const uint32_t port);
 
     ~DnsDiscoveryResolveTarget();
 
-    void startResolve();
+    void startResolveDns();
 
     RedisCluster& parent_;
     Network::ActiveDnsQuery* active_query_{};
     const std::string dns_address_;
     const uint32_t port_;
-    const envoy::api::v2::endpoint::LocalityLbEndpoints locality_lb_endpoint_;
-    const envoy::api::v2::endpoint::LbEndpoint lb_endpoint_;
+    Event::TimerPtr resolve_timer_;
   };
 
-  typedef std::unique_ptr<DnsDiscoveryResolveTarget> DnsDiscoveryResolveTargetPtr;
+  using DnsDiscoveryResolveTargetPtr = std::unique_ptr<DnsDiscoveryResolveTarget>;
 
   struct RedisDiscoverySession;
 
@@ -189,7 +188,7 @@ private:
     Extensions::NetworkFilters::Common::Redis::Client::ClientPtr client_;
   };
 
-  typedef std::unique_ptr<RedisDiscoveryClient> RedisDiscoveryClientPtr;
+  using RedisDiscoveryClientPtr = std::unique_ptr<RedisDiscoveryClient>;
 
   struct RedisDiscoverySession
       : public Extensions::NetworkFilters::Common::Redis::Client::Config,
@@ -197,14 +196,12 @@ private:
     RedisDiscoverySession(RedisCluster& parent,
                           NetworkFilters::Common::Redis::Client::ClientFactory& client_factory);
 
-    ~RedisDiscoverySession();
+    ~RedisDiscoverySession() override;
 
-    void registerDiscoveryAddress(
-        const std::list<Network::Address::InstanceConstSharedPtr>& address_list,
-        const uint32_t port);
+    void registerDiscoveryAddress(std::list<Network::DnsResponse>&& response, const uint32_t port);
 
     // Start discovery against a random host from existing hosts
-    void startResolve();
+    void startResolveRedis();
 
     // Extensions::NetworkFilters::Common::Redis::Client::Config
     bool disableOutlierEvents() const override { return true; }
@@ -216,6 +213,12 @@ private:
     bool enableRedirection() const override { return false; }
     uint32_t maxBufferSizeBeforeFlush() const override { return 0; }
     std::chrono::milliseconds bufferFlushTimeoutInMs() const override { return buffer_timeout_; }
+    uint32_t maxUpstreamUnknownConnections() const override { return 0; }
+    // This is effectively not in used for making the "Cluster Slots" calls.
+    // since we call cluster slots on both the master and slaves, ANY is more appropriate here.
+    Extensions::NetworkFilters::Common::Redis::Client::ReadPolicy readPolicy() const override {
+      return Extensions::NetworkFilters::Common::Redis::Client::ReadPolicy::Any;
+    }
 
     // Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks
     void onResponse(NetworkFilters::Common::Redis::RespValuePtr&& value) override;
@@ -223,6 +226,9 @@ private:
     // Note: Below callback isn't used in topology updates
     bool onRedirection(const NetworkFilters::Common::Redis::RespValue&) override { return true; }
     void onUnexpectedResponse(const NetworkFilters::Common::Redis::RespValuePtr&);
+
+    Network::Address::InstanceConstSharedPtr
+    ProcessCluster(const NetworkFilters::Common::Redis::RespValue& value);
 
     RedisCluster& parent_;
     Event::Dispatcher& dispatcher_;

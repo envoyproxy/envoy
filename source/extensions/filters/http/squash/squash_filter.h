@@ -1,5 +1,7 @@
 #pragma once
 
+#include <regex>
+
 #include "envoy/config/filter/http/squash/v2/squash.pb.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/filter.h"
@@ -51,7 +53,7 @@ private:
   const static std::regex ENV_REGEX;
 };
 
-typedef std::shared_ptr<SquashFilterConfig> SquashFilterConfigSharedPtr;
+using SquashFilterConfigSharedPtr = std::shared_ptr<SquashFilterConfig>;
 
 class AsyncClientCallbackShim : public Http::AsyncClient::Callbacks {
 public:
@@ -71,7 +73,7 @@ class SquashFilter : public Http::StreamDecoderFilter,
                      protected Logger::Loggable<Logger::Id::filter> {
 public:
   SquashFilter(SquashFilterConfigSharedPtr config, Upstream::ClusterManager& cm);
-  ~SquashFilter();
+  ~SquashFilter() override;
 
   // Http::StreamFilterBase
   void onDestroy() override;

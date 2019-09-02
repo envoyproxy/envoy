@@ -80,17 +80,17 @@ private:
     const uint64_t cluster_weight_;
     Envoy::Router::MetadataMatchCriteriaConstPtr metadata_match_criteria_;
   };
-  typedef std::shared_ptr<WeightedClusterEntry> WeightedClusterEntrySharedPtr;
+  using WeightedClusterEntrySharedPtr = std::shared_ptr<WeightedClusterEntry>;
 
   const std::string cluster_name_;
-  std::vector<Http::HeaderUtility::HeaderData> config_headers_;
+  const std::vector<Http::HeaderUtility::HeaderDataPtr> config_headers_;
   std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
   uint64_t total_cluster_weight_;
   Envoy::Router::MetadataMatchCriteriaConstPtr metadata_match_criteria_;
   const RateLimitPolicyImpl rate_limit_policy_;
 };
 
-typedef std::shared_ptr<const RouteEntryImplBase> RouteEntryImplBaseConstSharedPtr;
+using RouteEntryImplBaseConstSharedPtr = std::shared_ptr<const RouteEntryImplBase>;
 
 class MethodNameRouteEntryImpl : public RouteEntryImplBase {
 public:
@@ -142,7 +142,7 @@ class Router : public Tcp::ConnectionPool::UpstreamCallbacks,
 public:
   Router(Upstream::ClusterManager& cluster_manager) : cluster_manager_(cluster_manager) {}
 
-  ~Router() {}
+  ~Router() override = default;
 
   // ThriftFilters::DecoderFilter
   void onDestroy() override;
@@ -174,7 +174,7 @@ private:
     UpstreamRequest(Router& parent, Tcp::ConnectionPool::Instance& pool,
                     MessageMetadataSharedPtr& metadata, TransportType transport_type,
                     ProtocolType protocol_type);
-    ~UpstreamRequest();
+    ~UpstreamRequest() override;
 
     FilterStatus start();
     void resetStream();

@@ -20,10 +20,10 @@ envoy_cc_library(
         "//source/common/common:cleanup_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:resources_lib",
-        "//source/common/config:subscription_factory_lib",
         "//source/common/config:utility_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/api/v2:cds_cc",
+        "@envoy_api//envoy/api/v2/cluster:outlier_detection_cc",
     ],
 )
 
@@ -49,8 +49,8 @@ envoy_cc_library(
         "//source/common/common:cleanup_lib",
         "//source/common/common:enum_to_int",
         "//source/common/common:utility_lib",
-        "//source/common/config:cds_json_lib",
         "//source/common/config:grpc_mux_lib",
+        "//source/common/config:subscription_factory_lib",
         "//source/common/config:utility_lib",
         "//source/common/grpc:async_client_manager_lib",
         "//source/common/http:async_client_lib",
@@ -209,13 +209,22 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "logical_host_lib",
+    srcs = ["logical_host.cc"],
+    hdrs = ["logical_host.h"],
+    deps = [
+        ":upstream_includes",
+    ],
+)
+
+envoy_cc_library(
     name = "logical_dns_cluster_lib",
     srcs = ["logical_dns_cluster.cc"],
     hdrs = ["logical_dns_cluster.h"],
     deps = [
         ":cluster_factory_lib",
+        ":logical_host_lib",
         ":upstream_includes",
-        "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/upstream:cluster_factory_interface",
         "//source/common/common:empty_string",
         "//source/common/config:utility_lib",
@@ -259,6 +268,7 @@ envoy_cc_library(
         "//source/common/http:codes_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/api/v2:cds_cc",
+        "@envoy_api//envoy/api/v2/cluster:outlier_detection_cc",
         "@envoy_api//envoy/data/cluster/v2alpha:outlier_detection_event_cc",
     ],
 )
@@ -312,6 +322,7 @@ envoy_cc_library(
         ":cluster_factory_lib",
         ":upstream_includes",
         "//include/envoy/config:grpc_mux_interface",
+        "//include/envoy/config:subscription_factory_interface",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/secret:secret_manager_interface",
@@ -371,7 +382,6 @@ envoy_cc_library(
         "//source/common/common:enum_to_int",
         "//source/common/common:utility_lib",
         "//source/common/config:protocol_json_lib",
-        "//source/common/config:tls_context_json_lib",
         "//source/common/http:utility_lib",
         "//source/common/network:address_lib",
         "//source/common/network:resolver_lib",
@@ -417,6 +427,7 @@ envoy_cc_library(
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/network:dns_interface",
         "//include/envoy/runtime:runtime_interface",
+        "//include/envoy/server:filter_config_interface",
         "//include/envoy/server:transport_socket_config_interface",
         "//include/envoy/ssl:context_manager_interface",
         "//include/envoy/thread_local:thread_local_interface",
@@ -455,7 +466,6 @@ envoy_cc_library(
         "//source/common/common:enum_to_int",
         "//source/common/common:utility_lib",
         "//source/common/config:protocol_json_lib",
-        "//source/common/config:tls_context_json_lib",
         "//source/common/http:utility_lib",
         "//source/common/network:address_lib",
         "//source/common/network:resolver_lib",
@@ -495,6 +505,7 @@ envoy_cc_library(
         "//source/common/common:enum_to_int",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:metadata_lib",
+        "//source/common/config:subscription_factory_lib",
         "//source/common/config:utility_lib",
         "//source/common/config:well_known_names",
         "//source/common/stats:isolated_store_lib",

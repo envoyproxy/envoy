@@ -22,8 +22,8 @@
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
 
+#include "common/common/callback_impl.h"
 #include "common/common/logger.h"
-#include "common/config/subscription_factory.h"
 #include "common/init/target_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/router/route_config_update_receiver_impl.h"
@@ -31,6 +31,9 @@
 
 namespace Envoy {
 namespace Router {
+
+// For friend class declaration in RdsRouteConfigSubscription.
+class ScopedRdsConfigSubscription;
 
 /**
  * Route configuration provider utilities.
@@ -58,7 +61,7 @@ public:
   StaticRouteConfigProviderImpl(const envoy::api::v2::RouteConfiguration& config,
                                 Server::Configuration::FactoryContext& factory_context,
                                 RouteConfigProviderManagerImpl& route_config_provider_manager);
-  ~StaticRouteConfigProviderImpl();
+  ~StaticRouteConfigProviderImpl() override;
 
   // Router::RouteConfigProvider
   Router::ConfigConstSharedPtr config() override { return config_; }
@@ -67,6 +70,7 @@ public:
   }
   SystemTime lastUpdated() const override { return last_updated_; }
   void onConfigUpdate() override {}
+  void validateConfig(const envoy::api::v2::RouteConfiguration&) const override {}
 
 private:
   ConfigConstSharedPtr config_;
@@ -108,20 +112,23 @@ public:
   }
   RouteConfigUpdatePtr& routeConfigUpdate() { return config_update_info_; }
 
+private:
   // Config::SubscriptionCallbacks
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                       const std::string& version_info) override;
   void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
                       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                       const std::string&) override;
-  void onConfigUpdateFailed(const EnvoyException* e) override;
+  void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
+                            const EnvoyException* e) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::api::v2::RouteConfiguration>(resource,
-                                                                       validation_visitor_)
-        .name();
+    return MessageUtil::anyConvert<envoy::api::v2::RouteConfiguration>(resource).name();
   }
 
-private:
+  Common::CallbackHandle* addUpdateCallback(std::function<void()> callback) {
+    return update_callback_manager_.add(callback);
+  }
+
   RdsRouteConfigSubscription(
       const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
       const uint64_t manager_identifier, Server::Configuration::FactoryContext& factory_context,
@@ -143,8 +150,11 @@ private:
   VhdsSubscriptionPtr vhds_subscription_;
   RouteConfigUpdatePtr config_update_info_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
+  Common::CallbackManager<> update_callback_manager_;
 
   friend class RouteConfigProviderManagerImpl;
+  // Access to addUpdateCallback
+  friend class ScopedRdsConfigSubscription;
 };
 
 using RdsRouteConfigSubscriptionSharedPtr = std::shared_ptr<RdsRouteConfigSubscription>;
@@ -159,7 +169,6 @@ public:
   ~RdsRouteConfigProviderImpl() override;
 
   RdsRouteConfigSubscription& subscription() { return *subscription_; }
-  void onConfigUpdate() override;
 
   // Router::RouteConfigProvider
   Router::ConfigConstSharedPtr config() override;
@@ -167,6 +176,8 @@ public:
     return config_update_info_->configInfo();
   }
   SystemTime lastUpdated() const override { return config_update_info_->lastUpdated(); }
+  void onConfigUpdate() override;
+  void validateConfig(const envoy::api::v2::RouteConfiguration& config) const override;
 
 private:
   struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {
@@ -195,8 +206,8 @@ public:
   // RouteConfigProviderManager
   RouteConfigProviderPtr createRdsRouteConfigProvider(
       const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
-      Server::Configuration::FactoryContext& factory_context,
-      const std::string& stat_prefix) override;
+      Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
+      Init::Manager& init_manager) override;
 
   RouteConfigProviderPtr
   createStaticRouteConfigProvider(const envoy::api::v2::RouteConfiguration& route_config,

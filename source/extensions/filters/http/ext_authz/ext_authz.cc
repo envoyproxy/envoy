@@ -18,7 +18,7 @@ struct RcDetailsValues {
   // The ext_authz filter encountered a failure, and was configured to fail-closed.
   const std::string AuthzError = "ext_authz_error";
 };
-typedef ConstSingleton<RcDetailsValues> RcDetails;
+using RcDetails = ConstSingleton<RcDetailsValues>;
 
 void FilterConfigPerRoute::merge(const FilterConfigPerRoute& other) {
   disabled_ = other.disabled_;
@@ -65,9 +65,20 @@ void Filter::initiateCall(const Http::HeaderMap& headers) {
   if (maybe_merged_per_route_config) {
     context_extensions = maybe_merged_per_route_config.value().takeContextExtensions();
   }
+
+  // If metadata_context_namespaces is specified, pass matching metadata to the ext_authz service
+  envoy::api::v2::core::Metadata metadata_context;
+  const auto& request_metadata = callbacks_->streamInfo().dynamicMetadata().filter_metadata();
+  for (const auto& context_key : config_->metadataContextNamespaces()) {
+    const auto& metadata_it = request_metadata.find(context_key);
+    if (metadata_it != request_metadata.end()) {
+      (*metadata_context.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
+    }
+  }
+
   Filters::Common::ExtAuthz::CheckRequestUtils::createHttpCheck(
-      callbacks_, headers, std::move(context_extensions), check_request_,
-      config_->maxRequestBytes());
+      callbacks_, headers, std::move(context_extensions), std::move(metadata_context),
+      check_request_, config_->maxRequestBytes());
 
   ENVOY_STREAM_LOG(trace, "ext_authz filter calling authorization server", *callbacks_);
   state_ = State::Calling;
@@ -169,7 +180,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
         Http::HeaderMapImpl::appendToHeader(header_to_modify->value(), header.second);
       }
     }
-    cluster_->statsScope().counter("ext_authz.ok").inc();
+    config_->incCounter(cluster_->statsScope(), config_->ext_authz_ok_);
     continueDecoding();
     break;
   }
@@ -177,7 +188,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   case CheckStatus::Denied: {
     ENVOY_STREAM_LOG(trace, "ext_authz filter rejected the request. Response status code: '{}",
                      *callbacks_, enumToInt(response->status_code));
-    cluster_->statsScope().counter("ext_authz.denied").inc();
+    config_->incCounter(cluster_->statsScope(), config_->ext_authz_denied_);
     Http::CodeStats::ResponseStatInfo info{config_->scope(),
                                            cluster_->statsScope(),
                                            empty_stat_name,
@@ -207,10 +218,10 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   }
 
   case CheckStatus::Error: {
-    cluster_->statsScope().counter("ext_authz.error").inc();
+    config_->incCounter(cluster_->statsScope(), config_->ext_authz_error_);
     if (config_->failureModeAllow()) {
       ENVOY_STREAM_LOG(trace, "ext_authz filter allowed the request with error", *callbacks_);
-      cluster_->statsScope().counter("ext_authz.failure_mode_allowed").inc();
+      config_->incCounter(cluster_->statsScope(), config_->ext_authz_failure_mode_allowed_);
       continueDecoding();
     } else {
       ENVOY_STREAM_LOG(

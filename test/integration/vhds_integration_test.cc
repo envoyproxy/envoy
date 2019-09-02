@@ -176,8 +176,8 @@ public:
     xds_stream_->startGrpcStream();
     fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
-    EXPECT_TRUE(
-        compareSotwDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "", {"my_route"}));
+    EXPECT_TRUE(compareSotwDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "",
+                                            {"my_route"}, true));
     sendSotwDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
         Config::TypeUrl::get().RouteConfiguration, {rdsConfig()}, "1");
 
@@ -208,7 +208,7 @@ public:
   bool use_rds_with_vhosts{false};
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersionsClientType, VhdsIntegrationTest, GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, VhdsIntegrationTest, GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // tests a scenario when:
 //  - a spontaneous VHDS DiscoveryResponse adds two virtual hosts

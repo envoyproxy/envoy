@@ -26,19 +26,20 @@ namespace Upstream {
 class MockLoadBalancerSubsetInfo : public LoadBalancerSubsetInfo {
 public:
   MockLoadBalancerSubsetInfo();
-  ~MockLoadBalancerSubsetInfo();
+  ~MockLoadBalancerSubsetInfo() override;
 
   // Upstream::LoadBalancerSubsetInfo
   MOCK_CONST_METHOD0(isEnabled, bool());
   MOCK_CONST_METHOD0(fallbackPolicy,
                      envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy());
   MOCK_CONST_METHOD0(defaultSubset, const ProtobufWkt::Struct&());
-  MOCK_CONST_METHOD0(subsetKeys, const std::vector<std::set<std::string>>&());
+  MOCK_CONST_METHOD0(subsetSelectors, const std::vector<SubsetSelectorPtr>&());
   MOCK_CONST_METHOD0(localityWeightAware, bool());
   MOCK_CONST_METHOD0(scaleLocalityWeight, bool());
   MOCK_CONST_METHOD0(panicModeAny, bool());
+  MOCK_CONST_METHOD0(listAsAny, bool());
 
-  std::vector<std::set<std::string>> subset_keys_;
+  std::vector<SubsetSelectorPtr> subset_selectors_;
 };
 
 // While this mock class doesn't have any direct use in public Envoy tests, it's
@@ -60,7 +61,7 @@ public:
 class MockClusterInfo : public ClusterInfo {
 public:
   MockClusterInfo();
-  ~MockClusterInfo();
+  ~MockClusterInfo() override;
 
   void resetResourceManager(uint64_t cx, uint64_t rq_pending, uint64_t rq, uint64_t rq_retry,
                             uint64_t conn_pool) {
@@ -104,6 +105,7 @@ public:
   MOCK_CONST_METHOD0(drainConnectionsOnHostRemoval, bool());
   MOCK_CONST_METHOD0(warmHosts, bool());
   MOCK_CONST_METHOD0(eds_service_name, absl::optional<std::string>());
+  MOCK_CONST_METHOD1(createNetworkFilterChain, void(Network::Connection&));
 
   std::string name_{"fake_cluster"};
   absl::optional<std::string> eds_service_name_;
@@ -134,7 +136,7 @@ public:
 class MockIdleTimeEnabledClusterInfo : public MockClusterInfo {
 public:
   MockIdleTimeEnabledClusterInfo();
-  ~MockIdleTimeEnabledClusterInfo();
+  ~MockIdleTimeEnabledClusterInfo() override;
 };
 
 } // namespace Upstream

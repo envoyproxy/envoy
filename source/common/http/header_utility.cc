@@ -1,11 +1,13 @@
 #include "common/http/header_utility.h"
 
+#include "common/common/regex.h"
 #include "common/common/utility.h"
 #include "common/config/rds_json.h"
 #include "common/http/header_map_impl.h"
 #include "common/protobuf/utility.h"
 
 #include "absl/strings/match.h"
+#include "nghttp2/nghttp2.h"
 
 namespace Envoy {
 namespace Http {
@@ -31,7 +33,11 @@ HeaderUtility::HeaderData::HeaderData(const envoy::api::v2::route::HeaderMatcher
     break;
   case envoy::api::v2::route::HeaderMatcher::kRegexMatch:
     header_match_type_ = HeaderMatchType::Regex;
-    regex_pattern_ = RegexUtil::parseRegex(config.regex_match());
+    regex_ = Regex::Utility::parseStdRegexAsCompiledMatcher(config.regex_match());
+    break;
+  case envoy::api::v2::route::HeaderMatcher::kSafeRegexMatch:
+    header_match_type_ = HeaderMatchType::Regex;
+    regex_ = Regex::Utility::parseRegex(config.safe_regex_match());
     break;
   case envoy::api::v2::route::HeaderMatcher::kRangeMatch:
     header_match_type_ = HeaderMatchType::Range;
@@ -64,12 +70,28 @@ HeaderUtility::HeaderData::HeaderData(const Json::Object& config)
         return header_matcher;
       }()) {}
 
+void HeaderUtility::getAllOfHeader(const Http::HeaderMap& headers, absl::string_view key,
+                                   std::vector<absl::string_view>& out) {
+  auto args = std::make_pair(LowerCaseString(std::string(key)), &out);
+
+  headers.iterate(
+      [](const HeaderEntry& header, void* context) -> Envoy::Http::HeaderMap::Iterate {
+        auto key_ret =
+            static_cast<std::pair<LowerCaseString, std::vector<absl::string_view>*>*>(context);
+        if (header.key() == key_ret->first.get().c_str()) {
+          key_ret->second->emplace_back(header.value().getStringView());
+        }
+        return Envoy::Http::HeaderMap::Iterate::Continue;
+      },
+      &args);
+}
+
 bool HeaderUtility::matchHeaders(const Http::HeaderMap& request_headers,
-                                 const std::vector<HeaderData>& config_headers) {
+                                 const std::vector<HeaderDataPtr>& config_headers) {
   // No headers to match is considered a match.
   if (!config_headers.empty()) {
-    for (const HeaderData& cfg_header_data : config_headers) {
-      if (!matchHeaders(request_headers, cfg_header_data)) {
+    for (const HeaderDataPtr& cfg_header_data : config_headers) {
+      if (!matchHeaders(request_headers, *cfg_header_data)) {
         return false;
       }
     }
@@ -93,7 +115,7 @@ bool HeaderUtility::matchHeaders(const Http::HeaderMap& request_headers,
     match = header_data.value_.empty() || header_view == header_data.value_;
     break;
   case HeaderMatchType::Regex:
-    match = std::regex_match(header_view.begin(), header_view.end(), header_data.regex_pattern_);
+    match = header_data.regex_->match(header_view);
     break;
   case HeaderMatchType::Range: {
     int64_t header_value = 0;
@@ -115,6 +137,11 @@ bool HeaderUtility::matchHeaders(const Http::HeaderMap& request_headers,
   }
 
   return match != header_data.invert_match_;
+}
+
+bool HeaderUtility::headerIsValid(const absl::string_view header_value) {
+  return (nghttp2_check_header_value(reinterpret_cast<const uint8_t*>(header_value.data()),
+                                     header_value.size()) != 0);
 }
 
 void HeaderUtility::addHeaders(Http::HeaderMap& headers, const Http::HeaderMap& headers_to_add) {

@@ -16,7 +16,7 @@ namespace Network {
 
 class SocketImpl : public virtual Socket {
 public:
-  ~SocketImpl() { close(); }
+  ~SocketImpl() override { close(); }
 
   // Network::Socket
   const Address::InstanceConstSharedPtr& localAddress() const override { return local_address_; }
@@ -103,10 +103,10 @@ protected:
 };
 
 using TcpListenSocket = NetworkListenSocket<NetworkSocketTrait<Address::SocketType::Stream>>;
-typedef std::unique_ptr<TcpListenSocket> TcpListenSocketPtr;
+using TcpListenSocketPtr = std::unique_ptr<TcpListenSocket>;
 
 using UdpListenSocket = NetworkListenSocket<NetworkSocketTrait<Address::SocketType::Datagram>>;
-typedef std::unique_ptr<UdpListenSocket> UdpListenSocketPtr;
+using UdpListenSocketPtr = std::unique_ptr<UdpListenSocket>;
 
 class UdsListenSocket : public ListenSocketImpl {
 public:

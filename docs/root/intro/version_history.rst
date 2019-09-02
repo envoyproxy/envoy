@@ -1,18 +1,99 @@
 Version history
 ---------------
 
-1.11.0 (Pending)
+1.12.0 (pending)
 ================
+* access log: added :ref:`buffering <envoy_api_field_config.accesslog.v2.CommonGrpcAccessLogConfig.buffer_size_bytes>` and :ref:`periodical flushing <envoy_api_field_config.accesslog.v2.CommonGrpcAccessLogConfig.buffer_flush_interval>` support to gRPC access logger. Defaults to 16KB buffer and flushing every 1 second.
+* access log: gRPC Access Log Service (ALS) support added for :ref:`TCP access logs <envoy_api_msg_config.accesslog.v2.TcpGrpcAccessLogConfig>`.
+* access log: reintroduce :ref:`filesystem <filesystem_stats>` stats and added the `write_failed` counter to track failed log writes
+* admin: added ability to configure listener :ref:`socket options <envoy_api_field_config.bootstrap.v2.Admin.socket_options>`.
+* admin: added config dump support for Secret Discovery Service :ref:`SecretConfigDump <envoy_api_msg_admin.v2alpha.SecretsConfigDump>`.
+* api: added ::ref:`set_node_on_first_message_only <envoy_api_field_core.ApiConfigSource.set_node_on_first_message_only>` option to omit the node identifier from the subsequent discovery requests on the same stream.
+* buffer filter: the buffer filter populates content-length header if not present, behavior can be disabled using the runtime feature `envoy.reloadable_features.buffer_filter_populate_content_length`.
+* config: enforcing that terminal filters (e.g. HttpConnectionManager for L4, router for L7) be the last in their respective filter chains.
+* config: added access log :ref:`extension filter<envoy_api_field_config.filter.accesslog.v2.AccessLogFilter.extension_filter>`.
+* config: added support for :option:`--reject-unknown-dynamic-fields`, providing independent control
+  over whether unknown fields are rejected in static and dynamic configuration. By default, unknown
+  fields in static configuration are rejected and are allowed in dynamic configuration. Warnings
+  are logged for the first use of any unknown field and these occurrences are counted in the
+  :ref:`server.static_unknown_fields <server_statistics>` and :ref:`server.dynamic_unknown_fields
+  <server_statistics>` statistics.
+* config: async data access for local and remote data source.
+* config: changed the default value of :ref:`initial_fetch_timeout <envoy_api_field_core.ConfigSource.initial_fetch_timeout>` from 0s to 15s. This is a change in behaviour in the sense that Envoy will move to the next initialization phase, even if the first config is not delivered in 15s. Refer to :ref:`initialization process <arch_overview_initialization>` for more details.
+* config: added stat :ref:`init_fetch_timeout <config_cluster_manager_cds>`.
+* ext_authz: added :ref:`configurable ability <envoy_api_field_config.filter.http.ext_authz.v2.ExtAuthz.metadata_context_namespaces>` to send dynamic metadata to the `ext_authz` service.
+* fault: added overrides for default runtime keys in :ref:`HTTPFault <envoy_api_msg_config.filter.http.fault.v2.HTTPFault>` filter.
+* grpc: added :ref:`AWS IAM grpc credentials extension <envoy_api_file_envoy/config/grpc_credential/v2alpha/aws_iam.proto>` for AWS-managed xDS.
+* grpc-json: added support for :ref:`ignoring unknown query parameters<envoy_api_field_config.filter.http.transcoder.v2.GrpcJsonTranscoder.ignore_unknown_query_parameters>`.
+* header to metadata: added :ref:`PROTOBUF_VALUE <envoy_api_enum_value_config.filter.http.header_to_metadata.v2.Config.ValueType.PROTOBUF_VALUE>` and :ref:`ValueEncode <envoy_api_enum_config.filter.http.header_to_metadata.v2.Config.ValueEncode>` to support protobuf Value and Base64 encoding.
+* http: added the ability to reject HTTP/1.1 requests with invalid HTTP header values, using the runtime feature `envoy.reloadable_features.strict_header_validation`.
+* http: changed Envoy to forward existing x-forwarded-proto from upstream trusted proxies. Guarded by `envoy.reloadable_features.trusted_forwarded_proto` which defaults true.
+* http: added the ability to configure the behavior of the server response header, via the :ref:`server_header_transformation<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.server_header_transformation>` field.
+* http: added the ability to :ref:`merge adjacent slashes<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.merge_slashes>` in the path.
+* listeners: added :ref:`continue_on_listener_filters_timeout <envoy_api_field_Listener.continue_on_listener_filters_timeout>` to configure whether a listener will still create a connection when listener filters time out.
+* listeners: added :ref:`HTTP inspector listener filter <config_listener_filters_http_inspector>`.
+* lua: extended `httpCall()` and `respond()` APIs to accept headers with entry values that can be a string or table of strings.
+* performance: new buffer implementation enabled by default (to disable add "--use-libevent-buffers 1" to the command-line arguments when starting Envoy).
+* performance: stats symbol table implementation (disabled by default; to test it, add "--use-fake-symbol-table 0" to the command-line arguments when starting Envoy).
+* rbac: added support for DNS SAN as :ref:`principal_name <envoy_api_field_config.rbac.v2.Principal.Authenticated.principal_name>`.
+* redis: added :ref:`read_policy <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.ConnPoolSettings.read_policy>` to allow reading from redis replicas for Redis Cluster deployments.
+* regex: introduce new :ref:`RegexMatcher <envoy_api_msg_type.matcher.RegexMatcher>` type that
+  provides a safe regex implementation for untrusted user input. This type is now used in all
+  configuration that processes user provided input. See :ref:`deprecated configuration details
+  <deprecated>` for more information.
+* rbac: added conditions to the policy, see :ref:`condition <envoy_api_field_config.rbac.v2.Policy.condition>`.
+* router: added :ref:`rq_retry_skipped_request_not_complete <config_http_filters_router_stats>` counter stat to router stats.
+* router: :ref:`Scoped routing <arch_overview_http_routing_route_scope>` is supported.
+* router check tool: add coverage reporting & enforcement.
+* router check tool: add comprehensive coverage reporting.
+* router check tool: add deprecated field check.
+* tls: added verification of IP address SAN fields in certificates against configured SANs in the
+* tracing: added support to the Zipkin reporter for sending list of spans as Zipkin JSON v2 and protobuf message over HTTP.
+  certificate validation context.
+* tracing: added tags for gRPC response status and meesage.
+* upstream: added :ref:`an option <envoy_api_field_Cluster.CommonLbConfig.close_connections_on_host_set_change>` that allows draining HTTP, TCP connection pools on cluster membership change.
+* upstream: added network filter chains to upstream connections, see :ref:`filters<envoy_api_field_Cluster.filters>`.
+* upstream: use p2c to select hosts for least-requests load balancers if all host weights are the same, even in cases where weights are not equal to 1.
+* zookeeper: parse responses and emit latency stats.
+
+1.11.1 (August 13, 2019)
+========================
+* http: added mitigation of client initiated attacks that result in flooding of the downstream HTTP/2 connections. Those attacks can be logged at the "warning" level when the runtime feature `http.connection_manager.log_flood_exception` is enabled. The runtime setting defaults to disabled to avoid log spam when under attack.
+* http: added :ref:`inbound_empty_frames_flood <config_http_conn_man_stats_per_codec>` counter stat to the HTTP/2 codec stats, for tracking number of connections terminated for exceeding the limit on consecutive inbound frames with an empty payload and no end stream flag. The limit is configured by setting the :ref:`max_consecutive_inbound_frames_with_empty_payload config setting <envoy_api_field_core.Http2ProtocolOptions.max_consecutive_inbound_frames_with_empty_payload>`.
+  Runtime feature `envoy.reloadable_features.http2_protocol_options.max_consecutive_inbound_frames_with_empty_payload` overrides :ref:`max_consecutive_inbound_frames_with_empty_payload setting <envoy_api_field_core.Http2ProtocolOptions.max_consecutive_inbound_frames_with_empty_payload>`. Large override value (i.e. 2147483647) effectively disables mitigation of inbound frames with empty payload.
+* http: added :ref:`inbound_priority_frames_flood <config_http_conn_man_stats_per_codec>` counter stat to the HTTP/2 codec stats, for tracking number of connections terminated for exceeding the limit on inbound PRIORITY frames. The limit is configured by setting the :ref:`max_inbound_priority_frames_per_stream config setting <envoy_api_field_core.Http2ProtocolOptions.max_inbound_priority_frames_per_stream>`.
+  Runtime feature `envoy.reloadable_features.http2_protocol_options.max_inbound_priority_frames_per_stream` overrides :ref:`max_inbound_priority_frames_per_stream setting <envoy_api_field_core.Http2ProtocolOptions.max_inbound_priority_frames_per_stream>`. Large override value effectively disables flood mitigation of inbound PRIORITY frames.
+* http: added :ref:`inbound_window_update_frames_flood <config_http_conn_man_stats_per_codec>` counter stat to the HTTP/2 codec stats, for tracking number of connections terminated for exceeding the limit on inbound WINDOW_UPDATE frames. The limit is configured by setting the :ref:`max_inbound_window_update_frames_per_data_frame_sent config setting <envoy_api_field_core.Http2ProtocolOptions.max_inbound_window_update_frames_per_data_frame_sent>`.
+  Runtime feature `envoy.reloadable_features.http2_protocol_options.max_inbound_window_update_frames_per_data_frame_sent` overrides :ref:`max_inbound_window_update_frames_per_data_frame_sent setting <envoy_api_field_core.Http2ProtocolOptions.max_inbound_window_update_frames_per_data_frame_sent>`. Large override value effectively disables flood mitigation of inbound WINDOW_UPDATE frames.
+* http: added :ref:`outbound_flood <config_http_conn_man_stats_per_codec>` counter stat to the HTTP/2 codec stats, for tracking number of connections terminated for exceeding the outbound queue limit. The limit is configured by setting the :ref:`max_outbound_frames config setting <envoy_api_field_core.Http2ProtocolOptions.max_outbound_frames>`
+  Runtime feature `envoy.reloadable_features.http2_protocol_options.max_outbound_frames` overrides :ref:`max_outbound_frames config setting <envoy_api_field_core.Http2ProtocolOptions.max_outbound_frames>`. Large override value effectively disables flood mitigation of outbound frames of all types.
+* http: added :ref:`outbound_control_flood <config_http_conn_man_stats_per_codec>` counter stat to the HTTP/2 codec stats, for tracking number of connections terminated for exceeding the outbound queue limit for PING, SETTINGS and RST_STREAM frames. The limit is configured by setting the :ref:`max_outbound_control_frames config setting <envoy_api_field_core.Http2ProtocolOptions.max_outbound_control_frames>`.
+  Runtime feature `envoy.reloadable_features.http2_protocol_options.max_outbound_control_frames` overrides :ref:`max_outbound_control_frames config setting <envoy_api_field_core.Http2ProtocolOptions.max_outbound_control_frames>`. Large override value effectively disables flood mitigation of outbound frames of types PING, SETTINGS and RST_STREAM.
+* http: enabled strict validation of HTTP/2 messaging. Previous behavior can be restored using :ref:`stream_error_on_invalid_http_messaging config setting <envoy_api_field_core.Http2ProtocolOptions.stream_error_on_invalid_http_messaging>`.
+  Runtime feature `envoy.reloadable_features.http2_protocol_options.stream_error_on_invalid_http_messaging` overrides :ref:`stream_error_on_invalid_http_messaging config setting <envoy_api_field_core.Http2ProtocolOptions.stream_error_on_invalid_http_messaging>`.
+
+1.11.0 (July 11, 2019)
+======================
 * access log: added a new field for downstream TLS session ID to file and gRPC access logger.
 * access log: added a new field for route name to file and gRPC access logger.
 * access log: added a new field for response code details in :ref:`file access logger<config_access_log_format_response_code_details>` and :ref:`gRPC access logger<envoy_api_field_data.accesslog.v2.HTTPResponseProperties.response_code_details>`.
 * access log: added several new variables for exposing information about the downstream TLS connection to :ref:`file access logger<config_access_log_format_response_code_details>` and :ref:`gRPC access logger<envoy_api_field_data.accesslog.v2.AccessLogCommon.tls_properties>`.
+* access log: added a new flag for request rejected due to failed strict header check.
 * admin: the administration interface now includes a :ref:`/ready endpoint <operations_admin_interface>` for easier readiness checks.
 * admin: extend :ref:`/runtime_modify endpoint <operations_admin_interface_runtime_modify>` to support parameters within the request body.
+* admin: the :ref:`/listener endpoint <operations_admin_interface_listeners>` now returns :ref:`listeners.proto<envoy_api_msg_admin.v2alpha.Listeners>` which includes listener names and ports.
+* admin: added host priority to :http:get:`/clusters` and :http:get:`/clusters?format=json` endpoint response
+* admin: the :ref:`/clusters endpoint <operations_admin_interface_clusters>` now shows hostname
+  for each host, useful for DNS based clusters.
 * api: track and report requests issued since last load report.
 * build: releases are built with Clang and linked with LLD.
-* dubbo_proxy: support the :ref:`Dubbo proxy filter <config_network_filters_dubbo_proxy>`.
+* control-plane: management servers can respond with HTTP 304 to indicate that config is up to date for Envoy proxies polling a :ref:`REST API Config Type <envoy_api_field_core.ApiConfigSource.api_type>`
+* csrf: added support for whitelisting additional source origins.
+* dns: added support for getting DNS record TTL which is used by STRICT_DNS/LOGICAL_DNS cluster as DNS refresh rate.
+* dubbo_proxy: support the :ref:`dubbo proxy filter <config_network_filters_dubbo_proxy>`.
+* dynamo_request_parser: adding support for transactions. Adds check for new types of dynamodb operations (TransactWriteItems, TransactGetItems) and awareness for new types of dynamodb errors (IdempotentParameterMismatchException, TransactionCanceledException, TransactionInProgressException).
 * eds: added support to specify max time for which endpoints can be used :ref:`gRPC filter <envoy_api_msg_ClusterLoadAssignment.Policy>`.
+* eds: removed max limit for `load_balancing_weight`.
 * event: added :ref:`loop duration and poll delay statistics <operations_performance>`.
 * ext_authz: added a `x-envoy-auth-partial-body` metadata header set to `false|true` indicating if there is a partial body sent in the authorization request message.
 * ext_authz: added configurable status code that allows customizing HTTP responses on filter check status errors.
@@ -21,42 +102,62 @@ Version history
   <envoy_api_field_config.filter.http.transcoder.v2.GrpcJsonTranscoder.auto_mapping>`.
 * health check: added :ref:`initial jitter <envoy_api_field_core.HealthCheck.initial_jitter>` to add jitter to the first health check in order to prevent thundering herd on Envoy startup.
 * hot restart: stats are no longer shared between hot restart parent/child via shared memory, but rather by RPC. Hot restart version incremented to 11.
+* http: added the ability to pass a URL encoded PEM encoded peer certificate chain in the
+  :ref:`config_http_conn_man_headers_x-forwarded-client-cert` header.
 * http: fixed a bug where large unbufferable responses were not tracked in stats and logs correctly.
 * http: fixed a crashing bug where gRPC local replies would cause segfaults when upstream access logging was on.
 * http: mitigated a race condition with the :ref:`delayed_close_timeout<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.delayed_close_timeout>` where it could trigger while actively flushing a pending write buffer for a downstream connection.
+* http: added support for :ref:`preserve_external_request_id<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.preserve_external_request_id>` that represents whether the x-request-id should not be reset on edge entry inside mesh
 * http: changed `sendLocalReply` to send percent-encoded `GrpcMessage`.
+* http: added a :ref:header_prefix` <envoy_api_field_config.bootstrap.v2.Bootstrap.header_prefix>` configuration option to allow Envoy to send and process x-custom- prefixed headers rather than x-envoy.
+* http: added :ref:`dynamic forward proxy <arch_overview_http_dynamic_forward_proxy>` support.
+* http: tracking the active stream and dumping state in Envoy crash handlers. This can be disabled by building with `--define disable_object_dump_on_signal_trace=disabled`
 * jwt_authn: make filter's parsing of JWT more flexible, allowing syntax like ``jwt=eyJhbGciOiJS...ZFnFIw,extra=7,realm=123``
 * listener: added :ref:`source IP <envoy_api_field_listener.FilterChainMatch.source_prefix_ranges>`
   and :ref:`source port <envoy_api_field_listener.FilterChainMatch.source_ports>` filter
   chain matching.
 * lua: exposed functions to Lua to verify digital signature.
 * original_src filter: added the :ref:`filter<config_http_filters_original_src>`.
+* outlier_detector: added configuration :ref:`outlier_detection.split_external_local_origin_errors<envoy_api_field_cluster.OutlierDetection.split_external_local_origin_errors>` to distinguish locally and externally generated errors. See :ref:`arch_overview_outlier_detection` for full details.
 * rbac: migrated from v2alpha to v2.
 * redis: add support for Redis cluster custom cluster type.
 * redis: automatically route commands using cluster slots for Redis cluster.
 * redis: added :ref:`prefix routing <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.prefix_routes>` to enable routing commands based on their key's prefix to different upstream.
+* redis: added :ref:`request mirror policy <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.Route.request_mirror_policy>` to enable shadow traffic and/or dual writes.
 * redis: add support for zpopmax and zpopmin commands.
 * redis: added
   :ref:`max_buffer_size_before_flush <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.ConnPoolSettings.max_buffer_size_before_flush>` to batch commands together until the encoder buffer hits a certain size, and
   :ref:`buffer_flush_timeout <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.ConnPoolSettings.buffer_flush_timeout>` to control how quickly the buffer is flushed if it is not full.
 * redis: added auth support :ref:`downstream_auth_password <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.downstream_auth_password>` for downstream client authentication, and :ref:`auth_password <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProtocolOptions.auth_password>` to configure authentication passwords for upstream server clusters.
-* router: add support for configuring a :ref:`grpc timeout offset <envoy_api_field_route.RouteAction.grpc_timeout_offset>` on incoming requests.
+* retry: added a retry predicate that :ref:`rejects canary hosts. <envoy_api_field_route.RetryPolicy.retry_host_predicate>`
+* router: add support for configuring a :ref:`gRPC timeout offset <envoy_api_field_route.RouteAction.grpc_timeout_offset>` on incoming requests.
 * router: added ability to control retry back-off intervals via :ref:`retry policy <envoy_api_msg_route.RetryPolicy.RetryBackOff>`.
 * router: added ability to issue a hedged retry in response to a per try timeout via a :ref:`hedge policy <envoy_api_msg_route.HedgePolicy>`.
-* router: added a route name field to each http route in route.Route list 
+* router: added a route name field to each http route in route.Route list
 * router: added several new variables for exposing information about the downstream TLS connection via :ref:`header
   formatters <config_http_conn_man_headers_custom_request_headers>`.
 * router: per try timeouts will no longer start before the downstream request has been received
   in full by the router. This ensures that the per try timeout does not account for slow
   downstreams and that will not start before the global timeout.
+* router: added :ref:`RouteAction's auto_host_rewrite_header <envoy_api_field_route.RouteAction.auto_host_rewrite_header>` to allow upstream host header substitution with some other header's value
+* router: added support for UPSTREAM_REMOTE_ADDRESS :ref:`header formatter
+  <config_http_conn_man_headers_custom_request_headers>`.
+* router: add ability to reject a request that includes invalid values for
+  headers configured in :ref:`strict_check_headers <envoy_api_field_config.filter.http.router.v2.Router.strict_check_headers>`
 * runtime: added support for :ref:`flexible layering configuration
   <envoy_api_field_config.bootstrap.v2.Bootstrap.layered_runtime>`.
 * runtime: added support for statically :ref:`specifying the runtime in the bootstrap configuration
   <envoy_api_field_config.bootstrap.v2.Runtime.base>`.
+* runtime: :ref:`Runtime Discovery Service (RTDS) <config_runtime_rtds>` support added to layered runtime configuration.
 * sandbox: added :ref:`CSRF sandbox <install_sandboxes_csrf>`.
 * server: ``--define manual_stamp=manual_stamp`` was added to allow server stamping outside of binary rules.
   more info in the `bazel docs <https://github.com/envoyproxy/envoy/blob/master/bazel/README.md#enabling-optional-features>`_.
-* tool: added :repo:`proto <test/tools/router_check/validation.proto>` support for :ref:`router check tool <install_tools_route_table_check_tool>` tests.
+* server: added :ref:`server state <statistics>` statistic.
+* server: added :ref:`initialization_time_ms<statistics>` statistic.
+* subset: added :ref:`list_as_any<envoy_api_field_Cluster.LbSubsetConfig.list_as_any>` option to
+  the subset lb which allows matching metadata against any of the values in a list value
+  on the endpoints.
+* tools: added :repo:`proto <test/tools/router_check/validation.proto>` support for :ref:`router check tool <install_tools_route_table_check_tool>` tests.
 * tracing: add trace sampling configuration to the route, to override the route level.
 * upstream: added :ref:`upstream_cx_pool_overflow <config_cluster_manager_cluster_stats>` for the connection pool circuit breaker.
 * upstream: an EDS management server can now force removal of a host that is still passing active
@@ -68,6 +169,9 @@ Version history
   that allows ignoring new hosts for the purpose of load balancing calculations until they have
   been health checked for the first time.
 * upstream: added runtime error checking to prevent setting dns type to STRICT_DNS or LOGICAL_DNS when custom resolver name is specified.
+* upstream: added possibility to override fallback_policy per specific selector in :ref:`subset load balancer <arch_overview_load_balancer_subsets>`.
+* upstream: the :ref:`logical DNS cluster <arch_overview_service_discovery_types_logical_dns>` now
+  displays the current resolved IP address in admin output instead of 0.0.0.0.
 
 1.10.0 (Apr 5, 2019)
 ====================
@@ -135,7 +239,7 @@ Version history
 * router: added :ref:`rq_reset_after_downstream_response_started <config_http_filters_router_stats>` counter stat to router stats.
 * router: added per-route configuration of :ref:`internal redirects <envoy_api_field_route.RouteAction.internal_redirect_action>`.
 * router: removed deprecated route-action level headers_to_add/remove.
-* router: made :ref: `max retries header <config_http_filters_router_x-envoy-max-retries>` take precedence over the number of retries in route and virtual host retry policies.
+* router: made :ref:`max retries header <config_http_filters_router_x-envoy-max-retries>` take precedence over the number of retries in route and virtual host retry policies.
 * router: added support for prefix wildcards in :ref:`virtual host domains<envoy_api_field_route.VirtualHost.domains>`
 * stats: added support for histograms in prometheus
 * stats: added usedonly flag to prometheus stats to only output metrics which have been

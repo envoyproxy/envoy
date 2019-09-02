@@ -7,6 +7,7 @@
 
 #include "common/config/well_known_names.h"
 #include "common/memory/stats.h"
+#include "common/stats/symbol_table_creator.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/config/utility.h"
@@ -111,7 +112,7 @@ TEST_P(StatsIntegrationTest, WithTagSpecifierWithRegex) {
     bootstrap.mutable_stats_config()->mutable_use_all_default_tags()->set_value(false);
     auto tag_specifier = bootstrap.mutable_stats_config()->mutable_stats_tags()->Add();
     tag_specifier->set_tag_name("my.http_conn_manager_prefix");
-    tag_specifier->set_regex("^(?:|listener(?=\\.).*?\\.)http\\.((.*?)\\.)");
+    tag_specifier->set_regex(R"(^(?:|listener(?=\.).*?\.)http\.((.*?)\.))");
   });
   initialize();
 
@@ -145,13 +146,19 @@ public:
   ClusterMemoryTestHelper()
       : BaseIntegrationTest(testing::TestWithParam<Network::Address::IpVersion>::GetParam()) {}
 
+  static size_t computeMemory(int num_clusters) {
+    ClusterMemoryTestHelper helper;
+    return helper.clusterMemoryHelper(num_clusters, true);
+  }
+
+private:
   /**
-   *
    * @param num_clusters number of clusters appended to bootstrap_config
    * @param allow_stats if false, enable set_reject_all in stats_config
    * @return size_t the total memory allocated
    */
-  size_t ClusterMemoryHelper(int num_clusters, bool allow_stats) {
+  size_t clusterMemoryHelper(int num_clusters, bool allow_stats) {
+    Stats::TestUtil::MemoryTest memory_test;
     config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       if (!allow_stats) {
         bootstrap.mutable_stats_config()->mutable_stats_matcher()->set_reject_all(true);
@@ -163,38 +170,33 @@ public:
     });
     initialize();
 
-    return Memory::Stats::totalCurrentlyAllocated();
-  }
-
-  static size_t computeMemory(int num_clusters) {
-    const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
-    ClusterMemoryTestHelper helper;
-    size_t memory = helper.ClusterMemoryHelper(num_clusters, true);
-    EXPECT_LT(start_mem, memory);
-    return memory;
+    return memory_test.consumedBytes();
   }
 };
-class ClusterMemoryTestRunner : public testing::TestWithParam<Network::Address::IpVersion> {};
+class ClusterMemoryTestRunner : public testing::TestWithParam<Network::Address::IpVersion> {
+protected:
+  ClusterMemoryTestRunner() : save_use_fakes_(Stats::SymbolTableCreator::useFakeSymbolTables()) {}
+  ~ClusterMemoryTestRunner() override {
+    Stats::TestUtil::SymbolTableCreatorTestPeer::setUseFakeSymbolTables(save_use_fakes_);
+  }
+
+private:
+  const bool save_use_fakes_;
+};
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ClusterMemoryTestRunner,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithStats) {
-  // Skip test if we cannot measure memory with TCMALLOC
-  if (!Stats::TestUtil::hasDeterministicMallocStats()) {
-    return;
-  }
-  const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
+TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
+  Stats::TestUtil::SymbolTableCreatorTestPeer::setUseFakeSymbolTables(true);
+
   // A unique instance of ClusterMemoryTest allows for multiple runs of Envoy with
   // differing configuration. This is necessary for measuring the memory consumption
   // between the different instances within the same test.
   const size_t m1 = ClusterMemoryTestHelper::computeMemory(1);
   const size_t m1001 = ClusterMemoryTestHelper::computeMemory(1001);
   const size_t m_per_cluster = (m1001 - m1) / 1000;
-
-  EXPECT_LT(start_mem, m1);
-  EXPECT_LT(start_mem, m1001);
 
   // Note: if you are increasing this golden value because you are adding a
   // stat, please confirm that this will be generally useful to most Envoy
@@ -205,6 +207,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithStats) {
   // History of golden values:
   //
   // Date        PR       Bytes Per Cluster   Notes
+  //                      exact upper-bound
   // ----------  -----    -----------------   -----
   // 2019/03/20  6329     59015               Initial version
   // 2019/04/12  6477     59576               Implementing Endpoint lease...
@@ -215,8 +218,59 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithStats) {
   // 2019/05/31  6866     50157               libstdc++ upgrade in CI
   // 2019/06/03  7199     49393               absl update
   // 2019/06/06  7208     49650               make memory targets approximate
+  // 2019/06/17  7243     49412       49700   macros for exact/upper-bound memory checks
+  // 2019/06/29  7364     45685       46000   combine 2 levels of stat ref-counting into 1
+  // 2019/06/30  7428     42742       43000   remove stats multiple inheritance, inline HeapStatData
+  // 2019/07/06  7477     42742       43000   fork gauge representation to drop pending_increment_
+  // 2019/07/15  7555     42806       43000   static link libstdc++ in tests
+  // 2019/07/24  7503     43030       44000   add upstream filters to clusters
+  // 2019/08/13  7877     42838       44000   skip EdfScheduler creation if all host weights equal
 
-  EXPECT_LE(m_per_cluster, 49650);
+  // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
+  // 'release' builds, where we control the platform and tool-chain. So you
+  // will need to find the correct value only after failing CI and looking
+  // at the logs.
+  //
+  // On a local clang8/libstdc++/linux flow, the memory usage was observed in
+  // June 2019 to be 64 bytes higher than it is in CI/release. Your mileage may
+  // vary.
+  EXPECT_MEMORY_EQ(m_per_cluster, 42838); // 104 bytes higher than a debug build.
+  EXPECT_MEMORY_LE(m_per_cluster, 44000);
+}
+
+TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
+  Stats::TestUtil::SymbolTableCreatorTestPeer::setUseFakeSymbolTables(false);
+
+  // A unique instance of ClusterMemoryTest allows for multiple runs of Envoy with
+  // differing configuration. This is necessary for measuring the memory consumption
+  // between the different instances within the same test.
+  const size_t m1 = ClusterMemoryTestHelper::computeMemory(1);
+  const size_t m1001 = ClusterMemoryTestHelper::computeMemory(1001);
+  const size_t m_per_cluster = (m1001 - m1) / 1000;
+
+  // Note: if you are increasing this golden value because you are adding a
+  // stat, please confirm that this will be generally useful to most Envoy
+  // users. Otherwise you are adding to the per-cluster memory overhead, which
+  // will be significant for Envoy installations that are massively
+  // multi-tenant.
+  //
+  // History of golden values:
+  //
+  // Date        PR       Bytes Per Cluster   Notes
+  //                      exact upper-bound
+  // ----------  -----    -----------------   -----
+  // 2019/08/09  7882     35489       36000   Initial version
+
+  // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
+  // 'release' builds, where we control the platform and tool-chain. So you
+  // will need to find the correct value only after failing CI and looking
+  // at the logs.
+  //
+  // On a local clang8/libstdc++/linux flow, the memory usage was observed in
+  // June 2019 to be 64 bytes higher than it is in CI/release. Your mileage may
+  // vary.
+  EXPECT_MEMORY_EQ(m_per_cluster, 35489); // 104 bytes higher than a debug build.
+  EXPECT_MEMORY_LE(m_per_cluster, 36000);
 }
 
 } // namespace

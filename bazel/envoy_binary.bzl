@@ -4,7 +4,7 @@ load(
     ":envoy_internal.bzl",
     "envoy_copts",
     "envoy_external_dep_path",
-    "envoy_static_link_libstdcpp_linkopts",
+    "envoy_stdlib_deps",
     "tcmalloc_external_dep",
 )
 
@@ -25,7 +25,7 @@ def envoy_cc_binary(
     if stamped:
         linkopts = linkopts + _envoy_stamped_linkopts()
         deps = deps + _envoy_stamped_deps()
-    deps = deps + [envoy_external_dep_path(dep) for dep in external_deps]
+    deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + envoy_stdlib_deps()
     native.cc_binary(
         name = name,
         srcs = srcs,
@@ -50,25 +50,24 @@ def _envoy_select_exported_symbols(xs):
 # Compute the final linkopts based on various options.
 def _envoy_linkopts():
     return select({
-               # The macOS system library transitively links common libraries (e.g., pthread).
-               "@envoy//bazel:apple": [
-                   # See note here: https://luajit.org/install.html
-                   "-pagezero_size 10000",
-                   "-image_base 100000000",
-               ],
-               "@envoy//bazel:windows_x86_64": [
-                   "-DEFAULTLIB:advapi32.lib",
-                   "-DEFAULTLIB:ws2_32.lib",
-                   "-WX",
-               ],
-               "//conditions:default": [
-                   "-pthread",
-                   "-lrt",
-                   "-ldl",
-                   "-Wl,--hash-style=gnu",
-               ],
-           }) + envoy_static_link_libstdcpp_linkopts() + \
-           _envoy_select_exported_symbols(["-Wl,-E"])
+        # The macOS system library transitively links common libraries (e.g., pthread).
+        "@envoy//bazel:apple": [
+            # See note here: https://luajit.org/install.html
+            "-pagezero_size 10000",
+            "-image_base 100000000",
+        ],
+        "@envoy//bazel:windows_x86_64": [
+            "-DEFAULTLIB:advapi32.lib",
+            "-DEFAULTLIB:ws2_32.lib",
+            "-WX",
+        ],
+        "//conditions:default": [
+            "-pthread",
+            "-lrt",
+            "-ldl",
+            "-Wl,--hash-style=gnu",
+        ],
+    }) + _envoy_select_exported_symbols(["-Wl,-E"])
 
 def _envoy_stamped_deps():
     return select({

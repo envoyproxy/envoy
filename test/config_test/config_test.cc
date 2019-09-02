@@ -6,6 +6,7 @@
 
 #include "common/common/fmt.h"
 #include "common/protobuf/utility.h"
+#include "common/runtime/runtime_features.h"
 
 #include "server/config_validation/server.h"
 #include "server/configuration_impl.h"
@@ -39,6 +40,15 @@ OptionsImpl asConfigYaml(const OptionsImpl& src, Api::Api& api) {
                                               src.localAddressIpVersion());
 }
 
+class ScopedRuntimeInjector {
+public:
+  ScopedRuntimeInjector(Runtime::Loader& runtime) {
+    Runtime::LoaderSingleton::initialize(&runtime);
+  }
+
+  ~ScopedRuntimeInjector() { Runtime::LoaderSingleton::clear(); }
+};
+
 } // namespace
 
 class ConfigTest {
@@ -55,17 +65,32 @@ public:
         .WillByDefault(Invoke([&](const std::string& file) -> std::string {
           return api_->fileSystem().fileReadToEnd(file);
         }));
+    ON_CALL(os_sys_calls_, close(_)).WillByDefault(Return(Api::SysCallIntResult{0, 0}));
+
+    // Here we setup runtime to mimic the actual deprecated feature list used in the
+    // production code. Note that this test is actually more strict than production because
+    // in production runtime is not setup until after the bootstrap config is loaded. This seems
+    // better for configuration tests.
+    ScopedRuntimeInjector scoped_runtime(server_.runtime());
+    ON_CALL(server_.runtime_loader_.snapshot_, deprecatedFeatureEnabled(_))
+        .WillByDefault(Invoke([](const std::string& key) {
+          if (Runtime::RuntimeFeaturesDefaults::get().disallowedByDefault(key)) {
+            return false;
+          } else {
+            return true;
+          }
+        }));
 
     envoy::config::bootstrap::v2::Bootstrap bootstrap;
-    Server::InstanceUtil::loadBootstrapConfig(bootstrap, options_,
-                                              server_.messageValidationVisitor(), *api_);
+    Server::InstanceUtil::loadBootstrapConfig(
+        bootstrap, options_, server_.messageValidationContext().staticValidationVisitor(), *api_);
     Server::Configuration::InitialImpl initial_config(bootstrap);
     Server::Configuration::MainImpl main_config;
 
     cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
         server_.admin(), server_.runtime(), server_.stats(), server_.threadLocal(),
         server_.random(), server_.dnsResolver(), ssl_context_manager_, server_.dispatcher(),
-        server_.localInfo(), server_.secretManager(), server_.messageValidationVisitor(), *api_,
+        server_.localInfo(), server_.secretManager(), server_.messageValidationContext(), *api_,
         server_.httpContext(), server_.accessLogManager(), server_.singletonManager(),
         time_system_);
 

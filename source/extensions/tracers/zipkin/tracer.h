@@ -25,7 +25,7 @@ public:
   /**
    * Destructor.
    */
-  virtual ~Reporter() {}
+  virtual ~Reporter() = default;
 
   /**
    * Method that a concrete Reporter class must implement to handle finished spans.
@@ -33,10 +33,10 @@ public:
    *
    * @param span The span that needs action.
    */
-  virtual void reportSpan(const Span& span) PURE;
+  virtual void reportSpan(Span&& span) PURE;
 };
 
-typedef std::unique_ptr<Reporter> ReporterPtr;
+using ReporterPtr = std::unique_ptr<Reporter>;
 
 /**
  * This class implements the Zipkin tracer. It has methods to create the appropriate Zipkin span
@@ -72,6 +72,7 @@ public:
    * @param config The tracing configuration
    * @param span_name Name of the new span.
    * @param start_time The time indicating the beginning of the span.
+   * @return SpanPtr The root span.
    */
   SpanPtr startSpan(const Tracing::Config&, const std::string& span_name, SystemTime timestamp);
 
@@ -82,12 +83,15 @@ public:
    * @param span_name Name of the new span.
    * @param start_time The time indicating the beginning of the span.
    * @param previous_context The context of the span preceding the one to be created.
+   * @return SpanPtr The child span.
    */
   SpanPtr startSpan(const Tracing::Config&, const std::string& span_name, SystemTime timestamp,
-                    SpanContext& previous_context);
+                    const SpanContext& previous_context);
 
   /**
    * TracerInterface::reportSpan.
+   *
+   * @param span The span to be reported.
    */
   void reportSpan(Span&& span) override;
 
@@ -103,6 +107,8 @@ public:
 
   /**
    * Associates a Reporter object with this Tracer.
+   *
+   * @param The span reporter.
    */
   void setReporter(ReporterPtr reporter);
 
@@ -121,7 +127,7 @@ private:
   TimeSource& time_source_;
 };
 
-typedef std::unique_ptr<Tracer> TracerPtr;
+using TracerPtr = std::unique_ptr<Tracer>;
 
 } // namespace Zipkin
 } // namespace Tracers

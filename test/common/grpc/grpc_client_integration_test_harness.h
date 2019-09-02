@@ -51,7 +51,7 @@ const char HELLO_REPLY[] = "DEFG";
 
 MATCHER_P(HelloworldReplyEq, rhs, "") { return arg.message() == rhs; }
 
-typedef std::vector<std::pair<Http::LowerCaseString, std::string>> TestMetadata;
+using TestMetadata = std::vector<std::pair<Http::LowerCaseString, std::string>>;
 
 // Use in EXPECT_CALL(foo, bar(_)).WillExitIfNeeded() to exit dispatcher loop if
 // there are no longer any pending events in DispatcherHelper.
@@ -290,7 +290,7 @@ public:
         std::move(shadow_writer_ptr_), http_context_);
     EXPECT_CALL(cm_, httpAsyncClientForCluster(fake_cluster_name_))
         .WillRepeatedly(ReturnRef(*http_async_client_));
-    EXPECT_CALL(cm_, get(fake_cluster_name_)).WillRepeatedly(Return(&thread_local_cluster_));
+    EXPECT_CALL(cm_, get(Eq(fake_cluster_name_))).WillRepeatedly(Return(&thread_local_cluster_));
     envoy::api::v2::core::GrpcService config;
     config.mutable_envoy_grpc()->set_cluster_name(fake_cluster_name_);
     fillServiceWideInitialMetadata(config);
@@ -416,7 +416,7 @@ public:
   FakeHttpConnectionPtr fake_connection_;
   std::vector<FakeStreamPtr> fake_streams_;
   const Protobuf::MethodDescriptor* method_descriptor_;
-  Envoy::Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
+  Stats::TestSymbolTable symbol_table_;
   Stats::IsolatedStoreImpl* stats_store_ = new Stats::IsolatedStoreImpl(*symbol_table_);
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
@@ -471,7 +471,7 @@ public:
     mock_cluster_info_->transport_socket_factory_.reset();
   }
 
-  virtual envoy::api::v2::core::GrpcService createGoogleGrpcConfig() override {
+  envoy::api::v2::core::GrpcService createGoogleGrpcConfig() override {
     auto config = GrpcClientIntegrationTest::createGoogleGrpcConfig();
     TestUtility::setTestSslGoogleGrpcConfig(config, use_client_cert_);
     return config;

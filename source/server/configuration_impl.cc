@@ -17,6 +17,7 @@
 #include "common/common/utility.h"
 #include "common/config/runtime_utility.h"
 #include "common/config/utility.h"
+#include "common/network/socket_option_factory.h"
 #include "common/protobuf/utility.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/tracing/http_tracer_impl.h"
@@ -107,7 +108,7 @@ void MainImpl::initializeTracers(const envoy::config::trace::v2::Tracing& config
   // Now see if there is a factory that will accept the config.
   auto& factory = Config::Utility::getAndCheckFactory<TracerFactory>(type);
   ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-      configuration.http(), server.messageValidationVisitor(), factory);
+      configuration.http(), server.messageValidationContext().staticValidationVisitor(), factory);
   http_tracer_ = factory.createHttpTracer(*message, server);
 }
 
@@ -119,7 +120,7 @@ void MainImpl::initializeStatsSinks(const envoy::config::bootstrap::v2::Bootstra
     // Generate factory and translate stats sink custom config
     auto& factory = Config::Utility::getAndCheckFactory<StatsSinkFactory>(sink_object.name());
     ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-        sink_object, server.messageValidationVisitor(), factory);
+        sink_object, server.messageValidationContext().staticValidationVisitor(), factory);
 
     stats_sinks_.emplace_back(factory.createStatsSink(*message, server));
   }
@@ -132,6 +133,12 @@ InitialImpl::InitialImpl(const envoy::config::bootstrap::v2::Bootstrap& bootstra
       admin.profile_path().empty() ? "/var/log/envoy/envoy.prof" : admin.profile_path();
   if (admin.has_address()) {
     admin_.address_ = Network::Address::resolveProtoAddress(admin.address());
+  }
+  admin_.socket_options_ = std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
+  if (!admin.socket_options().empty()) {
+    Network::Socket::appendOptions(
+        admin_.socket_options_,
+        Network::SocketOptionFactory::buildLiteralOptions(admin.socket_options()));
   }
 
   if (!bootstrap.flags_path().empty()) {

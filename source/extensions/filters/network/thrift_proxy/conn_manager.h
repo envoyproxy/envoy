@@ -31,7 +31,7 @@ namespace ThriftProxy {
  */
 class Config {
 public:
-  virtual ~Config() {}
+  virtual ~Config() = default;
 
   virtual ThriftFilters::FilterChainFactory& filterFactory() PURE;
   virtual ThriftFilterStats& stats() PURE;
@@ -45,7 +45,7 @@ public:
  */
 class ProtocolOptionsConfig : public Upstream::ProtocolOptionsConfig {
 public:
-  virtual ~ProtocolOptionsConfig() {}
+  ~ProtocolOptionsConfig() override = default;
 
   virtual TransportType transport(TransportType downstream_transport) const PURE;
   virtual ProtocolType protocol(ProtocolType downstream_protocol) const PURE;
@@ -61,7 +61,7 @@ class ConnectionManager : public Network::ReadFilter,
 public:
   ConnectionManager(Config& config, Runtime::RandomGenerator& random_generator,
                     TimeSource& time_system);
-  ~ConnectionManager();
+  ~ConnectionManager() override;
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
@@ -109,7 +109,7 @@ private:
     bool complete_ : 1;
     bool first_reply_field_ : 1;
   };
-  typedef std::unique_ptr<ResponseDecoder> ResponseDecoderPtr;
+  using ResponseDecoderPtr = std::unique_ptr<ResponseDecoder>;
 
   // Wraps a DecoderFilter and acts as the DecoderFilterCallbacks for the filter, enabling filter
   // chain continuation.
@@ -144,7 +144,7 @@ private:
     ActiveRpc& parent_;
     ThriftFilters::DecoderFilterSharedPtr handle_;
   };
-  typedef std::unique_ptr<ActiveRpcDecoderFilter> ActiveRpcDecoderFilterPtr;
+  using ActiveRpcDecoderFilterPtr = std::unique_ptr<ActiveRpcDecoderFilter>;
 
   // ActiveRpc tracks request/response pairs.
   struct ActiveRpc : LinkedObject<ActiveRpc>,
@@ -164,7 +164,7 @@ private:
       stream_info_.setDownstreamRemoteAddress(
           parent_.read_callbacks_->connection().remoteAddress());
     }
-    ~ActiveRpc() {
+    ~ActiveRpc() override {
       request_timer_->complete();
       parent_.stats_.request_active_.dec();
 
@@ -246,7 +246,7 @@ private:
     bool pending_transport_end_ : 1;
   };
 
-  typedef std::unique_ptr<ActiveRpc> ActiveRpcPtr;
+  using ActiveRpcPtr = std::unique_ptr<ActiveRpc>;
 
   void continueDecoding();
   void dispatch();

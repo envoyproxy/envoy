@@ -40,6 +40,16 @@ Usage
     -p,  --useproto
       Use Proto test file schema
 
+    -f, --fail-under
+      Represents a percent value for route test coverage under which the run should fail.
+
+    --covall
+      Enables comprehensive code coverage percent calculation taking into account all the possible
+      asserts.
+
+    --disable-deprecation-check
+      Disables the deprecation check for RouteConfiguration proto.
+
     -h,  --help
       Displays usage information and exits.
 
@@ -66,9 +76,6 @@ Output
     Test_5
     locations ats cluster_name
     Test_6
-
-  Testing with valid :ref:`runtime values <envoy_api_field_route.RouteMatch.runtime_fraction>` is not currently supported,
-  this may be added in future work.
 
 Building
   The tool can be built locally using Bazel. ::

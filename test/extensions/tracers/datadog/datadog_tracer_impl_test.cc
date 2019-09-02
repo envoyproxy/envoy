@@ -28,6 +28,7 @@
 
 using testing::_;
 using testing::AtLeast;
+using testing::Eq;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
@@ -47,14 +48,14 @@ public:
 
     if (init_timer) {
       timer_ = new NiceMock<Event::MockTimer>(&tls_.dispatcher_);
-      EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(900)));
+      EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(900), _));
     }
 
     driver_ = std::make_unique<Driver>(datadog_config, cm_, stats_, tls_, runtime_);
   }
 
   void setupValidDriver() {
-    EXPECT_CALL(cm_, get("fake_cluster")).WillRepeatedly(Return(&cm_.thread_local_cluster_));
+    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
     ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
         .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
 
@@ -94,7 +95,7 @@ TEST_F(DatadogDriverTest, InitializeDriver) {
 
   {
     // Valid config but not valid cluster.
-    EXPECT_CALL(cm_, get("fake_cluster")).WillOnce(Return(nullptr));
+    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillOnce(Return(nullptr));
 
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
@@ -106,7 +107,7 @@ TEST_F(DatadogDriverTest, InitializeDriver) {
   }
 
   {
-    EXPECT_CALL(cm_, get("fake_cluster")).WillRepeatedly(Return(&cm_.thread_local_cluster_));
+    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
     ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
         .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
 
@@ -145,9 +146,9 @@ TEST_F(DatadogDriverTest, FlushSpansTimer) {
   span->finishSpan();
 
   // Timer should be re-enabled.
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(900)));
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(900), _));
 
-  timer_->callback_();
+  timer_->invokeCallback();
 
   EXPECT_EQ(1U, stats_.counter("tracing.datadog.timer_flushed").value());
   EXPECT_EQ(1U, stats_.counter("tracing.datadog.traces_sent").value());

@@ -1,4 +1,4 @@
-#include <stdlib.h>
+#include <cstdlib>
 
 #include "common/grpc/google_grpc_creds_impl.h"
 

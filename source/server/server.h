@@ -15,6 +15,7 @@
 #include "envoy/server/tracer_config.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/stats/timespan.h"
 #include "envoy/tracing/http_tracer.h"
 
 #include "common/access_log/access_log_manager_impl.h"
@@ -22,7 +23,7 @@
 #include "common/common/cleanup.h"
 #include "common/common/logger_delegates.h"
 #include "common/grpc/async_client_manager_impl.h"
-#include "common/grpc/common.h"
+#include "common/grpc/context_impl.h"
 #include "common/http/context_impl.h"
 #include "common/init/manager_impl.h"
 #include "common/memory/heap_shrinker.h"
@@ -38,8 +39,6 @@
 #include "server/overload_manager_impl.h"
 #include "server/worker_impl.h"
 
-#include "extensions/transport_sockets/tls/context_manager_impl.h"
-
 #include "absl/container/node_hash_map.h"
 #include "absl/types/optional.h"
 
@@ -49,7 +48,9 @@ namespace Server {
 /**
  * All server wide stats. @see stats_macros.h
  */
-#define ALL_SERVER_STATS(COUNTER, GAUGE)                                                           \
+#define ALL_SERVER_STATS(COUNTER, GAUGE, HISTOGRAM)                                                \
+  COUNTER(static_unknown_fields)                                                                   \
+  COUNTER(dynamic_unknown_fields)                                                                  \
   COUNTER(debug_assertion_failures)                                                                \
   GAUGE(concurrency, NeverImport)                                                                  \
   GAUGE(days_until_first_cert_expiring, Accumulate)                                                \
@@ -58,12 +59,14 @@ namespace Server {
   GAUGE(memory_allocated, Accumulate)                                                              \
   GAUGE(memory_heap_size, Accumulate)                                                              \
   GAUGE(parent_connections, Accumulate)                                                            \
+  GAUGE(state, NeverImport)                                                                        \
   GAUGE(total_connections, Accumulate)                                                             \
   GAUGE(uptime, Accumulate)                                                                        \
-  GAUGE(version, NeverImport)
+  GAUGE(version, NeverImport)                                                                      \
+  HISTOGRAM(initialization_time_ms)
 
 struct ServerStats {
-  ALL_SERVER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
+  ALL_SERVER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
 };
 
 /**
@@ -71,7 +74,7 @@ struct ServerStats {
  */
 class ComponentFactory {
 public:
-  virtual ~ComponentFactory() {}
+  virtual ~ComponentFactory() = default;
 
   /**
    * @return DrainManagerPtr a new drain manager for the server.
@@ -181,7 +184,7 @@ public:
   Runtime::RandomGenerator& random() override { return *random_generator_; }
   Runtime::Loader& runtime() override;
   void shutdown() override;
-  bool isShutdown() override final { return shutdown_; }
+  bool isShutdown() final { return shutdown_; }
   void shutdownAdmin() override;
   Singleton::Manager& singletonManager() override { return *singleton_manager_; }
   bool healthCheckFailed() override;
@@ -200,9 +203,8 @@ public:
     return config_.statsFlushInterval();
   }
 
-  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
-    return options_.allowUnknownFields() ? ProtobufMessage::getStrictValidationVisitor()
-                                         : ProtobufMessage::getNullValidationVisitor();
+  ProtobufMessage::ValidationContext& messageValidationContext() override {
+    return validation_context_;
   }
 
   // ServerLifecycleNotifier
@@ -213,6 +215,7 @@ public:
 private:
   ProtobufTypes::MessagePtr dumpBootstrapConfig();
   void flushStats();
+  void flushStatsInternal();
   void initialize(const Options& options, Network::Address::InstanceConstSharedPtr local_address,
                   ComponentFactory& component_factory, ListenerHooks& hooks);
   void loadServerFlags(const absl::optional<std::string>& flags_path);
@@ -231,8 +234,10 @@ private:
   // - There may be active clusters referencing it in config_.cluster_manager_.
   // - There may be active connections referencing it.
   std::unique_ptr<Secret::SecretManager> secret_manager_;
+  bool workers_started_;
   bool shutdown_;
   const Options& options_;
+  ProtobufMessage::ProdValidationContextImpl validation_context_;
   TimeSource& time_source_;
   HotRestart& restarter_;
   const time_t start_time_;
@@ -248,7 +253,7 @@ private:
   Network::ConnectionHandlerPtr handler_;
   Runtime::RandomGeneratorPtr random_generator_;
   std::unique_ptr<Runtime::ScopedLoaderSingleton> runtime_singleton_;
-  std::unique_ptr<Extensions::TransportSockets::Tls::ContextManagerImpl> ssl_context_manager_;
+  std::unique_ptr<Ssl::ContextManager> ssl_context_manager_;
   ProdListenerComponentFactory listener_component_factory_;
   ProdWorkerFactory worker_factory_;
   std::unique_ptr<ListenerManager> listener_manager_;
@@ -270,11 +275,14 @@ private:
   Upstream::HdsDelegatePtr hds_delegate_;
   std::unique_ptr<OverloadManagerImpl> overload_manager_;
   Envoy::MutexTracer* mutex_tracer_;
-  Grpc::Common grpc_context_;
+  Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
   std::unique_ptr<ProcessContext> process_context_;
   std::unique_ptr<Memory::HeapShrinker> heap_shrinker_;
   const std::thread::id main_thread_id_;
+  // initialization_time is a histogram for tracking the initialization time across hot restarts
+  // whenever we have support for histogram merge across hot restarts.
+  Stats::TimespanPtr initialization_timer_;
 
   using LifecycleNotifierCallbacks = std::list<StageCallback>;
   using LifecycleNotifierCompletionCallbacks = std::list<StageCallbackWithCompletion>;

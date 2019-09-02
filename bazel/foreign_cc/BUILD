@@ -52,10 +52,6 @@ envoy_cmake_external(
         "CARES_SHARED": "no",
         "CARES_STATIC": "on",
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
-        # Disable ranlib because it is not handled by bazel, and therefore
-        # doesn't respect custom toolchains such as the Android NDK,
-        # see https://github.com/bazelbuild/rules_foreign_cc/issues/252
-        "CMAKE_RANLIB": "",
     },
     copy_pdb = True,
     lib_source = "@com_github_c_ares_c_ares//:all",
@@ -95,10 +91,13 @@ envoy_cmake_external(
         "EVENT__DISABLE_TESTS": "on",
         "EVENT__LIBRARY_TYPE": "STATIC",
         "CMAKE_BUILD_TYPE": "Release",
-        # Disable ranlib because it is not handled by bazel, and therefore
-        # doesn't respect custom toolchains such as the Android NDK,
-        # see https://github.com/bazelbuild/rules_foreign_cc/issues/252
-        "CMAKE_RANLIB": "",
+        # Force _GNU_SOURCE on for Android builds. This would be contained in
+        # a 'select' but the downstream macro uses a select on all of these
+        # options, and they cannot be nested.
+        # If https://github.com/bazelbuild/rules_foreign_cc/issues/289 is fixed
+        # this can be removed.
+        # More details https://github.com/lyft/envoy-mobile/issues/116
+        "_GNU_SOURCE": "on",
     },
     copy_pdb = True,
     lib_source = "@com_github_libevent_libevent//:all",
@@ -118,10 +117,7 @@ envoy_cmake_external(
         "ENABLE_LIB_ONLY": "on",
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
         "CMAKE_INSTALL_LIBDIR": "lib",
-        # Disable ranlib because it is not handled by bazel, and therefore
-        # doesn't respect custom toolchains such as the Android NDK,
-        # see https://github.com/bazelbuild/rules_foreign_cc/issues/252
-        "CMAKE_RANLIB": "",
+        "CMAKE_CXX_COMPILER_FORCED": "on",
     },
     cmake_files_dir = "$BUILD_TMPDIR/lib/CMakeFiles",
     copy_pdb = True,
@@ -140,10 +136,7 @@ envoy_cmake_external(
         "YAML_CPP_BUILD_TESTS": "off",
         "YAML_CPP_BUILD_TOOLS": "off",
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
-        # Disable ranlib because it is not handled by bazel, and therefore
-        # doesn't respect custom toolchains such as the Android NDK,
-        # see https://github.com/bazelbuild/rules_foreign_cc/issues/252
-        "CMAKE_RANLIB": "",
+        "CMAKE_CXX_COMPILER_FORCED": "on",
     },
     lib_source = "@com_github_jbeder_yaml_cpp//:all",
     static_libraries = select({
@@ -158,10 +151,6 @@ envoy_cmake_external(
     name = "zlib",
     cache_entries = {
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
-        # Disable ranlib because it is not handled by bazel, and therefore
-        # doesn't respect custom toolchains such as the Android NDK,
-        # see https://github.com/bazelbuild/rules_foreign_cc/issues/252
-        "CMAKE_RANLIB": "",
     },
     copy_pdb = True,
     lib_source = "@net_zlib//:all",

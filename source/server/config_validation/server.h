@@ -25,8 +25,6 @@
 #include "server/listener_manager_impl.h"
 #include "server/server.h"
 
-#include "extensions/transport_sockets/tls/context_manager_impl.h"
-
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -106,16 +104,15 @@ public:
     return config_.statsFlushInterval();
   }
 
-  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
-    return options_.allowUnknownFields() ? ProtobufMessage::getStrictValidationVisitor()
-                                         : ProtobufMessage::getNullValidationVisitor();
+  ProtobufMessage::ValidationContext& messageValidationContext() override {
+    return validation_context_;
   }
 
   // Server::ListenerComponentFactory
   LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config) override {
-    return std::make_unique<LdsApiImpl>(lds_config, clusterManager(), dispatcher(), random(),
-                                        initManager(), localInfo(), stats(), listenerManager(),
-                                        messageValidationVisitor(), api());
+    return std::make_unique<LdsApiImpl>(lds_config, clusterManager(), initManager(), stats(),
+                                        listenerManager(),
+                                        messageValidationContext().dynamicValidationVisitor());
   }
   std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
@@ -176,6 +173,7 @@ private:
   // - There may be active connections referencing it.
   std::unique_ptr<Secret::SecretManager> secret_manager_;
   const Options& options_;
+  ProtobufMessage::ProdValidationContextImpl validation_context_;
   Stats::IsolatedStoreImpl& stats_store_;
   ThreadLocal::InstanceImpl thread_local_;
   Api::ApiPtr api_;
@@ -184,7 +182,7 @@ private:
   Singleton::ManagerPtr singleton_manager_;
   Runtime::LoaderPtr runtime_loader_;
   Runtime::RandomGeneratorImpl random_generator_;
-  std::unique_ptr<Extensions::TransportSockets::Tls::ContextManagerImpl> ssl_context_manager_;
+  std::unique_ptr<Ssl::ContextManager> ssl_context_manager_;
   Configuration::MainImpl config_;
   LocalInfo::LocalInfoPtr local_info_;
   AccessLog::AccessLogManagerImpl access_log_manager_;
@@ -192,7 +190,7 @@ private:
   std::unique_ptr<ListenerManagerImpl> listener_manager_;
   std::unique_ptr<OverloadManager> overload_manager_;
   MutexTracer* mutex_tracer_;
-  Grpc::Common grpc_context_;
+  Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
   Event::TimeSystem& time_system_;
 };

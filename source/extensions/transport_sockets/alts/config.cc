@@ -20,8 +20,8 @@ namespace TransportSockets {
 namespace Alts {
 
 // smart pointer for grpc_alts_credentials_options that will be automatically freed.
-typedef CSmartPtr<grpc_alts_credentials_options, grpc_alts_credentials_options_destroy>
-    GrpcAltsCredentialsOptionsPtr;
+using GrpcAltsCredentialsOptionsPtr =
+    CSmartPtr<grpc_alts_credentials_options, grpc_alts_credentials_options_destroy>;
 
 namespace {
 
@@ -64,7 +64,7 @@ class AltsSharedState : public Singleton::Instance {
 public:
   AltsSharedState() { grpc_alts_shared_resource_dedicated_init(); }
 
-  ~AltsSharedState() { grpc_alts_shared_resource_dedicated_shutdown(); }
+  ~AltsSharedState() override { grpc_alts_shared_resource_dedicated_shutdown(); }
 };
 
 SINGLETON_MANAGER_REGISTRATION(alts_shared_state);
@@ -79,10 +79,10 @@ Network::TransportSocketFactoryPtr createTransportSocketFactoryHelper(
       [] { return std::make_shared<AltsSharedState>(); });
   auto config =
       MessageUtil::downcastAndValidate<const envoy::config::transport_socket::alts::v2alpha::Alts&>(
-          message);
+          message, factory_ctxt.messageValidationVisitor());
   HandshakeValidator validator = createHandshakeValidator(config);
 
-  const std::string handshaker_service = config.handshaker_service();
+  const std::string& handshaker_service = config.handshaker_service();
   HandshakerFactory factory =
       [handshaker_service, is_upstream,
        alts_shared_state](Event::Dispatcher& dispatcher,

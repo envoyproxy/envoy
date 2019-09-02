@@ -18,6 +18,7 @@ CB
 CBs
 CDS
 CHACHA
+CHLO
 CIDR
 CLA
 CLI
@@ -69,6 +70,7 @@ ECONNREFUSED
 EDESTRUCTION
 EDF
 EDS
+EINVAL
 EIP
 ELB
 ENOTSUP
@@ -83,8 +85,10 @@ EVAL
 EVLOOP
 EVP
 EWOULDBLOCK
+EXPECTs
 EXPR
 FAQ
+FCDS
 FDs
 FFFF
 FIN
@@ -104,6 +108,7 @@ GOAWAY
 GRPC
 GTEST
 GiB
+GURL
 HC
 HCM
 HDS
@@ -164,6 +169,7 @@ NOAUTH
 NOLINT
 NOLINTNEXTLINE
 NONCES
+NOSORT
 NS
 NUL
 Nilsson
@@ -179,6 +185,7 @@ OSS
 OSX
 OT
 OU
+OVFL
 PB
 PC
 PCC
@@ -193,11 +200,14 @@ POSTs
 PREBIND
 PRNG
 PROT
+PSS
 QPS
 QUIC
 RAII
 RANLUX
 RBAC
+RECVDSTADDR
+RECVPKTINFO
 RCU
 RDN
 RDS
@@ -213,15 +223,19 @@ RNG
 RPC
 RSA
 RST
+RTDS
 RTTI
 RW
 RX
+RXQ
 Runn
 SA
 SAN
 SANs
+SCT
 SDK
 SDS
+SENDSRCADDR
 SHA
 SHM
 SIBABRT
@@ -233,6 +247,7 @@ SIGSEGV
 SIGTERM
 SimpleAtoi
 SNI
+SPD
 SPDY
 SPIFFE
 SPKI
@@ -248,7 +263,6 @@ TBD
 TCLAP
 TCMalloc
 TCP
-TDS
 TE
 TFO
 TID
@@ -257,10 +271,12 @@ TLSv
 TLV
 TMPDIR
 TODO
+TPM
 TPROXY
 TSAN
 TSI
 TTL
+TTLs
 TX
 TXT
 UA
@@ -284,7 +300,11 @@ WS
 Welford's
 Werror
 XDS
+decRefCount
+getaddrinfo
 sendto
+ssize
+upcasts
 vip
 xDSes
 XFCC
@@ -355,6 +375,7 @@ casted
 chrono
 chroot
 chunked
+ci
 circllhist
 cmd
 codec
@@ -385,6 +406,7 @@ cstring
 ctor
 ctrl
 customizations
+darwin
 dbg
 de
 dechunking
@@ -450,6 +472,7 @@ evthread
 evwatch
 exe
 execlp
+expectDeltaAndSotwUpdate
 facto
 favicon
 fd
@@ -533,6 +556,7 @@ keepalives
 ketama
 kqueue
 kubernetes
+kv
 kvs
 lala
 latencies
@@ -593,6 +617,7 @@ optimizations
 ostream
 outlier
 outliers
+offsetof
 overridable
 param
 parameterizable
@@ -604,6 +629,7 @@ params
 paren
 parentid
 parsers
+passthroughs
 pcall
 pcap
 pclose
@@ -631,6 +657,7 @@ pthreads
 pton
 ptr
 ptrs
+pts
 pwd
 py
 qps
@@ -718,6 +745,7 @@ structs
 subexpr
 subdirs
 symlink
+symlinks
 symlinked
 sync
 sys
@@ -749,6 +777,7 @@ uint
 un
 unacked
 unary
+uncomment
 unconfigurable
 unconfigured
 uncontended
@@ -764,6 +793,7 @@ unescaping
 unindexed
 uninsantiated
 uninstantiated
+uniq
 unix
 unlink
 unlinked

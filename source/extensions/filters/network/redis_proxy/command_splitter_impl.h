@@ -61,7 +61,7 @@ struct CommandStats {
 
 class CommandHandler {
 public:
-  virtual ~CommandHandler() {}
+  virtual ~CommandHandler() = default;
 
   virtual SplitRequestPtr startRequest(Common::Redis::RespValuePtr&& request,
                                        SplitCallbacks& callbacks, CommandStats& command_stats,
@@ -100,7 +100,7 @@ protected:
  */
 class SingleServerRequest : public SplitRequestBase, public Common::Redis::Client::PoolCallbacks {
 public:
-  ~SingleServerRequest();
+  ~SingleServerRequest() override;
 
   // Common::Redis::Client::PoolCallbacks
   void onResponse(Common::Redis::RespValuePtr&& response) override;
@@ -158,7 +158,7 @@ private:
  */
 class FragmentedRequest : public SplitRequestBase {
 public:
-  ~FragmentedRequest();
+  ~FragmentedRequest() override;
 
   // RedisProxy::CommandSplitter::SplitRequest
   void cancel() override;
@@ -277,7 +277,7 @@ public:
   CommandHandlerFactory(Router& router) : CommandHandlerBase(router) {}
   SplitRequestPtr startRequest(Common::Redis::RespValuePtr&& request, SplitCallbacks& callbacks,
                                CommandStats& command_stats, TimeSource& time_source,
-                               bool latency_in_micros) {
+                               bool latency_in_micros) override {
     return RequestClass::create(router_, std::move(request), callbacks, command_stats, time_source,
                                 latency_in_micros);
   }
@@ -314,7 +314,7 @@ private:
     std::reference_wrapper<CommandHandler> handler_;
   };
 
-  typedef std::shared_ptr<HandlerData> HandlerDataPtr;
+  using HandlerDataPtr = std::shared_ptr<HandlerData>;
 
   void addHandler(Stats::Scope& scope, const std::string& stat_prefix, const std::string& name,
                   CommandHandler& handler);

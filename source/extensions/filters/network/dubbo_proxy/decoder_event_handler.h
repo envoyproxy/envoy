@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/common/pure.h"
-#include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -14,101 +13,81 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
 
-/**
- * This class provides the pass-through capability of the original data of
- * the Dubbo protocol to improve the forwarding efficiency
- * when no modification of the original data is required.
- * Note: If the custom filter does not care about data transfer,
- *       then it does not need to care about this interface,
- *       which is currently used by router filter.
- */
-class ProtocolDataPassthroughConverter {
-public:
-  ProtocolDataPassthroughConverter() = default;
-  virtual ~ProtocolDataPassthroughConverter() = default;
-
-  void initProtocolConverter(Buffer::Instance& buffer) { buffer_ = &buffer; }
-
-  /**
-   * Transfer the original header data of the Dubbo protocol,
-   * it's called after the protocol's header data is parsed.
-   * @param header_buf raw header data
-   * @param size The size of the head.
-   */
-  virtual Network::FilterStatus transferHeaderTo(Buffer::Instance& header_buf, size_t size) {
-    if (buffer_ != nullptr) {
-      buffer_->move(header_buf, size);
-    }
-    return Network::FilterStatus::Continue;
-  }
-
-  /**
-   * Transfer the original body data of the Dubbo protocol
-   * it's called after the protocol's body data is parsed.
-   * @param header_buf raw body data
-   * @param size The size of the body.
-   */
-  virtual Network::FilterStatus transferBodyTo(Buffer::Instance& body_buf, size_t size) {
-    if (buffer_ != nullptr) {
-      buffer_->move(body_buf, size);
-    }
-    return Network::FilterStatus::Continue;
-  }
-
-protected:
-  Buffer::Instance* buffer_{nullptr};
+enum class FilterStatus : uint8_t {
+  // Continue filter chain iteration.
+  Continue,
+  // Do not iterate to any of the remaining filters in the chain. Returning
+  // FilterDataStatus::Continue from decodeData()/encodeData() or calling
+  // continueDecoding()/continueEncoding() MUST be called if continued filter iteration is desired.
+  StopIteration,
+  // Indicates that a retry is required for the reply message received.
+  Retry,
 };
 
-class DecoderEventHandler : public ProtocolDataPassthroughConverter {
+class StreamDecoder {
 public:
-  ~DecoderEventHandler() override = default;
+  virtual ~StreamDecoder() = default;
 
   /**
-   * Indicates the start of a Dubbo transport data was detected. Unframed transports generate
-   * simulated start messages.
-   */
-  virtual Network::FilterStatus transportBegin() PURE;
-
-  /**
-   * Indicates the end of a Dubbo transport data was detected. Unframed transport generate
-   * simulated complete messages.
-   */
-  virtual Network::FilterStatus transportEnd() PURE;
-
-  /**
-   * Indicates that the start of a Dubbo protocol message was detected.
-   * @param type the message type
-   * @param message_id the message identifier
-   * @param serialization_type the serialization type of the message
-   * @return FilterStatus to indicate if filter chain iteration should continue
-   */
-  virtual Network::FilterStatus messageBegin(MessageType type, int64_t message_id,
-                                             SerializationType serialization_type) PURE;
-
-  /**
-   * Indicates that the end of a Dubbo protocol message was detected.
+   * Indicates that the message had been decoded.
    * @param metadata MessageMetadataSharedPtr describing the message
+   * @param ctx the message context information
    * @return FilterStatus to indicate if filter chain iteration should continue
    */
-  virtual Network::FilterStatus messageEnd(MessageMetadataSharedPtr metadata) PURE;
+  virtual FilterStatus onMessageDecoded(MessageMetadataSharedPtr metadata,
+                                        ContextSharedPtr ctx) PURE;
 };
 
-class DecoderCallbacks {
+using StreamDecoderSharedPtr = std::shared_ptr<StreamDecoder>;
+
+class StreamEncoder {
 public:
-  virtual ~DecoderCallbacks() = default;
+  virtual ~StreamEncoder() = default;
 
   /**
-   * @return DecoderEventHandler& a new DecoderEventHandler for a message.
+   * Indicates that the message had been encoded.
+   * @param metadata MessageMetadataSharedPtr describing the message
+   * @param ctx the message context information
+   * @return FilterStatus to indicate if filter chain iteration should continue
    */
-  virtual DecoderEventHandler* newDecoderEventHandler() PURE;
+  virtual FilterStatus onMessageEncoded(MessageMetadataSharedPtr metadata,
+                                        ContextSharedPtr ctx) PURE;
+};
+
+using StreamEncoderSharedPtr = std::shared_ptr<StreamEncoder>;
+
+class StreamHandler {
+public:
+  virtual ~StreamHandler() = default;
+
+  /**
+   * Indicates that the message had been decoded.
+   * @param metadata MessageMetadataSharedPtr describing the message
+   * @param ctx the message context information
+   * @return FilterStatus to indicate if filter chain iteration should continue
+   */
+  virtual void onStreamDecoded(MessageMetadataSharedPtr metadata, ContextSharedPtr ctx) PURE;
+};
+
+using StreamDecoderSharedPtr = std::shared_ptr<StreamDecoder>;
+
+class DecoderCallbacksBase {
+public:
+  virtual ~DecoderCallbacksBase() = default;
+
+  /**
+   * @return StreamDecoder* a new StreamDecoder for a message.
+   */
+  virtual StreamHandler& newStream() PURE;
 
   /**
    * Indicates that the message is a heartbeat.
    */
-  virtual void onHeartbeat(MessageMetadataSharedPtr) {}
+  virtual void onHeartbeat(MessageMetadataSharedPtr) PURE;
 };
 
-typedef std::shared_ptr<DecoderEventHandler> DecoderEventHandlerSharedPtr;
+class RequestDecoderCallbacks : public DecoderCallbacksBase {};
+class ResponseDecoderCallbacks : public DecoderCallbacksBase {};
 
 } // namespace DubboProxy
 } // namespace NetworkFilters

@@ -16,7 +16,7 @@ namespace Tls {
  */
 class SslSocketConfigFactory : public virtual Server::Configuration::TransportSocketConfigFactory {
 public:
-  virtual ~SslSocketConfigFactory() {}
+  ~SslSocketConfigFactory() override = default;
   std::string name() const override { return TransportSocketNames::get().Tls; }
 };
 
@@ -43,6 +43,13 @@ public:
 };
 
 DECLARE_FACTORY(DownstreamSslSocketFactory);
+
+class SslContextManagerFactory : public Ssl::ContextManagerFactory {
+public:
+  Ssl::ContextManagerPtr createContextManager(TimeSource& time_source) override;
+};
+
+DECLARE_FACTORY(SslContextManagerFactory);
 
 } // namespace Tls
 } // namespace TransportSockets

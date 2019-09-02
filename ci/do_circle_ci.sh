@@ -15,9 +15,8 @@ export ENVOY_SRCDIR="$(pwd)"
 # hard code this (basically due to how docker works).
 export NUM_CPUS=8
 
-# CircleCI doesn't support IPv6 by default, so we run all tests with IPv4, and
-# a limited subset with IPv6 using "machine: true" and do_circle_ci_ipv6_tests.sh
-# (see https://circleci.com/docs/2.0/executor-types/#using-machine)
+# CircleCI doesn't support IPv6 by default, so we run all tests with IPv4 only.
+# IPv6 tests are run with Azure Pipelines.
 export BAZEL_EXTRA_TEST_OPTIONS="--test_env=ENVOY_IP_TEST_VERSIONS=v4only"
 
 function finish {
@@ -29,4 +28,4 @@ trap finish EXIT
 echo "disk space at beginning of build:"
 df -h
 
-ci/do_ci.sh "$1"
+ci/do_ci.sh $*

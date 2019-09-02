@@ -214,12 +214,6 @@ following are the command line options that Envoy supports.
   during a hot restart. See the :ref:`hot restart overview <arch_overview_hot_restart>` for more
   information. Defaults to 900 seconds (15 minutes).
 
-  .. attention::
-
-    This setting affects the output of :option:`--hot-restart-version`. If you started Envoy with this
-    option set to a non default value, you should use the same option (and same value) for subsequent hot
-    restarts.
-
 .. option:: --disable-hot-restart
 
   *(optional)* This flag disables Envoy hot restart for builds that have it enabled. By default, hot
@@ -234,10 +228,25 @@ following are the command line options that Envoy supports.
 
 .. option:: --allow-unknown-fields
 
-  *(optional)* This flag disables validation of protobuf configurations for unknown fields. By default, the 
+  *(optional)* Deprecated alias for :option:`--allow-unknown-static-fields`.
+
+.. option:: --allow-unknown-static-fields
+
+  *(optional)* This flag disables validation of protobuf configurations for unknown fields. By default, the
   validation is enabled. For most deployments, the default should be used which ensures configuration errors
-  are caught upfront and Envoy is configured as intended. However in cases where Envoy needs to accept configuration 
-  produced by newer control planes, effectively ignoring new features it does not know about yet, this can be disabled.
+  are caught upfront and Envoy is configured as intended. Warnings are logged for the first use of
+  any unknown field and these occurrences are counted in the :ref:`server.static_unknown_fields
+  <server_statistics>` statistic.
+
+.. option:: --reject-unknown-dynamic-fields
+
+  *(optional)* This flag disables validation of protobuf configuration for unknown fields in
+  dynamic configuration. By default, this flag is set false, disabling validation for fields beyond
+  bootstrap. This allows newer xDS configurations to be delivered to older Envoys. This can be set
+  true for strict dynamic checking when this behavior is not wanted but the default should be
+  desirable for most Envoy deployments. Warnings are logged for the first use of any unknown field
+  and these occurrences are counted in the :ref:`server.dynamic_unknown_fields <server_statistics>`
+  statistic.
 
 .. option:: --version
 

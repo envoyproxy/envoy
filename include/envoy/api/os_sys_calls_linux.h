@@ -14,7 +14,7 @@ namespace Api {
 
 class LinuxOsSysCalls {
 public:
-  virtual ~LinuxOsSysCalls() {}
+  virtual ~LinuxOsSysCalls() = default;
 
   /**
    * @see sched_getaffinity (man 2 sched_getaffinity)
@@ -22,7 +22,7 @@ public:
   virtual SysCallIntResult sched_getaffinity(pid_t pid, size_t cpusetsize, cpu_set_t* mask) PURE;
 };
 
-typedef std::unique_ptr<LinuxOsSysCalls> LinuxOsSysCallsPtr;
+using LinuxOsSysCallsPtr = std::unique_ptr<LinuxOsSysCalls>;
 
 } // namespace Api
 } // namespace Envoy

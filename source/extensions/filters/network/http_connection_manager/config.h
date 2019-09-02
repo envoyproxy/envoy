@@ -33,7 +33,7 @@ class HttpConnectionManagerFilterConfigFactory
           envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager> {
 public:
   HttpConnectionManagerFilterConfigFactory()
-      : FactoryBase(NetworkFilterNames::get().HttpConnectionManager) {}
+      : FactoryBase(NetworkFilterNames::get().HttpConnectionManager, true) {}
 
   // NamedNetworkFilterConfigFactory
   Network::FilterFactoryCb
@@ -86,7 +86,7 @@ public:
 
   // Http::FilterChainFactory
   void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
-  typedef std::list<Http::FilterFactoryCb> FilterFactoriesList;
+  using FilterFactoriesList = std::list<Http::FilterFactoryCb>;
   struct FilterConfig {
     std::unique_ptr<FilterFactoriesList> filter_factories;
     bool allow_upgrade;
@@ -104,6 +104,7 @@ public:
   std::chrono::milliseconds drainTimeout() override { return drain_timeout_; }
   FilterChainFactory& filterFactory() override { return *this; }
   bool generateRequestId() override { return generate_request_id_; }
+  bool preserveExternalRequestId() const override { return preserve_external_request_id_; }
   uint32_t maxRequestHeadersKb() const override { return max_request_headers_kb_; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
@@ -115,6 +116,9 @@ public:
     return scoped_routes_config_provider_.get();
   }
   const std::string& serverName() override { return server_name_; }
+  HttpConnectionManagerProto::ServerHeaderTransformation serverHeaderTransformation() override {
+    return server_transformation_;
+  }
   Http::ConnectionManagerStats& stats() override { return stats_; }
   Http::ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() override { return use_remote_address_; }
@@ -137,13 +141,14 @@ public:
   bool proxy100Continue() const override { return proxy_100_continue_; }
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   bool shouldNormalizePath() const override { return normalize_path_; }
+  bool shouldMergeSlashes() const override { return merge_slashes_; }
   std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
 
 private:
   enum class CodecType { HTTP1, HTTP2, AUTO };
   void processFilter(
       const envoy::config::filter::network::http_connection_manager::v2::HttpFilter& proto_config,
-      int i, absl::string_view prefix, FilterFactoriesList& filter_factories);
+      int i, absl::string_view prefix, FilterFactoriesList& filter_factories, bool& is_terminal);
 
   Server::Configuration::FactoryContext& context_;
   FilterFactoriesList filter_factories_;
@@ -164,6 +169,8 @@ private:
   CodecType codec_type_;
   const Http::Http2Settings http2_settings_;
   const Http::Http1Settings http1_settings_;
+  HttpConnectionManagerProto::ServerHeaderTransformation server_transformation_{
+      HttpConnectionManagerProto::OVERWRITE};
   std::string server_name_;
   Http::TracingConnectionManagerConfigPtr tracing_config_;
   absl::optional<std::string> user_agent_;
@@ -175,11 +182,13 @@ private:
   Config::ConfigProviderPtr scoped_routes_config_provider_;
   std::chrono::milliseconds drain_timeout_;
   bool generate_request_id_;
+  const bool preserve_external_request_id_;
   Http::DateProvider& date_provider_;
   Http::ConnectionManagerListenerStats listener_stats_;
   const bool proxy_100_continue_;
   std::chrono::milliseconds delayed_close_timeout_;
   const bool normalize_path_;
+  const bool merge_slashes_;
 
   // Default idle timeout is 5 minutes if nothing is specified in the HCM config.
   static const uint64_t StreamIdleTimeoutMs = 5 * 60 * 1000;

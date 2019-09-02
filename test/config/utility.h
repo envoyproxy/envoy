@@ -64,10 +64,9 @@ public:
   static void initializeTls(const ServerSslOptions& options,
                             envoy::api::v2::auth::CommonTlsContext& common_context);
 
-  typedef std::function<void(envoy::config::bootstrap::v2::Bootstrap&)> ConfigModifierFunction;
-  typedef std::function<void(
-      envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&)>
-      HttpModifierFunction;
+  using ConfigModifierFunction = std::function<void(envoy::config::bootstrap::v2::Bootstrap&)>;
+  using HttpModifierFunction = std::function<void(
+      envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&)>;
 
   // A basic configuration (admin port, cluster_0, one listener) with no network filters.
   static const std::string BASE_CONFIG;
@@ -149,6 +148,9 @@ public:
   // Apply any outstanding config modifiers, stick all the listeners in a discovery response message
   // and write it to the lds file.
   void setLds(absl::string_view version_info);
+
+  // Set limits on pending outbound frames.
+  void setOutboundFramesLimits(uint32_t max_all_frames, uint32_t max_control_frames);
 
   // Return the bootstrap configuration for hand-off to Envoy.
   const envoy::config::bootstrap::v2::Bootstrap& bootstrap() { return bootstrap_; }

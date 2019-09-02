@@ -1,6 +1,8 @@
 #include <sstream>
 #include <vector>
 
+#include "common/common/macros.h"
+
 #include "extensions/filters/network/redis_proxy/command_splitter_impl.h"
 
 #include "test/integration/integration.h"
@@ -13,8 +15,8 @@ namespace {
 // This is a basic redis_proxy configuration with a single host
 // in the cluster. The load balancing policy must be set
 // to random for proper test operation.
-
-const std::string CONFIG = R"EOF(
+const std::string& listenerConfig() {
+  CONSTRUCT_ON_FIRST_USE(std::string, R"EOF(
 admin:
   access_log_path: /dev/null
   address:
@@ -33,9 +35,15 @@ static_resources:
         name: envoy.redis_proxy
         config:
           stat_prefix: redis_stats
-          cluster: cluster_0
+          prefix_routes:
+            catch_all_route:
+              cluster: cluster_0
           settings:
-            op_timeout: 5s
+            op_timeout: 5s)EOF");
+}
+
+const std::string& clusterConfig() {
+  CONSTRUCT_ON_FIRST_USE(std::string, R"EOF(
   clusters:
     - name: cluster_0
       lb_policy: CLUSTER_PROVIDED
@@ -50,15 +58,28 @@ static_resources:
           value:
             cluster_refresh_rate: 1s
             cluster_refresh_timeout: 4s
-)EOF";
+)EOF");
+}
+
+const std::string& testConfig() {
+  CONSTRUCT_ON_FIRST_USE(std::string, listenerConfig() + clusterConfig());
+}
+
+const std::string& testConfigWithReadPolicy() {
+  CONSTRUCT_ON_FIRST_USE(std::string, listenerConfig() + R"EOF(
+            read_policy: REPLICA
+)EOF" + clusterConfig());
+}
 
 // This is the basic redis_proxy configuration with an upstream
 // authentication password specified.
 
-const std::string CONFIG_WITH_AUTH = CONFIG + R"EOF(
+const std::string& testConfigWithAuth() {
+  CONSTRUCT_ON_FIRST_USE(std::string, testConfig() + R"EOF(
       extension_protocol_options:
         envoy.redis_proxy: { auth_password: { inline_string: somepassword }}
-)EOF";
+)EOF");
+}
 
 // This function encodes commands as an array of bulkstrings as transmitted by Redis clients to
 // Redis servers, according to the Redis protocol.
@@ -66,9 +87,9 @@ std::string makeBulkStringArray(std::vector<std::string>&& command_strings) {
   std::stringstream result;
 
   result << "*" << command_strings.size() << "\r\n";
-  for (uint64_t i = 0; i < command_strings.size(); i++) {
-    result << "$" << command_strings[i].size() << "\r\n";
-    result << command_strings[i] << "\r\n";
+  for (auto& command_string : command_strings) {
+    result << "$" << command_string.size() << "\r\n";
+    result << command_string << "\r\n";
   }
 
   return result.str();
@@ -77,7 +98,7 @@ std::string makeBulkStringArray(std::vector<std::string>&& command_strings) {
 class RedisClusterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                     public BaseIntegrationTest {
 public:
-  RedisClusterIntegrationTest(const std::string& config = CONFIG, int num_upstreams = 2)
+  RedisClusterIntegrationTest(const std::string& config = testConfig(), int num_upstreams = 2)
       : BaseIntegrationTest(GetParam(), config), num_upstreams_(num_upstreams),
         version_(GetParam()) {}
 
@@ -211,13 +232,13 @@ protected:
   }
 
   /**
-   * Simple response for a single slot redis cluster with a master and slave.
+   * Simple response for a single slot redis cluster with a master and replica.
    * @param master the ip of the master node.
-   * @param slave the ip of the slave node.
+   * @param replica the ip of the replica node.
    * @return The cluster slot response.
    */
-  std::string singleSlotMasterSlave(const Network::Address::Ip* master,
-                                    const Network::Address::Ip* slave) {
+  std::string singleSlotMasterReplica(const Network::Address::Ip* master,
+                                      const Network::Address::Ip* replica) {
     int64_t start_slot = 0;
     int64_t end_slot = 16383;
 
@@ -227,7 +248,7 @@ protected:
          << ":" << start_slot << "\r\n"
          << ":" << end_slot << "\r\n"
          << makeIp(master->addressAsString(), master->port())
-         << makeIp(slave->addressAsString(), slave->port());
+         << makeIp(replica->addressAsString(), replica->port());
 
     return resp.str();
   }
@@ -265,8 +286,15 @@ protected:
 
 class RedisClusterWithAuthIntegrationTest : public RedisClusterIntegrationTest {
 public:
-  RedisClusterWithAuthIntegrationTest(const std::string& config = CONFIG_WITH_AUTH,
+  RedisClusterWithAuthIntegrationTest(const std::string& config = testConfigWithAuth(),
                                       int num_upstreams = 2)
+      : RedisClusterIntegrationTest(config, num_upstreams) {}
+};
+
+class RedisClusterWithReadPolicyIntegrationTest : public RedisClusterIntegrationTest {
+public:
+  RedisClusterWithReadPolicyIntegrationTest(const std::string& config = testConfigWithReadPolicy(),
+                                            int num_upstreams = 3)
       : RedisClusterIntegrationTest(config, num_upstreams) {}
 };
 
@@ -280,16 +308,16 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, RedisClusterWithAuthIntegrationTest,
 
 // This test sends a simple "get foo" command from a fake
 // downstream client through the proxy to a fake upstream
-// Redis cluster with a single slot with master and slave.
+// Redis cluster with a single slot with master and replica.
 // The fake server sends a valid response back to the client.
 // The request and response should make it through the envoy
 // proxy server code unchanged.
 
-TEST_P(RedisClusterIntegrationTest, SingleSlotMasterSlave) {
+TEST_P(RedisClusterIntegrationTest, SingleSlotMasterReplica) {
   random_index_ = 0;
 
   on_server_init_function_ = [this]() {
-    std::string cluster_slot_response = singleSlotMasterSlave(
+    std::string cluster_slot_response = singleSlotMasterReplica(
         fake_upstreams_[0]->localAddress()->ip(), fake_upstreams_[1]->localAddress()->ip());
     expectCallClusterSlot(random_index_, cluster_slot_response);
   };
@@ -325,9 +353,32 @@ TEST_P(RedisClusterIntegrationTest, TwoSlot) {
   simpleRequestAndResponse(1, makeBulkStringArray({"get", "foo"}), "$3\r\nbar\r\n");
 }
 
+// This test sends simple "set foo" and "get foo" command from a fake
+// downstream client through the proxy to a fake upstream
+// Redis cluster with a single slot with master and replica.
+// The envoy proxy is set with read_policy to read from replica, the expected result
+// is that the set command will be sent to the master and the get command will be sent
+// to the replica
+
+TEST_P(RedisClusterWithReadPolicyIntegrationTest, SingleSlotMasterReplicaReadReplica) {
+  random_index_ = 0;
+
+  on_server_init_function_ = [this]() {
+    std::string cluster_slot_response = singleSlotMasterReplica(
+        fake_upstreams_[0]->localAddress()->ip(), fake_upstreams_[1]->localAddress()->ip());
+    expectCallClusterSlot(random_index_, cluster_slot_response);
+  };
+
+  initialize();
+
+  // foo hashes to slot 12182 which has master node in upstream 0 and replica in upstream 1
+  simpleRequestAndResponse(0, makeBulkStringArray({"set", "foo", "bar"}), ":1\r\n");
+  simpleRequestAndResponse(1, makeBulkStringArray({"get", "foo"}), "$3\r\nbar\r\n");
+}
+
 // This test sends a simple "get foo" command from a fake
 // downstream client through the proxy to a fake upstream
-// Redis cluster with a single slot with master and slave.
+// Redis cluster with a single slot with master and replica.
 // The fake server sends a valid response back to the client.
 // The request and response should make it through the envoy
 // proxy server code unchanged.
@@ -337,11 +388,11 @@ TEST_P(RedisClusterIntegrationTest, TwoSlot) {
 // "cluster slots" command), and one to authenticate the connection
 // that carries the "get foo" request.
 
-TEST_P(RedisClusterWithAuthIntegrationTest, SingleSlotMasterSlave) {
+TEST_P(RedisClusterWithAuthIntegrationTest, SingleSlotMasterReplica) {
   random_index_ = 0;
 
   on_server_init_function_ = [this]() {
-    std::string cluster_slot_response = singleSlotMasterSlave(
+    std::string cluster_slot_response = singleSlotMasterReplica(
         fake_upstreams_[0]->localAddress()->ip(), fake_upstreams_[1]->localAddress()->ip());
     expectCallClusterSlot(0, cluster_slot_response, "somepassword");
   };

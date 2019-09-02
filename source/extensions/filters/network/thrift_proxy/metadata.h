@@ -1,8 +1,7 @@
 #pragma once
 
-#include <string.h>
-
 #include <algorithm>
+#include <cstring>
 #include <list>
 #include <memory>
 #include <string>
@@ -30,7 +29,7 @@ namespace ThriftProxy {
  */
 class MessageMetadata {
 public:
-  MessageMetadata() {}
+  MessageMetadata() = default;
 
   bool hasFrameSize() const { return frame_size_.has_value(); }
   uint32_t frameSize() const { return frame_size_.value(); }
@@ -118,7 +117,7 @@ private:
   absl::optional<bool> sampled_;
 };
 
-typedef std::shared_ptr<MessageMetadata> MessageMetadataSharedPtr;
+using MessageMetadataSharedPtr = std::shared_ptr<MessageMetadata>;
 
 /**
  * Constant Thrift headers. All lower case.
@@ -129,7 +128,7 @@ public:
   const Http::LowerCaseString Dest{":dest"};
   const Http::LowerCaseString MethodName{":method-name"};
 };
-typedef ConstSingleton<HeaderValues> Headers;
+using Headers = ConstSingleton<HeaderValues>;
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters

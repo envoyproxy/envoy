@@ -2,7 +2,6 @@
 
 #include <chrono>
 #include <cstdint>
-#include <regex>
 #include <set>
 #include <sstream>
 #include <string>
@@ -47,7 +46,7 @@ public:
 private:
   void parse(const std::string& format_string);
 
-  typedef std::vector<int32_t> SpecifierOffsets;
+  using SpecifierOffsets = std::vector<int32_t>;
   std::string fromTimeAndPrepareSpecifierOffsets(time_t time, SpecifierOffsets& specifier_offsets,
                                                  const std::string& seconds_str) const;
 
@@ -359,8 +358,8 @@ public:
   /**
    * Definition of unordered set of case-insensitive std::string.
    */
-  typedef absl::flat_hash_set<std::string, CaseInsensitiveHash, CaseInsensitiveCompare>
-      CaseUnorderedSet;
+  using CaseUnorderedSet =
+      absl::flat_hash_set<std::string, CaseInsensitiveHash, CaseInsensitiveCompare>;
 
   /**
    * Removes all the character indices from str contained in the interval-set.
@@ -386,22 +385,6 @@ public:
    * Finds the next prime number larger than x.
    */
   static uint32_t findPrimeLargerThan(uint32_t x);
-};
-
-/**
- * Utilities for constructing regular expressions.
- */
-class RegexUtil {
-public:
-  /*
-   * Constructs a std::regex, converting any std::regex_error exception into an EnvoyException.
-   * @param regex std::string containing the regular expression to parse.
-   * @param flags std::regex::flag_type containing parser flags. Defaults to std::regex::optimize.
-   * @return std::regex constructed from regex and flags.
-   * @throw EnvoyException if the regex string is invalid.
-   */
-  static std::regex parseRegex(const std::string& regex,
-                               std::regex::flag_type flags = std::regex::optimize);
 };
 
 /**
@@ -458,7 +441,7 @@ public:
 template <typename Value> class IntervalSetImpl : public IntervalSet<Value> {
 public:
   // Interval is a pair of Values.
-  typedef typename IntervalSet<Value>::Interval Interval;
+  using Interval = typename IntervalSet<Value>::Interval;
 
   void insert(Value left, Value right) override {
     if (left == right) {
@@ -719,7 +702,7 @@ public:
   /**
    * @return a string_view into the InlineString.
    */
-  absl::string_view toStringView() const { return absl::string_view(data_, size_); }
+  absl::string_view toStringView() const { return {data_, size_}; }
 
   /**
    * @return the number of bytes in the string

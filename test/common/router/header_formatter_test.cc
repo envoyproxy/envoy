@@ -71,6 +71,14 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamLocalAddressWithou
   testFormatting("DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT", "127.0.0.2");
 }
 
+TEST_F(StreamInfoHeaderFormatterTest, TestformatWithUpstreamRemoteAddressVariable) {
+  testFormatting("UPSTREAM_REMOTE_ADDRESS", "10.0.0.1:443");
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  stream_info.host_.reset();
+  testFormatting(stream_info, "UPSTREAM_REMOTE_ADDRESS", "");
+}
+
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithProtocolVariable) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   absl::optional<Envoy::Http::Protocol> protocol = Envoy::Http::Protocol::Http11;
@@ -497,7 +505,7 @@ TEST_F(StreamInfoHeaderFormatterTest, ValidateLimitsOnUserDefinedHeaders) {
     header->mutable_header()->set_key("header_name");
     header->mutable_header()->set_value(long_string);
     header->mutable_append()->set_value(true);
-    EXPECT_THROW_WITH_REGEX(MessageUtil::validate(route), ProtoValidationException,
+    EXPECT_THROW_WITH_REGEX(TestUtility::validate(route), ProtoValidationException,
                             "Proto constraint validation failed.*");
   }
   {
@@ -508,7 +516,7 @@ TEST_F(StreamInfoHeaderFormatterTest, ValidateLimitsOnUserDefinedHeaders) {
       header->mutable_header()->set_key("header_name");
       header->mutable_header()->set_value("value");
     }
-    EXPECT_THROW_WITH_REGEX(MessageUtil::validate(route), ProtoValidationException,
+    EXPECT_THROW_WITH_REGEX(TestUtility::validate(route), ProtoValidationException,
                             "Proto constraint validation failed.*");
   }
 }
@@ -668,6 +676,7 @@ TEST(HeaderParserTest, TestParseInternal) {
       {"%UPSTREAM_METADATA([\"ns\", \t \"key\"])%", {"value"}, {}},
       {"%UPSTREAM_METADATA([\"ns\", \n \"key\"])%", {"value"}, {}},
       {"%UPSTREAM_METADATA( \t [ \t \"ns\" \t , \t \"key\" \t ] \t )%", {"value"}, {}},
+      {"%UPSTREAM_REMOTE_ADDRESS%", {"10.0.0.1:443"}, {}},
       {"%PER_REQUEST_STATE(testing)%", {"test_value"}, {}},
       {"%START_TIME%", {"2018-04-03T23:06:09.123Z"}, {}},
 
@@ -1008,7 +1017,7 @@ request_headers_to_add:
   EXPECT_EQ("123456000, 1, 12, 123, 1234, 12345, 123456, 1234560, 12345600, 123456000",
             header_map.get_("x-request-start-range"));
 
-  typedef absl::flat_hash_map<std::string, int> CountMap;
+  using CountMap = absl::flat_hash_map<std::string, int>;
   CountMap counts;
   header_map.iterate(
       [](const Http::HeaderEntry& header, void* cb_v) -> Http::HeaderMap::Iterate {
@@ -1059,6 +1068,14 @@ response_headers_to_add:
       key: "x-request-start-default"
       value: "%START_TIME%"
     append: true
+  - header:
+      key: "set-cookie"
+      value: "foo"
+  - header:
+      key: "set-cookie"
+      value: "bar"
+    append: true
+
 response_headers_to_remove: ["x-nope"]
 )EOF";
 
@@ -1088,6 +1105,15 @@ response_headers_to_remove: ["x-nope"]
   EXPECT_TRUE(header_map.has("x-request-start-range"));
   EXPECT_EQ("123456000, 1, 12, 123, 1234, 12345, 123456, 1234560, 12345600, 123456000",
             header_map.get_("x-request-start-range"));
+  EXPECT_EQ("foo", header_map.get_("set-cookie"));
+
+  // Per https://github.com/envoyproxy/envoy/issues/7488 make sure we don't
+  // combine set-cookie headers
+  std::vector<absl::string_view> out;
+  Http::HeaderUtility::getAllOfHeader(header_map, "set-cookie", out);
+  ASSERT_EQ(out.size(), 2);
+  ASSERT_EQ(out[0], "foo");
+  ASSERT_EQ(out[1], "bar");
 }
 
 TEST(HeaderParserTest, EvaluateRequestHeadersRemoveBeforeAdd) {

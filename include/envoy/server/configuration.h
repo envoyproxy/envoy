@@ -22,7 +22,7 @@ namespace Configuration {
  */
 class Main {
 public:
-  virtual ~Main() {}
+  virtual ~Main() = default;
 
   /**
    * @return Upstream::ClusterManager* singleton for use by the entire server.
@@ -76,7 +76,7 @@ public:
  */
 class Admin {
 public:
-  virtual ~Admin() {}
+  virtual ~Admin() = default;
 
   /**
    * @return const std::string& the admin access log path.
@@ -92,6 +92,11 @@ public:
    * @return Network::Address::InstanceConstSharedPtr the server address.
    */
   virtual Network::Address::InstanceConstSharedPtr address() PURE;
+
+  /**
+   * @return Network::Address::OptionsSharedPtr the list of listener socket options.
+   */
+  virtual Network::Socket::OptionsSharedPtr socketOptions() PURE;
 };
 
 /**
@@ -99,7 +104,7 @@ public:
  */
 class Initial {
 public:
-  virtual ~Initial() {}
+  virtual ~Initial() = default;
 
   /**
    * @return Admin& the admin config.

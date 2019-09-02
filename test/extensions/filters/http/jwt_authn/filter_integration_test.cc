@@ -47,7 +47,8 @@ public:
   HeaderToFilterStateFilterConfig()
       : Common::EmptyHttpFilterConfig(HeaderToFilterStateFilterName) {}
 
-  Http::FilterFactoryCb createFilter(const std::string&, Server::Configuration::FactoryContext&) {
+  Http::FilterFactoryCb createFilter(const std::string&,
+                                     Server::Configuration::FactoryContext&) override {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamDecoderFilter(
           std::make_shared<HeaderToFilterStateFilter>("jwt_selector", "jwt_selector"));
@@ -80,7 +81,7 @@ std::string getFilterConfig(bool use_local_jwks) {
   return getAuthFilterConfig(ExampleConfig, use_local_jwks);
 }
 
-typedef HttpProtocolIntegrationTest LocalJwksIntegrationTest;
+using LocalJwksIntegrationTest = HttpProtocolIntegrationTest;
 
 INSTANTIATE_TEST_SUITE_P(Protocols, LocalJwksIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),

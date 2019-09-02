@@ -10,10 +10,36 @@ The following features have been DEPRECATED and will be removed in the specified
 A logged warning is expected for each deprecated item that is in deprecation window.
 Deprecated items below are listed in chronological order.
 
-Version 1.11.0 (Pending)
+Version 1.12.0 (pending)
 ========================
+* The ORIGINAL_DST_LB :ref:`load balancing policy <envoy_api_field_Cluster.lb_policy>` is
+  deprecated, use CLUSTER_PROVIDED policy instead when configuring an :ref:`original destination
+  cluster <envoy_api_field_Cluster.type>`.
+* The `regex` field in :ref:`StringMatcher <envoy_api_msg_type.matcher.StringMatcher>` has been
+  deprecated in favor of the `safe_regex` field.
+* The `regex` field in :ref:`RouteMatch <envoy_api_msg_route.RouteMatch>` has been
+  deprecated in favor of the `safe_regex` field.
+* The `allow_origin` and `allow_origin_regex` fields in :ref:`CorsPolicy
+  <envoy_api_msg_route.CorsPolicy>` have been deprecated in favor of the
+  `allow_origin_string_match` field.
+* The `pattern` and `method` fields in :ref:`VirtualCluster <envoy_api_msg_route.VirtualCluster>`
+  have been deprecated in favor of the `headers` field.
+* The `regex_match` field in :ref:`HeaderMatcher <envoy_api_msg_route.HeaderMatcher>` has been
+  deprecated in favor of the `safe_regex_match` field.
+* The `value` and `regex` fields in :ref:`QueryParameterMatcher
+  <envoy_api_msg_route.QueryParameterMatcher>` has been deprecated in favor of the `string_match`
+  and `present_match` fields.
+* The :option:`--allow-unknown-fields` command-line option,
+  use :option:`--allow-unknown-static-fields` instead.
+* The use of HTTP_JSON_V1 :ref:`Zipkin collector endpoint version
+  <envoy_api_field_config.trace.v2.ZipkinConfig.collector_endpoint_version>` or not explicitly
+  specifying it is deprecated, use HTTP_JSON or HTTP_PROTO instead.
+
+Version 1.11.0 (July 11, 2019)
+==============================
 * The --max-stats and --max-obj-name-len flags no longer has any effect.
-* Use of :ref:`cluster <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.cluster>` in :ref:`redis_proxy.proto <envoy_api_file_envoy/config/filter/network/redis_proxy/v2/redis_proxy.proto>` is deprecated. Set a :ref:`catch_all_cluster <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.catch_all_cluster>` instead.
+* Use of :ref:`cluster <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.cluster>` in :ref:`redis_proxy.proto <envoy_api_file_envoy/config/filter/network/redis_proxy/v2/redis_proxy.proto>` is deprecated. Set a :ref:`catch_all_route <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.catch_all_route>` instead.
+* Use of :ref:`catch_all_cluster <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.catch_all_cluster>` in :ref:`redis_proxy.proto <envoy_api_file_envoy/config/filter/network/redis_proxy/v2/redis_proxy.proto>` is deprecated. Set a :ref:`catch_all_route <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.catch_all_route>` instead.
 * Use of json based schema in router check tool tests. The tests should follow validation :repo:`schema<test/tools/router_check/validation.proto>`.
 * Use of the v1 style route configuration for the :ref:`TCP proxy filter <config_network_filters_tcp_proxy>`
   is now fully replaced with listener :ref:`filter chain matching <envoy_api_msg_listener.FilterChainMatch>`.

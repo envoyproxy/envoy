@@ -109,6 +109,12 @@ envoy_cc_library(
     deps = [":assert_lib"],
 )
 
+# Contains macros and helpers for dumpState utilities
+envoy_cc_library(
+    name = "dump_state_utils",
+    hdrs = ["dump_state_utils.h"],
+)
+
 # Contains minimal code for logging to stderr.
 envoy_cc_library(
     name = "minimal_logger_lib",
@@ -140,6 +146,7 @@ envoy_cc_library(
     srcs = ["logger_delegates.cc"],
     hdrs = ["logger_delegates.h"],
     deps = [
+        ":dump_state_utils",
         ":macros",
         ":minimal_logger_lib",
         "//include/envoy/access_log:access_log_interface",
@@ -158,12 +165,27 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         ":utility_lib",
+        "//include/envoy/common:matchers_interface",
+        "//source/common/common:regex_lib",
         "//source/common/config:metadata_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/type/matcher:metadata_cc",
         "@envoy_api//envoy/type/matcher:number_cc",
         "@envoy_api//envoy/type/matcher:string_cc",
         "@envoy_api//envoy/type/matcher:value_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "regex_lib",
+    srcs = ["regex.cc"],
+    hdrs = ["regex.h"],
+    deps = [
+        ":assert_lib",
+        "//include/envoy/common:regex_interface",
+        "//source/common/protobuf:utility_lib",
+        "@com_googlesource_code_re2//:re2",
+        "@envoy_api//envoy/type/matcher:regex_cc",
     ],
 )
 
@@ -175,6 +197,15 @@ envoy_cc_library(
 envoy_cc_library(
     name = "phantom",
     hdrs = ["phantom.h"],
+)
+
+envoy_cc_library(
+    name = "scope_tracker",
+    hdrs = ["scope_tracker.h"],
+    deps = [
+        "//include/envoy/common:scope_tracker_interface",
+        "//include/envoy/event:dispatcher_interface",
+    ],
 )
 
 envoy_cc_library(

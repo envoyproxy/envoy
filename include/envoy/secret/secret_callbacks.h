@@ -10,7 +10,7 @@ namespace Secret {
  */
 class SecretCallbacks {
 public:
-  virtual ~SecretCallbacks() {}
+  virtual ~SecretCallbacks() = default;
 
   virtual void onAddOrUpdateSecret() PURE;
 };

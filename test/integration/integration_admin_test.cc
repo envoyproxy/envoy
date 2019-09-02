@@ -1,5 +1,7 @@
 #include "test/integration/integration_admin_test.h"
 
+#include <string>
+
 #include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/config/metrics/v2/stats.pb.h"
 #include "envoy/http/header_map.h"
@@ -289,6 +291,13 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_THAT(response->body(), testing::HasSubstr("added_via_api"));
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
 
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/clusters?format=json",
+                                                "", downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("application/json", ContentType(response));
+  EXPECT_NO_THROW(Json::Factory::loadFromString(response->body()));
+
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST", "/cpuprofiler", "",
                                                 downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
@@ -342,17 +351,34 @@ TEST_P(IntegrationAdminTest, Admin) {
                                                 downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
+  auto listeners = test_server_->server().listenerManager().listeners();
+  auto listener_it = listeners.cbegin();
+  for (; listener_it != listeners.end(); ++listener_it) {
+    EXPECT_THAT(response->body(), testing::HasSubstr(fmt::format(
+                                      "{}::{}", listener_it->get().name(),
+                                      listener_it->get().socket().localAddress()->asString())));
+  }
+
+  response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "GET", "/listeners?format=json", "", downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("application/json", ContentType(response));
 
   json = Json::Factory::loadFromString(response->body());
-  std::vector<Json::ObjectSharedPtr> listener_info = json->asObjectArray();
+  std::vector<Json::ObjectSharedPtr> listener_info = json->getObjectArray("listener_statuses");
   auto listener_info_it = listener_info.cbegin();
-  auto listeners = test_server_->server().listenerManager().listeners();
-  auto listener_it = listeners.cbegin();
+  listeners = test_server_->server().listenerManager().listeners();
+  listener_it = listeners.cbegin();
   for (; listener_info_it != listener_info.end() && listener_it != listeners.end();
        ++listener_info_it, ++listener_it) {
-    EXPECT_EQ(listener_it->get().socket().localAddress()->asString(),
-              (*listener_info_it)->asString());
+    auto local_address = (*listener_info_it)->getObject("local_address");
+    auto socket_address = local_address->getObject("socket_address");
+    EXPECT_EQ(listener_it->get().socket().localAddress()->ip()->addressAsString(),
+              socket_address->getString("address"));
+    EXPECT_EQ(listener_it->get().socket().localAddress()->ip()->port(),
+              socket_address->getInteger("port_value"));
   }
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/config_dump", "",
@@ -367,9 +393,10 @@ TEST_P(IntegrationAdminTest, Admin) {
       "type.googleapis.com/envoy.admin.v2alpha.ClustersConfigDump",
       "type.googleapis.com/envoy.admin.v2alpha.ListenersConfigDump",
       "type.googleapis.com/envoy.admin.v2alpha.ScopedRoutesConfigDump",
-      "type.googleapis.com/envoy.admin.v2alpha.RoutesConfigDump"};
+      "type.googleapis.com/envoy.admin.v2alpha.RoutesConfigDump",
+      "type.googleapis.com/envoy.admin.v2alpha.SecretsConfigDump"};
 
-  for (Json::ObjectSharedPtr obj_ptr : json->getObjectArray("configs")) {
+  for (const Json::ObjectSharedPtr& obj_ptr : json->getObjectArray("configs")) {
     EXPECT_TRUE(expected_types[index].compare(obj_ptr->getString("@type")) == 0);
     index++;
   }
@@ -377,12 +404,16 @@ TEST_P(IntegrationAdminTest, Admin) {
   // Validate we can parse as proto.
   envoy::admin::v2alpha::ConfigDump config_dump;
   TestUtility::loadFromJson(response->body(), config_dump);
-  EXPECT_EQ(5, config_dump.configs_size());
+  EXPECT_EQ(6, config_dump.configs_size());
 
   // .. and that we can unpack one of the entries.
   envoy::admin::v2alpha::RoutesConfigDump route_config_dump;
   config_dump.configs(4).UnpackTo(&route_config_dump);
   EXPECT_EQ("route_config_0", route_config_dump.static_route_configs(0).route_config().name());
+
+  envoy::admin::v2alpha::SecretsConfigDump secret_config_dump;
+  config_dump.configs(5).UnpackTo(&secret_config_dump);
+  EXPECT_EQ("secret_static_0", secret_config_dump.static_secrets(0).name());
 }
 
 TEST_P(IntegrationAdminTest, AdminOnDestroyCallbacks) {
@@ -469,9 +500,14 @@ TEST_F(IntegrationAdminIpv4Ipv6Test, Ipv4Ipv6Listen) {
 
 // Testing the behavior of StatsMatcher, which allows/denies the  instantiation of stats based on
 // restrictions on their names.
+//
+// Note: using 'Event::TestUsingSimulatedTime' appears to conflict with LDS in
+// StatsMatcherIntegrationTest.IncludeExact, which manifests in a coverage test
+// crash, which is really difficult to debug. See #7215. It's possible this is
+// due to a bad interaction between the wait-for constructs in the integration
+// test framework with sim-time.
 class StatsMatcherIntegrationTest
     : public testing::Test,
-      public Event::TestUsingSimulatedTime,
       public HttpIntegrationTest,
       public testing::WithParamInterface<Network::Address::IpVersion> {
 public:
@@ -506,21 +542,21 @@ TEST_P(StatsMatcherIntegrationTest, ExcludePrefixServerDot) {
   EXPECT_THAT(response_->body(), testing::Not(testing::HasSubstr("server.")));
 }
 
-TEST_P(StatsMatcherIntegrationTest, ExcludeRequests) {
+TEST_P(StatsMatcherIntegrationTest, DEPRECATED_FEATURE_TEST(ExcludeRequests)) {
   stats_matcher_.mutable_exclusion_list()->add_patterns()->set_regex(".*requests.*");
   initialize();
   makeRequest();
   EXPECT_THAT(response_->body(), testing::Not(testing::HasSubstr("requests")));
 }
 
-TEST_P(StatsMatcherIntegrationTest, ExcludeExact) {
+TEST_P(StatsMatcherIntegrationTest, DEPRECATED_FEATURE_TEST(ExcludeExact)) {
   stats_matcher_.mutable_exclusion_list()->add_patterns()->set_exact("server.concurrency");
   initialize();
   makeRequest();
   EXPECT_THAT(response_->body(), testing::Not(testing::HasSubstr("server.concurrency")));
 }
 
-TEST_P(StatsMatcherIntegrationTest, ExcludeMultipleExact) {
+TEST_P(StatsMatcherIntegrationTest, DEPRECATED_FEATURE_TEST(ExcludeMultipleExact)) {
   stats_matcher_.mutable_exclusion_list()->add_patterns()->set_exact("server.concurrency");
   stats_matcher_.mutable_exclusion_list()->add_patterns()->set_regex(".*live");
   initialize();
@@ -533,7 +569,9 @@ TEST_P(StatsMatcherIntegrationTest, ExcludeMultipleExact) {
 // `listener_manager.listener_create_success` must be instantiated, because BaseIntegrationTest
 // blocks on its creation (see waitForCounterGe and the suite of waitFor* functions).
 // If this invariant is changed, this test must be rewritten.
-TEST_P(StatsMatcherIntegrationTest, IncludeExact) {
+TEST_P(StatsMatcherIntegrationTest, DEPRECATED_FEATURE_TEST(IncludeExact)) {
+  // Stats matching does not play well with LDS, at least in test. See #7215.
+  use_lds_ = false;
   stats_matcher_.mutable_inclusion_list()->add_patterns()->set_exact(
       "listener_manager.listener_create_success");
   initialize();

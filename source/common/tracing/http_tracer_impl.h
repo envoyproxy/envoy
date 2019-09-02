@@ -41,6 +41,7 @@ public:
   // Non-standard tag names.
   const std::string DownstreamCluster = "downstream_cluster";
   const std::string GrpcStatusCode = "grpc.status_code";
+  const std::string GrpcMessage = "grpc.message";
   const std::string GuidXClientTraceId = "guid:x-client-trace-id";
   const std::string GuidXRequestId = "guid:x-request-id";
   const std::string HttpProtocol = "http.protocol";
@@ -59,7 +60,7 @@ public:
   const std::string True = "true";
 };
 
-typedef ConstSingleton<TracingTagValues> Tags;
+using Tags = ConstSingleton<TracingTagValues>;
 
 class TracingLogValues {
 public:
@@ -76,7 +77,7 @@ public:
   const std::string LastDownstreamTxByteSent = "last_downstream_tx_byte_sent";
 };
 
-typedef ConstSingleton<TracingLogValues> Logs;
+using Logs = ConstSingleton<TracingLogValues>;
 
 class HttpTracerUtility {
 public:
@@ -101,6 +102,8 @@ public:
    * 2) Finish active span.
    */
   static void finalizeSpan(Span& span, const Http::HeaderMap* request_headers,
+                           const Http::HeaderMap* response_headers,
+                           const Http::HeaderMap* response_trailers,
                            const StreamInfo::StreamInfo& stream_info, const Config& tracing_config);
 
   static const std::string IngressOperation;
@@ -120,7 +123,7 @@ private:
   const std::vector<Http::LowerCaseString> request_headers_for_tags_{};
 };
 
-typedef ConstSingleton<EgressConfigImpl> EgressConfig;
+using EgressConfig = ConstSingleton<EgressConfigImpl>;
 
 class NullSpan : public Span {
 public:

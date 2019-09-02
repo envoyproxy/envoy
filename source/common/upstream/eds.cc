@@ -3,7 +3,6 @@
 #include "envoy/api/v2/eds.pb.validate.h"
 
 #include "common/common/utility.h"
-#include "common/config/subscription_factory.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -19,16 +18,15 @@ EdsClusterImpl::EdsClusterImpl(
                         ? cluster.name()
                         : cluster.eds_cluster_config().service_name()),
       validation_visitor_(factory_context.messageValidationVisitor()) {
-  Config::Utility::checkLocalInfo("eds", local_info_);
   Event::Dispatcher& dispatcher = factory_context.dispatcher();
-  Runtime::RandomGenerator& random = factory_context.random();
-  Upstream::ClusterManager& cm = factory_context.clusterManager();
   assignment_timeout_ = dispatcher.createTimer([this]() -> void { onAssignmentTimeout(); });
   const auto& eds_config = cluster.eds_cluster_config().eds_config();
-  subscription_ = Config::SubscriptionFactory::subscriptionFromConfigSource(
-      eds_config, local_info_, dispatcher, cm, random, info_->statsScope(),
-      Grpc::Common::typeUrl(envoy::api::v2::ClusterLoadAssignment().GetDescriptor()->full_name()),
-      factory_context.messageValidationVisitor(), factory_context.api(), *this);
+  subscription_ =
+      factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
+          eds_config,
+          Grpc::Common::typeUrl(
+              envoy::api::v2::ClusterLoadAssignment().GetDescriptor()->full_name()),
+          info_->statsScope(), *this);
 }
 
 void EdsClusterImpl::startPreInit() { subscription_->start({cluster_name_}); }
@@ -103,9 +101,9 @@ void EdsClusterImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt
   if (!validateUpdateSize(resources.size())) {
     return;
   }
-  auto cluster_load_assignment = MessageUtil::anyConvert<envoy::api::v2::ClusterLoadAssignment>(
-      resources[0], validation_visitor_);
-  MessageUtil::validate(cluster_load_assignment);
+  auto cluster_load_assignment =
+      MessageUtil::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resources[0]);
+  MessageUtil::validate(cluster_load_assignment, validation_visitor_);
   if (cluster_load_assignment.cluster_name() != cluster_name_) {
     throw EnvoyException(fmt::format("Unexpected EDS cluster (expecting {}): {}", cluster_name_,
                                      cluster_load_assignment.cluster_name()));
@@ -253,8 +251,13 @@ bool EdsClusterImpl::updateHostsPerLocality(
   return false;
 }
 
-void EdsClusterImpl::onConfigUpdateFailed(const EnvoyException* e) {
-  UNREFERENCED_PARAMETER(e);
+void EdsClusterImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
+                                          const EnvoyException*) {
+  //  We should not call onPreInitComplete if this method is called because of stream disconnection.
+  // This might potentially hang the initialization forever, if init_fetch_timeout is disabled.
+  if (reason == Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure) {
+    return;
+  }
   // We need to allow server startup to continue, even if we have a bad config.
   onPreInitComplete();
 }

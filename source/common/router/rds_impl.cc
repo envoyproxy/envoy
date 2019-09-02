@@ -30,8 +30,8 @@ RouteConfigProviderPtr RouteConfigProviderUtil::create(
     return route_config_provider_manager.createStaticRouteConfigProvider(config.route_config(),
                                                                          factory_context);
   case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::kRds:
-    return route_config_provider_manager.createRdsRouteConfigProvider(config.rds(), factory_context,
-                                                                      stat_prefix);
+    return route_config_provider_manager.createRdsRouteConfigProvider(
+        config.rds(), factory_context, stat_prefix, factory_context.initManager());
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
@@ -65,13 +65,11 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
       route_config_provider_manager_(route_config_provider_manager),
       manager_identifier_(manager_identifier),
       validation_visitor_(factory_context_.messageValidationVisitor()) {
-  Envoy::Config::Utility::checkLocalInfo("rds", factory_context.localInfo());
-
-  subscription_ = Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource(
-      rds.config_source(), factory_context.localInfo(), factory_context.dispatcher(),
-      factory_context.clusterManager(), factory_context.random(), *scope_,
-      Grpc::Common::typeUrl(envoy::api::v2::RouteConfiguration().GetDescriptor()->full_name()),
-      factory_context.messageValidationVisitor(), factory_context.api(), *this);
+  subscription_ =
+      factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
+          rds.config_source(),
+          Grpc::Common::typeUrl(envoy::api::v2::RouteConfiguration().GetDescriptor()->full_name()),
+          *scope_, *this);
 
   config_update_info_ = std::make_unique<RouteConfigUpdateReceiverImpl>(
       factory_context.timeSource(), factory_context.messageValidationVisitor());
@@ -94,12 +92,16 @@ void RdsRouteConfigSubscription::onConfigUpdate(
   if (!validateUpdateSize(resources.size())) {
     return;
   }
-  auto route_config = MessageUtil::anyConvert<envoy::api::v2::RouteConfiguration>(
-      resources[0], validation_visitor_);
-  MessageUtil::validate(route_config);
+  auto route_config = MessageUtil::anyConvert<envoy::api::v2::RouteConfiguration>(resources[0]);
+  MessageUtil::validate(route_config, validation_visitor_);
   if (route_config.name() != route_config_name_) {
     throw EnvoyException(fmt::format("Unexpected RDS configuration (expecting {}): {}",
                                      route_config_name_, route_config.name()));
+  }
+  for (auto* provider : route_config_providers_) {
+    // This seems inefficient, though it is necessary to validate config in each context,
+    // especially when it comes with per_filter_config,
+    provider->validateConfig(route_config);
   }
 
   if (config_update_info_->onRdsUpdate(route_config, version_info)) {
@@ -122,6 +124,7 @@ void RdsRouteConfigSubscription::onConfigUpdate(
       }
       vhds_subscription_.release();
     }
+    update_callback_manager_.runCallbacks();
   }
 
   init_target_.ready();
@@ -129,8 +132,7 @@ void RdsRouteConfigSubscription::onConfigUpdate(
 
 void RdsRouteConfigSubscription::onConfigUpdate(
     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
-    const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-    const std::string& system_version_info) {
+    const Protobuf::RepeatedPtrField<std::string>& removed_resources, const std::string&) {
   if (!removed_resources.empty()) {
     // TODO(#2500) when on-demand resource loading is supported, an RDS removal may make sense (see
     // discussion in #6879), and so we should do something other than ignoring here.
@@ -139,17 +141,15 @@ void RdsRouteConfigSubscription::onConfigUpdate(
         "Server sent a delta RDS update attempting to remove a resource (name: {}). Ignoring.",
         removed_resources[0]);
   }
-  Protobuf::RepeatedPtrField<ProtobufWkt::Any> unwrapped_resource;
   if (!added_resources.empty()) {
+    Protobuf::RepeatedPtrField<ProtobufWkt::Any> unwrapped_resource;
     *unwrapped_resource.Add() = added_resources[0].resource();
     onConfigUpdate(unwrapped_resource, added_resources[0].version());
-  } else {
-    onConfigUpdate({}, system_version_info);
-    return;
   }
 }
 
-void RdsRouteConfigSubscription::onConfigUpdateFailed(const EnvoyException*) {
+void RdsRouteConfigSubscription::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason,
+                                                      const EnvoyException*) {
   // We need to allow server startup to continue, even if we have a bad
   // config.
   init_target_.ready();
@@ -203,6 +203,12 @@ void RdsRouteConfigProviderImpl::onConfigUpdate() {
       [this, new_config]() -> void { tls_->getTyped<ThreadLocalConfig>().config_ = new_config; });
 }
 
+void RdsRouteConfigProviderImpl::validateConfig(
+    const envoy::api::v2::RouteConfiguration& config) const {
+  // TODO(lizan): consider cache the config here until onConfigUpdate.
+  ConfigImpl validation_config(config, factory_context_, false);
+}
+
 RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(Server::Admin& admin) {
   config_tracker_entry_ =
       admin.getConfigTracker().add("routes", [this] { return dumpRouteConfigs(); });
@@ -213,8 +219,8 @@ RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(Server::Admin& ad
 
 Router::RouteConfigProviderPtr RouteConfigProviderManagerImpl::createRdsRouteConfigProvider(
     const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
-    Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix) {
-
+    Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
+    Init::Manager& init_manager) {
   // RdsRouteConfigSubscriptions are unique based on their serialized RDS config.
   const uint64_t manager_identifier = MessageUtil::hash(rds);
 
@@ -227,9 +233,7 @@ Router::RouteConfigProviderPtr RouteConfigProviderManagerImpl::createRdsRouteCon
     // of simplicity.
     subscription.reset(new RdsRouteConfigSubscription(rds, manager_identifier, factory_context,
                                                       stat_prefix, *this));
-
-    factory_context.initManager().add(subscription->init_target_);
-
+    init_manager.add(subscription->init_target_);
     route_config_subscriptions_.insert({manager_identifier, subscription});
   } else {
     // Because the RouteConfigProviderManager's weak_ptrs only get cleaned up

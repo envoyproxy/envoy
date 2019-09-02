@@ -3,6 +3,7 @@
 #include "envoy/api/api.h"
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/protobuf/message_validator.h"
 #include "envoy/server/resource_monitor.h"
 
 #include "common/protobuf/protobuf.h"
@@ -13,7 +14,7 @@ namespace Configuration {
 
 class ResourceMonitorFactoryContext {
 public:
-  virtual ~ResourceMonitorFactoryContext() {}
+  virtual ~ResourceMonitorFactoryContext() = default;
 
   /**
    * @return Event::Dispatcher& the main thread's dispatcher. This dispatcher should be used
@@ -25,6 +26,12 @@ public:
    * @return reference to the Api object
    */
   virtual Api::Api& api() PURE;
+
+  /**
+   * @return ProtobufMessage::ValidationVisitor& validation visitor for filter configuration
+   *         messages.
+   */
+  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
 };
 
 /**
@@ -33,7 +40,7 @@ public:
  */
 class ResourceMonitorFactory {
 public:
-  virtual ~ResourceMonitorFactory() {}
+  virtual ~ResourceMonitorFactory() = default;
 
   /**
    * Create a particular resource monitor implementation.

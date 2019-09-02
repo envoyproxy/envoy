@@ -31,7 +31,7 @@ const ProtobufWkt::Struct& getMetadata(Http::StreamFilterCallbacks* callbacks) {
  */
 class FilterCallbacks {
 public:
-  virtual ~FilterCallbacks() {}
+  virtual ~FilterCallbacks() = default;
 
   /**
    * Add data to the connection manager buffer.
@@ -305,7 +305,7 @@ private:
   uint64_t response_function_slot_;
 };
 
-typedef std::shared_ptr<FilterConfig> FilterConfigConstSharedPtr;
+using FilterConfigConstSharedPtr = std::shared_ptr<FilterConfig>;
 
 // TODO(mattklein123): Filter stats.
 
@@ -400,7 +400,7 @@ private:
     Http::StreamEncoderFilterCallbacks* callbacks_{};
   };
 
-  typedef Filters::Common::Lua::LuaDeathRef<StreamHandleWrapper> StreamHandleRef;
+  using StreamHandleRef = Filters::Common::Lua::LuaDeathRef<StreamHandleWrapper>;
 
   Http::FilterHeadersStatus doHeaders(StreamHandleRef& handle,
                                       Filters::Common::Lua::CoroutinePtr& coroutine,

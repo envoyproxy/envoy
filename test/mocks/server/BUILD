@@ -26,6 +26,7 @@ envoy_cc_mock(
         "//include/envoy/server:worker_interface",
         "//include/envoy/ssl:context_manager_interface",
         "//include/envoy/upstream:health_checker_interface",
+        "//source/common/grpc:context_lib",
         "//source/common/http:context_lib",
         "//source/common/secret:secret_manager_impl_lib",
         "//source/common/singleton:manager_impl_lib",
@@ -37,6 +38,7 @@ envoy_cc_mock(
         "//test/mocks/init:init_mocks",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
@@ -44,5 +46,6 @@ envoy_cc_mock(
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:test_time_lib",
+        "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
     ],
 )

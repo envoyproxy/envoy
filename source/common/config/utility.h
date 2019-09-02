@@ -50,7 +50,7 @@ struct RateLimitSettings {
   bool enabled_{false};
 };
 
-typedef ConstSingleton<ApiTypeValues> ApiType;
+using ApiType = ConstSingleton<ApiTypeValues>;
 
 /**
  * General config API utilities.
@@ -110,7 +110,7 @@ public:
    * @param cluster_name supplies the cluster name to check.
    * @param cm supplies the cluster manager.
    */
-  static void checkCluster(const std::string& error_prefix, const std::string& cluster_name,
+  static void checkCluster(absl::string_view error_prefix, absl::string_view cluster_name,
                            Upstream::ClusterManager& cm);
 
   /**
@@ -120,9 +120,8 @@ public:
    * @param cm supplies the cluster manager.
    * @param local_info supplies the local info.
    */
-  static void checkClusterAndLocalInfo(const std::string& error_prefix,
-                                       const std::string& cluster_name,
-                                       Upstream::ClusterManager& cm,
+  static void checkClusterAndLocalInfo(absl::string_view error_prefix,
+                                       absl::string_view cluster_name, Upstream::ClusterManager& cm,
                                        const LocalInfo::LocalInfo& local_info);
 
   /**
@@ -130,7 +129,7 @@ public:
    * @param error_prefix supplies the prefix to use in error messages.
    * @param local_info supplies the local info.
    */
-  static void checkLocalInfo(const std::string& error_prefix,
+  static void checkLocalInfo(absl::string_view error_prefix,
                              const LocalInfo::LocalInfo& local_info);
 
   /**
@@ -292,6 +291,26 @@ public:
    * Return whether v1-style JSON filter config loading is allowed via 'deprecated_v1: true'.
    */
   static bool allowDeprecatedV1Config(Runtime::Loader& runtime, const Json::Object& config);
+
+  /**
+   * Verify any any filter designed to be terminal is configured to be terminal, and vice versa.
+   * @param name the name of the filter.
+   * @param name the type of filter.
+   * @param is_terminal_filter true if the filter is designed to be terminal.
+   * @param last_filter_in_current_config true if the filter is last in the configuration.
+   * @throws EnvoyException if there is a mismatch between design and configuration.
+   */
+  static void validateTerminalFilters(const std::string& name, const char* filter_type,
+                                      bool is_terminal_filter, bool last_filter_in_current_config) {
+    if (is_terminal_filter && !last_filter_in_current_config) {
+      throw EnvoyException(
+          fmt::format("Error: {} must be the terminal {} filter.", name, filter_type));
+    } else if (!is_terminal_filter && last_filter_in_current_config) {
+      throw EnvoyException(
+          fmt::format("Error: non-terminal filter {} is the last filter in a {} filter chain.",
+                      name, filter_type));
+    }
+  }
 };
 
 } // namespace Config

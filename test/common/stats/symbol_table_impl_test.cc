@@ -74,8 +74,8 @@ protected:
   std::unique_ptr<StatNamePool> pool_;
 };
 
-INSTANTIATE_TEST_CASE_P(StatNameTest, StatNameTest,
-                        testing::ValuesIn({SymbolTableType::Real, SymbolTableType::Fake}));
+INSTANTIATE_TEST_SUITE_P(StatNameTest, StatNameTest,
+                         testing::ValuesIn({SymbolTableType::Real, SymbolTableType::Fake}));
 
 TEST_P(StatNameTest, AllocFree) { encodeDecode("hello.world"); }
 
@@ -319,10 +319,10 @@ TEST_P(StatNameTest, HashTable) {
 }
 
 TEST_P(StatNameTest, Sort) {
-  std::vector<StatName> names{makeStat("a.c"),   makeStat("a.b"), makeStat("d.e"),
-                              makeStat("d.a.a"), makeStat("d.a"), makeStat("a.c")};
-  const std::vector<StatName> sorted_names{makeStat("a.b"), makeStat("a.c"),   makeStat("a.c"),
-                                           makeStat("d.a"), makeStat("d.a.a"), makeStat("d.e")};
+  StatNameVec names{makeStat("a.c"),   makeStat("a.b"), makeStat("d.e"),
+                    makeStat("d.a.a"), makeStat("d.a"), makeStat("a.c")};
+  const StatNameVec sorted_names{makeStat("a.b"), makeStat("a.c"),   makeStat("a.c"),
+                                 makeStat("d.a"), makeStat("d.a.a"), makeStat("d.e")};
   EXPECT_NE(names, sorted_names);
   std::sort(names.begin(), names.end(), StatNameLessThan(*table_));
   EXPECT_EQ(names, sorted_names);
@@ -537,24 +537,44 @@ TEST_P(StatNameTest, SharedStatNameStorageSetSwap) {
   set2.free(*table_);
 }
 
+TEST_P(StatNameTest, StatNameSet) {
+  StatNameSet set(*table_);
+
+  // Test that we get a consistent StatName object from a remembered name.
+  set.rememberBuiltin("remembered");
+  const Stats::StatName remembered = set.getStatName("remembered");
+  EXPECT_EQ("remembered", table_->toString(remembered));
+  EXPECT_EQ(remembered.data(), set.getStatName("remembered").data());
+
+  // Same test for a dynamically allocated name. The only difference between
+  // the behavior with a remembered vs dynamic name is that when looking
+  // up a remembered name, a mutex is not taken. But we have no easy way
+  // to test for that. So we'll at least cover the code.
+  const Stats::StatName dynamic = set.getStatName("dynamic");
+  EXPECT_EQ("dynamic", table_->toString(dynamic));
+  EXPECT_EQ(dynamic.data(), set.getStatName("dynamic").data());
+
+  // There's another corner case for the same "dynamic" name from a
+  // different set. Here we will get a different StatName object
+  // out of the second set, though it will share the same underlying
+  // symbol-table symbol.
+  StatNameSet set2(*table_);
+  const Stats::StatName dynamic2 = set2.getStatName("dynamic");
+  EXPECT_EQ("dynamic", table_->toString(dynamic2));
+  EXPECT_EQ(dynamic2.data(), set2.getStatName("dynamic").data());
+  EXPECT_NE(dynamic2.data(), dynamic.data());
+}
+
 // Tests the memory savings realized from using symbol tables with 1k
 // clusters. This test shows the memory drops from almost 8M to less than
 // 2M. Note that only SymbolTableImpl is tested for memory consumption,
 // and not FakeSymbolTableImpl.
 TEST(SymbolTableTest, Memory) {
-  if (!TestUtil::hasDeterministicMallocStats()) {
-    return;
-  }
-
   // Tests a stat-name allocation strategy.
   auto test_memory_usage = [](std::function<void(absl::string_view)> fn) -> size_t {
-    const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
+    TestUtil::MemoryTest memory_test;
     TestUtil::forEachSampleStat(1000, fn);
-    const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
-    if (end_mem != 0) { // See warning below for asan, tsan, and mac.
-      EXPECT_GT(end_mem, start_mem);
-    }
-    return end_mem - start_mem;
+    return memory_test.consumedBytes();
   };
 
   size_t string_mem_used, symbol_table_mem_used;
@@ -575,20 +595,13 @@ TEST(SymbolTableTest, Memory) {
     }
   }
 
-  // This test only works if Memory::Stats::totalCurrentlyAllocated() works, which
-  // appears not to be the case in some tests, including asan, tsan, and mac.
-  if (Memory::Stats::totalCurrentlyAllocated() == 0) {
-    ENVOY_LOG_MISC(info,
-                   "SymbolTableTest.Memory comparison skipped due to malloc-stats returning 0.");
-  } else {
-    // Make sure we don't regress. Data as of 2019/05/29:
-    //
-    // string_mem_used:        6710912 (libc++), 7759488 (libstdc++).
-    // symbol_table_mem_used:  1726056 (3.9x) -- does not seem to depend on STL sizes.
-    EXPECT_LE(string_mem_used, 7759488);
-    EXPECT_LT(symbol_table_mem_used, string_mem_used / 3);
-    EXPECT_EQ(symbol_table_mem_used, 1726056);
-  }
+  // Make sure we don't regress. Data as of 2019/05/29:
+  //
+  // string_mem_used:        6710912 (libc++), 7759488 (libstdc++).
+  // symbol_table_mem_used:  1726056 (3.9x) -- does not seem to depend on STL sizes.
+  EXPECT_MEMORY_LE(string_mem_used, 7759488);
+  EXPECT_MEMORY_LE(symbol_table_mem_used, string_mem_used / 3);
+  EXPECT_MEMORY_EQ(symbol_table_mem_used, 1726056);
 }
 
 } // namespace Stats

@@ -53,7 +53,7 @@ public:
   ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
                  TransportSocketPtr&& transport_socket, bool connected);
 
-  ~ConnectionImpl();
+  ~ConnectionImpl() override;
 
   // Network::FilterManager
   void addWriteFilter(WriteFilterSharedPtr filter) override;
@@ -146,6 +146,8 @@ protected:
   Buffer::OwnedImpl read_buffer_;
   // This must be a WatermarkBuffer, but as it is created by a factory the ConnectionImpl only has
   // a generic pointer.
+  // It MUST be defined after the filter_manager_ as some filters may have callbacks that
+  // write_buffer_ invokes during its clean up.
   Buffer::InstancePtr write_buffer_;
   uint32_t read_buffer_limit_ = 0;
   std::chrono::milliseconds delayed_close_timeout_{0};

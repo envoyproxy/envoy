@@ -6,6 +6,7 @@
 #include "envoy/api/v2/auth/cert.pb.h"
 #include "envoy/api/v2/core/config_source.pb.h"
 #include "envoy/config/subscription.h"
+#include "envoy/config/subscription_factory.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/init/manager.h"
 #include "envoy/local_info/local_info.h"
@@ -18,6 +19,7 @@
 
 #include "common/common/callback_impl.h"
 #include "common/common/cleanup.h"
+#include "common/config/utility.h"
 #include "common/init/target_impl.h"
 #include "common/ssl/certificate_validation_context_config_impl.h"
 #include "common/ssl/tls_certificate_config_impl.h"
@@ -30,23 +32,18 @@ namespace Secret {
  */
 class SdsApi : public Config::SubscriptionCallbacks {
 public:
-  SdsApi(const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
-         Runtime::RandomGenerator& random, Stats::Store& stats,
-         Upstream::ClusterManager& cluster_manager, Init::Manager& init_manager,
-         const envoy::api::v2::core::ConfigSource& sds_config, const std::string& sds_config_name,
-         std::function<void()> destructor_cb,
-         ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
+  struct SecretData {
+    const std::string resource_name_;
+    std::string version_info_;
+    SystemTime last_updated_;
+  };
 
-  // Config::SubscriptionCallbacks
-  void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
-                      const std::string& version_info) override;
-  void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>&,
-                      const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override;
-  void onConfigUpdateFailed(const EnvoyException* e) override;
-  std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::api::v2::auth::Secret>(resource, validation_visitor_)
-        .name();
-  }
+  SdsApi(envoy::api::v2::core::ConfigSource sds_config, absl::string_view sds_config_name,
+         Config::SubscriptionFactory& subscription_factory, TimeSource& time_source,
+         ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
+         Init::Manager& init_manager, std::function<void()> destructor_cb);
+
+  SecretData secretData();
 
 protected:
   // Creates new secrets.
@@ -54,15 +51,22 @@ protected:
   virtual void validateConfig(const envoy::api::v2::auth::Secret&) PURE;
   Common::CallbackManager<> update_callback_manager_;
 
+  // Config::SubscriptionCallbacks
+  void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                      const std::string& version_info) override;
+  void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>&,
+                      const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override;
+  void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
+                            const EnvoyException* e) override;
+  std::string resourceName(const ProtobufWkt::Any& resource) override {
+    return MessageUtil::anyConvert<envoy::api::v2::auth::Secret>(resource).name();
+  }
+
 private:
   void validateUpdateSize(int num_resources);
   void initialize();
   Init::TargetImpl init_target_;
-  const LocalInfo::LocalInfo& local_info_;
-  Event::Dispatcher& dispatcher_;
-  Runtime::RandomGenerator& random_;
   Stats::Store& stats_;
-  Upstream::ClusterManager& cluster_manager_;
 
   const envoy::api::v2::core::ConfigSource sds_config_;
   std::unique_ptr<Config::Subscription> subscription_;
@@ -71,14 +75,16 @@ private:
   uint64_t secret_hash_;
   Cleanup clean_up_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
-  Api::Api& api_;
+  Config::SubscriptionFactory& subscription_factory_;
+  TimeSource& time_source_;
+  SecretData secret_data_;
 };
 
 class TlsCertificateSdsApi;
 class CertificateValidationContextSdsApi;
-typedef std::shared_ptr<TlsCertificateSdsApi> TlsCertificateSdsApiSharedPtr;
-typedef std::shared_ptr<CertificateValidationContextSdsApi>
-    CertificateValidationContextSdsApiSharedPtr;
+using TlsCertificateSdsApiSharedPtr = std::shared_ptr<TlsCertificateSdsApi>;
+using CertificateValidationContextSdsApiSharedPtr =
+    std::shared_ptr<CertificateValidationContextSdsApi>;
 
 /**
  * TlsCertificateSdsApi implementation maintains and updates dynamic TLS certificate secrets.
@@ -89,22 +95,23 @@ public:
   create(Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
          const envoy::api::v2::core::ConfigSource& sds_config, const std::string& sds_config_name,
          std::function<void()> destructor_cb) {
+    // We need to do this early as we invoke the subscription factory during initialization, which
+    // is too late to throw.
+    Config::Utility::checkLocalInfo("TlsCertificateSdsApi", secret_provider_context.localInfo());
     return std::make_shared<TlsCertificateSdsApi>(
-        secret_provider_context.localInfo(), secret_provider_context.dispatcher(),
-        secret_provider_context.random(), secret_provider_context.stats(),
-        secret_provider_context.clusterManager(), *secret_provider_context.initManager(),
-        sds_config, sds_config_name, destructor_cb,
-        secret_provider_context.messageValidationVisitor(), secret_provider_context.api());
+        sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
+        secret_provider_context.dispatcher().timeSource(),
+        secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
+        *secret_provider_context.initManager(), destructor_cb);
   }
 
-  TlsCertificateSdsApi(const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
-                       Runtime::RandomGenerator& random, Stats::Store& stats,
-                       Upstream::ClusterManager& cluster_manager, Init::Manager& init_manager,
-                       const envoy::api::v2::core::ConfigSource& sds_config,
-                       const std::string& sds_config_name, std::function<void()> destructor_cb,
-                       ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
-      : SdsApi(local_info, dispatcher, random, stats, cluster_manager, init_manager, sds_config,
-               sds_config_name, destructor_cb, validation_visitor, api) {}
+  TlsCertificateSdsApi(const envoy::api::v2::core::ConfigSource& sds_config,
+                       const std::string& sds_config_name,
+                       Config::SubscriptionFactory& subscription_factory, TimeSource& time_source,
+                       ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
+                       Init::Manager& init_manager, std::function<void()> destructor_cb)
+      : SdsApi(sds_config, sds_config_name, subscription_factory, time_source, validation_visitor,
+               stats, init_manager, std::move(destructor_cb)) {}
 
   // SecretProvider
   const envoy::api::v2::auth::TlsCertificate* secret() const override {
@@ -136,22 +143,25 @@ public:
   create(Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
          const envoy::api::v2::core::ConfigSource& sds_config, const std::string& sds_config_name,
          std::function<void()> destructor_cb) {
+    // We need to do this early as we invoke the subscription factory during initialization, which
+    // is too late to throw.
+    Config::Utility::checkLocalInfo("CertificateValidationContextSdsApi",
+                                    secret_provider_context.localInfo());
     return std::make_shared<CertificateValidationContextSdsApi>(
-        secret_provider_context.localInfo(), secret_provider_context.dispatcher(),
-        secret_provider_context.random(), secret_provider_context.stats(),
-        secret_provider_context.clusterManager(), *secret_provider_context.initManager(),
-        sds_config, sds_config_name, destructor_cb,
-        secret_provider_context.messageValidationVisitor(), secret_provider_context.api());
+        sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
+        secret_provider_context.dispatcher().timeSource(),
+        secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
+        *secret_provider_context.initManager(), destructor_cb);
   }
-  CertificateValidationContextSdsApi(
-      const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
-      Runtime::RandomGenerator& random, Stats::Store& stats,
-      Upstream::ClusterManager& cluster_manager, Init::Manager& init_manager,
-      const envoy::api::v2::core::ConfigSource& sds_config, std::string sds_config_name,
-      std::function<void()> destructor_cb, ProtobufMessage::ValidationVisitor& validation_visitor,
-      Api::Api& api)
-      : SdsApi(local_info, dispatcher, random, stats, cluster_manager, init_manager, sds_config,
-               sds_config_name, destructor_cb, validation_visitor, api) {}
+  CertificateValidationContextSdsApi(const envoy::api::v2::core::ConfigSource& sds_config,
+                                     const std::string& sds_config_name,
+                                     Config::SubscriptionFactory& subscription_factory,
+                                     TimeSource& time_source,
+                                     ProtobufMessage::ValidationVisitor& validation_visitor,
+                                     Stats::Store& stats, Init::Manager& init_manager,
+                                     std::function<void()> destructor_cb)
+      : SdsApi(sds_config, sds_config_name, subscription_factory, time_source, validation_visitor,
+               stats, init_manager, std::move(destructor_cb)) {}
 
   // SecretProvider
   const envoy::api::v2::auth::CertificateValidationContext* secret() const override {

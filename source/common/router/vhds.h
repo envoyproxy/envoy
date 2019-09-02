@@ -20,7 +20,6 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/logger.h"
-#include "common/config/subscription_factory.h"
 #include "common/init/target_impl.h"
 #include "common/protobuf/utility.h"
 
@@ -38,23 +37,18 @@ struct VhdsStats {
   ALL_VHDS_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-typedef std::unique_ptr<Envoy::Config::Subscription> (*SubscriptionFactoryFunction)(
-    const envoy::api::v2::core::ConfigSource&, const LocalInfo::LocalInfo&, Event::Dispatcher&,
-    Upstream::ClusterManager&, Envoy::Runtime::RandomGenerator&, Stats::Scope&, absl::string_view,
-    ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api&,
-    Envoy::Config::SubscriptionCallbacks&);
-
 class VhdsSubscription : Envoy::Config::SubscriptionCallbacks,
                          Logger::Loggable<Logger::Id::router> {
 public:
   VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
                    Server::Configuration::FactoryContext& factory_context,
                    const std::string& stat_prefix,
-                   std::unordered_set<RouteConfigProvider*>& route_config_providers,
-                   SubscriptionFactoryFunction factory_function =
-                       Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource);
+                   std::unordered_set<RouteConfigProvider*>& route_config_providers);
   ~VhdsSubscription() override { init_target_.ready(); }
 
+  void registerInitTargetWithInitManager(Init::Manager& m) { m.add(init_target_); }
+
+private:
   // Config::SubscriptionCallbacks
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>&,
                       const std::string&) override {
@@ -62,13 +56,11 @@ public:
   }
   void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>&,
                       const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override;
-  void onConfigUpdateFailed(const EnvoyException* e) override;
+  void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
+                            const EnvoyException* e) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::api::v2::route::VirtualHost>(resource,
-                                                                       validation_visitor_)
-        .name();
+    return MessageUtil::anyConvert<envoy::api::v2::route::VirtualHost>(resource).name();
   }
-  void registerInitTargetWithInitManager(Init::Manager& m) { m.add(init_target_); }
 
   RouteConfigUpdatePtr& config_update_info_;
   std::unique_ptr<Envoy::Config::Subscription> subscription_;
@@ -76,7 +68,6 @@ public:
   Stats::ScopePtr scope_;
   VhdsStats stats_;
   std::unordered_set<RouteConfigProvider*>& route_config_providers_;
-  ProtobufMessage::ValidationVisitor& validation_visitor_;
 };
 
 using VhdsSubscriptionPtr = std::unique_ptr<VhdsSubscription>;

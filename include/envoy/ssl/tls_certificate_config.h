@@ -4,13 +4,14 @@
 #include <string>
 
 #include "envoy/common/pure.h"
+#include "envoy/ssl/private_key/private_key.h"
 
 namespace Envoy {
 namespace Ssl {
 
 class TlsCertificateConfig {
 public:
-  virtual ~TlsCertificateConfig() {}
+  virtual ~TlsCertificateConfig() = default;
 
   /**
    * @return a string of certificate chain.
@@ -35,6 +36,11 @@ public:
   virtual const std::string& privateKeyPath() const PURE;
 
   /**
+   * @return private key method provider.
+   */
+  virtual Envoy::Ssl::PrivateKeyMethodProviderSharedPtr privateKeyMethod() const PURE;
+
+  /**
    * @return a string of password.
    */
   virtual const std::string& password() const PURE;
@@ -46,7 +52,7 @@ public:
   virtual const std::string& passwordPath() const PURE;
 };
 
-typedef std::unique_ptr<TlsCertificateConfig> TlsCertificateConfigPtr;
+using TlsCertificateConfigPtr = std::unique_ptr<TlsCertificateConfig>;
 
 } // namespace Ssl
 } // namespace Envoy

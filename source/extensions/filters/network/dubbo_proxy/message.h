@@ -5,15 +5,46 @@
 
 #include "envoy/common/pure.h"
 
+#include "common/buffer/buffer_impl.h"
+
+#include "absl/types/optional.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
 
+/**
+ * Stream reset reasons.
+ */
+enum class StreamResetReason : uint8_t {
+  // If a local codec level reset was sent on the stream.
+  LocalReset,
+  // If a local codec level refused stream reset was sent on the stream (allowing for retry).
+  LocalRefusedStreamReset,
+  // If a remote codec level reset was received on the stream.
+  RemoteReset,
+  // If a remote codec level refused stream reset was received on the stream (allowing for retry).
+  RemoteRefusedStreamReset,
+  // If the stream was locally reset by a connection pool due to an initial connection failure.
+  ConnectionFailure,
+  // If the stream was locally reset due to connection termination.
+  ConnectionTermination,
+  // The stream was reset because of a resource overflow.
+  Overflow
+};
+
+// Supported protocol type
+enum class ProtocolType : uint8_t {
+  Dubbo = 1,
+
+  // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST PROTOCOL TYPE
+  LastProtocolType = Dubbo,
+};
+
 // Supported serialization type
 enum class SerializationType : uint8_t {
-  Hessian = 2,
-  Json = 6,
+  Hessian2 = 2,
 };
 
 // Message Type
@@ -22,9 +53,11 @@ enum class MessageType : uint8_t {
   Request = 1,
   Oneway = 2,
   Exception = 3,
+  HeartbeatRequest = 4,
+  HeartbeatResponse = 5,
 
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST MESSAGE TYPE
-  LastMessageType = Exception,
+  LastMessageType = HeartbeatResponse,
 };
 
 /**
@@ -53,32 +86,58 @@ enum class RpcResponseType : uint8_t {
   ResponseNullValueWithAttachments = 5,
 };
 
-class Message {
+class Context {
 public:
-  virtual ~Message() {}
-  virtual MessageType messageType() const PURE;
-  virtual int32_t bodySize() const PURE;
-  virtual bool isEvent() const PURE;
-  virtual int64_t requestId() const PURE;
-  virtual std::string toString() const PURE;
+  using AttachmentMap = std::unordered_map<std::string, std::string>;
+
+  bool hasAttachments() const { return !attachments_.empty(); }
+  const AttachmentMap& attachments() const { return attachments_; }
+
+  Buffer::Instance& message_origin_data() { return message_origin_buffer_; }
+  size_t message_size() const { return header_size() + body_size(); }
+
+  virtual size_t body_size() const PURE;
+  virtual size_t header_size() const PURE;
+
+protected:
+  Context() = default;
+  virtual ~Context() { attachments_.clear(); }
+
+  AttachmentMap attachments_;
+  Buffer::OwnedImpl message_origin_buffer_;
 };
 
-class RequestMessage : public virtual Message {
+using ContextSharedPtr = std::shared_ptr<Context>;
+
+/**
+ * RpcInvocation represent an rpc call
+ * See
+ * https://github.com/apache/incubator-dubbo/blob/master/dubbo-rpc/dubbo-rpc-api/src/main/java/org/apache/dubbo/rpc/RpcInvocation.java
+ */
+class RpcInvocation {
 public:
-  virtual ~RequestMessage() {}
-  virtual SerializationType serializationType() const PURE;
-  virtual bool isTwoWay() const PURE;
+  virtual ~RpcInvocation() = default;
+
+  virtual const std::string& service_name() const PURE;
+  virtual const std::string& method_name() const PURE;
+  virtual const absl::optional<std::string>& service_version() const PURE;
+  virtual const absl::optional<std::string>& service_group() const PURE;
 };
 
-typedef std::unique_ptr<RequestMessage> RequestMessagePtr;
+using RpcInvocationSharedPtr = std::shared_ptr<RpcInvocation>;
 
-class ResponseMessage : public virtual Message {
+/**
+ * RpcResult represent the result of an rpc call
+ * See
+ * https://github.com/apache/incubator-dubbo/blob/master/dubbo-rpc/dubbo-rpc-api/src/main/java/org/apache/dubbo/rpc/RpcResult.java
+ */
+class RpcResult {
 public:
-  virtual ~ResponseMessage() {}
-  virtual ResponseStatus responseStatus() const PURE;
+  virtual ~RpcResult() = default;
+  virtual bool hasException() const PURE;
 };
 
-typedef std::unique_ptr<ResponseMessage> ResponseMessagePtr;
+using RpcResultSharedPtr = std::shared_ptr<RpcResult>;
 
 } // namespace DubboProxy
 } // namespace NetworkFilters

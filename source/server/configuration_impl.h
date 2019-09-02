@@ -31,7 +31,7 @@ namespace Configuration {
  */
 class StatsSinkFactory {
 public:
-  virtual ~StatsSinkFactory() {}
+  virtual ~StatsSinkFactory() = default;
 
   /**
    * Create a particular Stats::Sink implementation. If the implementation is unable to produce a
@@ -159,10 +159,12 @@ private:
     const std::string& accessLogPath() override { return access_log_path_; }
     const std::string& profilePath() override { return profile_path_; }
     Network::Address::InstanceConstSharedPtr address() override { return address_; }
+    Network::Socket::OptionsSharedPtr socketOptions() override { return socket_options_; }
 
     std::string access_log_path_;
     std::string profile_path_;
     Network::Address::InstanceConstSharedPtr address_;
+    Network::Socket::OptionsSharedPtr socket_options_;
   };
 
   AdminImpl admin_;

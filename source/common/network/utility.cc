@@ -65,7 +65,7 @@ namespace {
 
 std::string hostFromUrl(const std::string& url, const std::string& scheme,
                         const std::string& scheme_name) {
-  if (url.find(scheme) != 0) {
+  if (!absl::StartsWith(url, scheme)) {
     throw EnvoyException(fmt::format("expected {} scheme, got: {}", scheme_name, url));
   }
 
@@ -80,13 +80,18 @@ std::string hostFromUrl(const std::string& url, const std::string& scheme,
 
 uint32_t portFromUrl(const std::string& url, const std::string& scheme,
                      const std::string& scheme_name) {
-  if (url.find(scheme) != 0) {
+  if (!absl::StartsWith(url, scheme)) {
     throw EnvoyException(fmt::format("expected {} scheme, got: {}", scheme_name, url));
   }
 
   size_t colon_index = url.find(':', scheme.size());
 
   if (colon_index == std::string::npos) {
+    throw EnvoyException(fmt::format("malformed url: {}", url));
+  }
+
+  size_t rcolon_index = url.rfind(':');
+  if (colon_index != rcolon_index) {
     throw EnvoyException(fmt::format("malformed url: {}", url));
   }
 
@@ -143,7 +148,7 @@ Address::InstanceConstSharedPtr Utility::parseInternetAddressAndPort(const std::
   }
   if (ip_address[0] == '[') {
     // Appears to be an IPv6 address. Find the "]:" that separates the address from the port.
-    auto pos = ip_address.rfind("]:");
+    const auto pos = ip_address.rfind("]:");
     if (pos == std::string::npos) {
       throwWithMalformedIp(ip_address);
     }
@@ -163,7 +168,7 @@ Address::InstanceConstSharedPtr Utility::parseInternetAddressAndPort(const std::
     return std::make_shared<Address::Ipv6Instance>(sa6, v6only);
   }
   // Treat it as an IPv4 address followed by a port.
-  auto pos = ip_address.rfind(":");
+  const auto pos = ip_address.rfind(':');
   if (pos == std::string::npos) {
     throwWithMalformedIp(ip_address);
   }
@@ -239,45 +244,21 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersio
 }
 
 bool Utility::isLocalConnection(const Network::ConnectionSocket& socket) {
+  // These are local:
+  // - Pipes
+  // - Sockets to a loopback address
+  // - Sockets where the local and remote address (ignoring port) are the same
   const auto& remote_address = socket.remoteAddress();
-  // Before calling getifaddrs, verify the obvious checks.
-  // Note that there are corner cases, where remote and local address will be the same
-  // while the client is not actually local. Example could be an iptables intercepted
-  // connection. However, this is a rare exception and such assumption results in big
-  // performance optimization.
   if (remote_address->type() == Envoy::Network::Address::Type::Pipe ||
-      remote_address == socket.localAddress() || isLoopbackAddress(*remote_address)) {
+      isLoopbackAddress(*remote_address)) {
     return true;
   }
-
-  struct ifaddrs* ifaddr;
-  const int rc = getifaddrs(&ifaddr);
-  Cleanup ifaddr_cleanup([ifaddr] {
-    if (ifaddr) {
-      freeifaddrs(ifaddr);
-    }
-  });
-  RELEASE_ASSERT(rc == 0, "");
-
-  auto af_look_up =
-      (remote_address->ip()->version() == Address::IpVersion::v4) ? AF_INET : AF_INET6;
-
-  for (struct ifaddrs* ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
-    if (ifa->ifa_addr == nullptr) {
-      continue;
-    }
-
-    if (ifa->ifa_addr->sa_family == af_look_up) {
-      const auto* addr = reinterpret_cast<const struct sockaddr_storage*>(ifa->ifa_addr);
-      auto local_address = Address::addressFromSockAddr(
-          *addr, (af_look_up == AF_INET) ? sizeof(sockaddr_in) : sizeof(sockaddr_in6));
-
-      if (remote_address == local_address) {
-        return true;
-      }
-    }
+  const auto local_ip = socket.localAddress()->ip();
+  const auto remote_ip = remote_address->ip();
+  if (remote_ip != nullptr && local_ip != nullptr &&
+      remote_ip->addressAsString() == local_ip->addressAsString()) {
+    return true;
   }
-
   return false;
 }
 
@@ -416,7 +397,7 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(int fd) {
 
 void Utility::parsePortRangeList(absl::string_view string, std::list<PortRange>& list) {
   const auto ranges = StringUtil::splitToken(string, ",");
-  for (auto s : ranges) {
+  for (const auto& s : ranges) {
     const std::string s_string{s};
     std::stringstream ss(s_string);
     uint32_t min = 0;
@@ -508,7 +489,7 @@ Address::SocketType
 Utility::protobufAddressSocketType(const envoy::api::v2::core::Address& proto_address) {
   switch (proto_address.address_case()) {
   case envoy::api::v2::core::Address::kSocketAddress: {
-    auto protocol = proto_address.socket_address().protocol();
+    const auto protocol = proto_address.socket_address().protocol();
     switch (protocol) {
     case envoy::api::v2::core::SocketAddress::TCP:
       return Address::SocketType::Stream;

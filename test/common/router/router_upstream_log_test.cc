@@ -91,6 +91,7 @@ public:
                                    router_proto));
     router_.reset(new TestFilter(*config_));
     router_->setDecoderFilterCallbacks(callbacks_);
+    EXPECT_CALL(callbacks_.dispatcher_, setTrackedObject(_)).Times(testing::AnyNumber());
 
     upstream_locality_.set_zone("to_az");
 
@@ -105,13 +106,13 @@ public:
 
   void expectResponseTimerCreate() {
     response_timeout_ = new Event::MockTimer(&callbacks_.dispatcher_);
-    EXPECT_CALL(*response_timeout_, enableTimer(_));
+    EXPECT_CALL(*response_timeout_, enableTimer(_, _));
     EXPECT_CALL(*response_timeout_, disableTimer());
   }
 
   void expectPerTryTimerCreate() {
     per_try_timeout_ = new Event::MockTimer(&callbacks_.dispatcher_);
-    EXPECT_CALL(*per_try_timeout_, enableTimer(_));
+    EXPECT_CALL(*per_try_timeout_, enableTimer(_, _));
     EXPECT_CALL(*per_try_timeout_, disableTimer());
   }
 
@@ -174,8 +175,8 @@ public:
 
     router_->retry_state_->expectResetRetry();
     EXPECT_CALL(context_.cluster_manager_.conn_pool_.host_->outlier_detector_,
-                putHttpResponseCode(504));
-    per_try_timeout_->callback_();
+                putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, _));
+    per_try_timeout_->invokeCallback();
 
     // We expect this reset to kick off a new request.
     NiceMock<Http::MockStreamEncoder> encoder2;
@@ -184,6 +185,8 @@ public:
             [&](Http::StreamDecoder& decoder,
                 Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
               response_decoder = &decoder;
+              EXPECT_CALL(context_.cluster_manager_.conn_pool_.host_->outlier_detector_,
+                          putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS, _));
               callbacks.onPoolReady(encoder2, context_.cluster_manager_.conn_pool_.host_);
               return nullptr;
             }));

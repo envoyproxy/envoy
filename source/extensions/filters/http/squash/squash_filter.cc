@@ -121,16 +121,15 @@ std::string SquashFilterConfig::replaceEnv(const std::string& attachment_templat
 }
 
 SquashFilter::SquashFilter(SquashFilterConfigSharedPtr config, Upstream::ClusterManager& cm)
-    : config_(config), is_squashing_(false), debug_attachment_path_(),
-      attachment_poll_period_timer_(nullptr), attachment_timeout_timer_(nullptr),
-      in_flight_request_(nullptr),
+    : config_(config), is_squashing_(false), attachment_poll_period_timer_(nullptr),
+      attachment_timeout_timer_(nullptr), in_flight_request_(nullptr),
       create_attachment_callback_(std::bind(&SquashFilter::onCreateAttachmentSuccess, this, _1),
                                   std::bind(&SquashFilter::onCreateAttachmentFailure, this, _1)),
       check_attachment_callback_(std::bind(&SquashFilter::onGetAttachmentSuccess, this, _1),
                                  std::bind(&SquashFilter::onGetAttachmentFailure, this, _1)),
       cm_(cm), decoder_callbacks_(nullptr) {}
 
-SquashFilter::~SquashFilter() {}
+SquashFilter::~SquashFilter() = default;
 
 void SquashFilter::onDestroy() { cleanup(); }
 
@@ -164,7 +163,8 @@ Http::FilterHeadersStatus SquashFilter::decodeHeaders(Http::HeaderMap& headers, 
 
   attachment_timeout_timer_ =
       decoder_callbacks_->dispatcher().createTimer([this]() -> void { doneSquashing(); });
-  attachment_timeout_timer_->enableTimer(config_->attachmentTimeout());
+  attachment_timeout_timer_->enableTimer(config_->attachmentTimeout(),
+                                         &decoder_callbacks_->scope());
   // Check if the timer expired inline.
   if (!is_squashing_) {
     return Http::FilterHeadersStatus::Continue;
@@ -262,7 +262,8 @@ void SquashFilter::scheduleRetry() {
     attachment_poll_period_timer_ =
         decoder_callbacks_->dispatcher().createTimer([this]() -> void { pollForAttachment(); });
   }
-  attachment_poll_period_timer_->enableTimer(config_->attachmentPollPeriod());
+  attachment_poll_period_timer_->enableTimer(config_->attachmentPollPeriod(),
+                                             &decoder_callbacks_->scope());
 }
 
 void SquashFilter::pollForAttachment() {

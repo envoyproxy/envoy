@@ -51,7 +51,7 @@ struct RcDetailsValues {
   // This will generally be accompanied by details about the transcoder failure.
   const std::string GrpcTranscodeFailed = "grpc_json_transcode_failure";
 };
-typedef ConstSingleton<RcDetailsValues> RcDetails;
+using RcDetails = ConstSingleton<RcDetailsValues>;
 
 namespace {
 // Transcoder:
@@ -154,13 +154,14 @@ JsonTranscoderConfig::JsonTranscoderConfig(
       Protobuf::util::NewTypeResolverForDescriptorPool(Grpc::Common::typeUrlPrefix(),
                                                        &descriptor_pool_));
 
-  const auto print_config = proto_config.print_options();
+  const auto& print_config = proto_config.print_options();
   print_options_.add_whitespace = print_config.add_whitespace();
   print_options_.always_print_primitive_fields = print_config.always_print_primitive_fields();
   print_options_.always_print_enums_as_ints = print_config.always_print_enums_as_ints();
   print_options_.preserve_proto_field_names = print_config.preserve_proto_field_names();
 
   match_incoming_request_route_ = proto_config.match_incoming_request_route();
+  ignore_unknown_query_parameters_ = proto_config.ignore_unknown_query_parameters();
 }
 
 bool JsonTranscoderConfig::matchIncomingRequestInfo() const {
@@ -203,6 +204,9 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
     status = type_helper_->ResolveFieldPath(*request_info.message_type, binding.field_path,
                                             &resolved_binding.field_path);
     if (!status.ok()) {
+      if (ignore_unknown_query_parameters_) {
+        continue;
+      }
       return status;
     }
 

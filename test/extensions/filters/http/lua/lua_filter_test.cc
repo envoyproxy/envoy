@@ -18,6 +18,7 @@
 
 using testing::_;
 using testing::AtLeast;
+using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
@@ -65,7 +66,7 @@ public:
     EXPECT_CALL(encoder_callbacks_, encodingBuffer()).Times(AtLeast(0));
   }
 
-  ~LuaHttpFilterTest() { filter_->onDestroy(); }
+  ~LuaHttpFilterTest() override { filter_->onDestroy(); }
 
   void setup(const std::string& lua_code) {
     config_.reset(new FilterConfig(lua_code, tls_, cluster_manager_));
@@ -249,6 +250,8 @@ TEST_F(LuaHttpFilterTest, ScriptBodyChunksRequestBody) {
   Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("/")));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
 
   Buffer::OwnedImpl data("hello");
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("5")));
@@ -741,7 +744,8 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
         {
           [":method"] = "POST",
           [":path"] = "/",
-          [":authority"] = "foo"
+          [":authority"] = "foo",
+          ["set-cookie"] = { "flavor=chocolate; Path=/", "variant=chewy; Path=/" }
         },
         "hello world",
         5000)
@@ -758,7 +762,7 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
   Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   Http::MockAsyncClientRequest request(&cluster_manager_.async_client_);
   Http::AsyncClient::Callbacks* callbacks;
-  EXPECT_CALL(cluster_manager_, get("cluster"));
+  EXPECT_CALL(cluster_manager_, get(Eq("cluster")));
   EXPECT_CALL(cluster_manager_, httpAsyncClientForCluster("cluster"));
   EXPECT_CALL(cluster_manager_.async_client_, send_(_, _, _))
       .WillOnce(
@@ -767,6 +771,8 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
             EXPECT_EQ((Http::TestHeaderMapImpl{{":path", "/"},
                                                {":method", "POST"},
                                                {":authority", "foo"},
+                                               {"set-cookie", "flavor=chocolate; Path=/"},
+                                               {"set-cookie", "variant=chewy; Path=/"},
                                                {"content-length", "11"}}),
                       message->headers());
             callbacks = &cb;
@@ -833,7 +839,7 @@ TEST_F(LuaHttpFilterTest, DoubleHttpCall) {
   Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   Http::MockAsyncClientRequest request(&cluster_manager_.async_client_);
   Http::AsyncClient::Callbacks* callbacks;
-  EXPECT_CALL(cluster_manager_, get("cluster"));
+  EXPECT_CALL(cluster_manager_, get(Eq("cluster")));
   EXPECT_CALL(cluster_manager_, httpAsyncClientForCluster("cluster"));
   EXPECT_CALL(cluster_manager_.async_client_, send_(_, _, _))
       .WillOnce(
@@ -856,7 +862,7 @@ TEST_F(LuaHttpFilterTest, DoubleHttpCall) {
   response_message->body() = std::make_unique<Buffer::OwnedImpl>("response");
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(":status 200")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("response")));
-  EXPECT_CALL(cluster_manager_, get("cluster2"));
+  EXPECT_CALL(cluster_manager_, get(Eq("cluster2")));
   EXPECT_CALL(cluster_manager_, httpAsyncClientForCluster("cluster2"));
   EXPECT_CALL(cluster_manager_.async_client_, send_(_, _, _))
       .WillOnce(
@@ -912,7 +918,7 @@ TEST_F(LuaHttpFilterTest, HttpCallNoBody) {
   Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   Http::MockAsyncClientRequest request(&cluster_manager_.async_client_);
   Http::AsyncClient::Callbacks* callbacks;
-  EXPECT_CALL(cluster_manager_, get("cluster"));
+  EXPECT_CALL(cluster_manager_, get(Eq("cluster")));
   EXPECT_CALL(cluster_manager_, httpAsyncClientForCluster("cluster"));
   EXPECT_CALL(cluster_manager_.async_client_, send_(_, _, _))
       .WillOnce(
@@ -956,7 +962,10 @@ TEST_F(LuaHttpFilterTest, HttpCallImmediateResponse) {
         nil,
         5000)
       request_handle:respond(
-        {[":status"] = "403"},
+        {
+          [":status"] = "403",
+          ["set-cookie"] = { "flavor=chocolate; Path=/", "variant=chewy; Path=/" }
+        },
         nil)
     end
   )EOF"};
@@ -967,7 +976,7 @@ TEST_F(LuaHttpFilterTest, HttpCallImmediateResponse) {
   Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   Http::MockAsyncClientRequest request(&cluster_manager_.async_client_);
   Http::AsyncClient::Callbacks* callbacks;
-  EXPECT_CALL(cluster_manager_, get("cluster"));
+  EXPECT_CALL(cluster_manager_, get(Eq("cluster")));
   EXPECT_CALL(cluster_manager_, httpAsyncClientForCluster("cluster"));
   EXPECT_CALL(cluster_manager_.async_client_, send_(_, _, _))
       .WillOnce(
@@ -985,7 +994,9 @@ TEST_F(LuaHttpFilterTest, HttpCallImmediateResponse) {
 
   Http::MessagePtr response_message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  Http::TestHeaderMapImpl expected_headers{{":status", "403"}};
+  Http::TestHeaderMapImpl expected_headers{{":status", "403"},
+                                           {"set-cookie", "flavor=chocolate; Path=/"},
+                                           {"set-cookie", "variant=chewy; Path=/"}};
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
   callbacks->onSuccess(std::move(response_message));
 }
@@ -1015,7 +1026,7 @@ TEST_F(LuaHttpFilterTest, HttpCallErrorAfterResumeSuccess) {
   Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   Http::MockAsyncClientRequest request(&cluster_manager_.async_client_);
   Http::AsyncClient::Callbacks* callbacks;
-  EXPECT_CALL(cluster_manager_, get("cluster"));
+  EXPECT_CALL(cluster_manager_, get(Eq("cluster")));
   EXPECT_CALL(cluster_manager_, httpAsyncClientForCluster("cluster"));
   EXPECT_CALL(cluster_manager_.async_client_, send_(_, _, _))
       .WillOnce(
@@ -1065,7 +1076,7 @@ TEST_F(LuaHttpFilterTest, HttpCallFailure) {
   Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   Http::MockAsyncClientRequest request(&cluster_manager_.async_client_);
   Http::AsyncClient::Callbacks* callbacks;
-  EXPECT_CALL(cluster_manager_, get("cluster"));
+  EXPECT_CALL(cluster_manager_, get(Eq("cluster")));
   EXPECT_CALL(cluster_manager_, httpAsyncClientForCluster("cluster"));
   EXPECT_CALL(cluster_manager_.async_client_, send_(_, _, _))
       .WillOnce(
@@ -1107,7 +1118,7 @@ TEST_F(LuaHttpFilterTest, HttpCallReset) {
   Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   Http::MockAsyncClientRequest request(&cluster_manager_.async_client_);
   Http::AsyncClient::Callbacks* callbacks;
-  EXPECT_CALL(cluster_manager_, get("cluster"));
+  EXPECT_CALL(cluster_manager_, get(Eq("cluster")));
   EXPECT_CALL(cluster_manager_, httpAsyncClientForCluster("cluster"));
   EXPECT_CALL(cluster_manager_.async_client_, send_(_, _, _))
       .WillOnce(
@@ -1150,7 +1161,7 @@ TEST_F(LuaHttpFilterTest, HttpCallImmediateFailure) {
 
   Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   Http::MockAsyncClientRequest request(&cluster_manager_.async_client_);
-  EXPECT_CALL(cluster_manager_, get("cluster"));
+  EXPECT_CALL(cluster_manager_, get(Eq("cluster")));
   EXPECT_CALL(cluster_manager_, httpAsyncClientForCluster("cluster"));
   EXPECT_CALL(cluster_manager_.async_client_, send_(_, _, _))
       .WillOnce(
@@ -1202,7 +1213,7 @@ TEST_F(LuaHttpFilterTest, HttpCallInvalidCluster) {
   setup(SCRIPT);
 
   Http::TestHeaderMapImpl request_headers{{":path", "/"}};
-  EXPECT_CALL(cluster_manager_, get("cluster")).WillOnce(Return(nullptr));
+  EXPECT_CALL(cluster_manager_, get(Eq("cluster"))).WillOnce(Return(nullptr));
   EXPECT_CALL(
       *filter_,
       scriptLog(spdlog::level::err,
@@ -1226,7 +1237,7 @@ TEST_F(LuaHttpFilterTest, HttpCallInvalidHeaders) {
   setup(SCRIPT);
 
   Http::TestHeaderMapImpl request_headers{{":path", "/"}};
-  EXPECT_CALL(cluster_manager_, get("cluster"));
+  EXPECT_CALL(cluster_manager_, get(Eq("cluster")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::err,
                                   StrEq("[string \"...\"]:3: http call headers must include "
                                         "':path', ':method', and ':authority'")));
@@ -1256,7 +1267,14 @@ TEST_F(LuaHttpFilterTest, ImmediateResponse) {
   config_->runtimeGC();
   const uint64_t mem_use_at_start = config_->runtimeBytesUsed();
 
-  for (uint64_t i = 0; i < 2000; i++) {
+  uint64_t num_loops = 2000;
+#if defined(__has_feature) && (__has_feature(thread_sanitizer))
+  // per https://github.com/envoyproxy/envoy/issues/7374 this test is causing
+  // problems on tsan
+  num_loops = 200;
+#endif
+
+  for (uint64_t i = 0; i < num_loops; i++) {
     Http::TestHeaderMapImpl request_headers{{":path", "/"}};
     Http::TestHeaderMapImpl expected_headers{{":status", "503"}, {"content-length", "4"}};
     EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), false));
@@ -1658,28 +1676,28 @@ TEST_F(LuaHttpFilterTest, SignatureVerify) {
 
       rawsig = signature:fromhex()
 
-      ok, error = request_handle:verifySignature(hashFunc, pubkey, rawsig, string.len(rawsig), data, string.len(data)) 
+      ok, error = request_handle:verifySignature(hashFunc, pubkey, rawsig, string.len(rawsig), data, string.len(data))
       if ok then
         request_handle:logTrace("signature is valid")
       else
         request_handle:logTrace(error)
       end
 
-      ok, error = request_handle:verifySignature("unknown", pubkey, rawsig, string.len(rawsig), data, string.len(data)) 
+      ok, error = request_handle:verifySignature("unknown", pubkey, rawsig, string.len(rawsig), data, string.len(data))
       if ok then
         request_handle:logTrace("signature is valid")
       else
         request_handle:logTrace(error)
       end
 
-      ok, error = request_handle:verifySignature(hashFunc, pubkey, "0000", 4, data, string.len(data)) 
+      ok, error = request_handle:verifySignature(hashFunc, pubkey, "0000", 4, data, string.len(data))
       if ok then
         request_handle:logTrace("signature is valid")
       else
         request_handle:logTrace(error)
       end
 
-      ok, error = request_handle:verifySignature(hashFunc, pubkey, rawsig, string.len(rawsig), "xxxx", 4) 
+      ok, error = request_handle:verifySignature(hashFunc, pubkey, rawsig, string.len(rawsig), "xxxx", 4)
       if ok then
         request_handle:logTrace("signature is valid")
       else

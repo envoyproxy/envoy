@@ -66,7 +66,7 @@ class GoogleAsyncClientThreadLocal : public ThreadLocal::ThreadLocalObject,
                                      Logger::Loggable<Logger::Id::grpc> {
 public:
   GoogleAsyncClientThreadLocal(Api::Api& api);
-  ~GoogleAsyncClientThreadLocal();
+  ~GoogleAsyncClientThreadLocal() override;
 
   grpc::CompletionQueue& completionQueue() { return cq_; }
 
@@ -114,7 +114,7 @@ struct GoogleAsyncClientStats {
 // Interface to allow the gRPC stub to be mocked out by tests.
 class GoogleStub {
 public:
-  virtual ~GoogleStub() {}
+  virtual ~GoogleStub() = default;
 
   // See grpc::PrepareCall().
   virtual std::unique_ptr<grpc::GenericClientAsyncReaderWriter>
@@ -139,7 +139,7 @@ private:
 // Interface to allow the gRPC stub creation to be mocked out by tests.
 class GoogleStubFactory {
 public:
-  virtual ~GoogleStubFactory() {}
+  virtual ~GoogleStubFactory() = default;
 
   // Create a stub from a given channel.
   virtual std::shared_ptr<GoogleStub> createStub(std::shared_ptr<grpc::Channel> channel) PURE;
@@ -199,7 +199,7 @@ public:
   GoogleAsyncStreamImpl(GoogleAsyncClientImpl& parent, absl::string_view service_full_name,
                         absl::string_view method_name, RawAsyncStreamCallbacks& callbacks,
                         const absl::optional<std::chrono::milliseconds>& timeout);
-  ~GoogleAsyncStreamImpl();
+  ~GoogleAsyncStreamImpl() override;
 
   virtual void initialize(bool buffer_body_for_retry);
 
@@ -237,10 +237,10 @@ private:
   struct PendingMessage {
     PendingMessage(Buffer::InstancePtr request, bool end_stream);
     // End-of-stream with no additional message.
-    PendingMessage() : end_stream_(true) {}
+    PendingMessage() = default;
 
     const absl::optional<grpc::ByteBuffer> buf_;
-    const bool end_stream_;
+    const bool end_stream_{true};
   };
 
   GoogleAsyncTag init_tag_{*this, GoogleAsyncTag::Operation::Init};

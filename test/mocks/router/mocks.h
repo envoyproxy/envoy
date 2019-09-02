@@ -8,9 +8,10 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/time.h"
+#include "envoy/config/config_provider.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/json/json_object.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/router/rds.h"
 #include "envoy/router/route_config_provider_manager.h"
@@ -24,17 +25,19 @@
 
 #include "common/stats/fake_symbol_table_impl.h"
 
+#include "test/mocks/stats/mocks.h"
 #include "test/test_common/global.h"
 
 #include "gmock/gmock.h"
 
 namespace Envoy {
 namespace Router {
+using ::testing::NiceMock;
 
 class MockDirectResponseEntry : public DirectResponseEntry {
 public:
   MockDirectResponseEntry();
-  ~MockDirectResponseEntry();
+  ~MockDirectResponseEntry() override;
 
   // DirectResponseEntry
   MOCK_CONST_METHOD2(finalizeResponseHeaders,
@@ -50,8 +53,9 @@ public:
 class TestCorsPolicy : public CorsPolicy {
 public:
   // Router::CorsPolicy
-  const std::list<std::string>& allowOrigins() const override { return allow_origin_; };
-  const std::list<std::regex>& allowOriginRegexes() const override { return allow_origin_regex_; };
+  const std::vector<Matchers::StringMatcherPtr>& allowOrigins() const override {
+    return allow_origins_;
+  };
   const std::string& allowMethods() const override { return allow_methods_; };
   const std::string& allowHeaders() const override { return allow_headers_; };
   const std::string& exposeHeaders() const override { return expose_headers_; };
@@ -60,13 +64,12 @@ public:
   bool enabled() const override { return enabled_; };
   bool shadowEnabled() const override { return shadow_enabled_; };
 
-  std::list<std::string> allow_origin_{};
-  std::list<std::regex> allow_origin_regex_{};
-  std::string allow_methods_{};
-  std::string allow_headers_{};
-  std::string expose_headers_{};
+  std::vector<Matchers::StringMatcherPtr> allow_origins_;
+  std::string allow_methods_;
+  std::string allow_headers_;
+  std::string expose_headers_;
   std::string max_age_{};
-  absl::optional<bool> allow_credentials_{};
+  absl::optional<bool> allow_credentials_;
   bool enabled_{};
   bool shadow_enabled_{};
 };
@@ -112,7 +115,7 @@ public:
 class MockRetryState : public RetryState {
 public:
   MockRetryState();
-  ~MockRetryState();
+  ~MockRetryState() override;
 
   void expectHeadersRetry();
   void expectHedgedPerTryTimeoutRetry();
@@ -138,7 +141,7 @@ public:
 class MockRateLimitPolicyEntry : public RateLimitPolicyEntry {
 public:
   MockRateLimitPolicyEntry();
-  ~MockRateLimitPolicyEntry();
+  ~MockRateLimitPolicyEntry() override;
 
   // Router::RateLimitPolicyEntry
   MOCK_CONST_METHOD0(stage, uint64_t());
@@ -156,7 +159,7 @@ public:
 class MockRateLimitPolicy : public RateLimitPolicy {
 public:
   MockRateLimitPolicy();
-  ~MockRateLimitPolicy();
+  ~MockRateLimitPolicy() override;
 
   // Router::RateLimitPolicy
   MOCK_CONST_METHOD1(
@@ -182,7 +185,7 @@ public:
 class MockShadowWriter : public ShadowWriter {
 public:
   MockShadowWriter();
-  ~MockShadowWriter();
+  ~MockShadowWriter() override;
 
   // Router::ShadowWriter
   void shadow(const std::string& cluster, Http::MessagePtr&& request,
@@ -199,14 +202,14 @@ public:
   // Router::VirtualCluster
   Stats::StatName statName() const override { return stat_name_.statName(); }
 
-  Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
+  Stats::TestSymbolTable symbol_table_;
   Stats::StatNameManagedStorage stat_name_{"fake_virtual_cluster", *symbol_table_};
 };
 
 class MockVirtualHost : public VirtualHost {
 public:
   MockVirtualHost();
-  ~MockVirtualHost();
+  ~MockVirtualHost() override;
 
   // Router::VirtualHost
   MOCK_CONST_METHOD0(name, const std::string&());
@@ -223,7 +226,7 @@ public:
     return stat_name_->statName();
   }
 
-  mutable Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
+  mutable Stats::TestSymbolTable symbol_table_;
   std::string name_{"fake_vhost"};
   mutable std::unique_ptr<Stats::StatNameManagedStorage> stat_name_;
   testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;
@@ -233,7 +236,7 @@ public:
 class MockHashPolicy : public HashPolicy {
 public:
   MockHashPolicy();
-  ~MockHashPolicy();
+  ~MockHashPolicy() override;
 
   // Router::HashPolicy
   MOCK_CONST_METHOD3(generateHash,
@@ -245,7 +248,7 @@ public:
 class MockMetadataMatchCriteria : public MetadataMatchCriteria {
 public:
   MockMetadataMatchCriteria();
-  ~MockMetadataMatchCriteria();
+  ~MockMetadataMatchCriteria() override;
 
   // Router::MetadataMatchCriteria
   MOCK_CONST_METHOD0(metadataMatchCriteria,
@@ -256,7 +259,7 @@ public:
 class MockPathMatchCriterion : public PathMatchCriterion {
 public:
   MockPathMatchCriterion();
-  ~MockPathMatchCriterion();
+  ~MockPathMatchCriterion() override;
 
   // Router::PathMatchCriterion
   MOCK_CONST_METHOD0(matchType, PathMatchType());
@@ -269,7 +272,7 @@ public:
 class MockRouteEntry : public RouteEntry {
 public:
   MockRouteEntry();
-  ~MockRouteEntry();
+  ~MockRouteEntry() override;
 
   // Router::Config
   MOCK_CONST_METHOD0(clusterName, const std::string&());
@@ -326,7 +329,7 @@ public:
 class MockDecorator : public Decorator {
 public:
   MockDecorator();
-  ~MockDecorator();
+  ~MockDecorator() override;
 
   // Router::Decorator
   MOCK_CONST_METHOD0(getOperation, const std::string&());
@@ -338,7 +341,7 @@ public:
 class MockRouteTracing : public RouteTracing {
 public:
   MockRouteTracing();
-  ~MockRouteTracing();
+  ~MockRouteTracing() override;
 
   // Router::RouteTracing
   MOCK_CONST_METHOD0(getClientSampling, const envoy::type::FractionalPercent&());
@@ -349,7 +352,7 @@ public:
 class MockRoute : public Route {
 public:
   MockRoute();
-  ~MockRoute();
+  ~MockRoute() override;
 
   // Router::Route
   MOCK_CONST_METHOD0(directResponseEntry, const DirectResponseEntry*());
@@ -366,7 +369,7 @@ public:
 class MockConfig : public Config {
 public:
   MockConfig();
-  ~MockConfig();
+  ~MockConfig() override;
 
   // Router::Config
   MOCK_CONST_METHOD2(route, RouteConstSharedPtr(const Http::HeaderMap&, uint64_t random_value));
@@ -379,16 +382,30 @@ public:
   std::string name_{"fake_config"};
 };
 
+class MockRouteConfigProvider : public RouteConfigProvider {
+public:
+  MockRouteConfigProvider();
+  ~MockRouteConfigProvider() override;
+
+  MOCK_METHOD0(config, ConfigConstSharedPtr());
+  MOCK_CONST_METHOD0(configInfo, absl::optional<ConfigInfo>());
+  MOCK_CONST_METHOD0(lastUpdated, SystemTime());
+  MOCK_METHOD0(onConfigUpdate, void());
+  MOCK_CONST_METHOD1(validateConfig, void(const envoy::api::v2::RouteConfiguration&));
+
+  std::shared_ptr<NiceMock<MockConfig>> route_config_{new NiceMock<MockConfig>()};
+};
+
 class MockRouteConfigProviderManager : public RouteConfigProviderManager {
 public:
   MockRouteConfigProviderManager();
-  ~MockRouteConfigProviderManager();
+  ~MockRouteConfigProviderManager() override;
 
-  MOCK_METHOD3(createRdsRouteConfigProvider,
+  MOCK_METHOD4(createRdsRouteConfigProvider,
                RouteConfigProviderPtr(
                    const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
                    Server::Configuration::FactoryContext& factory_context,
-                   const std::string& stat_prefix));
+                   const std::string& stat_prefix, Init::Manager& init_manager));
   MOCK_METHOD2(createStaticRouteConfigProvider,
                RouteConfigProviderPtr(const envoy::api::v2::RouteConfiguration& route_config,
                                       Server::Configuration::FactoryContext& factory_context));
@@ -397,9 +414,26 @@ public:
 class MockScopedConfig : public ScopedConfig {
 public:
   MockScopedConfig();
-  ~MockScopedConfig();
+  ~MockScopedConfig() override;
 
   MOCK_CONST_METHOD1(getRouteConfig, ConfigConstSharedPtr(const Http::HeaderMap& headers));
+
+  std::shared_ptr<MockConfig> route_config_{new NiceMock<MockConfig>()};
+};
+
+class MockScopedRouteConfigProvider : public Envoy::Config::ConfigProvider {
+public:
+  MockScopedRouteConfigProvider();
+  ~MockScopedRouteConfigProvider() override;
+
+  // Config::ConfigProvider
+  MOCK_CONST_METHOD0(lastUpdated, SystemTime());
+  MOCK_CONST_METHOD0(getConfigProto, Protobuf::Message*());
+  MOCK_CONST_METHOD0(getConfigProtos, Envoy::Config::ConfigProvider::ConfigProtoVector());
+  MOCK_CONST_METHOD0(getConfig, ConfigConstSharedPtr());
+  MOCK_CONST_METHOD0(apiType, ApiType());
+
+  std::shared_ptr<MockScopedConfig> config_;
 };
 
 } // namespace Router

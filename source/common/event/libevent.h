@@ -43,10 +43,10 @@ private:
   static bool initialized_;
 };
 
-typedef CSmartPtr<event_base, event_base_free> BasePtr;
-typedef CSmartPtr<evbuffer, evbuffer_free> BufferPtr;
-typedef CSmartPtr<bufferevent, bufferevent_free> BufferEventPtr;
-typedef CSmartPtr<evconnlistener, evconnlistener_free> ListenerPtr;
+using BasePtr = CSmartPtr<event_base, event_base_free>;
+using BufferPtr = CSmartPtr<evbuffer, evbuffer_free>;
+using BufferEventPtr = CSmartPtr<bufferevent, bufferevent_free>;
+using ListenerPtr = CSmartPtr<evconnlistener, evconnlistener_free>;
 
 } // namespace Libevent
 } // namespace Event

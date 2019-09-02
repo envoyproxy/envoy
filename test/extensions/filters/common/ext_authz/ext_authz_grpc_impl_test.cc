@@ -47,7 +47,7 @@ public:
         .WillOnce(Invoke(
             [this](
                 absl::string_view service_full_name, absl::string_view method_name,
-                Buffer::InstancePtr&, Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
+                Buffer::InstancePtr&&, Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
                 const absl::optional<std::chrono::milliseconds>& timeout) -> Grpc::AsyncRequest* {
               EXPECT_EQ(use_alpha_ ? V2Alpha : V2, service_full_name);
               EXPECT_EQ("Check", method_name);

@@ -51,7 +51,7 @@ private:
         public Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks,
         public Network::ConnectionCallbacks {
     RedisActiveHealthCheckSession(RedisHealthChecker& parent, const Upstream::HostSharedPtr& host);
-    ~RedisActiveHealthCheckSession();
+    ~RedisActiveHealthCheckSession() override;
 
     // ActiveHealthCheckSession
     void onInterval() override;
@@ -68,6 +68,9 @@ private:
     bool enableRedirection() const override {
       return true;
     } // Redirection errors are treated as check successes.
+    NetworkFilters::Common::Redis::Client::ReadPolicy readPolicy() const override {
+      return NetworkFilters::Common::Redis::Client::ReadPolicy::Master;
+    }
 
     // Batching
     unsigned int maxBufferSizeBeforeFlush() const override {
@@ -76,6 +79,8 @@ private:
     std::chrono::milliseconds bufferFlushTimeoutInMs() const override {
       return std::chrono::milliseconds(1);
     }
+
+    uint32_t maxUpstreamUnknownConnections() const override { return 0; }
 
     // Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks
     void onResponse(NetworkFilters::Common::Redis::RespValuePtr&& value) override;
@@ -101,7 +106,7 @@ private:
     NetworkFilters::Common::Redis::RespValue request_;
   };
 
-  typedef std::unique_ptr<RedisActiveHealthCheckSession> RedisActiveHealthCheckSessionPtr;
+  using RedisActiveHealthCheckSessionPtr = std::unique_ptr<RedisActiveHealthCheckSession>;
 
   // HealthCheckerImplBase
   ActiveHealthCheckSessionPtr makeSession(Upstream::HostSharedPtr host) override {

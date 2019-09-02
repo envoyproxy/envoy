@@ -15,6 +15,7 @@ envoy_cc_mock(
     external_deps = ["abseil_optional"],
     deps = [
         "//include/envoy/runtime:runtime_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
         "//test/mocks:common_lib",
     ],
 )

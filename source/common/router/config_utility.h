@@ -1,8 +1,6 @@
 #pragma once
 
-#include <inttypes.h>
-
-#include <regex>
+#include <cinttypes>
 #include <string>
 #include <vector>
 
@@ -12,6 +10,7 @@
 #include "envoy/upstream/resource_manager.h"
 
 #include "common/common/empty_string.h"
+#include "common/common/matchers.h"
 #include "common/common/utility.h"
 #include "common/config/rds_json.h"
 #include "common/http/headers.h"
@@ -33,10 +32,7 @@ public:
   // equivalent of the QueryParameterMatcher proto in the RDS v2 API.
   class QueryParameterMatcher {
   public:
-    QueryParameterMatcher(const envoy::api::v2::route::QueryParameterMatcher& config)
-        : name_(config.name()), value_(config.value()),
-          is_regex_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, regex, false)),
-          regex_pattern_(is_regex_ ? RegexUtil::parseRegex(value_) : std::regex()) {}
+    QueryParameterMatcher(const envoy::api::v2::route::QueryParameterMatcher& config);
 
     /**
      * Check if the query parameters for a request contain a match for this
@@ -48,10 +44,10 @@ public:
 
   private:
     const std::string name_;
-    const std::string value_;
-    const bool is_regex_;
-    const std::regex regex_pattern_;
+    const absl::optional<Matchers::StringMatcherImpl> matcher_;
   };
+
+  using QueryParameterMatcherPtr = std::unique_ptr<const QueryParameterMatcher>;
 
   /**
    * @return the resource priority parsed from proto.
@@ -67,7 +63,7 @@ public:
    *         query_params
    */
   static bool matchQueryParams(const Http::Utility::QueryParams& query_params,
-                               const std::vector<QueryParameterMatcher>& config_query_params);
+                               const std::vector<QueryParameterMatcherPtr>& config_query_params);
 
   /**
    * Returns the redirect HTTP Status Code enum parsed from proto.

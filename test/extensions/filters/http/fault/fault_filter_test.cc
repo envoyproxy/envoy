@@ -25,6 +25,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::AnyNumber;
 using testing::DoAll;
 using testing::Invoke;
 using testing::Matcher;
@@ -136,19 +137,21 @@ public:
     filter_ = std::make_unique<FaultFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_filter_callbacks_);
+    EXPECT_CALL(decoder_filter_callbacks_.dispatcher_, setTrackedObject(_)).Times(AnyNumber());
   }
 
   void SetUpTest(const std::string json) { SetUpTest(convertJsonStrToProtoConfig(json)); }
 
   void expectDelayTimer(uint64_t duration_ms) {
     timer_ = new Event::MockTimer(&decoder_filter_callbacks_.dispatcher_);
-    EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(duration_ms)));
+    EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(duration_ms), _));
     EXPECT_CALL(*timer_, disableTimer());
   }
 
   void TestPerFilterConfigFault(const Router::RouteSpecificFilterConfig* route_fault,
                                 const Router::RouteSpecificFilterConfig* vhost_fault);
 
+  Stats::IsolatedStoreImpl stats_;
   FaultFilterConfigSharedPtr config_;
   std::unique_ptr<FaultFilter> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_filter_callbacks_;
@@ -156,7 +159,6 @@ public:
   Http::TestHeaderMapImpl request_headers_;
   Http::TestHeaderMapImpl response_headers_;
   Buffer::OwnedImpl data_;
-  Stats::IsolatedStoreImpl stats_;
   NiceMock<Runtime::MockLoader> runtime_;
   Event::MockTimer* timer_{};
   Event::SimulatedTimeSystem time_system_;
@@ -299,6 +301,8 @@ TEST_F(FaultFilterTest, AbortWithHttpStatus) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
   EXPECT_EQ(1UL, config_->stats().active_faults_.value());
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
@@ -463,6 +467,7 @@ TEST_F(FaultFilterTest, DelayForDownstreamCluster) {
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
 
+  EXPECT_CALL(decoder_filter_callbacks_.dispatcher_, setTrackedObject(_)).Times(2);
   timer_->invokeCallback();
 
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
@@ -764,7 +769,7 @@ TEST_F(FaultFilterTest, TimerResetAfterStreamReset) {
 
   SCOPED_TRACE("FixedDelayWithStreamReset");
   timer_ = new Event::MockTimer(&decoder_filter_callbacks_.dispatcher_);
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5000UL)));
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5000UL), _));
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::DelayInjected));
@@ -1015,6 +1020,23 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitDisabled) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(request_headers_));
 }
 
+// Make sure we destroy the rate limiter if we are reset.
+TEST_F(FaultFilterRateLimitTest, DestroyWithResponseRateLimitEnabled) {
+  setupRateLimitTest(true);
+
+  ON_CALL(encoder_filter_callbacks_, encoderBufferLimit()).WillByDefault(Return(1100));
+  // The timer is consumed but not used by this test.
+  new NiceMock<Event::MockTimer>(&decoder_filter_callbacks_.dispatcher_);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
+
+  EXPECT_EQ(1UL, config_->stats().response_rl_injected_.value());
+  EXPECT_EQ(1UL, config_->stats().active_faults_.value());
+
+  filter_->onDestroy();
+
+  EXPECT_EQ(0UL, config_->stats().active_faults_.value());
+}
+
 TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
   setupRateLimitTest(true);
 
@@ -1034,7 +1056,7 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
 
   // Send a small amount of data which should be within limit.
   Buffer::OwnedImpl data1("hello");
-  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(0)));
+  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(0), _));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(data1, false));
   EXPECT_CALL(encoder_filter_callbacks_,
               injectEncodedDataToFilterChain(BufferStringEqual("hello"), false));
@@ -1045,11 +1067,11 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
 
   // Send 1152 bytes of data which is 1s + 2 refill cycles of data.
   EXPECT_CALL(encoder_filter_callbacks_, onEncoderFilterAboveWriteBufferHighWatermark());
-  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(0)));
+  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(0), _));
   Buffer::OwnedImpl data2(std::string(1152, 'a'));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(data2, false));
 
-  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(63)));
+  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(63), _));
   EXPECT_CALL(encoder_filter_callbacks_, onEncoderFilterBelowWriteBufferLowWatermark());
   EXPECT_CALL(encoder_filter_callbacks_,
               injectEncodedDataToFilterChain(BufferStringEqual(std::string(1024, 'a')), false));
@@ -1057,7 +1079,7 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
 
   // Fire timer, also advance time.
   time_system_.sleep(std::chrono::milliseconds(63));
-  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(63)));
+  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(63), _));
   EXPECT_CALL(encoder_filter_callbacks_,
               injectEncodedDataToFilterChain(BufferStringEqual(std::string(64, 'a')), false));
   token_timer->invokeCallback();
@@ -1068,7 +1090,7 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
 
   // Fire timer, also advance time.
   time_system_.sleep(std::chrono::milliseconds(63));
-  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(63)));
+  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(63), _));
   EXPECT_CALL(encoder_filter_callbacks_,
               injectEncodedDataToFilterChain(BufferStringEqual(std::string(64, 'a')), false));
   token_timer->invokeCallback();
@@ -1083,7 +1105,7 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
   time_system_.sleep(std::chrono::seconds(1));
 
   // Now send 1024 in one shot with end_stream true which should go through and end the stream.
-  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(0)));
+  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(0), _));
   Buffer::OwnedImpl data4(std::string(1024, 'c'));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(data4, true));
   EXPECT_CALL(encoder_filter_callbacks_,
@@ -1092,6 +1114,42 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
 
   filter_->onDestroy();
   EXPECT_EQ(0UL, config_->stats().active_faults_.value());
+}
+
+class FaultFilterSettingsTest : public FaultFilterTest {};
+
+TEST_F(FaultFilterSettingsTest, CheckDefaultRuntimeKeys) {
+  envoy::config::filter::http::fault::v2::HTTPFault fault;
+
+  Fault::FaultSettings settings(fault);
+
+  EXPECT_EQ("fault.http.delay.fixed_delay_percent", settings.delayPercentRuntime());
+  EXPECT_EQ("fault.http.abort.abort_percent", settings.abortPercentRuntime());
+  EXPECT_EQ("fault.http.delay.fixed_duration_ms", settings.delayDurationRuntime());
+  EXPECT_EQ("fault.http.abort.http_status", settings.abortHttpStatusRuntime());
+  EXPECT_EQ("fault.http.max_active_faults", settings.maxActiveFaultsRuntime());
+  EXPECT_EQ("fault.http.rate_limit.response_percent", settings.responseRateLimitPercentRuntime());
+}
+
+TEST_F(FaultFilterSettingsTest, CheckOverrideRuntimeKeys) {
+  envoy::config::filter::http::fault::v2::HTTPFault fault;
+  fault.set_abort_percent_runtime(std::string("fault.abort_percent_runtime"));
+  fault.set_delay_percent_runtime(std::string("fault.delay_percent_runtime"));
+  fault.set_abort_http_status_runtime(std::string("fault.abort_http_status_runtime"));
+  fault.set_delay_duration_runtime(std::string("fault.delay_duration_runtime"));
+  fault.set_max_active_faults_runtime(std::string("fault.max_active_faults_runtime"));
+  fault.set_response_rate_limit_percent_runtime(
+      std::string("fault.response_rate_limit_percent_runtime"));
+
+  Fault::FaultSettings settings(fault);
+
+  EXPECT_EQ("fault.delay_percent_runtime", settings.delayPercentRuntime());
+  EXPECT_EQ("fault.abort_percent_runtime", settings.abortPercentRuntime());
+  EXPECT_EQ("fault.delay_duration_runtime", settings.delayDurationRuntime());
+  EXPECT_EQ("fault.abort_http_status_runtime", settings.abortHttpStatusRuntime());
+  EXPECT_EQ("fault.max_active_faults_runtime", settings.maxActiveFaultsRuntime());
+  EXPECT_EQ("fault.response_rate_limit_percent_runtime",
+            settings.responseRateLimitPercentRuntime());
 }
 
 } // namespace

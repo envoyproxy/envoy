@@ -10,7 +10,7 @@ public:
     debug_assertion_failure_record_action_ = action;
   }
 
-  ~ActionRegistrationImpl() {
+  ~ActionRegistrationImpl() override {
     ASSERT(debug_assertion_failure_record_action_ != nullptr);
     debug_assertion_failure_record_action_ = nullptr;
   }
@@ -30,7 +30,7 @@ private:
 
 std::function<void()> ActionRegistrationImpl::debug_assertion_failure_record_action_;
 
-ActionRegistrationPtr setDebugAssertionFailureRecordAction(std::function<void()> action) {
+ActionRegistrationPtr setDebugAssertionFailureRecordAction(const std::function<void()>& action) {
   return std::make_unique<ActionRegistrationImpl>(action);
 }
 

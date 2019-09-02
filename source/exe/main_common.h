@@ -17,7 +17,7 @@
 #include "server/server.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
-#include "exe/signal_action.h"
+#include "common/signal/signal_action.h"
 #include "exe/terminate_handler.h"
 #endif
 
@@ -67,11 +67,11 @@ public:
 protected:
   ProcessWide process_wide_; // Process-wide state setup/teardown.
   const Envoy::OptionsImpl& options_;
-  Stats::FakeSymbolTableImpl symbol_table_;
   Server::ComponentFactory& component_factory_;
   Thread::ThreadFactory& thread_factory_;
   Filesystem::Instance& file_system_;
-  Stats::HeapStatDataAllocator stats_allocator_;
+  Stats::SymbolTablePtr symbol_table_;
+  Stats::AllocatorImpl stats_allocator_;
 
   std::unique_ptr<ThreadLocal::InstanceImpl> tls_;
   std::unique_ptr<Server::HotRestart> restarter_;

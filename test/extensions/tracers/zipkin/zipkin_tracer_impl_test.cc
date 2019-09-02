@@ -27,6 +27,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Eq;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
@@ -48,24 +49,76 @@ public:
 
     if (init_timer) {
       timer_ = new NiceMock<Event::MockTimer>(&tls_.dispatcher_);
-      EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5000)));
+      EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5000), _));
     }
 
     driver_ = std::make_unique<Driver>(zipkin_config, cm_, stats_, tls_, runtime_, local_info_,
                                        random_, time_source_);
   }
 
-  void setupValidDriver() {
-    EXPECT_CALL(cm_, get("fake_cluster")).WillRepeatedly(Return(&cm_.thread_local_cluster_));
+  void setupValidDriver(const std::string& version) {
+    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
 
-    const std::string yaml_string = R"EOF(
+    const std::string yaml_string = fmt::format(R"EOF(
     collector_cluster: fake_cluster
     collector_endpoint: /api/v1/spans
-    )EOF";
+    collector_endpoint_version: {}
+    )EOF",
+                                                version);
     envoy::config::trace::v2::ZipkinConfig zipkin_config;
     TestUtility::loadFromYaml(yaml_string, zipkin_config);
 
     setup(zipkin_config, true);
+  }
+
+  void expectValidFlushSeveralSpans(const std::string& version, const std::string& content_type) {
+    setupValidDriver(version);
+
+    Http::MockAsyncClientRequest request(&cm_.async_client_);
+    Http::AsyncClient::Callbacks* callback;
+    const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
+
+    EXPECT_CALL(cm_.async_client_,
+                send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
+        .WillOnce(
+            Invoke([&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
+                       const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+              callback = &callbacks;
+
+              EXPECT_EQ("/api/v1/spans", message->headers().Path()->value().getStringView());
+              EXPECT_EQ("fake_cluster", message->headers().Host()->value().getStringView());
+              EXPECT_EQ(content_type, message->headers().ContentType()->value().getStringView());
+
+              return &request;
+            }));
+
+    EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.min_flush_spans", 5))
+        .Times(2)
+        .WillRepeatedly(Return(2));
+    EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.request_timeout", 5000U))
+        .WillOnce(Return(5000U));
+
+    Tracing::SpanPtr first_span = driver_->startSpan(
+        config_, request_headers_, operation_name_, start_time_, {Tracing::Reason::Sampling, true});
+    first_span->finishSpan();
+
+    Tracing::SpanPtr second_span = driver_->startSpan(
+        config_, request_headers_, operation_name_, start_time_, {Tracing::Reason::Sampling, true});
+    second_span->finishSpan();
+
+    Http::MessagePtr msg(new Http::ResponseMessageImpl(
+        Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "202"}}}));
+
+    callback->onSuccess(std::move(msg));
+
+    EXPECT_EQ(2U, stats_.counter("tracing.zipkin.spans_sent").value());
+    EXPECT_EQ(1U, stats_.counter("tracing.zipkin.reports_sent").value());
+    EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_dropped").value());
+    EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_failed").value());
+
+    callback->onFailure(Http::AsyncClient::FailureReason::Reset);
+
+    EXPECT_EQ(1U, stats_.counter("tracing.zipkin.reports_failed").value());
   }
 
   // TODO(#4160): Currently time_system_ is initialized from DangerousDeprecatedTestTime, which uses
@@ -104,7 +157,7 @@ TEST_F(ZipkinDriverTest, InitializeDriver) {
 
   {
     // Valid config but not valid cluster.
-    EXPECT_CALL(cm_, get("fake_cluster")).WillOnce(Return(nullptr));
+    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillOnce(Return(nullptr));
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     collector_endpoint: /api/v1/spans
@@ -117,7 +170,7 @@ TEST_F(ZipkinDriverTest, InitializeDriver) {
 
   {
     // valid config
-    EXPECT_CALL(cm_, get("fake_cluster")).WillRepeatedly(Return(&cm_.thread_local_cluster_));
+    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
     ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features()).WillByDefault(Return(0));
 
     const std::string yaml_string = R"EOF(
@@ -132,58 +185,23 @@ TEST_F(ZipkinDriverTest, InitializeDriver) {
 }
 
 TEST_F(ZipkinDriverTest, FlushSeveralSpans) {
-  setupValidDriver();
+  expectValidFlushSeveralSpans("HTTP_JSON_V1", "application/json");
+}
 
-  Http::MockAsyncClientRequest request(&cm_.async_client_);
-  Http::AsyncClient::Callbacks* callback;
-  const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
+TEST_F(ZipkinDriverTest, FlushSeveralSpansHttpJsonV1) {
+  expectValidFlushSeveralSpans("HTTP_JSON_V1", "application/json");
+}
 
-  EXPECT_CALL(cm_.async_client_,
-              send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
-      .WillOnce(
-          Invoke([&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callback = &callbacks;
+TEST_F(ZipkinDriverTest, FlushSeveralSpansHttpJson) {
+  expectValidFlushSeveralSpans("HTTP_JSON", "application/json");
+}
 
-            EXPECT_EQ("/api/v1/spans", message->headers().Path()->value().getStringView());
-            EXPECT_EQ("fake_cluster", message->headers().Host()->value().getStringView());
-            EXPECT_EQ("application/json",
-                      message->headers().ContentType()->value().getStringView());
-
-            return &request;
-          }));
-
-  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.min_flush_spans", 5))
-      .Times(2)
-      .WillRepeatedly(Return(2));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.request_timeout", 5000U))
-      .WillOnce(Return(5000U));
-
-  Tracing::SpanPtr first_span = driver_->startSpan(config_, request_headers_, operation_name_,
-                                                   start_time_, {Tracing::Reason::Sampling, true});
-  first_span->finishSpan();
-
-  Tracing::SpanPtr second_span = driver_->startSpan(config_, request_headers_, operation_name_,
-                                                    start_time_, {Tracing::Reason::Sampling, true});
-  second_span->finishSpan();
-
-  Http::MessagePtr msg(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "202"}}}));
-
-  callback->onSuccess(std::move(msg));
-
-  EXPECT_EQ(2U, stats_.counter("tracing.zipkin.spans_sent").value());
-  EXPECT_EQ(1U, stats_.counter("tracing.zipkin.reports_sent").value());
-  EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_dropped").value());
-  EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_failed").value());
-
-  callback->onFailure(Http::AsyncClient::FailureReason::Reset);
-
-  EXPECT_EQ(1U, stats_.counter("tracing.zipkin.reports_failed").value());
+TEST_F(ZipkinDriverTest, FlushSeveralSpansHttpProto) {
+  expectValidFlushSeveralSpans("HTTP_PROTO", "application/x-protobuf");
 }
 
 TEST_F(ZipkinDriverTest, FlushOneSpanReportFailure) {
-  setupValidDriver();
+  setupValidDriver("HTTP_JSON_V1");
 
   Http::MockAsyncClientRequest request(&cm_.async_client_);
   Http::AsyncClient::Callbacks* callback;
@@ -225,7 +243,7 @@ TEST_F(ZipkinDriverTest, FlushOneSpanReportFailure) {
 }
 
 TEST_F(ZipkinDriverTest, FlushSpansTimer) {
-  setupValidDriver();
+  setupValidDriver("HTTP_JSON_V1");
 
   const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
   EXPECT_CALL(cm_.async_client_,
@@ -239,20 +257,20 @@ TEST_F(ZipkinDriverTest, FlushSpansTimer) {
   span->finishSpan();
 
   // Timer should be re-enabled.
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5000)));
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5000), _));
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.request_timeout", 5000U))
       .WillOnce(Return(5000U));
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.flush_interval_ms", 5000U))
       .WillOnce(Return(5000U));
 
-  timer_->callback_();
+  timer_->invokeCallback();
 
   EXPECT_EQ(1U, stats_.counter("tracing.zipkin.timer_flushed").value());
   EXPECT_EQ(1U, stats_.counter("tracing.zipkin.spans_sent").value());
 }
 
 TEST_F(ZipkinDriverTest, NoB3ContextSampledTrue) {
-  setupValidDriver();
+  setupValidDriver("HTTP_JSON_V1");
 
   EXPECT_EQ(nullptr, request_headers_.get(ZipkinCoreConstants::get().X_B3_SPAN_ID));
   EXPECT_EQ(nullptr, request_headers_.get(ZipkinCoreConstants::get().X_B3_TRACE_ID));
@@ -266,7 +284,7 @@ TEST_F(ZipkinDriverTest, NoB3ContextSampledTrue) {
 }
 
 TEST_F(ZipkinDriverTest, NoB3ContextSampledFalse) {
-  setupValidDriver();
+  setupValidDriver("HTTP_JSON_V1");
 
   EXPECT_EQ(nullptr, request_headers_.get(ZipkinCoreConstants::get().X_B3_SPAN_ID));
   EXPECT_EQ(nullptr, request_headers_.get(ZipkinCoreConstants::get().X_B3_TRACE_ID));
@@ -280,7 +298,7 @@ TEST_F(ZipkinDriverTest, NoB3ContextSampledFalse) {
 }
 
 TEST_F(ZipkinDriverTest, PropagateB3NoSampleDecisionSampleTrue) {
-  setupValidDriver();
+  setupValidDriver("HTTP_JSON_V1");
 
   request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_TRACE_ID,
                                    Hex::uint64ToHex(generateRandom64()));
@@ -296,7 +314,7 @@ TEST_F(ZipkinDriverTest, PropagateB3NoSampleDecisionSampleTrue) {
 }
 
 TEST_F(ZipkinDriverTest, PropagateB3NoSampleDecisionSampleFalse) {
-  setupValidDriver();
+  setupValidDriver("HTTP_JSON_V1");
 
   request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_TRACE_ID,
                                    Hex::uint64ToHex(generateRandom64()));
@@ -312,7 +330,7 @@ TEST_F(ZipkinDriverTest, PropagateB3NoSampleDecisionSampleFalse) {
 }
 
 TEST_F(ZipkinDriverTest, PropagateB3NotSampled) {
-  setupValidDriver();
+  setupValidDriver("HTTP_JSON_V1");
 
   EXPECT_EQ(nullptr, request_headers_.get(ZipkinCoreConstants::get().X_B3_SPAN_ID));
   EXPECT_EQ(nullptr, request_headers_.get(ZipkinCoreConstants::get().X_B3_TRACE_ID));
@@ -334,7 +352,7 @@ TEST_F(ZipkinDriverTest, PropagateB3NotSampled) {
 }
 
 TEST_F(ZipkinDriverTest, PropagateB3NotSampledWithFalse) {
-  setupValidDriver();
+  setupValidDriver("HTTP_JSON_V1");
 
   EXPECT_EQ(nullptr, request_headers_.get(ZipkinCoreConstants::get().X_B3_SPAN_ID));
   EXPECT_EQ(nullptr, request_headers_.get(ZipkinCoreConstants::get().X_B3_TRACE_ID));
@@ -356,7 +374,7 @@ TEST_F(ZipkinDriverTest, PropagateB3NotSampledWithFalse) {
 }
 
 TEST_F(ZipkinDriverTest, PropagateB3SampledWithTrue) {
-  setupValidDriver();
+  setupValidDriver("HTTP_JSON_V1");
 
   EXPECT_EQ(nullptr, request_headers_.get(ZipkinCoreConstants::get().X_B3_SPAN_ID));
   EXPECT_EQ(nullptr, request_headers_.get(ZipkinCoreConstants::get().X_B3_TRACE_ID));
@@ -378,7 +396,7 @@ TEST_F(ZipkinDriverTest, PropagateB3SampledWithTrue) {
 }
 
 TEST_F(ZipkinDriverTest, PropagateB3SampleFalse) {
-  setupValidDriver();
+  setupValidDriver("HTTP_JSON_V1");
 
   request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_TRACE_ID,
                                    Hex::uint64ToHex(generateRandom64()));
@@ -395,7 +413,7 @@ TEST_F(ZipkinDriverTest, PropagateB3SampleFalse) {
 }
 
 TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
-  setupValidDriver();
+  setupValidDriver("HTTP_JSON_V1");
 
   // ====
   // Test effective setTag()
@@ -475,7 +493,7 @@ TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
 }
 
 TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3HeadersTest) {
-  setupValidDriver();
+  setupValidDriver("HTTP_JSON_V1");
 
   const std::string trace_id = Hex::uint64ToHex(generateRandom64());
   const std::string span_id = Hex::uint64ToHex(generateRandom64());
@@ -499,7 +517,7 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3HeadersTest) {
 }
 
 TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3HeadersEmptyParentSpanTest) {
-  setupValidDriver();
+  setupValidDriver("HTTP_JSON_V1");
 
   // Root span so have same trace and span id
   const std::string id = Hex::uint64ToHex(generateRandom64());
@@ -520,7 +538,7 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3HeadersEmptyParentSpanTest) {
 }
 
 TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3Headers128TraceIdTest) {
-  setupValidDriver();
+  setupValidDriver("HTTP_JSON_V1");
 
   const uint64_t trace_id_high = generateRandom64();
   const uint64_t trace_id_low = generateRandom64();
@@ -548,7 +566,7 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3Headers128TraceIdTest) {
 }
 
 TEST_F(ZipkinDriverTest, ZipkinSpanContextFromInvalidTraceIdB3HeadersTest) {
-  setupValidDriver();
+  setupValidDriver("HTTP_JSON_V1");
 
   request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_TRACE_ID, std::string("xyz"));
   request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_SPAN_ID,
@@ -562,7 +580,7 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromInvalidTraceIdB3HeadersTest) {
 }
 
 TEST_F(ZipkinDriverTest, ZipkinSpanContextFromInvalidSpanIdB3HeadersTest) {
-  setupValidDriver();
+  setupValidDriver("HTTP_JSON_V1");
 
   request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_TRACE_ID,
                                    Hex::uint64ToHex(generateRandom64()));
@@ -576,7 +594,7 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromInvalidSpanIdB3HeadersTest) {
 }
 
 TEST_F(ZipkinDriverTest, ZipkinSpanContextFromInvalidParentIdB3HeadersTest) {
-  setupValidDriver();
+  setupValidDriver("HTTP_JSON_V1");
 
   request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_TRACE_ID,
                                    Hex::uint64ToHex(generateRandom64()));
@@ -591,7 +609,7 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromInvalidParentIdB3HeadersTest) {
 }
 
 TEST_F(ZipkinDriverTest, ExplicitlySetSampledFalse) {
-  setupValidDriver();
+  setupValidDriver("HTTP_JSON_V1");
 
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, true});
@@ -608,7 +626,7 @@ TEST_F(ZipkinDriverTest, ExplicitlySetSampledFalse) {
 }
 
 TEST_F(ZipkinDriverTest, ExplicitlySetSampledTrue) {
-  setupValidDriver();
+  setupValidDriver("HTTP_JSON_V1");
 
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, false});
@@ -625,7 +643,7 @@ TEST_F(ZipkinDriverTest, ExplicitlySetSampledTrue) {
 }
 
 TEST_F(ZipkinDriverTest, DuplicatedHeader) {
-  setupValidDriver();
+  setupValidDriver("HTTP_JSON_V1");
   request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_TRACE_ID,
                                    Hex::uint64ToHex(generateRandom64()));
   request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_SPAN_ID,
@@ -635,7 +653,7 @@ TEST_F(ZipkinDriverTest, DuplicatedHeader) {
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, false});
 
-  typedef std::function<bool(absl::string_view key)> DupCallback;
+  using DupCallback = std::function<bool(absl::string_view key)>;
   DupCallback dup_callback = [](absl::string_view key) -> bool {
     static absl::flat_hash_map<std::string, bool> dup;
     if (dup.find(key) == dup.end()) {

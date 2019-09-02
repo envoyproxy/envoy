@@ -69,7 +69,7 @@ public:
     return response;
   }
 
-  ~ExtAuthzFilterTest() {
+  ~ExtAuthzFilterTest() override {
     for (const Stats::GaugeSharedPtr& gauge : stats_store_.gauges()) {
       EXPECT_EQ(0U, gauge->value());
     }
@@ -95,7 +95,7 @@ TEST_F(ExtAuthzFilterTest, BadExtAuthzConfig) {
   envoy::config::filter::network::ext_authz::v2::ExtAuthz proto_config{};
   TestUtility::loadFromJson(json_string, proto_config);
 
-  EXPECT_THROW(MessageUtil::downcastAndValidate<
+  EXPECT_THROW(TestUtility::downcastAndValidate<
                    const envoy::config::filter::network::ext_authz::v2::ExtAuthz&>(proto_config),
                ProtoValidationException);
 }

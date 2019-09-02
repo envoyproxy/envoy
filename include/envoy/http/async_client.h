@@ -29,7 +29,7 @@ public:
    */
   class Callbacks {
   public:
-    virtual ~Callbacks() {}
+    virtual ~Callbacks() = default;
 
     /**
      * Called when the async HTTP request succeeds.
@@ -52,7 +52,7 @@ public:
    */
   class StreamCallbacks {
   public:
-    virtual ~StreamCallbacks() {}
+    virtual ~StreamCallbacks() = default;
 
     /**
      * Called when all headers get received on the async HTTP stream.
@@ -76,6 +76,13 @@ public:
     virtual void onTrailers(HeaderMapPtr&& trailers) PURE;
 
     /**
+     * Called when both the local and remote have gracefully closed the stream.
+     * Useful for asymmetric cases where end_stream may not be bidirectionally observable.
+     * Note this is NOT called on stream reset.
+     */
+    virtual void onComplete() PURE;
+
+    /**
      * Called when the async HTTP stream is reset.
      */
     virtual void onReset() PURE;
@@ -86,7 +93,7 @@ public:
    */
   class Request {
   public:
-    virtual ~Request() {}
+    virtual ~Request() = default;
 
     /**
      * Signals that the request should be cancelled.
@@ -99,7 +106,7 @@ public:
    */
   class Stream {
   public:
-    virtual ~Stream() {}
+    virtual ~Stream() = default;
 
     /***
      * Send headers to the stream. This method cannot be invoked more than once and
@@ -129,7 +136,7 @@ public:
     virtual void reset() PURE;
   };
 
-  virtual ~AsyncClient() {}
+  virtual ~AsyncClient() = default;
 
   /**
    * A structure to hold the options for AsyncStream object.
@@ -226,7 +233,7 @@ public:
   virtual Event::Dispatcher& dispatcher() PURE;
 };
 
-typedef std::unique_ptr<AsyncClient> AsyncClientPtr;
+using AsyncClientPtr = std::unique_ptr<AsyncClient>;
 
 } // namespace Http
 } // namespace Envoy

@@ -17,11 +17,8 @@ envoy_cc_test(
     deps = [
         ":utility_lib",
         "//source/common/config:utility_lib",
-        "//source/common/http:message_lib",
-        "//source/common/json:json_loader_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/upstream:cds_api_lib",
-        "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
@@ -60,6 +57,7 @@ envoy_cc_test(
         "//test/mocks/tcp:tcp_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:registry_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
@@ -112,7 +110,6 @@ envoy_cc_test(
     deps = [
         ":utility_lib",
         "//source/common/buffer:buffer_lib",
-        "//source/common/config:cds_json_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/http:headers_lib",
         "//source/common/json:json_loader_lib",
@@ -274,6 +271,7 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -335,6 +333,7 @@ envoy_cc_binary(
         "benchmark",
     ],
     deps = [
+        "//source/common/memory:stats_lib",
         "//source/common/upstream:maglev_lb_lib",
         "//source/common/upstream:ring_hash_lb_lib",
         "//source/common/upstream:upstream_lib",
@@ -398,12 +397,12 @@ envoy_cc_test_library(
     hdrs = ["utility.h"],
     deps = [
         "//include/envoy/stats:stats_interface",
-        "//source/common/config:cds_json_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
         "//source/common/stats:stats_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 

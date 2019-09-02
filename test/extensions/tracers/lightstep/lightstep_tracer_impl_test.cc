@@ -31,6 +31,7 @@
 
 using testing::_;
 using testing::AtLeast;
+using testing::Eq;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
@@ -59,7 +60,7 @@ public:
 
     if (init_timer) {
       timer_ = new NiceMock<Event::MockTimer>(&tls_.dispatcher_);
-      EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(1000)));
+      EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(1000), _));
     }
 
     driver_ = std::make_unique<LightStepDriver>(lightstep_config, cm_, stats_, tls_, runtime_,
@@ -68,7 +69,7 @@ public:
 
   void setupValidDriver(Common::Ot::OpenTracingDriver::PropagationMode propagation_mode =
                             Common::Ot::OpenTracingDriver::PropagationMode::TracerNative) {
-    EXPECT_CALL(cm_, get("fake_cluster")).WillRepeatedly(Return(&cm_.thread_local_cluster_));
+    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
     ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
         .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
 
@@ -88,8 +89,8 @@ public:
   SystemTime start_time_;
   StreamInfo::MockStreamInfo stream_info_;
 
-  Envoy::Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
-  Grpc::Common grpc_context_;
+  Stats::TestSymbolTable symbol_table_;
+  Grpc::ContextImpl grpc_context_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::IsolatedStoreImpl stats_;
   std::unique_ptr<LightStepDriver> driver_;
@@ -120,7 +121,7 @@ TEST_F(LightStepDriverTest, InitializeDriver) {
 
   {
     // Valid config but not valid cluster.
-    EXPECT_CALL(cm_, get("fake_cluster")).WillOnce(Return(nullptr));
+    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillOnce(Return(nullptr));
 
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
@@ -133,7 +134,7 @@ TEST_F(LightStepDriverTest, InitializeDriver) {
 
   {
     // Valid config, but upstream cluster does not support http2.
-    EXPECT_CALL(cm_, get("fake_cluster")).WillRepeatedly(Return(&cm_.thread_local_cluster_));
+    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
     ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features()).WillByDefault(Return(0));
 
     const std::string yaml_string = R"EOF(
@@ -146,7 +147,7 @@ TEST_F(LightStepDriverTest, InitializeDriver) {
   }
 
   {
-    EXPECT_CALL(cm_, get("fake_cluster")).WillRepeatedly(Return(&cm_.thread_local_cluster_));
+    EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
     ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
         .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
 
@@ -335,13 +336,13 @@ TEST_F(LightStepDriverTest, FlushSpansTimer) {
   span->finishSpan();
 
   // Timer should be re-enabled.
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(1000)));
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(1000), _));
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
       .WillOnce(Return(5000U));
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.flush_interval_ms", 1000U))
       .WillOnce(Return(1000U));
 
-  timer_->callback_();
+  timer_->invokeCallback();
 
   EXPECT_EQ(1U, stats_.counter("tracing.lightstep.timer_flushed").value());
   EXPECT_EQ(1U, stats_.counter("tracing.lightstep.spans_sent").value());
