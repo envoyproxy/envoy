@@ -587,11 +587,9 @@ TEST_P(StatNameTest, RecentLookups) {
   });
   std::string recent_lookups_str = StringUtil::join(accum, " ");
 
-  EXPECT_EQ("2009-12-22,00:00:01;Item=direct "
-            "2009-12-22,00:00:01;Item=stat "
-            "2009-12-22,00:00:00;Item=dynamic "
+  EXPECT_EQ("2009-12-22,00:00:01;Item=direct.stat "
             "2009-12-22,00:00:00;Item=dynamic.stat "
-            "2009-12-22,00:00:00;Item=stat",
+            "2009-12-22,00:00:00;Item=dynamic.stat",
             recent_lookups_str);
 }
 

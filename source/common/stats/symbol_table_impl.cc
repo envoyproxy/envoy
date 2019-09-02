@@ -126,12 +126,11 @@ void SymbolTableImpl::addTokensToEncoding(const absl::string_view name, Encoding
   // ref-counts in this.
   {
     Thread::LockGuard lock(lock_);
+    if (recent_lookups_ != nullptr) {
+      recent_lookups_->lookup(std::string(name));
+    }
     for (auto& token : tokens) {
-      Symbol symbol = toSymbol(token);
-      symbols.push_back(symbol);
-      if (recent_lookups_ != nullptr) {
-        recent_lookups_->lookup(symbol);
-      }
+      symbols.push_back(toSymbol(token));
     }
   }
 
@@ -223,10 +222,7 @@ void SymbolTableImpl::freeSymbolLockHeld(Symbol symbol) {
 void SymbolTableImpl::trackRecentLookups(TimeSource& time_source) {
   {
     Thread::LockGuard lock(lock_);
-    recent_lookups_ = std::make_unique<RecentLookups<Symbol>>(time_source);
-    recent_lookups_->setFreeFn([this](Symbol symbol) NO_THREAD_SAFETY_ANALYSIS {
-                                 freeSymbolLockHeld(symbol);
-                               });
+    recent_lookups_ = std::make_unique<RecentLookups<std::string>>(time_source);
   }
 
   {
@@ -240,12 +236,12 @@ void SymbolTableImpl::trackRecentLookups(TimeSource& time_source) {
 bool SymbolTableImpl::getRecentLookups(const RecentLookupsFn& iter) {
   struct LookupData {
     StatName stat_name_;
-    Symbol symbol_; // Used if stat_name is empty, as 0 is a valid symbol.
+    std::string name_; // Used if stat_name is empty.
     SystemTime time_;
 
     std::string name(SymbolTableImpl& symbol_table) const {
       if (stat_name_.empty()) {
-        return std::string(symbol_table.fromSymbol(symbol_));
+        return name_;
       }
       return symbol_table.toString(stat_name_);
     };
@@ -260,7 +256,7 @@ bool SymbolTableImpl::getRecentLookups(const RecentLookupsFn& iter) {
     for (StatNameSet* stat_name_set : stat_name_sets_) {
       stat_name_set->getRecentLookups([&lookup_data](StatName stat_name, SystemTime time) {
         ASSERT(!stat_name.empty());
-        lookup_data.push_back({stat_name, Symbol(0), time});
+        lookup_data.push_back({stat_name, "", time});
       });
     }
   }
@@ -270,9 +266,9 @@ bool SymbolTableImpl::getRecentLookups(const RecentLookupsFn& iter) {
     if (recent_lookups_ == nullptr) {
       return false;
     }
-    recent_lookups_->forEach([&lookup_data](Symbol symbol, SystemTime time)
+    recent_lookups_->forEach([&lookup_data](const std::string& str, SystemTime time)
                                  NO_THREAD_SAFETY_ANALYSIS {
-                                   lookup_data.push_back({StatName(), symbol, time});
+                                   lookup_data.push_back({StatName(), str, time});
                                  });
   }
 
@@ -283,8 +279,12 @@ bool SymbolTableImpl::getRecentLookups(const RecentLookupsFn& iter) {
               }
               return a.time_ > b.time_; // Sort latest first.
             });
+  const LookupData* prev = nullptr;
   for (const LookupData& lookup : lookup_data) {
-    iter(lookup.name(*this), lookup.time_);
+    if (prev == nullptr || prev->name_ != lookup.name_) {
+      iter(lookup.name(*this), lookup.time_);
+      prev = &lookup;
+    }
   }
   return true;
 }

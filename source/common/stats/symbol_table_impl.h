@@ -252,7 +252,7 @@ private:
   // TODO(ambuc): There might be an optimization here relating to storing ranges of freed symbols
   // using an Envoy::IntervalSet.
   std::stack<Symbol> pool_ GUARDED_BY(lock_);
-  std::unique_ptr<RecentLookups<Symbol>> recent_lookups_ GUARDED_BY(lock_);
+  std::unique_ptr<RecentLookups<std::string>> recent_lookups_ GUARDED_BY(lock_);
 
   absl::flat_hash_set<StatNameSet*> stat_name_sets_ GUARDED_BY(stat_name_set_mutex_);
 };
