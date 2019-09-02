@@ -63,7 +63,14 @@ def _envoy_test_linkopts():
     }) + envoy_select_force_libcpp([], ["-lstdc++fs", "-latomic"])
 
 # Envoy C++ fuzz test targets. These are not included in coverage runs.
-def envoy_cc_fuzz_test(name, corpus, repository = "", size = "medium", deps = [], tags = [], **kwargs):
+def envoy_cc_fuzz_test(
+        name,
+        corpus,
+        repository = "",
+        size = "medium",
+        deps = [],
+        tags = [],
+        **kwargs):
     if not (corpus.startswith("//") or corpus.startswith(":") or corpus.startswith("@")):
         corpus_name = name + "_corpus"
         corpus = native.glob([corpus + "/**"])
@@ -81,7 +88,10 @@ def envoy_cc_fuzz_test(name, corpus, repository = "", size = "medium", deps = []
     test_lib_name = name + "_lib"
     envoy_cc_test_library(
         name = test_lib_name,
-        deps = deps + [repository + "//test/fuzz:fuzz_runner_lib", repository + "//bazel:dynamic_stdlib"],
+        deps = deps + [
+            repository + "//test/fuzz:fuzz_runner_lib",
+            repository + "//bazel:dynamic_stdlib"
+        ],
         repository=repository,
         **kwargs
     )
