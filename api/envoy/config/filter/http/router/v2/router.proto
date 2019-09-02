@@ -63,4 +63,6 @@ message Router {
       "x-envoy-retry-on"
     ]
   }];
+
+  bool respect_expected_rq_timeout = 6;
 }

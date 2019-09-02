@@ -83,6 +83,7 @@ std::string getFilterConfig(bool use_local_jwks) {
 
 using LocalJwksIntegrationTest = HttpProtocolIntegrationTest;
 
+/*********/
 INSTANTIATE_TEST_SUITE_P(Protocols, LocalJwksIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
