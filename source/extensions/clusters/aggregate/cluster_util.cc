@@ -5,17 +5,6 @@ namespace Extensions {
 namespace Clusters {
 namespace Aggregate {
 
-Upstream::ThreadLocalCluster*
-ClusterUtil::getThreadLocalCluster(Upstream::ClusterManager& cluster_manager,
-                                   const std::string& name) {
-  Upstream::ThreadLocalCluster* tlc = cluster_manager.get(name);
-  if (tlc == nullptr) {
-    throw EnvoyException(fmt::format("no thread local cluster with name {}", name));
-  }
-
-  return tlc;
-}
-
 std::pair<Upstream::PrioritySetImpl,
           std::vector<std::pair<uint32_t, Upstream::ThreadLocalCluster*>>>
 ClusterUtil::linearizePrioritySet(Upstream::ClusterManager& cluster_manager,
@@ -32,7 +21,11 @@ ClusterUtil::linearizePrioritySet(Upstream::ClusterManager& cluster_manager,
   //    [C_0.P_0, C_0.P_1, C_0.P_2, C_1.P_0, C_1.P_1, C_2.P_0, C_2.P_1, C_2.P_2, C_2.P_3]
   // and the traffic will be distributed among these priorities.
   for (const auto& cluster : clusters) {
-    auto tlc = getThreadLocalCluster(cluster_manager, cluster);
+    auto tlc = cluster_manager.get(cluster);
+    if (tlc == nullptr) {
+      continue;
+    }
+
     int priority = 0;
     for (const auto& host_set : tlc->prioritySet().hostSetsPerPriority()) {
       if (!host_set->hosts().empty()) {
@@ -46,6 +39,20 @@ ClusterUtil::linearizePrioritySet(Upstream::ClusterManager& cluster_manager,
   }
 
   return std::make_pair(std::move(priority_set), std::move(priority_to_cluster));
+}
+
+void ClusterUtil::updatePrioritySetCallbacks(Upstream::ClusterManager& cluster_manager,
+                                             const std::vector<std::string>& clusters,
+                                             PriorityCb priority_cb, MemberCb member_cb) {
+  for (const auto& cluster : clusters) {
+    auto tlc = cluster_manager.get(cluster);
+    if (tlc == nullptr) {
+      continue;
+    }
+
+    tlc->prioritySet().addPriorityUpdateCb(priority_cb);
+    tlc->prioritySet().addMemberUpdateCb(member_cb);
+  }
 }
 
 } // namespace Aggregate

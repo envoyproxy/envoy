@@ -7,15 +7,13 @@ namespace Extensions {
 namespace Clusters {
 namespace Aggregate {
 
+using PriorityCb =
+    std::function<void(uint32_t, const Upstream::HostVector&, const Upstream::HostVector&)>;
+
+using MemberCb = std::function<void(const Upstream::HostVector&, const Upstream::HostVector&)>;
+
 class ClusterUtil {
 public:
-  // Get thread local cluster with cluster name.
-  // @param cluster_manager the cluster manager
-  // @param name the cluster name
-  // @return thread local cluster. Throw exception if cannot find the thread local cluster.
-  static Upstream::ThreadLocalCluster*
-  getThreadLocalCluster(Upstream::ClusterManager& cluster_manager, const std::string& name);
-
   // Linearize the priority set of clusters into one priority set.
   // @param cluster_manager the cluster manager
   // @param clusters clusters in aggregate cluster
@@ -25,6 +23,15 @@ public:
                    std::vector<std::pair<uint32_t, Upstream::ThreadLocalCluster*>>>
   linearizePrioritySet(Upstream::ClusterManager& cluster_manager,
                        const std::vector<std::string>& clusters);
+
+  // Update priority set callback
+  // @param cluster_manager the cluster manager
+  // @param clusters clusters in aggregate cluster
+  // @param priority_cb priority callback
+  // @param member_cb member callback
+  static void updatePrioritySetCallbacks(Upstream::ClusterManager& cluster_manager,
+                                         const std::vector<std::string>& clusters,
+                                         PriorityCb priority_cb, MemberCb member_cb);
 };
 } // namespace Aggregate
 } // namespace Clusters

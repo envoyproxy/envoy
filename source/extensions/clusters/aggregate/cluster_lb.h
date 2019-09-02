@@ -57,7 +57,6 @@ public:
     } else {
       priority_load_.degraded_priority_load_.get()[host_priority_] = 100;
     }
-
     return priority_load_;
   }
   bool shouldSelectAnotherHost(const Upstream::Host& host) override {
@@ -87,7 +86,15 @@ public:
 
   // Upstream::LoadBalancer
   Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext* context) override {
-    return load_balancer_->chooseHost(context);
+    // Initialize the inner load balancer.
+    if (!initialized_) {
+      initialize();
+    }
+
+    if (load_balancer_ != nullptr) {
+      return load_balancer_->chooseHost(context);
+    }
+    return nullptr;
   }
 
   // Upstream::ClusterUpdateCallbacks
@@ -95,7 +102,9 @@ public:
   void onClusterRemoval(const std::string& cluster_name) override;
 
 private:
-  void refreshLoadBalancer();
+  void refresh();
+  void refresh(const std::vector<std::string>& clusters);
+  void initialize();
 
   class LoadBalancerImpl : public Upstream::LoadBalancerBase {
   public:
@@ -121,6 +130,8 @@ private:
 
   using LoadBalancerPtr = std::unique_ptr<LoadBalancerImpl>;
 
+  bool initialized_{false};
+  Upstream::ClusterUpdateCallbacksHandlePtr handle_;
   LoadBalancerPtr load_balancer_;
   Upstream::ClusterManager& cluster_manager_;
   std::vector<std::string> clusters_;

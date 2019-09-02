@@ -141,8 +141,8 @@ public:
 TEST_F(AggregateClusterTest, BasicFlow) {
   initialize(default_yaml_config_);
   EXPECT_EQ(cluster_->initializePhase(), Upstream::Cluster::InitializePhase::Secondary);
-  auto primary = ClusterUtil::getThreadLocalCluster(cm_, "primary");
-  auto secondary = ClusterUtil::getThreadLocalCluster(cm_, "secondary");
+  auto primary = cm_.get("primary");
+  auto secondary = cm_.get("secondary");
   EXPECT_NE(nullptr, primary);
   EXPECT_NE(nullptr, secondary);
 
@@ -162,25 +162,6 @@ TEST_F(AggregateClusterTest, BasicFlow) {
     EXPECT_EQ(expect_cnt[i][3], pair.first.hostSetsPerPriority()[i]->priority());
     EXPECT_EQ(expect_cluster[i], pair.second[i].second);
   }
-}
-
-TEST_F(AggregateClusterTest, InvalidClusterName) {
-  const std::string invalid_yaml_config = R"EOF(
-    name: aggregate_cluster
-    connect_timeout: 0.25s
-    lb_policy: CLUSTER_PROVIDED
-    cluster_type:
-      name: envoy.clusters.aggregate
-      typed_config:
-        "@type": type.googleapis.com/envoy.config.cluster.aggregate.ClusterConfig
-        clusters:
-        - primary
-        - secondary
-        - tertiary
-)EOF";
-
-  EXPECT_THROW_WITH_MESSAGE(initialize(invalid_yaml_config), EnvoyException,
-                            "no thread local cluster with name tertiary");
 }
 
 TEST_F(AggregateClusterTest, LoadBalancerTest) {

@@ -12,30 +12,50 @@ AggregateClusterLoadBalancer::AggregateClusterLoadBalancer(
     Upstream::ClusterStats& stats, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
     const envoy::api::v2::Cluster::CommonLbConfig& common_config)
     : cluster_manager_(cluster_manager), clusters_(clusters), stats_(stats), runtime_(runtime),
-      random_(random), common_config_(common_config) {
-  refreshLoadBalancer();
-  cluster_manager_.addThreadLocalClusterUpdateCallbacks(*this);
+      random_(random), common_config_(common_config) {}
+
+void AggregateClusterLoadBalancer::initialize() {
+  initialized_ = true;
+  refresh();
+  ClusterUtil::updatePrioritySetCallbacks(
+      cluster_manager_, clusters_,
+      [this](uint32_t, const Upstream::HostVector&, const Upstream::HostVector&) { refresh(); },
+      [this](const Upstream::HostVector&, const Upstream::HostVector&) { refresh(); });
+
+  handle_ = cluster_manager_.addThreadLocalClusterUpdateCallbacks(*this);
 }
 
-void AggregateClusterLoadBalancer::refreshLoadBalancer() {
-  load_balancer_ = std::make_unique<AggregateClusterLoadBalancer::LoadBalancerImpl>(
-      *this, ClusterUtil::linearizePrioritySet(cluster_manager_, clusters_));
+void AggregateClusterLoadBalancer::refresh() { refresh(clusters_); }
+
+void AggregateClusterLoadBalancer::refresh(const std::vector<std::string>& clusters) {
+  std::pair<Upstream::PrioritySetImpl,
+            std::vector<std::pair<uint32_t, Upstream::ThreadLocalCluster*>>>
+      pair = ClusterUtil::linearizePrioritySet(cluster_manager_, clusters);
+  if (pair.first.hostSetsPerPriority().empty()) {
+    load_balancer_ = nullptr;
+  } else {
+    load_balancer_ =
+        std::make_unique<AggregateClusterLoadBalancer::LoadBalancerImpl>(*this, std::move(pair));
+  }
 }
 
 void AggregateClusterLoadBalancer::onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) {
-  auto callback = [this](uint32_t, const Upstream::HostVector&, const Upstream::HostVector&) {
-    refreshLoadBalancer();
-  };
-
   if (std::find(clusters_.begin(), clusters_.end(), cluster.info()->name()) != clusters_.end()) {
-    refreshLoadBalancer();
-    cluster.prioritySet().addPriorityUpdateCb(callback);
+    refresh();
+
+    cluster.prioritySet().addPriorityUpdateCb(
+        [this](uint32_t, const Upstream::HostVector&, const Upstream::HostVector&) { refresh(); });
+    cluster.prioritySet().addMemberUpdateCb(
+        [this](const Upstream::HostVector&, const Upstream::HostVector&) { refresh(); });
   }
 }
 
 void AggregateClusterLoadBalancer::onClusterRemoval(const std::string& cluster_name) {
-  if (std::find(clusters_.begin(), clusters_.end(), cluster_name) != clusters_.end()) {
-    refreshLoadBalancer();
+  auto clusters = clusters_;
+  auto it = std::find(clusters.begin(), clusters.end(), cluster_name);
+  if (it != clusters.end()) {
+    clusters.erase(it);
+    refresh(clusters);
   }
 }
 

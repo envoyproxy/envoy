@@ -12,8 +12,8 @@ Cluster::Cluster(const envoy::api::v2::Cluster& cluster,
                  Stats::ScopePtr&& stats_scope, bool added_via_api)
     : Upstream::BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
                                        added_via_api) {
-  for (const auto& cluster : config.clusters()) {
-    clusters_.emplace_back(cluster);
+  for (const auto& inner_cluster : config.clusters()) {
+    clusters_.emplace_back(inner_cluster);
   }
 }
 
