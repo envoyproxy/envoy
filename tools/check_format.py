@@ -42,26 +42,22 @@ REAL_TIME_WHITELIST = ("./source/common/common/utility.h",
                        "./test/test_common/utility.cc", "./test/test_common/utility.h",
                        "./test/integration/integration.h")
 
-# Files matching these directories can use stats by string for now. These should
-# be eliminated but for now we don't want to grow this work. The goal for this
-# whitelist is to eliminate it by making code transformations similar to
-# https://github.com/envoyproxy/envoy/pull/7573 and others.
-#
-# TODO(#4196): Eliminate this list completely and then merge #4980.
-STAT_FROM_STRING_WHITELIST = ("./source/extensions/filters/http/fault/fault_filter.cc",
-                              "./source/extensions/filters/http/ip_tagging/ip_tagging_filter.cc",
-                              "./source/extensions/filters/network/mongo_proxy/proxy.cc",
-                              "./source/extensions/stat_sinks/common/statsd/statsd.cc",
-                              "./source/extensions/transport_sockets/tls/context_impl.cc",
-                              "./source/server/guarddog_impl.cc",
-                              "./source/server/overload_manager_impl.cc")
-
 # Files in these paths can use MessageLite::SerializeAsString
 SERIALIZE_AS_STRING_WHITELIST = ("./test/common/protobuf/utility_test.cc",
                                  "./test/common/grpc/codec_test.cc")
 
 # Files in these paths can use Protobuf::util::JsonStringToMessage
 JSON_STRING_TO_MESSAGE_WHITELIST = ("./source/common/protobuf/utility.cc")
+
+# Files in these paths can use std::regex
+STD_REGEX_WHITELIST = ("./source/common/common/utility.cc", "./source/common/common/regex.h",
+                       "./source/common/common/regex.cc",
+                       "./source/common/stats/tag_extractor_impl.h",
+                       "./source/common/stats/tag_extractor_impl.cc",
+                       "./source/common/access_log/access_log_formatter.cc",
+                       "./source/extensions/filters/http/squash/squash_filter.h",
+                       "./source/extensions/filters/http/squash/squash_filter.cc",
+                       "./source/server/http/admin.h", "./source/server/http/admin.cc")
 
 CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-8")
 BUILDIFIER_PATH = os.getenv("BUILDIFIER_BIN", "$GOPATH/bin/buildifier")
@@ -141,7 +137,6 @@ UNOWNED_EXTENSIONS = {
   "extensions/common/tap",
   "extensions/transport_sockets/raw_buffer",
   "extensions/transport_sockets/tap",
-  "extensions/transport_sockets/tls",
   "extensions/tracers/zipkin",
   "extensions/tracers/dynamic_ot",
   "extensions/tracers/opencensus",
@@ -330,8 +325,8 @@ def whitelistedForJsonStringToMessage(file_path):
   return file_path in JSON_STRING_TO_MESSAGE_WHITELIST
 
 
-def whitelistedForStatFromString(file_path):
-  return file_path in STAT_FROM_STRING_WHITELIST
+def whitelistedForStdRegex(file_path):
+  return file_path.startswith("./test") or file_path in STD_REGEX_WHITELIST
 
 
 def findSubstringAndReturnError(pattern, file_path, error_message):
@@ -578,9 +573,11 @@ def checkSourceLine(line, file_path, reportError):
     reportError("Don't use Protobuf::util::JsonStringToMessage, use TestUtility::loadFromJson.")
 
   if isInSubdir(file_path, 'source') and file_path.endswith('.cc') and \
-     not whitelistedForStatFromString(file_path) and \
      ('.counter(' in line or '.gauge(' in line or '.histogram(' in line):
     reportError("Don't lookup stats by name at runtime; use StatName saved during construction")
+
+  if not whitelistedForStdRegex(file_path) and "std::regex" in line:
+    reportError("Don't use std::regex in code that handles untrusted input. Use RegexMatcher")
 
 
 def checkBuildLine(line, file_path, reportError):

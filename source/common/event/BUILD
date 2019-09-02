@@ -120,6 +120,7 @@ envoy_cc_library(
         ":event_impl_base_lib",
         ":libevent_lib",
         "//include/envoy/event:timer_interface",
+        "//source/common/common:scope_tracker",
     ],
 )
 

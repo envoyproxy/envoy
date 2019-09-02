@@ -755,7 +755,7 @@ void HttpIntegrationTest::testEnvoyProxying100Continue(bool continue_before_upst
           auto* virtual_host = route_config->mutable_virtual_hosts(0);
           {
             auto* cors = virtual_host->mutable_cors();
-            cors->add_allow_origin("*");
+            cors->mutable_allow_origin_string_match()->Add()->set_exact("*");
             cors->set_allow_headers("content-type,x-grpc-web");
             cors->set_allow_methods("GET,POST");
           }

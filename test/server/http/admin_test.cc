@@ -21,6 +21,7 @@
 
 #include "extensions/transport_sockets/tls/context_config_impl.h"
 
+#include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
@@ -88,6 +89,17 @@ public:
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   Http::TestHeaderMapImpl request_headers_;
 };
+
+// Check default implementations the admin class picks up.
+TEST_P(AdminFilterTest, MiscFunctions) {
+  EXPECT_EQ(false, admin_.preserveExternalRequestId());
+  Http::MockFilterChainFactoryCallbacks mock_filter_chain_factory_callbacks;
+  EXPECT_EQ(false,
+            admin_.createUpgradeFilterChain("", nullptr, mock_filter_chain_factory_callbacks));
+  EXPECT_TRUE(nullptr != admin_.scopedRouteConfigProvider());
+  EXPECT_EQ(Http::ConnectionManagerConfig::HttpConnectionManagerProto::OVERWRITE,
+            admin_.serverHeaderTransformation());
+}
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, AdminStatsTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
@@ -1239,6 +1251,7 @@ TEST_P(AdminInstanceTest, GetRequest) {
   }));
   NiceMock<Init::MockManager> initManager;
   ON_CALL(server_, initManager()).WillByDefault(ReturnRef(initManager));
+  ON_CALL(server_.hot_restart_, version()).WillByDefault(Return("foo_version"));
 
   {
     Http::HeaderMapImpl response_headers;
@@ -1254,6 +1267,7 @@ TEST_P(AdminInstanceTest, GetRequest) {
     // values such as timestamps + Envoy version are tricky to test for.
     TestUtility::loadFromJson(body, server_info_proto);
     EXPECT_EQ(server_info_proto.state(), envoy::admin::v2alpha::ServerInfo::LIVE);
+    EXPECT_EQ(server_info_proto.hot_restart_version(), "foo_version");
     EXPECT_EQ(server_info_proto.command_line_options().restart_epoch(), 2);
     EXPECT_EQ(server_info_proto.command_line_options().service_cluster(), "cluster");
   }

@@ -23,7 +23,7 @@ Stats::SinkPtr MetricsServiceSinkFactory::createStatsSink(const Protobuf::Messag
 
   const auto& sink_config =
       MessageUtil::downcastAndValidate<const envoy::config::metrics::v2::MetricsServiceConfig&>(
-          config);
+          config, server.messageValidationContext().staticValidationVisitor());
   const auto& grpc_service = sink_config.grpc_service();
   ENVOY_LOG(debug, "Metrics Service gRPC service configuration: {}", grpc_service.DebugString());
 

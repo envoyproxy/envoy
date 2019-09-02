@@ -25,7 +25,7 @@ import "gogoproto/gogo.proto";
 // [#protodoc-title: HTTP connection manager]
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 
-// [#comment:next free field: 34]
+// [#comment:next free field: 35]
 message HttpConnectionManager {
   enum CodecType {
     option (gogoproto.goproto_enum_prefix) = false;
@@ -143,6 +143,24 @@ message HttpConnectionManager {
   // An optional override that the connection manager will write to the server
   // header in responses. If not set, the default is *envoy*.
   string server_name = 10;
+
+  enum ServerHeaderTransformation {
+    option (gogoproto.goproto_enum_prefix) = false;
+
+    // Overwrite any Server header with the contents of server_name.
+    OVERWRITE = 0;
+    // If no Server header is present, append Server server_name
+    // If a Server header is present, pass it through.
+    APPEND_IF_ABSENT = 1;
+    // Pass through the value of the server header, and do not append a header
+    // if none is present.
+    PASS_THROUGH = 2;
+  }
+  // Defines the action to be applied to the Server header on the response path.
+  // By default, Envoy will overwrite the header with the value specified in
+  // server_name.
+  ServerHeaderTransformation server_header_transformation = 34
+      [(validate.rules).enum.defined_only = true];
 
   // The maximum request headers size for incoming connections.
   // If unconfigured, the default max request headers allowed is 60 KiB.

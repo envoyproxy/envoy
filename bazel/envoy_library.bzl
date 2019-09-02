@@ -70,6 +70,17 @@ def envoy_cc_library(
         strip_include_prefix = strip_include_prefix,
     )
 
+    # Intended for usage by external consumers. This allows them to disambiguate
+    # include paths via `external/envoy...`
+    native.cc_library(
+        name = name + "_with_external_headers",
+        hdrs = hdrs,
+        copts = envoy_copts(repository) + copts,
+        visibility = visibility,
+        deps = [":" + name],
+        strip_include_prefix = strip_include_prefix,
+    )
+
 # Used to specify a library that only builds on POSIX
 def envoy_cc_posix_library(name, srcs = [], hdrs = [], **kargs):
     envoy_cc_library(
