@@ -683,7 +683,8 @@ public:
 
   void trackRecentLookups(TimeSource& time_source);
   SymbolTable& symbolTable() { return symbol_table_; }
-  bool getRecentLookups(const SymbolTable::RecentLookupsFn&);
+
+  bool getRecentLookups(const RecentLookups<StatName>::IterFn& iter);
 
 private:
   Stats::SymbolTable& symbol_table_;
