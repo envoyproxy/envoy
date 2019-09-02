@@ -90,9 +90,9 @@ def envoy_cc_fuzz_test(
         name = test_lib_name,
         deps = deps + [
             repository + "//test/fuzz:fuzz_runner_lib",
-            repository + "//bazel:dynamic_stdlib"
+            repository + "//bazel:dynamic_stdlib",
         ],
-        repository=repository,
+        repository = repository,
         **kwargs
     )
     native.cc_test(
@@ -110,7 +110,7 @@ def envoy_cc_fuzz_test(
                 repository + "//test/fuzz:main",
             ],
         }),
-        size=size,
+        size = size,
         tags = tags,
     )
 
