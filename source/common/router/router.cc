@@ -151,31 +151,28 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
   }
   timeout.per_try_timeout_ = route.retryPolicy().perTryTimeout();
 
-  // See if there is any timeout to write in the expected timeout header.
-  uint64_t expected_timeout = timeout.per_try_timeout_.count();
-  // Use the global timeout if no per try timeout was specified or if we're
-  // doing hedging when there are per try timeouts. Either of these scenarios
-  // mean that the upstream server can use the full global timeout.
-  if (per_try_timeout_hedging_enabled || expected_timeout == 0) {
-    expected_timeout = timeout.global_timeout_.count();
-  }
-  // todo(nezdolik) Check if order is correct, add tests.
-  // Check if there is timeout set by egress envoy. If present, use that instead.
   uint64_t header_timeout;
+  // Check if there is timeout set by egress envoy.
+  // If present, use that value as route timeout and don't override `x-envoy-expected-timeout-ms`
+  // header.
   Http::HeaderEntry* header_expected_timeout_entry =
       request_headers.EnvoyExpectedRequestTimeoutMs();
-  if (!header_expected_timeout_entry) {
+  if (header_expected_timeout_entry) {
+    // This will prevent from overriding `x-envoy-expected-timeout-ms` header.
+    insert_envoy_expected_request_timeout_ms = false;
+    if (absl::SimpleAtoi(header_expected_timeout_entry->value().getStringView(), &header_timeout)) {
+      timeout.global_timeout_ = std::chrono::milliseconds(header_timeout);
+    }
+  } else {
     Http::HeaderEntry* header_timeout_entry = request_headers.EnvoyUpstreamRequestTimeoutMs();
     if (header_timeout_entry) {
       if (absl::SimpleAtoi(header_timeout_entry->value().getStringView(), &header_timeout)) {
         timeout.global_timeout_ = std::chrono::milliseconds(header_timeout);
       }
-      request_headers.removeEnvoyUpstreamRequestTimeoutMs();
-    }
-    if (insert_envoy_expected_request_timeout_ms && expected_timeout > 0) {
-      request_headers.insertEnvoyExpectedRequestTimeoutMs().value(expected_timeout);
     }
   }
+
+  request_headers.removeEnvoyUpstreamRequestTimeoutMs();
 
   // See if there is a per try/retry timeout. If it's >= global we just ignore it.
   Http::HeaderEntry* per_try_timeout_entry = request_headers.EnvoyUpstreamRequestPerTryTimeoutMs();
@@ -189,6 +186,20 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
   if (timeout.per_try_timeout_ >= timeout.global_timeout_) {
     timeout.per_try_timeout_ = std::chrono::milliseconds(0);
   }
+
+  // See if there is any timeout to write in the expected timeout header.
+  uint64_t expected_timeout = timeout.per_try_timeout_.count();
+  // Use the global timeout if no per try timeout was specified or if we're
+  // doing hedging when there are per try timeouts. Either of these scenarios
+  // mean that the upstream server can use the full global timeout.
+  if (per_try_timeout_hedging_enabled || expected_timeout == 0) {
+    expected_timeout = timeout.global_timeout_.count();
+  }
+
+  if (insert_envoy_expected_request_timeout_ms && expected_timeout > 0) {
+    request_headers.insertEnvoyExpectedRequestTimeoutMs().value(expected_timeout);
+  }
+
   // If we've configured max_grpc_timeout, override the grpc-timeout header with
   // the expected timeout. This ensures that the optional per try timeout is reflected
   // in grpc-timeout, ensuring that the upstream gRPC server is aware of the actual timeout.
