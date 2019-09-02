@@ -164,6 +164,7 @@ public:
   void trackRecentLookups(TimeSource& timeSource) override;
   void rememberSet(StatNameSet& stat_name_set) override;
   void forgetSet(StatNameSet& stat_name_set) override;
+  bool getRecentLookups(const RecentLookupsFn&) override;
 
 private:
   friend class StatName;
@@ -178,6 +179,9 @@ private:
 
   // This must be held during both encode() and free().
   mutable Thread::MutexBasicLockable lock_;
+
+  // This must be held while updateing stat_name_sets_.
+  mutable Thread::MutexBasicLockable stat_name_set_mutex_;
 
   /**
    * Decodes a vector of symbols back into its period-delimited stat name. If
@@ -248,7 +252,8 @@ private:
   // using an Envoy::IntervalSet.
   std::stack<Symbol> pool_ GUARDED_BY(lock_);
   std::unique_ptr<RecentLookups<Symbol>> recent_lookups_ GUARDED_BY(lock_);
-  absl::flat_hash_set<StatNameSet*> stat_name_sets_ GUARDED_BY(lock_);
+
+  absl::flat_hash_set<StatNameSet*> stat_name_sets_ GUARDED_BY(stat_name_set_mutex_);
 };
 
 /**
@@ -337,6 +342,10 @@ public:
   uint64_t hash() const {
     const char* cdata = reinterpret_cast<const char*>(data());
     return HashUtil::xxHash64(absl::string_view(cdata, dataSize()));
+  }
+
+  template <typename H> friend H AbslHashValue(H h, StatName stat_name) {
+    return H::combine(std::move(h), stat_name.hash());
   }
 
   bool operator==(const StatName& rhs) const {
@@ -685,6 +694,7 @@ public:
 
   void trackRecentLookups(TimeSource& time_source);
   SymbolTable& symbolTable() { return symbol_table_; }
+  bool getRecentLookups(const SymbolTable::RecentLookupsFn&);
 
 private:
   Stats::SymbolTable& symbol_table_;

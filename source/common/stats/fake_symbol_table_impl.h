@@ -128,6 +128,7 @@ public:
   void trackRecentLookups(TimeSource&) override {}
   void rememberSet(StatNameSet&) override {}
   void forgetSet(StatNameSet&) override {}
+  bool getRecentLookups(const RecentLookupsFn&) override { return false; }
 
 private:
   absl::string_view toStringView(const StatName& stat_name) const {

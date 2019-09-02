@@ -752,6 +752,23 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
   Http::Code rc = Http::Code::OK;
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
 
+  if (params.find("recentlookups") != params.end()) {
+    Stats::SymbolTable& symbol_table = server_.stats().symbolTable();
+    response_headers.insertContentType().value().setReference(
+        Http::Headers::get().ContentTypeValues.Html);
+    response.add("<table><thead><th>Last Lookup</th><th>Name</th>");
+    response.add("<th>Count</th></thead><tbody>\n");
+    symbol_table.getRecentLookups(
+        [&response](absl::string_view name, SystemTime time, size_t count) {
+          DateFormatter formatter("%Y-%m-%d,%H:%M:%S");
+          response.add(absl::StrCat("<tr><td>", formatter.fromTime(time), "</td><td>",
+                                    name,  // TODO(jmarantz): ESCAPE THIS BEFORE SUBMITTING
+                                    "</td><td>", count, "</td></tr>"));
+        });
+    response.add("</tbody></table>");
+    return rc;
+  }
+
   const bool used_only = params.find("usedonly") != params.end();
   const absl::optional<std::regex> regex = filterParam(params);
 
