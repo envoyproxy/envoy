@@ -244,6 +244,7 @@ envoy_cc_library(
     hdrs = ["local_reply.h"],
     deps = [
         "//source/common/common:matchers_lib",
+        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:http_connection_manager_cc",
     ],
 )
 

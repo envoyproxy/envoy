@@ -342,25 +342,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     }
   }
   if (config.send_local_reply_config().size() > 0) {
-    std::list<std::pair<Http::LocalReplyMatcher, Http::LocalReplyRewriter>>
-        list_of_pairs;
-      for (auto& match_rewrite_config : config.send_local_reply_config()) {
-        std::vector<uint32_t> status_codes;
-        for (auto code : match_rewrite_config.match().status_codes()) {
-          status_codes.emplace_back(code);
-        }
-        
-        std::pair<Http::LocalReplyMatcher, Http::LocalReplyRewriter> pair =
-            std::make_pair(
-                Http::LocalReplyMatcher{status_codes, match_rewrite_config.match().body_pattern()},
-                // ,
-                //                                 match_rewrite_config.match().body_pattern(),
-                //                                 match_rewrite_config.match().response_flags()},
-                Http::LocalReplyRewriter{match_rewrite_config.rewrite().status()});
-        list_of_pairs.emplace_back(std::move(pair));
-      }
-    local_reply_config_ = Http::LocalReplyConfigConstPtr(
-        new Http::LocalReplyConfig(list_of_pairs));
+    local_reply_config_ = Http::LocalReplyConfigConstPtr(new Http::LocalReplyConfig(config));
   }
 }
 

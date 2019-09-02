@@ -6,6 +6,7 @@
 
 
 #include "common/common/matchers.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.validate.h"
 
 namespace Envoy {
 namespace Http{
@@ -13,13 +14,11 @@ namespace Http{
  //  const envoy::type::matcher::StringMatcher& body_pattern,
   //  const envoy::data::accesslog::v2::ResponseFlags& response_flags
 struct LocalReplyMatcher {
-  LocalReplyMatcher(
-    std::vector<uint32_t>& status_codes,
-    const envoy::type::matcher::StringMatcher& body_pattern
-    ): status_codes_(move(status_codes)), body_pattern_(body_pattern){
-    };
+  LocalReplyMatcher(std::vector<uint32_t>& status_codes,
+   const envoy::type::matcher::StringMatcher& body_pattern): status_codes_(move(status_codes)),
+    body_pattern_(body_pattern){};
 
-  bool match(const absl::string_view value){
+  bool match(const absl::string_view value) const{
     return body_pattern_.match(value);
   }
 
@@ -39,13 +38,26 @@ struct LocalReplyRewriter {
 class LocalReplyConfig {
   public:
     LocalReplyConfig(
-      std::list<std::pair<LocalReplyMatcher, LocalReplyRewriter>>& match_rewrite_pair_list)
-      : match_rewrite_pair_list_(match_rewrite_pair_list){
+      const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& config
+      ){
+      for (const auto& match_rewrite_config : config.send_local_reply_config()) {
+        std::vector<uint32_t> status_codes;
+        for (const auto code : match_rewrite_config.match().status_codes()) {
+          status_codes.emplace_back(code);
+        }
+        
+        std::pair<Http::LocalReplyMatcher, Http::LocalReplyRewriter> pair =
+            std::make_pair(
+                Http::LocalReplyMatcher{status_codes, match_rewrite_config.match().body_pattern()},
+                Http::LocalReplyRewriter{match_rewrite_config.rewrite().status()});
+        match_rewrite_pair_list_.emplace_back(std::move(pair));
 
-        LocalReplyMatcher* test = & match_rewrite_pair_list.front().first;
-        test->match("test");
-        std::cout << "Test" <<  test->match("test") << '\n' ;
+      }
       };
+
+      bool match(const absl::string_view value) const{
+        return match_rewrite_pair_list_.front().first.match(value);
+  }
 
   private:
     std::list<std::pair<LocalReplyMatcher, LocalReplyRewriter>> match_rewrite_pair_list_;
