@@ -543,22 +543,11 @@ private:
   SymbolTable::StoragePtr storage_;
 };
 
-// Helper class for constructing hash-tables with StatName keys.
-struct StatNameHash {
-  size_t operator()(const StatName& a) const { return a.hash(); }
-};
-
-// Helper class for constructing hash-tables with StatName keys.
-struct StatNameCompare {
-  bool operator()(const StatName& a, const StatName& b) const { return a == b; }
-};
-
 // Value-templatized hash-map with StatName key.
-template <class T>
-using StatNameHashMap = absl::flat_hash_map<StatName, T, StatNameHash, StatNameCompare>;
+template <class T> using StatNameHashMap = absl::flat_hash_map<StatName, T>;
 
 // Hash-set of StatNames
-using StatNameHashSet = absl::flat_hash_set<StatName, StatNameHash, StatNameCompare>;
+using StatNameHashSet = absl::flat_hash_set<StatName>;
 
 // Helper class for sorting StatNames.
 struct StatNameLessThan {
