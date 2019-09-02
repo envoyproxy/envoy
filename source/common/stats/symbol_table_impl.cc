@@ -281,7 +281,7 @@ bool SymbolTableImpl::getRecentLookups(const RecentLookupsFn& iter) {
             });
   const LookupData* prev = nullptr;
   for (const LookupData& lookup : lookup_data) {
-    if (prev == nullptr || prev->name_ != lookup.name_) {
+    if (prev == nullptr || prev->name(*this) != lookup.name(*this)) {
       iter(lookup.name(*this), lookup.time_);
       prev = &lookup;
     }

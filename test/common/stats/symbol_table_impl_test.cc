@@ -574,9 +574,12 @@ TEST_P(StatNameTest, RecentLookups) {
   Event::SimulatedTimeSystem time_system;
   const uint64_t years = 365 * 24 * 3600;
   time_system.setSystemTime(SystemTime() + std::chrono::seconds(40 * years));
+  StatNameSet set1(*table_);
   table_->trackRecentLookups(time_system);
-  StatNameSet set(*table_);
-  set.getStatName("dynamic.stat");
+  StatNameSet set2(*table_);
+  set1.getStatName("dynamic.stat1");
+  time_system.sleep(std::chrono::seconds(1));
+  set2.getStatName("dynamic.stat2");
   time_system.sleep(std::chrono::seconds(1));
   encodeDecode("direct.stat");
 
@@ -587,9 +590,9 @@ TEST_P(StatNameTest, RecentLookups) {
   });
   std::string recent_lookups_str = StringUtil::join(accum, " ");
 
-  EXPECT_EQ("2009-12-22,00:00:01;Item=direct.stat "
-            "2009-12-22,00:00:00;Item=dynamic.stat "
-            "2009-12-22,00:00:00;Item=dynamic.stat",
+  EXPECT_EQ("2009-12-22,00:00:02;Item=direct.stat "
+            "2009-12-22,00:00:01;Item=dynamic.stat2 "
+            "2009-12-22,00:00:00;Item=dynamic.stat1",
             recent_lookups_str);
 }
 
