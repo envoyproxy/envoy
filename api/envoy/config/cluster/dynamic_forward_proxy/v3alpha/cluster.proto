@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package envoy.config.cluster.dynamic_forward_proxy.v3alpha;
+
+option java_outer_classname = "DynamicForwardProxyClusterProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.config.cluster.dynamic_forward_proxy.v3alpha";
+option go_package = "v2alpha";
+
+import "envoy/config/common/dynamic_forward_proxy/v3alpha/dns_cache.proto";
+
+import "validate/validate.proto";
+
+// [#protodoc-title: Dynamic forward proxy cluster configuration]
+
+// Configuration for the dynamic forward proxy cluster. See the :ref:`architecture overview
+// <arch_overview_http_dynamic_forward_proxy>` for more information.
+message ClusterConfig {
+  // The DNS cache configuration that the cluster will attach to. Note this configuration must
+  // match that of associated :ref:`dynamic forward proxy HTTP filter configuration
+  // <envoy_api_field_config.filter.http.dynamic_forward_proxy.v3alpha.FilterConfig.dns_cache_config>`.
+  common.dynamic_forward_proxy.v3alpha.DnsCacheConfig dns_cache_config = 1
+      [(validate.rules).message.required = true];
+}
