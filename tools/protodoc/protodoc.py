@@ -720,7 +720,7 @@ def Main():
       if pf.name == file_to_generate:
         proto_file = pf
         break
-    assert(proto_file is not None)
+    assert (proto_file is not None)
     f = response.file.add()
     f.name = proto_file.name + '.rst'
     if cprofile_enabled:
