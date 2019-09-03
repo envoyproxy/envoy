@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package envoy.service.discovery.v3alpha;
+
+option java_outer_classname = "RtdsProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.service.discovery.v3alpha";
+option java_generic_services = true;
+
+import "envoy/api/v3alpha/discovery.proto";
+
+import "google/api/annotations.proto";
+import "google/protobuf/struct.proto";
+
+import "validate/validate.proto";
+
+// [#protodoc-title: Runtime Discovery Service (RTDS)]
+// RTDS :ref:`configuration overview <config_runtime_rtds>`
+
+// [#not-implemented-hide:] Not configuration. Workaround c++ protobuf issue with importing
+// services: https://github.com/google/protobuf/issues/4221
+message RtdsDummy {
+}
+
+// Discovery service for Runtime resources.
+service RuntimeDiscoveryService {
+  rpc StreamRuntime(stream envoy.api.v3alpha.DiscoveryRequest)
+      returns (stream envoy.api.v3alpha.DiscoveryResponse) {
+  }
+
+  rpc DeltaRuntime(stream envoy.api.v3alpha.DeltaDiscoveryRequest)
+      returns (stream envoy.api.v3alpha.DeltaDiscoveryResponse) {
+  }
+
+  rpc FetchRuntime(envoy.api.v3alpha.DiscoveryRequest)
+      returns (envoy.api.v3alpha.DiscoveryResponse) {
+    option (google.api.http) = {
+      post: "/v2/discovery:runtime"
+      body: "*"
+    };
+  }
+}
+
+// RTDS resource type. This describes a layer in the runtime virtual filesystem.
+message Runtime {
+  // Runtime resource name. This makes the Runtime a self-describing xDS
+  // resource.
+  string name = 1 [(validate.rules).string.min_bytes = 1];
+  google.protobuf.Struct layer = 2;
+}

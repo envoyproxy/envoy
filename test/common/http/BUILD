@@ -129,17 +129,6 @@ envoy_cc_test_library(
     ],
 )
 
-envoy_cc_test_library(
-    name = "conn_manager_impl_common_lib",
-    hdrs = ["conn_manager_impl_common.h"],
-    deps = [
-        "//include/envoy/common:time_interface",
-        "//include/envoy/config:config_provider_interface",
-        "//include/envoy/router:rds_interface",
-        "//test/mocks/router:router_mocks",
-    ],
-)
-
 envoy_proto_library(
     name = "conn_manager_impl_fuzz_proto",
     srcs = ["conn_manager_impl_fuzz.proto"],
@@ -153,7 +142,6 @@ envoy_cc_fuzz_test(
     srcs = ["conn_manager_impl_fuzz_test.cc"],
     corpus = "conn_manager_impl_corpus",
     deps = [
-        ":conn_manager_impl_common_lib",
         ":conn_manager_impl_fuzz_proto_cc",
         "//source/common/common:empty_string",
         "//source/common/http:conn_manager_lib",
@@ -167,6 +155,7 @@ envoy_cc_fuzz_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/tracing:tracing_mocks",
@@ -180,7 +169,6 @@ envoy_cc_test(
     name = "conn_manager_impl_test",
     srcs = ["conn_manager_impl_test.cc"],
     deps = [
-        ":conn_manager_impl_common_lib",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/event:dispatcher_interface",
@@ -207,6 +195,7 @@ envoy_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:server_mocks",
         "//test/mocks/ssl:ssl_mocks",
