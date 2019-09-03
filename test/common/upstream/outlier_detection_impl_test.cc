@@ -1142,6 +1142,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowFailurePercentageExternalOrigin) {
             detector->successRateAverage(DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin));
   EXPECT_EQ(-1, detector->successRateEjectionThreshold(
                     DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin));
+  EXPECT_FALSE(hosts_[3]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
   EXPECT_TRUE(hosts_[4]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
   EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
 
