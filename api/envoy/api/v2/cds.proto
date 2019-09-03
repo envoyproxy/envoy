@@ -236,7 +236,7 @@ message Cluster {
   auth.UpstreamTlsContext tls_context = 11;
 
   // TransportSocketMatch specifies what transport socket config will be used
-  // whe the matches conditions are satified.
+  // when the matches conditions are satisfied.
   message TransportSocketMatcher {
     // The name of the match.
     string name = 1;
@@ -250,7 +250,7 @@ message Cluster {
   // Configuration to use different transport sockets for different endpoints.
   // This should only be used for EDS typed cluster.
   //
-  // An endpiont's *endpoint.Labels* is used to match against the *label_matches*
+  // An endpoint's *endpoint.Labels* is used to match against the *label_matches*
   // to decide which transport socket to use when connecting to that particular endpoint.
   // For example, with following matcher
   //
@@ -264,7 +264,7 @@ message Cluster {
   // }
   //
   // Connection to the endpoints whose "app" label equals to "foo" value uses "enable-mtls"
-  // configution, a tls socket with detailed configuration specified as *config*.
+  // configuration, a tls socket with detailed configuration specified as *config*.
   //
   // If an endpoint can't be matched against any *TransportSockerMatcher*, connection socket
   // fallbacks to use the *tls_context* or *transport_socket* specified in this cluster.
