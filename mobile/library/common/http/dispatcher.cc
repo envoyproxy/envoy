@@ -122,9 +122,8 @@ envoy_status_t Dispatcher::sendData(envoy_stream_t stream, envoy_data data, bool
 }
 
 // TODO: implement.
-envoy_status_t Dispatcher::sendMetadata(envoy_stream_t, envoy_headers, bool) {
-  return ENVOY_FAILURE;
-}
+envoy_status_t Dispatcher::sendMetadata(envoy_stream_t, envoy_headers) { return ENVOY_FAILURE; }
+
 envoy_status_t Dispatcher::sendTrailers(envoy_stream_t stream, envoy_headers trailers) {
   event_dispatcher_.post([this, stream, trailers]() -> void {
     DirectStream* direct_stream = getStream(stream);
