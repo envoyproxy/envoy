@@ -266,9 +266,9 @@ uint64_t SymbolTableImpl::getRecentLookups(const RecentLookupsFn& iter) {
     Thread::LockGuard lock(lock_);
     if (recent_lookups_ != nullptr) {
       recent_lookups_->forEach([&lookup_data](const std::string& str, SystemTime time)
-                               NO_THREAD_SAFETY_ANALYSIS {
-                                 lookup_data.push_back({StatName(), str, time});
-                               });
+                                   NO_THREAD_SAFETY_ANALYSIS {
+                                     lookup_data.push_back({StatName(), str, time});
+                                   });
       total += recent_lookups_->total();
     }
   }

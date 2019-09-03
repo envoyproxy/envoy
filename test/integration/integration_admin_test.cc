@@ -10,6 +10,7 @@
 #include "common/profiler/profiler.h"
 #include "common/stats/stats_matcher_impl.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/integration/utility.h"
 #include "test/test_common/utility.h"
 
@@ -122,6 +123,7 @@ std::string ContentType(const BufferingStreamDecoderPtr& response) {
 } // namespace
 
 TEST_P(IntegrationAdminTest, Admin) {
+  Stats::TestUtil::SymbolTableCreatorTestPeer::setUseFakeSymbolTables(false);
   initialize();
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
@@ -164,6 +166,15 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
+
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?recentlookups",
+                                                "", downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
+  EXPECT_TRUE(absl::StartsWith(response->body(), "Date       Time     Lookup\n"))
+      << response->body();
+  EXPECT_LT(30, response->body().size());
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?usedonly", "",
                                                 downstreamProtocol(), version_);
