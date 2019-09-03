@@ -1,0 +1,135 @@
+syntax = "proto3";
+
+package envoy.api.v3alpha;
+
+option java_outer_classname = "RdsProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.api.v3alpha";
+
+option java_generic_services = true;
+
+import "envoy/api/v3alpha/core/base.proto";
+import "envoy/api/v3alpha/core/config_source.proto";
+import "envoy/api/v3alpha/discovery.proto";
+import "envoy/api/v3alpha/route/route.proto";
+
+import "google/api/annotations.proto";
+import "google/protobuf/wrappers.proto";
+
+import "validate/validate.proto";
+import "gogoproto/gogo.proto";
+
+option (gogoproto.equal_all) = true;
+
+// [#protodoc-title: HTTP route configuration]
+// * Routing :ref:`architecture overview <arch_overview_http_routing>`
+// * HTTP :ref:`router filter <config_http_filters_router>`
+
+// The resource_names field in DiscoveryRequest specifies a route configuration.
+// This allows an Envoy configuration with multiple HTTP listeners (and
+// associated HTTP connection manager filters) to use different route
+// configurations. Each listener will bind its HTTP connection manager filter to
+// a route table via this identifier.
+service RouteDiscoveryService {
+  rpc StreamRoutes(stream DiscoveryRequest) returns (stream DiscoveryResponse) {
+  }
+
+  rpc DeltaRoutes(stream DeltaDiscoveryRequest) returns (stream DeltaDiscoveryResponse) {
+  }
+
+  rpc FetchRoutes(DiscoveryRequest) returns (DiscoveryResponse) {
+    option (google.api.http) = {
+      post: "/v2/discovery:routes"
+      body: "*"
+    };
+  }
+}
+
+// Virtual Host Discovery Service (VHDS) is used to dynamically update the list of virtual hosts for
+// a given RouteConfiguration. If VHDS is configured a virtual host list update will be triggered
+// during the processing of an HTTP request if a route for the request cannot be resolved. The
+// :ref:`resource_names_subscribe <envoy_api_msg_DeltaDiscoveryRequest.resource_names_subscribe>`
+// field contains a list of virtual host names or aliases to track. The contents of an alias would
+// be the contents of a *host* or *authority* header used to make an http request. An xDS server
+// will match an alias to a virtual host based on the content of :ref:`domains'
+// <envoy_api_msg_route.VirtualHost.domains>` field. The *resource_names_unsubscribe* field contains
+// a list of virtual host names that have been :ref:`unsubscribed <xds_protocol_unsubscribe>`
+// from the routing table associated with the RouteConfiguration.
+service VirtualHostDiscoveryService {
+  rpc DeltaVirtualHosts(stream DeltaDiscoveryRequest) returns (stream DeltaDiscoveryResponse) {
+  }
+}
+
+// [#comment:next free field: 10]
+message RouteConfiguration {
+  // The name of the route configuration. For example, it might match
+  // :ref:`route_config_name
+  // <envoy_api_field_config.filter.network.http_connection_manager.v3alpha.Rds.route_config_name>`
+  // in :ref:`envoy_api_msg_config.filter.network.http_connection_manager.v3alpha.Rds`.
+  string name = 1;
+
+  // An array of virtual hosts that make up the route table.
+  repeated route.VirtualHost virtual_hosts = 2;
+
+  // An array of virtual hosts will be dynamically loaded via the VHDS API.
+  // Both *virtual_hosts* and *vhds* fields will be used when present. *virtual_hosts* can be used
+  // for a base routing table or for infrequently changing virtual hosts. *vhds* is used for
+  // on-demand discovery of virtual hosts. The contents of these two fields will be merged to
+  // generate a routing table for a given RouteConfiguration, with *vhds* derived configuration
+  // taking precedence.
+  // [#not-implemented-hide:]
+  Vhds vhds = 9;
+
+  // Optionally specifies a list of HTTP headers that the connection manager
+  // will consider to be internal only. If they are found on external requests they will be cleaned
+  // prior to filter invocation. See :ref:`config_http_conn_man_headers_x-envoy-internal` for more
+  // information.
+  repeated string internal_only_headers = 3;
+
+  // Specifies a list of HTTP headers that should be added to each response that
+  // the connection manager encodes. Headers specified at this level are applied
+  // after headers from any enclosed :ref:`envoy_api_msg_route.VirtualHost` or
+  // :ref:`envoy_api_msg_route.RouteAction`. For more information, including details on
+  // header value syntax, see the documentation on :ref:`custom request headers
+  // <config_http_conn_man_headers_custom_request_headers>`.
+  repeated core.HeaderValueOption response_headers_to_add = 4
+      [(validate.rules).repeated .max_items = 1000];
+
+  // Specifies a list of HTTP headers that should be removed from each response
+  // that the connection manager encodes.
+  repeated string response_headers_to_remove = 5;
+
+  // Specifies a list of HTTP headers that should be added to each request
+  // routed by the HTTP connection manager. Headers specified at this level are
+  // applied after headers from any enclosed :ref:`envoy_api_msg_route.VirtualHost` or
+  // :ref:`envoy_api_msg_route.RouteAction`. For more information, including details on
+  // header value syntax, see the documentation on :ref:`custom request headers
+  // <config_http_conn_man_headers_custom_request_headers>`.
+  repeated core.HeaderValueOption request_headers_to_add = 6
+      [(validate.rules).repeated .max_items = 1000];
+
+  // Specifies a list of HTTP headers that should be removed from each request
+  // routed by the HTTP connection manager.
+  repeated string request_headers_to_remove = 8;
+
+  // An optional boolean that specifies whether the clusters that the route
+  // table refers to will be validated by the cluster manager. If set to true
+  // and a route refers to a non-existent cluster, the route table will not
+  // load. If set to false and a route refers to a non-existent cluster, the
+  // route table will load and the router filter will return a 404 if the route
+  // is selected at runtime. This setting defaults to true if the route table
+  // is statically defined via the :ref:`route_config
+  // <envoy_api_field_config.filter.network.http_connection_manager.v3alpha.HttpConnectionManager.route_config>`
+  // option. This setting default to false if the route table is loaded dynamically via the
+  // :ref:`rds
+  // <envoy_api_field_config.filter.network.http_connection_manager.v3alpha.HttpConnectionManager.rds>`
+  // option. Users may wish to override the default behavior in certain cases (for example when
+  // using CDS with a static route table).
+  google.protobuf.BoolValue validate_clusters = 7;
+}
+
+// [#not-implemented-hide:]
+message Vhds {
+  // Configuration source specifier for VHDS.
+  envoy.api.v3alpha.core.ConfigSource config_source = 1 [(validate.rules).message.required = true];
+}
