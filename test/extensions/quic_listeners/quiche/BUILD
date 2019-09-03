@@ -87,6 +87,7 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:global_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:simulated_time_system_lib",
     ],
 )

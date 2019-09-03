@@ -28,6 +28,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/global.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -59,6 +60,7 @@ public:
   }
 
   MOCK_METHOD2(SendConnectionClosePacket, void(quic::QuicErrorCode, const std::string&));
+  MOCK_METHOD1(SendControlFrame, bool(const quic::QuicFrame& frame));
 };
 
 class EnvoyQuicServerSessionTest : public testing::TestWithParam<bool> {
@@ -183,6 +185,24 @@ TEST_P(EnvoyQuicServerSessionTest, NewStream) {
   stream->OnStreamHeaderList(/*fin=*/true, headers.uncompressed_header_bytes(), headers);
 }
 
+TEST_P(EnvoyQuicServerSessionTest, InvalidIncomingStreamId) {
+  quic::SetVerbosityLogThreshold(1);
+  installReadFilter();
+  Http::MockStreamDecoder request_decoder;
+  Http::MockStreamCallbacks stream_callbacks;
+  // IETF stream 5 and GQuic stream 2 are client initiated.
+  quic::QuicStreamId stream_id =
+      quic_version_[0].transport_version == quic::QUIC_VERSION_99 ? 5u : 2u;
+  std::string data("aaaa");
+  quic::QuicStreamFrame stream_frame(stream_id, false, 0, data);
+  EXPECT_CALL(http_connection_callbacks_, newStream(_, false)).Times(0);
+  EXPECT_CALL(*quic_connection_, SendConnectionClosePacket(quic::QUIC_INVALID_STREAM_ID,
+                                                           "Data for nonexistent stream"));
+  EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+
+  envoy_quic_session_.OnStreamFrame(stream_frame);
+}
+
 TEST_P(EnvoyQuicServerSessionTest, OnResetFrame) {
   installReadFilter();
   Http::MockStreamDecoder request_decoder;
@@ -193,6 +213,8 @@ TEST_P(EnvoyQuicServerSessionTest, OnResetFrame) {
         encoder.getStream().addCallbacks(stream_callbacks);
         return request_decoder;
       }));
+
+  // GQUIC or IETF bi-directional stream.
   quic::QuicStreamId stream_id =
       quic_version_[0].transport_version == quic::QUIC_VERSION_99 ? 4u : 5u;
 
@@ -200,8 +222,17 @@ TEST_P(EnvoyQuicServerSessionTest, OnResetFrame) {
   quic::QuicRstStreamFrame rst1(/*control_frame_id=*/1u, stream1->id(),
                                 quic::QUIC_ERROR_PROCESSING_STREAM, /*bytes_written=*/0u);
   EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::RemoteReset, _));
+  if (quic_version_[0].transport_version < quic::QUIC_VERSION_99) {
+    EXPECT_CALL(*quic_connection_, SendControlFrame(_))
+        .WillOnce(Invoke([stream_id](const quic::QuicFrame& frame) {
+          EXPECT_EQ(stream_id, frame.rst_stream_frame->stream_id);
+          EXPECT_EQ(quic::QUIC_RST_ACKNOWLEDGEMENT, frame.rst_stream_frame->error_code);
+          return false;
+        }));
+  }
   stream1->OnStreamReset(rst1);
 
+  // GQUIC bi-directional stream or IETF read uni-directional stream.
   quic::QuicStream* stream2 = envoy_quic_session_.GetOrCreateStream(stream_id + 4u);
   quic::QuicRstStreamFrame rst2(/*control_frame_id=*/1u, stream2->id(), quic::QUIC_REFUSED_STREAM,
                                 /*bytes_written=*/0u);
@@ -252,6 +283,16 @@ TEST_P(EnvoyQuicServerSessionTest, ConnectionCloseWithActiveStream) {
   EXPECT_TRUE(stream->write_side_closed() && stream->reading_stopped());
 }
 
+TEST_P(EnvoyQuicServerSessionTest, FlushCloseNotSupported) {
+  installReadFilter();
+
+  EXPECT_CALL(*quic_connection_,
+              SendConnectionClosePacket(quic::QUIC_NO_ERROR, "Closed by application"));
+  EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+  EXPECT_LOG_CONTAINS("error", "Flush write is not implemented for QUIC.",
+                      envoy_quic_session_.close(Network::ConnectionCloseType::FlushWrite));
+}
+
 TEST_P(EnvoyQuicServerSessionTest, ShutdownNotice) {
   installReadFilter();
   // Not verifying dummy implementation, just to have coverage.
@@ -261,6 +302,14 @@ TEST_P(EnvoyQuicServerSessionTest, ShutdownNotice) {
   EXPECT_FALSE(envoy_quic_session_.aboveHighWatermark());
   EXPECT_DEBUG_DEATH(envoy_quic_session_.setDelayedCloseTimeout(std::chrono::milliseconds(1)), "");
   http_connection_->shutdownNotice();
+}
+
+TEST_P(EnvoyQuicServerSessionTest, GoAway) {
+  installReadFilter();
+  if (quic_version_[0].transport_version < quic::QUIC_VERSION_99) {
+    EXPECT_CALL(*quic_connection_, SendControlFrame(_));
+  }
+  http_connection_->goAway();
 }
 
 TEST_P(EnvoyQuicServerSessionTest, InitializeFilterChain) {

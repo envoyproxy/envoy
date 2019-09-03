@@ -26,6 +26,7 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_dispatcher.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_fake_proof_source.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_alarm_factory.h"
+#include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
 #include "extensions/transport_sockets/well_known_names.h"
 #include "server/configuration_impl.h"
 #include "gmock/gmock.h"
@@ -193,6 +194,9 @@ TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponCHLO) {
       envoy_quic_dispatcher_.session_map().find(connection_id)->second->IsEncryptionEstablished());
   EXPECT_EQ(1u, connection_handler_.numConnections());
   EXPECT_EQ("www.abc.com", read_filter->callbacks_->connection().requestedServerName());
+  EXPECT_EQ(peer_addr, envoyAddressInstanceToQuicSocketAddress(
+                           read_filter->callbacks_->connection().remoteAddress()));
+  EXPECT_EQ(*listen_socket_->localAddress(), *read_filter->callbacks_->connection().localAddress());
   EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
   // Shutdown() to close the connection.
   envoy_quic_dispatcher_.Shutdown();

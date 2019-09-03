@@ -125,6 +125,7 @@ public:
   void OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
                           quic::ConnectionCloseSource source) override;
   void Initialize() override;
+  void SendGoAway(quic::QuicErrorCode error_code, const std::string& reason) override;
 
 protected:
   // quic::QuicServerSessionBase
