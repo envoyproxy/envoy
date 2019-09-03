@@ -5,7 +5,6 @@ package envoy.api.v3alpha.listener;
 option java_outer_classname = "UdpListenerConfigProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.api.v3alpha.listener";
-option go_package = "listener";
 option csharp_namespace = "Envoy.Api.V2.ListenerNS";
 option ruby_package = "Envoy::Api::V2::ListenerNS";
 
