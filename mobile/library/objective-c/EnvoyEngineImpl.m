@@ -32,8 +32,8 @@
   }
 }
 
-- (EnvoyHTTPStream *)startStreamWithObserver:(EnvoyObserver *)observer {
-  return [[EnvoyHTTPStream alloc] initWithHandle:init_stream(_engineHandle) observer:observer];
+- (id<EnvoyHTTPStream>)startStreamWithObserver:(EnvoyObserver *)observer {
+  return [[EnvoyHTTPStreamImpl alloc] initWithHandle:init_stream(_engineHandle) observer:observer];
 }
 
 @end

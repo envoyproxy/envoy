@@ -157,10 +157,10 @@ static void ios_on_error(envoy_error error, void *context) {
   });
 }
 
-#pragma mark - EnvoyHTTPStream
+#pragma mark - EnvoyHTTPStreamImpl
 
-@implementation EnvoyHTTPStream {
-  EnvoyHTTPStream *_strongSelf;
+@implementation EnvoyHTTPStreamImpl {
+  EnvoyHTTPStreamImpl *_strongSelf;
   EnvoyObserver *_platformObserver;
   envoy_observer _nativeObserver;
   envoy_stream_t _streamHandle;
