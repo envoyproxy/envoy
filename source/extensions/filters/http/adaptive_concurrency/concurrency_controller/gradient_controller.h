@@ -24,13 +24,11 @@ namespace ConcurrencyController {
 /**
  * All stats for the gradient controller.
  */
-// clang-format off
-#define ALL_GRADIENT_CONTROLLER_STATS(GAUGE) \
-  GAUGE(concurrency_limit, Accumulate)  \
-  GAUGE(gradient, Accumulate)  \
-  GAUGE(burst_queue_size, Accumulate)  \
-  GAUGE(min_rtt_msecs, Accumulate)
-// clang-format on
+#define ALL_GRADIENT_CONTROLLER_STATS(GAUGE)                                                       \
+  GAUGE(concurrency_limit, NeverImport)                                                            \
+  GAUGE(gradient, NeverImport)                                                                     \
+  GAUGE(burst_queue_size, NeverImport)                                                             \
+  GAUGE(min_rtt_msecs, NeverImport)
 
 /**
  * Wrapper struct for gradient controller stats. @see stats_macros.h
@@ -45,12 +43,12 @@ public:
       const envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig&
           proto_config);
 
-  std::chrono::milliseconds min_rtt_calc_interval() const { return min_rtt_calc_interval_; }
-  std::chrono::milliseconds sample_rtt_calc_interval() const { return sample_rtt_calc_interval_; }
-  uint32_t max_concurrency_limit() const { return max_concurrency_limit_; }
-  uint32_t min_rtt_aggregate_request_count() const { return min_rtt_aggregate_request_count_; }
-  double max_gradient() const { return max_gradient_; }
-  double sample_aggregate_percentile() const { return sample_aggregate_percentile_; }
+  std::chrono::milliseconds minRTTCalcInterval() const { return min_rtt_calc_interval_; }
+  std::chrono::milliseconds sampleRTTCalcInterval() const { return sample_rtt_calc_interval_; }
+  uint32_t maxConcurrencyLimit() const { return max_concurrency_limit_; }
+  uint32_t minRTTAggregateRequestCount() const { return min_rtt_aggregate_request_count_; }
+  double maxGradient() const { return max_gradient_; }
+  double sampleAggregatePercentile() const { return sample_aggregate_percentile_; }
 
 private:
   // The measured request round-trip time under ideal conditions.
@@ -130,16 +128,10 @@ using GradientControllerConfigSharedPtr = std::shared_ptr<GradientControllerConf
  *
  * Locking:
  * ========
- * There are 2 mutually exclusive calculation windows, so update window mutex is held to prevent the
- * overlap of these windows. It is necessary for a worker thread to know specifically if the
- * controller is inside of a minRTT recalculation window during the recording of a latency sample,
- * so this extra bit of information is stored in the recalculating_min_rtt_ boolean. The
- * recalculating_min_rtt_ flag can only be set if inside of a minRTT calculation window.
- *
- * The histogram that aggregates latency samples, latency_sample_hist_, must be protected by a
- * separate lock (the latency sample mutex). The additional lock is necessary because not only is
- * the histogram mutated during both calculation windows, but also during latency samples triggered
- * during the adaptive concurrency filter's header encoding step.
+ * There are 2 mutually exclusive calculation windows, so the sample_mutation_mtx_ is held to
+ * prevent the overlap of these windows. It is necessary for a worker thread to know specifically if
+ * the controller is inside of a minRTT recalculation window during the recording of a latency
+ * sample, so this extra bit of information is stored in inMinRTTSamplingWindow().
  */
 class GradientController : public ConcurrencyController {
 public:
@@ -157,30 +149,34 @@ private:
                                                const std::string& stats_prefix);
   void updateMinRTT();
   std::chrono::microseconds processLatencySamplesAndClear()
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(latency_sample_mtx_);
-  uint32_t calculateNewLimit() ABSL_EXCLUSIVE_LOCKS_REQUIRED(update_window_mtx_);
-  void setMinRTTSamplingWindow() ABSL_EXCLUSIVE_LOCKS_REQUIRED(update_window_mtx_);
-  bool inMinRTTSamplingWindow() const { return recalculating_min_rtt_.load(); }
-  void resetSampleWindow() ABSL_EXCLUSIVE_LOCKS_REQUIRED(update_window_mtx_);
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
+  uint32_t calculateNewLimit() ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
+  void enterMinRTTSamplingWindow() ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
+  bool inMinRTTSamplingWindow() const { return deferred_limit_value_.load() > 0; }
+  void resetSampleWindow() ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
+  void updateConcurrencyLimit(const uint32_t new_limit) {
+    concurrency_limit_.store(new_limit);
+    stats_.concurrency_limit_.set(concurrency_limit_.load());
+  }
 
   const GradientControllerConfigSharedPtr config_;
   Event::Dispatcher& dispatcher_;
   Stats::Scope& scope_;
   GradientControllerStats stats_;
 
-  // Ensures that the minRTT calculation window and the sample window (where the new concurrency
-  // limit is determined) do not overlap.
-  absl::Mutex update_window_mtx_;
+  // Protects data related to latency sampling and RTT values. In addition to protecting the latency
+  // sample histogram, the mutex ensures that the minRTT calculation window and the sample window
+  // (where the new concurrency limit is determined) do not overlap.
+  absl::Mutex sample_mutation_mtx_;
 
-  std::atomic<bool> recalculating_min_rtt_;
-
-  // Protects the latency sample histogram during mutations.
-  absl::Mutex latency_sample_mtx_ ABSL_ACQUIRED_AFTER(update_window_mtx_);
+  // Stores the value of the concurrency limit prior to entering the minRTT update window. If this
+  // is non-zero, then we are actively in the minRTT sampling window.
+  std::atomic<uint32_t> deferred_limit_value_;
 
   // Stores the expected upstream latency value under ideal conditions. This is the numerator in the
   // gradient value explained above.
   std::chrono::nanoseconds min_rtt_;
-  std::chrono::nanoseconds sample_rtt_ ABSL_GUARDED_BY(update_window_mtx_);
+  std::chrono::nanoseconds sample_rtt_ ABSL_GUARDED_BY(sample_mutation_mtx_);
 
   // Tracks the count of requests that have been forwarded whose replies have
   // not been sampled yet. Atomicity is required because this variable is used to make the
@@ -194,7 +190,7 @@ private:
   // Stores all sampled latencies and provides percentile estimations when using the sampled data to
   // calculate a new concurrency limit.
   std::unique_ptr<histogram_t, decltype(&hist_free)>
-      latency_sample_hist_ ABSL_GUARDED_BY(latency_sample_mtx_);
+      latency_sample_hist_ ABSL_GUARDED_BY(sample_mutation_mtx_);
 
   Event::TimerPtr min_rtt_calc_timer_;
   Event::TimerPtr sample_reset_timer_;
