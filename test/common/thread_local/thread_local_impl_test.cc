@@ -85,6 +85,7 @@ TEST_F(ThreadLocalInstanceImplTest, All) {
   tls_.shutdownThread();
 }
 
+// Test that the config passed into the update callback is the previous version stored in the slot.
 TEST_F(ThreadLocalInstanceImplTest, UpdateCallback) {
   InSequence s;
 
