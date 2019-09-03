@@ -17,6 +17,7 @@ import "envoy/api/v2/core/health_check.proto";
 import "envoy/api/v2/core/protocol.proto";
 import "envoy/api/v2/cluster/circuit_breaker.proto";
 import "envoy/api/v2/cluster/filter.proto";
+import "envoy/api/v2/endpoint/endpoint.proto";
 import "envoy/api/v2/cluster/outlier_detection.proto";
 import "envoy/api/v2/eds.proto";
 import "envoy/type/percent.proto";
@@ -234,31 +235,40 @@ message Cluster {
   //   verification.
   auth.UpstreamTlsContext tls_context = 11;
 
-  // UpstreamTransportSocket specifies the transport socket config used for upstream connection.
-  message UpstreamTransportSocket {
-    oneof socket_config {
-      core.TransportSocket transport_socket = 1;
-      auth.UpstreamTlsContext tls_context = 2;
-    }
+  // TransportSocketMatch specifies what transport socket config will be used
+  // whe the matches conditions are satified.
+  message TransportSocketMatcher {
+    // The name of the match.
+    string name = 1;
+    // In order to be match, an endpoint must have all the label key/value pairs
+    // as specified in by *label_match*.
+    repeated endpoint.Label label_matches = 2;
+    // The configuration of the transport socket.
+    core.TransportSocket transport_socket = 3;
   }
 
   // Configuration to use different transport sockets for different endpoints.
   // This should only be used for EDS typed cluster.
-  // The value of LbEndpoint.Metadata configuration under the *envoy.transport_socket_matcher*
-  // is used to decide which transport socket to use when connecting to that particular endpoint.
-  // For example, an endpoint with metadata
+  //
+  // An endpiont's *endpoint.Labels* is used to match against the *label_matches*
+  // to decide which transport socket to use when connecting to that particular endpoint.
+  // For example, with following matcher
   //
   // .. code-block:: json
   //
-  //   {
-  //     "envoy.transport_socket_matcher_label":
-  //        { "label": "mtlsEnabled" }
-  //   }
+  // {
+  //   "endpoint_transport_socket_matchers": [
+  //     { "name": "enable-mtls", label_matches: [ { "label": "app": value: "foo" } ]
+  //     transport_socket: { "name": "tls", "config": { ... }
+  //   ]
+  // }
   //
-  // This endpoint will use the transport_socket_matcher["mtlsEnabled"] configuration.
-  // In case of of label is missing or the transport_socket_matcher does not have corresponding
-  // entry in the map, Envoy fallbacks to the *tls_context* or *transport_socket* in the cluster.
-  map<string, UpstreamTransportSocket> transport_socket_matcher = 41;
+  // Connection to the endpoints whose "app" label equals to "foo" value uses "enable-mtls"
+  // configution, a tls socket with detailed configuration specified as *config*.
+  //
+  // If an endpoint can't be matched against any *TransportSockerMatcher*, connection socket
+  // fallbacks to use the *tls_context* or *transport_socket* specified in this cluster.
+  repeated TransportSocketMatcher endpoint_transport_socket_matchers = 41;
 
   reserved 12;
 
