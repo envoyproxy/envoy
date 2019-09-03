@@ -667,7 +667,8 @@ void ClusterManagerImpl::loadCluster(const envoy::api::v2::Cluster& cluster,
   const auto cluster_entry_it = cluster_map.find(cluster_reference.info()->name());
 
   // If an LB is thread aware, create it here. The LB is not initialized until cluster pre-init
-  // finishes. For RingHash/Maglev don't create the LB here if subset balancing is enabled.
+  // finishes. For RingHash/Maglev don't create the LB here if subset balancing is enabled,
+  // because the thread_aware_lb_ field takes precedence over the subset lb).
   if (cluster_reference.info()->lbType() == LoadBalancerType::RingHash) {
     if (!cluster_reference.info()->lbSubsetInfo().isEnabled()) {
       cluster_entry_it->second->thread_aware_lb_ = std::make_unique<RingHashLoadBalancer>(

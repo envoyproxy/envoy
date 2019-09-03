@@ -607,6 +607,7 @@ public:
   }
 };
 
+// Test initialization of subset load balancer with every possible load balancer policy.
 TEST_P(ClusterManagerSubsetInitializationTest, SubsetLoadBalancerInitialization) {
   const std::string yamlPattern = R"EOF(
 static_resources:
