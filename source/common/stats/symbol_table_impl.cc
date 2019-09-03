@@ -162,7 +162,7 @@ std::string SymbolTableImpl::decodeSymbolVec(const SymbolVec& symbols) const {
     // Hold the lock only while decoding symbols.
     Thread::LockGuard lock(lock_);
     for (Symbol symbol : symbols) {
-      name_tokens.push_back(fromSymbolLockHeld(symbol));
+      name_tokens.push_back(fromSymbol(symbol));
     }
   }
   return absl::StrJoin(name_tokens, ".");
@@ -190,32 +190,23 @@ void SymbolTableImpl::free(const StatName& stat_name) {
 
   Thread::LockGuard lock(lock_);
   for (Symbol symbol : symbols) {
-    freeSymbolLockHeld(symbol);
-  }
-}
+    auto decode_search = decode_map_.find(symbol);
+    ASSERT(decode_search != decode_map_.end());
 
-void SymbolTableImpl::freeSymbol(Symbol symbol) {
-  Thread::LockGuard lock(lock_);
-  freeSymbolLockHeld(symbol);
-}
+    auto encode_search = encode_map_.find(decode_search->second->toStringView());
+    ASSERT(encode_search != encode_map_.end());
 
-void SymbolTableImpl::freeSymbolLockHeld(Symbol symbol) {
-  auto decode_search = decode_map_.find(symbol);
-  ASSERT(decode_search != decode_map_.end());
-
-  auto encode_search = encode_map_.find(decode_search->second->toStringView());
-  ASSERT(encode_search != encode_map_.end());
-
-  // If that was the last remaining client usage of the symbol, erase the
-  // current mappings and add the now-unused symbol to the reuse pool.
-  //
-  // The "if (--EXPR.ref_count_)" pattern speeds up BM_CreateRace by 20% in
-  // symbol_table_speed_test.cc, relative to breaking out the decrement into a
-  // separate step, likely due to the non-trivial dereferences in EXPR.
-  if (--encode_search->second.ref_count_ == 0) {
-    decode_map_.erase(decode_search);
-    encode_map_.erase(encode_search);
-    pool_.push(symbol);
+    // If that was the last remaining client usage of the symbol, erase the
+    // current mappings and add the now-unused symbol to the reuse pool.
+    //
+    // The "if (--EXPR.ref_count_)" pattern speeds up BM_CreateRace by 20% in
+    // symbol_table_speed_test.cc, relative to breaking out the decrement into a
+    // separate step, likely due to the non-trivial dereferences in EXPR.
+    if (--encode_search->second.ref_count_ == 0) {
+      decode_map_.erase(decode_search);
+      encode_map_.erase(encode_search);
+      pool_.push(symbol);
+    }
   }
 }
 
@@ -342,16 +333,11 @@ Symbol SymbolTableImpl::toSymbol(absl::string_view sv) {
   return result;
 }
 
-absl::string_view SymbolTableImpl::fromSymbolLockHeld(const Symbol symbol) const
+absl::string_view SymbolTableImpl::fromSymbol(const Symbol symbol) const
     EXCLUSIVE_LOCKS_REQUIRED(lock_) {
   auto search = decode_map_.find(symbol);
   RELEASE_ASSERT(search != decode_map_.end(), "no such symbol");
   return search->second->toStringView();
-}
-
-absl::string_view SymbolTableImpl::fromSymbol(const Symbol symbol) const {
-  Thread::LockGuard lock(lock_);
-  return fromSymbolLockHeld(symbol);
 }
 
 void SymbolTableImpl::newSymbol() EXCLUSIVE_LOCKS_REQUIRED(lock_) {
@@ -378,7 +364,7 @@ bool SymbolTableImpl::lessThan(const StatName& a, const StatName& b) const {
   Thread::LockGuard lock(lock_);
   for (uint64_t i = 0, n = std::min(av.size(), bv.size()); i < n; ++i) {
     if (av[i] != bv[i]) {
-      bool ret = fromSymbolLockHeld(av[i]) < fromSymbolLockHeld(bv[i]);
+      bool ret = fromSymbol(av[i]) < fromSymbol(bv[i]);
       return ret;
     }
   }
