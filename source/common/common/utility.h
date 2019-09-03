@@ -487,11 +487,12 @@ private:
 };
 
 /**
- * Hashing functor for use with unordered_map and unordered_set with string_view as a key.
+ * Hashing functor for use with absl hash tables, which can use hash on
+ * string_view if this declaration is visible.
  */
-struct StringViewHash {
-  std::size_t operator()(const absl::string_view& k) const { return HashUtil::xxHash64(k); }
-};
+template <typename H> H AbslHashValue(H h, absl::string_view str) {
+  return H::combine(std::move(h), HashUtil::xxHash64(str));
+}
 
 /**
  * Hashing functor for use with enum class types.

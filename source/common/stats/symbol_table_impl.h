@@ -229,7 +229,7 @@ private:
   // Bitmap implementation.
   // The encode map stores both the symbol and the ref count of that symbol.
   // Using absl::string_view lets us only store the complete string once, in the decode map.
-  using EncodeMap = absl::flat_hash_map<absl::string_view, SharedSymbol, StringViewHash>;
+  using EncodeMap = absl::flat_hash_map<absl::string_view, SharedSymbol>;
   using DecodeMap = absl::flat_hash_map<Symbol, InlineStringPtr>;
   EncodeMap encode_map_ GUARDED_BY(lock_);
   DecodeMap decode_map_ GUARDED_BY(lock_);
@@ -326,6 +326,10 @@ public:
   uint64_t hash() const {
     const char* cdata = reinterpret_cast<const char*>(data());
     return HashUtil::xxHash64(absl::string_view(cdata, dataSize()));
+  }
+
+  template <typename H> friend H AbslHashValue(H h, StatName stat_name) {
+    return H::combine(std::move(h), stat_name.hash());
   }
 
   bool operator==(const StatName& rhs) const {
@@ -528,17 +532,11 @@ struct StatNameHash {
   size_t operator()(const StatName& a) const { return a.hash(); }
 };
 
-// Helper class for constructing hash-tables with StatName keys.
-struct StatNameCompare {
-  bool operator()(const StatName& a, const StatName& b) const { return a == b; }
-};
-
 // Value-templatized hash-map with StatName key.
-template <class T>
-using StatNameHashMap = absl::flat_hash_map<StatName, T, StatNameHash, StatNameCompare>;
+template <class T> using StatNameHashMap = absl::flat_hash_map<StatName, T>;
 
 // Hash-set of StatNames
-using StatNameHashSet = absl::flat_hash_set<StatName, StatNameHash, StatNameCompare>;
+using StatNameHashSet = absl::flat_hash_set<StatName>;
 
 // Helper class for sorting StatNames.
 struct StatNameLessThan {
