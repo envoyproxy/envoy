@@ -169,7 +169,7 @@ def api_proto_library(
     )
     py_export_suffixes = []
     if require_py:
-        api_py_proto_library(name, srcs, deps)
+        api_py_proto_library(name, srcs, deps, external_py_proto_deps)
         py_export_suffixes = ["_py", "_py_genproto"]
 
     # Optionally define gRPC services
