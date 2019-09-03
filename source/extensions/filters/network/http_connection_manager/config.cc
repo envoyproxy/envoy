@@ -8,6 +8,7 @@
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.validate.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/server/admin.h"
+#include "envoy/tracing/http_tracer.h"
 
 #include "common/access_log/access_log_impl.h"
 #include "common/common/fmt.h"
@@ -274,8 +275,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     overall_sampling.set_numerator(
         tracing_config.has_overall_sampling() ? tracing_config.overall_sampling().value() : 100);
 
-    uint32_t max_path_tag_length =
-        tracing_config.max_path_tag_length() > 0 ? tracing_config.max_path_tag_length() : 256;
+    uint32_t max_path_tag_length = tracing_config.has_max_path_tag_length()
+                                       ? tracing_config.max_path_tag_length().value()
+                                       : Tracing::DefaultMaxPathTagLength;
 
     tracing_config_ =
         std::make_unique<Http::TracingConnectionManagerConfig>(Http::TracingConnectionManagerConfig{

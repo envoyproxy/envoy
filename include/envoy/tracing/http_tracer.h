@@ -11,6 +11,8 @@
 namespace Envoy {
 namespace Tracing {
 
+constexpr uint32_t DefaultMaxPathTagLength = 256;
+
 enum class OperationName { Ingress, Egress };
 
 /**

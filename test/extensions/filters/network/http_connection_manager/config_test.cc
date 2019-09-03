@@ -262,7 +262,7 @@ TEST_F(HttpConnectionManagerConfigTest, SamplingDefault) {
                                      scoped_routes_config_provider_manager_);
 
   EXPECT_EQ(100, config.tracingConfig()->client_sampling_.numerator());
-  EXPECT_EQ(256, config.tracingConfig()->max_path_tag_length_);
+  EXPECT_EQ(Tracing::DefaultMaxPathTagLength, config.tracingConfig()->max_path_tag_length_);
   EXPECT_EQ(envoy::type::FractionalPercent::HUNDRED,
             config.tracingConfig()->client_sampling_.denominator());
   EXPECT_EQ(10000, config.tracingConfig()->random_sampling_.numerator());
