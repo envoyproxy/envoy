@@ -44,11 +44,11 @@ rm -rf "${GENERATED_RST_DIR}"
 mkdir -p "${GENERATED_RST_DIR}"
 
 source_venv "$BUILD_DIR"
-pip install -r "${SCRIPT_DIR}"/requirements.txt
+pip3 install -r "${SCRIPT_DIR}"/requirements.txt
 
 bazel build ${BAZEL_BUILD_OPTIONS} @envoy_api//docs:protos --aspects \
-  tools/protodoc/protodoc.bzl%proto_doc_aspect --output_groups=rst --action_env=CPROFILE_ENABLED \
-  --action_env=ENVOY_BLOB_SHA --spawn_strategy=standalone --host_force_python=PY2
+  tools/protodoc/protodoc.bzl%proto_doc_aspect --output_groups=rst --action_env=CPROFILE_ENABLED=1 \
+  --action_env=ENVOY_BLOB_SHA --spawn_strategy=standalone --host_force_python=PY3
 
 declare -r DOC_PROTOS=$(bazel query  "deps(@envoy_api//docs:protos)"  | grep "^@envoy_api.*proto$")
 
