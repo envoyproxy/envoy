@@ -60,7 +60,7 @@ typedef NSDictionary<NSString *, NSArray<NSString *> *> EnvoyHeaders;
 
 #pragma mark - EnvoyHTTPStream
 
-@interface EnvoyHTTPStream : NSObject
+@protocol EnvoyHTTPStream
 
 /**
  Open an underlying HTTP stream.
@@ -110,6 +110,13 @@ typedef NSDictionary<NSString *, NSArray<NSString *> *> EnvoyHeaders;
 
 @end
 
+#pragma mark - EnvoyHTTPStreamImpl
+
+// Concrete implementation of the `EnvoyHTTPStream` protocol.
+@interface EnvoyHTTPStreamImpl : NSObject <EnvoyHTTPStream>
+
+@end
+
 #pragma mark - EnvoyEngine
 
 /// Wrapper layer for calling into Envoy's C/++ API.
@@ -142,7 +149,7 @@ typedef NSDictionary<NSString *, NSArray<NSString *> *> EnvoyHeaders;
 
  @param observer Handler for observing stream events.
  */
-- (EnvoyHTTPStream *)startStreamWithObserver:(EnvoyObserver *)observer;
+- (id<EnvoyHTTPStream>)startStreamWithObserver:(EnvoyObserver *)observer;
 
 @end
 

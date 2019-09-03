@@ -3,9 +3,10 @@ licenses(["notice"])  # Apache 2
 load("//bazel:swift_test.bzl", "envoy_mobile_swift_test")
 
 envoy_mobile_swift_test(
-    name = "client_tests",
+    name = "envoy_tests",
     srcs = [
-        "ClientTests.swift",
+        "EnvoyTests.swift",
+        "MockEnvoyHTTPStream.swift",
     ],
 )
 
@@ -13,6 +14,7 @@ envoy_mobile_swift_test(
     name = "envoy_builder_tests",
     srcs = [
         "EnvoyBuilderTests.swift",
+        "MockEnvoyHTTPStream.swift",
     ],
 )
 
