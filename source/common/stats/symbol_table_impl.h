@@ -685,12 +685,12 @@ public:
    */
   StatName add(absl::string_view str) { return pool_.add(str); }
 
-  void trackRecentLookups(TimeSource& time_source);
-  SymbolTable& symbolTable() { return symbol_table_; }
+private:
+  friend class SymbolTableImpl;
 
+  void trackRecentLookups(TimeSource& time_source);
   uint64_t getRecentLookups(const RecentLookups<StatName>::IterFn& iter);
 
-private:
   Stats::SymbolTable& symbol_table_;
   Stats::StatNamePool pool_;
   absl::Mutex mutex_;

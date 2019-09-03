@@ -36,8 +36,8 @@ public:
    *
    * @param fn The function to call for every recently looked up item.
    */
-  void forEach(IterFn fn) {
-    for (ItemTime& item_time : queue_) {
+  void forEach(IterFn fn) const {
+    for (const ItemTime& item_time : queue_) {
       fn(item_time.first, item_time.second);
     }
   }
