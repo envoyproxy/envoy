@@ -145,17 +145,31 @@ public:
   virtual void callWithStringView(StatName stat_name,
                                   const std::function<void(absl::string_view)>& fn) const PURE;
 
-  virtual void trackRecentLookups(TimeSource&) PURE;
-  virtual void rememberSet(StatNameSet& stat_name_set) PURE;
-  virtual void forgetSet(StatNameSet& stat_name_set) PURE;
+  /**
+   * Enables tracking the most recent symbol-table lookups in a bounded queue,
+   * to help identify the source of potential mutex contention in highly
+   * threaded systems. Ideally, once a system has been initialized, there
+   * should be no more symbol-table lookups.
+   *
+   * @param time_source used to help capture the time when a lookup occurs.
+   */
+  virtual void trackRecentLookups(TimeSource& time_source) PURE;
 
   using RecentLookupsFn = std::function<void(absl::string_view, SystemTime)>;
-  virtual uint64_t getRecentLookups(const RecentLookupsFn&) PURE;
+
+  /**
+   * Calls the provided function with the name of the most recently looked-up
+   * symbols, including lookups on any StatNameSets.
+   *
+   * @param iter the function to call for every recent item.
+   */
+  virtual uint64_t getRecentLookups(const RecentLookupsFn& iter) PURE;
 
 private:
   friend struct HeapStatData;
   friend class StatNameStorage;
   friend class StatNameList;
+  friend class StatNameSet;
 
   // The following methods are private, but are called by friend classes
   // StatNameStorage and StatNameList, which must be friendly with SymbolTable
@@ -192,6 +206,22 @@ private:
    *
    */
   virtual StoragePtr encode(absl::string_view name) PURE;
+
+  /**
+   * Enables trackRecentLookups to also track lookups that occur in
+   * StatNameSets, which has its own mutex. This function is called from
+   * StatNameSet's constructor.
+   *
+   * @param stat_name_set the set.
+   */
+  virtual void rememberSet(StatNameSet& stat_name_set) PURE;
+
+  /**
+   * Called by StatNameSet's destructor.
+   *
+   * @param stat_name_set the set.
+   */
+  virtual void forgetSet(StatNameSet& stat_name_set) PURE;
 };
 
 using SymbolTablePtr = std::unique_ptr<SymbolTable>;
