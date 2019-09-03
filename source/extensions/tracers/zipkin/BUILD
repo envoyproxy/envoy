@@ -57,6 +57,7 @@ envoy_cc_library(
         "//source/common/singleton:const_singleton",
         "//source/common/tracing:http_tracer_lib",
         "//source/extensions/tracers:well_known_names",
+        "@com_github_openzipkin_zipkinapi//:zipkin_cc",
     ],
 )
 

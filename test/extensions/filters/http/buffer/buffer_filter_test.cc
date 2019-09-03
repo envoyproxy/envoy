@@ -12,12 +12,8 @@
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/init/mocks.h"
-#include "test/mocks/local_info/mocks.h"
-#include "test/mocks/protobuf/mocks.h"
-#include "test/mocks/runtime/mocks.h"
-#include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -42,16 +38,8 @@ public:
     return std::make_shared<BufferFilterConfig>(proto_config);
   }
 
-  BufferFilterTest() : config_(setupConfig()), filter_(config_), api_(Api::createApiForTest()) {
+  BufferFilterTest() : config_(setupConfig()), filter_(config_) {
     filter_.setDecoderFilterCallbacks(callbacks_);
-
-    // Create a runtime loader, so that tests can manually manipulate runtime
-    // guarded features.
-    envoy::config::bootstrap::v2::LayeredRuntime config;
-    config.add_layers()->mutable_admin_layer();
-    loader_ = std::make_unique<Runtime::ScopedLoaderSingleton>(Runtime::LoaderPtr{
-        new Runtime::LoaderImpl(dispatcher_, tls_, config, local_info_, init_manager_, store_,
-                                generator_, validation_visitor_, *api_)});
   }
 
   void routeLocalConfig(const Router::RouteSpecificFilterConfig* route_settings,
@@ -66,15 +54,8 @@ public:
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   BufferFilterConfigSharedPtr config_;
   BufferFilter filter_;
-  Event::MockDispatcher dispatcher_;
-  NiceMock<ThreadLocal::MockInstance> tls_;
-  Stats::IsolatedStoreImpl store_;
-  Runtime::MockRandomGenerator generator_;
-  Api::ApiPtr api_;
-  NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  Init::MockManager init_manager_;
-  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
-  std::unique_ptr<Runtime::ScopedLoaderSingleton> loader_;
+  // Create a runtime loader, so that tests can manually manipulate runtime guarded features.
+  TestScopedRuntime scoped_runtime;
 };
 
 TEST_F(BufferFilterTest, HeaderOnlyRequest) {

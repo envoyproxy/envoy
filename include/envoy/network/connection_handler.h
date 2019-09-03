@@ -9,6 +9,8 @@
 #include "envoy/network/listener.h"
 #include "envoy/ssl/context.h"
 
+#include "spdlog/spdlog.h"
+
 namespace Envoy {
 namespace Network {
 

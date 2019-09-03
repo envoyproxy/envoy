@@ -14,6 +14,7 @@
 
 #include "common/network/cidr_range.h"
 #include "common/network/lc_trie.h"
+#include "common/stats/symbol_table_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -32,46 +33,16 @@ class IpTaggingFilterConfig {
 public:
   IpTaggingFilterConfig(const envoy::config::filter::http::ip_tagging::v2::IPTagging& config,
                         const std::string& stat_prefix, Stats::Scope& scope,
-                        Runtime::Loader& runtime)
-      : request_type_(requestTypeEnum(config.request_type())), scope_(scope), runtime_(runtime),
-        stats_prefix_(stat_prefix + "ip_tagging.") {
-
-    // Once loading IP tags from a file system is supported, the restriction on the size
-    // of the set should be removed and observability into what tags are loaded needs
-    // to be implemented.
-    // TODO(ccaraman): Remove size check once file system support is implemented.
-    // Work is tracked by issue https://github.com/envoyproxy/envoy/issues/2695.
-    if (config.ip_tags().empty()) {
-      throw EnvoyException("HTTP IP Tagging Filter requires ip_tags to be specified.");
-    }
-
-    std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data;
-    tag_data.reserve(config.ip_tags().size());
-    for (const auto& ip_tag : config.ip_tags()) {
-      std::vector<Network::Address::CidrRange> cidr_set;
-      cidr_set.reserve(ip_tag.ip_list().size());
-      for (const envoy::api::v2::core::CidrRange& entry : ip_tag.ip_list()) {
-
-        // Currently, CidrRange::create doesn't guarantee that the CidrRanges are valid.
-        Network::Address::CidrRange cidr_entry = Network::Address::CidrRange::create(entry);
-        if (cidr_entry.isValid()) {
-          cidr_set.emplace_back(std::move(cidr_entry));
-        } else {
-          throw EnvoyException(
-              fmt::format("invalid ip/mask combo '{}/{}' (format is <ip>/<# mask bits>)",
-                          entry.address_prefix(), entry.prefix_len().value()));
-        }
-      }
-      tag_data.emplace_back(ip_tag.ip_tag_name(), cidr_set);
-    }
-    trie_ = std::make_unique<Network::LcTrie::LcTrie<std::string>>(tag_data);
-  }
+                        Runtime::Loader& runtime);
 
   Runtime::Loader& runtime() { return runtime_; }
   Stats::Scope& scope() { return scope_; }
   FilterRequestType requestType() const { return request_type_; }
   const Network::LcTrie::LcTrie<std::string>& trie() const { return *trie_; }
-  const std::string& statsPrefix() const { return stats_prefix_; }
+
+  void incHit(absl::string_view tag) { incCounter(hit_, tag); }
+  void incNoHit() { incCounter(no_hit_); }
+  void incTotal() { incCounter(total_); }
 
 private:
   static FilterRequestType requestTypeEnum(
@@ -88,10 +59,16 @@ private:
     }
   }
 
+  void incCounter(Stats::StatName name1, absl::string_view tag = "");
+
   const FilterRequestType request_type_;
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
-  const std::string stats_prefix_;
+  Stats::StatNameSet stat_name_set_;
+  const Stats::StatName stats_prefix_;
+  const Stats::StatName hit_;
+  const Stats::StatName no_hit_;
+  const Stats::StatName total_;
   std::unique_ptr<Network::LcTrie::LcTrie<std::string>> trie_;
 };
 

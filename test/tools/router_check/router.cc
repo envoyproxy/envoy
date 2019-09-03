@@ -6,6 +6,7 @@
 #include <unordered_map>
 
 #include "common/network/utility.h"
+#include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/stream_info/stream_info_impl.h"
 
@@ -63,7 +64,8 @@ ToolConfig::ToolConfig(std::unique_ptr<Http::TestHeaderMapImpl> headers, int ran
     : headers_(std::move(headers)), random_value_(random_value) {}
 
 // static
-RouterCheckTool RouterCheckTool::create(const std::string& router_config_file) {
+RouterCheckTool RouterCheckTool::create(const std::string& router_config_file,
+                                        const bool disableDeprecationCheck) {
   // TODO(hennna): Allow users to load a full config and extract the route configuration from it.
   envoy::api::v2::RouteConfiguration route_config;
   auto stats = std::make_unique<Stats::IsolatedStoreImpl>();
@@ -72,6 +74,11 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_file) {
 
   auto factory_context = std::make_unique<NiceMock<Server::Configuration::MockFactoryContext>>();
   auto config = std::make_unique<Router::ConfigImpl>(route_config, *factory_context, false);
+  if (!disableDeprecationCheck) {
+    MessageUtil::checkForUnexpectedFields(route_config,
+                                          ProtobufMessage::getStrictValidationVisitor(),
+                                          &factory_context->runtime_loader_);
+  }
 
   return RouterCheckTool(std::move(factory_context), std::move(config), std::move(stats),
                          std::move(api), Coverage(route_config));
@@ -220,13 +227,13 @@ bool RouterCheckTool::compareCluster(ToolConfig& tool_config, const std::string&
 
 bool RouterCheckTool::compareCluster(
     ToolConfig& tool_config, const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
-  if (expected.cluster_name().empty()) {
+  if (!expected.has_cluster_name()) {
     return true;
   }
   if (tool_config.route_ == nullptr) {
-    return compareResults("", expected.cluster_name(), "cluster_name");
+    return compareResults("", expected.cluster_name().value(), "cluster_name");
   }
-  return compareCluster(tool_config, expected.cluster_name());
+  return compareCluster(tool_config, expected.cluster_name().value());
 }
 
 bool RouterCheckTool::compareVirtualCluster(ToolConfig& tool_config, const std::string& expected) {
@@ -247,13 +254,13 @@ bool RouterCheckTool::compareVirtualCluster(ToolConfig& tool_config, const std::
 
 bool RouterCheckTool::compareVirtualCluster(
     ToolConfig& tool_config, const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
-  if (expected.virtual_cluster_name().empty()) {
+  if (!expected.has_virtual_cluster_name()) {
     return true;
   }
   if (tool_config.route_ == nullptr) {
-    return compareResults("", expected.virtual_cluster_name(), "virtual_cluster_name");
+    return compareResults("", expected.virtual_cluster_name().value(), "virtual_cluster_name");
   }
-  return compareVirtualCluster(tool_config, expected.virtual_cluster_name());
+  return compareVirtualCluster(tool_config, expected.virtual_cluster_name().value());
 }
 
 bool RouterCheckTool::compareVirtualHost(ToolConfig& tool_config, const std::string& expected) {
@@ -271,13 +278,13 @@ bool RouterCheckTool::compareVirtualHost(ToolConfig& tool_config, const std::str
 
 bool RouterCheckTool::compareVirtualHost(
     ToolConfig& tool_config, const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
-  if (expected.virtual_host_name().empty()) {
+  if (!expected.has_virtual_host_name()) {
     return true;
   }
   if (tool_config.route_ == nullptr) {
-    return compareResults("", expected.virtual_host_name(), "virtual_host_name");
+    return compareResults("", expected.virtual_host_name().value(), "virtual_host_name");
   }
-  return compareVirtualHost(tool_config, expected.virtual_host_name());
+  return compareVirtualHost(tool_config, expected.virtual_host_name().value());
 }
 
 bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config, const std::string& expected) {
@@ -302,13 +309,13 @@ bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config, const std::str
 
 bool RouterCheckTool::compareRewritePath(
     ToolConfig& tool_config, const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
-  if (expected.path_rewrite().empty()) {
+  if (!expected.has_path_rewrite()) {
     return true;
   }
   if (tool_config.route_ == nullptr) {
-    return compareResults("", expected.path_rewrite(), "path_rewrite");
+    return compareResults("", expected.path_rewrite().value(), "path_rewrite");
   }
-  return compareRewritePath(tool_config, expected.path_rewrite());
+  return compareRewritePath(tool_config, expected.path_rewrite().value());
 }
 
 bool RouterCheckTool::compareRewriteHost(ToolConfig& tool_config, const std::string& expected) {
@@ -333,13 +340,13 @@ bool RouterCheckTool::compareRewriteHost(ToolConfig& tool_config, const std::str
 
 bool RouterCheckTool::compareRewriteHost(
     ToolConfig& tool_config, const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
-  if (expected.host_rewrite().empty()) {
+  if (!expected.has_host_rewrite()) {
     return true;
   }
   if (tool_config.route_ == nullptr) {
-    return compareResults("", expected.host_rewrite(), "host_rewrite");
+    return compareResults("", expected.host_rewrite().value(), "host_rewrite");
   }
-  return compareRewriteHost(tool_config, expected.host_rewrite());
+  return compareRewriteHost(tool_config, expected.host_rewrite().value());
 }
 
 bool RouterCheckTool::compareRedirectPath(ToolConfig& tool_config, const std::string& expected) {
@@ -357,13 +364,13 @@ bool RouterCheckTool::compareRedirectPath(ToolConfig& tool_config, const std::st
 
 bool RouterCheckTool::compareRedirectPath(
     ToolConfig& tool_config, const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
-  if (expected.path_redirect().empty()) {
+  if (!expected.has_path_redirect()) {
     return true;
   }
   if (tool_config.route_ == nullptr) {
-    return compareResults("", expected.path_redirect(), "path_redirect");
+    return compareResults("", expected.path_redirect().value(), "path_redirect");
   }
-  return compareRedirectPath(tool_config, expected.path_redirect());
+  return compareRedirectPath(tool_config, expected.path_redirect().value());
 }
 
 bool RouterCheckTool::compareHeaderField(
@@ -439,6 +446,8 @@ Options::Options(int argc, char** argv) {
   TCLAP::CmdLine cmd("router_check_tool", ' ', "none", true);
   TCLAP::SwitchArg is_proto("p", "useproto", "Use Proto test file schema", cmd, false);
   TCLAP::SwitchArg is_detailed("d", "details", "Show detailed test execution results", cmd, false);
+  TCLAP::SwitchArg disable_deprecation_check("", "disable-deprecation-check",
+                                             "Disable deprecated fields check", cmd, false);
   TCLAP::ValueArg<double> fail_under("f", "fail-under",
                                      "Fail if test coverage is under a specified amount", false,
                                      0.0, "float", cmd);
@@ -461,6 +470,7 @@ Options::Options(int argc, char** argv) {
   is_detailed_ = is_detailed.getValue();
   fail_under_ = fail_under.getValue();
   comprehensive_coverage_ = comprehensive_coverage.getValue();
+  disable_deprecation_check_ = disable_deprecation_check.getValue();
 
   if (is_proto_) {
     config_path_ = config_path.getValue();
