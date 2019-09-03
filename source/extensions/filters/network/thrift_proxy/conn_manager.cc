@@ -77,8 +77,14 @@ void ConnectionManager::dispatch() {
   } catch (const EnvoyException& ex) {
     ENVOY_CONN_LOG(error, "thrift error: {}", read_callbacks_->connection(), ex.what());
 
-    // Use the current rpc to send an error downstream, if possible.
-    rpcs_.front()->onError(ex.what());
+    if (!rpcs_.empty()) {
+      // Use the current rpc's transport/protocol to send an error downstream.
+      rpcs_.front()->onError(ex.what());
+    } else {
+      // Transport/protocol mismatch (including errors in automatic detection). Just hang up
+      // since we don't know how to encode a response.
+      read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+    }
   }
 
   stats_.request_decoding_error_.inc();
