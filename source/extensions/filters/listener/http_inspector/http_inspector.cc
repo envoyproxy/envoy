@@ -58,14 +58,12 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
     file_event_ = cb.dispatcher().createFileEvent(
         socket.ioHandle().fd(),
         [this](uint32_t events) {
-          if (events & Event::FileReadyType::Closed) {
-            config_->stats().read_error_.inc();
-            file_event_.reset();
-            cb_->socket().close();
-            return;
-          }
+          ENVOY_LOG(trace, "http inspector event: {}", events);
+          // inspector is always peeking and can never determine EOF.
+          // Use this event type to avoid listener timeout on the OS supporting
+          // FileReadyType::Closed.
+          bool end_stream = events & Event::FileReadyType::Closed;
 
-          ASSERT(events == Event::FileReadyType::Read);
           const ParseState parse_state = onRead();
           switch (parse_state) {
           case ParseState::Error:
@@ -78,6 +76,13 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
             cb_->continueFilterChain(true);
             break;
           case ParseState::Continue:
+            if (end_stream) {
+              // Parser fails to determine http but the end of stream is reached. Fallback to
+              // non-http.
+              done(false);
+              file_event_.reset();
+              cb_->continueFilterChain(true);
+            }
             // do nothing but wait for the next event
             break;
           }
