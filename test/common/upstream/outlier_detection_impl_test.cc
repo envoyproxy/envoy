@@ -1085,12 +1085,10 @@ TEST_F(OutlierDetectorImplTest, BasicFlowFailurePercentageExternalOrigin) {
   ON_CALL(runtime_.snapshot_,
           featureEnabled("outlier_detection.enforcing_consecutive_gateway_failure", 100))
       .WillByDefault(Return(false));
-  ON_CALL(runtime_.snapshot_,
-          featureEnabled("outlier_detection.enforcing_success_rate", 100))
+  ON_CALL(runtime_.snapshot_, featureEnabled("outlier_detection.enforcing_success_rate", 100))
       .WillByDefault(Return(false));
   // Now turn on FP detection.
-  ON_CALL(runtime_.snapshot_,
-          featureEnabled("outlier_detection.enforcing_failure_percentage", 0))
+  ON_CALL(runtime_.snapshot_, featureEnabled("outlier_detection.enforcing_failure_percentage", 0))
       .WillByDefault(Return(true));
   // Expect non-enforcing logging to happen every time the consecutive_5xx_ counter
   // gets saturated (every 5 times).
@@ -1124,8 +1122,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowFailurePercentageExternalOrigin) {
   time_system_.setMonotonicTime(std::chrono::milliseconds(10000));
   EXPECT_CALL(checker_, check(hosts_[4]));
   EXPECT_CALL(*event_logger_,
-              logEject(std::static_pointer_cast<const HostDescription>(hosts_[4]),
-                       _,
+              logEject(std::static_pointer_cast<const HostDescription>(hosts_[4]), _,
                        envoy::data::cluster::v2alpha::OutlierEjectionType::FAILURE_PERCENTAGE,
                        true));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
@@ -1133,11 +1130,11 @@ TEST_F(OutlierDetectorImplTest, BasicFlowFailurePercentageExternalOrigin) {
       .WillByDefault(Return(1900));
   interval_timer_->invokeCallback();
   EXPECT_FLOAT_EQ(100.0 * (50.0 / 300.0),
-      hosts_[3]->outlierDetector().successRate(
-          DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin));
+                  hosts_[3]->outlierDetector().successRate(
+                      DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin));
   EXPECT_FLOAT_EQ(100.0 * (50.0 / 350.0),
-      hosts_[4]->outlierDetector().successRate(
-          DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin));
+                  hosts_[4]->outlierDetector().successRate(
+                      DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin));
   // Make sure that local origin success rate monitor is not affected
   EXPECT_EQ(-1, hosts_[4]->outlierDetector().successRate(
                     DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin));

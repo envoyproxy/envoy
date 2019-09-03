@@ -118,14 +118,12 @@ message OutlierDetection {
   // The failure percentage to use when determining failure percentage-based outlier detection. If
   // the failure percentage of a given host is greater than or equal to this value, it will be
   // ejected. Defaults to 85.
-  google.protobuf.UInt32Value failure_percentage_threshold = 16
-      [(validate.rules).uint32.lte = 100];
+  google.protobuf.UInt32Value failure_percentage_threshold = 16 [(validate.rules).uint32.lte = 100];
 
   // The % chance that a host will be actually ejected when an outlier status is detected through
   // failure precentage statistics. This setting can be used to disable ejection or to ramp it up
   // slowly. Defaults to 0.
-  google.protobuf.UInt32Value enforcing_failure_percentage = 17
-      [(validate.rules).uint32.lte = 100];
+  google.protobuf.UInt32Value enforcing_failure_percentage = 17 [(validate.rules).uint32.lte = 100];
 
   // The % chance that a host will be actually ejected when an outlier status is detected through
   // local-origin failure precentage statistics. This setting can be used to disable ejection or to

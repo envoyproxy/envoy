@@ -53,7 +53,7 @@ Version history
 * tracing: added tags for gRPC response status and meesage.
 * upstream: added :ref:`an option <envoy_api_field_Cluster.CommonLbConfig.close_connections_on_host_set_change>` that allows draining HTTP, TCP connection pools on cluster membership change.
 * upstream: added network filter chains to upstream connections, see :ref:`filters<envoy_api_field_Cluster.filters>`.
-* upstream: added new :ref:`failure-percentage based outlier detection<arch_overview_outlier_detection_failure_percentage` mode.
+* upstream: added new :ref:`failure-percentage based outlier detection<arch_overview_outlier_detection_failure_percentage>` mode.
 * upstream: use p2c to select hosts for least-requests load balancers if all host weights are the same, even in cases where weights are not equal to 1.
 * zookeeper: parse responses and emit latency stats.
 

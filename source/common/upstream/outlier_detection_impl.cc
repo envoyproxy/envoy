@@ -366,9 +366,8 @@ bool DetectorImpl::enforceEjection(envoy::data::cluster::v2alpha::OutlierEjectio
         "outlier_detection.enforcing_local_origin_success_rate",
         config_.enforcingLocalOriginSuccessRate());
   case envoy::data::cluster::v2alpha::OutlierEjectionType::FAILURE_PERCENTAGE:
-    return runtime_.snapshot().featureEnabled(
-        "outlier_detection.enforcing_failure_percentage",
-        config_.enforcingFailurePercentage());
+    return runtime_.snapshot().featureEnabled("outlier_detection.enforcing_failure_percentage",
+                                              config_.enforcingFailurePercentage());
   case envoy::data::cluster::v2alpha::OutlierEjectionType::FAILURE_PERCENTAGE_LOCAL_ORIGIN:
     return runtime_.snapshot().featureEnabled(
         "outlier_detection.enforcing_failure_percentage_local_origin",
@@ -641,12 +640,12 @@ void DetectorImpl::processSuccessRateEjections(
 
 void DetectorImpl::processFailurePercentageEjections(
     DetectorHostMonitor::SuccessRateMonitorType monitor_type) {
-  uint64_t failure_percentage_minimum_hosts = runtime_.snapshot().getInteger(
-      "outlier_detection.failure_percentage_minimum_hosts",
-      config_.failurePercentageMinimumHosts());
-  uint64_t failure_percentage_request_volume = runtime_.snapshot().getInteger(
-      "outlier_detection.failure_percentage_request_volume",
-      config_.failurePercentageRequestVolume());
+  uint64_t failure_percentage_minimum_hosts =
+      runtime_.snapshot().getInteger("outlier_detection.failure_percentage_minimum_hosts",
+                                     config_.failurePercentageMinimumHosts());
+  uint64_t failure_percentage_request_volume =
+      runtime_.snapshot().getInteger("outlier_detection.failure_percentage_request_volume",
+                                     config_.failurePercentageRequestVolume());
   std::vector<HostSuccessRatePair> valid_failure_percentage_hosts;
 
   // Exit early if there are not enough hosts.
@@ -659,9 +658,10 @@ void DetectorImpl::processFailurePercentageEjections(
 
   for (const auto& host : host_monitors_) {
     if (!host.first->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
-      absl::optional<double> host_success_rate = host.second->getSRMonitor(monitor_type)
-                                                     .successRateAccumulator()
-                                                     .getSuccessRate(failure_percentage_request_volume);
+      absl::optional<double> host_success_rate =
+          host.second->getSRMonitor(monitor_type)
+              .successRateAccumulator()
+              .getSuccessRate(failure_percentage_request_volume);
 
       if (host_success_rate) {
         valid_failure_percentage_hosts.emplace_back(
@@ -673,9 +673,9 @@ void DetectorImpl::processFailurePercentageEjections(
   if (!valid_failure_percentage_hosts.empty() &&
       valid_failure_percentage_hosts.size() >= failure_percentage_minimum_hosts) {
     const double failure_percentage_threshold =
-      runtime_.snapshot().getInteger("outlier_detection.failure_percentage_threshold",
-                                     config_.failurePercentageThreshold()) /
-      100.0;
+        runtime_.snapshot().getInteger("outlier_detection.failure_percentage_threshold",
+                                       config_.failurePercentageThreshold()) /
+        100.0;
 
     for (const auto& host_success_rate_pair : valid_failure_percentage_hosts) {
       if ((100.0 - host_success_rate_pair.success_rate_) >= failure_percentage_threshold) {
@@ -684,9 +684,10 @@ void DetectorImpl::processFailurePercentageEjections(
         // The ejection type returned by the SuccessRateMonitor's getEjectionType() will be a
         // SUCCESS_RATE type, so we need to figure it out for ourselves.
         const envoy::data::cluster::v2alpha::OutlierEjectionType type =
-          (monitor_type == DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin)
-            ? envoy::data::cluster::v2alpha::OutlierEjectionType::FAILURE_PERCENTAGE
-            : envoy::data::cluster::v2alpha::OutlierEjectionType::FAILURE_PERCENTAGE_LOCAL_ORIGIN;
+            (monitor_type == DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin)
+                ? envoy::data::cluster::v2alpha::OutlierEjectionType::FAILURE_PERCENTAGE
+                : envoy::data::cluster::v2alpha::OutlierEjectionType::
+                      FAILURE_PERCENTAGE_LOCAL_ORIGIN;
         updateDetectedEjectionStats(type);
         ejectHost(host_success_rate_pair.host_, type);
       }
@@ -749,7 +750,8 @@ void EventLoggerImpl::logEject(const HostDescriptionConstSharedPtr& host, Detect
     event.mutable_eject_success_rate_event()->set_host_success_rate(
         host->outlierDetector().successRate(monitor_type));
   } else if ((type == envoy::data::cluster::v2alpha::OutlierEjectionType::FAILURE_PERCENTAGE) ||
-             (type == envoy::data::cluster::v2alpha::OutlierEjectionType::FAILURE_PERCENTAGE_LOCAL_ORIGIN)) {
+             (type == envoy::data::cluster::v2alpha::OutlierEjectionType::
+                          FAILURE_PERCENTAGE_LOCAL_ORIGIN)) {
     const DetectorHostMonitor::SuccessRateMonitorType monitor_type =
         (type == envoy::data::cluster::v2alpha::OutlierEjectionType::FAILURE_PERCENTAGE)
             ? DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin
