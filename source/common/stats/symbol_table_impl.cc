@@ -233,7 +233,8 @@ void SymbolTableImpl::trackRecentLookups(TimeSource& time_source) {
   }
 }
 
-bool SymbolTableImpl::getRecentLookups(const RecentLookupsFn& iter) {
+uint64_t SymbolTableImpl::getRecentLookups(const RecentLookupsFn& iter) {
+  uint64_t total = 0;
   struct LookupData {
     StatName stat_name_;
     std::string name_; // Used if stat_name is empty.
@@ -254,7 +255,7 @@ bool SymbolTableImpl::getRecentLookups(const RecentLookupsFn& iter) {
   {
     Thread::LockGuard lock(stat_name_set_mutex_);
     for (StatNameSet* stat_name_set : stat_name_sets_) {
-      stat_name_set->getRecentLookups([&lookup_data](StatName stat_name, SystemTime time) {
+      total += stat_name_set->getRecentLookups([&lookup_data](StatName stat_name, SystemTime time) {
         ASSERT(!stat_name.empty());
         lookup_data.push_back({stat_name, "", time});
       });
@@ -263,13 +264,13 @@ bool SymbolTableImpl::getRecentLookups(const RecentLookupsFn& iter) {
 
   {
     Thread::LockGuard lock(lock_);
-    if (recent_lookups_ == nullptr) {
-      return false;
+    if (recent_lookups_ != nullptr) {
+      recent_lookups_->forEach([&lookup_data](const std::string& str, SystemTime time)
+                               NO_THREAD_SAFETY_ANALYSIS {
+                                 lookup_data.push_back({StatName(), str, time});
+                               });
+      total += recent_lookups_->total();
     }
-    recent_lookups_->forEach([&lookup_data](const std::string& str, SystemTime time)
-                                 NO_THREAD_SAFETY_ANALYSIS {
-                                   lookup_data.push_back({StatName(), str, time});
-                                 });
   }
 
   std::sort(lookup_data.begin(), lookup_data.end(),
@@ -286,7 +287,7 @@ bool SymbolTableImpl::getRecentLookups(const RecentLookupsFn& iter) {
       prev = &lookup;
     }
   }
-  return true;
+  return total;
 }
 
 void SymbolTableImpl::rememberSet(StatNameSet& stat_name_set) {
@@ -585,13 +586,13 @@ void StatNameSet::trackRecentLookups(TimeSource& time_source) {
   recent_lookups_ = std::make_unique<RecentLookups<StatName>>(time_source);
 }
 
-bool StatNameSet::getRecentLookups(const RecentLookups<StatName>::IterFn& iter) {
+uint64_t StatNameSet::getRecentLookups(const RecentLookups<StatName>::IterFn& iter) {
   absl::MutexLock lock(&mutex_);
   if (recent_lookups_ == nullptr) {
-    return false;
+    return 0;
   }
   recent_lookups_->forEach(iter);
-  return true;
+  return recent_lookups_->total();
 }
 
 } // namespace Stats

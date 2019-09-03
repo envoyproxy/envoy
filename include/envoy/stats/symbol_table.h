@@ -150,7 +150,7 @@ public:
   virtual void forgetSet(StatNameSet& stat_name_set) PURE;
 
   using RecentLookupsFn = std::function<void(absl::string_view, SystemTime)>;
-  virtual bool getRecentLookups(const RecentLookupsFn&) PURE;
+  virtual uint64_t getRecentLookups(const RecentLookupsFn&) PURE;
 
 private:
   friend struct HeapStatData;

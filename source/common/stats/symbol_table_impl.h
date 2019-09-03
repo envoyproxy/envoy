@@ -164,7 +164,7 @@ public:
   void trackRecentLookups(TimeSource& timeSource) override;
   void rememberSet(StatNameSet& stat_name_set) override;
   void forgetSet(StatNameSet& stat_name_set) override;
-  bool getRecentLookups(const RecentLookupsFn&) override;
+  uint64_t getRecentLookups(const RecentLookupsFn&) override;
 
 private:
   friend class StatName;
@@ -692,7 +692,7 @@ public:
   void trackRecentLookups(TimeSource& time_source);
   SymbolTable& symbolTable() { return symbol_table_; }
 
-  bool getRecentLookups(const RecentLookups<StatName>::IterFn& iter);
+  uint64_t getRecentLookups(const RecentLookups<StatName>::IterFn& iter);
 
 private:
   Stats::SymbolTable& symbol_table_;
