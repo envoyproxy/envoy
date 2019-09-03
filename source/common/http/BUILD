@@ -123,8 +123,8 @@ envoy_cc_library(
         "//include/envoy/config:config_provider_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/router:rds_interface",
+        "//source/common/http:local_reply_lib",
         "//source/common/network:utility_lib",
-        "//source/common/http:local_reply_lib"
     ],
 )
 
@@ -245,6 +245,7 @@ envoy_cc_library(
     deps = [
         "//source/common/common:matchers_lib",
         "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:http_connection_manager_cc",
+        "@envoy_api//envoy/service/accesslog/v2:als_cc",
     ],
 )
 

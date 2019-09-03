@@ -14,8 +14,8 @@
 
 #include "common/common/logger.h"
 #include "common/http/conn_manager_impl.h"
-#include "common/json/json_loader.h"
 #include "common/http/local_reply.h"
+#include "common/json/json_loader.h"
 
 #include "extensions/filters/network/common/factory_base.h"
 #include "extensions/filters/network/well_known_names.h"
@@ -193,7 +193,7 @@ private:
   std::chrono::milliseconds delayed_close_timeout_;
   const bool normalize_path_;
   const bool merge_slashes_;
-  Http::LocalReplyConfigConstPtr local_reply_config_; 
+  Http::LocalReplyConfigConstPtr local_reply_config_;
 
   // Default idle timeout is 5 minutes if nothing is specified in the HCM config.
   static const uint64_t StreamIdleTimeoutMs = 5 * 60 * 1000;
