@@ -12,16 +12,22 @@ set -e
 declare -r OLD_VERSION="$1"
 declare -r NEW_VERSION="$2"
 
+# For vM -> vN, replace //$1*/vMalpha with //$1*/vN in BUILD file $2
+# For vM -> vN, replace //$1*/vM with //$1*/vN in BUILD file $2
 function replace_build() {
   sed -i -e "s#\(//$1[^\S]*\)/${OLD_VERSION}alpha#\1/${NEW_VERSION}#g" "$2"
   sed -i -e "s#\(//$1[^\S]*\)/${OLD_VERSION}#\1/${NEW_VERSION}#g" "$2"
 }
 
+# For vM -> vN, replace $1*[./]vMalpha with $1*[./]vN in .proto file $2
+# For vM -> vN, replace $1*[./]vM with $1*[./]vN in .proto file $2
 function replace_proto() {
   sed -i -e "s#\($1\S*[\./]\)${OLD_VERSION}alpha#\1${NEW_VERSION}#g" "$2"
   sed -i -e "s#\($1\S*[\./]\)${OLD_VERSION}#\1${NEW_VERSION}#g" "$2"
 }
 
+# We consider both {vM, vMalpha} to deal with the multiple possible combinations
+# of {vM, vMalpha} existence for a given package.
 for p in $(find api/ -name "${OLD_VERSION}" -o -name "${OLD_VERSION}alpha")
 do
   declare PACKAGE_ROOT="$(dirname "$p")"
