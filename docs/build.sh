@@ -50,7 +50,7 @@ bazel build ${BAZEL_BUILD_OPTIONS} @envoy_api//docs:protos --aspects \
   tools/protodoc/protodoc.bzl%proto_doc_aspect --output_groups=rst --action_env=CPROFILE_ENABLED=1 \
   --action_env=ENVOY_BLOB_SHA --spawn_strategy=standalone --host_force_python=PY3
 
-declare -r DOC_PROTOS=$(bazel query  "deps(@envoy_api//docs:protos)"  | grep "^@envoy_api.*proto$")
+declare -r DOC_PROTOS=$(bazel query "deps(@envoy_api//docs:protos)" | grep "^@envoy_api.*proto$")
 
 # Only copy in the protos we care about and know how to deal with in protodoc.
 for p in ${DOC_PROTOS}

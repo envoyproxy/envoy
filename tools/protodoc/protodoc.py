@@ -713,8 +713,11 @@ def Main():
   response = plugin_pb2.CodeGeneratorResponse()
   cprofile_enabled = os.getenv('CPROFILE_ENABLED')
 
+  # We use file_to_generate rather than proto_file here since we are invoked
+  # inside a Bazel aspect, each node in the DAG will be visited once by the
+  # aspect and we only want to generate docs for the current node.
   for file_to_generate in request.file_to_generate:
-    # Find the FileDescriptorProto for the file we actually are generating
+    # Find the FileDescriptorProto for the file we actually are generating.
     proto_file = None
     for pf in request.proto_file:
       if pf.name == file_to_generate:
