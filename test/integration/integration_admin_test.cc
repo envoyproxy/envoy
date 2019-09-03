@@ -542,21 +542,21 @@ TEST_P(StatsMatcherIntegrationTest, ExcludePrefixServerDot) {
   EXPECT_THAT(response_->body(), testing::Not(testing::HasSubstr("server.")));
 }
 
-TEST_P(StatsMatcherIntegrationTest, ExcludeRequests) {
+TEST_P(StatsMatcherIntegrationTest, DEPRECATED_FEATURE_TEST(ExcludeRequests)) {
   stats_matcher_.mutable_exclusion_list()->add_patterns()->set_regex(".*requests.*");
   initialize();
   makeRequest();
   EXPECT_THAT(response_->body(), testing::Not(testing::HasSubstr("requests")));
 }
 
-TEST_P(StatsMatcherIntegrationTest, ExcludeExact) {
+TEST_P(StatsMatcherIntegrationTest, DEPRECATED_FEATURE_TEST(ExcludeExact)) {
   stats_matcher_.mutable_exclusion_list()->add_patterns()->set_exact("server.concurrency");
   initialize();
   makeRequest();
   EXPECT_THAT(response_->body(), testing::Not(testing::HasSubstr("server.concurrency")));
 }
 
-TEST_P(StatsMatcherIntegrationTest, ExcludeMultipleExact) {
+TEST_P(StatsMatcherIntegrationTest, DEPRECATED_FEATURE_TEST(ExcludeMultipleExact)) {
   stats_matcher_.mutable_exclusion_list()->add_patterns()->set_exact("server.concurrency");
   stats_matcher_.mutable_exclusion_list()->add_patterns()->set_regex(".*live");
   initialize();
@@ -569,7 +569,7 @@ TEST_P(StatsMatcherIntegrationTest, ExcludeMultipleExact) {
 // `listener_manager.listener_create_success` must be instantiated, because BaseIntegrationTest
 // blocks on its creation (see waitForCounterGe and the suite of waitFor* functions).
 // If this invariant is changed, this test must be rewritten.
-TEST_P(StatsMatcherIntegrationTest, IncludeExact) {
+TEST_P(StatsMatcherIntegrationTest, DEPRECATED_FEATURE_TEST(IncludeExact)) {
   // Stats matching does not play well with LDS, at least in test. See #7215.
   use_lds_ = false;
   stats_matcher_.mutable_inclusion_list()->add_patterns()->set_exact(

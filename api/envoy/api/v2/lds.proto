@@ -12,6 +12,7 @@ import "envoy/api/v2/core/address.proto";
 import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/discovery.proto";
 import "envoy/api/v2/listener/listener.proto";
+import "envoy/api/v2/listener/udp_listener_config.proto";
 
 import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
@@ -44,7 +45,7 @@ service ListenerDiscoveryService {
   }
 }
 
-// [#comment:next free field: 18]
+// [#comment:next free field: 19]
 message Listener {
   // The unique name by which this listener is known. If no name is provided,
   // Envoy will allocate an internal UUID for the listener. If the listener is to be dynamically
@@ -194,4 +195,12 @@ message Listener {
 
   // Specifies the intended direction of the traffic relative to the local Envoy.
   core.TrafficDirection traffic_direction = 16;
+
+  // If the protocol in the listener socket address in :ref:`protocol
+  // <envoy_api_field_core.SocketAddress.protocol>` is :ref:'UDP
+  // <envoy_api_field_core.Protocol.UDP>`, this field specifies the actual udp listener to create,
+  // i.e. :ref:`udp_listener_name
+  // <envoy_api_field_listener.UdpListenerConfig.udp_listener_name>` = "raw_udp_listener" for
+  // creating a packet-oriented UDP listener. If not present, treat it as "raw_udp_listener".
+  listener.UdpListenerConfig udp_listener_config = 18;
 }

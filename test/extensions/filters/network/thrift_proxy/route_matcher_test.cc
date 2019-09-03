@@ -339,7 +339,9 @@ routes:
       method_name: "method1"
       headers:
       - name: "x-version"
-        regex_match: "0.[5-9]"
+        safe_regex_match:
+          google_re2: {}
+          regex: "0.[5-9]"
     route:
       cluster: "cluster1"
 )EOF";

@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package envoy.config.filter.http.csrf.v3alpha;
+
+option java_outer_classname = "CsrfPolicyProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.config.filter.http.csrf.v3alpha";
+option go_package = "v2";
+
+import "envoy/api/v3alpha/core/base.proto";
+import "envoy/type/matcher/string.proto";
+
+import "validate/validate.proto";
+import "gogoproto/gogo.proto";
+
+// [#protodoc-title: CSRF]
+// Cross-Site Request Forgery :ref:`configuration overview <config_http_filters_csrf>`.
+
+// CSRF filter config.
+message CsrfPolicy {
+  // Specifies if CSRF is enabled.
+  //
+  // More information on how this can be controlled via runtime can be found
+  // :ref:`here <csrf-runtime>`.
+  //
+  // .. note::
+  //
+  //   This field defaults to 100/:ref:`HUNDRED
+  //   <envoy_api_enum_type.FractionalPercent.DenominatorType>`.
+  envoy.api.v3alpha.core.RuntimeFractionalPercent filter_enabled = 1
+      [(validate.rules).message.required = true];
+
+  // Specifies that CSRF policies will be evaluated and tracked, but not enforced.
+  // This is intended to be used when filter_enabled is off.
+  //
+  // More information on how this can be controlled via runtime can be found
+  // :ref:`here <csrf-runtime>`.
+  //
+  // .. note::
+  //
+  //   This field defaults to 100/:ref:`HUNDRED
+  //   <envoy_api_enum_type.FractionalPercent.DenominatorType>`.
+  envoy.api.v3alpha.core.RuntimeFractionalPercent shadow_enabled = 2;
+
+  // Specifies additional source origins that will be allowed in addition to
+  // the destination origin.
+  //
+  // More information on how this can be configured via runtime can be found
+  // :ref:`here <csrf-configuration>`.
+  repeated envoy.type.matcher.StringMatcher additional_origins = 3;
+}

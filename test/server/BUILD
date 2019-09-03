@@ -53,10 +53,12 @@ envoy_cc_test(
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
         "//source/common/stats:stats_lib",
+        "//source/server:active_raw_udp_listener_config",
         "//source/server:connection_handler_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:network_utility_lib",
+        "//test/test_common:threadsafe_singleton_injector_lib",
     ],
 )
 
@@ -180,6 +182,7 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:config",
         "//source/extensions/transport_sockets/tls:ssl_socket_lib",
+        "//source/server:active_raw_udp_listener_config",
         "//source/server:listener_manager_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
@@ -259,6 +262,7 @@ envoy_cc_test(
         ":invalid_layered_runtime_duplicate_name.yaml",
         ":invalid_layered_runtime_missing_name.yaml",
         ":invalid_layered_runtime_no_layer_specifier.yaml",
+        ":invalid_legacy_runtime_bootstrap.yaml",
         ":invalid_runtime_bootstrap.yaml",
         ":node_bootstrap.yaml",
         ":node_bootstrap_no_admin_port.yaml",

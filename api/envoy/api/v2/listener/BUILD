@@ -19,3 +19,12 @@ api_proto_library_internal(
         "//envoy/api/v2/core:base",
     ],
 )
+
+api_proto_library_internal(
+    name = "udp_listener_config",
+    srcs = ["udp_listener_config.proto"],
+    visibility = ["//envoy/api/v2:friends"],
+    deps = [
+        "//envoy/api/v2/core:base",
+    ],
+)
