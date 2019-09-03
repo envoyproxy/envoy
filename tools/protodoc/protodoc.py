@@ -713,7 +713,14 @@ def Main():
   response = plugin_pb2.CodeGeneratorResponse()
   cprofile_enabled = os.getenv('CPROFILE_ENABLED')
 
-  for proto_file in request.proto_file:
+  for file_to_generate in request.file_to_generate:
+    # Find the FileDescriptorProto for the file we actually are generating
+    proto_file = None
+    for pf in request.proto_file:
+      if pf.name == file_to_generate:
+        proto_file = pf
+        break
+    assert(proto_file is not None)
     f = response.file.add()
     f.name = proto_file.name + '.rst'
     if cprofile_enabled:
