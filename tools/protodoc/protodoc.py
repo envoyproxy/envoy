@@ -6,9 +6,9 @@
 from collections import defaultdict
 import cProfile
 import functools
+import io
 import os
 import pstats
-import StringIO
 import re
 import sys
 
@@ -709,7 +709,7 @@ def GenerateRst(proto_file):
 def Main():
   # http://www.expobrain.net/2015/09/13/create-a-plugin-for-google-protocol-buffer/
   request = plugin_pb2.CodeGeneratorRequest()
-  request.ParseFromString(sys.stdin.read())
+  request.ParseFromString(sys.stdin.buffer.read())
   response = plugin_pb2.CodeGeneratorResponse()
   cprofile_enabled = os.getenv('CPROFILE_ENABLED')
 
@@ -724,14 +724,14 @@ def Main():
     f.content = GenerateRst(proto_file)
     if cprofile_enabled:
       pr.disable()
-      stats_stream = StringIO.StringIO()
+      stats_stream = io.StringIO()
       ps = pstats.Stats(pr,
                         stream=stats_stream).sort_stats(os.getenv('CPROFILE_SORTBY', 'cumulative'))
       stats_file = response.file.add()
       stats_file.name = proto_file.name + '.rst.profile'
       ps.print_stats()
       stats_file.content = stats_stream.getvalue()
-  sys.stdout.write(response.SerializeToString())
+  sys.stdout.buffer.write(response.SerializeToString())
 
 
 if __name__ == '__main__':
