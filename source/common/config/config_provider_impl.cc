@@ -23,6 +23,20 @@ ConfigSubscriptionCommonBase::~ConfigSubscriptionCommonBase() {
   init_target_.ready();
   config_provider_manager_.unbindSubscription(manager_identifier_);
 }
+
+void ConfigSubscriptionCommonBase::applyConfigUpdate(const ConfigUpdateCb& update_fn,
+                                                     const Event::PostCb& complete_cb) {
+  tls_->runOnAllThreads(
+      [update_fn](ThreadLocal::ThreadLocalObjectSharedPtr previous)
+          -> ThreadLocal::ThreadLocalObjectSharedPtr {
+        auto prev_thread_local_config = std::dynamic_pointer_cast<ThreadLocalConfig>(previous);
+        ASSERT(prev_thread_local_config != nullptr);
+        prev_thread_local_config->config_ = update_fn(prev_thread_local_config->config_);
+        return previous;
+      },
+      complete_cb);
+}
+
 bool ConfigSubscriptionInstance::checkAndApplyConfigUpdate(const Protobuf::Message& config_proto,
                                                            const std::string& config_name,
                                                            const std::string& version_info) {
