@@ -6,6 +6,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/secret/secret_callbacks.h"
+#include "envoy/ssl/private_key/private_key_callbacks.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
@@ -38,9 +39,11 @@ struct SslSocketFactoryStats {
 };
 
 enum class InitialState { Client, Server };
+enum class SocketState { PreHandshake, HandshakeInProgress, HandshakeComplete, ShutdownSent };
 
 class SslSocket : public Network::TransportSocket,
                   public Envoy::Ssl::ConnectionInfo,
+                  public Envoy::Ssl::PrivateKeyConnectionCallbacks,
                   protected Logger::Loggable<Logger::Id::connection> {
 public:
   SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
@@ -70,12 +73,15 @@ public:
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
   std::string protocol() const override;
   absl::string_view failureReason() const override;
-  bool canFlushClose() override { return handshake_complete_; }
+  bool canFlushClose() override { return state_ == SocketState::HandshakeComplete; }
   void closeSocket(Network::ConnectionEvent close_type) override;
   Network::IoResult doRead(Buffer::Instance& read_buffer) override;
   Network::IoResult doWrite(Buffer::Instance& write_buffer, bool end_stream) override;
   void onConnected() override;
   const Ssl::ConnectionInfo* ssl() const override { return this; }
+
+  // Ssl::PrivateKeyConnectionCallbacks
+  void onPrivateKeyMethodComplete() override;
 
   SSL* rawSslForTest() const { return ssl_.get(); }
 
@@ -89,18 +95,20 @@ private:
   Network::PostIoAction doHandshake();
   void drainErrorQueue();
   void shutdownSsl();
+  bool isThreadSafe() const {
+    return callbacks_ != nullptr && callbacks_->connection().dispatcher().isThreadSafe();
+  }
 
   const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
   Network::TransportSocketCallbacks* callbacks_{};
   ContextImplSharedPtr ctx_;
   bssl::UniquePtr<SSL> ssl_;
-  bool handshake_complete_{};
-  bool shutdown_sent_{};
   uint64_t bytes_to_retry_{};
   std::string failure_reason_;
   mutable std::string cached_sha_256_peer_certificate_digest_;
   mutable std::string cached_url_encoded_pem_encoded_peer_certificate_;
   mutable std::string cached_url_encoded_pem_encoded_peer_cert_chain_;
+  SocketState state_;
 };
 
 class ClientSslSocketFactory : public Network::TransportSocketFactory,

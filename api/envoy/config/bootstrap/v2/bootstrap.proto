@@ -10,7 +10,6 @@ package envoy.config.bootstrap.v2;
 option java_outer_classname = "BootstrapProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.bootstrap.v2";
-option go_package = "v2";
 
 import "envoy/api/v2/core/address.proto";
 import "envoy/api/v2/core/base.proto";
@@ -99,7 +98,14 @@ message Bootstrap {
   // performance reasons Envoy latches counters and only flushes counters and
   // gauges at a periodic interval. If not specified the default is 5000ms (5
   // seconds).
-  google.protobuf.Duration stats_flush_interval = 7 [(gogoproto.stdduration) = true];
+  // Duration must be at least 1ms and at most 5 min.
+  google.protobuf.Duration stats_flush_interval = 7 [
+    (validate.rules).duration = {
+      lt: {seconds: 300},
+      gte: {nanos: 1000000}
+    },
+    (gogoproto.stdduration) = true
+  ];
 
   // Optional watchdog configuration.
   Watchdog watchdog = 8;
@@ -295,6 +301,8 @@ message RuntimeLayer {
     // This follows the :ref:`runtime protobuf JSON representation encoding
     // <config_runtime_proto_json>`. Unlike static xDS resources, this static
     // layer is overridable by later layers in the runtime virtual filesystem.
+    option (validate.required) = true;
+
     google.protobuf.Struct static_layer = 2;
     DiskLayer disk_layer = 3;
     AdminLayer admin_layer = 4;

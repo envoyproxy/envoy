@@ -16,6 +16,7 @@
 #include <iomanip>
 #include <iostream>
 #include <list>
+#include <regex>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -385,6 +386,11 @@ const uint32_t Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS;
 const uint32_t Http2Settings::DEFAULT_INITIAL_STREAM_WINDOW_SIZE;
 const uint32_t Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE;
 const uint32_t Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE;
+const uint32_t Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES;
+const uint32_t Http2Settings::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES;
+const uint32_t Http2Settings::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD;
+const uint32_t Http2Settings::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM;
+const uint32_t Http2Settings::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT;
 
 TestHeaderMapImpl::TestHeaderMapImpl() = default;
 
@@ -417,9 +423,11 @@ void TestHeaderMapImpl::addCopy(const std::string& key, const std::string& value
 
 void TestHeaderMapImpl::remove(const std::string& key) { remove(LowerCaseString(key)); }
 
-std::string TestHeaderMapImpl::get_(const std::string& key) { return get_(LowerCaseString(key)); }
+std::string TestHeaderMapImpl::get_(const std::string& key) const {
+  return get_(LowerCaseString(key));
+}
 
-std::string TestHeaderMapImpl::get_(const LowerCaseString& key) {
+std::string TestHeaderMapImpl::get_(const LowerCaseString& key) const {
   const HeaderEntry* header = get(key);
   if (!header) {
     return EMPTY_STRING;

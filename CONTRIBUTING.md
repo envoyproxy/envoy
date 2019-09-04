@@ -72,7 +72,11 @@ maximize the chances of your PR being merged.
   could convert from the earlier API to the new API. A field may be deprecated
   if this tool would be able to perform the conversion. For example, removing a
   field to describe HTTP/2 window settings is valid if a more comprehensive
-  HTTP/2 protocol options field is being introduced to replace it.
+  HTTP/2 protocol options field is being introduced to replace it. The PR author
+  deprecating the old configuration is responsible for updating all tests and
+  canonical configuration, or guarding them with the DEPRECATED_FEATURE_TEST() macro.
+  This will be validated by the bazel.compile_time_options target, which will hard-fail when
+  deprecated configuration is used.
 * For configuration deprecations that are not covered by the above semantic
   replacement policy, any deprecation will only take place after
   community consultation on mailing lists, Slack and GitHub, over the period of

@@ -86,8 +86,10 @@ EVAL
 EVLOOP
 EVP
 EWOULDBLOCK
+EXPECTs
 EXPR
 FAQ
+FCDS
 FDs
 FFFF
 FIN
@@ -199,6 +201,7 @@ POSTs
 PREBIND
 PRNG
 PROT
+PSS
 QPS
 QUIC
 RAII
@@ -269,6 +272,7 @@ TLSv
 TLV
 TMPDIR
 TODO
+TPM
 TPROXY
 TSAN
 TSI
@@ -469,6 +473,7 @@ evthread
 evwatch
 exe
 execlp
+expectDeltaAndSotwUpdate
 facto
 favicon
 fd
@@ -625,6 +630,7 @@ params
 paren
 parentid
 parsers
+passthroughs
 pcall
 pcap
 pclose
@@ -772,6 +778,7 @@ uint
 un
 unacked
 unary
+uncomment
 unconfigurable
 unconfigured
 uncontended
@@ -787,6 +794,7 @@ unescaping
 unindexed
 uninsantiated
 uninstantiated
+uniq
 unix
 unlink
 unlinked

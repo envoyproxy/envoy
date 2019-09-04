@@ -20,7 +20,8 @@ ZooKeeperFilterConfig::ZooKeeperFilterConfig(const std::string& stat_prefix,
                                              const uint32_t max_packet_bytes, Stats::Scope& scope)
     : scope_(scope), max_packet_bytes_(max_packet_bytes), stats_(generateStats(stat_prefix, scope)),
       stat_name_set_(scope.symbolTable()), stat_prefix_(stat_name_set_.add(stat_prefix)),
-      auth_(stat_name_set_.add("auth")) {
+      auth_(stat_name_set_.add("auth")),
+      connect_latency_(stat_name_set_.add("connect_response_latency")) {
   // https://zookeeper.apache.org/doc/r3.5.4-beta/zookeeperProgrammers.html#sc_BuiltinACLSchemes
   // lists commons schemes: "world", "auth", "digest", "host", "x509", and
   // "ip". These are used in filter.cc by appending "_rq".
@@ -32,8 +33,8 @@ ZooKeeperFilterConfig::ZooKeeperFilterConfig(const std::string& stat_prefix,
   stat_name_set_.rememberBuiltin("x509_rq");
 }
 
-ZooKeeperFilter::ZooKeeperFilter(ZooKeeperFilterConfigSharedPtr config)
-    : config_(std::move(config)), decoder_(createDecoder(*this)) {}
+ZooKeeperFilter::ZooKeeperFilter(ZooKeeperFilterConfigSharedPtr config, TimeSource& time_source)
+    : config_(std::move(config)), decoder_(createDecoder(*this, time_source)) {}
 
 void ZooKeeperFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
@@ -53,8 +54,8 @@ Network::FilterStatus ZooKeeperFilter::onWrite(Buffer::Instance& data, bool) {
 
 Network::FilterStatus ZooKeeperFilter::onNewConnection() { return Network::FilterStatus::Continue; }
 
-DecoderPtr ZooKeeperFilter::createDecoder(DecoderCallbacks& callbacks) {
-  return std::make_unique<DecoderImpl>(callbacks, config_->maxPacketBytes());
+DecoderPtr ZooKeeperFilter::createDecoder(DecoderCallbacks& callbacks, TimeSource& time_source) {
+  return std::make_unique<DecoderImpl>(callbacks, config_->maxPacketBytes(), time_source);
 }
 
 void ZooKeeperFilter::setDynamicMetadata(const std::string& key, const std::string& value) {
@@ -249,8 +250,15 @@ void ZooKeeperFilter::onCloseRequest() {
 }
 
 void ZooKeeperFilter::onConnectResponse(const int32_t proto_version, const int32_t timeout,
-                                        const bool readonly) {
+                                        const bool readonly,
+                                        const std::chrono::milliseconds& latency) {
   config_->stats_.connect_resp_.inc();
+
+  Stats::SymbolTable::StoragePtr storage =
+      config_->scope_.symbolTable().join({config_->stat_prefix_, config_->connect_latency_});
+  config_->scope_.histogramFromStatName(Stats::StatName(storage.get()))
+      .recordValue(latency.count());
+
   setDynamicMetadata({{"opname", "connect_response"},
                       {"protocol_version", std::to_string(proto_version)},
                       {"timeout", std::to_string(timeout)},
@@ -258,7 +266,7 @@ void ZooKeeperFilter::onConnectResponse(const int32_t proto_version, const int32
 }
 
 void ZooKeeperFilter::onResponse(const OpCodes opcode, const int32_t xid, const int64_t zxid,
-                                 const int32_t error) {
+                                 const int32_t error, const std::chrono::milliseconds& latency) {
   std::string opname = "";
 
   switch (opcode) {
@@ -361,6 +369,12 @@ void ZooKeeperFilter::onResponse(const OpCodes opcode, const int32_t xid, const 
   default:
     break;
   }
+
+  Stats::SymbolTable::StoragePtr storage = config_->scope_.symbolTable().join(
+      {config_->stat_prefix_,
+       config_->stat_name_set_.getStatName(absl::StrCat(opname, "_latency"))});
+  config_->scope_.histogramFromStatName(Stats::StatName(storage.get()))
+      .recordValue(latency.count());
 
   setDynamicMetadata({{"opname", opname},
                       {"xid", std::to_string(xid)},

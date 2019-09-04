@@ -28,7 +28,7 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
   }
 
   // Create an all-new span, with no parent id
-  SpanPtr span_ptr(new Span(time_source_));
+  SpanPtr span_ptr = std::make_unique<Span>(time_source_);
   span_ptr->setName(span_name);
   uint64_t random_number = random_generator_.random();
   span_ptr->setId(random_number);
@@ -56,8 +56,8 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
 }
 
 SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span_name,
-                          SystemTime timestamp, SpanContext& previous_context) {
-  SpanPtr span_ptr(new Span(time_source_));
+                          SystemTime timestamp, const SpanContext& previous_context) {
+  SpanPtr span_ptr = std::make_unique<Span>(time_source_);
   Annotation annotation;
   uint64_t timestamp_micro;
 

@@ -5,7 +5,8 @@ EXTENSIONS = {
     #
 
     "envoy.access_loggers.file":                        "//source/extensions/access_loggers/file:config",
-    "envoy.access_loggers.http_grpc":                   "//source/extensions/access_loggers/http_grpc:config",
+    "envoy.access_loggers.http_grpc":                   "//source/extensions/access_loggers/grpc:http_config",
+    "envoy.access_loggers.tcp_grpc":                    "//source/extensions/access_loggers/grpc:tcp_config",
 
     #
     # Clusters
@@ -18,6 +19,7 @@ EXTENSIONS = {
     #
 
     "envoy.grpc_credentials.file_based_metadata":       "//source/extensions/grpc_credentials/file_based_metadata:config",
+    "envoy.grpc_credentials.aws_iam":                   "//source/extensions/grpc_credentials/aws_iam:config",
 
     #
     # Health checkers
@@ -147,7 +149,7 @@ WINDOWS_EXTENSIONS = {
     #
 
     "envoy.access_loggers.file":                        "//source/extensions/access_loggers/file:config",
-    #"envoy.access_loggers.http_grpc":                   "//source/extensions/access_loggers/http_grpc:config",
+    #"envoy.access_loggers.http_grpc":                   "//source/extensions/access_loggers/grpc:http_config",
 
     #
     # gRPC Credentials Plugins

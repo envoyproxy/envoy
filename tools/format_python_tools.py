@@ -23,7 +23,8 @@ def collectFiles():
   for root, dirnames, filenames in os.walk(dirname):
     dirnames[:] = [d for d in dirnames if d not in EXCLUDE_LIST]
     for filename in fnmatch.filter(filenames, '*.py'):
-      matches.append(os.path.join(root, filename))
+      if not filename.endswith('_pb2.py') and not filename.endswith('_pb2_grpc.py'):
+        matches.append(os.path.join(root, filename))
   return matches
 
 
@@ -37,8 +38,10 @@ def validateFormat(fix=False):
   failed_update_files = set()
   successful_update_files = set()
   for python_file in collectFiles():
-    reformatted_source, encoding, changed = FormatFile(
-        python_file, style_config='.style.yapf', in_place=fix, print_diff=not fix)
+    reformatted_source, encoding, changed = FormatFile(python_file,
+                                                       style_config='.style.yapf',
+                                                       in_place=fix,
+                                                       print_diff=not fix)
     if not fix:
       fixes_required = True if changed else fixes_required
       if reformatted_source:
@@ -64,8 +67,10 @@ def displayFixResults(successful_files, failed_files):
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(description='Tool to format python files.')
-  parser.add_argument(
-      'action', choices=['check', 'fix'], default='check', help='Fix invalid syntax in files.')
+  parser.add_argument('action',
+                      choices=['check', 'fix'],
+                      default='check',
+                      help='Fix invalid syntax in files.')
   args = parser.parse_args()
   is_valid = validateFormat(args.action == 'fix')
   sys.exit(0 if is_valid else 1)

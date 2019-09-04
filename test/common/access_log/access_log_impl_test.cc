@@ -1143,7 +1143,7 @@ public:
     auto factory_config = Config::Utility::translateToFactoryConfig(
         config, Envoy::ProtobufMessage::getNullValidationVisitor(), *this);
     const auto& header_config =
-        MessageUtil::downcastAndValidate<const envoy::config::filter::accesslog::v2::HeaderFilter&>(
+        TestUtility::downcastAndValidate<const envoy::config::filter::accesslog::v2::HeaderFilter&>(
             *factory_config);
     return std::make_unique<HeaderFilter>(header_config);
   }
