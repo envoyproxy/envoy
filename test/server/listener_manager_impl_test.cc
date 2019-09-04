@@ -379,6 +379,8 @@ filter_chains:
 TEST_F(ListenerManagerImplWithRealFiltersTest, QuicUsesSslContext) {
   NiceMock<Api::MockOsSysCalls> os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+  ON_CALL(os_sys_calls, socket(_, _, _)).WillByDefault(Return(Api::SysCallIntResult{1, 0}));
+  ON_CALL(os_sys_calls, close(_)).WillByDefault(Return(Api::SysCallIntResult{0, 0}));
   const std::string yaml = TestEnvironment::substitute(R"EOF(
 address:
   socket_address:
