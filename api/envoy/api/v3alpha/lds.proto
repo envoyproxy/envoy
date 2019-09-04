@@ -39,7 +39,7 @@ service ListenerDiscoveryService {
 
   rpc FetchListeners(DiscoveryRequest) returns (DiscoveryResponse) {
     option (google.api.http) = {
-      post: "/v2/discovery:listeners"
+      post: "/v3alpha/discovery:listeners"
       body: "*"
     };
   }

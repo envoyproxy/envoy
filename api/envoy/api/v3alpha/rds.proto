@@ -39,7 +39,7 @@ service RouteDiscoveryService {
 
   rpc FetchRoutes(DiscoveryRequest) returns (DiscoveryResponse) {
     option (google.api.http) = {
-      post: "/v2/discovery:routes"
+      post: "/v3alpha/discovery:routes"
       body: "*"
     };
   }
