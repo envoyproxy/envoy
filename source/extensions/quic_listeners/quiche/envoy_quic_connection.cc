@@ -25,6 +25,7 @@ bool EnvoyQuicConnection::OnPacketHeader(const quic::QuicPacketHeader& header) {
     // Self address should be initialized by now. It's time to install filters.
     Network::Address::InstanceConstSharedPtr local_addr =
         quicAddressToEnvoyAddressInstance(self_address());
+
     Network::Address::InstanceConstSharedPtr remote_addr =
         quicAddressToEnvoyAddressInstance(peer_address());
     connection_socket_ = std::make_unique<Network::ConnectionSocketImpl>(

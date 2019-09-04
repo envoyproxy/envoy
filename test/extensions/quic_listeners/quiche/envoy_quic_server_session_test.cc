@@ -18,6 +18,7 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_alarm_factory.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_fake_proof_source.h"
+#include "extensions/transport_sockets/well_known_names.h"
 
 #include "envoy/stats/stats_macros.h"
 #include "common/event/libevent_scheduler.h"
@@ -50,8 +51,8 @@ public:
                           const quic::ParsedQuicVersionVector& supported_versions,
                           Network::ListenerConfig& listener_config, Server::ListenerStats& stats)
       : EnvoyQuicConnection(quic::test::TestConnectionId(),
-                            quic::QuicSocketAddress(quic::QuicIpAddress::Any6(), 12345), helper,
-                            alarm_factory, writer, /*owns_writer=*/false,
+                            quic::QuicSocketAddress(quic::QuicIpAddress::Loopback4(), 12345),
+                            helper, alarm_factory, writer, /*owns_writer=*/false,
                             quic::Perspective::IS_SERVER, supported_versions, listener_config,
                             stats) {}
 
@@ -87,6 +88,7 @@ public:
                             &compressed_certs_cache_, *dispatcher_),
         read_filter_(new Network::MockReadFilter()) {
     EXPECT_EQ(time_system_.systemTime(), envoy_quic_session_.streamInfo().startTime());
+    EXPECT_EQ(EMPTY_STRING, envoy_quic_session_.nextProtocol());
     time_system_.sleep(std::chrono::milliseconds(1));
     ON_CALL(writer_, WritePacket(_, _, _, _, _))
         .WillByDefault(testing::Return(quic::WriteResult(quic::WRITE_STATUS_OK, 1)));
@@ -190,7 +192,7 @@ TEST_P(EnvoyQuicServerSessionTest, InvalidIncomingStreamId) {
   installReadFilter();
   Http::MockStreamDecoder request_decoder;
   Http::MockStreamCallbacks stream_callbacks;
-  // IETF stream 5 and GQuic stream 2 are client initiated.
+  // IETF stream 5 and G-Quic stream 2 are server initiated.
   quic::QuicStreamId stream_id =
       quic_version_[0].transport_version == quic::QUIC_VERSION_99 ? 5u : 2u;
   std::string data("aaaa");
@@ -201,6 +203,23 @@ TEST_P(EnvoyQuicServerSessionTest, InvalidIncomingStreamId) {
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
 
   envoy_quic_session_.OnStreamFrame(stream_frame);
+}
+
+TEST_P(EnvoyQuicServerSessionTest, NoNewStreamForInvalidIncomingStream) {
+  quic::SetVerbosityLogThreshold(1);
+  installReadFilter();
+  Http::MockStreamDecoder request_decoder;
+  Http::MockStreamCallbacks stream_callbacks;
+  // IETF stream 5 and G-Quic stream 2 are server initiated.
+  quic::QuicStreamId stream_id =
+      quic_version_[0].transport_version == quic::QUIC_VERSION_99 ? 5u : 2u;
+  EXPECT_CALL(http_connection_callbacks_, newStream(_, false)).Times(0);
+  EXPECT_CALL(*quic_connection_, SendConnectionClosePacket(quic::QUIC_INVALID_STREAM_ID,
+                                                           "Data for nonexistent stream"));
+  EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+
+  // Stream creation on closed connection should fail.
+  EXPECT_EQ(nullptr, envoy_quic_session_.GetOrCreateStream(stream_id));
 }
 
 TEST_P(EnvoyQuicServerSessionTest, OnResetFrame) {
@@ -214,7 +233,7 @@ TEST_P(EnvoyQuicServerSessionTest, OnResetFrame) {
         return request_decoder;
       }));
 
-  // GQUIC or IETF bi-directional stream.
+  // G-QUIC or IETF bi-directional stream.
   quic::QuicStreamId stream_id =
       quic_version_[0].transport_version == quic::QUIC_VERSION_99 ? 4u : 5u;
 
@@ -232,7 +251,7 @@ TEST_P(EnvoyQuicServerSessionTest, OnResetFrame) {
   }
   stream1->OnStreamReset(rst1);
 
-  // GQUIC bi-directional stream or IETF read uni-directional stream.
+  // G-QUIC bi-directional stream or IETF read uni-directional stream.
   quic::QuicStream* stream2 = envoy_quic_session_.GetOrCreateStream(stream_id + 4u);
   quic::QuicRstStreamFrame rst2(/*control_frame_id=*/1u, stream2->id(), quic::QUIC_REFUSED_STREAM,
                                 /*bytes_written=*/0u);
@@ -324,8 +343,8 @@ TEST_P(EnvoyQuicServerSessionTest, InitializeFilterChain) {
           quic_connection_->connection_id(), quic::EmptyQuicConnectionId(), /*version_flag=*/true,
           /*reset_flag*/ false, /*packet_number=*/1, packet_content));
 
-  quic::QuicSocketAddress self_address(quic::QuicIpAddress::Loopback4(), 12344);
-  quic::QuicSocketAddress peer_address(quic::QuicIpAddress::Loopback4(), 12345);
+  quic::QuicSocketAddress self_address(
+      envoyAddressInstanceToQuicSocketAddress(listener_config_.socket().localAddress()));
   auto packet = std::unique_ptr<quic::QuicReceivedPacket>(
       quic::test::ConstructReceivedPacket(*encrypted_packet, connection_helper_.GetClock()->Now()));
 
@@ -333,7 +352,16 @@ TEST_P(EnvoyQuicServerSessionTest, InitializeFilterChain) {
   Network::MockFilterChainManager filter_chain_manager;
   EXPECT_CALL(listener_config_, filterChainManager()).WillOnce(ReturnRef(filter_chain_manager));
   Network::MockFilterChain filter_chain;
-  EXPECT_CALL(filter_chain_manager, findFilterChain(_)).WillOnce(Return(&filter_chain));
+  EXPECT_CALL(filter_chain_manager, findFilterChain(_))
+      .WillOnce(Invoke([&](const Network::ConnectionSocket& socket) {
+        EXPECT_EQ(*quicAddressToEnvoyAddressInstance(quic_connection_->peer_address()),
+                  *socket.remoteAddress());
+        EXPECT_EQ(*quicAddressToEnvoyAddressInstance(self_address), *socket.localAddress());
+        EXPECT_EQ(listener_config_.socket().ioHandle().fd(), socket.ioHandle().fd());
+        EXPECT_EQ(Extensions::TransportSockets::TransportSocketNames::get().Quic,
+                  socket.detectedTransportProtocol());
+        return &filter_chain;
+      }));
   std::vector<Network::FilterFactoryCb> filter_factory{[this](
                                                            Network::FilterManager& filter_manager) {
     filter_manager.addReadFilter(read_filter_);
@@ -353,10 +381,24 @@ TEST_P(EnvoyQuicServerSessionTest, InitializeFilterChain) {
   // A reject should be sent because of the inchoate CHLO.
   EXPECT_CALL(writer_, WritePacket(_, _, _, _, _))
       .WillOnce(testing::Return(quic::WriteResult(quic::WRITE_STATUS_OK, 1)));
-  quic_connection_->ProcessUdpPacket(self_address, peer_address, *packet);
+  quic_connection_->ProcessUdpPacket(self_address, quic_connection_->peer_address(), *packet);
   EXPECT_TRUE(quic_connection_->connected());
   EXPECT_EQ(nullptr, envoy_quic_session_.socketOptions());
   EXPECT_FALSE(envoy_quic_session_.IsEncryptionEstablished());
+  EXPECT_TRUE(quic_connection_->connectionSocket()->ioHandle().isOpen());
+  EXPECT_TRUE(quic_connection_->connectionSocket()->ioHandle().close().ok());
+  EXPECT_FALSE(quic_connection_->connectionSocket()->ioHandle().isOpen());
+}
+
+TEST_P(EnvoyQuicServerSessionTest, NetworkConnectionInterface) {
+  installReadFilter();
+  EXPECT_EQ(dispatcher_.get(), &envoy_quic_session_.dispatcher());
+  EXPECT_TRUE(envoy_quic_session_.readEnabled());
+  EXPECT_FALSE(envoy_quic_session_.localAddressRestored());
+  EXPECT_DEBUG_DEATH(envoy_quic_session_.unixSocketPeerCredentials(),
+                     "Unix domain socket is not supported.");
+  EXPECT_DEBUG_DEATH(envoy_quic_session_.readDisable(true),
+                     "Quic connection should be able to read through out its life time.");
 }
 
 } // namespace Quic

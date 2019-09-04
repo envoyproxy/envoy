@@ -125,3 +125,15 @@ envoy_cc_test_library(
         "@com_googlesource_quiche//:quic_test_tools_test_utils_interface_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "quic_io_handle_wrapper_test",
+    srcs = ["quic_io_handle_wrapper_test.cc"],
+    tags = ["nofips"],
+    deps = [
+        "//source/extensions/quic_listeners/quiche:quic_io_handle_wrapper_lib",
+        "//test/mocks/api:api_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/test_common:threadsafe_singleton_injector_lib",
+    ],
+)
