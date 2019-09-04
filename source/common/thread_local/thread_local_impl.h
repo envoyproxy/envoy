@@ -7,6 +7,7 @@
 
 #include "envoy/thread_local/thread_local.h"
 
+#include "common/common/non_copyable.h"
 #include "common/common/logger.h"
 
 namespace Envoy {
@@ -15,7 +16,7 @@ namespace ThreadLocal {
 /**
  * Implementation of ThreadLocal that relies on static thread_local objects.
  */
-class InstanceImpl : Logger::Loggable<Logger::Id::main>, public Instance {
+class InstanceImpl : Logger::Loggable<Logger::Id::main>, public NonCopyable, public Instance {
 public:
   InstanceImpl() : main_thread_id_(std::this_thread::get_id()) {}
   ~InstanceImpl() override;
@@ -32,17 +33,15 @@ private:
     SlotImpl(InstanceImpl& parent, uint64_t index) : parent_(parent), index_(index) {}
     ~SlotImpl() override { parent_.removeSlot(*this); }
 
-    // non copyable, non moveable.
-    SlotImpl(const SlotImpl&) = delete;
+    // non moveable.
     SlotImpl(SlotImpl&&) = delete;
-    SlotImpl& operator=(const SlotImpl&) = delete;
     SlotImpl& operator=(SlotImpl&&) = delete;
 
     // ThreadLocal::Slot
     ThreadLocalObjectSharedPtr get() override;
     bool currentThreadRegistered() override;
-    void runOnAllThreads(const UpdateCb&& cb) override;
-    void runOnAllThreads(const UpdateCb&& cb, Event::PostCb complete_cb) override;
+    void runOnAllThreads(const UpdateCb& cb) override;
+    void runOnAllThreads(const UpdateCb& cb, Event::PostCb complete_cb) override;
     void runOnAllThreads(Event::PostCb cb) override { parent_.runOnAllThreads(cb); }
     void runOnAllThreads(Event::PostCb cb, Event::PostCb main_callback) override {
       parent_.runOnAllThreads(cb, main_callback);
@@ -72,8 +71,8 @@ private:
 
     // ThreadLocal::Slot
     ThreadLocalObjectSharedPtr get() override;
-    void runOnAllThreads(const UpdateCb&& cb) override;
-    void runOnAllThreads(const UpdateCb&& cb, Event::PostCb complete_cb) override;
+    void runOnAllThreads(const UpdateCb& cb) override;
+    void runOnAllThreads(const UpdateCb& cb, Event::PostCb complete_cb) override;
     bool currentThreadRegistered() override;
     void runOnAllThreads(Event::PostCb cb) override;
     void runOnAllThreads(Event::PostCb cb, Event::PostCb main_callback) override;

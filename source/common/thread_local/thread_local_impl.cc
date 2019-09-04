@@ -42,11 +42,11 @@ SlotPtr InstanceImpl::allocateSlot() {
 bool InstanceImpl::SlotImpl::currentThreadRegistered() {
   return thread_local_data_.data_.size() > index_;
 }
-void InstanceImpl::SlotImpl::runOnAllThreads(const UpdateCb&& cb) {
+void InstanceImpl::SlotImpl::runOnAllThreads(const UpdateCb& cb) {
   parent_.runOnAllThreads([this, cb = std::move(cb)]() { setThreadLocal(index_, cb(get())); });
 }
 
-void InstanceImpl::SlotImpl::runOnAllThreads(const UpdateCb&& cb, Event::PostCb complete_cb) {
+void InstanceImpl::SlotImpl::runOnAllThreads(const UpdateCb& cb, Event::PostCb complete_cb) {
   parent_.runOnAllThreads([this, cb = std::move(cb)]() { setThreadLocal(index_, cb(get())); },
                           complete_cb);
 }
@@ -60,12 +60,12 @@ InstanceImpl::Bookkeeper::Bookkeeper(InstanceImpl& parent, std::unique_ptr<SlotI
     : parent_(parent), holder_(std::make_unique<SlotHolder>(std::move(slot))) {}
 
 ThreadLocalObjectSharedPtr InstanceImpl::Bookkeeper::get() { return slot().get(); }
-void InstanceImpl::Bookkeeper::runOnAllThreads(const UpdateCb&& cb, Event::PostCb complete_cb) {
+void InstanceImpl::Bookkeeper::runOnAllThreads(const UpdateCb& cb, Event::PostCb complete_cb) {
   slot().runOnAllThreads([cb = std::move(cb), ref_count = holder_->ref_count_](
                              ThreadLocalObjectSharedPtr previous) { return cb(previous); },
                          complete_cb);
 }
-void InstanceImpl::Bookkeeper::runOnAllThreads(const UpdateCb&& cb) {
+void InstanceImpl::Bookkeeper::runOnAllThreads(const UpdateCb& cb) {
   slot().runOnAllThreads([cb = std::move(cb), ref_count = holder_->ref_count_](
                              ThreadLocalObjectSharedPtr previous) { return cb(previous); });
 }
@@ -120,7 +120,7 @@ void InstanceImpl::scheduleCleanup() {
     deferred_deletes_.remove_if(
         [](std::unique_ptr<SlotHolder>& holder) -> bool { return holder->isRecycleable(); });
     if (!deferred_deletes_.empty()) {
-      // Recursively.
+      // Reschedule another cleanup task if there are still non-recyclable slots.
       scheduleCleanup();
     }
   });

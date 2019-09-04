@@ -201,7 +201,9 @@ void RdsRouteConfigProviderImpl::onConfigUpdate() {
       new ConfigImpl(config_update_info_->routeConfiguration(), factory_context_, false));
   tls_->runOnAllThreads([new_config](ThreadLocal::ThreadLocalObjectSharedPtr previous)
                             -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    static_cast<ThreadLocalConfig*>(previous.get())->config_ = new_config;
+    auto prev_config = dynamic_cast<ThreadLocalConfig*>(previous.get());
+    ASSERT(prev_config != nullptr);
+    prev_config->config_ = new_config;
     return previous;
   });
 }
