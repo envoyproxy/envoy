@@ -128,7 +128,7 @@ using GradientControllerConfigSharedPtr = std::shared_ptr<GradientControllerConf
  *
  * Locking:
  * ========
- * There are 2 mutually exclusive calculation windows, so the sample mutaion mutex is held to
+ * There are 2 mutually exclusive calculation windows, so the sample mutation mutex is held to
  * prevent the overlap of these windows. It is necessary for a worker thread to know specifically if
  * the controller is inside of a minRTT recalculation window during the recording of a latency
  * sample, so this extra bit of information is stored in inMinRTTSamplingWindow().
