@@ -5,7 +5,6 @@ package envoy.config.accesslog.v2;
 option java_outer_classname = "AlsProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.accesslog.v2";
-option go_package = "v2";
 
 import "envoy/api/v2/core/grpc_service.proto";
 
@@ -38,7 +37,6 @@ message HttpGrpcAccessLogConfig {
 
 // Configuration for the built-in *envoy.tcp_grpc_access_log* type. This configuration will
 // populate *StreamAccessLogsMessage.tcp_logs*.
-// [#not-implemented-hide:]
 message TcpGrpcAccessLogConfig {
   CommonGrpcAccessLogConfig common_config = 1 [(validate.rules).message.required = true];
 }

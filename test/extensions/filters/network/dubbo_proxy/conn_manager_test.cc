@@ -306,7 +306,8 @@ public:
     buffer.add(static_cast<void*>(&msg_type), 1);
     buffer.add(std::string{0x14});
     addInt64(buffer, request_id);                    // Request Id
-    buffer.add(std::string{0x00, 0x00, 0x00, 0x00}); // Body Length
+    buffer.add(std::string{0x00, 0x00, 0x00, 0x01}); // Body Length
+    buffer.add(std::string{0x01});                   // Body
   }
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
@@ -377,6 +378,7 @@ TEST_F(ConnectionManagerTest, OnDataHandlesHeartbeatEvent) {
       }));
 
   EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(0U, buffer_.length());
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
   EXPECT_EQ(0U, store_.counter("test.request").value());
@@ -1168,7 +1170,9 @@ route_config:
       - match:
           method:
             name:
-              regex: "(.*?)"
+              safe_regex:
+                google_re2: {}
+                regex: "(.*?)"
         route:
             cluster: user_service_dubbo_server
 )EOF";
