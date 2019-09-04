@@ -24,4 +24,5 @@ message FilterConfig {
   // hide the gRPC semantics from the upstream, allowing it to receive and respond with a
   // simple binary encoded protobuf.
   bool withhold_grpc_frames = 2;
+  bool enabled = 3;
 }

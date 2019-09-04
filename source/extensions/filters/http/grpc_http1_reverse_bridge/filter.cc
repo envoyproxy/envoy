@@ -1,5 +1,7 @@
 #include "extensions/filters/http/grpc_http1_reverse_bridge/filter.h"
 
+#include "envoy/config/filter/http/grpc_http1_reverse_bridge/v2alpha1/config.pb.validate.h"
+
 #include "common/common/enum_to_int.h"
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
@@ -55,7 +57,20 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     return Http::FilterHeadersStatus::Continue;
   }
 
-  // TODO(snowp): Add an enabled flag so that this filter can be enabled on a per route basis.
+  // Allow enable the filter on a per route basis
+  if (decoder_callbacks_->route() && decoder_callbacks_->route()->routeEntry()) {
+    const std::string& name =
+        Extensions::HttpFilters::HttpFilterNames::get().GrpcHttp1ReverseBridge;
+    const auto* route_entry = decoder_callbacks_->route()->routeEntry();
+    const auto* config_per_route = route_entry->perFilterConfigTyped<
+        envoy::config::filter::http::grpc_http1_reverse_bridge::v2alpha1::FilterConfig>(name);
+    if (config_per_route != nullptr) {
+      if (!config_per_route->enabled()) {
+        enabled_ = false;
+        return Http::FilterHeadersStatus::Continue;
+      }
+    }
+  }
 
   // If this is a gRPC request we:
   //  - mark this request as being gRPC
