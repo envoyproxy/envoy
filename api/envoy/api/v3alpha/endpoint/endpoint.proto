@@ -5,7 +5,6 @@ package envoy.api.v3alpha.endpoint;
 option java_outer_classname = "EndpointProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.api.v3alpha.endpoint";
-option go_package = "endpoint";
 
 import "envoy/api/v3alpha/core/address.proto";
 import "envoy/api/v3alpha/core/base.proto";
