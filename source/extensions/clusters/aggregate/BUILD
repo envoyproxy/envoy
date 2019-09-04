@@ -9,20 +9,10 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "cluster_util",
-    srcs = ["cluster_util.cc"],
-    hdrs = ["cluster_util.h"],
-    deps = [
-        "//source/common/upstream:upstream_includes",
-    ],
-)
-
-envoy_cc_library(
     name = "cluster_lb",
     srcs = ["cluster_lb.cc"],
     hdrs = ["cluster_lb.h"],
     deps = [
-        ":cluster_util",
         "//source/common/upstream:upstream_includes",
     ],
 )

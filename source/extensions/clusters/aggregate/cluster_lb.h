@@ -13,9 +13,9 @@ namespace Aggregate {
 class AggregateLoadBalancerContext : public Upstream::LoadBalancerContext {
 public:
   AggregateLoadBalancerContext(Upstream::LoadBalancerContext* context,
-                               Upstream::LoadBalancerBase::HostAvailability host_avail,
+                               Upstream::LoadBalancerBase::HostAvailability host_availability,
                                uint32_t host_priority)
-      : context_(context), host_avail_(host_avail), host_priority_(host_priority) {
+      : context_(context), host_availability_(host_availability), host_priority_(host_priority) {
     if (context_ == nullptr) {
       context_ = new Upstream::LoadBalancerContextBase();
       own_context_ = true;
@@ -52,7 +52,7 @@ public:
     priority_load_.healthy_priority_load_.get().assign(priorities, 0);
     priority_load_.degraded_priority_load_.get().assign(priorities, 0);
 
-    if (host_avail_ == Upstream::LoadBalancerBase::HostAvailability::Healthy) {
+    if (host_availability_ == Upstream::LoadBalancerBase::HostAvailability::Healthy) {
       priority_load_.healthy_priority_load_.get()[host_priority_] = 100;
     } else {
       priority_load_.degraded_priority_load_.get()[host_priority_] = 100;
@@ -70,7 +70,7 @@ public:
 private:
   Upstream::HealthyAndDegradedLoad priority_load_;
   Upstream::LoadBalancerContext* context_{nullptr};
-  Upstream::LoadBalancerBase::HostAvailability host_avail_;
+  Upstream::LoadBalancerBase::HostAvailability host_availability_;
   uint32_t host_priority_;
   bool own_context_{false};
 };
@@ -105,6 +105,28 @@ private:
   void refresh();
   void refresh(const std::vector<std::string>& clusters);
   void initialize();
+
+  // Linearize the priority sets of clusters into one priority set.
+  // @param cluster_manager the cluster manager
+  // @param clusters clusters in aggregate cluster
+  // @return a pair of linearization result. First element if the priority set, second element if a
+  // map from priority to cluster.
+  std::pair<Upstream::PrioritySetImpl,
+            std::vector<std::pair<uint32_t, Upstream::ThreadLocalCluster*>>>
+  linearizePrioritySet(const std::vector<std::string>& clusters);
+
+  using PriorityCb =
+      std::function<void(uint32_t, const Upstream::HostVector&, const Upstream::HostVector&)>;
+
+  using MemberCb = std::function<void(const Upstream::HostVector&, const Upstream::HostVector&)>;
+
+  // Update priority set callback
+  // @param cluster_manager the cluster manager
+  // @param clusters clusters in aggregate cluster
+  // @param priority_cb priority callback
+  // @param member_cb member callback
+  void updatePrioritySetCallbacks(const std::vector<std::string>& clusters, PriorityCb priority_cb,
+                                  MemberCb member_cb);
 
   class LoadBalancerImpl : public Upstream::LoadBalancerBase {
   public:

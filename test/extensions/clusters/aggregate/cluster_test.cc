@@ -138,32 +138,6 @@ public:
 )EOF";
 };
 
-TEST_F(AggregateClusterTest, BasicFlow) {
-  initialize(default_yaml_config_);
-  EXPECT_EQ(cluster_->initializePhase(), Upstream::Cluster::InitializePhase::Secondary);
-  auto primary = cm_.get("primary");
-  auto secondary = cm_.get("secondary");
-  EXPECT_NE(nullptr, primary);
-  EXPECT_NE(nullptr, secondary);
-
-  std::pair<Upstream::PrioritySetImpl,
-            std::vector<std::pair<uint32_t, Upstream::ThreadLocalCluster*>>>
-      pair = ClusterUtil::linearizePrioritySet(cm_, {"primary", "secondary"});
-
-  EXPECT_EQ(pair.first.hostSetsPerPriority().size(), 4);
-  EXPECT_EQ(pair.second.size(), 4);
-
-  std::vector<std::vector<int>> expect_cnt{{1, 1, 3, 0}, {2, 2, 6, 1}, {2, 2, 6, 2}, {1, 1, 3, 3}};
-  std::vector<Upstream::ThreadLocalCluster*> expect_cluster{primary, primary, secondary, secondary};
-  for (int i = 0; i < 4; ++i) {
-    EXPECT_EQ(expect_cnt[i][0], pair.first.hostSetsPerPriority()[i]->healthyHosts().size());
-    EXPECT_EQ(expect_cnt[i][1], pair.first.hostSetsPerPriority()[i]->degradedHosts().size());
-    EXPECT_EQ(expect_cnt[i][2], pair.first.hostSetsPerPriority()[i]->hosts().size());
-    EXPECT_EQ(expect_cnt[i][3], pair.first.hostSetsPerPriority()[i]->priority());
-    EXPECT_EQ(expect_cluster[i], pair.second[i].second);
-  }
-}
-
 TEST_F(AggregateClusterTest, LoadBalancerTest) {
   initialize(default_yaml_config_);
   // Health value:

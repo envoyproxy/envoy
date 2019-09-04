@@ -7,7 +7,6 @@
 #include "common/upstream/upstream_impl.h"
 
 #include "extensions/clusters/aggregate/cluster_lb.h"
-#include "extensions/clusters/aggregate/cluster_util.h"
 
 namespace Envoy {
 namespace Extensions {
