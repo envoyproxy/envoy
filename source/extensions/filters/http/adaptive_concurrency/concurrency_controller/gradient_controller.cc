@@ -66,7 +66,7 @@ GradientController::GradientController(GradientControllerConfigSharedPtr config,
   });
 
   sample_reset_timer_->enableTimer(config_->sampleRTTCalcInterval());
-  stats_.concurrency_limit_.set(concurrencyLimit());
+  stats_.concurrency_limit_.set(concurrency_limit_.load());
 }
 
 GradientControllerStats GradientController::generateStats(Stats::Scope& scope,

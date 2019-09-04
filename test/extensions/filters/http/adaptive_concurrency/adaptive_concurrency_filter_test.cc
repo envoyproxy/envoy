@@ -31,7 +31,7 @@ public:
 
 class AdaptiveConcurrencyFilterTest : public testing::Test {
 public:
-  AdaptiveConcurrencyFilterTest() {}
+  AdaptiveConcurrencyFilterTest() = default;
 
   void SetUp() override {
     const envoy::config::filter::http::adaptive_concurrency::v2alpha::AdaptiveConcurrency config;
