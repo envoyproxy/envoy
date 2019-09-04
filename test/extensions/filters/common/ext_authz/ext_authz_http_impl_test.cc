@@ -33,10 +33,13 @@ namespace Common {
 namespace ExtAuthz {
 namespace {
 
-class ExtAuthzHttpTest : public testing::Test {
+class ExtAuthzHttpClientTest : public testing::Test {
 public:
-  ExtAuthzHttpTest()
-      : async_request_{&async_client_}, config_{createConfig()}, client_{cm_, config_} {}
+  ExtAuthzHttpClientTest()
+      : async_request_{&async_client_}, config_{createConfig()}, client_{cm_, config_} {
+    ON_CALL(cm_, httpAsyncClientForCluster(config_->cluster()))
+        .WillByDefault(ReturnRef(async_client_));
+  }
 
   static ClientConfigSharedPtr createConfig(std::string yaml = "", uint32_t timeout = 250,
                                             std::string path_prefix = "/bar") {
@@ -113,14 +116,6 @@ public:
   ClientConfigSharedPtr config_;
   RawHttpClientImpl client_;
   MockRequestCallbacks request_callbacks_;
-};
-
-class ExtAuthzHttpClientTest : public ExtAuthzHttpTest {
-public:
-  ExtAuthzHttpClientTest() {
-    ON_CALL(cm_, httpAsyncClientForCluster(config_->cluster()))
-        .WillByDefault(ReturnRef(async_client_));
-  }
 };
 
 // Test HTTP client config default values.
