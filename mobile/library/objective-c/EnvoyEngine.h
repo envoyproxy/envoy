@@ -7,10 +7,10 @@ NS_ASSUME_NONNULL_BEGIN
 /// A set of headers that may be passed to/from an Envoy stream.
 typedef NSDictionary<NSString *, NSArray<NSString *> *> EnvoyHeaders;
 
-#pragma mark - EnvoyObserver
+#pragma mark - EnvoyHTTPCallbacks
 
 /// Interface that can handle callbacks from an HTTP stream.
-@interface EnvoyObserver : NSObject
+@interface EnvoyHTTPCallbacks : NSObject
 
 /**
  * Dispatch queue provided to handle callbacks.
@@ -66,9 +66,9 @@ typedef NSDictionary<NSString *, NSArray<NSString *> *> EnvoyHeaders;
  Open an underlying HTTP stream.
 
  @param handle Underlying handle of the HTTP stream owned by an Envoy engine.
- @param observer The observer that will run the stream callbacks.
+ @param callbacks The callbacks for the stream.
  */
-- (instancetype)initWithHandle:(uint64_t)handle observer:(EnvoyObserver *)observer;
+- (instancetype)initWithHandle:(uint64_t)handle callbacks:(EnvoyHTTPCallbacks *)callbacks;
 
 /**
  Send headers over the provided stream.
@@ -147,9 +147,9 @@ typedef NSDictionary<NSString *, NSArray<NSString *> *> EnvoyHeaders;
 /**
  Opens a new HTTP stream attached to this engine.
 
- @param observer Handler for observing stream events.
+ @param callbacks Handler for observing stream events.
  */
-- (id<EnvoyHTTPStream>)startStreamWithObserver:(EnvoyObserver *)observer;
+- (id<EnvoyHTTPStream>)startStreamWithCallbacks:(EnvoyHTTPCallbacks *)callbacks;
 
 @end
 

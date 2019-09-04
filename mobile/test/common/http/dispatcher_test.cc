@@ -59,23 +59,24 @@ public:
   Http::ContextImpl http_context_;
   AsyncClientImpl client_;
   Dispatcher http_dispatcher_;
-  envoy_observer observer_;
+  envoy_http_callbacks bridge_callbacks_;
 };
 
 TEST_F(DispatcherTest, BasicStreamHeadersOnly) {
   envoy_stream_t stream = 1;
-  // Setup observer to handle the response headers.
-  envoy_observer observer;
+  // Setup bridge_callbacks to handle the response headers.
+  envoy_http_callbacks bridge_callbacks;
   callbacks_called cc = {0, 0, 0, 0};
-  observer.context = &cc;
-  observer.on_headers = [](envoy_headers c_headers, bool end_stream, void* context) -> void {
+  bridge_callbacks.context = &cc;
+  bridge_callbacks.on_headers = [](envoy_headers c_headers, bool end_stream,
+                                   void* context) -> void {
     ASSERT_TRUE(end_stream);
     HeaderMapPtr response_headers = Utility::toInternalHeaders(c_headers);
     EXPECT_EQ(response_headers->Status()->value().getStringView(), "200");
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_headers_calls++;
   };
-  observer.on_complete = [](void* context) -> void {
+  bridge_callbacks.on_complete = [](void* context) -> void {
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_complete_calls++;
   };
@@ -101,7 +102,7 @@ TEST_F(DispatcherTest, BasicStreamHeadersOnly) {
           WithArg<0>(Invoke([&](AsyncClient::StreamCallbacks& callbacks) -> AsyncClient::Stream* {
             return client_.start(callbacks, AsyncClient::StreamOptions());
           })));
-  EXPECT_EQ(http_dispatcher_.startStream(stream, observer), ENVOY_SUCCESS);
+  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks), ENVOY_SUCCESS);
 
   // Send request headers.
   Event::PostCb post_cb;
@@ -127,7 +128,7 @@ TEST_F(DispatcherTest, BasicStreamHeadersOnly) {
                      .counter("internal.upstream_rq_200")
                      .value());
 
-  // Ensure that the callbacks on the observer were called.
+  // Ensure that the callbacks on the bridge_callbacks were called.
   ASSERT_EQ(cc.on_headers_calls, 1);
   ASSERT_EQ(cc.on_complete_calls, 1);
   ASSERT_EQ(cc.on_data_calls, 0);
@@ -135,24 +136,25 @@ TEST_F(DispatcherTest, BasicStreamHeadersOnly) {
 
 TEST_F(DispatcherTest, BasicStream) {
   envoy_stream_t stream = 1;
-  // Setup observer to handle the response.
-  envoy_observer observer;
+  // Setup bridge_callbacks to handle the response.
+  envoy_http_callbacks bridge_callbacks;
   callbacks_called cc = {0, 0, 0, 0};
-  observer.context = &cc;
-  observer.on_headers = [](envoy_headers c_headers, bool end_stream, void* context) -> void {
+  bridge_callbacks.context = &cc;
+  bridge_callbacks.on_headers = [](envoy_headers c_headers, bool end_stream,
+                                   void* context) -> void {
     ASSERT_FALSE(end_stream);
     HeaderMapPtr response_headers = Utility::toInternalHeaders(c_headers);
     EXPECT_EQ(response_headers->Status()->value().getStringView(), "200");
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_headers_calls++;
   };
-  observer.on_data = [](envoy_data c_data, bool end_stream, void* context) -> void {
+  bridge_callbacks.on_data = [](envoy_data c_data, bool end_stream, void* context) -> void {
     ASSERT_TRUE(end_stream);
     ASSERT_EQ(Http::Utility::convertToString(c_data), "response body");
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_data_calls++;
   };
-  observer.on_complete = [](void* context) -> void {
+  bridge_callbacks.on_complete = [](void* context) -> void {
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_complete_calls++;
   };
@@ -182,7 +184,7 @@ TEST_F(DispatcherTest, BasicStream) {
           WithArg<0>(Invoke([&](AsyncClient::StreamCallbacks& callbacks) -> AsyncClient::Stream* {
             return client_.start(callbacks, AsyncClient::StreamOptions());
           })));
-  EXPECT_EQ(http_dispatcher_.startStream(stream, observer), ENVOY_SUCCESS);
+  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks), ENVOY_SUCCESS);
 
   // Send request headers.
   Event::PostCb headers_post_cb;
@@ -217,7 +219,7 @@ TEST_F(DispatcherTest, BasicStream) {
                      .counter("internal.upstream_rq_200")
                      .value());
 
-  // Ensure that the callbacks on the observer were called.
+  // Ensure that the callbacks on the bridge_callbacks were called.
   ASSERT_EQ(cc.on_headers_calls, 1);
   ASSERT_EQ(cc.on_data_calls, 1);
   ASSERT_EQ(cc.on_complete_calls, 1);
@@ -225,16 +227,16 @@ TEST_F(DispatcherTest, BasicStream) {
 
 TEST_F(DispatcherTest, ResetStream) {
   envoy_stream_t stream = 1;
-  envoy_observer observer;
+  envoy_http_callbacks bridge_callbacks;
   callbacks_called cc = {0, 0, 0, 0};
-  observer.context = &cc;
-  observer.on_error = [](envoy_error actual_error, void* context) -> void {
+  bridge_callbacks.context = &cc;
+  bridge_callbacks.on_error = [](envoy_error actual_error, void* context) -> void {
     envoy_error expected_error = {ENVOY_STREAM_RESET, envoy_nodata};
     ASSERT_EQ(actual_error.error_code, expected_error.error_code);
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_error_calls++;
   };
-  observer.on_complete = [](void* context) -> void {
+  bridge_callbacks.on_complete = [](void* context) -> void {
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_complete_calls++;
   };
@@ -245,7 +247,7 @@ TEST_F(DispatcherTest, ResetStream) {
           WithArg<0>(Invoke([&](AsyncClient::StreamCallbacks& callbacks) -> AsyncClient::Stream* {
             return client_.start(callbacks, AsyncClient::StreamOptions());
           })));
-  EXPECT_EQ(http_dispatcher_.startStream(stream, observer), ENVOY_SUCCESS);
+  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks), ENVOY_SUCCESS);
 
   Event::PostCb post_cb;
   EXPECT_CALL(event_dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
@@ -254,7 +256,7 @@ TEST_F(DispatcherTest, ResetStream) {
   EXPECT_CALL(event_dispatcher_, isThreadSafe()).Times(1).WillRepeatedly(Return(true));
   post_cb();
 
-  // Ensure that the on_error on the observer was called.
+  // Ensure that the on_error on the bridge_callbacks was called.
   ASSERT_EQ(cc.on_error_calls, 1);
   ASSERT_EQ(cc.on_complete_calls, 0);
 }
@@ -263,18 +265,19 @@ TEST_F(DispatcherTest, MultipleStreams) {
   envoy_stream_t stream1 = 1;
   envoy_stream_t stream2 = 2;
   // Start stream1.
-  // Setup observer to handle the response headers.
-  envoy_observer observer;
+  // Setup bridge_callbacks to handle the response headers.
+  envoy_http_callbacks bridge_callbacks;
   callbacks_called cc = {0, 0, 0, 0};
-  observer.context = &cc;
-  observer.on_headers = [](envoy_headers c_headers, bool end_stream, void* context) -> void {
+  bridge_callbacks.context = &cc;
+  bridge_callbacks.on_headers = [](envoy_headers c_headers, bool end_stream,
+                                   void* context) -> void {
     ASSERT_TRUE(end_stream);
     HeaderMapPtr response_headers = Utility::toInternalHeaders(c_headers);
     EXPECT_EQ(response_headers->Status()->value().getStringView(), "200");
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_headers_calls++;
   };
-  observer.on_complete = [](void* context) -> void {
+  bridge_callbacks.on_complete = [](void* context) -> void {
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_complete_calls++;
   };
@@ -300,7 +303,7 @@ TEST_F(DispatcherTest, MultipleStreams) {
           WithArg<0>(Invoke([&](AsyncClient::StreamCallbacks& callbacks) -> AsyncClient::Stream* {
             return client_.start(callbacks, AsyncClient::StreamOptions());
           })));
-  EXPECT_EQ(http_dispatcher_.startStream(stream1, observer), ENVOY_SUCCESS);
+  EXPECT_EQ(http_dispatcher_.startStream(stream1, bridge_callbacks), ENVOY_SUCCESS);
 
   // Send request headers.
   Event::PostCb post_cb;
@@ -312,20 +315,21 @@ TEST_F(DispatcherTest, MultipleStreams) {
   post_cb();
 
   // Start stream2.
-  // Setup observer to handle the response headers.
+  // Setup bridge_callbacks to handle the response headers.
   NiceMock<MockStreamEncoder> stream_encoder2;
   StreamDecoder* response_decoder2{};
-  envoy_observer observer2;
+  envoy_http_callbacks bridge_callbacks2;
   callbacks_called cc2 = {false, 0, false, false};
-  observer2.context = &cc2;
-  observer2.on_headers = [](envoy_headers c_headers, bool end_stream, void* context) -> void {
+  bridge_callbacks2.context = &cc2;
+  bridge_callbacks2.on_headers = [](envoy_headers c_headers, bool end_stream,
+                                    void* context) -> void {
     ASSERT_TRUE(end_stream);
     HeaderMapPtr response_headers = Utility::toInternalHeaders(c_headers);
     EXPECT_EQ(response_headers->Status()->value().getStringView(), "503");
     bool* on_headers_called2 = static_cast<bool*>(context);
     *on_headers_called2 = true;
   };
-  observer2.on_complete = [](void* context) -> void {
+  bridge_callbacks2.on_complete = [](void* context) -> void {
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_complete_calls++;
   };
@@ -352,7 +356,7 @@ TEST_F(DispatcherTest, MultipleStreams) {
             return client_.start(callbacks, AsyncClient::StreamOptions());
           })));
   EXPECT_CALL(event_dispatcher_, post(_));
-  EXPECT_EQ(http_dispatcher_.startStream(stream2, observer2), ENVOY_SUCCESS);
+  EXPECT_EQ(http_dispatcher_.startStream(stream2, bridge_callbacks2), ENVOY_SUCCESS);
 
   // Send request headers.
   Event::PostCb post_cb2;
@@ -367,7 +371,7 @@ TEST_F(DispatcherTest, MultipleStreams) {
   EXPECT_CALL(event_dispatcher_, isThreadSafe()).Times(1).WillRepeatedly(Return(true));
   HeaderMapPtr response_headers2(new TestHeaderMapImpl{{":status", "503"}});
   response_decoder2->decodeHeaders(std::move(response_headers2), true);
-  // Ensure that the on_headers on the observer was called.
+  // Ensure that the on_headers on the bridge_callbacks was called.
   ASSERT_EQ(cc2.on_headers_calls, 1);
   ASSERT_EQ(cc2.on_complete_calls, 1);
 
@@ -381,24 +385,25 @@ TEST_F(DispatcherTest, MultipleStreams) {
 
 TEST_F(DispatcherTest, LocalResetAfterStreamStart) {
   envoy_stream_t stream = 1;
-  envoy_observer observer;
+  envoy_http_callbacks bridge_callbacks;
   callbacks_called cc = {0, 0, 0, 0};
-  observer.context = &cc;
+  bridge_callbacks.context = &cc;
 
-  observer.on_error = [](envoy_error actual_error, void* context) -> void {
+  bridge_callbacks.on_error = [](envoy_error actual_error, void* context) -> void {
     envoy_error expected_error = {ENVOY_STREAM_RESET, envoy_nodata};
     ASSERT_EQ(actual_error.error_code, expected_error.error_code);
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_error_calls++;
   };
-  observer.on_headers = [](envoy_headers c_headers, bool end_stream, void* context) -> void {
+  bridge_callbacks.on_headers = [](envoy_headers c_headers, bool end_stream,
+                                   void* context) -> void {
     ASSERT_FALSE(end_stream);
     HeaderMapPtr response_headers = Utility::toInternalHeaders(c_headers);
     EXPECT_EQ(response_headers->Status()->value().getStringView(), "200");
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_headers_calls++;
   };
-  observer.on_complete = [](void* context) -> void {
+  bridge_callbacks.on_complete = [](void* context) -> void {
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_complete_calls++;
   };
@@ -424,7 +429,7 @@ TEST_F(DispatcherTest, LocalResetAfterStreamStart) {
           WithArg<0>(Invoke([&](AsyncClient::StreamCallbacks& callbacks) -> AsyncClient::Stream* {
             return client_.start(callbacks, AsyncClient::StreamOptions());
           })));
-  EXPECT_EQ(http_dispatcher_.startStream(stream, observer), ENVOY_SUCCESS);
+  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks), ENVOY_SUCCESS);
 
   // Send request headers.
   Event::PostCb send_headers_post_cb;
@@ -436,7 +441,7 @@ TEST_F(DispatcherTest, LocalResetAfterStreamStart) {
   send_headers_post_cb();
 
   response_decoder_->decodeHeaders(HeaderMapPtr(new TestHeaderMapImpl{{":status", "200"}}), false);
-  // Ensure that the on_headers on the observer was called.
+  // Ensure that the on_headers on the bridge_callbacks was called.
   ASSERT_EQ(cc.on_headers_calls, 1);
 
   Event::PostCb reset_post_cb;
@@ -446,31 +451,32 @@ TEST_F(DispatcherTest, LocalResetAfterStreamStart) {
   EXPECT_CALL(event_dispatcher_, isThreadSafe()).Times(1).WillRepeatedly(Return(true));
   reset_post_cb();
 
-  // Ensure that the on_error on the observer was called.
+  // Ensure that the on_error on the bridge_callbacks was called.
   ASSERT_EQ(cc.on_error_calls, 1);
   ASSERT_EQ(cc.on_complete_calls, 0);
 }
 
 TEST_F(DispatcherTest, RemoteResetAfterStreamStart) {
   envoy_stream_t stream = 1;
-  envoy_observer observer;
+  envoy_http_callbacks bridge_callbacks;
   callbacks_called cc = {0, 0, 0, 0};
-  observer.context = &cc;
+  bridge_callbacks.context = &cc;
 
-  observer.on_error = [](envoy_error actual_error, void* context) -> void {
+  bridge_callbacks.on_error = [](envoy_error actual_error, void* context) -> void {
     envoy_error expected_error = {ENVOY_STREAM_RESET, envoy_nodata};
     ASSERT_EQ(actual_error.error_code, expected_error.error_code);
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_error_calls++;
   };
-  observer.on_headers = [](envoy_headers c_headers, bool end_stream, void* context) -> void {
+  bridge_callbacks.on_headers = [](envoy_headers c_headers, bool end_stream,
+                                   void* context) -> void {
     ASSERT_FALSE(end_stream);
     HeaderMapPtr response_headers = Utility::toInternalHeaders(c_headers);
     EXPECT_EQ(response_headers->Status()->value().getStringView(), "200");
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_headers_calls++;
   };
-  observer.on_complete = [](void* context) -> void {
+  bridge_callbacks.on_complete = [](void* context) -> void {
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_complete_calls++;
   };
@@ -496,7 +502,7 @@ TEST_F(DispatcherTest, RemoteResetAfterStreamStart) {
           WithArg<0>(Invoke([&](AsyncClient::StreamCallbacks& callbacks) -> AsyncClient::Stream* {
             return client_.start(callbacks, AsyncClient::StreamOptions());
           })));
-  EXPECT_EQ(http_dispatcher_.startStream(stream, observer), ENVOY_SUCCESS);
+  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks), ENVOY_SUCCESS);
 
   // Send request headers.
   Event::PostCb send_headers_post_cb;
@@ -508,11 +514,11 @@ TEST_F(DispatcherTest, RemoteResetAfterStreamStart) {
   send_headers_post_cb();
 
   response_decoder_->decodeHeaders(HeaderMapPtr(new TestHeaderMapImpl{{":status", "200"}}), false);
-  // Ensure that the on_headers on the observer was called.
+  // Ensure that the on_headers on the bridge_callbacks was called.
   ASSERT_EQ(cc.on_headers_calls, 1);
 
   stream_encoder_.getStream().resetStream(StreamResetReason::RemoteReset);
-  // Ensure that the on_error on the observer was called.
+  // Ensure that the on_error on the bridge_callbacks was called.
   ASSERT_EQ(cc.on_error_calls, 1);
   ASSERT_EQ(cc.on_complete_calls, 0);
 }
@@ -537,7 +543,7 @@ TEST_F(DispatcherTest, DestroyWithActiveStream) {
   EXPECT_CALL(cm_, httpAsyncClientForCluster("base")).WillOnce(ReturnRef(cm_.async_client_));
   EXPECT_CALL(cm_.async_client_, start(_, _))
       .WillOnce(Return(client_.start(stream_callbacks_, AsyncClient::StreamOptions())));
-  EXPECT_EQ(http_dispatcher_.startStream(stream, observer_), ENVOY_SUCCESS);
+  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks_), ENVOY_SUCCESS);
 
   // Send request headers.
   EXPECT_CALL(stream_encoder_, encodeHeaders(_, false));
@@ -567,7 +573,7 @@ TEST_F(DispatcherTest, ResetInOnHeaders) {
   EXPECT_CALL(cm_, httpAsyncClientForCluster("base")).WillOnce(ReturnRef(cm_.async_client_));
   EXPECT_CALL(cm_.async_client_, start(_, _))
       .WillOnce(Return(client_.start(stream_callbacks_, AsyncClient::StreamOptions())));
-  EXPECT_EQ(http_dispatcher_.startStream(stream, observer_), ENVOY_SUCCESS);
+  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks_), ENVOY_SUCCESS);
 
   // Send request headers.
   Event::PostCb send_headers_post_cb;
@@ -607,7 +613,7 @@ TEST_F(DispatcherTest, StreamTimeout) {
   EXPECT_CALL(cm_.async_client_, start(_, _))
       .WillOnce(Return(client_.start(stream_callbacks_, AsyncClient::StreamOptions().setTimeout(
                                                             std::chrono::milliseconds(40)))));
-  EXPECT_EQ(http_dispatcher_.startStream(stream, observer_), ENVOY_SUCCESS);
+  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks_), ENVOY_SUCCESS);
 
   // Send request headers.
   Event::PostCb send_headers_post_cb;
@@ -655,7 +661,7 @@ TEST_F(DispatcherTest, StreamTimeoutHeadReply) {
   EXPECT_CALL(cm_.async_client_, start(_, _))
       .WillOnce(Return(client_.start(stream_callbacks_, AsyncClient::StreamOptions().setTimeout(
                                                             std::chrono::milliseconds(40)))));
-  EXPECT_EQ(http_dispatcher_.startStream(stream, observer_), ENVOY_SUCCESS);
+  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks_), ENVOY_SUCCESS);
 
   // Send request headers.
   Event::PostCb send_headers_post_cb;
@@ -693,7 +699,7 @@ TEST_F(DispatcherTest, DisableTimerWithStream) {
   EXPECT_CALL(cm_.async_client_, start(_, _))
       .WillOnce(Return(client_.start(stream_callbacks_, AsyncClient::StreamOptions().setTimeout(
                                                             std::chrono::milliseconds(40)))));
-  EXPECT_EQ(http_dispatcher_.startStream(stream, observer_), ENVOY_SUCCESS);
+  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks_), ENVOY_SUCCESS);
 
   // Send request headers and reset stream.
   Event::PostCb send_headers_post_cb;
@@ -718,23 +724,24 @@ TEST_F(DispatcherTest, DisableTimerWithStream) {
 
 TEST_F(DispatcherTest, MultipleDataStream) {
   envoy_stream_t stream = 1;
-  // Setup observer to handle the response.
-  envoy_observer observer;
+  // Setup bridge_callbacks to handle the response.
+  envoy_http_callbacks bridge_callbacks;
   callbacks_called cc = {0, 0, 0, 0};
-  observer.context = &cc;
-  observer.on_headers = [](envoy_headers c_headers, bool end_stream, void* context) -> void {
+  bridge_callbacks.context = &cc;
+  bridge_callbacks.on_headers = [](envoy_headers c_headers, bool end_stream,
+                                   void* context) -> void {
     ASSERT_FALSE(end_stream);
     HeaderMapPtr response_headers = Utility::toInternalHeaders(c_headers);
     EXPECT_EQ(response_headers->Status()->value().getStringView(), "200");
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_headers_calls++;
   };
-  observer.on_data = [](envoy_data, bool, void* context) -> void {
+  bridge_callbacks.on_data = [](envoy_data, bool, void* context) -> void {
     // TODO: assert end_stream and contents of c_data for multiple calls of on_data.
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_data_calls++;
   };
-  observer.on_complete = [](void* context) -> void {
+  bridge_callbacks.on_complete = [](void* context) -> void {
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_complete_calls++;
   };
@@ -768,7 +775,7 @@ TEST_F(DispatcherTest, MultipleDataStream) {
           WithArg<0>(Invoke([&](AsyncClient::StreamCallbacks& callbacks) -> AsyncClient::Stream* {
             return client_.start(callbacks, AsyncClient::StreamOptions());
           })));
-  EXPECT_EQ(http_dispatcher_.startStream(stream, observer), ENVOY_SUCCESS);
+  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks), ENVOY_SUCCESS);
 
   // Send request headers.
   Event::PostCb headers_post_cb;
@@ -814,7 +821,7 @@ TEST_F(DispatcherTest, MultipleDataStream) {
                      .counter("internal.upstream_rq_200")
                      .value());
 
-  // Ensure that the callbacks on the observer were called.
+  // Ensure that the callbacks on the bridge_callbacks were called.
   ASSERT_EQ(cc.on_headers_calls, 1);
   ASSERT_EQ(cc.on_data_calls, 2);
   ASSERT_EQ(cc.on_complete_calls, 1);

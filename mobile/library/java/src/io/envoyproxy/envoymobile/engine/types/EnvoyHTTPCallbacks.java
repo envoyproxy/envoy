@@ -5,7 +5,7 @@ import java.util.concurrent.Executor;
 import java.util.List;
 import java.util.Map;
 
-public interface EnvoyObserver {
+public interface EnvoyHTTPCallbacks {
 
   Executor getExecutor();
 

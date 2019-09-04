@@ -1,15 +1,15 @@
 package io.envoyproxy.envoymobile.engine;
 
-import io.envoyproxy.envoymobile.engine.types.EnvoyObserver;
+import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks;
 
 public interface EnvoyEngine {
   /**
-   * Creates a new stream with the provided observer.
+   * Creates a new stream with the provided callbacks.
    *
-   * @param observer The observer for receiving callbacks from the stream.
+   * @param callbacks The callbacks for receiving callbacks from the stream.
    * @return A stream that may be used for sending data.
    */
-  EnvoyHTTPStream startStream(EnvoyObserver observer);
+  EnvoyHTTPStream startStream(EnvoyHTTPCallbacks callbacks);
 
   /**
    * Run the Envoy engine with the provided config and log level.

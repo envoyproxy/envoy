@@ -3,14 +3,14 @@ import Foundation
 /// Callback interface for receiving stream events.
 @objcMembers
 public final class ResponseHandler: NSObject {
-  /// Underlying observer which will be passed to the Envoy Engine.
-  let underlyingObserver = EnvoyObserver()
+  /// Underlying callbacks which will be passed to the Envoy Engine.
+  let underlyingCallbacks = EnvoyHTTPCallbacks()
 
   /// Initialize a new instance of the handler.
   ///
   /// - parameter queue: Dispatch queue upon which callbacks will be called.
   public init(queue: DispatchQueue = .main) {
-    self.underlyingObserver.dispatchQueue = queue
+    self.underlyingCallbacks.dispatchQueue = queue
   }
 
   /// Specify a callback for when response headers are received by the stream.
@@ -23,7 +23,7 @@ public final class ResponseHandler: NSObject {
     @escaping (_ headers: [String: [String]], _ statusCode: Int, _ endStream: Bool) -> Void)
     -> ResponseHandler
   {
-    self.underlyingObserver.onHeaders = { headers, endStream in
+    self.underlyingCallbacks.onHeaders = { headers, endStream in
       closure(headers, ResponseHandler.statusCode(fromHeaders: headers), endStream)
     }
 
@@ -40,7 +40,7 @@ public final class ResponseHandler: NSObject {
     @escaping (_ data: Data, _ endStream: Bool) -> Void)
     -> ResponseHandler
   {
-    self.underlyingObserver.onData = closure
+    self.underlyingCallbacks.onData = closure
     return self
   }
 
@@ -53,7 +53,7 @@ public final class ResponseHandler: NSObject {
     @escaping (_ trailers: [String: [String]]) -> Void)
     -> ResponseHandler
   {
-    self.underlyingObserver.onTrailers = closure
+    self.underlyingCallbacks.onTrailers = closure
     return self
   }
 
@@ -66,7 +66,7 @@ public final class ResponseHandler: NSObject {
     @escaping () -> Void)
     -> ResponseHandler
   {
-    self.underlyingObserver.onError = closure
+    self.underlyingCallbacks.onError = closure
     return self
   }
 
@@ -79,7 +79,7 @@ public final class ResponseHandler: NSObject {
     @escaping () -> Void)
     -> ResponseHandler
   {
-    self.underlyingObserver.onCancel = closure
+    self.underlyingCallbacks.onCancel = closure
     return self
   }
 

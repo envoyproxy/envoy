@@ -58,7 +58,7 @@ class Envoy constructor(
   }
 
   override fun send(request: Request, responseHandler: ResponseHandler): StreamEmitter {
-    val stream = engine.startStream(responseHandler.underlyingObserver)
+    val stream = engine.startStream(responseHandler.underlyingCallbacks)
     stream.sendHeaders(request.outboundHeaders(), false)
     return EnvoyStreamEmitter(stream)
   }

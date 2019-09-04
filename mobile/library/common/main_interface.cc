@@ -26,8 +26,8 @@ static std::atomic<envoy_stream_t> current_stream_handle_{0};
 
 envoy_stream_t init_stream(envoy_engine_t) { return current_stream_handle_++; }
 
-envoy_status_t start_stream(envoy_stream_t stream, envoy_observer observer) {
-  http_dispatcher_->startStream(stream, observer);
+envoy_status_t start_stream(envoy_stream_t stream, envoy_http_callbacks callbacks) {
+  http_dispatcher_->startStream(stream, callbacks);
   return ENVOY_SUCCESS;
 }
 

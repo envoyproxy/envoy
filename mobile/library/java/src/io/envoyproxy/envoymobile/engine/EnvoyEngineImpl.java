@@ -1,6 +1,6 @@
 package io.envoyproxy.envoymobile.engine;
 
-import io.envoyproxy.envoymobile.engine.types.EnvoyObserver;
+import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks;
 
 public class EnvoyEngineImpl implements EnvoyEngine {
 
@@ -12,15 +12,15 @@ public class EnvoyEngineImpl implements EnvoyEngine {
   }
 
   /**
-   * Creates a new stream with the provided observer.
+   * Creates a new stream with the provided callbacks.
    *
-   * @param observer The observer for receiving callbacks from the stream.
+   * @param callbacks The callbacks for the stream.
    * @return A stream that may be used for sending data.
    */
   @Override
-  public EnvoyHTTPStream startStream(EnvoyObserver observer) {
+  public EnvoyHTTPStream startStream(EnvoyHTTPCallbacks callbacks) {
     long streamHandle = JniLibrary.initStream(engineHandle);
-    return new EnvoyHTTPStream(streamHandle, observer);
+    return new EnvoyHTTPStream(streamHandle, callbacks);
   }
 
   /**

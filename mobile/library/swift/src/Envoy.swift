@@ -48,7 +48,7 @@ public final class Envoy: NSObject {
 
 extension Envoy: Client {
   public func send(_ request: Request, handler: ResponseHandler) -> StreamEmitter {
-    let httpStream = self.engine.startStream(with: handler.underlyingObserver)
+    let httpStream = self.engine.startStream(with: handler.underlyingCallbacks)
     httpStream.sendHeaders(request.outboundHeaders(), close: false)
     return EnvoyStreamEmitter(stream: httpStream)
   }

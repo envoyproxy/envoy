@@ -67,11 +67,11 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_templateString(JNIEnv* env,
   return result;
 }
 
-// JvmObserverContext
+// JvmCallbackContext
 
 static void pass_headers(JNIEnv* env, envoy_headers headers, jobject j_context) {
-  jclass jcls_JvmObserverContext = env->GetObjectClass(j_context);
-  jmethodID jmid_passHeader = env->GetMethodID(jcls_JvmObserverContext, "passHeader", "([B[BZ)V");
+  jclass jcls_JvmCallbackContext = env->GetObjectClass(j_context);
+  jmethodID jmid_passHeader = env->GetMethodID(jcls_JvmCallbackContext, "passHeader", "([B[BZ)V");
   env->PushLocalFrame(headers.length * 2);
   for (envoy_header_size_t i = 0; i < headers.length; i++) {
     // Note this is just an initial implementation, and we will pass a more optimized structure in
@@ -103,7 +103,7 @@ static void pass_headers(JNIEnv* env, envoy_headers headers, jobject j_context) 
     // consider this and/or periodically popping the frame.
   }
   env->PopLocalFrame(nullptr);
-  env->DeleteLocalRef(jcls_JvmObserverContext);
+  env->DeleteLocalRef(jcls_JvmCallbackContext);
   release_envoy_headers(headers);
 }
 
@@ -121,14 +121,14 @@ static void jvm_on_headers(envoy_headers headers, bool end_stream, void* context
   JNIEnv* env = get_env();
   jobject j_context = static_cast<jobject>(context);
 
-  jclass jcls_JvmObserverContext = env->GetObjectClass(j_context);
-  jmethodID jmid_onHeaders = env->GetMethodID(jcls_JvmObserverContext, "onHeaders", "(JZ)V");
+  jclass jcls_JvmCallbackContext = env->GetObjectClass(j_context);
+  jmethodID jmid_onHeaders = env->GetMethodID(jcls_JvmCallbackContext, "onHeaders", "(JZ)V");
   // Note: be careful of JVM types
   // FIXME: make this cast safer
   env->CallVoidMethod(j_context, jmid_onHeaders, (jlong)headers.length,
                       end_stream ? JNI_TRUE : JNI_FALSE);
 
-  env->DeleteLocalRef(jcls_JvmObserverContext);
+  env->DeleteLocalRef(jcls_JvmCallbackContext);
   pass_headers(env, headers, j_context);
 }
 
@@ -137,8 +137,8 @@ static void jvm_on_data(envoy_data data, bool end_stream, void* context) {
   JNIEnv* env = get_env();
   jobject j_context = static_cast<jobject>(context);
 
-  jclass jcls_JvmObserverContext = env->GetObjectClass(j_context);
-  jmethodID jmid_onData = env->GetMethodID(jcls_JvmObserverContext, "onData", "([BZ)V");
+  jclass jcls_JvmCallbackContext = env->GetObjectClass(j_context);
+  jmethodID jmid_onData = env->GetMethodID(jcls_JvmCallbackContext, "onData", "([BZ)V");
 
   jbyteArray j_data = env->NewByteArray(data.length);
   // FIXME: check if copied via isCopy
@@ -151,7 +151,7 @@ static void jvm_on_data(envoy_data data, bool end_stream, void* context) {
 
   data.release(data.context);
   env->DeleteLocalRef(j_data);
-  env->DeleteLocalRef(jcls_JvmObserverContext);
+  env->DeleteLocalRef(jcls_JvmCallbackContext);
 }
 
 static void jvm_on_metadata(envoy_headers metadata, void* context) {
@@ -240,17 +240,19 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_startStream(
     JNIEnv* env, jclass, jlong stream_handle, jobject j_context) {
 
-  jclass jcls_JvmObserverContext = env->GetObjectClass(j_context);
-  jmethodID jmid_onHeaders = env->GetMethodID(jcls_JvmObserverContext, "onHeaders", "(JZ)V");
+  jclass jcls_JvmCallbackContext = env->GetObjectClass(j_context);
+  jmethodID jmid_onHeaders = env->GetMethodID(jcls_JvmCallbackContext, "onHeaders", "(JZ)V");
   // TODO: To be truly safe we may need stronger guarantees of operation ordering on this ref
   jobject retained_context = env->NewGlobalRef(j_context);
-  envoy_observer native_obs = {jvm_on_headers, jvm_on_data,     jvm_on_metadata, jvm_on_trailers,
-                               jvm_on_error,   jvm_on_complete, retained_context};
-  envoy_status_t result = start_stream(static_cast<envoy_stream_t>(stream_handle), native_obs);
+  envoy_http_callbacks native_callbacks = {jvm_on_headers,  jvm_on_data,  jvm_on_metadata,
+                                           jvm_on_trailers, jvm_on_error, jvm_on_complete,
+                                           retained_context};
+  envoy_status_t result =
+      start_stream(static_cast<envoy_stream_t>(stream_handle), native_callbacks);
   if (result != ENVOY_SUCCESS) {
     env->DeleteGlobalRef(retained_context); // No callbacks are fired and we need to release
   }
-  env->DeleteLocalRef(jcls_JvmObserverContext);
+  env->DeleteLocalRef(jcls_JvmCallbackContext);
   return result;
 }
 

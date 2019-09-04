@@ -187,4 +187,4 @@ typedef struct {
   envoy_on_error_f on_error;
   envoy_on_complete_f on_complete;
   void* context; // Will be passed through to callbacks to provide dispatch and execution state.
-} envoy_observer;
+} envoy_http_callbacks;
