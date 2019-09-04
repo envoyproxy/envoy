@@ -379,6 +379,7 @@ TEST_F(ExtAuthzHttpClientTest, CancelledAuthorizationRequest) {
   client_.cancel();
 }
 
+// Test the client when the configured cluster is missing/removed.
 TEST_F(ExtAuthzHttpClientTest, NoCluster) {
   InSequence s;
 
