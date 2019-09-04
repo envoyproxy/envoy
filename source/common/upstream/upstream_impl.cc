@@ -268,8 +268,9 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
   } else {
     connection_options = options;
   }
-
-  Network::TransportSocketFactory& socket_factory = cluster.resolveTransportSocketFactory(metadata);
+  Network::TransportSocketFactory& socket_factory = cluster.resolveTransportSocketFactory(
+      address->asString(),
+      metadata);
   Network::ClientConnectionPtr connection = dispatcher.createClientConnection(
       address, cluster.sourceAddress(),
       //cluster.transportSocketFactory().createTransportSocket(transport_socket_options),
@@ -786,7 +787,6 @@ TransportSocketMatcherPtr createTransportSocketMatcher(
     auto& tls_config_factory = Config::Utility::getAndCheckFactory<
       Server::Configuration::UpstreamTransportSocketConfigFactory>("tls");
     MessageUtil::jsonConvert(tls_config, *socket.mutable_config());
-    // ENVOY_LOG(info, "incfly debug1");
 
     ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
       socket, factory_context.messageValidationVisitor(), tls_config_factory);

@@ -14,7 +14,16 @@ TransportSocketMatcher::TransportSocketMatcher(
   socket_factory_map_(std::move(socket_factory_overrides)) {}
 
 Network::TransportSocketFactory& TransportSocketMatcher::resolve(
+    const std::string& hardcode,
     const envoy::api::v2::core::Metadata& metadata) {
+  if (hardcode == "127.0.0.1:9000") {
+    if (socket_factory_map_->find("mtlsReady") == socket_factory_map_->end()) {
+      ENVOY_LOG(info, "incfly debug, harcode transport socket resolved default 0...");
+      return *default_socket_factory_;
+    }
+    ENVOY_LOG(info, "incfly debug, hardcode transport socket resolved customized 1...");
+    return *((*socket_factory_map_)[hardcode]);
+  }
   const auto& filter_metadata = metadata.filter_metadata();
   const auto envoy_tss_itr = metadata.filter_metadata().find("envoy.transport_socket_selector");
   ENVOY_LOG(info, "incfly debug, transport socket resolving... {}", metadata.DebugString());

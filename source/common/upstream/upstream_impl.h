@@ -566,8 +566,9 @@ public:
     return *transport_socket_factory_;
   }
   Network::TransportSocketFactory& resolveTransportSocketFactory(
+      const std::string& hc,
       const envoy::api::v2::core::Metadata& metadata) const override {
-    return socket_overrides_->resolve(metadata);
+    return socket_overrides_->resolve(hc, metadata);
   }
   ClusterStats& stats() const override { return stats_; }
   Stats::Scope& statsScope() const override { return *stats_scope_; }

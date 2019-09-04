@@ -786,6 +786,7 @@ public:
    *         communicating with the cluster.
    */
   virtual Network::TransportSocketFactory& resolveTransportSocketFactory(
+      const std::string& hardcode,
       const envoy::api::v2::core::Metadata& metadata) const PURE;
 
   /**
