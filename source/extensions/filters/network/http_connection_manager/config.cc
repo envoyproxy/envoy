@@ -275,9 +275,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     overall_sampling.set_numerator(
         tracing_config.has_overall_sampling() ? tracing_config.overall_sampling().value() : 100);
 
-    uint32_t max_path_tag_length = tracing_config.has_max_path_tag_length()
-                                       ? tracing_config.max_path_tag_length().value()
-                                       : Tracing::DefaultMaxPathTagLength;
+    const uint32_t max_path_tag_length = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+        tracing_config, max_path_tag_length, Tracing::DefaultMaxPathTagLength);
 
     tracing_config_ =
         std::make_unique<Http::TracingConnectionManagerConfig>(Http::TracingConnectionManagerConfig{
