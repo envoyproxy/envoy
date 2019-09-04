@@ -17,7 +17,7 @@ class ResponseHandler(val executor: Executor) {
     override fun getExecutor(): Executor = responseHandler.executor
 
     override fun onHeaders(headers: Map<String, List<String>>, endStream: Boolean) {
-      val statusCode = headers!![":status"]?.first()?.toIntOrNull() ?: 0
+      val statusCode = headers[":status"]?.first()?.toIntOrNull() ?: 0
       responseHandler.onHeadersClosure(headers, statusCode, endStream)
     }
 

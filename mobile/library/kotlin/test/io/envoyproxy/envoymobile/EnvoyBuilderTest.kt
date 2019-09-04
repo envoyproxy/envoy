@@ -1,13 +1,10 @@
 package io.envoyproxy.envoymobile.io.envoyproxy.envoymobile
 
-import io.envoyproxy.envoymobile.ConfigurationException
 import io.envoyproxy.envoymobile.EnvoyBuilder
 import io.envoyproxy.envoymobile.LogLevel
-import io.envoyproxy.envoymobile.engine.EnvoyConfiguration
 import io.envoyproxy.envoymobile.engine.EnvoyEngine
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
-import org.mockito.Mockito.`when`
 import org.mockito.Mockito.mock
 
 private const val TEST_CONFIG = """
@@ -22,24 +19,23 @@ class EnvoyBuilderTest {
 
   private lateinit var builder: EnvoyBuilder
 
-  private var envoyConfiguration: EnvoyConfiguration = mock(EnvoyConfiguration::class.java)
   private var engine: EnvoyEngine = mock(EnvoyEngine::class.java)
 
   @Test
   fun `adding custom config builder uses custom config for running Envoy`() {
-    `when`(envoyConfiguration.templateString()).thenReturn(TEST_CONFIG)
-    builder = EnvoyBuilder(envoyConfiguration)
+    builder = EnvoyBuilder()
+    builder.addConfigYAML(TEST_CONFIG)
     builder.addEngineType { engine }
 
     builder.addConfigYAML("mock_template:")
     val envoy = builder.build()
-    assertThat(envoy.config).isEqualTo("mock_template:")
+    assertThat(envoy.configurationYAML).isEqualTo("mock_template:")
   }
 
   @Test
   fun `adding log level builder uses log level for running Envoy`() {
-    `when`(envoyConfiguration.templateString()).thenReturn(TEST_CONFIG)
-    builder = EnvoyBuilder(envoyConfiguration)
+    builder = EnvoyBuilder()
+    builder.addConfigYAML(TEST_CONFIG)
     builder.addEngineType { engine }
 
     builder.addLogLevel(LogLevel.DEBUG)
@@ -49,46 +45,33 @@ class EnvoyBuilderTest {
 
   @Test
   fun `specifying connection timeout overrides default`() {
-    `when`(envoyConfiguration.templateString()).thenReturn(TEST_CONFIG)
-    builder = EnvoyBuilder(envoyConfiguration)
+    builder = EnvoyBuilder()
     builder.addEngineType { engine }
 
     builder.addConnectTimeoutSeconds(1234)
     val envoy = builder.build()
-    assertThat(envoy.config).contains("connect_timeout: 1234s")
+    assertThat(envoy.envoyConfiguration!!.connectTimeoutSeconds).isEqualTo(1234)
   }
 
   @Test
   fun `specifying DNS refresh overrides default`() {
-    `when`(envoyConfiguration.templateString()).thenReturn(TEST_CONFIG)
-    builder = EnvoyBuilder(envoyConfiguration)
+    builder = EnvoyBuilder()
     builder.addEngineType { engine }
 
     builder.addDNSRefreshSeconds(1234)
     val envoy = builder.build()
-    assertThat(envoy.config).contains("dns_refresh_rate: 1234s")
+    assertThat(envoy.envoyConfiguration!!.dnsRefreshSeconds).isEqualTo(1234)
   }
 
   @Test
   fun `specifying stats flush overrides default`() {
-    `when`(envoyConfiguration.templateString()).thenReturn(TEST_CONFIG)
-    builder = EnvoyBuilder(envoyConfiguration)
+    builder = EnvoyBuilder()
     builder.addEngineType { engine }
 
     builder.addStatsFlushSeconds(1234)
     builder.build()
     val envoy = builder.build()
-    assertThat(envoy.config).contains("stats_flush_interval: 1234s")
+    assertThat(envoy.envoyConfiguration!!.statsFlushSeconds).isEqualTo(1234)
 
-  }
-
-  @Test(expected = ConfigurationException::class)
-  fun `specifying configs with invalid templates will throw on build`() {
-    `when`(envoyConfiguration.templateString()).thenReturn(TEST_CONFIG)
-    builder = EnvoyBuilder(envoyConfiguration)
-    builder.addEngineType { engine }
-
-    builder.addConfigYAML("{{ missing }}")
-    builder.build()
   }
 }

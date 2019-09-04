@@ -1,5 +1,6 @@
 package io.envoyproxy.envoymobile
 
+import io.envoyproxy.envoymobile.engine.EnvoyConfiguration
 import io.envoyproxy.envoymobile.engine.EnvoyEngine
 import java.nio.ByteBuffer
 
@@ -19,17 +20,23 @@ enum class LogLevel(internal val level: String) {
 /**
  * Wrapper class that allows for easy calling of Envoy's JNI interface in native Java.
  */
-class Envoy constructor(
+class Envoy private constructor(
     private val engine: EnvoyEngine,
-    internal val config: String,
-    internal val logLevel: LogLevel = LogLevel.INFO
+    internal val envoyConfiguration: EnvoyConfiguration?,
+    internal val configurationYAML: String?,
+    internal val logLevel: LogLevel
 ) : Client {
 
-  constructor(engine: EnvoyEngine, config: String) : this(engine, config, LogLevel.INFO)
+  constructor(engine: EnvoyEngine, envoyConfiguration: EnvoyConfiguration, logLevel: LogLevel = LogLevel.INFO) : this(engine, envoyConfiguration, null, logLevel)
+  constructor(engine: EnvoyEngine, configurationYAML: String, logLevel: LogLevel = LogLevel.INFO) : this(engine, null, configurationYAML, logLevel)
 
   // Dedicated thread for running this instance of Envoy.
   private val runner: Thread = Thread(ThreadGroup("Envoy"), Runnable {
-    engine.runWithConfig(config.trim(), logLevel.level)
+    if (envoyConfiguration == null) {
+      engine.runWithConfig(configurationYAML, logLevel.level)
+    }else {
+      engine.runWithConfig(envoyConfiguration, logLevel.level)
+    }
   })
 
   /**

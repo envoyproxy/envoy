@@ -1,28 +1,19 @@
 package io.envoyproxy.envoymobile
 
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration
-import io.envoyproxy.envoymobile.engine.EnvoyConfigurationImpl
 import io.envoyproxy.envoymobile.engine.EnvoyEngine
 import io.envoyproxy.envoymobile.engine.EnvoyEngineImpl
 
-class ConfigurationException : Exception("Unresolved Template Key")
 
 open class EnvoyBuilder internal constructor(
-    private val envoyConfiguration: EnvoyConfiguration
 ) {
   private var logLevel = LogLevel.INFO
-  private var configYAML: String
+  private var configYAML: String? = null
   private var engineType: () -> EnvoyEngine = { EnvoyEngineImpl() }
 
   private var connectTimeoutSeconds = 30
   private var dnsRefreshSeconds = 60
   private var statsFlushSeconds = 60
-
-  constructor() : this(EnvoyConfigurationImpl())
-
-  init {
-    configYAML = envoyConfiguration.templateString()
-  }
 
   /**
    * Add a log level to use with Envoy.
@@ -40,7 +31,7 @@ open class EnvoyBuilder internal constructor(
    * @param configYAML the YAML file to use as a configuration.
    */
   fun addConfigYAML(configYAML: String?): EnvoyBuilder {
-    this.configYAML = configYAML ?: envoyConfiguration.templateString()
+    this.configYAML = configYAML
     return this
   }
 
@@ -80,7 +71,12 @@ open class EnvoyBuilder internal constructor(
    * @return A new instance of Envoy.
    */
   fun build(): Envoy {
-    return Envoy(engineType(), resolvedYAML(), logLevel)
+    val configurationYAML = configYAML
+    if (configurationYAML == null) {
+      return Envoy(engineType(), EnvoyConfiguration(connectTimeoutSeconds, dnsRefreshSeconds, statsFlushSeconds), logLevel)
+    } else {
+      return Envoy(engineType(), configurationYAML, logLevel)
+    }
   }
 
   /**
@@ -91,25 +87,5 @@ open class EnvoyBuilder internal constructor(
   internal fun addEngineType(engineType: () -> EnvoyEngine): EnvoyBuilder {
     this.engineType = engineType
     return this
-  }
-
-
-  /** Processes the YAML template provided, replacing keys with values from the configuration.
-   *
-   * @parameter template: The template YAML file to use.
-   * @returns: A resolved YAML file with all template keys replaced.
-   * @throws ConfigurationException when the yaml configuration replacement is incomplete
-   */
-  private fun resolvedYAML(): String {
-    val resolvedTemplate = configYAML
-        .replace("{{ connect_timeout }}", "${connectTimeoutSeconds}s")
-        .replace("{{ dns_refresh_rate }}", "${dnsRefreshSeconds}s")
-        .replace("{{ stats_flush_interval }}", "${statsFlushSeconds}s")
-
-    if (resolvedTemplate.contains("{{")) {
-      throw ConfigurationException()
-    }
-
-    return resolvedTemplate
   }
 }
