@@ -37,6 +37,7 @@ envoy_extension_cc_test(
         "//source/common/upstream:cluster_manager_lib",
         "//source/extensions/clusters/aggregate:cluster",
         "//source/extensions/transport_sockets/raw_buffer:config",
+        "//test/common/upstream:test_cluster_manager",
         "//test/common/upstream:utility_lib",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/server:server_mocks",
