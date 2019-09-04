@@ -47,6 +47,8 @@ do
   for b in $(find "${NEW_VERSION_ROOT}" -name BUILD)
   do
     replace_build envoy "$b"
+    # Misc. cleanup for go BUILD rules
+    sed -i -e "s#\"${OLD_VERSION}\"#\"${NEW_VERSION}\"#g" "$b"
   done
 
   # Update .proto files with vM -> vN
@@ -58,5 +60,6 @@ do
     replace_proto common "$f"
     replace_proto config "$f"
     replace_proto filter "$f"
+    replace_proto "" "$f"
   done
 done
