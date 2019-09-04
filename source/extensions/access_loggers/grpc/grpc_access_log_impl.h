@@ -36,9 +36,17 @@ public:
    * @param entry supplies the access log to send.
    */
   virtual void log(envoy::data::accesslog::v2::HTTPAccessLogEntry&& entry) PURE;
+
+  /**
+   * Log tcp access entry.
+   * @param entry supplies the access log to send.
+   */
+  virtual void log(envoy::data::accesslog::v2::TCPAccessLogEntry&& entry) PURE;
 };
 
 using GrpcAccessLoggerSharedPtr = std::shared_ptr<GrpcAccessLogger>;
+
+enum class GrpcAccessLoggerType { TCP, HTTP };
 
 /**
  * Interface for an access logger cache. The cache deals with threading and de-duplicates loggers
@@ -54,7 +62,8 @@ public:
    * @return GrpcAccessLoggerSharedPtr ready for logging requests.
    */
   virtual GrpcAccessLoggerSharedPtr
-  getOrCreateLogger(const ::envoy::config::accesslog::v2::CommonGrpcAccessLogConfig& config) PURE;
+  getOrCreateLogger(const ::envoy::config::accesslog::v2::CommonGrpcAccessLogConfig& config,
+                    GrpcAccessLoggerType logger_type) PURE;
 };
 
 using GrpcAccessLoggerCacheSharedPtr = std::shared_ptr<GrpcAccessLoggerCache>;
@@ -66,7 +75,9 @@ public:
                        uint64_t buffer_size_bytes, Event::Dispatcher& dispatcher,
                        const LocalInfo::LocalInfo& local_info);
 
+  // Extensions::AccessLoggers::GrpcCommon::GrpcAccessLogger
   void log(envoy::data::accesslog::v2::HTTPAccessLogEntry&& entry) override;
+  void log(envoy::data::accesslog::v2::TCPAccessLogEntry&& entry) override;
 
 private:
   struct LocalStream
@@ -106,8 +117,9 @@ public:
                             ThreadLocal::SlotAllocator& tls,
                             const LocalInfo::LocalInfo& local_info);
 
-  GrpcAccessLoggerSharedPtr getOrCreateLogger(
-      const ::envoy::config::accesslog::v2::CommonGrpcAccessLogConfig& config) override;
+  GrpcAccessLoggerSharedPtr
+  getOrCreateLogger(const ::envoy::config::accesslog::v2::CommonGrpcAccessLogConfig& config,
+                    GrpcAccessLoggerType logger_type) override;
 
 private:
   /**
@@ -117,8 +129,9 @@ private:
     ThreadLocalCache(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
 
     Event::Dispatcher& dispatcher_;
-    // Access loggers indexed by the hash of logger's configuration.
-    absl::flat_hash_map<std::size_t, GrpcAccessLoggerSharedPtr> access_loggers_;
+    // Access loggers indexed by the hash of logger's configuration and logger type.
+    absl::flat_hash_map<std::pair<std::size_t, GrpcAccessLoggerType>, GrpcAccessLoggerSharedPtr>
+        access_loggers_;
   };
 
   Grpc::AsyncClientManager& async_client_manager_;

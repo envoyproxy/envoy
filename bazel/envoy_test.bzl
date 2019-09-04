@@ -8,6 +8,7 @@ load(
     "envoy_external_dep_path",
     "envoy_linkstatic",
     "envoy_select_force_libcpp",
+    "envoy_stdlib_deps",
     "tcmalloc_external_dep",
 )
 
@@ -62,8 +63,15 @@ def _envoy_test_linkopts():
     }) + envoy_select_force_libcpp([], ["-lstdc++fs", "-latomic"])
 
 # Envoy C++ fuzz test targets. These are not included in coverage runs.
-def envoy_cc_fuzz_test(name, corpus, deps = [], tags = [], **kwargs):
-    if not (corpus.startswith("//") or corpus.startswith(":")):
+def envoy_cc_fuzz_test(
+        name,
+        corpus,
+        repository = "",
+        size = "medium",
+        deps = [],
+        tags = [],
+        **kwargs):
+    if not (corpus.startswith("//") or corpus.startswith(":") or corpus.startswith("@")):
         corpus_name = name + "_corpus"
         corpus = native.glob([corpus + "/**"])
         native.filegroup(
@@ -80,7 +88,11 @@ def envoy_cc_fuzz_test(name, corpus, deps = [], tags = [], **kwargs):
     test_lib_name = name + "_lib"
     envoy_cc_test_library(
         name = test_lib_name,
-        deps = deps + ["//test/fuzz:fuzz_runner_lib"],
+        deps = deps + [
+            repository + "//test/fuzz:fuzz_runner_lib",
+            repository + "//bazel:dynamic_stdlib",
+        ],
+        repository = repository,
         **kwargs
     )
     native.cc_test(
@@ -92,12 +104,13 @@ def envoy_cc_fuzz_test(name, corpus, deps = [], tags = [], **kwargs):
         data = [corpus_name],
         # No fuzzing on macOS.
         deps = select({
-            "@envoy//bazel:apple": ["//test:dummy_main"],
+            "@envoy//bazel:apple": [repository + "//test:dummy_main"],
             "//conditions:default": [
                 ":" + test_lib_name,
-                "//test/fuzz:main",
+                repository + "//test/fuzz:main",
             ],
         }),
+        size = size,
         tags = tags,
     )
 
@@ -163,7 +176,7 @@ def envoy_cc_test(
         linkopts = _envoy_test_linkopts(),
         linkstatic = envoy_linkstatic(),
         malloc = tcmalloc_external_dep(repository),
-        deps = [
+        deps = envoy_stdlib_deps() + [
             ":" + name + "_lib_internal_only",
             repository + "//test:main",
         ],

@@ -78,7 +78,17 @@ FaultFilterConfig::FaultFilterConfig(const envoy::config::filter::http::fault::v
                                      Runtime::Loader& runtime, const std::string& stats_prefix,
                                      Stats::Scope& scope, TimeSource& time_source)
     : settings_(fault), runtime_(runtime), stats_(generateStats(stats_prefix, scope)),
-      stats_prefix_(stats_prefix), scope_(scope), time_source_(time_source) {}
+      scope_(scope), time_source_(time_source), stat_name_set_(scope.symbolTable()),
+      aborts_injected_(stat_name_set_.add("aborts_injected")),
+      delays_injected_(stat_name_set_.add("delays_injected")),
+      stats_prefix_(stat_name_set_.add(absl::StrCat(stats_prefix, "fault"))) {}
+
+void FaultFilterConfig::incCounter(absl::string_view downstream_cluster,
+                                   Stats::StatName stat_name) {
+  Stats::SymbolTable::StoragePtr storage = scope_.symbolTable().join(
+      {stats_prefix_, stat_name_set_.getStatName(downstream_cluster), stat_name});
+  scope_.counterFromStatName(Stats::StatName(storage.get())).inc();
+}
 
 FaultFilter::FaultFilter(FaultFilterConfigSharedPtr config) : config_(config) {}
 
@@ -279,10 +289,7 @@ uint64_t FaultFilter::abortHttpStatus() {
 void FaultFilter::recordDelaysInjectedStats() {
   // Downstream specific stats.
   if (!downstream_cluster_.empty()) {
-    const std::string stats_counter =
-        fmt::format("{}fault.{}.delays_injected", config_->statsPrefix(), downstream_cluster_);
-
-    config_->scope().counter(stats_counter).inc();
+    config_->incDelays(downstream_cluster_);
   }
 
   // General stats. All injected faults are considered a single aggregate active fault.
@@ -293,10 +300,7 @@ void FaultFilter::recordDelaysInjectedStats() {
 void FaultFilter::recordAbortsInjectedStats() {
   // Downstream specific stats.
   if (!downstream_cluster_.empty()) {
-    const std::string stats_counter =
-        fmt::format("{}fault.{}.aborts_injected", config_->statsPrefix(), downstream_cluster_);
-
-    config_->scope().counter(stats_counter).inc();
+    config_->incAborts(downstream_cluster_);
   }
 
   // General stats. All injected faults are considered a single aggregate active fault.

@@ -90,6 +90,9 @@ protected:
   Singleton::Manager& singleton_manager_;
 };
 
+// For friend declaration in ClusterManagerInitHelper.
+class ClusterManagerImpl;
+
 /**
  * This is a helper class used during cluster management initialization. Dealing with primary
  * clusters, secondary clusters, and CDS, is quite complicated, so this makes it easier to test.
@@ -100,8 +103,9 @@ public:
    * @param per_cluster_init_callback supplies the callback to call when a cluster has itself
    *        initialized. The cluster manager can use this for post-init processing.
    */
-  ClusterManagerInitHelper(const std::function<void(Cluster&)>& per_cluster_init_callback)
-      : per_cluster_init_callback_(per_cluster_init_callback) {}
+  ClusterManagerInitHelper(ClusterManager& cm,
+                           const std::function<void(Cluster&)>& per_cluster_init_callback)
+      : cm_(cm), per_cluster_init_callback_(per_cluster_init_callback) {}
 
   enum class State {
     // Initial state. During this state all static clusters are loaded. Any phase 1 clusters
@@ -128,9 +132,14 @@ public:
   State state() const { return state_; }
 
 private:
+  // To enable invariant assertions on the cluster lists.
+  friend ClusterManagerImpl;
+
+  void initializeSecondaryClusters();
   void maybeFinishInitialize();
   void onClusterInit(Cluster& cluster);
 
+  ClusterManager& cm_;
   std::function<void(Cluster& cluster)> per_cluster_init_callback_;
   CdsApi* cds_{};
   std::function<void()> initialized_callback_;

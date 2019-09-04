@@ -38,14 +38,22 @@ GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(Grpc::RawAsyncClientPtr&& client, std
 
 void GrpcAccessLoggerImpl::log(envoy::data::accesslog::v2::HTTPAccessLogEntry&& entry) {
   approximate_message_size_bytes_ += entry.ByteSizeLong();
-  message_.mutable_http_logs()->add_log_entry()->Swap(&entry);
+  message_.mutable_http_logs()->mutable_log_entry()->Add(std::move(entry));
+  if (approximate_message_size_bytes_ >= buffer_size_bytes_) {
+    flush();
+  }
+}
+
+void GrpcAccessLoggerImpl::log(envoy::data::accesslog::v2::TCPAccessLogEntry&& entry) {
+  approximate_message_size_bytes_ += entry.ByteSizeLong();
+  message_.mutable_tcp_logs()->mutable_log_entry()->Add(std::move(entry));
   if (approximate_message_size_bytes_ >= buffer_size_bytes_) {
     flush();
   }
 }
 
 void GrpcAccessLoggerImpl::flush() {
-  if (!message_.has_http_logs()) {
+  if (!message_.has_http_logs() && !message_.has_tcp_logs()) {
     // Nothing to flush.
     return;
   }
@@ -88,11 +96,11 @@ GrpcAccessLoggerCacheImpl::GrpcAccessLoggerCacheImpl(Grpc::AsyncClientManager& a
 }
 
 GrpcAccessLoggerSharedPtr GrpcAccessLoggerCacheImpl::getOrCreateLogger(
-    const envoy::config::accesslog::v2::CommonGrpcAccessLogConfig& config) {
+    const envoy::config::accesslog::v2::CommonGrpcAccessLogConfig& config,
+    GrpcAccessLoggerType logger_type) {
   // TODO(euroelessar): Consider cleaning up loggers.
   auto& cache = tls_slot_->getTyped<ThreadLocalCache>();
-  // TODO(lizan): Include logger type in the hash
-  const std::size_t cache_key = MessageUtil::hash(config);
+  const auto cache_key = std::make_pair(MessageUtil::hash(config), logger_type);
   const auto it = cache.access_loggers_.find(cache_key);
   if (it != cache.access_loggers_.end()) {
     return it->second;

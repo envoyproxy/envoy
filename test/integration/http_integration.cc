@@ -304,6 +304,40 @@ void HttpIntegrationTest::cleanupUpstreamAndDownstream() {
   }
 }
 
+void HttpIntegrationTest::sendRequestAndVerifyResponse(
+    const Http::TestHeaderMapImpl& request_headers, const int request_size,
+    const Http::TestHeaderMapImpl& response_headers, const int response_size,
+    const int backend_idx) {
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = sendRequestAndWaitForResponse(request_headers, request_size, response_headers,
+                                                response_size, backend_idx);
+  verifyResponse(std::move(response), "200", response_headers, std::string(response_size, 'a'));
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(request_size, upstream_request_->bodyLength());
+  cleanupUpstreamAndDownstream();
+}
+
+void HttpIntegrationTest::verifyResponse(IntegrationStreamDecoderPtr response,
+                                         const std::string& response_code,
+                                         const Http::TestHeaderMapImpl& expected_headers,
+                                         const std::string& expected_body) {
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ(response_code, response->headers().Status()->value().getStringView());
+  expected_headers.iterate(
+      [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
+        auto response_headers = static_cast<Http::HeaderMap*>(context);
+        const Http::HeaderEntry* entry =
+            response_headers->get(Http::LowerCaseString{std::string(header.key().getStringView())});
+        EXPECT_NE(entry, nullptr);
+        EXPECT_EQ(header.value().getStringView(), entry->value().getStringView());
+        return Http::HeaderMap::Iterate::Continue;
+      },
+      const_cast<void*>(static_cast<const void*>(&response->headers())));
+
+  EXPECT_EQ(response->body(), expected_body);
+}
+
 uint64_t
 HttpIntegrationTest::waitForNextUpstreamRequest(const std::vector<uint64_t>& upstream_indices) {
   uint64_t upstream_with_request;

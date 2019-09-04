@@ -18,12 +18,16 @@ DecoderStateMachine::onDecodeStreamHeader(Buffer::Instance& buffer) {
     return {ProtocolState::WaitForData};
   }
 
-  // The heartbeat message has no body.
   auto context = ret.first;
   if (metadata->message_type() == MessageType::HeartbeatRequest ||
       metadata->message_type() == MessageType::HeartbeatResponse) {
+    if (buffer.length() < (context->header_size() + context->body_size())) {
+      ENVOY_LOG(debug, "dubbo decoder: need more data for {} protocol heartbeat", protocol_.name());
+      return {ProtocolState::WaitForData};
+    }
+
     ENVOY_LOG(debug, "dubbo decoder: this is the {} heartbeat message", protocol_.name());
-    buffer.drain(context->header_size());
+    buffer.drain(context->header_size() + context->body_size());
     delegate_.onHeartbeat(metadata);
     return {ProtocolState::Done};
   }

@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.RouterCheckToolSchema;
 
 import "envoy/api/v2/core/base.proto";
+import "google/protobuf/wrappers.proto";
 import "validate/validate.proto";
 
 // [#protodoc-title: RouterCheckTool Validation]
@@ -78,22 +79,22 @@ message ValidationInput {
 // For example, to test that no cluster match is expected use {“cluster_name”: “”}.
 message ValidationAssert {
   // Match the cluster name.
-  string cluster_name = 1;
+  google.protobuf.StringValue cluster_name = 1;
 
   // Match the virtual cluster name.
-  string virtual_cluster_name = 2;
+  google.protobuf.StringValue virtual_cluster_name = 2;
 
   // Match the virtual host name.
-  string virtual_host_name = 3;
+  google.protobuf.StringValue virtual_host_name = 3;
 
   // Match the host header field after rewrite.
-  string host_rewrite = 4;
+  google.protobuf.StringValue host_rewrite = 4;
 
   // Match the path header field after rewrite.
-  string path_rewrite = 5;
+  google.protobuf.StringValue path_rewrite = 5;
 
   // Match the returned redirect path.
-  string path_redirect = 6;
+  google.protobuf.StringValue path_redirect = 6;
 
   // Match the listed header fields.
   // Examples header fields include the “:path”, “cookie”, and “date” fields.

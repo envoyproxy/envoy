@@ -31,6 +31,9 @@ Version 1.12.0 (pending)
   and `present_match` fields.
 * The :option:`--allow-unknown-fields` command-line option,
   use :option:`--allow-unknown-static-fields` instead.
+* The use of HTTP_JSON_V1 :ref:`Zipkin collector endpoint version
+  <envoy_api_field_config.trace.v2.ZipkinConfig.collector_endpoint_version>` or not explicitly
+  specifying it is deprecated, use HTTP_JSON or HTTP_PROTO instead.
 
 Version 1.11.0 (July 11, 2019)
 ==============================

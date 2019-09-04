@@ -47,7 +47,9 @@ routes:
   - match:
       method:
         name:
-          regex: "(.*?)"
+          safe_regex:
+            google_re2: {}
+            regex: "(.*?)"
     route:
         cluster: user_service_dubbo_server
 )EOF";
@@ -94,7 +96,9 @@ routes:
   - match:
       method:
         name:
-          regex: "(.*?)"
+          safe_regex:
+            google_re2: {}
+            regex: "(.*?)"
     route:
         cluster: user_service_dubbo_server
 )EOF";
@@ -128,7 +132,9 @@ routes:
   - match:
       method:
         name:
-          regex: "(.*?)"
+          safe_regex:
+            google_re2: {}
+            regex: "(.*?)"
     route:
         cluster: user_service_dubbo_server
 )EOF";
@@ -167,7 +173,9 @@ routes:
   - match:
       method:
         name:
-          regex: "(.*?)"
+          safe_regex:
+            google_re2: {}
+            regex: "(.*?)"
     route:
         cluster: user_service_dubbo_server
 )EOF";
@@ -299,7 +307,9 @@ routes:
   - match:
       method:
         name:
-          regex: "\\d{3}test"
+          safe_regex:
+            google_re2: {}
+            regex: "\\d{3}test"
     route:
         cluster: user_service_dubbo_server
 )EOF";
