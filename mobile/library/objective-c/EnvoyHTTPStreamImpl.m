@@ -187,12 +187,16 @@ static void ios_on_error(envoy_error error, void *context) {
                                ios_on_error,   ios_on_complete, context};
   _nativeObserver = native_obs;
 
+  // We need create the native-held strong ref on this stream before we call start_stream because
+  // start_stream could result in a reset that would release the native ref.
+  // TODO: To be truly safe we probably need stronger guarantees of operation ordering on this ref
+  _strongSelf = self;
   envoy_status_t result = start_stream(_streamHandle, native_obs);
   if (result != ENVOY_SUCCESS) {
+    _strongSelf = nil;
     return nil;
   }
 
-  _strongSelf = self;
   return self;
 }
 
