@@ -461,19 +461,27 @@ message HttpConnectionManager {
     // It works like and operator e.g: if you define status code 404 and body pattern
     // then response must match both
     message Match {
-      // Definition of status codes to match.
-      repeated uint32 status_codes = 1;
-      // Definition of body pattern to match.
-      envoy.type.matcher.StringMatcher body_pattern = 2;
-      // Definition of response flags to match.
-      envoy.data.accesslog.v2.ResponseFlags response_flags = 3;
+      oneof matcher_specifier{
+        // Definition of status codes to match.
+        google.protobuf.UInt32Value status_codes = 1;
+        // Definition of body pattern to match.
+        envoy.type.matcher.StringMatcher body_pattern = 2;
+        // Definition of response flags to match.
+        envoy.data.accesslog.v2.ResponseFlags response_flags = 3;
+        // Definiton of and matcher which combine all defined rules in logical AND operation
+        AndMatcher and_matcher = 4;
+      }
     };
 
     // Configuration which allows to define custom mapping for matched response.
     message Rewrite {
       // Definition of status code to which matched one will be mapped.
-      uint32 status = 1 [(validate.rules).uint32 = {gte: 100, lt: 600}];
+      google.protobuf.UInt32Value status = 1;
     };
+
+    message AndMatcher {
+      repeated Match matchers = 1 [(validate.rules).repeated .min_items = 2];
+    }
 
     Match match = 1;
     Rewrite rewrite = 2;
