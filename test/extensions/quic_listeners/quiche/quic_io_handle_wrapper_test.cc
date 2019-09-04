@@ -48,6 +48,10 @@ TEST_F(QuicIoHandleWrapperTest, DelegateIoHandleCalls) {
   EXPECT_CALL(os_sys_calls_, writev(fd, _, 1)).WillOnce(Return(Api::SysCallSizeResult{5u, 0}));
   wrapper_->writev(&slice, 1);
 
+  EXPECT_CALL(os_sys_calls_, socket(AF_INET6, SOCK_STREAM, 0))
+      .WillRepeatedly(Return(Api::SysCallIntResult{1, 0}));
+  EXPECT_CALL(os_sys_calls_, close(1)).WillRepeatedly(Return(Api::SysCallIntResult{0, 0}));
+  
   Network::Address::InstanceConstSharedPtr addr(new Network::Address::Ipv4Instance(12345));
   EXPECT_CALL(os_sys_calls_, sendto(fd, data, 5u, 0, _, _))
       .WillOnce(Return(Api::SysCallSizeResult{5u, 0}));
@@ -68,9 +72,6 @@ TEST_F(QuicIoHandleWrapperTest, DelegateIoHandleCalls) {
     msg->msg_namelen = sizeof(sockaddr_in6);
     return Api::SysCallSizeResult{5u, 0};
   }));
-  EXPECT_CALL(os_sys_calls_, socket(AF_INET6, SOCK_STREAM, 0))
-      .WillOnce(Return(Api::SysCallIntResult{1, 0}));
-  EXPECT_CALL(os_sys_calls_, close(1)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
   wrapper_->recvmsg(&slice, 1, /*self_port=*/12345, output);
 
   EXPECT_TRUE(wrapper_->close().ok());
