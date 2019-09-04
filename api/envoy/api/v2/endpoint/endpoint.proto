@@ -54,12 +54,6 @@ message Endpoint {
   HealthCheckConfig health_check_config = 2;
 }
 
-// A label is a key/value string pair applied on an endpoint.
-message Label {
-  string label = 1;
-  string value = 2;
-}
-
 // An Endpoint that Envoy can route traffic to.
 message LbEndpoint {
   // Upstream host identifier or a named reference.
@@ -80,7 +74,10 @@ message LbEndpoint {
   // to subset the endpoints considered in cluster load balancing.
   core.Metadata metadata = 3;
 
-  repeated Label labels = 6;
+  // Used as the key to identiy the transport socket configuration defined 
+  // in *Cluster.transport_socket_map* to use when connecting to this endpoint.
+  // [#not-implemented-hide:]
+  string transport_socket_name = 6;
 
   // The optional load balancing weight of the upstream host; at least 1.
   // Envoy uses the load balancing weight in some of the built in load

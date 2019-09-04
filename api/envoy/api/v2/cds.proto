@@ -17,7 +17,6 @@ import "envoy/api/v2/core/health_check.proto";
 import "envoy/api/v2/core/protocol.proto";
 import "envoy/api/v2/cluster/circuit_breaker.proto";
 import "envoy/api/v2/cluster/filter.proto";
-import "envoy/api/v2/endpoint/endpoint.proto";
 import "envoy/api/v2/cluster/outlier_detection.proto";
 import "envoy/api/v2/eds.proto";
 import "envoy/type/percent.proto";
@@ -237,12 +236,9 @@ message Cluster {
 
   // TransportSocketMatch specifies what transport socket config will be used
   // when the matches conditions are satisfied.
-  message TransportSocketMatcher {
+  message TransportSocketConfig {
     // The name of the match.
     string name = 1;
-    // In order to be match, an endpoint must have all the label key/value pairs
-    // as specified in by *label_match*.
-    repeated endpoint.Label label_matches = 2;
     // The configuration of the transport socket.
     core.TransportSocket transport_socket = 3;
   }
@@ -250,25 +246,13 @@ message Cluster {
   // Configuration to use different transport sockets for different endpoints.
   // This should only be used for EDS typed cluster.
   //
-  // An endpoint's *endpoint.Labels* is used to match against the *label_matches*
-  // to decide which transport socket to use when connecting to that particular endpoint.
-  // For example, with following matcher
+  // An endpoint's *endpoint.transport_socket_name* is used to select  which transport
+  // socket to use when connecting to that particular endpoint.
   //
-  // .. code-block:: json
-  //
-  // {
-  //   "endpoint_transport_socket_matchers": [
-  //     { "name": "enable-mtls", label_matches: [ { "label": "app": value: "foo" } ]
-  //     transport_socket: { "name": "tls", "config": { ... }
-  //   ]
-  // }
-  //
-  // Connection to the endpoints whose "app" label equals to "foo" value uses "enable-mtls"
-  // configuration, a tls socket with detailed configuration specified as *config*.
-  //
-  // If an endpoint can't be matched against any *TransportSockerMatcher*, connection socket
-  // fallbacks to use the *tls_context* or *transport_socket* specified in this cluster.
-  repeated TransportSocketMatcher endpoint_transport_socket_matchers = 41;
+  // If an *endpoint.transport_socket_name* can't be found in the map,
+  // fall back to use the *tls_context* or *transport_socket* specified in this cluster.
+  // [#not-implemented-hide:]
+  map<string, core.TransportSocket> endpoint_transport_socket_map = 41;
 
   reserved 12;
 
