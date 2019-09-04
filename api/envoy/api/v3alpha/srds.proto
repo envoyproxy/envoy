@@ -33,7 +33,7 @@ service ScopedRoutesDiscoveryService {
 
   rpc FetchScopedRoutes(DiscoveryRequest) returns (DiscoveryResponse) {
     option (google.api.http) = {
-      post: "/v2/discovery:scoped-routes"
+      post: "/v3alpha/discovery:scoped-routes"
       body: "*"
     };
   }
