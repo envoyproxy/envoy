@@ -1,4 +1,4 @@
-load("@envoy_api//bazel:api_build_system.bzl", "api_go_grpc_library", "api_go_proto_library", "api_proto_library_internal")
+load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library_internal", "api_proto_package")
 
 licenses(["notice"])  # Apache 2
 
@@ -16,17 +16,26 @@ package_group(
     ],
 )
 
+api_proto_package(
+    name = "v3alpha",
+    has_services = True,
+    deps = [
+        "//envoy/api/v3alpha/auth",
+        "//envoy/api/v3alpha/cluster",
+        "//envoy/api/v3alpha/core",
+        "//envoy/api/v3alpha/endpoint:pkg",
+        "//envoy/api/v3alpha/listener:pkg",
+        "//envoy/api/v3alpha/ratelimit:pkg",
+        "//envoy/api/v3alpha/route:pkg",
+        "//envoy/type",
+    ],
+)
+
 api_proto_library_internal(
     name = "discovery",
     srcs = ["discovery.proto"],
     visibility = [":friends"],
     deps = ["//envoy/api/v3alpha/core:base"],
-)
-
-api_go_proto_library(
-    name = "discovery",
-    proto = ":discovery",
-    deps = ["//envoy/api/v3alpha/core:base_go_proto"],
 )
 
 api_proto_library_internal(
@@ -41,19 +50,6 @@ api_proto_library_internal(
         "//envoy/api/v3alpha/core:health_check",
         "//envoy/api/v3alpha/endpoint",
         "//envoy/type:percent",
-    ],
-)
-
-api_go_grpc_library(
-    name = "eds",
-    proto = ":eds",
-    deps = [
-        ":discovery_go_proto",
-        "//envoy/api/v3alpha/core:address_go_proto",
-        "//envoy/api/v3alpha/core:base_go_proto",
-        "//envoy/api/v3alpha/core:health_check_go_proto",
-        "//envoy/api/v3alpha/endpoint:endpoint_go_proto",
-        "//envoy/type:percent_go_proto",
     ],
 )
 
@@ -79,26 +75,6 @@ api_proto_library_internal(
     ],
 )
 
-api_go_grpc_library(
-    name = "cds",
-    proto = ":cds",
-    deps = [
-        ":discovery_go_proto",
-        ":eds_go_grpc",
-        "//envoy/api/v3alpha/auth:cert_go_proto",
-        "//envoy/api/v3alpha/cluster:circuit_breaker_go_proto",
-        "//envoy/api/v3alpha/cluster:filter_go_proto",
-        "//envoy/api/v3alpha/cluster:outlier_detection_go_proto",
-        "//envoy/api/v3alpha/core:address_go_proto",
-        "//envoy/api/v3alpha/core:base_go_proto",
-        "//envoy/api/v3alpha/core:config_source_go_proto",
-        "//envoy/api/v3alpha/core:health_check_go_proto",
-        "//envoy/api/v3alpha/core:protocol_go_proto",
-        "//envoy/api/v3alpha/endpoint:endpoint_go_proto",
-        "//envoy/type:percent_go_proto",
-    ],
-)
-
 api_proto_library_internal(
     name = "lds",
     srcs = ["lds.proto"],
@@ -110,18 +86,6 @@ api_proto_library_internal(
         "//envoy/api/v3alpha/core:base",
         "//envoy/api/v3alpha/listener",
         "//envoy/api/v3alpha/listener:udp_listener_config",
-    ],
-)
-
-api_go_grpc_library(
-    name = "lds",
-    proto = ":lds",
-    deps = [
-        ":discovery_go_proto",
-        "//envoy/api/v3alpha/core:address_go_proto",
-        "//envoy/api/v3alpha/core:base_go_proto",
-        "//envoy/api/v3alpha/listener:listener_go_proto",
-        "//envoy/api/v3alpha/listener:udp_listener_config_go_proto",
     ],
 )
 
@@ -138,17 +102,6 @@ api_proto_library_internal(
     ],
 )
 
-api_go_grpc_library(
-    name = "rds",
-    proto = ":rds",
-    deps = [
-        ":discovery_go_proto",
-        "//envoy/api/v3alpha/core:base_go_proto",
-        "//envoy/api/v3alpha/core:config_source_go_proto",
-        "//envoy/api/v3alpha/route:route_go_proto",
-    ],
-)
-
 api_proto_library_internal(
     name = "srds",
     srcs = ["srds.proto"],
@@ -158,14 +111,5 @@ api_proto_library_internal(
         ":discovery",
         "//envoy/api/v3alpha/core:base",
         "//envoy/api/v3alpha/route",
-    ],
-)
-
-api_go_grpc_library(
-    name = "srds",
-    proto = ":srds",
-    deps = [
-        ":discovery_go_proto",
-        "//envoy/api/v3alpha/core:base_go_proto",
     ],
 )

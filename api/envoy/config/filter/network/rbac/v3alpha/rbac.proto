@@ -5,7 +5,6 @@ package envoy.config.filter.network.rbac.v3alpha;
 option java_outer_classname = "RbacProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.filter.network.rbac.v3alpha";
-option go_package = "v2";
 
 import "envoy/config/rbac/v3alpha/rbac.proto";
 

@@ -1,6 +1,13 @@
-load("@envoy_api//bazel:api_build_system.bzl", "api_go_proto_library", "api_proto_library_internal")
+load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library_internal", "api_proto_package")
 
 licenses(["notice"])  # Apache 2
+
+api_proto_package(
+    deps = [
+        "//envoy/api/v3alpha/auth",
+        "//envoy/api/v3alpha/core",
+    ],
+)
 
 api_proto_library_internal(
     name = "endpoint",
@@ -16,19 +23,6 @@ api_proto_library_internal(
     ],
 )
 
-api_go_proto_library(
-    name = "endpoint",
-    proto = ":endpoint",
-    deps = [
-        "//envoy/api/v3alpha/auth:cert_go_proto",
-        "//envoy/api/v3alpha/core:address_go_proto",
-        "//envoy/api/v3alpha/core:base_go_proto",
-        "//envoy/api/v3alpha/core:config_source_go_proto",
-        "//envoy/api/v3alpha/core:health_check_go_proto",
-        "//envoy/api/v3alpha/core:protocol_go_proto",
-    ],
-)
-
 api_proto_library_internal(
     name = "load_report",
     srcs = ["load_report.proto"],
@@ -36,14 +30,5 @@ api_proto_library_internal(
     deps = [
         "//envoy/api/v3alpha/core:address",
         "//envoy/api/v3alpha/core:base",
-    ],
-)
-
-api_go_proto_library(
-    name = "load_report",
-    proto = ":load_report",
-    deps = [
-        "//envoy/api/v3alpha/core:address_go_proto",
-        "//envoy/api/v3alpha/core:base_go_proto",
     ],
 )

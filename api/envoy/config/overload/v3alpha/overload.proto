@@ -5,7 +5,6 @@ package envoy.config.overload.v3alpha;
 option java_outer_classname = "OverloadProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.overload.v3alpha";
-option go_package = "v2alpha";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";

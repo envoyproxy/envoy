@@ -1,6 +1,14 @@
-load("@envoy_api//bazel:api_build_system.bzl", "api_go_grpc_library", "api_go_proto_library", "api_proto_library_internal")
+load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library_internal", "api_proto_package")
 
 licenses(["notice"])  # Apache 2
+
+api_proto_package(
+    has_services = True,
+    deps = [
+        "//envoy/api/v2/core",
+        "@prometheus_metrics_model//:client_model",
+    ],
+)
 
 api_proto_library_internal(
     name = "metrics_service",
@@ -11,14 +19,5 @@ api_proto_library_internal(
         "//envoy/api/v2/core:base",
         "//envoy/api/v2/core:grpc_service",
         "@prometheus_metrics_model//:client_model",
-    ],
-)
-
-api_go_grpc_library(
-    name = "metrics_service",
-    proto = ":metrics_service",
-    deps = [
-        "//envoy/api/v2/core:base_go_proto",
-        "@prometheus_metrics_model//:client_model_go_proto",
     ],
 )
