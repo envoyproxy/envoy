@@ -14,7 +14,6 @@ package envoy.config.rbac.v2;
 option java_outer_classname = "RbacProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.rbac.v2";
-option go_package = "v2";
 
 option (gogoproto.stable_marshaler_all) = true;
 
