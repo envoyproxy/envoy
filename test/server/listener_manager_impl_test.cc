@@ -425,7 +425,7 @@ udp_listener_config:
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
-  // No filter chain found with unmatching transport protocol.
+  // No filter chain found with non-matching transport protocol.
   EXPECT_EQ(nullptr, findFilterChain(1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111));
 
   auto filter_chain = dynamic_cast<const QuicFilterChainImpl*>(
