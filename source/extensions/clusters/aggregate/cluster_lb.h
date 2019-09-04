@@ -15,16 +15,12 @@ public:
   AggregateLoadBalancerContext(Upstream::LoadBalancerContext* context,
                                Upstream::LoadBalancerBase::HostAvailability host_availability,
                                uint32_t host_priority)
-      : context_(context), host_availability_(host_availability), host_priority_(host_priority) {
-    if (context_ == nullptr) {
-      context_ = new Upstream::LoadBalancerContextBase();
-      own_context_ = true;
-    }
-  }
-
-  ~AggregateLoadBalancerContext() override {
-    if (own_context_) {
-      delete context_;
+      : host_availability_(host_availability), host_priority_(host_priority) {
+    if (context == nullptr) {
+      owned_context_ = std::make_unique<Upstream::LoadBalancerContextBase>();
+      context_ = owned_context_.get();
+    } else {
+      context_ = context;
     }
   }
 
@@ -42,13 +38,11 @@ public:
   const Upstream::HealthyAndDegradedLoad&
   determinePriorityLoad(const Upstream::PrioritySet&,
                         const Upstream::HealthyAndDegradedLoad& original_priority_load) override {
-    priority_load_ = original_priority_load;
-
     // Re-assign load. Set all traffic to the priority and availability selected in aggregate
     // cluster.
     // TODO(yxue): allow determinePriorityLoad to affect the load of top level cluster and verify it
     // works with current retry plugin
-    size_t priorities = priority_load_.healthy_priority_load_.get().size();
+    size_t priorities = original_priority_load.healthy_priority_load_.get().size();
     priority_load_.healthy_priority_load_.get().assign(priorities, 0);
     priority_load_.degraded_priority_load_.get().assign(priorities, 0);
 
@@ -69,10 +63,10 @@ public:
 
 private:
   Upstream::HealthyAndDegradedLoad priority_load_;
+  std::unique_ptr<Upstream::LoadBalancerContext> owned_context_;
   Upstream::LoadBalancerContext* context_{nullptr};
   Upstream::LoadBalancerBase::HostAvailability host_availability_;
   uint32_t host_priority_;
-  bool own_context_{false};
 };
 
 class AggregateClusterLoadBalancer : public Upstream::LoadBalancer,
