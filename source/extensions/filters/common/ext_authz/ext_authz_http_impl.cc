@@ -239,6 +239,9 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::MessagePtr message) {
     return std::make_unique<Response>(errorResponse());
   }
 
+  span_->setTag(TracingConstants::get().HttpStatus,
+                Http::CodeUtility::toString(static_cast<Http::Code>(status_code)));
+
   // Set an error status if the call to the authorization server returns any of the 5xx HTTP error
   // codes. A Forbidden response is sent to the client if the filter has not been configured with
   // failure_mode_allow.
@@ -252,8 +255,6 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::MessagePtr message) {
                        Response{CheckStatus::OK, Http::HeaderVector{}, Http::HeaderVector{},
                                 EMPTY_STRING, Http::Code::OK}};
     span_->setTag(TracingConstants::get().TraceStatus, TracingConstants::get().TraceOk);
-    span_->setTag(TracingConstants::get().HttpStatus,
-                  Http::CodeUtility::toString(static_cast<Http::Code>(status_code)));
     return std::move(ok.response_);
   }
 
@@ -262,8 +263,6 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::MessagePtr message) {
                          Response{CheckStatus::Denied, Http::HeaderVector{}, Http::HeaderVector{},
                                   message->bodyAsString(), static_cast<Http::Code>(status_code)}};
   span_->setTag(TracingConstants::get().TraceStatus, TracingConstants::get().TraceUnauthz);
-  span_->setTag(TracingConstants::get().HttpStatus,
-                Http::CodeUtility::toString(static_cast<Http::Code>(status_code)));
   return std::move(denied.response_);
 }
 
