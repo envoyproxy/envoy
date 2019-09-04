@@ -7,8 +7,8 @@
 
 #include "envoy/thread_local/thread_local.h"
 
-#include "common/common/non_copyable.h"
 #include "common/common/logger.h"
+#include "common/common/non_copyable.h"
 
 namespace Envoy {
 namespace ThreadLocal {
