@@ -16,6 +16,8 @@
 
 using testing::_;
 using testing::AllOf;
+using testing::Eq;
+using testing::InSequence;
 using testing::Invoke;
 using testing::Ref;
 using testing::Return;
@@ -31,13 +33,10 @@ namespace Common {
 namespace ExtAuthz {
 namespace {
 
-class ExtAuthzHttpClientTest : public testing::Test {
+class ExtAuthzHttpTest : public testing::Test {
 public:
-  ExtAuthzHttpClientTest()
-      : async_request_{&async_client_}, config_{createConfig()}, client_{cm_, config_} {
-    ON_CALL(cm_, httpAsyncClientForCluster(config_->cluster()))
-        .WillByDefault(ReturnRef(async_client_));
-  }
+  ExtAuthzHttpTest()
+      : async_request_{&async_client_}, config_{createConfig()}, client_{cm_, config_} {}
 
   static ClientConfigSharedPtr createConfig(std::string yaml = "", uint32_t timeout = 250,
                                             std::string path_prefix = "/bar") {
@@ -114,6 +113,14 @@ public:
   ClientConfigSharedPtr config_;
   RawHttpClientImpl client_;
   MockRequestCallbacks request_callbacks_;
+};
+
+class ExtAuthzHttpClientTest : public ExtAuthzHttpTest {
+public:
+  ExtAuthzHttpClientTest() {
+    ON_CALL(cm_, httpAsyncClientForCluster(config_->cluster()))
+        .WillByDefault(ReturnRef(async_client_));
+  }
 };
 
 // Test HTTP client config default values.
@@ -375,6 +382,17 @@ TEST_F(ExtAuthzHttpClientTest, CancelledAuthorizationRequest) {
 
   EXPECT_CALL(async_request_, cancel());
   client_.cancel();
+}
+
+TEST_F(ExtAuthzHttpClientTest, NoCluster) {
+  InSequence s;
+
+  EXPECT_CALL(cm_, get(Eq("ext_authz"))).WillOnce(Return(nullptr));
+  EXPECT_CALL(cm_, httpAsyncClientForCluster("ext_authz")).Times(0);
+  EXPECT_CALL(request_callbacks_,
+              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
+  client_.check(request_callbacks_, envoy::service::auth::v2::CheckRequest{},
+                Tracing::NullSpan::instance());
 }
 
 } // namespace
