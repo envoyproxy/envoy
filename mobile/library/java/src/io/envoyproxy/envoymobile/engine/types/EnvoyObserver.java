@@ -14,7 +14,6 @@ public interface EnvoyObserver {
    *
    * @param headers,   the headers received.
    * @param endStream, whether the response is headers-only.
-   *                   execution.
    */
   void onHeaders(Map<String, List<String>> headers, boolean endStream);
 
@@ -24,7 +23,6 @@ public interface EnvoyObserver {
    *
    * @param data,      the buffer of the data received.
    * @param endStream, whether the data is the last data frame.
-   *                   execution.
    */
   void onData(ByteBuffer data, boolean endStream);
 
@@ -33,7 +31,6 @@ public interface EnvoyObserver {
    * Note that end stream is implied when on_metadata is called.
    *
    * @param metadata, the metadata received.
-   *                  execution.
    */
   void onMetadata(Map<String, List<String>> metadata);
 
@@ -42,7 +39,6 @@ public interface EnvoyObserver {
    * Note that end stream is implied when on_trailers is called.
    *
    * @param trailers, the trailers received.
-   *                  execution.
    */
   void onTrailers(Map<String, List<String>> trailers);
 
