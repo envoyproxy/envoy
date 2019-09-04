@@ -1226,7 +1226,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowFailurePercentageLocalOrigin) {
                envoy::data::cluster::v2alpha::OutlierEjectionType::CONSECUTIVE_LOCAL_ORIGIN_FAILURE,
                false))
       .Times(40);
-  // Cause a SR error on one host. First have 4 of the hosts have perfect SR.
+  // Cause a SR error on one host. First 4 of the hosts have perfect SR.
   loadRq(hosts_, 200, Result::LOCAL_ORIGIN_CONNECT_SUCCESS);
   loadRq(hosts_[4], 200, Result::LOCAL_ORIGIN_CONNECT_FAILED);
 
