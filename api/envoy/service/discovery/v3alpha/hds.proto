@@ -65,7 +65,7 @@ service HealthDiscoveryService {
   // to bind with the response?
   rpc FetchHealthCheck(HealthCheckRequestOrEndpointHealthResponse) returns (HealthCheckSpecifier) {
     option (google.api.http) = {
-      post: "/v2/discovery:health_check"
+      post: "/v3alpha/discovery:health_check"
       body: "*"
     };
   }
