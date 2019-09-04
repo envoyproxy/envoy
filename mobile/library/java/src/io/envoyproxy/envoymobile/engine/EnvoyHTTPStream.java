@@ -1,6 +1,6 @@
 package io.envoyproxy.envoymobile.engine;
 
-import io.envoyproxy.envoymobile.engine.types.EnvoyObserver;
+import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.ByteBuffer;
@@ -11,12 +11,12 @@ import java.util.Map;
 public class EnvoyHTTPStream {
 
   private final long streamHandle;
-  private final JvmObserverContext observerContext;
+  private final JvmCallbackContext callbacksContext;
 
-  EnvoyHTTPStream(long streamHandle, EnvoyObserver observer) {
+  EnvoyHTTPStream(long streamHandle, EnvoyHTTPCallbacks callbacks) {
     this.streamHandle = streamHandle;
-    observerContext = new JvmObserverContext(observer);
-    JniLibrary.startStream(streamHandle, observerContext);
+    callbacksContext = new JvmCallbackContext(callbacks);
+    JniLibrary.startStream(streamHandle, callbacksContext);
   }
 
   /**

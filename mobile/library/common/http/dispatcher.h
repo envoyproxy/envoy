@@ -28,10 +28,10 @@ public:
    * Attempts to open a new stream to the remote. Note that this function is asynchronous and
    * opening a stream may fail. The returned handle is immediately valid for use with this API, but
    * there is no guarantee it will ever functionally represent an open stream.
-   * @param observer wrapper for callbacks for events on this stream.
+   * @param bridge_callbacks wrapper for callbacks for events on this stream.
    * @return envoy_stream_t handle to the stream being created.
    */
-  envoy_status_t startStream(envoy_stream_t stream, envoy_observer observer);
+  envoy_status_t startStream(envoy_stream_t stream, envoy_http_callbacks bridge_callbacks);
 
   /**
    * Send headers over an open HTTP stream. This method can be invoked once and needs to be called
@@ -88,7 +88,7 @@ private:
   class DirectStreamCallbacks : public AsyncClient::StreamCallbacks,
                                 public Logger::Loggable<Logger::Id::http> {
   public:
-    DirectStreamCallbacks(envoy_stream_t stream_handle, envoy_observer observer,
+    DirectStreamCallbacks(envoy_stream_t stream_handle, envoy_http_callbacks bridge_callbacks,
                           Dispatcher& http_dispatcher);
 
     // AsyncClient::StreamCallbacks
@@ -100,7 +100,7 @@ private:
 
   private:
     const envoy_stream_t stream_handle_;
-    const envoy_observer observer_;
+    const envoy_http_callbacks bridge_callbacks_;
     Dispatcher& http_dispatcher_;
   };
 

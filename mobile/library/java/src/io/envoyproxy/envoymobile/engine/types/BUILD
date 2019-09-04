@@ -7,7 +7,7 @@ envoy_mobile_java_library(
     srcs = [
         "EnvoyError.java",
         "EnvoyErrorCode.java",
-        "EnvoyObserver.java",
+        "EnvoyHTTPCallbacks.java",
         "EnvoyStatus.java",
     ],
     visibility = ["//visibility:public"],

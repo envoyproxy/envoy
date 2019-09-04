@@ -1,4 +1,4 @@
 #import "library/objective-c/EnvoyEngine.h"
 
-@implementation EnvoyObserver
+@implementation EnvoyHTTPCallbacks
 @end

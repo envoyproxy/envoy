@@ -29,10 +29,10 @@ envoy_stream_t init_stream(envoy_engine_t);
  * Open an underlying HTTP stream. Note: Streams must be started before other other interaction can
  * can occur.
  * @param stream, handle to the stream to be started.
- * @param observer, the observer that will run the stream callbacks.
+ * @param callbacks, the callbacks that will run the stream callbacks.
  * @return envoy_stream, with a stream handle and a success status, or a failure status.
  */
-envoy_status_t start_stream(envoy_stream_t, envoy_observer observer);
+envoy_status_t start_stream(envoy_stream_t, envoy_http_callbacks callbacks);
 
 /**
  * Send headers over an open HTTP stream. This method can be invoked once and needs to be called
@@ -71,7 +71,7 @@ envoy_status_t send_metadata(envoy_stream_t stream, envoy_headers metadata);
 envoy_status_t send_trailers(envoy_stream_t stream, envoy_headers trailers);
 
 /**
- * Detach all observers from a stream and send an interrupt upstream if supported by transport.
+ * Detach all callbacks from a stream and send an interrupt upstream if supported by transport.
  * @param stream, the stream to evict.
  * @return envoy_status_t, the resulting status of the operation.
  */

@@ -1,6 +1,6 @@
 package io.envoyproxy.envoymobile.engine;
 
-import io.envoyproxy.envoymobile.engine.types.EnvoyObserver;
+import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks;
 
 import java.nio.ByteBuffer;
 import java.util.List;
@@ -51,12 +51,12 @@ class JniLibrary {
    * other interaction can can occur.
    *
    * @param stream,  handle to the stream to be started.
-   * @param context, context that contains dispatch logic to fire observer
+   * @param context, context that contains dispatch logic to fire callbacks
    *                 callbacks.
    * @return envoy_stream, with a stream handle and a success status, or a failure
    *         status.
    */
-  protected static native int startStream(long stream, JvmObserverContext context);
+  protected static native int startStream(long stream, JvmCallbackContext context);
 
   /**
    * Send headers over an open HTTP stream. This method can be invoked once and
@@ -100,7 +100,7 @@ class JniLibrary {
   protected static native int sendTrailers(long stream, byte[][] trailers);
 
   /**
-   * Detach all observers from a stream and send an interrupt upstream if
+   * Detach all callbacks from a stream and send an interrupt upstream if
    * supported by transport.
    *
    * @param stream, the stream to evict.

@@ -7,9 +7,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import io.envoyproxy.envoymobile.engine.types.EnvoyObserver;
+import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks;
 
-class JvmObserverContext {
+class JvmCallbackContext {
   private enum FrameType {
     NONE,
     HEADERS,
@@ -18,7 +18,7 @@ class JvmObserverContext {
   }
 
   private final AtomicBoolean canceled = new AtomicBoolean(false);
-  private final EnvoyObserver observer;
+  private final EnvoyHTTPCallbacks callbacks;
 
   // State-tracking for header accumulation
   private Map<String, List<String>> headerAccumulator = null;
@@ -27,7 +27,7 @@ class JvmObserverContext {
   private long expectedHeaderLength = 0;
   private long accumulatedHeaderLength = 0;
 
-  public JvmObserverContext(EnvoyObserver observer) { this.observer = observer; }
+  public JvmCallbackContext(EnvoyHTTPCallbacks callbacks) { this.callbacks = callbacks; }
 
   /**
    * Initializes state for accumulating header pairs via passHeaders, ultimately to be dispatched
@@ -86,13 +86,13 @@ class JvmObserverContext {
 
         switch (frameType) {
         case HEADERS:
-          observer.onHeaders(headers, endStream);
+          callbacks.onHeaders(headers, endStream);
           break;
         case METADATA:
-          observer.onMetadata(headers);
+          callbacks.onMetadata(headers);
           break;
         case TRAILERS:
-          observer.onTrailers(headers);
+          callbacks.onTrailers(headers);
           break;
         case NONE:
         default:
@@ -101,7 +101,7 @@ class JvmObserverContext {
       }
     };
 
-    observer.getExecutor().execute(runnable);
+    callbacks.getExecutor().execute(runnable);
 
     resetHeaderAccumulation();
   }
@@ -113,13 +113,13 @@ class JvmObserverContext {
    * @param endStream, indicates this is the last remote frame of the stream.
    */
   public void onData(byte[] data, boolean endStream) {
-    observer.getExecutor().execute(new Runnable() {
+    callbacks.getExecutor().execute(new Runnable() {
       public void run() {
         if (canceled.get()) {
           return;
         }
         ByteBuffer dataBuffer = ByteBuffer.wrap(data);
-        observer.onData(dataBuffer, endStream);
+        callbacks.onData(dataBuffer, endStream);
       }
     });
   }
