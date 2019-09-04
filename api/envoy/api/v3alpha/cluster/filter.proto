@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package envoy.api.v3alpha.cluster;
+
+option java_outer_classname = "FilterProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.api.v3alpha.cluster";
+option csharp_namespace = "Envoy.Api.V2.ClusterNS";
+option ruby_package = "Envoy.Api.V2.ClusterNS";
+
+import "google/protobuf/any.proto";
+
+import "validate/validate.proto";
+import "gogoproto/gogo.proto";
+
+option (gogoproto.equal_all) = true;
+
+// [#protodoc-title: Upstream filters]
+//
+// Upstream filters apply to the connections to the upstream cluster hosts.
+message Filter {
+  // The name of the filter to instantiate. The name must match a
+  // :ref:`supported filter <config_network_filters>`.
+  string name = 1 [(validate.rules).string.min_bytes = 1];
+
+  // Filter specific configuration which depends on the filter being
+  // instantiated. See the supported filters for further documentation.
+  google.protobuf.Any typed_config = 2;
+}

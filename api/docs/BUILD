@@ -7,8 +7,7 @@ package_group(
     ],
 )
 
-# TODO(htuch): Grow this to cover everything we want to generate docs for, so we can just invoke
-# bazel build //docs:protos --aspects tools/protodoc/protodoc.bzl%proto_doc_aspect  --output_groups=rst
+# This is where you add protos that will participate in docs RST generation.
 proto_library(
     name = "protos",
     deps = [
@@ -94,8 +93,6 @@ proto_library(
         "//envoy/service/auth/v2:external_auth",
         "//envoy/service/discovery/v2:ads",
         "//envoy/service/discovery/v2:rtds",
-        "//envoy/service/load_stats/v2:lrs",
-        "//envoy/service/metrics/v2:metrics_service",
         "//envoy/service/ratelimit/v2:rls",
         "//envoy/service/tap/v2alpha:common",
         "//envoy/type:percent",

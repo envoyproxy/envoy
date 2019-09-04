@@ -496,6 +496,11 @@ private:
 
     void traceRequest();
 
+    // Updates the snapped_route_config_ if scope found, or ends the stream by
+    // sending local reply.
+    // Returns true if scoped route config snapped, false otherwise.
+    bool snapScopedRouteConfig();
+
     void refreshCachedRoute();
 
     // Pass on watermark callbacks to watermark subscribers. This boils down to passing watermark
@@ -585,7 +590,7 @@ private:
 
     ConnectionManagerImpl& connection_manager_;
     Router::ConfigConstSharedPtr snapped_route_config_;
-    Router::ScopedConfigConstSharedPtr snapped_scoped_route_config_;
+    Router::ScopedConfigConstSharedPtr snapped_scoped_routes_config_;
     Tracing::SpanPtr active_span_;
     const uint64_t stream_id_;
     StreamEncoder* response_encoder_{};
