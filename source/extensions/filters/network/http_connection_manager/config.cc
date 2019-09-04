@@ -244,13 +244,27 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     Tracing::OperationName tracing_operation_name;
     std::vector<Http::LowerCaseString> request_headers_for_tags;
 
-    switch (tracing_config.operation_name()) {
-    case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
-        Tracing::INGRESS:
+    // Listener level traffic direction overrides the operation name
+    switch (context.direction()) {
+    case envoy::api::v2::core::TrafficDirection::UNSPECIFIED: {
+      switch (tracing_config.operation_name()) {
+      case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+          Tracing::INGRESS:
+        tracing_operation_name = Tracing::OperationName::Ingress;
+        break;
+      case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+          Tracing::EGRESS:
+        tracing_operation_name = Tracing::OperationName::Egress;
+        break;
+      default:
+        NOT_REACHED_GCOVR_EXCL_LINE;
+      }
+      break;
+    }
+    case envoy::api::v2::core::TrafficDirection::INBOUND:
       tracing_operation_name = Tracing::OperationName::Ingress;
       break;
-    case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
-        Tracing::EGRESS:
+    case envoy::api::v2::core::TrafficDirection::OUTBOUND:
       tracing_operation_name = Tracing::OperationName::Egress;
       break;
     default:

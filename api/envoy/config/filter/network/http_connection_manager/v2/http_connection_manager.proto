@@ -79,7 +79,6 @@ message HttpConnectionManager {
   google.protobuf.BoolValue add_user_agent = 6;
 
   message Tracing {
-    // [#comment:TODO(kyessenov): Align this field with listener traffic direction field.]
     enum OperationName {
       option (gogoproto.goproto_enum_prefix) = false;
 
@@ -90,8 +89,13 @@ message HttpConnectionManager {
       EGRESS = 1;
     }
 
-    // The span name will be derived from this field.
-    OperationName operation_name = 1 [(validate.rules).enum.defined_only = true];
+    // The span name will be derived from this field. If
+    // :ref:`traffic_direction <envoy_api_field_Listener.traffic_direction>` is
+    // specified on the parent listener, then it is used instead of this field.
+    //
+    // .. attention::
+    //  This field has been deprecated in favor of `traffic_direction`.
+    OperationName operation_name = 1 [(validate.rules).enum.defined_only = true, deprecated = true];
 
     // A list of header names used to create tags for the active span. The header name is used to
     // populate the tag name, and the header value is used to populate the tag value. The tag is
