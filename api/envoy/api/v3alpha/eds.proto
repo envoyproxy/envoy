@@ -36,7 +36,7 @@ service EndpointDiscoveryService {
 
   rpc FetchEndpoints(DiscoveryRequest) returns (DiscoveryResponse) {
     option (google.api.http) = {
-      post: "/v2/discovery:endpoints"
+      post: "/v3alpha/discovery:endpoints"
       body: "*"
     };
   }
