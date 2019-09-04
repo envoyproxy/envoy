@@ -6,8 +6,6 @@ option java_outer_classname = "OriginalSrcProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.filter.http.original_src.v2alpha1";
 
-option go_package = "v2alpha1";
-
 import "validate/validate.proto";
 
 // [#protodoc-title: Original Src Filter]

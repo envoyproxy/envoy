@@ -247,7 +247,7 @@ key:
 }
 
 // Tests that multiple uniquely named non-conflict resources are allowed in config updates.
-TEST_F(ScopedRdsTest, MultipleResourcesStow) {
+TEST_F(ScopedRdsTest, MultipleResourcesSotw) {
   setup();
 
   const std::string config_yaml = R"EOF(
