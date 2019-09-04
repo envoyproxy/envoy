@@ -74,7 +74,7 @@ message LbEndpoint {
   // to subset the endpoints considered in cluster load balancing.
   core.Metadata metadata = 3;
 
-  // Used as the key to identiy the transport socket configuration defined 
+  // Used as the key to identiy the transport socket configuration defined
   // in *Cluster.transport_socket_map* to use when connecting to this endpoint.
   // [#not-implemented-hide:]
   string transport_socket_name = 6;
