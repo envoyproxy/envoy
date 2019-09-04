@@ -58,9 +58,9 @@ do
   for p in $(bazel query "labels(srcs, ${PROTO_TARGET})" )
   do
     declare PROTO_TARGET_WITHOUT_PREFIX="${PROTO_TARGET#@envoy_api//}"
-    declare PROTO_TARGET_CANONICAL="${PROTO_TARGET_WITHOUT_PREFIX/:/\/}"
+    declare PROTO_TARGET_CANONICAL="${PROTO_TARGET_WITHOUT_PREFIX/://}"
     declare PROTO_FILE_WITHOUT_PREFIX="${p#@envoy_api//}"
-    declare PROTO_FILE_CANONICAL="${PROTO_FILE_WITHOUT_PREFIX/:/\/}"
+    declare PROTO_FILE_CANONICAL="${PROTO_FILE_WITHOUT_PREFIX/://}"
     declare DEST="${GENERATED_RST_DIR}/api-v2/${PROTO_FILE_CANONICAL#envoy/}".rst
     mkdir -p "$(dirname "${DEST}")"
     cp -f bazel-bin/external/envoy_api/"${PROTO_TARGET_CANONICAL}/${PROTO_FILE_CANONICAL}.rst" "$(dirname "${DEST}")"
