@@ -102,7 +102,8 @@ public:
     envoy::type::FractionalPercent percent2;
     percent2.set_numerator(10000);
     percent2.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);
-    tracing_config_ = {Tracing::OperationName::Ingress, {}, percent1, percent2, percent1, false};
+    tracing_config_ = {
+        Tracing::OperationName::Ingress, {}, percent1, percent2, percent1, false, 256};
     ON_CALL(config_, tracingConfig()).WillByDefault(Return(&tracing_config_));
 
     ON_CALL(config_, via()).WillByDefault(ReturnRef(via_));
