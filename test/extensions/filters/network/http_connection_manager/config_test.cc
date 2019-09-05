@@ -242,6 +242,62 @@ http_filters:
   EXPECT_EQ(5 * 60 * 1000, config.streamIdleTimeout().count());
 }
 
+TEST_F(HttpConnectionManagerConfigTest, ListenerDirectionOutboundOverride) {
+  const std::string yaml_string = R"EOF(
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+tracing:
+  operation_name: ingress
+http_filters:
+- name: envoy.router
+  config: {}
+  )EOF";
+
+  ON_CALL(context_, direction())
+      .WillByDefault(Return(envoy::api::v2::core::TrafficDirection::OUTBOUND));
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
+  EXPECT_EQ(Tracing::OperationName::Egress, config.tracingConfig()->operation_name_);
+}
+
+TEST_F(HttpConnectionManagerConfigTest, ListenerDirectionInboundOverride) {
+  const std::string yaml_string = R"EOF(
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+tracing:
+  operation_name: egress
+http_filters:
+- name: envoy.router
+  config: {}
+  )EOF";
+
+  ON_CALL(context_, direction())
+      .WillByDefault(Return(envoy::api::v2::core::TrafficDirection::INBOUND));
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
+  EXPECT_EQ(Tracing::OperationName::Ingress, config.tracingConfig()->operation_name_);
+}
+
 TEST_F(HttpConnectionManagerConfigTest, SamplingDefault) {
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http

@@ -35,7 +35,7 @@ service RuntimeDiscoveryService {
   rpc FetchRuntime(envoy.api.v3alpha.DiscoveryRequest)
       returns (envoy.api.v3alpha.DiscoveryResponse) {
     option (google.api.http) = {
-      post: "/v2/discovery:runtime"
+      post: "/v3alpha/discovery:runtime"
       body: "*"
     };
   }

@@ -5,7 +5,6 @@ package envoy.api.v3alpha.core;
 option java_outer_classname = "BaseProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.api.v3alpha.core";
-option go_package = "core";
 
 import "envoy/api/v3alpha/core/http_uri.proto";
 
