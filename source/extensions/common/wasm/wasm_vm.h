@@ -111,8 +111,8 @@ public:
 
   /**
    * Whether or not the VM implementation supports cloning. Cloning is VM system dependent.
-   * When a VM is configured a single VM is intantiated to check that the .wasm file is valid and to
-   * do VM system specific initialization. In the case of WAVM this is potentially ahead-of-time
+   * When a VM is configured a single VM is instantiated to check that the .wasm file is valid and
+   * to do VM system specific initialization. In the case of WAVM this is potentially ahead-of-time
    * compilation. Then, if cloning is supported, we clone that VM for each worker, potentially
    * copying and sharing the initialized data structures for efficiency. Otherwise we create an new
    * VM from scratch for each worker.
@@ -129,7 +129,9 @@ public:
   virtual WasmVmPtr clone() PURE;
 
   /**
-   * Load the WASM code from a file. Return true on success.
+   * Load the WASM code from a file. Return true on success. Once the module is loaded it can be
+   * queried, e.g. to see which version of emscriptent support is rquired. After loading, the
+   * appropriate ABI callbacks can be registered and then the module can be link()ed (see below).
    * @param code the WASM binary code (or registered NullVm plugin name).
    * @param allow_precompiled if true, allows supporting VMs (e.g. WAVM) to load the binary
    * machine code from a user-defined section of the WASM file. Because that code is not verified by
@@ -140,7 +142,9 @@ public:
   virtual bool load(const std::string& code, bool allow_precompiled) PURE;
 
   /**
-   * Link the WASM code to the host-provided functions and globals, e.g. the ABI.
+   * Link the WASM code to the host-provided functions and globals, e.g. the ABI. Prior to linking,
+   * the module should be loaded and the ABI callbacks registered (see above). Linking should be
+   * done once between load() and start().
    * @param debug_name user-provided name for use in log and error messages.
    * @param needs_emscripten whether emscripten support should be provided (e.g.
    * _emscripten_memcpy_bigHandler). Emscripten (http://https://emscripten.org/) is
@@ -158,7 +162,10 @@ public:
                                uint64_t heap_base_pointer) PURE;
 
   /**
-   * Call the 'start' function and initialize globals.
+   * Iniitalie globals (including calling global constructors) and call the 'start' function. Prior
+   * to calling start() the module should be load()ed, ABI callbacks should be registered
+   * (registerCallback), the module link()ed, and any exported functions should be gotten
+   * (getFunction).
    * @param vm_context a context which represents the caller: in this case Envoy itself.
    */
   virtual void start(Context* vm_context) PURE;
