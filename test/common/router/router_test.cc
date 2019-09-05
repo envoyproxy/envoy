@@ -1204,6 +1204,7 @@ TEST_F(RouterTest, GrpcAlreadyExistsTrailersOnlyRuntimeGuard) {
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 }
 
+// Validate gRPC AlreadyExists response stats are sane when response is trailers only.
 TEST_F(RouterTest, GrpcAlreadyExistsTrailersOnly) {
   TestScopedRuntime scoped_runtime;
   Runtime::LoaderSingleton::getExisting()->mergeValues(
@@ -1230,7 +1231,7 @@ TEST_F(RouterTest, GrpcAlreadyExistsTrailersOnly) {
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 }
 
-// Validate outlier detections records failure when gRPC response status is Unavailable.
+// Validate gRPC Unavailable response stats are sane when response is trailers only.
 TEST_F(RouterTest, GrpcOutlierDetectionUnavailableStatusCodeRuntimeGuard) {
   TestScopedRuntime scoped_runtime;
   Runtime::LoaderSingleton::getExisting()->mergeValues(
@@ -1258,6 +1259,7 @@ TEST_F(RouterTest, GrpcOutlierDetectionUnavailableStatusCodeRuntimeGuard) {
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
 
+// Validate gRPC Unavailable response stats are sane when response is trailers only.
 TEST_F(RouterTest, GrpcOutlierDetectionUnavailableStatusCode) {
   TestScopedRuntime scoped_runtime;
   Runtime::LoaderSingleton::getExisting()->mergeValues(
@@ -1312,6 +1314,7 @@ TEST_F(RouterTest, GrpcInternalTrailersOnlyRuntimeGuard) {
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
 
+// Validate gRPC Internal response stats are sane when response is trailers only.
 TEST_F(RouterTest, GrpcInternalTrailersOnly) {
   TestScopedRuntime scoped_runtime;
   Runtime::LoaderSingleton::getExisting()->mergeValues(
@@ -2869,6 +2872,7 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
                     .value());
 }
 
+// Validate gRPC Cancelled response stats are sane when retry is taking effect.
 TEST_F(RouterTest, RetryUpstreamGrpcCancelledRuntimeGuard) {
   TestScopedRuntime scoped_runtime;
   Runtime::LoaderSingleton::getExisting()->mergeValues(
@@ -2920,6 +2924,7 @@ TEST_F(RouterTest, RetryUpstreamGrpcCancelledRuntimeGuard) {
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
 }
 
+// Validate gRPC Cancelled response stats are sane when retry is taking effect.
 TEST_F(RouterTest, RetryUpstreamGrpcCancelled) {
   TestScopedRuntime scoped_runtime;
   Runtime::LoaderSingleton::getExisting()->mergeValues(
