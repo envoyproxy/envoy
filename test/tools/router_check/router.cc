@@ -108,7 +108,7 @@ bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_jso
     tool_config.route_ = config_->route(*tool_config.headers_, tool_config.random_value_);
 
     std::string test_name = check_config->getString("test_name", "");
-    if (details_) {
+    if (details_ && !only_show_failures_) {
       std::cout << test_name << std::endl;
     }
     Json::ObjectSharedPtr validate = check_config->getObject("validate");
@@ -137,6 +137,9 @@ bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_jso
           compareResults("", expected, test.first);
         } else {
           if (!test.second(tool_config, expected)) {
+            if (only_show_failures_) {
+              std::cout << "in test: " << test_name << std::endl;
+            }
             no_failures = false;
           }
         }
@@ -147,6 +150,9 @@ bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_jso
       for (const Json::ObjectSharedPtr& header_field : validate->getObjectArray("header_fields")) {
         if (!compareHeaderField(tool_config, header_field->getString("field"),
                                 header_field->getString("value"))) {
+          if (only_show_failures_) {
+            std::cout << "in test: " << test_name << std::endl;
+          }
           no_failures = false;
         }
       }
@@ -157,6 +163,9 @@ bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_jso
            validate->getObjectArray("custom_header_fields")) {
         if (!compareCustomHeaderField(tool_config, header_field->getString("field"),
                                       header_field->getString("value"))) {
+          if (only_show_failures_) {
+            std::cout << "in test: " << test_name << std::endl;
+          }
           no_failures = false;
         }
       }
@@ -183,7 +192,7 @@ bool RouterCheckTool::compareEntries(const std::string& expected_routes) {
     tool_config.route_ = config_->route(*tool_config.headers_, tool_config.random_value_);
 
     const std::string& test_name = check_config.test_name();
-    if (details_) {
+    if (details_ && !only_show_failures_) {
       std::cout << test_name << std::endl;
     }
     const envoy::RouterCheckToolSchema::ValidationAssert& validate = check_config.validate();
@@ -204,6 +213,9 @@ bool RouterCheckTool::compareEntries(const std::string& expected_routes) {
     // Call appropriate function for each match case.
     for (const auto& test : checkers) {
       if (!test(tool_config, validate)) {
+        if (only_show_failures_) {
+          std::cout << "in test: " << test_name << std::endl;
+        }
         no_failures = false;
       }
     }
@@ -426,7 +438,7 @@ bool RouterCheckTool::compareResults(const std::string& actual, const std::strin
   }
 
   // Output failure details to stdout if details_ flag is set to true
-  if (details_) {
+  if (details_ || only_show_failures_) {
     std::cerr << "expected: [" << expected << "], actual: [" << actual
               << "], test type: " << test_type << std::endl;
   }
@@ -446,6 +458,7 @@ Options::Options(int argc, char** argv) {
   TCLAP::CmdLine cmd("router_check_tool", ' ', "none", true);
   TCLAP::SwitchArg is_proto("p", "useproto", "Use Proto test file schema", cmd, false);
   TCLAP::SwitchArg is_detailed("d", "details", "Show detailed test execution results", cmd, false);
+  TCLAP::SwitchArg only_show_failures("o", "only-show-failures", "Only display failing tests", cmd, false);
   TCLAP::SwitchArg disable_deprecation_check("", "disable-deprecation-check",
                                              "Disable deprecated fields check", cmd, false);
   TCLAP::ValueArg<double> fail_under("f", "fail-under",
@@ -468,6 +481,7 @@ Options::Options(int argc, char** argv) {
 
   is_proto_ = is_proto.getValue();
   is_detailed_ = is_detailed.getValue();
+  only_show_failures_ = only_show_failures.getValue();
   fail_under_ = fail_under.getValue();
   comprehensive_coverage_ = comprehensive_coverage.getValue();
   disable_deprecation_check_ = disable_deprecation_check.getValue();

@@ -91,6 +91,11 @@ public:
    */
   void setShowDetails() { details_ = true; }
 
+  /**
+   * Set whether to only print failing match cases.
+   */
+  void onlyShowFailures() { only_show_failures_ = true; }
+
   float coverage(bool detailed) {
     return detailed ? coverage_.detailedReport() : coverage_.report();
   }
@@ -144,6 +149,8 @@ private:
 
   bool details_{false};
 
+  bool only_show_failures_{false};
+
   // TODO(hennna): Switch away from mocks following work done by @rlazarus in github issue #499.
   std::unique_ptr<NiceMock<Server::Configuration::MockFactoryContext>> factory_context_;
   std::unique_ptr<Router::ConfigImpl> config_;
@@ -196,9 +203,14 @@ public:
   bool isProto() const { return is_proto_; }
 
   /**
-   * @return true is detailed test execution results are displayed.
+   * @return true if detailed test execution results are displayed.
    */
   bool isDetailed() const { return is_detailed_; }
+
+  /**
+   * @return true if only test failures are displayed.
+   */
+  bool onlyShowFailures() const { return only_show_failures_; }
 
   /**
    * @return true if the deprecated field check for RouteConfiguration is disabled.
@@ -214,6 +226,7 @@ private:
   bool comprehensive_coverage_;
   bool is_proto_;
   bool is_detailed_;
+  bool only_show_failures_;
   bool disable_deprecation_check_;
 };
 } // namespace Envoy
