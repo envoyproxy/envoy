@@ -86,10 +86,3 @@ FAILURE_OUTPUT=$("${PATH_BIN}" "${PATH_CONFIG}/TestRoutes.yaml" "${PATH_CONFIG}/
 if [[ "${FAILURE_OUTPUT}" != *"expected: [cluster1], actual: [instant-server], test type: cluster_name"*"in test: Test_2"* ]]; then
   exit 1
 fi
-
-# Failure test case with neither flag set
-FAILURE_OUTPUT=$("${PATH_BIN}" "${PATH_CONFIG}/TestRoutes.yaml" "${PATH_CONFIG}/Weighted.golden.json" 2>&1) ||
-  echo "${FAILURE_OUTPUT:-no-output}"
-if [[ "${FAILURE_OUTPUT}" != "" ]]; then
-  exit 1
-fi
