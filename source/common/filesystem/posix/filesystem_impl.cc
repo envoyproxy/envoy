@@ -126,16 +126,19 @@ bool InstanceImplPosix::illegalPath(const std::string& path) {
     return true;
   }
 
+  return illegalCanonicalPath(canonical_path.rc_);
+}
+
+bool InstanceImplPosix::illegalCanonicalPath(const absl::string_view& canonical) {
   // Platform specific path sanity; we provide a convenience to avoid Envoy
   // instances poking in bad places. We may have to consider conditioning on
   // platform in the future, growing these or relaxing some constraints (e.g.
   // there are valid reasons to go via /proc for file paths).
-  auto paths = []() {
-    CONSTRUCT_ON_FIRST_USE(std::vector<std::string>, {"/dev", "/sys", "/proc"});
-  };
+  auto& paths = []() -> const std::vector<absl::string_view>& {
+    CONSTRUCT_ON_FIRST_USE(std::vector<absl::string_view>, {"/dev", "/sys", "/proc"});
+  }();
 
-  absl::string_view canonical(canonical_path.rc_);
-  for (const auto& path : paths()) {
+  for (const auto& path : paths) {
     if (absl::StartsWith(canonical, path)) {
       if (canonical.size() == path.size() || canonical[path.size()] == '/') {
         return true;

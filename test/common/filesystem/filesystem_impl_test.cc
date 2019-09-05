@@ -33,6 +33,9 @@ protected:
   Api::SysCallStringResult canonicalPath(const std::string& path) {
     return file_system_.canonicalPath(path);
   }
+  bool illegalCanonicalPath(const absl::string_view& canonical) {
+    return file_system_.illegalCanonicalPath(canonical);
+  }
   InstanceImplPosix file_system_;
 #endif
 };
@@ -143,6 +146,15 @@ TEST_F(FileSystemImplTest, IllegalPath) {
   EXPECT_TRUE(file_system_.illegalPath("/sys/"));
   EXPECT_TRUE(file_system_.illegalPath("/_some_non_existent_file"));
 #endif
+}
+
+TEST_F(FileSystemImplTest, illegalCanonicalPath) {
+  EXPECT_FALSE(illegalCanonicalPath("/develop"));
+  EXPECT_FALSE(illegalCanonicalPath("/develop/"));
+  EXPECT_FALSE(illegalCanonicalPath("/system"));
+  EXPECT_FALSE(illegalCanonicalPath("/system/"));
+  EXPECT_FALSE(illegalCanonicalPath("/procedure"));
+  EXPECT_FALSE(illegalCanonicalPath("/procedure/"));
 }
 
 TEST_F(FileSystemImplTest, ConstructedFileNotOpen) {

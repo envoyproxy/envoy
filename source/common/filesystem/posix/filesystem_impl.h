@@ -7,6 +7,8 @@
 
 #include "common/filesystem/file_shared_impl.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Filesystem {
 
@@ -42,7 +44,9 @@ public:
   bool illegalPath(const std::string& path) override;
 
 private:
+  bool illegalCanonicalPath(const absl::string_view& path);
   Api::SysCallStringResult canonicalPath(const std::string& path);
+
   friend class FileSystemImplTest;
 };
 
