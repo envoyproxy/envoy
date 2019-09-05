@@ -1236,6 +1236,41 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingLocalEmpty) {
   EXPECT_EQ(1U, stats_.lb_local_cluster_not_ok_.value());
 }
 
+TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingLocalEmptyFailTrafficOnPanic) {
+  common_config_.mutable_zone_aware_lb_config()->set_fail_traffic_on_panic(true);
+
+  if (&hostSet() == &failover_host_set_) { // P = 1 does not support zone-aware routing.
+    return;
+  }
+  HostVectorSharedPtr upstream_hosts(new HostVector(
+      {makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81")}));
+  HostVectorSharedPtr local_hosts(new HostVector({}, {}));
+
+  HostsPerLocalitySharedPtr upstream_hosts_per_locality = makeHostsPerLocality(
+      {{makeTestHost(info_, "tcp://127.0.0.1:80")}, {makeTestHost(info_, "tcp://127.0.0.1:81")}});
+  HostsPerLocalitySharedPtr local_hosts_per_locality = makeHostsPerLocality({{}, {}});
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
+      .WillOnce(Return(50))
+      .WillOnce(Return(50));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
+      .WillOnce(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 6))
+      .WillOnce(Return(1));
+
+  hostSet().healthy_hosts_ = *upstream_hosts;
+  hostSet().hosts_ = *upstream_hosts;
+  hostSet().healthy_hosts_per_locality_ = upstream_hosts_per_locality;
+  init(true);
+  updateHosts(local_hosts, local_hosts_per_locality);
+
+  // Local cluster is not OK, we'll do regular routing (and select no host, since we're in global
+  // panic).
+  EXPECT_EQ(nullptr, lb_->chooseHost(nullptr));
+  EXPECT_EQ(0U, stats_.lb_healthy_panic_.value());
+  EXPECT_EQ(1U, stats_.lb_local_cluster_not_ok_.value());
+}
+
 // Validate that if we have healthy host lists >= 2, but there is no local
 // locality included, that we skip zone aware routing and fallback.
 TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingNoLocalLocality) {
@@ -1447,20 +1482,40 @@ INSTANTIATE_TEST_SUITE_P(PrimaryOrFailover, LeastRequestLoadBalancerTest,
 
 class RandomLoadBalancerTest : public LoadBalancerTestBase {
 public:
-  RandomLoadBalancer lb_{priority_set_, nullptr, stats_, runtime_, random_, common_config_};
+  void init() {
+    lb_.reset(
+        new RandomLoadBalancer(priority_set_, nullptr, stats_, runtime_, random_, common_config_));
+  }
+  std::shared_ptr<LoadBalancer> lb_;
 };
 
-TEST_P(RandomLoadBalancerTest, NoHosts) { EXPECT_EQ(nullptr, lb_.chooseHost(nullptr)); }
+TEST_P(RandomLoadBalancerTest, NoHosts) {
+  init();
+  EXPECT_EQ(nullptr, lb_->chooseHost(nullptr));
+}
 
 TEST_P(RandomLoadBalancerTest, Normal) {
+  init();
+
   hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
                               makeTestHost(info_, "tcp://127.0.0.1:81")};
   hostSet().hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(2));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(3));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+}
+
+TEST_P(RandomLoadBalancerTest, FailClusterOnPanic) {
+  common_config_.mutable_zone_aware_lb_config()->set_fail_traffic_on_panic(true);
+  init();
+
+  hostSet().healthy_hosts_ = {};
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
+                      makeTestHost(info_, "tcp://127.0.0.1:81")};
+  hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
+  EXPECT_EQ(nullptr, lb_->chooseHost(nullptr));
 }
 
 INSTANTIATE_TEST_SUITE_P(PrimaryOrFailover, RandomLoadBalancerTest, ::testing::Values(true, false));
