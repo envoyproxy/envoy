@@ -110,7 +110,12 @@ public:
   virtual absl::string_view vm() PURE;
 
   /**
-   * Whether or not the VM implementation supports cloning.
+   * Whether or not the VM implementation supports cloning. Cloning is VM system dependent.
+   * When a VM is configured a single VM is intantiated to check that the .wasm file is valid and to
+   * do VM system specific initialization. In the case of WAVM this is potentially ahead-of-time
+   * compilation. Then, if cloning is supported, we clone that VM for each worker, potentially
+   * copying and sharing the initialized data structures for efficiency. Otherwise we create an new
+   * VM from scratch for each worker.
    * @return true if the VM is cloneable.
    */
   virtual bool cloneable() PURE;
