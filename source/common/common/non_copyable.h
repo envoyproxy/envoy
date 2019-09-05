@@ -9,13 +9,12 @@ class NonCopyable {
 protected:
   NonCopyable() = default;
 
-private:
   // Non-moveable.
-  NonCopyable(NonCopyable&&);
-  NonCopyable& operator=(NonCopyable&&);
+  NonCopyable(NonCopyable&&) noexcept = delete;
+  NonCopyable& operator=(NonCopyable&&) noexcept = delete;
 
   // Non-copyable.
-  NonCopyable(const NonCopyable&);
-  NonCopyable& operator=(const NonCopyable&);
+  NonCopyable(const NonCopyable&) = delete;
+  NonCopyable& operator=(const NonCopyable&) = delete;
 };
 } // namespace Envoy
