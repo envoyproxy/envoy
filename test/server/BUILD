@@ -53,10 +53,12 @@ envoy_cc_test(
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
         "//source/common/stats:stats_lib",
+        "//source/server:active_raw_udp_listener_config",
         "//source/server:connection_handler_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:network_utility_lib",
+        "//test/test_common:threadsafe_singleton_injector_lib",
     ],
 )
 
@@ -122,6 +124,7 @@ envoy_cc_test(
         "//test/test_common:logging_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
     ],
 )
 
@@ -175,9 +178,11 @@ envoy_cc_test(
         "//source/extensions/filters/listener/original_dst:config",
         "//source/extensions/filters/listener/tls_inspector:config",
         "//source/extensions/filters/network/http_connection_manager:config",
+        "//source/extensions/filters/network/tcp_proxy:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:config",
         "//source/extensions/transport_sockets/tls:ssl_socket_lib",
+        "//source/server:active_raw_udp_listener_config",
         "//source/server:listener_manager_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
@@ -241,6 +246,11 @@ filegroup(
     srcs = glob(["test_data/runtime/**"]),
 )
 
+filegroup(
+    name = "static_validation_test_data",
+    srcs = glob(["test_data/static_validation/**"]),
+)
+
 envoy_cc_test(
     name = "server_test",
     srcs = ["server_test.cc"],
@@ -251,6 +261,8 @@ envoy_cc_test(
         ":invalid_bootstrap.yaml",
         ":invalid_layered_runtime_duplicate_name.yaml",
         ":invalid_layered_runtime_missing_name.yaml",
+        ":invalid_layered_runtime_no_layer_specifier.yaml",
+        ":invalid_legacy_runtime_bootstrap.yaml",
         ":invalid_runtime_bootstrap.yaml",
         ":node_bootstrap.yaml",
         ":node_bootstrap_no_admin_port.yaml",
@@ -258,6 +270,7 @@ envoy_cc_test(
         ":node_bootstrap_without_access_log.yaml",
         ":runtime_bootstrap.yaml",
         ":runtime_test_data",
+        ":static_validation_test_data",
         ":stats_sink_bootstrap.yaml",
         ":zipkin_tracing.yaml",
     ],

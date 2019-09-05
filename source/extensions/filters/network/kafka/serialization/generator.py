@@ -52,6 +52,6 @@ class RenderingHelper:
     import sys
     # Templates are resolved relatively to main start script, due to main & test templates being
     # stored in different directories.
-    env = jinja2.Environment(
-        loader=jinja2.FileSystemLoader(searchpath=os.path.dirname(os.path.abspath(sys.argv[0]))))
+    env = jinja2.Environment(loader=jinja2.FileSystemLoader(
+        searchpath=os.path.dirname(os.path.abspath(sys.argv[0]))))
     return env.get_template(template)

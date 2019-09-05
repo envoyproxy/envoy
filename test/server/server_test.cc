@@ -165,10 +165,8 @@ public:
 };
 
 // Class creates minimally viable server instance for testing.
-class ServerInstanceImplTest : public testing::TestWithParam<Network::Address::IpVersion> {
+class ServerInstanceImplTestBase {
 protected:
-  ServerInstanceImplTest() : version_(GetParam()) {}
-
   void initialize(const std::string& bootstrap_path) { initialize(bootstrap_path, false); }
 
   void initialize(const std::string& bootstrap_path, const bool use_intializing_instance) {
@@ -258,6 +256,12 @@ protected:
   std::unique_ptr<InstanceImpl> server_;
 };
 
+class ServerInstanceImplTest : public ServerInstanceImplTestBase,
+                               public testing::TestWithParam<Network::Address::IpVersion> {
+protected:
+  ServerInstanceImplTest() { version_ = GetParam(); }
+};
+
 // Custom StatsSink that just increments a counter when flush is called.
 class CustomStatsSink : public Stats::Sink {
 public:
@@ -315,6 +319,7 @@ TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
   server_thread->join();
   // Validate that initialization_time histogram value has been set.
   EXPECT_TRUE(stats_store_.histogram("server.initialization_time").used());
+  EXPECT_EQ(0L, TestUtility::findGauge(stats_store_, "server.state")->value());
 }
 
 TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
@@ -442,6 +447,66 @@ TEST_P(ServerInstanceImplTest, Stats) {
 #endif
 }
 
+// Default validation mode
+TEST_P(ServerInstanceImplTest, ValidationDefault) {
+  options_.service_cluster_name_ = "some_cluster_name";
+  options_.service_node_name_ = "some_node_name";
+  EXPECT_NO_THROW(initialize("test/server/empty_bootstrap.yaml"));
+  EXPECT_THAT_THROWS_MESSAGE(
+      server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo"),
+      EnvoyException, "Protobuf message (foo) has unknown fields");
+  EXPECT_EQ(0, TestUtility::findCounter(stats_store_, "server.static_unknown_fields")->value());
+  EXPECT_NO_THROW(
+      server_->messageValidationContext().dynamicValidationVisitor().onUnknownField("bar"));
+  EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "server.dynamic_unknown_fields")->value());
+}
+
+// Validation mode with --allow-unknown-static-fields
+TEST_P(ServerInstanceImplTest, ValidationAllowStatic) {
+  options_.service_cluster_name_ = "some_cluster_name";
+  options_.service_node_name_ = "some_node_name";
+  options_.allow_unknown_static_fields_ = true;
+  EXPECT_NO_THROW(initialize("test/server/empty_bootstrap.yaml"));
+  EXPECT_NO_THROW(
+      server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo"));
+  EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "server.static_unknown_fields")->value());
+  EXPECT_NO_THROW(
+      server_->messageValidationContext().dynamicValidationVisitor().onUnknownField("bar"));
+  EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "server.dynamic_unknown_fields")->value());
+}
+
+// Validation mode with --reject-unknown-dynamic-fields
+TEST_P(ServerInstanceImplTest, ValidationRejectDynamic) {
+  options_.service_cluster_name_ = "some_cluster_name";
+  options_.service_node_name_ = "some_node_name";
+  options_.reject_unknown_dynamic_fields_ = true;
+  EXPECT_NO_THROW(initialize("test/server/empty_bootstrap.yaml"));
+  EXPECT_THAT_THROWS_MESSAGE(
+      server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo"),
+      EnvoyException, "Protobuf message (foo) has unknown fields");
+  EXPECT_EQ(0, TestUtility::findCounter(stats_store_, "server.static_unknown_fields")->value());
+  EXPECT_THAT_THROWS_MESSAGE(
+      server_->messageValidationContext().dynamicValidationVisitor().onUnknownField("bar"),
+      EnvoyException, "Protobuf message (bar) has unknown fields");
+  EXPECT_EQ(0, TestUtility::findCounter(stats_store_, "server.dynamic_unknown_fields")->value());
+}
+
+// Validation mode with --allow-unknown-static-fields --reject-unknown-dynamic-fields
+TEST_P(ServerInstanceImplTest, ValidationAllowStaticRejectDynamic) {
+  options_.service_cluster_name_ = "some_cluster_name";
+  options_.service_node_name_ = "some_node_name";
+  options_.allow_unknown_static_fields_ = true;
+  options_.reject_unknown_dynamic_fields_ = true;
+  EXPECT_NO_THROW(initialize("test/server/empty_bootstrap.yaml"));
+  EXPECT_NO_THROW(
+      server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo"));
+  EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "server.static_unknown_fields")->value());
+  EXPECT_THAT_THROWS_MESSAGE(
+      server_->messageValidationContext().dynamicValidationVisitor().onUnknownField("bar"),
+      EnvoyException, "Protobuf message (bar) has unknown fields");
+  EXPECT_EQ(0, TestUtility::findCounter(stats_store_, "server.dynamic_unknown_fields")->value());
+}
+
 // Validate server localInfo() from bootstrap Node.
 TEST_P(ServerInstanceImplTest, BootstrapNode) {
   initialize("test/server/node_bootstrap.yaml");
@@ -450,6 +515,25 @@ TEST_P(ServerInstanceImplTest, BootstrapNode) {
   EXPECT_EQ("bootstrap_id", server_->localInfo().nodeName());
   EXPECT_EQ("bootstrap_sub_zone", server_->localInfo().node().locality().sub_zone());
   EXPECT_EQ(VersionInfo::version(), server_->localInfo().node().build_version());
+}
+
+TEST_P(ServerInstanceImplTest, LoadsBootstrapFromConfigProtoOptions) {
+  options_.config_proto_.mutable_node()->set_id("foo");
+  initialize("test/server/node_bootstrap.yaml");
+  EXPECT_EQ("foo", server_->localInfo().node().id());
+}
+
+TEST_P(ServerInstanceImplTest, LoadsBootstrapFromConfigYamlAfterConfigPath) {
+  options_.config_yaml_ = "node:\n  id: 'bar'";
+  initialize("test/server/node_bootstrap.yaml");
+  EXPECT_EQ("bar", server_->localInfo().node().id());
+}
+
+TEST_P(ServerInstanceImplTest, LoadsBootstrapFromConfigProtoOptionsLast) {
+  options_.config_yaml_ = "node:\n  id: 'bar'";
+  options_.config_proto_.mutable_node()->set_id("foo");
+  initialize("test/server/node_bootstrap.yaml");
+  EXPECT_EQ("foo", server_->localInfo().node().id());
 }
 
 // Validate server localInfo() from bootstrap Node with CLI overrides.
@@ -491,6 +575,11 @@ TEST_P(ServerInstanceImplTest, RuntimeNoAdminLayer) {
   EXPECT_EQ("No admin layer specified", response_body);
 }
 
+TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(InvalidLegacyBootstrapRuntime)) {
+  EXPECT_THROW_WITH_MESSAGE(initialize("test/server/invalid_runtime_bootstrap.yaml"),
+                            EnvoyException, "Invalid runtime entry value for foo");
+}
+
 // Validate invalid runtime in bootstrap is rejected.
 TEST_P(ServerInstanceImplTest, InvalidBootstrapRuntime) {
   EXPECT_THROW_WITH_MESSAGE(initialize("test/server/invalid_runtime_bootstrap.yaml"),
@@ -508,6 +597,12 @@ TEST_P(ServerInstanceImplTest, InvalidLayeredBootstrapMissingName) {
 TEST_P(ServerInstanceImplTest, InvalidLayeredBootstrapDuplicateName) {
   EXPECT_THROW_WITH_REGEX(initialize("test/server/invalid_layered_runtime_duplicate_name.yaml"),
                           EnvoyException, "Duplicate layer name: some_static_laye");
+}
+
+// Validate invalid layered runtime with no layer specifier is rejected.
+TEST_P(ServerInstanceImplTest, InvalidLayeredBootstrapNoLayerSpecifier) {
+  EXPECT_THROW_WITH_REGEX(initialize("test/server/invalid_layered_runtime_no_layer_specifier.yaml"),
+                          EnvoyException, "BootstrapValidationError.LayeredRuntime");
 }
 
 // Regression test for segfault when server initialization fails prior to
@@ -606,7 +701,7 @@ TEST_P(ServerInstanceImplTest, EmptyBootstrap) {
 }
 
 // Custom header bootstrap succeeds.
-TEST_P(ServerInstanceImplTest, CusomHeaderBoostrap) {
+TEST_P(ServerInstanceImplTest, CustomHeaderBootstrap) {
   options_.config_path_ = TestEnvironment::writeStringToFileForTest(
       "custom.yaml", "header_prefix: \"x-envoy\"\nstatic_resources:\n");
   options_.service_cluster_name_ = "some_cluster_name";
@@ -671,7 +766,9 @@ TEST_P(ServerInstanceImplTest, NoOptionsPassed) {
           hooks_, restart_, stats_store_, fakelock_, component_factory_,
           std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
           Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr)),
-      EnvoyException, "At least one of --config-path and --config-yaml should be non-empty");
+      EnvoyException,
+      "At least one of --config-path or --config-yaml or Options::configProto() should be "
+      "non-empty");
 }
 
 // Validate that when std::exception is unexpectedly thrown, we exit safely.
@@ -751,6 +848,65 @@ TEST_P(ServerInstanceImplTest, WithProcessContext) {
 
   object.boolean_flag_ = false;
   EXPECT_FALSE(object_from_context.boolean_flag_);
+}
+
+// Static configuration validation. We test with both allow/reject settings various aspects of
+// configuration from YAML.
+class StaticValidationTest
+    : public ServerInstanceImplTestBase,
+      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>> {
+protected:
+  StaticValidationTest() {
+    version_ = std::get<0>(GetParam());
+    options_.service_cluster_name_ = "some_cluster_name";
+    options_.service_node_name_ = "some_node_name";
+    options_.allow_unknown_static_fields_ = std::get<1>(GetParam());
+    // By inverting the static validation value, we can hopefully catch places we may have confused
+    // static/dynamic validation.
+    options_.reject_unknown_dynamic_fields_ = options_.allow_unknown_static_fields_;
+  }
+
+  AssertionResult validate(absl::string_view yaml_filename) {
+    const std::string path =
+        absl::StrCat("test/server/test_data/static_validation/", yaml_filename);
+    try {
+      initialize(path);
+    } catch (EnvoyException&) {
+      return options_.allow_unknown_static_fields_ ? AssertionFailure() : AssertionSuccess();
+    }
+    return options_.allow_unknown_static_fields_ ? AssertionSuccess() : AssertionFailure();
+  }
+};
+
+std::string staticValidationTestParamsToString(
+    const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>>& params) {
+  return fmt::format(
+      "{}_{}",
+      TestUtility::ipTestParamsToString(
+          ::testing::TestParamInfo<Network::Address::IpVersion>(std::get<0>(params.param), 0)),
+      std::get<1>(params.param) ? "with_allow_unknown_static_fields"
+                                : "without_allow_unknown_static_fields");
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, StaticValidationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()),
+    staticValidationTestParamsToString);
+
+TEST_P(StaticValidationTest, BootstrapUnknownField) {
+  EXPECT_TRUE(validate("bootstrap_unknown_field.yaml"));
+}
+
+TEST_P(StaticValidationTest, ListenerUnknownField) {
+  EXPECT_TRUE(validate("listener_unknown_field.yaml"));
+}
+
+TEST_P(StaticValidationTest, NetworkFilterUnknownField) {
+  EXPECT_TRUE(validate("network_filter_unknown_field.yaml"));
+}
+
+TEST_P(StaticValidationTest, ClusterUnknownField) {
+  EXPECT_TRUE(validate("cluster_unknown_field.yaml"));
 }
 
 } // namespace

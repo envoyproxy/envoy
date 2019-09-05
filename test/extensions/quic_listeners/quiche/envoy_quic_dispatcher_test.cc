@@ -26,6 +26,8 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_dispatcher.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_fake_proof_source.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_alarm_factory.h"
+#include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
+#include "extensions/transport_sockets/well_known_names.h"
 #include "server/configuration_impl.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -79,6 +81,7 @@ public:
     listen_socket_ = std::make_unique<Network::NetworkListenSocket<
         Network::NetworkSocketTrait<Network::Address::SocketType::Datagram>>>(
         Network::Test::getCanonicalLoopbackAddress(version_), nullptr, /*bind*/ true);
+    // Advance time a bit because QuicTime regards 0 as uninitialized timestamp.
     time_system_.sleep(std::chrono::milliseconds(100));
     EXPECT_CALL(listener_config_, socket()).WillRepeatedly(ReturnRef(*listen_socket_));
   }
@@ -153,6 +156,8 @@ TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponCHLO) {
   EXPECT_CALL(filter_chain_manager, findFilterChain(_))
       .WillOnce(Invoke([&](const Network::ConnectionSocket& socket) {
         EXPECT_EQ(*listen_socket_->localAddress(), *socket.localAddress());
+        EXPECT_EQ(Extensions::TransportSockets::TransportSocketNames::get().Quic,
+                  socket.detectedTransportProtocol());
         EXPECT_EQ(peer_addr, envoyAddressInstanceToQuicSocketAddress(socket.remoteAddress()));
         return &filter_chain;
       }));
@@ -189,13 +194,15 @@ TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponCHLO) {
       envoy_quic_dispatcher_.session_map().find(connection_id)->second->IsEncryptionEstablished());
   EXPECT_EQ(1u, connection_handler_.numConnections());
   EXPECT_EQ("www.abc.com", read_filter->callbacks_->connection().requestedServerName());
+  EXPECT_EQ(peer_addr, envoyAddressInstanceToQuicSocketAddress(
+                           read_filter->callbacks_->connection().remoteAddress()));
+  EXPECT_EQ(*listen_socket_->localAddress(), *read_filter->callbacks_->connection().localAddress());
   EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
   // Shutdown() to close the connection.
   envoy_quic_dispatcher_.Shutdown();
 }
 
 TEST_P(EnvoyQuicDispatcherTest, CloseConnectionDueToMissingFilterChain) {
-  //  quic::SetVerbosityLogThreshold(2);
   quic::QuicSocketAddress peer_addr(version_ == Network::Address::IpVersion::v4
                                         ? quic::QuicIpAddress::Loopback4()
                                         : quic::QuicIpAddress::Loopback6(),

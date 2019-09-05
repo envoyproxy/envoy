@@ -16,7 +16,7 @@ namespace Quic {
 
 class TestDelegate : public quic::QuicAlarm::Delegate {
 public:
-  TestDelegate() : fired_(false) {}
+  TestDelegate() = default;
 
   // quic::QuicAlarm::Delegate
   void OnAlarm() override { fired_ = true; }
@@ -25,7 +25,7 @@ public:
   void set_fired(bool fired) { fired_ = fired; }
 
 private:
-  bool fired_;
+  bool fired_{false};
 };
 
 class EnvoyQuicAlarmTest : public ::testing::Test {

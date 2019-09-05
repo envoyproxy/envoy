@@ -6,16 +6,8 @@
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
 #include "test/test_common/utility.h"
 
-using ::envoy::api::v2::route::RouteMatch;
-using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider;
-using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtRequirement;
 using ::envoy::config::filter::http::jwt_authn::v2alpha::RequirementRule;
 using Envoy::Http::TestHeaderMapImpl;
-using ::testing::_;
-using ::testing::Invoke;
-using ::testing::NiceMock;
-
-using ::google::jwt_verify::Status;
 
 namespace Envoy {
 namespace Extensions {
@@ -48,6 +40,28 @@ TEST_F(MatcherTest, TestMatchPrefix) {
 TEST_F(MatcherTest, TestMatchRegex) {
   const char config[] = R"(match:
   regex: "/[^c][au]t")";
+  RequirementRule rule;
+  TestUtility::loadFromYaml(config, rule);
+  MatcherConstPtr matcher = Matcher::create(rule);
+  auto headers = TestHeaderMapImpl{{":path", "/but"}};
+  EXPECT_TRUE(matcher->matches(headers));
+  headers = TestHeaderMapImpl{{":path", "/mat?ok=bye"}};
+  EXPECT_TRUE(matcher->matches(headers));
+  headers = TestHeaderMapImpl{{":path", "/maut"}};
+  EXPECT_FALSE(matcher->matches(headers));
+  headers = TestHeaderMapImpl{{":path", "/cut"}};
+  EXPECT_FALSE(matcher->matches(headers));
+  headers = TestHeaderMapImpl{{":path", "/mut/"}};
+  EXPECT_FALSE(matcher->matches(headers));
+}
+
+TEST_F(MatcherTest, TestMatchSafeRegex) {
+  const char config[] = R"(
+match:
+  safe_regex:
+    google_re2: {}
+    regex: "/[^c][au]t")";
+
   RequirementRule rule;
   TestUtility::loadFromYaml(config, rule);
   MatcherConstPtr matcher = Matcher::create(rule);

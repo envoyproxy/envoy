@@ -57,6 +57,7 @@ envoy_cc_test(
         "//test/mocks/tcp:tcp_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:registry_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
@@ -332,6 +333,7 @@ envoy_cc_binary(
         "benchmark",
     ],
     deps = [
+        "//source/common/memory:stats_lib",
         "//source/common/upstream:maglev_lb_lib",
         "//source/common/upstream:ring_hash_lb_lib",
         "//source/common/upstream:upstream_lib",

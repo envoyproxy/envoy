@@ -16,14 +16,13 @@ namespace Quic {
 
 EnvoyQuicServerSession::EnvoyQuicServerSession(
     const quic::QuicConfig& config, const quic::ParsedQuicVersionVector& supported_versions,
-    quic::QuicConnection* connection, quic::QuicSession::Visitor* visitor,
+    std::unique_ptr<EnvoyQuicConnection> connection, quic::QuicSession::Visitor* visitor,
     quic::QuicCryptoServerStream::Helper* helper, const quic::QuicCryptoServerConfig* crypto_config,
     quic::QuicCompressedCertsCache* compressed_certs_cache, Event::Dispatcher& dispatcher)
-    : quic::QuicServerSessionBase(config, supported_versions, connection, visitor, helper,
+    : quic::QuicServerSessionBase(config, supported_versions, connection.get(), visitor, helper,
                                   crypto_config, compressed_certs_cache),
-      filter_manager_(*this), dispatcher_(dispatcher), stream_info_(dispatcher.timeSource()) {}
-
-EnvoyQuicServerSession::~EnvoyQuicServerSession() { delete connection(); }
+      quic_connection_(std::move(connection)), filter_manager_(*this), dispatcher_(dispatcher),
+      stream_info_(dispatcher.timeSource()) {}
 
 quic::QuicCryptoServerStreamBase* EnvoyQuicServerSession::CreateQuicCryptoServerStream(
     const quic::QuicCryptoServerConfig* crypto_config,
@@ -42,15 +41,14 @@ quic::QuicSpdyStream* EnvoyQuicServerSession::CreateIncomingStream(quic::QuicStr
   return stream;
 }
 
-quic::QuicSpdyStream* EnvoyQuicServerSession::CreateIncomingStream(quic::PendingStream* pending) {
-  auto stream = new EnvoyQuicServerStream(pending, this, quic::BIDIRECTIONAL);
-  ActivateStream(absl::WrapUnique(stream));
-  setUpRequestDecoder(*stream);
-  return stream;
+quic::QuicSpdyStream*
+EnvoyQuicServerSession::CreateIncomingStream(quic::PendingStream* /*pending*/) {
+  // Only client side server push stream should trigger this call.
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 quic::QuicSpdyStream* EnvoyQuicServerSession::CreateOutgoingBidirectionalStream() {
-  // Not allow server initiated stream.
+  // Disallow server initiated stream.
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
@@ -79,7 +77,13 @@ void EnvoyQuicServerSession::OnConnectionClosed(const quic::QuicConnectionCloseF
 
 void EnvoyQuicServerSession::Initialize() {
   quic::QuicServerSessionBase::Initialize();
-  reinterpret_cast<EnvoyQuicConnection*>(connection())->setEnvoyConnection(*this);
+  quic_connection_->setEnvoyConnection(*this);
+}
+
+void EnvoyQuicServerSession::SendGoAway(quic::QuicErrorCode error_code, const std::string& reason) {
+  if (transport_version() < quic::QUIC_VERSION_99) {
+    quic::QuicServerSessionBase::SendGoAway(error_code, reason);
+  }
 }
 
 void EnvoyQuicServerSession::addWriteFilter(Network::WriteFilterSharedPtr filter) {
@@ -103,8 +107,8 @@ void EnvoyQuicServerSession::addConnectionCallbacks(Network::ConnectionCallbacks
 }
 
 void EnvoyQuicServerSession::addBytesSentCallback(Network::Connection::BytesSentCb /*cb*/) {
-  // Proxy is not supported.
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  // TODO(danzh): implement to support proxy.
+  ASSERT(false, "addBytesSentCallback is not implemented for QUIC");
 }
 
 void EnvoyQuicServerSession::enableHalfClose(bool enabled) {
@@ -124,8 +128,10 @@ uint32_t EnvoyQuicServerSession::bufferLimit() const {
 }
 
 void EnvoyQuicServerSession::close(Network::ConnectionCloseType type) {
-  // TODO(danzh): Implement FlushWrite and FlushWriteAndDelay mode.
-  ASSERT(type == Network::ConnectionCloseType::NoFlush);
+  if (type != Network::ConnectionCloseType::NoFlush) {
+    // TODO(danzh): Implement FlushWrite and FlushWriteAndDelay mode.
+    ENVOY_CONN_LOG(error, "Flush write is not implemented for QUIC.", *this);
+  }
   connection()->CloseConnection(quic::QUIC_NO_ERROR, "Closed by application",
                                 quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
 }
@@ -142,8 +148,11 @@ std::chrono::milliseconds EnvoyQuicServerSession::delayedCloseTimeout() const {
 }
 
 const Network::ConnectionSocket::OptionsSharedPtr& EnvoyQuicServerSession::socketOptions() const {
-  ENVOY_CONN_LOG(error, "QUIC does not support connection pooling", *this);
-  return dynamic_cast<const EnvoyQuicConnection*>(connection())->connectionSocket()->options();
+  ENVOY_CONN_LOG(
+      error,
+      "QUIC connection socket is merely a wrapper, and doesn't have any specific socket options.",
+      *this);
+  return quic_connection_->connectionSocket()->options();
 }
 
 absl::string_view EnvoyQuicServerSession::requestedServerName() const {
@@ -151,17 +160,15 @@ absl::string_view EnvoyQuicServerSession::requestedServerName() const {
 }
 
 const Network::Address::InstanceConstSharedPtr& EnvoyQuicServerSession::remoteAddress() const {
-  auto quic_connection = dynamic_cast<const EnvoyQuicConnection*>(connection());
-  ASSERT(quic_connection->connectionSocket() != nullptr,
+  ASSERT(quic_connection_->connectionSocket() != nullptr,
          "remoteAddress() should only be called after OnPacketHeader");
-  return quic_connection->connectionSocket()->remoteAddress();
+  return quic_connection_->connectionSocket()->remoteAddress();
 }
 
 const Network::Address::InstanceConstSharedPtr& EnvoyQuicServerSession::localAddress() const {
-  auto quic_connection = dynamic_cast<const EnvoyQuicConnection*>(connection());
-  ASSERT(quic_connection->connectionSocket() != nullptr,
+  ASSERT(quic_connection_->connectionSocket() != nullptr,
          "localAddress() should only be called after OnPacketHeader");
-  return quic_connection->connectionSocket()->localAddress();
+  return quic_connection_->connectionSocket()->localAddress();
 }
 
 const Ssl::ConnectionInfo* EnvoyQuicServerSession::ssl() const {

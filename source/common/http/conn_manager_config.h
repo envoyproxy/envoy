@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/config/config_provider.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/router/rds.h"
 #include "envoy/stats/scope.h"
@@ -170,6 +171,9 @@ public:
  */
 class ConnectionManagerConfig {
 public:
+  using HttpConnectionManagerProto =
+      envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager;
+
   virtual ~ConnectionManagerConfig() = default;
 
   /**
@@ -184,15 +188,11 @@ public:
    * @param connection supplies the owning connection.
    * @param data supplies the currently available read data.
    * @param callbacks supplies the callbacks to install into the codec.
-   * @param strict_header_validation indicates whether or not the codec should validate the values
-   * of each HTTP header (NOTE: this argument only affects the H/1.1 codec; the H/2 codec always
-   * does this)
    * @return a codec or nullptr if no codec can be created.
    */
   virtual ServerConnectionPtr createCodec(Network::Connection& connection,
                                           const Buffer::Instance& data,
-                                          ServerConnectionCallbacks& callbacks,
-                                          const bool strict_header_validation) PURE;
+                                          ServerConnectionCallbacks& callbacks) PURE;
 
   /**
    * @return DateProvider& the date provider to use for
@@ -268,6 +268,11 @@ public:
    * @return const std::string& the server name to write into responses.
    */
   virtual const std::string& serverName() PURE;
+
+  /**
+   * @return ServerHeaderTransformation the transformation to apply to Server response headers.
+   */
+  virtual HttpConnectionManagerProto::ServerHeaderTransformation serverHeaderTransformation() PURE;
 
   /**
    * @return ConnectionManagerStats& the stats to write to.
@@ -357,6 +362,12 @@ public:
    * @return if the HttpConnectionManager should normalize url following RFC3986
    */
   virtual bool shouldNormalizePath() const PURE;
+
+  /**
+   * @return if the HttpConnectionManager should merge two or more adjacent slashes in the path into
+   * one.
+   */
+  virtual bool shouldMergeSlashes() const PURE;
 };
 } // namespace Http
 } // namespace Envoy

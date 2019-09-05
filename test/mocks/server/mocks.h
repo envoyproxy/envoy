@@ -6,6 +6,8 @@
 #include <string>
 
 #include "envoy/common/mutex_tracer.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/protobuf/message_validator.h"
 #include "envoy/server/admin.h"
 #include "envoy/server/configuration.h"
 #include "envoy/server/drain_manager.h"
@@ -34,6 +36,7 @@
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/secret/mocks.h"
@@ -59,8 +62,10 @@ public:
   MOCK_CONST_METHOD0(baseId, uint64_t());
   MOCK_CONST_METHOD0(concurrency, uint32_t());
   MOCK_CONST_METHOD0(configPath, const std::string&());
+  MOCK_CONST_METHOD0(configProto, const envoy::config::bootstrap::v2::Bootstrap&());
   MOCK_CONST_METHOD0(configYaml, const std::string&());
-  MOCK_CONST_METHOD0(allowUnknownFields, bool());
+  MOCK_CONST_METHOD0(allowUnknownStaticFields, bool());
+  MOCK_CONST_METHOD0(rejectUnknownDynamicFields, bool());
   MOCK_CONST_METHOD0(adminAddressPath, const std::string&());
   MOCK_CONST_METHOD0(localAddressIpVersion, Network::Address::IpVersion());
   MOCK_CONST_METHOD0(drainTime, std::chrono::seconds());
@@ -80,11 +85,15 @@ public:
   MOCK_CONST_METHOD0(signalHandlingEnabled, bool());
   MOCK_CONST_METHOD0(mutexTracingEnabled, bool());
   MOCK_CONST_METHOD0(libeventBufferEnabled, bool());
+  MOCK_CONST_METHOD0(fakeSymbolTableEnabled, bool());
   MOCK_CONST_METHOD0(cpusetThreadsEnabled, bool());
   MOCK_CONST_METHOD0(toCommandLineOptions, Server::CommandLineOptionsPtr());
 
   std::string config_path_;
+  envoy::config::bootstrap::v2::Bootstrap config_proto_;
   std::string config_yaml_;
+  bool allow_unknown_static_fields_{};
+  bool reject_unknown_dynamic_fields_{};
   std::string admin_address_path_;
   std::string service_cluster_name_;
   std::string service_node_name_;
@@ -210,7 +219,7 @@ public:
   MOCK_METHOD0(statsAllocator, Stats::Allocator&());
 
 private:
-  Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
+  Stats::TestSymbolTable symbol_table_;
   Thread::MutexBasicLockable log_lock_;
   Thread::MutexBasicLockable access_log_lock_;
   Stats::AllocatorImpl stats_allocator_;
@@ -377,7 +386,7 @@ public:
   MOCK_METHOD0(threadLocal, ThreadLocal::Instance&());
   MOCK_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_CONST_METHOD0(statsFlushInterval, std::chrono::milliseconds());
-  MOCK_METHOD0(messageValidationVisitor, ProtobufMessage::ValidationVisitor&());
+  MOCK_METHOD0(messageValidationContext, ProtobufMessage::ValidationContext&());
 
   TimeSource& timeSource() override { return time_system_; }
 
@@ -407,6 +416,7 @@ public:
   Singleton::ManagerPtr singleton_manager_;
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
+  testing::NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
 };
 
 namespace Configuration {
@@ -455,6 +465,7 @@ public:
   MOCK_METHOD0(listenerScope, Stats::Scope&());
   MOCK_CONST_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_CONST_METHOD0(listenerMetadata, const envoy::api::v2::core::Metadata&());
+  MOCK_CONST_METHOD0(direction, envoy::api::v2::core::TrafficDirection());
   MOCK_METHOD0(timeSource, TimeSource&());
   Event::TestTimeSystem& timeSystem() { return time_system_; }
   Grpc::Context& grpcContext() override { return grpc_context_; }

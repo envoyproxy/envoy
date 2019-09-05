@@ -12,10 +12,12 @@
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
 
 #include "quiche/quic/core/http/quic_header_list.h"
+#include "quiche/quic/core/quic_session.h"
 #include "quiche/spdy/core/spdy_header_block.h"
 
 #pragma GCC diagnostic pop
 
+#include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
 #include "common/buffer/buffer_impl.h"
 #include "common/http/header_map_impl.h"
 #include "common/common/assert.h"
@@ -46,26 +48,6 @@ void EnvoyQuicServerStream::resetStream(Http::StreamResetReason /*reason*/) {
 
 void EnvoyQuicServerStream::readDisable(bool /*disable*/) { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
-Http::HeaderMapImplPtr quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_list) {
-  Http::HeaderMapImplPtr headers = std::make_unique<Http::HeaderMapImpl>();
-  for (const auto& entry : header_list) {
-    // TODO(danzh): Avoid copy by referencing entry as header_list is already validated by QUIC.
-    headers->addCopy(Http::LowerCaseString(entry.first), entry.second);
-  }
-  return headers;
-}
-
-Http::HeaderMapImplPtr spdyHeaderBlockToEnvoyHeaders(const spdy::SpdyHeaderBlock& header_block) {
-  Http::HeaderMapImplPtr headers = std::make_unique<Http::HeaderMapImpl>();
-  for (auto entry : header_block) {
-    // TODO(danzh): Avoid temporary strings and addCopy() with std::string_view.
-    std::string key(entry.first);
-    std::string value(entry.second);
-    headers->addCopy(Http::LowerCaseString(key), value);
-  }
-  return headers;
-}
-
 void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
                                                      const quic::QuicHeaderList& header_list) {
   quic::QuicSpdyServerStreamBase::OnInitialHeadersComplete(fin, frame_len, header_list);
@@ -76,16 +58,13 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
 }
 
 void EnvoyQuicServerStream::OnBodyAvailable() {
-  std::cerr << "======== OnBodyAvailable\n";
   Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
   // TODO(danzh): check Envoy per stream buffer limit.
   // Currently read out all the data.
   while (HasBytesToRead()) {
     struct iovec iov;
-    if (GetReadableRegions(&iov, 1) == 0) {
-      // No more data to read.
-      break;
-    }
+    int num_regions = GetReadableRegions(&iov, 1);
+    ASSERT(num_regions > 0);
     size_t bytes_read = iov.iov_len;
     Buffer::RawSlice slice;
     buffer->reserve(bytes_read, &slice, 1);
@@ -102,7 +81,11 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
   // trailers.
   ASSERT(decoder() != nullptr);
   decoder()->decodeData(*buffer, finished_reading);
-  if (sequencer()->IsClosed() && !FinishedReadingTrailers()) {
+  if (!quic::VersionUsesQpack(transport_version()) && sequencer()->IsClosed() &&
+      !FinishedReadingTrailers()) {
+    // For Google QUIC implementation, trailers may arrived earlier and wait to
+    // be consumed after reading all the body. Consume it here.
+    // IETF QUIC shouldn't reach here because trailers are sent on same stream.
     decoder()->decodeTrailers(spdyHeaderBlockToEnvoyHeaders(received_trailers()));
     MarkTrailersConsumed();
   }
@@ -111,25 +94,14 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
 void EnvoyQuicServerStream::OnTrailingHeadersComplete(bool fin, size_t frame_len,
                                                       const quic::QuicHeaderList& header_list) {
   quic::QuicSpdyServerStreamBase::OnTrailingHeadersComplete(fin, frame_len, header_list);
-  if (!FinishedReadingTrailers()) {
+  if (session()->connection()->connected() &&
+      (quic::VersionUsesQpack(transport_version()) || sequencer()->IsClosed()) &&
+      !FinishedReadingTrailers()) {
     // Before QPack trailers can arrive before body. Only decode trailers after finishing decoding
     // body.
     ASSERT(decoder() != nullptr);
     decoder()->decodeTrailers(spdyHeaderBlockToEnvoyHeaders(received_trailers()));
     MarkTrailersConsumed();
-  }
-}
-
-Http::StreamResetReason quicRstErrorToEnvoyResetReason(quic::QuicRstStreamErrorCode quic_rst) {
-  switch (quic_rst) {
-  case quic::QUIC_REFUSED_STREAM:
-    return Http::StreamResetReason::RemoteRefusedStreamReset;
-  case quic::QUIC_STREAM_NO_ERROR:
-    return Http::StreamResetReason::ConnectionTermination;
-  case quic::QUIC_STREAM_CONNECTION_ERROR:
-    return Http::StreamResetReason::ConnectionFailure;
-  default:
-    return Http::StreamResetReason::RemoteReset;
   }
 }
 

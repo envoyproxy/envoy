@@ -37,7 +37,6 @@ public:
                 std::unique_ptr<quic::ProofSource::Callback> callback) override {
     quic::QuicReferenceCountedPointer<quic::ProofSource::Chain> chain =
         GetCertChain(server_address, hostname);
-    std::cerr << "hostname " << hostname << " GetCertChain " << chain->certs[0] << "\n";
     quic::QuicCryptoProof proof;
     bool success = false;
     auto signature_callback = std::make_unique<FakeSignatureCallback>(success, proof.signature);

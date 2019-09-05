@@ -22,10 +22,14 @@ public:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
   Http::Protocol protocol() override {
-    // No need to distinguish QUIC from H2 from HCM's view so far.
+    // From HCM's view, QUIC should behave the same as Http2, only the stats
+    // should be different.
+    // TODO(danzh) add Http3 enum value for QUIC.
     return Http::Protocol::Http2;
   }
   void goAway() override;
+  // Returns true if the session has data to send but queued in connection or
+  // stream send buffer.
   bool wantsToWrite() override;
   void onUnderlyingConnectionAboveWriteBufferHighWatermark() override;
   void onUnderlyingConnectionBelowWriteBufferLowWatermark() override;

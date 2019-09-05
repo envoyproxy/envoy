@@ -278,3 +278,15 @@ message ControlPlane {
   // the Envoy is connected to.
   string identifier = 1;
 }
+
+// Identifies the direction of the traffic relative to the local Envoy.
+enum TrafficDirection {
+  // Default option is unspecified.
+  UNSPECIFIED = 0;
+
+  // The transport is used for incoming traffic.
+  INBOUND = 1;
+
+  // The transport is used for outgoing traffic.
+  OUTBOUND = 2;
+}

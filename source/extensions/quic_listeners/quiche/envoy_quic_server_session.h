@@ -30,17 +30,14 @@ class EnvoyQuicServerSession : public quic::QuicServerSessionBase,
                                public Network::FilterManagerConnection,
                                protected Logger::Loggable<Logger::Id::connection> {
 public:
-  // Owns connection.
   EnvoyQuicServerSession(const quic::QuicConfig& config,
                          const quic::ParsedQuicVersionVector& supported_versions,
-                         quic::QuicConnection* connection, quic::QuicSession::Visitor* visitor,
+                         std::unique_ptr<EnvoyQuicConnection> connection,
+                         quic::QuicSession::Visitor* visitor,
                          quic::QuicCryptoServerStream::Helper* helper,
                          const quic::QuicCryptoServerConfig* crypto_config,
                          quic::QuicCompressedCertsCache* compressed_certs_cache,
                          Event::Dispatcher& dispatcher);
-
-  // Overridden to delete connection object.
-  ~EnvoyQuicServerSession() override;
 
   // Network::FilterManager
   // Overridden to delegate calls to filter_manager_.
@@ -66,9 +63,8 @@ public:
   }
   void setDelayedCloseTimeout(std::chrono::milliseconds timeout) override;
   std::chrono::milliseconds delayedCloseTimeout() const override;
-  void readDisable(bool /*disable*/) override {
-    // Quic connection should be able to read through out its life time.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  void readDisable(bool disable) override {
+    ASSERT(!disable, "Quic connection should be able to read through out its life time.");
   }
   void detectEarlyCloseWhenReadDisabled(bool /*value*/) override { NOT_REACHED_GCOVR_EXCL_LINE; }
   bool readEnabled() const override { return true; }
@@ -76,12 +72,12 @@ public:
   const Network::Address::InstanceConstSharedPtr& localAddress() const override;
   absl::optional<Network::Connection::UnixDomainSocketPeerCredentials>
   unixSocketPeerCredentials() const override {
-    // Unix domain socket is not supported.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    ASSERT(false, "Unix domain socket is not supported.");
+    return absl::nullopt;
   }
   void setConnectionStats(const Network::Connection::ConnectionStats& stats) override {
     stats_ = std::make_unique<Network::Connection::ConnectionStats>(stats);
-    reinterpret_cast<EnvoyQuicConnection*>(connection())->setConnectionStats(stats);
+    quic_connection_->setConnectionStats(stats);
   }
   const Ssl::ConnectionInfo* ssl() const override;
   Network::Connection::State state() const override {
@@ -129,6 +125,7 @@ public:
   void OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
                           quic::ConnectionCloseSource source) override;
   void Initialize() override;
+  void SendGoAway(quic::QuicErrorCode error_code, const std::string& reason) override;
 
 protected:
   // quic::QuicServerSessionBase
@@ -146,6 +143,7 @@ protected:
 private:
   void setUpRequestDecoder(EnvoyQuicStream& stream);
 
+  std::unique_ptr<EnvoyQuicConnection> quic_connection_;
   // Currently ConnectionManagerImpl is the one and only filter. If more network
   // filters are added, ConnectionManagerImpl should always be the last one.
   // Its onRead() is only called once to trigger ReadFilter::onNewConnection()
@@ -156,6 +154,8 @@ private:
   std::string transport_failure_reason_;
   // TODO(danzh): populate stats.
   std::unique_ptr<Network::Connection::ConnectionStats> stats_;
+  // These callbacks are owned by network filters and quic session should out live
+  // them.
   Http::ServerConnectionCallbacks* http_connection_callbacks_{nullptr};
   std::list<Network::ConnectionCallbacks*> network_connection_callbacks_;
 };

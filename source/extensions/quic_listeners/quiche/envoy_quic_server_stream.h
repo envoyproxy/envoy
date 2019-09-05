@@ -46,7 +46,6 @@ protected:
                                 const quic::QuicHeaderList& header_list) override;
   void OnTrailingHeadersComplete(bool fin, size_t frame_len,
                                  const quic::QuicHeaderList& header_list) override;
-  void CloseWriteSide() override { quic::QuicSpdyServerStreamBase::CloseWriteSide(); }
 };
 
 } // namespace Quic

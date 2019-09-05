@@ -76,7 +76,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
       type,
       dispatcher->createClientConnection(addr, Network::Address::InstanceConstSharedPtr(),
                                          Network::Test::createRawBufferSocket(), nullptr),
-      host_description, *dispatcher, false);
+      host_description, *dispatcher);
   BufferingStreamDecoderPtr response(new BufferingStreamDecoder([&]() -> void {
     client.close();
     dispatcher->exit();
@@ -145,6 +145,11 @@ Network::FilterStatus WaitForPayloadReader::onData(Buffer::Instance& data, bool 
   if ((!data_to_wait_for_.empty() && absl::StartsWith(data_, data_to_wait_for_)) ||
       (exact_match_ == false && data_.find(data_to_wait_for_) != std::string::npos) || end_stream) {
     data_to_wait_for_.clear();
+    dispatcher_.exit();
+  }
+
+  if (wait_for_length_ && data_.size() >= length_to_wait_for_) {
+    wait_for_length_ = false;
     dispatcher_.exit();
   }
 
