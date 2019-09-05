@@ -550,7 +550,8 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context) {
   HostsSource hosts_source;
   hosts_source.priority_ = host_set.priority();
 
-  // If the selected host set has insufficient healthy hosts, return all hosts.
+  // If the selected host set has insufficient healthy hosts, return all hosts (unless we should
+  // fail traffic on panic, in which case return no host).
   if (per_priority_panic_[hosts_source.priority_]) {
     stats_.lb_healthy_panic_.inc();
     if (fail_traffic_on_panic_) {

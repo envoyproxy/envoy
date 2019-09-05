@@ -223,6 +223,7 @@ protected:
 
   /**
    * Pick the host source to use, doing zone aware routing when the hosts are sufficiently healthy.
+   * If no host is chosen (due to fail_traffic_on_panic being set), return absl::nullopt.
    */
   absl::optional<HostsSource> hostSourceToUse(LoadBalancerContext* context);
 
