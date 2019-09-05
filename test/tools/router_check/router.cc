@@ -458,7 +458,8 @@ Options::Options(int argc, char** argv) {
   TCLAP::CmdLine cmd("router_check_tool", ' ', "none", true);
   TCLAP::SwitchArg is_proto("p", "useproto", "Use Proto test file schema", cmd, false);
   TCLAP::SwitchArg is_detailed("d", "details", "Show detailed test execution results", cmd, false);
-  TCLAP::SwitchArg only_show_failures("o", "only-show-failures", "Only display failing tests", cmd, false);
+  TCLAP::SwitchArg only_show_failures("o", "only-show-failures", "Only display failing tests", cmd,
+                                      false);
   TCLAP::SwitchArg disable_deprecation_check("", "disable-deprecation-check",
                                              "Disable deprecated fields check", cmd, false);
   TCLAP::ValueArg<double> fail_under("f", "fail-under",
