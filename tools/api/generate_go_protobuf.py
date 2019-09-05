@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 from subprocess import check_output
 from subprocess import call
 
@@ -8,11 +8,11 @@ import shutil
 import sys
 
 # Find the locations of the workspace root and the generated files directory.
-workspace = check_output(['bazel', 'info', 'workspace']).strip()
-bazel_bin = check_output(['bazel', 'info', 'bazel-bin']).strip()
+workspace = check_output(['bazel', 'info', 'workspace']).decode().strip()
+bazel_bin = check_output(['bazel', 'info', 'bazel-bin']).decode().strip()
 targets = '@envoy_api//...'
 import_base = 'github.com/envoyproxy/data-plane-api/api'
-output_base = 'go_out'
+output_base = 'build_go'
 
 go_protos = check_output([
     'bazel',
@@ -36,7 +36,7 @@ for rule in go_protos:
   #
   # Example output directory:
   # go_out/envoy/config/bootstrap/v2
-  rule_dir, proto = rule[len("@envoy_api//"):].rsplit(':', 1)
+  rule_dir, proto = rule.decode()[len('@envoy_api//'):].rsplit(':', 1)
 
   input_dir = os.path.join(bazel_bin, 'external', 'envoy_api', rule_dir, 'linux_amd64_stripped',
                            proto + '%', import_base, rule_dir)
@@ -44,8 +44,8 @@ for rule in go_protos:
   output_dir = os.path.join(workspace, output_base, rule_dir)
 
   # Ensure the output directory exists
-  if not os.path.exists(output_dir):
-    os.makedirs(output_dir, 0o755)
+  os.makedirs(output_dir, 0o755, exist_ok = True)
+  print(output_dir)
   for generated_file in input_files:
     shutil.copy(generated_file, output_dir)
     os.chmod(os.path.join(output_dir, generated_file), 0o644)
