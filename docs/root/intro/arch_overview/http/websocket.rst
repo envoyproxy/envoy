@@ -37,7 +37,7 @@ Note that the statistics for upgrades are all bundled together so WebSocket
 downstream_cx_upgrades_total and downstream_cx_upgrades_active
 
 Handling HTTP/2 hops
-^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^
 
 While HTTP/2 support for WebSockets is off by default, Envoy does support tunneling WebSockets over
 HTTP/2 streams for deployments that prefer a uniform HTTP/2 mesh throughout; this enables, for example,
