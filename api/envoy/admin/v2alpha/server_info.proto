@@ -36,6 +36,9 @@ message ServerInfo {
   // Uptime since the start of the first epoch.
   google.protobuf.Duration uptime_all_epochs = 4;
 
+  // Hot restart version.
+  string hot_restart_version = 5;
+
   // Command line options the server is currently running with.
   CommandLineOptions command_line_options = 6;
 }
@@ -53,8 +56,11 @@ message CommandLineOptions {
   // See :option:`--config-yaml` for details.
   string config_yaml = 4;
 
-  // See :option:`--allow-unknown-fields` for details.
-  bool allow_unknown_fields = 5;
+  // See :option:`--allow-unknown-static-fields` for details.
+  bool allow_unknown_static_fields = 5;
+
+  // See :option:`--reject-unknown-dynamic-fields` for details.
+  bool reject_unknown_dynamic_fields = 26;
 
   // See :option:`--admin-address-path` for details.
   string admin_address_path = 6;
@@ -79,8 +85,7 @@ message CommandLineOptions {
   // See :option:`--log-path` for details.
   string log_path = 11;
 
-  // See :option:`--hot-restart-version` for details.
-  bool hot_restart_version = 12;
+  reserved 12;
 
   // See :option:`--service-cluster` for details.
   string service_cluster = 13;

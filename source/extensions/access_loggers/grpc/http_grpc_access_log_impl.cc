@@ -34,8 +34,8 @@ HttpGrpcAccessLog::HttpGrpcAccessLog(AccessLog::FilterPtr&& filter,
   }
 
   tls_slot_->set([this](Event::Dispatcher&) {
-    return std::make_shared<ThreadLocalLogger>(
-        access_logger_cache_->getOrCreateLogger(config_.common_config()));
+    return std::make_shared<ThreadLocalLogger>(access_logger_cache_->getOrCreateLogger(
+        config_.common_config(), GrpcCommon::GrpcAccessLoggerType::HTTP));
   });
 }
 
@@ -59,9 +59,6 @@ void HttpGrpcAccessLog::emitLog(const Http::HeaderMap& request_headers,
       break;
     case Http::Protocol::Http2:
       log_entry.set_protocol_version(envoy::data::accesslog::v2::HTTPAccessLogEntry::HTTP2);
-      break;
-    case Http::Protocol::Http3:
-      log_entry.set_protocol_version(envoy::data::accesslog::v2::HTTPAccessLogEntry::HTTP3);
       break;
     }
   }

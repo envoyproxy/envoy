@@ -17,7 +17,7 @@ public:
   LibeventScheduler();
 
   // Scheduler
-  TimerPtr createTimer(const TimerCb& cb) override;
+  TimerPtr createTimer(const TimerCb& cb, Dispatcher& dispatcher) override;
 
   /**
    * Runs the event loop.

@@ -82,6 +82,7 @@ PROTO_RST="
   /envoy/api/v2/srds/envoy/api/v2/srds.proto.rst
   /envoy/api/v2/lds/envoy/api/v2/lds.proto.rst
   /envoy/api/v2/listener/listener/envoy/api/v2/listener/listener.proto.rst
+  /envoy/api/v2/listener/udp_listener_config/envoy/api/v2/listener/udp_listener_config.proto.rst
   /envoy/api/v2/ratelimit/ratelimit/envoy/api/v2/ratelimit/ratelimit.proto.rst
   /envoy/config/accesslog/v2/als/envoy/config/accesslog/v2/als.proto.rst
   /envoy/config/accesslog/v2/file/envoy/config/accesslog/v2/file.proto.rst
@@ -156,6 +157,7 @@ PROTO_RST="
   /envoy/type/matcher/metadata/envoy/type/matcher/metadata.proto.rst
   /envoy/type/matcher/value/envoy/type/matcher/value.proto.rst
   /envoy/type/matcher/number/envoy/type/matcher/number.proto.rst
+  /envoy/type/matcher/regex/envoy/type/matcher/regex.proto.rst
   /envoy/type/matcher/string/envoy/type/matcher/string.proto.rst
 "
 

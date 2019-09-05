@@ -13,6 +13,7 @@
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
 
 #include "quiche/quic/core/http/quic_header_list.h"
+#include "quiche/quic/core/quic_session.h"
 #include "quiche/spdy/core/spdy_header_block.h"
 #include "quiche/quic/platform/api/quic_mem_slice_span.h"
 #pragma GCC diagnostic pop
@@ -117,10 +118,8 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
   // Currently read out all the data.
   while (HasBytesToRead()) {
     struct iovec iov;
-    if (GetReadableRegions(&iov, 1) == 0) {
-      // No more data to read.
-      break;
-    }
+    int num_regions = GetReadableRegions(&iov, 1);
+    ASSERT(num_regions > 0);
     size_t bytes_read = iov.iov_len;
     Buffer::RawSlice slice;
     buffer->reserve(bytes_read, &slice, 1);
@@ -137,7 +136,11 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
   // trailers.
   ASSERT(decoder() != nullptr);
   decoder()->decodeData(*buffer, finished_reading);
-  if (sequencer()->IsClosed() && !FinishedReadingTrailers()) {
+  if (!quic::VersionUsesQpack(transport_version()) && sequencer()->IsClosed() &&
+      !FinishedReadingTrailers()) {
+    // For Google QUIC implementation, trailers may arrived earlier and wait to
+    // be consumed after reading all the body. Consume it here.
+    // IETF QUIC shouldn't reach here because trailers are sent on same stream.
     decoder()->decodeTrailers(spdyHeaderBlockToEnvoyHeaders(received_trailers()));
     MarkTrailersConsumed();
   }
@@ -146,7 +149,9 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
 void EnvoyQuicServerStream::OnTrailingHeadersComplete(bool fin, size_t frame_len,
                                                       const quic::QuicHeaderList& header_list) {
   quic::QuicSpdyServerStreamBase::OnTrailingHeadersComplete(fin, frame_len, header_list);
-  if (!FinishedReadingTrailers()) {
+  if (session()->connection()->connected() &&
+      (quic::VersionUsesQpack(transport_version()) || sequencer()->IsClosed()) &&
+      !FinishedReadingTrailers()) {
     // Before QPack trailers can arrive before body. Only decode trailers after finishing decoding
     // body.
     ASSERT(decoder() != nullptr);

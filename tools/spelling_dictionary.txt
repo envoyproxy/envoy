@@ -88,6 +88,7 @@ EWOULDBLOCK
 EXPECTs
 EXPR
 FAQ
+FCDS
 FDs
 FFFF
 FIN
@@ -120,6 +121,7 @@ HV
 IAM
 IANA
 IDL
+IETF
 INADDR
 INET
 IO
@@ -200,6 +202,7 @@ PREBIND
 PRNG
 PROT
 ProcessBufferedChlos
+PSS
 QPS
 QoS
 QUIC
@@ -271,6 +274,7 @@ TLSv
 TLV
 TMPDIR
 TODO
+TPM
 TPROXY
 TSAN
 TSI
@@ -776,6 +780,7 @@ uint
 un
 unacked
 unary
+uncomment
 unconfigurable
 unconfigured
 uncontended
@@ -791,6 +796,7 @@ unescaping
 unindexed
 uninsantiated
 uninstantiated
+uniq
 unix
 unlink
 unlinked

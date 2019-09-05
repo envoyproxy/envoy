@@ -10,7 +10,7 @@ void QuicHttpConnectionImplBase::goAway() {
 bool QuicHttpConnectionImplBase::wantsToWrite() { return quic_session_.HasDataToWrite(); }
 
 void QuicHttpConnectionImplBase::onUnderlyingConnectionAboveWriteBufferHighWatermark() {
-  for (auto& it : quic_session_.dynamic_streams()) {
+  for (auto& it : quic_session_.stream_map()) {
     if (!it.second->is_static()) {
       dynamic_cast<EnvoyQuicServerStream*>(it.second.get())->runHighWatermarkCallbacks();
     }
@@ -18,7 +18,7 @@ void QuicHttpConnectionImplBase::onUnderlyingConnectionAboveWriteBufferHighWater
 }
 
 void QuicHttpConnectionImplBase::onUnderlyingConnectionBelowWriteBufferLowWatermark() {
-  for (const auto& it : quic_session_.dynamic_streams()) {
+  for (const auto& it : quic_session_.stream_map()) {
     if (!it.second->is_static()) {
       dynamic_cast<EnvoyQuicServerStream*>(it.second.get())->runLowWatermarkCallbacks();
     }

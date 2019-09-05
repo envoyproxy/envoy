@@ -10,6 +10,52 @@ namespace Extensions {
 namespace HttpFilters {
 namespace IpTagging {
 
+IpTaggingFilterConfig::IpTaggingFilterConfig(
+    const envoy::config::filter::http::ip_tagging::v2::IPTagging& config,
+    const std::string& stat_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
+    : request_type_(requestTypeEnum(config.request_type())), scope_(scope), runtime_(runtime),
+      stat_name_set_(scope.symbolTable()),
+      stats_prefix_(stat_name_set_.add(stat_prefix + "ip_tagging")),
+      hit_(stat_name_set_.add("hit")), no_hit_(stat_name_set_.add("no_hit")),
+      total_(stat_name_set_.add("total")) {
+
+  // Once loading IP tags from a file system is supported, the restriction on the size
+  // of the set should be removed and observability into what tags are loaded needs
+  // to be implemented.
+  // TODO(ccaraman): Remove size check once file system support is implemented.
+  // Work is tracked by issue https://github.com/envoyproxy/envoy/issues/2695.
+  if (config.ip_tags().empty()) {
+    throw EnvoyException("HTTP IP Tagging Filter requires ip_tags to be specified.");
+  }
+
+  std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data;
+  tag_data.reserve(config.ip_tags().size());
+  for (const auto& ip_tag : config.ip_tags()) {
+    std::vector<Network::Address::CidrRange> cidr_set;
+    cidr_set.reserve(ip_tag.ip_list().size());
+    for (const envoy::api::v2::core::CidrRange& entry : ip_tag.ip_list()) {
+
+      // Currently, CidrRange::create doesn't guarantee that the CidrRanges are valid.
+      Network::Address::CidrRange cidr_entry = Network::Address::CidrRange::create(entry);
+      if (cidr_entry.isValid()) {
+        cidr_set.emplace_back(std::move(cidr_entry));
+      } else {
+        throw EnvoyException(
+            fmt::format("invalid ip/mask combo '{}/{}' (format is <ip>/<# mask bits>)",
+                        entry.address_prefix(), entry.prefix_len().value()));
+      }
+    }
+    tag_data.emplace_back(ip_tag.ip_tag_name(), cidr_set);
+  }
+  trie_ = std::make_unique<Network::LcTrie::LcTrie<std::string>>(tag_data);
+}
+
+void IpTaggingFilterConfig::incCounter(Stats::StatName name, absl::string_view tag) {
+  Stats::SymbolTable::StoragePtr storage =
+      scope_.symbolTable().join({stats_prefix_, stat_name_set_.getStatName(tag), name});
+  scope_.counterFromStatName(Stats::StatName(storage.get())).inc();
+}
+
 IpTaggingFilter::IpTaggingFilter(IpTaggingFilterConfigSharedPtr config) : config_(config) {}
 
 IpTaggingFilter::~IpTaggingFilter() = default;
@@ -42,12 +88,12 @@ Http::FilterHeadersStatus IpTaggingFilter::decodeHeaders(Http::HeaderMap& header
     // If there are use cases with a large set of tags, a way to opt into these stats
     // should be exposed and other observability options like logging tags need to be implemented.
     for (const std::string& tag : tags) {
-      config_->scope().counter(fmt::format("{}{}.hit", config_->statsPrefix(), tag)).inc();
+      config_->incHit(tag);
     }
   } else {
-    config_->scope().counter(fmt::format("{}no_hit", config_->statsPrefix())).inc();
+    config_->incNoHit();
   }
-  config_->scope().counter(fmt::format("{}total", config_->statsPrefix())).inc();
+  config_->incTotal();
   return Http::FilterHeadersStatus::Continue;
 }
 

@@ -102,7 +102,7 @@ CI Docker image.
 
 ## Building Envoy with Remote Execution
 
-Envoy can also be built with Bazel [Remote Executioon](https://docs.bazel.build/versions/master/remote-execution.html),
+Envoy can also be built with Bazel [Remote Execution](https://docs.bazel.build/versions/master/remote-execution.html),
 part of the CI is running with the hosted [GCP RBE](https://blog.bazel.build/2018/10/05/remote-build-execution.html) service.
 
 To build Envoy with a remote build services, run Bazel with your remote build service flags and with `--config=remote-clang`.
@@ -407,6 +407,8 @@ The following optional features can be disabled on the Bazel build command-line:
 * Backtracing on signals with `--define signal_trace=disabled`
 * Active stream state dump on signals with `--define signal_trace=disabled` or `--define disable_object_dump_on_signal_trace=disabled`
 * tcmalloc with `--define tcmalloc=disabled`
+* deprecated features with `--define deprecated_features=disabled`
+
 
 ## Enabling optional features
 

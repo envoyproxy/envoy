@@ -34,7 +34,7 @@ public:
 
   void initLogger(std::chrono::milliseconds buffer_flush_interval_msec, size_t buffer_size_bytes) {
     timer_ = new Event::MockTimer(&dispatcher_);
-    EXPECT_CALL(*timer_, enableTimer(buffer_flush_interval_msec));
+    EXPECT_CALL(*timer_, enableTimer(buffer_flush_interval_msec, _));
     logger_ = std::make_unique<GrpcAccessLoggerImpl>(Grpc::RawAsyncClientPtr{async_client_},
                                                      log_name_, buffer_flush_interval_msec,
                                                      buffer_size_bytes, dispatcher_, local_info_);
@@ -202,7 +202,7 @@ TEST_F(GrpcAccessLoggerImplTest, Flushing) {
   initLogger(FlushInterval, 100);
 
   // Nothing to do yet.
-  EXPECT_CALL(*timer_, enableTimer(FlushInterval));
+  EXPECT_CALL(*timer_, enableTimer(FlushInterval, _));
   timer_->invokeCallback();
 
   envoy::data::accesslog::v2::HTTPAccessLogEntry entry;
@@ -227,11 +227,11 @@ TEST_F(GrpcAccessLoggerImplTest, Flushing) {
     - request:
         path: /test/path1
   )EOF"));
-  EXPECT_CALL(*timer_, enableTimer(FlushInterval));
+  EXPECT_CALL(*timer_, enableTimer(FlushInterval, _));
   timer_->invokeCallback();
 
   // Flush on empty message does nothing.
-  EXPECT_CALL(*timer_, enableTimer(FlushInterval));
+  EXPECT_CALL(*timer_, enableTimer(FlushInterval, _));
   timer_->invokeCallback();
 }
 
@@ -271,21 +271,26 @@ TEST_F(GrpcAccessLoggerCacheImplTest, Deduplication) {
   config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("cluster-1");
 
   expectClientCreation();
-  GrpcAccessLoggerSharedPtr logger1 = logger_cache_->getOrCreateLogger(config);
-  EXPECT_EQ(logger1, logger_cache_->getOrCreateLogger(config));
+  GrpcAccessLoggerSharedPtr logger1 =
+      logger_cache_->getOrCreateLogger(config, GrpcAccessLoggerType::HTTP);
+  EXPECT_EQ(logger1, logger_cache_->getOrCreateLogger(config, GrpcAccessLoggerType::HTTP));
+
+  // Do not deduplicate different types of logger
+  expectClientCreation();
+  EXPECT_NE(logger1, logger_cache_->getOrCreateLogger(config, GrpcAccessLoggerType::TCP));
 
   // Changing log name leads to another logger.
   config.set_log_name("log-2");
   expectClientCreation();
-  EXPECT_NE(logger1, logger_cache_->getOrCreateLogger(config));
+  EXPECT_NE(logger1, logger_cache_->getOrCreateLogger(config, GrpcAccessLoggerType::HTTP));
 
   config.set_log_name("log-1");
-  EXPECT_EQ(logger1, logger_cache_->getOrCreateLogger(config));
+  EXPECT_EQ(logger1, logger_cache_->getOrCreateLogger(config, GrpcAccessLoggerType::HTTP));
 
   // Changing cluster name leads to another logger.
   config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("cluster-2");
   expectClientCreation();
-  EXPECT_NE(logger1, logger_cache_->getOrCreateLogger(config));
+  EXPECT_NE(logger1, logger_cache_->getOrCreateLogger(config, GrpcAccessLoggerType::HTTP));
 }
 
 } // namespace

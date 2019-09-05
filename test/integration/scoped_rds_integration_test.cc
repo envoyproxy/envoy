@@ -48,7 +48,11 @@ protected:
                    http_connection_manager) {
           const std::string& scope_key_builder_config_yaml = R"EOF(
 fragments:
-  - header_value_extractor: { name: X-Google-VIP }
+  - header_value_extractor:
+      name: Addr
+      element:
+        key: x-foo-key
+        separator: ;
 )EOF";
           envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::ScopeKeyBuilder
               scope_key_builder;
@@ -124,6 +128,15 @@ fragments:
     createStream(&scoped_rds_upstream_info_, getScopedRdsFakeUpstream());
   }
 
+  void sendRdsResponse(const std::string& route_config, const std::string& version) {
+    envoy::api::v2::DiscoveryResponse response;
+    response.set_version_info(version);
+    response.set_type_url(Config::TypeUrl::get().RouteConfiguration);
+    response.add_resources()->PackFrom(
+        TestUtility::parseYaml<envoy::api::v2::RouteConfiguration>(route_config));
+    rds_upstream_info_.stream_->sendGrpcMessage(response);
+  }
+
   void sendScopedRdsResponse(const std::vector<std::string>& resource_protos,
                              const std::string& version) {
     ASSERT(scoped_rds_upstream_info_.stream_ != nullptr);
@@ -159,19 +172,31 @@ key:
 )EOF";
   const std::string scope_route2 = R"EOF(
 name: foo_scope2
-route_configuration_name: foo_route2
+route_configuration_name: foo_route1
 key:
   fragments:
-    - string_key: x-foo-key
+    - string_key: x-bar-key
 )EOF";
 
-  on_server_init_function_ = [this, &scope_route1, &scope_route2]() {
+  const std::string route_config_tmpl = R"EOF(
+      name: {}
+      virtual_hosts:
+      - name: integration
+        domains: ["*"]
+        routes:
+        - match: {{ prefix: "/" }}
+          route: {{ cluster: {} }}
+)EOF";
+
+  on_server_init_function_ = [&]() {
     createScopedRdsStream();
     sendScopedRdsResponse({scope_route1, scope_route2}, "1");
+    createRdsStream();
+    sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1", "cluster_foo_1"), "1");
+    sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1", "cluster_foo_2"), "2");
   };
   initialize();
-
-  test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_attempt", 1);
+  test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_attempt", 2);
   test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_success", 1);
   // The version gauge should be set to xxHash64("1").
   test_server_->waitForGaugeEq("http.config_test.scoped_rds.foo-scoped-routes.version",
@@ -179,20 +204,21 @@ key:
 
   const std::string scope_route3 = R"EOF(
 name: foo_scope3
-route_configuration_name: foo_route3
+route_configuration_name: foo_route1
 key:
   fragments:
     - string_key: x-baz-key
 )EOF";
   sendScopedRdsResponse({scope_route3}, "2");
-
-  test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_attempt", 2);
   test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_success", 2);
   test_server_->waitForGaugeEq("http.config_test.scoped_rds.foo-scoped-routes.version",
                                6927017134761466251UL);
-
-  // TODO(AndresGuedez): test actual scoped routing logic; only the config handling is implemented
-  // at this point.
+  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_attempt", 3);
+  sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1", "cluster_foo_3"), "3");
+  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 3);
+  // RDS updates won't affect SRDS.
+  test_server_->waitForGaugeEq("http.config_test.scoped_rds.foo-scoped-routes.version",
+                               6927017134761466251UL);
 }
 
 // Test that a bad config update updates the corresponding stats.

@@ -30,6 +30,7 @@ envoy_cc_test(
     name = "envoy_quic_writer_test",
     srcs = ["envoy_quic_writer_test.cc"],
     external_deps = ["quiche_quic_platform"],
+    tags = ["nofips"],
     deps = [
         "//source/common/network:io_socket_error_lib",
         "//source/extensions/quic_listeners/quiche:envoy_quic_packet_writer_lib",
@@ -59,7 +60,7 @@ envoy_cc_test(
         "//source/extensions/quic_listeners/quiche:envoy_quic_alarm_factory_lib",
         "//source/extensions/quic_listeners/quiche:envoy_quic_connection_helper_lib",
         "//source/extensions/quic_listeners/quiche:envoy_quic_connection_lib",
-        "//source/extensions/quic_listeners/quiche:envoy_quic_server_stream_lib",
+        "//source/extensions/quic_listeners/quiche:envoy_quic_server_session_lib",
         "//test/mocks/http:stream_decoder_mock",
         "//test/mocks/network:network_mocks",
         "//test/test_common:utility_lib",
@@ -86,6 +87,7 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:global_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:simulated_time_system_lib",
     ],
 )
@@ -121,5 +123,17 @@ envoy_cc_test_library(
         "//source/extensions/quic_listeners/quiche:envoy_quic_proof_source_lib",
         "//source/extensions/quic_listeners/quiche:envoy_quic_proof_verifier_lib",
         "@com_googlesource_quiche//:quic_test_tools_test_utils_interface_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "quic_io_handle_wrapper_test",
+    srcs = ["quic_io_handle_wrapper_test.cc"],
+    tags = ["nofips"],
+    deps = [
+        "//source/extensions/quic_listeners/quiche:quic_io_handle_wrapper_lib",
+        "//test/mocks/api:api_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/test_common:threadsafe_singleton_injector_lib",
     ],
 )

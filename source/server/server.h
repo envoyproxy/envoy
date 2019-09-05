@@ -49,6 +49,8 @@ namespace Server {
  * All server wide stats. @see stats_macros.h
  */
 #define ALL_SERVER_STATS(COUNTER, GAUGE, HISTOGRAM)                                                \
+  COUNTER(static_unknown_fields)                                                                   \
+  COUNTER(dynamic_unknown_fields)                                                                  \
   COUNTER(debug_assertion_failures)                                                                \
   GAUGE(concurrency, NeverImport)                                                                  \
   GAUGE(days_until_first_cert_expiring, Accumulate)                                                \
@@ -201,9 +203,8 @@ public:
     return config_.statsFlushInterval();
   }
 
-  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
-    return options_.allowUnknownFields() ? ProtobufMessage::getStrictValidationVisitor()
-                                         : ProtobufMessage::getNullValidationVisitor();
+  ProtobufMessage::ValidationContext& messageValidationContext() override {
+    return validation_context_;
   }
 
   // ServerLifecycleNotifier
@@ -236,6 +237,7 @@ private:
   bool workers_started_;
   bool shutdown_;
   const Options& options_;
+  ProtobufMessage::ProdValidationContextImpl validation_context_;
   TimeSource& time_source_;
   HotRestart& restarter_;
   const time_t start_time_;

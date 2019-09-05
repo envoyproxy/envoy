@@ -45,15 +45,14 @@ quic::QuicSpdyStream* EnvoyQuicServerSession::CreateIncomingStream(quic::QuicStr
   return stream;
 }
 
-quic::QuicSpdyStream* EnvoyQuicServerSession::CreateIncomingStream(quic::PendingStream* pending) {
-  auto stream = new EnvoyQuicServerStream(pending, this, quic::BIDIRECTIONAL);
-  ActivateStream(absl::WrapUnique(stream));
-  setUpRequestDecoder(*stream);
-  return stream;
+quic::QuicSpdyStream*
+EnvoyQuicServerSession::CreateIncomingStream(quic::PendingStream* /*pending*/) {
+  // Only client side server push stream should trigger this call.
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 quic::QuicSpdyStream* EnvoyQuicServerSession::CreateOutgoingBidirectionalStream() {
-  // Not allow server initiated stream.
+  // Disallow server initiated stream.
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
@@ -83,6 +82,12 @@ void EnvoyQuicServerSession::OnConnectionClosed(const quic::QuicConnectionCloseF
 void EnvoyQuicServerSession::Initialize() {
   quic::QuicServerSessionBase::Initialize();
   quic_connection_->setEnvoyConnection(*this);
+}
+
+void EnvoyQuicServerSession::SendGoAway(quic::QuicErrorCode error_code, const std::string& reason) {
+  if (transport_version() < quic::QUIC_VERSION_99) {
+    quic::QuicServerSessionBase::SendGoAway(error_code, reason);
+  }
 }
 
 void EnvoyQuicServerSession::addWriteFilter(Network::WriteFilterSharedPtr filter) {
@@ -147,7 +152,10 @@ std::chrono::milliseconds EnvoyQuicServerSession::delayedCloseTimeout() const {
 }
 
 const Network::ConnectionSocket::OptionsSharedPtr& EnvoyQuicServerSession::socketOptions() const {
-  ENVOY_CONN_LOG(error, "QUIC does not support connection pooling", *this);
+  ENVOY_CONN_LOG(
+      error,
+      "QUIC connection socket is merely a wrapper, and doesn't have any specific socket options.",
+      *this);
   return quic_connection_->connectionSocket()->options();
 }
 

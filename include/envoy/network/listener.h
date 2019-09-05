@@ -14,6 +14,7 @@ namespace Envoy {
 namespace Network {
 
 class UdpListenerFilterManager;
+class ActiveUdpListenerFactory;
 
 /**
  * A configuration for an individual listener.
@@ -90,6 +91,12 @@ public:
    * @return const std::string& the listener's name.
    */
   virtual const std::string& name() const PURE;
+
+  /**
+   * @return factory pointer if listening on UDP socket, otherwise return
+   * nullptr.
+   */
+  virtual const ActiveUdpListenerFactory* udpListenerFactory() PURE;
 };
 
 /**

@@ -49,10 +49,14 @@ public:
 
   envoy::api::v2::Cluster buildCluster(const std::string& name);
 
+  envoy::api::v2::Cluster buildRedisCluster(const std::string& name);
+
   envoy::api::v2::ClusterLoadAssignment buildClusterLoadAssignment(const std::string& name);
 
   envoy::api::v2::Listener buildListener(const std::string& name, const std::string& route_config,
                                          const std::string& stat_prefix = "ads_test");
+
+  envoy::api::v2::Listener buildRedisListener(const std::string& name, const std::string& cluster);
 
   envoy::api::v2::RouteConfiguration buildRouteConfig(const std::string& name,
                                                       const std::string& cluster);
