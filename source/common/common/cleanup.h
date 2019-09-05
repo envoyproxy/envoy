@@ -10,7 +10,7 @@ namespace Envoy {
 // RAII cleanup via functor.
 class Cleanup {
 public:
-  Cleanup(std::function<void()> f) : f_(std::move(f)) {}
+  Cleanup(std::function<void()> f) : f_(std::move(f)), cancelled_(false) {}
   ~Cleanup() { f_(); }
 
   void cancel() {
