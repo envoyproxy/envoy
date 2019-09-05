@@ -654,6 +654,7 @@ createTransportSocketFactory(const envoy::api::v2::Cluster& config,
 
 
 TransportSocketMatcherPtr createTransportSocketMatcher(
+    spdlog::logger& logger,
     const envoy::api::v2::Cluster& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context);
 

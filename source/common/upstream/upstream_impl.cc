@@ -38,6 +38,8 @@
 #include "server/transport_socket_config_impl.h"
 
 #include "extensions/transport_sockets/well_known_names.h"
+#include "spdlog/spdlog.h"
+
 
 namespace Envoy {
 namespace Upstream {
@@ -751,6 +753,7 @@ Network::TransportSocketFactoryPtr createTransportSocketFactory(
 
 // TODO(icnfly): figure out here, what's about factory context.
 TransportSocketMatcherPtr createTransportSocketMatcher(
+    spdlog::logger& logger,
     const envoy::api::v2::Cluster& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context) {
   // If the cluster config doesn't have a transport socket configured, override with the default
@@ -793,6 +796,8 @@ TransportSocketMatcherPtr createTransportSocketMatcher(
       socket, factory_context.messageValidationVisitor(), tls_config_factory);
     (*socket_factory_map)[label] = 
         tls_config_factory.createTransportSocketFactory(*message, factory_context);
+    ENVOY_LOG_TO_LOGGER(logger, info, "incfly debug nullptr? {}, label value {} ", 
+        (*socket_factory_map)[label].get() == nullptr, label);
   }
   return std::make_unique<TransportSocketMatcher>(
       std::move(default_socket_factory),  std::move(socket_factory_map));
@@ -813,7 +818,7 @@ ClusterImplBase::ClusterImplBase(
       symbol_table_(stats_scope->symbolTable()) {
   factory_context.setInitManager(init_manager_);
   auto socket_factory = createTransportSocketFactory(cluster, factory_context);
-  auto socket_overrides = createTransportSocketMatcher(cluster, factory_context);
+  auto socket_overrides = createTransportSocketMatcher(ENVOY_LOGGER(), cluster, factory_context);
   info_ = std::make_unique<ClusterInfoImpl>(
       cluster, factory_context.clusterManager().bindConfig(), runtime, std::move(socket_factory),
       std::move(socket_overrides), std::move(stats_scope), added_via_api,
