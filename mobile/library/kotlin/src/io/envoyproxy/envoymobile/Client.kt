@@ -17,12 +17,12 @@ interface Client {
    * Convenience function for sending a unary request.
    *
    * @param request  The request to send.
-   * @param data Serialized data to send as the body of the request.
+   * @param body Serialized data to send as the body of the request.
    * @param trailers Trailers to send with the request.
    * @param responseHandler the callback for receiving stream events.
    * @return CancelableStream, a cancelable request.
    */
-  fun send(request: Request, data: ByteBuffer?, trailers: Map<String, List<String>>,
+  fun send(request: Request, body: ByteBuffer?, trailers: Map<String, List<String>>,
                 responseHandler: ResponseHandler): CancelableStream
 
   /**

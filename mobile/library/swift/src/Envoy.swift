@@ -54,13 +54,13 @@ extension Envoy: Client {
   }
 
   @discardableResult
-  public func send(_ request: Request, data: Data?,
+  public func send(_ request: Request, body: Data?,
                    trailers: [String: [String]] = [:], handler: ResponseHandler)
     -> CancelableStream
   {
     let emitter = self.send(request, handler: handler)
-    if let data = data {
-      emitter.sendData(data)
+    if let body = body {
+      emitter.sendData(body)
     }
 
     emitter.close(trailers: trailers)

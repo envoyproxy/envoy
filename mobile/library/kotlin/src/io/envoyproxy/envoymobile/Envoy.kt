@@ -70,10 +70,10 @@ class Envoy private constructor(
     return EnvoyStreamEmitter(stream)
   }
 
-  override fun send(request: Request, data: ByteBuffer?, trailers: Map<String, List<String>>, responseHandler: ResponseHandler): CancelableStream {
+  override fun send(request: Request, body: ByteBuffer?, trailers: Map<String, List<String>>, responseHandler: ResponseHandler): CancelableStream {
     val stream = send(request, responseHandler)
-    if (data != null) {
-      stream.sendData(data)
+    if (body != null) {
+      stream.sendData(body)
     }
     stream.close(trailers)
     return stream
