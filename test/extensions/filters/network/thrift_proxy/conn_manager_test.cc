@@ -509,6 +509,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesTransportApplicationException) 
   EXPECT_EQ(0U, stats_.request_active_.value());
 }
 
+// Tests that OnData handles non-thrift input. Regression test for crash on invalid input.
 TEST_F(ThriftConnectionManagerTest, OnDataHandlesGarbageRequest) {
   initializeFilter();
   addRepeated(buffer_, 8, 0);
@@ -905,6 +906,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndTransportApplicationException) {
   EXPECT_EQ(1U, store_.counter("test.response_decoding_error").value());
 }
 
+// Tests that a request is routed and a non-thrift response is handled.
 TEST_F(ThriftConnectionManagerTest, RequestAndGarbageResponse) {
   initializeFilter();
   writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
