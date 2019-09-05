@@ -5,6 +5,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "extensions/filters/network/common/redis/codec_impl.h"
+#include "extensions/filters/network/common/redis/redis_command_stats.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -189,7 +190,7 @@ public:
    * @return ClientPtr a new connection pool client.
    */
   virtual ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
-                           const Config& config) PURE;
+                           const Config& config, RedisCommandStatsPtr&& redis_command_stats) PURE;
 };
 
 } // namespace Client

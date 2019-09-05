@@ -73,8 +73,12 @@ public:
     EXPECT_CALL(*upstream_connection_, connect());
     EXPECT_CALL(*upstream_connection_, noDelay(true));
 
+    stats_scope_ = stats_.createScope("test");
+    redis_command_stats_ = Common::Redis::RedisCommandStats::createRedisCommandStats(
+        *stats_scope_, "upstream_commands", true);
+
     client_ = ClientImpl::create(host_, dispatcher_, Common::Redis::EncoderPtr{encoder_}, *this,
-                                 *config_);
+                                 *config_, std::move(redis_command_stats_));
     EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_cx_total_.value());
     EXPECT_EQ(1UL, host_->stats_.cx_total_.value());
     EXPECT_EQ(false, client_->active());
@@ -111,6 +115,9 @@ public:
   Network::ReadFilterSharedPtr upstream_read_filter_;
   std::unique_ptr<Config> config_;
   ClientPtr client_;
+  Stats::IsolatedStoreImpl stats_;
+  Stats::ScopePtr stats_scope_;
+  Common::Redis::RedisCommandStatsPtr redis_command_stats_;
 };
 
 TEST_F(RedisClientImplTest, BatchWithZeroBufferAndTimeout) {
@@ -877,7 +884,11 @@ TEST(RedisClientFactoryImplTest, Basic) {
   EXPECT_CALL(*host, createConnection_(_, _)).WillOnce(Return(conn_info));
   NiceMock<Event::MockDispatcher> dispatcher;
   ConfigImpl config(createConnPoolSettings());
-  ClientPtr client = factory.create(host, dispatcher, config);
+  Stats::IsolatedStoreImpl stats_;
+  Stats::ScopePtr stats_scope = stats_.createScope("test");
+  auto redis_command_stats = Common::Redis::RedisCommandStats::createRedisCommandStats(
+      *stats_scope, "upstream_commands", true);
+  ClientPtr client = factory.create(host, dispatcher, config, std::move(redis_command_stats));
   client->close();
 }
 

@@ -46,6 +46,7 @@ envoy_cc_library(
     hdrs = ["client.h"],
     deps = [
         ":codec_lib",
+        ":redis_command_stats_lib",
         "//include/envoy/upstream:cluster_manager_interface",
     ],
 )
@@ -57,7 +58,6 @@ envoy_cc_library(
     deps = [
         ":client_interface",
         ":codec_lib",
-        ":redis_command_stats_lib",
         "//include/envoy/router:router_interface",
         "//include/envoy/stats:timespan",
         "//include/envoy/thread_local:thread_local_interface",

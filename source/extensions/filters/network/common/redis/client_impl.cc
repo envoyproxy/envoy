@@ -49,9 +49,7 @@ ConfigImpl::ConfigImpl(
 
 ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                              EncoderPtr&& encoder, DecoderFactory& decoder_factory,
-                             const Config& config) {
-  auto redis_command_stats = std::make_shared<RedisCommandStats>(
-      host->cluster().statsScope(), "upstream_commands", config.enableCommandStats());
+                             const Config& config, RedisCommandStatsPtr&& redis_command_stats) {
   auto client = std::make_unique<ClientImpl>(host, dispatcher, std::move(encoder), decoder_factory,
                                              config, std::move(redis_command_stats));
   client->connection_ = host->createConnection(dispatcher, nullptr, nullptr).connection_;
@@ -275,9 +273,10 @@ void ClientImpl::PendingRequest::cancel() {
 ClientFactoryImpl ClientFactoryImpl::instance_;
 
 ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
-                                    Event::Dispatcher& dispatcher, const Config& config) {
+                                    Event::Dispatcher& dispatcher, const Config& config,
+                                    RedisCommandStatsPtr&& redis_command_stats) {
   return ClientImpl::create(host, dispatcher, EncoderPtr{new EncoderImpl()}, decoder_factory_,
-                            config);
+                            config, std::move(redis_command_stats));
 }
 
 } // namespace Client

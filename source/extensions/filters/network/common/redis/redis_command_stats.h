@@ -19,7 +19,16 @@ namespace Redis {
 
 class RedisCommandStats {
 public:
-  RedisCommandStats(Stats::Scope& scope, const std::string& prefix, bool enabled);
+  RedisCommandStats(Stats::Scope&, const std::string& prefix, bool enabled);
+
+  // TODO: Make std::shared_ptr<RedisCommandStats> be RedisCommandStatsPtr
+  static std::shared_ptr<RedisCommandStats>
+  createRedisCommandStats(Stats::Scope& stats_scope, const std::string& prefix, bool enabled) {
+    auto redis_command_stats = std::make_shared<Common::Redis::RedisCommandStats>(
+        stats_scope, prefix,
+        enabled); // TODO: createScope uses make_unique, should I be doing that?
+    return redis_command_stats;
+  }
 
   Stats::Counter& counter(const Stats::StatNameVec& stat_names);
   Stats::Histogram& histogram(const Stats::StatNameVec& stat_names);

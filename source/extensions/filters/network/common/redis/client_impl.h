@@ -16,7 +16,6 @@
 #include "common/upstream/upstream_impl.h"
 
 #include "extensions/filters/network/common/redis/client.h"
-#include "extensions/filters/network/common/redis/redis_command_stats.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -69,7 +68,7 @@ class ClientImpl : public Client, public DecoderCallbacks, public Network::Conne
 public:
   static ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                           EncoderPtr&& encoder, DecoderFactory& decoder_factory,
-                          const Config& config);
+                          const Config& config, RedisCommandStatsPtr&& redis_command_stats);
 
   ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
              DecoderFactory& decoder_factory, const Config& config,
@@ -145,7 +144,7 @@ class ClientFactoryImpl : public ClientFactory {
 public:
   // RedisProxy::ConnPool::ClientFactoryImpl
   ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
-                   const Config& config) override;
+                   const Config& config, RedisCommandStatsPtr&& redis_command_stats) override;
 
   static ClientFactoryImpl instance_;
 
