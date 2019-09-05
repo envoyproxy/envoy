@@ -79,7 +79,7 @@ cc_proto_library(
 
 go_proto_library(
     name = "gogo_proto_go",
-    importpath = "gogoproto",
+    importpath = "github.com/gogo/protobuf/gogoproto",
     proto = ":gogo_proto",
     visibility = ["//visibility:public"],
     deps = [
@@ -113,7 +113,7 @@ api_proto_library(
 
 go_proto_library(
     name = "client_model_go_proto",
-    importpath = "client_model",
+    importpath = "github.com/prometheus/client_model/go",
     proto = ":client_model",
     visibility = ["//visibility:public"],
 )
