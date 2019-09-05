@@ -19,11 +19,8 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::AnyNumber;
 using testing::InSequence;
-using testing::Invoke;
 using testing::Return;
-using testing::ReturnRef;
 using testing::StrEq;
 using testing::Throw;
 

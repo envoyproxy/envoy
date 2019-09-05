@@ -50,7 +50,6 @@ using testing::_;
 using testing::An;
 using testing::AnyNumber;
 using testing::AtLeast;
-using testing::DoAll;
 using testing::Eq;
 using testing::HasSubstr;
 using testing::InSequence;
@@ -61,7 +60,6 @@ using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
-using testing::Sequence;
 
 namespace Envoy {
 namespace Http {

@@ -23,9 +23,6 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 namespace {
 
-using Envoy::Buffer::addRepeated;
-using Envoy::Buffer::addSeq;
-
 inline std::string fieldTypeToString(const FieldType& field_type) {
   switch (field_type) {
   case FieldType::Stop:

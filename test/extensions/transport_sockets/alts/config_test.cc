@@ -11,10 +11,7 @@
 #include "gtest/gtest.h"
 
 using Envoy::Server::Configuration::MockTransportSocketFactoryContext;
-using testing::_;
-using testing::Invoke;
 using testing::ReturnRef;
-using testing::StrictMock;
 
 namespace Envoy {
 namespace Extensions {
