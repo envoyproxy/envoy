@@ -35,7 +35,7 @@ using testing::_; // NOLINT(misc-unused-using-decls)
 using testing::AssertionFailure;
 using testing::AssertionResult;
 using testing::AssertionSuccess;
-using testing::Invoke; //  NOLINT(misc-unused-using-decls
+using testing::Invoke; //  NOLINT(misc-unused-using-decls)
 
 namespace Envoy {
 
