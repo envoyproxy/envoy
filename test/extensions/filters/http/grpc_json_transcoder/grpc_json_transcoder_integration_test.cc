@@ -527,7 +527,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, DeepStruct) {
       Http::TestHeaderMapImpl{
           {":method", "POST"}, {":path", "/echoStruct"}, {":authority", "host"}},
       createDeepJson(100, true), {}, {}, Status(),
-      Http::TestHeaderMapImpl{{":status", "503"}, {"content-type", "application/grpc"}}, "");
+      Http::TestHeaderMapImpl{{":status", "503"}, {"content-type", "application/json"}}, "");
 
   // The invalid deep struct is detected.
   testTranscoding<bookstore::EchoStructReqResp, bookstore::EchoStructReqResp>(

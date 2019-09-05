@@ -353,6 +353,22 @@ void JsonTranscoderFilter::setDecoderFilterCallbacks(
   decoder_callbacks_ = &callbacks;
 }
 
+void JsonTranscoderFilter::encodeGrpcStatusMessage(Http::HeaderMap& trailers) {
+  const absl::optional<Grpc::Status::GrpcStatus> grpc_status =
+      Grpc::Common::getGrpcStatus(trailers);
+  if (!grpc_status || grpc_status.value() == Grpc::Status::GrpcStatus::InvalidCode) {
+    response_headers_->Status()->value(enumToInt(Http::Code::ServiceUnavailable));
+  } else {
+    response_headers_->Status()->value(Grpc::Utility::grpcToHttpStatus(grpc_status.value()));
+    response_headers_->insertGrpcStatus().value(enumToInt(grpc_status.value()));
+  }
+
+  const Http::HeaderEntry* grpc_message_header = trailers.GrpcMessage();
+  if (grpc_message_header) {
+    response_headers_->insertGrpcMessage().value(*grpc_message_header);
+  }
+}
+
 Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::HeaderMap& headers,
                                                               bool end_stream) {
   if (!Grpc::Common::isGrpcResponseHeader(headers, end_stream)) {
@@ -365,14 +381,16 @@ Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::HeaderMap& h
 
   response_headers_ = &headers;
 
+  headers.insertContentType().value().setReference(Http::Headers::get().ContentTypeValues.Json);
+
   if (end_stream) {
     // In gRPC wire protocol, headers frame with end_stream is a trailers-only response.
     // The return value from encodeTrailers is ignored since it is always continue.
-    encodeTrailers(headers);
+    encodeGrpcStatusMessage(headers);
+    response_headers_->insertContentLength().value(uint64_t(0));
     return Http::FilterHeadersStatus::Continue;
   }
 
-  headers.insertContentType().value().setReference(Http::Headers::get().ContentTypeValues.Json);
   if (!method_->server_streaming()) {
     return Http::FilterHeadersStatus::StopIteration;
   }
@@ -427,19 +445,7 @@ Http::FilterTrailersStatus JsonTranscoderFilter::encodeTrailers(Http::HeaderMap&
     return Http::FilterTrailersStatus::Continue;
   }
 
-  const absl::optional<Grpc::Status::GrpcStatus> grpc_status =
-      Grpc::Common::getGrpcStatus(trailers);
-  if (!grpc_status || grpc_status.value() == Grpc::Status::GrpcStatus::InvalidCode) {
-    response_headers_->Status()->value(enumToInt(Http::Code::ServiceUnavailable));
-  } else {
-    response_headers_->Status()->value(Grpc::Utility::grpcToHttpStatus(grpc_status.value()));
-    response_headers_->insertGrpcStatus().value(enumToInt(grpc_status.value()));
-  }
-
-  const Http::HeaderEntry* grpc_message_header = trailers.GrpcMessage();
-  if (grpc_message_header) {
-    response_headers_->insertGrpcMessage().value(*grpc_message_header);
-  }
+  encodeGrpcStatusMessage(trailers);
 
   // remove Trailer headers if the client connection was http/1
   if (encoder_callbacks_->streamInfo().protocol() != Http::Protocol::Http2) {
