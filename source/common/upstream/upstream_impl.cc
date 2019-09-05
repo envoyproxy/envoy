@@ -222,7 +222,7 @@ Host::CreateConnectionData HostImpl::createConnection(
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsSharedPtr transport_socket_options) const {
 
-  ENVOY_LOG(info, "incfly debug address {} metadata {}", address_->asString(), metadata()->DebugString());
+  // ENVOY_LOG(info, "incfly debug address {} metadata {}", address_->asString(), metadata()->DebugString());
   return {createConnection(dispatcher, *cluster_, address_, *metadata(), options, transport_socket_options),
           shared_from_this()};
 }
@@ -796,8 +796,8 @@ TransportSocketMatcherPtr createTransportSocketMatcher(
       socket, factory_context.messageValidationVisitor(), tls_config_factory);
     (*socket_factory_map)[label] = 
         tls_config_factory.createTransportSocketFactory(*message, factory_context);
-    ENVOY_LOG_TO_LOGGER(logger, info, "incfly debug nullptr? {}, label value {} ", 
-        (*socket_factory_map)[label].get() == nullptr, label);
+    //ENVOY_LOG_TO_LOGGER(logger, info, "incfly debug nullptr? {}, label value {} ", 
+        //(*socket_factory_map)[label].get() == nullptr, label);
   }
   return std::make_unique<TransportSocketMatcher>(
       std::move(default_socket_factory),  std::move(socket_factory_map));

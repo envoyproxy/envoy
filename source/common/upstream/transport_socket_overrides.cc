@@ -7,9 +7,6 @@ TransportSocketMatcher::TransportSocketMatcher(
     Network::TransportSocketFactoryPtr&& socket_factory,
 
   TransportSocketFactoryMapPtr&& socket_factory_overrides):
-//      std::map<std::string, Network::TransportSocketFactoryPtr>&& socket_factory_overrides) :
-//    const Protobuf::Map<std::string, envoy::api::v2::auth::UpstreamTlsContext>& socket_matcher,
-//Server::Configuration::TransportSocketFactoryContext&  factory) : 
   default_socket_factory_(std::move(socket_factory)),
   socket_factory_map_(std::move(socket_factory_overrides)) {}
 
