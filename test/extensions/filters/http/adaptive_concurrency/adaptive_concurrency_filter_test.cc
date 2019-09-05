@@ -24,6 +24,7 @@ using ConcurrencyController::RequestForwardingAction;
 class MockConcurrencyController : public ConcurrencyController::ConcurrencyController {
 public:
   MOCK_METHOD0(forwardingDecision, RequestForwardingAction());
+  MOCK_METHOD0(cancelLatencySample, void());
   MOCK_METHOD1(recordLatencySample, void(std::chrono::nanoseconds));
 
   uint32_t concurrencyLimit() const override { return 0; }
@@ -40,6 +41,7 @@ public:
 
     filter_ = std::make_unique<AdaptiveConcurrencyFilter>(config_ptr, controller_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+    filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
   void TearDown() override { filter_.reset(); }
@@ -49,6 +51,7 @@ public:
   NiceMock<Runtime::MockLoader> runtime_;
   std::shared_ptr<MockConcurrencyController> controller_{new MockConcurrencyController()};
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   std::unique_ptr<AdaptiveConcurrencyFilter> filter_;
 };
 
@@ -95,6 +98,17 @@ TEST_F(AdaptiveConcurrencyFilterTest, RecordSampleOmission) {
   filter_->decodeHeaders(request_headers, true);
 
   filter_.reset();
+}
+
+TEST_F(AdaptiveConcurrencyFilterTest, OnDestroyCleanupTest) {
+  // Get the filter to record the request start time via decode.
+  Http::TestHeaderMapImpl request_headers;
+  EXPECT_CALL(*controller_, forwardingDecision())
+      .WillOnce(Return(RequestForwardingAction::Forward));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  EXPECT_CALL(*controller_, cancelLatencySample());
+  filter_->onDestroy();
 }
 
 TEST_F(AdaptiveConcurrencyFilterTest, EncodeHeadersValidTest) {

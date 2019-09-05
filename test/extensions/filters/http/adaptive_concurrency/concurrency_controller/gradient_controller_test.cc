@@ -1,8 +1,8 @@
 #include <chrono>
 #include <iostream>
 
-#include "envoy/config/filter/http/adaptive_concurrency/v2alpha/adaptive_concurrency.pb.h"
-#include "envoy/config/filter/http/adaptive_concurrency/v2alpha/adaptive_concurrency.pb.validate.h"
+#include "envoy/config/filter/http/adaptive_concurrency/v3alpha/adaptive_concurrency.pb.h"
+#include "envoy/config/filter/http/adaptive_concurrency/v3alpha/adaptive_concurrency.pb.validate.h"
 
 #include "common/stats/isolated_store_impl.h"
 
@@ -88,7 +88,7 @@ sample_aggregate_percentile:
 concurrency_limit_params:
   max_gradient: 2.1
   max_concurrency_limit: 1337
-  concurrency_update_interval: 
+  concurrency_update_interval:
     nanos: 123000000
 min_rtt_calc_params:
   interval:
@@ -113,7 +113,7 @@ min_rtt_calc_params:
 TEST_F(GradientControllerConfigTest, DefaultValuesTest) {
   const std::string yaml = R"EOF(
 concurrency_limit_params:
-  concurrency_update_interval: 
+  concurrency_update_interval:
     nanos: 123000000
 min_rtt_calc_params:
   interval:
@@ -140,8 +140,8 @@ sample_aggregate_percentile:
   value: 50
 concurrency_limit_params:
   max_gradient: 2.0
-  max_concurrency_limit: 
-  concurrency_update_interval: 
+  max_concurrency_limit:
+  concurrency_update_interval:
     nanos: 100000000 # 100ms
 min_rtt_calc_params:
   interval:
@@ -172,14 +172,14 @@ min_rtt_calc_params:
       13, stats_.gauge("test_prefix.min_rtt_msecs", Stats::Gauge::ImportMode::NeverImport).value());
 }
 
-TEST_F(GradientControllerTest, SamplePercentileProcessTest) {
+TEST_F(GradientControllerTest, CancelLatencySample) {
   const std::string yaml = R"EOF(
 sample_aggregate_percentile:
   value: 50
 concurrency_limit_params:
   max_gradient: 2.0
-  max_concurrency_limit: 
-  concurrency_update_interval: 
+  max_concurrency_limit:
+  concurrency_update_interval:
     nanos: 100000000 # 100ms
 min_rtt_calc_params:
   interval:
@@ -197,14 +197,38 @@ min_rtt_calc_params:
       3, stats_.gauge("test_prefix.min_rtt_msecs", Stats::Gauge::ImportMode::NeverImport).value());
 }
 
+TEST_F(GradientControllerTest, SamplePercentileProcessTest) {
+  const std::string yaml = R"EOF(
+sample_aggregate_percentile:
+  value: 50
+concurrency_limit_params:
+  max_gradient: 2.0
+  max_concurrency_limit:
+  concurrency_update_interval:
+    nanos: 100000000 # 100ms
+min_rtt_calc_params:
+  interval:
+    seconds: 30
+  request_count: 5
+)EOF";
+
+  auto controller = makeController(yaml);
+
+  tryForward(controller, true);
+  tryForward(controller, false);
+  controller->cancelLatencySample();
+  tryForward(controller, true);
+  tryForward(controller, false);
+}
+
 TEST_F(GradientControllerTest, ConcurrencyLimitBehaviorTestBasic) {
   const std::string yaml = R"EOF(
 sample_aggregate_percentile:
   value: 50
 concurrency_limit_params:
   max_gradient: 2.0
-  max_concurrency_limit: 
-  concurrency_update_interval: 
+  max_concurrency_limit:
+  concurrency_update_interval:
     nanos: 100000000 # 100ms
 min_rtt_calc_params:
   interval:
@@ -257,8 +281,8 @@ sample_aggregate_percentile:
   value: 50
 concurrency_limit_params:
   max_gradient: 3.0
-  max_concurrency_limit: 
-  concurrency_update_interval: 
+  max_concurrency_limit:
+  concurrency_update_interval:
     nanos: 100000000 # 100ms
 min_rtt_calc_params:
   interval:
@@ -294,8 +318,8 @@ sample_aggregate_percentile:
   value: 50
 concurrency_limit_params:
   max_gradient: 3.0
-  max_concurrency_limit: 
-  concurrency_update_interval: 
+  max_concurrency_limit:
+  concurrency_update_interval:
     nanos: 100000000 # 100ms
 min_rtt_calc_params:
   interval:
@@ -346,8 +370,8 @@ sample_aggregate_percentile:
   value: 50
 concurrency_limit_params:
   max_gradient: 3.0
-  max_concurrency_limit: 
-  concurrency_update_interval: 
+  max_concurrency_limit:
+  concurrency_update_interval:
     nanos: 100000000 # 100ms
 min_rtt_calc_params:
   interval:
@@ -391,8 +415,8 @@ sample_aggregate_percentile:
   value: 50
 concurrency_limit_params:
   max_gradient: 3.0
-  max_concurrency_limit: 
-  concurrency_update_interval: 
+  max_concurrency_limit:
+  concurrency_update_interval:
     nanos: 100000000 # 100ms
 min_rtt_calc_params:
   interval:
@@ -434,8 +458,8 @@ sample_aggregate_percentile:
   value: 50
 concurrency_limit_params:
   max_gradient: 3.0
-  max_concurrency_limit: 
-  concurrency_update_interval: 
+  max_concurrency_limit:
+  concurrency_update_interval:
     nanos: 123000000 # 123ms
 min_rtt_calc_params:
   interval:

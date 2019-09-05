@@ -3,7 +3,7 @@
 #include <atomic>
 #include <chrono>
 
-#include "envoy/config/filter/http/adaptive_concurrency/v2alpha/adaptive_concurrency.pb.h"
+#include "envoy/config/filter/http/adaptive_concurrency/v3alpha/adaptive_concurrency.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats.h"
@@ -35,9 +35,9 @@ GradientControllerConfig::GradientControllerConfig(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config.min_rtt_calc_params(), request_count, 50)),
       max_gradient_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config.concurrency_limit_params(),
                                                     max_gradient, 2.0)),
-      sample_aggregate_percentile_(PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
-                                       proto_config, sample_aggregate_percentile, 1000, 500) /
-                                   1000.0) {}
+      sample_aggregate_percentile_(
+          PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(proto_config, sample_aggregate_percentile, 50) /
+          100.0) {}
 
 GradientController::GradientController(GradientControllerConfigSharedPtr config,
                                        Event::Dispatcher& dispatcher, Runtime::Loader&,
@@ -45,15 +45,13 @@ GradientController::GradientController(GradientControllerConfigSharedPtr config,
     : config_(std::move(config)), dispatcher_(dispatcher), scope_(scope),
       stats_(generateStats(scope_, stats_prefix)), deferred_limit_value_(1), num_rq_outstanding_(0),
       concurrency_limit_(1), latency_sample_hist_(hist_fast_alloc(), hist_free) {
-  min_rtt_calc_timer_ = dispatcher_.createTimer([this]() -> void {
-    absl::MutexLock ml(&sample_mutation_mtx_);
-    enterMinRTTSamplingWindow();
-  });
+  min_rtt_calc_timer_ = dispatcher_.createTimer([this]() -> void { enterMinRTTSamplingWindow(); });
 
   sample_reset_timer_ = dispatcher_.createTimer([this]() -> void {
     if (inMinRTTSamplingWindow()) {
-      // Since the minRTT value is being calculated, let's give up on this timer. At the end of the
-      // minRTT calculation, this timer will be enabled again.
+      // The minRTT sampling window started since the sample reset timer was enabled last. Since the
+      // minRTT value is being calculated, let's give up on this timer to avoid blocking the
+      // dispatcher thread and rely on it being enabled again as part of the minRTT calculation.
       return;
     }
 
@@ -75,6 +73,8 @@ GradientControllerStats GradientController::generateStats(Stats::Scope& scope,
 }
 
 void GradientController::enterMinRTTSamplingWindow() {
+  absl::MutexLock ml(&sample_mutation_mtx_);
+
   // Set the minRTT flag to indicate we're gathering samples to update the value. This will
   // prevent the sample window from resetting until enough requests are gathered to complete the
   // recalculation.
@@ -172,6 +172,11 @@ void GradientController::recordLatencySample(std::chrono::nanoseconds rq_latency
     // recalculation. It must now be finished.
     updateMinRTT();
   }
+}
+
+void GradientController::cancelLatencySample() {
+  ASSERT(num_rq_outstanding_.load() > 0);
+  --num_rq_outstanding_;
 }
 
 } // namespace ConcurrencyController

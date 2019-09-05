@@ -11,5 +11,6 @@ api_proto_library_internal(
     srcs = ["adaptive_concurrency.proto"],
     deps = [
         "//envoy/api/v3alpha/core:base",
+        "//envoy/type:percent",
     ],
 )

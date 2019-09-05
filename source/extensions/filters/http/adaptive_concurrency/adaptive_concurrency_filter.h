@@ -5,7 +5,7 @@
 #include <string>
 
 #include "envoy/common/time.h"
-#include "envoy/config/filter/http/adaptive_concurrency/v2alpha/adaptive_concurrency.pb.h"
+#include "envoy/config/filter/http/adaptive_concurrency/v3alpha/adaptive_concurrency.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
@@ -59,6 +59,7 @@ public:
 
   // Http::StreamEncoderFilter
   void encodeComplete() override;
+  void onDestroy() override;
 
 private:
   AdaptiveConcurrencyFilterConfigSharedPtr config_;

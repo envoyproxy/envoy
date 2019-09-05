@@ -3,8 +3,8 @@
 #include <chrono>
 #include <vector>
 
-#include "envoy/config/filter/http/adaptive_concurrency/v2alpha/adaptive_concurrency.pb.h"
-#include "envoy/config/filter/http/adaptive_concurrency/v2alpha/adaptive_concurrency.pb.validate.h"
+#include "envoy/config/filter/http/adaptive_concurrency/v3alpha/adaptive_concurrency.pb.h"
+#include "envoy/config/filter/http/adaptive_concurrency/v3alpha/adaptive_concurrency.pb.validate.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats_macros.h"
@@ -72,7 +72,7 @@ private:
 using GradientControllerConfigSharedPtr = std::shared_ptr<GradientControllerConfig>;
 
 /**
- * A concurrency controller that implements the a variation of the Gradient algorithm described in:
+ * A concurrency controller that implements a variation of the Gradient algorithm described in:
  *
  * https://medium.com/@NetflixTechBlog/performance-under-load-3e6fa9a60581
  *
@@ -142,6 +142,7 @@ public:
   // ConcurrencyController.
   RequestForwardingAction forwardingDecision() override;
   void recordLatencySample(std::chrono::nanoseconds rq_latency) override;
+  void cancelLatencySample() override;
   uint32_t concurrencyLimit() const override { return concurrency_limit_.load(); }
 
 private:
@@ -151,7 +152,7 @@ private:
   std::chrono::microseconds processLatencySamplesAndClear()
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
   uint32_t calculateNewLimit() ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
-  void enterMinRTTSamplingWindow() ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
+  void enterMinRTTSamplingWindow();
   bool inMinRTTSamplingWindow() const { return deferred_limit_value_.load() > 0; }
   void resetSampleWindow() ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
   void updateConcurrencyLimit(const uint32_t new_limit) {
