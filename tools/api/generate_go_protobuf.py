@@ -26,7 +26,7 @@ if call(['bazel', 'build'] + go_protos) != 0:
   print('Build failed')
   sys.exit(1)
 
-shutil.rmtree(os.path.join(workspace, output_base, 'envoy'), ignore_errors=True)
+shutil.rmtree(os.path.join(workspace, output_base, 'envoy'), ignore_errors = True)
 for rule in go_protos:
   # Example rule:
   # @envoy_api//envoy/config/bootstrap/v2:pkg_go_proto
