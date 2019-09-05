@@ -66,7 +66,7 @@ private:
   // (detaches it).
   struct Bookkeeper : public Slot {
     Bookkeeper(InstanceImpl& parent, std::unique_ptr<SlotImpl>&& slot);
-    ~Bookkeeper() { parent_.recycle(std::move(holder_)); }
+    ~Bookkeeper() override { parent_.recycle(std::move(holder_)); }
     SlotImpl& slot() { return *(holder_->slot_); }
 
     // ThreadLocal::Slot

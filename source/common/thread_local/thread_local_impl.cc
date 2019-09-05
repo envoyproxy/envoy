@@ -43,12 +43,11 @@ bool InstanceImpl::SlotImpl::currentThreadRegistered() {
   return thread_local_data_.data_.size() > index_;
 }
 void InstanceImpl::SlotImpl::runOnAllThreads(const UpdateCb& cb) {
-  parent_.runOnAllThreads([this, cb = std::move(cb)]() { setThreadLocal(index_, cb(get())); });
+  parent_.runOnAllThreads([this, cb]() { setThreadLocal(index_, cb(get())); });
 }
 
 void InstanceImpl::SlotImpl::runOnAllThreads(const UpdateCb& cb, Event::PostCb complete_cb) {
-  parent_.runOnAllThreads([this, cb = std::move(cb)]() { setThreadLocal(index_, cb(get())); },
-                          complete_cb);
+  parent_.runOnAllThreads([this, cb]() { setThreadLocal(index_, cb(get())); }, complete_cb);
 }
 
 ThreadLocalObjectSharedPtr InstanceImpl::SlotImpl::get() {
@@ -61,13 +60,17 @@ InstanceImpl::Bookkeeper::Bookkeeper(InstanceImpl& parent, std::unique_ptr<SlotI
 
 ThreadLocalObjectSharedPtr InstanceImpl::Bookkeeper::get() { return slot().get(); }
 void InstanceImpl::Bookkeeper::runOnAllThreads(const UpdateCb& cb, Event::PostCb complete_cb) {
-  slot().runOnAllThreads([cb = std::move(cb), ref_count = holder_->ref_count_](
-                             ThreadLocalObjectSharedPtr previous) { return cb(previous); },
-                         complete_cb);
+  slot().runOnAllThreads(
+      [cb, ref_count = holder_->ref_count_](ThreadLocalObjectSharedPtr previous) {
+        return cb(std::move(previous));
+      },
+      complete_cb);
 }
 void InstanceImpl::Bookkeeper::runOnAllThreads(const UpdateCb& cb) {
-  slot().runOnAllThreads([cb = std::move(cb), ref_count = holder_->ref_count_](
-                             ThreadLocalObjectSharedPtr previous) { return cb(previous); });
+  slot().runOnAllThreads(
+      [cb, ref_count = holder_->ref_count_](ThreadLocalObjectSharedPtr previous) {
+        return cb(std::move(previous));
+      });
 }
 bool InstanceImpl::Bookkeeper::currentThreadRegistered() {
   return slot().currentThreadRegistered();
