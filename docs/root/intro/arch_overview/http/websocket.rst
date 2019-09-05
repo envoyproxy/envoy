@@ -36,11 +36,11 @@ Note that the statistics for upgrades are all bundled together so WebSocket
 :ref:`statistics <config_http_conn_man_stats>` are tracked by stats such as
 downstream_cx_upgrades_total and downstream_cx_upgrades_active
 
-Handling H2 hops
+Handling HTTP/2 hops
 ^^^^^^^^^^^^^^^^
 
-While H2 support for WebSockets is off by default, Envoy does supports tunneling WebSockets over
-H2 streams for deployments that prefer a uniform H2 mesh throughout; this enables, for example,
+While HTTP/2 support for WebSockets is off by default, Envoy does support tunneling WebSockets over
+HTTP/2 streams for deployments that prefer a uniform HTTP/2 mesh throughout; this enables, for example,
 a deployment of the form:
 
 [Client] ---- HTTP/1.1 ---- [Front Envoy] ---- HTTP/2 ---- [Sidecar Envoy ---- H1  ---- App]
@@ -59,5 +59,5 @@ Non-WebSocket upgrades are allowed to use any valid HTTP method (i.e. POST) and 
 upgrade/downgrade mechanism will drop the original method and transform the Upgrade request to
 a GET method on the final Envoy-Upstream hop.
 
-Note that the H2 upgrade path has very strict HTTP/1.1 compliance, so will not proxy WebSocket
+Note that the HTTP/2 upgrade path has very strict HTTP/1.1 compliance, so will not proxy WebSocket
 upgrade requests or responses with bodies.
