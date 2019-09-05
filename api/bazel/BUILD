@@ -10,3 +10,12 @@ go_proto_compiler(
     valid_archive = False,
     visibility = ["//visibility:public"],
 )
+
+go_proto_compiler(
+    name = "pgv_plugin_gogo",
+    options = ["lang=gogo"],
+    plugin = "@com_envoyproxy_protoc_gen_validate//:protoc-gen-validate",
+    suffix = ".pb.validate.go",
+    valid_archive = False,
+    visibility = ["//visibility:public"],
+)

@@ -28,10 +28,6 @@ import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
-import "gogoproto/gogo.proto";
-
-option (gogoproto.equal_all) = true;
-option (gogoproto.stable_marshaler_all) = true;
 
 // Return list of all clusters this proxy will load balance to.
 service ClusterDiscoveryService {
@@ -127,8 +123,7 @@ message Cluster {
   EdsClusterConfig eds_cluster_config = 3;
 
   // The timeout for new network connections to hosts in the cluster.
-  google.protobuf.Duration connect_timeout = 4
-      [(validate.rules).duration.gt = {}, (gogoproto.stdduration) = true];
+  google.protobuf.Duration connect_timeout = 4 [(validate.rules).duration.gt = {}];
 
   // Soft limit on size of the cluster’s connections read and write buffers. If
   // unspecified, an implementation defined default is applied (1MiB).
@@ -274,8 +269,7 @@ message Cluster {
   // :ref:`STRICT_DNS<envoy_api_enum_value_Cluster.DiscoveryType.STRICT_DNS>`
   // and :ref:`LOGICAL_DNS<envoy_api_enum_value_Cluster.DiscoveryType.LOGICAL_DNS>`
   // this setting is ignored.
-  google.protobuf.Duration dns_refresh_rate = 16
-      [(validate.rules).duration.gt = {}, (gogoproto.stdduration) = true];
+  google.protobuf.Duration dns_refresh_rate = 16 [(validate.rules).duration.gt = {}];
 
   // Optional configuration for setting cluster's DNS refresh rate. If the value is set to true,
   // cluster's DNS refresh rate will be set to resource record's TTL which comes from DNS
@@ -333,8 +327,7 @@ message Cluster {
   // value defaults to 5000ms. For cluster types other than
   // :ref:`ORIGINAL_DST<envoy_api_enum_value_Cluster.DiscoveryType.ORIGINAL_DST>`
   // this setting is ignored.
-  google.protobuf.Duration cleanup_interval = 20
-      [(validate.rules).duration.gt = {}, (gogoproto.stdduration) = true];
+  google.protobuf.Duration cleanup_interval = 20 [(validate.rules).duration.gt = {}];
 
   // Optional configuration used to bind newly established upstream connections.
   // This overrides any bind_config specified in the bootstrap proto.

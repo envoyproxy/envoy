@@ -8,6 +8,8 @@ _CC_SUFFIX = "_cc"
 _CC_EXPORT_SUFFIX = "_export_cc"
 _GO_PROTO_SUFFIX = "_go_proto"
 _GO_IMPORTPATH_PREFIX = "github.com/envoyproxy/data-plane-api/api/"
+_GOGO_PROTO_SUFFIX = "_gogo_proto"
+_GOGO_IMPORTPATH_PREFIX = "github.com/envoyproxy/go-control-plane/"
 
 _COMMON_PROTO_DEPS = [
     "@com_google_protobuf//:any_proto",
@@ -20,7 +22,6 @@ _COMMON_PROTO_DEPS = [
     "@com_google_googleapis//google/api:http_proto",
     "@com_google_googleapis//google/api:annotations_proto",
     "@com_google_googleapis//google/rpc:status_proto",
-    "@com_github_gogo_protobuf//:gogo_proto",
     "@com_envoyproxy_protoc_gen_validate//validate:validate_proto",
 ]
 
@@ -50,7 +51,6 @@ def api_py_proto_library(name, srcs = [], deps = [], external_py_proto_deps = []
             "@com_google_googleapis//google/api:annotations_py_proto",
             "@com_google_googleapis//google/api:http_py_proto",
             "@com_google_googleapis//google/api:httpbody_py_proto",
-            "@com_github_gogo_protobuf//:gogo_proto_py",
         ],
         visibility = ["//visibility:public"],
     )
@@ -108,7 +108,6 @@ def api_proto_library(
         name = _Suffix(name, _CC_SUFFIX),
         linkstatic = linkstatic,
         cc_deps = [_LibrarySuffix(d, _CC_SUFFIX) for d in deps] + external_cc_proto_deps + [
-            "@com_github_gogo_protobuf//:gogo_proto_cc",
             "@com_google_googleapis//google/api:http_cc_proto",
             "@com_google_googleapis//google/api:annotations_cc_proto",
             "@com_google_googleapis//google/rpc:status_cc_proto",
@@ -158,6 +157,9 @@ def go_proto_mapping(dep):
         return _Suffix("@" + Label(dep).workspace_name + "//" + Label(dep).package + ":" + Label(dep).name, _GO_PROTO_SUFFIX)
     return mapped
 
+def gogo_proto_mapping(dep):
+    return _Suffix("@" + Label(dep).workspace_name + "//" + Label(dep).package + ":" + Label(dep).name, _GOGO_PROTO_SUFFIX)
+
 def api_proto_package(name = "pkg", srcs = [], deps = [], has_services = False, visibility = ["//visibility:public"]):
     if srcs == []:
         srcs = native.glob(["*.proto"])
@@ -180,7 +182,6 @@ def api_proto_package(name = "pkg", srcs = [], deps = [], has_services = False, 
         proto = name,
         visibility = ["//visibility:public"],
         deps = [go_proto_mapping(dep) for dep in deps] + [
-            "@com_github_gogo_protobuf//:gogo_proto_go",
             "@com_github_golang_protobuf//ptypes:go_default_library",
             "@com_github_golang_protobuf//ptypes/any:go_default_library",
             "@com_github_golang_protobuf//ptypes/duration:go_default_library",
@@ -190,5 +191,17 @@ def api_proto_package(name = "pkg", srcs = [], deps = [], has_services = False, 
             "@com_envoyproxy_protoc_gen_validate//validate:go_default_library",
             "@com_google_googleapis//google/api:annotations_go_proto",
             "@com_google_googleapis//google/rpc:status_go_proto",
+        ],
+    )
+
+    go_proto_library(
+        name = _Suffix(name, _GOGO_PROTO_SUFFIX),
+        compilers = ["@io_bazel_rules_go//proto:gogofast_proto", "//bazel:pgv_plugin_gogo"],
+        importpath = _Suffix(_GOGO_IMPORTPATH_PREFIX, native.package_name()),
+        proto = name,
+        visibility = ["//visibility:public"],
+        deps = [gogo_proto_mapping(dep) for dep in deps] + [
+            "@com_envoyproxy_protoc_gen_validate//validate:go_default_library",
+            "@io_istio_gogo_genproto//googleapis/google/rpc:go_default_library",
         ],
     )

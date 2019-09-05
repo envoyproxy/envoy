@@ -25,7 +25,6 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 
 import "validate/validate.proto";
-import "gogoproto/gogo.proto";
 
 // Bootstrap :ref:`configuration overview <config_overview_v2_bootstrap>`.
 message Bootstrap {
@@ -102,8 +101,7 @@ message Bootstrap {
     (validate.rules).duration = {
       lt: {seconds: 300},
       gte: {nanos: 1000000}
-    },
-    (gogoproto.stdduration) = true
+    }
   ];
 
   // Optional watchdog configuration.
