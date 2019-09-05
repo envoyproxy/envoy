@@ -5,7 +5,6 @@ package envoy.service.load_stats.v3alpha;
 option java_outer_classname = "LrsProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.service.load_stats.v3alpha";
-option go_package = "v2";
 option java_generic_services = true;
 
 import "envoy/api/v3alpha/core/base.proto";

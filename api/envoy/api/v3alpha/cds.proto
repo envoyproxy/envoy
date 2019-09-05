@@ -43,7 +43,7 @@ service ClusterDiscoveryService {
 
   rpc FetchClusters(DiscoveryRequest) returns (DiscoveryResponse) {
     option (google.api.http) = {
-      post: "/v2/discovery:clusters"
+      post: "/v3alpha/discovery:clusters"
       body: "*"
     };
   }

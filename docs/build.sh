@@ -50,20 +50,22 @@ bazel build ${BAZEL_BUILD_OPTIONS} @envoy_api//docs:protos --aspects \
   tools/protodoc/protodoc.bzl%proto_doc_aspect --output_groups=rst --action_env=CPROFILE_ENABLED=1 \
   --action_env=ENVOY_BLOB_SHA --spawn_strategy=standalone --host_force_python=PY3
 
-declare -r DOC_PROTOS=$(bazel query "deps(@envoy_api//docs:protos)" | grep "^@envoy_api.*proto$")
+declare -r DOCS_DEPS=$(bazel query "labels(deps, @envoy_api//docs:protos)")
 
 # Only copy in the protos we care about and know how to deal with in protodoc.
-for p in ${DOC_PROTOS}
+for PROTO_TARGET in ${DOCS_DEPS}
 do
-  declare PROTO_TARGET=$(bazel query "kind(proto_library, same_pkg_direct_rdeps($p))")
-  declare PROTO_TARGET_WITHOUT_PREFIX="${PROTO_TARGET#@envoy_api//}"
-  declare PROTO_TARGET_CANONICAL="${PROTO_TARGET_WITHOUT_PREFIX/:/\/}"
-  declare PROTO_FILE_WITHOUT_PREFIX="${p#@envoy_api//}"
-  declare PROTO_FILE_CANONICAL="${PROTO_FILE_WITHOUT_PREFIX/:/\/}"
-  declare DEST="${GENERATED_RST_DIR}/api-v2/${PROTO_FILE_CANONICAL#envoy/}".rst
-  mkdir -p "$(dirname "${DEST}")"
-  cp -f bazel-bin/external/envoy_api/"${PROTO_TARGET_CANONICAL}/${PROTO_FILE_CANONICAL}.rst" "$(dirname "${DEST}")"
-  [ -n "${CPROFILE_ENABLED}" ] && cp -f bazel-bin/"${p}".profile "$(dirname "${DEST}")"
+  for p in $(bazel query "labels(srcs, ${PROTO_TARGET})" )
+  do
+    declare PROTO_TARGET_WITHOUT_PREFIX="${PROTO_TARGET#@envoy_api//}"
+    declare PROTO_TARGET_CANONICAL="${PROTO_TARGET_WITHOUT_PREFIX/://}"
+    declare PROTO_FILE_WITHOUT_PREFIX="${p#@envoy_api//}"
+    declare PROTO_FILE_CANONICAL="${PROTO_FILE_WITHOUT_PREFIX/://}"
+    declare DEST="${GENERATED_RST_DIR}/api-v2/${PROTO_FILE_CANONICAL#envoy/}".rst
+    mkdir -p "$(dirname "${DEST}")"
+    cp -f bazel-bin/external/envoy_api/"${PROTO_TARGET_CANONICAL}/${PROTO_FILE_CANONICAL}.rst" "$(dirname "${DEST}")"
+    [ -n "${CPROFILE_ENABLED}" ] && cp -f bazel-bin/"${p}".profile "$(dirname "${DEST}")"
+  done
 done
 
 mkdir -p ${GENERATED_RST_DIR}/api-docs

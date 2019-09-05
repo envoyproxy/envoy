@@ -34,6 +34,11 @@ Version 1.12.0 (pending)
 * The use of HTTP_JSON_V1 :ref:`Zipkin collector endpoint version
   <envoy_api_field_config.trace.v2.ZipkinConfig.collector_endpoint_version>` or not explicitly
   specifying it is deprecated, use HTTP_JSON or HTTP_PROTO instead.
+* The `operation_name` field in :ref:`HTTP connection manager
+  <envoy_api_msg_config.filter.network.http_connection_manager.v2.HttpConnectionManager>`
+  has been deprecated in favor of the `traffic_direction` field in
+  :ref:`Listener <envoy_api_msg_Listener>`. The latter takes priority if
+  specified.
 
 Version 1.11.0 (July 11, 2019)
 ==============================
