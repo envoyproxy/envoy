@@ -57,7 +57,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     return Http::FilterHeadersStatus::Continue;
   }
 
-  // Allow enable the filter on a per route basis
+  // Allow disable the filter per route basis
   if (decoder_callbacks_->route() && decoder_callbacks_->route()->routeEntry()) {
     const std::string& name =
         Extensions::HttpFilters::HttpFilterNames::get().GrpcHttp1ReverseBridge;
@@ -65,7 +65,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     const auto* config_per_route = route_entry->perFilterConfigTyped<
         envoy::config::filter::http::grpc_http1_reverse_bridge::v2alpha1::FilterConfig>(name);
     if (config_per_route != nullptr) {
-      if (!config_per_route->enabled()) {
+      if (config_per_route->disabled()) {
         enabled_ = false;
         return Http::FilterHeadersStatus::Continue;
       }
