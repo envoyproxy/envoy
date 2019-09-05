@@ -110,6 +110,8 @@ void InstanceImpl::registerThread(Event::Dispatcher& dispatcher, bool main_threa
   }
 }
 
+// Deletes a Slot if it's recycleable(no on-the-fly callbacks points to it), otherwise puts it into
+// a deferred delete queue, and schedules a cleanup task to collect the Slot once it's recycleable.
 void InstanceImpl::recycle(std::unique_ptr<SlotHolder>&& holder) {
   if (holder->isRecycleable()) {
     holder.reset();
@@ -119,6 +121,11 @@ void InstanceImpl::recycle(std::unique_ptr<SlotHolder>&& holder) {
   scheduleCleanup();
 }
 
+// Cleans up the deferred deletes queue.
+// Removes all the items with ref count 1, and reschedule another cleanup task if there are left
+// un-recycleable items.
+// This way ensures that, unless server shuts down, an enqueued item will be
+// deleted eventually.
 void InstanceImpl::scheduleCleanup() {
   ASSERT(main_thread_dispatcher_ != nullptr);
   if (shutdown_) {

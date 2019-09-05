@@ -33,10 +33,6 @@ private:
     SlotImpl(InstanceImpl& parent, uint64_t index) : parent_(parent), index_(index) {}
     ~SlotImpl() override { parent_.removeSlot(*this); }
 
-    // non moveable.
-    SlotImpl(SlotImpl&&) = delete;
-    SlotImpl& operator=(SlotImpl&&) = delete;
-
     // ThreadLocal::Slot
     ThreadLocalObjectSharedPtr get() override;
     bool currentThreadRegistered() override;
