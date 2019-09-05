@@ -21,6 +21,9 @@ KAFKA_SOURCE_SHA = "ae7a1696c0a0302b43c5b21e515c37e6ecd365941f68a510a7e442eebddf
 UDPA_GIT_SHA = "4cbdcb9931ca743a915a7c5fda51b2ee793ed157"  # Aug 22, 2019
 UDPA_SHA256 = "6291d0c0e3a4d5f08057ea7a00ed0b0ec3dd4e5a3b1cf20f803774680b5a806f"
 
+ZIPKINAPI_RELEASE = "0.2.2"  # Aug 23, 2019
+ZIPKINAPI_SHA256 = "688c4fe170821dd589f36ec45aaadc03a618a40283bc1f97da8fa11686fc816b"
+
 REPOSITORY_LOCATIONS = dict(
     bazel_skylib = dict(
         sha256 = BAZEL_SKYLIB_SHA256,
@@ -61,5 +64,10 @@ REPOSITORY_LOCATIONS = dict(
         sha256 = KAFKA_SOURCE_SHA,
         strip_prefix = "kafka-2.2.0-rc2/clients/src/main/resources/common/message",
         urls = ["https://github.com/apache/kafka/archive/2.2.0-rc2.zip"],
+    ),
+    com_github_openzipkin_zipkinapi = dict(
+        sha256 = ZIPKINAPI_SHA256,
+        strip_prefix = "zipkin-api-" + ZIPKINAPI_RELEASE,
+        urls = ["https://github.com/openzipkin/zipkin-api/archive/" + ZIPKINAPI_RELEASE + ".tar.gz"],
     ),
 )

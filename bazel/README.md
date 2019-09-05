@@ -65,6 +65,7 @@ for how to update or override dependencies.
     ```
     _notes_: `coreutils` is used for `realpath`, `gmd5sum` and `gsha256sum`
 
+    XCode is also required to build Envoy on macOS.
     Envoy compiles and passes tests with the version of clang installed by XCode 9.3.0:
     Apple LLVM version 9.1.0 (clang-902.0.30).
 
