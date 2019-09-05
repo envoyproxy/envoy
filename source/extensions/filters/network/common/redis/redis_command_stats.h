@@ -33,8 +33,11 @@ public:
   Stats::StatName getUnusedStatName() {return unused_metric_; }
 
 private:
+  void addCommandToPool(const std::string& command);
+
   Stats::Scope& scope_;
-  Stats::StatNameSet stat_name_set_;
+  Stats::StatNamePool stat_name_pool_;
+  StringMap<Stats::StatName> stat_name_map_;
   const Stats::StatName prefix_;
   bool enabled_;
   const Stats::StatName upstream_rq_time_;
