@@ -1079,7 +1079,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowFailurePercentageExternalOrigin) {
       cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_, event_logger_));
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
-  // Turn off 5xx detection and SR detection to test FP detection in isolation.
+  // Turn off 5xx detection and SR detection to test failure percentage detection in isolation.
   ON_CALL(runtime_.snapshot_, featureEnabled("outlier_detection.enforcing_consecutive_5xx", 100))
       .WillByDefault(Return(false));
   ON_CALL(runtime_.snapshot_,
@@ -1087,7 +1087,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowFailurePercentageExternalOrigin) {
       .WillByDefault(Return(false));
   ON_CALL(runtime_.snapshot_, featureEnabled("outlier_detection.enforcing_success_rate", 100))
       .WillByDefault(Return(false));
-  // Now turn on FP detection.
+  // Now turn on failure percentage detection.
   ON_CALL(runtime_.snapshot_, featureEnabled("outlier_detection.enforcing_failure_percentage", 0))
       .WillByDefault(Return(true));
   // Expect non-enforcing logging to happen every time the consecutive_5xx_ counter
@@ -1113,8 +1113,9 @@ TEST_F(OutlierDetectorImplTest, BasicFlowFailurePercentageExternalOrigin) {
                false))
       .Times(60);
 
-  // Cause a FP error on one host. First 3 hosts have perfect FP; fourth host has failure percentage
-  // slightly below threshold; fifth has FP slightly above threshold.
+  // Cause a failure percentage error on one host. First 3 hosts have perfect failure percentage;
+  // fourth host has failure percentage slightly below threshold; fifth has failure percentage
+  // slightly above threshold.
   loadRq(hosts_, 50, 200);
   loadRq(hosts_[3], 250, 503);
   loadRq(hosts_[4], 300, 503);
@@ -1207,14 +1208,14 @@ TEST_F(OutlierDetectorImplTest, BasicFlowFailurePercentageLocalOrigin) {
       cluster_, outlier_detection_split_, dispatcher_, runtime_, time_system_, event_logger_));
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
-  // Turn off 5xx detection and SR detection to test FP detection in isolation.
+  // Turn off 5xx detection and SR detection to test failure percentage detection in isolation.
   ON_CALL(runtime_.snapshot_,
           featureEnabled("outlier_detection.enforcing_consecutive_local_origin_failure", 100))
       .WillByDefault(Return(false));
   ON_CALL(runtime_.snapshot_,
           featureEnabled("outlier_detection.enforcing_local_origin_success_rate", 100))
       .WillByDefault(Return(false));
-  // Now turn on FP detection.
+  // Now turn on failure percentage detection.
   ON_CALL(runtime_.snapshot_,
           featureEnabled("outlier_detection.enforcing_failure_percentage_local_origin", 0))
       .WillByDefault(Return(true));
@@ -1226,7 +1227,8 @@ TEST_F(OutlierDetectorImplTest, BasicFlowFailurePercentageLocalOrigin) {
                envoy::data::cluster::v2alpha::OutlierEjectionType::CONSECUTIVE_LOCAL_ORIGIN_FAILURE,
                false))
       .Times(40);
-  // Cause a SR error on one host. First 4 of the hosts have perfect SR.
+  // Cause a failure percentage error on one host. First 4 of the hosts have perfect failure
+  // percentage.
   loadRq(hosts_, 200, Result::LOCAL_ORIGIN_CONNECT_SUCCESS);
   loadRq(hosts_[4], 200, Result::LOCAL_ORIGIN_CONNECT_FAILED);
 
