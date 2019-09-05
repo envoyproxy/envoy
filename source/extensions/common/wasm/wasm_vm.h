@@ -130,7 +130,7 @@ public:
 
   /**
    * Load the WASM code from a file. Return true on success. Once the module is loaded it can be
-   * queried, e.g. to see which version of emscriptent support is rquired. After loading, the
+   * queried, e.g. to see which version of emscripten support is required. After loading, the
    * appropriate ABI callbacks can be registered and then the module can be link()ed (see below).
    * @param code the WASM binary code (or registered NullVm plugin name).
    * @param allow_precompiled if true, allows supporting VMs (e.g. WAVM) to load the binary
@@ -162,8 +162,8 @@ public:
                                uint64_t heap_base_pointer) PURE;
 
   /**
-   * Iniitalie globals (including calling global constructors) and call the 'start' function. Prior
-   * to calling start() the module should be load()ed, ABI callbacks should be registered
+   * Initialize globals (including calling global constructors) and call the 'start' function.
+   * Prior to calling start() the module should be load()ed, ABI callbacks should be registered
    * (registerCallback), the module link()ed, and any exported functions should be gotten
    * (getFunction).
    * @param vm_context a context which represents the caller: in this case Envoy itself.
