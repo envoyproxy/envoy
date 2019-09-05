@@ -21,7 +21,12 @@ public:
     // Bypassed. QUIC connection already hands all data to streams.
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
-  Http::Protocol protocol() override { return Http::Protocol::Http3; }
+  Http::Protocol protocol() override {
+    // From HCM's view, QUIC should behave the same as Http2, only the stats
+    // should be different.
+    // TODO(danzh) add Http3 enum value for QUIC.
+    return Http::Protocol::Http2;
+  }
   void goAway() override;
   // Returns true if the session has data to send but queued in connection or
   // stream send buffer.

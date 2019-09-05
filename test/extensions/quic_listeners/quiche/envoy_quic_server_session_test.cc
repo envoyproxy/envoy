@@ -111,6 +111,7 @@ public:
       // Create ServerConnection instance and setup callbacks for it.
       http_connection_ = std::make_unique<QuicHttpServerConnectionImpl>(envoy_quic_session_,
                                                                         http_connection_callbacks_);
+      EXPECT_EQ(Http::Protocol::Http2, http_connection_->protocol());
       // Stop iteration to avoid calling getRead/WriteBuffer().
       return Network::FilterStatus::StopIteration;
     }));
