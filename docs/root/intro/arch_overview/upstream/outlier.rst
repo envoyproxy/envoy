@@ -145,6 +145,8 @@ Most configuration items, namely
 types of errors, but :ref:`outlier_detection.enforcing_success_rate<envoy_api_field_cluster.OutlierDetection.enforcing_success_rate>` applies
 to externally originated errors only and :ref:`outlier_detection.enforcing_local_origin_success_rate<envoy_api_field_cluster.OutlierDetection.enforcing_local_origin_success_rate>`  applies to locally originated errors only.
 
+.. _arch_overview_outlier_detection_grpc:
+
 gRPC
 ----------------------
 
