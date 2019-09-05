@@ -203,7 +203,10 @@ public:
   virtual bool setMemory(uint64_t pointer, uint64_t size, const void* data) PURE;
 
   /**
-   * Get a Word in the VM, returns true on success, false if the pointer is invalid.
+   * Get a VM native Word (e.g. sizeof(void*) or sizeof(size_t)) from VM memory, returns true on
+   * success, false if the pointer is invalid. WASM-32 VMs have 32-bit native words and WASM-64 VMs
+   * (not yet supported) will have 64-bit words as does the Null VM (compiled into 64-bit Envoy).
+   * This function can be used to chase pointers in VM memory.
    * @param pointer the offset into VM memory describing the start of VM native word size block.
    * @param data a pointer to a Word whose contents will be filled from the VM native word at
    * 'pointer'.
@@ -213,6 +216,8 @@ public:
 
   /**
    * Set a Word in the VM, returns true on success, false if the pointer is invalid.
+   * See getWord above for details. This function can be used (for example) to set indirect pointer
+   * return values (e.g. proxy_getHeaderHapValue(... const char** value_ptr, size_t* value_size).
    * @param pointer the offset into VM memory describing the start of VM native word size block.
    * @param data a Word whose contents will be written in VM native word size at 'pointer'.
    * @return whether or not the pointer was to a valid VM memory block of VM native word size.
