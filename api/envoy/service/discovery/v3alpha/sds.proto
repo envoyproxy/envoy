@@ -27,7 +27,7 @@ service SecretDiscoveryService {
   rpc FetchSecrets(envoy.api.v3alpha.DiscoveryRequest)
       returns (envoy.api.v3alpha.DiscoveryResponse) {
     option (google.api.http) = {
-      post: "/v2/discovery:secrets"
+      post: "/v3alpha/discovery:secrets"
       body: "*"
     };
   }
