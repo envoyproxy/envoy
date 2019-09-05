@@ -43,7 +43,7 @@ public:
 
   void expectTimerCreateAndEnable() {
     retry_timer_ = new Event::MockTimer(&dispatcher_);
-    EXPECT_CALL(*retry_timer_, enableTimer(_));
+    EXPECT_CALL(*retry_timer_, enableTimer(_, _));
   }
 
   NiceMock<TestRetryPolicy> policy_;
@@ -466,12 +466,12 @@ TEST_F(RouterRetryStateImplTest, MaxRetriesHeader) {
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
 
-  EXPECT_CALL(*retry_timer_, enableTimer(_));
+  EXPECT_CALL(*retry_timer_, enableTimer(_, _));
   EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(connect_failure_, callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
 
-  EXPECT_CALL(*retry_timer_, enableTimer(_));
+  EXPECT_CALL(*retry_timer_, enableTimer(_, _));
   EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(connect_failure_, callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
@@ -493,19 +493,19 @@ TEST_F(RouterRetryStateImplTest, Backoff) {
 
   EXPECT_CALL(random_, random()).WillOnce(Return(49));
   retry_timer_ = new Event::MockTimer(&dispatcher_);
-  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(24)));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(24), _));
   EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(connect_failure_, callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
 
   EXPECT_CALL(random_, random()).WillOnce(Return(149));
-  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(74)));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(74), _));
   EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(connect_failure_, callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
 
   EXPECT_CALL(random_, random()).WillOnce(Return(349));
-  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(174)));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(174), _));
   EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(connect_failure_, callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
@@ -530,25 +530,25 @@ TEST_F(RouterRetryStateImplTest, CustomBackOffInterval) {
 
   EXPECT_CALL(random_, random()).WillOnce(Return(149));
   retry_timer_ = new Event::MockTimer(&dispatcher_);
-  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(49)));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(49), _));
   EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(connect_failure_, callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
 
   EXPECT_CALL(random_, random()).WillOnce(Return(350));
-  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(50)));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(50), _));
   EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(connect_failure_, callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
 
   EXPECT_CALL(random_, random()).WillOnce(Return(751));
-  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(51)));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(51), _));
   EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(connect_failure_, callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
 
   EXPECT_CALL(random_, random()).WillOnce(Return(1499));
-  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(1200)));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(1200), _));
   EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(connect_failure_, callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
@@ -565,25 +565,25 @@ TEST_F(RouterRetryStateImplTest, CustomBackOffIntervalDefaultMax) {
 
   EXPECT_CALL(random_, random()).WillOnce(Return(149));
   retry_timer_ = new Event::MockTimer(&dispatcher_);
-  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(49)));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(49), _));
   EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(connect_failure_, callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
 
   EXPECT_CALL(random_, random()).WillOnce(Return(350));
-  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(50)));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(50), _));
   EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(connect_failure_, callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
 
   EXPECT_CALL(random_, random()).WillOnce(Return(751));
-  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(51)));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(51), _));
   EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(connect_failure_, callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
 
   EXPECT_CALL(random_, random()).WillOnce(Return(1499));
-  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(1000)));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(1000), _));
   EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(connect_failure_, callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();

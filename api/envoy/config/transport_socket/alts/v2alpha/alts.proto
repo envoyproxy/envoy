@@ -5,7 +5,6 @@ package envoy.config.transport_socket.alts.v2alpha;
 option java_outer_classname = "AltsProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.transport_socket.alts.v2alpha";
-option go_package = "v2";
 
 // [#protodoc-title: ALTS]
 

@@ -13,6 +13,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -63,6 +64,8 @@ public:
   MOCK_METHOD0(routeConfigProvider, Router::RouteConfigProvider*());
   MOCK_METHOD0(scopedRouteConfigProvider, Config::ConfigProvider*());
   MOCK_METHOD0(serverName, const std::string&());
+  MOCK_METHOD0(serverHeaderTransformation,
+               HttpConnectionManagerProto::ServerHeaderTransformation());
   MOCK_METHOD0(stats, ConnectionManagerStats&());
   MOCK_METHOD0(tracingStats, ConnectionManagerTracingStats&());
   MOCK_METHOD0(useRemoteAddress, bool());
@@ -99,7 +102,8 @@ public:
     envoy::type::FractionalPercent percent2;
     percent2.set_numerator(10000);
     percent2.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);
-    tracing_config_ = {Tracing::OperationName::Ingress, {}, percent1, percent2, percent1, false};
+    tracing_config_ = {
+        Tracing::OperationName::Ingress, {}, percent1, percent2, percent1, false, 256};
     ON_CALL(config_, tracingConfig()).WillByDefault(Return(&tracing_config_));
 
     ON_CALL(config_, via()).WillByDefault(ReturnRef(via_));
@@ -224,6 +228,50 @@ TEST_F(ConnectionManagerUtilityTest, SkipXffAppendPassThruUseRemoteAddress) {
   EXPECT_EQ((MutateRequestRet{"12.12.12.12:0", false}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ("198.51.100.1", headers.ForwardedFor()->value().getStringView());
+}
+
+TEST_F(ConnectionManagerUtilityTest, ForwardedProtoLegacyBehavior) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.trusted_forwarded_proto", "false"}});
+
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(1));
+  EXPECT_CALL(config_, skipXffAppend()).WillOnce(Return(true));
+  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12");
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  TestHeaderMapImpl headers{{"x-forwarded-proto", "https"}};
+
+  callMutateRequestHeaders(headers, Protocol::Http2);
+  EXPECT_EQ("http", headers.ForwardedProto()->value().getStringView());
+}
+
+TEST_F(ConnectionManagerUtilityTest, PreserveForwardedProtoWhenInternal) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.trusted_forwarded_proto", "true"}});
+
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(1));
+  EXPECT_CALL(config_, skipXffAppend()).WillOnce(Return(true));
+  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12");
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  TestHeaderMapImpl headers{{"x-forwarded-proto", "https"}};
+
+  callMutateRequestHeaders(headers, Protocol::Http2);
+  EXPECT_EQ("https", headers.ForwardedProto()->value().getStringView());
+}
+
+TEST_F(ConnectionManagerUtilityTest, OverwriteForwardedProtoWhenExternal) {
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(0));
+  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1");
+  TestHeaderMapImpl headers{{"x-forwarded-proto", "https"}};
+  Network::Address::Ipv4Instance local_address("10.3.2.1");
+  ON_CALL(config_, localAddress()).WillByDefault(ReturnRef(local_address));
+
+  callMutateRequestHeaders(headers, Protocol::Http2);
+  EXPECT_EQ("http", headers.ForwardedProto()->value().getStringView());
 }
 
 // Verify internal request and XFF is set when we are using remote address and the address is

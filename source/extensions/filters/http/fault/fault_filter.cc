@@ -33,7 +33,8 @@ struct RcDetailsValues {
 using RcDetails = ConstSingleton<RcDetailsValues>;
 
 FaultSettings::FaultSettings(const envoy::config::filter::http::fault::v2::HTTPFault& fault)
-    : delay_percent_runtime_(PROTOBUF_GET_STRING_OR_DEFAULT(fault, delay_percent_runtime,
+    : fault_filter_headers_(Http::HeaderUtility::buildHeaderDataVector(fault.headers())),
+      delay_percent_runtime_(PROTOBUF_GET_STRING_OR_DEFAULT(fault, delay_percent_runtime,
                                                             RuntimeKeys::get().DelayPercentKey)),
       abort_percent_runtime_(PROTOBUF_GET_STRING_OR_DEFAULT(fault, abort_percent_runtime,
                                                             RuntimeKeys::get().AbortPercentKey)),
@@ -57,10 +58,6 @@ FaultSettings::FaultSettings(const envoy::config::filter::http::fault::v2::HTTPF
         std::make_unique<Filters::Common::Fault::FaultDelayConfig>(fault.delay());
   }
 
-  for (const Http::HeaderUtility::HeaderData& header_map : fault.headers()) {
-    fault_filter_headers_.push_back(header_map);
-  }
-
   upstream_cluster_ = fault.upstream_cluster();
 
   for (const auto& node : fault.downstream_nodes()) {
@@ -81,7 +78,17 @@ FaultFilterConfig::FaultFilterConfig(const envoy::config::filter::http::fault::v
                                      Runtime::Loader& runtime, const std::string& stats_prefix,
                                      Stats::Scope& scope, TimeSource& time_source)
     : settings_(fault), runtime_(runtime), stats_(generateStats(stats_prefix, scope)),
-      stats_prefix_(stats_prefix), scope_(scope), time_source_(time_source) {}
+      scope_(scope), time_source_(time_source), stat_name_set_(scope.symbolTable()),
+      aborts_injected_(stat_name_set_.add("aborts_injected")),
+      delays_injected_(stat_name_set_.add("delays_injected")),
+      stats_prefix_(stat_name_set_.add(absl::StrCat(stats_prefix, "fault"))) {}
+
+void FaultFilterConfig::incCounter(absl::string_view downstream_cluster,
+                                   Stats::StatName stat_name) {
+  Stats::SymbolTable::StoragePtr storage = scope_.symbolTable().join(
+      {stats_prefix_, stat_name_set_.getStatName(downstream_cluster), stat_name});
+  scope_.counterFromStatName(Stats::StatName(storage.get())).inc();
+}
 
 FaultFilter::FaultFilter(FaultFilterConfigSharedPtr config) : config_(config) {}
 
@@ -148,7 +155,7 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::HeaderMap& headers, b
     delay_timer_ =
         decoder_callbacks_->dispatcher().createTimer([this]() -> void { postDelayInjection(); });
     ENVOY_LOG(debug, "fault: delaying request {}ms", duration.value().count());
-    delay_timer_->enableTimer(duration.value());
+    delay_timer_->enableTimer(duration.value(), &decoder_callbacks_->scope());
     recordDelaysInjectedStats();
     decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::DelayInjected);
     return Http::FilterHeadersStatus::StopIteration;
@@ -192,7 +199,7 @@ void FaultFilter::maybeSetupResponseRateLimit(const Http::HeaderMap& request_hea
         encoder_callbacks_->injectEncodedDataToFilterChain(data, end_stream);
       },
       [this] { encoder_callbacks_->continueEncoding(); }, config_->timeSource(),
-      decoder_callbacks_->dispatcher());
+      decoder_callbacks_->dispatcher(), decoder_callbacks_->scope());
 }
 
 bool FaultFilter::faultOverflow() {
@@ -282,10 +289,7 @@ uint64_t FaultFilter::abortHttpStatus() {
 void FaultFilter::recordDelaysInjectedStats() {
   // Downstream specific stats.
   if (!downstream_cluster_.empty()) {
-    const std::string stats_counter =
-        fmt::format("{}fault.{}.delays_injected", config_->statsPrefix(), downstream_cluster_);
-
-    config_->scope().counter(stats_counter).inc();
+    config_->incDelays(downstream_cluster_);
   }
 
   // General stats. All injected faults are considered a single aggregate active fault.
@@ -296,10 +300,7 @@ void FaultFilter::recordDelaysInjectedStats() {
 void FaultFilter::recordAbortsInjectedStats() {
   // Downstream specific stats.
   if (!downstream_cluster_.empty()) {
-    const std::string stats_counter =
-        fmt::format("{}fault.{}.aborts_injected", config_->statsPrefix(), downstream_cluster_);
-
-    config_->scope().counter(stats_counter).inc();
+    config_->incAborts(downstream_cluster_);
   }
 
   // General stats. All injected faults are considered a single aggregate active fault.
@@ -423,10 +424,10 @@ StreamRateLimiter::StreamRateLimiter(uint64_t max_kbps, uint64_t max_buffered_da
                                      std::function<void()> resume_data_cb,
                                      std::function<void(Buffer::Instance&, bool)> write_data_cb,
                                      std::function<void()> continue_cb, TimeSource& time_source,
-                                     Event::Dispatcher& dispatcher)
+                                     Event::Dispatcher& dispatcher, const ScopeTrackedObject& scope)
     : // bytes_per_time_slice is KiB converted to bytes divided by the number of ticks per second.
       bytes_per_time_slice_((max_kbps * 1024) / SecondDivisor), write_data_cb_(write_data_cb),
-      continue_cb_(continue_cb),
+      continue_cb_(continue_cb), scope_(scope),
       // The token bucket is configured with a max token count of the number of ticks per second,
       // and refills at the same rate, so that we have a per second limit which refills gradually in
       // ~63ms intervals.
@@ -472,7 +473,7 @@ void StreamRateLimiter::onTokenTimer() {
     const std::chrono::milliseconds ms = token_bucket_.nextTokenAvailable();
     if (ms.count() > 0) {
       ENVOY_LOG(trace, "limiter: scheduling wakeup for {}ms", ms.count());
-      token_timer_->enableTimer(ms);
+      token_timer_->enableTimer(ms, &scope_);
     }
   }
 
@@ -498,7 +499,7 @@ void StreamRateLimiter::writeData(Buffer::Instance& incoming_buffer, bool end_st
     // The filter API does not currently support that and it will not be a trivial change to add.
     // Instead we cheat here by scheduling the token timer to run immediately after the stack is
     // unwound, at which point we can directly called encode/decodeData.
-    token_timer_->enableTimer(std::chrono::milliseconds(0));
+    token_timer_->enableTimer(std::chrono::milliseconds(0), &scope_);
   }
 }
 

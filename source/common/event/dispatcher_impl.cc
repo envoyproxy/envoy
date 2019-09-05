@@ -149,7 +149,7 @@ TimerPtr DispatcherImpl::createTimer(TimerCb cb) { return createTimerInternal(cb
 
 TimerPtr DispatcherImpl::createTimerInternal(TimerCb cb) {
   ASSERT(isThreadSafe());
-  return scheduler_->createTimer(cb);
+  return scheduler_->createTimer(cb, *this);
 }
 
 void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {

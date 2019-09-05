@@ -5,7 +5,6 @@ package envoy.config.cluster.redis;
 option java_outer_classname = "RedisClusterProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.cluster.redis";
-option go_package = "v2";
 
 import "google/protobuf/duration.proto";
 

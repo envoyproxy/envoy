@@ -269,11 +269,14 @@ public:
    * implementation is unable to produce a factory with the provided parameters, it should throw an
    * EnvoyException.
    * @param config supplies the protobuf configuration for the filter
+   * @param validation_visitor message validation visitor instance.
    * @return Upstream::ProtocolOptionsConfigConstSharedPtr the protocol options
    */
   virtual Upstream::ProtocolOptionsConfigConstSharedPtr
-  createProtocolOptionsConfig(const Protobuf::Message& config) {
+  createProtocolOptionsConfig(const Protobuf::Message& config,
+                              ProtobufMessage::ValidationVisitor& validation_visitor) {
     UNREFERENCED_PARAMETER(config);
+    UNREFERENCED_PARAMETER(validation_visitor);
     return nullptr;
   }
 

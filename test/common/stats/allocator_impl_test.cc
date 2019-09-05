@@ -1,7 +1,7 @@
 #include <string>
 
 #include "common/stats/allocator_impl.h"
-#include "common/stats/fake_symbol_table_impl.h"
+#include "common/stats/symbol_table_creator.h"
 
 #include "test/test_common/logging.h"
 
@@ -13,21 +13,23 @@ namespace {
 
 class AllocatorImplTest : public testing::Test {
 protected:
-  AllocatorImplTest() : alloc_(symbol_table_), pool_(symbol_table_) {}
+  AllocatorImplTest()
+      : symbol_table_(SymbolTableCreator::makeSymbolTable()), alloc_(*symbol_table_),
+        pool_(*symbol_table_) {}
   ~AllocatorImplTest() override { clearStorage(); }
 
   StatNameStorage makeStatStorage(absl::string_view name) {
-    return StatNameStorage(name, symbol_table_);
+    return StatNameStorage(name, *symbol_table_);
   }
 
   StatName makeStat(absl::string_view name) { return pool_.add(name); }
 
   void clearStorage() {
     pool_.clear();
-    EXPECT_EQ(0, symbol_table_.numSymbols());
+    EXPECT_EQ(0, symbol_table_->numSymbols());
   }
 
-  FakeSymbolTableImpl symbol_table_;
+  SymbolTablePtr symbol_table_;
   AllocatorImpl alloc_;
   StatNamePool pool_;
 };

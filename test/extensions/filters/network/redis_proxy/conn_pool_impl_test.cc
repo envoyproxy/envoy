@@ -161,7 +161,8 @@ public:
 
   void testReadPolicy(
       envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings::ReadPolicy
-          read_policy) {
+          read_policy,
+      NetworkFilters::Common::Redis::Client::ReadPolicy expected_read_policy) {
     InSequence s;
 
     read_policy_ = read_policy;
@@ -178,6 +179,9 @@ public:
               EXPECT_EQ(context->computeHashKey().value(), MurmurHash::murmurHash2_64("hash_key"));
               EXPECT_EQ(context->metadataMatchCriteria(), nullptr);
               EXPECT_EQ(context->downstreamConnection(), nullptr);
+              auto redis_context =
+                  dynamic_cast<Clusters::Redis::RedisLoadBalancerContext*>(context);
+              EXPECT_EQ(redis_context->readPolicy(), expected_read_policy);
               return cm_.thread_local_cluster_.lb_.host_;
             }));
     EXPECT_CALL(*this, create_(_)).WillOnce(Return(client));
@@ -279,13 +283,17 @@ TEST_F(RedisConnPoolImplTest, BasicWithAuthPassword) {
 
 TEST_F(RedisConnPoolImplTest, BasicWithReadPolicy) {
   testReadPolicy(envoy::config::filter::network::redis_proxy::v2::
-                     RedisProxy_ConnPoolSettings_ReadPolicy_PREFER_MASTER);
+                     RedisProxy_ConnPoolSettings_ReadPolicy_PREFER_MASTER,
+                 NetworkFilters::Common::Redis::Client::ReadPolicy::PreferMaster);
   testReadPolicy(envoy::config::filter::network::redis_proxy::v2::
-                     RedisProxy_ConnPoolSettings_ReadPolicy_REPLICA);
+                     RedisProxy_ConnPoolSettings_ReadPolicy_REPLICA,
+                 NetworkFilters::Common::Redis::Client::ReadPolicy::Replica);
   testReadPolicy(envoy::config::filter::network::redis_proxy::v2::
-                     RedisProxy_ConnPoolSettings_ReadPolicy_PREFER_REPLICA);
+                     RedisProxy_ConnPoolSettings_ReadPolicy_PREFER_REPLICA,
+                 NetworkFilters::Common::Redis::Client::ReadPolicy::PreferReplica);
   testReadPolicy(
-      envoy::config::filter::network::redis_proxy::v2::RedisProxy_ConnPoolSettings_ReadPolicy_ANY);
+      envoy::config::filter::network::redis_proxy::v2::RedisProxy_ConnPoolSettings_ReadPolicy_ANY,
+      NetworkFilters::Common::Redis::Client::ReadPolicy::Any);
 };
 
 TEST_F(RedisConnPoolImplTest, Hashtagging) {

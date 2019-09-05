@@ -31,6 +31,7 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoGrpc) {
   TestUtility::loadFromYaml(yaml, *proto_config);
 
   testing::StrictMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_CALL(context, messageValidationVisitor()).Times(1);
   EXPECT_CALL(context, localInfo()).Times(1);
   EXPECT_CALL(context, clusterManager()).Times(1);
   EXPECT_CALL(context, runtime()).Times(1);
@@ -85,6 +86,7 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
   TestUtility::loadFromYaml(yaml, *proto_config);
   testing::StrictMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_CALL(context, messageValidationVisitor()).Times(1);
   EXPECT_CALL(context, localInfo()).Times(1);
   EXPECT_CALL(context, clusterManager()).Times(1);
   EXPECT_CALL(context, runtime()).Times(1);

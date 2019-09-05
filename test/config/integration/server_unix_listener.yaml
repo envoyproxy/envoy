@@ -7,12 +7,12 @@ static_resources:
     - filters:
       - name: envoy.http_connection_manager
         config:
-          filters:
-          - name: router
+          http_filters:
+          - name: envoy.router
             config: {}
           codec_type: auto
           stat_prefix: router
-          drain_timeout_ms: 5000
+          drain_timeout: 5s
           route_config:
             virtual_hosts:
             - domains:

@@ -32,6 +32,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/common/rbac:engine_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:utility_lib",
     ],
 )

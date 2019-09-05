@@ -18,7 +18,7 @@ TEST_F(GrpcSubscriptionImplTest, StreamCreationFailure) {
   EXPECT_CALL(callbacks_,
               onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, _));
   EXPECT_CALL(random_, random());
-  EXPECT_CALL(*timer_, enableTimer(_));
+  EXPECT_CALL(*timer_, enableTimer(_, _));
   subscription_->start({"cluster0", "cluster1"});
   EXPECT_TRUE(statsAre(2, 0, 0, 1, 0, 0));
   // Ensure this doesn't cause an issue by sending a request, since we don't
@@ -40,7 +40,7 @@ TEST_F(GrpcSubscriptionImplTest, RemoteStreamClose) {
   EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0));
   EXPECT_CALL(callbacks_,
               onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, _));
-  EXPECT_CALL(*timer_, enableTimer(_));
+  EXPECT_CALL(*timer_, enableTimer(_, _));
   EXPECT_CALL(random_, random());
   subscription_->grpcMux().grpcStreamForTest().onRemoteClose(Grpc::Status::GrpcStatus::Canceled,
                                                              "");

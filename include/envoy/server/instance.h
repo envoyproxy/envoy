@@ -220,10 +220,10 @@ public:
   virtual std::chrono::milliseconds statsFlushInterval() const PURE;
 
   /**
-   * @return ProtobufMessage::ValidationVisitor& validation visitor for configuration
+   * @return ProtobufMessage::ValidationContext& validation context for configuration
    *         messages.
    */
-  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
+  virtual ProtobufMessage::ValidationContext& messageValidationContext() PURE;
 };
 
 } // namespace Server
