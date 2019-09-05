@@ -550,6 +550,10 @@ def _io_opencensus_cpp():
         actual = "@io_opencensus_cpp//opencensus/trace:trace_context",
     )
     native.bind(
+        name = "opencensus_exporter_ocagent",
+        actual = "@io_opencensus_cpp//opencensus/exporters/trace/ocagent:ocagent_exporter",
+    )
+    native.bind(
         name = "opencensus_exporter_stdout",
         actual = "@io_opencensus_cpp//opencensus/exporters/trace/stdout:stdout_exporter",
     )
@@ -613,6 +617,8 @@ def _com_github_grpc_grpc():
             "@envoy//bazel:grpc-protoinfo-2.patch",
             # Pre-integration of https://github.com/grpc/grpc/pull/19860
             "@envoy//bazel:grpc-protoinfo-3.patch",
+            # Pre-integration of https://github.com/grpc/grpc/pull/18950
+            "@envoy//bazel:grpc-rename-gettid.patch",
         ],
         patch_args = ["-p1"],
     )

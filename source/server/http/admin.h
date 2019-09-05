@@ -320,6 +320,9 @@ private:
     Stats::Scope& listenerScope() override { return *scope_; }
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
+    const Network::ActiveUdpListenerFactory* udpListenerFactory() override {
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
 
     AdminImpl& parent_;
     const std::string name_;

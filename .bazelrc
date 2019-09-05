@@ -20,6 +20,9 @@ build --action_env=BAZEL_LINKOPTS=-lm:-static-libgcc
 build --host_javabase=@bazel_tools//tools/jdk:remote_jdk11
 build --javabase=@bazel_tools//tools/jdk:remote_jdk11
 
+# We already have absl in the build, define absl=1 to tell googletest to use absl for backtrace.
+build --define absl=1
+
 # Pass PATH, CC and CXX variables from the environment.
 build --action_env=CC
 build --action_env=CXX
