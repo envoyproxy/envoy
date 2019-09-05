@@ -9,8 +9,7 @@ namespace Common {
 namespace Redis {
 
 RedisCommandStats::RedisCommandStats(Stats::Scope& scope, const std::string& prefix, bool enabled)
-    : scope_(scope), stat_name_pool_(scope.symbolTable()), 
-      prefix_(stat_name_pool_.add(prefix)),
+    : scope_(scope), stat_name_pool_(scope.symbolTable()), prefix_(stat_name_pool_.add(prefix)),
       enabled_(enabled), upstream_rq_time_(stat_name_pool_.add("upstream_rq_time")),
       latency_(stat_name_pool_.add("latency")), total_(stat_name_pool_.add("total")),
       success_(stat_name_pool_.add("success")), error_(stat_name_pool_.add("error")),
@@ -31,10 +30,8 @@ RedisCommandStats::RedisCommandStats(Stats::Scope& scope, const std::string& pre
              hashMultipleSumResultCommands()) {
       addCommandToPool(command);
     }
-    addCommandToPool(
-        Extensions::NetworkFilters::Common::Redis::SupportedCommands::mget());
-    addCommandToPool(
-        Extensions::NetworkFilters::Common::Redis::SupportedCommands::mset());
+    addCommandToPool(Extensions::NetworkFilters::Common::Redis::SupportedCommands::mget());
+    addCommandToPool(Extensions::NetworkFilters::Common::Redis::SupportedCommands::mset());
   }
 }
 

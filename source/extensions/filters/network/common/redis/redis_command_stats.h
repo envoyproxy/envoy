@@ -6,8 +6,8 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/timespan.h"
 
-#include "common/stats/symbol_table_impl.h"
 #include "common/common/to_lower_table.h"
+#include "common/stats/symbol_table_impl.h"
 
 #include "extensions/filters/network/common/redis/codec.h"
 
@@ -30,7 +30,7 @@ public:
   void updateStatsTotal(Stats::StatName stat_name);
   void updateStats(const bool success, Stats::StatName stat_name);
   bool enabled() { return enabled_; }
-  Stats::StatName getUnusedStatName() {return unused_metric_; }
+  Stats::StatName getUnusedStatName() { return unused_metric_; }
 
 private:
   void addCommandToPool(const std::string& command);
