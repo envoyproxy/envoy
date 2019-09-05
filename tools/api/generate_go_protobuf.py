@@ -26,7 +26,7 @@ if call(['bazel', 'build'] + go_protos) != 0:
   print('Build failed')
   sys.exit(1)
 
-shutil.rmtree(os.path.join(workspace, output_base, 'envoy'), ignore_errors = True)
+shutil.rmtree(os.path.join(workspace, output_base, 'envoy'), ignore_errors=True)
 for rule in go_protos:
   # Example rule:
   # @envoy_api//envoy/config/bootstrap/v2:pkg_go_proto
@@ -44,7 +44,7 @@ for rule in go_protos:
   output_dir = os.path.join(workspace, output_base, rule_dir)
 
   # Ensure the output directory exists
-  os.makedirs(output_dir, 0o755, exist_ok = True)
+  os.makedirs(output_dir, 0o755, exist_ok=True)
   print(output_dir)
   for generated_file in input_files:
     shutil.copy(generated_file, output_dir)
