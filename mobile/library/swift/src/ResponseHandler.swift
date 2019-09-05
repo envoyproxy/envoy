@@ -63,10 +63,12 @@ public final class ResponseHandler: NSObject {
   /// - parameter closure: Closure which will be called when an error occurs.
   @discardableResult
   public func onError(_ closure:
-    @escaping () -> Void)
+    @escaping (_ error: EnvoyError) -> Void)
     -> ResponseHandler
   {
-    self.underlyingCallbacks.onError = closure
+    self.underlyingCallbacks.onError = { errorCode, message in
+      closure(EnvoyError(errorCode: errorCode, message: message, cause: nil))
+    }
     return self
   }
 

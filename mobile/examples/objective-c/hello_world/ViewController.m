@@ -88,8 +88,8 @@ NSString *_REQUEST_SCHEME = @"http";
     NSLog(@"Response data (%i): %ld bytes", requestID, data.length);
   }];
 
-  [handler onError:^{
-    NSLog(@"Error (%i): Request failed", requestID);
+  [handler onError:^(EnvoyError *error) {
+    NSLog(@"Error (%i): Request failed: %@", requestID, error.message);
   }];
 
   [self.envoy send:request data:nil trailers:[NSDictionary new] handler:handler];
