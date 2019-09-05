@@ -109,7 +109,7 @@ private:
 
     ClientImpl& parent_;
     PoolCallbacks& callbacks_;
-    Stats::StatName stat_name_;
+    Stats::StatName command_;
     bool canceled_{};
     Stats::CompletableTimespanPtr aggregate_request_timer_;
     Stats::CompletableTimespanPtr command_request_timer_;

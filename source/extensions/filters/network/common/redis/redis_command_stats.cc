@@ -35,9 +35,9 @@ RedisCommandStats::RedisCommandStats(Stats::Scope& scope, const std::string& pre
   }
 }
 
-void RedisCommandStats::addCommandToPool(const std::string& command) {
-  Stats::StatName stat_name = stat_name_pool_.add(command);
-  stat_name_map_[std::string(command)] = stat_name;
+void RedisCommandStats::addCommandToPool(const std::string& command_string) {
+  Stats::StatName command = stat_name_pool_.add(command_string);
+  stat_name_map_[command_string] = command;
 }
 
 Stats::Counter& RedisCommandStats::counter(const Stats::StatNameVec& stat_names) {
@@ -53,9 +53,9 @@ Stats::Histogram& RedisCommandStats::histogram(const Stats::StatNameVec& stat_na
 }
 
 Stats::CompletableTimespanPtr
-RedisCommandStats::createCommandTimer(Stats::StatName stat_name, Envoy::TimeSource& time_source) {
+RedisCommandStats::createCommandTimer(Stats::StatName command, Envoy::TimeSource& time_source) {
   return std::make_unique<Stats::TimespanWithUnit<std::chrono::microseconds>>(
-      histogram({prefix_, stat_name, latency_}), time_source);
+      histogram({prefix_, command, latency_}), time_source);
 }
 
 Stats::CompletableTimespanPtr
@@ -88,15 +88,15 @@ Stats::StatName RedisCommandStats::getCommandFromRequest(const RespValue& reques
   }
 }
 
-void RedisCommandStats::updateStatsTotal(Stats::StatName stat_name) {
-  counter({prefix_, stat_name, total_}).inc();
+void RedisCommandStats::updateStatsTotal(Stats::StatName command) {
+  counter({prefix_, command, total_}).inc();
 }
 
-void RedisCommandStats::updateStats(const bool success, Stats::StatName stat_name) {
+void RedisCommandStats::updateStats(const bool success, Stats::StatName command) {
   if (success) {
-    counter({prefix_, stat_name, success_}).inc();
+    counter({prefix_, command, success_}).inc();
   } else {
-    counter({prefix_, stat_name, success_}).inc();
+    counter({prefix_, command, success_}).inc();
   }
 }
 

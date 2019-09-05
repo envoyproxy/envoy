@@ -23,17 +23,17 @@ public:
 
   Stats::Counter& counter(const Stats::StatNameVec& stat_names);
   Stats::Histogram& histogram(const Stats::StatNameVec& stat_names);
-  Stats::CompletableTimespanPtr createCommandTimer(Stats::StatName stat_name,
+  Stats::CompletableTimespanPtr createCommandTimer(Stats::StatName command,
                                                    Envoy::TimeSource& time_source);
   Stats::CompletableTimespanPtr createAggregateTimer(Envoy::TimeSource& time_source);
   Stats::StatName getCommandFromRequest(const RespValue& request);
-  void updateStatsTotal(Stats::StatName stat_name);
-  void updateStats(const bool success, Stats::StatName stat_name);
+  void updateStatsTotal(Stats::StatName command);
+  void updateStats(const bool success, Stats::StatName command);
   bool enabled() { return enabled_; }
   Stats::StatName getUnusedStatName() { return unused_metric_; }
 
 private:
-  void addCommandToPool(const std::string& command);
+  void addCommandToPool(const std::string& command_string);
 
   Stats::Scope& scope_;
   Stats::StatNamePool stat_name_pool_;
