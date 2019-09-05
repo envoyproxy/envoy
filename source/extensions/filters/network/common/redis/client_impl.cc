@@ -98,14 +98,18 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, PoolCallbacks& ca
 
   const bool empty_buffer = encoder_buffer_.length() == 0;
 
-  std::string to_lower_command(redis_command_stats_->getCommandFromRequest(request));
-  to_lower_table_.toLowerCase(to_lower_command);
-  pending_requests_.emplace_back(*this, callbacks, to_lower_command);
-  encoder_->encode(request, encoder_buffer_);
-
+  Stats::StatName stat_name;
   if (config_.enableCommandStats()) {
-    redis_command_stats_->updateStatsTotal(to_lower_command);
+    // Only lowercase command and get stat_name if we enable command stats
+    stat_name = redis_command_stats_->getCommandFromRequest(request);
+    redis_command_stats_->updateStatsTotal(stat_name);
+  } else {
+    // If disabled, we use a placeholder stat name "unused" that is not used
+    stat_name = redis_command_stats_->getUnusedStatName();
   }
+
+  pending_requests_.emplace_back(*this, callbacks, stat_name);
+  encoder_->encode(request, encoder_buffer_);
 
   // If buffer is full, flush. If the buffer was empty before the request, start the timer.
   if (encoder_buffer_.length() >= config_.maxBufferSizeBeforeFlush()) {
@@ -199,7 +203,7 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
 
   if (redis_command_stats_->enabled()) {
     bool success = !canceled && (value->type() != Common::Redis::RespType::Error);
-    redis_command_stats_->updateStats(success, request.command_);
+    redis_command_stats_->updateStats(success, request.stat_name_);
     request.command_request_timer_->complete();
   }
   request.aggregate_request_timer_->complete();
@@ -244,12 +248,12 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
 }
 
 ClientImpl::PendingRequest::PendingRequest(ClientImpl& parent, PoolCallbacks& callbacks,
-                                           std::string command)
-    : parent_(parent), callbacks_(callbacks), command_{command},
+                                           Stats::StatName stat_name)
+    : parent_(parent), callbacks_(callbacks), stat_name_{stat_name},
       aggregate_request_timer_(
           parent_.redis_command_stats_->createAggregateTimer(parent_.time_source_)),
       command_request_timer_(
-          parent_.redis_command_stats_->createCommandTimer(command_, parent_.time_source_)) {
+          parent_.redis_command_stats_->createCommandTimer(stat_name_, parent_.time_source_)) {
   parent.host_->cluster().stats().upstream_rq_total_.inc();
   parent.host_->stats().rq_total_.inc();
   parent.host_->cluster().stats().upstream_rq_active_.inc();

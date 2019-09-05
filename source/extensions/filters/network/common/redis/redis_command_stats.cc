@@ -12,7 +12,9 @@ RedisCommandStats::RedisCommandStats(Stats::Scope& scope, const std::string& pre
     : scope_(scope), stat_name_set_(scope.symbolTable()), prefix_(stat_name_set_.add(prefix)),
       enabled_(enabled), upstream_rq_time_(stat_name_set_.add("upstream_rq_time")),
       latency_(stat_name_set_.add("latency")), total_(stat_name_set_.add("total")),
-      success_(stat_name_set_.add("success")), error_(stat_name_set_.add("error")) {
+      success_(stat_name_set_.add("success")), error_(stat_name_set_.add("error")),
+      unused_metric_(stat_name_set_.add("unused")), null_metric_(stat_name_set_.add("null")),
+      unknown_metric_(stat_name_set_.add("unknown")) {
   // Note: Even if this is disabled, we track the upstream_rq_time.
   if (enabled_) {
     // Create StatName for each Redis command. Note that we don't include Auth or Ping.
@@ -48,8 +50,7 @@ Stats::Histogram& RedisCommandStats::histogram(const Stats::StatNameVec& stat_na
 }
 
 Stats::CompletableTimespanPtr
-RedisCommandStats::createCommandTimer(std::string command, Envoy::TimeSource& time_source) {
-  Stats::StatName stat_name = stat_name_set_.getStatName(command);
+RedisCommandStats::createCommandTimer(Stats::StatName stat_name, Envoy::TimeSource& time_source) {
   return std::make_unique<Stats::TimespanWithUnit<std::chrono::microseconds>>(
       histogram({prefix_, stat_name, latency_}), time_source);
 }
@@ -60,7 +61,7 @@ RedisCommandStats::createAggregateTimer(Envoy::TimeSource& time_source) {
       histogram({prefix_, upstream_rq_time_}), time_source);
 }
 
-std::string RedisCommandStats::getCommandFromRequest(const RespValue& request) {
+Stats::StatName RedisCommandStats::getCommandFromRequest(const RespValue& request) {
   // Get command from RespValue
   switch (request.type()) {
   case RespType::Array:
@@ -70,17 +71,17 @@ std::string RedisCommandStats::getCommandFromRequest(const RespValue& request) {
   case RespType::Null:
     return null_metric_;
   default:
-    return request.asString();
+    std::string to_lower_command(request.asString());
+    to_lower_table_.toLowerCase(to_lower_command);
+    return stat_name_set_.getStatName(to_lower_command);
   }
 }
 
-void RedisCommandStats::updateStatsTotal(const std::string& command) {
-  Stats::StatName stat_name = stat_name_set_.getStatName(command);
+void RedisCommandStats::updateStatsTotal(Stats::StatName stat_name) {
   counter({prefix_, stat_name, total_}).inc();
 }
 
-void RedisCommandStats::updateStats(const bool success, const std::string& command) {
-  Stats::StatName stat_name = stat_name_set_.getStatName(command);
+void RedisCommandStats::updateStats(const bool success, Stats::StatName stat_name) {
   if (success) {
     counter({prefix_, stat_name, success_}).inc();
   } else {

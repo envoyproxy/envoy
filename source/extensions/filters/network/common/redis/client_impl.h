@@ -9,7 +9,6 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/hash.h"
-#include "common/common/to_lower_table.h"
 #include "common/network/filter_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/singleton/const_singleton.h"
@@ -102,7 +101,7 @@ private:
   };
 
   struct PendingRequest : public PoolRequest {
-    PendingRequest(ClientImpl& parent, PoolCallbacks& callbacks, std::string command);
+    PendingRequest(ClientImpl& parent, PoolCallbacks& callbacks, Stats::StatName stat_name);
     ~PendingRequest() override;
 
     // PoolRequest
@@ -110,7 +109,7 @@ private:
 
     ClientImpl& parent_;
     PoolCallbacks& callbacks_;
-    std::string command_;
+    Stats::StatName stat_name_;
     bool canceled_{};
     Stats::CompletableTimespanPtr aggregate_request_timer_;
     Stats::CompletableTimespanPtr command_request_timer_;
@@ -140,7 +139,6 @@ private:
   Event::TimerPtr flush_timer_;
   Envoy::TimeSource& time_source_;
   const RedisCommandStatsPtr redis_command_stats_;
-  const ToLowerTable to_lower_table_;
 };
 
 class ClientFactoryImpl : public ClientFactory {
