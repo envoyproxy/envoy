@@ -373,7 +373,7 @@ envoy_cc_library(
         ":static_cluster_lib",
         ":strict_dns_cluster_lib",
         ":upstream_includes",
-        ":transport_socket_overrides_lib",
+        ":transport_socket_matcher_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",
         "//include/envoy/network:dns_interface",
@@ -397,8 +397,8 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "transport_socket_overrides_lib",
-    srcs = ["transport_socket_overrides.cc"],
+    name = "transport_socket_matcher_lib",
+    srcs = ["transport_socket_matcher.cc"],
     deps = [
         ":eds_lib",
         ":health_checker_lib",
@@ -454,7 +454,7 @@ envoy_cc_library(
     hdrs = [
         "upstream_impl.h",
         # TODO(incfly): this might not be a good way to include all the dependency.
-        "transport_socket_overrides.h"
+        "transport_socket_matcher.h"
         ],
     external_deps = ["abseil_synchronization"],
     deps = [

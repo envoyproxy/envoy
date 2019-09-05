@@ -42,7 +42,7 @@
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/outlier_detection_impl.h"
 #include "common/upstream/resource_manager_impl.h"
-#include "common/upstream/transport_socket_overrides.h"
+#include "common/upstream/transport_socket_matcher.h"
 
 #include "absl/synchronization/mutex.h"
 
