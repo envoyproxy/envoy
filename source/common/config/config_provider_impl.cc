@@ -28,7 +28,6 @@ void ConfigSubscriptionCommonBase::applyConfigUpdate(const ConfigUpdateCb& updat
   tls_->runOnAllThreads([update_fn](ThreadLocal::ThreadLocalObjectSharedPtr previous)
                             -> ThreadLocal::ThreadLocalObjectSharedPtr {
     auto prev_thread_local_config = std::dynamic_pointer_cast<ThreadLocalConfig>(previous);
-    ASSERT(prev_thread_local_config != nullptr);
     prev_thread_local_config->config_ = update_fn(prev_thread_local_config->config_);
     return previous;
   });

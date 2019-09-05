@@ -42,6 +42,7 @@ SlotPtr InstanceImpl::allocateSlot() {
 bool InstanceImpl::SlotImpl::currentThreadRegistered() {
   return thread_local_data_.data_.size() > index_;
 }
+
 void InstanceImpl::SlotImpl::runOnAllThreads(const UpdateCb& cb) {
   parent_.runOnAllThreads([this, cb]() { setThreadLocal(index_, cb(get())); });
 }
@@ -59,6 +60,7 @@ InstanceImpl::Bookkeeper::Bookkeeper(InstanceImpl& parent, std::unique_ptr<SlotI
     : parent_(parent), holder_(std::make_unique<SlotHolder>(std::move(slot))) {}
 
 ThreadLocalObjectSharedPtr InstanceImpl::Bookkeeper::get() { return slot().get(); }
+
 void InstanceImpl::Bookkeeper::runOnAllThreads(const UpdateCb& cb, Event::PostCb complete_cb) {
   slot().runOnAllThreads(
       [cb, ref_count = holder_->ref_count_](ThreadLocalObjectSharedPtr previous) {
@@ -66,24 +68,29 @@ void InstanceImpl::Bookkeeper::runOnAllThreads(const UpdateCb& cb, Event::PostCb
       },
       complete_cb);
 }
+
 void InstanceImpl::Bookkeeper::runOnAllThreads(const UpdateCb& cb) {
   slot().runOnAllThreads(
       [cb, ref_count = holder_->ref_count_](ThreadLocalObjectSharedPtr previous) {
         return cb(std::move(previous));
       });
 }
+
 bool InstanceImpl::Bookkeeper::currentThreadRegistered() {
   return slot().currentThreadRegistered();
 }
+
 void InstanceImpl::Bookkeeper::runOnAllThreads(Event::PostCb cb) {
   // Use holder_.ref_count_ to bookkeep how many on-the-fly callback are out there.
   slot().runOnAllThreads([cb, ref_count = holder_->ref_count_]() { cb(); });
 }
+
 void InstanceImpl::Bookkeeper::runOnAllThreads(Event::PostCb cb, Event::PostCb main_callback) {
   // Use holder_.ref_count_ to bookkeep how many on-the-fly callback are out there.
   slot().runOnAllThreads([cb, main_callback, ref_count = holder_->ref_count_]() { cb(); },
                          main_callback);
 }
+
 void InstanceImpl::Bookkeeper::set(InitializeCb cb) {
   slot().set([cb, ref_count = holder_->ref_count_](Event::Dispatcher& dispatcher)
                  -> ThreadLocalObjectSharedPtr { return cb(dispatcher); });
@@ -102,6 +109,7 @@ void InstanceImpl::registerThread(Event::Dispatcher& dispatcher, bool main_threa
     dispatcher.post([&dispatcher] { thread_local_data_.dispatcher_ = &dispatcher; });
   }
 }
+
 void InstanceImpl::recycle(std::unique_ptr<SlotHolder>&& holder) {
   if (holder->isRecycleable()) {
     holder.reset();

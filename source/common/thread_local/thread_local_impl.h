@@ -58,8 +58,8 @@ private:
     SlotHolder(std::unique_ptr<SlotImpl>&& slot) : slot_(std::move(slot)) {}
     bool isRecycleable() { return ref_count_.use_count() == 1; }
 
-    std::unique_ptr<SlotImpl> slot_;
-    std::shared_ptr<int> ref_count_{new int(0)};
+    const std::unique_ptr<SlotImpl> slot_;
+    const std::shared_ptr<int> ref_count_{new int(0)};
   };
 
   // A Wrapper of SlotImpl which on destruction returns the SlotImpl to the deferred delete queue
