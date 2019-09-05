@@ -92,7 +92,7 @@ NSString *_REQUEST_SCHEME = @"http";
     NSLog(@"Error (%i): Request failed: %@", requestID, error.message);
   }];
 
-  [self.envoy send:request data:nil trailers:[NSDictionary new] handler:handler];
+  [self.envoy send:request body:nil trailers:[NSDictionary new] handler:handler];
 }
 
 - (void)addResponseBody:(NSString *)body
