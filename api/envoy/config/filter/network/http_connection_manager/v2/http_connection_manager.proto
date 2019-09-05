@@ -130,6 +130,11 @@ message HttpConnectionManager {
     // Whether to annotate spans with additional data. If true, spans will include logs for stream
     // events.
     bool verbose = 6;
+
+    // Maximum length of the request path to extract and include in the HttpUrl tag. Used to
+    // truncate lengthy request paths to meet the needs of a tracing backend.
+    // Default: 256
+    google.protobuf.UInt32Value max_path_tag_length = 7;
   }
 
   // Presence of the object defines whether the connection manager

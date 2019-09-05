@@ -224,6 +224,7 @@ tracing:
   operation_name: ingress
   request_headers_for_tags:
   - foo
+  max_path_tag_length: 128
 http_filters:
 - name: envoy.router
   config: {}
@@ -235,6 +236,7 @@ http_filters:
 
   EXPECT_THAT(std::vector<Http::LowerCaseString>({Http::LowerCaseString("foo")}),
               ContainerEq(config.tracingConfig()->request_headers_for_tags_));
+  EXPECT_EQ(128, config.tracingConfig()->max_path_tag_length_);
   EXPECT_EQ(*context_.local_info_.address_, config.localAddress());
   EXPECT_EQ("foo", config.serverName());
   EXPECT_EQ(HttpConnectionManagerConfig::HttpConnectionManagerProto::OVERWRITE,
@@ -316,6 +318,7 @@ TEST_F(HttpConnectionManagerConfigTest, SamplingDefault) {
                                      scoped_routes_config_provider_manager_);
 
   EXPECT_EQ(100, config.tracingConfig()->client_sampling_.numerator());
+  EXPECT_EQ(Tracing::DefaultMaxPathTagLength, config.tracingConfig()->max_path_tag_length_);
   EXPECT_EQ(envoy::type::FractionalPercent::HUNDRED,
             config.tracingConfig()->client_sampling_.denominator());
   EXPECT_EQ(10000, config.tracingConfig()->random_sampling_.numerator());

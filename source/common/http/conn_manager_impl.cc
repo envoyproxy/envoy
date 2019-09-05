@@ -1757,6 +1757,10 @@ bool ConnectionManagerImpl::ActiveStream::verbose() const {
   return connection_manager_.config_.tracingConfig()->verbose_;
 }
 
+uint32_t ConnectionManagerImpl::ActiveStream::maxPathTagLength() const {
+  return connection_manager_.config_.tracingConfig()->max_path_tag_length_;
+}
+
 void ConnectionManagerImpl::ActiveStream::callHighWatermarkCallbacks() {
   ++high_watermark_count_;
   for (auto watermark_callbacks : watermark_callbacks_) {
