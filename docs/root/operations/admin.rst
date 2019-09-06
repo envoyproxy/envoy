@@ -200,7 +200,7 @@ modify different aspects of the server:
 .. http:post:: /reset_counters
 
   Reset all counters to zero. This is useful along with :http:get:`/stats` during debugging. Note
-  that this does not drop any data sent to statsd. It just effects local output of the
+  that this does not drop any data sent to statsd. It just affects local output of the
   :http:get:`/stats` command.
 
 .. http:get:: /server_info
@@ -353,6 +353,23 @@ modify different aspects of the server:
   You can optionally pass the `usedonly` URL query argument to only get statistics that
   Envoy has updated (counters incremented at least once, gauges changed at least once,
   and histograms added to at least once)
+
+  .. http:get:: /stats?recentlookups
+
+  This endpoint is intended for Envoy developers debugging potential contention issues
+  in the stats system.
+
+  It emits a table of stat names that were recently accessed as strings by Envoy.  In
+  general, strings should be converted into StatNames, counters, gauges, and histograms
+  by Envoy code only during startup or when receiving a new configuration via xDS. This
+  is because when stats are looked up as strings they must take a global symbol table
+  lock. During startup this is expected, but in response to user requests on high
+  core-count machines, this can cause performance issues due to mutex contention.
+
+  See `stats.md <https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md>`_
+  for more details.
+
+  Note also that actual mutex contention can be tracked via `/contention`.
 
 .. _operations_admin_interface_runtime:
 
