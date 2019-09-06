@@ -662,10 +662,8 @@ void DetectorImpl::processSuccessRateEjections(
 
   if (!valid_failure_percentage_hosts.empty() &&
       valid_failure_percentage_hosts.size() >= failure_percentage_minimum_hosts) {
-    const double failure_percentage_threshold =
-        runtime_.snapshot().getInteger("outlier_detection.failure_percentage_threshold",
-                                       config_.failurePercentageThreshold()) /
-        100.0;
+    const double failure_percentage_threshold = runtime_.snapshot().getInteger(
+        "outlier_detection.failure_percentage_threshold", config_.failurePercentageThreshold());
 
     for (const auto& host_success_rate_pair : valid_failure_percentage_hosts) {
       if ((100.0 - host_success_rate_pair.success_rate_) >= failure_percentage_threshold) {
