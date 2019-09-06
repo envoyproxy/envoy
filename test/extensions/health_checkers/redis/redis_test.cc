@@ -33,8 +33,7 @@ class RedisHealthCheckerTest
 public:
   RedisHealthCheckerTest()
       : cluster_(new NiceMock<Upstream::MockClusterMockPrioritySet>()),
-        event_logger_(new Upstream::MockHealthCheckEventLogger()),
-        api_(Api::createApiForTest()) {}
+        event_logger_(new Upstream::MockHealthCheckEventLogger()), api_(Api::createApiForTest()) {}
 
   void setup() {
     const std::string yaml = R"EOF(
@@ -53,9 +52,9 @@ public:
     const auto& redis_config = getRedisHealthCheckConfig(
         health_check_config, ProtobufMessage::getStrictValidationVisitor());
 
-    health_checker_.reset(
-        new RedisHealthChecker(*cluster_, health_check_config, redis_config, dispatcher_, runtime_,
-                               random_, Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this));
+    health_checker_.reset(new RedisHealthChecker(
+        *cluster_, health_check_config, redis_config, dispatcher_, runtime_, random_,
+        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this));
   }
 
   void setupAlwaysLogHealthCheckFailures() {
@@ -76,9 +75,9 @@ public:
     const auto& redis_config = getRedisHealthCheckConfig(
         health_check_config, ProtobufMessage::getStrictValidationVisitor());
 
-    health_checker_.reset(
-        new RedisHealthChecker(*cluster_, health_check_config, redis_config, dispatcher_, runtime_,
-                               random_, Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this));
+    health_checker_.reset(new RedisHealthChecker(
+        *cluster_, health_check_config, redis_config, dispatcher_, runtime_, random_,
+        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this));
   }
 
   void setupExistsHealthcheck() {
@@ -99,9 +98,9 @@ public:
     const auto& redis_config = getRedisHealthCheckConfig(
         health_check_config, ProtobufMessage::getStrictValidationVisitor());
 
-    health_checker_.reset(
-        new RedisHealthChecker(*cluster_, health_check_config, redis_config, dispatcher_, runtime_,
-                               random_, Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this));
+    health_checker_.reset(new RedisHealthChecker(
+        *cluster_, health_check_config, redis_config, dispatcher_, runtime_, random_,
+        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this));
   }
 
   void setupDontReuseConnection() {
@@ -122,14 +121,15 @@ public:
     const auto& redis_config = getRedisHealthCheckConfig(
         health_check_config, ProtobufMessage::getStrictValidationVisitor());
 
-    health_checker_.reset(
-        new RedisHealthChecker(*cluster_, health_check_config, redis_config, dispatcher_, runtime_,
-                               random_, Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this));
+    health_checker_.reset(new RedisHealthChecker(
+        *cluster_, health_check_config, redis_config, dispatcher_, runtime_, random_,
+        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this));
   }
 
   Extensions::NetworkFilters::Common::Redis::Client::ClientPtr
   create(Upstream::HostConstSharedPtr, Event::Dispatcher&,
-         const Extensions::NetworkFilters::Common::Redis::Client::Config&, const std::string&) override {
+         const Extensions::NetworkFilters::Common::Redis::Client::Config&,
+         const std::string&) override {
     return Extensions::NetworkFilters::Common::Redis::Client::ClientPtr{create_()};
   }
 
