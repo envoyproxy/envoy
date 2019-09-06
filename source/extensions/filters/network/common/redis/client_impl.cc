@@ -6,6 +6,9 @@ namespace NetworkFilters {
 namespace Common {
 namespace Redis {
 namespace Client {
+namespace {
+Common::Redis::Client::DoNothingPoolCallbacks null_pool_callbacks;
+} // namespace
 
 ConfigImpl::ConfigImpl(
     const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config)
@@ -49,7 +52,6 @@ ConfigImpl::ConfigImpl(
 ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                              EncoderPtr&& encoder, DecoderFactory& decoder_factory,
                              const Config& config) {
-
   std::unique_ptr<ClientImpl> client(
       new ClientImpl(host, dispatcher, std::move(encoder), decoder_factory, config));
   client->connection_ = host->createConnection(dispatcher, nullptr, nullptr).connection_;
@@ -245,12 +247,28 @@ void ClientImpl::PendingRequest::cancel() {
   canceled_ = true;
 }
 
+void ClientImpl::initialize(const std::string& auth_password) {
+  if (!auth_password.empty()) {
+    // Send an AUTH command to the upstream server.
+    makeRequest(Utility::makeAuthCommand(auth_password), null_pool_callbacks);
+  }
+  // Any connection to replica requires the READONLY command in order to perform read.
+  // Also the READONLY command is a no-opt for the master.
+  // We only need to send the READONLY command iff it's possible that the host is a replica.
+  if (config_.readPolicy() != Common::Redis::Client::ReadPolicy::Master) {
+    makeRequest(Utility::ReadOnlyRequest::instance(), null_pool_callbacks);
+  }
+}
+
 ClientFactoryImpl ClientFactoryImpl::instance_;
 
 ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
-                                    Event::Dispatcher& dispatcher, const Config& config) {
-  return ClientImpl::create(host, dispatcher, EncoderPtr{new EncoderImpl()}, decoder_factory_,
-                            config);
+                                    Event::Dispatcher& dispatcher, const Config& config,
+                                    const std::string& auth_password) {
+  ClientPtr client =
+      ClientImpl::create(host, dispatcher, EncoderPtr{new EncoderImpl()}, decoder_factory_, config);
+  client->initialize(auth_password);
+  return client;
 }
 
 } // namespace Client

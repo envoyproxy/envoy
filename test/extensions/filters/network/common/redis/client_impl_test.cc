@@ -5,6 +5,7 @@
 #include "common/upstream/upstream_impl.h"
 
 #include "extensions/filters/network/common/redis/client_impl.h"
+#include "extensions/filters/network/common/redis/utility.h"
 
 #include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/extensions/filters/network/common/redis/test_utils.h"
@@ -99,6 +100,28 @@ public:
     client_impl->onRespValue(std::move(response1));
   }
 
+  void testInitializeReadPolicy(
+      envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings::ReadPolicy
+          read_policy) {
+    InSequence s;
+
+    setup(std::make_unique<ConfigImpl>(createConnPoolSettings(20, true, true, 100, read_policy)));
+
+    Common::Redis::RespValue readonly_request = Utility::ReadOnlyRequest::instance();
+    EXPECT_CALL(*encoder_, encode(Eq(readonly_request), _));
+    EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+    client_->initialize(auth_password_);
+
+    EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_rq_total_.value());
+    EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_rq_active_.value());
+    EXPECT_EQ(1UL, host_->stats_.rq_total_.value());
+    EXPECT_EQ(1UL, host_->stats_.rq_active_.value());
+
+    EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+    EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+    client_->close();
+  }
+
   const std::string cluster_name_{"foo"};
   std::shared_ptr<Upstream::MockHost> host_{new NiceMock<Upstream::MockHost>()};
   Event::MockDispatcher dispatcher_;
@@ -111,6 +134,7 @@ public:
   Network::ReadFilterSharedPtr upstream_read_filter_;
   std::unique_ptr<Config> config_;
   ClientPtr client_;
+  std::string auth_password_;
 };
 
 TEST_F(RedisClientImplTest, BatchWithZeroBufferAndTimeout) {
@@ -256,6 +280,8 @@ TEST_F(RedisClientImplTest, Basic) {
 
   setup();
 
+  client_->initialize(auth_password_);
+
   Common::Redis::RespValue request1;
   MockPoolCallbacks callbacks1;
   EXPECT_CALL(*encoder_, encode(Ref(request1), _));
@@ -299,6 +325,47 @@ TEST_F(RedisClientImplTest, Basic) {
   EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
   client_->close();
+}
+
+TEST_F(RedisClientImplTest, InitializedWithAuthPassword) {
+  InSequence s;
+
+  setup();
+
+  auth_password_ = "testing password";
+  Common::Redis::RespValue auth_request = Utility::makeAuthCommand(auth_password_);
+  EXPECT_CALL(*encoder_, encode(Eq(auth_request), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  client_->initialize(auth_password_);
+
+  EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_rq_total_.value());
+  EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_rq_active_.value());
+  EXPECT_EQ(1UL, host_->stats_.rq_total_.value());
+  EXPECT_EQ(1UL, host_->stats_.rq_active_.value());
+
+  EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  client_->close();
+}
+
+TEST_F(RedisClientImplTest, InitializedWithPreferMasterReadPolicy) {
+  testInitializeReadPolicy(envoy::config::filter::network::redis_proxy::v2::
+                               RedisProxy_ConnPoolSettings_ReadPolicy_PREFER_MASTER);
+}
+
+TEST_F(RedisClientImplTest, InitializedWithReplicaReadPolicy) {
+  testInitializeReadPolicy(envoy::config::filter::network::redis_proxy::v2::
+                               RedisProxy_ConnPoolSettings_ReadPolicy_REPLICA);
+}
+
+TEST_F(RedisClientImplTest, InitializedWithPreferReplicaReadPolicy) {
+  testInitializeReadPolicy(envoy::config::filter::network::redis_proxy::v2::
+                               RedisProxy_ConnPoolSettings_ReadPolicy_PREFER_REPLICA);
+}
+
+TEST_F(RedisClientImplTest, InitializedWithAnyReadPolicy) {
+  testInitializeReadPolicy(
+      envoy::config::filter::network::redis_proxy::v2::RedisProxy_ConnPoolSettings_ReadPolicy_ANY);
 }
 
 TEST_F(RedisClientImplTest, Cancel) {
@@ -875,10 +942,10 @@ TEST(RedisClientFactoryImplTest, Basic) {
   EXPECT_CALL(*host, createConnection_(_, _)).WillOnce(Return(conn_info));
   NiceMock<Event::MockDispatcher> dispatcher;
   ConfigImpl config(createConnPoolSettings());
-  ClientPtr client = factory.create(host, dispatcher, config);
+  const std::string auth_password;
+  ClientPtr client = factory.create(host, dispatcher, config, auth_password);
   client->close();
 }
-
 } // namespace Client
 } // namespace Redis
 } // namespace Common

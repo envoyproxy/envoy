@@ -249,16 +249,10 @@ void RedisCluster::RedisDiscoverySession::startResolveRedis() {
   if (!client) {
     client = std::make_unique<RedisDiscoveryClient>(*this);
     client->host_ = current_host_address_;
-    client->client_ = client_factory_.create(host, dispatcher_, *this);
-    client->client_->addConnectionCallbacks(*client);
     std::string auth_password =
         Envoy::Config::DataSource::read(parent_.auth_password_datasource_, true, parent_.api_);
-    if (!auth_password.empty()) {
-      // Send an AUTH command to the upstream server.
-      client->client_->makeRequest(
-          Extensions::NetworkFilters::Common::Redis::Utility::makeAuthCommand(auth_password),
-          null_pool_callbacks);
-    }
+    client->client_ = client_factory_.create(host, dispatcher_, *this, auth_password);
+    client->client_->addConnectionCallbacks(*client);
   }
 
   current_request_ = client->client_->makeRequest(ClusterSlotsRequest::instance_, *this);
