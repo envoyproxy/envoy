@@ -202,7 +202,7 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
   PendingRequest& request = pending_requests_.front();
   const bool canceled = request.canceled_;
 
-  if (redis_command_stats_->enabled()) {
+  if (config_.enableCommandStats()) {
     bool success = !canceled && (value->type() != Common::Redis::RespType::Error);
     redis_command_stats_->updateStats(scope_, request.command_, success);
     request.command_request_timer_->complete();
@@ -253,7 +253,7 @@ ClientImpl::PendingRequest::PendingRequest(ClientImpl& parent, PoolCallbacks& ca
     : parent_(parent), callbacks_(callbacks), command_{command},
       aggregate_request_timer_(parent_.redis_command_stats_->createAggregateTimer(
           parent_.scope_, parent_.time_source_)) {
-  if (parent_.redis_command_stats_->enabled()) {
+  if (parent_.config_.enableCommandStats()) {
     command_request_timer_ = parent_.redis_command_stats_->createCommandTimer(
         parent_.scope_, command_, parent_.time_source_);
   }

@@ -19,12 +19,11 @@ namespace Redis {
 
 class RedisCommandStats {
 public:
-  RedisCommandStats(Stats::SymbolTable& symbol_table, const std::string& prefix, bool enabled);
+  RedisCommandStats(Stats::SymbolTable& symbol_table, const std::string& prefix);
 
   static std::shared_ptr<RedisCommandStats>
-  createRedisCommandStats(Stats::SymbolTable& symbol_table, const std::string& prefix,
-                          bool enabled) {
-    return std::make_shared<Common::Redis::RedisCommandStats>(symbol_table, prefix, enabled);
+  createRedisCommandStats(Stats::SymbolTable& symbol_table, const std::string& prefix) {
+    return std::make_shared<Common::Redis::RedisCommandStats>(symbol_table, prefix);
   }
 
   Stats::Counter& counter(Stats::Scope& scope, const Stats::StatNameVec& stat_names);
@@ -36,7 +35,6 @@ public:
   Stats::StatName getCommandFromRequest(const RespValue& request);
   void updateStatsTotal(Stats::Scope& scope, Stats::StatName command);
   void updateStats(Stats::Scope& scope, Stats::StatName command, const bool success);
-  bool enabled() { return enabled_; }
   Stats::StatName getUnusedStatName() { return unused_metric_; }
 
 private:
@@ -46,7 +44,6 @@ private:
   Stats::StatNamePool stat_name_pool_;
   StringMap<Stats::StatName> stat_name_map_;
   const Stats::StatName prefix_;
-  bool enabled_;
   const Stats::StatName upstream_rq_time_;
   const Stats::StatName latency_;
   const Stats::StatName total_;

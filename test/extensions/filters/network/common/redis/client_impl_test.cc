@@ -74,7 +74,7 @@ public:
     EXPECT_CALL(*upstream_connection_, noDelay(true));
 
     redis_command_stats_ = Common::Redis::RedisCommandStats::createRedisCommandStats(
-        stats_.symbolTable(), "upstream_commands", true);
+        stats_.symbolTable(), "upstream_commands");
 
     client_ = ClientImpl::create(host_, dispatcher_, Common::Redis::EncoderPtr{encoder_}, *this,
                                  *config_, std::move(redis_command_stats_), stats_);
@@ -885,7 +885,7 @@ TEST(RedisClientFactoryImplTest, Basic) {
   ConfigImpl config(createConnPoolSettings());
   Stats::IsolatedStoreImpl stats_;
   auto redis_command_stats = Common::Redis::RedisCommandStats::createRedisCommandStats(
-      stats_.symbolTable(), "upstream_commands", true);
+      stats_.symbolTable(), "upstream_commands");
   ClientPtr client =
       factory.create(host, dispatcher, config, std::move(redis_command_stats), stats_);
   client->close();

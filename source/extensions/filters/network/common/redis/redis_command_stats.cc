@@ -8,33 +8,30 @@ namespace NetworkFilters {
 namespace Common {
 namespace Redis {
 
-RedisCommandStats::RedisCommandStats(Stats::SymbolTable& symbol_table, const std::string& prefix,
-                                     bool enabled)
+RedisCommandStats::RedisCommandStats(Stats::SymbolTable& symbol_table, const std::string& prefix)
     : symbol_table_(symbol_table), stat_name_pool_(symbol_table_),
-      prefix_(stat_name_pool_.add(prefix)), enabled_(enabled),
+      prefix_(stat_name_pool_.add(prefix)),
       upstream_rq_time_(stat_name_pool_.add("upstream_rq_time")),
       latency_(stat_name_pool_.add("latency")), total_(stat_name_pool_.add("total")),
       success_(stat_name_pool_.add("success")), error_(stat_name_pool_.add("error")),
       unused_metric_(stat_name_pool_.add("unused")), null_metric_(stat_name_pool_.add("null")),
       unknown_metric_(stat_name_pool_.add("unknown")) {
   // Note: Even if this is disabled, we track the upstream_rq_time.
-  if (enabled_) {
-    // Create StatName for each Redis command. Note that we don't include Auth or Ping.
-    for (const std::string& command :
-         Extensions::NetworkFilters::Common::Redis::SupportedCommands::simpleCommands()) {
-      addCommandToPool(command);
-    }
-    for (const std::string& command :
-         Extensions::NetworkFilters::Common::Redis::SupportedCommands::evalCommands()) {
-      addCommandToPool(command);
-    }
-    for (const std::string& command : Extensions::NetworkFilters::Common::Redis::SupportedCommands::
-             hashMultipleSumResultCommands()) {
-      addCommandToPool(command);
-    }
-    addCommandToPool(Extensions::NetworkFilters::Common::Redis::SupportedCommands::mget());
-    addCommandToPool(Extensions::NetworkFilters::Common::Redis::SupportedCommands::mset());
+  // Create StatName for each Redis command. Note that we don't include Auth or Ping.
+  for (const std::string& command :
+       Extensions::NetworkFilters::Common::Redis::SupportedCommands::simpleCommands()) {
+    addCommandToPool(command);
   }
+  for (const std::string& command :
+       Extensions::NetworkFilters::Common::Redis::SupportedCommands::evalCommands()) {
+    addCommandToPool(command);
+  }
+  for (const std::string& command : Extensions::NetworkFilters::Common::Redis::SupportedCommands::
+           hashMultipleSumResultCommands()) {
+    addCommandToPool(command);
+  }
+  addCommandToPool(Extensions::NetworkFilters::Common::Redis::SupportedCommands::mget());
+  addCommandToPool(Extensions::NetworkFilters::Common::Redis::SupportedCommands::mset());
 }
 
 void RedisCommandStats::addCommandToPool(const std::string& command_string) {
