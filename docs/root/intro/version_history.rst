@@ -48,6 +48,7 @@ Version history
 * router check tool: add coverage reporting & enforcement.
 * router check tool: add comprehensive coverage reporting.
 * router check tool: add deprecated field check.
+* router check tool: add flag for only printing names of failed tests.
 * tls: added verification of IP address SAN fields in certificates against configured SANs in the
 * tracing: added support to the Zipkin reporter for sending list of spans as Zipkin JSON v2 and protobuf message over HTTP.
   certificate validation context.
