@@ -50,7 +50,6 @@ using testing::_;
 using testing::An;
 using testing::AnyNumber;
 using testing::AtLeast;
-using testing::DoAll;
 using testing::Eq;
 using testing::HasSubstr;
 using testing::InSequence;
@@ -61,7 +60,6 @@ using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
-using testing::Sequence;
 
 namespace Envoy {
 namespace Http {
@@ -128,7 +126,8 @@ public:
                                          percent1,
                                          percent2,
                                          percent1,
-                                         false});
+                                         false,
+                                         256});
     }
   }
 
@@ -984,7 +983,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
                                      percent1,
                                      percent2,
                                      percent1,
-                                     false});
+                                     false,
+                                     256});
 
   auto* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(tracer_, startSpan_(_, _, _, _))
@@ -1062,7 +1062,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
                                      percent1,
                                      percent2,
                                      percent1,
-                                     false});
+                                     false,
+                                     256});
 
   auto* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(tracer_, startSpan_(_, _, _, _))
@@ -1135,7 +1136,8 @@ TEST_F(HttpConnectionManagerImplTest,
                                      percent1,
                                      percent2,
                                      percent1,
-                                     false});
+                                     false,
+                                     256});
 
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled",
                                                  An<const envoy::type::FractionalPercent&>(), _))

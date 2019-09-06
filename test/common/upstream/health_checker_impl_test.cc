@@ -35,11 +35,9 @@ using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::NiceMock;
-using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
-using testing::WithArg;
 
 namespace Envoy {
 namespace Upstream {

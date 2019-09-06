@@ -1,10 +1,7 @@
 #include "test/extensions/clusters/redis/mocks.h"
 
 using testing::_;
-using testing::Invoke;
 using testing::Return;
-using testing::ReturnPointee;
-using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
