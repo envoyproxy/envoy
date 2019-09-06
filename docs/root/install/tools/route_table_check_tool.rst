@@ -37,7 +37,7 @@ Usage
     -d,  --details
       Show detailed test execution results. The first line indicates the test name.
 
-    -o, --only-show-failures
+    --only-show-failures
       Displays test names for failed tests. Omits test names for passing tests if the details flag is set.
 
     -p,  --useproto
