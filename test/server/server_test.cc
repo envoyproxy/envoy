@@ -26,8 +26,6 @@ using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
-using testing::Property;
-using testing::Ref;
 using testing::Return;
 using testing::SaveArg;
 using testing::StrictMock;

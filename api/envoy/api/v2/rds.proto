@@ -17,9 +17,6 @@ import "google/api/annotations.proto";
 import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
-import "gogoproto/gogo.proto";
-
-option (gogoproto.equal_all) = true;
 
 // [#protodoc-title: HTTP route configuration]
 // * Routing :ref:`architecture overview <arch_overview_http_routing>`

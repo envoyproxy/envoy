@@ -19,9 +19,6 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
-import "gogoproto/gogo.proto";
-
-option (gogoproto.equal_all) = true;
 
 // [#protodoc-title: Listener]
 // Listener :ref:`configuration overview <config_listeners>`
@@ -136,7 +133,7 @@ message Listener {
   // the accepted socket is closed without a connection being created unless
   // `continue_on_listener_filters_timeout` is set to true. Specify 0 to disable the
   // timeout. If not specified, a default timeout of 15s is used.
-  google.protobuf.Duration listener_filters_timeout = 15 [(gogoproto.stdduration) = true];
+  google.protobuf.Duration listener_filters_timeout = 15;
 
   // Whether a connection should be created when listener filters timeout. Default is false.
   //

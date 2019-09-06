@@ -10,9 +10,6 @@ import "envoy/api/v2/core/address.proto";
 import "envoy/api/v2/core/base.proto";
 
 import "google/protobuf/timestamp.proto";
-import "gogoproto/gogo.proto";
-
-option (gogoproto.stable_marshaler_all) = true;
 
 // [#protodoc-title: Attribute Context ]
 

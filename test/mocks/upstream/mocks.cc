@@ -12,7 +12,6 @@ using testing::_;
 using testing::Eq;
 using testing::Invoke;
 using testing::Return;
-using testing::ReturnPointee;
 using testing::ReturnRef;
 using testing::SaveArg;
 

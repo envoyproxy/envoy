@@ -8,6 +8,7 @@
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.validate.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/server/admin.h"
+#include "envoy/tracing/http_tracer.h"
 
 #include "common/access_log/access_log_impl.h"
 #include "common/common/fmt.h"
@@ -245,13 +246,27 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     Tracing::OperationName tracing_operation_name;
     std::vector<Http::LowerCaseString> request_headers_for_tags;
 
-    switch (tracing_config.operation_name()) {
-    case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
-        Tracing::INGRESS:
+    // Listener level traffic direction overrides the operation name
+    switch (context.direction()) {
+    case envoy::api::v2::core::TrafficDirection::UNSPECIFIED: {
+      switch (tracing_config.operation_name()) {
+      case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+          Tracing::INGRESS:
+        tracing_operation_name = Tracing::OperationName::Ingress;
+        break;
+      case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+          Tracing::EGRESS:
+        tracing_operation_name = Tracing::OperationName::Egress;
+        break;
+      default:
+        NOT_REACHED_GCOVR_EXCL_LINE;
+      }
+      break;
+    }
+    case envoy::api::v2::core::TrafficDirection::INBOUND:
       tracing_operation_name = Tracing::OperationName::Ingress;
       break;
-    case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
-        Tracing::EGRESS:
+    case envoy::api::v2::core::TrafficDirection::OUTBOUND:
       tracing_operation_name = Tracing::OperationName::Egress;
       break;
     default:
@@ -275,10 +290,13 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     overall_sampling.set_numerator(
         tracing_config.has_overall_sampling() ? tracing_config.overall_sampling().value() : 100);
 
+    const uint32_t max_path_tag_length = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+        tracing_config, max_path_tag_length, Tracing::DefaultMaxPathTagLength);
+
     tracing_config_ =
         std::make_unique<Http::TracingConnectionManagerConfig>(Http::TracingConnectionManagerConfig{
             tracing_operation_name, request_headers_for_tags, client_sampling, random_sampling,
-            overall_sampling, tracing_config.verbose()});
+            overall_sampling, tracing_config.verbose(), max_path_tag_length});
   }
 
   for (const auto& access_log : config.access_log()) {

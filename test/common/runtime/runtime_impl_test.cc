@@ -23,8 +23,6 @@ using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Return;
-using testing::ReturnNew;
-using testing::ReturnRef;
 
 namespace Envoy {
 namespace Runtime {
