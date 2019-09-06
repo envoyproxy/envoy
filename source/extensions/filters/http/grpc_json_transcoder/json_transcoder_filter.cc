@@ -356,9 +356,9 @@ void JsonTranscoderFilter::setDecoderFilterCallbacks(
 void JsonTranscoderFilter::encodeGrpcStatusMessage(Http::HeaderMap& trailers) {
   const absl::optional<Grpc::Status::GrpcStatus> grpc_status =
       Grpc::Common::getGrpcStatus(trailers);
-  if (!grpc_status || grpc_status.value() == Grpc::Status::GrpcStatus::InvalidCode) {
+  if (grpc_status.value() == Grpc::Status::GrpcStatus::InvalidCode) {
     response_headers_->Status()->value(enumToInt(Http::Code::ServiceUnavailable));
-  } else {
+  } else if (grpc_status) {
     response_headers_->Status()->value(Grpc::Utility::grpcToHttpStatus(grpc_status.value()));
     response_headers_->insertGrpcStatus().value(enumToInt(grpc_status.value()));
   }
@@ -384,8 +384,6 @@ Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::HeaderMap& h
   headers.insertContentType().value().setReference(Http::Headers::get().ContentTypeValues.Json);
 
   if (end_stream) {
-    // In gRPC wire protocol, headers frame with end_stream is a trailers-only response.
-    // The return value from encodeTrailers is ignored since it is always continue.
     encodeGrpcStatusMessage(headers);
     response_headers_->insertContentLength().value(uint64_t(0));
     return Http::FilterHeadersStatus::Continue;
