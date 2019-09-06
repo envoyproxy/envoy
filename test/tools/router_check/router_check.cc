@@ -19,7 +19,7 @@ int main(int argc, char* argv[]) {
     }
 
     if (options.onlyShowFailures()) {
-      checktool.onlyShowFailures();
+      checktool.setOnlyShowFailures();
     }
 
     bool is_equal = options.isProto()

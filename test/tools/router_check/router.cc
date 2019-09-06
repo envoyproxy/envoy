@@ -108,7 +108,7 @@ bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_jso
     tool_config.route_ = config_->route(*tool_config.headers_, tool_config.random_value_);
 
     std::string test_name = check_config->getString("test_name", "");
-    if (details_ && !only_show_failures_) {
+    if (details_) {
       std::cout << test_name << std::endl;
     }
     Json::ObjectSharedPtr validate = check_config->getObject("validate");

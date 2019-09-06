@@ -94,7 +94,7 @@ public:
   /**
    * Set whether to only print failing match cases.
    */
-  void onlyShowFailures() { only_show_failures_ = true; }
+  void setOnlyShowFailures() { only_show_failures_ = true; }
 
   float coverage(bool detailed) {
     return detailed ? coverage_.detailedReport() : coverage_.report();
