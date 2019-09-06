@@ -12,9 +12,6 @@
 using testing::_;
 using testing::Return;
 using testing::ReturnRef;
-using testing::TestParamInfo;
-using testing::TestWithParam;
-using testing::Values;
 
 namespace Envoy {
 namespace Extensions {

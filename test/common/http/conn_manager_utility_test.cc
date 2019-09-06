@@ -21,7 +21,6 @@
 
 using testing::_;
 using testing::An;
-using testing::InSequence;
 using testing::Matcher;
 using testing::NiceMock;
 using testing::Return;

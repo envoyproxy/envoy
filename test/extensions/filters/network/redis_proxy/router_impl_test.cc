@@ -8,14 +8,10 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/test_common/utility.h"
 
-using testing::_;
 using testing::Eq;
-using testing::InSequence;
 using testing::Matcher;
 using testing::NiceMock;
-using testing::Ref;
 using testing::Return;
-using testing::StrEq;
 
 namespace Envoy {
 namespace Extensions {

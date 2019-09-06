@@ -27,7 +27,6 @@
 #include "opencensus/trace/span_id.h"
 
 using testing::NiceMock;
-using testing::Return;
 
 namespace opencensus {
 namespace trace {
