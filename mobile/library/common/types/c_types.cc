@@ -1,6 +1,17 @@
+// NOLINT(namespace-envoy)
 #include "library/common/types/c_types.h"
 
-#include <string.h>
+#include <string>
+
+#include "common/common/assert.h"
+
+void* safe_malloc(size_t size) {
+  void* ptr = malloc(size);
+  if (size > 0) {
+    RELEASE_ASSERT(ptr != nullptr, "malloc failure");
+  }
+  return ptr;
+}
 
 void envoy_noop_release(void* context) { (void)context; }
 
@@ -14,7 +25,8 @@ void release_envoy_headers(envoy_headers headers) {
 }
 
 envoy_headers copy_envoy_headers(envoy_headers src) {
-  envoy_header* dst_header_array = (envoy_header*)malloc(sizeof(envoy_header) * src.length);
+  envoy_header* dst_header_array =
+      static_cast<envoy_header*>(safe_malloc(sizeof(envoy_header) * src.length));
   for (envoy_header_size_t i = 0; i < src.length; i++) {
     envoy_header new_header = {
         copy_envoy_data(src.headers[i].key.length, src.headers[i].key.bytes),
@@ -26,7 +38,7 @@ envoy_headers copy_envoy_headers(envoy_headers src) {
 }
 
 envoy_data copy_envoy_data(size_t length, const uint8_t* src_bytes) {
-  uint8_t* dst_bytes = (uint8_t*)malloc(sizeof(uint8_t) * length);
+  uint8_t* dst_bytes = static_cast<uint8_t*>(safe_malloc(sizeof(uint8_t) * length));
   memcpy(dst_bytes, src_bytes, length);
   // Note: since this function is copying the bytes over to freshly allocated memory, free is an
   // appropriate release function and dst_bytes is an appropriate context.

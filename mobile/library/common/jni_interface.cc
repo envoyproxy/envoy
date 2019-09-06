@@ -210,13 +210,13 @@ static envoy_headers to_native_headers(JNIEnv* env, jobjectArray headers) {
   // Note that headers is a flattened array of key/value pairs.
   // Therefore, the length of the native header array is n envoy_data or n/2 envoy_header.
   envoy_header_size_t length = env->GetArrayLength(headers);
-  envoy_header* header_array = (envoy_header*)malloc(sizeof(envoy_header) * length / 2);
+  envoy_header* header_array = (envoy_header*)safe_malloc(sizeof(envoy_header) * length / 2);
 
   for (envoy_header_size_t i = 0; i < length; i += 2) {
     // Copy native byte array for header key
     jbyteArray j_key = (jbyteArray)env->GetObjectArrayElement(headers, i);
     size_t key_length = env->GetArrayLength(j_key);
-    uint8_t* native_key = (uint8_t*)malloc(key_length);
+    uint8_t* native_key = (uint8_t*)safe_malloc(key_length);
     void* critical_key = env->GetPrimitiveArrayCritical(j_key, 0);
     memcpy(native_key, critical_key, key_length);
     env->ReleasePrimitiveArrayCritical(j_key, critical_key, 0);
@@ -225,7 +225,7 @@ static envoy_headers to_native_headers(JNIEnv* env, jobjectArray headers) {
     // Copy native byte array for header value
     jbyteArray j_value = (jbyteArray)env->GetObjectArrayElement(headers, i + 1);
     size_t value_length = env->GetArrayLength(j_value);
-    uint8_t* native_value = (uint8_t*)malloc(value_length);
+    uint8_t* native_value = (uint8_t*)safe_malloc(value_length);
     void* critical_value = env->GetPrimitiveArrayCritical(j_value, 0);
     memcpy(native_value, critical_value, value_length);
     env->ReleasePrimitiveArrayCritical(j_value, critical_value, 0);

@@ -23,7 +23,7 @@ HeaderMapPtr toInternalHeaders(envoy_headers headers) {
 
 envoy_headers toBridgeHeaders(const HeaderMap& header_map) {
   envoy_header* headers =
-      static_cast<envoy_header*>(malloc(sizeof(envoy_header) * header_map.size()));
+      static_cast<envoy_header*>(safe_malloc(sizeof(envoy_header) * header_map.size()));
   envoy_headers transformed_headers;
   transformed_headers.length = 0;
   transformed_headers.headers = headers;
