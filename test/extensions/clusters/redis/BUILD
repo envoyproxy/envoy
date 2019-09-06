@@ -82,6 +82,7 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "redis_cluster_integration_test",
     size = "small",
     srcs = ["redis_cluster_integration_test.cc"],
     extension_name = "envoy.clusters.redis",
