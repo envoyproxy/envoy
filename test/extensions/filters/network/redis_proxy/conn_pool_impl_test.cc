@@ -67,7 +67,7 @@ public:
     }));
 
     auto redis_command_stats =
-        std::make_shared<Common::Redis::RedisCommandStats>(*store, "upstream_commands", true);
+        Common::Redis::RedisCommandStats::createRedisCommandStats(store->symbolTable(), "upstream_commands", true);
     std::unique_ptr<InstanceImpl> conn_pool_impl =
         std::make_unique<InstanceImpl>(cluster_name_, cm_, *this, tls_,
                                        Common::Redis::Client::createConnPoolSettings(
@@ -158,7 +158,7 @@ public:
   // Common::Redis::Client::ClientFactory
   Common::Redis::Client::ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher&,
                                           const Common::Redis::Client::Config&,
-                                          Common::Redis::RedisCommandStatsSharedPtr&&) override {
+                                          Common::Redis::RedisCommandStatsSharedPtr&&, Stats::Scope&) override {
     return Common::Redis::Client::ClientPtr{create_(host)};
   }
 
