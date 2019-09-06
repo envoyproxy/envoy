@@ -25,10 +25,10 @@ open class EnvoyBuilder internal constructor(
   }
 
   /**
-   * Add a YAML file to use as a configuration.
+   * Add contents of a yaml file to use as a configuration.
    * Setting this will supersede any other configuration settings in the builder.
    *
-   * @param configYAML the YAML file to use as a configuration.
+   * @param configYAML the contents of a yaml file to use as a configuration.
    */
   fun addConfigYAML(configYAML: String?): EnvoyBuilder {
     this.configYAML = configYAML

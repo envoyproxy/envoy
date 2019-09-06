@@ -3,11 +3,11 @@ import Foundation
 import XCTest
 
 private final class MockEnvoyEngine: EnvoyEngine {
-  func run(withConfig config: String) -> Int32 {
+  func run(withConfig config: EnvoyConfiguration, logLevel: String) -> Int32 {
     return 0
   }
 
-  func run(withConfig config: String, logLevel: String) -> Int32 {
+  func run(withConfigYAML configYAML: String, logLevel: String) -> Int32 {
     return 0
   }
 

@@ -9,9 +9,10 @@ public class EnvoyConfiguration {
   /**
    * Create an EnvoyConfiguration with a user provided configuration values.
    *
-   * @param connectTimeoutSeconds timeout for new network connections to hosts in the cluster.
-   * @param dnsRefreshSeconds rate in seconds to refresh DNS.
-   * @param statsFlushSeconds interval at which to flush Envoy stats.
+   * @param connectTimeoutSeconds timeout for new network connections to hosts in
+   *                              the cluster.
+   * @param dnsRefreshSeconds     rate in seconds to refresh DNS.
+   * @param statsFlushSeconds     interval at which to flush Envoy stats.
    */
   public EnvoyConfiguration(int connectTimeoutSeconds, int dnsRefreshSeconds,
                             int statsFlushSeconds) {
@@ -21,12 +22,13 @@ public class EnvoyConfiguration {
   }
 
   /**
-   * Resolves the provided configuration template using properties on this configuration.
-   * This default configuration is provided by the native layer.
+   * Resolves the provided configuration template using properties on this
+   * configuration.
    *
-   * @param templateYAML the default template configuration.
+   * @param templateYAML the template configuration to resolve.
    * @return String, the resolved template.
-   * @throws ConfigurationException, when the template provided is not fully resolved.
+   * @throws ConfigurationException, when the template provided is not fully
+   *                                 resolved.
    */
   String resolveTemplate(String templateYAML) {
     String resolvedConfiguration =

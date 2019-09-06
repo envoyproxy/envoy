@@ -117,6 +117,32 @@ typedef NSDictionary<NSString *, NSArray<NSString *> *> EnvoyHeaders;
 
 @end
 
+#pragma mark - EnvoyConfiguration
+
+/// Typed configuration that may be used for starting Envoy.
+@interface EnvoyConfiguration : NSObject
+
+@property (nonatomic, assign) UInt32 connectTimeoutSeconds;
+@property (nonatomic, assign) UInt32 dnsRefreshSeconds;
+@property (nonatomic, assign) UInt32 statsFlushSeconds;
+
+/**
+ Create a new instance of the configuration.
+ */
+- (instancetype)initWithConnectTimeoutSeconds:(UInt32)connectTimeoutSeconds
+                            dnsRefreshSeconds:(UInt32)dnsRefreshSeconds
+                            statsFlushSeconds:(UInt32)statsFlushSeconds;
+
+/**
+ Resolves the provided configuration template using properties on this configuration.
+
+ @param templateYAML The template configuration to resolve.
+ @return The resolved template. Nil if the template fails to fully resolve.
+ */
+- (nullable NSString *)resolveTemplate:(NSString *)templateYAML;
+
+@end
+
 #pragma mark - EnvoyEngine
 
 /// Wrapper layer for calling into Envoy's C/++ API.
@@ -128,21 +154,22 @@ typedef NSDictionary<NSString *, NSArray<NSString *> *> EnvoyHeaders;
 - (instancetype)init;
 
 /**
- Run the Envoy engine with the provided config and log level.
+ Run the Envoy engine with the provided configuration and log level.
 
- @param config The configuration file with which to start Envoy.
- @return A status indicating if the action was successful.
- */
-- (int)runWithConfig:(NSString *)config;
-
-/**
- Run the Envoy engine with the provided config and log level.
-
- @param config The configuration file with which to start Envoy.
+ @param configuration The EnvoyConfiguration used to start Envoy.
  @param logLevel The log level to use when starting Envoy.
  @return A status indicating if the action was successful.
  */
-- (int)runWithConfig:(NSString *)config logLevel:(NSString *)logLevel;
+- (int)runWithConfig:(EnvoyConfiguration *)config logLevel:(NSString *)logLevel;
+
+/**
+ Run the Envoy engine with the provided yaml string and log level.
+
+ @param configYAML The configuration yaml with which to start Envoy.
+ @param logLevel The log level to use when starting Envoy.
+ @return A status indicating if the action was successful.
+ */
+- (int)runWithConfigYAML:(NSString *)configYAML logLevel:(NSString *)logLevel;
 
 /**
  Opens a new HTTP stream attached to this engine.
@@ -150,20 +177,6 @@ typedef NSDictionary<NSString *, NSArray<NSString *> *> EnvoyHeaders;
  @param callbacks Handler for observing stream events.
  */
 - (id<EnvoyHTTPStream>)startStreamWithCallbacks:(EnvoyHTTPCallbacks *)callbacks;
-
-@end
-
-#pragma mark - EnvoyConfiguration
-
-/// Namespace for Envoy configurations.
-@interface EnvoyConfiguration : NSObject
-
-/**
- Provides a default configuration template that may be used for starting Envoy.
-
- @return A template that may be used as a starting point for constructing configurations.
- */
-+ (NSString *)templateString;
 
 @end
 

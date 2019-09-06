@@ -16,15 +16,21 @@
   return self;
 }
 
-- (int)runWithConfig:(NSString *)config {
-  return [self runWithConfig:config logLevel:@"info"];
+- (int)runWithConfig:(EnvoyConfiguration *)config logLevel:(NSString *)logLevel {
+  NSString *templateYAML = [[NSString alloc] initWithUTF8String:config_template];
+  NSString *resolvedYAML = [config resolveTemplate:templateYAML];
+  if (resolvedYAML == nil) {
+    return 1;
+  }
+
+  return [self runWithConfigYAML:resolvedYAML logLevel:logLevel];
 }
 
-- (int)runWithConfig:(NSString *)config logLevel:(NSString *)logLevel {
+- (int)runWithConfigYAML:(NSString *)configYAML logLevel:(NSString *)logLevel {
   // Envoy exceptions will only be caught here when compiled for 64-bit arches.
   // https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/Exceptions/Articles/Exceptions64Bit.html
   @try {
-    return (int)run_engine(config.UTF8String, logLevel.UTF8String);
+    return (int)run_engine(configYAML.UTF8String, logLevel.UTF8String);
   } @catch (...) {
     NSLog(@"Envoy exception caught.");
     [NSNotificationCenter.defaultCenter postNotificationName:@"EnvoyException" object:self];
