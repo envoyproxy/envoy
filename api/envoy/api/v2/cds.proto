@@ -52,7 +52,7 @@ service ClusterDiscoveryService {
 // [#protodoc-title: Clusters]
 
 // Configuration for a single upstream cluster.
-// [#comment:next free field: 41]
+// [#comment:next free field: 42]
 message Cluster {
   // Supplies the name of the cluster which must be unique across all clusters.
   // The cluster name is used when emitting
@@ -175,6 +175,13 @@ message Cluster {
     // specific load balancer. Consult the configured cluster's documentation for whether to set
     // this option or not.
     CLUSTER_PROVIDED = 6;
+
+    // [#not-implemented-hide:] Use the new :ref:`load_balancing_policy
+    // <envoy_api_field_Cluster.load_balancing_policy>` field to determine the LB policy.
+    // [#next-major-version: In the v3 API, we should consider deprecating the lb_policy field
+    // and instead using the new load_balancing_policy field as the one and only mechanism for
+    // configuring this.]
+    LOAD_BALANCING_POLICY_CONFIG = 7;
   }
   // The :ref:`load balancer type <arch_overview_load_balancing_types>` to use
   // when picking a host in the cluster.
@@ -645,6 +652,47 @@ message Cluster {
   // outgoing connections made by the cluster. Order matters as the filters are
   // processed sequentially as connection events happen.
   repeated cluster.Filter filters = 40;
+
+  // [#not-implemented-hide:] New mechanism for LB policy configuration. Used only if the
+  // :ref:`lb_policy<envoy_api_field_Cluster.lb_policy>` field has the value
+  // :ref:`LOAD_BALANCING_POLICY_CONFIG<envoy_api_enum_value_Cluster.LbPolicy.LOAD_BALANCING_POLICY_CONFIG>`.
+  LoadBalancingPolicy load_balancing_policy = 41;
+}
+
+// [#not-implemented-hide:] Extensible load balancing policy configuration.
+//
+// Every LB policy defined via this mechanism will be identified via a unique name using reverse
+// DNS notation. If the policy needs configuration parameters, it must define a message for its
+// own configuration, which will be stored in the config field. The name of the policy will tell
+// clients which type of message they should expect to see in the config field.
+//
+// Note that there are cases where it is useful to be able to independently select LB policies
+// for choosing a locality and for choosing an endpoint within that locality. For example, a
+// given deployment may always use the same policy to choose the locality, but for choosing the
+// endpoint within the locality, some clusters may use weighted-round-robin, while others may
+// use some sort of session-based balancing.
+//
+// This can be accomplished via hierarchical LB policies, where the parent LB policy creates a
+// child LB policy for each locality. For each request, the parent chooses the locality and then
+// delegates to the child policy for that locality to choose the endpoint within the locality.
+//
+// To facilitate this, the config message for the top-level LB policy may include a field of
+// type LoadBalancingPolicy that specifies the child policy.
+//
+// [#proto-status: experimental]
+message LoadBalancingPolicy {
+  message Policy {
+    // Required. The name of the LB policy.
+    string name = 1;
+    // Optional config for the LB policy.
+    // No more than one of these two fields may be populated.
+    google.protobuf.Struct config = 2;
+    google.protobuf.Any typed_config = 3;
+  }
+  // Each client will iterate over the list in order and stop at the first policy that it
+  // supports. This provides a mechanism for starting to use new LB policies that are not yet
+  // supported by all clients.
+  repeated Policy policies = 1;
 }
 
 // An extensible structure containing the address Envoy should bind to when

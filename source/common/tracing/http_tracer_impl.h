@@ -118,6 +118,7 @@ public:
     return request_headers_for_tags_;
   }
   bool verbose() const override { return false; }
+  uint32_t maxPathTagLength() const override { return Tracing::DefaultMaxPathTagLength; }
 
 private:
   const std::vector<Http::LowerCaseString> request_headers_for_tags_{};
