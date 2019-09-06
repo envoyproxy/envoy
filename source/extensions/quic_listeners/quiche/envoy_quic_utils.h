@@ -20,6 +20,7 @@ quicAddressToEnvoyAddressInstance(const quic::QuicSocketAddress& quic_address);
 quic::QuicSocketAddress envoyAddressInstanceToQuicSocketAddress(
     const Network::Address::InstanceConstSharedPtr& envoy_address);
 
+// The returned header map has all keys in lower case.
 Http::HeaderMapImplPtr quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_list);
 
 Http::HeaderMapImplPtr spdyHeaderBlockToEnvoyHeaders(const spdy::SpdyHeaderBlock& header_block);

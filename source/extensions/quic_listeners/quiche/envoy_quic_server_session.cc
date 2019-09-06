@@ -110,7 +110,8 @@ void EnvoyQuicServerSession::addConnectionCallbacks(Network::ConnectionCallbacks
 }
 
 void EnvoyQuicServerSession::addBytesSentCallback(Network::Connection::BytesSentCb /*cb*/) {
-  // TODO(danzh): implement to support proxy.
+  // TODO(danzh): implement to support proxy. This interface is only called from
+  // TCP proxy code.
   ASSERT(false, "addBytesSentCallback is not implemented for QUIC");
 }
 
