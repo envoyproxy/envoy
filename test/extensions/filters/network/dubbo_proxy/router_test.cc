@@ -1,7 +1,9 @@
 #include "extensions/filters/network/dubbo_proxy/app_exception.h"
-#include "extensions/filters/network/dubbo_proxy/deserializer.h"
+#include "extensions/filters/network/dubbo_proxy/dubbo_hessian2_serializer_impl.h"
+#include "extensions/filters/network/dubbo_proxy/message_impl.h"
 #include "extensions/filters/network/dubbo_proxy/protocol.h"
 #include "extensions/filters/network/dubbo_proxy/router/router_impl.h"
+#include "extensions/filters/network/dubbo_proxy/serializer_impl.h"
 
 #include "test/extensions/filters/network/dubbo_proxy/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -14,13 +16,11 @@
 using testing::_;
 using testing::ContainsRegex;
 using testing::Eq;
-using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
-using testing::Values;
 
 namespace Envoy {
 namespace Extensions {
@@ -30,23 +30,27 @@ namespace Router {
 
 namespace {
 
-class TestNamedDeserializerConfigFactory : public NamedDeserializerConfigFactory {
+class TestNamedSerializerConfigFactory : public NamedSerializerConfigFactory {
 public:
-  TestNamedDeserializerConfigFactory(std::function<MockDeserializer*()> f) : f_(f) {}
+  TestNamedSerializerConfigFactory(std::function<MockSerializer*()> f) : f_(f) {}
 
-  DeserializerPtr createDeserializer() override { return DeserializerPtr{f_()}; }
+  SerializerPtr createSerializer() override { return SerializerPtr{f_()}; }
   std::string name() override {
-    return DeserializerNames::get().fromType(SerializationType::Hessian);
+    return SerializerNames::get().fromType(SerializationType::Hessian2);
   }
 
-  std::function<MockDeserializer*()> f_;
+  std::function<MockSerializer*()> f_;
 };
 
 class TestNamedProtocolConfigFactory : public NamedProtocolConfigFactory {
 public:
   TestNamedProtocolConfigFactory(std::function<MockProtocol*()> f) : f_(f) {}
 
-  ProtocolPtr createProtocol() override { return ProtocolPtr{f_()}; }
+  ProtocolPtr createProtocol(SerializationType serialization_type) override {
+    auto protocol = ProtocolPtr{f_()};
+    protocol->initSerializer(serialization_type);
+    return protocol;
+  }
   std::string name() override { return ProtocolNames::get().fromType(ProtocolType::Dubbo); }
 
   std::function<MockProtocol*()> f_;
@@ -57,13 +61,13 @@ public:
 class DubboRouterTestBase {
 public:
   DubboRouterTestBase()
-      : deserializer_factory_([&]() -> MockDeserializer* {
-          ASSERT(deserializer_ == nullptr);
-          deserializer_ = new NiceMock<MockDeserializer>();
-          if (mock_deserializer_cb_) {
-            mock_deserializer_cb_(deserializer_);
+      : serializer_factory_([&]() -> MockSerializer* {
+          ASSERT(serializer_ == nullptr);
+          serializer_ = new NiceMock<MockSerializer>();
+          if (mock_serializer_cb_) {
+            mock_serializer_cb_(serializer_);
           }
-          return deserializer_;
+          return serializer_;
         }),
         protocol_factory_([&]() -> MockProtocol* {
           ASSERT(protocol_ == nullptr);
@@ -73,7 +77,7 @@ public:
           }
           return protocol_;
         }),
-        deserializer_register_(deserializer_factory_), protocol_register_(protocol_factory_) {}
+        serializer_register_(serializer_factory_), protocol_register_(protocol_factory_) {}
 
   void initializeRouter() {
     route_ = new NiceMock<MockRoute>();
@@ -90,9 +94,14 @@ public:
     msg_type_ = msg_type;
 
     metadata_.reset(new MessageMetadata());
-    metadata_->setServiceName("test");
     metadata_->setMessageType(msg_type_);
     metadata_->setRequestId(1);
+
+    auto invo = std::make_shared<RpcInvocationImpl>();
+    metadata_->setInvocationInfo(invo);
+    invo->setMethodName("test");
+
+    message_context_ = std::make_shared<ContextImpl>();
   }
 
   void startRequest(MessageType msg_type) {
@@ -102,13 +111,10 @@ public:
     EXPECT_CALL(*route_, routeEntry()).WillOnce(Return(&route_entry_));
     EXPECT_CALL(route_entry_, clusterName()).WillRepeatedly(ReturnRef(cluster_name_));
 
-    EXPECT_CALL(callbacks_, downstreamSerializationType())
-        .WillOnce(Return(SerializationType::Hessian));
-    EXPECT_CALL(callbacks_, downstreamProtocolType()).WillOnce(Return(ProtocolType::Dubbo));
+    EXPECT_CALL(callbacks_, serializationType()).WillOnce(Return(SerializationType::Hessian2));
+    EXPECT_CALL(callbacks_, protocolType()).WillOnce(Return(ProtocolType::Dubbo));
 
-    EXPECT_EQ(Network::FilterStatus::Continue,
-              router_->messageBegin(msg_type, metadata_->request_id(), SerializationType::Hessian));
-    EXPECT_EQ(Network::FilterStatus::StopIteration, router_->messageEnd(metadata_));
+    EXPECT_EQ(FilterStatus::StopIteration, router_->onMessageDecoded(metadata_, message_context_));
 
     EXPECT_CALL(callbacks_, connection()).WillRepeatedly(Return(&connection_));
     EXPECT_EQ(&connection_, router_->downstreamConnection());
@@ -137,8 +143,6 @@ public:
   }
 
   void startRequestWithExistingConnection(MessageType msg_type) {
-    EXPECT_EQ(Network::FilterStatus::Continue, router_->transportBegin());
-
     EXPECT_CALL(callbacks_, route()).WillOnce(Return(route_ptr_));
     EXPECT_CALL(*route_, routeEntry()).WillOnce(Return(&route_entry_));
     EXPECT_CALL(route_entry_, clusterName()).WillRepeatedly(ReturnRef(cluster_name_));
@@ -158,9 +162,8 @@ public:
     EXPECT_EQ(nullptr, router_->metadataMatchCriteria());
     EXPECT_EQ(nullptr, router_->downstreamHeaders());
 
-    EXPECT_CALL(callbacks_, downstreamSerializationType())
-        .WillOnce(Return(SerializationType::Hessian));
-    EXPECT_CALL(callbacks_, downstreamProtocolType()).WillOnce(Return(ProtocolType::Dubbo));
+    EXPECT_CALL(callbacks_, serializationType()).WillOnce(Return(SerializationType::Hessian2));
+    EXPECT_CALL(callbacks_, protocolType()).WillOnce(Return(ProtocolType::Dubbo));
 
     EXPECT_CALL(callbacks_, continueDecoding()).Times(0);
     EXPECT_CALL(context_.cluster_manager_.tcp_conn_pool_, newConnection(_))
@@ -175,7 +178,7 @@ public:
   void returnResponse() {
     Buffer::OwnedImpl buffer;
 
-    EXPECT_CALL(callbacks_, startUpstreamResponse(_, _));
+    EXPECT_CALL(callbacks_, startUpstreamResponse());
 
     EXPECT_CALL(callbacks_, upstreamData(Ref(buffer)))
         .WillOnce(Return(DubboFilters::UpstreamResponseStatus::MoreData));
@@ -196,18 +199,18 @@ public:
     router_.reset();
   }
 
-  TestNamedDeserializerConfigFactory deserializer_factory_;
+  TestNamedSerializerConfigFactory serializer_factory_;
   TestNamedProtocolConfigFactory protocol_factory_;
-  Registry::InjectFactory<NamedDeserializerConfigFactory> deserializer_register_;
+  Registry::InjectFactory<NamedSerializerConfigFactory> serializer_register_;
   Registry::InjectFactory<NamedProtocolConfigFactory> protocol_register_;
 
-  std::function<void(MockDeserializer*)> mock_deserializer_cb_{};
+  std::function<void(MockSerializer*)> mock_serializer_cb_{};
   std::function<void(MockProtocol*)> mock_protocol_cb_{};
 
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   NiceMock<Network::MockClientConnection> connection_;
   NiceMock<DubboFilters::MockDecoderFilterCallbacks> callbacks_;
-  NiceMock<MockDeserializer>* deserializer_{};
+  NiceMock<MockSerializer>* serializer_{};
   NiceMock<MockProtocol>* protocol_{};
   NiceMock<MockRoute>* route_{};
   NiceMock<MockRouteEntry> route_entry_;
@@ -221,6 +224,7 @@ public:
 
   MessageType msg_type_{MessageType::Request};
   MessageMetadataSharedPtr metadata_;
+  ContextSharedPtr message_context_;
 
   Tcp::ConnectionPool::UpstreamCallbacks* upstream_callbacks_{};
   NiceMock<Network::MockClientConnection> upstream_connection_;
@@ -293,7 +297,7 @@ TEST_F(DubboRouterTest, ClusterMaintenanceMode) {
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*maintenance mode.*"));
         EXPECT_FALSE(end_stream);
       }));
-  EXPECT_EQ(Network::FilterStatus::StopIteration, router_->messageEnd(metadata_));
+  EXPECT_EQ(FilterStatus::StopIteration, router_->onMessageDecoded(metadata_, message_context_));
 }
 
 TEST_F(DubboRouterTest, NoHealthyHosts) {
@@ -314,18 +318,18 @@ TEST_F(DubboRouterTest, NoHealthyHosts) {
         EXPECT_FALSE(end_stream);
       }));
 
-  EXPECT_EQ(Network::FilterStatus::StopIteration, router_->messageEnd(metadata_));
+  EXPECT_EQ(FilterStatus::StopIteration, router_->onMessageDecoded(metadata_, message_context_));
 }
 
 TEST_F(DubboRouterTest, PoolConnectionFailureWithOnewayMessage) {
   initializeRouter();
   initializeMetadata(MessageType::Oneway);
 
-  EXPECT_CALL(callbacks_, downstreamSerializationType())
-      .WillOnce(Return(SerializationType::Hessian));
+  EXPECT_CALL(callbacks_, protocolType()).WillOnce(Return(ProtocolType::Dubbo));
+  EXPECT_CALL(callbacks_, serializationType()).WillOnce(Return(SerializationType::Hessian2));
   EXPECT_CALL(callbacks_, sendLocalReply(_, _)).Times(0);
   EXPECT_CALL(callbacks_, resetStream()).Times(1);
-  EXPECT_EQ(Network::FilterStatus::StopIteration, router_->messageEnd(metadata_));
+  EXPECT_EQ(FilterStatus::StopIteration, router_->onMessageDecoded(metadata_, message_context_));
 
   context_.cluster_manager_.tcp_conn_pool_.poolFailure(
       Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
@@ -345,7 +349,7 @@ TEST_F(DubboRouterTest, NoRoute) {
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*no route.*"));
         EXPECT_FALSE(end_stream);
       }));
-  EXPECT_EQ(Network::FilterStatus::StopIteration, router_->messageEnd(metadata_));
+  EXPECT_EQ(FilterStatus::StopIteration, router_->onMessageDecoded(metadata_, message_context_));
 }
 
 TEST_F(DubboRouterTest, NoCluster) {
@@ -363,24 +367,21 @@ TEST_F(DubboRouterTest, NoCluster) {
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*unknown cluster.*"));
         EXPECT_FALSE(end_stream);
       }));
-  EXPECT_EQ(Network::FilterStatus::StopIteration, router_->messageEnd(metadata_));
+  EXPECT_EQ(FilterStatus::StopIteration, router_->onMessageDecoded(metadata_, message_context_));
 }
 
 TEST_F(DubboRouterTest, UnexpectedRouterDestroy) {
   initializeRouter();
   initializeMetadata(MessageType::Request);
   EXPECT_CALL(upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
-  startRequest(MessageType::Request);
-
-  EXPECT_EQ(Network::FilterStatus::Continue, router_->transportBegin());
 
   Buffer::OwnedImpl buffer;
-  buffer.add(std::string({'\xda', '\xbb', 0x42, 20}));
-  EXPECT_EQ(Network::FilterStatus::Continue, router_->transferHeaderTo(buffer, buffer.length()));
-  buffer.drain(buffer.length());
-  buffer.add("test");
-  EXPECT_EQ(Network::FilterStatus::Continue, router_->transferBodyTo(buffer, buffer.length()));
+  buffer.add(std::string({'\xda', '\xbb', 0x42, 20})); // Header
+  buffer.add("test");                                  // Body
 
+  auto ctx = static_cast<ContextImpl*>(message_context_.get());
+  ctx->message_origin_data().move(buffer, buffer.length());
+  startRequest(MessageType::Request);
   connectUpstream();
   destroyRouter();
 }
@@ -418,9 +419,6 @@ TEST_F(DubboRouterTest, OneWay) {
 
   startRequest(MessageType::Oneway);
   connectUpstream();
-
-  EXPECT_EQ(Network::FilterStatus::Continue, router_->transportEnd());
-
   destroyRouter();
 }
 
@@ -432,10 +430,6 @@ TEST_F(DubboRouterTest, Call) {
 
   startRequest(MessageType::Request);
   connectUpstream();
-
-  EXPECT_EQ(Network::FilterStatus::Continue, router_->transportBegin());
-  EXPECT_EQ(Network::FilterStatus::Continue, router_->transportEnd());
-
   returnResponse();
   destroyRouter();
 }
@@ -445,14 +439,11 @@ TEST_F(DubboRouterTest, DecoderFilterCallbacks) {
   initializeMetadata(MessageType::Request);
 
   EXPECT_CALL(upstream_connection_, write(_, false));
-  EXPECT_CALL(callbacks_, startUpstreamResponse(_, _)).Times(1);
+  EXPECT_CALL(callbacks_, startUpstreamResponse()).Times(1);
   EXPECT_CALL(callbacks_, upstreamData(_)).Times(1);
 
   startRequest(MessageType::Request);
   connectUpstream();
-
-  EXPECT_EQ(Network::FilterStatus::Continue, router_->transportBegin());
-  EXPECT_EQ(Network::FilterStatus::Continue, router_->transportEnd());
 
   Buffer::OwnedImpl buffer;
   buffer.add(std::string("This is the test data"));
@@ -465,7 +456,7 @@ TEST_F(DubboRouterTest, UpstreamDataReset) {
   initializeRouter();
   initializeMetadata(MessageType::Request);
 
-  EXPECT_CALL(callbacks_, startUpstreamResponse(_, _)).Times(1);
+  EXPECT_CALL(callbacks_, startUpstreamResponse()).Times(1);
   EXPECT_CALL(callbacks_, upstreamData(_))
       .WillOnce(Return(DubboFilters::UpstreamResponseStatus::Reset));
   EXPECT_CALL(upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
@@ -484,7 +475,7 @@ TEST_F(DubboRouterTest, StartRequestWithExistingConnection) {
   initializeRouter();
   startRequestWithExistingConnection(MessageType::Request);
 
-  EXPECT_EQ(Network::FilterStatus::Continue, router_->messageEnd(metadata_));
+  EXPECT_EQ(FilterStatus::Continue, router_->onMessageDecoded(metadata_, message_context_));
 
   destroyRouter();
 }
@@ -511,7 +502,7 @@ TEST_F(DubboRouterTest, LocalClosedWhileResponseComplete) {
   initializeRouter();
   initializeMetadata(MessageType::Request);
 
-  EXPECT_CALL(callbacks_, startUpstreamResponse(_, _)).Times(1);
+  EXPECT_CALL(callbacks_, startUpstreamResponse()).Times(1);
   EXPECT_CALL(callbacks_, upstreamData(_))
       .WillOnce(Return(DubboFilters::UpstreamResponseStatus::Complete));
   EXPECT_CALL(callbacks_, sendLocalReply(_, _)).Times(0);

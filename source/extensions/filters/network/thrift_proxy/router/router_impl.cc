@@ -22,11 +22,9 @@ namespace Router {
 
 RouteEntryImplBase::RouteEntryImplBase(
     const envoy::config::filter::network::thrift_proxy::v2alpha1::Route& route)
-    : cluster_name_(route.route().cluster()), rate_limit_policy_(route.route().rate_limits()) {
-  for (const auto& header_map : route.match().headers()) {
-    config_headers_.push_back(header_map);
-  }
-
+    : cluster_name_(route.route().cluster()),
+      config_headers_(Http::HeaderUtility::buildHeaderDataVector(route.match().headers())),
+      rate_limit_policy_(route.route().rate_limits()) {
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
@@ -368,7 +366,7 @@ Router::UpstreamRequest::UpstreamRequest(Router& parent, Tcp::ConnectionPool::In
       protocol_(NamedProtocolConfigFactory::getFactory(protocol_type).createProtocol()),
       request_complete_(false), response_started_(false), response_complete_(false) {}
 
-Router::UpstreamRequest::~UpstreamRequest() {}
+Router::UpstreamRequest::~UpstreamRequest() = default;
 
 FilterStatus Router::UpstreamRequest::start() {
   Tcp::ConnectionPool::Cancellable* handle = conn_pool_.newConnection(*this);

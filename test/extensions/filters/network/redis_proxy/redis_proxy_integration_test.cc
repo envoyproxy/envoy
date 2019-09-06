@@ -7,7 +7,6 @@
 
 #include "gtest/gtest.h"
 
-using testing::Matcher;
 using testing::Return;
 
 namespace RedisCmdSplitter = Envoy::Extensions::NetworkFilters::RedisProxy::CommandSplitter;
@@ -56,7 +55,9 @@ static_resources:
         name: envoy.redis_proxy
         config:
           stat_prefix: redis_stats
-          cluster: cluster_0
+          prefix_routes:
+            catch_all_route:
+              cluster: cluster_0
           settings:
             op_timeout: 5s
 )EOF";
@@ -149,7 +150,8 @@ static_resources:
 
 const std::string CONFIG_WITH_ROUTES = CONFIG_WITH_ROUTES_BASE + R"EOF(
           prefix_routes:
-            catch_all_cluster: cluster_0
+            catch_all_route:
+              cluster: cluster_0
             routes:
             - prefix: "foo:"
               cluster: cluster_1
@@ -250,7 +252,8 @@ static_resources:
           settings:
             op_timeout: 5s
           prefix_routes:
-            catch_all_cluster: cluster_0
+            catch_all_route:
+              cluster: cluster_0
             routes:
             - prefix: "foo:"
               cluster: cluster_1
@@ -264,9 +267,9 @@ std::string makeBulkStringArray(std::vector<std::string>&& command_strings) {
   std::stringstream result;
 
   result << "*" << command_strings.size() << "\r\n";
-  for (uint64_t i = 0; i < command_strings.size(); i++) {
-    result << "$" << command_strings[i].size() << "\r\n";
-    result << command_strings[i] << "\r\n";
+  for (auto& command_string : command_strings) {
+    result << "$" << command_string.size() << "\r\n";
+    result << command_string << "\r\n";
   }
 
   return result.str();
@@ -976,7 +979,8 @@ TEST_P(RedisProxyWithMirrorsIntegrationTest, ExcludeReadCommands) {
 
   // command is not mirrored to cluster 1
   FakeRawConnectionPtr cluster_1_connection;
-  EXPECT_FALSE(fake_upstreams_[2]->waitForRawConnection(cluster_1_connection));
+  EXPECT_FALSE(fake_upstreams_[2]->waitForRawConnection(cluster_1_connection,
+                                                        std::chrono::milliseconds(500)));
 
   redis_client->waitForData(get_response);
   EXPECT_EQ(get_response, redis_client->data());

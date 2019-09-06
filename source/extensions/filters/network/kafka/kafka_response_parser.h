@@ -39,12 +39,22 @@ struct ResponseContext {
   /**
    * Bytes left to process.
    */
-  int32_t remaining_response_size_;
+  uint32_t remaining_response_size_;
 
   /**
    * Response's correlation id.
    */
   int32_t correlation_id_;
+
+  /**
+   * Bytes left to consume.
+   */
+  uint32_t& remaining() { return remaining_response_size_; }
+
+  /**
+   * Returns data needed for construction of parse failure message.
+   */
+  const ResponseMetadata asFailureData() const { return {api_key_, api_version_, correlation_id_}; }
 };
 
 using ResponseContextSharedPtr = std::shared_ptr<ResponseContext>;
@@ -107,16 +117,15 @@ private:
  * api_key & api_version. It does not attempt to capture any data, just throws it away until end of
  * message.
  */
-class SentinelResponseParser : public ResponseParser {
+class SentinelResponseParser
+    : public AbstractSentinelParser<ResponseContextSharedPtr, ResponseParseResponse>,
+      public ResponseParser {
 public:
-  SentinelResponseParser(ResponseContextSharedPtr context) : context_{context} {};
+  SentinelResponseParser(ResponseContextSharedPtr context) : AbstractSentinelParser{context} {};
 
-  ResponseParseResponse parse(absl::string_view& data) override;
-
-  const ResponseContextSharedPtr contextForTest() const { return context_; }
-
-private:
-  ResponseContextSharedPtr context_;
+  ResponseParseResponse parse(absl::string_view& data) override {
+    return AbstractSentinelParser::parse(data);
+  }
 };
 
 /**

@@ -4,6 +4,7 @@ from __future__ import print_function
 import re
 import subprocess
 import fileinput
+from six.moves import input
 
 
 # Sorts out the list of deprecated proto fields which should be disallowed and returns a tuple of
@@ -48,8 +49,8 @@ def deprecate_proto():
 # Sorts out the list of features which should be default enabled and returns a tuple of
 # email and code changes.
 def flip_runtime_features():
-  grep_output = subprocess.check_output(
-      'grep -r "envoy.reloadable_features\." source/*', shell=True)
+  grep_output = subprocess.check_output('grep -r "envoy.reloadable_features\." source/*',
+                                        shell=True)
 
   features_to_flip = set()
 
@@ -89,7 +90,7 @@ email = ('The Envoy maintainer team is cutting the next Envoy release.  In the n
 print('\n\nSuggested envoy-announce email: \n')
 print(email)
 
-if not raw_input('Apply relevant runtime changes? [yN] ').strip().lower() in ('y', 'yes'):
+if not input('Apply relevant runtime changes? [yN] ').strip().lower() in ('y', 'yes'):
   exit(1)
 
 for line in fileinput.FileInput('source/common/runtime/runtime_features.cc', inplace=1):

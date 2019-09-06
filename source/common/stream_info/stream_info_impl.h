@@ -7,6 +7,7 @@
 #include "envoy/stream_info/stream_info.h"
 
 #include "common/common/assert.h"
+#include "common/common/dump_state_utils.h"
 #include "common/stream_info/filter_state_impl.h"
 
 namespace Envoy {
@@ -174,12 +175,21 @@ struct StreamInfoImpl : public StreamInfo {
     return downstream_remote_address_;
   }
 
-  void setDownstreamSslConnection(const Ssl::ConnectionInfo* connection_info) override {
+  void
+  setDownstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& connection_info) override {
     downstream_ssl_info_ = connection_info;
   }
 
-  const Ssl::ConnectionInfo* downstreamSslConnection() const override {
+  Ssl::ConnectionInfoConstSharedPtr downstreamSslConnection() const override {
     return downstream_ssl_info_;
+  }
+
+  void setUpstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& connection_info) override {
+    upstream_ssl_info_ = connection_info;
+  }
+
+  Ssl::ConnectionInfoConstSharedPtr upstreamSslConnection() const override {
+    return upstream_ssl_info_;
   }
 
   const Router::RouteEntry* routeEntry() const override { return route_entry_; }
@@ -206,6 +216,13 @@ struct StreamInfoImpl : public StreamInfo {
 
   const std::string& upstreamTransportFailureReason() const override {
     return upstream_transport_failure_reason_;
+  }
+
+  void dumpState(std::ostream& os, int indent_level = 0) const {
+    const char* spaces = spacesForLevel(indent_level);
+    os << spaces << "StreamInfoImpl " << this << DUMP_OPTIONAL_MEMBER(protocol_)
+       << DUMP_OPTIONAL_MEMBER(response_code_) << DUMP_OPTIONAL_MEMBER(response_code_details_)
+       << DUMP_MEMBER(health_check_request_) << DUMP_MEMBER(route_name_) << "\n";
   }
 
   TimeSource& time_source_;
@@ -235,7 +252,8 @@ private:
   Network::Address::InstanceConstSharedPtr downstream_local_address_;
   Network::Address::InstanceConstSharedPtr downstream_direct_remote_address_;
   Network::Address::InstanceConstSharedPtr downstream_remote_address_;
-  const Ssl::ConnectionInfo* downstream_ssl_info_;
+  Ssl::ConnectionInfoConstSharedPtr downstream_ssl_info_;
+  Ssl::ConnectionInfoConstSharedPtr upstream_ssl_info_;
   std::string requested_server_name_;
   UpstreamTiming upstream_timing_;
   std::string upstream_transport_failure_reason_;

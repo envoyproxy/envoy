@@ -85,4 +85,4 @@ If you've found a vulnerability or a potential vulnerability in Envoy please let
 email to acknowledge your report, and we'll send an additional email when we've identified the issue
 positively or negatively.
 
-For further details please see our complete [security release process](SECURITY_RELEASE_PROCESS.md).
+For further details please see our complete [security release process](SECURITY.md).

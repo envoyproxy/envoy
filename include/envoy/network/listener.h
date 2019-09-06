@@ -14,6 +14,7 @@ namespace Envoy {
 namespace Network {
 
 class UdpListenerFilterManager;
+class ActiveUdpListenerFactory;
 
 /**
  * A configuration for an individual listener.
@@ -65,9 +66,16 @@ public:
   /**
    * @return std::chrono::milliseconds the time to wait for all listener filters to complete
    *         operation. If the timeout is reached, the accepted socket is closed without a
-   *         connection being created. 0 specifies a disabled timeout.
+   *         connection being created unless continueOnListenerFiltersTimeout() returns true.
+   *         0 specifies a disabled timeout.
    */
   virtual std::chrono::milliseconds listenerFiltersTimeout() const PURE;
+
+  /**
+   * @return bool whether the listener should try to create a connection when listener filters
+   *         time out.
+   */
+  virtual bool continueOnListenerFiltersTimeout() const PURE;
 
   /**
    * @return Stats::Scope& the stats scope to use for all listener specific stats.
@@ -83,6 +91,12 @@ public:
    * @return const std::string& the listener's name.
    */
   virtual const std::string& name() const PURE;
+
+  /**
+   * @return factory pointer if listening on UDP socket, otherwise return
+   * nullptr.
+   */
+  virtual const ActiveUdpListenerFactory* udpListenerFactory() PURE;
 };
 
 /**
@@ -134,7 +148,9 @@ struct UdpRecvData {
  * Encapsulates the information needed to send a udp packet to a target
  */
 struct UdpSendData {
-  Address::InstanceConstSharedPtr send_address_;
+  const Address::Ip* local_ip_;
+  const Address::Instance& peer_address_;
+
   // The buffer is a reference so that it can be reused by the sender to send different
   // messages
   Buffer::Instance& buffer_;

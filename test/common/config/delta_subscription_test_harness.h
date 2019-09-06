@@ -38,7 +38,7 @@ public:
         rate_limit_settings_, callbacks_, stats_, init_fetch_timeout);
   }
 
-  ~DeltaSubscriptionTestHarness() {
+  ~DeltaSubscriptionTestHarness() override {
     while (!nonce_acks_required_.empty()) {
       EXPECT_FALSE(nonce_acks_sent_.empty());
       EXPECT_EQ(nonce_acks_required_.front(), nonce_acks_sent_.front());
@@ -55,9 +55,10 @@ public:
     subscription_->start(cluster_names);
   }
 
-  void expectSendMessage(const std::set<std::string>& cluster_names,
-                         const std::string& version) override {
+  void expectSendMessage(const std::set<std::string>& cluster_names, const std::string& version,
+                         bool expect_node = false) override {
     UNREFERENCED_PARAMETER(version);
+    UNREFERENCED_PARAMETER(expect_node);
     expectSendMessage(cluster_names, {}, Grpc::Status::GrpcStatus::Ok, "", {});
   }
 
@@ -127,7 +128,8 @@ public:
     if (accept) {
       expectSendMessage({}, version);
     } else {
-      EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
+      EXPECT_CALL(callbacks_, onConfigUpdateFailed(
+                                  Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, _));
       expectSendMessage({}, {}, Grpc::Status::GrpcStatus::Internal, "bad config", {});
     }
     subscription_->onDiscoveryResponse(std::move(response));
@@ -150,19 +152,19 @@ public:
   }
 
   void expectConfigUpdateFailed() override {
-    EXPECT_CALL(callbacks_, onConfigUpdateFailed(nullptr));
+    EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, nullptr));
   }
 
   void expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds timeout) override {
     init_timeout_timer_ = new Event::MockTimer(&dispatcher_);
-    EXPECT_CALL(*init_timeout_timer_, enableTimer(std::chrono::milliseconds(timeout)));
+    EXPECT_CALL(*init_timeout_timer_, enableTimer(std::chrono::milliseconds(timeout), _));
   }
 
   void expectDisableInitFetchTimeoutTimer() override {
     EXPECT_CALL(*init_timeout_timer_, disableTimer());
   }
 
-  void callInitFetchTimeoutCb() override { init_timeout_timer_->callback_(); }
+  void callInitFetchTimeoutCb() override { init_timeout_timer_->invokeCallback(); }
 
   const Protobuf::MethodDescriptor* method_descriptor_;
   Grpc::MockAsyncClient* async_client_;

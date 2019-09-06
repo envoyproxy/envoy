@@ -1,5 +1,6 @@
 #include "extensions/filters/network/dubbo_proxy/decoder.h"
-#include "extensions/filters/network/dubbo_proxy/deserializer_impl.h"
+#include "extensions/filters/network/dubbo_proxy/dubbo_hessian2_serializer_impl.h"
+#include "extensions/filters/network/dubbo_proxy/message_impl.h"
 #include "extensions/filters/network/dubbo_proxy/metadata.h"
 
 #include "test/extensions/filters/network/dubbo_proxy/mocks.h"
@@ -11,9 +12,6 @@
 using testing::_;
 using testing::Return;
 using testing::ReturnRef;
-using testing::TestParamInfo;
-using testing::TestWithParam;
-using testing::Values;
 
 namespace Envoy {
 namespace Extensions {
@@ -22,33 +20,36 @@ namespace DubboProxy {
 
 class DecoderStateMachineTestBase {
 public:
-  DecoderStateMachineTestBase() : metadata_(std::make_shared<MessageMetadata>()) {
-    context_.header_size_ = 16;
-  }
-  virtual ~DecoderStateMachineTestBase() = default;
+  DecoderStateMachineTestBase() = default;
+  virtual ~DecoderStateMachineTestBase() { active_stream_.reset(); }
 
   void initHandler() {
-    EXPECT_CALL(decoder_callback_, newDecoderEventHandler())
-        .WillOnce(Invoke([this]() -> DecoderEventHandler* { return &handler_; }));
-  }
-
-  void initProtocolDecoder(MessageType type, int32_t body_size, bool is_heartbeat = false) {
-    EXPECT_CALL(protocol_, decode(_, _, _))
-        .WillOnce(Invoke([=](Buffer::Instance&, Protocol::Context* context,
-                             MessageMetadataSharedPtr metadata) -> bool {
-          context->is_heartbeat_ = is_heartbeat;
-          context->body_size_ = body_size;
-          metadata->setMessageType(type);
-          return true;
+    ON_CALL(delegate_, newStream(_, _))
+        .WillByDefault(Invoke([this](MessageMetadataSharedPtr data,
+                                     ContextSharedPtr ctx) -> ActiveStream* {
+          this->active_stream_ = std::make_shared<NiceMock<MockActiveStream>>(handler_, data, ctx);
+          return active_stream_.get();
         }));
   }
 
+  void initProtocolDecoder(MessageType type, int32_t body_size) {
+    ON_CALL(protocol_, decodeHeader(_, _))
+        .WillByDefault(
+            Invoke([=](Buffer::Instance&,
+                       MessageMetadataSharedPtr metadata) -> std::pair<ContextSharedPtr, bool> {
+              auto context = std::make_shared<ContextImpl>();
+              context->set_header_size(16);
+              context->set_body_size(body_size);
+              metadata->setMessageType(type);
+
+              return std::pair<ContextSharedPtr, bool>(context, true);
+            }));
+  }
+
   NiceMock<MockProtocol> protocol_;
-  NiceMock<MockDeserializer> deserializer_;
-  NiceMock<MockDecoderEventHandler> handler_;
-  NiceMock<MockDecoderCallbacks> decoder_callback_;
-  MessageMetadataSharedPtr metadata_;
-  Protocol::Context context_;
+  NiceMock<MockDecoderStateMachineDelegate> delegate_;
+  std::shared_ptr<NiceMock<MockActiveStream>> active_stream_;
+  NiceMock<MockStreamHandler> handler_;
 };
 
 class DubboDecoderStateMachineTest : public DecoderStateMachineTestBase, public testing::Test {};
@@ -56,166 +57,165 @@ class DubboDecoderStateMachineTest : public DecoderStateMachineTestBase, public 
 class DubboDecoderTest : public testing::Test {
 public:
   DubboDecoderTest() = default;
-  virtual ~DubboDecoderTest() override = default;
+  ~DubboDecoderTest() override = default;
 
   NiceMock<MockProtocol> protocol_;
-  NiceMock<MockDeserializer> deserializer_;
-  NiceMock<MockDecoderCallbacks> callbacks_;
+  NiceMock<MockStreamHandler> handler_;
+  NiceMock<MockRequestDecoderCallbacks> request_callbacks_;
+  NiceMock<MockResponseDecoderCallbacks> response_callbacks_;
 };
 
 TEST_F(DubboDecoderStateMachineTest, EmptyData) {
-  EXPECT_CALL(protocol_, decode(_, _, _)).Times(1);
-  EXPECT_CALL(handler_, transferHeaderTo(_, _)).Times(0);
-  EXPECT_CALL(handler_, messageBegin(_, _, _)).Times(0);
+  EXPECT_CALL(protocol_, decodeHeader(_, _)).Times(1);
+  EXPECT_CALL(delegate_, newStream(_, _)).Times(0);
+  EXPECT_CALL(delegate_, onHeartbeat(_)).Times(0);
 
-  DecoderStateMachine dsm(protocol_, deserializer_, metadata_, decoder_callback_);
+  DecoderStateMachine dsm(protocol_, delegate_);
   Buffer::OwnedImpl buffer;
   EXPECT_EQ(dsm.run(buffer), ProtocolState::WaitForData);
 }
 
 TEST_F(DubboDecoderStateMachineTest, OnlyHaveHeaderData) {
   initHandler();
-  initProtocolDecoder(MessageType::Request, 1, false);
+  initProtocolDecoder(MessageType::Request, 1);
 
-  EXPECT_CALL(handler_, transportBegin()).Times(1);
-  EXPECT_CALL(handler_, transferHeaderTo(_, _)).Times(1);
-  EXPECT_CALL(handler_, messageBegin(_, _, _)).Times(1);
-  EXPECT_CALL(handler_, messageEnd(_)).Times(0);
+  EXPECT_CALL(delegate_, onHeartbeat(_)).Times(0);
+  EXPECT_CALL(protocol_, decodeData(_, _, _)).WillOnce(Return(false));
 
   Buffer::OwnedImpl buffer;
-  DecoderStateMachine dsm(protocol_, deserializer_, metadata_, decoder_callback_);
+  DecoderStateMachine dsm(protocol_, delegate_);
   EXPECT_EQ(dsm.run(buffer), ProtocolState::WaitForData);
 }
 
 TEST_F(DubboDecoderStateMachineTest, RequestMessageCallbacks) {
   initHandler();
-  initProtocolDecoder(MessageType::Request, 0, false);
+  initProtocolDecoder(MessageType::Request, 0);
 
-  EXPECT_CALL(handler_, transportBegin()).Times(1);
-  EXPECT_CALL(handler_, transferHeaderTo(_, _)).Times(1);
-  EXPECT_CALL(handler_, messageBegin(_, _, _)).Times(1);
-  EXPECT_CALL(handler_, messageEnd(_)).Times(1);
-  EXPECT_CALL(handler_, transferBodyTo(_, _)).Times(1);
-  EXPECT_CALL(handler_, transportEnd()).Times(1);
+  EXPECT_CALL(delegate_, onHeartbeat(_)).Times(0);
+  EXPECT_CALL(protocol_, decodeData(_, _, _)).WillOnce(Return(true));
+  EXPECT_CALL(handler_, onStreamDecoded(_, _)).Times(1);
 
-  EXPECT_CALL(deserializer_, deserializeRpcInvocation(_, _, _)).WillOnce(Return());
-
-  DecoderStateMachine dsm(protocol_, deserializer_, metadata_, decoder_callback_);
+  DecoderStateMachine dsm(protocol_, delegate_);
   Buffer::OwnedImpl buffer;
   EXPECT_EQ(dsm.run(buffer), ProtocolState::Done);
+
+  EXPECT_EQ(active_stream_->metadata_->message_type(), MessageType::Request);
 }
 
 TEST_F(DubboDecoderStateMachineTest, ResponseMessageCallbacks) {
   initHandler();
-  initProtocolDecoder(MessageType::Response, 0, false);
+  initProtocolDecoder(MessageType::Response, 0);
 
-  EXPECT_CALL(handler_, transportBegin()).Times(1);
-  EXPECT_CALL(handler_, transferHeaderTo(_, _)).Times(1);
-  EXPECT_CALL(handler_, messageBegin(_, _, _)).Times(1);
-  EXPECT_CALL(handler_, messageEnd(_)).Times(1);
-  EXPECT_CALL(handler_, transferBodyTo(_, _)).Times(1);
-  EXPECT_CALL(handler_, transportEnd()).Times(1);
+  EXPECT_CALL(delegate_, onHeartbeat(_)).Times(0);
+  EXPECT_CALL(protocol_, decodeData(_, _, _)).WillOnce(Return(true));
+  EXPECT_CALL(handler_, onStreamDecoded(_, _)).Times(1);
 
-  EXPECT_CALL(deserializer_, deserializeRpcResult(_, _))
-      .WillOnce(Invoke([](Buffer::Instance&, size_t) -> RpcResultPtr {
-        return std::make_unique<RpcResultImpl>(false);
-      }));
-
-  DecoderStateMachine dsm(protocol_, deserializer_, metadata_, decoder_callback_);
+  DecoderStateMachine dsm(protocol_, delegate_);
   Buffer::OwnedImpl buffer;
   EXPECT_EQ(dsm.run(buffer), ProtocolState::Done);
+
+  EXPECT_EQ(active_stream_->metadata_->message_type(), MessageType::Response);
 }
 
-TEST_F(DubboDecoderStateMachineTest, DeserializeRpcInvocationException) {
+TEST_F(DubboDecoderStateMachineTest, SerializeRpcInvocationException) {
   initHandler();
-  initProtocolDecoder(MessageType::Request, 0, false);
+  initProtocolDecoder(MessageType::Request, 0);
 
-  EXPECT_CALL(handler_, messageEnd(_)).Times(0);
-  EXPECT_CALL(handler_, transferBodyTo(_, _)).Times(0);
-  EXPECT_CALL(handler_, transportEnd()).Times(0);
+  EXPECT_CALL(delegate_, newStream(_, _)).Times(1);
+  EXPECT_CALL(delegate_, onHeartbeat(_)).Times(0);
+  EXPECT_CALL(handler_, onStreamDecoded(_, _)).Times(0);
 
-  EXPECT_CALL(deserializer_, deserializeRpcInvocation(_, _, _))
-      .WillOnce(Invoke([](Buffer::Instance&, int32_t, MessageMetadataSharedPtr) -> void {
-        throw EnvoyException(fmt::format("mock deserialize exception"));
+  EXPECT_CALL(protocol_, decodeData(_, _, _))
+      .WillOnce(Invoke([&](Buffer::Instance&, ContextSharedPtr, MessageMetadataSharedPtr) -> bool {
+        throw EnvoyException(fmt::format("mock serialize exception"));
       }));
 
-  DecoderStateMachine dsm(protocol_, deserializer_, metadata_, decoder_callback_);
+  DecoderStateMachine dsm(protocol_, delegate_);
 
   Buffer::OwnedImpl buffer;
-  EXPECT_THROW_WITH_MESSAGE(dsm.run(buffer), EnvoyException, "mock deserialize exception");
-  EXPECT_EQ(dsm.currentState(), ProtocolState::OnMessageEnd);
+  EXPECT_THROW_WITH_MESSAGE(dsm.run(buffer), EnvoyException, "mock serialize exception");
+  EXPECT_EQ(dsm.currentState(), ProtocolState::OnDecodeStreamData);
 }
 
-TEST_F(DubboDecoderStateMachineTest, DeserializeRpcResultException) {
+TEST_F(DubboDecoderStateMachineTest, SerializeRpcResultException) {
   initHandler();
-  initProtocolDecoder(MessageType::Response, 0, false);
+  initProtocolDecoder(MessageType::Response, 0);
 
-  EXPECT_CALL(handler_, messageEnd(_)).Times(0);
-  EXPECT_CALL(handler_, transferBodyTo(_, _)).Times(0);
-  EXPECT_CALL(handler_, transportEnd()).Times(0);
+  EXPECT_CALL(delegate_, newStream(_, _)).Times(1);
+  EXPECT_CALL(delegate_, onHeartbeat(_)).Times(0);
+  EXPECT_CALL(handler_, onStreamDecoded(_, _)).Times(0);
 
-  EXPECT_CALL(deserializer_, deserializeRpcResult(_, _))
-      .WillOnce(Invoke([](Buffer::Instance&, size_t) -> RpcResultPtr {
-        throw EnvoyException(fmt::format("mock deserialize exception"));
+  EXPECT_CALL(protocol_, decodeData(_, _, _))
+      .WillOnce(Invoke([&](Buffer::Instance&, ContextSharedPtr, MessageMetadataSharedPtr) -> bool {
+        throw EnvoyException(fmt::format("mock serialize exception"));
       }));
 
-  DecoderStateMachine dsm(protocol_, deserializer_, metadata_, decoder_callback_);
+  DecoderStateMachine dsm(protocol_, delegate_);
 
   Buffer::OwnedImpl buffer;
-  EXPECT_THROW_WITH_MESSAGE(dsm.run(buffer), EnvoyException, "mock deserialize exception");
-  EXPECT_EQ(dsm.currentState(), ProtocolState::OnMessageEnd);
+  EXPECT_THROW_WITH_MESSAGE(dsm.run(buffer), EnvoyException, "mock serialize exception");
+  EXPECT_EQ(dsm.currentState(), ProtocolState::OnDecodeStreamData);
 }
 
 TEST_F(DubboDecoderStateMachineTest, ProtocolDecodeException) {
-  EXPECT_CALL(decoder_callback_, newDecoderEventHandler()).Times(0);
-  EXPECT_CALL(protocol_, decode(_, _, _))
-      .WillOnce(Invoke([](Buffer::Instance&, Protocol::Context*, MessageMetadataSharedPtr) -> bool {
-        throw EnvoyException(fmt::format("mock deserialize exception"));
-      }));
+  EXPECT_CALL(delegate_, newStream(_, _)).Times(0);
+  EXPECT_CALL(protocol_, decodeHeader(_, _))
+      .WillOnce(Invoke(
+          [](Buffer::Instance&, MessageMetadataSharedPtr) -> std::pair<ContextSharedPtr, bool> {
+            throw EnvoyException(fmt::format("mock protocol decode exception"));
+          }));
 
-  DecoderStateMachine dsm(protocol_, deserializer_, metadata_, decoder_callback_);
+  DecoderStateMachine dsm(protocol_, delegate_);
 
   Buffer::OwnedImpl buffer;
-  EXPECT_THROW_WITH_MESSAGE(dsm.run(buffer), EnvoyException, "mock deserialize exception");
-  EXPECT_EQ(dsm.currentState(), ProtocolState::OnTransportBegin);
+  EXPECT_THROW_WITH_MESSAGE(dsm.run(buffer), EnvoyException, "mock protocol decode exception");
+  EXPECT_EQ(dsm.currentState(), ProtocolState::OnDecodeStreamHeader);
 }
 
 TEST_F(DubboDecoderTest, NeedMoreDataForProtocolHeader) {
-  EXPECT_CALL(protocol_, decode(_, _, _))
-      .WillOnce(Invoke([](Buffer::Instance&, Protocol::Context*, MessageMetadataSharedPtr) -> bool {
-        return false;
-      }));
-  EXPECT_CALL(callbacks_, newDecoderEventHandler()).Times(0);
+  EXPECT_CALL(request_callbacks_, newStream()).Times(0);
+  EXPECT_CALL(protocol_, decodeHeader(_, _))
+      .WillOnce(Invoke(
+          [](Buffer::Instance&, MessageMetadataSharedPtr) -> std::pair<ContextSharedPtr, bool> {
+            return std::pair<ContextSharedPtr, bool>(nullptr, false);
+          }));
 
-  Decoder decoder(protocol_, deserializer_, callbacks_);
+  RequestDecoder decoder(protocol_, request_callbacks_);
 
   Buffer::OwnedImpl buffer;
   bool buffer_underflow;
-  EXPECT_EQ(decoder.onData(buffer, buffer_underflow), Network::FilterStatus::Continue);
+  EXPECT_EQ(decoder.onData(buffer, buffer_underflow), FilterStatus::Continue);
   EXPECT_EQ(buffer_underflow, true);
 }
 
 TEST_F(DubboDecoderTest, NeedMoreDataForProtocolBody) {
-  EXPECT_CALL(protocol_, decode(_, _, _))
-      .WillOnce(Invoke([](Buffer::Instance&, Protocol::Context* context,
-                          MessageMetadataSharedPtr metadata) -> bool {
-        metadata->setMessageType(MessageType::Request);
-        context->body_size_ = 10;
-        return true;
+  EXPECT_CALL(protocol_, decodeHeader(_, _))
+      .WillOnce(Invoke([](Buffer::Instance&,
+                          MessageMetadataSharedPtr metadate) -> std::pair<ContextSharedPtr, bool> {
+        metadate->setMessageType(MessageType::Response);
+        auto context = std::make_shared<ContextImpl>();
+        context->set_header_size(16);
+        context->set_body_size(10);
+        return std::pair<ContextSharedPtr, bool>(context, true);
       }));
-  EXPECT_CALL(callbacks_, newDecoderEventHandler()).Times(1);
-  EXPECT_CALL(callbacks_.handler_, transportBegin()).Times(1);
-  EXPECT_CALL(callbacks_.handler_, transferHeaderTo(_, _)).Times(1);
-  EXPECT_CALL(callbacks_.handler_, messageBegin(_, _, _)).Times(1);
-  EXPECT_CALL(callbacks_.handler_, messageEnd(_)).Times(0);
-  EXPECT_CALL(callbacks_.handler_, transferBodyTo(_, _)).Times(0);
-  EXPECT_CALL(callbacks_.handler_, transportEnd()).Times(0);
+  EXPECT_CALL(protocol_, decodeData(_, _, _))
+      .WillOnce(Invoke([&](Buffer::Instance&, ContextSharedPtr, MessageMetadataSharedPtr) -> bool {
+        return false;
+      }));
 
-  Decoder decoder(protocol_, deserializer_, callbacks_);
+  std::shared_ptr<NiceMock<MockActiveStream>> active_stream;
+
+  EXPECT_CALL(response_callbacks_, newStream()).WillOnce(Invoke([this]() -> StreamHandler& {
+    return handler_;
+  }));
+  EXPECT_CALL(response_callbacks_, onHeartbeat(_)).Times(0);
+  EXPECT_CALL(handler_, onStreamDecoded(_, _)).Times(0);
+
+  ResponseDecoder decoder(protocol_, response_callbacks_);
 
   Buffer::OwnedImpl buffer;
   bool buffer_underflow;
-  EXPECT_EQ(decoder.onData(buffer, buffer_underflow), Network::FilterStatus::Continue);
+  EXPECT_EQ(decoder.onData(buffer, buffer_underflow), FilterStatus::Continue);
   EXPECT_EQ(buffer_underflow, true);
 }
 
@@ -223,30 +223,46 @@ TEST_F(DubboDecoderTest, decodeResponseMessage) {
   Buffer::OwnedImpl buffer;
   buffer.add(std::string({'\xda', '\xbb', '\xc2', 0x00}));
 
-  EXPECT_CALL(protocol_, decode(_, _, _))
-      .WillOnce(Invoke([&](Buffer::Instance&, Protocol::Context* context,
-                           MessageMetadataSharedPtr metadata) -> bool {
-        metadata->setMessageType(MessageType::Response);
-        context->body_size_ = buffer.length();
-        return true;
+  EXPECT_CALL(protocol_, decodeHeader(_, _))
+      .WillOnce(Invoke([](Buffer::Instance&,
+                          MessageMetadataSharedPtr metadate) -> std::pair<ContextSharedPtr, bool> {
+        metadate->setMessageType(MessageType::Response);
+        auto context = std::make_shared<ContextImpl>();
+        context->set_header_size(16);
+        context->set_body_size(10);
+        return std::pair<ContextSharedPtr, bool>(context, true);
       }));
-  EXPECT_CALL(deserializer_, deserializeRpcResult(_, _))
-      .WillOnce(Invoke([](Buffer::Instance&, size_t) -> RpcResultPtr {
-        return std::make_unique<RpcResultImpl>(true);
-      }));
-  EXPECT_CALL(callbacks_, newDecoderEventHandler()).Times(1);
-  EXPECT_CALL(callbacks_.handler_, transportBegin()).Times(1);
-  EXPECT_CALL(callbacks_.handler_, transferHeaderTo(_, _)).Times(1);
-  EXPECT_CALL(callbacks_.handler_, messageBegin(_, _, _)).Times(1);
-  EXPECT_CALL(callbacks_.handler_, messageEnd(_)).Times(1);
-  EXPECT_CALL(callbacks_.handler_, transferBodyTo(_, _)).Times(1);
-  EXPECT_CALL(callbacks_.handler_, transportEnd()).Times(1);
+  EXPECT_CALL(protocol_, decodeData(_, _, _)).WillOnce(Return(true));
+  EXPECT_CALL(response_callbacks_, newStream()).WillOnce(ReturnRef(handler_));
+  EXPECT_CALL(response_callbacks_, onHeartbeat(_)).Times(0);
+  EXPECT_CALL(handler_, onStreamDecoded(_, _)).Times(1);
 
-  Decoder decoder(protocol_, deserializer_, callbacks_);
+  ResponseDecoder decoder(protocol_, response_callbacks_);
 
   bool buffer_underflow;
-  EXPECT_EQ(decoder.onData(buffer, buffer_underflow), Network::FilterStatus::Continue);
-  EXPECT_EQ(buffer_underflow, false);
+  EXPECT_EQ(decoder.onData(buffer, buffer_underflow), FilterStatus::Continue);
+  EXPECT_EQ(buffer_underflow, true);
+
+  decoder.reset();
+
+  EXPECT_EQ(ProtocolType::Dubbo, decoder.protocol().type());
+  EXPECT_CALL(protocol_, decodeHeader(_, _))
+      .WillOnce(Invoke([](Buffer::Instance&,
+                          MessageMetadataSharedPtr metadate) -> std::pair<ContextSharedPtr, bool> {
+        metadate->setMessageType(MessageType::Response);
+        auto context = std::make_shared<ContextImpl>();
+        context->set_header_size(16);
+        context->set_body_size(10);
+        return std::pair<ContextSharedPtr, bool>(context, true);
+      }));
+  EXPECT_CALL(protocol_, decodeData(_, _, _)).WillOnce(Return(true));
+  EXPECT_CALL(response_callbacks_, newStream()).WillOnce(ReturnRef(handler_));
+  EXPECT_CALL(response_callbacks_, onHeartbeat(_)).Times(0);
+  EXPECT_CALL(handler_, onStreamDecoded(_, _)).Times(1);
+
+  buffer_underflow = false;
+  EXPECT_EQ(decoder.onData(buffer, buffer_underflow), FilterStatus::Continue);
+  EXPECT_EQ(buffer_underflow, true);
 }
 
 } // namespace DubboProxy

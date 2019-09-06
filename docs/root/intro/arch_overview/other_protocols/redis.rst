@@ -27,6 +27,7 @@ The Redis project offers a thorough reference on partitioning as it relates to R
 * Prefix routing.
 * Separate downstream client and upstream server authentication.
 * Request mirroring for all requests or write requests only.
+* Control :ref:`read requests routing<envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.ConnPoolSettings.read_policy>`. This only works with Redis Cluster.
 
 **Planned future enhancements**:
 
@@ -81,6 +82,15 @@ following information:
 For topology configuration details, see the Redis Cluster
 :ref:`v2 API reference <envoy_api_msg_config.cluster.redis.RedisClusterConfig>`.
 
+Every Redis cluster has its own extra statistics tree rooted at *cluster.<name>.redis_cluster.* with the following statistics:
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  max_upstream_unknown_connections_reached, Counter, Total number of times that an upstream connection to an unknown host is not created after redirection having reached the connection pool's max_upstream_unknown_connections limit
+  upstream_cx_drained, Counter, Total number of upstream connections drained of active requests before being closed
+  
 Supported commands
 ------------------
 

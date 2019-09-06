@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdint>
 #include <iterator>
+#include <regex>
 #include <string>
 
 #include "envoy/common/exception.h"
@@ -323,6 +324,16 @@ std::vector<absl::string_view> StringUtil::splitToken(absl::string_view source,
   return absl::StrSplit(source, absl::ByAnyChar(delimiters), absl::SkipEmpty());
 }
 
+std::string StringUtil::removeTokens(absl::string_view source, absl::string_view delimiters,
+                                     const CaseUnorderedSet& tokens_to_remove,
+                                     absl::string_view joiner) {
+  auto values = Envoy::StringUtil::splitToken(source, delimiters);
+  std::for_each(values.begin(), values.end(), [](auto& v) { v = StringUtil::trim(v); });
+  auto end = std::remove_if(values.begin(), values.end(),
+                            [&](absl::string_view t) { return tokens_to_remove.count(t) != 0; });
+  return absl::StrJoin(values.begin(), end, joiner);
+}
+
 uint32_t StringUtil::itoa(char* out, size_t buffer_size, uint64_t i) {
   // The maximum size required for an unsigned 64-bit integer is 21 chars (including null).
   if (buffer_size < 21) {
@@ -497,16 +508,6 @@ uint32_t Primes::findPrimeLargerThan(uint32_t x) {
     x += 2;
   }
   return x;
-}
-
-std::regex RegexUtil::parseRegex(const std::string& regex, std::regex::flag_type flags) {
-  // TODO(zuercher): In the future, PGV (https://github.com/lyft/protoc-gen-validate) annotations
-  // may allow us to remove this in favor of direct validation of regular expressions.
-  try {
-    return std::regex(regex, flags);
-  } catch (const std::regex_error& e) {
-    throw EnvoyException(fmt::format("Invalid regex '{}': {}", regex, e.what()));
-  }
 }
 
 // https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Online_algorithm

@@ -135,7 +135,14 @@ versioning across resource types. When ADS is not used, even each
 resource of a given resource type may have a distinct version, since the
 Envoy API allows distinct EDS/RDS resources to point at different :ref:`ConfigSources <envoy_api_msg_core.ConfigSource>`.
 
-.. xds_protocol_resource_update:
+Only the first request on a stream is guaranteed to carry the node identifier.
+The subsequent discovery requests on the same stream may carry an empty node
+identifier. This holds true regardless of the acceptance of the discovery
+responses on the same stream. The node identifier should always be identical if
+present more than once on the stream. It is sufficient to only check the first
+message for the node identifier as a result.
+
+.. _xds_protocol_resource_update:
 
 Resource Update
 ~~~~~~~~~~~~~~~
@@ -160,8 +167,8 @@ Resource hints
 ^^^^^^^^^^^^^^
 
 The :ref:`resource_names <envoy_api_field_DiscoveryRequest.resource_names>` specified in the :ref:`DiscoveryRequest <envoy_api_msg_DiscoveryRequest>` are a hint.
-Some resource types, e.g. `Clusters` and `Listeners` will
-specify an empty :ref:`resource_names <envoy_api_field_DiscoveryRequest.resource_names>` list, since Envoy is interested in
+Some resource types, e.g. `Clusters` and `Listeners` may
+specify an empty :ref:`resource_names <envoy_api_field_DiscoveryRequest.resource_names>` list, since a client such as Envoy is interested in
 learning about all the :ref:`Clusters (CDS) <envoy_api_msg_Cluster>` and :ref:`Listeners (LDS) <envoy_api_msg_Listener>`
 that the management server(s) know about corresponding to its node
 identification. Other resource types, e.g. :ref:`RouteConfiguration (RDS) <envoy_api_msg_RouteConfiguration>`
@@ -169,10 +176,11 @@ and :ref:`ClusterLoadAssignment (EDS) <envoy_api_msg_ClusterLoadAssignment>`, fo
 CDS/LDS updates and Envoy is able to explicitly enumerate these
 resources.
 
-LDS/CDS resource hints will always be empty and it is expected that the
-management server will provide the complete state of the LDS/CDS
-resources in each response. An absent `Listener` or `Cluster` will
-be deleted.
+Envoy will always set the LDS/CDS resource hints to empty and it is expected that the management
+server will provide the complete state of the LDS/CDS resources in each response. An absent
+`Listener` or `Cluster` will be deleted. Other xDS clients may specify explicit LDS/CDS resources as
+resource hints, for example if they only have a singleton listener and already know its name from
+some out-of-band configuration.
 
 For EDS/RDS, the management server does not need to supply every
 requested resource and may also supply additional, unrequested
@@ -462,7 +470,7 @@ messages. ADS is not available for REST-JSON polling.
 When the poll period is set to a small value, with the intention of long
 polling, then there is also a requirement to avoid sending a
 :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>` unless a change to the underlying resources has
-occurred <Resource Update>.
+occurred via a :ref:`resource update <xds_protocol_resource_update>`.
 
 .. |Multiple EDS requests on the same stream| image:: diagrams/eds-same-stream.svg
 .. |Multiple EDS requests on distinct streams| image:: diagrams/eds-distinct-stream.svg

@@ -5,19 +5,16 @@ package envoy.api.v2.core;
 option java_outer_classname = "BaseProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.api.v2.core";
-option go_package = "core";
+
+import "envoy/api/v2/core/http_uri.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
-import "gogoproto/gogo.proto";
 
 import "envoy/type/percent.proto";
-
-option (gogoproto.equal_all) = true;
-option (gogoproto.stable_marshaler_all) = true;
 
 // [#protodoc-title: Common types]
 
@@ -130,7 +127,6 @@ enum RoutingPriority {
 
 // HTTP request method.
 enum RequestMethod {
-  option (gogoproto.goproto_enum_prefix) = false;
   METHOD_UNSPECIFIED = 0;
   GET = 1;
   HEAD = 2;
@@ -187,6 +183,28 @@ message DataSource {
   }
 }
 
+// The message specifies how to fetch data from remote and how to verify it.
+message RemoteDataSource {
+  // The HTTP URI to fetch the remote data.
+  HttpUri http_uri = 1 [(validate.rules).message.required = true];
+
+  // SHA256 string for verifying data.
+  string sha256 = 2 [(validate.rules).string.min_bytes = 1];
+}
+
+// Async data source which support async data fetch.
+message AsyncDataSource {
+  oneof specifier {
+    option (validate.required) = true;
+
+    // Local async data source.
+    DataSource local = 1;
+
+    // Remote async data source.
+    RemoteDataSource remote = 2;
+  }
+}
+
 // Configuration for transport socket in :ref:`listeners <config_listeners>` and
 // :ref:`clusters <envoy_api_msg_Cluster>`. If the configuration is
 // empty, a default transport socket implementation and configuration will be
@@ -224,7 +242,6 @@ message SocketOption {
     bytes buf_value = 5;
   }
   enum SocketState {
-    option (gogoproto.goproto_enum_prefix) = false;
     // Socket options are applied after socket creation but before binding the socket to a port
     STATE_PREBIND = 0;
     // Socket options are applied after binding the socket to a port but before calling listen()
@@ -234,8 +251,7 @@ message SocketOption {
   }
   // The state in which the option will be applied. When used in BindConfig
   // STATE_PREBIND is currently the only valid value.
-  SocketState state = 6
-      [(validate.rules).message.required = true, (validate.rules).enum.defined_only = true];
+  SocketState state = 6 [(validate.rules).enum.defined_only = true];
 }
 
 // Runtime derived FractionalPercent with defaults for when the numerator or denominator is not
@@ -254,4 +270,16 @@ message ControlPlane {
   // of control plane. This can be used to identify which control plane instance,
   // the Envoy is connected to.
   string identifier = 1;
+}
+
+// Identifies the direction of the traffic relative to the local Envoy.
+enum TrafficDirection {
+  // Default option is unspecified.
+  UNSPECIFIED = 0;
+
+  // The transport is used for incoming traffic.
+  INBOUND = 1;
+
+  // The transport is used for outgoing traffic.
+  OUTBOUND = 2;
 }

@@ -41,6 +41,7 @@ envoy_cc_library(
         "//source/common/config:runtime_utility_lib",
         "//source/common/config:utility_lib",
         "//source/common/network:resolver_lib",
+        "//source/common/network:socket_option_factory_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/tracing:http_tracer_lib",
@@ -63,6 +64,7 @@ envoy_cc_library(
         "//include/envoy/network:filter_interface",
         "//include/envoy/network:listen_socket_interface",
         "//include/envoy/network:listener_interface",
+        "//include/envoy/server:active_udp_listener_config_interface",
         "//include/envoy/server:listener_manager_interface",
         "//include/envoy/stats:timespan",
         "//source/common/common:linked_object",
@@ -105,6 +107,7 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:thread_lib",
         "//source/common/event:libevent_lib",
+        "//source/common/stats:symbol_table_lib",
     ],
 )
 
@@ -167,7 +170,7 @@ envoy_cc_library(
         "//include/envoy/server:options_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
-        "//source/common/stats:heap_stat_data_lib",
+        "//source/common/stats:allocator_lib",
     ],
 )
 
@@ -176,7 +179,7 @@ envoy_cc_library(
     hdrs = ["hot_restart_nop_impl.h"],
     deps = [
         "//include/envoy/server:hot_restart_interface",
-        "//source/common/stats:heap_stat_data_lib",
+        "//source/common/stats:allocator_lib",
     ],
 )
 
@@ -186,6 +189,7 @@ envoy_cc_library(
         "//bazel:linux_x86_64": ["options_impl_platform_linux.cc"],
         "//bazel:linux_aarch64": ["options_impl_platform_linux.cc"],
         "//bazel:linux_ppc": ["options_impl_platform_linux.cc"],
+        "//bazel:linux_mips64": ["options_impl_platform_linux.cc"],
         "//conditions:default": ["options_impl_platform_default.cc"],
     }),
     hdrs = [
@@ -195,6 +199,7 @@ envoy_cc_library(
         "//bazel:linux_x86_64": ["options_impl_platform_linux.h"],
         "//bazel:linux_aarch64": ["options_impl_platform_linux.h"],
         "//bazel:linux_ppc": ["options_impl_platform_linux.h"],
+        "//bazel:linux_mips64": ["options_impl_platform_linux.h"],
         "//conditions:default": [],
     }),
     # TCLAP command line parser needs this to support int64_t/uint64_t in several build environments.
@@ -210,6 +215,7 @@ envoy_cc_library(
         "//source/common/common:version_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:stats_lib",
+        "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
     ],
 )
 
@@ -223,6 +229,7 @@ envoy_cc_library(
         "//include/envoy/thread_local:thread_local_interface",
         "//source/common/common:logger_lib",
         "//source/common/config:utility_lib",
+        "//source/common/stats:symbol_table_lib",
         "//source/server:resource_monitor_config_lib",
         "@envoy_api//envoy/config/overload/v2alpha:overload_cc",
     ],
@@ -256,6 +263,8 @@ envoy_cc_library(
         ":filter_chain_manager_lib",
         ":lds_api_lib",
         ":transport_socket_config_lib",
+        ":well_known_names_lib",
+        "//include/envoy/server:active_udp_listener_config_interface",
         "//include/envoy/server:filter_config_interface",
         "//include/envoy/server:listener_manager_interface",
         "//include/envoy/server:transport_socket_config_interface",
@@ -270,8 +279,6 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/listener:well_known_names",
         "//source/extensions/transport_sockets:well_known_names",
-        "//source/extensions/transport_sockets/tls:context_config_lib",
-        "//source/extensions/transport_sockets/tls:context_lib",
         "@envoy_api//envoy/admin/v2alpha:config_dump_cc",
         "@envoy_api//envoy/api/v2:lds_cc",
     ],
@@ -340,6 +347,7 @@ envoy_cc_library(
         ":guarddog_lib",
         ":listener_hooks_lib",
         ":listener_manager_lib",
+        ":ssl_context_manager_lib",
         ":worker_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:signal_interface",
@@ -375,12 +383,23 @@ envoy_cc_library(
         "//source/common/runtime:runtime_lib",
         "//source/common/secret:secret_manager_impl_lib",
         "//source/common/singleton:manager_impl_lib",
+        "//source/common/stats:symbol_table_creator_lib",
         "//source/common/stats:thread_local_store_lib",
         "//source/common/upstream:cluster_manager_lib",
         "//source/common/upstream:health_discovery_service_lib",
         "//source/server:overload_manager_lib",
         "//source/server/http:admin_lib",
         "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "ssl_context_manager_lib",
+    srcs = ["ssl_context_manager.cc"],
+    hdrs = ["ssl_context_manager.h"],
+    deps = [
+        "//include/envoy/registry",
+        "//include/envoy/ssl:context_manager_interface",
     ],
 )
 
@@ -425,5 +444,23 @@ envoy_cc_library(
     hdrs = ["transport_socket_config_impl.h"],
     deps = [
         "//include/envoy/server:transport_socket_config_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "well_known_names_lib",
+    hdrs = ["well_known_names.h"],
+    deps = ["//source/common/singleton:const_singleton"],
+)
+
+envoy_cc_library(
+    name = "active_raw_udp_listener_config",
+    srcs = ["active_raw_udp_listener_config.cc"],
+    hdrs = ["active_raw_udp_listener_config.h"],
+    deps = [
+        ":connection_handler_lib",
+        ":well_known_names_lib",
+        "//include/envoy/registry",
+        "//include/envoy/server:active_udp_listener_config_interface",
     ],
 )

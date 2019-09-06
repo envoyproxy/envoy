@@ -57,14 +57,21 @@ priority.
 +-------------+-------------+----------+--------------+----------+--------------+-------------+
 | 71%         |  71%        |  99%     | NO           |   1%     | NO           |  100%       |
 +-------------+-------------+----------+--------------+----------+--------------+-------------+
-| 50%         |  60%        |  50%     | NO           |   50%    | NO           |  100%       |
+| 50%         |  60%        |  70%     | NO           |   30%    | NO           |  100%       |
 +-------------+-------------+----------+--------------+----------+--------------+-------------+
-| 25%         |  100%       |  25%     | NO           |   75%    | NO           |  100%       |
+| 25%         |  100%       |  35%     | NO           |   65%    | NO           |  100%       |
 +-------------+-------------+----------+--------------+----------+--------------+-------------+
 | 25%         |  25%        |  50%     | YES          |   50%    | YES          |  70%        |
 +-------------+-------------+----------+--------------+----------+--------------+-------------+
 | 5%          |  65%        |  7%      | YES          |   93%    | NO           |  98%        |
 +-------------+-------------+----------+--------------+----------+--------------+-------------+
 
-Note that panic thresholds can be configured *per-priority*.
+Panic mode can be disabled by setting the panic threshold to 0%.
 
+If all hosts become unhealthy normalized total health is 0%, and if the panic threshold is above 0%
+all traffic will be redirected to P=0.
+However, if the panic threshold is 0% for any priority, that priority will never enter panic mode.
+In this case if all hosts are unhealthy, Envoy will fail to select a host and will instead immediately
+return error responses with "503 - no healthy upstream".
+
+Note that panic thresholds can be configured *per-priority*.

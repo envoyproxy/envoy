@@ -12,15 +12,13 @@ import "envoy/api/v2/core/address.proto";
 import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/discovery.proto";
 import "envoy/api/v2/listener/listener.proto";
+import "envoy/api/v2/listener/udp_listener_config.proto";
 
 import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
-import "gogoproto/gogo.proto";
-
-option (gogoproto.equal_all) = true;
 
 // [#protodoc-title: Listener]
 // Listener :ref:`configuration overview <config_listeners>`
@@ -44,7 +42,7 @@ service ListenerDiscoveryService {
   }
 }
 
-// [#comment:next free field: 16]
+// [#comment:next free field: 19]
 message Listener {
   // The unique name by which this listener is known. If no name is provided,
   // Envoy will allocate an internal UUID for the listener. If the listener is to be dynamically
@@ -54,7 +52,7 @@ message Listener {
   // The address that the listener should listen on. In general, the address must be unique, though
   // that is governed by the bind rules of the OS. E.g., multiple listeners can listen on port 0 on
   // Linux as the actual port will be allocated by the OS.
-  core.Address address = 2 [(validate.rules).message.required = true, (gogoproto.nullable) = false];
+  core.Address address = 2 [(validate.rules).message.required = true];
 
   // A list of filter chains to consider for this listener. The
   // :ref:`FilterChain <envoy_api_msg_listener.FilterChain>` with the most specific
@@ -63,7 +61,7 @@ message Listener {
   //
   // Example using SNI for filter chain selection can be found in the
   // :ref:`FAQ entry <faq_how_to_setup_sni>`.
-  repeated listener.FilterChain filter_chains = 3 [(gogoproto.nullable) = false];
+  repeated listener.FilterChain filter_chains = 3;
 
   // If a connection is redirected using *iptables*, the port on which the proxy
   // receives it might be different from the original destination address. When this flag is set to
@@ -129,12 +127,22 @@ message Listener {
   // :ref:`protocol <envoy_api_field_core.SocketAddress.protocol>` is :ref:'UDP
   // <envoy_api_field_core.Protocol.UDP>`.
   // UDP listeners currently support a single filter.
-  repeated listener.ListenerFilter listener_filters = 9 [(gogoproto.nullable) = false];
+  repeated listener.ListenerFilter listener_filters = 9;
 
   // The timeout to wait for all listener filters to complete operation. If the timeout is reached,
-  // the accepted socket is closed without a connection being created. Specify 0 to disable the
+  // the accepted socket is closed without a connection being created unless
+  // `continue_on_listener_filters_timeout` is set to true. Specify 0 to disable the
   // timeout. If not specified, a default timeout of 15s is used.
-  google.protobuf.Duration listener_filters_timeout = 15 [(gogoproto.stdduration) = true];
+  google.protobuf.Duration listener_filters_timeout = 15;
+
+  // Whether a connection should be created when listener filters timeout. Default is false.
+  //
+  // .. attention::
+  //
+  //   Some listener filters, such as :ref:`Proxy Protocol filter
+  //   <config_listener_filters_proxy_protocol>`, should not be used with this option. It will cause
+  //   unexpected behavior when a connection is created.
+  bool continue_on_listener_filters_timeout = 17;
 
   // Whether the listener should be set as a transparent socket.
   // When this flag is set to true, connections can be redirected to the listener using an
@@ -181,4 +189,15 @@ message Listener {
   google.protobuf.UInt32Value tcp_fast_open_queue_length = 12;
 
   reserved 14;
+
+  // Specifies the intended direction of the traffic relative to the local Envoy.
+  core.TrafficDirection traffic_direction = 16;
+
+  // If the protocol in the listener socket address in :ref:`protocol
+  // <envoy_api_field_core.SocketAddress.protocol>` is :ref:'UDP
+  // <envoy_api_field_core.Protocol.UDP>`, this field specifies the actual udp listener to create,
+  // i.e. :ref:`udp_listener_name
+  // <envoy_api_field_listener.UdpListenerConfig.udp_listener_name>` = "raw_udp_listener" for
+  // creating a packet-oriented UDP listener. If not present, treat it as "raw_udp_listener".
+  listener.UdpListenerConfig udp_listener_config = 18;
 }

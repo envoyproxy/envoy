@@ -8,6 +8,7 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/lock_guard.h"
+#include "common/stats/symbol_table_impl.h"
 
 #include "server/watchdog_impl.h"
 
@@ -30,8 +31,12 @@ GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuratio
                          multikillEnabled() ? multi_kill_timeout_ : min_of_nonfatal,
                          min_of_nonfatal});
       }()),
-      watchdog_miss_counter_(stats_scope.counter("server.watchdog_miss")),
-      watchdog_megamiss_counter_(stats_scope.counter("server.watchdog_mega_miss")),
+      watchdog_miss_counter_(stats_scope.counterFromStatName(
+          Stats::StatNameManagedStorage("server.watchdog_miss", stats_scope.symbolTable())
+              .statName())),
+      watchdog_megamiss_counter_(stats_scope.counterFromStatName(
+          Stats::StatNameManagedStorage("server.watchdog_mega_miss", stats_scope.symbolTable())
+              .statName())),
       dispatcher_(api.allocateDispatcher()),
       loop_timer_(dispatcher_->createTimer([this]() { step(); })), run_thread_(true) {
   start(api);
@@ -103,7 +108,7 @@ void GuardDogImpl::step() {
   }
 }
 
-WatchDogSharedPtr GuardDogImpl::createWatchDog(Thread::ThreadIdPtr&& thread_id) {
+WatchDogSharedPtr GuardDogImpl::createWatchDog(Thread::ThreadId thread_id) {
   // Timer started by WatchDog will try to fire at 1/2 of the interval of the
   // minimum timeout specified. loop_interval_ is const so all shared state
   // accessed out of the locked section below is const (time_source_ has no

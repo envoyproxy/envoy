@@ -6,7 +6,6 @@
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/config/datasource.h"
-#include "common/config/tls_context_json.h"
 #include "common/protobuf/utility.h"
 #include "common/secret/sds_api.h"
 #include "common/ssl/certificate_validation_context_config_impl.h"
@@ -26,7 +25,8 @@ std::vector<Secret::TlsCertificateConfigProviderSharedPtr> getTlsCertificateConf
   if (!config.tls_certificates().empty()) {
     std::vector<Secret::TlsCertificateConfigProviderSharedPtr> providers;
     for (const auto& tls_certificate : config.tls_certificates()) {
-      if (!tls_certificate.has_certificate_chain() && !tls_certificate.has_private_key()) {
+      if (!tls_certificate.has_private_key_provider() && !tls_certificate.has_certificate_chain() &&
+          !tls_certificate.has_private_key()) {
         continue;
       }
       providers.push_back(
@@ -144,7 +144,7 @@ ContextConfigImpl::ContextConfigImpl(
   if (!tls_certificate_providers_.empty()) {
     for (auto& provider : tls_certificate_providers_) {
       if (provider->secret() != nullptr) {
-        tls_certificate_configs_.emplace_back(*provider->secret(), api_);
+        tls_certificate_configs_.emplace_back(*provider->secret(), &factory_context, api_);
       }
     }
   }
@@ -175,7 +175,8 @@ void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) 
           // This breaks multiple certificate support, but today SDS is only single cert.
           // TODO(htuch): Fix this when SDS goes multi-cert.
           tls_certificate_configs_.clear();
-          tls_certificate_configs_.emplace_back(*tls_certificate_providers_[0]->secret(), api_);
+          tls_certificate_configs_.emplace_back(*tls_certificate_providers_[0]->secret(), nullptr,
+                                                api_);
           callback();
         });
   }
@@ -288,17 +289,6 @@ ClientContextConfigImpl::ClientContextConfigImpl(
   }
 }
 
-ClientContextConfigImpl::ClientContextConfigImpl(
-    const Json::Object& config,
-    Server::Configuration::TransportSocketFactoryContext& factory_context)
-    : ClientContextConfigImpl(
-          [&config] {
-            envoy::api::v2::auth::UpstreamTlsContext upstream_tls_context;
-            Config::TlsContextJson::translateUpstreamTlsContext(config, upstream_tls_context);
-            return upstream_tls_context;
-          }(),
-          factory_context) {}
-
 const unsigned ServerContextConfigImpl::DEFAULT_MIN_VERSION = TLS1_VERSION;
 const unsigned ServerContextConfigImpl::DEFAULT_MAX_VERSION =
 #ifndef BORINGSSL_FIPS
@@ -368,17 +358,6 @@ ServerContextConfigImpl::ServerContextConfigImpl(
     throw EnvoyException("SDS and non-SDS TLS certificates may not be mixed in server contexts");
   }
 }
-
-ServerContextConfigImpl::ServerContextConfigImpl(
-    const Json::Object& config,
-    Server::Configuration::TransportSocketFactoryContext& factory_context)
-    : ServerContextConfigImpl(
-          [&config] {
-            envoy::api::v2::auth::DownstreamTlsContext downstream_tls_context;
-            Config::TlsContextJson::translateDownstreamTlsContext(config, downstream_tls_context);
-            return downstream_tls_context;
-          }(),
-          factory_context) {}
 
 // Append a SessionTicketKey to keys, initializing it with key_data.
 // Throws if key_data is invalid.

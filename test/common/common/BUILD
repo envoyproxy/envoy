@@ -55,6 +55,13 @@ envoy_cc_fuzz_test(
     deps = ["//source/common/common:utility_lib"],
 )
 
+envoy_cc_fuzz_test(
+    name = "hash_fuzz_test",
+    srcs = ["hash_fuzz_test.cc"],
+    corpus = "hash_corpus",
+    deps = ["//source/common/common:hash_lib"],
+)
+
 envoy_cc_test(
     name = "cleanup_test",
     srcs = ["cleanup_test.cc"],
@@ -137,6 +144,15 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "regex_test",
+    srcs = ["regex_test.cc"],
+    deps = [
+        "//source/common/common:regex_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "perf_annotation_test",
     srcs = ["perf_annotation_test.cc"],
     deps = [
@@ -201,6 +217,16 @@ envoy_cc_test(
     deps = [
         "//source/common/common:lock_guard_lib",
         "//source/common/common:thread_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "thread_id_test",
+    srcs = ["thread_id_test.cc"],
+    external_deps = ["abseil_hash_testing"],
+    deps = [
+        "//source/common/common:thread_lib",
+        "//test/test_common:thread_factory_for_test_lib",
     ],
 )
 

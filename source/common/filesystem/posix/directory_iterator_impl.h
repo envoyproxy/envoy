@@ -12,11 +12,9 @@ namespace Filesystem {
 class DirectoryIteratorImpl : public DirectoryIterator {
 public:
   DirectoryIteratorImpl(const std::string& directory_path);
-  DirectoryIteratorImpl()
-      : DirectoryIterator(), directory_path_(""), dir_(nullptr),
-        os_sys_calls_(Api::OsSysCallsSingleton::get()) {}
+  DirectoryIteratorImpl() : directory_path_(""), os_sys_calls_(Api::OsSysCallsSingleton::get()) {}
 
-  ~DirectoryIteratorImpl();
+  ~DirectoryIteratorImpl() override;
 
   DirectoryIteratorImpl& operator++() override;
 
@@ -33,7 +31,7 @@ private:
   FileType fileType(const std::string& name) const;
 
   std::string directory_path_;
-  DIR* dir_;
+  DIR* dir_{nullptr};
   Api::OsSysCallsImpl& os_sys_calls_;
 };
 

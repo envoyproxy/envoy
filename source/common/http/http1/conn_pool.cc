@@ -14,6 +14,7 @@
 #include "common/http/codes.h"
 #include "common/http/headers.h"
 #include "common/network/utility.h"
+#include "common/runtime/runtime_impl.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "absl/strings/match.h"
@@ -69,7 +70,8 @@ void ConnPoolImpl::attachRequestToClient(ActiveClient& client, StreamDecoder& re
   host_->cluster().stats().upstream_rq_total_.inc();
   host_->stats().rq_total_.inc();
   client.stream_wrapper_ = std::make_unique<StreamWrapper>(response_decoder, client);
-  callbacks.onPoolReady(*client.stream_wrapper_, client.real_host_description_);
+  callbacks.onPoolReady(*client.stream_wrapper_, client.real_host_description_,
+                        client.codec_client_->streamInfo());
 }
 
 void ConnPoolImpl::checkForDrained() {

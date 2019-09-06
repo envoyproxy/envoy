@@ -17,9 +17,7 @@ fi
 if [[ ${DYNLIBS} =~ "libc++" ]]; then
   echo "libc++ is dynamically linked:"
   echo "${DYNLIBS}"
-  # TODO(PiotrSikora): enforce this once there is a way to statically link libc++.
-  # See: https://reviews.llvm.org/D53238
-  exit 0
+  exit 1
 fi
 
 if [[ ${DYNLIBS} =~ "libstdc++" || ${DYNLIBS} =~ "libgcc" ]]; then

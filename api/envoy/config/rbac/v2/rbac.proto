@@ -1,20 +1,18 @@
 syntax = "proto3";
 
 import "validate/validate.proto";
-import "gogoproto/gogo.proto";
 import "envoy/api/v2/core/address.proto";
 import "envoy/api/v2/route/route.proto";
 import "envoy/type/matcher/metadata.proto";
 import "envoy/type/matcher/string.proto";
+
+import "google/api/expr/v1alpha1/syntax.proto";
 
 package envoy.config.rbac.v2;
 
 option java_outer_classname = "RbacProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.rbac.v2";
-option go_package = "v2";
-
-option (gogoproto.stable_marshaler_all) = true;
 
 // [#protodoc-title: Role Based Access Control (RBAC)]
 
@@ -81,7 +79,7 @@ message RBAC {
 
 // Policy specifies a role and the principals that are assigned/denied the role. A policy matches if
 // and only if at least one of its permissions match the action taking place AND at least one of its
-// principals match the downstream.
+// principals match the downstream AND the condition is true if specified.
 message Policy {
   // Required. The set of permissions that define a role. Each permission is matched with OR
   // semantics. To match all actions for this policy, a single Permission with the `any` field set
@@ -92,6 +90,10 @@ message Policy {
   // principal is matched with OR semantics. To match all downstreams for this policy, a single
   // Principal with the `any` field set to true should be used.
   repeated Principal principals = 2 [(validate.rules).repeated .min_items = 1];
+
+  // An optional symbolic expression specifying an access control condition.
+  // The condition is combined with AND semantics.
+  google.api.expr.v1alpha1.Expr condition = 3;
 }
 
 // Permission defines an action (or actions) that a principal can take.
@@ -170,8 +172,9 @@ message Principal {
     reserved 1;
     reserved "name";
 
-    // The name of the principal. If set, The URI SAN is used from the certificate, otherwise the
-    // subject field is used. If unset, it applies to any user that is authenticated.
+    // The name of the principal. If set, The URI SAN or DNS SAN in that order is used from the
+    // certificate, otherwise the subject field is used. If unset, it applies to any user that is
+    // authenticated.
     envoy.type.matcher.StringMatcher principal_name = 2;
   }
 

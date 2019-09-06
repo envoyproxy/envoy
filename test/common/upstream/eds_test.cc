@@ -22,9 +22,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::AtLeast;
-using testing::Return;
-using testing::ReturnRef;
 
 namespace Envoy {
 namespace Upstream {
@@ -108,7 +105,7 @@ protected:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Server::MockAdmin> admin_;
-  Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest().currentThreadId()};
+  Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
@@ -116,7 +113,7 @@ protected:
 
 class EdsWithHealthCheckUpdateTest : public EdsTest {
 protected:
-  EdsWithHealthCheckUpdateTest() {}
+  EdsWithHealthCheckUpdateTest() = default;
 
   // Build the initial cluster with some endpoints.
   void initializeCluster(const std::vector<uint32_t> endpoint_ports,
@@ -210,6 +207,14 @@ TEST_F(EdsTest, ValidateFail) {
   EXPECT_FALSE(initialized_);
 }
 
+// Validate onConfigUpdate() on stream disconnection.
+TEST_F(EdsTest, StreamDisconnection) {
+  initialize();
+  eds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure,
+                                       nullptr);
+  EXPECT_FALSE(initialized_);
+}
+
 // Validate that onConfigUpdate() with unexpected cluster names rejects config.
 TEST_F(EdsTest, OnConfigUpdateWrongName) {
   envoy::api::v2::ClusterLoadAssignment cluster_load_assignment;
@@ -217,8 +222,12 @@ TEST_F(EdsTest, OnConfigUpdateWrongName) {
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
   resources.Add()->PackFrom(cluster_load_assignment);
   initialize();
-  EXPECT_THROW(eds_callbacks_->onConfigUpdate(resources, ""), EnvoyException);
-  eds_callbacks_->onConfigUpdateFailed(nullptr);
+  try {
+    eds_callbacks_->onConfigUpdate(resources, "");
+  } catch (const EnvoyException& e) {
+    eds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected,
+                                         &e);
+  }
   EXPECT_TRUE(initialized_);
 }
 
@@ -241,8 +250,12 @@ TEST_F(EdsTest, OnConfigUpdateWrongSize) {
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
   resources.Add()->PackFrom(cluster_load_assignment);
   resources.Add()->PackFrom(cluster_load_assignment);
-  EXPECT_THROW(eds_callbacks_->onConfigUpdate(resources, ""), EnvoyException);
-  eds_callbacks_->onConfigUpdateFailed(nullptr);
+  try {
+    eds_callbacks_->onConfigUpdate(resources, "");
+  } catch (const EnvoyException& e) {
+    eds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected,
+                                         &e);
+  }
   EXPECT_TRUE(initialized_);
 }
 
@@ -1658,7 +1671,7 @@ TEST_F(EdsTest, MalformedIP) {
 
 class EdsAssignmentTimeoutTest : public EdsTest {
 public:
-  EdsAssignmentTimeoutTest() : EdsTest(), interval_timer_(nullptr) {
+  EdsAssignmentTimeoutTest() {
     EXPECT_CALL(dispatcher_, createTimer_(_))
         .WillOnce(Invoke([this](Event::TimerCb cb) {
           timer_cb_ = cb;
@@ -1671,7 +1684,7 @@ public:
     resetCluster();
   }
 
-  Event::MockTimer* interval_timer_;
+  Event::MockTimer* interval_timer_{nullptr};
   Event::TimerCb timer_cb_;
 };
 
@@ -1697,9 +1710,9 @@ TEST_F(EdsAssignmentTimeoutTest, AssignmentTimeoutEnableDisable) {
   cluster_load_assignment_lease.mutable_policy()->mutable_endpoint_stale_after()->MergeFrom(
       Protobuf::util::TimeUtil::SecondsToDuration(1));
 
-  EXPECT_CALL(*interval_timer_, enableTimer(_)).Times(2); // Timer enabled twice.
-  EXPECT_CALL(*interval_timer_, disableTimer()).Times(1); // Timer disabled once.
-  EXPECT_CALL(*interval_timer_, enabled()).Times(6);      // Includes calls by test.
+  EXPECT_CALL(*interval_timer_, enableTimer(_, _)).Times(2); // Timer enabled twice.
+  EXPECT_CALL(*interval_timer_, disableTimer()).Times(1);    // Timer disabled once.
+  EXPECT_CALL(*interval_timer_, enabled()).Times(6);         // Includes calls by test.
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment_lease);
   // Check that the timer is enabled.
   EXPECT_EQ(interval_timer_->enabled(), true);
@@ -1739,7 +1752,7 @@ TEST_F(EdsAssignmentTimeoutTest, AssignmentLeaseExpired) {
   add_endpoint(81);
 
   // Expect the timer to be enabled once.
-  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(1000)));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(1000), _));
   // Expect the timer to be disabled when stale assignments are removed.
   EXPECT_CALL(*interval_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enabled()).Times(2);

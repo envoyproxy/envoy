@@ -56,7 +56,7 @@ public:
 
 class LocalMockFilter : public MockFilter {
 public:
-  ~LocalMockFilter() {
+  ~LocalMockFilter() override {
     // Make sure the upstream host is still valid in the filter destructor.
     callbacks_->upstreamHost()->address();
   }

@@ -42,7 +42,7 @@ protected:
   static void expectReservationFailure(const Slice::Reservation& reservation, const Slice& slice,
                                        uint64_t reservable_size) {
     EXPECT_EQ(nullptr, reservation.mem_);
-    EXPECT_EQ(0, reservation.mem_);
+    EXPECT_EQ(nullptr, reservation.mem_);
     EXPECT_EQ(reservable_size, slice.reservableSize());
   }
 
@@ -208,6 +208,22 @@ TEST(UnownedSliceTest, CreateDelete) {
   EXPECT_TRUE(release_callback_called);
 }
 
+TEST(UnownedSliceTest, CreateDeleteOwnedBufferFragment) {
+  constexpr char input[] = "hello world";
+  bool release_callback_called = false;
+  auto fragment = OwnedBufferFragmentImpl::create(
+      {input, sizeof(input) - 1}, [&release_callback_called](const OwnedBufferFragmentImpl*) {
+        release_callback_called = true;
+      });
+  auto slice = std::make_unique<UnownedSlice>(*fragment);
+  EXPECT_EQ(11, slice->dataSize());
+  EXPECT_EQ(0, slice->reservableSize());
+  EXPECT_EQ(0, memcmp(slice->data(), input, slice->dataSize()));
+  EXPECT_FALSE(release_callback_called);
+  slice.reset(nullptr);
+  EXPECT_TRUE(release_callback_called);
+}
+
 TEST(SliceDequeTest, CreateDelete) {
   bool slice1_deleted = false;
   bool slice2_deleted = false;
@@ -269,8 +285,8 @@ TEST(SliceDequeTest, CreateDelete) {
 
 class BufferHelperTest : public BufferImplementationParamTest {};
 
-INSTANTIATE_TEST_CASE_P(BufferHelperTest, BufferHelperTest,
-                        testing::ValuesIn({BufferImplementation::Old, BufferImplementation::New}));
+INSTANTIATE_TEST_SUITE_P(BufferHelperTest, BufferHelperTest,
+                         testing::ValuesIn({BufferImplementation::Old, BufferImplementation::New}));
 
 TEST_P(BufferHelperTest, PeekI8) {
   {

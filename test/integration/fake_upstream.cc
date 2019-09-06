@@ -51,6 +51,7 @@ void FakeStream::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
 }
 
 void FakeStream::decodeData(Buffer::Instance& data, bool end_stream) {
+  received_data_ = true;
   Thread::LockGuard lock(lock_);
   body_.add(data);
   setEndStream(end_stream);
@@ -62,6 +63,13 @@ void FakeStream::decodeTrailers(Http::HeaderMapPtr&& trailers) {
   setEndStream(true);
   trailers_ = std::move(trailers);
   decoder_event_.notifyOne();
+}
+
+void FakeStream::decodeMetadata(Http::MetadataMapPtr&& metadata_map_ptr) {
+  for (const auto& metadata : *metadata_map_ptr) {
+    duplicated_metadata_key_count_[metadata.first]++;
+    metadata_map_.insert(metadata);
+  }
 }
 
 void FakeStream::encode100ContinueHeaders(const Http::HeaderMapImpl& headers) {
@@ -213,7 +221,8 @@ FakeHttpConnection::FakeHttpConnection(SharedConnectionWrapper& shared_connectio
     : FakeConnectionBase(shared_connection, time_system) {
   if (type == Type::HTTP1) {
     codec_ = std::make_unique<Http::Http1::ServerConnectionImpl>(
-        shared_connection_.connection(), *this, Http::Http1Settings(), max_request_headers_kb);
+        shared_connection_.connection(), store, *this, Http::Http1Settings(),
+        max_request_headers_kb);
   } else {
     auto settings = Http::Http2Settings();
     settings.allow_connect_ = true;
@@ -389,7 +398,8 @@ FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket
       api_(Api::createApiForTest(stats_store_)), time_system_(time_system),
       dispatcher_(api_->allocateDispatcher()),
       handler_(new Server::ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
-      allow_unexpected_disconnects_(false), enable_half_close_(enable_half_close), listener_(*this),
+      allow_unexpected_disconnects_(false), read_disable_on_new_connection_(true),
+      enable_half_close_(enable_half_close), listener_(*this),
       filter_chain_(Network::Test::createEmptyFilterChain(std::move(transport_socket_factory))) {
   thread_ = api_->threadFactory().createThread([this]() -> void { threadRoutine(); });
   server_initialized_.waitReady();
@@ -408,7 +418,9 @@ void FakeUpstream::cleanUp() {
 bool FakeUpstream::createNetworkFilterChain(Network::Connection& connection,
                                             const std::vector<Network::FilterFactoryCb>&) {
   Thread::LockGuard lock(lock_);
-  connection.readDisable(true);
+  if (read_disable_on_new_connection_) {
+    connection.readDisable(true);
+  }
   auto connection_wrapper =
       std::make_unique<QueuedConnectionWrapper>(connection, allow_unexpected_disconnects_);
   connection_wrapper->moveIntoListBack(std::move(connection_wrapper), new_connections_);
@@ -470,13 +482,13 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
                                     std::vector<std::unique_ptr<FakeUpstream>>& upstreams,
                                     FakeHttpConnectionPtr& connection, milliseconds timeout) {
   if (upstreams.empty()) {
-    return AssertionFailure() << "No upstreams confgured.";
+    return AssertionFailure() << "No upstreams configured.";
   }
   Event::TestTimeSystem& time_system = upstreams[0]->timeSystem();
   auto end_time = time_system.monotonicTime() + timeout;
   while (time_system.monotonicTime() < end_time) {
-    for (auto it = upstreams.begin(); it != upstreams.end(); ++it) {
-      FakeUpstream& upstream = **it;
+    for (auto& it : upstreams) {
+      FakeUpstream& upstream = *it;
       Thread::ReleasableLockGuard lock(upstream.lock_);
       if (upstream.new_connections_.empty()) {
         time_system.waitFor(upstream.lock_, upstream.new_connection_event_, 5ms);

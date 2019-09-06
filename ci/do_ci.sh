@@ -97,19 +97,13 @@ if [[ "$CI_TARGET" == "bazel.release" ]]; then
   # toolchain is kept consistent. This ifdef is checked in
   # test/common/stats/stat_test_utility.cc when computing
   # Stats::TestUtil::MemoryTest::mode().
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --cxxopt=-DMEMORY_TEST_EXACT=1"
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_env=ENVOY_MEMORY_TEST_EXACT=true"
 
   setup_clang_toolchain
   echo "bazel release build with tests..."
   bazel_binary_build release
 
   echo "Testing ${TEST_TARGETS}"
-  if [[ "$TEST_TARGETS" == "//test/..." ]]; then
-    # We have various test binaries in the test directory such as tools, benchmarks, etc. We
-    # run a build pass to make sure they compile.
-    bazel build ${BAZEL_BUILD_OPTIONS} -c opt //include/... //source/... //test/...
-  fi
-  # Now run all of the tests which should already be compiled.
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c opt ${TEST_TARGETS}
   exit 0
 elif [[ "$CI_TARGET" == "bazel.release.server_only" ]]; then
@@ -128,6 +122,11 @@ elif [[ "$CI_TARGET" == "bazel.sizeopt" ]]; then
   bazel_binary_build sizeopt
   echo "Testing ${TEST_TARGETS}"
   bazel test ${BAZEL_BUILD_OPTIONS} --config=sizeopt ${TEST_TARGETS}
+  exit 0
+elif [[ "$CI_TARGET" == "bazel.gcc" ]]; then
+  setup_gcc_toolchain
+  echo "bazel fastbuild build..."
+  bazel_binary_build fastbuild
   exit 0
 elif [[ "$CI_TARGET" == "bazel.debug" ]]; then
   setup_clang_toolchain
@@ -159,8 +158,8 @@ elif [[ "$CI_TARGET" == "bazel.asan" ]]; then
   rm -rf "${TAP_TMP}"
   mkdir -p "${TAP_TMP}"
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-asan \
-    //test/extensions/transport_sockets/tls/integration:ssl_integration_test \
-    --test_env=TAP_PATH="${TAP_TMP}/tap"
+    --strategy=TestRunner=local --test_env=TAP_PATH="${TAP_TMP}/tap" \
+    //test/extensions/transport_sockets/tls/integration:ssl_integration_test
   # Verify that some pb_text files have been created. We can't check for pcap,
   # since tcpdump is not available in general due to CircleCI lack of support
   # for privileged Docker executors.
@@ -191,7 +190,6 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   # changes, this build type may need to be broken up.
   # TODO(mpwarres): remove quiche=enabled once QUICHE is built by default.
   COMPILE_TIME_OPTIONS="\
-    --config libc++ \
     --define signal_trace=disabled \
     --define hot_restart=disabled \
     --define google_grpc=disabled \
@@ -199,38 +197,20 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
     --define log_debug_assert_in_release=enabled \
     --define quiche=enabled \
     --define path_normalization_by_default=true \
+    --define deprecated_features=disabled \
   "
-  setup_clang_toolchain
+  setup_clang_libcxx_toolchain
   # This doesn't go into CI but is available for developer convenience.
   echo "bazel with different compiletime options build with tests..."
   # Building all the dependencies from scratch to link them against libc++.
   echo "Building..."
-  bazel build ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg //source/exe:envoy-static
+  bazel build ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg //source/exe:envoy-static --build_tag_filters=-nofips
   echo "Building and testing ${TEST_TARGETS}"
-  bazel test ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg ${TEST_TARGETS}
+  bazel test ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg ${TEST_TARGETS} --test_tag_filters=-nofips --build_tests_only
 
   # "--define log_debug_assert_in_release=enabled" must be tested with a release build, so run only
   # these tests under "-c opt" to save time in CI.
   bazel test ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c opt //test/common/common:assert_test //test/server:server_test
-  exit 0
-elif [[ "$CI_TARGET" == "bazel.ipv6_tests" ]]; then
-  # This is around until Circle supports IPv6. We try to run a limited set of IPv6 tests as fast
-  # as possible for basic sanity testing.
-
-  # Hack to avoid returning IPv6 DNS
-  sed -i 's_#precedence ::ffff:0:0/96  100_precedence ::ffff:0:0/96  100_' /etc/gai.conf
-  # Debug IPv6 network issues
-  apt-get update && apt-get install -y dnsutils net-tools curl && \
-    ifconfig && \
-    route -A inet -A inet6 && \
-    curl -v https://go.googlesource.com && \
-    curl -6 -v https://go.googlesource.com && \
-    dig go.googlesource.com A go.googlesource.com AAAA
-
-  setup_clang_toolchain
-  echo "Testing..."
-  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} --test_env=ENVOY_IP_TEST_VERSIONS=v6only -c fastbuild \
-    //test/integration/... //test/common/network/...
   exit 0
 elif [[ "$CI_TARGET" == "bazel.api" ]]; then
   setup_clang_toolchain
@@ -241,29 +221,20 @@ elif [[ "$CI_TARGET" == "bazel.api" ]]; then
     @envoy_api//tools:tap2pcap_test
   exit 0
 elif [[ "$CI_TARGET" == "bazel.coverage" ]]; then
-  setup_gcc_toolchain
+  setup_clang_toolchain
   echo "bazel coverage build with tests ${TEST_TARGETS}"
 
-  # gcovr is a pain to run with `bazel run`, so package it up into a
-  # relocatable and hermetic-ish .par file.
-  bazel build --python_version=PY2 @com_github_gcovr_gcovr//:gcovr.par
-  export GCOVR="/tmp/gcovr.par"
-  cp -f "${ENVOY_SRCDIR}/bazel-bin/external/com_github_gcovr_gcovr/gcovr.par" ${GCOVR}
-
-  # Reduce the amount of memory and number of cores Bazel tries to use to
-  # prevent it from launching too many subprocesses. This should prevent the
-  # system from running out of memory and killing tasks. See discussion on
+  # Reduce the amount of memory Bazel tries to use to prevent it from launching too many subprocesses.
+  # This should prevent the system from running out of memory and killing tasks. See discussion on
   # https://github.com/envoyproxy/envoy/pull/5611.
-  # TODO(akonradi): use --local_cpu_resources flag once Bazel has a release
-  # after 0.21.
-  [ -z "$CIRCLECI" ] || export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --local_resources=12288,4,1"
+  [ -z "$CIRCLECI" ] || export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --local_ram_resources=12288"
 
   test/run_envoy_bazel_coverage.sh ${TEST_TARGETS}
   collect_build_profile coverage
   exit 0
 elif [[ "$CI_TARGET" == "bazel.clang_tidy" ]]; then
   setup_clang_toolchain
-  ci/run_clang_tidy.sh
+  NUM_CPUS=$NUM_CPUS ci/run_clang_tidy.sh 
   exit 0
 elif [[ "$CI_TARGET" == "bazel.coverity" ]]; then
   # Coverity Scan version 2017.07 fails to analyze the entirely of the Envoy
@@ -281,6 +252,13 @@ elif [[ "$CI_TARGET" == "bazel.coverity" ]]; then
   cp -f \
      "${ENVOY_BUILD_DIR}"/envoy-coverity-output.tgz \
      "${ENVOY_DELIVERY_DIR}"/envoy-coverity-output.tgz
+  exit 0
+elif [[ "$CI_TARGET" == "bazel.fuzz" ]]; then
+  setup_clang_toolchain
+  FUZZ_TEST_TARGETS="$(bazel query "attr('tags','fuzzer',${TEST_TARGETS})")"
+  echo "bazel ASAN libFuzzer build with fuzz tests ${FUZZ_TEST_TARGETS}"
+  echo "Building envoy fuzzers and executing 100 fuzz iterations..."
+  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} --config=asan-fuzzer ${FUZZ_TEST_TARGETS} --test_arg="-runs=10"
   exit 0
 elif [[ "$CI_TARGET" == "fix_format" ]]; then
   echo "fix_format..."

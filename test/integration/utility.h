@@ -181,9 +181,14 @@ public:
     data_to_wait_for_ = data;
     exact_match_ = exact_match;
   }
+  void setLengthToWaitFor(size_t length) {
+    ASSERT(!wait_for_length_);
+    length_to_wait_for_ = length;
+    wait_for_length_ = true;
+  }
   const std::string& data() { return data_; }
   bool readLastByte() { return read_end_stream_; }
-  void clearData() { data_.clear(); }
+  void clearData(size_t count = std::string::npos) { data_.erase(0, count); }
 
 private:
   Event::Dispatcher& dispatcher_;
@@ -191,6 +196,8 @@ private:
   std::string data_;
   bool exact_match_{true};
   bool read_end_stream_{};
+  size_t length_to_wait_for_{0};
+  bool wait_for_length_{false};
 };
 
 } // namespace Envoy

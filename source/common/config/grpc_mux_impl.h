@@ -28,8 +28,8 @@ public:
   GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::RawAsyncClientPtr async_client,
               Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
               Runtime::RandomGenerator& random, Stats::Scope& scope,
-              const RateLimitSettings& rate_limit_settings);
-  ~GrpcMuxImpl();
+              const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node);
+  ~GrpcMuxImpl() override;
 
   void start() override;
   GrpcMuxWatchPtr subscribe(const std::string& type_url, const std::set<std::string>& resources,
@@ -104,6 +104,8 @@ private:
 
   GrpcStream<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse> grpc_stream_;
   const LocalInfo::LocalInfo& local_info_;
+  const bool skip_subsequent_node_;
+  bool first_stream_request_;
   std::unordered_map<std::string, ApiState> api_state_;
   // Envoy's dependency ordering.
   std::list<std::string> subscriptions_;
@@ -123,7 +125,7 @@ public:
   }
   void pause(const std::string&) override {}
   void resume(const std::string&) override {}
-  bool paused(const std::string&) const override { NOT_REACHED_GCOVR_EXCL_LINE; }
+  bool paused(const std::string&) const override { return false; }
 };
 
 } // namespace Config

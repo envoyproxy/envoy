@@ -27,75 +27,113 @@ namespace DubboProxy {
 class ConnectionManager;
 class ActiveMessage;
 
-class ResponseDecoder : public DecoderCallbacks,
-                        public DecoderEventHandler,
-                        Logger::Loggable<Logger::Id::dubbo> {
+class ActiveResponseDecoder : public ResponseDecoderCallbacks,
+                              public StreamHandler,
+                              Logger::Loggable<Logger::Id::dubbo> {
 public:
-  ResponseDecoder(Buffer::Instance& buffer, DubboFilterStats& stats,
-                  Network::Connection& connection, Deserializer& deserializer, Protocol& protocol);
-  ~ResponseDecoder() override = default;
+  ActiveResponseDecoder(ActiveMessage& parent, DubboFilterStats& stats,
+                        Network::Connection& connection, ProtocolPtr&& protocol);
+  ~ActiveResponseDecoder() override = default;
 
-  bool onData(Buffer::Instance& data);
+  DubboFilters::UpstreamResponseStatus onData(Buffer::Instance& data);
 
-  // DecoderEventHandler
-  Network::FilterStatus transportBegin() override;
-  Network::FilterStatus transportEnd() override;
-  Network::FilterStatus messageBegin(MessageType type, int64_t message_id,
-                                     SerializationType serialization_type) override;
-  Network::FilterStatus messageEnd(MessageMetadataSharedPtr metadata) override;
+  // StreamHandler
+  void onStreamDecoded(MessageMetadataSharedPtr metadata, ContextSharedPtr ctx) override;
 
-  // DecoderCallbacks
-  DecoderEventHandler* newDecoderEventHandler() override;
+  // ResponseDecoderCallbacks
+  StreamHandler& newStream() override { return *this; }
+  void onHeartbeat(MessageMetadataSharedPtr) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
   uint64_t requestId() const { return metadata_ ? metadata_->request_id() : 0; }
 
 private:
-  Buffer::Instance& response_buffer_;
+  FilterStatus applyMessageEncodedFilters(MessageMetadataSharedPtr metadata, ContextSharedPtr ctx);
+
+  ActiveMessage& parent_;
   DubboFilterStats& stats_;
   Network::Connection& response_connection_;
-  DecoderPtr decoder_;
+  ProtocolPtr protocol_;
+  ResponseDecoderPtr decoder_;
   MessageMetadataSharedPtr metadata_;
   bool complete_ : 1;
+  DubboFilters::UpstreamResponseStatus response_status_;
 };
 
-using ResponseDecoderPtr = std::unique_ptr<ResponseDecoder>;
+using ActiveResponseDecoderPtr = std::unique_ptr<ActiveResponseDecoder>;
+
+class ActiveMessageFilterBase : public virtual DubboFilters::FilterCallbacksBase {
+public:
+  ActiveMessageFilterBase(ActiveMessage& parent, bool dual_filter)
+      : parent_(parent), dual_filter_(dual_filter) {}
+  ~ActiveMessageFilterBase() override = default;
+
+  // DubboFilters::FilterCallbacksBase
+  uint64_t requestId() const override;
+  uint64_t streamId() const override;
+  const Network::Connection* connection() const override;
+  DubboProxy::Router::RouteConstSharedPtr route() override;
+  SerializationType serializationType() const override;
+  ProtocolType protocolType() const override;
+  StreamInfo::StreamInfo& streamInfo() override;
+  Event::Dispatcher& dispatcher() override;
+  void resetStream() override;
+
+protected:
+  ActiveMessage& parent_;
+  const bool dual_filter_ : 1;
+};
 
 // Wraps a DecoderFilter and acts as the DecoderFilterCallbacks for the filter, enabling filter
 // chain continuation.
 class ActiveMessageDecoderFilter : public DubboFilters::DecoderFilterCallbacks,
-                                   public LinkedObject<ActiveMessageDecoderFilter> {
+                                   public ActiveMessageFilterBase,
+                                   public LinkedObject<ActiveMessageDecoderFilter>,
+                                   Logger::Loggable<Logger::Id::dubbo> {
 public:
-  ActiveMessageDecoderFilter(ActiveMessage& parent, DubboFilters::DecoderFilterSharedPtr filter);
+  ActiveMessageDecoderFilter(ActiveMessage& parent, DubboFilters::DecoderFilterSharedPtr filter,
+                             bool dual_filter);
   ~ActiveMessageDecoderFilter() override = default;
 
-  // DubboFilters::DecoderFilterCallbacks
-  uint64_t requestId() const override;
-  uint64_t streamId() const override;
-  const Network::Connection* connection() const override;
   void continueDecoding() override;
-  DubboProxy::Router::RouteConstSharedPtr route() override;
-  SerializationType downstreamSerializationType() const override;
-  ProtocolType downstreamProtocolType() const override;
   void sendLocalReply(const DubboFilters::DirectResponse& response, bool end_stream) override;
-  void startUpstreamResponse(Deserializer& deserializer, Protocol& protocol) override;
+  void startUpstreamResponse() override;
   DubboFilters::UpstreamResponseStatus upstreamData(Buffer::Instance& buffer) override;
   void resetDownstreamConnection() override;
-  StreamInfo::StreamInfo& streamInfo() override;
-  void resetStream() override;
 
   DubboFilters::DecoderFilterSharedPtr handler() { return handle_; }
 
 private:
-  ActiveMessage& parent_;
   DubboFilters::DecoderFilterSharedPtr handle_;
 };
 
 using ActiveMessageDecoderFilterPtr = std::unique_ptr<ActiveMessageDecoderFilter>;
 
+// Wraps a EncoderFilter and acts as the EncoderFilterCallbacks for the filter, enabling filter
+// chain continuation.
+class ActiveMessageEncoderFilter : public ActiveMessageFilterBase,
+                                   public DubboFilters::EncoderFilterCallbacks,
+                                   public LinkedObject<ActiveMessageEncoderFilter>,
+                                   Logger::Loggable<Logger::Id::dubbo> {
+public:
+  ActiveMessageEncoderFilter(ActiveMessage& parent, DubboFilters::EncoderFilterSharedPtr filter,
+                             bool dual_filter);
+  ~ActiveMessageEncoderFilter() override = default;
+
+  void continueEncoding() override;
+  DubboFilters::EncoderFilterSharedPtr handler() { return handle_; }
+
+private:
+  DubboFilters::EncoderFilterSharedPtr handle_;
+
+  friend class ActiveMessage;
+};
+
+using ActiveMessageEncoderFilterPtr = std::unique_ptr<ActiveMessageEncoderFilter>;
+
 // ActiveMessage tracks downstream requests for which no response has been received.
 class ActiveMessage : public LinkedObject<ActiveMessage>,
                       public Event::DeferredDeletable,
-                      public DecoderEventHandler,
+                      public StreamHandler,
                       public DubboFilters::DecoderFilterCallbacks,
                       public DubboFilters::FilterChainFactoryCallbacks,
                       Logger::Loggable<Logger::Id::dubbo> {
@@ -103,52 +141,70 @@ public:
   ActiveMessage(ConnectionManager& parent);
   ~ActiveMessage() override;
 
+  // Indicates which filter to start the iteration with.
+  enum class FilterIterationStartState { AlwaysStartFromNext, CanStartFromCurrent };
+
+  // Returns the encoder filter to start iteration with.
+  std::list<ActiveMessageEncoderFilterPtr>::iterator
+  commonEncodePrefix(ActiveMessageEncoderFilter* filter, FilterIterationStartState state);
+  // Returns the decoder filter to start iteration with.
+  std::list<ActiveMessageDecoderFilterPtr>::iterator
+  commonDecodePrefix(ActiveMessageDecoderFilter* filter, FilterIterationStartState state);
+
   // Dubbo::FilterChainFactoryCallbacks
   void addDecoderFilter(DubboFilters::DecoderFilterSharedPtr filter) override;
+  void addEncoderFilter(DubboFilters::EncoderFilterSharedPtr filter) override;
+  void addFilter(DubboFilters::CodecFilterSharedPtr filter) override;
 
-  // DecoderEventHandler
-  Network::FilterStatus transportBegin() override;
-  Network::FilterStatus transportEnd() override;
-  Network::FilterStatus messageBegin(MessageType type, int64_t message_id,
-                                     SerializationType serialization_type) override;
-  Network::FilterStatus messageEnd(MessageMetadataSharedPtr metadata) override;
-  Network::FilterStatus transferHeaderTo(Buffer::Instance& header_buf, size_t size) override;
-  Network::FilterStatus transferBodyTo(Buffer::Instance& body_buf, size_t size) override;
+  // StreamHandler
+  void onStreamDecoded(MessageMetadataSharedPtr metadata, ContextSharedPtr ctx) override;
 
   // DubboFilters::DecoderFilterCallbacks
   uint64_t requestId() const override;
   uint64_t streamId() const override;
   const Network::Connection* connection() const override;
   void continueDecoding() override;
-  SerializationType downstreamSerializationType() const override;
-  ProtocolType downstreamProtocolType() const override;
+  SerializationType serializationType() const override;
+  ProtocolType protocolType() const override;
   StreamInfo::StreamInfo& streamInfo() override;
   Router::RouteConstSharedPtr route() override;
   void sendLocalReply(const DubboFilters::DirectResponse& response, bool end_stream) override;
-  void startUpstreamResponse(Deserializer& deserializer, Protocol& protocol) override;
+  void startUpstreamResponse() override;
   DubboFilters::UpstreamResponseStatus upstreamData(Buffer::Instance& buffer) override;
   void resetDownstreamConnection() override;
+  Event::Dispatcher& dispatcher() override;
   void resetStream() override;
 
   void createFilterChain();
-  Network::FilterStatus applyDecoderFilters(ActiveMessageDecoderFilter* filter);
+  FilterStatus applyDecoderFilters(ActiveMessageDecoderFilter* filter,
+                                   FilterIterationStartState state);
+  FilterStatus applyEncoderFilters(ActiveMessageEncoderFilter* filter,
+                                   FilterIterationStartState state);
   void finalizeRequest();
   void onReset();
   void onError(const std::string& what);
   MessageMetadataSharedPtr metadata() const { return metadata_; }
-  bool pending_transport_end() const { return pending_transport_end_; }
+  ContextSharedPtr context() const { return context_; }
+  bool pending_stream_decoded() const { return pending_stream_decoded_; }
 
 private:
+  void addDecoderFilterWorker(DubboFilters::DecoderFilterSharedPtr filter, bool dual_filter);
+  void addEncoderFilterWorker(DubboFilters::EncoderFilterSharedPtr, bool dual_filter);
+
   ConnectionManager& parent_;
 
+  ContextSharedPtr context_;
   MessageMetadataSharedPtr metadata_;
   Stats::TimespanPtr request_timer_;
-  ResponseDecoderPtr response_decoder_;
+  ActiveResponseDecoderPtr response_decoder_;
 
   absl::optional<Router::RouteConstSharedPtr> cached_route_;
 
   std::list<ActiveMessageDecoderFilterPtr> decoder_filters_;
-  std::function<Network::FilterStatus(DubboFilters::DecoderFilter*)> filter_action_;
+  std::function<FilterStatus(DubboFilters::DecoderFilter*)> filter_action_;
+
+  std::list<ActiveMessageEncoderFilterPtr> encoder_filters_;
+  std::function<FilterStatus(DubboFilters::EncoderFilter*)> encoder_filter_action_;
 
   int32_t request_id_;
 
@@ -158,8 +214,10 @@ private:
 
   Buffer::OwnedImpl response_buffer_;
 
-  bool pending_transport_end_ : 1;
+  bool pending_stream_decoded_ : 1;
   bool local_response_sent_ : 1;
+
+  friend class ActiveResponseDecoder;
 };
 
 using ActiveMessagePtr = std::unique_ptr<ActiveMessage>;

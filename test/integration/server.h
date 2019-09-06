@@ -32,7 +32,9 @@ namespace Server {
 
 // Create OptionsImpl structures suitable for tests.
 OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::string& config_yaml,
-                                  Network::Address::IpVersion ip_version);
+                                  Network::Address::IpVersion ip_version,
+                                  bool allow_unknown_static_fields = false,
+                                  bool reject_unknown_dynamic_fields = false);
 
 class TestDrainManager : public DrainManager {
 public:
@@ -109,16 +111,15 @@ public:
     return histogramFromStatName(storage.statName());
   }
 
-  absl::optional<std::reference_wrapper<const Counter>> findCounter(StatName name) const override {
+  OptionalCounter findCounter(StatName name) const override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->findCounter(name);
   }
-  absl::optional<std::reference_wrapper<const Gauge>> findGauge(StatName name) const override {
+  OptionalGauge findGauge(StatName name) const override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->findGauge(name);
   }
-  absl::optional<std::reference_wrapper<const Histogram>>
-  findHistogram(StatName name) const override {
+  OptionalHistogram findHistogram(StatName name) const override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->findHistogram(name);
   }
@@ -170,16 +171,15 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.histogram(name);
   }
-  absl::optional<std::reference_wrapper<const Counter>> findCounter(StatName name) const override {
+  OptionalCounter findCounter(StatName name) const override {
     Thread::LockGuard lock(lock_);
     return store_.findCounter(name);
   }
-  absl::optional<std::reference_wrapper<const Gauge>> findGauge(StatName name) const override {
+  OptionalGauge findGauge(StatName name) const override {
     Thread::LockGuard lock(lock_);
     return store_.findGauge(name);
   }
-  absl::optional<std::reference_wrapper<const Histogram>>
-  findHistogram(StatName name) const override {
+  OptionalHistogram findHistogram(StatName name) const override {
     Thread::LockGuard lock(lock_);
     return store_.findHistogram(name);
   }
@@ -235,10 +235,11 @@ public:
          std::function<void()> on_server_init_function, bool deterministic,
          Event::TestTimeSystem& time_system, Api::Api& api,
          bool defer_listener_finalization = false,
-         absl::optional<std::reference_wrapper<ProcessObject>> process_object = absl::nullopt);
+         absl::optional<std::reference_wrapper<ProcessObject>> process_object = absl::nullopt,
+         bool allow_unknown_static_fields = false, bool reject_unknown_dynamic_fields = false);
   // Note that the derived class is responsible for tearing down the server in its
   // destructor.
-  ~IntegrationTestServer();
+  ~IntegrationTestServer() override;
 
   void waitUntilListenersReady();
 
@@ -254,7 +255,8 @@ public:
   void start(const Network::Address::IpVersion version,
              std::function<void()> on_server_init_function, bool deterministic,
              bool defer_listener_finalization,
-             absl::optional<std::reference_wrapper<ProcessObject>> process_object);
+             absl::optional<std::reference_wrapper<ProcessObject>> process_object,
+             bool allow_unknown_static_fields, bool reject_unknown_dynamic_fields);
 
   void waitForCounterEq(const std::string& name, uint64_t value) override {
     TestUtility::waitForCounterEq(stat_store(), name, value, time_system_);
@@ -333,7 +335,8 @@ private:
    * Runs the real server on a thread.
    */
   void threadRoutine(const Network::Address::IpVersion version, bool deterministic,
-                     absl::optional<std::reference_wrapper<ProcessObject>> process_object);
+                     absl::optional<std::reference_wrapper<ProcessObject>> process_object,
+                     bool allow_unknown_static_fields, bool reject_unknown_dynamic_fields);
 
   Event::TestTimeSystem& time_system_;
   Api::Api& api_;

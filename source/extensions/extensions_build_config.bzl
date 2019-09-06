@@ -5,7 +5,8 @@ EXTENSIONS = {
     #
 
     "envoy.access_loggers.file":                        "//source/extensions/access_loggers/file:config",
-    "envoy.access_loggers.http_grpc":                   "//source/extensions/access_loggers/http_grpc:config",
+    "envoy.access_loggers.http_grpc":                   "//source/extensions/access_loggers/grpc:http_config",
+    "envoy.access_loggers.tcp_grpc":                    "//source/extensions/access_loggers/grpc:tcp_config",
 
     #
     # Clusters
@@ -18,6 +19,7 @@ EXTENSIONS = {
     #
 
     "envoy.grpc_credentials.file_based_metadata":       "//source/extensions/grpc_credentials/file_based_metadata:config",
+    "envoy.grpc_credentials.aws_iam":                   "//source/extensions/grpc_credentials/aws_iam:config",
 
     #
     # Health checkers
@@ -29,6 +31,9 @@ EXTENSIONS = {
     # HTTP filters
     #
 
+    # NOTE: The adaptive concurrency filter does not have a proper filter
+    #       implemented right now. We are just referencing the filter lib here.
+    "envoy.filters.http.adaptive_concurrency":          "//source/extensions/filters/http/adaptive_concurrency:adaptive_concurrency_filter_lib",
     "envoy.filters.http.buffer":                        "//source/extensions/filters/http/buffer:config",
     "envoy.filters.http.cache":                         "//source/extensions/filters/http/cache:config",
     "envoy.filters.http.cors":                          "//source/extensions/filters/http/cors:config",
@@ -38,9 +43,9 @@ EXTENSIONS = {
     "envoy.filters.http.ext_authz":                     "//source/extensions/filters/http/ext_authz:config",
     "envoy.filters.http.fault":                         "//source/extensions/filters/http/fault:config",
     "envoy.filters.http.grpc_http1_bridge":             "//source/extensions/filters/http/grpc_http1_bridge:config",
+    "envoy.filters.http.grpc_http1_reverse_bridge":     "//source/extensions/filters/http/grpc_http1_reverse_bridge:config",
     "envoy.filters.http.grpc_json_transcoder":          "//source/extensions/filters/http/grpc_json_transcoder:config",
     "envoy.filters.http.grpc_web":                      "//source/extensions/filters/http/grpc_web:config",
-    "envoy.filters.http.grpc_http1_reverse_bridge":     "//source/extensions/filters/http/grpc_http1_reverse_bridge:config",
     "envoy.filters.http.gzip":                          "//source/extensions/filters/http/gzip:config",
     "envoy.filters.http.header_to_metadata":            "//source/extensions/filters/http/header_to_metadata:config",
     "envoy.filters.http.health_check":                  "//source/extensions/filters/http/health_check:config",
@@ -58,16 +63,14 @@ EXTENSIONS = {
     # Listener filters
     #
 
-    # NOTE: The proxy_protocol filter is implicitly loaded if proxy_protocol functionality is
-    #       configured on the listener. Do not remove it in that case or configs will fail to load.
-    "envoy.filters.listener.proxy_protocol":            "//source/extensions/filters/listener/proxy_protocol:config",
-
+    "envoy.filters.listener.http_inspector":            "//source/extensions/filters/listener/http_inspector:config",
     # NOTE: The original_dst filter is implicitly loaded if original_dst functionality is
     #       configured on the listener. Do not remove it in that case or configs will fail to load.
     "envoy.filters.listener.original_dst":              "//source/extensions/filters/listener/original_dst:config",
-
     "envoy.filters.listener.original_src":               "//source/extensions/filters/listener/original_src:config",
-
+    # NOTE: The proxy_protocol filter is implicitly loaded if proxy_protocol functionality is
+    #       configured on the listener. Do not remove it in that case or configs will fail to load.
+    "envoy.filters.listener.proxy_protocol":            "//source/extensions/filters/listener/proxy_protocol:config",
     "envoy.filters.listener.tls_inspector":             "//source/extensions/filters/listener/tls_inspector:config",
 
     #
@@ -131,6 +134,7 @@ EXTENSIONS = {
 
     "envoy.transport_sockets.alts":                     "//source/extensions/transport_sockets/alts:config",
     "envoy.transport_sockets.tap":                      "//source/extensions/transport_sockets/tap:config",
+    "envoy.transport_sockets.tls":                      "//source/extensions/transport_sockets/tls:config",
 
     # Retry host predicates
     "envoy.retry_host_predicates.previous_hosts":          "//source/extensions/retry/host/previous_hosts:config",
@@ -146,7 +150,7 @@ WINDOWS_EXTENSIONS = {
     #
 
     "envoy.access_loggers.file":                        "//source/extensions/access_loggers/file:config",
-    #"envoy.access_loggers.http_grpc":                   "//source/extensions/access_loggers/http_grpc:config",
+    #"envoy.access_loggers.http_grpc":                   "//source/extensions/access_loggers/grpc:http_config",
 
     #
     # gRPC Credentials Plugins

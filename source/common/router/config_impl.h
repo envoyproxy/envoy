@@ -104,8 +104,9 @@ public:
   CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config, Runtime::Loader& loader);
 
   // Router::CorsPolicy
-  const std::list<std::string>& allowOrigins() const override { return allow_origin_; };
-  const std::list<std::regex>& allowOriginRegexes() const override { return allow_origin_regex_; }
+  const std::vector<Matchers::StringMatcherPtr>& allowOrigins() const override {
+    return allow_origins_;
+  };
   const std::string& allowMethods() const override { return allow_methods_; };
   const std::string& allowHeaders() const override { return allow_headers_; };
   const std::string& exposeHeaders() const override { return expose_headers_; };
@@ -131,14 +132,13 @@ public:
 private:
   const envoy::api::v2::route::CorsPolicy config_;
   Runtime::Loader& loader_;
-  std::list<std::string> allow_origin_;
-  std::list<std::regex> allow_origin_regex_;
-  std::string allow_methods_;
-  std::string allow_headers_;
-  std::string expose_headers_;
-  std::string max_age_{};
+  std::vector<Matchers::StringMatcherPtr> allow_origins_;
+  const std::string allow_methods_;
+  const std::string allow_headers_;
+  const std::string expose_headers_;
+  const std::string max_age_;
   absl::optional<bool> allow_credentials_{};
-  bool legacy_enabled_;
+  const bool legacy_enabled_;
 };
 
 class ConfigImpl;
@@ -182,9 +182,8 @@ private:
     // Router::VirtualCluster
     Stats::StatName statName() const override { return stat_name_; }
 
-    const std::regex pattern_;
-    absl::optional<std::string> method_;
     const Stats::StatName stat_name_;
+    std::vector<Http::HeaderUtility::HeaderDataPtr> headers_;
   };
 
   class CatchAllVirtualCluster : public VirtualCluster {
@@ -228,7 +227,7 @@ class RetryPolicyImpl : public RetryPolicy {
 public:
   RetryPolicyImpl(const envoy::api::v2::route::RetryPolicy& retry_policy,
                   ProtobufMessage::ValidationVisitor& validation_visitor);
-  RetryPolicyImpl() {}
+  RetryPolicyImpl() = default;
 
   // Router::RetryPolicy
   std::chrono::milliseconds perTryTimeout() const override { return per_try_timeout_; }
@@ -258,6 +257,7 @@ private:
   std::vector<uint32_t> retriable_status_codes_;
   absl::optional<std::chrono::milliseconds> base_interval_;
   absl::optional<std::chrono::milliseconds> max_interval_;
+  ProtobufMessage::ValidationVisitor* validation_visitor_{};
 };
 
 /**
@@ -265,7 +265,7 @@ private:
  */
 class ShadowPolicyImpl : public ShadowPolicy {
 public:
-  ShadowPolicyImpl(const envoy::api::v2::route::RouteAction& config);
+  explicit ShadowPolicyImpl(const envoy::api::v2::route::RouteAction& config);
 
   // Router::ShadowPolicy
   const std::string& cluster() const override { return cluster_; }
@@ -284,8 +284,9 @@ private:
  */
 class HashPolicyImpl : public HashPolicy {
 public:
-  HashPolicyImpl(const Protobuf::RepeatedPtrField<envoy::api::v2::route::RouteAction::HashPolicy>&
-                     hash_policy);
+  explicit HashPolicyImpl(
+      const Protobuf::RepeatedPtrField<envoy::api::v2::route::RouteAction::HashPolicy>&
+          hash_policy);
 
   // Router::HashPolicy
   absl::optional<uint64_t> generateHash(const Network::Address::Instance* downstream_addr,
@@ -336,7 +337,7 @@ private:
  */
 class DecoratorImpl : public Decorator {
 public:
-  DecoratorImpl(const envoy::api::v2::route::Decorator& decorator);
+  explicit DecoratorImpl(const envoy::api::v2::route::Decorator& decorator);
 
   // Decorator::apply
   void apply(Tracing::Span& span) const override;
@@ -353,7 +354,7 @@ private:
  */
 class RouteTracingImpl : public RouteTracing {
 public:
-  RouteTracingImpl(const envoy::api::v2::route::Tracing& tracing);
+  explicit RouteTracingImpl(const envoy::api::v2::route::Tracing& tracing);
 
   // Tracing::getClientSampling
   const envoy::type::FractionalPercent& getClientSampling() const override;
@@ -478,7 +479,7 @@ protected:
     return (isRedirect()) ? prefix_rewrite_redirect_ : prefix_rewrite_;
   }
 
-  void finalizePathHeader(Http::HeaderMap& headers, const std::string& matched_path,
+  void finalizePathHeader(Http::HeaderMap& headers, absl::string_view matched_path,
                           bool insert_envoy_original_path) const;
 
 private:
@@ -668,8 +669,8 @@ private:
   const RateLimitPolicyImpl rate_limit_policy_;
   const ShadowPolicyImpl shadow_policy_;
   const Upstream::ResourcePriority priority_;
-  std::vector<Http::HeaderUtility::HeaderData> config_headers_;
-  std::vector<ConfigUtility::QueryParameterMatcher> config_query_parameters_;
+  std::vector<Http::HeaderUtility::HeaderDataPtr> config_headers_;
+  std::vector<ConfigUtility::QueryParameterMatcherPtr> config_query_parameters_;
   std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
 
   UpgradeMap upgrade_map_;
@@ -758,8 +759,10 @@ public:
   void rewritePathHeader(Http::HeaderMap& headers, bool insert_envoy_original_path) const override;
 
 private:
-  const std::regex regex_;
-  const std::string regex_str_;
+  absl::string_view pathOnly(const Http::HeaderMap& headers) const;
+
+  Regex::CompiledMatcherPtr regex_;
+  std::string regex_str_;
 };
 
 /**

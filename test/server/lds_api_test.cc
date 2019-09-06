@@ -18,7 +18,6 @@ using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
-using testing::ReturnRef;
 using testing::Throw;
 
 namespace Envoy {
@@ -412,7 +411,8 @@ TEST_F(LdsApiTest, FailureSubscription) {
   setup();
 
   EXPECT_CALL(init_watcher_, ready());
-  lds_callbacks_->onConfigUpdateFailed({});
+  lds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure,
+                                       {});
   EXPECT_EQ("", lds_->versionInfo());
 }
 

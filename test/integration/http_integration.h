@@ -34,12 +34,15 @@ public:
   void sendData(Http::StreamEncoder& encoder, uint64_t size, bool end_stream);
   void sendTrailers(Http::StreamEncoder& encoder, const Http::HeaderMap& trailers);
   void sendReset(Http::StreamEncoder& encoder);
+  // Intentionally makes a copy of metadata_map.
+  void sendMetadata(Http::StreamEncoder& encoder, Http::MetadataMap metadata_map);
   std::pair<Http::StreamEncoder&, IntegrationStreamDecoderPtr>
   startRequest(const Http::HeaderMap& headers);
   bool waitForDisconnect(std::chrono::milliseconds time_to_wait = std::chrono::milliseconds(0));
   Network::ClientConnection* connection() const { return connection_.get(); }
   Network::ConnectionEvent last_connection_event() const { return last_connection_event_; }
   Network::Connection& rawConnection() { return *connection_; }
+  bool disconnected() { return disconnected_; }
 
 private:
   struct ConnectionCallbacks : public Network::ConnectionCallbacks {
@@ -95,7 +98,7 @@ public:
                       const InstanceConstSharedPtrFn& upstream_address_fn,
                       Network::Address::IpVersion version,
                       const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
-  virtual ~HttpIntegrationTest();
+  ~HttpIntegrationTest() override;
 
   // Waits for the first access log entry.
   std::string waitForAccessLog(const std::string& filename);
@@ -135,8 +138,19 @@ protected:
   // Close |codec_client_| and |fake_upstream_connection_| cleanly.
   void cleanupUpstreamAndDownstream();
 
-  // Utility function to add filters.
-  void addFilters(std::vector<std::string> filters);
+  // Verifies the response_headers contains the expected_headers, and response body matches given
+  // body string.
+  void verifyResponse(IntegrationStreamDecoderPtr response, const std::string& response_code,
+                      const Http::TestHeaderMapImpl& expected_headers,
+                      const std::string& expected_body);
+
+  // Helper that sends a request to Envoy, and verifies if Envoy response headers and body size is
+  // the same as the expected headers map.
+  // Requires the "http" port has been registered.
+  void sendRequestAndVerifyResponse(const Http::TestHeaderMapImpl& request_headers,
+                                    const int request_size,
+                                    const Http::TestHeaderMapImpl& response_headers,
+                                    const int response_size, const int backend_idx);
 
   // Check for completion of upstream_request_, and a simple "200" response.
   void checkSimpleRequestSuccess(uint64_t expected_request_size, uint64_t expected_response_size,

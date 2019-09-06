@@ -19,8 +19,8 @@
 #include "common/http/exception.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
+#include "common/stats/symbol_table_creator.h"
 
-#include "test/common/http/conn_manager_impl_common.h"
 #include "test/common/http/conn_manager_impl_fuzz.pb.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"
@@ -29,6 +29,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/tracing/mocks.h"
@@ -46,13 +47,15 @@ namespace Http {
 class FuzzConfig : public ConnectionManagerConfig {
 public:
   FuzzConfig()
-      : route_config_provider_(time_system_), scoped_route_config_provider_(time_system_),
-        stats_{{ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(fake_stats_), POOL_GAUGE(fake_stats_),
+      : stats_{{ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(fake_stats_), POOL_GAUGE(fake_stats_),
                                         POOL_HISTOGRAM(fake_stats_))},
                "",
                fake_stats_},
         tracing_stats_{CONN_MAN_TRACING_STATS(POOL_COUNTER(fake_stats_))},
         listener_stats_{CONN_MAN_LISTENER_STATS(POOL_COUNTER(fake_stats_))} {
+    ON_CALL(route_config_provider_, lastUpdated()).WillByDefault(Return(time_system_.systemTime()));
+    ON_CALL(scoped_route_config_provider_, lastUpdated())
+        .WillByDefault(Return(time_system_.systemTime()));
     access_logs_.emplace_back(std::make_shared<NiceMock<AccessLog::MockInstance>>());
   }
 
@@ -85,11 +88,22 @@ public:
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
   std::chrono::milliseconds requestTimeout() const override { return request_timeout_; }
   std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
-  Router::RouteConfigProvider* routeConfigProvider() override { return &route_config_provider_; }
+  Router::RouteConfigProvider* routeConfigProvider() override {
+    if (use_srds_) {
+      return nullptr;
+    }
+    return &route_config_provider_;
+  }
   Config::ConfigProvider* scopedRouteConfigProvider() override {
-    return &scoped_route_config_provider_;
+    if (use_srds_) {
+      return &scoped_route_config_provider_;
+    }
+    return nullptr;
   }
   const std::string& serverName() override { return server_name_; }
+  HttpConnectionManagerProto::ServerHeaderTransformation serverHeaderTransformation() override {
+    return server_transformation_;
+  }
   ConnectionManagerStats& stats() override { return stats_; }
   ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() override { return use_remote_address_; }
@@ -110,6 +124,7 @@ public:
   bool proxy100Continue() const override { return proxy_100_continue_; }
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   bool shouldNormalizePath() const override { return false; }
+  bool shouldMergeSlashes() const override { return false; }
 
   const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager config_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
@@ -119,9 +134,12 @@ public:
   NiceMock<MockFilterChainFactory> filter_factory_;
   Event::SimulatedTimeSystem time_system_;
   SlowDateProviderImpl date_provider_{time_system_};
-  ConnectionManagerImplHelper::RouteConfigProvider route_config_provider_;
-  ConnectionManagerImplHelper::ScopedRouteConfigProvider scoped_route_config_provider_;
+  bool use_srds_{};
+  Router::MockRouteConfigProvider route_config_provider_;
+  Router::MockScopedRouteConfigProvider scoped_route_config_provider_;
   std::string server_name_;
+  HttpConnectionManagerProto::ServerHeaderTransformation server_transformation_{
+      HttpConnectionManagerProto::OVERWRITE};
   Stats::IsolatedStoreImpl fake_stats_;
   ConnectionManagerStats stats_;
   ConnectionManagerTracingStats tracing_stats_;
@@ -381,17 +399,17 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
   FuzzConfig config;
   NiceMock<Network::MockDrainDecision> drain_close;
   NiceMock<Runtime::MockRandomGenerator> random;
-  Stats::FakeSymbolTableImpl symbol_table;
-  Http::ContextImpl http_context(symbol_table);
+  Stats::SymbolTablePtr symbol_table(Stats::SymbolTableCreator::makeSymbolTable());
+  Http::ContextImpl http_context(*symbol_table);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
-  std::unique_ptr<Ssl::MockConnectionInfo> ssl_connection;
+  auto ssl_connection = std::make_shared<Ssl::MockConnectionInfo>();
   bool connection_alive = true;
 
-  ON_CALL(filter_callbacks.connection_, ssl()).WillByDefault(Return(ssl_connection.get()));
-  ON_CALL(Const(filter_callbacks.connection_), ssl()).WillByDefault(Return(ssl_connection.get()));
+  ON_CALL(filter_callbacks.connection_, ssl()).WillByDefault(Return(ssl_connection));
+  ON_CALL(Const(filter_callbacks.connection_), ssl()).WillByDefault(Return(ssl_connection));
   ON_CALL(filter_callbacks.connection_, close(_))
       .WillByDefault(InvokeWithoutArgs([&connection_alive] { connection_alive = false; }));
   filter_callbacks.connection_.local_address_ =

@@ -32,39 +32,20 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "cds_json_lib",
-    srcs = ["cds_json.cc"],
-    hdrs = ["cds_json.h"],
-    external_deps = ["abseil_optional"],
+    name = "config_provider_lib",
+    srcs = ["config_provider_impl.cc"],
+    hdrs = ["config_provider_impl.h"],
     deps = [
-        ":address_json_lib",
-        ":json_utility_lib",
-        ":protocol_json_lib",
-        ":tls_context_json_lib",
         ":utility_lib",
-        "//include/envoy/json:json_object_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
-        "//source/common/common:assert_lib",
-        "//source/common/json:config_schemas_lib",
-        "//source/common/network:utility_lib",
-        "@envoy_api//envoy/api/v2:cds_cc",
-        "@envoy_api//envoy/api/v2/cluster:circuit_breaker_cc",
-    ],
-)
-
-envoy_cc_library(
-    name = "filesystem_subscription_lib",
-    srcs = ["filesystem_subscription_impl.cc"],
-    hdrs = ["filesystem_subscription_impl.h"],
-    deps = [
-        "//include/envoy/config:subscription_interface",
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/filesystem:filesystem_interface",
-        "//source/common/common:minimal_logger_lib",
-        "//source/common/config:utility_lib",
+        "//include/envoy/config:config_provider_interface",
+        "//include/envoy/config:config_provider_manager_interface",
+        "//include/envoy/init:manager_interface",
+        "//include/envoy/server:admin_interface",
+        "//include/envoy/server:config_tracker_interface",
+        "//include/envoy/singleton:instance_interface",
+        "//include/envoy/thread_local:thread_local_interface",
+        "//source/common/init:target_lib",
         "//source/common/protobuf",
-        "//source/common/protobuf:message_validator_lib",
-        "//source/common/protobuf:utility_lib",
     ],
 )
 
@@ -73,8 +54,15 @@ envoy_cc_library(
     srcs = ["datasource.cc"],
     hdrs = ["datasource.h"],
     deps = [
+        ":remote_data_fetcher_lib",
         "//include/envoy/api:api_interface",
+        "//include/envoy/init:manager_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/common:empty_string",
+        "//source/common/init:target_lib",
+        "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/api/v2/core:base_cc",
+        "@envoy_api//envoy/api/v2/core:http_uri_cc",
     ],
 )
 
@@ -111,6 +99,22 @@ envoy_cc_library(
         "//source/common/grpc:common_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/api/v2:discovery_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "filesystem_subscription_lib",
+    srcs = ["filesystem_subscription_impl.cc"],
+    hdrs = ["filesystem_subscription_impl.h"],
+    deps = [
+        "//include/envoy/config:subscription_interface",
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/filesystem:filesystem_interface",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/config:utility_lib",
+        "//source/common/protobuf",
+        "//source/common/protobuf:message_validator_lib",
+        "//source/common/protobuf:utility_lib",
     ],
 )
 
@@ -280,12 +284,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "resources_lib",
-    hdrs = ["resources.h"],
-    deps = ["//source/common/singleton:const_singleton"],
-)
-
-envoy_cc_library(
     name = "rds_json_lib",
     srcs = ["rds_json.cc"],
     hdrs = ["rds_json.h"],
@@ -299,6 +297,25 @@ envoy_cc_library(
         "//source/common/json:config_schemas_lib",
         "//source/extensions/filters/http:well_known_names",
         "@envoy_api//envoy/api/v2:rds_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "resources_lib",
+    hdrs = ["resources.h"],
+    deps = ["//source/common/singleton:const_singleton"],
+)
+
+envoy_cc_library(
+    name = "remote_data_fetcher_lib",
+    srcs = ["remote_data_fetcher.cc"],
+    hdrs = ["remote_data_fetcher.h"],
+    deps = [
+        "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/common:hex_lib",
+        "//source/common/crypto:utility_lib",
+        "//source/common/http:utility_lib",
+        "@envoy_api//envoy/api/v2/core:http_uri_cc",
     ],
 )
 
@@ -326,18 +343,6 @@ envoy_cc_library(
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/protobuf",
         "@envoy_api//envoy/api/v2/core:base_cc",
-    ],
-)
-
-envoy_cc_library(
-    name = "tls_context_json_lib",
-    srcs = ["tls_context_json.cc"],
-    hdrs = ["tls_context_json.h"],
-    deps = [
-        ":json_utility_lib",
-        "//include/envoy/json:json_object_interface",
-        "//source/common/common:utility_lib",
-        "@envoy_api//envoy/api/v2/auth:cert_cc",
     ],
 )
 
@@ -387,29 +392,23 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "watch_map_lib",
+    srcs = ["watch_map.cc"],
+    hdrs = ["watch_map.h"],
+    deps = [
+        "//include/envoy/config:subscription_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/protobuf",
+    ],
+)
+
+envoy_cc_library(
     name = "well_known_names",
     srcs = ["well_known_names.cc"],
     hdrs = ["well_known_names.h"],
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/singleton:const_singleton",
-    ],
-)
-
-envoy_cc_library(
-    name = "config_provider_lib",
-    srcs = ["config_provider_impl.cc"],
-    hdrs = ["config_provider_impl.h"],
-    deps = [
-        ":utility_lib",
-        "//include/envoy/config:config_provider_interface",
-        "//include/envoy/config:config_provider_manager_interface",
-        "//include/envoy/init:manager_interface",
-        "//include/envoy/server:admin_interface",
-        "//include/envoy/server:config_tracker_interface",
-        "//include/envoy/singleton:instance_interface",
-        "//include/envoy/thread_local:thread_local_interface",
-        "//source/common/init:target_lib",
-        "//source/common/protobuf",
     ],
 )

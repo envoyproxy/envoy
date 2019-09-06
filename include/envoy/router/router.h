@@ -10,6 +10,7 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/v2/core/base.pb.h"
+#include "envoy/common/matchers.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
@@ -101,14 +102,9 @@ public:
   virtual ~CorsPolicy() = default;
 
   /**
-   * @return std::list<std::string>& access-control-allow-origin values.
+   * @return std::vector<StringMatcherPtr>& access-control-allow-origin matchers.
    */
-  virtual const std::list<std::string>& allowOrigins() const PURE;
-
-  /*
-   * @return std::list<std::regex>& regexes that match allowed origins.
-   */
-  virtual const std::list<std::regex>& allowOriginRegexes() const PURE;
+  virtual const std::vector<Matchers::StringMatcherPtr>& allowOrigins() const PURE;
 
   /**
    * @return std::string access-control-allow-methods value.
@@ -163,6 +159,7 @@ public:
   static const uint32_t RETRY_ON_GRPC_UNAVAILABLE        = 0x100;
   static const uint32_t RETRY_ON_GRPC_INTERNAL           = 0x200;
   static const uint32_t RETRY_ON_RETRIABLE_STATUS_CODES  = 0x400;
+  static const uint32_t RETRY_ON_RESET                   = 0x800;
   // clang-format on
 
   virtual ~RetryPolicy() = default;

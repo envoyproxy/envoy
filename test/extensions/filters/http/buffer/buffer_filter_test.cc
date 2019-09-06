@@ -5,6 +5,7 @@
 #include "envoy/event/dispatcher.h"
 
 #include "common/http/header_map_impl.h"
+#include "common/runtime/runtime_impl.h"
 
 #include "extensions/filters/http/buffer/buffer_filter.h"
 #include "extensions/filters/http/well_known_names.h"
@@ -12,16 +13,14 @@
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
-using testing::DoAll;
 using testing::InSequence;
 using testing::NiceMock;
 using testing::Return;
-using testing::SaveArg;
 
 namespace Envoy {
 namespace Extensions {
@@ -52,11 +51,18 @@ public:
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   BufferFilterConfigSharedPtr config_;
   BufferFilter filter_;
+  // Create a runtime loader, so that tests can manually manipulate runtime guarded features.
+  TestScopedRuntime scoped_runtime;
 };
 
 TEST_F(BufferFilterTest, HeaderOnlyRequest) {
   Http::TestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers, true));
+}
+
+TEST_F(BufferFilterTest, TestMetadata) {
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.decodeMetadata(metadata_map));
 }
 
 TEST_F(BufferFilterTest, RequestWithData) {
@@ -87,6 +93,46 @@ TEST_F(BufferFilterTest, TxResetAfterEndStream) {
   // It's possible that the stream will be reset on the TX side even after RX end stream. Mimic
   // that here.
   filter_.onDestroy();
+}
+
+TEST_F(BufferFilterTest, ContentLengthPopulation) {
+  InSequence s;
+
+  Http::TestHeaderMapImpl headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers, false));
+
+  Buffer::OwnedImpl data1("hello");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_.decodeData(data1, false));
+
+  Buffer::OwnedImpl data2(" world");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data2, true));
+  ASSERT_NE(headers.ContentLength(), nullptr);
+  EXPECT_EQ(headers.ContentLength()->value().getStringView(), "11");
+}
+
+TEST_F(BufferFilterTest, ContentLengthPopulationAlreadyPresent) {
+  InSequence s;
+
+  Http::TestHeaderMapImpl headers{{"content-length", "3"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers, false));
+
+  Buffer::OwnedImpl data("foo");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, true));
+  ASSERT_NE(headers.ContentLength(), nullptr);
+  EXPECT_EQ(headers.ContentLength()->value().getStringView(), "3");
+}
+
+TEST_F(BufferFilterTest, ContentLengthPopulationRuntimeGuard) {
+  InSequence s;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.buffer_filter_populate_content_length", "false"}});
+
+  Http::TestHeaderMapImpl headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers, false));
+
+  Buffer::OwnedImpl data("foo");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, true));
+  EXPECT_EQ(headers.ContentLength(), nullptr);
 }
 
 TEST_F(BufferFilterTest, RouteConfigOverride) {

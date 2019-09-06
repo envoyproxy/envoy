@@ -18,8 +18,6 @@
 using testing::_;
 using testing::InSequence;
 using testing::NiceMock;
-using testing::Return;
-using testing::StartsWith;
 
 namespace Envoy {
 namespace Event {
@@ -28,7 +26,7 @@ namespace {
 class TestDeferredDeletable : public DeferredDeletable {
 public:
   TestDeferredDeletable(std::function<void()> on_destroy) : on_destroy_(on_destroy) {}
-  ~TestDeferredDeletable() { on_destroy_(); }
+  ~TestDeferredDeletable() override { on_destroy_(); }
 
 private:
   std::function<void()> on_destroy_;
@@ -67,9 +65,7 @@ TEST(DeferredDeleteTest, DeferredDelete) {
 
 class DispatcherImplTest : public testing::Test {
 protected:
-  DispatcherImplTest()
-      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()),
-        work_finished_(false) {
+  DispatcherImplTest() : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()) {
     dispatcher_thread_ = api_->threadFactory().createThread([this]() {
       // Must create a keepalive timer to keep the dispatcher from exiting.
       std::chrono::milliseconds time_interval(500);
@@ -93,7 +89,7 @@ protected:
   Thread::MutexBasicLockable mu_;
   Thread::CondVar cv_;
 
-  bool work_finished_;
+  bool work_finished_{false};
   TimerPtr keepalive_timer_;
 };
 
@@ -185,6 +181,74 @@ TEST_F(DispatcherImplTest, Timer) {
   while (!work_finished_) {
     cv_.wait(mu_);
   }
+}
+
+TEST_F(DispatcherImplTest, TimerWithScope) {
+  TimerPtr timer;
+  MockScopedTrackedObject scope;
+  dispatcher_->post([this, &timer, &scope]() {
+    {
+      // Expect a call to dumpState. The timer will call onFatalError during
+      // the alarm interval, and if the scope is tracked correctly this will
+      // result in a dumpState call.
+      EXPECT_CALL(scope, dumpState(_, _));
+      Thread::LockGuard lock(mu_);
+      timer = dispatcher_->createTimer([this]() {
+        {
+          Thread::LockGuard lock(mu_);
+          static_cast<DispatcherImpl*>(dispatcher_.get())->onFatalError();
+          work_finished_ = true;
+        }
+        cv_.notifyOne();
+      });
+      EXPECT_FALSE(timer->enabled());
+    }
+    cv_.notifyOne();
+  });
+
+  Thread::LockGuard lock(mu_);
+  while (timer == nullptr) {
+    cv_.wait(mu_);
+  }
+  timer->enableTimer(std::chrono::milliseconds(50), &scope);
+
+  while (!work_finished_) {
+    cv_.wait(mu_);
+  }
+}
+
+TEST_F(DispatcherImplTest, IsThreadSafe) {
+  dispatcher_->post([this]() {
+    {
+      Thread::LockGuard lock(mu_);
+      // Thread safe because it is called within the dispatcher thread's context.
+      EXPECT_TRUE(dispatcher_->isThreadSafe());
+      work_finished_ = true;
+    }
+    cv_.notifyOne();
+  });
+
+  Thread::LockGuard lock(mu_);
+  while (!work_finished_) {
+    cv_.wait(mu_);
+  }
+  // Not thread safe because it is not called within the dispatcher thread's context.
+  EXPECT_FALSE(dispatcher_->isThreadSafe());
+}
+
+class NotStartedDispatcherImplTest : public testing::Test {
+protected:
+  NotStartedDispatcherImplTest()
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()) {}
+
+  Api::ApiPtr api_;
+  DispatcherPtr dispatcher_;
+};
+
+TEST_F(NotStartedDispatcherImplTest, IsThreadSafe) {
+  // Thread safe because the dispatcher has not started.
+  // Therefore, no thread id has been assigned.
+  EXPECT_TRUE(dispatcher_->isThreadSafe());
 }
 
 TEST(TimerImplTest, TimerEnabledDisabled) {

@@ -5,7 +5,10 @@
 
 #include "envoy/common/time.h"
 #include "envoy/ssl/context_manager.h"
+#include "envoy/ssl/private_key/private_key.h"
 #include "envoy/stats/scope.h"
+
+#include "extensions/transport_sockets/tls/private_key/private_key_manager_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -22,7 +25,7 @@ namespace Tls {
 class ContextManagerImpl final : public Envoy::Ssl::ContextManager {
 public:
   ContextManagerImpl(TimeSource& time_source) : time_source_(time_source) {}
-  ~ContextManagerImpl();
+  ~ContextManagerImpl() override;
 
   // Ssl::ContextManager
   Ssl::ClientContextSharedPtr
@@ -33,11 +36,15 @@ public:
                          const std::vector<std::string>& server_names) override;
   size_t daysUntilFirstCertExpires() const override;
   void iterateContexts(std::function<void(const Envoy::Ssl::Context&)> callback) override;
+  Ssl::PrivateKeyMethodManager& privateKeyMethodManager() override {
+    return private_key_method_manager_;
+  };
 
 private:
   void removeEmptyContexts();
   TimeSource& time_source_;
   std::list<std::weak_ptr<Envoy::Ssl::Context>> contexts_;
+  PrivateKeyMethodManagerImpl private_key_method_manager_{};
 };
 
 } // namespace Tls

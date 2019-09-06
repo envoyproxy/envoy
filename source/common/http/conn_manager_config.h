@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/config/config_provider.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/router/rds.h"
 #include "envoy/stats/scope.h"
@@ -107,6 +108,7 @@ struct TracingConnectionManagerConfig {
   envoy::type::FractionalPercent random_sampling_;
   envoy::type::FractionalPercent overall_sampling_;
   bool verbose_;
+  uint32_t max_path_tag_length_;
 };
 
 using TracingConnectionManagerConfigPtr = std::unique_ptr<TracingConnectionManagerConfig>;
@@ -170,6 +172,9 @@ public:
  */
 class ConnectionManagerConfig {
 public:
+  using HttpConnectionManagerProto =
+      envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager;
+
   virtual ~ConnectionManagerConfig() = default;
 
   /**
@@ -266,6 +271,11 @@ public:
   virtual const std::string& serverName() PURE;
 
   /**
+   * @return ServerHeaderTransformation the transformation to apply to Server response headers.
+   */
+  virtual HttpConnectionManagerProto::ServerHeaderTransformation serverHeaderTransformation() PURE;
+
+  /**
    * @return ConnectionManagerStats& the stats to write to.
    */
   virtual ConnectionManagerStats& stats() PURE;
@@ -353,6 +363,12 @@ public:
    * @return if the HttpConnectionManager should normalize url following RFC3986
    */
   virtual bool shouldNormalizePath() const PURE;
+
+  /**
+   * @return if the HttpConnectionManager should merge two or more adjacent slashes in the path into
+   * one.
+   */
+  virtual bool shouldMergeSlashes() const PURE;
 };
 } // namespace Http
 } // namespace Envoy

@@ -1,21 +1,20 @@
 #include "common/stats/isolated_store_impl.h"
 
-#include <string.h>
-
 #include <algorithm>
+#include <cstring>
 #include <string>
 
 #include "common/common/utility.h"
 #include "common/stats/fake_symbol_table_impl.h"
 #include "common/stats/histogram_impl.h"
 #include "common/stats/scope_prefixer.h"
+#include "common/stats/symbol_table_creator.h"
 #include "common/stats/utility.h"
 
 namespace Envoy {
 namespace Stats {
 
-IsolatedStoreImpl::IsolatedStoreImpl()
-    : IsolatedStoreImpl(std::make_unique<FakeSymbolTableImpl>()) {}
+IsolatedStoreImpl::IsolatedStoreImpl() : IsolatedStoreImpl(SymbolTableCreator::makeSymbolTable()) {}
 
 IsolatedStoreImpl::IsolatedStoreImpl(std::unique_ptr<SymbolTable>&& symbol_table)
     : IsolatedStoreImpl(*symbol_table) {
@@ -32,10 +31,11 @@ IsolatedStoreImpl::IsolatedStoreImpl(SymbolTable& symbol_table)
                                 import_mode);
       }),
       histograms_([this](StatName name) -> HistogramSharedPtr {
-        return std::make_shared<HistogramImpl>(name, *this, alloc_.symbolTable().toString(name),
-                                               std::vector<Tag>());
+        return HistogramSharedPtr(new HistogramImpl(
+            name, *this, alloc_.symbolTable().toString(name), std::vector<Tag>()));
       }),
-      null_gauge_(symbol_table) {}
+      null_counter_(new NullCounterImpl(symbol_table)),
+      null_gauge_(new NullGaugeImpl(symbol_table)) {}
 
 ScopePtr IsolatedStoreImpl::createScope(const std::string& name) {
   return std::make_unique<ScopePrefixer>(name, *this);

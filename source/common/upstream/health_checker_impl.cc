@@ -12,6 +12,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/network/address_impl.h"
 #include "common/router/router.h"
+#include "common/runtime/runtime_impl.h"
 #include "common/upstream/host_utility.h"
 
 // TODO(dio): Remove dependency to extension health checkers when redis_health_check is removed.
@@ -186,6 +187,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onEvent(Network::Conne
     // For the raw disconnect event, we are either between intervals in which case we already have
     // a timer setup, or we did the close or got a reset, in which case we already setup a new
     // timer. There is nothing to do here other than blow away the client.
+    response_headers_.reset();
     parent_.dispatcher_.deferredDelete(std::move(client_));
   }
 }
@@ -249,7 +251,7 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
                   response_headers_->EnvoyUpstreamHealthCheckedCluster()->value().getStringView())
             : EMPTY_STRING;
 
-    if (service_cluster_healthchecked.find(parent_.service_name_.value()) == 0) {
+    if (absl::StartsWith(service_cluster_healthchecked, parent_.service_name_.value())) {
       return degraded ? HealthCheckResult::Degraded : HealthCheckResult::Succeeded;
     } else {
       return HealthCheckResult::Failed;

@@ -17,7 +17,7 @@ namespace Network {
 class MockConnectionCallbacks : public ConnectionCallbacks {
 public:
   MockConnectionCallbacks();
-  ~MockConnectionCallbacks();
+  ~MockConnectionCallbacks() override;
 
   // Network::ConnectionCallbacks
   MOCK_METHOD1(onEvent, void(Network::ConnectionEvent event));
@@ -48,7 +48,7 @@ public:
 class MockConnection : public Connection, public MockConnectionBase {
 public:
   MockConnection();
-  ~MockConnection();
+  ~MockConnection() override;
 
   // Network::Connection
   MOCK_METHOD1(addConnectionCallbacks, void(ConnectionCallbacks& cb));
@@ -71,7 +71,7 @@ public:
                      absl::optional<Connection::UnixDomainSocketPeerCredentials>());
   MOCK_CONST_METHOD0(localAddress, const Address::InstanceConstSharedPtr&());
   MOCK_METHOD1(setConnectionStats, void(const ConnectionStats& stats));
-  MOCK_CONST_METHOD0(ssl, const Ssl::ConnectionInfo*());
+  MOCK_CONST_METHOD0(ssl, Ssl::ConnectionInfoConstSharedPtr());
   MOCK_CONST_METHOD0(requestedServerName, absl::string_view());
   MOCK_CONST_METHOD0(state, State());
   MOCK_METHOD2(write, void(Buffer::Instance& data, bool end_stream));
@@ -94,7 +94,7 @@ public:
 class MockClientConnection : public ClientConnection, public MockConnectionBase {
 public:
   MockClientConnection();
-  ~MockClientConnection();
+  ~MockClientConnection() override;
 
   // Network::Connection
   MOCK_METHOD1(addConnectionCallbacks, void(ConnectionCallbacks& cb));
@@ -117,7 +117,7 @@ public:
                      absl::optional<Connection::UnixDomainSocketPeerCredentials>());
   MOCK_CONST_METHOD0(localAddress, const Address::InstanceConstSharedPtr&());
   MOCK_METHOD1(setConnectionStats, void(const ConnectionStats& stats));
-  MOCK_CONST_METHOD0(ssl, const Ssl::ConnectionInfo*());
+  MOCK_CONST_METHOD0(ssl, Ssl::ConnectionInfoConstSharedPtr());
   MOCK_CONST_METHOD0(requestedServerName, absl::string_view());
   MOCK_CONST_METHOD0(state, State());
   MOCK_METHOD2(write, void(Buffer::Instance& data, bool end_stream));
@@ -143,7 +143,7 @@ public:
 class MockFilterManagerConnection : public FilterManagerConnection, public MockConnectionBase {
 public:
   MockFilterManagerConnection();
-  ~MockFilterManagerConnection();
+  ~MockFilterManagerConnection() override;
 
   // Network::Connection
   MOCK_METHOD1(addConnectionCallbacks, void(ConnectionCallbacks& cb));
@@ -166,7 +166,7 @@ public:
                      absl::optional<Connection::UnixDomainSocketPeerCredentials>());
   MOCK_CONST_METHOD0(localAddress, const Address::InstanceConstSharedPtr&());
   MOCK_METHOD1(setConnectionStats, void(const ConnectionStats& stats));
-  MOCK_CONST_METHOD0(ssl, const Ssl::ConnectionInfo*());
+  MOCK_CONST_METHOD0(ssl, Ssl::ConnectionInfoConstSharedPtr());
   MOCK_CONST_METHOD0(requestedServerName, absl::string_view());
   MOCK_CONST_METHOD0(state, State());
   MOCK_METHOD2(write, void(Buffer::Instance& data, bool end_stream));

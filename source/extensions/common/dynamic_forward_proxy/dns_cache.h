@@ -24,6 +24,17 @@ public:
   virtual Network::Address::InstanceConstSharedPtr address() PURE;
 
   /**
+   * Returns the host that was actually resolved via DNS. If port was originally specified it will
+   * be stripped from this return value.
+   */
+  virtual const std::string& resolvedHost() PURE;
+
+  /**
+   * Returns whether the original host is an IP address.
+   */
+  virtual bool isIpAddress() PURE;
+
+  /**
    * Indicates that the host has been used and should not be purged depending on any configured
    * TTL policy
    */

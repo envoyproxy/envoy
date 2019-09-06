@@ -5,7 +5,6 @@ package envoy.config.filter.network.thrift_proxy.v2alpha1;
 option java_outer_classname = "RouteProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.filter.network.thrift_proxy.v2alpha1";
-option go_package = "v2";
 
 import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/route/route.proto";
@@ -13,7 +12,6 @@ import "envoy/api/v2/route/route.proto";
 import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
-import "gogoproto/gogo.proto";
 
 // [#protodoc-title: Thrift Proxy Route Configuration]
 // Thrift Proxy :ref:`configuration overview <config_network_filters_thrift_proxy>`.
@@ -25,16 +23,16 @@ message RouteConfiguration {
 
   // The list of routes that will be matched, in order, against incoming requests. The first route
   // that matches will be used.
-  repeated Route routes = 2 [(gogoproto.nullable) = false];
+  repeated Route routes = 2;
 }
 
 // [#comment:next free field: 3]
 message Route {
   // Route matching parameters.
-  RouteMatch match = 1 [(validate.rules).message.required = true, (gogoproto.nullable) = false];
+  RouteMatch match = 1 [(validate.rules).message.required = true];
 
   // Route request to some upstream cluster.
-  RouteAction route = 2 [(validate.rules).message.required = true, (gogoproto.nullable) = false];
+  RouteAction route = 2 [(validate.rules).message.required = true];
 }
 
 // [#comment:next free field: 5]

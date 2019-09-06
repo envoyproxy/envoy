@@ -26,6 +26,8 @@ private:
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };
 
+DECLARE_FACTORY(DynamicForwardProxyFilterFactory);
+
 } // namespace DynamicForwardProxy
 } // namespace HttpFilters
 } // namespace Extensions

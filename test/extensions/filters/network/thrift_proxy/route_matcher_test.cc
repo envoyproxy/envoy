@@ -9,8 +9,6 @@
 
 #include "gtest/gtest.h"
 
-using testing::_;
-
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -22,7 +20,7 @@ envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration
 parseRouteConfigurationFromV2Yaml(const std::string& yaml) {
   envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration route_config;
   TestUtility::loadFromYaml(yaml, route_config);
-  MessageUtil::validate(route_config);
+  TestUtility::validate(route_config);
   return route_config;
 }
 
@@ -339,7 +337,9 @@ routes:
       method_name: "method1"
       headers:
       - name: "x-version"
-        regex_match: "0.[5-9]"
+        safe_regex_match:
+          google_re2: {}
+          regex: "0.[5-9]"
     route:
       cluster: "cluster1"
 )EOF";

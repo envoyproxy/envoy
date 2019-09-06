@@ -4,7 +4,6 @@ import "envoy/service/tap/v2alpha/common.proto";
 import "envoy/api/v2/core/config_source.proto";
 
 import "validate/validate.proto";
-import "gogoproto/gogo.proto";
 
 package envoy.config.common.tap.v2alpha;
 
@@ -20,8 +19,7 @@ message CommonExtensionConfig {
   // [#not-implemented-hide:]
   message TapDSConfig {
     // Configuration for the source of TapDS updates for this Cluster.
-    envoy.api.v2.core.ConfigSource config_source = 1
-        [(validate.rules).message.required = true, (gogoproto.nullable) = false];
+    envoy.api.v2.core.ConfigSource config_source = 1 [(validate.rules).message.required = true];
 
     // Tap config to request from XDS server.
     string name = 2 [(validate.rules).string.min_bytes = 1];

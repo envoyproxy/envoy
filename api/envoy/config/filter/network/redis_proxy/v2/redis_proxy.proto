@@ -5,14 +5,13 @@ package envoy.config.filter.network.redis_proxy.v2;
 option java_outer_classname = "RedisProxyProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.filter.network.redis_proxy.v2";
-option go_package = "v2";
 
 import "envoy/api/v2/core/base.proto";
 
 import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
-import "gogoproto/gogo.proto";
 
 // [#protodoc-title: Redis Proxy]
 // Redis Proxy :ref:`configuration overview <config_network_filters_redis_proxy>`.
@@ -40,8 +39,7 @@ message RedisProxy {
     // The only exception to this behavior is when a connection to a backend is not yet established.
     // In that case, the connect timeout on the cluster will govern the timeout until the connection
     // is ready.
-    google.protobuf.Duration op_timeout = 1
-        [(validate.rules).duration.required = true, (gogoproto.stdduration) = true];
+    google.protobuf.Duration op_timeout = 1 [(validate.rules).duration.required = true];
 
     // Use hash tagging on every redis key to guarantee that keys with the same hash tag will be
     // forwarded to the same upstream. The hash key used for determining the upstream in a
@@ -81,7 +79,37 @@ message RedisProxy {
     // before the timer fires.
     // If `max_buffer_size_before_flush` is set, but `buffer_flush_timeout` is not, the latter
     // defaults to 3ms.
-    google.protobuf.Duration buffer_flush_timeout = 5 [(gogoproto.stdduration) = true];
+    google.protobuf.Duration buffer_flush_timeout = 5;
+
+    // `max_upstream_unknown_connections` controls how many upstream connections to unknown hosts
+    // can be created at any given time by any given worker thread (see `enable_redirection` for
+    // more details). If the host is unknown and a connection cannot be created due to enforcing
+    // this limit, then redirection will fail and the original redirection error will be passed
+    // downstream unchanged. This limit defaults to 100.
+    google.protobuf.UInt32Value max_upstream_unknown_connections = 6;
+
+    // ReadPolicy controls how Envoy routes read commands to Redis nodes. This is currently
+    // supported for Redis Cluster. All ReadPolicy settings except MASTER may return stale data
+    // because replication is asynchronous and requires some delay. You need to ensure that your
+    // application can tolerate stale data.
+    enum ReadPolicy {
+      // Default mode. Read from the current master node.
+      MASTER = 0;
+      // Read from the master, but if it is unavailable, read from replica nodes.
+      PREFER_MASTER = 1;
+      // Read from replica nodes. If multiple replica nodes are present within a shard, a random
+      // node is selected. Healthy nodes have precedent over unhealthy nodes.
+      REPLICA = 2;
+      // Read from the replica nodes (similar to REPLICA), but if all replicas are unavailable (not
+      // present or unhealthy), read from the master.
+      PREFER_REPLICA = 3;
+      // Read from any node of the cluster. A random node is selected among the master and replicas,
+      // healthy nodes have precedent over unhealthy nodes.
+      ANY = 4;
+    }
+
+    // Read policy. The default is to read from the master.
+    ReadPolicy read_policy = 7 [(validate.rules).enum.defined_only = true];
   }
 
   // Network settings for the connection pool to the upstream clusters.
@@ -136,7 +164,7 @@ message RedisProxy {
     }
 
     // List of prefix routes.
-    repeated Route routes = 1 [(gogoproto.nullable) = false];
+    repeated Route routes = 1;
 
     // Indicates that prefix matching should be case insensitive.
     bool case_insensitive = 2;
@@ -182,7 +210,7 @@ message RedisProxy {
   // See the :ref:`configuration section
   // <arch_overview_redis_configuration>` of the architecture overview for recommendations on
   // configuring the backing clusters.
-  PrefixRoutes prefix_routes = 5 [(gogoproto.nullable) = false];
+  PrefixRoutes prefix_routes = 5;
 
   // Authenticate Redis client connections locally by forcing downstream clients to issue a 'Redis
   // AUTH command <https://redis.io/commands/auth>`_ with this password before enabling any other

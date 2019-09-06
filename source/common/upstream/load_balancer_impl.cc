@@ -50,6 +50,20 @@ std::pair<int32_t, size_t> distributeLoad(PriorityLoad& per_priority_load,
   return {first_available_priority, total_load};
 }
 
+// Returns true if the weights of all the hosts in the HostVector are equal.
+bool hostWeightsAreEqual(const HostVector& hosts) {
+  if (hosts.size() <= 1) {
+    return true;
+  }
+  const uint32_t weight = hosts[0]->weight();
+  for (size_t i = 1; i < hosts.size(); ++i) {
+    if (hosts[i]->weight() != weight) {
+      return false;
+    }
+  }
+  return true;
+}
+
 } // namespace
 
 std::pair<uint32_t, LoadBalancerBase::HostAvailability>
@@ -115,11 +129,10 @@ LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set, ClusterStats
 // - normalized total health is = 100%. It means there are enough healthy hosts to handle the load.
 //   Do not enter panic mode, even if a specific priority has low number of healthy hosts.
 // - normalized total health is < 100%. There are not enough healthy hosts to handle the load.
-// Continue
-//   distributing the load among priority sets, but turn on panic mode for a given priority
+// Continue distributing the load among priority sets, but turn on panic mode for a given priority
 //   if # of healthy hosts in priority set is low.
-// - normalized total health is 0%. All hosts are down. Redirect 100% of traffic to P=0 and enable
-// panic mode.
+// - normalized total health is 0%. All hosts are down. Redirect 100% of traffic to P=0.
+//   And if panic threshold > 0% then enable panic mode for P=0, otherwise disable.
 
 void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
                                                    const PrioritySet& priority_set,
@@ -220,7 +233,11 @@ void LoadBalancerBase::recalculatePerPriorityPanic() {
   const uint32_t normalized_total_availability =
       calculateNormalizedTotalAvailability(per_priority_health_, per_priority_degraded_);
 
-  if (normalized_total_availability == 0) {
+  const uint64_t panic_threshold = std::min<uint64_t>(
+      100, runtime_.snapshot().getInteger(RuntimePanicThreshold, default_healthy_panic_percent_));
+
+  // Panic mode is disabled only when panic_threshold is 0%.
+  if (panic_threshold > 0 && normalized_total_availability == 0) {
     // Everything is terrible. All load should be to P=0. Turn on panic mode.
     ASSERT(per_priority_load_.healthy_priority_load_.get()[0] == 100);
     per_priority_panic_[0] = true;
@@ -626,6 +643,16 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
     auto& scheduler = scheduler_[source] = Scheduler{};
     refreshHostSource(source);
 
+    // Check if the original host weights are equal and skip EDF creation if they are. When all
+    // original weights are equal we can rely on unweighted host pick to do optimal round robin and
+    // least-loaded host selection with lower memory and CPU overhead.
+    if (hostWeightsAreEqual(hosts)) {
+      // Skip edf creation.
+      return;
+    }
+
+    scheduler.edf_ = std::make_unique<EdfScheduler<const Host>>();
+
     // Populate scheduler with host list.
     // TODO(mattklein123): We must build the EDF schedule even if all of the hosts are currently
     // weighted 1. This is because currently we don't refresh host sets if only weights change.
@@ -636,7 +663,7 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
       // notification, this will only be stale until this host is next picked,
       // at which point it is reinserted into the EdfScheduler with its new
       // weight in chooseHost().
-      scheduler.edf_.add(hostWeight(*host), host);
+      scheduler.edf_->add(hostWeight(*host), host);
     }
 
     // Cycle through hosts to achieve the intended offset behavior.
@@ -644,8 +671,8 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
     // refreshes for the weighted case.
     if (!hosts.empty()) {
       for (uint32_t i = 0; i < seed_ % hosts.size(); ++i) {
-        auto host = scheduler.edf_.pick();
-        scheduler.edf_.add(hostWeight(*host), host);
+        auto host = scheduler.edf_->pick();
+        scheduler.edf_->add(hostWeight(*host), host);
       }
     }
   };
@@ -681,15 +708,12 @@ HostConstSharedPtr EdfLoadBalancerBase::chooseHostOnce(LoadBalancerContext* cont
 
   // As has been commented in both EdfLoadBalancerBase::refresh and
   // BaseDynamicClusterImpl::updateDynamicHostList, we must do a runtime pivot here to determine
-  // whether to use EDF or do unweighted (fast) selection.
-  // TODO(mattklein123): As commented elsewhere, this is wasteful, and we should just refresh the
-  // host set if any weights change. Additionally, it has the property that if all weights are
-  // the same but not 1 (like 42), we will use the EDF schedule not the unweighted pick. This is
-  // not optimal. If this is fixed, remove the note in the arch overview docs for the LR LB.
-  if (stats_.max_host_weight_.value() != 1) {
-    auto host = scheduler.edf_.pick();
+  // whether to use EDF or do unweighted (fast) selection. EDF is non-null iff the original weights
+  // of 2 or more hosts differ.
+  if (scheduler.edf_ != nullptr) {
+    auto host = scheduler.edf_->pick();
     if (host != nullptr) {
-      scheduler.edf_.add(hostWeight(*host), host);
+      scheduler.edf_->add(hostWeight(*host), host);
     }
     return host;
   } else {

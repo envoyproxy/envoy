@@ -67,6 +67,8 @@ public:
 
     // Allow touch() to still be strict.
     EXPECT_CALL(*host_map_[host], address()).Times(AtLeast(0));
+    EXPECT_CALL(*host_map_[host], isIpAddress()).Times(AtLeast(0));
+    EXPECT_CALL(*host_map_[host], resolvedHost()).Times(AtLeast(0));
   }
 
   void updateTestHostAddress(const std::string& host, const std::string& address) {
@@ -94,7 +96,7 @@ public:
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Server::MockAdmin> admin_;
-  Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest().currentThreadId()};
+  Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_{Api::createApiForTest(stats_store_)};
   std::shared_ptr<Extensions::Common::DynamicForwardProxy::MockDnsCacheManager> dns_cache_manager_{

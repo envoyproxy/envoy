@@ -9,9 +9,9 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "heap_stat_data_lib",
-    srcs = ["heap_stat_data.cc"],
-    hdrs = ["heap_stat_data.h"],
+    name = "allocator_lib",
+    srcs = ["allocator_impl.cc"],
+    hdrs = ["allocator_impl.h"],
     deps = [
         ":metric_impl_lib",
         ":stat_merger_lib",
@@ -50,8 +50,9 @@ envoy_cc_library(
         ":scope_prefixer_lib",
         ":stats_lib",
         ":store_impl_lib",
+        ":symbol_table_creator_lib",
         "//include/envoy/stats:stats_macros",
-        "//source/common/stats:heap_stat_data_lib",
+        "//source/common/stats:allocator_lib",
     ],
 )
 
@@ -156,6 +157,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "symbol_table_creator_lib",
+    srcs = ["symbol_table_creator.cc"],
+    hdrs = ["symbol_table_creator.h"],
+    external_deps = ["abseil_base"],
+    deps = [
+        ":fake_symbol_table_lib",
+        ":symbol_table_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "fake_symbol_table_lib",
     hdrs = ["fake_symbol_table_impl.h"],
     deps = [":symbol_table_lib"],
@@ -168,6 +180,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/stats:stats_interface",
         "//source/common/common:perf_annotation_lib",
+        "//source/common/common:regex_lib",
     ],
 )
 
@@ -202,7 +215,7 @@ envoy_cc_library(
     srcs = ["thread_local_store.cc"],
     hdrs = ["thread_local_store.h"],
     deps = [
-        ":heap_stat_data_lib",
+        ":allocator_lib",
         ":null_counter_lib",
         ":null_gauge_lib",
         ":scope_prefixer_lib",
