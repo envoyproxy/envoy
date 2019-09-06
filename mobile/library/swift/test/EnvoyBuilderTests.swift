@@ -23,8 +23,6 @@ private final class MockEnvoyEngine: NSObject, EnvoyEngine {
     return 0
   }
 
-  func setup() {}
-
   func startStream(with callbacks: EnvoyHTTPCallbacks) -> EnvoyHTTPStream {
     return MockEnvoyHTTPStream(handle: 0, callbacks: callbacks)
   }
