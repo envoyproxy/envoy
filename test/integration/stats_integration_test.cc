@@ -178,9 +178,9 @@ private:
           auto* socket_address = host->mutable_socket_address();
           socket_address->set_protocol(envoy::api::v2::core::SocketAddress::TCP);
           socket_address->set_address("0.0.0.0");
-          //fake_upstreams_.emplace_back(
+          // fake_upstreams_.emplace_back(
           //    new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
-          //host->set_address(fmt::format("host_{}", i));
+          // host->set_address(fmt::format("host_{}", i));
           std::cout << host->DebugString() << "\n";
         }
       }
