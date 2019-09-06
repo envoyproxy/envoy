@@ -117,7 +117,7 @@ public:
   ClientPtr client_;
   Stats::IsolatedStoreImpl stats_;
   Stats::ScopePtr stats_scope_;
-  Common::Redis::RedisCommandStatsPtr redis_command_stats_;
+  Common::Redis::RedisCommandStatsSharedPtr redis_command_stats_;
 };
 
 TEST_F(RedisClientImplTest, BatchWithZeroBufferAndTimeout) {

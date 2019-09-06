@@ -190,7 +190,7 @@ public:
    * @return ClientPtr a new connection pool client.
    */
   virtual ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
-                           const Config& config, RedisCommandStatsPtr&& redis_command_stats) PURE;
+                           const Config& config, RedisCommandStatsSharedPtr&& redis_command_stats) PURE;
 };
 
 } // namespace Client

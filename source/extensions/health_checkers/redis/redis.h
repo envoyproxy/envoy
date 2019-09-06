@@ -96,7 +96,7 @@ private:
     RedisHealthChecker& parent_;
     Extensions::NetworkFilters::Common::Redis::Client::ClientPtr client_;
     Extensions::NetworkFilters::Common::Redis::Client::PoolRequest* current_request_{};
-    Extensions::NetworkFilters::Common::Redis::RedisCommandStatsPtr redis_command_stats_;
+    Extensions::NetworkFilters::Common::Redis::RedisCommandStatsSharedPtr redis_command_stats_;
   };
 
   enum class Type { Ping, Exists };

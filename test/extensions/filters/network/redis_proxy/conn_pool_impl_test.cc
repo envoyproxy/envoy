@@ -158,7 +158,7 @@ public:
   // Common::Redis::Client::ClientFactory
   Common::Redis::Client::ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher&,
                                           const Common::Redis::Client::Config&,
-                                          Common::Redis::RedisCommandStatsPtr&&) override {
+                                          Common::Redis::RedisCommandStatsSharedPtr&&) override {
     return Common::Redis::Client::ClientPtr{create_(host)};
   }
 

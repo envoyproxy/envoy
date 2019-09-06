@@ -21,13 +21,11 @@ class RedisCommandStats {
 public:
   RedisCommandStats(Stats::Scope&, const std::string& prefix, bool enabled);
 
-  // TODO: Make std::shared_ptr<RedisCommandStats> be RedisCommandStatsPtr
   static std::shared_ptr<RedisCommandStats>
   createRedisCommandStats(Stats::Scope& stats_scope, const std::string& prefix, bool enabled) {
-    auto redis_command_stats = std::make_shared<Common::Redis::RedisCommandStats>(
+    return std::make_shared<Common::Redis::RedisCommandStats>(
         stats_scope, prefix,
-        enabled); // TODO: createScope uses make_unique, should I be doing that?
-    return redis_command_stats;
+        enabled);
   }
 
   Stats::Counter& counter(const Stats::StatNameVec& stat_names);
@@ -59,7 +57,7 @@ private:
   const Stats::StatName unknown_metric_;
   const ToLowerTable to_lower_table_;
 };
-using RedisCommandStatsPtr = std::shared_ptr<RedisCommandStats>;
+using RedisCommandStatsSharedPtr = std::shared_ptr<RedisCommandStats>;
 
 } // namespace Redis
 } // namespace Common

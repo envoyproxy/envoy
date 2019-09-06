@@ -24,7 +24,7 @@ InstanceImpl::InstanceImpl(
     Common::Redis::Client::ClientFactory& client_factory, ThreadLocal::SlotAllocator& tls,
     const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config,
     Api::Api& api, Stats::ScopePtr&& stats_scope,
-    Common::Redis::RedisCommandStatsPtr&& redis_command_stats)
+    Common::Redis::RedisCommandStatsSharedPtr&& redis_command_stats)
     : cm_(cm), client_factory_(client_factory), tls_(tls.allocateSlot()), config_(config),
       api_(api), stats_scope_(std::move(stats_scope)),
       redis_command_stats_(std::move(redis_command_stats)),
