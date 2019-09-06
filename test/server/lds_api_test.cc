@@ -18,7 +18,6 @@ using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
-using testing::ReturnRef;
 using testing::Throw;
 
 namespace Envoy {

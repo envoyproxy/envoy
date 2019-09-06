@@ -22,7 +22,7 @@ namespace {
 TEST(UtilityTest, TestGetSubjectAlternateNamesWithDNS) {
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
-  const std::vector<std::string>& subject_alt_names = Utility::getSubjectAltNames(*cert, GEN_DNS);
+  const auto& subject_alt_names = Utility::getSubjectAltNames(*cert, GEN_DNS);
   EXPECT_EQ(1, subject_alt_names.size());
 }
 
@@ -30,22 +30,21 @@ TEST(UtilityTest, TestMultipleGetSubjectAlternateNamesWithDNS) {
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir "
       "}}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem"));
-  const std::vector<std::string>& subject_alt_names = Utility::getSubjectAltNames(*cert, GEN_DNS);
+  const auto& subject_alt_names = Utility::getSubjectAltNames(*cert, GEN_DNS);
   EXPECT_EQ(2, subject_alt_names.size());
 }
 
 TEST(UtilityTest, TestGetSubjectAlternateNamesWithUri) {
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"));
-  const std::vector<std::string>& subject_alt_names = Utility::getSubjectAltNames(*cert, GEN_URI);
+  const auto& subject_alt_names = Utility::getSubjectAltNames(*cert, GEN_URI);
   EXPECT_EQ(1, subject_alt_names.size());
 }
 
 TEST(UtilityTest, TestGetSubjectAlternateNamesWithNoSAN) {
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"));
-  const std::vector<std::string>& uri_subject_alt_names =
-      Utility::getSubjectAltNames(*cert, GEN_URI);
+  const auto& uri_subject_alt_names = Utility::getSubjectAltNames(*cert, GEN_URI);
   EXPECT_EQ(0, uri_subject_alt_names.size());
 }
 

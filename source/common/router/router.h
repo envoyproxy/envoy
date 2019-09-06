@@ -427,7 +427,8 @@ private:
                        absl::string_view transport_failure_reason,
                        Upstream::HostDescriptionConstSharedPtr host) override;
     void onPoolReady(Http::StreamEncoder& request_encoder,
-                     Upstream::HostDescriptionConstSharedPtr host) override;
+                     Upstream::HostDescriptionConstSharedPtr host,
+                     const StreamInfo::StreamInfo& info) override;
 
     void setRequestEncoder(Http::StreamEncoder& request_encoder);
     void clearRequestEncoder();

@@ -19,12 +19,9 @@ using testing::AllOf;
 using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
-using testing::Ref;
 using testing::Return;
-using testing::ReturnPointee;
 using testing::ReturnRef;
 using testing::WhenDynamicCastTo;
-using testing::WithArg;
 
 namespace Envoy {
 namespace Extensions {

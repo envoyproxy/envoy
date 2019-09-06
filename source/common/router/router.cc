@@ -1538,7 +1538,8 @@ void Filter::UpstreamRequest::onPoolFailure(Http::ConnectionPool::PoolFailureRea
 }
 
 void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
-                                          Upstream::HostDescriptionConstSharedPtr host) {
+                                          Upstream::HostDescriptionConstSharedPtr host,
+                                          const StreamInfo::StreamInfo& info) {
   // This may be called under an existing ScopeTrackerScopeState but it will unwind correctly.
   ScopeTrackerScopeState scope(&parent_.callbacks_->scope(), parent_.callbacks_->dispatcher());
   ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks_);
@@ -1548,6 +1549,9 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
   // TODO(ggreenway): set upstream local address in the StreamInfo.
   onUpstreamHostSelected(host);
   request_encoder.getStream().addCallbacks(*this);
+
+  stream_info_.setUpstreamSslConnection(info.downstreamSslConnection());
+  parent_.callbacks_->streamInfo().setUpstreamSslConnection(info.downstreamSslConnection());
 
   if (parent_.downstream_end_stream_) {
     setupPerTryTimeout();

@@ -238,6 +238,7 @@ if __name__ == "__main__":
   errors += checkAndFixError("bad_envoy_build_sys_ref.BUILD", "Superfluous '@envoy//' prefix")
   errors += checkAndFixError("proto_format.proto", "clang-format check failed")
   errors += checkAndFixError("api/java_options.proto", "Java proto option")
+  errors += checkFileExpectingError("api/go_package.proto", "go_package option should not be set")
   errors += checkAndFixError(
       "cpp_std.cc",
       "term absl::make_unique< should be replaced with standard library term std::make_unique<")
