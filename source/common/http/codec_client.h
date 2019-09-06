@@ -118,6 +118,8 @@ public:
 
   Type type() const { return type_; }
 
+  const StreamInfo::StreamInfo& streamInfo() { return connection_->streamInfo(); }
+
 protected:
   /**
    * Create a codec client and connect to a remote host/port.
