@@ -156,7 +156,7 @@ occurring.
 
 It is difficult to search for those scenarios in the source code or prevent them
 with a format-check, but we can determine whether symbol-table lookups are
-occuring during via an admin endpoint that shows 20 recent lookups by name, at
+occurring during via an admin endpoint that shows 20 recent lookups by name, at
 `ENVOY_HOST:ADMIN_PORT/stats?recentlookups`. This works only when real symbol
 tables are enabled, via command-line option `--use-fake-symbol-table 0`.
 

@@ -359,7 +359,7 @@ modify different aspects of the server:
   This endpoint is intended for Envoy developers debugging potential contention issues
   in the stats system.
 
-  It emits a table of stat names that were recently accessed as strings by Envoy.  In
+  It emits a table of stat names that were recently accessed as strings by Envoy. In
   general, strings should be converted into StatNames, counters, gauges, and histograms
   by Envoy code only during startup or when receiving a new configuration via xDS. This
   is because when stats are looked up as strings they must take a global symbol table
