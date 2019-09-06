@@ -11,15 +11,16 @@ mock_template:
 """
 
 private final class MockEnvoyEngine: NSObject, EnvoyEngine {
-  static var onRun: ((_ config: String, _ logLevel: String?) -> Void)?
+  static var onRunWithConfig: ((_ config: EnvoyConfiguration, _ logLevel: String?) -> Void)?
+  static var onRunWithYAML: ((_ configYAML: String, _ logLevel: String?) -> Void)?
 
-  func run(withConfig config: String) -> Int32 {
-    MockEnvoyEngine.onRun?(config, nil)
+  func run(withConfig config: EnvoyConfiguration, logLevel: String) -> Int32 {
+    MockEnvoyEngine.onRunWithConfig?(config, logLevel)
     return 0
   }
 
-  func run(withConfig config: String, logLevel: String) -> Int32 {
-    MockEnvoyEngine.onRun?(config, logLevel)
+  func run(withConfigYAML configYAML: String, logLevel: String) -> Int32 {
+    MockEnvoyEngine.onRunWithYAML?(configYAML, logLevel)
     return 0
   }
 
@@ -31,12 +32,13 @@ private final class MockEnvoyEngine: NSObject, EnvoyEngine {
 final class EnvoyBuilderTests: XCTestCase {
   override func tearDown() {
     super.tearDown()
-    MockEnvoyEngine.onRun = nil
+    MockEnvoyEngine.onRunWithConfig = nil
+    MockEnvoyEngine.onRunWithYAML = nil
   }
 
   func testAddingCustomConfigYAMLUsesSpecifiedYAMLWhenRunningEnvoy() throws {
     let expectation = self.expectation(description: "Run called with expected data")
-    MockEnvoyEngine.onRun = { yaml, _ in
+    MockEnvoyEngine.onRunWithYAML = { yaml, _ in
       XCTAssertEqual("foobar", yaml)
       expectation.fulfill()
     }
@@ -50,7 +52,7 @@ final class EnvoyBuilderTests: XCTestCase {
 
   func testAddingLogLevelAddsLogLevelWhenRunningEnvoy() throws {
     let expectation = self.expectation(description: "Run called with expected data")
-    MockEnvoyEngine.onRun = { _, logLevel in
+    MockEnvoyEngine.onRunWithConfig = { _, logLevel in
       XCTAssertEqual("trace", logLevel)
       expectation.fulfill()
     }
@@ -62,37 +64,24 @@ final class EnvoyBuilderTests: XCTestCase {
     self.waitForExpectations(timeout: 0.01)
   }
 
-  func testResolvesYAMLWithConnectTimeout() throws {
-    let resolvedYAML = try EnvoyBuilder()
-      .addEngineType(MockEnvoyEngine.self)
-      .addConnectTimeoutSeconds(200)
-      .resolvedYAML(kMockTemplate)
+  func testResolvesYAMLWithIndividuallySetValues() throws {
+    let config = EnvoyConfiguration(connectTimeoutSeconds: 200,
+                                    dnsRefreshSeconds: 300,
+                                    statsFlushSeconds: 400)
+    guard let resolvedYAML = config.resolveTemplate(kMockTemplate) else {
+      XCTFail("Resolved template YAML is nil")
+      return
+    }
 
     XCTAssertTrue(resolvedYAML.contains("connect_timeout: 200s"))
+    XCTAssertTrue(resolvedYAML.contains("dns_refresh_rate: 300s"))
+    XCTAssertTrue(resolvedYAML.contains("stats_flush_interval: 400s"))
   }
 
-  func testResolvesYAMLWithDNSRefreshSeconds() throws {
-    let resolvedYAML = try EnvoyBuilder()
-      .addEngineType(MockEnvoyEngine.self)
-      .addDNSRefreshSeconds(200)
-      .resolvedYAML(kMockTemplate)
-
-    XCTAssertTrue(resolvedYAML.contains("dns_refresh_rate: 200s"))
-  }
-
-  func testResolvesYAMLWithStatsFlushSeconds() throws {
-    let resolvedYAML = try EnvoyBuilder()
-      .addEngineType(MockEnvoyEngine.self)
-      .addStatsFlushSeconds(200)
-      .resolvedYAML(kMockTemplate)
-
-    XCTAssertTrue(resolvedYAML.contains("stats_flush_interval: 200s"))
-  }
-
-  func testThrowsWhenUnresolvedValueInTemplate() {
-    let builder = EnvoyBuilder().addEngineType(MockEnvoyEngine.self)
-    XCTAssertThrowsError(try builder.resolvedYAML("{{ missing }}")) { error in
-      XCTAssertEqual(.unresolvedTemplateKey, error as? EnvoyBuilderError)
-    }
+  func testReturnsNilWhenUnresolvedValueInTemplate() {
+    let config = EnvoyConfiguration(connectTimeoutSeconds: 200,
+                                    dnsRefreshSeconds: 300,
+                                    statsFlushSeconds: 400)
+    XCTAssertNil(config.resolveTemplate("{{ missing }}"))
   }
 }

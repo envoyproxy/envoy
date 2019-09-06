@@ -1,12 +1,5 @@
 import Foundation
 
-/// Error that may be thrown by the Envoy builder.
-@objc
-public enum EnvoyBuilderError: Int, Swift.Error {
-  /// Not all keys within the provided template were resolved.
-  case unresolvedTemplateKey
-}
-
 /// Builder used for creating new instances of Envoy.
 @objcMembers
 public final class EnvoyBuilder: NSObject {
@@ -14,22 +7,24 @@ public final class EnvoyBuilder: NSObject {
   private var logLevel: LogLevel = .info
   private var configYAML: String?
 
-  private var connectTimeoutSeconds: UInt = 30
-  private var dnsRefreshSeconds: UInt = 60
-  private var statsFlushSeconds: UInt = 60
+  private var connectTimeoutSeconds: UInt32 = 30
+  private var dnsRefreshSeconds: UInt32 = 60
+  private var statsFlushSeconds: UInt32 = 60
 
   // MARK: - Public
 
   /// Add a log level to use with Envoy.
+  ///
+  /// - parameter logLevel: The log level to use with Envoy.
   public func addLogLevel(_ logLevel: LogLevel) -> EnvoyBuilder {
     self.logLevel = logLevel
     return self
   }
 
-  // MARK: - YAML configuration options
-
-  /// Add a YAML file to use as a configuration.
+  /// Add contents of a yaml file to use as a configuration.
   /// Setting this will supersede any other configuration settings in the builder.
+  ///
+  /// - parameter configYAML: the contents of a yaml file to use as a configuration.
   @discardableResult
   public func addConfigYAML(_ configYAML: String?) -> EnvoyBuilder {
     self.configYAML = configYAML
@@ -37,22 +32,29 @@ public final class EnvoyBuilder: NSObject {
   }
 
   /// Add a timeout for new network connections to hosts in the cluster.
+  ///
+  /// - parameter connectTimeoutSeconds: Timeout for new network
+  ///                                    connections to hosts in the cluster.
   @discardableResult
-  public func addConnectTimeoutSeconds(_ connectTimeoutSeconds: UInt) -> EnvoyBuilder {
+  public func addConnectTimeoutSeconds(_ connectTimeoutSeconds: UInt32) -> EnvoyBuilder {
     self.connectTimeoutSeconds = connectTimeoutSeconds
     return self
   }
 
   /// Add a rate at which to refresh DNS.
+  ///
+  /// - parameter dnsRefreshSeconds: Rate in seconds to refresh DNS.
   @discardableResult
-  public func addDNSRefreshSeconds(_ dnsRefreshSeconds: UInt) -> EnvoyBuilder {
+  public func addDNSRefreshSeconds(_ dnsRefreshSeconds: UInt32) -> EnvoyBuilder {
     self.dnsRefreshSeconds = dnsRefreshSeconds
     return self
   }
 
   /// Add an interval at which to flush Envoy stats.
+  ///
+  /// - parameter statsFlushSeconds: Interval at which to flush Envoy stats.
   @discardableResult
-  public func addStatsFlushSeconds(_ statsFlushSeconds: UInt) -> EnvoyBuilder {
+  public func addStatsFlushSeconds(_ statsFlushSeconds: UInt32) -> EnvoyBuilder {
     self.statsFlushSeconds = statsFlushSeconds
     return self
   }
@@ -62,8 +64,14 @@ public final class EnvoyBuilder: NSObject {
   /// - returns: A new instance of Envoy.
   public func build() throws -> Envoy {
     let engine = self.engineType.init()
-    let configYAML = try self.configYAML ?? self.resolvedYAML()
-    return Envoy(configYAML: configYAML, logLevel: self.logLevel, engine: engine)
+    if let configYAML = self.configYAML {
+      return Envoy(configYAML: configYAML, logLevel: self.logLevel, engine: engine)
+    } else {
+      let config = EnvoyConfiguration(connectTimeoutSeconds: self.connectTimeoutSeconds,
+                                      dnsRefreshSeconds: self.dnsRefreshSeconds,
+                                      statsFlushSeconds: self.statsFlushSeconds)
+      return Envoy(config: config, logLevel: self.logLevel, engine: engine)
+    }
   }
 
   // MARK: - Internal
@@ -76,32 +84,6 @@ public final class EnvoyBuilder: NSObject {
   func addEngineType(_ engineType: EnvoyEngine.Type) -> EnvoyBuilder {
     self.engineType = engineType
     return self
-  }
-
-  /// Processes the YAML template provided, replacing keys with values from the configuration.
-  ///
-  /// - parameter template: The template YAML file to use.
-  ///
-  /// - returns: A resolved YAML file with all template keys replaced.
-  func resolvedYAML(_ template: String = EnvoyConfiguration.templateString()) throws -> String {
-    var template = template
-    let templateKeysToValues: [String: String] = [
-      "connect_timeout": "\(self.connectTimeoutSeconds)s",
-      "dns_refresh_rate": "\(self.dnsRefreshSeconds)s",
-      "stats_flush_interval": "\(self.statsFlushSeconds)s",
-    ]
-
-    for (templateKey, value) in templateKeysToValues {
-      while let range = template.range(of: "{{ \(templateKey) }}") {
-        template = template.replacingCharacters(in: range, with: value)
-      }
-    }
-
-    if template.contains("{{") {
-      throw EnvoyBuilderError.unresolvedTemplateKey
-    }
-
-    return template
   }
 }
 
