@@ -11,7 +11,7 @@ import sys
 workspace = check_output(['bazel', 'info', 'workspace']).decode().strip()
 bazel_bin = check_output(['bazel', 'info', 'bazel-bin']).decode().strip()
 targets = '@envoy_api//...'
-import_base = 'github.com/envoyproxy/data-plane-api/api'
+import_base = 'github.com/envoyproxy/go-control-plane/v2'
 output_base = 'build_go'
 
 go_protos = check_output([
@@ -32,7 +32,7 @@ for rule in go_protos:
   # @envoy_api//envoy/config/bootstrap/v2:pkg_go_proto
   #
   # Example generated directory:
-  # bazel-bin/external/envoy_api/envoy/config/bootstrap/v2/linux_amd64_stripped/pkg_go_proto%/github.com/envoyproxy/data-plane-api/api/envoy/config/bootstrap/v2/
+  # bazel-bin/external/envoy_api/envoy/config/bootstrap/v2/linux_amd64_stripped/pkg_go_proto%/github.com/envoyproxy/go-control-plane/v2/envoy/config/bootstrap/v2/
   #
   # Example output directory:
   # go_out/envoy/config/bootstrap/v2
