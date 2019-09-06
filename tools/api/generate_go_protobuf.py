@@ -22,7 +22,7 @@ go_protos = check_output([
 
 # Each rule has the form @envoy_api//foo/bar:baz_go_proto.
 # First build all the rules to ensure we have the output files.
-if call(['bazel', 'build'] + go_protos) != 0:
+if call(['bazel', 'build', '-c', 'fastbuild'] + go_protos) != 0:
   print('Build failed')
   sys.exit(1)
 
@@ -45,7 +45,7 @@ for rule in go_protos:
 
   # Ensure the output directory exists
   os.makedirs(output_dir, 0o755, exist_ok=True)
-  print(output_dir)
   for generated_file in input_files:
     shutil.copy(generated_file, output_dir)
     os.chmod(os.path.join(output_dir, generated_file), 0o644)
+print('Go artifacts placed into: ' + output_base)
