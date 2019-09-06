@@ -164,12 +164,16 @@ private:
         bootstrap.mutable_stats_config()->mutable_stats_matcher()->set_reject_all(true);
       }
       if (num_hosts > 0) {
-        setUpstreamCount(num_clusters * num_hosts);
+        setUpstreamCount((1 + num_clusters) * num_hosts);
       }
-      for (int i = 1; i < num_clusters; i++) {
+      for (int i = 1; i < num_clusters; ++i) {
         auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
         cluster->set_name(fmt::format("cluster_{}", i));
-        for (int j = 0; j < num_hosts; j++) {
+      }
+
+      for (int i = 0; i < num_clusters; ++i) {
+        auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(i);
+        for (int j = 0; j < num_hosts; ++j) {
           auto* host = cluster->add_hosts();
           auto* socket_address = host->mutable_socket_address();
           socket_address->set_protocol(envoy::api::v2::core::SocketAddress::TCP);
