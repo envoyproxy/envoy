@@ -260,12 +260,6 @@ TEST_P(EnvoyQuicServerSessionTest, OnResetFrame) {
   EXPECT_CALL(stream_callbacks,
               onResetStream(Http::StreamResetReason::RemoteRefusedStreamReset, _));
   stream2->OnStreamReset(rst2);
-
-  quic::QuicStream* stream3 = envoy_quic_session_.GetOrCreateStream(stream_id + 8u);
-  quic::QuicRstStreamFrame rst3(/*control_frame_id=*/1u, stream3->id(),
-                                quic::QUIC_STREAM_CONNECTION_ERROR, /*bytes_written=*/0u);
-  EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::ConnectionFailure, _));
-  stream3->OnStreamReset(rst3);
 }
 
 TEST_P(EnvoyQuicServerSessionTest, ConnectionClose) {
