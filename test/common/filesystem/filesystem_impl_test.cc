@@ -148,6 +148,7 @@ TEST_F(FileSystemImplTest, IllegalPath) {
 #endif
 }
 
+#ifndef WIN32
 TEST_F(FileSystemImplTest, illegalCanonicalPath) {
   EXPECT_FALSE(illegalCanonicalPath("/develop"));
   EXPECT_FALSE(illegalCanonicalPath("/develop/"));
@@ -156,6 +157,7 @@ TEST_F(FileSystemImplTest, illegalCanonicalPath) {
   EXPECT_FALSE(illegalCanonicalPath("/procedure"));
   EXPECT_FALSE(illegalCanonicalPath("/procedure/"));
 }
+#endif
 
 TEST_F(FileSystemImplTest, ConstructedFileNotOpen) {
   const std::string new_file_path = TestEnvironment::temporaryPath("envoy_this_not_exist");
