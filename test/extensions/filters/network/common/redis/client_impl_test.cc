@@ -77,7 +77,7 @@ public:
         stats_.symbolTable(), "upstream_commands");
 
     client_ = ClientImpl::create(host_, dispatcher_, Common::Redis::EncoderPtr{encoder_}, *this,
-                                 *config_, std::move(redis_command_stats_), stats_);
+                                 *config_, redis_command_stats_, stats_);
     EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_cx_total_.value());
     EXPECT_EQ(1UL, host_->stats_.cx_total_.value());
     EXPECT_EQ(false, client_->active());
@@ -886,8 +886,7 @@ TEST(RedisClientFactoryImplTest, Basic) {
   Stats::IsolatedStoreImpl stats_;
   auto redis_command_stats = Common::Redis::RedisCommandStats::createRedisCommandStats(
       stats_.symbolTable(), "upstream_commands");
-  ClientPtr client =
-      factory.create(host, dispatcher, config, std::move(redis_command_stats), stats_);
+  ClientPtr client = factory.create(host, dispatcher, config, redis_command_stats, stats_);
   client->close();
 }
 

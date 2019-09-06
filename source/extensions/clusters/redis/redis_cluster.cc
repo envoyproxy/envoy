@@ -252,8 +252,8 @@ void RedisCluster::RedisDiscoverySession::startResolveRedis() {
   if (!client) {
     client = std::make_unique<RedisDiscoveryClient>(*this);
     client->host_ = current_host_address_;
-    client->client_ = client_factory_.create(
-        host, dispatcher_, *this, std::move(redis_command_stats_), parent_.info()->statsScope());
+    client->client_ = client_factory_.create(host, dispatcher_, *this, redis_command_stats_,
+                                             parent_.info()->statsScope());
     client->client_->addConnectionCallbacks(*client);
     std::string auth_password =
         Envoy::Config::DataSource::read(parent_.auth_password_datasource_, true, parent_.api_);
