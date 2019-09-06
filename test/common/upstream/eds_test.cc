@@ -22,9 +22,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::AtLeast;
-using testing::Return;
-using testing::ReturnRef;
 
 namespace Envoy {
 namespace Upstream {

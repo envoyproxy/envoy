@@ -23,7 +23,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::AnyNumber;
 using testing::AtLeast;
 using testing::Invoke;
 using testing::Matcher;

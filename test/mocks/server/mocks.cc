@@ -10,7 +10,6 @@
 using testing::_;
 using testing::Invoke;
 using testing::Return;
-using testing::ReturnNew;
 using testing::ReturnPointee;
 using testing::ReturnRef;
 using testing::SaveArg;

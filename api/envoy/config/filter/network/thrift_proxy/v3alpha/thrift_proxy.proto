@@ -12,7 +12,6 @@ import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
 
 import "validate/validate.proto";
-import "gogoproto/gogo.proto";
 
 // [#protodoc-title: Thrift Proxy]
 // Thrift Proxy :ref:`configuration overview <config_network_filters_thrift_proxy>`.
@@ -42,7 +41,6 @@ message ThriftProxy {
 
 // Thrift transport types supported by Envoy.
 enum TransportType {
-  option (gogoproto.goproto_enum_prefix) = false;
 
   // For downstream connections, the Thrift proxy will attempt to determine which transport to use.
   // For upstream connections, the Thrift proxy will use same transport as the downstream
@@ -61,7 +59,6 @@ enum TransportType {
 
 // Thrift Protocol types supported by Envoy.
 enum ProtocolType {
-  option (gogoproto.goproto_enum_prefix) = false;
 
   // For downstream connections, the Thrift proxy will attempt to determine which protocol to use.
   // Note that the older, non-strict (or lax) binary protocol is not included in automatic protocol
