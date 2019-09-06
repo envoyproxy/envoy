@@ -910,9 +910,11 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRateExternalOrigin) {
   time_system_.setMonotonicTime(std::chrono::milliseconds(60001));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
   interval_timer_->invokeCallback();
+  // The success rate should be *calculated* since the minimum request volume was met for failure
+  // percentage ejection, but the host should not be ejected.
   EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
-  EXPECT_EQ(-1, hosts_[4]->outlierDetector().successRate(
-                    DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin));
+  EXPECT_EQ(50UL, hosts_[4]->outlierDetector().successRate(
+                      DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin));
   EXPECT_EQ(-1, detector->successRateAverage(
                     DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin));
   EXPECT_EQ(-1, detector->successRateEjectionThreshold(
@@ -1040,9 +1042,11 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRateLocalOrigin) {
   time_system_.setMonotonicTime(std::chrono::milliseconds(60001));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
   interval_timer_->invokeCallback();
+  // The success rate should be *calculated* since the minimum request volume was met for failure
+  // percentage ejection, but the host should not be ejected.
   EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
-  EXPECT_EQ(-1, hosts_[4]->outlierDetector().successRate(
-                    DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin));
+  EXPECT_EQ(50UL, hosts_[4]->outlierDetector().successRate(
+                      DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin));
   EXPECT_EQ(-1,
             detector->successRateAverage(DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin));
   EXPECT_EQ(-1, detector->successRateEjectionThreshold(
@@ -1184,9 +1188,11 @@ TEST_F(OutlierDetectorImplTest, BasicFlowFailurePercentageExternalOrigin) {
   time_system_.setMonotonicTime(std::chrono::milliseconds(60001));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
   interval_timer_->invokeCallback();
+  // The success rate should be *calculated* since the minimum request volume was met for failure
+  // percentage ejection, but the host should not be ejected.
   EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
-  EXPECT_EQ(-1, hosts_[4]->outlierDetector().successRate(
-                    DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin));
+  EXPECT_EQ(50UL, hosts_[4]->outlierDetector().successRate(
+                      DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin));
   EXPECT_EQ(-1, detector->successRateAverage(
                     DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin));
   EXPECT_EQ(-1, detector->successRateEjectionThreshold(
@@ -1297,9 +1303,11 @@ TEST_F(OutlierDetectorImplTest, BasicFlowFailurePercentageLocalOrigin) {
   time_system_.setMonotonicTime(std::chrono::milliseconds(60001));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
   interval_timer_->invokeCallback();
+  // The success rate should be *calculated* since the minimum request volume was met for failure
+  // percentage ejection, but the host should not be ejected.
   EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
-  EXPECT_EQ(-1, hosts_[4]->outlierDetector().successRate(
-                    DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin));
+  EXPECT_EQ(50UL, hosts_[4]->outlierDetector().successRate(
+                      DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin));
   EXPECT_EQ(-1,
             detector->successRateAverage(DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin));
   EXPECT_EQ(-1, detector->successRateEjectionThreshold(

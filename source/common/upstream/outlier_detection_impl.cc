@@ -585,32 +585,51 @@ void DetectorImpl::processSuccessRateEjections(
       "outlier_detection.success_rate_minimum_hosts", config_.successRateMinimumHosts());
   uint64_t success_rate_request_volume = runtime_.snapshot().getInteger(
       "outlier_detection.success_rate_request_volume", config_.successRateRequestVolume());
+  uint64_t failure_percentage_minimum_hosts =
+      runtime_.snapshot().getInteger("outlier_detection.failure_percentage_minimum_hosts",
+                                     config_.failurePercentageMinimumHosts());
+  uint64_t failure_percentage_request_volume =
+      runtime_.snapshot().getInteger("outlier_detection.failure_percentage_request_volume",
+                                     config_.failurePercentageRequestVolume());
+
   std::vector<HostSuccessRatePair> valid_success_rate_hosts;
+  std::vector<HostSuccessRatePair> valid_failure_percentage_hosts;
   double success_rate_sum = 0;
 
   // Reset the Detector's success rate mean and stdev.
   getSRNums(monitor_type) = {-1, -1};
 
   // Exit early if there are not enough hosts.
-  if (host_monitors_.size() < success_rate_minimum_hosts) {
+  if (host_monitors_.size() < success_rate_minimum_hosts &&
+      host_monitors_.size() < failure_percentage_minimum_hosts) {
     return;
   }
 
   // reserve upper bound of vector size to avoid reallocation.
   valid_success_rate_hosts.reserve(host_monitors_.size());
+  valid_failure_percentage_hosts.reserve(host_monitors_.size());
 
   for (const auto& host : host_monitors_) {
     // Don't do work if the host is already ejected.
     if (!host.first->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
-      absl::optional<double> host_success_rate = host.second->getSRMonitor(monitor_type)
-                                                     .successRateAccumulator()
-                                                     .getSuccessRate(success_rate_request_volume);
+      std::pair<double, uint64_t> host_success_rate_and_volume =
+          host.second->getSRMonitor(monitor_type)
+              .successRateAccumulator()
+              .getSuccessRateAndVolume();
+      double success_rate = host_success_rate_and_volume.first;
+      double request_volume = host_success_rate_and_volume.second;
 
-      if (host_success_rate) {
-        valid_success_rate_hosts.emplace_back(
-            HostSuccessRatePair(host.first, host_success_rate.value()));
-        success_rate_sum += host_success_rate.value();
-        host.second->successRate(monitor_type, host_success_rate.value());
+      if (request_volume >=
+          std::min(success_rate_request_volume, failure_percentage_request_volume)) {
+        host.second->successRate(monitor_type, success_rate);
+      }
+
+      if (request_volume >= success_rate_request_volume) {
+        valid_success_rate_hosts.emplace_back(HostSuccessRatePair(host.first, success_rate));
+        success_rate_sum += success_rate;
+      }
+      if (request_volume >= failure_percentage_request_volume) {
+        valid_failure_percentage_hosts.emplace_back(HostSuccessRatePair(host.first, success_rate));
       }
     }
   }
@@ -633,39 +652,6 @@ void DetectorImpl::processSuccessRateEjections(
                 .getEjectionType();
         updateDetectedEjectionStats(type);
         ejectHost(host_success_rate_pair.host_, type);
-      }
-    }
-  }
-}
-
-void DetectorImpl::processFailurePercentageEjections(
-    DetectorHostMonitor::SuccessRateMonitorType monitor_type) {
-  uint64_t failure_percentage_minimum_hosts =
-      runtime_.snapshot().getInteger("outlier_detection.failure_percentage_minimum_hosts",
-                                     config_.failurePercentageMinimumHosts());
-  uint64_t failure_percentage_request_volume =
-      runtime_.snapshot().getInteger("outlier_detection.failure_percentage_request_volume",
-                                     config_.failurePercentageRequestVolume());
-  std::vector<HostSuccessRatePair> valid_failure_percentage_hosts;
-
-  // Exit early if there are not enough hosts.
-  if (host_monitors_.size() < failure_percentage_minimum_hosts) {
-    return;
-  }
-
-  // reserve upper bound of vector size to avoid reallocation.
-  valid_failure_percentage_hosts.reserve(host_monitors_.size());
-
-  for (const auto& host : host_monitors_) {
-    if (!host.first->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
-      absl::optional<double> host_success_rate =
-          host.second->getSRMonitor(monitor_type)
-              .successRateAccumulator()
-              .getSuccessRate(failure_percentage_request_volume);
-
-      if (host_success_rate) {
-        valid_failure_percentage_hosts.emplace_back(
-            HostSuccessRatePair(host.first, host_success_rate.value()));
       }
     }
   }
@@ -712,8 +698,8 @@ void DetectorImpl::onIntervalTimer() {
   processSuccessRateEjections(DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin);
   processSuccessRateEjections(DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin);
 
-  processFailurePercentageEjections(DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin);
-  processFailurePercentageEjections(DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin);
+  // processFailurePercentageEjections(DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin);
+  // processFailurePercentageEjections(DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin);
 
   armIntervalTimer();
 }
@@ -805,14 +791,11 @@ SuccessRateAccumulatorBucket* SuccessRateAccumulator::updateCurrentWriter() {
   return current_success_rate_bucket_.get();
 }
 
-absl::optional<double>
-SuccessRateAccumulator::getSuccessRate(uint64_t success_rate_request_volume) {
-  if (backup_success_rate_bucket_->total_request_counter_ < success_rate_request_volume) {
-    return {};
-  }
+std::pair<double, uint64_t> SuccessRateAccumulator::getSuccessRateAndVolume() {
+  double success_rate = backup_success_rate_bucket_->success_request_counter_ * 100.0 /
+                        backup_success_rate_bucket_->total_request_counter_;
 
-  return {backup_success_rate_bucket_->success_request_counter_ * 100.0 /
-          backup_success_rate_bucket_->total_request_counter_};
+  return {success_rate, backup_success_rate_bucket_->total_request_counter_};
 }
 
 } // namespace Outlier

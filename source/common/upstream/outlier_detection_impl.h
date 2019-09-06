@@ -92,7 +92,7 @@ public:
    * @return a valid absl::optional<double> with the success rate. If there were not enough
    * requests, an invalid absl::optional<double> is returned.
    */
-  absl::optional<double> getSuccessRate(uint64_t success_rate_request_volume);
+  std::pair<double, uint64_t> getSuccessRateAndVolume();
 
 private:
   std::unique_ptr<SuccessRateAccumulatorBucket> current_success_rate_bucket_;
@@ -364,7 +364,6 @@ private:
   void updateEnforcedEjectionStats(envoy::data::cluster::v2alpha::OutlierEjectionType type);
   void updateDetectedEjectionStats(envoy::data::cluster::v2alpha::OutlierEjectionType type);
   void processSuccessRateEjections(DetectorHostMonitor::SuccessRateMonitorType monitor_type);
-  void processFailurePercentageEjections(DetectorHostMonitor::SuccessRateMonitorType monitor_type);
 
   DetectorConfig config_;
   Event::Dispatcher& dispatcher_;
