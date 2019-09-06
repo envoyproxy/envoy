@@ -59,9 +59,11 @@ void CdsApiImpl::onConfigUpdate(
     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& system_version_info) {
+
+  std::unique_ptr<Cleanup> maybe_eds_resume;
   if (cm_.adsMux()) {
     cm_.adsMux()->pause(Config::TypeUrl::get().ClusterLoadAssignment);
-    Cleanup eds_resume(
+    maybe_eds_resume = std::make_unique<Cleanup>(
         [this] { cm_.adsMux()->resume(Config::TypeUrl::get().ClusterLoadAssignment); });
   }
 
