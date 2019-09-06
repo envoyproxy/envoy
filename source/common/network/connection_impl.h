@@ -131,7 +131,6 @@ public:
     delayed_close_timeout_ = timeout;
   }
   std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
-  bool isQuic() const override { return false; }
 
 protected:
   void closeSocket(ConnectionEvent close_type);

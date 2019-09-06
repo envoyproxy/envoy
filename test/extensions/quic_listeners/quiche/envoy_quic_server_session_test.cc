@@ -100,7 +100,8 @@ public:
   bool installReadFilter() {
     // Setup read filter.
     envoy_quic_session_.addReadFilter(read_filter_);
-    EXPECT_TRUE(read_filter_->callbacks_->connection().isQuic());
+    EXPECT_EQ(Http::Protocol::Http2,
+              read_filter_->callbacks_->connection().streamInfo().protocol().value());
     EXPECT_EQ(envoy_quic_session_.id(), read_filter_->callbacks_->connection().id());
     EXPECT_EQ(&envoy_quic_session_, &read_filter_->callbacks_->connection());
     read_filter_->callbacks_->connection().addConnectionCallbacks(network_connection_callbacks_);

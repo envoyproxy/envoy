@@ -107,14 +107,24 @@ void EnvoyQuicServerStream::OnTrailingHeadersComplete(bool fin, size_t frame_len
 
 void EnvoyQuicServerStream::OnStreamReset(const quic::QuicRstStreamFrame& frame) {
   quic::QuicSpdyServerStreamBase::OnStreamReset(frame);
-  Http::StreamResetReason reason = quicRstErrorToEnvoyResetReason(frame.error_code);
+  Http::StreamResetReason reason;
+  if (frame.error_code == quic::QUIC_REFUSED_STREAM) {
+    reason = Http::StreamResetReason::RemoteRefusedStreamReset;
+  } else {
+    reason = Http::StreamResetReason::RemoteReset;
+  }
   runResetCallbacks(reason);
 }
 
 void EnvoyQuicServerStream::OnConnectionClosed(quic::QuicErrorCode error,
                                                quic::ConnectionCloseSource source) {
   quic::QuicSpdyServerStreamBase::OnConnectionClosed(error, source);
-  Http::StreamResetReason reason = quicRstErrorToEnvoyResetReason(stream_error());
+  Http::StreamResetReason reason;
+  if (error == quic::QUIC_NO_ERROR) {
+    reason = Http::StreamResetReason::ConnectionTermination;
+  } else {
+    reason = Http::StreamResetReason::ConnectionFailure;
+  }
   runResetCallbacks(reason);
 }
 

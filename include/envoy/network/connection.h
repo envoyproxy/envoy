@@ -299,11 +299,6 @@ public:
    *         occurred an empty string is returned.
    */
   virtual absl::string_view transportFailureReason() const PURE;
-
-  /**
-   * @return return true if it speaks QUIC.
-   */
-  virtual bool isQuic() const PURE;
 };
 
 using ConnectionPtr = std::unique_ptr<Connection>;

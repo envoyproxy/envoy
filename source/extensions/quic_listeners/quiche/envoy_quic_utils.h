@@ -24,7 +24,5 @@ Http::HeaderMapImplPtr quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& hea
 
 Http::HeaderMapImplPtr spdyHeaderBlockToEnvoyHeaders(const spdy::SpdyHeaderBlock& header_block);
 
-Http::StreamResetReason quicRstErrorToEnvoyResetReason(quic::QuicRstStreamErrorCode quic_rst);
-
 } // namespace Quic
 } // namespace Envoy
