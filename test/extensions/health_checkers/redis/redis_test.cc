@@ -127,7 +127,8 @@ public:
   Extensions::NetworkFilters::Common::Redis::Client::ClientPtr
   create(Upstream::HostConstSharedPtr, Event::Dispatcher&,
          const Extensions::NetworkFilters::Common::Redis::Client::Config&,
-         Extensions::NetworkFilters::Common::Redis::RedisCommandStatsSharedPtr&&, Stats::Scope& scope) {
+         const Extensions::NetworkFilters::Common::Redis::RedisCommandStatsSharedPtr&,
+         Stats::Scope&) {
     return Extensions::NetworkFilters::Common::Redis::Client::ClientPtr{create_()};
   }
 

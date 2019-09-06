@@ -66,8 +66,8 @@ public:
       max_upstream_unknown_connections_reached_.value_++;
     }));
 
-    auto redis_command_stats =
-        Common::Redis::RedisCommandStats::createRedisCommandStats(store->symbolTable(), "upstream_commands", true);
+    auto redis_command_stats = Common::Redis::RedisCommandStats::createRedisCommandStats(
+        store->symbolTable(), "upstream_commands", true);
     std::unique_ptr<InstanceImpl> conn_pool_impl =
         std::make_unique<InstanceImpl>(cluster_name_, cm_, *this, tls_,
                                        Common::Redis::Client::createConnPoolSettings(
@@ -158,7 +158,8 @@ public:
   // Common::Redis::Client::ClientFactory
   Common::Redis::Client::ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher&,
                                           const Common::Redis::Client::Config&,
-                                          Common::Redis::RedisCommandStatsSharedPtr&&, Stats::Scope&) override {
+                                          const Common::Redis::RedisCommandStatsSharedPtr&,
+                                          Stats::Scope&) override {
     return Common::Redis::Client::ClientPtr{create_(host)};
   }
 

@@ -64,7 +64,8 @@ public:
   Extensions::NetworkFilters::Common::Redis::Client::ClientPtr
   create(Upstream::HostConstSharedPtr host, Event::Dispatcher&,
          const Extensions::NetworkFilters::Common::Redis::Client::Config&,
-         Extensions::NetworkFilters::Common::Redis::RedisCommandStatsSharedPtr&&, Stats::Scope&) {
+         const Extensions::NetworkFilters::Common::Redis::RedisCommandStatsSharedPtr&,
+         Stats::Scope&) {
     EXPECT_EQ(22120, host->address()->ip()->port());
     return Extensions::NetworkFilters::Common::Redis::Client::ClientPtr{
         create_(host->address()->asString())};

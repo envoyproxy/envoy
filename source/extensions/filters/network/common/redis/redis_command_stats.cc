@@ -8,9 +8,11 @@ namespace NetworkFilters {
 namespace Common {
 namespace Redis {
 
-RedisCommandStats::RedisCommandStats(Stats::SymbolTable& symbol_table, const std::string& prefix, bool enabled)
-    : symbol_table_(symbol_table), stat_name_pool_(symbol_table_), prefix_(stat_name_pool_.add(prefix)),
-      enabled_(enabled), upstream_rq_time_(stat_name_pool_.add("upstream_rq_time")),
+RedisCommandStats::RedisCommandStats(Stats::SymbolTable& symbol_table, const std::string& prefix,
+                                     bool enabled)
+    : symbol_table_(symbol_table), stat_name_pool_(symbol_table_),
+      prefix_(stat_name_pool_.add(prefix)), enabled_(enabled),
+      upstream_rq_time_(stat_name_pool_.add("upstream_rq_time")),
       latency_(stat_name_pool_.add("latency")), total_(stat_name_pool_.add("total")),
       success_(stat_name_pool_.add("success")), error_(stat_name_pool_.add("error")),
       unused_metric_(stat_name_pool_.add("unused")), null_metric_(stat_name_pool_.add("null")),
@@ -40,20 +42,23 @@ void RedisCommandStats::addCommandToPool(const std::string& command_string) {
   stat_name_map_[command_string] = command;
 }
 
-Stats::Counter& RedisCommandStats::counter(Stats::Scope& scope, const Stats::StatNameVec& stat_names) {
+Stats::Counter& RedisCommandStats::counter(Stats::Scope& scope,
+                                           const Stats::StatNameVec& stat_names) {
   const Stats::SymbolTable::StoragePtr storage_ptr = symbol_table_.join(stat_names);
   Stats::StatName full_stat_name = Stats::StatName(storage_ptr.get());
   return scope.counterFromStatName(full_stat_name);
 }
 
-Stats::Histogram& RedisCommandStats::histogram(Stats::Scope& scope, const Stats::StatNameVec& stat_names) {
+Stats::Histogram& RedisCommandStats::histogram(Stats::Scope& scope,
+                                               const Stats::StatNameVec& stat_names) {
   const Stats::SymbolTable::StoragePtr storage_ptr = symbol_table_.join(stat_names);
   Stats::StatName full_stat_name = Stats::StatName(storage_ptr.get());
   return scope.histogramFromStatName(full_stat_name);
 }
 
 Stats::CompletableTimespanPtr
-RedisCommandStats::createCommandTimer(Stats::Scope& scope, Stats::StatName command, Envoy::TimeSource& time_source) {
+RedisCommandStats::createCommandTimer(Stats::Scope& scope, Stats::StatName command,
+                                      Envoy::TimeSource& time_source) {
   return std::make_unique<Stats::TimespanWithUnit<std::chrono::microseconds>>(
       histogram(scope, {prefix_, command, latency_}), time_source);
 }
@@ -92,7 +97,8 @@ void RedisCommandStats::updateStatsTotal(Stats::Scope& scope, Stats::StatName co
   counter(scope, {prefix_, command, total_}).inc();
 }
 
-void RedisCommandStats::updateStats(Stats::Scope& scope, Stats::StatName command, const bool success) {
+void RedisCommandStats::updateStats(Stats::Scope& scope, Stats::StatName command,
+                                    const bool success) {
   if (success) {
     counter(scope, {prefix_, command, success_}).inc();
   } else {

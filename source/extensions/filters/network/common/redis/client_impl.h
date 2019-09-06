@@ -68,11 +68,13 @@ class ClientImpl : public Client, public DecoderCallbacks, public Network::Conne
 public:
   static ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                           EncoderPtr&& encoder, DecoderFactory& decoder_factory,
-                          const Config& config, RedisCommandStatsSharedPtr&& redis_command_stats, Stats::Scope& scope);
+                          const Config& config,
+                          const RedisCommandStatsSharedPtr& redis_command_stats,
+                          Stats::Scope& scope);
 
   ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
              DecoderFactory& decoder_factory, const Config& config,
-             RedisCommandStatsSharedPtr&& redis_command_stats, Stats::Scope& scope);
+             const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope);
   ~ClientImpl() override;
 
   // Client
@@ -145,7 +147,8 @@ class ClientFactoryImpl : public ClientFactory {
 public:
   // RedisProxy::ConnPool::ClientFactoryImpl
   ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
-                   const Config& config, RedisCommandStatsSharedPtr&& redis_command_stats, Stats::Scope& scope) override;
+                   const Config& config, const RedisCommandStatsSharedPtr& redis_command_stats,
+                   Stats::Scope& scope) override;
 
   static ClientFactoryImpl instance_;
 

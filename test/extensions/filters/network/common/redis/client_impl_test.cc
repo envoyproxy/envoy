@@ -886,7 +886,8 @@ TEST(RedisClientFactoryImplTest, Basic) {
   Stats::IsolatedStoreImpl stats_;
   auto redis_command_stats = Common::Redis::RedisCommandStats::createRedisCommandStats(
       stats_.symbolTable(), "upstream_commands", true);
-  ClientPtr client = factory.create(host, dispatcher, config, std::move(redis_command_stats), stats_);
+  ClientPtr client =
+      factory.create(host, dispatcher, config, std::move(redis_command_stats), stats_);
   client->close();
 }
 

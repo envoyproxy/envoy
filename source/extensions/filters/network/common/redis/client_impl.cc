@@ -49,9 +49,11 @@ ConfigImpl::ConfigImpl(
 
 ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                              EncoderPtr&& encoder, DecoderFactory& decoder_factory,
-                             const Config& config, RedisCommandStatsSharedPtr&& redis_command_stats, Stats::Scope& scope) {
+                             const Config& config,
+                             const RedisCommandStatsSharedPtr& redis_command_stats,
+                             Stats::Scope& scope) {
   auto client = std::make_unique<ClientImpl>(host, dispatcher, std::move(encoder), decoder_factory,
-                                             config, std::move(redis_command_stats), scope);
+                                             config, redis_command_stats, scope);
   client->connection_ = host->createConnection(dispatcher, nullptr, nullptr).connection_;
   client->connection_->addConnectionCallbacks(*client);
   client->connection_->addReadFilter(Network::ReadFilterSharedPtr{new UpstreamReadFilter(*client)});
@@ -62,7 +64,7 @@ ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatche
 
 ClientImpl::ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                        EncoderPtr&& encoder, DecoderFactory& decoder_factory, const Config& config,
-                       RedisCommandStatsSharedPtr&& redis_command_stats,  Stats::Scope& scope)
+                       const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope)
     : host_(host), encoder_(std::move(encoder)), decoder_(decoder_factory.create(*this)),
       config_(config),
       connect_or_op_timer_(dispatcher.createTimer([this]() { onConnectOrOpTimeout(); })),
@@ -249,11 +251,11 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
 ClientImpl::PendingRequest::PendingRequest(ClientImpl& parent, PoolCallbacks& callbacks,
                                            Stats::StatName command)
     : parent_(parent), callbacks_(callbacks), command_{command},
-      aggregate_request_timer_(
-          parent_.redis_command_stats_->createAggregateTimer(parent_.scope_, parent_.time_source_)) {
+      aggregate_request_timer_(parent_.redis_command_stats_->createAggregateTimer(
+          parent_.scope_, parent_.time_source_)) {
   if (parent_.redis_command_stats_->enabled()) {
-    command_request_timer_ =
-        parent_.redis_command_stats_->createCommandTimer(parent_.scope_, command_, parent_.time_source_);
+    command_request_timer_ = parent_.redis_command_stats_->createCommandTimer(
+        parent_.scope_, command_, parent_.time_source_);
   }
   parent.host_->cluster().stats().upstream_rq_total_.inc();
   parent.host_->stats().rq_total_.inc();
@@ -277,9 +279,10 @@ ClientFactoryImpl ClientFactoryImpl::instance_;
 
 ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
                                     Event::Dispatcher& dispatcher, const Config& config,
-                                    RedisCommandStatsSharedPtr&& redis_command_stats, Stats::Scope& scope) {
+                                    const RedisCommandStatsSharedPtr& redis_command_stats,
+                                    Stats::Scope& scope) {
   return ClientImpl::create(host, dispatcher, EncoderPtr{new EncoderImpl()}, decoder_factory_,
-                            config, std::move(redis_command_stats), scope);
+                            config, redis_command_stats, scope);
 }
 
 } // namespace Client

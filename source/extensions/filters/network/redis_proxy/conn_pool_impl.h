@@ -52,7 +52,7 @@ public:
       Common::Redis::Client::ClientFactory& client_factory, ThreadLocal::SlotAllocator& tls,
       const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config,
       Api::Api& api, Stats::ScopePtr&& stats_scope,
-      Common::Redis::RedisCommandStatsSharedPtr&& redis_command_stats);
+      const Common::Redis::RedisCommandStatsSharedPtr& redis_command_stats);
   // RedisProxy::ConnPool::Instance
   Common::Redis::Client::PoolRequest*
   makeRequest(const std::string& key, const Common::Redis::RespValue& request,

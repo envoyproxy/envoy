@@ -22,17 +22,17 @@ public:
   RedisCommandStats(Stats::SymbolTable& symbol_table, const std::string& prefix, bool enabled);
 
   static std::shared_ptr<RedisCommandStats>
-  createRedisCommandStats(Stats::SymbolTable& symbol_table, const std::string& prefix, bool enabled) {
-    return std::make_shared<Common::Redis::RedisCommandStats>(
-        symbol_table, prefix,
-        enabled);
+  createRedisCommandStats(Stats::SymbolTable& symbol_table, const std::string& prefix,
+                          bool enabled) {
+    return std::make_shared<Common::Redis::RedisCommandStats>(symbol_table, prefix, enabled);
   }
 
   Stats::Counter& counter(Stats::Scope& scope, const Stats::StatNameVec& stat_names);
   Stats::Histogram& histogram(Stats::Scope& scope, const Stats::StatNameVec& stat_names);
   Stats::CompletableTimespanPtr createCommandTimer(Stats::Scope& scope, Stats::StatName command,
                                                    Envoy::TimeSource& time_source);
-  Stats::CompletableTimespanPtr createAggregateTimer(Stats::Scope& scope, Envoy::TimeSource& time_source);
+  Stats::CompletableTimespanPtr createAggregateTimer(Stats::Scope& scope,
+                                                     Envoy::TimeSource& time_source);
   Stats::StatName getCommandFromRequest(const RespValue& request);
   void updateStatsTotal(Stats::Scope& scope, Stats::StatName command);
   void updateStats(Stats::Scope& scope, Stats::StatName command, const bool success);
