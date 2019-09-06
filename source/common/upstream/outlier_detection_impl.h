@@ -92,7 +92,7 @@ public:
    * @return a valid absl::optional<double> with the success rate. If there were not enough
    * requests, an invalid absl::optional<double> is returned.
    */
-  std::pair<double, uint64_t> getSuccessRateAndVolume();
+  absl::optional<std::pair<double, uint64_t>> getSuccessRateAndVolume();
 
 private:
   std::unique_ptr<SuccessRateAccumulatorBucket> current_success_rate_bucket_;

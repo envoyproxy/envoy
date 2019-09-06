@@ -612,12 +612,16 @@ void DetectorImpl::processSuccessRateEjections(
   for (const auto& host : host_monitors_) {
     // Don't do work if the host is already ejected.
     if (!host.first->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
-      std::pair<double, uint64_t> host_success_rate_and_volume =
+      absl::optional<std::pair<double, uint64_t>> host_success_rate_and_volume =
           host.second->getSRMonitor(monitor_type)
               .successRateAccumulator()
               .getSuccessRateAndVolume();
-      double success_rate = host_success_rate_and_volume.first;
-      double request_volume = host_success_rate_and_volume.second;
+
+      if (!host_success_rate_and_volume) {
+        continue;
+      }
+      double success_rate = host_success_rate_and_volume.value().first;
+      double request_volume = host_success_rate_and_volume.value().second;
 
       if (request_volume >=
           std::min(success_rate_request_volume, failure_percentage_request_volume)) {
@@ -697,9 +701,6 @@ void DetectorImpl::onIntervalTimer() {
 
   processSuccessRateEjections(DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin);
   processSuccessRateEjections(DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin);
-
-  // processFailurePercentageEjections(DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin);
-  // processFailurePercentageEjections(DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin);
 
   armIntervalTimer();
 }
@@ -791,11 +792,15 @@ SuccessRateAccumulatorBucket* SuccessRateAccumulator::updateCurrentWriter() {
   return current_success_rate_bucket_.get();
 }
 
-std::pair<double, uint64_t> SuccessRateAccumulator::getSuccessRateAndVolume() {
+absl::optional<std::pair<double, uint64_t>> SuccessRateAccumulator::getSuccessRateAndVolume() {
+  if (!backup_success_rate_bucket_->total_request_counter_) {
+    return absl::nullopt;
+  }
+
   double success_rate = backup_success_rate_bucket_->success_request_counter_ * 100.0 /
                         backup_success_rate_bucket_->total_request_counter_;
 
-  return {success_rate, backup_success_rate_bucket_->total_request_counter_};
+  return {{success_rate, backup_success_rate_bucket_->total_request_counter_}};
 }
 
 } // namespace Outlier
