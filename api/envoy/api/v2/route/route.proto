@@ -19,10 +19,6 @@ import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
-import "gogoproto/gogo.proto";
-
-option (gogoproto.equal_all) = true;
-option (gogoproto.stable_marshaler_all) = true;
 
 // [#protodoc-title: HTTP route]
 // * Routing :ref:`architecture overview <arch_overview_http_routing>`
@@ -602,7 +598,7 @@ message RouteAction {
   //   :ref:`config_http_filters_router_x-envoy-upstream-rq-timeout-ms`,
   //   :ref:`config_http_filters_router_x-envoy-upstream-rq-per-try-timeout-ms`, and the
   //   :ref:`retry overview <arch_overview_http_routing_retry>`.
-  google.protobuf.Duration timeout = 8 [(gogoproto.stdduration) = true];
+  google.protobuf.Duration timeout = 8;
 
   // Specifies the idle timeout for the route. If not specified, there is no per-route idle timeout,
   // although the connection manager wide :ref:`stream_idle_timeout
@@ -622,7 +618,7 @@ message RouteAction {
   // fires, the stream is terminated with a 408 Request Timeout error code if no
   // upstream response header has been received, otherwise a stream reset
   // occurs.
-  google.protobuf.Duration idle_timeout = 24 [(gogoproto.stdduration) = true];
+  google.protobuf.Duration idle_timeout = 24;
 
   // Indicates that the route has a retry policy. Note that if this is set,
   // it'll take precedence over the virtual host level retry policy entirely
@@ -732,7 +728,7 @@ message RouteAction {
       // If specified, a cookie with the TTL will be generated if the cookie is
       // not present. If the TTL is present and zero, the generated cookie will
       // be a session cookie.
-      google.protobuf.Duration ttl = 2 [(gogoproto.stdduration) = true];
+      google.protobuf.Duration ttl = 2;
 
       // The name of the path for the cookie. If no path is specified here, no path
       // will be set for the cookie.
@@ -811,7 +807,7 @@ message RouteAction {
   // :ref:`timeout <envoy_api_field_route.RouteAction.timeout>` or its default.
   // This can be used to prevent unexpected upstream request timeouts due to potentially long
   // time gaps between gRPC request and response in gRPC streaming mode.
-  google.protobuf.Duration max_grpc_timeout = 23 [(gogoproto.stdduration) = true];
+  google.protobuf.Duration max_grpc_timeout = 23;
 
   // If present, Envoy will adjust the timeout provided by the `grpc-timeout` header by subtracting
   // the provided duration from the header. This is useful in allowing Envoy to set its global
@@ -820,7 +816,7 @@ message RouteAction {
   // The offset will only be applied if the provided grpc_timeout is greater than the offset. This
   // ensures that the offset will only ever decrease the timeout and never set it to 0 (meaning
   // infinity).
-  google.protobuf.Duration grpc_timeout_offset = 28 [(gogoproto.stdduration) = true];
+  google.protobuf.Duration grpc_timeout_offset = 28;
 
   // Allows enabling and disabling upgrades on a per-route basis.
   // This overrides any enabled/disabled upgrade filter chain specified in the
@@ -875,7 +871,7 @@ message RetryPolicy {
   //   Consequently, when using a :ref:`5xx <config_http_filters_router_x-envoy-retry-on>` based
   //   retry policy, a request that times out will not be retried as the total timeout budget
   //   would have been exhausted.
-  google.protobuf.Duration per_try_timeout = 3 [(gogoproto.stdduration) = true];
+  google.protobuf.Duration per_try_timeout = 3;
 
   message RetryPriority {
     string name = 1 [(validate.rules).string.min_bytes = 1];
@@ -919,20 +915,16 @@ message RetryPolicy {
     // than zero. Values less than 1 ms are rounded up to 1 ms.
     // See :ref:`config_http_filters_router_x-envoy-max-retries` for a discussion of Envoy's
     // back-off algorithm.
-    google.protobuf.Duration base_interval = 1 [
-      (validate.rules).duration = {
-        required: true,
-        gt: {seconds: 0}
-      },
-      (gogoproto.stdduration) = true
-    ];
+    google.protobuf.Duration base_interval = 1 [(validate.rules).duration = {
+      required: true,
+      gt: {seconds: 0}
+    }];
 
     // Specifies the maximum interval between retries. This parameter is optional, but must be
     // greater than or equal to the `base_interval` if set. The default is 10 times the
     // `base_interval`. See :ref:`config_http_filters_router_x-envoy-max-retries` for a discussion
     // of Envoy's back-off algorithm.
-    google.protobuf.Duration max_interval = 2
-        [(validate.rules).duration.gt = {seconds: 0}, (gogoproto.stdduration) = true];
+    google.protobuf.Duration max_interval = 2 [(validate.rules).duration.gt = {seconds: 0}];
   }
 
   // Specifies parameters that control retry back off. This parameter is optional, in which case the

@@ -10,7 +10,6 @@ import "envoy/api/v3alpha/core/address.proto";
 import "google/protobuf/duration.proto";
 
 import "validate/validate.proto";
-import "gogoproto/gogo.proto";
 
 // [#protodoc-title: Client TLS authentication]
 // Client TLS authentication
@@ -31,7 +30,7 @@ message ClientSSLAuth {
   // authentication service. Default is 60000 (60s). The actual fetch time
   // will be this value plus a random jittered value between
   // 0-refresh_delay_ms milliseconds.
-  google.protobuf.Duration refresh_delay = 3 [(gogoproto.stdduration) = true];
+  google.protobuf.Duration refresh_delay = 3;
 
   // An optional list of IP address and subnet masks that should be white
   // listed for access by the filter. If no list is provided, there is no

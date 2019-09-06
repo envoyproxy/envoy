@@ -9,7 +9,6 @@ option java_package = "io.envoyproxy.envoy.config.cluster.redis";
 import "google/protobuf/duration.proto";
 
 import "validate/validate.proto";
-import "gogoproto/gogo.proto";
 
 // [#protodoc-title: Redis Cluster Configuration]
 // This cluster adds support for `Redis Cluster <https://redis.io/topics/cluster-spec>`_, as part
@@ -44,10 +43,8 @@ import "gogoproto/gogo.proto";
 
 message RedisClusterConfig {
   // Interval between successive topology refresh requests. If not set, this defaults to 5s.
-  google.protobuf.Duration cluster_refresh_rate = 1
-      [(validate.rules).duration.gt = {}, (gogoproto.stdduration) = true];
+  google.protobuf.Duration cluster_refresh_rate = 1 [(validate.rules).duration.gt = {}];
 
   // Timeout for topology refresh request. If not set, this defaults to 3s.
-  google.protobuf.Duration cluster_refresh_timeout = 2
-      [(validate.rules).duration.gt = {}, (gogoproto.stdduration) = true];
+  google.protobuf.Duration cluster_refresh_timeout = 2 [(validate.rules).duration.gt = {}];
 }

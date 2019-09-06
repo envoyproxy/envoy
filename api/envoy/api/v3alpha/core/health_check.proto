@@ -15,9 +15,6 @@ import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
-import "gogoproto/gogo.proto";
-
-option (gogoproto.equal_all) = true;
 
 // [#protodoc-title: Health check]
 // * Health checking :ref:`architecture overview <arch_overview_health_checking>`.
@@ -27,22 +24,16 @@ option (gogoproto.equal_all) = true;
 message HealthCheck {
   // The time to wait for a health check response. If the timeout is reached the
   // health check attempt will be considered a failure.
-  google.protobuf.Duration timeout = 1 [
-    (validate.rules).duration = {
-      required: true,
-      gt: {seconds: 0}
-    },
-    (gogoproto.stdduration) = true
-  ];
+  google.protobuf.Duration timeout = 1 [(validate.rules).duration = {
+    required: true,
+    gt: {seconds: 0}
+  }];
 
   // The interval between health checks.
-  google.protobuf.Duration interval = 2 [
-    (validate.rules).duration = {
-      required: true,
-      gt: {seconds: 0}
-    },
-    (gogoproto.stdduration) = true
-  ];
+  google.protobuf.Duration interval = 2 [(validate.rules).duration = {
+    required: true,
+    gt: {seconds: 0}
+  }];
 
   // An optional jitter amount in milliseconds. If specified, Envoy will start health
   // checking after for a random time in ms between 0 and initial_jitter. This only
