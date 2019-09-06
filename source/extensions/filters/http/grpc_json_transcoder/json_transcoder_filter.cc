@@ -23,8 +23,6 @@
 #include "grpc_transcoding/path_matcher_utility.h"
 #include "grpc_transcoding/response_to_json_translator.h"
 
-using Envoy::Protobuf::DescriptorPool;
-using Envoy::Protobuf::FileDescriptor;
 using Envoy::Protobuf::FileDescriptorSet;
 using Envoy::Protobuf::io::ZeroCopyInputStream;
 using Envoy::ProtobufUtil::Status;
@@ -161,6 +159,7 @@ JsonTranscoderConfig::JsonTranscoderConfig(
   print_options_.preserve_proto_field_names = print_config.preserve_proto_field_names();
 
   match_incoming_request_route_ = proto_config.match_incoming_request_route();
+  ignore_unknown_query_parameters_ = proto_config.ignore_unknown_query_parameters();
 }
 
 bool JsonTranscoderConfig::matchIncomingRequestInfo() const {
@@ -203,6 +202,9 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
     status = type_helper_->ResolveFieldPath(*request_info.message_type, binding.field_path,
                                             &resolved_binding.field_path);
     if (!status.ok()) {
+      if (ignore_unknown_query_parameters_) {
+        continue;
+      }
       return status;
     }
 

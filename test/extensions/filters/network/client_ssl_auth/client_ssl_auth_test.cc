@@ -25,9 +25,7 @@ using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
-using testing::ReturnNew;
 using testing::ReturnRef;
-using testing::WithArg;
 
 namespace Envoy {
 namespace Extensions {
@@ -58,8 +56,9 @@ class ClientSslAuthFilterTest : public testing::Test {
 protected:
   ClientSslAuthFilterTest()
       : request_(&cm_.async_client_), interval_timer_(new Event::MockTimer(&dispatcher_)),
-        api_(Api::createApiForTest(stats_store_)) {}
-  ~ClientSslAuthFilterTest() { tls_.shutdownThread(); }
+        api_(Api::createApiForTest(stats_store_)),
+        ssl_(std::make_shared<Ssl::MockConnectionInfo>()) {}
+  ~ClientSslAuthFilterTest() override { tls_.shutdownThread(); }
 
   void setup() {
     std::string yaml = R"EOF(
@@ -112,10 +111,10 @@ ip_white_list:
   std::unique_ptr<ClientSslAuthFilter> instance_;
   Event::MockTimer* interval_timer_;
   Http::AsyncClient::Callbacks* callbacks_;
-  Ssl::MockConnectionInfo ssl_;
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   Api::ApiPtr api_;
+  std::shared_ptr<Ssl::MockConnectionInfo> ssl_;
 };
 
 TEST_F(ClientSslAuthFilterTest, NoCluster) {
@@ -156,18 +155,18 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
 
   // Create a new filter for an SSL connection, with no backing auth data yet.
   createAuthFilter();
-  ON_CALL(filter_callbacks_.connection_, ssl()).WillByDefault(Return(&ssl_));
+  ON_CALL(filter_callbacks_.connection_, ssl()).WillByDefault(Return(ssl_));
   filter_callbacks_.connection_.remote_address_ =
       std::make_shared<Network::Address::Ipv4Instance>("192.168.1.1");
   std::string expected_sha_1("digest");
-  EXPECT_CALL(ssl_, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha_1));
+  EXPECT_CALL(*ssl_, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha_1));
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_EQ(Network::FilterStatus::StopIteration, instance_->onNewConnection());
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::Connected);
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 
   // Respond.
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
   message->body() = std::make_unique<Buffer::OwnedImpl>(
@@ -184,7 +183,7 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
   filter_callbacks_.connection_.remote_address_ =
       std::make_shared<Network::Address::Ipv4Instance>("192.168.1.1");
   std::string expected_sha_2("1b7d42ef0025ad89c1c911d6c10d7e86a4cb7c5863b2980abcbad1895f8b5314");
-  EXPECT_CALL(ssl_, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha_2));
+  EXPECT_CALL(*ssl_, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha_2));
   EXPECT_EQ(Network::FilterStatus::StopIteration, instance_->onNewConnection());
   EXPECT_CALL(filter_callbacks_, continueReading());
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::Connected);
@@ -221,20 +220,20 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
 
   // Interval timer fires.
   setupRequest();
-  interval_timer_->callback_();
+  interval_timer_->invokeCallback();
 
   // Error response.
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   message = std::make_unique<Http::ResponseMessageImpl>(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "503"}}});
   callbacks_->onSuccess(std::move(message));
 
   // Interval timer fires.
   setupRequest();
-  interval_timer_->callback_();
+  interval_timer_->invokeCallback();
 
   // Parsing error
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   message = std::make_unique<Http::ResponseMessageImpl>(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}});
   message->body() = std::make_unique<Buffer::OwnedImpl>("bad_json");
@@ -242,10 +241,10 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
 
   // Interval timer fires.
   setupRequest();
-  interval_timer_->callback_();
+  interval_timer_->invokeCallback();
 
   // No response failure.
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   callbacks_->onFailure(Http::AsyncClient::FailureReason::Reset);
 
   // Interval timer fires, cannot obtain async client.
@@ -258,8 +257,8 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
                 Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "503"}}})});
             return nullptr;
           }));
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
-  interval_timer_->callback_();
+  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
+  interval_timer_->invokeCallback();
 
   EXPECT_EQ(4U, stats_store_.counter("auth.clientssl.vpn.update_failure").value());
 }

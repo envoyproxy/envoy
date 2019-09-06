@@ -8,8 +8,11 @@
 #include "envoy/network/transport_socket.h"
 #include "envoy/ssl/context.h"
 #include "envoy/ssl/context_config.h"
+#include "envoy/ssl/private_key/private_key.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
+
+#include "common/stats/symbol_table_impl.h"
 
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 
@@ -79,6 +82,8 @@ public:
   Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override;
   std::vector<Envoy::Ssl::CertificateDetailsPtr> getCertChainInformation() const override;
 
+  std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> getPrivateKeyMethodProviders();
+
 protected:
   ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
               TimeSource& time_source);
@@ -123,6 +128,7 @@ protected:
   static SslStats generateStats(Stats::Scope& scope);
 
   std::string getCaFileName() const { return ca_file_path_; };
+  void incCounter(const Stats::StatName name, absl::string_view value) const;
 
   Envoy::Ssl::CertificateDetailsPtr certificateDetails(X509* cert, const std::string& path) const;
 
@@ -135,11 +141,15 @@ protected:
     bssl::UniquePtr<X509> cert_chain_;
     std::string cert_chain_file_path_;
     bool is_ecdsa_{};
+    Ssl::PrivateKeyMethodProviderSharedPtr private_key_method_provider_{};
 
     std::string getCertChainFileName() const { return cert_chain_file_path_; };
     void addClientValidationContext(const Envoy::Ssl::CertificateValidationContextConfig& config,
                                     bool require_client_cert);
     bool isCipherEnabled(uint16_t cipher_id, uint16_t client_version);
+    Envoy::Ssl::PrivateKeyMethodProviderSharedPtr getPrivateKeyMethodProvider() {
+      return private_key_method_provider_;
+    }
   };
 
   // This is always non-empty, with the first context used for all new SSL
@@ -160,6 +170,11 @@ protected:
   std::string cert_chain_file_path_;
   TimeSource& time_source_;
   const unsigned tls_max_version_;
+  mutable Stats::StatNameSet stat_name_set_;
+  const Stats::StatName ssl_ciphers_;
+  const Stats::StatName ssl_versions_;
+  const Stats::StatName ssl_curves_;
+  const Stats::StatName ssl_sigalgs_;
 };
 
 using ContextImplSharedPtr = std::shared_ptr<ContextImpl>;

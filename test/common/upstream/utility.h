@@ -3,7 +3,6 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/utility.h"
-#include "common/config/cds_json.h"
 #include "common/json/json_loader.h"
 #include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
@@ -16,8 +15,7 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
-inline std::string defaultStaticClusterJson(const std::string& name) {
-  return fmt::sprintf(R"EOF(
+constexpr static const char* kDefaultStaticClusterTmpl = R"EOF(
   {
     "name": "%s",
     "connect_timeout": "0.250s",
@@ -25,15 +23,18 @@ inline std::string defaultStaticClusterJson(const std::string& name) {
     "lb_policy": "round_robin",
     "hosts": [
       {
-        "socket_address": {
-          "address": "127.0.0.1",
-          "port_value": 11001
-        }
+        %s,
       }
     ]
   }
-  )EOF",
-                      name);
+  )EOF";
+
+inline std::string defaultStaticClusterJson(const std::string& name) {
+  return fmt::sprintf(kDefaultStaticClusterTmpl, name, R"EOF(
+"socket_address": {
+  "address": "127.0.0.1",
+  "port_value": 11001
+})EOF");
 }
 
 inline envoy::config::bootstrap::v2::Bootstrap
@@ -41,14 +42,6 @@ parseBootstrapFromV2Json(const std::string& json_string) {
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
   TestUtility::loadFromJson(json_string, bootstrap);
   return bootstrap;
-}
-
-inline envoy::api::v2::Cluster parseClusterFromJson(const std::string& json_string) {
-  envoy::api::v2::Cluster cluster;
-  auto json_object_ptr = Json::Factory::loadFromString(json_string);
-  Config::CdsJson::translateCluster(*json_object_ptr,
-                                    absl::optional<envoy::api::v2::core::ConfigSource>(), cluster);
-  return cluster;
 }
 
 inline envoy::api::v2::Cluster parseClusterFromV2Json(const std::string& json_string) {

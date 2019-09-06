@@ -24,13 +24,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
-using testing::InSequence;
-using testing::Invoke;
-using testing::Return;
-using testing::ReturnRef;
-using testing::SaveArg;
-
 namespace Envoy {
 namespace Router {
 namespace {

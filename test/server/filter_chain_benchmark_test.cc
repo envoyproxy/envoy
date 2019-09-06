@@ -85,7 +85,7 @@ public:
     return Network::Address::SocketType::Stream;
   }
   void setLocalAddress(const Network::Address::InstanceConstSharedPtr&) override {}
-  void restoreLocalAddress(const Network::Address::InstanceConstSharedPtr&) override { return; }
+  void restoreLocalAddress(const Network::Address::InstanceConstSharedPtr&) override {}
   void setRemoteAddress(const Network::Address::InstanceConstSharedPtr&) override {}
   bool localAddressRestored() const override { return true; }
   void setDetectedTransportProtocol(absl::string_view) override {}
@@ -149,9 +149,11 @@ const char YamlSingleDstPortBottom[] = R"EOF(
 
 class FilterChainBenchmarkFixture : public benchmark::Fixture {
 public:
-  void SetUp(const ::benchmark::State& state) {
+  using Fixture::SetUp;
+  void SetUp(const ::benchmark::State& state) override {
     int64_t input_size = state.range(0);
     std::vector<std::string> port_chains;
+    port_chains.reserve(input_size);
     for (int i = 0; i < input_size; i++) {
       port_chains.push_back(absl::StrCat(YamlSingleDstPortTop, 10000 + i, YamlSingleDstPortBottom));
     }

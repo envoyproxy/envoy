@@ -29,6 +29,9 @@ envoy_cc_library(
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
         "//source/extensions/clusters:well_known_names",
+        "//source/extensions/filters/network/common/redis:client_interface",
+        "//source/extensions/filters/network/common/redis:codec_interface",
+        "//source/extensions/filters/network/common/redis:supported_commands_lib",
     ],
 )
 

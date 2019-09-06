@@ -198,11 +198,36 @@ TEST_P(ProxyFilterIntegrationTest, UpstreamTls) {
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
   waitForNextUpstreamRequest();
 
-  const Extensions::TransportSockets::Tls::SslSocket* ssl_socket =
-      dynamic_cast<const Extensions::TransportSockets::Tls::SslSocket*>(
-          fake_upstream_connection_->connection().ssl());
+  const Extensions::TransportSockets::Tls::SslSocketInfo* ssl_socket =
+      dynamic_cast<const Extensions::TransportSockets::Tls::SslSocketInfo*>(
+          fake_upstream_connection_->connection().ssl().get());
   EXPECT_STREQ("localhost",
                SSL_get_servername(ssl_socket->rawSslForTest(), TLSEXT_NAMETYPE_host_name));
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  response->waitForEndStream();
+  checkSimpleRequestSuccess(0, 0, response.get());
+}
+
+TEST_P(ProxyFilterIntegrationTest, UpstreamTlsWithIpHost) {
+  upstream_tls_ = true;
+  setup();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const Http::TestHeaderMapImpl request_headers{
+      {":method", "POST"},
+      {":path", "/test/long/url"},
+      {":scheme", "http"},
+      {":authority", fmt::format("{}:{}", Network::Test::getLoopbackAddressUrlString(GetParam()),
+                                 fake_upstreams_[0]->localAddress()->ip()->port())}};
+
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest();
+
+  // No SNI for IP hosts.
+  const Extensions::TransportSockets::Tls::SslSocketInfo* ssl_socket =
+      dynamic_cast<const Extensions::TransportSockets::Tls::SslSocketInfo*>(
+          fake_upstream_connection_->connection().ssl().get());
+  EXPECT_STREQ(nullptr, SSL_get_servername(ssl_socket->rawSslForTest(), TLSEXT_NAMETYPE_host_name));
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
   response->waitForEndStream();

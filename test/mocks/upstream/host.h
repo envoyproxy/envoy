@@ -22,7 +22,7 @@ namespace Outlier {
 class MockDetectorHostMonitor : public DetectorHostMonitor {
 public:
   MockDetectorHostMonitor();
-  ~MockDetectorHostMonitor();
+  ~MockDetectorHostMonitor() override;
 
   MOCK_METHOD0(numEjections, uint32_t());
   MOCK_METHOD1(putHttpResponseCode, void(uint64_t code));
@@ -38,7 +38,7 @@ public:
 class MockEventLogger : public EventLogger {
 public:
   MockEventLogger();
-  ~MockEventLogger();
+  ~MockEventLogger() override;
 
   MOCK_METHOD4(logEject,
                void(const HostDescriptionConstSharedPtr& host, Detector& detector,
@@ -49,7 +49,7 @@ public:
 class MockDetector : public Detector {
 public:
   MockDetector();
-  ~MockDetector();
+  ~MockDetector() override;
 
   void runCallbacks(HostSharedPtr host) {
     for (const ChangeStateCb& cb : callbacks_) {
@@ -70,7 +70,7 @@ public:
 class MockHealthCheckHostMonitor : public HealthCheckHostMonitor {
 public:
   MockHealthCheckHostMonitor();
-  ~MockHealthCheckHostMonitor();
+  ~MockHealthCheckHostMonitor() override;
 
   MOCK_METHOD0(setUnhealthy, void());
 };
@@ -78,7 +78,7 @@ public:
 class MockHostDescription : public HostDescription {
 public:
   MockHostDescription();
-  ~MockHostDescription();
+  ~MockHostDescription() override;
 
   MOCK_CONST_METHOD0(address, Network::Address::InstanceConstSharedPtr());
   MOCK_CONST_METHOD0(healthCheckAddress, Network::Address::InstanceConstSharedPtr());
@@ -108,7 +108,7 @@ public:
   testing::NiceMock<MockClusterInfo> cluster_;
   testing::NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   HostStats stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_), POOL_GAUGE(stats_store_))};
-  mutable Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
+  mutable Stats::TestSymbolTable symbol_table_;
   mutable std::unique_ptr<Stats::StatNameManagedStorage> locality_zone_stat_name_;
 };
 
@@ -120,7 +120,7 @@ public:
   };
 
   MockHost();
-  ~MockHost();
+  ~MockHost() override;
 
   CreateConnectionData createConnection(Event::Dispatcher& dispatcher,
                                         const Network::ConnectionSocket::OptionsSharedPtr& options,
@@ -186,7 +186,7 @@ public:
   testing::NiceMock<Outlier::MockDetectorHostMonitor> outlier_detector_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   HostStats stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_), POOL_GAUGE(stats_store_))};
-  mutable Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
+  mutable Stats::TestSymbolTable symbol_table_;
   mutable std::unique_ptr<Stats::StatNameManagedStorage> locality_zone_stat_name_;
 };
 

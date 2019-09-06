@@ -70,6 +70,17 @@ def envoy_cc_library(
         strip_include_prefix = strip_include_prefix,
     )
 
+    # Intended for usage by external consumers. This allows them to disambiguate
+    # include paths via `external/envoy...`
+    native.cc_library(
+        name = name + "_with_external_headers",
+        hdrs = hdrs,
+        copts = envoy_copts(repository) + copts,
+        visibility = visibility,
+        deps = [":" + name],
+        strip_include_prefix = strip_include_prefix,
+    )
+
 # Used to specify a library that only builds on POSIX
 def envoy_cc_posix_library(name, srcs = [], hdrs = [], **kargs):
     envoy_cc_library(
@@ -113,8 +124,8 @@ def envoy_proto_library(name, external_deps = [], **kwargs):
     external_proto_deps = []
     external_cc_proto_deps = []
     if "api_httpbody_protos" in external_deps:
-        external_cc_proto_deps.append("@googleapis//:api_httpbody_protos")
-        external_proto_deps.append("@googleapis//:api_httpbody_protos_proto")
+        external_cc_proto_deps.append("@com_google_googleapis//google/api:httpbody_cc_proto")
+        external_proto_deps.append("@com_google_googleapis//google/api:httpbody_proto")
     api_proto_library(
         name,
         external_cc_proto_deps = external_cc_proto_deps,

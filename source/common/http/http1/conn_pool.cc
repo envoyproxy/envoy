@@ -70,7 +70,8 @@ void ConnPoolImpl::attachRequestToClient(ActiveClient& client, StreamDecoder& re
   host_->cluster().stats().upstream_rq_total_.inc();
   host_->stats().rq_total_.inc();
   client.stream_wrapper_ = std::make_unique<StreamWrapper>(response_decoder, client);
-  callbacks.onPoolReady(*client.stream_wrapper_, client.real_host_description_);
+  callbacks.onPoolReady(*client.stream_wrapper_, client.real_host_description_,
+                        client.codec_client_->streamInfo());
 }
 
 void ConnPoolImpl::checkForDrained() {
@@ -342,13 +343,8 @@ void ConnPoolImpl::ActiveClient::onConnectTimeout() {
 }
 
 CodecClientPtr ProdConnPoolImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {
-
-  const bool strict_header_validation =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_header_validation");
-
   CodecClientPtr codec{new CodecClientProd(CodecClient::Type::HTTP1, std::move(data.connection_),
-                                           data.host_description_, dispatcher_,
-                                           strict_header_validation)};
+                                           data.host_description_, dispatcher_)};
   return codec;
 }
 

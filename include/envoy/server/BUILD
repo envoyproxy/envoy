@@ -119,6 +119,7 @@ envoy_cc_library(
         "//include/envoy/network:address_interface",
         "//include/envoy/stats:stats_interface",
         "@envoy_api//envoy/admin/v2alpha:server_info_cc",
+        "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
     ],
 )
 
@@ -233,6 +234,7 @@ envoy_cc_library(
         ":resource_monitor_interface",
         "//include/envoy/api:api_interface",
         "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/protobuf:message_validator_interface",
     ],
 )
 
@@ -253,4 +255,10 @@ envoy_cc_library(
         "//source/common/protobuf",
         "@envoy_api//envoy/config/trace/v2:trace_cc",
     ],
+)
+
+envoy_cc_library(
+    name = "active_udp_listener_config_interface",
+    hdrs = ["active_udp_listener_config.h"],
+    deps = ["//include/envoy/network:connection_handler_interface"],
 )

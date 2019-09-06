@@ -95,13 +95,16 @@ public:
 
   void close();
   void waitForData(const std::string& data, bool exact_match = true);
+  // wait for at least `length` bytes to be received
+  void waitForData(size_t length);
   void waitForDisconnect(bool ignore_spurious_events = false);
   void waitForHalfClose();
   void readDisable(bool disabled);
   void write(const std::string& data, bool end_stream = false, bool verify = true);
   const std::string& data() { return payload_reader_->data(); }
   bool connected() const { return !disconnected_; }
-  void clearData() { payload_reader_->clearData(); }
+  // clear up to the `count` number of bytes of received data
+  void clearData(size_t count = std::string::npos) { payload_reader_->clearData(count); }
 
 private:
   struct ConnectionCallbacks : public Network::ConnectionCallbacks {
@@ -190,9 +193,13 @@ public:
   void registerTestServerPorts(const std::vector<std::string>& port_names);
   void createTestServer(const std::string& json_path, const std::vector<std::string>& port_names);
   void createGeneratedApiTestServer(const std::string& bootstrap_path,
-                                    const std::vector<std::string>& port_names);
+                                    const std::vector<std::string>& port_names,
+                                    bool allow_unknown_static_fields,
+                                    bool reject_unknown_dynamic_fields, bool allow_lds_rejection);
   void createApiTestServer(const ApiFilesystemConfig& api_filesystem_config,
-                           const std::vector<std::string>& port_names);
+                           const std::vector<std::string>& port_names,
+                           bool allow_unknown_static_fields, bool reject_unknown_dynamic_fields,
+                           bool allow_lds_rejection);
 
   Event::TestTimeSystem& timeSystem() { return time_system_; }
 
@@ -215,6 +222,7 @@ public:
                           const std::vector<std::string>& expected_resource_names,
                           const std::vector<std::string>& expected_resource_names_added,
                           const std::vector<std::string>& expected_resource_names_removed,
+                          bool expect_node = false,
                           const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
                           const std::string& expected_error_message = "");
   template <class T>
@@ -247,7 +255,7 @@ public:
       const std::string& expected_error_message = "");
   AssertionResult compareSotwDiscoveryRequest(
       const std::string& expected_type_url, const std::string& expected_version,
-      const std::vector<std::string>& expected_resource_names,
+      const std::vector<std::string>& expected_resource_names, bool expect_node = false,
       const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
       const std::string& expected_error_message = "");
 
@@ -318,6 +326,8 @@ protected:
                               Event::TestTimeSystem& time_system);
 
   bool initialized() const { return initialized_; }
+
+  std::unique_ptr<Stats::Scope> upstream_stats_store_;
 
   // The IpVersion (IPv4, IPv6) to use.
   Network::Address::IpVersion version_;

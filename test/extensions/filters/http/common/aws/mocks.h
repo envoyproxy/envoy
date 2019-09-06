@@ -14,7 +14,7 @@ namespace Aws {
 class MockCredentialsProvider : public CredentialsProvider {
 public:
   MockCredentialsProvider();
-  ~MockCredentialsProvider();
+  ~MockCredentialsProvider() override;
 
   MOCK_METHOD0(getCredentials, Credentials());
 };
@@ -22,7 +22,7 @@ public:
 class MockSigner : public Signer {
 public:
   MockSigner();
-  ~MockSigner();
+  ~MockSigner() override;
 
   MOCK_METHOD2(sign, void(Http::Message&, bool));
 };

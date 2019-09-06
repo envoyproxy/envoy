@@ -101,7 +101,8 @@ void ConnPoolImpl::newClientStream(Http::StreamDecoder& response_decoder,
     host_->cluster().stats().upstream_rq_active_.inc();
     host_->cluster().resourceManager(priority_).requests().inc();
     callbacks.onPoolReady(primary_client_->client_->newStream(response_decoder),
-                          primary_client_->real_host_description_);
+                          primary_client_->real_host_description_,
+                          primary_client_->client_->streamInfo());
   }
 }
 
@@ -304,7 +305,7 @@ ConnPoolImpl::ActiveClient::~ActiveClient() {
 
 CodecClientPtr ProdConnPoolImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {
   CodecClientPtr codec{new CodecClientProd(CodecClient::Type::HTTP2, std::move(data.connection_),
-                                           data.host_description_, dispatcher_, false)};
+                                           data.host_description_, dispatcher_)};
   return codec;
 }
 

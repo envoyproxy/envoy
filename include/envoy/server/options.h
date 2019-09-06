@@ -6,6 +6,7 @@
 
 #include "envoy/admin/v2alpha/server_info.pb.h"
 #include "envoy/common/pure.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/network/address.h"
 
 #include "spdlog/spdlog.h"
@@ -79,9 +80,20 @@ public:
   virtual const std::string& configYaml() const PURE;
 
   /**
-   * @return bool allow unknown fields in the configuration?
+   * @return const envoy::config::bootstrap::v2::Bootstrap& a bootstrap proto object
+   * that merges into the config last, after configYaml and configPath.
    */
-  virtual bool allowUnknownFields() const PURE;
+  virtual const envoy::config::bootstrap::v2::Bootstrap& configProto() const PURE;
+
+  /**
+   * @return bool allow unknown fields in the static configuration?
+   */
+  virtual bool allowUnknownStaticFields() const PURE;
+
+  /**
+   * @return bool allow unknown fields in the dynamic configuration?
+   */
+  virtual bool rejectUnknownDynamicFields() const PURE;
 
   /**
    * @return const std::string& the admin address output file.
@@ -171,6 +183,11 @@ public:
    * @return whether to use the old libevent evbuffer-based Buffer implementation.
    */
   virtual bool libeventBufferEnabled() const PURE;
+
+  /**
+   * @return whether to use the fake symbol table implementation.
+   */
+  virtual bool fakeSymbolTableEnabled() const PURE;
 
   /**
    * @return bool indicating whether cpuset size should determine the number of worker threads.

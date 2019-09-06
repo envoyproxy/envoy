@@ -51,7 +51,7 @@ private:
         public Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks,
         public Network::ConnectionCallbacks {
     RedisActiveHealthCheckSession(RedisHealthChecker& parent, const Upstream::HostSharedPtr& host);
-    ~RedisActiveHealthCheckSession();
+    ~RedisActiveHealthCheckSession() override;
 
     // ActiveHealthCheckSession
     void onInterval() override;
@@ -68,6 +68,9 @@ private:
     bool enableRedirection() const override {
       return true;
     } // Redirection errors are treated as check successes.
+    NetworkFilters::Common::Redis::Client::ReadPolicy readPolicy() const override {
+      return NetworkFilters::Common::Redis::Client::ReadPolicy::Master;
+    }
 
     // Batching
     unsigned int maxBufferSizeBeforeFlush() const override {

@@ -5,7 +5,6 @@ package envoy.config.filter.accesslog.v2;
 option java_outer_classname = "AccesslogProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.filter.accesslog.v2";
-option go_package = "v2";
 
 import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/route/route.proto";
@@ -24,6 +23,7 @@ message AccessLog {
   //
   // #. "envoy.file_access_log"
   // #. "envoy.http_grpc_access_log"
+  // #. "envoy.tcp_grpc_access_log"
   string name = 1;
 
   // Filter which is used to determine if the access log needs to be written.
@@ -36,6 +36,8 @@ message AccessLog {
   //    <envoy_api_msg_config.accesslog.v2.FileAccessLog>`
   // #. "envoy.http_grpc_access_log": :ref:`HttpGrpcAccessLogConfig
   //    <envoy_api_msg_config.accesslog.v2.HttpGrpcAccessLogConfig>`
+  // #. "envoy.tcp_grpc_access_log": :ref:`TcpGrpcAccessLogConfig
+  //    <envoy_api_msg_config.accesslog.v2.TcpGrpcAccessLogConfig>`
   oneof config_type {
     google.protobuf.Struct config = 3;
 
@@ -76,6 +78,9 @@ message AccessLogFilter {
 
     // gRPC status filter.
     GrpcStatusFilter grpc_status_filter = 10;
+
+    // Extension filter.
+    ExtensionFilter extension_filter = 11;
   }
 }
 
@@ -226,4 +231,17 @@ message GrpcStatusFilter {
   // If included and set to true, the filter will instead block all responses with a gRPC status or
   // inferred gRPC status enumerated in statuses, and allow all other responses.
   bool exclude = 2;
+}
+
+// Extension filter is statically registered at runtime.
+message ExtensionFilter {
+  // The name of the filter implementation to instantiate. The name must
+  // match a statically registered filter.
+  string name = 1;
+
+  // Custom configuration that depends on the filter being instantiated.
+  oneof config_type {
+    google.protobuf.Struct config = 2;
+    google.protobuf.Any typed_config = 3;
+  }
 }

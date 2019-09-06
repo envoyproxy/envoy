@@ -8,7 +8,7 @@ tests {
     method: "GET"
   }
   validate: {
-    path_redirect: ""
+    path_redirect: { value: "" }
   }
 }
 
@@ -21,6 +21,6 @@ tests {
     random_value: 115
   }
   validate: {
-    cluster_name: "cluster1"
+    cluster_name: { value: "cluster1" }
   }
 }

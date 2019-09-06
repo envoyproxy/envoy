@@ -8,7 +8,7 @@ namespace Upstream {
 class MockLoadBalancerContext : public LoadBalancerContext {
 public:
   MockLoadBalancerContext();
-  ~MockLoadBalancerContext();
+  ~MockLoadBalancerContext() override;
 
   MOCK_METHOD0(computeHashKey, absl::optional<uint64_t>());
   MOCK_METHOD0(metadataMatchCriteria, Router::MetadataMatchCriteria*());

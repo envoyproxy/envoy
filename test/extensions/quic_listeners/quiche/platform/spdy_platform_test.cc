@@ -1,4 +1,5 @@
 #include <functional>
+#include <string>
 
 #include "extensions/quic_listeners/quiche/platform/flags_impl.h"
 
@@ -13,7 +14,6 @@
 #include "quiche/spdy/platform/api/spdy_flags.h"
 #include "quiche/spdy/platform/api/spdy_logging.h"
 #include "quiche/spdy/platform/api/spdy_ptr_util.h"
-#include "quiche/spdy/platform/api/spdy_string.h"
 #include "quiche/spdy/platform/api/spdy_string_piece.h"
 #include "quiche/spdy/platform/api/spdy_test_helpers.h"
 
@@ -43,15 +43,14 @@ TEST(SpdyPlatformTest, SpdyBugTracker) {
 }
 
 TEST(SpdyPlatformTest, SpdyHashMap) {
-  spdy::SpdyHashMap<spdy::SpdyString, int> hmap;
+  spdy::SpdyHashMap<std::string, int> hmap;
   hmap.insert({"foo", 2});
   EXPECT_EQ(2, hmap["foo"]);
 }
 
 TEST(SpdyPlatformTest, SpdyHashSet) {
-  spdy::SpdyHashSet<spdy::SpdyString, spdy::SpdyHash<spdy::SpdyString>,
-                    std::equal_to<spdy::SpdyString>>
-      hset({"foo", "bar"});
+  spdy::SpdyHashSet<std::string, spdy::SpdyHash<std::string>, std::equal_to<std::string>> hset(
+      {"foo", "bar"});
   EXPECT_EQ(1, hset.count("bar"));
   EXPECT_EQ(0, hset.count("qux"));
 }
@@ -62,7 +61,7 @@ TEST(SpdyPlatformTest, SpdyEndianness) {
 }
 
 TEST(SpdyPlatformTest, SpdyEstimateMemoryUsage) {
-  spdy::SpdyString s = "foo";
+  std::string s = "foo";
   // Stubbed out to always return 0.
   EXPECT_EQ(0, spdy::SpdyEstimateMemoryUsage(s));
 }
@@ -99,12 +98,12 @@ TEST(SpdyPlatformTest, SpdyWrapUnique) {
 }
 
 TEST(SpdyPlatformTest, SpdyString) {
-  spdy::SpdyString s = "foo";
+  std::string s = "foo";
   EXPECT_EQ('o', s[1]);
 }
 
 TEST(SpdyPlatformTest, SpdyStringPiece) {
-  spdy::SpdyString s = "bar";
+  std::string s = "bar";
   spdy::SpdyStringPiece sp(s);
   EXPECT_EQ('b', sp[0]);
 }

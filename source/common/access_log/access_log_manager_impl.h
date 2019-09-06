@@ -20,6 +20,7 @@ namespace Envoy {
   COUNTER(reopen_failed)                                                                           \
   COUNTER(write_buffered)                                                                          \
   COUNTER(write_completed)                                                                         \
+  COUNTER(write_failed)                                                                            \
   GAUGE(write_total_buffered, Accumulate)
 
 struct AccessLogFileStats {
@@ -34,9 +35,9 @@ public:
                        Event::Dispatcher& dispatcher, Thread::BasicLockable& lock,
                        Stats::Store& stats_store)
       : file_flush_interval_msec_(file_flush_interval_msec), api_(api), dispatcher_(dispatcher),
-        lock_(lock), file_stats_{ACCESS_LOG_FILE_STATS(
-                         POOL_COUNTER_PREFIX(stats_store, "access_log_file."),
-                         POOL_GAUGE_PREFIX(stats_store, "access_log_file."))} {}
+        lock_(lock), file_stats_{
+                         ACCESS_LOG_FILE_STATS(POOL_COUNTER_PREFIX(stats_store, "filesystem."),
+                                               POOL_GAUGE_PREFIX(stats_store, "filesystem."))} {}
 
   // AccessLog::AccessLogManager
   void reopen() override;
@@ -64,7 +65,7 @@ public:
                     Thread::BasicLockable& lock, AccessLogFileStats& stats_,
                     std::chrono::milliseconds flush_interval_msec,
                     Thread::ThreadFactory& thread_factory);
-  ~AccessLogFileImpl();
+  ~AccessLogFileImpl() override;
 
   // AccessLog::AccessLogFile
   void write(absl::string_view data) override;
@@ -82,6 +83,9 @@ private:
   void flushThreadFunc();
   void open();
   void createFlushStructures();
+
+  // return default flags set which used by open
+  static Filesystem::FlagSet defaultFlags();
 
   // Minimum size before the flush thread will be told to flush.
   static const uint64_t MIN_FLUSH_SIZE = 1024 * 64;

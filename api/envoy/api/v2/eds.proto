@@ -15,12 +15,8 @@ import "envoy/type/percent.proto";
 import "google/api/annotations.proto";
 
 import "validate/validate.proto";
-import "gogoproto/gogo.proto";
 import "google/protobuf/wrappers.proto";
 import "google/protobuf/duration.proto";
-
-option (gogoproto.equal_all) = true;
-option (gogoproto.stable_marshaler_all) = true;
 
 // [#protodoc-title: EDS]
 // Endpoint discovery :ref:`architecture overview <arch_overview_service_discovery_types_eds>`
@@ -59,7 +55,7 @@ message ClusterLoadAssignment {
   string cluster_name = 1 [(validate.rules).string.min_bytes = 1];
 
   // List of endpoints to load balance to.
-  repeated endpoint.LocalityLbEndpoints endpoints = 2 [(gogoproto.nullable) = false];
+  repeated endpoint.LocalityLbEndpoints endpoints = 2;
 
   // Map of named endpoints that can be referenced in LocalityLbEndpoints.
   map<string, endpoint.Endpoint> named_endpoints = 5;
@@ -117,6 +113,17 @@ message ClusterLoadAssignment {
     // are considered stale and should be marked unhealthy.
     // Defaults to 0 which means endpoints never go stale.
     google.protobuf.Duration endpoint_stale_after = 4 [(validate.rules).duration.gt.seconds = 0];
+
+    // The flag to disable overprovisioning. If it is set to true,
+    // :ref:`overprovisioning factor
+    // <arch_overview_load_balancing_overprovisioning_factor>` will be ignored
+    // and Envoy will not perform graceful failover between priority levels or
+    // localities as endpoints become unhealthy. Otherwise Envoy will perform
+    // graceful failover as :ref:`overprovisioning factor
+    // <arch_overview_load_balancing_overprovisioning_factor>` suggests.
+    // [#next-major-version: Unify with overprovisioning config as a single message.]
+    // [#not-implemented-hide:]
+    bool disable_overprovisioning = 5;
   }
 
   // Load balancing policy settings.

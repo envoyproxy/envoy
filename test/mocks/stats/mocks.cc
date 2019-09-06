@@ -10,7 +10,6 @@
 using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
-using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
 
@@ -63,7 +62,7 @@ MockMetricSnapshot::~MockMetricSnapshot() = default;
 MockSink::MockSink() = default;
 MockSink::~MockSink() = default;
 
-MockStore::MockStore() : StoreImpl(*fake_symbol_table_) {
+MockStore::MockStore() : StoreImpl(*global_symbol_table_) {
   ON_CALL(*this, counter(_)).WillByDefault(ReturnRef(counter_));
   ON_CALL(*this, histogram(_)).WillByDefault(Invoke([this](const std::string& name) -> Histogram& {
     auto* histogram = new NiceMock<MockHistogram>(); // symbol_table_);
@@ -75,8 +74,7 @@ MockStore::MockStore() : StoreImpl(*fake_symbol_table_) {
 }
 MockStore::~MockStore() = default;
 
-MockIsolatedStatsStore::MockIsolatedStatsStore()
-    : IsolatedStoreImpl(Test::Global<Stats::FakeSymbolTableImpl>::get()) {}
+MockIsolatedStatsStore::MockIsolatedStatsStore() : IsolatedStoreImpl(*global_symbol_table_) {}
 MockIsolatedStatsStore::~MockIsolatedStatsStore() = default;
 
 MockStatsMatcher::MockStatsMatcher() = default;

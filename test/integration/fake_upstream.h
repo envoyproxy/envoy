@@ -531,7 +531,7 @@ public:
   FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory, uint32_t port,
                FakeHttpConnection::Type type, Network::Address::IpVersion version,
                Event::TestTimeSystem& time_system);
-  ~FakeUpstream();
+  ~FakeUpstream() override;
 
   FakeHttpConnection::Type httpType() { return http_type_; }
 
@@ -601,11 +601,16 @@ private:
     std::chrono::milliseconds listenerFiltersTimeout() const override {
       return std::chrono::milliseconds();
     }
+    bool continueOnListenerFiltersTimeout() const override { return false; }
     Stats::Scope& listenerScope() override { return parent_.stats_store_; }
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
+    Network::ActiveUdpListenerFactory* udpListenerFactory() override {
+      return udp_listener_factory_.get();
+    }
 
     FakeUpstream& parent_;
+    Network::ActiveUdpListenerFactoryPtr udp_listener_factory_;
     std::string name_;
   };
 

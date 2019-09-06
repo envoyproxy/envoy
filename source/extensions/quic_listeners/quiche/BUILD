@@ -15,6 +15,7 @@ envoy_cc_library(
     external_deps = ["quiche_quic_platform"],
     tags = ["nofips"],
     deps = [
+        "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",
         "@com_googlesource_quiche//:quic_core_alarm_interface_lib",
     ],
@@ -39,6 +40,7 @@ envoy_cc_library(
     srcs = ["envoy_quic_packet_writer.cc"],
     hdrs = ["envoy_quic_packet_writer.h"],
     external_deps = ["quiche_quic_platform"],
+    tags = ["nofips"],
     deps = [
         ":envoy_quic_utils_lib",
         "@com_googlesource_quiche//:quic_core_packet_writer_interface_lib",
@@ -70,6 +72,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "spdy_server_push_utils_for_envoy_lib",
     srcs = ["spdy_server_push_utils_for_envoy.cc"],
+    tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
         "//source/common/common:assert_lib",
@@ -81,5 +84,6 @@ envoy_cc_library(
     name = "envoy_quic_utils_lib",
     hdrs = ["envoy_quic_utils.h"],
     external_deps = ["quiche_quic_platform"],
+    tags = ["nofips"],
     deps = ["//source/common/network:address_lib"],
 )

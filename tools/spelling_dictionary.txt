@@ -85,8 +85,10 @@ EVAL
 EVLOOP
 EVP
 EWOULDBLOCK
+EXPECTs
 EXPR
 FAQ
+FCDS
 FDs
 FFFF
 FIN
@@ -198,6 +200,7 @@ POSTs
 PREBIND
 PRNG
 PROT
+PSS
 QPS
 QUIC
 RAII
@@ -244,6 +247,7 @@ SIGSEGV
 SIGTERM
 SimpleAtoi
 SNI
+SPD
 SPDY
 SPIFFE
 SPKI
@@ -267,6 +271,7 @@ TLSv
 TLV
 TMPDIR
 TODO
+TPM
 TPROXY
 TSAN
 TSI
@@ -409,6 +414,7 @@ decompressor
 decrement
 decrypt
 decrypting
+decls
 dedup
 dedupe
 deduplicate
@@ -467,6 +473,7 @@ evthread
 evwatch
 exe
 execlp
+expectDeltaAndSotwUpdate
 facto
 favicon
 fd
@@ -623,6 +630,7 @@ params
 paren
 parentid
 parsers
+passthroughs
 pcall
 pcap
 pclose
@@ -770,6 +778,7 @@ uint
 un
 unacked
 unary
+uncomment
 unconfigurable
 unconfigured
 uncontended
@@ -785,6 +794,7 @@ unescaping
 unindexed
 uninsantiated
 uninstantiated
+uniq
 unix
 unlink
 unlinked

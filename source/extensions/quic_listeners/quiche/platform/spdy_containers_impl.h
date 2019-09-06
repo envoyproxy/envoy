@@ -37,4 +37,6 @@ inline size_t SpdyHashStringPairImpl(SpdyStringPieceImpl a, SpdyStringPieceImpl 
   return absl::Hash<std::pair<SpdyStringPieceImpl, SpdyStringPieceImpl>>()(std::make_pair(a, b));
 }
 
+template <typename Key, typename Value, int Size>
+using SpdySmallMapImpl = absl::flat_hash_map<Key, Value>;
 } // namespace spdy

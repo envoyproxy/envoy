@@ -31,11 +31,11 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
+using testing::_; // NOLINT(misc-unused-using-decls)
 using testing::AssertionFailure;
 using testing::AssertionResult;
 using testing::AssertionSuccess;
-using testing::Invoke;
+using testing::Invoke; //  NOLINT(misc-unused-using-decls)
 
 namespace Envoy {
 
@@ -104,6 +104,19 @@ namespace Envoy {
       return status;                                                                               \
     }                                                                                              \
   } while (false)
+
+// A convenience macro for testing Envoy deprecated features. This will disable the test when
+// tests are built with --define deprecated_features=disabled to avoid the hard-failure mode for
+// deprecated features. Sample usage is:
+//
+// TEST_F(FixtureName, DEPRECATED_FEATURE_TEST(TestName)) {
+// ...
+// }
+#ifndef ENVOY_DISABLE_DEPRECATED_FEATURES
+#define DEPRECATED_FEATURE_TEST(X) X
+#else
+#define DEPRECATED_FEATURE_TEST(X) DISABLED_##X
+#endif
 
 // Random number generator which logs its seed to stderr. To repeat a test run with a non-zero seed
 // one can run the test with --test_arg=--gtest_random_seed=[seed]
@@ -499,8 +512,7 @@ public:
 
   template <class MessageType>
   static inline MessageType anyConvert(const ProtobufWkt::Any& message) {
-    return MessageUtil::anyConvert<MessageType>(message,
-                                                ProtobufMessage::getStrictValidationVisitor());
+    return MessageUtil::anyConvert<MessageType>(message);
   }
 
   template <class MessageType>
@@ -513,6 +525,16 @@ public:
   static void loadFromYamlAndValidate(const std::string& yaml, MessageType& message) {
     return MessageUtil::loadFromYamlAndValidate(yaml, message,
                                                 ProtobufMessage::getStrictValidationVisitor());
+  }
+
+  template <class MessageType> static void validate(const MessageType& message) {
+    return MessageUtil::validate(message, ProtobufMessage::getStrictValidationVisitor());
+  }
+
+  template <class MessageType>
+  static const MessageType& downcastAndValidate(const Protobuf::Message& config) {
+    return MessageUtil::downcastAndValidate<MessageType>(
+        config, ProtobufMessage::getStrictValidationVisitor());
   }
 
   static void jsonConvert(const Protobuf::Message& source, Protobuf::Message& dest) {
@@ -615,8 +637,8 @@ public:
   using HeaderMapImpl::remove;
   void addCopy(const std::string& key, const std::string& value);
   void remove(const std::string& key);
-  std::string get_(const std::string& key);
-  std::string get_(const LowerCaseString& key);
+  std::string get_(const std::string& key) const;
+  std::string get_(const LowerCaseString& key) const;
   bool has(const std::string& key);
   bool has(const LowerCaseString& key);
 };

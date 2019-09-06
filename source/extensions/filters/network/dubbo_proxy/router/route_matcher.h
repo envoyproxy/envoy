@@ -30,7 +30,7 @@ class RouteEntryImplBase : public RouteEntry,
                            public Logger::Loggable<Logger::Id::dubbo> {
 public:
   RouteEntryImplBase(const envoy::config::filter::network::dubbo_proxy::v2alpha1::Route& route);
-  virtual ~RouteEntryImplBase() = default;
+  ~RouteEntryImplBase() override = default;
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
@@ -77,7 +77,7 @@ private:
 
   uint64_t total_cluster_weight_;
   const std::string cluster_name_;
-  std::vector<Http::HeaderUtility::HeaderData> config_headers_;
+  const std::vector<Http::HeaderUtility::HeaderDataPtr> config_headers_;
   std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
 
   // TODO(gengleilei) Implement it.
@@ -123,7 +123,7 @@ public:
                               uint64_t random_value) const override;
 
 private:
-  const Matchers::StringMatcher method_name_;
+  const Matchers::StringMatcherImpl method_name_;
   std::shared_ptr<ParameterRouteEntryImpl> parameter_route_;
 };
 

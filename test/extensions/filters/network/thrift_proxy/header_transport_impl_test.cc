@@ -13,7 +13,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::NiceMock;
 using testing::Return;
 
 namespace Envoy {
@@ -25,7 +24,7 @@ namespace {
 class MockBuffer : public Envoy::MockBuffer {
 public:
   MockBuffer() = default;
-  ~MockBuffer() = default;
+  ~MockBuffer() override = default;
 
   MOCK_CONST_METHOD0(length, uint64_t());
 };

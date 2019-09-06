@@ -14,10 +14,7 @@
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
 
-using testing::AssertionFailure;
 using testing::AssertionResult;
-using testing::AssertionSuccess;
-using testing::IsSubstring;
 
 namespace Envoy {
 
@@ -42,6 +39,17 @@ envoy::api::v2::Cluster AdsIntegrationTest::buildCluster(const std::string& name
       eds_cluster_config: {{ eds_config: {{ ads: {{}} }} }}
       lb_policy: ROUND_ROBIN
       http2_protocol_options: {{}}
+    )EOF",
+                                                                     name));
+}
+
+envoy::api::v2::Cluster AdsIntegrationTest::buildRedisCluster(const std::string& name) {
+  return TestUtility::parseYaml<envoy::api::v2::Cluster>(fmt::format(R"EOF(
+      name: {}
+      connect_timeout: 5s
+      type: EDS
+      eds_cluster_config: {{ eds_config: {{ ads: {{}} }} }}
+      lb_policy: MAGLEV
     )EOF",
                                                                      name));
 }
@@ -85,6 +93,29 @@ envoy::api::v2::Listener AdsIntegrationTest::buildListener(const std::string& na
             http_filters: [{{ name: envoy.router }}]
     )EOF",
       name, Network::Test::getLoopbackAddressString(ipVersion()), stat_prefix, route_config));
+}
+
+envoy::api::v2::Listener AdsIntegrationTest::buildRedisListener(const std::string& name,
+                                                                const std::string& cluster) {
+  return TestUtility::parseYaml<envoy::api::v2::Listener>(fmt::format(
+      R"EOF(
+      name: {}
+      address:
+        socket_address:
+          address: {}
+          port_value: 0
+      filter_chains:
+        filters:
+        - name: envoy.redis_proxy
+          config:
+            settings: 
+              op_timeout: 1s
+            stat_prefix: {}
+            prefix_routes:
+              catch_all_route: 
+                cluster: {}
+    )EOF",
+      name, Network::Test::getLoopbackAddressString(ipVersion()), name, cluster));
 }
 
 envoy::api::v2::RouteConfiguration
@@ -145,7 +176,7 @@ void AdsIntegrationTest::initializeAds(const bool rate_limiting) {
 
 void AdsIntegrationTest::testBasicFlow() {
   // Send initial configuration, validate we can process a request.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
   sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
                                                  {buildCluster("cluster_0")},
                                                  {buildCluster("cluster_0")}, {}, "1");

@@ -19,9 +19,10 @@ public:
                        const Protobuf::MethodDescriptor& service_method, absl::string_view type_url,
                        SubscriptionCallbacks& callbacks, SubscriptionStats stats,
                        Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
-                       std::chrono::milliseconds init_fetch_timeout)
-      : callbacks_(callbacks), grpc_mux_(local_info, std::move(async_client), dispatcher,
-                                         service_method, random, scope, rate_limit_settings),
+                       std::chrono::milliseconds init_fetch_timeout, bool skip_subsequent_node)
+      : callbacks_(callbacks),
+        grpc_mux_(local_info, std::move(async_client), dispatcher, service_method, random, scope,
+                  rate_limit_settings, skip_subsequent_node),
         grpc_mux_subscription_(grpc_mux_, callbacks_, stats, type_url, dispatcher,
                                init_fetch_timeout) {}
 

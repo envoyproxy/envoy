@@ -16,10 +16,20 @@
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
+#include "common/runtime/runtime_impl.h"
 
 namespace Envoy {
 namespace Http {
 namespace Http1 {
+namespace {
+
+const StringUtil::CaseUnorderedSet& caseUnorderdSetContainingUpgradeAndHttp2Settings() {
+  CONSTRUCT_ON_FIRST_USE(StringUtil::CaseUnorderedSet,
+                         Http::Headers::get().ConnectionValues.Upgrade,
+                         Http::Headers::get().ConnectionValues.Http2Settings);
+}
+
+} // namespace
 
 const std::string StreamEncoderImpl::CRLF = "\r\n";
 const std::string StreamEncoderImpl::LAST_CHUNK = "0\r\n\r\n";
@@ -162,6 +172,10 @@ void StreamEncoderImpl::encodeData(Buffer::Instance& data, bool end_stream) {
 }
 
 void StreamEncoderImpl::encodeTrailers(const HeaderMap&) { endEncode(); }
+
+void StreamEncoderImpl::encodeMetadata(const MetadataMapVector&) {
+  connection_.stats().metadata_not_supported_error_.inc();
+}
 
 void StreamEncoderImpl::endEncode() {
   if (chunk_encoding_) {
@@ -320,20 +334,14 @@ const ToLowerTable& ConnectionImpl::toLowerTable() {
   return *table;
 }
 
-// TODO(alyssawilk) The overloaded constructors here and on {Client,Server}ConnectionImpl
-// can be cleaned up once "strict_header_validation" becomes the default behavior, rather
-// than a runtime-guarded one. The overloads were a workaround for the fact that Runtime
-// doesn't work from integration test call sites in scenarios where the required
-// thread-local storage is not available.
-ConnectionImpl::ConnectionImpl(Network::Connection& connection, http_parser_type type,
-                               uint32_t max_headers_kb)
-    : ConnectionImpl::ConnectionImpl(connection, type, max_headers_kb, false) {}
-
-ConnectionImpl::ConnectionImpl(Network::Connection& connection, http_parser_type type,
-                               uint32_t max_headers_kb, bool strict_header_validation)
-    : connection_(connection), output_buffer_([&]() -> void { this->onBelowLowWatermark(); },
-                                              [&]() -> void { this->onAboveHighWatermark(); }),
-      max_headers_kb_(max_headers_kb), strict_header_validation_(strict_header_validation) {
+ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
+                               http_parser_type type, uint32_t max_request_headers_kb)
+    : connection_(connection), stats_{ALL_HTTP1_CODEC_STATS(POOL_COUNTER_PREFIX(stats, "http1."))},
+      output_buffer_([&]() -> void { this->onBelowLowWatermark(); },
+                     [&]() -> void { this->onAboveHighWatermark(); }),
+      max_request_headers_kb_(max_request_headers_kb),
+      strict_header_validation_(
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_header_validation")) {
   output_buffer_.setWatermarks(connection.bufferLimit());
   http_parser_init(&parser_, type);
   parser_.data = this;
@@ -454,7 +462,7 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
 
   const uint32_t total =
       current_header_field_.size() + current_header_value_.size() + current_header_map_->byteSize();
-  if (total > (max_headers_kb_ * 1024)) {
+  if (total > (max_request_headers_kb_ * 1024)) {
     error_code_ = Http::Code::RequestHeaderFieldsTooLarge;
     sendProtocolError();
     throw CodecProtocolException("headers size exceeds limit");
@@ -470,8 +478,28 @@ int ConnectionImpl::onHeadersCompleteBase() {
     protocol_ = Protocol::Http10;
   }
   if (Utility::isUpgrade(*current_header_map_)) {
-    ENVOY_CONN_LOG(trace, "codec entering upgrade mode.", connection_);
-    handling_upgrade_ = true;
+    // Ignore h2c upgrade requests until we support them.
+    // See https://github.com/envoyproxy/envoy/issues/7161 for details.
+    if (current_header_map_->Upgrade() &&
+        absl::EqualsIgnoreCase(current_header_map_->Upgrade()->value().getStringView(),
+                               Http::Headers::get().UpgradeValues.H2c)) {
+      ENVOY_CONN_LOG(trace, "removing unsupported h2c upgrade headers.", connection_);
+      current_header_map_->removeUpgrade();
+      if (current_header_map_->Connection()) {
+        const auto& tokens_to_remove = caseUnorderdSetContainingUpgradeAndHttp2Settings();
+        std::string new_value = StringUtil::removeTokens(
+            current_header_map_->Connection()->value().getStringView(), ",", tokens_to_remove, ",");
+        if (new_value.empty()) {
+          current_header_map_->removeConnection();
+        } else {
+          current_header_map_->Connection()->value(new_value);
+        }
+      }
+      current_header_map_->remove(Headers::get().Http2Settings);
+    } else {
+      ENVOY_CONN_LOG(trace, "codec entering upgrade mode.", connection_);
+      handling_upgrade_ = true;
+    }
   }
 
   int rc = onHeadersComplete(std::move(current_header_map_));
@@ -513,17 +541,10 @@ void ConnectionImpl::onResetStreamBase(StreamResetReason reason) {
   onResetStream(reason);
 }
 
-ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection,
+ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
                                            ServerConnectionCallbacks& callbacks,
                                            Http1Settings settings, uint32_t max_request_headers_kb)
-    : ServerConnectionImpl::ServerConnectionImpl(connection, callbacks, settings,
-                                                 max_request_headers_kb, false) {}
-
-ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection,
-                                           ServerConnectionCallbacks& callbacks,
-                                           Http1Settings settings, uint32_t max_request_headers_kb,
-                                           bool strict_header_validation)
-    : ConnectionImpl(connection, HTTP_REQUEST, max_request_headers_kb, strict_header_validation),
+    : ConnectionImpl(connection, stats, HTTP_REQUEST, max_request_headers_kb),
       callbacks_(callbacks), codec_settings_(settings) {}
 
 void ServerConnectionImpl::onEncodeComplete() {
@@ -695,14 +716,9 @@ void ServerConnectionImpl::onBelowLowWatermark() {
   }
 }
 
-ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection,
-                                           ConnectionCallbacks& callbacks)
-    : ClientConnectionImpl::ClientConnectionImpl(connection, callbacks, false) {}
-
-ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks&,
-                                           bool strict_header_validation)
-    : ConnectionImpl(connection, HTTP_RESPONSE, MAX_RESPONSE_HEADERS_KB, strict_header_validation) {
-}
+ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
+                                           ConnectionCallbacks&)
+    : ConnectionImpl(connection, stats, HTTP_RESPONSE, MAX_RESPONSE_HEADERS_KB) {}
 
 bool ClientConnectionImpl::cannotHaveBody() {
   if ((!pending_responses_.empty() && pending_responses_.front().head_request_) ||

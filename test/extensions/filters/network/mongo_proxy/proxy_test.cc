@@ -8,6 +8,7 @@
 
 #include "extensions/filters/network/mongo_proxy/bson_impl.h"
 #include "extensions/filters/network/mongo_proxy/codec_impl.h"
+#include "extensions/filters/network/mongo_proxy/mongo_stats.h"
 #include "extensions/filters/network/mongo_proxy/proxy.h"
 #include "extensions/filters/network/well_known_names.h"
 
@@ -22,7 +23,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::AnyNumber;
 using testing::AtLeast;
 using testing::Invoke;
 using testing::Matcher;
@@ -62,7 +62,7 @@ public:
 
 class MongoProxyFilterTest : public testing::Test {
 public:
-  MongoProxyFilterTest() { setup(); }
+  MongoProxyFilterTest() : mongo_stats_(std::make_shared<MongoStats>(store_, "test")) { setup(); }
 
   void setup() {
     ON_CALL(runtime_.snapshot_, featureEnabled("mongo.proxy_enabled", 100))
@@ -82,9 +82,9 @@ public:
   }
 
   void initializeFilter(bool emit_dynamic_metadata = false) {
-    filter_ = std::make_unique<TestProxyFilter>("test.", store_, runtime_, access_log_,
-                                                fault_config_, drain_decision_,
-                                                dispatcher_.timeSource(), emit_dynamic_metadata);
+    filter_ = std::make_unique<TestProxyFilter>(
+        "test.", store_, runtime_, access_log_, fault_config_, drain_decision_,
+        dispatcher_.timeSource(), emit_dynamic_metadata, mongo_stats_);
     filter_->initializeReadFilterCallbacks(read_filter_callbacks_);
     filter_->onNewConnection();
 
@@ -114,6 +114,7 @@ public:
 
   Buffer::OwnedImpl fake_data_;
   NiceMock<TestStatStore> store_;
+  MongoStatsSharedPtr mongo_stats_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Envoy::AccessLog::MockAccessLogFile> file_{
@@ -133,7 +134,7 @@ TEST_F(MongoProxyFilterTest, DelayFaults) {
 
   Event::MockTimer* delay_timer =
       new Event::MockTimer(&read_filter_callbacks_.connection_.dispatcher_);
-  EXPECT_CALL(*delay_timer, enableTimer(std::chrono::milliseconds(10)));
+  EXPECT_CALL(*delay_timer, enableTimer(std::chrono::milliseconds(10), _));
   EXPECT_CALL(*file_, write(_)).Times(AtLeast(1));
 
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
@@ -178,7 +179,7 @@ TEST_F(MongoProxyFilterTest, DelayFaults) {
   EXPECT_EQ(1U, store_.counter("test.op_kill_cursors").value());
 
   EXPECT_CALL(read_filter_callbacks_, continueReading());
-  delay_timer->callback_();
+  delay_timer->invokeCallback();
   EXPECT_EQ(1U, store_.counter("test.delays_injected").value());
 }
 
@@ -551,14 +552,14 @@ TEST_F(MongoProxyFilterTest, ConcurrentQueryWithDrainClose) {
         .WillByDefault(Return(true));
     EXPECT_CALL(drain_decision_, drainClose()).WillOnce(Return(true));
     drain_timer = new Event::MockTimer(&read_filter_callbacks_.connection_.dispatcher_);
-    EXPECT_CALL(*drain_timer, enableTimer(std::chrono::milliseconds(0)));
+    EXPECT_CALL(*drain_timer, enableTimer(std::chrono::milliseconds(0), _));
     filter_->callbacks_->decodeReply(std::move(message));
   }));
   filter_->onWrite(fake_data_, false);
 
   EXPECT_CALL(read_filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
   EXPECT_CALL(*drain_timer, disableTimer());
-  drain_timer->callback_();
+  drain_timer->invokeCallback();
 
   EXPECT_EQ(0U, store_.gauge("test.op_query_active", Stats::Gauge::ImportMode::Accumulate).value());
   EXPECT_EQ(1U, store_.counter("test.cx_drain_close").value());
@@ -595,7 +596,7 @@ TEST_F(MongoProxyFilterTest, ConnectionDestroyLocal) {
 
   Event::MockTimer* delay_timer =
       new Event::MockTimer(&read_filter_callbacks_.connection_.dispatcher_);
-  EXPECT_CALL(*delay_timer, enableTimer(std::chrono::milliseconds(10)));
+  EXPECT_CALL(*delay_timer, enableTimer(std::chrono::milliseconds(10), _));
 
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     QueryMessagePtr message(new QueryMessageImpl(0, 0));
@@ -619,7 +620,7 @@ TEST_F(MongoProxyFilterTest, ConnectionDestroyRemote) {
 
   Event::MockTimer* delay_timer =
       new Event::MockTimer(&read_filter_callbacks_.connection_.dispatcher_);
-  EXPECT_CALL(*delay_timer, enableTimer(std::chrono::milliseconds(10)));
+  EXPECT_CALL(*delay_timer, enableTimer(std::chrono::milliseconds(10), _));
 
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     QueryMessagePtr message(new QueryMessageImpl(0, 0));

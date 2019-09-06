@@ -43,10 +43,10 @@ public:
                             Event::Dispatcher& main_thread_dispatcher,
                             const LocalInfo::LocalInfo& local_info,
                             Secret::SecretManager& secret_manager,
-                            ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
+                            ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
                             Http::Context& http_context, AccessLog::AccessLogManager& log_manager,
                             Singleton::Manager& singleton_manager)
-      : main_thread_dispatcher_(main_thread_dispatcher), validation_visitor_(validation_visitor),
+      : main_thread_dispatcher_(main_thread_dispatcher), validation_context_(validation_context),
         api_(api), http_context_(http_context), admin_(admin), runtime_(runtime), stats_(stats),
         tls_(tls), random_(random), dns_resolver_(dns_resolver),
         ssl_context_manager_(ssl_context_manager), local_info_(local_info),
@@ -74,7 +74,7 @@ public:
 
 protected:
   Event::Dispatcher& main_thread_dispatcher_;
-  ProtobufMessage::ValidationVisitor& validation_visitor_;
+  ProtobufMessage::ValidationContext& validation_context_;
   Api::Api& api_;
   Http::Context& http_context_;
   Server::Admin& admin_;
@@ -90,6 +90,9 @@ protected:
   Singleton::Manager& singleton_manager_;
 };
 
+// For friend declaration in ClusterManagerInitHelper.
+class ClusterManagerImpl;
+
 /**
  * This is a helper class used during cluster management initialization. Dealing with primary
  * clusters, secondary clusters, and CDS, is quite complicated, so this makes it easier to test.
@@ -100,8 +103,9 @@ public:
    * @param per_cluster_init_callback supplies the callback to call when a cluster has itself
    *        initialized. The cluster manager can use this for post-init processing.
    */
-  ClusterManagerInitHelper(const std::function<void(Cluster&)>& per_cluster_init_callback)
-      : per_cluster_init_callback_(per_cluster_init_callback) {}
+  ClusterManagerInitHelper(ClusterManager& cm,
+                           const std::function<void(Cluster&)>& per_cluster_init_callback)
+      : cm_(cm), per_cluster_init_callback_(per_cluster_init_callback) {}
 
   enum class State {
     // Initial state. During this state all static clusters are loaded. Any phase 1 clusters
@@ -128,9 +132,14 @@ public:
   State state() const { return state_; }
 
 private:
+  // To enable invariant assertions on the cluster lists.
+  friend ClusterManagerImpl;
+
+  void initializeSecondaryClusters();
   void maybeFinishInitialize();
   void onClusterInit(Cluster& cluster);
 
+  ClusterManager& cm_;
   std::function<void(Cluster& cluster)> per_cluster_init_callback_;
   CdsApi* cds_{};
   std::function<void()> initialized_callback_;
@@ -173,7 +182,7 @@ public:
                      Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
                      AccessLog::AccessLogManager& log_manager,
                      Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
-                     ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
+                     ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
                      Http::Context& http_context);
 
   // Upstream::ClusterManager
@@ -232,7 +241,8 @@ public:
   std::size_t warmingClusterCount() const override { return warming_clusters_.size(); }
 
 protected:
-  virtual void postThreadLocalHostRemoval(const Cluster& cluster, const HostVector& hosts_removed);
+  virtual void postThreadLocalDrainConnections(const Cluster& cluster,
+                                               const HostVector& hosts_removed);
   virtual void postThreadLocalClusterUpdate(const Cluster& cluster, uint32_t priority,
                                             const HostVector& hosts_added,
                                             const HostVector& hosts_removed);
@@ -293,7 +303,7 @@ private:
     struct ClusterEntry : public ThreadLocalCluster {
       ClusterEntry(ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster,
                    const LoadBalancerFactorySharedPtr& lb_factory);
-      ~ClusterEntry();
+      ~ClusterEntry() override;
 
       Http::ConnectionPool::Instance* connPool(ResourcePriority priority, Http::Protocol protocol,
                                                LoadBalancerContext* context);
@@ -323,7 +333,7 @@ private:
 
     ThreadLocalClusterManagerImpl(ClusterManagerImpl& parent, Event::Dispatcher& dispatcher,
                                   const absl::optional<std::string>& local_cluster_name);
-    ~ThreadLocalClusterManagerImpl();
+    ~ThreadLocalClusterManagerImpl() override;
     void drainConnPools(const HostVector& hosts);
     void drainConnPools(HostSharedPtr old_host, ConnPoolsContainer& container);
     void clearContainer(HostSharedPtr old_host, ConnPoolsContainer& container);
@@ -419,9 +429,13 @@ private:
     // This is default constructed to the clock's epoch:
     // https://en.cppreference.com/w/cpp/chrono/time_point/time_point
     //
-    // This will usually be the computer's boot time, which means that given a not very large
-    // `Cluster.CommonLbConfig.update_merge_window`, the first update will trigger immediately
-    // (the expected behavior).
+    // Depending on your execution environment this value can be different.
+    // When running as host process: This will usually be the computer's boot time, which means that
+    // given a not very large `Cluster.CommonLbConfig.update_merge_window`, the first update will
+    // trigger immediately (the expected behavior). When running in some sandboxed environment this
+    // value can be set to the start time of the sandbox, which means that the delta calculated
+    // between now and the start time may fall within the
+    // `Cluster.CommonLbConfig.update_merge_window`, with the side effect to delay the first update.
     MonotonicTime last_updated_;
   };
 

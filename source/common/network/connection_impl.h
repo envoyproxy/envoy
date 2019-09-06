@@ -81,7 +81,7 @@ public:
   }
   absl::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const override;
   void setConnectionStats(const ConnectionStats& stats) override;
-  const Ssl::ConnectionInfo* ssl() const override { return transport_socket_->ssl(); }
+  Ssl::ConnectionInfoConstSharedPtr ssl() const override { return transport_socket_->ssl(); }
   State state() const override;
   void write(Buffer::Instance& data, bool end_stream) override;
   void setBufferLimits(uint32_t limit) override;
@@ -146,6 +146,8 @@ protected:
   Buffer::OwnedImpl read_buffer_;
   // This must be a WatermarkBuffer, but as it is created by a factory the ConnectionImpl only has
   // a generic pointer.
+  // It MUST be defined after the filter_manager_ as some filters may have callbacks that
+  // write_buffer_ invokes during its clean up.
   Buffer::InstancePtr write_buffer_;
   uint32_t read_buffer_limit_ = 0;
   std::chrono::milliseconds delayed_close_timeout_{0};

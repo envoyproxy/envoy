@@ -29,9 +29,6 @@ using testing::_;
 using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
-using testing::Return;
-using testing::ReturnRef;
-using testing::SaveArg;
 
 namespace Envoy {
 namespace Router {
@@ -75,7 +72,7 @@ public:
     route_config_provider_manager_ =
         std::make_unique<RouteConfigProviderManagerImpl>(factory_context_.admin_);
   }
-  ~RdsImplTest() { factory_context_.thread_local_.shutdownThread(); }
+  ~RdsImplTest() override { factory_context_.thread_local_.shutdownThread(); }
 
   void setup() {
     const std::string config_json = R"EOF(
@@ -256,7 +253,8 @@ TEST_F(RdsImplTest, FailureSubscription) {
   setup();
 
   EXPECT_CALL(init_watcher_, ready());
-  rds_callbacks_->onConfigUpdateFailed({});
+  rds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure,
+                                       {});
 }
 
 class RouteConfigProviderManagerImplTest : public RdsTestBase {
@@ -265,8 +263,8 @@ public:
     // Get a RouteConfigProvider. This one should create an entry in the RouteConfigProviderManager.
     rds_.set_route_config_name("foo_route_config");
     rds_.mutable_config_source()->set_path("foo_path");
-    provider_ = route_config_provider_manager_->createRdsRouteConfigProvider(rds_, factory_context_,
-                                                                             "foo_prefix.");
+    provider_ = route_config_provider_manager_->createRdsRouteConfigProvider(
+        rds_, factory_context_, "foo_prefix.", factory_context_.initManager());
     rds_callbacks_ = factory_context_.cluster_manager_.subscription_factory_.callbacks_;
   }
 
@@ -276,7 +274,9 @@ public:
         std::make_unique<RouteConfigProviderManagerImpl>(factory_context_.admin_);
   }
 
-  ~RouteConfigProviderManagerImplTest() { factory_context_.thread_local_.shutdownThread(); }
+  ~RouteConfigProviderManagerImplTest() override {
+    factory_context_.thread_local_.shutdownThread();
+  }
 
   envoy::config::filter::network::http_connection_manager::v2::Rds rds_;
   std::unique_ptr<RouteConfigProviderManagerImpl> route_config_provider_manager_;
@@ -292,7 +292,7 @@ envoy::api::v2::RouteConfiguration parseRouteConfigurationFromV2Yaml(const std::
 TEST_F(RouteConfigProviderManagerImplTest, ConfigDump) {
   auto message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"]();
   const auto& route_config_dump =
-      MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::RoutesConfigDump&>(
+      TestUtility::downcastAndValidate<const envoy::admin::v2alpha::RoutesConfigDump&>(
           *message_ptr);
 
   // No routes at all, no last_updated timestamp
@@ -322,7 +322,7 @@ virtual_hosts:
           parseRouteConfigurationFromV2Yaml(config_yaml), factory_context_);
   message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"]();
   const auto& route_config_dump2 =
-      MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::RoutesConfigDump&>(
+      TestUtility::downcastAndValidate<const envoy::admin::v2alpha::RoutesConfigDump&>(
           *message_ptr);
   TestUtility::loadFromYaml(R"EOF(
 static_route_configs:
@@ -365,7 +365,7 @@ dynamic_route_configs:
   rds_callbacks_->onConfigUpdate(response1.resources(), response1.version_info());
   message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"]();
   const auto& route_config_dump3 =
-      MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::RoutesConfigDump&>(
+      TestUtility::downcastAndValidate<const envoy::admin::v2alpha::RoutesConfigDump&>(
           *message_ptr);
   TestUtility::loadFromYaml(R"EOF(
 static_route_configs:
@@ -416,7 +416,7 @@ virtual_hosts:
                                                                                      "1");
 
   RouteConfigProviderPtr provider2 = route_config_provider_manager_->createRdsRouteConfigProvider(
-      rds_, factory_context_, "foo_prefix");
+      rds_, factory_context_, "foo_prefix", factory_context_.initManager());
 
   // provider2 should have route config immediately after create
   EXPECT_TRUE(provider2->configInfo().has_value());
@@ -430,7 +430,7 @@ virtual_hosts:
   rds2.set_route_config_name("foo_route_config");
   rds2.mutable_config_source()->set_path("bar_path");
   RouteConfigProviderPtr provider3 = route_config_provider_manager_->createRdsRouteConfigProvider(
-      rds2, factory_context_, "foo_prefix");
+      rds2, factory_context_, "foo_prefix", factory_context_.initManager());
   EXPECT_NE(provider3, provider_);
   factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(route_configs,
                                                                                      "provider3");
@@ -488,6 +488,72 @@ TEST_F(RouteConfigProviderManagerImplTest, onConfigUpdateWrongSize) {
       factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
           route_configs, ""),
       EnvoyException, "Unexpected RDS resource length: 2");
+}
+
+// Regression test for https://github.com/envoyproxy/envoy/issues/7939
+TEST_F(RouteConfigProviderManagerImplTest, ConfigDumpAfterConfigRejected) {
+  auto message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"]();
+  const auto& route_config_dump =
+      TestUtility::downcastAndValidate<const envoy::admin::v2alpha::RoutesConfigDump&>(
+          *message_ptr);
+
+  // No routes at all, no last_updated timestamp
+  envoy::admin::v2alpha::RoutesConfigDump expected_route_config_dump;
+  TestUtility::loadFromYaml(R"EOF(
+static_route_configs:
+dynamic_route_configs:
+)EOF",
+                            expected_route_config_dump);
+  EXPECT_EQ(expected_route_config_dump.DebugString(), route_config_dump.DebugString());
+
+  timeSystem().setSystemTime(std::chrono::milliseconds(1234567891234));
+
+  // dynamic.
+  setup();
+  EXPECT_CALL(*factory_context_.cluster_manager_.subscription_factory_.subscription_, start(_));
+  factory_context_.init_manager_.initialize(init_watcher_);
+
+  const std::string response1_yaml = R"EOF(
+version_info: '1'
+resources:
+- "@type": type.googleapis.com/envoy.api.v2.RouteConfiguration
+  name: foo_route_config
+  virtual_hosts:
+  - name: integration
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/foo"
+      route:
+        cluster_header: ":authority"
+  - name: duplicate
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/foo"
+      route:
+        cluster_header: ":authority"
+)EOF";
+  auto response1 = TestUtility::parseYaml<envoy::api::v2::DiscoveryResponse>(response1_yaml);
+
+  EXPECT_CALL(init_watcher_, ready());
+
+  EXPECT_THROW_WITH_MESSAGE(
+      rds_callbacks_->onConfigUpdate(response1.resources(), response1.version_info()),
+      EnvoyException, "Only a single wildcard domain is permitted");
+
+  message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"]();
+  const auto& route_config_dump3 =
+      TestUtility::downcastAndValidate<const envoy::admin::v2alpha::RoutesConfigDump&>(
+          *message_ptr);
+  TestUtility::loadFromYaml(R"EOF(
+static_route_configs:
+dynamic_route_configs:
+)EOF",
+                            expected_route_config_dump);
+  EXPECT_EQ(expected_route_config_dump.DebugString(), route_config_dump3.DebugString());
 }
 
 } // namespace

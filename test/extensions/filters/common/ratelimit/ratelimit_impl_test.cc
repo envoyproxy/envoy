@@ -20,12 +20,10 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::AtLeast;
 using testing::Eq;
 using testing::Invoke;
 using testing::Ref;
 using testing::Return;
-using testing::WithArg;
 
 namespace Envoy {
 namespace Extensions {
@@ -36,7 +34,7 @@ namespace {
 
 class MockRequestCallbacks : public RequestCallbacks {
 public:
-  void complete(LimitStatus status, Http::HeaderMapPtr&& headers) {
+  void complete(LimitStatus status, Http::HeaderMapPtr&& headers) override {
     complete_(status, headers.get());
   }
 

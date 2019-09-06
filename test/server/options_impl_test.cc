@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "envoy/common/exception.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 
 #include "common/common/utility.h"
 
@@ -24,8 +25,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
-
-using testing::HasSubstr;
 
 namespace Envoy {
 namespace {
@@ -75,7 +74,8 @@ TEST_F(OptionsImplTest, All) {
       "--service-cluster cluster --service-node node --service-zone zone "
       "--file-flush-interval-msec 9000 "
       "--drain-time-s 60 --log-format [%v] --parent-shutdown-time-s 90 --log-path /foo/bar "
-      "--disable-hot-restart --cpuset-threads");
+      "--disable-hot-restart --cpuset-threads --allow-unknown-static-fields "
+      "--reject-unknown-dynamic-fields");
   EXPECT_EQ(Server::Mode::Validate, options->mode());
   EXPECT_EQ(2U, options->concurrency());
   EXPECT_EQ("hello", options->configPath());
@@ -92,12 +92,35 @@ TEST_F(OptionsImplTest, All) {
   EXPECT_EQ(std::chrono::milliseconds(9000), options->fileFlushIntervalMsec());
   EXPECT_EQ(std::chrono::seconds(60), options->drainTime());
   EXPECT_EQ(std::chrono::seconds(90), options->parentShutdownTime());
-  EXPECT_EQ(true, options->hotRestartDisabled());
-  EXPECT_EQ(true, options->libeventBufferEnabled());
-  EXPECT_EQ(true, options->cpusetThreadsEnabled());
+  EXPECT_TRUE(options->hotRestartDisabled());
+  EXPECT_FALSE(options->libeventBufferEnabled());
+  EXPECT_TRUE(options->cpusetThreadsEnabled());
+  EXPECT_TRUE(options->allowUnknownStaticFields());
+  EXPECT_TRUE(options->rejectUnknownDynamicFields());
+  EXPECT_TRUE(options->fakeSymbolTableEnabled());
 
   options = createOptionsImpl("envoy --mode init_only");
   EXPECT_EQ(Server::Mode::InitOnly, options->mode());
+}
+
+// Either variants of allow-unknown-[static-]-fields works.
+TEST_F(OptionsImplTest, AllowUnknownFields) {
+  {
+    std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy");
+    EXPECT_FALSE(options->allowUnknownStaticFields());
+  }
+  {
+    std::unique_ptr<OptionsImpl> options;
+    EXPECT_LOG_CONTAINS(
+        "warning",
+        "--allow-unknown-fields is deprecated, use --allow-unknown-static-fields instead.",
+        options = createOptionsImpl("envoy --allow-unknown-fields"));
+    EXPECT_TRUE(options->allowUnknownStaticFields());
+  }
+  {
+    std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --allow-unknown-static-fields");
+    EXPECT_TRUE(options->allowUnknownStaticFields());
+  }
 }
 
 TEST_F(OptionsImplTest, SetAll) {
@@ -105,10 +128,14 @@ TEST_F(OptionsImplTest, SetAll) {
   bool hot_restart_disabled = options->hotRestartDisabled();
   bool signal_handling_enabled = options->signalHandlingEnabled();
   bool cpuset_threads_enabled = options->cpusetThreadsEnabled();
+  bool fake_symbol_table_enabled = options->fakeSymbolTableEnabled();
 
   options->setBaseId(109876);
   options->setConcurrency(42);
   options->setConfigPath("foo");
+  envoy::config::bootstrap::v2::Bootstrap bootstrap_foo{};
+  bootstrap_foo.mutable_node()->set_id("foo");
+  options->setConfigProto(bootstrap_foo);
   options->setConfigYaml("bogus:");
   options->setAdminAddressPath("path");
   options->setLocalAddressIpVersion(Network::Address::IpVersion::v6);
@@ -126,10 +153,16 @@ TEST_F(OptionsImplTest, SetAll) {
   options->setHotRestartDisabled(!options->hotRestartDisabled());
   options->setSignalHandling(!options->signalHandlingEnabled());
   options->setCpusetThreads(!options->cpusetThreadsEnabled());
+  options->setAllowUnkownFields(true);
+  options->setRejectUnknownFieldsDynamic(true);
+  options->setFakeSymbolTableEnabled(!options->fakeSymbolTableEnabled());
 
   EXPECT_EQ(109876, options->baseId());
   EXPECT_EQ(42U, options->concurrency());
   EXPECT_EQ("foo", options->configPath());
+  envoy::config::bootstrap::v2::Bootstrap bootstrap_bar{};
+  bootstrap_bar.mutable_node()->set_id("foo");
+  EXPECT_TRUE(TestUtility::protoEqual(bootstrap_bar, options->configProto()));
   EXPECT_EQ("bogus:", options->configYaml());
   EXPECT_EQ("path", options->adminAddressPath());
   EXPECT_EQ(Network::Address::IpVersion::v6, options->localAddressIpVersion());
@@ -147,6 +180,9 @@ TEST_F(OptionsImplTest, SetAll) {
   EXPECT_EQ(!hot_restart_disabled, options->hotRestartDisabled());
   EXPECT_EQ(!signal_handling_enabled, options->signalHandlingEnabled());
   EXPECT_EQ(!cpuset_threads_enabled, options->cpusetThreadsEnabled());
+  EXPECT_TRUE(options->allowUnknownStaticFields());
+  EXPECT_TRUE(options->rejectUnknownDynamicFields());
+  EXPECT_EQ(!fake_symbol_table_enabled, options->fakeSymbolTableEnabled());
 
   // Validate that CommandLineOptions is constructed correctly.
   Server::CommandLineOptionsPtr command_line_options = options->toCommandLineOptions();
@@ -183,8 +219,8 @@ TEST_F(OptionsImplTest, DefaultParams) {
   EXPECT_EQ("", options->adminAddressPath());
   EXPECT_EQ(Network::Address::IpVersion::v4, options->localAddressIpVersion());
   EXPECT_EQ(Server::Mode::Serve, options->mode());
-  EXPECT_EQ(false, options->hotRestartDisabled());
-  EXPECT_EQ(false, options->cpusetThreadsEnabled());
+  EXPECT_FALSE(options->hotRestartDisabled());
+  EXPECT_FALSE(options->cpusetThreadsEnabled());
 
   // Validate that CommandLineOptions is constructed correctly with default params.
   Server::CommandLineOptionsPtr command_line_options = options->toCommandLineOptions();
@@ -195,8 +231,10 @@ TEST_F(OptionsImplTest, DefaultParams) {
   EXPECT_EQ(envoy::admin::v2alpha::CommandLineOptions::v4,
             command_line_options->local_address_ip_version());
   EXPECT_EQ(envoy::admin::v2alpha::CommandLineOptions::Serve, command_line_options->mode());
-  EXPECT_EQ(false, command_line_options->disable_hot_restart());
-  EXPECT_EQ(false, command_line_options->cpuset_threads());
+  EXPECT_FALSE(command_line_options->disable_hot_restart());
+  EXPECT_FALSE(command_line_options->cpuset_threads());
+  EXPECT_FALSE(command_line_options->allow_unknown_static_fields());
+  EXPECT_FALSE(command_line_options->reject_unknown_dynamic_fields());
 }
 
 // Validates that the server_info proto is in sync with the options.
@@ -205,12 +243,15 @@ TEST_F(OptionsImplTest, OptionsAreInSyncWithProto) {
   Server::CommandLineOptionsPtr command_line_options = options->toCommandLineOptions();
   // Failure of this condition indicates that the server_info proto is not in sync with the options.
   // If an option is added/removed, please update server_info proto as well to keep it in sync.
-  // Currently the following 4 options are not defined in proto, hence the count differs by 5.
+  // Currently the following 7 options are not defined in proto, hence the count differs by 7.
   // 1. version        - default TCLAP argument.
   // 2. help           - default TCLAP argument.
   // 3. ignore_rest    - default TCLAP argument.
   // 4. use-libevent-buffers  - short-term override for rollout of new buffer implementation.
-  EXPECT_EQ(options->count() - 4, command_line_options->GetDescriptor()->field_count());
+  // 5. allow-unknown-fields  - deprecated alias of allow-unknown-static-fields.
+  // 6. use-fake-symbol-table - short-term override for rollout of real symbol-table implementation.
+  // 7. hot restart version - print the hot restart version and exit.
+  EXPECT_EQ(options->count() - 7, command_line_options->GetDescriptor()->field_count());
 }
 
 TEST_F(OptionsImplTest, BadCliOption) {
@@ -278,6 +319,8 @@ TEST_F(OptionsImplTest, SaneTestConstructor) {
 
   EXPECT_EQ(regular_options_impl->baseId(), test_options_impl.baseId());
   EXPECT_EQ(regular_options_impl->configPath(), test_options_impl.configPath());
+  EXPECT_TRUE(TestUtility::protoEqual(regular_options_impl->configProto(),
+                                      test_options_impl.configProto()));
   EXPECT_EQ(regular_options_impl->configYaml(), test_options_impl.configYaml());
   EXPECT_EQ(regular_options_impl->adminAddressPath(), test_options_impl.adminAddressPath());
   EXPECT_EQ(regular_options_impl->localAddressIpVersion(),

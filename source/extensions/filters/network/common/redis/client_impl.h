@@ -49,6 +49,7 @@ public:
   uint32_t maxUpstreamUnknownConnections() const override {
     return max_upstream_unknown_connections_;
   }
+  ReadPolicy readPolicy() const override { return read_policy_; }
 
 private:
   const std::chrono::milliseconds op_timeout_;
@@ -57,6 +58,7 @@ private:
   const uint32_t max_buffer_size_before_flush_;
   const std::chrono::milliseconds buffer_flush_timeout_;
   const uint32_t max_upstream_unknown_connections_;
+  ReadPolicy read_policy_;
 };
 
 class ClientImpl : public Client, public DecoderCallbacks, public Network::ConnectionCallbacks {
@@ -65,7 +67,7 @@ public:
                           EncoderPtr&& encoder, DecoderFactory& decoder_factory,
                           const Config& config);
 
-  ~ClientImpl();
+  ~ClientImpl() override;
 
   // Client
   void addConnectionCallbacks(Network::ConnectionCallbacks& callbacks) override {
@@ -93,7 +95,7 @@ private:
 
   struct PendingRequest : public PoolRequest {
     PendingRequest(ClientImpl& parent, PoolCallbacks& callbacks);
-    ~PendingRequest();
+    ~PendingRequest() override;
 
     // PoolRequest
     void cancel() override;
