@@ -62,16 +62,15 @@ TEST(UtilityTest, TestImportPublicKey) {
              "d5af8136a9630a6cc0cde157dc8e00f39540628d5f335b2c36c54c7c8bc3738a6b21acff815405afa28e5"
              "183f550dac19abcf1145a7f9ced987db680e4a229cac75dee347ec9ebce1fc3dbbbb0203010001";
 
-  Common::Crypto::CryptoObjectPtr cryptoPtr(
+  Common::Crypto::CryptoObjectPtr crypto_ptr(
       Common::Crypto::Utility::importPublicKey(Hex::decode(key)));
-  auto wrapper =
-      Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*(cryptoPtr.get()));
+  auto wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*crypto_ptr);
   EVP_PKEY* pkey = wrapper->getEVP_PKEY();
   EXPECT_NE(nullptr, pkey);
 
   key = "badkey";
-  cryptoPtr = Common::Crypto::Utility::importPublicKey(Hex::decode(key));
-  wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*(cryptoPtr.get()));
+  crypto_ptr = Common::Crypto::Utility::importPublicKey(Hex::decode(key));
+  wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*crypto_ptr);
   pkey = wrapper->getEVP_PKEY();
   EXPECT_EQ(nullptr, pkey);
 }
@@ -110,8 +109,8 @@ TEST(UtilityTest, TestVerifySignature) {
   EXPECT_EQ(false, result.result_);
   EXPECT_EQ("unknown is not supported.", result.error_message_);
 
-  auto emptyCrypto = new PublicKeyObject();
-  result = Utility::verifySignature(hash_func, *emptyCrypto, sig, text);
+  auto empty_crypto = new PublicKeyObject();
+  result = Utility::verifySignature(hash_func, *empty_crypto, sig, text);
   EXPECT_EQ(false, result.result_);
   EXPECT_EQ("Failed to initialize digest verify.", result.error_message_);
 
