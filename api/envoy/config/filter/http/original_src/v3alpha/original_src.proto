@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package envoy.config.filter.http.original_src.v3alpha;
+
+option java_outer_classname = "OriginalSrcProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.config.filter.http.original_src.v3alpha";
+
+import "validate/validate.proto";
+
+// [#protodoc-title: Original Src Filter]
+// Use the Original source address on upstream connections.
+
+// The Original Src filter binds upstream connections to the original source address determined
+// for the request. This address could come from something like the Proxy Protocol filter, or it
+// could come from trusted http headers.
+message OriginalSrc {
+
+  // Sets the SO_MARK option on the upstream connection's socket to the provided value. Used to
+  // ensure that non-local addresses may be routed back through envoy when binding to the original
+  // source address. The option will not be applied if the mark is 0.
+  // [#proto-status: experimental]
+  uint32 mark = 1;
+}

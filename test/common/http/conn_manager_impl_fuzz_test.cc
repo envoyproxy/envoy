@@ -21,7 +21,6 @@
 #include "common/network/utility.h"
 #include "common/stats/symbol_table_creator.h"
 
-#include "test/common/http/conn_manager_impl_common.h"
 #include "test/common/http/conn_manager_impl_fuzz.pb.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"
@@ -30,6 +29,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/tracing/mocks.h"
@@ -47,13 +47,15 @@ namespace Http {
 class FuzzConfig : public ConnectionManagerConfig {
 public:
   FuzzConfig()
-      : route_config_provider_(time_system_), scoped_route_config_provider_(time_system_),
-        stats_{{ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(fake_stats_), POOL_GAUGE(fake_stats_),
+      : stats_{{ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(fake_stats_), POOL_GAUGE(fake_stats_),
                                         POOL_HISTOGRAM(fake_stats_))},
                "",
                fake_stats_},
         tracing_stats_{CONN_MAN_TRACING_STATS(POOL_COUNTER(fake_stats_))},
         listener_stats_{CONN_MAN_LISTENER_STATS(POOL_COUNTER(fake_stats_))} {
+    ON_CALL(route_config_provider_, lastUpdated()).WillByDefault(Return(time_system_.systemTime()));
+    ON_CALL(scoped_route_config_provider_, lastUpdated())
+        .WillByDefault(Return(time_system_.systemTime()));
     access_logs_.emplace_back(std::make_shared<NiceMock<AccessLog::MockInstance>>());
   }
 
@@ -86,11 +88,22 @@ public:
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
   std::chrono::milliseconds requestTimeout() const override { return request_timeout_; }
   std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
-  Router::RouteConfigProvider* routeConfigProvider() override { return &route_config_provider_; }
+  Router::RouteConfigProvider* routeConfigProvider() override {
+    if (use_srds_) {
+      return nullptr;
+    }
+    return &route_config_provider_;
+  }
   Config::ConfigProvider* scopedRouteConfigProvider() override {
-    return &scoped_route_config_provider_;
+    if (use_srds_) {
+      return &scoped_route_config_provider_;
+    }
+    return nullptr;
   }
   const std::string& serverName() override { return server_name_; }
+  HttpConnectionManagerProto::ServerHeaderTransformation serverHeaderTransformation() override {
+    return server_transformation_;
+  }
   ConnectionManagerStats& stats() override { return stats_; }
   ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() override { return use_remote_address_; }
@@ -121,9 +134,12 @@ public:
   NiceMock<MockFilterChainFactory> filter_factory_;
   Event::SimulatedTimeSystem time_system_;
   SlowDateProviderImpl date_provider_{time_system_};
-  ConnectionManagerImplHelper::RouteConfigProvider route_config_provider_;
-  ConnectionManagerImplHelper::ScopedRouteConfigProvider scoped_route_config_provider_;
+  bool use_srds_{};
+  Router::MockRouteConfigProvider route_config_provider_;
+  Router::MockScopedRouteConfigProvider scoped_route_config_provider_;
   std::string server_name_;
+  HttpConnectionManagerProto::ServerHeaderTransformation server_transformation_{
+      HttpConnectionManagerProto::OVERWRITE};
   Stats::IsolatedStoreImpl fake_stats_;
   ConnectionManagerStats stats_;
   ConnectionManagerTracingStats tracing_stats_;

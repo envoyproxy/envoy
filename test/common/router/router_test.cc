@@ -44,11 +44,9 @@ using testing::Invoke;
 using testing::Matcher;
 using testing::MockFunction;
 using testing::NiceMock;
-using testing::Ref;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
-using testing::SaveArg;
 using testing::StartsWith;
 
 namespace Envoy {

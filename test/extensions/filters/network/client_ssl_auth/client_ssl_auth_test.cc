@@ -25,9 +25,7 @@ using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
-using testing::ReturnNew;
 using testing::ReturnRef;
-using testing::WithArg;
 
 namespace Envoy {
 namespace Extensions {

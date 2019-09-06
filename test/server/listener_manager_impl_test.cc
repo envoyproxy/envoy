@@ -176,6 +176,7 @@ public:
     socket_ = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
     local_address_.reset(new Network::Address::Ipv4Instance("127.0.0.1", 1234));
     remote_address_.reset(new Network::Address::Ipv4Instance("127.0.0.1", 1234));
+    EXPECT_CALL(os_sys_calls_, close(_)).WillRepeatedly(Return(Api::SysCallIntResult{0, errno}));
   }
 
   const Network::FilterChain*
@@ -265,11 +266,9 @@ public:
                         const envoy::api::v2::core::SocketOption::SocketState& expected_state,
                         const Network::SocketOptionName& expected_option, int expected_value,
                         uint32_t expected_num_options = 1) {
-    NiceMock<Api::MockOsSysCalls> os_sys_calls;
-    TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
     if (expected_option.has_value()) {
       expectCreateListenSocket(expected_state, expected_num_options);
-      expectSetsockopt(os_sys_calls, expected_option.level(), expected_option.option(),
+      expectSetsockopt(os_sys_calls_, expected_option.level(), expected_option.option(),
                        expected_value, expected_num_options);
       manager_->addOrUpdateListener(listener, "", true);
       EXPECT_EQ(1U, manager_->listeners().size());
@@ -279,6 +278,10 @@ public:
       EXPECT_EQ(0U, manager_->listeners().size());
     }
   }
+
+protected:
+  NiceMock<Api::MockOsSysCalls> os_sys_calls_;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&os_sys_calls_};
 
 private:
   std::unique_ptr<Network::MockConnectionSocket> socket_;
@@ -390,9 +393,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
   EXPECT_CALL(server_.random_, uuid());
   EXPECT_CALL(listener_factory_,
               createListenSocket(_, Network::Address::SocketType::Datagram, _, true));
-  NiceMock<Api::MockOsSysCalls> os_sys_calls;
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-  EXPECT_CALL(os_sys_calls, setsockopt_(_, _, _, _, _)).Times(testing::AtLeast(1));
+  EXPECT_CALL(os_sys_calls_, setsockopt_(_, _, _, _, _)).Times(testing::AtLeast(1));
+  EXPECT_CALL(os_sys_calls_, close(_)).WillRepeatedly(Return(Api::SysCallIntResult{0, errno}));
   manager_->addOrUpdateListener(listener_proto, "", true);
   EXPECT_EQ(1u, manager_->listeners().size());
 }
@@ -694,6 +696,7 @@ drain_type: default
 
   ON_CALL(os_sys_calls, socket(AF_INET, _, 0)).WillByDefault(Return(Api::SysCallIntResult{5, 0}));
   ON_CALL(os_sys_calls, socket(AF_INET6, _, 0)).WillByDefault(Return(Api::SysCallIntResult{-1, 0}));
+  ON_CALL(os_sys_calls, close(_)).WillByDefault(Return(Api::SysCallIntResult{0, 0}));
 
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
 
@@ -726,6 +729,7 @@ drain_type: default
 
   ON_CALL(os_sys_calls, socket(AF_INET, _, 0)).WillByDefault(Return(Api::SysCallIntResult{-1, 0}));
   ON_CALL(os_sys_calls, socket(AF_INET6, _, 0)).WillByDefault(Return(Api::SysCallIntResult{5, 0}));
+  ON_CALL(os_sys_calls, close(_)).WillByDefault(Return(Api::SysCallIntResult{0, 0}));
 
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
 
@@ -2926,7 +2930,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TransparentFreebindListenerDisabl
 TEST_F(ListenerManagerImplWithRealFiltersTest, TransparentListenerEnabled) {
   auto listener = createIPv4Listener("TransparentListener");
   listener.mutable_transparent()->set_value(true);
-
   testSocketOption(listener, envoy::api::v2::core::SocketOption::STATE_PREBIND,
                    ENVOY_SOCKET_IP_TRANSPARENT, /* expected_value */ 1,
                    /* expected_num_options */ 2);
@@ -2961,9 +2964,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, FastOpenListenerEnabled) {
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, LiteralSockoptListenerEnabled) {
-  NiceMock<Api::MockOsSysCalls> os_sys_calls;
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-
   const envoy::api::v2::Listener listener = parseListenerFromV2Yaml(R"EOF(
     name: SockoptsListener
     address:
@@ -2981,11 +2981,11 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, LiteralSockoptListenerEnabled) {
 
   expectCreateListenSocket(envoy::api::v2::core::SocketOption::STATE_PREBIND,
                            /* expected_num_options */ 3);
-  expectSetsockopt(os_sys_calls,
+  expectSetsockopt(os_sys_calls_,
                    /* expected_sockopt_level */ 1,
                    /* expected_sockopt_name */ 2,
                    /* expected_value */ 3);
-  expectSetsockopt(os_sys_calls,
+  expectSetsockopt(os_sys_calls_,
                    /* expected_sockopt_level */ 4,
                    /* expected_sockopt_name */ 5,
                    /* expected_value */ 6);

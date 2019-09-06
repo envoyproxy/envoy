@@ -34,12 +34,6 @@
 
 #include "gtest/gtest.h"
 
-using testing::_;
-using testing::AnyNumber;
-using testing::HasSubstr;
-using testing::Invoke;
-using testing::Not;
-
 namespace Envoy {
 namespace {
 
@@ -302,6 +296,40 @@ void HttpIntegrationTest::cleanupUpstreamAndDownstream() {
   if (codec_client_) {
     codec_client_->close();
   }
+}
+
+void HttpIntegrationTest::sendRequestAndVerifyResponse(
+    const Http::TestHeaderMapImpl& request_headers, const int request_size,
+    const Http::TestHeaderMapImpl& response_headers, const int response_size,
+    const int backend_idx) {
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = sendRequestAndWaitForResponse(request_headers, request_size, response_headers,
+                                                response_size, backend_idx);
+  verifyResponse(std::move(response), "200", response_headers, std::string(response_size, 'a'));
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(request_size, upstream_request_->bodyLength());
+  cleanupUpstreamAndDownstream();
+}
+
+void HttpIntegrationTest::verifyResponse(IntegrationStreamDecoderPtr response,
+                                         const std::string& response_code,
+                                         const Http::TestHeaderMapImpl& expected_headers,
+                                         const std::string& expected_body) {
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ(response_code, response->headers().Status()->value().getStringView());
+  expected_headers.iterate(
+      [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
+        auto response_headers = static_cast<Http::HeaderMap*>(context);
+        const Http::HeaderEntry* entry =
+            response_headers->get(Http::LowerCaseString{std::string(header.key().getStringView())});
+        EXPECT_NE(entry, nullptr);
+        EXPECT_EQ(header.value().getStringView(), entry->value().getStringView());
+        return Http::HeaderMap::Iterate::Continue;
+      },
+      const_cast<void*>(static_cast<const void*>(&response->headers())));
+
+  EXPECT_EQ(response->body(), expected_body);
 }
 
 uint64_t
@@ -755,7 +783,7 @@ void HttpIntegrationTest::testEnvoyProxying100Continue(bool continue_before_upst
           auto* virtual_host = route_config->mutable_virtual_hosts(0);
           {
             auto* cors = virtual_host->mutable_cors();
-            cors->add_allow_origin("*");
+            cors->mutable_allow_origin_string_match()->Add()->set_exact("*");
             cors->set_allow_headers("content-type,x-grpc-web");
             cors->set_allow_methods("GET,POST");
           }

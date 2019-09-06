@@ -7,6 +7,7 @@
 #include "common/common/fmt.h"
 #include "common/common/macros.h"
 #include "common/common/utility.h"
+#include "common/grpc/common.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
@@ -26,11 +27,12 @@ static std::string valueOrDefault(const Http::HeaderEntry* header, const char* d
   return header ? std::string(header->value().getStringView()) : default_value;
 }
 
-static std::string buildUrl(const Http::HeaderMap& request_headers) {
+static std::string buildUrl(const Http::HeaderMap& request_headers,
+                            const uint32_t max_path_length) {
   std::string path(request_headers.EnvoyOriginalPath()
                        ? request_headers.EnvoyOriginalPath()->value().getStringView()
                        : request_headers.Path()->value().getStringView());
-  static const size_t max_path_length = 256;
+
   if (path.length() > max_path_length) {
     path = path.substr(0, max_path_length);
   }
@@ -81,6 +83,22 @@ Decision HttpTracerUtility::isTracing(const StreamInfo::StreamInfo& stream_info,
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
+static void addGrpcTags(Span& span, const Http::HeaderMap& headers) {
+  const Http::HeaderEntry* grpc_status_header = headers.GrpcStatus();
+  if (grpc_status_header) {
+    span.setTag(Tracing::Tags::get().GrpcStatusCode, grpc_status_header->value().getStringView());
+  }
+  const Http::HeaderEntry* grpc_message_header = headers.GrpcMessage();
+  if (grpc_message_header) {
+    span.setTag(Tracing::Tags::get().GrpcMessage, grpc_message_header->value().getStringView());
+  }
+  absl::optional<Grpc::Status::GrpcStatus> grpc_status_code = Grpc::Common::getGrpcStatus(headers);
+  // Set error tag when status is not OK.
+  if (grpc_status_code && grpc_status_code.value() != Grpc::Status::GrpcStatus::Ok) {
+    span.setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+  }
+}
+
 static void annotateVerbose(Span& span, const StreamInfo::StreamInfo& stream_info) {
   const auto start_time = stream_info.startTime();
   if (stream_info.lastDownstreamRxByteReceived()) {
@@ -121,6 +139,8 @@ static void annotateVerbose(Span& span, const StreamInfo::StreamInfo& stream_inf
 }
 
 void HttpTracerUtility::finalizeSpan(Span& span, const Http::HeaderMap* request_headers,
+                                     const Http::HeaderMap* response_headers,
+                                     const Http::HeaderMap* response_trailers,
                                      const StreamInfo::StreamInfo& stream_info,
                                      const Config& tracing_config) {
   // Pre response data.
@@ -129,7 +149,8 @@ void HttpTracerUtility::finalizeSpan(Span& span, const Http::HeaderMap* request_
       span.setTag(Tracing::Tags::get().GuidXRequestId,
                   std::string(request_headers->RequestId()->value().getStringView()));
     }
-    span.setTag(Tracing::Tags::get().HttpUrl, buildUrl(*request_headers));
+    span.setTag(Tracing::Tags::get().HttpUrl,
+                buildUrl(*request_headers, tracing_config.maxPathTagLength()));
     span.setTag(Tracing::Tags::get().HttpMethod,
                 std::string(request_headers->Method()->value().getStringView()));
     span.setTag(Tracing::Tags::get().DownstreamCluster,
@@ -162,6 +183,13 @@ void HttpTracerUtility::finalizeSpan(Span& span, const Http::HeaderMap* request_
   span.setTag(Tracing::Tags::get().ResponseSize, std::to_string(stream_info.bytesSent()));
   span.setTag(Tracing::Tags::get().ResponseFlags,
               StreamInfo::ResponseFlagUtils::toShortString(stream_info));
+
+  // GRPC data.
+  if (response_trailers && response_trailers->GrpcStatus() != nullptr) {
+    addGrpcTags(span, *response_trailers);
+  } else if (response_headers && response_headers->GrpcStatus() != nullptr) {
+    addGrpcTags(span, *response_headers);
+  }
 
   if (tracing_config.verbose()) {
     annotateVerbose(span, stream_info);

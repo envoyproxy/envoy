@@ -20,6 +20,7 @@ namespace Envoy {
   COUNTER(reopen_failed)                                                                           \
   COUNTER(write_buffered)                                                                          \
   COUNTER(write_completed)                                                                         \
+  COUNTER(write_failed)                                                                            \
   GAUGE(write_total_buffered, Accumulate)
 
 struct AccessLogFileStats {
@@ -34,9 +35,9 @@ public:
                        Event::Dispatcher& dispatcher, Thread::BasicLockable& lock,
                        Stats::Store& stats_store)
       : file_flush_interval_msec_(file_flush_interval_msec), api_(api), dispatcher_(dispatcher),
-        lock_(lock), file_stats_{ACCESS_LOG_FILE_STATS(
-                         POOL_COUNTER_PREFIX(stats_store, "access_log_file."),
-                         POOL_GAUGE_PREFIX(stats_store, "access_log_file."))} {}
+        lock_(lock), file_stats_{
+                         ACCESS_LOG_FILE_STATS(POOL_COUNTER_PREFIX(stats_store, "filesystem."),
+                                               POOL_GAUGE_PREFIX(stats_store, "filesystem."))} {}
 
   // AccessLog::AccessLogManager
   void reopen() override;

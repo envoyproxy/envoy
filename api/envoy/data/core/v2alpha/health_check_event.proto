@@ -11,9 +11,6 @@ import "envoy/api/v2/core/address.proto";
 import "google/protobuf/timestamp.proto";
 
 import "validate/validate.proto";
-import "gogoproto/gogo.proto";
-
-option (gogoproto.equal_all) = true;
 
 // [#protodoc-title: Health check logging events]
 // :ref:`Health check logging <arch_overview_health_check_logging>`.
@@ -43,7 +40,7 @@ message HealthCheckEvent {
   }
 
   // Timestamp for event.
-  google.protobuf.Timestamp timestamp = 6 [(gogoproto.stdtime) = true];
+  google.protobuf.Timestamp timestamp = 6;
 }
 
 enum HealthCheckFailureType {

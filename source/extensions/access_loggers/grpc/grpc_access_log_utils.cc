@@ -116,6 +116,7 @@ void Utility::responseFlagsToAccessLogResponseFlags(
 void Utility::extractCommonAccessLogProperties(
     envoy::data::accesslog::v2::AccessLogCommon& common_access_log,
     const StreamInfo::StreamInfo& stream_info) {
+  // TODO(mattklein123): Populate sample_rate field.
   if (stream_info.downstreamRemoteAddress() != nullptr) {
     Network::Utility::addressToProtobufAddress(
         *stream_info.downstreamRemoteAddress(),

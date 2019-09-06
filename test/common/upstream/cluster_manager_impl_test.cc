@@ -42,14 +42,14 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::ByRef;
+using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
 using testing::Mock;
 using testing::NiceMock;
-using testing::Pointee;
 using testing::Return;
 using testing::ReturnNew;
-using testing::ReturnRef;
 using testing::SaveArg;
 
 namespace Envoy {
@@ -1230,6 +1230,78 @@ dynamic_warming_clusters:
   checkStats(1 /*added*/, 0 /*modified*/, 1 /*removed*/, 0 /*active*/, 0 /*warming*/);
 
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
+}
+
+TEST_F(ClusterManagerImplTest, ModifyWarmingCluster) {
+  time_system_.setSystemTime(std::chrono::milliseconds(1234567891234));
+  create(defaultConfig());
+
+  InSequence s;
+  ReadyWatcher initialized;
+  EXPECT_CALL(initialized, ready());
+  cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
+
+  // Add a "fake_cluster" in warming state.
+  std::shared_ptr<MockClusterMockPrioritySet> cluster1 =
+      std::make_shared<NiceMock<MockClusterMockPrioritySet>>();
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+      .WillOnce(Return(std::make_pair(cluster1, nullptr)));
+  EXPECT_CALL(*cluster1, initializePhase()).Times(0);
+  EXPECT_CALL(*cluster1, initialize(_));
+  EXPECT_TRUE(
+      cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), "version1"));
+  checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
+  EXPECT_EQ(nullptr, cluster_manager_->get("fake_cluster"));
+  checkConfigDump(R"EOF(
+ dynamic_warming_clusters:
+   - version_info: "version1"
+     cluster:
+       name: "fake_cluster"
+       type: STATIC
+       connect_timeout: 0.25s
+       hosts:
+       - socket_address:
+           address: "127.0.0.1"
+           port_value: 11001
+     last_updated:
+       seconds: 1234567891
+       nanos: 234000000
+ )EOF");
+
+  // Update the warming cluster that was just added.
+  std::shared_ptr<MockClusterMockPrioritySet> cluster2 =
+      std::make_shared<NiceMock<MockClusterMockPrioritySet>>();
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+      .WillOnce(Return(std::make_pair(cluster2, nullptr)));
+  EXPECT_CALL(*cluster2, initializePhase()).Times(0);
+  EXPECT_CALL(*cluster2, initialize(_));
+  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(
+      parseClusterFromV2Json(fmt::sprintf(kDefaultStaticClusterTmpl, "fake_cluster",
+                                          R"EOF(
+"socket_address": {
+  "address": "127.0.0.1",
+  "port_value": 11002
+})EOF")),
+      "version2"));
+  checkStats(1 /*added*/, 1 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
+  checkConfigDump(R"EOF(
+ dynamic_warming_clusters:
+   - version_info: "version2"
+     cluster:
+       name: "fake_cluster"
+       type: STATIC
+       connect_timeout: 0.25s
+       hosts:
+       - socket_address:
+           address: "127.0.0.1"
+           port_value: 11002
+     last_updated:
+       seconds: 1234567891
+       nanos: 234000000
+ )EOF");
+
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster2.get()));
 }
 
 // Verify that shutting down the cluster manager destroys warming clusters.
@@ -2752,7 +2824,8 @@ class ClusterManagerInitHelperTest : public testing::Test {
 public:
   MOCK_METHOD1(onClusterInit, void(Cluster& cluster));
 
-  ClusterManagerInitHelper init_helper_{[this](Cluster& cluster) { onClusterInit(cluster); }};
+  NiceMock<MockClusterManager> cm_;
+  ClusterManagerInitHelper init_helper_{cm_, [this](Cluster& cluster) { onClusterInit(cluster); }};
 };
 
 TEST_F(ClusterManagerInitHelperTest, ImmediateInitialize) {
@@ -2822,6 +2895,60 @@ TEST_F(ClusterManagerInitHelperTest, UpdateAlreadyInitialized) {
   EXPECT_CALL(*this, onClusterInit(Ref(cluster2)));
   EXPECT_CALL(cm_initialized, ready());
   cluster2.initialize_callback_();
+}
+
+// If secondary clusters initialization triggered outside of CdsApiImpl::onConfigUpdate()'s
+// callback flows, sending ClusterLoadAssignment should not be paused before calling
+// ClusterManagerInitHelper::maybeFinishInitialize(). This case tests that
+// ClusterLoadAssignment request is paused and resumed properly.
+TEST_F(ClusterManagerInitHelperTest, InitSecondaryWithoutEdsPaused) {
+  InSequence s;
+
+  ReadyWatcher cm_initialized;
+  init_helper_.setInitializedCb([&]() -> void { cm_initialized.ready(); });
+
+  NiceMock<MockClusterMockPrioritySet> cluster1;
+  ON_CALL(cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
+  init_helper_.addCluster(cluster1);
+
+  const auto& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  EXPECT_CALL(cm_.ads_mux_, paused(Eq(ByRef(type_url)))).WillRepeatedly(Return(false));
+  EXPECT_CALL(cm_.ads_mux_, pause(Eq(ByRef(type_url))));
+  EXPECT_CALL(cluster1, initialize(_));
+  EXPECT_CALL(cm_.ads_mux_, resume(Eq(ByRef(type_url))));
+
+  init_helper_.onStaticLoadComplete();
+
+  EXPECT_CALL(*this, onClusterInit(Ref(cluster1)));
+  EXPECT_CALL(cm_initialized, ready());
+  cluster1.initialize_callback_();
+}
+
+// If secondary clusters initialization triggered inside of CdsApiImpl::onConfigUpdate()'s
+// callback flows, that's, the CDS response didn't have any primary cluster, sending
+// ClusterLoadAssignment should be already paused by CdsApiImpl::onConfigUpdate().
+// This case tests that ClusterLoadAssignment request isn't paused again.
+TEST_F(ClusterManagerInitHelperTest, InitSecondaryWithEdsPaused) {
+  InSequence s;
+
+  ReadyWatcher cm_initialized;
+  init_helper_.setInitializedCb([&]() -> void { cm_initialized.ready(); });
+
+  NiceMock<MockClusterMockPrioritySet> cluster1;
+  ON_CALL(cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
+  init_helper_.addCluster(cluster1);
+
+  const auto& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  EXPECT_CALL(cm_.ads_mux_, paused(Eq(ByRef(type_url)))).WillRepeatedly(Return(true));
+  EXPECT_CALL(cm_.ads_mux_, pause(Eq(ByRef(type_url)))).Times(0);
+  EXPECT_CALL(cluster1, initialize(_));
+  EXPECT_CALL(cm_.ads_mux_, resume(Eq(ByRef(type_url)))).Times(0);
+
+  init_helper_.onStaticLoadComplete();
+
+  EXPECT_CALL(*this, onClusterInit(Ref(cluster1)));
+  EXPECT_CALL(cm_initialized, ready());
+  cluster1.initialize_callback_();
 }
 
 TEST_F(ClusterManagerInitHelperTest, AddSecondaryAfterSecondaryInit) {
