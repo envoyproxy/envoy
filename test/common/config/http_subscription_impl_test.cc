@@ -16,7 +16,8 @@ TEST_F(HttpSubscriptionImplTest, OnRequestReset) {
   EXPECT_CALL(random_gen_, random()).WillOnce(Return(0));
   EXPECT_CALL(*timer_, enableTimer(_, _));
   EXPECT_CALL(callbacks_,
-              onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, _));
+              onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, _))
+      .Times(0);
   http_callbacks_->onFailure(Http::AsyncClient::FailureReason::Reset);
   EXPECT_TRUE(statsAre(1, 0, 0, 1, 0, 0));
   timerTick();

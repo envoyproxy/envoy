@@ -251,8 +251,9 @@ bool EdsClusterImpl::updateHostsPerLocality(
   return false;
 }
 
-void EdsClusterImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason,
+void EdsClusterImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                                           const EnvoyException*) {
+  ASSERT(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure != reason);
   // We need to allow server startup to continue, even if we have a bad config.
   onPreInitComplete();
 }

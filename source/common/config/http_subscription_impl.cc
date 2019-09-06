@@ -105,6 +105,7 @@ void HttpSubscriptionImpl::handleFailure(Config::ConfigUpdateFailureReason reaso
   case Config::ConfigUpdateFailureReason::FetchTimedout:
     ENVOY_LOG(warn, "REST config: initial fetch timeout for {}", path_);
     stats_.init_fetch_timeout_.inc();
+    disableInitFetchTimeoutTimer();
     break;
   case Config::ConfigUpdateFailureReason::UpdateRejected:
     ASSERT(e != nullptr);
@@ -114,11 +115,12 @@ void HttpSubscriptionImpl::handleFailure(Config::ConfigUpdateFailureReason reaso
     break;
   }
 
-  // TODO(l8huang): test case "//test/integration:hotrestart_test" relies
-  // on Http::AsyncClient::FailureReason::Reset to get server startup without
-  // any initial CDS/LDS discovery response, so here calls onConfigUpdateFailed()
-  // even reason is ConnectionFailure. After the test case fixed,
-  // onConfigUpdateFailed() shouldn't be called for ConnectionFailure.
+  if (Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure == reason) {
+    // New requests will be sent again.
+    // If init_fetch_timeout is non-zero, server will continue startup after it timeout
+    return;
+  }
+
   callbacks_.onConfigUpdateFailed(reason, e);
 }
 
