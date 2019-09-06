@@ -55,7 +55,7 @@ final class EnvoyTests: XCTestCase {
     let envoy = try EnvoyBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .build()
-    envoy.send(expectedRequest, data: expectedData, trailers: expectedTrailers,
+    envoy.send(expectedRequest, body: expectedData, trailers: expectedTrailers,
                handler: ResponseHandler())
     self.wait(for: [requestExpectation, dataExpectation, closeExpectation],
               timeout: 0.1, enforceOrder: true)
