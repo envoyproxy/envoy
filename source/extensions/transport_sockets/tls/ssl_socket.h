@@ -41,7 +41,8 @@ struct SslSocketFactoryStats {
 enum class InitialState { Client, Server };
 enum class SocketState { PreHandshake, HandshakeInProgress, HandshakeComplete, ShutdownSent };
 
-struct SslSocketInfo : public Envoy::Ssl::ConnectionInfo {
+class SslSocketInfo : public Envoy::Ssl::ConnectionInfo {
+public:
   SslSocketInfo(bssl::UniquePtr<SSL> ssl) : ssl_(std::move(ssl)) {}
 
   // Ssl::ConnectionInfo
@@ -67,6 +68,8 @@ struct SslSocketInfo : public Envoy::Ssl::ConnectionInfo {
   SSL* rawSslForTest() const { return ssl_.get(); }
 
   bssl::UniquePtr<SSL> ssl_;
+
+private:
   mutable std::vector<std::string> cached_uri_san_local_certificate_;
   mutable std::string cached_sha_256_peer_certificate_digest_;
   mutable std::string cached_serial_number_peer_certificate_;

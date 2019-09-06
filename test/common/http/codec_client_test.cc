@@ -31,6 +31,7 @@ using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Pointee;
 using testing::Ref;
+using testing::Return;
 using testing::Throw;
 
 namespace Envoy {
