@@ -13,6 +13,7 @@ import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/discovery.proto";
 import "envoy/api/v2/listener/listener.proto";
 import "envoy/api/v2/listener/udp_listener_config.proto";
+import "envoy/api/config/filter/network/http_connection_manager/v2/http_connection_manager.proto";
 
 import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
@@ -45,12 +46,25 @@ service ListenerDiscoveryService {
   }
 }
 
-// [#comment:next free field: 19]
+// [#comment:next free field: 21]
 message Listener {
   // The unique name by which this listener is known. If no name is provided,
   // Envoy will allocate an internal UUID for the listener. If the listener is to be dynamically
   // updated or removed via :ref:`LDS <config_listeners_lds>` a unique name must be provided.
   string name = 1;
+
+  // [#not-implemented-hide:]
+  enum Type {
+    // Default listener type. Binds to a port.
+    SOCKET = 0;
+    // HTTP API listener. This type of listener does not bind to a socket or support L3/L4
+    // filter chains; it simply exposes an HTTP API to the xDS client application.
+    // The only fields that should be set for this listener type are
+    // :ref:`name<envoy_api_field_Listener.name>` and
+    // :ref:`api_http_port_map<envoy_api_field_Listener.api_http_port_map>`,
+    API_HTTP = 1;
+  }
+  Type type = 19;
 
   // The address that the listener should listen on. In general, the address must be unique, though
   // that is governed by the bind rules of the OS. E.g., multiple listeners can listen on port 0 on
@@ -203,4 +217,13 @@ message Listener {
   // <envoy_api_field_listener.UdpListenerConfig.udp_listener_name>` = "raw_udp_listener" for
   // creating a packet-oriented UDP listener. If not present, treat it as "raw_udp_listener".
   listener.UdpListenerConfig udp_listener_config = 18;
+
+  // [#not-implemented-hide:]
+  // Used only when the :ref:`type<envoy_api_field_Listener.type>` field is set to
+  // :ref:`API_HTTP<envoy_api_field_Listener.Type.API_HTTP>`.
+  // Maps port to corresponding HttpConnectionManager configuration.
+  // When an HTTP client is trying to connect to "servername:port", it will look up the port in
+  // this map to find the root of its configuration.
+  map<uint32, envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager>
+      api_http_port_map = 20;
 }
