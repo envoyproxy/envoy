@@ -11,7 +11,6 @@ import "envoy/type/percent.proto";
 import "google/protobuf/duration.proto";
 
 import "validate/validate.proto";
-import "gogoproto/gogo.proto";
 
 // [#protodoc-title: Common fault injection types]
 
@@ -43,8 +42,7 @@ message FaultDelay {
     // delay will be injected before a new request/operation. For TCP
     // connections, the proxying of the connection upstream will be delayed
     // for the specified period. This is required if type is FIXED.
-    google.protobuf.Duration fixed_delay = 3
-        [(validate.rules).duration.gt = {}, (gogoproto.stdduration) = true];
+    google.protobuf.Duration fixed_delay = 3 [(validate.rules).duration.gt = {}];
 
     // Fault delays are controlled via an HTTP header (if applicable).
     HeaderDelay header_delay = 5;

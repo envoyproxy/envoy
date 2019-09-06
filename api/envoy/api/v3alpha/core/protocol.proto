@@ -12,9 +12,6 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
-import "gogoproto/gogo.proto";
-
-option (gogoproto.equal_all) = true;
 
 // [#protodoc-title: Protocol options]
 
@@ -27,7 +24,7 @@ message HttpProtocolOptions {
   // period in which there are no active requests. If not set, there is no idle timeout. When the
   // idle timeout is reached the connection will be closed. Note that request based timeouts mean
   // that HTTP/2 PINGs will not keep the connection alive.
-  google.protobuf.Duration idle_timeout = 1 [(gogoproto.stdduration) = true];
+  google.protobuf.Duration idle_timeout = 1;
 }
 
 message Http1ProtocolOptions {
