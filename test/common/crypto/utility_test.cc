@@ -93,9 +93,9 @@ TEST(UtilityTest, TestVerifySignature) {
       "295234f7c14fa46303b7e977d2c89ba8a39a46a35f33eb07a332";
   auto data = "hello";
 
-  Common::Crypto::CryptoObjectPtr cryptoPtr(
+  Common::Crypto::CryptoObjectPtr crypto_ptr(
       Common::Crypto::Utility::importPublicKey(Hex::decode(key)));
-  Common::Crypto::CryptoObject* crypto(cryptoPtr.get());
+  Common::Crypto::CryptoObject* crypto(crypto_ptr.get());
 
   std::vector<uint8_t> text(data, data + strlen(data));
 

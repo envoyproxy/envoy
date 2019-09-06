@@ -18,7 +18,7 @@ class PublicKeyObject : public Envoy::Common::Crypto::CryptoObject {
 public:
   PublicKeyObject() = default;
   PublicKeyObject(EVP_PKEY* pkey) : pkey_(pkey) {}
-  PublicKeyObject(const PublicKeyObject& pkeyWrapper);
+  PublicKeyObject(const PublicKeyObject& pkey_wrapper);
   EVP_PKEY* getEVP_PKEY() const;
   void setEVP_PKEY(EVP_PKEY* pkey);
 
