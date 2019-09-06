@@ -13,7 +13,7 @@ typedef struct {
 } ios_context;
 
 static envoy_data toNativeData(NSData *data) {
-  uint8_t *native_bytes = (uint8_t *)malloc(sizeof(uint8_t) * data.length);
+  uint8_t *native_bytes = (uint8_t *)safe_malloc(sizeof(uint8_t) * data.length);
   memcpy(native_bytes, data.bytes, data.length);
   envoy_data ret = {data.length, native_bytes, free, native_bytes};
   return ret;
@@ -21,7 +21,7 @@ static envoy_data toNativeData(NSData *data) {
 
 static envoy_data toManagedNativeString(NSString *s) {
   size_t length = s.length;
-  uint8_t *native_string = (uint8_t *)malloc(sizeof(uint8_t) * length);
+  uint8_t *native_string = (uint8_t *)safe_malloc(sizeof(uint8_t) * length);
   memcpy(native_string, s.UTF8String, length);
   envoy_data ret = {length, native_string, free, native_string};
   return ret;
@@ -32,7 +32,7 @@ static envoy_headers toNativeHeaders(EnvoyHeaders *headers) {
   for (id headerKey in headers) {
     length += [headers[headerKey] count];
   }
-  envoy_header *header_array = (envoy_header *)malloc(sizeof(envoy_header) * length);
+  envoy_header *header_array = (envoy_header *)safe_malloc(sizeof(envoy_header) * length);
   envoy_header_size_t header_index = 0;
   for (id headerKey in headers) {
     NSArray *headerList = headers[headerKey];
@@ -180,9 +180,9 @@ static void ios_on_error(envoy_error error, void *context) {
   _platformCallbacks = callbacks;
 
   // Create callback context
-  ios_context *context = malloc(sizeof(ios_context));
+  ios_context *context = safe_malloc(sizeof(ios_context));
   context->callbacks = callbacks;
-  context->canceled = malloc(sizeof(atomic_bool));
+  context->canceled = safe_malloc(sizeof(atomic_bool));
   atomic_store(context->canceled, NO);
 
   // Create native callbacks

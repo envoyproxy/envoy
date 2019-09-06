@@ -20,7 +20,7 @@ Buffer::InstancePtr toInternalData(envoy_data data) {
 envoy_data toBridgeData(Buffer::Instance& data) {
   envoy_data bridge_data;
   bridge_data.length = data.length();
-  bridge_data.bytes = static_cast<uint8_t*>(malloc(sizeof(uint8_t) * bridge_data.length));
+  bridge_data.bytes = static_cast<uint8_t*>(safe_malloc(sizeof(uint8_t) * bridge_data.length));
   data.copyOut(0, bridge_data.length, const_cast<uint8_t*>(bridge_data.bytes));
   data.drain(bridge_data.length);
   bridge_data.release = free;
