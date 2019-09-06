@@ -144,12 +144,11 @@ def FormatHeaderFromFile(style, source_code_info, proto_name):
   """
   anchor = FormatAnchor(FileCrossRefLabel(proto_name))
   stripped_comment = annotations.WithoutAnnotations(
-      StripLeadingSpace('\n'.join(
-          c + '\n' for c in source_code_info.file_level_comments)))
+      StripLeadingSpace('\n'.join(c + '\n' for c in source_code_info.file_level_comments)))
   if annotations.DOC_TITLE_ANNOTATION in source_code_info.file_level_annotations:
     return anchor + FormatHeader(
-        style, source_code_info.file_level_annotations[
-            annotations.DOC_TITLE_ANNOTATION]), stripped_comment
+        style,
+        source_code_info.file_level_annotations[annotations.DOC_TITLE_ANNOTATION]), stripped_comment
   return anchor + FormatHeader(style, proto_name), stripped_comment
 
 
@@ -184,12 +183,10 @@ def FormatMessageAsJson(type_context, msg):
     leading_comment = field_type_context.leading_comment
     if HideNotImplemented(leading_comment):
       continue
-    lines.append('"%s": %s' %
-                 (field.name, FormatFieldTypeAsJson(type_context, field)))
+    lines.append('"%s": %s' % (field.name, FormatFieldTypeAsJson(type_context, field)))
 
   if lines:
-    return '.. code-block:: json\n\n  {\n' + ',\n'.join(IndentLines(
-        4, lines)) + '\n  }\n\n'
+    return '.. code-block:: json\n\n  {\n' + ',\n'.join(IndentLines(4, lines)) + '\n  }\n\n'
   else:
     return '.. code-block:: json\n\n  {}\n\n'
 
@@ -250,15 +247,14 @@ def FormatFieldType(type_context, field):
     field: FieldDescriptor proto.
   Return: RST formatted field type.
   """
-  if field.type_name.startswith(
-      ENVOY_API_NAMESPACE_PREFIX) or field.type_name.startswith(ENVOY_PREFIX):
+  if field.type_name.startswith(ENVOY_API_NAMESPACE_PREFIX) or field.type_name.startswith(
+      ENVOY_PREFIX):
     type_name = NormalizeFieldTypeName(field.type_name)
     if field.type == field.TYPE_MESSAGE:
       if type_context.map_typenames and TypeNameFromFQN(
           field.type_name) in type_context.map_typenames:
         return 'map<%s, %s>' % tuple(
-            map(
-                functools.partial(FormatFieldType, type_context),
+            map(functools.partial(FormatFieldType, type_context),
                 type_context.map_typenames[TypeNameFromFQN(field.type_name)]))
       return FormatInternalLink(type_name, MessageCrossRefLabel(type_name))
     if field.type == field.TYPE_ENUM:
@@ -266,15 +262,13 @@ def FormatFieldType(type_context, field):
   elif field.type_name.startswith(WKT_NAMESPACE_PREFIX):
     wkt = field.type_name[len(WKT_NAMESPACE_PREFIX):]
     return FormatExternalLink(
-        wkt,
-        'https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#%s'
-        % wkt.lower())
+        wkt, 'https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#%s' %
+        wkt.lower())
   elif field.type_name.startswith(RPC_NAMESPACE_PREFIX):
     rpc = field.type_name[len(RPC_NAMESPACE_PREFIX):]
     return FormatExternalLink(
         rpc,
-        'https://cloud.google.com/natural-language/docs/reference/rpc/google.rpc#%s'
-        % rpc.lower())
+        'https://cloud.google.com/natural-language/docs/reference/rpc/google.rpc#%s' % rpc.lower())
   elif field.type_name:
     return field.type_name
 
@@ -296,9 +290,8 @@ def FormatFieldType(type_context, field):
       field.TYPE_BYTES: 'bytes',
   }
   if field.type in pretty_type_names:
-    return FormatExternalLink(
-        pretty_type_names[field.type],
-        'https://developers.google.com/protocol-buffers/docs/proto#scalar')
+    return FormatExternalLink(pretty_type_names[field.type],
+                              'https://developers.google.com/protocol-buffers/docs/proto#scalar')
   raise ProtodocError('Unknown field type ' + str(field.type))
 
 
@@ -350,8 +343,7 @@ def FormatFieldAsDefinitionListItem(outer_type_context, type_context, field):
   """
   field_annotations = []
 
-  anchor = FormatAnchor(
-      FieldCrossRefLabel(NormalizeTypeContextName(type_context.name)))
+  anchor = FormatAnchor(FieldCrossRefLabel(NormalizeTypeContextName(type_context.name)))
   if field.options.HasExtension(validate_pb2.rules):
     rule = field.options.Extensions[validate_pb2.rules]
     if ((rule.HasField('message') and rule.message.required) or
@@ -364,16 +356,16 @@ def FormatFieldAsDefinitionListItem(outer_type_context, type_context, field):
     return ''
 
   if field.HasField('oneof_index'):
-    oneof_context = outer_type_context.ExtendOneof(
-        field.oneof_index, type_context.oneof_names[field.oneof_index])
+    oneof_context = outer_type_context.ExtendOneof(field.oneof_index,
+                                                   type_context.oneof_names[field.oneof_index])
     oneof_comment = oneof_context.leading_comment
     formatted_oneof_comment = FormatCommentWithAnnotations(oneof_comment)
     if HideNotImplemented(oneof_comment):
       return ''
 
     # If the oneof only has one field and marked required, mark the field as required.
-    if len(type_context.oneof_fields[field.oneof_index]
-          ) == 1 and type_context.oneof_required[field.oneof_index]:
+    if len(type_context.oneof_fields[field.oneof_index]) == 1 and type_context.oneof_required[
+        field.oneof_index]:
       field_annotations = ['*REQUIRED*']
 
     if len(type_context.oneof_fields[field.oneof_index]) > 1:
@@ -384,17 +376,16 @@ def FormatFieldAsDefinitionListItem(outer_type_context, type_context, field):
       formatted_oneof_comment += oneof_template % ', '.join(
           FormatInternalLink(
               f,
-              FieldCrossRefLabel(
-                  NormalizeTypeContextName(
-                      outer_type_context.ExtendField(i, f).name)))
+              FieldCrossRefLabel(NormalizeTypeContextName(
+                  outer_type_context.ExtendField(i, f).name)))
           for i, f in type_context.oneof_fields[field.oneof_index])
   else:
     formatted_oneof_comment = ''
 
   comment = '(%s) ' % ', '.join([FormatFieldType(type_context, field)] +
                                 field_annotations) + formatted_leading_comment
-  return anchor + field.name + '\n' + MapLines(
-      functools.partial(Indent, 2), comment + formatted_oneof_comment)
+  return anchor + field.name + '\n' + MapLines(functools.partial(Indent, 2),
+                                               comment + formatted_oneof_comment)
 
 
 def FormatMessageAsDefinitionList(type_context, msg):
@@ -412,20 +403,17 @@ def FormatMessageAsDefinitionList(type_context, msg):
   type_context.oneof_names = defaultdict(list)
   for index, field in enumerate(msg.field):
     if field.HasField('oneof_index'):
-      leading_comment = type_context.ExtendField(index,
-                                                 field.name).leading_comment
+      leading_comment = type_context.ExtendField(index, field.name).leading_comment
       if HideNotImplemented(leading_comment):
         continue
       type_context.oneof_fields[field.oneof_index].append((index, field.name))
   for index, oneof_decl in enumerate(msg.oneof_decl):
     if oneof_decl.options.HasExtension(validate_pb2.required):
-      type_context.oneof_required[index] = oneof_decl.options.Extensions[
-          validate_pb2.required]
+      type_context.oneof_required[index] = oneof_decl.options.Extensions[validate_pb2.required]
     type_context.oneof_names[index] = oneof_decl.name
   return '\n'.join(
-      FormatFieldAsDefinitionListItem(
-          type_context, type_context.ExtendField(index, field.name), field)
-      for index, field in enumerate(msg.field)) + '\n'
+      FormatFieldAsDefinitionListItem(type_context, type_context.ExtendField(index, field.name),
+                                      field) for index, field in enumerate(msg.field)) + '\n'
 
 
 def FormatEnumValueAsDefinitionListItem(type_context, enum_value):
@@ -438,16 +426,14 @@ def FormatEnumValueAsDefinitionListItem(type_context, enum_value):
   Returns:
     RST formatted definition list item.
   """
-  anchor = FormatAnchor(
-      EnumValueCrossRefLabel(NormalizeTypeContextName(type_context.name)))
+  anchor = FormatAnchor(EnumValueCrossRefLabel(NormalizeTypeContextName(type_context.name)))
   default_comment = '*(DEFAULT)* ' if enum_value.number == 0 else ''
   leading_comment = type_context.leading_comment
   formatted_leading_comment = FormatCommentWithAnnotations(leading_comment)
   if HideNotImplemented(leading_comment):
     return ''
   comment = default_comment + UNICODE_INVISIBLE_SEPARATOR + formatted_leading_comment
-  return anchor + enum_value.name + '\n' + MapLines(
-      functools.partial(Indent, 2), comment)
+  return anchor + enum_value.name + '\n' + MapLines(functools.partial(Indent, 2), comment)
 
 
 def FormatEnumAsDefinitionList(type_context, enum):
@@ -461,18 +447,17 @@ def FormatEnumAsDefinitionList(type_context, enum):
     RST formatted definition list item.
   """
   return '\n'.join(
-      FormatEnumValueAsDefinitionListItem(
-          type_context.ExtendEnumValue(index, enum_value.name), enum_value)
+      FormatEnumValueAsDefinitionListItem(type_context.ExtendEnumValue(index, enum_value.name),
+                                          enum_value)
       for index, enum_value in enumerate(enum.value)) + '\n'
 
 
 def FormatProtoAsBlockComment(proto):
-  """Format as RST a proto as a block comment.
+  """Format a proto as a RST block comment.
 
   Useful in debugging, not usually referenced.
   """
-  return '\n\nproto::\n\n' + MapLines(functools.partial(Indent, 2),
-                                      str(proto)) + '\n'
+  return '\n\nproto::\n\n' + MapLines(functools.partial(Indent, 2), str(proto)) + '\n'
 
 
 class RstFormatVisitor(visitor.Visitor):
@@ -486,11 +471,9 @@ class RstFormatVisitor(visitor.Visitor):
     anchor = FormatAnchor(EnumCrossRefLabel(normal_enum_type))
     header = FormatHeader('-', 'Enum %s' % normal_enum_type)
     github_url = GithubUrl(type_context)
-    proto_link = FormatExternalLink('[%s proto]' % normal_enum_type,
-                                    github_url) + '\n\n'
+    proto_link = FormatExternalLink('[%s proto]' % normal_enum_type, github_url) + '\n\n'
     leading_comment = type_context.leading_comment
-    formatted_leading_comment = FormatCommentWithAnnotations(
-        leading_comment, 'enum')
+    formatted_leading_comment = FormatCommentWithAnnotations(leading_comment, 'enum')
     if HideNotImplemented(leading_comment):
       return ''
     return anchor + header + proto_link + formatted_leading_comment + FormatEnumAsDefinitionList(
@@ -501,26 +484,21 @@ class RstFormatVisitor(visitor.Visitor):
     anchor = FormatAnchor(MessageCrossRefLabel(normal_msg_type))
     header = FormatHeader('-', normal_msg_type)
     github_url = GithubUrl(type_context)
-    proto_link = FormatExternalLink('[%s proto]' % normal_msg_type,
-                                    github_url) + '\n\n'
+    proto_link = FormatExternalLink('[%s proto]' % normal_msg_type, github_url) + '\n\n'
     leading_comment = type_context.leading_comment
-    formatted_leading_comment = FormatCommentWithAnnotations(
-        leading_comment, 'message')
+    formatted_leading_comment = FormatCommentWithAnnotations(leading_comment, 'message')
     if HideNotImplemented(leading_comment):
       return ''
     return anchor + header + proto_link + formatted_leading_comment + FormatMessageAsJson(
         type_context, msg_proto) + FormatMessageAsDefinitionList(
-            type_context,
-            msg_proto) + '\n'.join(nested_msgs) + '\n' + '\n'.join(nested_enums)
+            type_context, msg_proto) + '\n'.join(nested_msgs) + '\n' + '\n'.join(nested_enums)
 
   def VisitFile(self, file_proto, type_context, msgs, enums):
     # Find the earliest detached comment, attribute it to file level.
     # Also extract file level titles if any.
-    header, comment = FormatHeaderFromFile('=', type_context.source_code_info,
-                                           file_proto.name)
+    header, comment = FormatHeaderFromFile('=', type_context.source_code_info, file_proto.name)
     debug_proto = FormatProtoAsBlockComment(file_proto)
-    return header + comment + '\n'.join(msgs) + '\n'.join(
-        enums)  # + debug_proto
+    return header + comment + '\n'.join(msgs) + '\n'.join(enums)  # + debug_proto
 
 
 def Main():

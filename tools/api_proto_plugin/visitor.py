@@ -1,5 +1,6 @@
 """FileDescriptorProto visitor interface for api_proto_plugin implementations."""
 
+
 class Visitor(object):
   """Abstract visitor interface for api_proto_plugin implementation."""
 

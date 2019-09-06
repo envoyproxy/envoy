@@ -15,9 +15,7 @@ class SourceCodeInfo(object):
     self.name = name
     self.proto = source_code_info
     # Map from path to SourceCodeInfo.Location
-    self._locations = {
-        str(location.path): location for location in self.proto.location
-    }
+    self._locations = {str(location.path): location for location in self.proto.location}
     self._file_level_comments = None
     self._file_level_annotations = None
 
@@ -27,11 +25,12 @@ class SourceCodeInfo(object):
     if self._file_level_comments:
       return self._file_level_comments
     comments = []
-    earliest_detached_comment = max(
-        max(location.span) for location in self.proto.location)
+    # We find the earliest detached comment by first finding the maximum start
+    # line for any location and then scanning for any earlier locations with
+    # detached comments.
+    earliest_detached_comment = max(location.span[0] for location in self.proto.location) + 1
     for location in self.proto.location:
-      if location.leading_detached_comments and location.span[
-          0] < earliest_detached_comment:
+      if location.leading_detached_comments and location.span[0] < earliest_detached_comment:
         comments = location.leading_detached_comments
         earliest_detached_comment = location.span[0]
     self._file_level_comments = comments
@@ -43,10 +42,8 @@ class SourceCodeInfo(object):
     if self._file_level_annotations:
       return self._file_level_annotations
     self._file_level_annotations = dict(
-        sum([
-            list(annotations.ExtractAnnotations(c).items())
-            for c in self.file_level_comments
-        ], []))
+        sum([list(annotations.ExtractAnnotations(c).items()) for c in self.file_level_comments],
+            []))
     return self._file_level_annotations
 
   def LocationPathLookup(self, path):
@@ -77,8 +74,7 @@ class SourceCodeInfo(object):
     if location is not None:
       return Comment(
           location.leading_comments,
-          annotations.ExtractAnnotations(location.leading_comments,
-                                         self.file_level_annotations))
+          annotations.ExtractAnnotations(location.leading_comments, self.file_level_annotations))
     return Comment('', {})
 
 
@@ -101,7 +97,7 @@ class TypeContext(object):
     self.name = name
     # Map from type name to the correct type annotation string, e.g. from
     # ".envoy.api.v2.Foo.Bar" to "map<string, string>". This is lost during
-    # proto synthesis and is dynamically recovered in FormatMessage.
+    # proto synthesis and is dynamically recovered in TraverseMessage.
     self.map_typenames = {}
     # Map from a message's oneof index to the fields sharing a oneof.
     self.oneof_fields = {}

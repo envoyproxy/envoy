@@ -31,14 +31,12 @@ def Plugin(output_suffix, visitor):
   response = plugin_pb2.CodeGeneratorResponse()
   cprofile_enabled = os.getenv('CPROFILE_ENABLED')
 
-  # We use file_to_generate rather than file_proto here since we are invoked
-  # inside a Bazel aspect, each node in the DAG will be visited once by the
-  # aspect and we only want to generate docs for the current node.
+  # We use request.file_to_generate rather than request.file_proto here since we
+  # are invoked inside a Bazel aspect, each node in the DAG will be visited once
+  # by the aspect and we only want to generate docs for the current node.
   for file_to_generate in request.file_to_generate:
     # Find the FileDescriptorProto for the file we actually are generating.
-    file_proto = [
-        pf for pf in request.proto_file if pf.name == file_to_generate
-    ][0]
+    file_proto = [pf for pf in request.proto_file if pf.name == file_to_generate][0]
     f = response.file.add()
     f.name = file_proto.name + output_suffix
     if cprofile_enabled:
@@ -50,9 +48,8 @@ def Plugin(output_suffix, visitor):
     if cprofile_enabled:
       pr.disable()
       stats_stream = io.StringIO()
-      ps = pstats.Stats(
-          pr, stream=stats_stream).sort_stats(
-              os.getenv('CPROFILE_SORTBY', 'cumulative'))
+      ps = pstats.Stats(pr,
+                        stream=stats_stream).sort_stats(os.getenv('CPROFILE_SORTBY', 'cumulative'))
       stats_file = response.file.add()
       stats_file.name = file_proto.name + output_suffix + '.profile'
       ps.print_stats()

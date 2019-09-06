@@ -34,23 +34,19 @@ def TraverseMessage(type_context, msg_proto, visitor):
   # We need to do some extra work to recover the map type annotation from the
   # synthesized messages.
   type_context.map_typenames = {
-      '%s.%s' % (type_context.name, nested_msg.name):
-      (nested_msg.field[0], nested_msg.field[1])
+      '%s.%s' % (type_context.name, nested_msg.name): (nested_msg.field[0], nested_msg.field[1])
       for nested_msg in msg_proto.nested_type
       if nested_msg.options.map_entry
   }
   nested_msgs = [
-      TraverseMessage(
-          type_context.ExtendNestedMessage(index, nested_msg.name), nested_msg,
-          visitor) for index, nested_msg in enumerate(msg_proto.nested_type)
+      TraverseMessage(type_context.ExtendNestedMessage(index, nested_msg.name), nested_msg, visitor)
+      for index, nested_msg in enumerate(msg_proto.nested_type)
   ]
   nested_enums = [
-      TraverseEnum(
-          type_context.ExtendNestedEnum(index, nested_enum.name), nested_enum,
-          visitor) for index, nested_enum in enumerate(msg_proto.enum_type)
+      TraverseEnum(type_context.ExtendNestedEnum(index, nested_enum.name), nested_enum, visitor)
+      for index, nested_enum in enumerate(msg_proto.enum_type)
   ]
-  return visitor.VisitMessage(msg_proto, type_context, nested_msgs,
-                              nested_enums)
+  return visitor.VisitMessage(msg_proto, type_context, nested_msgs, nested_enums)
 
 
 def TraverseFile(file_proto, visitor):
@@ -63,18 +59,14 @@ def TraverseFile(file_proto, visitor):
   Returns:
     Plugin specific output.
   """
-  source_code_info = type_context.SourceCodeInfo(file_proto.name,
-                                                 file_proto.source_code_info)
-  package_type_context = type_context.TypeContext(source_code_info,
-                                                  file_proto.package)
+  source_code_info = type_context.SourceCodeInfo(file_proto.name, file_proto.source_code_info)
+  package_type_context = type_context.TypeContext(source_code_info, file_proto.package)
   msgs = [
-      TraverseMessage(
-          package_type_context.ExtendMessage(index, msg.name), msg, visitor)
+      TraverseMessage(package_type_context.ExtendMessage(index, msg.name), msg, visitor)
       for index, msg in enumerate(file_proto.message_type)
   ]
   enums = [
-      TraverseEnum(
-          package_type_context.ExtendEnum(index, enum.name), enum, visitor)
+      TraverseEnum(package_type_context.ExtendEnum(index, enum.name), enum, visitor)
       for index, enum in enumerate(file_proto.enum_type)
   ]
   return visitor.VisitFile(file_proto, package_type_context, msgs, enums)
