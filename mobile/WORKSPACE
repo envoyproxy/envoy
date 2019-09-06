@@ -33,9 +33,9 @@ http_file(
 
 git_repository(
     name = "build_bazel_rules_apple",
-    commit = "7edb4c18fca1514aa6c26fbdf6271625f6823f33",
+    commit = "821ca56c920f88679c90a807e6d7bd071950d7f8",
     remote = "https://github.com/bazelbuild/rules_apple.git",
-    shallow_since = "1562886228 -0700",
+    shallow_since = "1567794850 -0700",
 )
 
 load("@envoy//bazel:api_binding.bzl", "envoy_api_binding")
