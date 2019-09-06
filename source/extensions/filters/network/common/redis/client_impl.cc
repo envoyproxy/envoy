@@ -249,9 +249,11 @@ ClientImpl::PendingRequest::PendingRequest(ClientImpl& parent, PoolCallbacks& ca
                                            Stats::StatName command)
     : parent_(parent), callbacks_(callbacks), command_{command},
       aggregate_request_timer_(
-          parent_.redis_command_stats_->createAggregateTimer(parent_.time_source_)),
-      command_request_timer_(
-          parent_.redis_command_stats_->createCommandTimer(command_, parent_.time_source_)) {
+          parent_.redis_command_stats_->createAggregateTimer(parent_.time_source_)) {
+  if (parent_.redis_command_stats_->enabled()) {
+    command_request_timer_ =
+        parent_.redis_command_stats_->createCommandTimer(command_, parent_.time_source_);
+  }
   parent.host_->cluster().stats().upstream_rq_total_.inc();
   parent.host_->stats().rq_total_.inc();
   parent.host_->cluster().stats().upstream_rq_active_.inc();
