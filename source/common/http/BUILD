@@ -120,10 +120,10 @@ envoy_cc_library(
     hdrs = ["conn_manager_config.h"],
     deps = [
         ":date_provider_lib",
+        "//include/envoy/http:local_reply_interface",
         "//include/envoy/config:config_provider_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/router:rds_interface",
-        "//source/common/http:local_reply_lib",
         "//source/common/network:utility_lib",
     ],
 )
@@ -188,6 +188,7 @@ envoy_cc_library(
         "//source/common/runtime:uuid_util_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/tracing:http_tracer_lib",
+        "//source/common/http:local_reply_formatter_lib"
     ],
 )
 
@@ -240,12 +241,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "local_reply_lib",
-    hdrs = ["local_reply.h"],
+    name = "local_reply_formatter_lib",
+    srcs = ["local_reply_formatter.cc"],
+    hdrs = ["local_reply_formatter.h"],
     deps = [
-        "//source/common/common:matchers_lib",
-        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:http_connection_manager_cc",
-        "@envoy_api//envoy/service/accesslog/v2:als_cc",
+        ":headers_lib",
+         "//include/envoy/http:local_reply_interface",
+         "//include/envoy/access_log:access_log_interface",
+         "//include/envoy/stream_info:stream_info_interface",
+         "//source/common/access_log:access_log_formatter_lib",
     ],
 )
 

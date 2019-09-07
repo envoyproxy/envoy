@@ -147,7 +147,7 @@ public:
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   bool shouldNormalizePath() const override { return true; }
   bool shouldMergeSlashes() const override { return true; }
-  Http::LocalReplyConfig* localReplyConfig() const override { return nullptr; }
+  Http::Formatter* localReplyFormatter() const override { return nullptr; }
   Http::Code request(absl::string_view path_and_query, absl::string_view method,
                      Http::HeaderMap& response_headers, std::string& body) override;
   void closeSocket();

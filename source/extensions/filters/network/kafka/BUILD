@@ -26,7 +26,7 @@ envoy_cc_library(
     name = "kafka_request_codec_lib",
     srcs = ["request_codec.cc"],
     hdrs = [
-         "codec.h",
+        "codec.h",
         "request_codec.h",
     ],
     deps = [

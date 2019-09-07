@@ -11,9 +11,7 @@ import "envoy/api/v2/core/protocol.proto";
 import "envoy/api/v2/rds.proto";
 import "envoy/api/v2/srds.proto";
 import "envoy/config/filter/accesslog/v2/accesslog.proto";
-import "envoy/data/accesslog/v2/accesslog.proto";
 import "envoy/type/percent.proto";
-import "envoy/type/matcher/string.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
@@ -456,41 +454,25 @@ message HttpConnectionManager {
   // `HTTP spec <https://tools.ietf.org/html/rfc3986>` and is provided for convenience.
   bool merge_slashes = 33;
 
-  // Configuration of local reply send by envoy for http responses. Allows to define custom rules
-  // which maps response attribute returned by envoy to different one. Currently mapping of
-  // status code is implemented.
-  message SendLocalReplyConfig {
-    // Configuration which allows to define custom rules for matching local response.
-    // It works like and operator e.g: if you define status code 404 and body pattern
-    // then response must match both
-    message Match {
-      oneof matcher_specifier{
-        // Definition of status codes to match.
-        google.protobuf.UInt32Value status_codes = 1;
-        // Definition of body pattern to match.
-        envoy.type.matcher.StringMatcher body_pattern = 2;
-        // Definition of response flags to match.
-        envoy.data.accesslog.v2.ResponseFlags response_flags = 3;
-        // Definiton of and matcher which combine all defined rules in logical AND operation
-        AndMatcher and_matcher = 4;
-      }
-    };
+  // // Determines if adjacent slashes in the path are merged into one before any processing of
+  // // requests by HTTP filters or routing. This affects the upstream *:path* header as well. Without
+  // // setting this option, incoming requests with path `//dir///file` will not match against route
+  // // with `prefix` match set to `/dir`. Defaults to `false`. Note that slash merging is not part of
+  // // `HTTP spec <https://tools.ietf.org/html/rfc3986>` and is provided for convenience.
+  // bool merge_slashes = 33;
 
-    // Configuration which allows to define custom mapping for matched response.
-    message Rewrite {
-      // Definition of status code to which matched one will be mapped.
-      google.protobuf.UInt32Value status = 1;
-    };
-
-    message AndMatcher {
-      repeated Match matchers = 1 [(validate.rules).repeated .min_items = 2];
+  // Configuration of local reply send by envoy for http responses.
+  message LocalReplyConfig {
+    oneof format {
+      // Response body text format
+      string text_format = 1;
+  
+      // Response body json format as dictionary
+      google.protobuf.Struct json_format = 2;
     }
-
-    repeated Match match = 1;
-    Rewrite rewrite = 2;
   };
 
-  repeated SendLocalReplyConfig send_local_reply_config = 35;
+  LocalReplyConfig local_reply_config = 35;
 }
 
 message Rds {

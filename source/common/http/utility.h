@@ -209,6 +209,7 @@ void sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbacks, const
 void sendLocalReply(bool is_grpc,
                     std::function<void(HeaderMapPtr&& headers, bool end_stream)> encode_headers,
                     std::function<void(Buffer::Instance& data, bool end_stream)> encode_data,
+                    std::function<std::string(absl::string_view& body,HeaderMapPtr&& headers)> format_data,
                     const bool& is_reset, Code response_code, absl::string_view body_text,
                     const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                     bool is_head_request = false);

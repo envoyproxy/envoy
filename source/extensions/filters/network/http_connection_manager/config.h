@@ -12,9 +12,9 @@
 #include "envoy/http/filter.h"
 #include "envoy/router/route_config_provider_manager.h"
 
+#include "common/access_log/access_log_formatter.h"
 #include "common/common/logger.h"
 #include "common/http/conn_manager_impl.h"
-#include "common/http/local_reply.h"
 #include "common/json/json_loader.h"
 
 #include "extensions/filters/network/common/factory_base.h"
@@ -143,9 +143,7 @@ public:
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   bool shouldNormalizePath() const override { return normalize_path_; }
   bool shouldMergeSlashes() const override { return merge_slashes_; }
-  const Http::LocalReplyConfig* localReplyConfig() const override {
-    return local_reply_config_.get();
-  }
+  Http::Formatter* localReplyFormatter() const override { return local_reply_formatter_.get(); }
   std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
 
 private:
@@ -193,7 +191,7 @@ private:
   std::chrono::milliseconds delayed_close_timeout_;
   const bool normalize_path_;
   const bool merge_slashes_;
-  Http::LocalReplyConfigConstPtr local_reply_config_;
+  Http::FormatterPtr local_reply_formatter_;
 
   // Default idle timeout is 5 minutes if nothing is specified in the HCM config.
   static const uint64_t StreamIdleTimeoutMs = 5 * 60 * 1000;

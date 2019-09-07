@@ -103,3 +103,11 @@ envoy_cc_library(
     name = "metadata_interface",
     hdrs = ["metadata_interface.h"],
 )
+
+envoy_cc_library(
+    name = "local_reply_interface",
+    hdrs = ["local_reply.h"],
+    deps = [
+        ":header_map_interface",
+    ],
+)

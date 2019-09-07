@@ -19,6 +19,7 @@
 #include "common/http/default_server_string.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
+#include "common/http/local_reply_formatter.h"
 #include "common/http/utility.h"
 #include "common/json/config_schemas.h"
 #include "common/protobuf/utility.h"
@@ -63,6 +64,43 @@ std::unique_ptr<Http::InternalAddressConfig> createInternalAddressConfig(
   }
 
   return std::make_unique<Http::DefaultInternalAddressConfig>();
+}
+
+std::unordered_map<std::string, std::string>convertJsonFormatToMap(ProtobufWkt::Struct json_format) {
+  std::unordered_map<std::string, std::string> output;
+  for (const auto& pair : json_format.fields()) {
+    if (pair.second.kind_case() != ProtobufWkt::Value::kStringValue) {
+      throw EnvoyException("Only string values are supported in the JSON access log format.");
+    }
+    output.emplace(pair.first, pair.second.string_value());
+  }
+  return output;
+}
+
+std::unordered_map<std::string, std::string> createLocalReplyFormatter(const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& config) {
+  // AccessLog::Formatter formatter;
+
+  // if (config.access_log_format_case() == envoy::config::accesslog::v2::FileAccessLog::kFormat ||
+  //     fal_config.access_log_format_case() ==
+  //         envoy::config::accesslog::v2::FileAccessLog::ACCESS_LOG_FORMAT_NOT_SET) {
+  //   if (fal_config.format().empty()) {
+  //     formatter = AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter();
+  //   } else {
+  //     formatter = std::make_unique<AccessLog::FormatterImpl>(fal_config.format());
+  //   }
+  // } else 
+  std::unordered_map<std::string, std::string> json_format_map;
+  if (config.local_reply_config().format_case() ==
+             envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::LocalReplyConfig::kJsonFormat) {
+    json_format_map = convertJsonFormatToMap(config.local_reply_config().json_format());
+    // formatter = AccessLog::JsonFormatterImpl(json_format_map);
+  } else {
+    throw EnvoyException(
+        "Invalid access_log format provided. Only 'format' and 'json_format' are supported.");
+  }
+
+return json_format_map;
+  // return std::make_unique<Http::JsonFormatterImpl>(formatter);
 }
 
 } // namespace
@@ -359,9 +397,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           std::make_pair(name, FilterConfig{std::move(factories), enabled}));
     }
   }
-  if (config.send_local_reply_config().size() > 0) {
-    local_reply_config_ = Http::LocalReplyConfigConstPtr(new Http::LocalReplyConfig(config));
-  }
+
+  local_reply_formatter_ = std::make_unique<Http::JsonFormatterImpl>(createLocalReplyFormatter(config));
 }
 
 void HttpConnectionManagerConfig::processFilter(

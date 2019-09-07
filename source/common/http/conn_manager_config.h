@@ -5,10 +5,10 @@
 #include "envoy/http/filter.h"
 #include "envoy/router/rds.h"
 #include "envoy/stats/scope.h"
+#include "envoy/http/local_reply.h"
 
 #include "common/http/date_provider.h"
 #include "common/network/utility.h"
-#include "common/http/local_reply.h"
 
 namespace Envoy {
 namespace Http {
@@ -371,10 +371,8 @@ public:
    */
   virtual bool shouldMergeSlashes() const PURE;
 
-  /**
-   * @return supplies the local reply mapping configuration
-   */
-  virtual const LocalReplyConfig* localReplyConfig() const PURE;
+  
+  virtual Http::Formatter* localReplyFormatter() const PURE;
 };
 } // namespace Http
 } // namespace Envoy

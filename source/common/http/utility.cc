@@ -291,12 +291,19 @@ void Utility::sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbac
       [&](Buffer::Instance& data, bool end_stream) -> void {
         callbacks.encodeData(data, end_stream);
       },
+      [&](absl::string_view& body,HeaderMapPtr&& headers) -> std::string {
+        std::cout<< body;
+        headers->insertContentLength().value(body.size());
+        headers->insertContentType().value(Headers::get().ContentTypeValues.Json);
+        return std::string{};
+      },
       is_reset, response_code, body_text, grpc_status, is_head_request);
 }
 
 void Utility::sendLocalReply(
     bool is_grpc, std::function<void(HeaderMapPtr&& headers, bool end_stream)> encode_headers,
-    std::function<void(Buffer::Instance& data, bool end_stream)> encode_data, const bool& is_reset,
+    std::function<void(Buffer::Instance& data, bool end_stream)> encode_data,
+    std::function<std::string(absl::string_view& body, HeaderMapPtr&& headers)> format_data, const bool& is_reset,
     Code response_code, absl::string_view body_text,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, bool is_head_request) {
   // encode_headers() may reset the stream, so the stream must not be reset before calling it.
@@ -319,11 +326,13 @@ void Utility::sendLocalReply(
     return;
   }
 
+  
+
   HeaderMapPtr response_headers{
       new HeaderMapImpl{{Headers::get().Status, std::to_string(enumToInt(response_code))}}};
+  std::string formatted_body;
   if (!body_text.empty()) {
-    response_headers->insertContentLength().value(body_text.size());
-    response_headers->insertContentType().value(Headers::get().ContentTypeValues.Text);
+    formatted_body = format_data(body_text ,std::move(response_headers));
   }
 
   if (is_head_request) {
@@ -331,10 +340,10 @@ void Utility::sendLocalReply(
     return;
   }
 
-  encode_headers(std::move(response_headers), body_text.empty());
+  encode_headers(std::move(response_headers), formatted_body.empty());
   // encode_headers()) may have changed the referenced is_reset so we need to test it
-  if (!body_text.empty() && !is_reset) {
-    Buffer::OwnedImpl buffer(body_text);
+  if (!formatted_body.empty() && !is_reset) {
+    Buffer::OwnedImpl buffer(formatted_body);
     encode_data(buffer, true);
   }
 }

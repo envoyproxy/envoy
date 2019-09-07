@@ -93,7 +93,8 @@ public:
   std::string format(const Http::HeaderMap& request_headers,
                      const Http::HeaderMap& response_headers,
                      const Http::HeaderMap& response_trailers,
-                     const StreamInfo::StreamInfo& stream_info) const override;
+                     const StreamInfo::StreamInfo& stream_info,
+                     const absl::string_view& body) const override;
 
 private:
   std::vector<FormatterProviderPtr> providers_;
@@ -107,7 +108,8 @@ public:
   std::string format(const Http::HeaderMap& request_headers,
                      const Http::HeaderMap& response_headers,
                      const Http::HeaderMap& response_trailers,
-                     const StreamInfo::StreamInfo& stream_info) const override;
+                     const StreamInfo::StreamInfo& stream_info,
+                     const absl::string_view& body) const override;
 
 private:
   std::vector<FormatterProviderPtr> providers_;
@@ -115,7 +117,8 @@ private:
 
   std::unordered_map<std::string, std::string>
   toMap(const Http::HeaderMap& request_headers, const Http::HeaderMap& response_headers,
-        const Http::HeaderMap& response_trailers, const StreamInfo::StreamInfo& stream_info) const;
+        const Http::HeaderMap& response_trailers, const StreamInfo::StreamInfo& stream_info,
+        const absl::string_view& body) const;
 };
 
 /**
@@ -128,10 +131,23 @@ public:
 
   // Formatter::format
   std::string format(const Http::HeaderMap&, const Http::HeaderMap&, const Http::HeaderMap&,
-                     const StreamInfo::StreamInfo&) const override;
+                     const StreamInfo::StreamInfo&, const absl::string_view&) const override;
 
 private:
   std::string str_;
+};
+
+/**
+ * Formatter for string literal. It ignores headers and stream info and returns string by which it
+ * was initialized.
+ */
+class BodyFormatter : public FormatterProvider {
+public:
+  BodyFormatter();
+
+  // Formatter::format
+  std::string format(const Http::HeaderMap&, const Http::HeaderMap&, const Http::HeaderMap&,
+                     const StreamInfo::StreamInfo&, const absl::string_view& body) const override;
 };
 
 class HeaderFormatter {
@@ -157,7 +173,7 @@ public:
 
   // Formatter::format
   std::string format(const Http::HeaderMap& request_headers, const Http::HeaderMap&,
-                     const Http::HeaderMap&, const StreamInfo::StreamInfo&) const override;
+                     const Http::HeaderMap&, const StreamInfo::StreamInfo&, const absl::string_view&) const override;
 };
 
 /**
@@ -170,7 +186,7 @@ public:
 
   // Formatter::format
   std::string format(const Http::HeaderMap&, const Http::HeaderMap& response_headers,
-                     const Http::HeaderMap&, const StreamInfo::StreamInfo&) const override;
+                     const Http::HeaderMap&, const StreamInfo::StreamInfo&, const absl::string_view&) const override;
 };
 
 /**
@@ -184,7 +200,8 @@ public:
   // Formatter::format
   std::string format(const Http::HeaderMap&, const Http::HeaderMap&,
                      const Http::HeaderMap& response_trailers,
-                     const StreamInfo::StreamInfo&) const override;
+                     const StreamInfo::StreamInfo&,
+                     const absl::string_view&) const override;
 };
 
 /**
@@ -196,7 +213,7 @@ public:
 
   // Formatter::format
   std::string format(const Http::HeaderMap&, const Http::HeaderMap&, const Http::HeaderMap&,
-                     const StreamInfo::StreamInfo& stream_info) const override;
+                     const StreamInfo::StreamInfo& stream_info, const absl::string_view&) const override;
 
   using FieldExtractor = std::function<std::string(const StreamInfo::StreamInfo&)>;
 
@@ -230,7 +247,7 @@ public:
 
   // FormatterProvider::format
   std::string format(const Http::HeaderMap&, const Http::HeaderMap&, const Http::HeaderMap&,
-                     const StreamInfo::StreamInfo& stream_info) const override;
+                     const StreamInfo::StreamInfo& stream_info, const absl::string_view&) const override;
 };
 
 /**
@@ -240,7 +257,7 @@ class StartTimeFormatter : public FormatterProvider {
 public:
   StartTimeFormatter(const std::string& format);
   std::string format(const Http::HeaderMap&, const Http::HeaderMap&, const Http::HeaderMap&,
-                     const StreamInfo::StreamInfo&) const override;
+                     const StreamInfo::StreamInfo&, const absl::string_view&) const override;
 
 private:
   const Envoy::DateFormatter date_formatter_;

@@ -103,12 +103,13 @@ FormatterImpl::FormatterImpl(const std::string& format) {
 std::string FormatterImpl::format(const Http::HeaderMap& request_headers,
                                   const Http::HeaderMap& response_headers,
                                   const Http::HeaderMap& response_trailers,
-                                  const StreamInfo::StreamInfo& stream_info) const {
+                                  const StreamInfo::StreamInfo& stream_info,
+                                  const absl::string_view& body) const {
   std::string log_line;
   log_line.reserve(256);
 
   for (const FormatterProviderPtr& provider : providers_) {
-    log_line += provider->format(request_headers, response_headers, response_trailers, stream_info);
+    log_line += provider->format(request_headers, response_headers, response_trailers, stream_info, body);
   }
 
   return log_line;
@@ -124,8 +125,9 @@ JsonFormatterImpl::JsonFormatterImpl(std::unordered_map<std::string, std::string
 std::string JsonFormatterImpl::format(const Http::HeaderMap& request_headers,
                                       const Http::HeaderMap& response_headers,
                                       const Http::HeaderMap& response_trailers,
-                                      const StreamInfo::StreamInfo& stream_info) const {
-  const auto output_map = toMap(request_headers, response_headers, response_trailers, stream_info);
+                                      const StreamInfo::StreamInfo& stream_info,
+                                      const absl::string_view& body) const {
+  const auto output_map = toMap(request_headers, response_headers, response_trailers, stream_info, body);
 
   ProtobufWkt::Struct output_struct;
   for (const auto& pair : output_map) {
@@ -140,17 +142,17 @@ std::string JsonFormatterImpl::format(const Http::HeaderMap& request_headers,
     log_line =
         fmt::format("Error serializing access log to JSON: {}", conversion_status.ToString());
   }
-
-  return absl::StrCat(log_line, "\n");
+ return absl::StrCat(log_line, "\n");
 }
 
 std::unordered_map<std::string, std::string> JsonFormatterImpl::toMap(
     const Http::HeaderMap& request_headers, const Http::HeaderMap& response_headers,
-    const Http::HeaderMap& response_trailers, const StreamInfo::StreamInfo& stream_info) const {
+    const Http::HeaderMap& response_trailers, const StreamInfo::StreamInfo& stream_info,
+    const absl::string_view& body) const {
   std::unordered_map<std::string, std::string> output;
   for (const auto& pair : json_output_format_) {
     output.emplace(pair.first, pair.second->format(request_headers, response_headers,
-                                                   response_trailers, stream_info));
+                                                   response_trailers, stream_info, body));
   }
   return output;
 }
@@ -270,6 +272,8 @@ std::vector<FormatterProviderPtr> AccessLogFormatParser::parse(const std::string
 
         formatters.emplace_back(FormatterProviderPtr{
             new ResponseTrailerFormatter(main_header, alternative_header, max_length)});
+      } else if (absl::StartsWith(token, "RESP_BODY")) {
+        formatters.emplace_back(FormatterProviderPtr{new BodyFormatter()});
       } else if (absl::StartsWith(token, DYNAMIC_META_TOKEN)) {
         std::string filter_namespace;
         absl::optional<size_t> max_length;
@@ -495,7 +499,8 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
 
 std::string StreamInfoFormatter::format(const Http::HeaderMap&, const Http::HeaderMap&,
                                         const Http::HeaderMap&,
-                                        const StreamInfo::StreamInfo& stream_info) const {
+                                        const StreamInfo::StreamInfo& stream_info,
+                                        const absl::string_view&) const {
   return field_extractor_(stream_info);
 }
 
@@ -503,8 +508,18 @@ PlainStringFormatter::PlainStringFormatter(const std::string& str) : str_(str) {
 
 std::string PlainStringFormatter::format(const Http::HeaderMap&, const Http::HeaderMap&,
                                          const Http::HeaderMap&,
-                                         const StreamInfo::StreamInfo&) const {
+                                         const StreamInfo::StreamInfo&,
+                                         const absl::string_view&) const {
   return str_;
+}
+
+BodyFormatter::BodyFormatter(){}
+
+std::string BodyFormatter::format(const Http::HeaderMap&, const Http::HeaderMap&,
+                                         const Http::HeaderMap&,
+                                         const StreamInfo::StreamInfo&,
+                                         const absl::string_view& body) const {
+  return body.data();
 }
 
 HeaderFormatter::HeaderFormatter(const std::string& main_header,
@@ -541,7 +556,8 @@ ResponseHeaderFormatter::ResponseHeaderFormatter(const std::string& main_header,
 std::string ResponseHeaderFormatter::format(const Http::HeaderMap&,
                                             const Http::HeaderMap& response_headers,
                                             const Http::HeaderMap&,
-                                            const StreamInfo::StreamInfo&) const {
+                                            const StreamInfo::StreamInfo&,
+                                            const absl::string_view&) const {
   return HeaderFormatter::format(response_headers);
 }
 
@@ -552,7 +568,8 @@ RequestHeaderFormatter::RequestHeaderFormatter(const std::string& main_header,
 
 std::string RequestHeaderFormatter::format(const Http::HeaderMap& request_headers,
                                            const Http::HeaderMap&, const Http::HeaderMap&,
-                                           const StreamInfo::StreamInfo&) const {
+                                           const StreamInfo::StreamInfo&,
+                                           const absl::string_view&) const {
   return HeaderFormatter::format(request_headers);
 }
 
@@ -563,7 +580,8 @@ ResponseTrailerFormatter::ResponseTrailerFormatter(const std::string& main_heade
 
 std::string ResponseTrailerFormatter::format(const Http::HeaderMap&, const Http::HeaderMap&,
                                              const Http::HeaderMap& response_trailers,
-                                             const StreamInfo::StreamInfo&) const {
+                                             const StreamInfo::StreamInfo&,
+                                             const absl::string_view&) const {
   return HeaderFormatter::format(response_trailers);
 }
 
@@ -605,7 +623,8 @@ DynamicMetadataFormatter::DynamicMetadataFormatter(const std::string& filter_nam
 
 std::string DynamicMetadataFormatter::format(const Http::HeaderMap&, const Http::HeaderMap&,
                                              const Http::HeaderMap&,
-                                             const StreamInfo::StreamInfo& stream_info) const {
+                                             const StreamInfo::StreamInfo& stream_info,
+                                             const absl::string_view&) const {
   return MetadataFormatter::format(stream_info.dynamicMetadata());
 }
 
@@ -613,7 +632,8 @@ StartTimeFormatter::StartTimeFormatter(const std::string& format) : date_formatt
 
 std::string StartTimeFormatter::format(const Http::HeaderMap&, const Http::HeaderMap&,
                                        const Http::HeaderMap&,
-                                       const StreamInfo::StreamInfo& stream_info) const {
+                                       const StreamInfo::StreamInfo& stream_info,
+                                       const absl::string_view&) const {
   if (date_formatter_.formatString().empty()) {
     return AccessLogDateTimeFormatter::fromTime(stream_info.startTime());
   } else {
