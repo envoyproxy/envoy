@@ -536,8 +536,9 @@ private:
   void doRetry();
   // Called immediately after a non-5xx header is received from upstream, performs stats accounting
   // and handle difference between gRPC and non-gRPC requests.
-  void handleNon5xxResponseHeaders(const Http::HeaderMap& headers,
-                                   UpstreamRequest& upstream_request, bool end_stream);
+  void handleNon5xxResponseHeaders(absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                                   UpstreamRequest& upstream_request, bool end_stream,
+                                   uint64_t grpc_to_http_status);
   TimeSource& timeSource() { return config_.timeSource(); }
   Http::Context& httpContext() { return config_.http_context_; }
 
