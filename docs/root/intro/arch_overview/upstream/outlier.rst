@@ -145,6 +145,13 @@ Most configuration items, namely
 types of errors, but :ref:`outlier_detection.enforcing_success_rate<envoy_api_field_cluster.OutlierDetection.enforcing_success_rate>` applies
 to externally originated errors only and :ref:`outlier_detection.enforcing_local_origin_success_rate<envoy_api_field_cluster.OutlierDetection.enforcing_local_origin_success_rate>`  applies to locally originated errors only.
 
+.. _arch_overview_outlier_detection_grpc:
+
+gRPC
+----------------------
+
+For gRPC requests, the outlier detection will use the HTTP status mapped from the `grpc-status <https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#responses>`_ response header. This behavior is guarded by the runtime feature `envoy.reloadable_features.outlier_detection_support_for_grpc_status` which defaults to true.
+
 
 .. _arch_overview_outlier_detection_logging:
 
