@@ -158,7 +158,11 @@ ConnectionHandlerImpl::findActiveListenerByAddress(const Network::Address::Insta
 void ConnectionHandlerImpl::ActiveSocket::onTimeout() {
   listener_.stats_.downstream_pre_cx_timeout_.inc();
   ASSERT(inserted());
+  ENVOY_LOG_TO_LOGGER(listener_.parent_.logger_, debug, "listener filter times out after {} ms",
+                      listener_.listener_filters_timeout_.count());
+
   if (listener_.continue_on_listener_filters_timeout_) {
+    ENVOY_LOG_TO_LOGGER(listener_.parent_.logger_, debug, "fallback to default listener filter");
     newConnection();
   }
   unlink();
