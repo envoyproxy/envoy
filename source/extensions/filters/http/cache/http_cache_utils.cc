@@ -166,7 +166,7 @@ SystemTime::duration effectiveMaxAge(absl::string_view cache_control) {
 
 SystemTime httpTime(const Http::HeaderEntry* header_entry) {
   if (!header_entry) {
-    return SystemTime();
+    return {};
   }
   absl::Time time;
   const std::string input(header_entry->value().getStringView());
@@ -184,7 +184,7 @@ SystemTime httpTime(const Http::HeaderEntry* header_entry) {
       return ToChronoTime(time);
     }
   }
-  return SystemTime();
+  return {};
 }
 } // namespace Internal
 } // namespace Cache
