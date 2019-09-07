@@ -12,7 +12,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Eq;
 
 namespace Envoy {
 namespace Extensions {

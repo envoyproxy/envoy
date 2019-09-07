@@ -1,7 +1,6 @@
 syntax = "proto3";
 
 import "validate/validate.proto";
-import "gogoproto/gogo.proto";
 import "envoy/api/v3alpha/core/address.proto";
 import "envoy/api/v3alpha/route/route.proto";
 import "envoy/type/matcher/metadata.proto";
@@ -14,8 +13,6 @@ package envoy.config.rbac.v3alpha;
 option java_outer_classname = "RbacProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.rbac.v3alpha";
-
-option (gogoproto.stable_marshaler_all) = true;
 
 // [#protodoc-title: Role Based Access Control (RBAC)]
 

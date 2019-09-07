@@ -11,7 +11,6 @@ import "envoy/config/ratelimit/v2/rls.proto";
 import "google/protobuf/duration.proto";
 
 import "validate/validate.proto";
-import "gogoproto/gogo.proto";
 
 // [#protodoc-title: Rate limit]
 // Rate limit :ref:`configuration overview <config_thrift_filters_rate_limit>`.
@@ -34,7 +33,7 @@ message RateLimit {
 
   // The timeout in milliseconds for the rate limit service RPC. If not
   // set, this defaults to 20ms.
-  google.protobuf.Duration timeout = 3 [(gogoproto.stdduration) = true];
+  google.protobuf.Duration timeout = 3;
 
   // The filter's behaviour in case the rate limiting service does
   // not respond back. When it is set to true, Envoy will not allow traffic in case of

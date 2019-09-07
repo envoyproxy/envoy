@@ -10,7 +10,6 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 
 import "validate/validate.proto";
-import "gogoproto/gogo.proto";
 
 // [#protodoc-title: Squash]
 // Squash :ref:`configuration overview <config_http_filters_squash>`.
@@ -42,13 +41,13 @@ message Squash {
   google.protobuf.Struct attachment_template = 2;
 
   // The timeout for individual requests sent to the Squash cluster. Defaults to 1 second.
-  google.protobuf.Duration request_timeout = 3 [(gogoproto.stdduration) = true];
+  google.protobuf.Duration request_timeout = 3;
 
   // The total timeout Squash will delay a request and wait for it to be attached. Defaults to 60
   // seconds.
-  google.protobuf.Duration attachment_timeout = 4 [(gogoproto.stdduration) = true];
+  google.protobuf.Duration attachment_timeout = 4;
 
   // Amount of time to poll for the status of the attachment object in the Squash server
   // (to check if has been attached). Defaults to 1 second.
-  google.protobuf.Duration attachment_poll_period = 5 [(gogoproto.stdduration) = true];
+  google.protobuf.Duration attachment_poll_period = 5;
 }

@@ -26,13 +26,10 @@
 
 using testing::_;
 using testing::AnyNumber;
-using testing::DoAll;
-using testing::Invoke;
 using testing::Matcher;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
-using testing::WithArgs;
 
 namespace Envoy {
 namespace Extensions {

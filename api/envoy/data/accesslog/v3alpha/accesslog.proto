@@ -12,10 +12,7 @@ import "envoy/api/v3alpha/core/base.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/wrappers.proto";
-import "gogoproto/gogo.proto";
 import "validate/validate.proto";
-
-option (gogoproto.stable_marshaler_all) = true;
 
 // [#protodoc-title: gRPC access logs]
 // Envoy access logs describe incoming interaction with Envoy over a fixed
@@ -85,37 +82,37 @@ message AccessLogCommon {
 
   // The time that Envoy started servicing this request. This is effectively the time that the first
   // downstream byte is received.
-  google.protobuf.Timestamp start_time = 5 [(gogoproto.stdtime) = true];
+  google.protobuf.Timestamp start_time = 5;
 
   // Interval between the first downstream byte received and the last
   // downstream byte received (i.e. time it takes to receive a request).
-  google.protobuf.Duration time_to_last_rx_byte = 6 [(gogoproto.stdduration) = true];
+  google.protobuf.Duration time_to_last_rx_byte = 6;
 
   // Interval between the first downstream byte received and the first upstream byte sent. There may
   // by considerable delta between *time_to_last_rx_byte* and this value due to filters.
   // Additionally, the same caveats apply as documented in *time_to_last_downstream_tx_byte* about
   // not accounting for kernel socket buffer time, etc.
-  google.protobuf.Duration time_to_first_upstream_tx_byte = 7 [(gogoproto.stdduration) = true];
+  google.protobuf.Duration time_to_first_upstream_tx_byte = 7;
 
   // Interval between the first downstream byte received and the last upstream byte sent. There may
   // by considerable delta between *time_to_last_rx_byte* and this value due to filters.
   // Additionally, the same caveats apply as documented in *time_to_last_downstream_tx_byte* about
   // not accounting for kernel socket buffer time, etc.
-  google.protobuf.Duration time_to_last_upstream_tx_byte = 8 [(gogoproto.stdduration) = true];
+  google.protobuf.Duration time_to_last_upstream_tx_byte = 8;
 
   // Interval between the first downstream byte received and the first upstream
   // byte received (i.e. time it takes to start receiving a response).
-  google.protobuf.Duration time_to_first_upstream_rx_byte = 9 [(gogoproto.stdduration) = true];
+  google.protobuf.Duration time_to_first_upstream_rx_byte = 9;
 
   // Interval between the first downstream byte received and the last upstream
   // byte received (i.e. time it takes to receive a complete response).
-  google.protobuf.Duration time_to_last_upstream_rx_byte = 10 [(gogoproto.stdduration) = true];
+  google.protobuf.Duration time_to_last_upstream_rx_byte = 10;
 
   // Interval between the first downstream byte received and the first downstream byte sent.
   // There may be a considerable delta between the *time_to_first_upstream_rx_byte* and this field
   // due to filters. Additionally, the same caveats apply as documented in
   // *time_to_last_downstream_tx_byte* about not accounting for kernel socket buffer time, etc.
-  google.protobuf.Duration time_to_first_downstream_tx_byte = 11 [(gogoproto.stdduration) = true];
+  google.protobuf.Duration time_to_first_downstream_tx_byte = 11;
 
   // Interval between the first downstream byte received and the last downstream byte sent.
   // Depending on protocol, buffering, windowing, filters, etc. there may be a considerable delta
@@ -123,7 +120,7 @@ message AccessLogCommon {
   // time. In the current implementation it does not include kernel socket buffer time. In the
   // current implementation it also does not include send window buffering inside the HTTP/2 codec.
   // In the future it is likely that work will be done to make this duration more accurate.
-  google.protobuf.Duration time_to_last_downstream_tx_byte = 12 [(gogoproto.stdduration) = true];
+  google.protobuf.Duration time_to_last_downstream_tx_byte = 12;
 
   // The upstream remote/destination address that handles this exchange. This does not include
   // retries.

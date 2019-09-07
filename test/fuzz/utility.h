@@ -103,8 +103,7 @@ inline test::fuzz::Headers toHeaders(const Http::HeaderMap& headers) {
   return fuzz_headers;
 }
 
-inline TestStreamInfo fromStreamInfo(const test::fuzz::StreamInfo& stream_info,
-                                     const Ssl::MockConnectionInfo* connection_info) {
+inline TestStreamInfo fromStreamInfo(const test::fuzz::StreamInfo& stream_info) {
   // Set mocks' default string return value to be an empty string.
   testing::DefaultValue<const std::string&>::Set(EMPTY_STRING);
   TestStreamInfo test_stream_info;
@@ -129,10 +128,11 @@ inline TestStreamInfo fromStreamInfo(const test::fuzz::StreamInfo& stream_info,
   test_stream_info.downstream_local_address_ = address;
   test_stream_info.downstream_direct_remote_address_ = address;
   test_stream_info.downstream_remote_address_ = address;
-  test_stream_info.setDownstreamSslConnection(connection_info);
+  auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   ON_CALL(*connection_info, subjectPeerCertificate())
       .WillByDefault(testing::Return(
           "CN=Test Server,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US"));
+  test_stream_info.setDownstreamSslConnection(connection_info);
   return test_stream_info;
 }
 

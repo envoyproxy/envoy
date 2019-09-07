@@ -34,12 +34,6 @@
 
 #include "gtest/gtest.h"
 
-using testing::_;
-using testing::AnyNumber;
-using testing::HasSubstr;
-using testing::Invoke;
-using testing::Not;
-
 namespace Envoy {
 namespace {
 

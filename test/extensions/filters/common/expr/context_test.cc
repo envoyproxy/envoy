@@ -10,8 +10,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
-using testing::Const;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -258,7 +256,7 @@ TEST(Context, ConnectionAttributes) {
   NiceMock<StreamInfo::MockStreamInfo> info;
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
-  NiceMock<Ssl::MockConnectionInfo> connection_info;
+  auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   ConnectionWrapper connection(info);
   PeerWrapper source(info, false);
   PeerWrapper destination(info, true);
@@ -272,10 +270,10 @@ TEST(Context, ConnectionAttributes) {
   const std::string sni_name = "kittens.com";
   EXPECT_CALL(info, downstreamLocalAddress()).WillRepeatedly(ReturnRef(local));
   EXPECT_CALL(info, downstreamRemoteAddress()).WillRepeatedly(ReturnRef(remote));
-  EXPECT_CALL(info, downstreamSslConnection()).WillRepeatedly(Return(&connection_info));
+  EXPECT_CALL(info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
   EXPECT_CALL(info, upstreamHost()).WillRepeatedly(Return(host));
   EXPECT_CALL(info, requestedServerName()).WillRepeatedly(ReturnRef(sni_name));
-  EXPECT_CALL(connection_info, peerCertificatePresented()).WillRepeatedly(Return(true));
+  EXPECT_CALL(*connection_info, peerCertificatePresented()).WillRepeatedly(Return(true));
   EXPECT_CALL(*host, address()).WillRepeatedly(Return(upstream));
 
   {
