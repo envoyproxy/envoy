@@ -249,7 +249,7 @@ private:
   const std::chrono::milliseconds cluster_refresh_rate_;
   const std::chrono::milliseconds cluster_refresh_timeout_;
   const std::chrono::milliseconds redirect_refresh_interval_;
-  const uint32_t redirect_per_minute_refresh_threshold_;
+  const uint32_t redirect_refresh_threshold_;
   std::list<DnsDiscoveryResolveTargetPtr> dns_discovery_resolve_targets_;
   Event::Dispatcher& dispatcher_;
   Network::DnsResolverSharedPtr dns_resolver_;

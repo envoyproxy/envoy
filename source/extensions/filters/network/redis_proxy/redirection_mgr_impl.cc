@@ -10,25 +10,25 @@ bool RedirectionManagerImpl::onRedirection(const std::string& cluster_name) {
   if (it != info_map_.end()) {
     ClusterInfoSharedPtr info = it->second;
     if (info.get()) {
-      info->tracker_->update();
-      if (info->tracker_->eventsPerMinute() >= info->redirects_per_minute_threshold_) {
-        uint64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(
-                           time_source_.monotonicTime().time_since_epoch())
-                           .count();
-        uint64_t last_callback_time_ms = info->last_callback_time_ms_.load();
-        if (!last_callback_time_ms ||
-            (now >= (last_callback_time_ms + info->min_time_between_triggering_.count()))) {
-          if (info->last_callback_time_ms_.compare_exchange_strong(last_callback_time_ms, now)) {
-            main_thread_dispatcher_.post([=]() {
-              // Ensure that cluster is still active before calling callback.
-              auto map = cm_.clusters();
-              auto it = map.find(cluster_name);
-              if (it != map.end()) {
-                info->cb_();
-              }
-            });
-            return true;
-          }
+      uint64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(
+                         time_source_.monotonicTime().time_since_epoch())
+                         .count();
+      uint64_t last_callback_time_ms = info->last_callback_time_ms_.load();
+      if (!last_callback_time_ms ||
+          (now >= (last_callback_time_ms + info->min_time_between_triggering_.count()))) {
+        info->redirects_count_++; // ignore redirects during min time between triggering
+        if ((info->redirects_count_ >= info->redirects_threshold_) &&
+            (info->last_callback_time_ms_.compare_exchange_strong(last_callback_time_ms, now))) {
+          info->redirects_count_ = 0;
+          main_thread_dispatcher_.post([=]() {
+            // Ensure that cluster is still active before calling callback.
+            auto map = cm_.clusters();
+            auto it = map.find(cluster_name);
+            if (it != map.end()) {
+              info->cb_();
+            }
+          });
+          return true;
         }
       }
     }
@@ -36,12 +36,13 @@ bool RedirectionManagerImpl::onRedirection(const std::string& cluster_name) {
   return false;
 }
 
-RedirectionManagerImpl::HandlePtr RedirectionManagerImpl::registerCluster(
-    const std::string& cluster_name, const std::chrono::milliseconds min_time_between_triggering,
-    const uint32_t redirects_per_minute_threshold, const RedirectCB cb) {
+RedirectionManagerImpl::HandlePtr
+RedirectionManagerImpl::registerCluster(const std::string& cluster_name,
+                                        const std::chrono::milliseconds min_time_between_triggering,
+                                        const uint32_t redirects_threshold, const RedirectCB cb) {
 
-  ClusterInfoSharedPtr info = std::make_shared<ClusterInfo>(
-      min_time_between_triggering, redirects_per_minute_threshold, cb, time_source_);
+  ClusterInfoSharedPtr info =
+      std::make_shared<ClusterInfo>(min_time_between_triggering, redirects_threshold, cb);
   info_map_[cluster_name] = info;
 
   std::unique_ptr<RedirectionManagerImpl::HandleImpl> handle =

@@ -33,6 +33,7 @@ public:
   MockRoute(ConnPool::InstanceSharedPtr);
   ~MockRoute() = default;
   MOCK_CONST_METHOD0(upstream, ConnPool::InstanceSharedPtr());
+  MOCK_CONST_METHOD0(mirrorPolicies, const MirrorPolicies&());
   ConnPool::InstanceSharedPtr conn_pool_;
   const MirrorPolicies policies_;
 };
@@ -85,7 +86,10 @@ public:
   MockSplitCallbacks() = default;
   ~MockSplitCallbacks() = default;
 
+  void onResponse(Common::Redis::RespValuePtr&& value) override { onResponse_(value); }
 
+  MOCK_METHOD0(connectionAllowed, bool());
+  MOCK_METHOD1(onAuth, void(const std::string& password));
   MOCK_METHOD1(onResponse_, void(Common::Redis::RespValuePtr& value));
 };
 

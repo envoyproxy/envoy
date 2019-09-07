@@ -61,7 +61,7 @@ const std::string& clusterConfig() {
             cluster_refresh_rate: 60s
             cluster_refresh_timeout: 4s
             redirect_refresh_interval: 0s
-            redirect_per_minute_refresh_threshold: 0
+            redirect_refresh_threshold: 0
 )EOF");
 }
 

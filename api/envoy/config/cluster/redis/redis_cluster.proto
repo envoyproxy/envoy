@@ -46,7 +46,7 @@ import "validate/validate.proto";
 //         cluster_refresh_rate: 30s
 //         cluster_refresh_timeout: 0.5s
 //         redirect_refresh_interval: 10s
-//         redirect_per_minute_refresh_threshold: 10
+//         redirect_refresh_threshold: 10
 
 message RedisClusterConfig {
   // Interval between successive topology refresh requests. If not set, this defaults to 5s.
@@ -56,15 +56,15 @@ message RedisClusterConfig {
   google.protobuf.Duration cluster_refresh_timeout = 2 [(validate.rules).duration.gt = {}];
 
   // The minimum interval that must pass after triggering a topology refresh request before a new
-  // request can possibly be triggered again, no matter how many redirection errors are received
-  // from upstream servers during this interval. If not set, this defaults to 5s.
-  google.protobuf.Duration redirect_refresh_interval = 3 [(gogoproto.stdduration) = true];
+  // request can possibly be triggered again. Any redirection errors received during one of these
+  // time intervals are ignored. If not set, this defaults to 5s.
+  google.protobuf.Duration redirect_refresh_interval = 3;
 
-  // The number of redirection errors received in the last minute that must be reached before
+  // The number of redirection errors that must be received before
   // triggering a topology refresh request. If not set, this defaults to 0. In this case every
   // redirection error will trigger a topology refresh, limited only by when the last error was
   // received and the
   // :ref:`redirect_refresh_interval<envoy_api_field_config.cluster.redis.RedisClusterConfig.redirect_refresh_interval>`
   // setting.
-  uint32 redirect_per_minute_refresh_threshold = 4;
+  uint32 redirect_refresh_threshold = 4;
 }

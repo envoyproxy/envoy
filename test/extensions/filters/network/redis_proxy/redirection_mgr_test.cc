@@ -122,8 +122,9 @@ public:
 // registered via 2 threads. The manager is notified of events on valid registered clusters and
 // invalid unregistered cluster names.
 TEST_F(RedirectionMgrTest, Basic) {
-  handle_ = redirection_manager_->registerCluster(cluster_name_, std::chrono::milliseconds(0), 0,
+  handle_ = redirection_manager_->registerCluster(cluster_name_, std::chrono::milliseconds(1000), 1,
                                                   [&]() { callback_count_++; });
+  RedirectionManagerImpl::ClusterInfoSharedPtr cluster_info = clusterInfo(cluster_name_);
 
   Thread::ThreadPtr thread_1 = platform_.threadFactory().createThread([&]() {
     waitForTime(MonotonicTime(std::chrono::seconds(1)));
@@ -143,20 +144,13 @@ TEST_F(RedirectionMgrTest, Basic) {
   thread_2->join();
 
   EXPECT_GE(callback_count_, 2);
-  RedirectionManagerImpl::ClusterInfoSharedPtr cluster_info = clusterInfo(cluster_name_);
-  EXPECT_EQ(cluster_info->tracker_->eventsPerMinute(), 3);
+  EXPECT_EQ(cluster_info->redirects_count_, 0);
   EXPECT_EQ(cluster_info->last_callback_time_ms_.load(), 2000);
-  EXPECT_EQ(cluster_info->min_time_between_triggering_, std::chrono::milliseconds(0));
-  EXPECT_EQ(cluster_info->redirects_per_minute_threshold_, 0);
-
-  advanceTime(MonotonicTime(std::chrono::seconds(61)));
-  EXPECT_EQ(cluster_info->tracker_->eventsPerMinute(), 2);
-
-  advanceTime(MonotonicTime(std::chrono::seconds(62)));
-  EXPECT_EQ(cluster_info->tracker_->eventsPerMinute(), 0);
+  EXPECT_EQ(cluster_info->min_time_between_triggering_, std::chrono::milliseconds(1000));
+  EXPECT_EQ(cluster_info->redirects_threshold_, 1);
 
   callback_count_ = 0;
-  advanceTime(MonotonicTime(std::chrono::seconds(63)));
+  advanceTime(MonotonicTime(std::chrono::seconds(5)));
   EXPECT_FALSE(redirection_manager_->onRedirection("unregistered_cluster_name"));
   EXPECT_EQ(callback_count_, 0);
 
@@ -182,7 +176,6 @@ TEST_F(RedirectionMgrTest, HighVolume) {
           thread1_callback_count++;
         }
       }
-      EXPECT_GE(cluster_info->tracker_->eventsPerMinute(), 1000);
     }
   });
   Thread::ThreadPtr thread_2 = platform_.threadFactory().createThread([&]() {
@@ -193,199 +186,18 @@ TEST_F(RedirectionMgrTest, HighVolume) {
           thread2_callback_count++;
         }
       }
-      EXPECT_GE(cluster_info->tracker_->eventsPerMinute(), 1000);
     }
   });
 
-  // Synchronize all threads every 2 seconds and advance simulation time
-  // on the main thread in millisecond increments without thread synchronization.
+  // Synchronize all threads every 2 seconds of simulated time.
   for (uint32_t i = 1; i < 61; i += 2) {
-    advanceTime(MonotonicTime(std::chrono::seconds(i)), 2, std::chrono::milliseconds(1));
-    for (uint32_t j = 1; j < 2000; j++) {
-      time_system_.sleep(std::chrono::milliseconds(1));
-    }
+    advanceTime(MonotonicTime(std::chrono::seconds(i)), 2, std::chrono::seconds(1));
   }
   thread_1->join();
   thread_2->join();
 
   EXPECT_EQ(callback_count_, thread1_callback_count + thread2_callback_count);
-  EXPECT_LE(callback_count_, 30);
-  EXPECT_EQ(cluster_info->tracker_->eventsPerMinute(), 2000 * 60);
-
-  // Advance simulation time through the next minute in 2 second intervals
-  // that match the thread synchronization points (noting that each thread
-  // called onRedirection() 2000 times in each 2 second interval).
-  for (uint32_t i = 62; i < 121; i += 2) {
-    advanceTime(MonotonicTime(std::chrono::seconds(i)));
-    EXPECT_EQ(cluster_info->tracker_->eventsPerMinute(), 2000 * (120 - i));
-  }
-}
-
-// This test exercises manager logic when there is multi-second delay in recording
-// redirect events that is less than a minute, leading to a multi-entry partial clearing of the
-// tracker's count array.
-TEST_F(RedirectionMgrTest, DelayLessThanMinute) {
-  handle_ = redirection_manager_->registerCluster(cluster_name_, std::chrono::seconds(2), 1000,
-                                                  [&]() { callback_count_++; });
-  RedirectionManagerImpl::ClusterInfoSharedPtr cluster_info = clusterInfo(cluster_name_);
-  uint32_t thread1_callback_count = 0;
-  uint32_t thread2_callback_count = 0;
-
-  Thread::ThreadPtr thread_1 = platform_.threadFactory().createThread([&]() {
-    for (uint32_t i = 1; i < 61; i++) {
-      waitForTime(MonotonicTime(std::chrono::seconds(i)));
-      for (uint32_t j = 0; j < 1000; j++) {
-        if (redirection_manager_->onRedirection(cluster_name_)) {
-          thread1_callback_count++;
-        }
-      }
-      EXPECT_GE(cluster_info->tracker_->eventsPerMinute(), 1000);
-    }
-    waitForTime(MonotonicTime(std::chrono::seconds(61)));
-    waitForTime(MonotonicTime(std::chrono::seconds(91)));
-    for (uint32_t j = 0; j < 1000; j++) {
-      if (redirection_manager_->onRedirection(cluster_name_)) {
-        thread1_callback_count++;
-      }
-    }
-    waitForTime(MonotonicTime(std::chrono::seconds(121)));
-    waitForTime(MonotonicTime(std::chrono::seconds(181)));
-  });
-  Thread::ThreadPtr thread_2 = platform_.threadFactory().createThread([&]() {
-    for (uint32_t i = 1; i < 61; i++) {
-      waitForTime(MonotonicTime(std::chrono::seconds(i)));
-      for (uint32_t j = 0; j < 1000; j++) {
-        if (redirection_manager_->onRedirection(cluster_name_)) {
-          thread2_callback_count++;
-        }
-      }
-      EXPECT_GE(cluster_info->tracker_->eventsPerMinute(), 1000);
-    }
-    waitForTime(MonotonicTime(std::chrono::seconds(61)));
-    waitForTime(MonotonicTime(std::chrono::seconds(91)));
-    for (uint32_t j = 0; j < 1000; j++) {
-      if (redirection_manager_->onRedirection(cluster_name_)) {
-        thread2_callback_count++;
-      }
-    }
-    waitForTime(MonotonicTime(std::chrono::seconds(121)));
-    waitForTime(MonotonicTime(std::chrono::seconds(181)));
-  });
-
-  // Synchronize all threads every second and advance simulation time
-  // on the main thread in millisecond increments without thread synchronization.
-  for (uint32_t i = 1; i < 61; i++) {
-    advanceTime(MonotonicTime(std::chrono::seconds(i)), 2, std::chrono::milliseconds(1));
-    for (uint32_t j = 1; j < 1000; j++) {
-      time_system_.sleep(std::chrono::milliseconds(1));
-    }
-  }
-  advanceTime(MonotonicTime(std::chrono::seconds(61)), 2, std::chrono::milliseconds(1));
-
-  EXPECT_EQ(callback_count_, thread1_callback_count + thread2_callback_count);
-  EXPECT_LE(callback_count_, 30);
-  EXPECT_EQ(cluster_info->tracker_->eventsPerMinute(), 2000 * 59);
-
-  advanceTime(MonotonicTime(std::chrono::seconds(91)), 2);
-  for (uint32_t j = 0; j < 29; j++) {
-    time_system_.sleep(std::chrono::seconds(1));
-  }
-  advanceTime(MonotonicTime(std::chrono::seconds(121)), 2);
-
-  EXPECT_EQ(callback_count_, thread1_callback_count + thread2_callback_count);
-  EXPECT_LE(callback_count_, 45);
-  EXPECT_EQ(cluster_info->tracker_->eventsPerMinute(), 2000);
-
-  advanceTime(MonotonicTime(std::chrono::seconds(181)), 2);
-
-  EXPECT_EQ(callback_count_, thread1_callback_count + thread2_callback_count);
-  EXPECT_LE(callback_count_, 45);
-  EXPECT_EQ(cluster_info->tracker_->eventsPerMinute(), 0);
-
-  thread_1->join();
-  thread_2->join();
-}
-
-// This test exercises This test exercises manager logic when there is multi-second delay in
-// recording redirect events that is more than a minute, leading to a complete clearing of the
-// tracker's count array.
-TEST_F(RedirectionMgrTest, DelayGreaterThanMinute) {
-  handle_ = redirection_manager_->registerCluster(cluster_name_, std::chrono::seconds(2), 1000,
-                                                  [&]() { callback_count_++; });
-  RedirectionManagerImpl::ClusterInfoSharedPtr cluster_info = clusterInfo(cluster_name_);
-  uint32_t thread1_callback_count = 0;
-  uint32_t thread2_callback_count = 0;
-
-  Thread::ThreadPtr thread_1 = platform_.threadFactory().createThread([&]() {
-    for (uint32_t i = 1; i < 61; i++) {
-      waitForTime(MonotonicTime(std::chrono::seconds(i)));
-      for (uint32_t j = 0; j < 1000; j++) {
-        if (redirection_manager_->onRedirection(cluster_name_)) {
-          thread1_callback_count++;
-        }
-      }
-      EXPECT_GE(cluster_info->tracker_->eventsPerMinute(), 1000);
-    }
-    waitForTime(MonotonicTime(std::chrono::seconds(61)));
-    waitForTime(MonotonicTime(std::chrono::seconds(181)));
-    for (uint32_t j = 0; j < 1000; j++) {
-      if (redirection_manager_->onRedirection(cluster_name_)) {
-        thread1_callback_count++;
-      }
-    }
-    waitForTime(MonotonicTime(std::chrono::seconds(240)));
-    waitForTime(MonotonicTime(std::chrono::seconds(301)));
-  });
-  Thread::ThreadPtr thread_2 = platform_.threadFactory().createThread([&]() {
-    for (uint32_t i = 1; i < 61; i++) {
-      waitForTime(MonotonicTime(std::chrono::seconds(i)));
-      for (uint32_t j = 0; j < 1000; j++) {
-        if (redirection_manager_->onRedirection(cluster_name_)) {
-          thread2_callback_count++;
-        }
-      }
-      EXPECT_GE(cluster_info->tracker_->eventsPerMinute(), 1000);
-    }
-    waitForTime(MonotonicTime(std::chrono::seconds(61)));
-    waitForTime(MonotonicTime(std::chrono::seconds(181)));
-    for (uint32_t j = 0; j < 1000; j++) {
-      if (redirection_manager_->onRedirection(cluster_name_)) {
-        thread2_callback_count++;
-      }
-    }
-    waitForTime(MonotonicTime(std::chrono::seconds(240)));
-    waitForTime(MonotonicTime(std::chrono::seconds(301)));
-  });
-
-  // Synchronize all threads every second and advance simulation time
-  // on the main thread in millisecond increments without thread synchronization.
-  for (uint32_t i = 1; i < 61; i++) {
-    advanceTime(MonotonicTime(std::chrono::seconds(i)), 2, std::chrono::milliseconds(1));
-    for (uint32_t j = 1; j < 1000; j++) {
-      time_system_.sleep(std::chrono::milliseconds(1));
-    }
-  }
-  advanceTime(MonotonicTime(std::chrono::seconds(61)), 2, std::chrono::milliseconds(1));
-  advanceTime(MonotonicTime(std::chrono::seconds(181)), 2);
-  // Allow for a maximum skew of 2s between the simulated times of the two threads depending on
-  // thread scheduling.
-  for (uint32_t j = 0; j < 2000; j++) {
-    time_system_.sleep(std::chrono::milliseconds(1));
-  }
-  advanceTime(MonotonicTime(std::chrono::seconds(240)), 2);
-
-  EXPECT_EQ(callback_count_, thread1_callback_count + thread2_callback_count);
-  EXPECT_LE(callback_count_, 45);
-  EXPECT_EQ(cluster_info->tracker_->eventsPerMinute(), 2000);
-
-  advanceTime(MonotonicTime(std::chrono::seconds(301)), 2);
-
-  EXPECT_EQ(callback_count_, thread1_callback_count + thread2_callback_count);
-  EXPECT_LE(callback_count_, 45);
-  EXPECT_EQ(cluster_info->tracker_->eventsPerMinute(), 0);
-
-  thread_1->join();
-  thread_2->join();
+  EXPECT_EQ(callback_count_, 30);
 }
 
 } // namespace RedisProxy

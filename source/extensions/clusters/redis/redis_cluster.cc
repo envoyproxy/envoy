@@ -29,7 +29,7 @@ RedisCluster::RedisCluster(
           PROTOBUF_GET_MS_OR_DEFAULT(redisCluster, cluster_refresh_timeout, 3000))),
       redirect_refresh_interval_(std::chrono::milliseconds(
           PROTOBUF_GET_MS_OR_DEFAULT(redisCluster, redirect_refresh_interval, 5000))),
-      redirect_per_minute_refresh_threshold_(redisCluster.redirect_per_minute_refresh_threshold()),
+      redirect_refresh_threshold_(redisCluster.redirect_refresh_threshold()),
       dispatcher_(factory_context.dispatcher()), dns_resolver_(std::move(dns_resolver)),
       dns_lookup_family_(Upstream::getDnsLookupFamilyFromCluster(cluster)),
       load_assignment_(cluster.has_load_assignment()
@@ -57,7 +57,7 @@ RedisCluster::RedisCluster(
           });
 
   registration_handle_ = redirection_manager_->registerCluster(
-      cluster.name(), redirect_refresh_interval_, redirect_per_minute_refresh_threshold_, [&]() {
+      cluster.name(), redirect_refresh_interval_, redirect_refresh_threshold_, [&]() {
         redis_discovery_session_.resolve_timer_->enableTimer(std::chrono::milliseconds(0));
       });
 
