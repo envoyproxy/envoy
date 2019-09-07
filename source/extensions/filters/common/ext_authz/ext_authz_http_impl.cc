@@ -156,14 +156,19 @@ RawHttpClientImpl::RawHttpClientImpl(Upstream::ClusterManager& cm, ClientConfigS
                                      TimeSource& time_source)
     : cm_(cm), config_(config), time_source_(time_source) {}
 
-RawHttpClientImpl::~RawHttpClientImpl() { ASSERT(!callbacks_); }
+RawHttpClientImpl::~RawHttpClientImpl() {
+  ASSERT(callbacks_ == nullptr);
+  ASSERT(span_ == nullptr);
+}
 
 void RawHttpClientImpl::cancel() {
   ASSERT(callbacks_ != nullptr);
+  ASSERT(span_ != nullptr);
   span_->setTag(Tracing::Tags::get().Status, Tracing::Tags::get().Canceled);
   span_->finishSpan();
   request_->cancel();
   callbacks_ = nullptr;
+  span_ = nullptr;
 }
 
 // Client
@@ -220,6 +225,7 @@ void RawHttpClientImpl::onSuccess(Http::MessagePtr&& message) {
   callbacks_->onComplete(toResponse(std::move(message)));
   span_->finishSpan();
   callbacks_ = nullptr;
+  span_ = nullptr;
 }
 
 void RawHttpClientImpl::onFailure(Http::AsyncClient::FailureReason reason) {
@@ -228,6 +234,7 @@ void RawHttpClientImpl::onFailure(Http::AsyncClient::FailureReason reason) {
   span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
   span_->finishSpan();
   callbacks_ = nullptr;
+  span_ = nullptr;
 }
 
 ResponsePtr RawHttpClientImpl::toResponse(Http::MessagePtr message) {
