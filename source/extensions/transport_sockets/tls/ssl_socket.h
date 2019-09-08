@@ -41,13 +41,9 @@ struct SslSocketFactoryStats {
 enum class InitialState { Client, Server };
 enum class SocketState { PreHandshake, HandshakeInProgress, HandshakeComplete, ShutdownSent };
 
-class SslSocket : public Network::TransportSocket,
-                  public Envoy::Ssl::ConnectionInfo,
-                  public Envoy::Ssl::PrivateKeyConnectionCallbacks,
-                  protected Logger::Loggable<Logger::Id::connection> {
+class SslSocketInfo : public Envoy::Ssl::ConnectionInfo {
 public:
-  SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
-            const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
+  SslSocketInfo(bssl::UniquePtr<SSL> ssl) : ssl_(std::move(ssl)) {}
 
   // Ssl::ConnectionInfo
   bool peerCertificatePresented() const override;
@@ -69,6 +65,32 @@ public:
   std::string ciphersuiteString() const override;
   std::string tlsVersion() const override;
 
+  SSL* rawSslForTest() const { return ssl_.get(); }
+
+  bssl::UniquePtr<SSL> ssl_;
+
+private:
+  mutable std::vector<std::string> cached_uri_san_local_certificate_;
+  mutable std::string cached_sha_256_peer_certificate_digest_;
+  mutable std::string cached_serial_number_peer_certificate_;
+  mutable std::string cached_issuer_peer_certificate_;
+  mutable std::string cached_subject_peer_certificate_;
+  mutable std::string cached_subject_local_certificate_;
+  mutable std::vector<std::string> cached_uri_san_peer_certificate_;
+  mutable std::string cached_url_encoded_pem_encoded_peer_certificate_;
+  mutable std::string cached_url_encoded_pem_encoded_peer_cert_chain_;
+  mutable std::vector<std::string> cached_dns_san_peer_certificate_;
+  mutable std::vector<std::string> cached_dns_san_local_certificate_;
+  mutable std::string cached_session_id_;
+};
+
+class SslSocket : public Network::TransportSocket,
+                  public Envoy::Ssl::PrivateKeyConnectionCallbacks,
+                  protected Logger::Loggable<Logger::Id::connection> {
+public:
+  SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
+            const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
+
   // Network::TransportSocket
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
   std::string protocol() const override;
@@ -78,12 +100,11 @@ public:
   Network::IoResult doRead(Buffer::Instance& read_buffer) override;
   Network::IoResult doWrite(Buffer::Instance& write_buffer, bool end_stream) override;
   void onConnected() override;
-  const Ssl::ConnectionInfo* ssl() const override { return this; }
-
+  Ssl::ConnectionInfoConstSharedPtr ssl() const override;
   // Ssl::PrivateKeyConnectionCallbacks
   void onPrivateKeyMethodComplete() override;
 
-  SSL* rawSslForTest() const { return ssl_.get(); }
+  SSL* rawSslForTest() const { return ssl_; }
 
 private:
   struct ReadResult {
@@ -102,13 +123,12 @@ private:
   const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
   Network::TransportSocketCallbacks* callbacks_{};
   ContextImplSharedPtr ctx_;
-  bssl::UniquePtr<SSL> ssl_;
   uint64_t bytes_to_retry_{};
   std::string failure_reason_;
-  mutable std::string cached_sha_256_peer_certificate_digest_;
-  mutable std::string cached_url_encoded_pem_encoded_peer_certificate_;
-  mutable std::string cached_url_encoded_pem_encoded_peer_cert_chain_;
   SocketState state_;
+
+  SSL* ssl_;
+  Ssl::ConnectionInfoConstSharedPtr info_;
 };
 
 class ClientSslSocketFactory : public Network::TransportSocketFactory,

@@ -15,12 +15,8 @@ import "envoy/type/percent.proto";
 import "google/api/annotations.proto";
 
 import "validate/validate.proto";
-import "gogoproto/gogo.proto";
 import "google/protobuf/wrappers.proto";
 import "google/protobuf/duration.proto";
-
-option (gogoproto.equal_all) = true;
-option (gogoproto.stable_marshaler_all) = true;
 
 // [#protodoc-title: EDS]
 // Endpoint discovery :ref:`architecture overview <arch_overview_service_discovery_types_eds>`
@@ -36,7 +32,7 @@ service EndpointDiscoveryService {
 
   rpc FetchEndpoints(DiscoveryRequest) returns (DiscoveryResponse) {
     option (google.api.http) = {
-      post: "/v2/discovery:endpoints"
+      post: "/v3alpha/discovery:endpoints"
       body: "*"
     };
   }
