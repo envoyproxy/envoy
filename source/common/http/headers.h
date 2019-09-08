@@ -125,6 +125,7 @@ public:
   const LowerCaseString GrpcAcceptEncoding{"grpc-accept-encoding"};
   const LowerCaseString Host{":authority"};
   const LowerCaseString HostLegacy{"host"};
+  const LowerCaseString Http2Settings{"http2-settings"};
   const LowerCaseString KeepAlive{"keep-alive"};
   const LowerCaseString LastModified{"last-modified"};
   const LowerCaseString Location{"location"};
@@ -153,11 +154,13 @@ public:
 
   struct {
     const std::string Close{"close"};
+    const std::string Http2Settings{"http2-settings"};
     const std::string KeepAlive{"keep-alive"};
     const std::string Upgrade{"upgrade"};
   } ConnectionValues;
 
   struct {
+    const std::string H2c{"h2c"};
     const std::string WebSocket{"websocket"};
   } UpgradeValues;
 

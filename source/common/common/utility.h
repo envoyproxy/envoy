@@ -144,6 +144,35 @@ public:
  */
 class StringUtil {
 public:
+  /**
+   * Callable struct that returns the result of string comparison ignoring case.
+   * @param lhs supplies the first string view.
+   * @param rhs supplies the second string view.
+   * @return true if strings are semantically the same and false otherwise.
+   */
+  struct CaseInsensitiveCompare {
+    // Enable heterogeneous lookup (https://abseil.io/tips/144)
+    using is_transparent = void;
+    bool operator()(absl::string_view lhs, absl::string_view rhs) const;
+  };
+
+  /**
+   * Callable struct that returns the hash representation of a case-insensitive string_view input.
+   * @param key supplies the string view.
+   * @return uint64_t hash representation of the supplied string view.
+   */
+  struct CaseInsensitiveHash {
+    // Enable heterogeneous lookup (https://abseil.io/tips/144)
+    using is_transparent = void;
+    uint64_t operator()(absl::string_view key) const;
+  };
+
+  /**
+   * Definition of unordered set of case-insensitive std::string.
+   */
+  using CaseUnorderedSet =
+      absl::flat_hash_set<std::string, CaseInsensitiveHash, CaseInsensitiveCompare>;
+
   static const char WhitespaceChars[];
 
   /**
@@ -282,6 +311,20 @@ public:
                                                    bool keep_empty_string = false);
 
   /**
+   * Remove tokens from a delimiter-separated string view. The tokens are trimmed before
+   * they are compared ignoring case with the elements of 'tokens_to_remove'. The output is
+   * built from the trimmed tokens preserving case.
+   * @param source supplies the delimiter-separated string view.
+   * @param multi-delimiters supplies chars used to split the delimiter-separated string view.
+   * @param tokens_to_remove supplies a set of tokens which should not appear in the result.
+   * @param joiner contains a string used between tokens in the result.
+   * @return string of the remaining joined tokens.
+   */
+  static std::string removeTokens(absl::string_view source, absl::string_view delimiters,
+                                  const CaseUnorderedSet& tokens_to_remove,
+                                  absl::string_view joiner);
+
+  /**
    * Size-bounded string copying and concatenation
    */
   static size_t strlcpy(char* dst, const char* src, size_t size);
@@ -331,35 +374,6 @@ public:
    * @return std::string s converted to lower case.
    */
   static std::string toLower(absl::string_view s);
-
-  /**
-   * Callable struct that returns the result of string comparison ignoring case.
-   * @param lhs supplies the first string view.
-   * @param rhs supplies the second string view.
-   * @return true if strings are semantically the same and false otherwise.
-   */
-  struct CaseInsensitiveCompare {
-    // Enable heterogeneous lookup (https://abseil.io/tips/144)
-    using is_transparent = void;
-    bool operator()(absl::string_view lhs, absl::string_view rhs) const;
-  };
-
-  /**
-   * Callable struct that returns the hash representation of a case-insensitive string_view input.
-   * @param key supplies the string view.
-   * @return uint64_t hash representation of the supplied string view.
-   */
-  struct CaseInsensitiveHash {
-    // Enable heterogeneous lookup (https://abseil.io/tips/144)
-    using is_transparent = void;
-    uint64_t operator()(absl::string_view key) const;
-  };
-
-  /**
-   * Definition of unordered set of case-insensitive std::string.
-   */
-  using CaseUnorderedSet =
-      absl::flat_hash_set<std::string, CaseInsensitiveHash, CaseInsensitiveCompare>;
 
   /**
    * Removes all the character indices from str contained in the interval-set.

@@ -9,7 +9,6 @@ package envoy.data.tap.v2alpha;
 option java_outer_classname = "TransportProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.data.tap.v2alpha";
-option go_package = "v2";
 
 import "envoy/api/v2/core/address.proto";
 import "envoy/data/tap/v2alpha/common.proto";

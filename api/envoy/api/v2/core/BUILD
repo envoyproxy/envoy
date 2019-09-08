@@ -1,4 +1,4 @@
-load("@envoy_api//bazel:api_build_system.bzl", "api_go_grpc_library", "api_go_proto_library", "api_proto_library_internal")
+load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library_internal", "api_proto_package")
 
 licenses(["notice"])  # Apache 2
 
@@ -16,6 +16,13 @@ package_group(
     ],
 )
 
+api_proto_package(
+    name = "core",
+    deps = [
+        "//envoy/type",
+    ],
+)
+
 api_proto_library_internal(
     name = "address",
     srcs = ["address.proto"],
@@ -23,12 +30,6 @@ api_proto_library_internal(
         ":friends",
     ],
     deps = [":base"],
-)
-
-api_go_proto_library(
-    name = "address",
-    proto = ":address",
-    deps = [":base_go_proto"],
 )
 
 api_proto_library_internal(
@@ -40,15 +41,6 @@ api_proto_library_internal(
     deps = [
         ":http_uri",
         "//envoy/type:percent",
-    ],
-)
-
-api_go_proto_library(
-    name = "base",
-    proto = ":base",
-    deps = [
-        ":http_uri_go_proto",
-        "//envoy/type:percent_go_proto",
     ],
 )
 
@@ -64,15 +56,6 @@ api_proto_library_internal(
     ],
 )
 
-api_go_proto_library(
-    name = "health_check",
-    proto = ":health_check",
-    deps = [
-        ":base_go_proto",
-        "//envoy/type:range_go_proto",
-    ],
-)
-
 api_proto_library_internal(
     name = "config_source",
     srcs = ["config_source.proto"],
@@ -83,20 +66,6 @@ api_proto_library_internal(
         ":base",
         ":grpc_service",
     ],
-)
-
-api_go_proto_library(
-    name = "config_source",
-    proto = ":config_source",
-    deps = [
-        ":base_go_proto",
-        ":grpc_service_go_proto",
-    ],
-)
-
-api_go_proto_library(
-    name = "http_uri",
-    proto = ":http_uri",
 )
 
 api_proto_library_internal(
@@ -116,21 +85,10 @@ api_proto_library_internal(
     deps = [":base"],
 )
 
-api_go_proto_library(
-    name = "grpc_service",
-    proto = ":grpc_service",
-    deps = [":base_go_proto"],
-)
-
 api_proto_library_internal(
     name = "protocol",
     srcs = ["protocol.proto"],
     visibility = [
         ":friends",
     ],
-)
-
-api_go_proto_library(
-    name = "protocol",
-    proto = ":protocol",
 )
