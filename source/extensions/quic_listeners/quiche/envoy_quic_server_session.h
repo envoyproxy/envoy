@@ -79,7 +79,7 @@ public:
     stats_ = std::make_unique<Network::Connection::ConnectionStats>(stats);
     quic_connection_->setConnectionStats(stats);
   }
-  const Ssl::ConnectionInfo* ssl() const override;
+  Ssl::ConnectionInfoConstSharedPtr ssl() const override;
   Network::Connection::State state() const override {
     return connection()->connected() ? Network::Connection::State::Open
                                      : Network::Connection::State::Closed;

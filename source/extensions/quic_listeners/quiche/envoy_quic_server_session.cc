@@ -175,7 +175,7 @@ const Network::Address::InstanceConstSharedPtr& EnvoyQuicServerSession::localAdd
   return quic_connection_->connectionSocket()->localAddress();
 }
 
-const Ssl::ConnectionInfo* EnvoyQuicServerSession::ssl() const {
+Ssl::ConnectionInfoConstSharedPtr EnvoyQuicServerSession::ssl() const {
   // TODO(danzh): construct Ssl::ConnectionInfo from crypto stream
   ENVOY_CONN_LOG(error, "Ssl::ConnectionInfo instance is not populated.", *this);
   return nullptr;
