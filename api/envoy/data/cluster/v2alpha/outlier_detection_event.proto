@@ -10,9 +10,6 @@ import "google/protobuf/timestamp.proto";
 import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
-import "gogoproto/gogo.proto";
-
-option (gogoproto.equal_all) = true;
 
 // [#protodoc-title: Outlier detection logging events]
 // :ref:`Outlier detection logging <arch_overview_outlier_detection_logging>`.
@@ -21,7 +18,7 @@ message OutlierDetectionEvent {
   // In case of eject represents type of ejection that took place.
   OutlierEjectionType type = 1 [(validate.rules).enum.defined_only = true];
   // Timestamp for event.
-  google.protobuf.Timestamp timestamp = 2 [(gogoproto.stdtime) = true];
+  google.protobuf.Timestamp timestamp = 2;
   // The time in seconds since the last action (either an ejection or unejection) took place.
   google.protobuf.UInt64Value secs_since_last_action = 3;
   // The :ref:`cluster <envoy_api_msg_Cluster>` that owns the ejected host.

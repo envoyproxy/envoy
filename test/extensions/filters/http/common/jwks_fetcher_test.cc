@@ -11,7 +11,6 @@
 #include "test/test_common/utility.h"
 
 using ::envoy::api::v2::core::HttpUri;
-using ::google::jwt_verify::Status;
 
 namespace Envoy {
 namespace Extensions {

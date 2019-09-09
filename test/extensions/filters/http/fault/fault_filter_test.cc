@@ -26,13 +26,10 @@
 
 using testing::_;
 using testing::AnyNumber;
-using testing::DoAll;
-using testing::Invoke;
 using testing::Matcher;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
-using testing::WithArgs;
 
 namespace Envoy {
 namespace Extensions {
@@ -151,6 +148,7 @@ public:
   void TestPerFilterConfigFault(const Router::RouteSpecificFilterConfig* route_fault,
                                 const Router::RouteSpecificFilterConfig* vhost_fault);
 
+  Stats::IsolatedStoreImpl stats_;
   FaultFilterConfigSharedPtr config_;
   std::unique_ptr<FaultFilter> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_filter_callbacks_;
@@ -158,7 +156,6 @@ public:
   Http::TestHeaderMapImpl request_headers_;
   Http::TestHeaderMapImpl response_headers_;
   Buffer::OwnedImpl data_;
-  Stats::IsolatedStoreImpl stats_;
   NiceMock<Runtime::MockLoader> runtime_;
   Event::MockTimer* timer_{};
   Event::SimulatedTimeSystem time_system_;

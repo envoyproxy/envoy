@@ -14,7 +14,6 @@ using testing::Eq;
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
-using testing::Throw;
 
 namespace Envoy {
 namespace Grpc {

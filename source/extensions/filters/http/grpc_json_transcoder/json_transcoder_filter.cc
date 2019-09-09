@@ -23,8 +23,6 @@
 #include "grpc_transcoding/path_matcher_utility.h"
 #include "grpc_transcoding/response_to_json_translator.h"
 
-using Envoy::Protobuf::DescriptorPool;
-using Envoy::Protobuf::FileDescriptor;
 using Envoy::Protobuf::FileDescriptorSet;
 using Envoy::Protobuf::io::ZeroCopyInputStream;
 using Envoy::ProtobufUtil::Status;

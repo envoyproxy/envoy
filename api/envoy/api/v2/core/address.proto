@@ -11,9 +11,6 @@ import "envoy/api/v2/core/base.proto";
 import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
-import "gogoproto/gogo.proto";
-
-option (gogoproto.equal_all) = true;
 
 // [#protodoc-title: Network addresses]
 
@@ -27,7 +24,6 @@ message Pipe {
 
 message SocketAddress {
   enum Protocol {
-    option (gogoproto.goproto_enum_prefix) = false;
     TCP = 0;
     // [#not-implemented-hide:]
     UDP = 1;

@@ -16,7 +16,7 @@ build --experimental_local_memory_estimate
 build --experimental_strict_action_env=true
 build --host_force_python=PY2
 build --action_env=BAZEL_LINKLIBS=-l%:libstdc++.a
-build --action_env=BAZEL_LINKOPTS=-lm:-static-libgcc
+build --action_env=BAZEL_LINKOPTS=-lm
 build --host_javabase=@bazel_tools//tools/jdk:remote_jdk11
 build --javabase=@bazel_tools//tools/jdk:remote_jdk11
 
@@ -28,19 +28,21 @@ build --action_env=CC
 build --action_env=CXX
 build --action_env=PATH
 
+# Common flags for sanitizers
+build:sanitizer --define tcmalloc=disabled
+build:sanitizer --linkopt -ldl
+build:sanitizer --build_tag_filters=-no_san
+build:sanitizer --test_tag_filters=-no_san
+
 # Basic ASAN/UBSAN that works for gcc
-build:asan --action_env=BAZEL_LINKLIBS=
-build:asan --action_env=BAZEL_LINKOPTS=-lstdc++:-lm
+build:asan --config=sanitizer
+# ASAN install its signal handler, disable ours so the stacktrace will be printed by ASAN
+build:asan --define signal_trace=disabled
 build:asan --define ENVOY_CONFIG_ASAN=1
 build:asan --copt -fsanitize=address,undefined
 build:asan --linkopt -fsanitize=address,undefined
 build:asan --copt -fno-sanitize=vptr
 build:asan --linkopt -fno-sanitize=vptr
-build:asan --linkopt -ldl
-build:asan --define tcmalloc=disabled
-build:asan --build_tag_filters=-no_asan
-build:asan --test_tag_filters=-no_asan
-build:asan --define signal_trace=disabled
 build:asan --copt -DADDRESS_SANITIZER=1
 build:asan --copt -D__SANITIZE_ADDRESS__
 build:asan --test_env=ASAN_OPTIONS=handle_abort=1:allow_addr2line=true:check_initialization_order=true:strict_init_order=true:detect_odr_violation=1
@@ -62,21 +64,20 @@ build:macos-asan --copt -DGRPC_BAZEL_BUILD
 build:macos-asan --dynamic_mode=off
 
 # Clang TSAN
+build:clang-tsan --config=sanitizer
 build:clang-tsan --define ENVOY_CONFIG_TSAN=1
 build:clang-tsan --copt -fsanitize=thread
 build:clang-tsan --linkopt -fsanitize=thread
 build:clang-tsan --linkopt -fuse-ld=lld
-build:clang-tsan --linkopt -static-libsan
-build:clang-tsan --define tcmalloc=disabled
 # Needed due to https://github.com/libevent/libevent/issues/777
 build:clang-tsan --copt -DEVENT__DISABLE_DEBUG_MODE
 
 # Clang MSAN - broken today since we need to rebuild lib[std]c++ and external deps with MSAN
 # support (see https://github.com/envoyproxy/envoy/issues/443).
+build:clang-msan --config=sanitizer
 build:clang-msan --define ENVOY_CONFIG_MSAN=1
 build:clang-msan --copt -fsanitize=memory
 build:clang-msan --linkopt -fsanitize=memory
-build:clang-msan --define tcmalloc=disabled
 build:clang-msan --copt -fsanitize-memory-track-origins=2
 
 # Clang with libc++
@@ -108,6 +109,7 @@ build:rbe-toolchain-clang-libc++ --config=rbe-toolchain
 build:rbe-toolchain-clang-libc++ --crosstool_top=@rbe_ubuntu_clang_libcxx//cc:toolchain
 build:rbe-toolchain-clang-libc++ --extra_toolchains=@rbe_ubuntu_clang_libcxx//config:cc-toolchain
 build:rbe-toolchain-clang-libc++ --action_env=CC=clang --action_env=CXX=clang++ --action_env=PATH=/usr/sbin:/usr/bin:/sbin:/bin:/usr/lib/llvm-8/bin
+build:rbe-toolchain-clang-libc++ --define force_libcpp=enabled
 
 build:rbe-toolchain-gcc --config=rbe-toolchain
 build:rbe-toolchain-gcc --crosstool_top=@rbe_ubuntu_gcc//cc:toolchain

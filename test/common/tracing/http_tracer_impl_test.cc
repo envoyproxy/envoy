@@ -25,11 +25,9 @@
 
 using testing::_;
 using testing::Eq;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
-using testing::ReturnRef;
 
 namespace Envoy {
 namespace Tracing {
@@ -336,6 +334,7 @@ TEST(HttpConnManFinalizerImpl, SpanPopulatedFailureResponse) {
   EXPECT_CALL(span, setTag(Eq("cc"), Eq("c")));
   EXPECT_CALL(config, requestHeadersForTags());
   EXPECT_CALL(config, verbose).WillOnce(Return(false));
+  EXPECT_CALL(config, maxPathTagLength).WillOnce(Return(256));
 
   absl::optional<uint32_t> response_code(503);
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
