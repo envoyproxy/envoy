@@ -1214,7 +1214,7 @@ TEST_F(RouterTest, GrpcAlreadyExistsTrailersOnly) {
       .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
-        callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
+        callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
         return nullptr;
       }));
   expectResponseTimerCreate();
@@ -1241,7 +1241,7 @@ TEST_F(RouterTest, GrpcOutlierDetectionUnavailableStatusCodeRuntimeGuard) {
       .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
-        callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
+        callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
         return nullptr;
       }));
   expectResponseTimerCreate();
@@ -1269,7 +1269,7 @@ TEST_F(RouterTest, GrpcOutlierDetectionUnavailableStatusCode) {
       .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
-        callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
+        callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
         return nullptr;
       }));
   expectResponseTimerCreate();
@@ -1324,7 +1324,7 @@ TEST_F(RouterTest, GrpcInternalTrailersOnly) {
       .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
-        callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
+        callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
         return nullptr;
       }));
   expectResponseTimerCreate();
@@ -2934,7 +2934,7 @@ TEST_F(RouterTest, RetryUpstreamGrpcCancelled) {
       .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
-        callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
+        callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
         return nullptr;
       }));
   expectResponseTimerCreate();
@@ -2961,7 +2961,7 @@ TEST_F(RouterTest, RetryUpstreamGrpcCancelled) {
       .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
-        callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_);
+        callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_);
         return nullptr;
       }));
   router_.retry_state_->callback_();
