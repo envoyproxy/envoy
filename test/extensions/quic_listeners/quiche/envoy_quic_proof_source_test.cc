@@ -44,7 +44,7 @@ protected:
   quic::QuicTransportVersion version_{quic::QUIC_VERSION_UNSUPPORTED};
   quic::QuicStringPiece chlo_hash_{""};
   std::string server_config_{"Server Config"};
-  std::vector<std::string> expected_certs_{absl::StrCat("Fake cert from ", hostname_)};
+  std::vector<std::string> expected_certs_{"Fake cert"};
   std::string expected_signature_{absl::StrCat("Fake signature for { ", server_config_, " }")};
   EnvoyQuicFakeProofSource proof_source_;
   EnvoyQuicFakeProofVerifier proof_verifier_;

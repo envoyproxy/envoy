@@ -7,9 +7,6 @@ option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.type";
 
 import "validate/validate.proto";
-import "gogoproto/gogo.proto";
-
-option (gogoproto.equal_all) = true;
 
 // [#protodoc-title: Percent]
 

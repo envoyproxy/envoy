@@ -11,9 +11,6 @@ option ruby_package = "Envoy.Api.V2.ClusterNS";
 import "google/protobuf/any.proto";
 
 import "validate/validate.proto";
-import "gogoproto/gogo.proto";
-
-option (gogoproto.equal_all) = true;
 
 // [#protodoc-title: Upstream filters]
 //

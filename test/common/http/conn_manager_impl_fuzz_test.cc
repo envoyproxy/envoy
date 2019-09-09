@@ -405,11 +405,11 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
-  std::unique_ptr<Ssl::MockConnectionInfo> ssl_connection;
+  auto ssl_connection = std::make_shared<Ssl::MockConnectionInfo>();
   bool connection_alive = true;
 
-  ON_CALL(filter_callbacks.connection_, ssl()).WillByDefault(Return(ssl_connection.get()));
-  ON_CALL(Const(filter_callbacks.connection_), ssl()).WillByDefault(Return(ssl_connection.get()));
+  ON_CALL(filter_callbacks.connection_, ssl()).WillByDefault(Return(ssl_connection));
+  ON_CALL(Const(filter_callbacks.connection_), ssl()).WillByDefault(Return(ssl_connection));
   ON_CALL(filter_callbacks.connection_, close(_))
       .WillByDefault(InvokeWithoutArgs([&connection_alive] { connection_alive = false; }));
   filter_callbacks.connection_.local_address_ =
