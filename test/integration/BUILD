@@ -253,9 +253,9 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "http_load_balancer_integration_test",
+    name = "http_subset_lb_integration_test",
     srcs = [
-        "http_load_balancer_integration_test.cc",
+        "http_subset_lb_integration_test.cc",
     ],
     deps = [
         ":http_integration_lib",
