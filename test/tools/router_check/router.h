@@ -106,46 +106,32 @@ private:
       std::unique_ptr<Router::ConfigImpl> config, std::unique_ptr<Stats::IsolatedStoreImpl> stats,
       Api::ApiPtr api, Coverage coverage);
 
-  bool compareCluster(ToolConfig& tool_config, const std::string& expected,
-                      const std::string& test_name);
+  bool compareCluster(ToolConfig& tool_config, const std::string& expected);
   bool compareCluster(ToolConfig& tool_config,
-                      const envoy::RouterCheckToolSchema::ValidationAssert& expected,
-                      const std::string& test_name);
-  bool compareVirtualCluster(ToolConfig& tool_config, const std::string& expected,
-                             const std::string& test_name);
+                      const envoy::RouterCheckToolSchema::ValidationAssert& expected);
+  bool compareVirtualCluster(ToolConfig& tool_config, const std::string& expected);
   bool compareVirtualCluster(ToolConfig& tool_config,
-                             const envoy::RouterCheckToolSchema::ValidationAssert& expected,
-                             const std::string& test_name);
-  bool compareVirtualHost(ToolConfig& tool_config, const std::string& expected,
-                          const std::string& test_name);
+                             const envoy::RouterCheckToolSchema::ValidationAssert& expected);
+  bool compareVirtualHost(ToolConfig& tool_config, const std::string& expected);
   bool compareVirtualHost(ToolConfig& tool_config,
-                          const envoy::RouterCheckToolSchema::ValidationAssert& expected,
-                          const std::string& test_name);
-  bool compareRewriteHost(ToolConfig& tool_config, const std::string& expected,
-                          const std::string& test_name);
+                          const envoy::RouterCheckToolSchema::ValidationAssert& expected);
+  bool compareRewriteHost(ToolConfig& tool_config, const std::string& expected);
   bool compareRewriteHost(ToolConfig& tool_config,
-                          const envoy::RouterCheckToolSchema::ValidationAssert& expected,
-                          const std::string& test_name);
-  bool compareRewritePath(ToolConfig& tool_config, const std::string& expected,
-                          const std::string& test_name);
+                          const envoy::RouterCheckToolSchema::ValidationAssert& expected);
+  bool compareRewritePath(ToolConfig& tool_config, const std::string& expected);
   bool compareRewritePath(ToolConfig& tool_config,
-                          const envoy::RouterCheckToolSchema::ValidationAssert& expected,
-                          const std::string& test_name);
-  bool compareRedirectPath(ToolConfig& tool_config, const std::string& expected,
-                           const std::string& test_name);
+                          const envoy::RouterCheckToolSchema::ValidationAssert& expected);
+  bool compareRedirectPath(ToolConfig& tool_config, const std::string& expected);
   bool compareRedirectPath(ToolConfig& tool_config,
-                           const envoy::RouterCheckToolSchema::ValidationAssert& expected,
-                           const std::string& test_name);
+                           const envoy::RouterCheckToolSchema::ValidationAssert& expected);
   bool compareHeaderField(ToolConfig& tool_config, const std::string& field,
-                          const std::string& expected, const std::string& test_name);
+                          const std::string& expected);
   bool compareHeaderField(ToolConfig& tool_config,
-                          const envoy::RouterCheckToolSchema::ValidationAssert& expected,
-                          const std::string& test_name);
+                          const envoy::RouterCheckToolSchema::ValidationAssert& expected);
   bool compareCustomHeaderField(ToolConfig& tool_config, const std::string& field,
-                                const std::string& expected, const std::string& test_name);
+                                const std::string& expected);
   bool compareCustomHeaderField(ToolConfig& tool_config,
-                                const envoy::RouterCheckToolSchema::ValidationAssert& expected,
-                                const std::string& test_name);
+                                const envoy::RouterCheckToolSchema::ValidationAssert& expected);
   /**
    * Compare the expected and actual route parameter values. Print out match details if details_
    * flag is set.
@@ -154,7 +140,7 @@ private:
    * @return bool if actual and expected match.
    */
   bool compareResults(const std::string& actual, const std::string& expected,
-                      const std::string& test_type, const std::string& test_name);
+                      const std::string& test_type);
 
   bool runtimeMock(const std::string& key, const envoy::type::FractionalPercent& default_value,
                    uint64_t random_value);
@@ -165,7 +151,7 @@ private:
 
   bool only_show_failures_{false};
 
-  std::map<std::string, std::vector<std::string>> tests_;
+  std::vector<std::pair<std::string, std::vector<std::string>>> tests_;
 
   // TODO(hennna): Switch away from mocks following work done by @rlazarus in github issue #499.
   std::unique_ptr<NiceMock<Server::Configuration::MockFactoryContext>> factory_context_;
