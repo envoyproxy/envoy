@@ -9,6 +9,7 @@ ALPN
 ALS
 AMZ
 API
+ABI
 ASAN
 ASCII
 ASSERTs
@@ -294,6 +295,9 @@ VC
 VH
 VHDS
 VLOG
+VM
+WASM
+WAVM
 WKT
 WRR
 WS
@@ -452,6 +456,7 @@ dynamodb
 eg
 emplace
 emplaced
+emscripten
 enablement
 encodings
 endian
