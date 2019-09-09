@@ -49,6 +49,7 @@ envoy_cc_test(
         "//source/common/upstream:subset_lb_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:context_lib",
+        "//test/integration/clusters:custom_static_cluster",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/api:api_mocks",
         "//test/mocks/http:http_mocks",

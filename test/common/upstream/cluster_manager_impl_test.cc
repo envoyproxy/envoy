@@ -23,6 +23,7 @@
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/common/upstream/utility.h"
+#include "test/integration/clusters/custom_static_cluster.h"
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/http/mocks.h"
@@ -614,7 +615,7 @@ static_resources:
   clusters:
   - name: cluster_1
     connect_timeout: 0.250s
-    type: static
+    {}
     lb_policy: "{}"
     lb_subset_config:
       fallback_policy: ANY_ENDPOINT
@@ -636,11 +637,24 @@ static_resources:
   )EOF";
 
   const std::string& policy_name = envoy::api::v2::Cluster_LbPolicy_Name(GetParam());
-  const std::string yaml = fmt::format(yamlPattern, policy_name);
+
+  std::string cluster_type = "type: STATIC";
+  if (GetParam() == envoy::api::v2::Cluster_LbPolicy_ORIGINAL_DST_LB) {
+    cluster_type = "type: ORIGINAL_DST";
+  } else if (GetParam() == envoy::api::v2::Cluster_LbPolicy_CLUSTER_PROVIDED) {
+    // This custom cluster type is registered by linking test/integration/custom/static_cluster.cc.
+    cluster_type = "cluster_type: { name: envoy.clusters.custom_static_with_lb }";
+  }
+
+  const std::string yaml = fmt::format(yamlPattern, cluster_type, policy_name);
 
   if (GetParam() == envoy::api::v2::Cluster_LbPolicy_ORIGINAL_DST_LB ||
       GetParam() == envoy::api::v2::Cluster_LbPolicy_CLUSTER_PROVIDED) {
-    EXPECT_THROW(create(parseBootstrapFromV2Yaml(yaml)), EnvoyException);
+    EXPECT_THROW_WITH_MESSAGE(
+        create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
+        fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
+                    envoy::api::v2::Cluster_LbPolicy_Name(GetParam())));
+
   } else {
     create(parseBootstrapFromV2Yaml(yaml));
     checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
@@ -678,7 +692,7 @@ static_resources:
 
   EXPECT_THROW_WITH_MESSAGE(
       create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
-      "cluster: cluster type 'original_dst' may not be used with lb_subset_config");
+      "cluster: LB policy ORIGINAL_DST_LB cannot be combined with lb_subset_config");
 }
 
 TEST_F(ClusterManagerImplTest, SubsetLoadBalancerClusterProvidedLbRestriction) {
