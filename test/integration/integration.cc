@@ -608,17 +608,17 @@ AssertionResult BaseIntegrationTest::compareSotwDiscoveryRequest(
   return AssertionSuccess();
 }
 
-AssertionResult compareSets(std::set<std::string> set1, std::set<std::string> set2,
+AssertionResult compareSets(const std::set<std::string>& set1, const std::set<std::string>& set2,
                             absl::string_view name) {
   if (set1 == set2) {
     return AssertionSuccess();
   }
   auto failure = AssertionFailure() << name << " field not as expected.\nExpected: {";
-  for (auto x : set1) {
+  for (const auto& x : set1) {
     failure << x << ", ";
   }
   failure << "}\nActual: {";
-  for (auto x : set2) {
+  for (const auto& x : set2) {
     failure << x << ", ";
   }
   return failure << "}";
@@ -669,7 +669,7 @@ AssertionResult BaseIntegrationTest::compareDeltaDiscoveryRequest(
   if (expected_error_code != Grpc::Status::GrpcStatus::Ok &&
       request.error_detail().message().find(expected_error_substring) == std::string::npos) {
     return AssertionFailure() << "\"" << expected_error_substring
-                              << "\" is not a substring of error message \""
+                              << "\" is not a substring of actual error message \""
                               << request.error_detail().message() << "\"";
   }
   return AssertionSuccess();

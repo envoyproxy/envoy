@@ -98,7 +98,7 @@ void NewGrpcMuxImpl::onEstablishmentFailure() {
 void NewGrpcMuxImpl::onWriteable() { trySendDiscoveryRequests(); }
 
 void NewGrpcMuxImpl::kickOffAck(UpdateAck ack) {
-  pausable_ack_queue_.push(ack);
+  pausable_ack_queue_.push(std::move(ack));
   trySendDiscoveryRequests();
 }
 

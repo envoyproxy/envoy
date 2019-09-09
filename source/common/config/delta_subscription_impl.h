@@ -35,7 +35,7 @@ public:
   DeltaSubscriptionImpl(GrpcMuxSharedPtr context, absl::string_view type_url,
                         SubscriptionCallbacks& callbacks, SubscriptionStats stats,
                         std::chrono::milliseconds init_fetch_timeout, bool is_aggregated);
-  ~DeltaSubscriptionImpl();
+  ~DeltaSubscriptionImpl() override;
 
   void pause();
   void resume();

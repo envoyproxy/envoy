@@ -43,6 +43,9 @@ public:
   // The WithAck version first calls the Ackless version, then adds in the passed-in ack.
   envoy::api::v2::DeltaDiscoveryRequest getNextRequestWithAck(const UpdateAck& ack);
 
+  DeltaSubscriptionState(const DeltaSubscriptionState&) = delete;
+  DeltaSubscriptionState& operator=(const DeltaSubscriptionState&) = delete;
+
 private:
   void handleGoodResponse(const envoy::api::v2::DeltaDiscoveryResponse& message);
   void handleBadResponse(const EnvoyException& e, UpdateAck& ack);
@@ -95,9 +98,6 @@ private:
   // Feel free to change to unordered if you can figure out how to make it work.
   std::set<std::string> names_added_;
   std::set<std::string> names_removed_;
-
-  DeltaSubscriptionState(const DeltaSubscriptionState&) = delete;
-  DeltaSubscriptionState& operator=(const DeltaSubscriptionState&) = delete;
 };
 
 } // namespace Config

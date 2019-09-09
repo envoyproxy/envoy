@@ -47,7 +47,7 @@ public:
     subscription_.updateResourceInterest(cluster_names);
   }
 
-  void updateFile(const std::string json, bool run_dispatcher = true) {
+  void updateFile(const std::string& json, bool run_dispatcher = true) {
     // Write JSON contents to file, rename to path_ and run dispatcher to catch
     // inotify.
     const std::string temp_path = TestEnvironment::writeStringToFileForTest("eds.json.tmp", json);
