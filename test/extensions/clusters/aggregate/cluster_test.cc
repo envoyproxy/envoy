@@ -283,7 +283,6 @@ TEST_F(AggregateClusterTest, ClusterInPanicTest) {
   EXPECT_CALL(secondary_load_balancer_, chooseHost(_)).WillRepeatedly(Return(nullptr));
 
   for (int i = 0; i <= 25; ++i) {
-    std::cout << i << std::endl;
     EXPECT_CALL(random_, random()).WillOnce(Return(i));
     Upstream::HostConstSharedPtr target = lb_->chooseHost(nullptr);
     EXPECT_EQ(host.get(), target.get());
