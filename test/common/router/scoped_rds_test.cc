@@ -20,15 +20,12 @@
 #include "gtest/gtest.h"
 
 using testing::AnyNumber;
-using testing::ByMove;
-using testing::DoAll;
 using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
 using testing::IsNull;
 using testing::NiceMock;
 using testing::Return;
-using testing::ReturnRefOfCopy;
 
 namespace Envoy {
 namespace Router {
@@ -247,7 +244,7 @@ key:
 }
 
 // Tests that multiple uniquely named non-conflict resources are allowed in config updates.
-TEST_F(ScopedRdsTest, MultipleResourcesStow) {
+TEST_F(ScopedRdsTest, MultipleResourcesSotw) {
   setup();
 
   const std::string config_yaml = R"EOF(

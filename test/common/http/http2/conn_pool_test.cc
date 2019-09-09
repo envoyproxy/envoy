@@ -27,7 +27,6 @@ using testing::NiceMock;
 using testing::Property;
 using testing::Return;
 using testing::ReturnRef;
-using testing::SaveArg;
 
 namespace Envoy {
 namespace Http {

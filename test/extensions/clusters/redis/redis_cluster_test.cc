@@ -21,15 +21,10 @@
 
 using testing::_;
 using testing::ContainerEq;
-using testing::DoAll;
 using testing::Eq;
-using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
-using testing::ReturnRef;
-using testing::SaveArg;
-using testing::WithArg;
 
 namespace Envoy {
 namespace Extensions {

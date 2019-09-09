@@ -3,7 +3,7 @@ licenses(["notice"])  # Apache 2
 py_binary(
     name = "protodoc",
     srcs = ["protodoc.py"],
-    python_version = "PY2",
+    python_version = "PY3",
     visibility = ["//visibility:public"],
     deps = [
         "@com_envoyproxy_protoc_gen_validate//validate:validate_py",

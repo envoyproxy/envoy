@@ -6,9 +6,6 @@
 
 #include "gtest/gtest.h"
 
-using testing::IsFalse;
-using testing::IsTrue;
-
 namespace Envoy {
 namespace Stats {
 
