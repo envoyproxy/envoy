@@ -399,6 +399,34 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
   EXPECT_EQ(1u, manager_->listeners().size());
 }
 
+TEST_F(ListenerManagerImplWithRealFiltersTest, QuicListener) {
+  const std::string proto_text = R"EOF(
+address: {
+  socket_address: {
+    protocol: UDP
+    address: "127.0.0.1"
+    port_value: 1234
+  }
+}
+filter_chains: {}
+udp_listener_config: {
+  udp_listener_name: "quic_listener"
+  config: {}
+}
+  )EOF";
+  envoy::api::v2::Listener listener_proto;
+  EXPECT_TRUE(Protobuf::TextFormat::ParseFromString(proto_text, &listener_proto));
+
+  EXPECT_CALL(server_.random_, uuid());
+  EXPECT_CALL(listener_factory_,
+              createListenSocket(_, Network::Address::SocketType::Datagram, _, true));
+  EXPECT_CALL(os_sys_calls_, setsockopt_(_, _, _, _, _)).Times(testing::AtLeast(1));
+  EXPECT_CALL(os_sys_calls_, close(_)).WillRepeatedly(Return(Api::SysCallIntResult{0, errno}));
+  manager_->addOrUpdateListener(listener_proto, "", true);
+  EXPECT_EQ(1u, manager_->listeners().size());
+  EXPECT_NE(nullptr, manager_->listeners()[0].get().udpListenerFactory());
+}
+
 TEST_F(ListenerManagerImplWithRealFiltersTest, BadListenerConfig) {
   const std::string yaml = R"EOF(
 address:
