@@ -214,10 +214,10 @@ private:
     uint32_t maxBufferSizeBeforeFlush() const override { return 0; }
     std::chrono::milliseconds bufferFlushTimeoutInMs() const override { return buffer_timeout_; }
     uint32_t maxUpstreamUnknownConnections() const override { return 0; }
-    // This is effectively not in used for making the "Cluster Slots" calls.
-    // since we call cluster slots on both the master and slaves, ANY is more appropriate here.
+    // This is effectively not in used for making the "Cluster Slots" calls, using Master to avoid
+    // the READONLY command when establishing connection.
     Extensions::NetworkFilters::Common::Redis::Client::ReadPolicy readPolicy() const override {
-      return Extensions::NetworkFilters::Common::Redis::Client::ReadPolicy::Any;
+      return Extensions::NetworkFilters::Common::Redis::Client::ReadPolicy::Master;
     }
 
     // Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks
