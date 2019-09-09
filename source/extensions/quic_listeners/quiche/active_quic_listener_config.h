@@ -6,6 +6,7 @@
 namespace Envoy {
 namespace Quic {
 
+// A factory to create ActiveQuicListenerFactory based on given protobuf.
 class ActiveQuicListenerConfigFactory : public Server::ActiveUdpListenerConfigFactory {
 public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;

@@ -10,6 +10,8 @@
 namespace Envoy {
 namespace Quic {
 
+// QUIC specific UdpListenerCallbacks implemention which delegates incoming
+// packets, write signal and listener error to QuicDispatcher.
 class ActiveQuicListener : public Network::UdpListenerCallbacks,
                            public Server::ConnectionHandlerImpl::ActiveListenerImplBase,
                            // Inherits below two interfaces just to have common
@@ -58,6 +60,7 @@ private:
 
 using ActiveQuicListenerPtr = std::unique_ptr<ActiveQuicListener>;
 
+// A factory to create ActiveQuicListener based on given config.
 class ActiveQuicListenerFactory : public Network::ActiveUdpListenerFactory {
 public:
   ActiveQuicListenerFactory(const envoy::api::v2::listener::QuicConfigProto& config) {

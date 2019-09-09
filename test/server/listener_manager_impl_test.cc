@@ -399,7 +399,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
   EXPECT_EQ(1u, manager_->listeners().size());
 }
 
-TEST_F(ListenerManagerImplWithRealFiltersTest, QuicListener) {
+TEST_F(ListenerManagerImplWithRealFiltersTest, QuicListenerFactory) {
   const std::string proto_text = R"EOF(
 address: {
   socket_address: {
