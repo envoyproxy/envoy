@@ -1603,6 +1603,36 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
       .WillOnce(SaveArg<0>(&log4));
   event_logger.logUneject(host);
   Json::Factory::loadFromString(log4);
+
+  StringViewSaver log5;
+  EXPECT_CALL(host->outlier_detector_, lastUnejectionTime()).WillOnce(ReturnRef(monotonic_time));
+  EXPECT_CALL(host->outlier_detector_,
+              successRate(DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin))
+      .WillOnce(Return(0));
+  EXPECT_CALL(*file,
+              write(absl::string_view(
+                  "{\"type\":\"FAILURE_PERCENTAGE\",\"cluster_name\":\"fake_cluster\","
+                  "\"upstream_url\":\"10.0.0.1:443\",\"action\":\"EJECT\","
+                  "\"num_ejections\":0,\"enforced\":false,\"eject_failure_percentage_event\":{"
+                  "\"host_success_rate\":0},\"timestamp\":\"2018-12-18T09:00:00Z\","
+                  "\"secs_since_last_action\":\"30\"}\n")))
+      .WillOnce(SaveArg<0>(&log5));
+  event_logger.logEject(host, detector,
+                        envoy::data::cluster::v2alpha::OutlierEjectionType::FAILURE_PERCENTAGE,
+                        false);
+  Json::Factory::loadFromString(log5);
+
+  StringViewSaver log6;
+  EXPECT_CALL(host->outlier_detector_, lastEjectionTime()).WillOnce(ReturnRef(monotonic_time));
+  EXPECT_CALL(*file,
+              write(absl::string_view(
+                  "{\"type\":\"CONSECUTIVE_5XX\",\"cluster_name\":\"fake_cluster\","
+                  "\"upstream_url\":\"10.0.0.1:443\",\"action\":\"UNEJECT\","
+                  "\"num_ejections\":0,\"enforced\":false,\"timestamp\":\"2018-12-18T09:00:00Z\","
+                  "\"secs_since_last_action\":\"30\"}\n")))
+      .WillOnce(SaveArg<0>(&log6));
+  event_logger.logUneject(host);
+  Json::Factory::loadFromString(log6);
 }
 
 TEST(OutlierUtility, SRThreshold) {
