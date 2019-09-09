@@ -150,6 +150,7 @@ void NewGrpcMuxImpl::addSubscription(const std::string& type_url,
 }
 
 void NewGrpcMuxImpl::trySendDiscoveryRequests() {
+  auto old_queue_size = pausable_ack_queue_.size();
   while (true) {
     // Do any of our subscriptions even want to send a request?
     absl::optional<std::string> maybe_request_type = whoWantsToSendDiscoveryRequest();
@@ -184,7 +185,9 @@ void NewGrpcMuxImpl::trySendDiscoveryRequests() {
       grpc_stream_.sendMessage(sub->second->sub_state_.getNextRequestAckless());
     }
   }
-  grpc_stream_.maybeUpdateQueueSizeStat(pausable_ack_queue_.size());
+  if (old_queue_size != pausable_ack_queue_.size()) {
+    grpc_stream_.maybeUpdateQueueSizeStat(pausable_ack_queue_.size());
+  }
 }
 
 // Checks whether external conditions allow sending a DeltaDiscoveryRequest. (Does not check
