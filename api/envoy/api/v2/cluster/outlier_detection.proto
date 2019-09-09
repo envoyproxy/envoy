@@ -123,6 +123,9 @@ message OutlierDetection {
   // The % chance that a host will be actually ejected when an outlier status is detected through
   // failure percentage statistics. This setting can be used to disable ejection or to ramp it up
   // slowly. Defaults to 0.
+  //
+  // [#next-major-version: setting this without setting failure_percentage_threshold should be
+  // invalid in v4.]
   google.protobuf.UInt32Value enforcing_failure_percentage = 17 [(validate.rules).uint32.lte = 100];
 
   // The % chance that a host will be actually ejected when an outlier status is detected through
