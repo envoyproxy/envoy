@@ -12,13 +12,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
 
-using testing::AtLeast;
-using testing::DoAll;
-using testing::Eq;
-using testing::InSequence;
 using testing::Return;
-using testing::ReturnRef;
-using testing::SizeIs;
 
 namespace Envoy {
 namespace Extensions {

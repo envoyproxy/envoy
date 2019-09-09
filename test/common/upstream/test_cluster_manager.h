@@ -44,17 +44,8 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::ByRef;
-using testing::Eq;
-using testing::InSequence;
 using testing::Invoke;
-using testing::Mock;
 using testing::NiceMock;
-using testing::Pointee;
-using testing::Return;
-using testing::ReturnNew;
-using testing::ReturnRef;
-using testing::SaveArg;
 
 namespace Envoy {
 namespace Upstream {
