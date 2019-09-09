@@ -212,10 +212,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v3.8.0/protobuf-all-3.8.0.tar.gz"],
     ),
     grpc_httpjson_transcoding = dict(
-        sha256 = "dedd76b0169eb8c72e479529301a1d9b914a4ccb4d2b5ddb4ebe92d63a7b2152",
-        strip_prefix = "grpc-httpjson-transcoding-64d6ac985360b624d8e95105701b64a3814794cd",
-        # 2018-12-19
-        urls = ["https://github.com/grpc-ecosystem/grpc-httpjson-transcoding/archive/64d6ac985360b624d8e95105701b64a3814794cd.tar.gz"],
+        sha256 = "a447458b47ea4dc1d31499f555769af437c5d129d988ec1e13d5fdd0a6a36b4e",
+        strip_prefix = "grpc-httpjson-transcoding-2feabd5d64436e670084091a937855972ee35161",
+        # 2019-08-28
+        urls = ["https://github.com/grpc-ecosystem/grpc-httpjson-transcoding/archive/2feabd5d64436e670084091a937855972ee35161.tar.gz"],
     ),
     io_bazel_rules_go = dict(
         sha256 = "96b1f81de5acc7658e1f5a86d7dc9e1b89bc935d83799b711363a748652c471a",
@@ -232,10 +232,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://files.pythonhosted.org/packages/b3/b2/238e2590826bfdd113244a40d9d3eb26918bd798fc187e2360a8367068db/six-1.10.0.tar.gz"],
     ),
     io_opencensus_cpp = dict(
-        sha256 = "b5fcc36a994a4ecb6e53c901e33579ed1ac238cff9975807db760918a15f43ff",
-        strip_prefix = "opencensus-cpp-8058a1b8efe6a63bd18673abc51223917d12d45d",
-        # 2019-08-22
-        urls = ["https://github.com/census-instrumentation/opencensus-cpp/archive/8058a1b8efe6a63bd18673abc51223917d12d45d.tar.gz"],
+        sha256 = "145e42594db358905737dc07400657be62a2961f4e93ab7f4c9765dd2441033c",
+        strip_prefix = "opencensus-cpp-cc198ff64569bc47beed5384777a4bb563d268e7",
+        # 2019-09-04
+        urls = ["https://github.com/census-instrumentation/opencensus-cpp/archive/cc198ff64569bc47beed5384777a4bb563d268e7.tar.gz"],
     ),
     com_github_curl = dict(
         sha256 = "4376ac72b95572fb6c4fbffefb97c7ea0dd083e1974c0e44cd7e49396f454839",
@@ -243,9 +243,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/curl/curl/releases/download/curl-7_65_3/curl-7.65.3.tar.gz"],
     ),
     com_googlesource_quiche = dict(
-        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/2a930469533c3b541443488a629fe25cd8ff53d0.tar.gz
-        sha256 = "fcdebf54c89d839ffa7eefae166c8e4b551c765559db13ff15bff98047f344fb",
-        urls = ["https://storage.googleapis.com/quiche-envoy-integration/2a930469533c3b541443488a629fe25cd8ff53d0.tar.gz"],
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/4abb566fbbc63df8fe7c1ac30b21632b9eb18d0c.tar.gz
+        sha256 = "c60bca3cf7f58b91394a89da96080657ff0fbe4d5675be9b21e90da8f68bc06f",
+        urls = ["https://storage.googleapis.com/quiche-envoy-integration/4abb566fbbc63df8fe7c1ac30b21632b9eb18d0c.tar.gz"],
     ),
     com_google_cel_cpp = dict(
         sha256 = "f027c551d57d38fb9f0b5e4f21a2b0b8663987119e23b1fd8dfcc7588e9a2350",

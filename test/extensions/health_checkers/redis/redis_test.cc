@@ -16,8 +16,6 @@ using testing::InSequence;
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
-using testing::ReturnRef;
-using testing::SaveArg;
 using testing::WithArg;
 
 namespace Envoy {
