@@ -56,6 +56,7 @@ public:
         connection_handler_(ENVOY_LOGGER(), *dispatcher_) {
     EXPECT_CALL(listener_config_, listenerScope());
     EXPECT_CALL(listener_config_, listenerFiltersTimeout());
+    EXPECT_CALL(listener_config_, continueOnListenerFiltersTimeout());
     EXPECT_CALL(listener_config_, listenerTag());
   }
 
@@ -80,7 +81,7 @@ public:
           return true;
         }));
 
-    quic_listener_ = std::make_unique<ActiveQuicListener>(connection_handler_, listener_config_);
+    quic_listener_ = std::make_unique<ActiveQuicListener>(*dispatcher_, connection_handler_, ENVOY_LOGGER(), listener_config_, quic_config_);
     simulated_time_system_.sleep(std::chrono::milliseconds(100));
   }
 
@@ -103,6 +104,7 @@ protected:
   Network::MockFilterChain filter_chain_;
   Network::MockFilterChainManager filter_chain_manager_;
   Network::MockListenerConfig listener_config_;
+  quic::QuicConfig quic_config_;
   Server::ConnectionHandlerImpl connection_handler_;
   std::unique_ptr<ActiveQuicListener> quic_listener_;
 };
