@@ -17,6 +17,10 @@ namespace Server {
 ConnectionHandlerImpl::ConnectionHandlerImpl(spdlog::logger& logger, Event::Dispatcher& dispatcher)
     : logger_(logger), dispatcher_(dispatcher), disable_listeners_(false) {}
 
+void ConnectionHandlerImpl::incNumConnections() { ++num_connections_; }
+
+void ConnectionHandlerImpl::decNumConnections() { --num_connections_; }
+
 void ConnectionHandlerImpl::addListener(Network::ListenerConfig& config) {
   Network::ConnectionHandler::ActiveListenerPtr listener;
   Network::Address::SocketType socket_type = config.socket().socketType();

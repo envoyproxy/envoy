@@ -10,36 +10,40 @@
 namespace Envoy {
 namespace Quic {
 
-ActiveQuicListener::ActiveQuicListener(Server::ConnectionHandlerImpl& parent,
-                                       Network::ListenerConfig& listener_config)
-    : ActiveQuicListener(parent,
-                         parent.dispatcher_.createUdpListener(listener_config.socket(), *this),
-                         listener_config) {}
+ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
+                                       Network::ConnectionHandler& parent, spdlog::logger& logger,
+                                       Network::ListenerConfig& listener_config,
+                                       const quic::QuicConfig& quic_config)
+    : ActiveQuicListener(dispatcher, parent,
+                         dispatcher.createUdpListener(listener_config.socket(), *this), logger,
+                         listener_config, quic_config) {}
 
-ActiveQuicListener::ActiveQuicListener(Server::ConnectionHandlerImpl& parent,
-                                       Network::ListenerPtr&& listener,
-                                       Network::ListenerConfig& listener_config)
-    : Server::ConnectionHandlerImpl::ActiveListenerBase(parent, std::move(listener),
-                                                        listener_config),
-      version_manager_(quic::CurrentSupportedVersions()) {
+ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
+                                       Network::ConnectionHandler& parent,
+                                       Network::ListenerPtr&& listener, spdlog::logger& logger,
+                                       Network::ListenerConfig& listener_config,
+                                       const quic::QuicConfig& quic_config)
+    : Server::ConnectionHandlerImpl::ActiveListenerImplBase(std::move(listener), listener_config),
+      logger_(logger), dispatcher_(dispatcher), version_manager_(quic::CurrentSupportedVersions()) {
   quic::QuicRandom* const random = quic::QuicRandom::GetInstance();
   random->RandBytes(random_seed_, sizeof(random_seed_));
   crypto_config_ = std::make_unique<quic::QuicCryptoServerConfig>(
       quic::QuicStringPiece(reinterpret_cast<char*>(random_seed_), sizeof(random_seed_)),
       quic::QuicRandom::GetInstance(), std::make_unique<EnvoyQuicFakeProofSource>(),
       quic::KeyExchangeSource::Default());
-  auto connection_helper = std::make_unique<EnvoyQuicConnectionHelper>(parent.dispatcher_);
+  auto connection_helper = std::make_unique<EnvoyQuicConnectionHelper>(dispatcher_);
   auto alarm_factory =
-      std::make_unique<EnvoyQuicAlarmFactory>(parent.dispatcher_, *connection_helper->GetClock());
+      std::make_unique<EnvoyQuicAlarmFactory>(dispatcher_, *connection_helper->GetClock());
   quic_dispatcher_ = std::make_unique<EnvoyQuicDispatcher>(
-      crypto_config_.get(), &version_manager_, std::move(connection_helper),
-      std::move(alarm_factory), quic::kQuicDefaultConnectionIdLength, parent, config_, stats_);
+      crypto_config_.get(), quic_config, &version_manager_, std::move(connection_helper),
+      std::move(alarm_factory), quic::kQuicDefaultConnectionIdLength, parent, config_, stats_,
+      dispatcher);
   quic_dispatcher_->InitializeWithWriter(
       new EnvoyQuicPacketWriter(*dynamic_cast<Network::UdpListener*>(listener_.get())));
 }
 
 void ActiveQuicListener::onListenerShutdown() {
-  ENVOY_LOG_TO_LOGGER(parent_.logger_, info, "Listener shutdown.");
+  ENVOY_LOG_TO_LOGGER(logger_, info, "Listener shutdown.");
   quic_dispatcher_->Shutdown();
 }
 

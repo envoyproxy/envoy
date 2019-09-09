@@ -27,6 +27,16 @@ public:
   virtual uint64_t numConnections() PURE;
 
   /**
+   * Increment the return value of numConnections() by one.
+   */
+  virtual void incNumConnections() PURE;
+
+  /**
+   * Decrement the return value of numConnections() by one.
+   */
+  virtual void decNumConnections() PURE;
+
+  /**
    * Adds a listener to the handler.
    * @param config listener configuration options.
    */

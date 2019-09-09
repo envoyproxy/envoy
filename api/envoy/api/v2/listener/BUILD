@@ -39,3 +39,14 @@ api_go_proto_library(
         "//envoy/api/v2/core:base_go_proto",
     ],
 )
+
+api_proto_library_internal(
+    name = "quic_config",
+    srcs = ["quic_config.proto"],
+    visibility = ["//envoy/api/v2:friends"],
+)
+
+api_go_proto_library(
+    name = "quic_config",
+    proto = ":quic_config",
+)

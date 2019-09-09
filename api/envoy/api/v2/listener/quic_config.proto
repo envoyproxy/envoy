@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package envoy.api.v2.listener;
+
+option java_outer_classname = "ListenerProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.api.v2.listener";
+option go_package = "listener";
+option csharp_namespace = "Envoy.Api.V2.ListenerNS";
+option ruby_package = "Envoy::Api::V2::ListenerNS";
+
+// Configuration specific to the QUIC protocol.
+// Next id: 4
+message QuicConfigProto {
+  // Maximum number of streams that the client can negotiate per connection. 100
+  // if not specified.
+  int32 max_streams_per_connection = 1;
+
+  // Maximum number of milliseconds that connection will be alive when there is
+  // no network activity. 300000ms if not specified.
+  int32 idle_network_timeout_ms = 2;
+
+  // Connection timeout before the crypto handshake is finished. 20s if not
+  // specified.
+  int32 max_time_before_crypto_handshake_ms = 3;
+}
