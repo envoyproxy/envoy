@@ -55,5 +55,7 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/listener/http_inspector @yxue @PiotrSikora @lizan
 # attribute context
 /*/extensions/filters/common/expr @kyessenov @yangminzhu
+# webassembly common extension
+/*/extensions/common/wasm @jplevyak @PiotrSikora
 # aggregate cluster
 /*/extensions/clusters/aggregate @yxue @snowp
