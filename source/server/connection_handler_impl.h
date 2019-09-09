@@ -23,6 +23,12 @@
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
+
+namespace Quic {
+class ActiveQuicListener;
+class EnvoyQuicDispatcher;
+} // namespace Quic
+
 namespace Server {
 
 #define ALL_LISTENER_STATS(COUNTER, GAUGE, HISTOGRAM)                                              \
@@ -84,12 +90,17 @@ public:
   };
 
 private:
+  class ActiveUdpListener;
+  using ActiveUdpListenerPtr = std::unique_ptr<ActiveUdpListener>;
   class ActiveTcpListener;
   using ActiveTcpListenerPtr = std::unique_ptr<ActiveTcpListener>;
   struct ActiveConnection;
   using ActiveConnectionPtr = std::unique_ptr<ActiveConnection>;
   struct ActiveSocket;
   using ActiveSocketPtr = std::unique_ptr<ActiveSocket>;
+
+  friend class Quic::ActiveQuicListener;
+  friend class Quic::EnvoyQuicDispatcher;
 
   /**
    * Wrapper for an active tcp listener owned by this handler.
