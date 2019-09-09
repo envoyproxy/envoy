@@ -79,8 +79,9 @@ public:
   }
 
   void setupSecureConnection(const bool secure) {
+    ssl_ = std::make_shared<NiceMock<Envoy::Ssl::MockConnectionInfo>>();
     EXPECT_CALL(decoder_callbacks_, connection()).WillOnce(Return(&connection_));
-    EXPECT_CALL(Const(connection_), ssl()).Times(1).WillOnce(Return(secure ? &ssl_ : nullptr));
+    EXPECT_CALL(Const(connection_), ssl()).Times(1).WillOnce(Return(secure ? ssl_ : nullptr));
   }
 
   void setupMetadata(const std::string& yaml) {
@@ -96,7 +97,7 @@ public:
   Http::MockStreamDecoderFilterCallbacks decoder_callbacks_;
   Http::MockStreamEncoderFilterCallbacks encoder_callbacks_;
   envoy::api::v2::core::Metadata metadata_;
-  NiceMock<Envoy::Ssl::MockConnectionInfo> ssl_;
+  std::shared_ptr<NiceMock<Envoy::Ssl::MockConnectionInfo>> ssl_;
   NiceMock<Envoy::Network::MockConnection> connection_;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
 

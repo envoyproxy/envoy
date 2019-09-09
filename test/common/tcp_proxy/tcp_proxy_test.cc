@@ -947,9 +947,9 @@ TEST_F(TcpProxyTest, AccessLogPeerUriSan) {
       Network::Utility::resolveUrl("tcp://1.1.1.1:40000");
 
   const std::vector<std::string> uriSan{"someSan"};
-  Ssl::MockConnectionInfo mockConnectionInfo;
-  EXPECT_CALL(mockConnectionInfo, uriSanPeerCertificate()).WillOnce(Return(uriSan));
-  EXPECT_CALL(filter_callbacks_.connection_, ssl()).WillRepeatedly(Return(&mockConnectionInfo));
+  auto mockConnectionInfo = std::make_shared<Ssl::MockConnectionInfo>();
+  EXPECT_CALL(*mockConnectionInfo, uriSanPeerCertificate()).WillOnce(Return(uriSan));
+  EXPECT_CALL(filter_callbacks_.connection_, ssl()).WillRepeatedly(Return(mockConnectionInfo));
 
   setup(1, accessLogConfig("%DOWNSTREAM_PEER_URI_SAN%"));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
@@ -966,9 +966,9 @@ TEST_F(TcpProxyTest, AccessLogTlsSessionId) {
 
   const std::string tlsSessionId{
       "D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B"};
-  Ssl::MockConnectionInfo mockConnectionInfo;
-  EXPECT_CALL(mockConnectionInfo, sessionId()).WillOnce(Return(tlsSessionId));
-  EXPECT_CALL(filter_callbacks_.connection_, ssl()).WillRepeatedly(Return(&mockConnectionInfo));
+  auto mockConnectionInfo = std::make_shared<Ssl::MockConnectionInfo>();
+  EXPECT_CALL(*mockConnectionInfo, sessionId()).WillOnce(Return(tlsSessionId));
+  EXPECT_CALL(filter_callbacks_.connection_, ssl()).WillRepeatedly(Return(mockConnectionInfo));
 
   setup(1, accessLogConfig("%DOWNSTREAM_TLS_SESSION_ID%"));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
@@ -1008,6 +1008,21 @@ TEST_F(TcpProxyTest, AccessLogBytesRxTxDuration) {
   EXPECT_THAT(access_log_data_,
               MatchesRegex(
                   "bytesreceived=1 bytessent=2 datetime=[0-9-]+T[0-9:.]+Z nonzeronum=[1-9][0-9]*"));
+}
+
+TEST_F(TcpProxyTest, AccessLogUpstreamSSLConnection) {
+  setup(1);
+
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  const std::string session_id = "D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B";
+  auto ssl_info = std::make_shared<Ssl::MockConnectionInfo>();
+  EXPECT_CALL(*ssl_info, sessionId()).WillRepeatedly(Return(session_id));
+  stream_info.setDownstreamSslConnection(ssl_info);
+  EXPECT_CALL(*upstream_connections_.at(0), streamInfo()).WillRepeatedly(ReturnRef(stream_info));
+
+  raiseEventUpstreamConnected(0);
+  ASSERT_NE(nullptr, filter_->getStreamInfo().upstreamSslConnection());
+  EXPECT_EQ(session_id, filter_->getStreamInfo().upstreamSslConnection()->sessionId());
 }
 
 // Tests that upstream flush works properly with no idle timeout configured.

@@ -215,7 +215,7 @@ public:
    * @return the const SSL connection data if this is an SSL connection, or nullptr if it is not.
    */
   // TODO(snowp): Remove this in favor of StreamInfo::downstreamSslConnection.
-  virtual const Ssl::ConnectionInfo* ssl() const PURE;
+  virtual Ssl::ConnectionInfoConstSharedPtr ssl() const PURE;
 
   /**
    * @return requested server name (e.g. SNI in TLS), if any.
