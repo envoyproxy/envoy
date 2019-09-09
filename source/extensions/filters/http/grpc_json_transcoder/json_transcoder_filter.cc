@@ -356,11 +356,13 @@ void JsonTranscoderFilter::setDecoderFilterCallbacks(
 void JsonTranscoderFilter::encodeGrpcStatusMessage(Http::HeaderMap& trailers) {
   const absl::optional<Grpc::Status::GrpcStatus> grpc_status =
       Grpc::Common::getGrpcStatus(trailers);
-  if (grpc_status.value() == Grpc::Status::GrpcStatus::InvalidCode) {
-    response_headers_->Status()->value(enumToInt(Http::Code::ServiceUnavailable));
-  } else if (grpc_status) {
-    response_headers_->Status()->value(Grpc::Utility::grpcToHttpStatus(grpc_status.value()));
-    response_headers_->insertGrpcStatus().value(enumToInt(grpc_status.value()));
+  if (grpc_status) {
+    if (grpc_status.value() == Grpc::Status::GrpcStatus::InvalidCode) {
+      response_headers_->Status()->value(enumToInt(Http::Code::ServiceUnavailable));
+    } else {
+      response_headers_->Status()->value(Grpc::Utility::grpcToHttpStatus(grpc_status.value()));
+      response_headers_->insertGrpcStatus().value(enumToInt(grpc_status.value()));
+    }
   }
 
   const Http::HeaderEntry* grpc_message_header = trailers.GrpcMessage();
