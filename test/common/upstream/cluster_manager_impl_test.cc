@@ -48,10 +48,8 @@ using testing::InSequence;
 using testing::Invoke;
 using testing::Mock;
 using testing::NiceMock;
-using testing::Pointee;
 using testing::Return;
 using testing::ReturnNew;
-using testing::ReturnRef;
 using testing::SaveArg;
 
 namespace Envoy {

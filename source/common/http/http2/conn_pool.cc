@@ -101,7 +101,8 @@ void ConnPoolImpl::newClientStream(Http::StreamDecoder& response_decoder,
     host_->cluster().stats().upstream_rq_active_.inc();
     host_->cluster().resourceManager(priority_).requests().inc();
     callbacks.onPoolReady(primary_client_->client_->newStream(response_decoder),
-                          primary_client_->real_host_description_);
+                          primary_client_->real_host_description_,
+                          primary_client_->client_->streamInfo());
   }
 }
 

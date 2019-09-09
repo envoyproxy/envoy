@@ -172,6 +172,13 @@ required request volume in an interval is less than the
 :ref:`outlier_detection.failure_percentage_minimum_hosts<envoy_api_field_cluster.OutlierDetection.failure_percentage_minimum_hosts>`
 value.
 
+.. _arch_overview_outlier_detection_grpc:
+
+gRPC
+----------------------
+
+For gRPC requests, the outlier detection will use the HTTP status mapped from the `grpc-status <https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#responses>`_ response header. This behavior is guarded by the runtime feature `envoy.reloadable_features.outlier_detection_support_for_grpc_status` which defaults to true.
+
 
 .. _arch_overview_outlier_detection_logging:
 
