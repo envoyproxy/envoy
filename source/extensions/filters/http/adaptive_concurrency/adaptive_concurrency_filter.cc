@@ -52,8 +52,15 @@ void AdaptiveConcurrencyFilter::encodeComplete() {
 }
 
 void AdaptiveConcurrencyFilter::onDestroy() {
-  deferred_sample_task_->cancel();
-  controller_->cancelLatencySample();
+  if (deferred_sample_task_) {
+    // The sampling task hasn't been destroyed yet, so this implies we did not complete encoding.
+    // Let's stop the sampling from happening and perform request cleanup inside the controller.
+    //
+    // TODO (tonya11en): Return some RAII handle from the concurrency controller that performs this
+    // logic as part of its lifecycle.
+    deferred_sample_task_->cancel();
+    controller_->cancelLatencySample();
+  }
 }
 
 } // namespace AdaptiveConcurrency
