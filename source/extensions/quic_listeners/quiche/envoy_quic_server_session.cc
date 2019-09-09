@@ -22,7 +22,10 @@ EnvoyQuicServerSession::EnvoyQuicServerSession(
     : quic::QuicServerSessionBase(config, supported_versions, connection.get(), visitor, helper,
                                   crypto_config, compressed_certs_cache),
       quic_connection_(std::move(connection)), filter_manager_(*this), dispatcher_(dispatcher),
-      stream_info_(dispatcher.timeSource()) {}
+      stream_info_(dispatcher.timeSource()) {
+  // TODO(danzh): Use QUIC specific enum value.
+  stream_info_.protocol(Http::Protocol::Http2);
+}
 
 quic::QuicCryptoServerStreamBase* EnvoyQuicServerSession::CreateQuicCryptoServerStream(
     const quic::QuicCryptoServerConfig* crypto_config,
@@ -107,7 +110,8 @@ void EnvoyQuicServerSession::addConnectionCallbacks(Network::ConnectionCallbacks
 }
 
 void EnvoyQuicServerSession::addBytesSentCallback(Network::Connection::BytesSentCb /*cb*/) {
-  // TODO(danzh): implement to support proxy.
+  // TODO(danzh): implement to support proxy. This interface is only called from
+  // TCP proxy code.
   ASSERT(false, "addBytesSentCallback is not implemented for QUIC");
 }
 
@@ -171,7 +175,7 @@ const Network::Address::InstanceConstSharedPtr& EnvoyQuicServerSession::localAdd
   return quic_connection_->connectionSocket()->localAddress();
 }
 
-const Ssl::ConnectionInfo* EnvoyQuicServerSession::ssl() const {
+Ssl::ConnectionInfoConstSharedPtr EnvoyQuicServerSession::ssl() const {
   // TODO(danzh): construct Ssl::ConnectionInfo from crypto stream
   ENVOY_CONN_LOG(error, "Ssl::ConnectionInfo instance is not populated.", *this);
   return nullptr;

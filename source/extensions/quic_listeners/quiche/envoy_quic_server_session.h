@@ -79,7 +79,7 @@ public:
     stats_ = std::make_unique<Network::Connection::ConnectionStats>(stats);
     quic_connection_->setConnectionStats(stats);
   }
-  const Ssl::ConnectionInfo* ssl() const override;
+  Ssl::ConnectionInfoConstSharedPtr ssl() const override;
   Network::Connection::State state() const override {
     return connection()->connected() ? Network::Connection::State::Open
                                      : Network::Connection::State::Closed;
@@ -103,7 +103,6 @@ public:
   StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
   const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
   absl::string_view transportFailureReason() const override { return transport_failure_reason_; }
-  bool isQuic() const override { return true; }
 
   // Network::FilterManagerConnection
   void rawWrite(Buffer::Instance& data, bool end_stream) override;

@@ -31,14 +31,12 @@
 
 using testing::_;
 using testing::ContainerEq;
-using testing::ElementsAreArray;
 using testing::Eq;
 using testing::Matcher;
 using testing::MockFunction;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
-using testing::StrNe;
 
 namespace Envoy {
 namespace Router {

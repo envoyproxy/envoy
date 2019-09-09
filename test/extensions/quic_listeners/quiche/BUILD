@@ -153,3 +153,15 @@ envoy_cc_test(
         "//test/test_common:threadsafe_singleton_injector_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "envoy_quic_utils_test",
+    srcs = ["envoy_quic_utils_test.cc"],
+    tags = ["nofips"],
+    deps = [
+        ":quic_test_utils_for_envoy_lib",
+        "//source/extensions/quic_listeners/quiche:envoy_quic_utils_lib",
+        "//test/mocks/api:api_mocks",
+        "//test/test_common:threadsafe_singleton_injector_lib",
+    ],
+)

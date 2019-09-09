@@ -71,7 +71,7 @@ public:
                      absl::optional<Connection::UnixDomainSocketPeerCredentials>());
   MOCK_CONST_METHOD0(localAddress, const Address::InstanceConstSharedPtr&());
   MOCK_METHOD1(setConnectionStats, void(const ConnectionStats& stats));
-  MOCK_CONST_METHOD0(ssl, const Ssl::ConnectionInfo*());
+  MOCK_CONST_METHOD0(ssl, Ssl::ConnectionInfoConstSharedPtr());
   MOCK_CONST_METHOD0(requestedServerName, absl::string_view());
   MOCK_CONST_METHOD0(state, State());
   MOCK_METHOD2(write, void(Buffer::Instance& data, bool end_stream));
@@ -85,7 +85,6 @@ public:
   MOCK_METHOD1(setDelayedCloseTimeout, void(std::chrono::milliseconds));
   MOCK_CONST_METHOD0(delayedCloseTimeout, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(transportFailureReason, absl::string_view());
-  MOCK_CONST_METHOD0(isQuic, bool());
 };
 
 /**
@@ -118,7 +117,7 @@ public:
                      absl::optional<Connection::UnixDomainSocketPeerCredentials>());
   MOCK_CONST_METHOD0(localAddress, const Address::InstanceConstSharedPtr&());
   MOCK_METHOD1(setConnectionStats, void(const ConnectionStats& stats));
-  MOCK_CONST_METHOD0(ssl, const Ssl::ConnectionInfo*());
+  MOCK_CONST_METHOD0(ssl, Ssl::ConnectionInfoConstSharedPtr());
   MOCK_CONST_METHOD0(requestedServerName, absl::string_view());
   MOCK_CONST_METHOD0(state, State());
   MOCK_METHOD2(write, void(Buffer::Instance& data, bool end_stream));
@@ -132,7 +131,6 @@ public:
   MOCK_METHOD1(setDelayedCloseTimeout, void(std::chrono::milliseconds));
   MOCK_CONST_METHOD0(delayedCloseTimeout, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(transportFailureReason, absl::string_view());
-  MOCK_CONST_METHOD0(isQuic, bool());
 
   // Network::ClientConnection
   MOCK_METHOD0(connect, void());
@@ -168,7 +166,7 @@ public:
                      absl::optional<Connection::UnixDomainSocketPeerCredentials>());
   MOCK_CONST_METHOD0(localAddress, const Address::InstanceConstSharedPtr&());
   MOCK_METHOD1(setConnectionStats, void(const ConnectionStats& stats));
-  MOCK_CONST_METHOD0(ssl, const Ssl::ConnectionInfo*());
+  MOCK_CONST_METHOD0(ssl, Ssl::ConnectionInfoConstSharedPtr());
   MOCK_CONST_METHOD0(requestedServerName, absl::string_view());
   MOCK_CONST_METHOD0(state, State());
   MOCK_METHOD2(write, void(Buffer::Instance& data, bool end_stream));
@@ -182,7 +180,6 @@ public:
   MOCK_METHOD1(setDelayedCloseTimeout, void(std::chrono::milliseconds));
   MOCK_CONST_METHOD0(delayedCloseTimeout, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(transportFailureReason, absl::string_view());
-  MOCK_CONST_METHOD0(isQuic, bool());
 
   // Network::FilterManagerConnection
   MOCK_METHOD0(getReadBuffer, StreamBuffer());

@@ -100,7 +100,8 @@ public:
   bool installReadFilter() {
     // Setup read filter.
     envoy_quic_session_.addReadFilter(read_filter_);
-    EXPECT_TRUE(read_filter_->callbacks_->connection().isQuic());
+    EXPECT_EQ(Http::Protocol::Http2,
+              read_filter_->callbacks_->connection().streamInfo().protocol().value());
     EXPECT_EQ(envoy_quic_session_.id(), read_filter_->callbacks_->connection().id());
     EXPECT_EQ(&envoy_quic_session_, &read_filter_->callbacks_->connection());
     read_filter_->callbacks_->connection().addConnectionCallbacks(network_connection_callbacks_);
@@ -259,12 +260,6 @@ TEST_P(EnvoyQuicServerSessionTest, OnResetFrame) {
   EXPECT_CALL(stream_callbacks,
               onResetStream(Http::StreamResetReason::RemoteRefusedStreamReset, _));
   stream2->OnStreamReset(rst2);
-
-  quic::QuicStream* stream3 = envoy_quic_session_.GetOrCreateStream(stream_id + 8u);
-  quic::QuicRstStreamFrame rst3(/*control_frame_id=*/1u, stream3->id(),
-                                quic::QUIC_STREAM_CONNECTION_ERROR, /*bytes_written=*/0u);
-  EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::ConnectionFailure, _));
-  stream3->OnStreamReset(rst3);
 }
 
 TEST_P(EnvoyQuicServerSessionTest, ConnectionClose) {

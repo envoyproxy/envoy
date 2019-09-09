@@ -5,14 +5,12 @@ package envoy.config.filter.network.dubbo_proxy.v2alpha1;
 option java_outer_classname = "DubboProxyProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.filter.network.dubbo_proxy.v2alpha1";
-option go_package = "v2";
 
 import "envoy/config/filter/network/dubbo_proxy/v2alpha1/route.proto";
 
 import "google/protobuf/any.proto";
 
 import "validate/validate.proto";
-import "gogoproto/gogo.proto";
 
 // [#protodoc-title: Dubbo Proxy]
 // Dubbo Proxy :ref:`configuration overview <config_network_filters_dubbo_proxy>`.

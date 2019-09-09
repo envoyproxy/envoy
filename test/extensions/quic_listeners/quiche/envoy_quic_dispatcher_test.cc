@@ -208,7 +208,6 @@ TEST_P(EnvoyQuicDispatcherTest, CloseConnectionDueToMissingFilterChain) {
                                         ? quic::QuicIpAddress::Loopback4()
                                         : quic::QuicIpAddress::Loopback6(),
                                     54321);
-  Network::MockFilterChain filter_chain;
   Network::MockFilterChainManager filter_chain_manager;
   EXPECT_CALL(listener_config_, filterChainManager()).WillOnce(ReturnRef(filter_chain_manager));
   EXPECT_CALL(filter_chain_manager, findFilterChain(_))
@@ -228,6 +227,36 @@ TEST_P(EnvoyQuicDispatcherTest, CloseConnectionDueToMissingFilterChain) {
   EXPECT_TRUE(quic::test::QuicDispatcherPeer::time_wait_list_manager(&envoy_quic_dispatcher_)
                   ->IsConnectionIdInTimeWait(connection_id));
   EXPECT_EQ(1u, listener_stats_.no_filter_chain_match_.value());
+}
+
+TEST_P(EnvoyQuicDispatcherTest, CloseConnectionDueToEmptyFilterChain) {
+  quic::QuicSocketAddress peer_addr(version_ == Network::Address::IpVersion::v4
+                                        ? quic::QuicIpAddress::Loopback4()
+                                        : quic::QuicIpAddress::Loopback6(),
+                                    54321);
+  Network::MockFilterChain filter_chain;
+  Network::MockFilterChainManager filter_chain_manager;
+  EXPECT_CALL(listener_config_, filterChainManager()).WillOnce(ReturnRef(filter_chain_manager));
+  EXPECT_CALL(filter_chain_manager, findFilterChain(_))
+      .WillOnce(Invoke([&](const Network::ConnectionSocket& socket) {
+        EXPECT_EQ(*listen_socket_->localAddress(), *socket.localAddress());
+        EXPECT_EQ(peer_addr, envoyAddressInstanceToQuicSocketAddress(socket.remoteAddress()));
+        return &filter_chain;
+      }));
+  // Empty filter_factory should cause connection close.
+  std::vector<Network::FilterFactoryCb> filter_factory;
+  EXPECT_CALL(filter_chain, networkFilterFactories()).WillOnce(ReturnRef(filter_factory));
+
+  quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);
+  std::unique_ptr<quic::QuicReceivedPacket> received_packet =
+      createFullChloPacket(connection_id, peer_addr);
+  envoy_quic_dispatcher_.ProcessPacket(
+      envoyAddressInstanceToQuicSocketAddress(listen_socket_->localAddress()), peer_addr,
+      *received_packet);
+  EXPECT_EQ(0u, envoy_quic_dispatcher_.session_map().size());
+  EXPECT_EQ(0u, connection_handler_.numConnections());
+  EXPECT_TRUE(quic::test::QuicDispatcherPeer::time_wait_list_manager(&envoy_quic_dispatcher_)
+                  ->IsConnectionIdInTimeWait(connection_id));
 }
 
 } // namespace Quic

@@ -423,9 +423,11 @@ void TestHeaderMapImpl::addCopy(const std::string& key, const std::string& value
 
 void TestHeaderMapImpl::remove(const std::string& key) { remove(LowerCaseString(key)); }
 
-std::string TestHeaderMapImpl::get_(const std::string& key) { return get_(LowerCaseString(key)); }
+std::string TestHeaderMapImpl::get_(const std::string& key) const {
+  return get_(LowerCaseString(key));
+}
 
-std::string TestHeaderMapImpl::get_(const LowerCaseString& key) {
+std::string TestHeaderMapImpl::get_(const LowerCaseString& key) const {
   const HeaderEntry* header = get(key);
   if (!header) {
     return EMPTY_STRING;
