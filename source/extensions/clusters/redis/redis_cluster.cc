@@ -13,20 +13,20 @@ Extensions::NetworkFilters::Common::Redis::Client::DoNothingPoolCallbacks null_p
 
 RedisCluster::RedisCluster(
     const envoy::api::v2::Cluster& cluster,
-    const envoy::config::cluster::redis::RedisClusterConfig& redisCluster,
+    const envoy::config::cluster::redis::RedisClusterConfig& redis_cluster,
     NetworkFilters::Common::Redis::Client::ClientFactory& redis_client_factory,
-    Upstream::ClusterManager& clusterManager, Runtime::Loader& runtime, Api::Api& api,
+    Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime, Api::Api& api,
     Network::DnsResolverSharedPtr dns_resolver,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api,
     ClusterSlotUpdateCallBackSharedPtr lb_factory)
     : Upstream::BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
                                        added_via_api),
-      cluster_manager_(clusterManager),
+      cluster_manager_(cluster_manager),
       cluster_refresh_rate_(std::chrono::milliseconds(
-          PROTOBUF_GET_MS_OR_DEFAULT(redisCluster, cluster_refresh_rate, 5000))),
+          PROTOBUF_GET_MS_OR_DEFAULT(redis_cluster, cluster_refresh_rate, 5000))),
       cluster_refresh_timeout_(std::chrono::milliseconds(
-          PROTOBUF_GET_MS_OR_DEFAULT(redisCluster, cluster_refresh_timeout, 3000))),
+          PROTOBUF_GET_MS_OR_DEFAULT(redis_cluster, cluster_refresh_timeout, 3000))),
       dispatcher_(factory_context.dispatcher()), dns_resolver_(std::move(dns_resolver)),
       dns_lookup_family_(Upstream::getDnsLookupFamilyFromCluster(cluster)),
       load_assignment_(cluster.has_load_assignment()

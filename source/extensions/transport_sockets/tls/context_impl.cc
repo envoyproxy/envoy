@@ -626,16 +626,16 @@ bool ContextImpl::verifySubjectAltName(X509* cert,
   return false;
 }
 
-bool ContextImpl::dNSNameMatch(const std::string& dNSName, const char* pattern) {
-  if (dNSName == pattern) {
+bool ContextImpl::dNSNameMatch(const std::string& d_ns_name, const char* pattern) {
+  if (d_ns_name == pattern) {
     return true;
   }
 
   size_t pattern_len = strlen(pattern);
   if (pattern_len > 1 && pattern[0] == '*' && pattern[1] == '.') {
-    if (dNSName.length() > pattern_len - 1) {
-      size_t off = dNSName.length() - pattern_len + 1;
-      return dNSName.compare(off, pattern_len - 1, pattern + 1) == 0;
+    if (d_ns_name.length() > pattern_len - 1) {
+      size_t off = d_ns_name.length() - pattern_len + 1;
+      return d_ns_name.compare(off, pattern_len - 1, pattern + 1) == 0;
     }
   }
 

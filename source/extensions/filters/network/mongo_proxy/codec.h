@@ -89,7 +89,7 @@ public:
   virtual bool operator==(const KillCursorsMessage& rhs) const PURE;
 
   virtual int32_t numberOfCursorIds() const PURE;
-  virtual void numberOfCursorIds(int32_t number_of_cursors_ids_) PURE;
+  virtual void numberOfCursorIds(int32_t number_of_cursors_ids) PURE;
   virtual const std::vector<int64_t>& cursorIds() const PURE;
   virtual void cursorIds(std::vector<int64_t>&& cursors_ids) PURE;
 };
@@ -163,11 +163,11 @@ public:
   virtual std::string database() const PURE;
   virtual void database(std::string database) PURE;
   virtual std::string commandName() const PURE;
-  virtual void commandName(std::string commandName) PURE;
+  virtual void commandName(std::string command_name) PURE;
   virtual const Bson::Document* metadata() const PURE;
   virtual void metadata(Bson::DocumentSharedPtr&& metadata) PURE;
   virtual const Bson::Document* commandArgs() const PURE;
-  virtual void commandArgs(Bson::DocumentSharedPtr&& commandArgs) PURE;
+  virtual void commandArgs(Bson::DocumentSharedPtr&& command_args) PURE;
   virtual const std::list<Bson::DocumentSharedPtr>& inputDocs() const PURE;
   virtual std::list<Bson::DocumentSharedPtr>& inputDocs() PURE;
 };
@@ -180,7 +180,7 @@ public:
   virtual const Bson::Document* metadata() const PURE;
   virtual void metadata(Bson::DocumentSharedPtr&& metadata) PURE;
   virtual const Bson::Document* commandReply() const PURE;
-  virtual void commandReply(Bson::DocumentSharedPtr&& commandReply) PURE;
+  virtual void commandReply(Bson::DocumentSharedPtr&& command_reply) PURE;
   virtual const std::list<Bson::DocumentSharedPtr>& outputDocs() const PURE;
   virtual std::list<Bson::DocumentSharedPtr>& outputDocs() PURE;
 };

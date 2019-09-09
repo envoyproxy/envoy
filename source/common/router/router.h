@@ -92,10 +92,10 @@ public:
 
   private:
     static HeaderCheckResult hasValidRetryFields(Http::HeaderEntry* header_entry,
-                                                 const ParseRetryFlagsFunc& parseFn) {
+                                                 const ParseRetryFlagsFunc& parse_fn) {
       HeaderCheckResult r;
       if (header_entry) {
-        const auto flags_and_validity = parseFn(header_entry->value().getStringView());
+        const auto flags_and_validity = parse_fn(header_entry->value().getStringView());
         r.valid_ = flags_and_validity.second;
         r.entry_ = header_entry;
       }

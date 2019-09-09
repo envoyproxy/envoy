@@ -45,7 +45,7 @@ public:
    * Start writing stats once thread-local storage is ready to receive them (see
    * ThreadLocalStoreImpl::initializeThreading).
    */
-  void initializeStats(DispatcherStats* stats_);
+  void initializeStats(DispatcherStats* stats);
 
 private:
   static void onPrepare(evwatch*, const evwatch_prepare_cb_info* info, void* arg);

@@ -53,9 +53,9 @@ enum record_type { A, AAAA };
 
 class TestDnsServerQuery {
 public:
-  TestDnsServerQuery(ConnectionPtr connection, const HostMap& hosts_A, const HostMap& hosts_AAAA,
+  TestDnsServerQuery(ConnectionPtr connection, const HostMap& hosts_a, const HostMap& hosts_aaaa,
                      const CNameMap& cnames, const std::chrono::seconds& record_ttl)
-      : connection_(std::move(connection)), hosts_A_(hosts_A), hosts_AAAA_(hosts_AAAA),
+      : connection_(std::move(connection)), hosts_A_(hosts_a), hosts_AAAA_(hosts_aaaa),
         cnames_(cnames), record_ttl_(record_ttl) {
     connection_->addReadFilter(Network::ReadFilterSharedPtr{new ReadFilter(*this)});
   }

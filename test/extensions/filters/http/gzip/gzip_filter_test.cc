@@ -96,15 +96,15 @@ protected:
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, end_stream));
   }
 
-  void doResponseCompression(Http::TestHeaderMapImpl&& headers, bool withTrailers) {
+  void doResponseCompression(Http::TestHeaderMapImpl&& headers, bool with_trailers) {
     uint64_t content_length;
     ASSERT_TRUE(absl::SimpleAtoi(headers.get_("content-length"), &content_length));
     feedBuffer(content_length);
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
     EXPECT_EQ("", headers.get_("content-length"));
     EXPECT_EQ(Http::Headers::get().ContentEncodingValues.Gzip, headers.get_("content-encoding"));
-    EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data_, !withTrailers));
-    if (withTrailers) {
+    EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data_, !with_trailers));
+    if (with_trailers) {
       Buffer::OwnedImpl trailers_buffer;
       EXPECT_CALL(encoder_callbacks_, addEncodedData(_, true))
           .WillOnce(Invoke([&](Buffer::Instance& data, bool) { data_.move(data); }));

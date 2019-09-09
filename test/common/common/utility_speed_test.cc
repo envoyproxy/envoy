@@ -118,7 +118,7 @@ static void BM_FindToken(benchmark::State& state) {
 }
 BENCHMARK(BM_FindToken);
 
-static bool nextToken(absl::string_view& str, char delim, bool stripWhitespace,
+static bool nextToken(absl::string_view& str, char delim, bool strip_whitespace,
                       absl::string_view* token) {
   while (!str.empty()) {
     absl::string_view::size_type pos = str.find(delim);
@@ -129,7 +129,7 @@ static bool nextToken(absl::string_view& str, char delim, bool stripWhitespace,
       *token = str.substr(0, pos);
       str.remove_prefix(pos + 1); // move past token and delim
     }
-    if (stripWhitespace) {
+    if (strip_whitespace) {
       *token = Envoy::StringUtil::trim(*token);
     }
     if (!token->empty()) {
@@ -143,8 +143,8 @@ static bool nextToken(absl::string_view& str, char delim, bool stripWhitespace,
 // a temp vector, but just iterates through the string_view, tokenizing, and matching against
 // the token we want. It appears to be about 2.5x to 3x faster on this testcase.
 static bool findTokenWithoutSplitting(absl::string_view str, char delim, absl::string_view token,
-                                      bool stripWhitespace) {
-  for (absl::string_view tok; nextToken(str, delim, stripWhitespace, &tok);) {
+                                      bool strip_whitespace) {
+  for (absl::string_view tok; nextToken(str, delim, strip_whitespace, &tok);) {
     if (tok == token) {
       return true;
     }

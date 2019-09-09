@@ -38,7 +38,7 @@ public:
    * Parse operation out of x-amz-target header.
    * @return empty string if operation cannot be parsed.
    */
-  static std::string parseOperation(const Http::HeaderMap& headerMap);
+  static std::string parseOperation(const Http::HeaderMap& header_map);
 
   /**
    * Parse table name out of data, based on the operation.

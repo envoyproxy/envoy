@@ -90,9 +90,9 @@ namespace Redis {
 class RedisCluster : public Upstream::BaseDynamicClusterImpl {
 public:
   RedisCluster(const envoy::api::v2::Cluster& cluster,
-               const envoy::config::cluster::redis::RedisClusterConfig& redisCluster,
+               const envoy::config::cluster::redis::RedisClusterConfig& redis_cluster,
                NetworkFilters::Common::Redis::Client::ClientFactory& client_factory,
-               Upstream::ClusterManager& clusterManager, Runtime::Loader& runtime, Api::Api& api,
+               Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime, Api::Api& api,
                Network::DnsResolverSharedPtr dns_resolver,
                Server::Configuration::TransportSocketFactoryContext& factory_context,
                Stats::ScopePtr&& stats_scope, bool added_via_api,

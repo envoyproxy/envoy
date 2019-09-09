@@ -20,7 +20,7 @@ namespace Squash {
 class SquashFilterConfig : protected Logger::Loggable<Logger::Id::config> {
 public:
   SquashFilterConfig(const envoy::config::filter::http::squash::v2::Squash& proto_config,
-                     Upstream::ClusterManager& clusterManager);
+                     Upstream::ClusterManager& cluster_manager);
   const std::string& clusterName() { return cluster_name_; }
   const std::string& attachmentJson() { return attachment_json_; }
   const std::chrono::milliseconds& attachmentTimeout() { return attachment_timeout_; }

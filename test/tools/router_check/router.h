@@ -70,7 +70,7 @@ public:
    * config file.
    * */
   static RouterCheckTool create(const std::string& router_config_file,
-                                const bool disableDeprecationCheck);
+                                const bool disable_deprecation_check);
 
   /**
    * TODO(tonya11en): Use a YAML format for the expected routes. This will require a proto.

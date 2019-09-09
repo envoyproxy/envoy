@@ -49,7 +49,7 @@ private:
 
   void onBody(const Buffer::Instance& data,
               Extensions::Common::Tap::TraceWrapperPtr& buffered_streamed_body,
-              uint32_t maxBufferedBytes, MutableBodyChunk mutable_body_chunk,
+              uint32_t max_buffered_bytes, MutableBodyChunk mutable_body_chunk,
               MutableMessage mutable_message);
 
   void makeBufferedFullTraceIfNeeded() {

@@ -62,7 +62,7 @@ private:
 class AccessLogFileImpl : public AccessLogFile {
 public:
   AccessLogFileImpl(Filesystem::FilePtr&& file, Event::Dispatcher& dispatcher,
-                    Thread::BasicLockable& lock, AccessLogFileStats& stats_,
+                    Thread::BasicLockable& lock, AccessLogFileStats& stats,
                     std::chrono::milliseconds flush_interval_msec,
                     Thread::ThreadFactory& thread_factory);
   ~AccessLogFileImpl() override;

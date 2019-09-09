@@ -73,7 +73,7 @@ public:
    * @param pattern the pattern to match against (*.example.com)
    * @return true if the san matches pattern
    */
-  static bool dNSNameMatch(const std::string& dnsName, const char* pattern);
+  static bool dNSNameMatch(const std::string& dns_name, const char* pattern);
 
   SslStats& stats() { return stats_; }
 
