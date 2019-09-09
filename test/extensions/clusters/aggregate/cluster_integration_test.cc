@@ -126,6 +126,17 @@ TEST_F(AggregateClusterIntegrationTest, BasicFlow) {
   EXPECT_NE(nullptr, host);
   EXPECT_EQ("primary", host->cluster().name());
   EXPECT_EQ("127.0.0.1:11001", host->address()->asString());
+}
+
+TEST_F(AggregateClusterIntegrationTest, LoadBalancingTest) {
+  initialize(default_yaml_config_);
+  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(Upstream::defaultStaticCluster("primary"), ""));
+  auto primary = cluster_manager_->get("primary");
+  EXPECT_NE(nullptr, primary);
+  EXPECT_TRUE(
+      cluster_manager_->addOrUpdateCluster(Upstream::defaultStaticCluster("secondary"), ""));
+  auto secondary = cluster_manager_->get("secondary");
+  EXPECT_NE(nullptr, secondary);
 
   // Set up the HostSet with 1 healthy, 1 degraded and 1 unhealthy.
   Upstream::HostSharedPtr host1 = Upstream::makeTestHost(primary->info(), "tcp://127.0.0.1:80");
@@ -133,13 +144,13 @@ TEST_F(AggregateClusterIntegrationTest, BasicFlow) {
   Upstream::HostSharedPtr host2 = Upstream::makeTestHost(primary->info(), "tcp://127.0.0.2:80");
   host2->healthFlagSet(Upstream::HostImpl::HealthFlag::FAILED_ACTIVE_HC);
   Upstream::HostSharedPtr host3 = Upstream::makeTestHost(primary->info(), "tcp://127.0.0.3:80");
-  Upstream::HostVector hosts{host1, host2, host3};
-  auto hosts_ptr = std::make_shared<Upstream::HostVector>(hosts);
-
   Upstream::Cluster& cluster = cluster_manager_->activeClusters().find("primary")->second;
   cluster.prioritySet().updateHosts(
-      0, Upstream::HostSetImpl::partitionHosts(hosts_ptr, Upstream::HostsPerLocalityImpl::empty()),
-      nullptr, hosts, {}, 100);
+      0,
+      Upstream::HostSetImpl::partitionHosts(
+          std::make_shared<Upstream::HostVector>(Upstream::HostVector{host1, host2, host3}),
+          Upstream::HostsPerLocalityImpl::empty()),
+      nullptr, {host1, host2, host3}, {}, 100);
 
   // Set up the HostSet with 1 healthy, 1 degraded and 1 unhealthy.
   Upstream::HostSharedPtr host4 = Upstream::makeTestHost(secondary->info(), "tcp://127.0.0.4:80");
@@ -147,13 +158,15 @@ TEST_F(AggregateClusterIntegrationTest, BasicFlow) {
   Upstream::HostSharedPtr host5 = Upstream::makeTestHost(secondary->info(), "tcp://127.0.0.5:80");
   host5->healthFlagSet(Upstream::HostImpl::HealthFlag::FAILED_ACTIVE_HC);
   Upstream::HostSharedPtr host6 = Upstream::makeTestHost(secondary->info(), "tcp://127.0.0.6:80");
-  Upstream::HostVector hosts1{host4, host5, host6};
-  auto hosts_ptr1 = std::make_shared<Upstream::HostVector>(hosts1);
   Upstream::Cluster& cluster1 = cluster_manager_->activeClusters().find("secondary")->second;
   cluster1.prioritySet().updateHosts(
-      0, Upstream::HostSetImpl::partitionHosts(hosts_ptr1, Upstream::HostsPerLocalityImpl::empty()),
-      nullptr, hosts1, {}, 100);
+      0,
+      Upstream::HostSetImpl::partitionHosts(
+          std::make_shared<Upstream::HostVector>(Upstream::HostVector{host4, host5, host6}),
+          Upstream::HostsPerLocalityImpl::empty()),
+      nullptr, {host4, host5, host6}, {}, 100);
 
+  Upstream::HostConstSharedPtr host;
   for (int i = 0; i < 33; ++i) {
     EXPECT_CALL(factory_.random_, random()).WillRepeatedly(Return(i));
     host = cluster_->loadBalancer().chooseHost(nullptr);

@@ -13,6 +13,7 @@ AggregateClusterLoadBalancer::AggregateClusterLoadBalancer(
       random_(random), common_config_(common_config) {}
 
 void AggregateClusterLoadBalancer::initialize() {
+  ASSERT(!initialized_);
   initialized_ = true;
   refresh();
   updatePrioritySetCallbacks(
@@ -23,12 +24,10 @@ void AggregateClusterLoadBalancer::initialize() {
   handle_ = cluster_manager_.addThreadLocalClusterUpdateCallbacks(*this);
 }
 
-void AggregateClusterLoadBalancer::refresh() { refresh(clusters_); }
-
-void AggregateClusterLoadBalancer::refresh(const std::vector<std::string>& clusters) {
+void AggregateClusterLoadBalancer::refresh() {
   std::pair<Upstream::PrioritySetImpl,
             std::vector<std::pair<uint32_t, Upstream::ThreadLocalCluster*>>>
-      pair = linearizePrioritySet(clusters);
+      pair = linearizePrioritySet();
   if (pair.first.hostSetsPerPriority().empty()) {
     load_balancer_ = nullptr;
   } else {
@@ -39,6 +38,10 @@ void AggregateClusterLoadBalancer::refresh(const std::vector<std::string>& clust
 
 void AggregateClusterLoadBalancer::onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) {
   if (std::find(clusters_.begin(), clusters_.end(), cluster.info()->name()) != clusters_.end()) {
+    if (deleted_clusters_.count(cluster.info()->name())) {
+      deleted_clusters_.erase(cluster.info()->name());
+    }
+
     refresh();
 
     cluster.prioritySet().addPriorityUpdateCb(
@@ -49,20 +52,24 @@ void AggregateClusterLoadBalancer::onClusterAddOrUpdate(Upstream::ThreadLocalClu
 }
 
 void AggregateClusterLoadBalancer::onClusterRemoval(const std::string& cluster_name) {
-  auto clusters = clusters_;
-  auto it = std::find(clusters.begin(), clusters.end(), cluster_name);
-  if (it != clusters.end()) {
-    clusters.erase(it);
-    refresh(clusters);
+  //  The onClusterRemoval callback is called before the thread local cluster was removed. There
+  //  will be a dangling pointer to the thread local cluster if delete cluster is not skipped.
+  if (std::find(clusters_.begin(), clusters_.end(), cluster_name) != clusters_.end()) {
+    if (deleted_clusters_.count(cluster_name)) {
+      return;
+    }
+
+    deleted_clusters_.insert(cluster_name);
+    refresh();
   }
 }
 
 std::pair<Upstream::PrioritySetImpl,
           std::vector<std::pair<uint32_t, Upstream::ThreadLocalCluster*>>>
-AggregateClusterLoadBalancer::linearizePrioritySet(const std::vector<std::string>& clusters) {
+AggregateClusterLoadBalancer::linearizePrioritySet() {
   Upstream::PrioritySetImpl priority_set;
   std::vector<std::pair<uint32_t, Upstream::ThreadLocalCluster*>> priority_to_cluster;
-  int next_priority_after_linearing = 0;
+  int next_priority_after_linearizing = 0;
 
   // Linearize the priority set. e.g. for clusters [C_0, C_1, C_2] referred in aggregate cluster
   //    C_0 [P_0, P_1, P_2]
@@ -71,7 +78,10 @@ AggregateClusterLoadBalancer::linearizePrioritySet(const std::vector<std::string
   // The linearization result is:
   //    [C_0.P_0, C_0.P_1, C_0.P_2, C_1.P_0, C_1.P_1, C_2.P_0, C_2.P_1, C_2.P_2, C_2.P_3]
   // and the traffic will be distributed among these priorities.
-  for (const auto& cluster : clusters) {
+  for (const auto& cluster : clusters_) {
+    if (deleted_clusters_.count(cluster)) {
+      continue;
+    }
     auto tlc = cluster_manager_.get(cluster);
     if (tlc == nullptr) {
       continue;
@@ -81,7 +91,7 @@ AggregateClusterLoadBalancer::linearizePrioritySet(const std::vector<std::string
     for (const auto& host_set : tlc->prioritySet().hostSetsPerPriority()) {
       if (!host_set->hosts().empty()) {
         priority_set.updateHosts(
-            next_priority_after_linearing++, Upstream::HostSetImpl::updateHostsParams(*host_set),
+            next_priority_after_linearizing++, Upstream::HostSetImpl::updateHostsParams(*host_set),
             host_set->localityWeights(), host_set->hosts(), {}, host_set->overprovisioningFactor());
         priority_to_cluster.emplace_back(std::make_pair(priority_in_current_cluster, tlc));
       }
@@ -107,8 +117,9 @@ void AggregateClusterLoadBalancer::updatePrioritySetCallbacks(
 
 Upstream::HostConstSharedPtr
 AggregateClusterLoadBalancer::LoadBalancerImpl::chooseHost(Upstream::LoadBalancerContext* context) {
-  auto priority_pair = choosePriority(random_.random(), per_priority_load_.healthy_priority_load_,
-                                      per_priority_load_.degraded_priority_load_);
+  const auto priority_pair =
+      choosePriority(random_.random(), per_priority_load_.healthy_priority_load_,
+                     per_priority_load_.degraded_priority_load_);
   AggregateLoadBalancerContext aggregate_context(context, priority_pair.second,
                                                  priority_to_cluster_[priority_pair.first].first);
   return priority_to_cluster_[priority_pair.first].second->loadBalancer().chooseHost(

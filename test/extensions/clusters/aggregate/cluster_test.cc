@@ -25,51 +25,50 @@ class AggregateClusterTest : public testing::Test {
 public:
   AggregateClusterTest() : stats_(Upstream::ClusterInfoImpl::generateStats(stats_store_)) {}
 
+  Upstream::HostVector setupHostSet(int healthy_hosts, int degraded_hosts, int unhealthy_hosts) {
+    Upstream::HostVector hosts;
+    for (int i = 0; i < healthy_hosts; ++i) {
+      hosts.emplace_back(Upstream::makeTestHost(info_, "tcp://127.0.0.1:80"));
+    }
+
+    for (int i = 0; i < degraded_hosts; ++i) {
+      Upstream::HostSharedPtr host = Upstream::makeTestHost(info_, "tcp://127.0.0.2:80");
+      host->healthFlagSet(Upstream::HostImpl::HealthFlag::DEGRADED_ACTIVE_HC);
+      hosts.emplace_back(host);
+    }
+
+    for (int i = 0; i < unhealthy_hosts; ++i) {
+      Upstream::HostSharedPtr host = Upstream::makeTestHost(info_, "tcp://127.0.0.3:80");
+      host->healthFlagSet(Upstream::HostImpl::HealthFlag::FAILED_ACTIVE_HC);
+      hosts.emplace_back(host);
+    }
+
+    return hosts;
+  }
+
+  void setupPrimary(int priority, int healthy_hosts, int degraded_hosts, int unhealthy_hosts) {
+    auto hosts = setupHostSet(healthy_hosts, degraded_hosts, unhealthy_hosts);
+    primary_ps_.updateHosts(
+        priority,
+        Upstream::HostSetImpl::partitionHosts(std::make_shared<Upstream::HostVector>(hosts),
+                                              Upstream::HostsPerLocalityImpl::empty()),
+        nullptr, hosts, {}, 100);
+  }
+
+  void setupSecondary(int priority, int healthy_hosts, int degraded_hosts, int unhealthy_hosts) {
+    auto hosts = setupHostSet(healthy_hosts, degraded_hosts, unhealthy_hosts);
+    secondary_ps_.updateHosts(
+        priority,
+        Upstream::HostSetImpl::partitionHosts(std::make_shared<Upstream::HostVector>(hosts),
+                                              Upstream::HostsPerLocalityImpl::empty()),
+        nullptr, hosts, {}, 100);
+  }
+
   void setupPrioritySet() {
-    // Set up the HostSet with 1 healthy, 1 degraded and 1 unhealthy.
-    Upstream::HostSharedPtr host1 = Upstream::makeTestHost(info_, "tcp://127.0.0.1:80");
-    host1->healthFlagSet(Upstream::HostImpl::HealthFlag::DEGRADED_ACTIVE_HC);
-    Upstream::HostSharedPtr host2 = Upstream::makeTestHost(info_, "tcp://127.0.0.2:80");
-    host2->healthFlagSet(Upstream::HostImpl::HealthFlag::FAILED_ACTIVE_HC);
-    Upstream::HostSharedPtr host3 = Upstream::makeTestHost(info_, "tcp://127.0.0.3:80");
-
-    // Set up the HostSet with 2 healthy, 2 degraded and 2 unhealthy.
-    Upstream::HostSharedPtr host4 = Upstream::makeTestHost(info_, "tcp://127.0.0.4:80");
-    Upstream::HostSharedPtr host5 = Upstream::makeTestHost(info_, "tcp://127.0.0.5:80");
-    host4->healthFlagSet(Upstream::HostImpl::HealthFlag::DEGRADED_ACTIVE_HC);
-    host5->healthFlagSet(Upstream::HostImpl::HealthFlag::DEGRADED_ACTIVE_HC);
-    Upstream::HostSharedPtr host6 = Upstream::makeTestHost(info_, "tcp://127.0.0.6:80");
-    Upstream::HostSharedPtr host7 = Upstream::makeTestHost(info_, "tcp://127.0.0.7:80");
-    host6->healthFlagSet(Upstream::HostImpl::HealthFlag::FAILED_ACTIVE_HC);
-    host7->healthFlagSet(Upstream::HostImpl::HealthFlag::FAILED_ACTIVE_HC);
-    Upstream::HostSharedPtr host8 = Upstream::makeTestHost(info_, "tcp://127.0.0.8:80");
-    Upstream::HostSharedPtr host9 = Upstream::makeTestHost(info_, "tcp://127.0.0.9:80");
-
-    Upstream::HostVector hosts1{host1, host2, host3},
-        hosts2{host4, host5, host6, host7, host8, host9};
-    auto hosts1_ptr = std::make_shared<Upstream::HostVector>(hosts1);
-    auto hosts2_ptr = std::make_shared<Upstream::HostVector>(hosts2);
-
-    primary_ps_.updateHosts(
-        0,
-        Upstream::HostSetImpl::partitionHosts(hosts1_ptr, Upstream::HostsPerLocalityImpl::empty()),
-        nullptr, hosts1, {}, 100);
-
-    primary_ps_.updateHosts(
-        1,
-        Upstream::HostSetImpl::partitionHosts(hosts2_ptr, Upstream::HostsPerLocalityImpl::empty()),
-        nullptr, hosts2, {}, 100);
-
-    secondary_ps_.updateHosts(
-        0,
-        Upstream::HostSetImpl::partitionHosts(hosts2_ptr, Upstream::HostsPerLocalityImpl::empty()),
-        nullptr, hosts2, {}, 100);
-
-    secondary_ps_.updateHosts(
-        1,
-        Upstream::HostSetImpl::partitionHosts(hosts1_ptr, Upstream::HostsPerLocalityImpl::empty()),
-        nullptr, hosts1, {}, 100);
-
+    setupPrimary(0, 1, 1, 1);
+    setupPrimary(1, 2, 2, 2);
+    setupSecondary(0, 2, 2, 2);
+    setupSecondary(1, 1, 1, 1);
     ON_CALL(primary_, prioritySet()).WillByDefault(ReturnRef(primary_ps_));
     ON_CALL(secondary_, prioritySet()).WillByDefault(ReturnRef(secondary_ps_));
   }
@@ -136,7 +135,7 @@ public:
         - primary
         - secondary
 )EOF";
-};
+}; // namespace Aggregate
 
 TEST_F(AggregateClusterTest, LoadBalancerTest) {
   initialize(default_yaml_config_);
@@ -169,21 +168,8 @@ TEST_F(AggregateClusterTest, LoadBalancerTest) {
     EXPECT_EQ(host.get(), target.get());
   }
 
-  // Set up the HostSet with 1 healthy, 1 degraded and 1 unhealthy.
-  Upstream::HostSharedPtr host1 = Upstream::makeTestHost(info_, "tcp://127.0.1.1:80");
-  host1->healthFlagSet(Upstream::HostImpl::HealthFlag::DEGRADED_ACTIVE_HC);
-  Upstream::HostSharedPtr host2 = Upstream::makeTestHost(info_, "tcp://127.0.1.2:80");
-  Upstream::HostSharedPtr host3 = Upstream::makeTestHost(info_, "tcp://127.0.1.3:80");
-  host2->healthFlagSet(Upstream::HostImpl::HealthFlag::FAILED_ACTIVE_HC);
-  host3->healthFlagSet(Upstream::HostImpl::HealthFlag::FAILED_ACTIVE_HC);
-  Upstream::HostSharedPtr host4 = Upstream::makeTestHost(info_, "tcp://127.0.1.4:80");
-
-  Upstream::HostVector hosts{host1, host2, host3, host4};
-  auto hosts_ptr = std::make_shared<Upstream::HostVector>(hosts);
-
-  primary_ps_.updateHosts(
-      0, Upstream::HostSetImpl::partitionHosts(hosts_ptr, Upstream::HostsPerLocalityImpl::empty()),
-      nullptr, hosts, {}, 100);
+  // Set up the HostSet with 1 healthy, 1 degraded and 2 unhealthy.
+  setupPrimary(0, 1, 1, 2);
 
   refreshLb();
   // Health value:
@@ -209,6 +195,110 @@ TEST_F(AggregateClusterTest, LoadBalancerTest) {
   EXPECT_CALL(secondary_, loadBalancer()).WillRepeatedly(ReturnRef(secondary_load_balancer_));
   EXPECT_CALL(secondary_load_balancer_, chooseHost(_)).WillRepeatedly(Return(host));
   for (int i = 58; i < 100; ++i) {
+    EXPECT_CALL(random_, random()).WillOnce(Return(i));
+    Upstream::HostConstSharedPtr target = lb_->chooseHost(nullptr);
+    EXPECT_EQ(host.get(), target.get());
+  }
+}
+
+TEST_F(AggregateClusterTest, AllHostAreUnhealthyTest) {
+  initialize(default_yaml_config_);
+  Upstream::HostSharedPtr host = Upstream::makeTestHost(info_, "tcp://127.0.0.1:80");
+  // Set up the HostSet with 0 healthy, 0 degraded and 2 unhealthy.
+  setupPrimary(0, 0, 0, 2);
+  setupPrimary(1, 0, 0, 2);
+
+  // Set up the HostSet with 0 healthy, 0 degraded and 2 unhealthy.
+  setupSecondary(0, 0, 0, 2);
+  setupSecondary(1, 0, 0, 2);
+  refreshLb();
+  // Health value:
+  // Cluster 1:
+  //     Priority 0: 0%
+  //     Priority 1: 0%
+  // Cluster 2:
+  //     Priority 0: 0%
+  //     Priority 1: 0%
+  EXPECT_CALL(primary_, loadBalancer()).WillRepeatedly(ReturnRef(primary_load_balancer_));
+  EXPECT_CALL(primary_load_balancer_, chooseHost(_)).WillRepeatedly(Return(host));
+  EXPECT_CALL(secondary_, loadBalancer()).WillRepeatedly(ReturnRef(secondary_load_balancer_));
+  EXPECT_CALL(secondary_load_balancer_, chooseHost(_)).WillRepeatedly(Return(nullptr));
+
+  for (int i = 0; i < 100; ++i) {
+    EXPECT_CALL(random_, random()).WillOnce(Return(i));
+    Upstream::HostConstSharedPtr target = lb_->chooseHost(nullptr);
+    EXPECT_EQ(host.get(), target.get());
+  }
+}
+
+TEST_F(AggregateClusterTest, ClusterInPanicTest) {
+  initialize(default_yaml_config_);
+  Upstream::HostSharedPtr host = Upstream::makeTestHost(info_, "tcp://127.0.0.1:80");
+  setupPrimary(0, 1, 0, 4);
+  setupPrimary(1, 1, 0, 4);
+  setupSecondary(0, 1, 0, 4);
+  setupSecondary(1, 1, 0, 4);
+  refreshLb();
+  // Health value:
+  // Cluster 1:
+  //     Priority 0: 20%
+  //     Priority 1: 20%
+  // Cluster 2:
+  //     Priority 0: 20%
+  //     Priority 1: 20%
+  // All priorities are in panic mode. Traffic will be distributed evenly among four priorities.
+  EXPECT_CALL(primary_, loadBalancer()).WillRepeatedly(ReturnRef(primary_load_balancer_));
+  EXPECT_CALL(primary_load_balancer_, chooseHost(_)).WillRepeatedly(Return(host));
+  EXPECT_CALL(secondary_, loadBalancer()).WillRepeatedly(ReturnRef(secondary_load_balancer_));
+  EXPECT_CALL(secondary_load_balancer_, chooseHost(_)).WillRepeatedly(Return(nullptr));
+
+  for (int i = 0; i < 50; ++i) {
+    EXPECT_CALL(random_, random()).WillOnce(Return(i));
+    Upstream::HostConstSharedPtr target = lb_->chooseHost(nullptr);
+    EXPECT_EQ(host.get(), target.get());
+  }
+
+  EXPECT_CALL(primary_, loadBalancer()).WillRepeatedly(ReturnRef(primary_load_balancer_));
+  EXPECT_CALL(primary_load_balancer_, chooseHost(_)).WillRepeatedly(Return(nullptr));
+  EXPECT_CALL(secondary_, loadBalancer()).WillRepeatedly(ReturnRef(secondary_load_balancer_));
+  EXPECT_CALL(secondary_load_balancer_, chooseHost(_)).WillRepeatedly(Return(host));
+
+  for (int i = 50; i < 100; ++i) {
+    EXPECT_CALL(random_, random()).WillOnce(Return(i));
+    Upstream::HostConstSharedPtr target = lb_->chooseHost(nullptr);
+    EXPECT_EQ(host.get(), target.get());
+  }
+
+  setupPrimary(0, 1, 0, 9);
+  setupPrimary(1, 1, 0, 9);
+  setupSecondary(0, 1, 0, 9);
+  setupSecondary(1, 1, 0, 1);
+  refreshLb();
+  // Health value:
+  // Cluster 1:
+  //     Priority 0: 10%
+  //     Priority 1: 10%
+  // Cluster 2:
+  //     Priority 0: 10%
+  //     Priority 0: 50%
+  EXPECT_CALL(primary_, loadBalancer()).WillRepeatedly(ReturnRef(primary_load_balancer_));
+  EXPECT_CALL(primary_load_balancer_, chooseHost(_)).WillRepeatedly(Return(host));
+  EXPECT_CALL(secondary_, loadBalancer()).WillRepeatedly(ReturnRef(secondary_load_balancer_));
+  EXPECT_CALL(secondary_load_balancer_, chooseHost(_)).WillRepeatedly(Return(nullptr));
+
+  for (int i = 0; i <= 25; ++i) {
+    std::cout << i << std::endl;
+    EXPECT_CALL(random_, random()).WillOnce(Return(i));
+    Upstream::HostConstSharedPtr target = lb_->chooseHost(nullptr);
+    EXPECT_EQ(host.get(), target.get());
+  }
+
+  EXPECT_CALL(primary_, loadBalancer()).WillRepeatedly(ReturnRef(primary_load_balancer_));
+  EXPECT_CALL(primary_load_balancer_, chooseHost(_)).WillRepeatedly(Return(nullptr));
+  EXPECT_CALL(secondary_, loadBalancer()).WillRepeatedly(ReturnRef(secondary_load_balancer_));
+  EXPECT_CALL(secondary_load_balancer_, chooseHost(_)).WillRepeatedly(Return(host));
+
+  for (int i = 26; i < 100; ++i) {
     EXPECT_CALL(random_, random()).WillOnce(Return(i));
     Upstream::HostConstSharedPtr target = lb_->chooseHost(nullptr);
     EXPECT_EQ(host.get(), target.get());

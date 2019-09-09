@@ -42,7 +42,7 @@ public:
     // cluster.
     // TODO(yxue): allow determinePriorityLoad to affect the load of top level cluster and verify it
     // works with current retry plugin
-    size_t priorities = original_priority_load.healthy_priority_load_.get().size();
+    const size_t priorities = original_priority_load.healthy_priority_load_.get().size();
     priority_load_.healthy_priority_load_.get().assign(priorities, 0);
     priority_load_.degraded_priority_load_.get().assign(priorities, 0);
 
@@ -65,7 +65,7 @@ private:
   Upstream::HealthyAndDegradedLoad priority_load_;
   std::unique_ptr<Upstream::LoadBalancerContext> owned_context_;
   Upstream::LoadBalancerContext* context_{nullptr};
-  Upstream::LoadBalancerBase::HostAvailability host_availability_;
+  const Upstream::LoadBalancerBase::HostAvailability host_availability_;
   uint32_t host_priority_;
 };
 
@@ -96,18 +96,16 @@ public:
   void onClusterRemoval(const std::string& cluster_name) override;
 
 private:
+  absl::flat_hash_set<std::string> deleted_clusters_;
   void refresh();
-  void refresh(const std::vector<std::string>& clusters);
   void initialize();
 
   // Linearize the priority sets of clusters into one priority set.
-  // @param cluster_manager the cluster manager
-  // @param clusters clusters in aggregate cluster
   // @return a pair of linearization result. First element if the priority set, second element if a
   // map from priority to cluster.
   std::pair<Upstream::PrioritySetImpl,
             std::vector<std::pair<uint32_t, Upstream::ThreadLocalCluster*>>>
-  linearizePrioritySet(const std::vector<std::string>& clusters);
+  linearizePrioritySet();
 
   using PriorityCb =
       std::function<void(uint32_t, const Upstream::HostVector&, const Upstream::HostVector&)>;
