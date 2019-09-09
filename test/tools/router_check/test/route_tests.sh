@@ -67,22 +67,21 @@ fi
 # Failure output flag test cases
 echo "testing failure test cases"
 # Failure test case with only details flag set
-FAILURE_OUTPUT=$("${PATH_BIN}" "${PATH_CONFIG}/TestRoutes.yaml" "${PATH_CONFIG}/Weighted.golden.json" "--details" 2>&1) ||
+FAILURE_OUTPUT=$("${PATH_BIN}" "-c" "${PATH_CONFIG}/TestRoutes.yaml" "-t" "${PATH_CONFIG}/Weighted.golden.proto.json" "--details" "--useproto" 2>&1) ||
+if [[ "${FAILURE_OUTPUT}" != *"Test_1"*"Test_2"*"expected: [cluster1], actual: [instant-server], test type: cluster_name"* ]]; then
+  exit 1
+fi
+
+# Failure test case with details flag set and failures flag set
+FAILURE_OUTPUT=$("${PATH_BIN}" "-c" "${PATH_CONFIG}/TestRoutes.yaml" "-t" "${PATH_CONFIG}/Weighted.golden.proto.json" "--details"  "--only-show-failures" "--useproto" 2>&1) ||
   echo "${FAILURE_OUTPUT:-no-output}"
 if [[ "${FAILURE_OUTPUT}" != *"expected: [cluster1], actual: [instant-server], test type: cluster_name"* ]]; then
   exit 1
 fi
 
-# Failure test case with details flag set and failures flag set
-FAILURE_OUTPUT=$("${PATH_BIN}" "${PATH_CONFIG}/TestRoutes.yaml" "${PATH_CONFIG}/Weighted.golden.json" "--details"  "--only-show-failures" 2>&1) ||
-  echo "${FAILURE_OUTPUT:-no-output}"
-if [[ "${FAILURE_OUTPUT}" != *"expected: [cluster1], actual: [instant-server], test type: cluster_name"*"in test: Test_2"* ]]; then
-  exit 1
-fi
-
 # Failure test case with details flag unset and failures flag set
-FAILURE_OUTPUT=$("${PATH_BIN}" "${PATH_CONFIG}/TestRoutes.yaml" "${PATH_CONFIG}/Weighted.golden.json" "--only-show-failures" 2>&1) ||
+FAILURE_OUTPUT=$("${PATH_BIN}" "-c" "${PATH_CONFIG}/TestRoutes.yaml" "-t" "${PATH_CONFIG}/Weighted.golden.proto.json" "--only-show-failures" "--useproto" 2>&1) ||
   echo "${FAILURE_OUTPUT:-no-output}"
-if [[ "${FAILURE_OUTPUT}" != *"expected: [cluster1], actual: [instant-server], test type: cluster_name"*"in test: Test_2"* ]]; then
+if [[ "${FAILURE_OUTPUT}" != *"expected: [cluster1], actual: [instant-server], test type: cluster_name"* ]]; then
   exit 1
 fi
