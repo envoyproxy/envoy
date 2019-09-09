@@ -136,7 +136,8 @@ public:
       auto policy = static_cast<envoy::api::v2::Cluster_LbPolicy>(i);
 
       if (policy == envoy::api::v2::Cluster_LbPolicy_ORIGINAL_DST_LB ||
-          policy == envoy::api::v2::Cluster_LbPolicy_CLUSTER_PROVIDED) {
+          policy == envoy::api::v2::Cluster_LbPolicy_CLUSTER_PROVIDED ||
+          policy == envoy::api::v2::Cluster_LbPolicy_LOAD_BALANCING_POLICY_CONFIG) {
         continue;
       }
 

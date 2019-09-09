@@ -594,7 +594,9 @@ public:
     for (int i = first; i <= last; i++) {
       if (envoy::api::v2::Cluster_LbPolicy_IsValid(i)) {
         auto policy = static_cast<envoy::api::v2::Cluster_LbPolicy>(i);
-        policies.push_back(policy);
+        if (policy != envoy::api::v2::Cluster_LbPolicy_LOAD_BALANCING_POLICY_CONFIG) {
+          policies.push_back(policy);
+        }
       }
     }
     return policies;
