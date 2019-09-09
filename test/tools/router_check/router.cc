@@ -186,8 +186,8 @@ bool RouterCheckTool::compareEntries(const std::string& expected_routes) {
     tests_.push_back(std::pair<std::string, std::vector<std::string>>(test_name, {}));
     const envoy::RouterCheckToolSchema::ValidationAssert& validate = check_config.validate();
 
-    using checkerFunc = std::function<bool(
-        ToolConfig&, const envoy::RouterCheckToolSchema::ValidationAssert&)>;
+    using checkerFunc =
+        std::function<bool(ToolConfig&, const envoy::RouterCheckToolSchema::ValidationAssert&)>;
     checkerFunc checkers[] = {
         [this](auto&... params) -> bool { return this->compareCluster(params...); },
         [this](auto&... params) -> bool { return this->compareVirtualCluster(params...); },
@@ -235,8 +235,8 @@ bool RouterCheckTool::compareCluster(ToolConfig& tool_config, const std::string&
   return matches;
 }
 
-bool RouterCheckTool::compareCluster(ToolConfig& tool_config,
-                                     const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
+bool RouterCheckTool::compareCluster(
+    ToolConfig& tool_config, const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
   if (!expected.has_cluster_name()) {
     return true;
   }
@@ -436,7 +436,7 @@ bool RouterCheckTool::compareResults(const std::string& actual, const std::strin
   }
 
   tests_.back().second.push_back("expected: [" + expected + "], actual: [" + actual +
-                              "], test type: " + test_type);
+                                 "], test type: " + test_type);
   return false;
 }
 
