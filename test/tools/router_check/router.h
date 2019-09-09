@@ -106,27 +106,33 @@ private:
       std::unique_ptr<Router::ConfigImpl> config, std::unique_ptr<Stats::IsolatedStoreImpl> stats,
       Api::ApiPtr api, Coverage coverage);
 
-  bool compareCluster(ToolConfig& tool_config, const std::string& expected, const std::string& test_name);
+  bool compareCluster(ToolConfig& tool_config, const std::string& expected,
+                      const std::string& test_name);
   bool compareCluster(ToolConfig& tool_config,
                       const envoy::RouterCheckToolSchema::ValidationAssert& expected,
                       const std::string& test_name);
-  bool compareVirtualCluster(ToolConfig& tool_config, const std::string& expected, const std::string& test_name);
+  bool compareVirtualCluster(ToolConfig& tool_config, const std::string& expected,
+                             const std::string& test_name);
   bool compareVirtualCluster(ToolConfig& tool_config,
                              const envoy::RouterCheckToolSchema::ValidationAssert& expected,
                              const std::string& test_name);
-  bool compareVirtualHost(ToolConfig& tool_config, const std::string& expected, const std::string& test_name);
+  bool compareVirtualHost(ToolConfig& tool_config, const std::string& expected,
+                          const std::string& test_name);
   bool compareVirtualHost(ToolConfig& tool_config,
                           const envoy::RouterCheckToolSchema::ValidationAssert& expected,
                           const std::string& test_name);
-  bool compareRewriteHost(ToolConfig& tool_config, const std::string& expected, const std::string& test_name);
+  bool compareRewriteHost(ToolConfig& tool_config, const std::string& expected,
+                          const std::string& test_name);
   bool compareRewriteHost(ToolConfig& tool_config,
                           const envoy::RouterCheckToolSchema::ValidationAssert& expected,
                           const std::string& test_name);
-  bool compareRewritePath(ToolConfig& tool_config, const std::string& expected, const std::string& test_name);
+  bool compareRewritePath(ToolConfig& tool_config, const std::string& expected,
+                          const std::string& test_name);
   bool compareRewritePath(ToolConfig& tool_config,
                           const envoy::RouterCheckToolSchema::ValidationAssert& expected,
                           const std::string& test_name);
-  bool compareRedirectPath(ToolConfig& tool_config, const std::string& expected, const std::string& test_name);
+  bool compareRedirectPath(ToolConfig& tool_config, const std::string& expected,
+                           const std::string& test_name);
   bool compareRedirectPath(ToolConfig& tool_config,
                            const envoy::RouterCheckToolSchema::ValidationAssert& expected,
                            const std::string& test_name);
@@ -148,7 +154,7 @@ private:
    * @return bool if actual and expected match.
    */
   bool compareResults(const std::string& actual, const std::string& expected,
-                      const std::string& test_type, const std::string& test_name);                   
+                      const std::string& test_type, const std::string& test_name);
 
   bool runtimeMock(const std::string& key, const envoy::type::FractionalPercent& default_value,
                    uint64_t random_value);
