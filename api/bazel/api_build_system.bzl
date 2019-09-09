@@ -20,7 +20,6 @@ _COMMON_PROTO_DEPS = [
     "@com_google_googleapis//google/api:http_proto",
     "@com_google_googleapis//google/api:annotations_proto",
     "@com_google_googleapis//google/rpc:status_proto",
-    "@com_github_gogo_protobuf//:gogo_proto",
     "@com_envoyproxy_protoc_gen_validate//validate:validate_proto",
 ]
 
@@ -50,7 +49,6 @@ def api_py_proto_library(name, srcs = [], deps = [], external_py_proto_deps = []
             "@com_google_googleapis//google/api:annotations_py_proto",
             "@com_google_googleapis//google/api:http_py_proto",
             "@com_google_googleapis//google/api:httpbody_py_proto",
-            "@com_github_gogo_protobuf//:gogo_proto_py",
         ],
         visibility = ["//visibility:public"],
     )
@@ -108,7 +106,6 @@ def api_proto_library(
         name = _Suffix(name, _CC_SUFFIX),
         linkstatic = linkstatic,
         cc_deps = [_LibrarySuffix(d, _CC_SUFFIX) for d in deps] + external_cc_proto_deps + [
-            "@com_github_gogo_protobuf//:gogo_proto_cc",
             "@com_google_googleapis//google/api:http_cc_proto",
             "@com_google_googleapis//google/api:annotations_cc_proto",
             "@com_google_googleapis//google/rpc:status_cc_proto",
@@ -180,7 +177,6 @@ def api_proto_package(name = "pkg", srcs = [], deps = [], has_services = False, 
         proto = name,
         visibility = ["//visibility:public"],
         deps = [go_proto_mapping(dep) for dep in deps] + [
-            "@com_github_gogo_protobuf//:gogo_proto_go",
             "@com_github_golang_protobuf//ptypes:go_default_library",
             "@com_github_golang_protobuf//ptypes/any:go_default_library",
             "@com_github_golang_protobuf//ptypes/duration:go_default_library",

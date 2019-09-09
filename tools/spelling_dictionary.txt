@@ -414,6 +414,7 @@ decompressor
 decrement
 decrypt
 decrypting
+decls
 dedup
 dedupe
 deduplicate

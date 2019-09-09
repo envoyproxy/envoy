@@ -6,10 +6,6 @@ option java_outer_classname = "RangeProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.type";
 
-import "gogoproto/gogo.proto";
-
-option (gogoproto.equal_all) = true;
-
 // [#protodoc-title: Range]
 
 // Specifies the int64 start and end of the range using half-open interval semantics [start,
