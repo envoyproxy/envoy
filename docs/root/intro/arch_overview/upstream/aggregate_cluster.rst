@@ -57,3 +57,5 @@ A sample aggregate cluster configuration could be:
       - secondary
       - tertiary
 
+Note: PriorityLoad retry plugins won't work for aggregate cluster because the aggregate load balancer
+will override the PriorityLoad during load balancing.
