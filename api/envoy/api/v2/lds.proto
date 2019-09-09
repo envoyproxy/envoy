@@ -54,6 +54,11 @@ message Listener {
   string name = 1;
 
   // [#not-implemented-hide:]
+  // [#next-major-version: In the v3 API, instead of this messy approach where the enum
+  // value dictates which fields should be set, we should refactor this message such that
+  // the fields for each type of listener are each in their own sub-message, and we put the
+  // sub-messages for each type into a oneof. That way, a given Listener message can
+  // structurally only contain the fields of the relevant type.]
   enum Type {
     // Default listener type. Binds to a port.
     SOCKET = 0;
