@@ -39,7 +39,7 @@ GradientControllerConfig::GradientControllerConfig(
           PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(proto_config, sample_aggregate_percentile, 50) /
           100.0) {}
 
-GradientController::GradientController(GradientControllerConfigSharedPtr config,
+GradientController::GradientController(GradientControllerConfig config,
                                        Event::Dispatcher& dispatcher, Runtime::Loader&,
                                        const std::string& stats_prefix, Stats::Scope& scope)
     : config_(std::move(config)), dispatcher_(dispatcher), scope_(scope),
@@ -60,10 +60,10 @@ GradientController::GradientController(GradientControllerConfigSharedPtr config,
       resetSampleWindow();
     }
 
-    sample_reset_timer_->enableTimer(config_->sampleRTTCalcInterval());
+    sample_reset_timer_->enableTimer(config_.sampleRTTCalcInterval());
   });
 
-  sample_reset_timer_->enableTimer(config_->sampleRTTCalcInterval());
+  sample_reset_timer_->enableTimer(config_.sampleRTTCalcInterval());
   stats_.concurrency_limit_.set(concurrency_limit_.load());
 }
 
@@ -98,7 +98,8 @@ void GradientController::updateMinRTT() {
     deferred_limit_value_.store(0);
   }
 
-  min_rtt_calc_timer_->enableTimer(config_->minRTTCalcInterval());
+  sample_reset_timer_->enableTimer(config_.sampleRTTCalcInterval());
+  min_rtt_calc_timer_->enableTimer(config_.minRTTCalcInterval());
 }
 
 void GradientController::resetSampleWindow() {
@@ -110,11 +111,12 @@ void GradientController::resetSampleWindow() {
   }
 
   sample_rtt_ = processLatencySamplesAndClear();
+  std::cout << "@tallen sample rtt calculated: " << sample_rtt_.count() << std::endl;
   updateConcurrencyLimit(calculateNewLimit());
 }
 
 std::chrono::microseconds GradientController::processLatencySamplesAndClear() {
-  const std::array<double, 1> quantile{config_->sampleAggregatePercentile()};
+  const std::array<double, 1> quantile{config_.sampleAggregatePercentile()};
   std::array<double, 1> calculated_quantile;
   hist_approx_quantile(latency_sample_hist_.get(), quantile.data(), 1, calculated_quantile.data());
   hist_clear(latency_sample_hist_.get());
@@ -125,18 +127,18 @@ uint32_t GradientController::calculateNewLimit() {
   // Calculate the gradient value, ensuring it remains below the configured maximum.
   ASSERT(sample_rtt_.count() > 0);
   const double raw_gradient = static_cast<double>(min_rtt_.count()) / sample_rtt_.count();
-  const double gradient = std::min(config_->maxGradient(), raw_gradient);
+  const double gradient = std::min(config_.maxGradient(), raw_gradient);
   stats_.gradient_.set(gradient);
 
   const double limit = concurrencyLimit() * gradient;
-  const double burst_headroom = sqrt(limit);
+  const double burst_headroom = std::max(1.0, sqrt(limit));
   stats_.burst_queue_size_.set(burst_headroom);
 
   // The final concurrency value factors in the burst headroom and must be clamped to keep the value
   // in the range [1, configured_max].
   const auto clamp = [](int min, int max, int val) { return std::max(min, std::min(max, val)); };
   const uint32_t new_limit = limit + burst_headroom;
-  return clamp(1, config_->maxConcurrencyLimit(), new_limit);
+  return clamp(1, config_.maxConcurrencyLimit(), new_limit);
 }
 
 RequestForwardingAction GradientController::forwardingDecision() {
@@ -167,7 +169,7 @@ void GradientController::recordLatencySample(std::chrono::nanoseconds rq_latency
     sample_count = hist_sample_count(latency_sample_hist_.get());
   }
 
-  if (inMinRTTSamplingWindow() && sample_count >= config_->minRTTAggregateRequestCount()) {
+  if (inMinRTTSamplingWindow() && sample_count >= config_.minRTTAggregateRequestCount()) {
     // This sample has pushed the request count over the request count requirement for the minRTT
     // recalculation. It must now be finished.
     updateMinRTT();

@@ -47,7 +47,6 @@ Http::FilterHeadersStatus AdaptiveConcurrencyFilter::decodeHeaders(Http::HeaderM
 }
 
 void AdaptiveConcurrencyFilter::encodeComplete() {
-  ASSERT(deferred_sample_task_);
   deferred_sample_task_.reset();
 }
 

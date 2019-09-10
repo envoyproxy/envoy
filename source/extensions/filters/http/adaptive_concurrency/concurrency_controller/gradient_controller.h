@@ -37,7 +37,7 @@ struct GradientControllerStats {
   ALL_GRADIENT_CONTROLLER_STATS(GENERATE_GAUGE_STRUCT)
 };
 
-class GradientControllerConfig {
+class GradientControllerConfig : public Logger::Loggable<Logger::Id::filter> {
 public:
   GradientControllerConfig(
       const envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig&
@@ -135,7 +135,7 @@ using GradientControllerConfigSharedPtr = std::shared_ptr<GradientControllerConf
  */
 class GradientController : public ConcurrencyController {
 public:
-  GradientController(GradientControllerConfigSharedPtr config, Event::Dispatcher& dispatcher,
+  GradientController(GradientControllerConfig config, Event::Dispatcher& dispatcher,
                      Runtime::Loader& runtime, const std::string& stats_prefix,
                      Stats::Scope& scope);
 
@@ -156,11 +156,12 @@ private:
   bool inMinRTTSamplingWindow() const { return deferred_limit_value_.load() > 0; }
   void resetSampleWindow() ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
   void updateConcurrencyLimit(const uint32_t new_limit) {
+    std::cout << "@tallen updating limit to " << new_limit << std::endl;
     concurrency_limit_.store(new_limit);
     stats_.concurrency_limit_.set(concurrency_limit_.load());
   }
 
-  const GradientControllerConfigSharedPtr config_;
+  const GradientControllerConfig config_;
   Event::Dispatcher& dispatcher_;
   Stats::Scope& scope_;
   GradientControllerStats stats_;
