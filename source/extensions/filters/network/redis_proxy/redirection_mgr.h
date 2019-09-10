@@ -43,17 +43,16 @@ public:
    * Register a cluster to be tracked by the manager (called by main thread only).
    * @param cluster_name is the name of the cluster.
    * @param min_time_between_triggering is the minimum amount of time that must pass between
-   * callback invocations.
-   * @param redirects_per_minute_threshold is the number of redirects in the last minute that must
-   * be reached to consider calling the callback.
+   * callback invocations (redirects ignored and not counted during this time).
+   * @param redirects_threshold is the number of redirects that must be reached to consider
+   * calling the callback.
    * @param cb is the cluster callback function.
    * @return HandlePtr is a smart pointer to an opaque Handle that will unregister the cluster upon
    * destruction.
    */
   virtual HandlePtr registerCluster(const std::string& cluster_name,
                                     const std::chrono::milliseconds min_time_between_triggering,
-                                    const uint32_t redirects_per_minute_threshold,
-                                    const RedirectCB cb) PURE;
+                                    const uint32_t redirects_threshold, const RedirectCB cb) PURE;
 
   /**
    * Unregister a cluster from the manager (called by main thread only).
