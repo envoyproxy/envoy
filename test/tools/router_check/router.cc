@@ -437,10 +437,6 @@ bool RouterCheckTool::compareResults(const std::string& actual, const std::strin
   if (expected == actual) {
     return true;
   }
-  // if (details_) {
-  //     std::cerr << "expected: [" << expected << "], actual: [" << actual
-  //               << "], test type: " << test_type << std::endl;
-  // }
   tests_.back().second.push_back("expected: [" + expected + "], actual: [" + actual +
                                  "], test type: " + test_type);
   return false;
