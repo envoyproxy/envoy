@@ -87,7 +87,8 @@ private:
   static thread_local ThreadLocalData thread_local_data_;
 
   // A indexed container for Slots that has to be deferred to delete due to out-going callbacks
-  // pointing to the Slot.
+  // pointing to the Slot. To let the ref_count_ deleter find the SlotImpl by address, the container
+  // is defined as a map of SlotImpl address to the unique_ptr<SolotImpl>.
   absl::flat_hash_map<SlotImpl*, std::unique_ptr<SlotImpl>> deferred_deletes_;
 
   std::vector<SlotImpl*> slots_;
