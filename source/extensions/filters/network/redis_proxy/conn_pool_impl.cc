@@ -24,11 +24,12 @@ InstanceImpl::InstanceImpl(
     Common::Redis::Client::ClientFactory& client_factory, ThreadLocal::SlotAllocator& tls,
     const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config,
     Api::Api& api, Stats::ScopePtr&& stats_scope,
+    const Common::Redis::RedisCommandStatsSharedPtr& redis_command_stats,
     RedisProxy::RedirectionManagerSharedPtr redirection_manager)
-    : cluster_name_(cluster_name), cm_(cm), client_factory_(client_factory),
-      tls_(tls.allocateSlot()), config_(config), api_(api),
-      stats_scope_(std::move(stats_scope)), redis_cluster_stats_{REDIS_CLUSTER_STATS(
-                                                POOL_COUNTER(*stats_scope_))},
+    : cm_(cm), client_factory_(client_factory), tls_(tls.allocateSlot()), config_(config),
+      api_(api), stats_scope_(std::move(stats_scope)),
+      redis_command_stats_(redis_command_stats), redis_cluster_stats_{REDIS_CLUSTER_STATS(
+                                                     POOL_COUNTER(*stats_scope_))},
       redirection_manager_(std::move(redirection_manager)) {
   tls_->set([this, cluster_name](
                 Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
@@ -198,7 +199,8 @@ InstanceImpl::ThreadLocalPool::threadLocalActiveClient(Upstream::HostConstShared
   if (!client) {
     client = std::make_unique<ThreadLocalActiveClient>(*this);
     client->host_ = host;
-    client->redis_client_ = parent_.client_factory_.create(host, dispatcher_, parent_.config_);
+    client->redis_client_ = parent_.client_factory_.create(
+        host, dispatcher_, parent_.config_, parent_.redis_command_stats_, *parent_.stats_scope_);
     client->redis_client_->addConnectionCallbacks(*client);
     // TODO(hyang): should the auth command and readonly command be moved to the factory method?
     if (!auth_password_.empty()) {

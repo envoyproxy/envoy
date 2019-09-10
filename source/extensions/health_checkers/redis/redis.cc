@@ -22,7 +22,11 @@ RedisHealthChecker::RedisHealthChecker(
 
 RedisHealthChecker::RedisActiveHealthCheckSession::RedisActiveHealthCheckSession(
     RedisHealthChecker& parent, const Upstream::HostSharedPtr& host)
-    : ActiveHealthCheckSession(parent, host), parent_(parent) {}
+    : ActiveHealthCheckSession(parent, host), parent_(parent) {
+  redis_command_stats_ =
+      Extensions::NetworkFilters::Common::Redis::RedisCommandStats::createRedisCommandStats(
+          parent_.cluster_.info()->statsScope().symbolTable());
+}
 
 RedisHealthChecker::RedisActiveHealthCheckSession::~RedisActiveHealthCheckSession() {
   ASSERT(current_request_ == nullptr);
@@ -51,7 +55,9 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onEvent(Network::Connect
 
 void RedisHealthChecker::RedisActiveHealthCheckSession::onInterval() {
   if (!client_) {
-    client_ = parent_.client_factory_.create(host_, parent_.dispatcher_, *this);
+    client_ =
+        parent_.client_factory_.create(host_, parent_.dispatcher_, *this, redis_command_stats_,
+                                       parent_.cluster_.info()->statsScope());
     client_->addConnectionCallbacks(*this);
   }
 

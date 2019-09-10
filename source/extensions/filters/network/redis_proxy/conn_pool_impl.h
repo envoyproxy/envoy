@@ -53,6 +53,7 @@ public:
       Common::Redis::Client::ClientFactory& client_factory, ThreadLocal::SlotAllocator& tls,
       const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config,
       Api::Api& api, Stats::ScopePtr&& stats_scope,
+      const Common::Redis::RedisCommandStatsSharedPtr& redis_command_stats,
       RedisProxy::RedirectionManagerSharedPtr redirection_manager);
   // RedisProxy::ConnPool::Instance
   Common::Redis::Client::PoolRequest*
@@ -135,6 +136,7 @@ private:
   Common::Redis::Client::ConfigImpl config_;
   Api::Api& api_;
   Stats::ScopePtr stats_scope_;
+  Common::Redis::RedisCommandStatsSharedPtr redis_command_stats_;
   RedisClusterStats redis_cluster_stats_;
   RedisProxy::RedirectionManagerSharedPtr redirection_manager_;
 };
