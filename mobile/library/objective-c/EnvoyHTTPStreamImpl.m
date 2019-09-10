@@ -81,9 +81,8 @@ static EnvoyHeaders *to_ios_headers(envoy_headers headers) {
 static void ios_on_headers(envoy_headers headers, bool end_stream, void *context) {
   ios_context *c = (ios_context *)context;
   EnvoyHTTPCallbacks *callbacks = c->callbacks;
-  // TODO: protection against null pointers.
   dispatch_async(callbacks.dispatchQueue, ^{
-    if (atomic_load(c->canceled)) {
+    if (atomic_load(c->canceled) || !callbacks.onHeaders) {
       return;
     }
     callbacks.onHeaders(to_ios_headers(headers), end_stream);
@@ -94,7 +93,7 @@ static void ios_on_data(envoy_data data, bool end_stream, void *context) {
   ios_context *c = (ios_context *)context;
   EnvoyHTTPCallbacks *callbacks = c->callbacks;
   dispatch_async(callbacks.dispatchQueue, ^{
-    if (atomic_load(c->canceled)) {
+    if (atomic_load(c->canceled) || !callbacks.onData) {
       return;
     }
     callbacks.onData(to_ios_data(data), end_stream);
@@ -105,7 +104,7 @@ static void ios_on_metadata(envoy_headers metadata, void *context) {
   ios_context *c = (ios_context *)context;
   EnvoyHTTPCallbacks *callbacks = c->callbacks;
   dispatch_async(callbacks.dispatchQueue, ^{
-    if (atomic_load(c->canceled)) {
+    if (atomic_load(c->canceled) || !callbacks.onMetadata) {
       return;
     }
     callbacks.onMetadata(to_ios_headers(metadata));
@@ -116,7 +115,7 @@ static void ios_on_trailers(envoy_headers trailers, void *context) {
   ios_context *c = (ios_context *)context;
   EnvoyHTTPCallbacks *callbacks = c->callbacks;
   dispatch_async(callbacks.dispatchQueue, ^{
-    if (atomic_load(c->canceled)) {
+    if (atomic_load(c->canceled) || !callbacks.onTrailers) {
       return;
     }
     callbacks.onTrailers(to_ios_headers(trailers));
@@ -140,6 +139,9 @@ static void ios_on_cancel(void *context) {
   // TODO: release stream
   dispatch_async(callbacks.dispatchQueue, ^{
     // This call is atomically gated at the call-site and will only happen once.
+    if (!callbacks.onCancel) {
+      return;
+    }
     callbacks.onCancel();
   });
 }
@@ -149,7 +151,7 @@ static void ios_on_error(envoy_error error, void *context) {
   EnvoyHTTPCallbacks *callbacks = c->callbacks;
   dispatch_async(callbacks.dispatchQueue, ^{
     // TODO: release stream
-    if (atomic_load(c->canceled)) {
+    if (atomic_load(c->canceled) || !callbacks.onError) {
       return;
     }
     NSString *errorMessage = [[NSString alloc] initWithBytes:error.message.bytes
