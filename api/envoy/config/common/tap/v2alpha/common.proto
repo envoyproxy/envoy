@@ -4,7 +4,6 @@ import "envoy/service/tap/v2alpha/common.proto";
 import "envoy/api/v2/core/config_source.proto";
 
 import "validate/validate.proto";
-import "gogoproto/gogo.proto";
 
 package envoy.config.common.tap.v2alpha;
 

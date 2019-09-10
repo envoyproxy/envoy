@@ -20,15 +20,12 @@
 #include "gtest/gtest.h"
 
 using testing::AnyNumber;
-using testing::ByMove;
-using testing::DoAll;
 using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
 using testing::IsNull;
 using testing::NiceMock;
 using testing::Return;
-using testing::ReturnRefOfCopy;
 
 namespace Envoy {
 namespace Router {

@@ -5,7 +5,6 @@ package envoy.config.filter.network.zookeeper_proxy.v1alpha1;
 option java_outer_classname = "ZookeeperProxyProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.filter.network.zookeeper_proxy.v1alpha1";
-option go_package = "v1alpha1";
 
 import "validate/validate.proto";
 import "google/protobuf/wrappers.proto";
