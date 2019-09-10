@@ -86,7 +86,7 @@ private:
 
   static thread_local ThreadLocalData thread_local_data_;
 
-  // A queue for Slots that has to be deferred to delete due to out-going callbacks
+  // A indexed container for Slots that has to be deferred to delete due to out-going callbacks
   // pointing to the Slot.
   absl::flat_hash_map<SlotImpl*, std::unique_ptr<SlotImpl>> deferred_deletes_;
 
