@@ -66,11 +66,13 @@ public:
       max_upstream_unknown_connections_reached_.value_++;
     }));
 
+    auto redis_command_stats =
+        Common::Redis::RedisCommandStats::createRedisCommandStats(store->symbolTable());
     std::unique_ptr<InstanceImpl> conn_pool_impl =
         std::make_unique<InstanceImpl>(cluster_name_, cm_, *this, tls_,
                                        Common::Redis::Client::createConnPoolSettings(
                                            20, hashtagging, true, max_unknown_conns, read_policy_),
-                                       api_, std::move(store));
+                                       api_, std::move(store), redis_command_stats);
     // Set the authentication password for this connection pool.
     conn_pool_impl->tls_->getTyped<InstanceImpl::ThreadLocalPool>().auth_password_ = auth_password_;
     conn_pool_ = std::move(conn_pool_impl);
@@ -155,7 +157,9 @@ public:
 
   // Common::Redis::Client::ClientFactory
   Common::Redis::Client::ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher&,
-                                          const Common::Redis::Client::Config&) override {
+                                          const Common::Redis::Client::Config&,
+                                          const Common::Redis::RedisCommandStatsSharedPtr&,
+                                          Stats::Scope&) override {
     return Common::Redis::Client::ClientPtr{create_(host)};
   }
 
