@@ -21,9 +21,10 @@ class RedisCommandStats {
 public:
   RedisCommandStats(Stats::SymbolTable& symbol_table, const std::string& prefix);
 
+  // TODO (@FAYiEKcbD0XFqF2QK2E4viAHg8rMm2VbjYKdjTg): Use Singleton to manage a single RedisCommandStats on the client factory so that it can be used for proxy filter, discovery and health check.
   static std::shared_ptr<RedisCommandStats>
-  createRedisCommandStats(Stats::SymbolTable& symbol_table, const std::string& prefix) {
-    return std::make_shared<Common::Redis::RedisCommandStats>(symbol_table, prefix);
+  createRedisCommandStats(Stats::SymbolTable& symbol_table) {
+    return std::make_shared<Common::Redis::RedisCommandStats>(symbol_table, "upstream_commands");
   }
 
   Stats::Counter& counter(Stats::Scope& scope, const Stats::StatNameVec& stat_names);

@@ -25,7 +25,7 @@ RedisHealthChecker::RedisActiveHealthCheckSession::RedisActiveHealthCheckSession
     : ActiveHealthCheckSession(parent, host), parent_(parent) {
   redis_command_stats_ =
       Extensions::NetworkFilters::Common::Redis::RedisCommandStats::createRedisCommandStats(
-          parent_.cluster_.info()->statsScope().symbolTable(), "upstream_commands");
+          parent_.cluster_.info()->statsScope().symbolTable());
 }
 
 RedisHealthChecker::RedisActiveHealthCheckSession::~RedisActiveHealthCheckSession() {

@@ -67,7 +67,7 @@ public:
     }));
 
     auto redis_command_stats = Common::Redis::RedisCommandStats::createRedisCommandStats(
-        store->symbolTable(), "upstream_commands");
+        store->symbolTable());
     std::unique_ptr<InstanceImpl> conn_pool_impl =
         std::make_unique<InstanceImpl>(cluster_name_, cm_, *this, tls_,
                                        Common::Redis::Client::createConnPoolSettings(
