@@ -2,7 +2,7 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-namespace Deps {
+namespace Dependencies {
 
 TEST(CurlTest, BuiltWithExpectedFeatures) {
   // Ensure built with the expected features, flags from
@@ -28,5 +28,5 @@ TEST(CurlTest, BuiltWithExpectedFeatures) {
   EXPECT_EQ(0, info->features & CURL_VERSION_SSPI);
 }
 
-} // namespace Deps
+} // namespace Dependencies
 } // namespace Envoy
