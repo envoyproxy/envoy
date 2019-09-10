@@ -9,6 +9,7 @@
 
 #include "common/common/logger.h"
 #include "common/common/non_copyable.h"
+
 #include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
