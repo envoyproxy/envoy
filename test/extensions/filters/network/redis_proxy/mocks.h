@@ -23,7 +23,7 @@ namespace RedisProxy {
 class MockRouter : public Router {
 public:
   MockRouter() = default;
-  ~MockRouter() = default;
+  ~MockRouter() override = default;
 
   MOCK_METHOD1(upstreamPool, RouteSharedPtr(std::string& key));
 };
@@ -31,7 +31,7 @@ public:
 class MockRoute : public Route {
 public:
   MockRoute(ConnPool::InstanceSharedPtr);
-  ~MockRoute() = default;
+  ~MockRoute() override = default;
   MOCK_CONST_METHOD0(upstream, ConnPool::InstanceSharedPtr());
   MOCK_CONST_METHOD0(mirrorPolicies, const MirrorPolicies&());
   ConnPool::InstanceSharedPtr conn_pool_;
@@ -41,7 +41,7 @@ public:
 class MockRedirectionManager : public RedirectionManager {
 public:
   MockRedirectionManager() = default;
-  ~MockRedirectionManager() = default;
+  ~MockRedirectionManager() override = default;
 
   MOCK_METHOD1(onRedirection, bool(const std::string& cluster_name));
   MOCK_METHOD4(registerCluster,
@@ -56,7 +56,7 @@ namespace ConnPool {
 class MockInstance : public Instance {
 public:
   MockInstance() = default;
-  ~MockInstance() = default;
+  ~MockInstance() override = default;
 
   MOCK_METHOD3(makeRequest,
                Common::Redis::Client::PoolRequest*(
@@ -76,7 +76,7 @@ namespace CommandSplitter {
 class MockSplitRequest : public SplitRequest {
 public:
   MockSplitRequest() = default;
-  ~MockSplitRequest() = default;
+  ~MockSplitRequest() override = default;
 
   MOCK_METHOD0(cancel, void());
 };
@@ -84,7 +84,7 @@ public:
 class MockSplitCallbacks : public SplitCallbacks {
 public:
   MockSplitCallbacks() = default;
-  ~MockSplitCallbacks() = default;
+  ~MockSplitCallbacks() override = default;
 
   void onResponse(Common::Redis::RespValuePtr&& value) override { onResponse_(value); }
 
@@ -96,7 +96,7 @@ public:
 class MockInstance : public Instance {
 public:
   MockInstance() = default;
-  ~MockInstance() = default;
+  ~MockInstance() override = default;
 
   SplitRequestPtr makeRequest(Common::Redis::RespValuePtr&& request,
                               SplitCallbacks& callbacks) override {

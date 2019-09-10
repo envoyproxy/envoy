@@ -40,8 +40,8 @@ public:
 
   class HandleImpl : public Handle {
   public:
-    HandleImpl(const std::string& cluster_name, RedirectionManagerImpl* mgr)
-        : manager_(mgr->shared_from_this()), cluster_name_(cluster_name) {}
+    HandleImpl(std::string cluster_name, RedirectionManagerImpl* mgr)
+        : manager_(mgr->shared_from_this()), cluster_name_(std::move(cluster_name)) {}
 
     ~HandleImpl() override {
       std::shared_ptr<RedirectionManagerImpl> strong_manager = manager_.lock();
