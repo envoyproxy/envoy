@@ -235,7 +235,8 @@ TEST(AuthenticatedMatcher, subjectPeerCertificate) {
   const std::vector<std::string> sans;
   EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(sans));
   EXPECT_CALL(*ssl, dnsSansPeerCertificate()).WillRepeatedly(Return(sans));
-  EXPECT_CALL(*ssl, subjectPeerCertificate()).WillRepeatedly(Return("bar"));
+  std::string peer_subject = "bar";
+  EXPECT_CALL(*ssl, subjectPeerCertificate()).WillRepeatedly(ReturnRef(peer_subject));
   EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(ssl));
 
   envoy::config::rbac::v2::Principal_Authenticated auth;
