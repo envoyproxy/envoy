@@ -48,6 +48,13 @@ jobs:
     displayName: "Check disk space at end"
     condition: always()
 
+  - task: PublishTestResults@2
+    inputs:
+      testResultsFiles: '**/bazel-out/**/testlogs/**/test.xml'
+      testRunTitle: '$(CI_TARGET)'
+      searchFolder: $(Build.StagingDirectory)/tmp
+    condition: always()
+
   - task: PublishBuildArtifacts@1
     inputs:
       pathtoPublish: "$(Build.StagingDirectory)/envoy"
