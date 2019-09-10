@@ -34,7 +34,8 @@ RedisCluster::RedisCluster(
                            : Config::Utility::translateClusterHosts(cluster.hosts())),
       local_info_(factory_context.localInfo()), random_(factory_context.random()),
       redis_discovery_session_(*this, redis_client_factory), lb_factory_(std::move(lb_factory)),
-      auth_password_(NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl::auth_password(info(), api)) {
+      auth_password_(
+          NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl::auth_password(info(), api)) {
   const auto& locality_lb_endpoints = load_assignment_.endpoints();
   for (const auto& locality_lb_endpoint : locality_lb_endpoints) {
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
