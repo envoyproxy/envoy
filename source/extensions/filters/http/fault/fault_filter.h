@@ -16,6 +16,7 @@
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/token_bucket_impl.h"
 #include "common/http/header_utility.h"
+#include "common/stats/symbol_table_impl.h"
 
 #include "extensions/filters/common/fault/fault_config.h"
 
@@ -111,20 +112,31 @@ public:
 
   Runtime::Loader& runtime() { return runtime_; }
   FaultFilterStats& stats() { return stats_; }
-  const std::string& statsPrefix() { return stats_prefix_; }
   Stats::Scope& scope() { return scope_; }
   const FaultSettings* settings() { return &settings_; }
   TimeSource& timeSource() { return time_source_; }
 
+  void incDelays(absl::string_view downstream_cluster) {
+    incCounter(downstream_cluster, delays_injected_);
+  }
+
+  void incAborts(absl::string_view downstream_cluster) {
+    incCounter(downstream_cluster, aborts_injected_);
+  }
+
 private:
   static FaultFilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
+  void incCounter(absl::string_view downstream_cluster, Stats::StatName stat_name);
 
   const FaultSettings settings_;
   Runtime::Loader& runtime_;
   FaultFilterStats stats_;
-  const std::string stats_prefix_;
   Stats::Scope& scope_;
   TimeSource& time_source_;
+  Stats::StatNameSet stat_name_set_;
+  const Stats::StatName aborts_injected_;
+  const Stats::StatName delays_injected_;
+  const Stats::StatName stats_prefix_; // Includes ".fault".
 };
 
 using FaultFilterConfigSharedPtr = std::shared_ptr<FaultFilterConfig>;

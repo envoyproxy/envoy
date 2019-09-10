@@ -14,10 +14,7 @@
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
 
-using testing::AssertionFailure;
 using testing::AssertionResult;
-using testing::AssertionSuccess;
-using testing::IsSubstring;
 
 namespace Envoy {
 

@@ -88,21 +88,6 @@ ProtoValidationException::ProtoValidationException(const std::string& validation
   ENVOY_LOG_MISC(debug, "Proto validation error; throwing {}", what());
 }
 
-void MessageUtil::checkUnknownFields(const Protobuf::Message& message,
-                                     ProtobufMessage::ValidationVisitor& validation_visitor) {
-  const auto& unknown_fields = message.GetReflection()->GetUnknownFields(message);
-  // If there are no unknown fields, we're done here.
-  if (unknown_fields.empty()) {
-    return;
-  }
-  std::string error_msg;
-  for (int n = 0; n < unknown_fields.field_count(); ++n) {
-    error_msg += absl::StrCat(n > 0 ? ", " : "", unknown_fields.field(n).number());
-  }
-  validation_visitor.onUnknownField("type " + message.GetTypeName() + " with unknown field set {" +
-                                    error_msg + "}");
-}
-
 void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& message,
                                ProtobufMessage::ValidationVisitor& validation_visitor) {
   Protobuf::util::JsonParseOptions options;
@@ -159,7 +144,7 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
   if (absl::EndsWith(path, FileExtensions::get().ProtoBinary)) {
     // Attempt to parse the binary format.
     if (message.ParseFromString(contents)) {
-      MessageUtil::checkUnknownFields(message, validation_visitor);
+      MessageUtil::checkForUnexpectedFields(message, validation_visitor);
       return;
     }
     throw EnvoyException("Unable to parse file \"" + path + "\" as a binary protobuf (type " +
@@ -180,7 +165,23 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
   }
 }
 
-void MessageUtil::checkForDeprecation(const Protobuf::Message& message, Runtime::Loader* runtime) {
+void MessageUtil::checkForUnexpectedFields(const Protobuf::Message& message,
+                                           ProtobufMessage::ValidationVisitor& validation_visitor,
+                                           Runtime::Loader* runtime) {
+  // Reject unknown fields.
+  const auto& unknown_fields = message.GetReflection()->GetUnknownFields(message);
+  if (!unknown_fields.empty()) {
+    std::string error_msg;
+    for (int n = 0; n < unknown_fields.field_count(); ++n) {
+      error_msg += absl::StrCat(n > 0 ? ", " : "", unknown_fields.field(n).number());
+    }
+    // We use the validation visitor but have hard coded behavior below for deprecated fields.
+    // TODO(htuch): Unify the deprecated and unknown visitor handling behind the validation
+    // visitor pattern. https://github.com/envoyproxy/envoy/issues/8092.
+    validation_visitor.onUnknownField("type " + message.GetTypeName() +
+                                      " with unknown field set {" + error_msg + "}");
+  }
+
   const Protobuf::Descriptor* descriptor = message.GetDescriptor();
   const Protobuf::Reflection* reflection = message.GetReflection();
   for (int i = 0; i < descriptor->field_count(); ++i) {
@@ -192,7 +193,11 @@ void MessageUtil::checkForDeprecation(const Protobuf::Message& message, Runtime:
       continue;
     }
 
+#ifdef ENVOY_DISABLE_DEPRECATED_FEATURES
+    bool warn_only = false;
+#else
     bool warn_only = true;
+#endif
     absl::string_view filename = filenameFromPath(field->file()->name());
     // Allow runtime to be null both to not crash if this is called before server initialization,
     // and so proto validation works in context where runtime singleton is not set up (e.g.
@@ -227,10 +232,12 @@ void MessageUtil::checkForDeprecation(const Protobuf::Message& message, Runtime:
       if (field->is_repeated()) {
         const int size = reflection->FieldSize(message, field);
         for (int j = 0; j < size; ++j) {
-          checkForDeprecation(reflection->GetRepeatedMessage(message, field, j), runtime);
+          checkForUnexpectedFields(reflection->GetRepeatedMessage(message, field, j),
+                                   validation_visitor, runtime);
         }
       } else {
-        checkForDeprecation(reflection->GetMessage(message, field), runtime);
+        checkForUnexpectedFields(reflection->GetMessage(message, field), validation_visitor,
+                                 runtime);
       }
     }
   }

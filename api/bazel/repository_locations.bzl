@@ -1,11 +1,8 @@
 BAZEL_SKYLIB_RELEASE = "0.8.0"
 BAZEL_SKYLIB_SHA256 = "2ef429f5d7ce7111263289644d233707dba35e39696377ebab8b0bc701f7818e"
 
-GOGOPROTO_RELEASE = "1.2.1"
-GOGOPROTO_SHA256 = "99e423905ba8921e86817607a5294ffeedb66fdd4a85efce5eb2848f715fdb3a"
-
-OPENCENSUS_PROTO_RELEASE = "0.2.1"
-OPENCENSUS_PROTO_SHA256 = "bfcefa6093fc2ecdf5c9effea86e6982d0d6f9a5178b17fcf73a62e0f3fb43d0"
+OPENCENSUS_PROTO_GIT_SHA = "5cec5ea58c3efa81fa808f2bd38ce182da9ee731"  # Jul 25, 2019
+OPENCENSUS_PROTO_SHA256 = "faeb93f293ff715b0cb530d273901c0e2e99277b9ed1c0a0326bca9ec5774ad2"
 
 PGV_GIT_SHA = "2feaabb13a5d697b80fcb938c0ce37b24c9381ee"  # Jul 26, 2018
 PGV_SHA256 = "ddefe3dcbb25d68a2e5dfea67d19c060959c2aecc782802bd4c1a5811d44dd45"
@@ -20,6 +17,9 @@ KAFKA_SOURCE_SHA = "ae7a1696c0a0302b43c5b21e515c37e6ecd365941f68a510a7e442eebddf
 
 UDPA_GIT_SHA = "4cbdcb9931ca743a915a7c5fda51b2ee793ed157"  # Aug 22, 2019
 UDPA_SHA256 = "6291d0c0e3a4d5f08057ea7a00ed0b0ec3dd4e5a3b1cf20f803774680b5a806f"
+
+ZIPKINAPI_RELEASE = "0.2.2"  # Aug 23, 2019
+ZIPKINAPI_SHA256 = "688c4fe170821dd589f36ec45aaadc03a618a40283bc1f97da8fa11686fc816b"
 
 REPOSITORY_LOCATIONS = dict(
     bazel_skylib = dict(
@@ -42,11 +42,6 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "udpa-" + UDPA_GIT_SHA,
         urls = ["https://github.com/cncf/udpa/archive/" + UDPA_GIT_SHA + ".tar.gz"],
     ),
-    com_github_gogo_protobuf = dict(
-        sha256 = GOGOPROTO_SHA256,
-        strip_prefix = "protobuf-" + GOGOPROTO_RELEASE,
-        urls = ["https://github.com/gogo/protobuf/archive/v" + GOGOPROTO_RELEASE + ".tar.gz"],
-    ),
     prometheus_metrics_model = dict(
         sha256 = PROMETHEUS_SHA,
         strip_prefix = "client_model-" + PROMETHEUS_GIT_SHA,
@@ -54,12 +49,17 @@ REPOSITORY_LOCATIONS = dict(
     ),
     opencensus_proto = dict(
         sha256 = OPENCENSUS_PROTO_SHA256,
-        strip_prefix = "opencensus-proto-" + OPENCENSUS_PROTO_RELEASE + "/src",
-        urls = ["https://github.com/census-instrumentation/opencensus-proto/archive/v" + OPENCENSUS_PROTO_RELEASE + ".tar.gz"],
+        strip_prefix = "opencensus-proto-" + OPENCENSUS_PROTO_GIT_SHA + "/src",
+        urls = ["https://github.com/census-instrumentation/opencensus-proto/archive/" + OPENCENSUS_PROTO_GIT_SHA + ".tar.gz"],
     ),
     kafka_source = dict(
         sha256 = KAFKA_SOURCE_SHA,
         strip_prefix = "kafka-2.2.0-rc2/clients/src/main/resources/common/message",
         urls = ["https://github.com/apache/kafka/archive/2.2.0-rc2.zip"],
+    ),
+    com_github_openzipkin_zipkinapi = dict(
+        sha256 = ZIPKINAPI_SHA256,
+        strip_prefix = "zipkin-api-" + ZIPKINAPI_RELEASE,
+        urls = ["https://github.com/openzipkin/zipkin-api/archive/" + ZIPKINAPI_RELEASE + ".tar.gz"],
     ),
 )

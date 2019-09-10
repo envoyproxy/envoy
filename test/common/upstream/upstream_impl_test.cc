@@ -39,8 +39,6 @@ using testing::_;
 using testing::ContainerEq;
 using testing::Invoke;
 using testing::NiceMock;
-using testing::Return;
-using testing::ReturnRef;
 
 namespace Envoy {
 namespace Upstream {

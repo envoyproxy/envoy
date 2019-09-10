@@ -103,6 +103,19 @@ void ClusterManagerInitHelper::removeCluster(Cluster& cluster) {
   maybeFinishInitialize();
 }
 
+void ClusterManagerInitHelper::initializeSecondaryClusters() {
+  started_secondary_initialize_ = true;
+  // Cluster::initialize() method can modify the list of secondary_init_clusters_ to remove
+  // the item currently being initialized, so we eschew range-based-for and do this complicated
+  // dance to increment the iterator before calling initialize.
+  for (auto iter = secondary_init_clusters_.begin(); iter != secondary_init_clusters_.end();) {
+    Cluster* cluster = *iter;
+    ++iter;
+    ENVOY_LOG(debug, "initializing secondary cluster {}", cluster->info()->name());
+    cluster->initialize([cluster, this] { onClusterInit(*cluster); });
+  }
+}
+
 void ClusterManagerInitHelper::maybeFinishInitialize() {
   // Do not do anything if we are still doing the initial static load or if we are waiting for
   // CDS initialize.
@@ -121,15 +134,16 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
   if (!secondary_init_clusters_.empty()) {
     if (!started_secondary_initialize_) {
       ENVOY_LOG(info, "cm init: initializing secondary clusters");
-      started_secondary_initialize_ = true;
-      // Cluster::initialize() method can modify the list of secondary_init_clusters_ to remove
-      // the item currently being initialized, so we eschew range-based-for and do this complicated
-      // dance to increment the iterator before calling initialize.
-      for (auto iter = secondary_init_clusters_.begin(); iter != secondary_init_clusters_.end();) {
-        Cluster* cluster = *iter;
-        ++iter;
-        ENVOY_LOG(debug, "initializing secondary cluster {}", cluster->info()->name());
-        cluster->initialize([cluster, this] { onClusterInit(*cluster); });
+      // If the first CDS response doesn't have any primary cluster, ClusterLoadAssignment
+      // should be already paused by CdsApiImpl::onConfigUpdate(). Need to check that to
+      // avoid double pause ClusterLoadAssignment.
+      if (cm_.adsMux().paused(Config::TypeUrl::get().ClusterLoadAssignment)) {
+        initializeSecondaryClusters();
+      } else {
+        cm_.adsMux().pause(Config::TypeUrl::get().ClusterLoadAssignment);
+        Cleanup eds_resume(
+            [this] { cm_.adsMux().resume(Config::TypeUrl::get().ClusterLoadAssignment); });
+        initializeSecondaryClusters();
       }
     }
 
@@ -188,7 +202,7 @@ ClusterManagerImpl::ClusterManagerImpl(
     : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls.allocateSlot()),
       random_(random), bind_config_(bootstrap.cluster_manager().upstream_bind_config()),
       local_info_(local_info), cm_stats_(generateStats(stats)),
-      init_helper_([this](Cluster& cluster) { onClusterInit(cluster); }),
+      init_helper_(*this, [this](Cluster& cluster) { onClusterInit(cluster); }),
       config_tracker_entry_(
           admin.getConfigTracker().add("clusters", [this] { return dumpClusterConfigs(); })),
       time_source_(main_thread_dispatcher.timeSource()), dispatcher_(main_thread_dispatcher),
@@ -473,9 +487,22 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& clust
 
   if (existing_active_cluster != active_clusters_.end() ||
       existing_warming_cluster != warming_clusters_.end()) {
-    // The following init manager remove call is a NOP in the case we are already initialized. It's
-    // just kept here to avoid additional logic.
-    init_helper_.removeCluster(*existing_active_cluster->second->cluster_);
+    if (existing_active_cluster != active_clusters_.end()) {
+      // The following init manager remove call is a NOP in the case we are already initialized.
+      // It's just kept here to avoid additional logic.
+      init_helper_.removeCluster(*existing_active_cluster->second->cluster_);
+    } else {
+      // Validate that warming clusters are not added to the init_helper_.
+      // NOTE: This loop is compiled out in optimized builds.
+      for (const std::list<Cluster*>& cluster_list :
+           {std::cref(init_helper_.primary_init_clusters_),
+            std::cref(init_helper_.secondary_init_clusters_)}) {
+        ASSERT(!std::any_of(cluster_list.begin(), cluster_list.end(),
+                            [&existing_warming_cluster](Cluster* cluster) {
+                              return existing_warming_cluster->second->cluster_.get() == cluster;
+                            }));
+      }
+    }
     cm_stats_.cluster_modified_.inc();
   } else {
     cm_stats_.cluster_added_.inc();
@@ -496,7 +523,7 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& clust
   loadCluster(cluster, version_info, true, use_active_map ? active_clusters_ : warming_clusters_);
 
   if (use_active_map) {
-    ENVOY_LOG(info, "add/update cluster {} during init", cluster_name);
+    ENVOY_LOG(debug, "add/update cluster {} during init", cluster_name);
     auto& cluster_entry = active_clusters_.at(cluster_name);
     createOrUpdateThreadLocalCluster(*cluster_entry);
     init_helper_.addCluster(*cluster_entry->cluster_);
