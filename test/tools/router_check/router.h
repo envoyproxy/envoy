@@ -142,6 +142,8 @@ private:
   bool compareResults(const std::string& actual, const std::string& expected,
                       const std::string& test_type);
 
+  void printResults();
+
   bool runtimeMock(const std::string& key, const envoy::type::FractionalPercent& default_value,
                    uint64_t random_value);
 
@@ -151,6 +153,8 @@ private:
 
   bool only_show_failures_{false};
 
+  // The first member of each pair is the name of the test.
+  // The second member is a list of any failing results for that test as strings.
   std::vector<std::pair<std::string, std::vector<std::string>>> tests_;
 
   // TODO(hennna): Switch away from mocks following work done by @rlazarus in github issue #499.

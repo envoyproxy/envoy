@@ -106,7 +106,7 @@ bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_jso
     ToolConfig tool_config = ToolConfig::create(check_config);
     tool_config.route_ = config_->route(*tool_config.headers_, tool_config.random_value_);
     std::string test_name = check_config->getString("test_name", "");
-    tests_.push_back(std::pair<std::string, std::vector<std::string>>(test_name, {}));
+    tests_.emplace_back(std::pair<std::string, std::vector<std::string>>(test_name, {}));
     Json::ObjectSharedPtr validate = check_config->getObject("validate");
     using checkerFunc = std::function<bool(ToolConfig&, const std::string&)>;
     const std::unordered_map<std::string, checkerFunc> checkers = {
@@ -154,18 +154,7 @@ bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_jso
       }
     }
   }
-  // Output failure details to stdout if details_ flag is set to true
-  for (const auto& test_result : tests_) {
-    // All test names are printed if the details_ flag is true unless only_show_failures_ is also
-    // true.
-    if ((details_ && !only_show_failures_) ||
-        (only_show_failures_ && !test_result.second.empty())) {
-      std::cout << test_result.first << std::endl;
-      for (const auto& failure : test_result.second) {
-        std::cerr << failure << std::endl;
-      }
-    }
-  }
+  printResults();
   return no_failures;
 }
 
@@ -186,7 +175,7 @@ bool RouterCheckTool::compareEntries(const std::string& expected_routes) {
     tool_config.route_ = config_->route(*tool_config.headers_, tool_config.random_value_);
 
     const std::string& test_name = check_config.test_name();
-    tests_.push_back(std::pair<std::string, std::vector<std::string>>(test_name, {}));
+    tests_.emplace_back(std::pair<std::string, std::vector<std::string>>(test_name, {}));
     const envoy::RouterCheckToolSchema::ValidationAssert& validate = check_config.validate();
 
     using checkerFunc =
@@ -209,19 +198,7 @@ bool RouterCheckTool::compareEntries(const std::string& expected_routes) {
       }
     }
   }
-  // Output failure details to stdout if details_ flag is set to true
-  for (const auto& test_result : tests_) {
-    // All test names are printed if the details_ flag is true unless only_show_failures_ is also
-    // true.
-    if ((details_ && !only_show_failures_) ||
-        (only_show_failures_ && !test_result.second.empty())) {
-      std::cout << test_result.first << std::endl;
-      for (const auto& failure : test_result.second) {
-        std::cerr << failure << std::endl;
-      }
-    }
-  }
-
+  printResults();
   return no_failures;
 }
 
@@ -437,9 +414,24 @@ bool RouterCheckTool::compareResults(const std::string& actual, const std::strin
   if (expected == actual) {
     return true;
   }
-  tests_.back().second.push_back("expected: [" + expected + "], actual: [" + actual +
+  tests_.back().second.emplace_back("expected: [" + expected + "], actual: [" + actual +
                                  "], test type: " + test_type);
   return false;
+}
+
+void RouterCheckTool::printResults() {
+  // Output failure details to stdout if details_ flag is set to true
+  for (const auto& test_result : tests_) {
+    // All test names are printed if the details_ flag is true unless only_show_failures_ is also
+    // true.
+    if ((details_ && !only_show_failures_) ||
+        (only_show_failures_ && !test_result.second.empty())) {
+      std::cout << test_result.first << std::endl;
+      for (const auto& failure : test_result.second) {
+        std::cerr << failure << std::endl;
+      }
+    }
+  }
 }
 
 // The Mock for runtime value checks.
