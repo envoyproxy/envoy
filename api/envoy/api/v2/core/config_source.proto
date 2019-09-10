@@ -12,9 +12,6 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
-import "gogoproto/gogo.proto";
-
-option (gogoproto.equal_all) = true;
 
 // [#protodoc-title: Configuration sources]
 
@@ -56,11 +53,10 @@ message ApiConfigSource {
   repeated GrpcService grpc_services = 4;
 
   // For REST APIs, the delay between successive polls.
-  google.protobuf.Duration refresh_delay = 3 [(gogoproto.stdduration) = true];
+  google.protobuf.Duration refresh_delay = 3;
 
   // For REST APIs, the request timeout. If not set, a default value of 1s will be used.
-  google.protobuf.Duration request_timeout = 5
-      [(validate.rules).duration.gt.seconds = 0, (gogoproto.stdduration) = true];
+  google.protobuf.Duration request_timeout = 5 [(validate.rules).duration.gt.seconds = 0];
 
   // For GRPC APIs, the rate limit settings. If present, discovery requests made by Envoy will be
   // rate limited.

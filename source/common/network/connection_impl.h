@@ -81,7 +81,7 @@ public:
   }
   absl::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const override;
   void setConnectionStats(const ConnectionStats& stats) override;
-  const Ssl::ConnectionInfo* ssl() const override { return transport_socket_->ssl(); }
+  Ssl::ConnectionInfoConstSharedPtr ssl() const override { return transport_socket_->ssl(); }
   State state() const override;
   void write(Buffer::Instance& data, bool end_stream) override;
   void setBufferLimits(uint32_t limit) override;
@@ -131,7 +131,6 @@ public:
     delayed_close_timeout_ = timeout;
   }
   std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
-  bool isQuic() const override { return false; }
 
 protected:
   void closeSocket(ConnectionEvent close_type);

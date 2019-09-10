@@ -9,6 +9,8 @@ void QuicHttpConnectionImplBase::goAway() {
 
 bool QuicHttpConnectionImplBase::wantsToWrite() { return quic_session_.HasDataToWrite(); }
 
+// TODO(danzh): modify QUIC stack to react based on aggregated bytes across all
+// streams.
 void QuicHttpConnectionImplBase::onUnderlyingConnectionAboveWriteBufferHighWatermark() {
   for (auto& it : quic_session_.stream_map()) {
     if (!it.second->is_static()) {

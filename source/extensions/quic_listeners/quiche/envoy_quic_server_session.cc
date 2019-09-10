@@ -10,6 +10,7 @@
 #pragma GCC diagnostic pop
 
 #include "common/common/assert.h"
+#include "extensions/quic_listeners/quiche/envoy_quic_server_stream.h"
 
 namespace Envoy {
 namespace Quic {
@@ -26,7 +27,9 @@ EnvoyQuicServerSession::EnvoyQuicServerSession(
       stream_info_(dispatcher.timeSource()),
       write_buffer_watermark_simulation_(
           send_buffer_limit / 2, send_buffer_limit, [this]() { onSendBufferLowWatermark(); },
-          [this]() { onSendBufferHighWatermark(); }) {}
+          [this]() { onSendBufferHighWatermark(); }) {
+  stream_info_.protocol(Http::Protocol::Http3);
+}
 
 quic::QuicCryptoServerStreamBase* EnvoyQuicServerSession::CreateQuicCryptoServerStream(
     const quic::QuicCryptoServerConfig* crypto_config,
@@ -111,7 +114,8 @@ void EnvoyQuicServerSession::addConnectionCallbacks(Network::ConnectionCallbacks
 }
 
 void EnvoyQuicServerSession::addBytesSentCallback(Network::Connection::BytesSentCb /*cb*/) {
-  // TODO(danzh): implement to support proxy.
+  // TODO(danzh): implement to support proxy. This interface is only called from
+  // TCP proxy code.
   ASSERT(false, "addBytesSentCallback is not implemented for QUIC");
 }
 
@@ -175,7 +179,7 @@ const Network::Address::InstanceConstSharedPtr& EnvoyQuicServerSession::localAdd
   return quic_connection_->connectionSocket()->localAddress();
 }
 
-const Ssl::ConnectionInfo* EnvoyQuicServerSession::ssl() const {
+Ssl::ConnectionInfoConstSharedPtr EnvoyQuicServerSession::ssl() const {
   // TODO(danzh): construct Ssl::ConnectionInfo from crypto stream
   ENVOY_CONN_LOG(error, "Ssl::ConnectionInfo instance is not populated.", *this);
   return nullptr;

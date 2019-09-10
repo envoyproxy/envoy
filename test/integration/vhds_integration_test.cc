@@ -19,10 +19,7 @@
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 
-using testing::AssertionFailure;
 using testing::AssertionResult;
-using testing::AssertionSuccess;
-using testing::IsSubstring;
 
 namespace Envoy {
 namespace {

@@ -133,7 +133,8 @@ The macOS CI build is part of the [CircleCI](https://circleci.com/gh/envoyproxy/
 Dependencies are installed by the `ci/mac_ci_setup.sh` script, via [Homebrew](https://brew.sh),
 which is pre-installed on the CircleCI macOS image. The dependencies are cached are re-installed
 on every build. The `ci/mac_ci_steps.sh` script executes the specific commands that
-build and test Envoy.
+build and test Envoy. If Envoy cannot be built (`error: /Library/Developer/CommandLineTools/usr/bin/libtool: no output file specified (specify with -o output)`),
+ensure that XCode is installed.
 
 # Coverity Scan Build Flow
 

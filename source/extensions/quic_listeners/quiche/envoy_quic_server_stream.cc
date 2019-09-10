@@ -16,10 +16,10 @@
 #include "quiche/quic/core/quic_session.h"
 #include "quiche/spdy/core/spdy_header_block.h"
 #include "quiche/quic/platform/api/quic_mem_slice_span.h"
-#pragma GCC diagnostic pop
-
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_server_session.h"
+#pragma GCC diagnostic pop
+
 #include "common/buffer/buffer_impl.h"
 #include "common/http/header_map_impl.h"
 #include "common/common/assert.h"
@@ -162,7 +162,24 @@ void EnvoyQuicServerStream::OnTrailingHeadersComplete(bool fin, size_t frame_len
 
 void EnvoyQuicServerStream::OnStreamReset(const quic::QuicRstStreamFrame& frame) {
   quic::QuicSpdyServerStreamBase::OnStreamReset(frame);
-  Http::StreamResetReason reason = quicRstErrorToEnvoyResetReason(frame.error_code);
+  Http::StreamResetReason reason;
+  if (frame.error_code == quic::QUIC_REFUSED_STREAM) {
+    reason = Http::StreamResetReason::RemoteRefusedStreamReset;
+  } else {
+    reason = Http::StreamResetReason::RemoteReset;
+  }
+  runResetCallbacks(reason);
+}
+
+void EnvoyQuicServerStream::OnConnectionClosed(quic::QuicErrorCode error,
+                                               quic::ConnectionCloseSource source) {
+  quic::QuicSpdyServerStreamBase::OnConnectionClosed(error, source);
+  Http::StreamResetReason reason;
+  if (error == quic::QUIC_NO_ERROR) {
+    reason = Http::StreamResetReason::ConnectionTermination;
+  } else {
+    reason = Http::StreamResetReason::ConnectionFailure;
+  }
   runResetCallbacks(reason);
 }
 
@@ -178,13 +195,6 @@ void EnvoyQuicServerStream::OnCanWrite() {
     dynamic_cast<EnvoyQuicServerSession*>(session())->adjustBytesToSend(buffered_data_new -
                                                                         buffered_data_old);
   }
-}
-
-void EnvoyQuicServerStream::OnConnectionClosed(quic::QuicErrorCode error,
-                                               quic::ConnectionCloseSource source) {
-  quic::QuicSpdyServerStreamBase::OnConnectionClosed(error, source);
-  Http::StreamResetReason reason = quicRstErrorToEnvoyResetReason(stream_error());
-  runResetCallbacks(reason);
 }
 
 } // namespace Quic

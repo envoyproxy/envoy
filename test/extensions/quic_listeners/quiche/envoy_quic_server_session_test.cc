@@ -82,10 +82,10 @@ public:
         crypto_config_(quic::QuicCryptoServerConfig::TESTING, quic::QuicRandom::GetInstance(),
                        std::make_unique<EnvoyQuicFakeProofSource>(),
                        quic::KeyExchangeSource::Default()),
-        envoy_quic_session_(quic_config_, quic_version_,
-                            std::unique_ptr<TestEnvoyQuicConnection>(quic_connection_),
-                            /*visitor=*/nullptr, &crypto_stream_helper_, &crypto_config_,
-                            &compressed_certs_cache_, *dispatcher_),
+        envoy_quic_session_(
+            quic_config_, quic_version_, std::unique_ptr<TestEnvoyQuicConnection>(quic_connection_),
+            /*visitor=*/nullptr, &crypto_stream_helper_, &crypto_config_, &compressed_certs_cache_,
+            *dispatcher_, /*send_buffer_limit*/ 1024 * 1024),
         read_filter_(new Network::MockReadFilter()) {
     EXPECT_EQ(time_system_.systemTime(), envoy_quic_session_.streamInfo().startTime());
     EXPECT_EQ(EMPTY_STRING, envoy_quic_session_.nextProtocol());
@@ -100,7 +100,8 @@ public:
   bool installReadFilter() {
     // Setup read filter.
     envoy_quic_session_.addReadFilter(read_filter_);
-    EXPECT_TRUE(read_filter_->callbacks_->connection().isQuic());
+    EXPECT_EQ(Http::Protocol::Http3,
+              read_filter_->callbacks_->connection().streamInfo().protocol().value());
     EXPECT_EQ(envoy_quic_session_.id(), read_filter_->callbacks_->connection().id());
     EXPECT_EQ(&envoy_quic_session_, &read_filter_->callbacks_->connection());
     read_filter_->callbacks_->connection().addConnectionCallbacks(network_connection_callbacks_);
@@ -111,6 +112,7 @@ public:
       // Create ServerConnection instance and setup callbacks for it.
       http_connection_ = std::make_unique<QuicHttpServerConnectionImpl>(envoy_quic_session_,
                                                                         http_connection_callbacks_);
+      EXPECT_EQ(Http::Protocol::Http3, http_connection_->protocol());
       // Stop iteration to avoid calling getRead/WriteBuffer().
       return Network::FilterStatus::StopIteration;
     }));
@@ -258,12 +260,6 @@ TEST_P(EnvoyQuicServerSessionTest, OnResetFrame) {
   EXPECT_CALL(stream_callbacks,
               onResetStream(Http::StreamResetReason::RemoteRefusedStreamReset, _));
   stream2->OnStreamReset(rst2);
-
-  quic::QuicStream* stream3 = envoy_quic_session_.GetOrCreateStream(stream_id + 8u);
-  quic::QuicRstStreamFrame rst3(/*control_frame_id=*/1u, stream3->id(),
-                                quic::QUIC_STREAM_CONNECTION_ERROR, /*bytes_written=*/0u);
-  EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::ConnectionFailure, _));
-  stream3->OnStreamReset(rst3);
 }
 
 TEST_P(EnvoyQuicServerSessionTest, ConnectionClose) {
@@ -316,7 +312,6 @@ TEST_P(EnvoyQuicServerSessionTest, ShutdownNotice) {
   installReadFilter();
   // Not verifying dummy implementation, just to have coverage.
   EXPECT_DEBUG_DEATH(envoy_quic_session_.enableHalfClose(true), "");
-  envoy_quic_session_.setBufferLimits(1024 * 1024);
   EXPECT_EQ(nullptr, envoy_quic_session_.ssl());
   EXPECT_FALSE(envoy_quic_session_.aboveHighWatermark());
   EXPECT_DEBUG_DEATH(envoy_quic_session_.setDelayedCloseTimeout(std::chrono::milliseconds(1)), "");
@@ -366,6 +361,8 @@ TEST_P(EnvoyQuicServerSessionTest, InitializeFilterChain) {
                                                            Network::FilterManager& filter_manager) {
     filter_manager.addReadFilter(read_filter_);
     read_filter_->callbacks_->connection().addConnectionCallbacks(network_connection_callbacks_);
+    read_filter_->callbacks_->connection().setConnectionStats(
+        {read_total_, read_current_, write_total_, write_current_, nullptr, nullptr});
   }};
   EXPECT_CALL(filter_chain, networkFilterFactories()).WillOnce(ReturnRef(filter_factory));
   EXPECT_CALL(*read_filter_, onNewConnection())
@@ -397,8 +394,7 @@ TEST_P(EnvoyQuicServerSessionTest, NetworkConnectionInterface) {
   EXPECT_FALSE(envoy_quic_session_.localAddressRestored());
   EXPECT_DEBUG_DEATH(envoy_quic_session_.unixSocketPeerCredentials(),
                      "Unix domain socket is not supported.");
-  EXPECT_DEBUG_DEATH(envoy_quic_session_.readDisable(true),
-                     "Quic connection should be able to read through out its life time.");
+  EXPECT_DEBUG_DEATH(envoy_quic_session_.readDisable(true), "not reached");
 }
 
 } // namespace Quic

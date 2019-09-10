@@ -145,7 +145,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, EnvoyQuicDispatcherTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponCHLO) {
-  quic::SetVerbosityLogThreshold(2);
+  EXPECT_CALL(listener_config_, perConnectionBufferLimitBytes()).WillOnce(Return(1024 * 1024));
   quic::QuicSocketAddress peer_addr(version_ == Network::Address::IpVersion::v4
                                         ? quic::QuicIpAddress::Loopback4()
                                         : quic::QuicIpAddress::Loopback6(),
@@ -163,10 +163,17 @@ TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponCHLO) {
       }));
   std::shared_ptr<Network::MockReadFilter> read_filter(new Network::MockReadFilter());
   Network::MockConnectionCallbacks network_connection_callbacks;
+  testing::StrictMock<Stats::MockCounter> read_total;
+  testing::StrictMock<Stats::MockGauge> read_current;
+  testing::StrictMock<Stats::MockCounter> write_total;
+  testing::StrictMock<Stats::MockGauge> write_current;
+
   std::vector<Network::FilterFactoryCb> filter_factory(
       {[&](Network::FilterManager& filter_manager) {
         filter_manager.addReadFilter(read_filter);
         read_filter->callbacks_->connection().addConnectionCallbacks(network_connection_callbacks);
+        read_filter->callbacks_->connection().setConnectionStats(
+            {read_total, read_current, write_total, write_current, nullptr, nullptr});
       }});
   EXPECT_CALL(filter_chain, networkFilterFactories()).WillOnce(ReturnRef(filter_factory));
   EXPECT_CALL(listener_config_, filterChainFactory());
@@ -203,6 +210,7 @@ TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponCHLO) {
 }
 
 TEST_P(EnvoyQuicDispatcherTest, CloseConnectionDueToMissingFilterChain) {
+  EXPECT_CALL(listener_config_, perConnectionBufferLimitBytes()).WillOnce(Return(1024 * 1024));
   quic::QuicSocketAddress peer_addr(version_ == Network::Address::IpVersion::v4
                                         ? quic::QuicIpAddress::Loopback4()
                                         : quic::QuicIpAddress::Loopback6(),
@@ -227,6 +235,37 @@ TEST_P(EnvoyQuicDispatcherTest, CloseConnectionDueToMissingFilterChain) {
   EXPECT_TRUE(quic::test::QuicDispatcherPeer::time_wait_list_manager(&envoy_quic_dispatcher_)
                   ->IsConnectionIdInTimeWait(connection_id));
   EXPECT_EQ(1u, listener_stats_.no_filter_chain_match_.value());
+}
+
+TEST_P(EnvoyQuicDispatcherTest, CloseConnectionDueToEmptyFilterChain) {
+  EXPECT_CALL(listener_config_, perConnectionBufferLimitBytes()).WillOnce(Return(1024 * 1024));
+  quic::QuicSocketAddress peer_addr(version_ == Network::Address::IpVersion::v4
+                                        ? quic::QuicIpAddress::Loopback4()
+                                        : quic::QuicIpAddress::Loopback6(),
+                                    54321);
+  Network::MockFilterChain filter_chain;
+  Network::MockFilterChainManager filter_chain_manager;
+  EXPECT_CALL(listener_config_, filterChainManager()).WillOnce(ReturnRef(filter_chain_manager));
+  EXPECT_CALL(filter_chain_manager, findFilterChain(_))
+      .WillOnce(Invoke([&](const Network::ConnectionSocket& socket) {
+        EXPECT_EQ(*listen_socket_->localAddress(), *socket.localAddress());
+        EXPECT_EQ(peer_addr, envoyAddressInstanceToQuicSocketAddress(socket.remoteAddress()));
+        return &filter_chain;
+      }));
+  // Empty filter_factory should cause connection close.
+  std::vector<Network::FilterFactoryCb> filter_factory;
+  EXPECT_CALL(filter_chain, networkFilterFactories()).WillOnce(ReturnRef(filter_factory));
+
+  quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);
+  std::unique_ptr<quic::QuicReceivedPacket> received_packet =
+      createFullChloPacket(connection_id, peer_addr);
+  envoy_quic_dispatcher_.ProcessPacket(
+      envoyAddressInstanceToQuicSocketAddress(listen_socket_->localAddress()), peer_addr,
+      *received_packet);
+  EXPECT_EQ(0u, envoy_quic_dispatcher_.session_map().size());
+  EXPECT_EQ(0u, connection_handler_.numConnections());
+  EXPECT_TRUE(quic::test::QuicDispatcherPeer::time_wait_list_manager(&envoy_quic_dispatcher_)
+                  ->IsConnectionIdInTimeWait(connection_id));
 }
 
 } // namespace Quic

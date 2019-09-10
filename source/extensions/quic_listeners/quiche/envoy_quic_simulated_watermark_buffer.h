@@ -10,10 +10,10 @@ namespace Quic {
 // re-acts upon crossing high/low watermarks.
 class EnvoyQuicSimulatedWatermarkBuffer {
 public:
-  EnvoyQuicSimulatedWatermarkBuffer(uint32_t high_watermark, uint32_t low_watermark,
+  EnvoyQuicSimulatedWatermarkBuffer(uint32_t low_watermark, uint32_t high_watermark,
                                     std::function<void()> below_low_watermark,
                                     std::function<void()> above_high_watermark)
-      : high_watermark_(high_watermark), low_watermark_(low_watermark),
+      : low_watermark_(low_watermark), high_watermark_(high_watermark),
         below_low_watermark_(std::move(below_low_watermark)),
         above_high_watermark_(std::move(above_high_watermark)) {
     ASSERT(high_watermark_ > low_watermark_);
@@ -42,10 +42,10 @@ public:
   bool isBelowLowWatermark() const { return is_below_low_watermark_; }
 
 private:
-  uint32_t high_watermark_{0};
-  bool is_above_high_watermark_{false};
   uint32_t low_watermark_{0};
   bool is_below_low_watermark_{true};
+  uint32_t high_watermark_{0};
+  bool is_above_high_watermark_{false};
   std::function<void()> below_low_watermark_;
   std::function<void()> above_high_watermark_;
 };

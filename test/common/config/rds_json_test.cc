@@ -6,8 +6,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
-
 namespace Envoy {
 namespace Config {
 namespace {

@@ -44,6 +44,7 @@ bool EnvoyQuicConnection::OnPacketHeader(const quic::QuicPacketHeader& header) {
                       quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
       return false;
     }
+    ENVOY_CONN_LOG(debug, "Create network filters for connection.", *this);
     const bool empty_filter_chain = !listener_config_.filterChainFactory().createNetworkFilterChain(
         *envoy_connection_, filter_chain_->networkFilterFactories());
     if (empty_filter_chain) {
