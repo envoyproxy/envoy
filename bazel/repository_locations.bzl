@@ -4,9 +4,12 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/0.18.1/bazel-gazelle-0.18.1.tar.gz"],
     ),
     bazel_toolchains = dict(
-        sha256 = "b72e7a911436b2900b05759a1fcd735070edbd4442f0a3506ef021fdcd6e15b3",
-        strip_prefix = "bazel-toolchains-0.28.5",
-        urls = ["https://github.com/bazelbuild/bazel-toolchains/archive/0.28.5.tar.gz"],
+        sha256 = "ab0d8aaeaeeef413ddb03922dbdb99bbae9e1b2c157a87c77d70d45a830be5b0",
+        strip_prefix = "bazel-toolchains-0.29.1",
+        urls = [
+            "https://github.com/bazelbuild/bazel-toolchains/releases/download/0.29.1/bazel-toolchains-0.29.1.tar.gz",
+            "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/0.29.1.tar.gz",
+        ],
     ),
     boringssl = dict(
         sha256 = "c712766ddc844de2a38e686e1cdd7288795e9a6fe7f699c6636f1b76703db84e",
