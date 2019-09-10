@@ -216,9 +216,23 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
         std::make_unique<Buffer::OwnedImpl>(request.attributes().request().http().body());
   }
 
-  request_ = cm_.httpAsyncClientForCluster(config_->cluster())
-                 .send(std::move(message), *this,
-                       Http::AsyncClient::RequestOptions().setTimeout(config_->timeout()));
+  const std::string& cluster = config_->cluster();
+
+  // It's possible that the cluster specified in the filter configuration no longer exists due to a
+  // CDS removal.
+  if (cm_.get(cluster) == nullptr) {
+    // TODO(dio): Add stats and tracing related to this.
+    ENVOY_LOG(debug, "ext_authz cluster '{}' does not exist", cluster);
+    callbacks_->onComplete(std::make_unique<Response>(errorResponse()));
+    span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+    span_->finishSpan();
+    callbacks_ = nullptr;
+    span_ = nullptr;
+  } else {
+    request_ = cm_.httpAsyncClientForCluster(cluster).send(
+        std::move(message), *this,
+        Http::AsyncClient::RequestOptions().setTimeout(config_->timeout()));
+  }
 }
 
 void RawHttpClientImpl::onSuccess(Http::MessagePtr&& message) {
@@ -243,6 +257,7 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::MessagePtr message) {
   uint64_t status_code{};
   if (!absl::SimpleAtoi(message->headers().Status()->value().getStringView(), &status_code)) {
     ENVOY_LOG(warn, "ext_authz HTTP client failed to parse the HTTP status code.");
+    span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
     return std::make_unique<Response>(errorResponse());
   }
 

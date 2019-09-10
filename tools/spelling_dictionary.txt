@@ -9,11 +9,13 @@ ALPN
 ALS
 AMZ
 API
+ABI
 ASAN
 ASCII
 ASSERTs
 AWS
 BSON
+CAS
 CB
 CBs
 CDS
@@ -121,6 +123,7 @@ HV
 IAM
 IANA
 IDL
+IETF
 INADDR
 INET
 IO
@@ -200,8 +203,10 @@ POSTs
 PREBIND
 PRNG
 PROT
+ProcessBufferedChlos
 PSS
 QPS
+QoS
 QUIC
 RAII
 RANLUX
@@ -294,6 +299,9 @@ VC
 VH
 VHDS
 VLOG
+VM
+WASM
+WAVM
 WKT
 WRR
 WS
@@ -452,6 +460,7 @@ dynamodb
 eg
 emplace
 emplaced
+emscripten
 enablement
 encodings
 endian
