@@ -43,7 +43,7 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
 }
 
 void ActiveQuicListener::onListenerShutdown() {
-  ENVOY_LOG_TO_LOGGER(logger_, info, "Listener shutdown.");
+  ENVOY_LOG_TO_LOGGER(logger_, info, "Listener with tag {} shutdown.", listenerTag());
   quic_dispatcher_->Shutdown();
 }
 
