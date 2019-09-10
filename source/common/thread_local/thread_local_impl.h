@@ -9,6 +9,7 @@
 
 #include "common/common/logger.h"
 #include "common/common/non_copyable.h"
+#include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
 namespace ThreadLocal {
@@ -48,22 +49,11 @@ private:
     const uint64_t index_;
   };
 
-  // A helper class for holding a SlotImpl and its bookkeeping shared_ptr which counts the number of
-  // update callbacks on-the-fly.
-  struct SlotHolder {
-    SlotHolder(std::unique_ptr<SlotImpl>&& slot) : slot_(std::move(slot)) {}
-    bool isRecycleable() { return ref_count_.use_count() == 1; }
-
-    const std::unique_ptr<SlotImpl> slot_;
-    const std::shared_ptr<int> ref_count_{new int(0)};
-  };
-
   // A Wrapper of SlotImpl which on destruction returns the SlotImpl to the deferred delete queue
   // (detaches it).
   struct Bookkeeper : public Slot {
     Bookkeeper(InstanceImpl& parent, std::unique_ptr<SlotImpl>&& slot);
-    ~Bookkeeper() override { parent_.recycle(std::move(holder_)); }
-    SlotImpl& slot() { return *(holder_->slot_); }
+    ~Bookkeeper() override { parent_.recycle(std::move(slot_)); }
 
     // ThreadLocal::Slot
     ThreadLocalObjectSharedPtr get() override;
@@ -75,7 +65,8 @@ private:
     void set(InitializeCb cb) override;
 
     InstanceImpl& parent_;
-    std::unique_ptr<SlotHolder> holder_;
+    std::unique_ptr<SlotImpl> slot_;
+    std::shared_ptr<uint32_t> ref_count_;
   };
 
   struct ThreadLocalData {
@@ -83,9 +74,10 @@ private:
     std::vector<ThreadLocalObjectSharedPtr> data_;
   };
 
-  void recycle(std::unique_ptr<SlotHolder>&& holder);
+  void recycle(std::unique_ptr<SlotImpl>&& slot);
   // Cleanup the deferred deletes queue.
-  void scheduleCleanup();
+  void scheduleCleanup(SlotImpl* slot);
+
   void removeSlot(SlotImpl& slot);
   void runOnAllThreads(Event::PostCb cb);
   void runOnAllThreads(Event::PostCb cb, Event::PostCb main_callback);
@@ -95,7 +87,7 @@ private:
 
   // A queue for Slots that has to be deferred to delete due to out-going callbacks
   // pointing to the Slot.
-  std::list<std::unique_ptr<SlotHolder>> deferred_deletes_;
+  absl::flat_hash_map<SlotImpl*, std::unique_ptr<SlotImpl>> deferred_deletes_;
 
   std::vector<SlotImpl*> slots_;
   // A list of index of freed slots.
