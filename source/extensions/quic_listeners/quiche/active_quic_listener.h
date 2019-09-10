@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/api/v2/listener/quic_config.pb.h"
+#include "envoy/network/connection_handler.h"
 #include "envoy/network/listener.h"
 
 #include "server/connection_handler_impl.h"
@@ -11,7 +12,7 @@ namespace Envoy {
 namespace Quic {
 
 // QUIC specific UdpListenerCallbacks implemention which delegates incoming
-// packets, write signal and listener error to QuicDispatcher.
+// packets, write signals and listener errors to QuicDispatcher.
 class ActiveQuicListener : public Network::UdpListenerCallbacks,
                            public Server::ConnectionHandlerImpl::ActiveListenerImplBase,
                            // Inherits below two interfaces just to have common
@@ -75,6 +76,10 @@ public:
             : config.max_time_before_crypto_handshake_ms();
     quic_config_.set_max_time_before_crypto_handshake(
         quic::QuicTime::Delta::FromMilliseconds(max_time_before_crypto_handshake_ms));
+    int32_t max_streams =
+        config.max_streams_per_connection() == 0 ? 100 : config.max_streams_per_connection();
+    quic_config_.SetMaxIncomingBidirectionalStreamsToSend(max_streams);
+    quic_config_.SetMaxIncomingUnidirectionalStreamsToSend(max_streams);
   }
 
   Network::ConnectionHandler::ActiveListenerPtr
@@ -84,6 +89,8 @@ public:
   }
 
 private:
+  friend class ActiveQuicListenerFactoryPeer;
+
   quic::QuicConfig quic_config_;
 };
 

@@ -165,3 +165,15 @@ envoy_cc_test(
         "//test/test_common:threadsafe_singleton_injector_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "active_quic_listener_config_test",
+    srcs = ["active_quic_listener_config_test.cc"],
+    tags = ["nofips"],
+    deps = [
+        "//source/common/config:utility_lib",
+        "//source/extensions/quic_listeners/quiche:active_quic_listener_config_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2/listener:quic_config_cc",
+    ],
+)

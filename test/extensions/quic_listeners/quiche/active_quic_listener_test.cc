@@ -115,7 +115,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ActiveQuicListenerTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(ActiveQuicListenerTest, ReceiveFullQuicCHLO) {
-  //  quic::SetVerbosityLogThreshold(2);
   quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);
   EnvoyQuicClock clock(*dispatcher_);
   quic::CryptoHandshakeMessage chlo = quic::test::crypto_test_utils::GenerateDefaultInchoateCHLO(
