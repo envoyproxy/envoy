@@ -25,7 +25,7 @@ import "validate/validate.proto";
 // Additionally, if
 // :ref:`enable_redirection<envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.ConnPoolSettings.enable_redirection>`
 // is true, then moved and ask redirection errors from upstream servers will trigger a topology
-// refresh when they exceed a user-configured error rate threshold.
+// refresh when they exceed a user-configured error threshold.
 //
 // Example:
 //
@@ -61,9 +61,9 @@ message RedisClusterConfig {
   google.protobuf.Duration redirect_refresh_interval = 3;
 
   // The number of redirection errors that must be received before
-  // triggering a topology refresh request. If not set, this defaults to 0. In this case every
-  // redirection error will trigger a topology refresh, limited only by when the last error was
-  // received and the
+  // triggering a topology refresh request. If not set, this defaults to 0, which is effectively the
+  // same as a threshold of 1. In this case every redirection error will trigger a topology refresh,
+  // limited only by when the last error was received and the
   // :ref:`redirect_refresh_interval<envoy_api_field_config.cluster.redis.RedisClusterConfig.redirect_refresh_interval>`
   // setting.
   uint32 redirect_refresh_threshold = 4;
