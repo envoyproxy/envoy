@@ -18,7 +18,7 @@ class ActiveQuicListener : public Network::UdpListenerCallbacks,
                            // Inherits below two interfaces just to have common
                            // interfaces. Not expected to support listener
                            // filter.
-                           // TODO(danzh): clean up unuseful inheritance.
+                           // TODO(danzh): clean up meaningless inheritance.
                            public Network::UdpListenerFilterManager,
                            public Network::UdpReadFilterCallbacks {
 public:
