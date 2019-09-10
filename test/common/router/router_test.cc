@@ -3419,9 +3419,9 @@ TEST_F(RouterTest, UpstreamSSLConnection) {
   NiceMock<Http::MockStreamEncoder> encoder;
   Http::StreamDecoder* response_decoder = nullptr;
 
-  const auto session_id = "D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B";
+  std::string session_id = "D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B";
   auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
-  ON_CALL(*connection_info, sessionId()).WillByDefault(Return(session_id));
+  ON_CALL(*connection_info, sessionId()).WillByDefault(ReturnRef(session_id));
   upstream_stream_info_.setDownstreamSslConnection(connection_info);
 
   expectResponseTimerCreate();
