@@ -415,7 +415,7 @@ bool RouterCheckTool::compareResults(const std::string& actual, const std::strin
     return true;
   }
   tests_.back().second.emplace_back("expected: [" + expected + "], actual: [" + actual +
-                                 "], test type: " + test_type);
+                                    "], test type: " + test_type);
   return false;
 }
 
