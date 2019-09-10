@@ -8,6 +8,7 @@ option java_package = "io.envoyproxy.envoy.api.v2.route";
 option java_generic_services = true;
 
 import "envoy/api/v2/core/base.proto";
+import "envoy/api/v2/core/config_source.proto";
 import "envoy/type/matcher/regex.proto";
 import "envoy/type/matcher/string.proto";
 import "envoy/type/percent.proto";
@@ -243,12 +244,21 @@ message Route {
 // multiple upstream clusters along with weights that indicate the percentage of
 // traffic to be forwarded to each cluster. The router selects an upstream cluster based on the
 // weights.
-// [#comment:next free field: 11]
+// [#comment:next free field: 4]
 message WeightedCluster {
+  // [#comment:next free field: 12]
   message ClusterWeight {
     // Name of the upstream cluster. The cluster must exist in the
     // :ref:`cluster manager configuration <config_cluster_manager>`.
     string name = 1 [(validate.rules).string.min_bytes = 1];
+
+    // [#not-implemented-hide:]
+    // If specified, indicates a server to contact to get the cluster data via CDS.
+    // By default, Envoy will know where to get CDS data from via its bootstrap file, but
+    // other clients (e.g., gRPC) may not have a default.
+    // [#next-major-version: In the v3 API, we should replace the name and config_source
+    // fields with a single ClusterSource field.]
+    envoy.api.v2.core.ConfigSource config_source = 11;
 
     // An integer between 0 and :ref:`total_weight
     // <envoy_api_field_route.WeightedCluster.total_weight>`. When a request matches the route,
@@ -491,7 +501,18 @@ message CorsPolicy {
   core.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
-// [#comment:next free field: 30]
+// [#not-implemented-hide:]
+message ClusterSource {
+  // The cluster name.
+  string name = 1 [(validate.rules).string.min_bytes = 1];
+
+  // If specified, indicates a server to contact to get the cluster data via CDS.
+  // By default, Envoy will know where to get CDS data from via its bootstrap file, but
+  // other clients (e.g., gRPC) may not have a default.
+  envoy.api.v2.core.ConfigSource config_source = 2;
+}
+
+// [#comment:next free field: 31]
 message RouteAction {
   oneof cluster_specifier {
     option (validate.required) = true;
@@ -499,6 +520,12 @@ message RouteAction {
     // Indicates the upstream cluster to which the request should be routed
     // to.
     string cluster = 1 [(validate.rules).string.min_bytes = 1];
+
+    // [#not-implemented-hide:]
+    // Same as populating the :ref:`cluster<envoy_api_field.RouteAction.cluster>`, but
+    // allows configuring a specific server to get the cluster's data from.
+    // [#next-major-version: In the v3 API, we should replace the cluster field with this one.]
+    ClusterSource cluster_source = 30;
 
     // Envoy will determine the cluster to route to by reading the value of the
     // HTTP header named by cluster_header from the request headers. If the
