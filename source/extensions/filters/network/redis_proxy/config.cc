@@ -57,8 +57,8 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
   }
   addUniqueClusters(unique_clusters, prefix_routes.catch_all_route());
 
-  auto redis_command_stats = Common::Redis::RedisCommandStats::createRedisCommandStats(
-      context.scope().symbolTable());
+  auto redis_command_stats =
+      Common::Redis::RedisCommandStats::createRedisCommandStats(context.scope().symbolTable());
 
   Upstreams upstreams;
   for (auto& cluster : unique_clusters) {
