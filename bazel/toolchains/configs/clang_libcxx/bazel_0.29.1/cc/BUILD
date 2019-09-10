@@ -18,6 +18,7 @@ package(default_visibility = ["//visibility:public"])
 
 load(":cc_toolchain_config.bzl", "cc_toolchain_config")
 load(":armeabi_cc_toolchain_config.bzl", "armeabi_cc_toolchain_config")
+load("@rules_cc//cc:defs.bzl", "cc_toolchain", "cc_toolchain_suite")
 
 licenses(["notice"])  # Apache 2.0
 
@@ -37,7 +38,7 @@ filegroup(
 
 filegroup(
     name = "compiler_deps",
-    srcs = glob(["extra_tools/**"], allow_empty = True) + [":empty"],
+    srcs = glob(["extra_tools/**"], allow_empty = True) + [":builtin_include_directory_paths"],
 )
 
 # This is the entry point for --crosstool_top.  Toolchains are found
@@ -82,9 +83,7 @@ cc_toolchain_config(
     "/usr/lib/llvm-8/lib/clang/8.0.1/include",
     "/usr/include/x86_64-linux-gnu",
     "/usr/include",
-    "/usr/include/c++/7.4.0",
-    "/usr/include/x86_64-linux-gnu/c++/7.4.0",
-    "/usr/include/c++/7.4.0/backward",
+    "/usr/lib/llvm-8/include/c++/v1",
     "/usr/include/clang/8.0.1/include"],
     tool_paths = {"ar": "/usr/bin/ar",
         "ld": "/usr/bin/ld",
@@ -110,14 +109,16 @@ cc_toolchain_config(
     "-ffunction-sections",
     "-fdata-sections"],
     dbg_compile_flags = ["-g"],
-    cxx_flags = ["-std=c++0x"],
-    link_flags = ["-fuse-ld=gold",
+    cxx_flags = ["-stdlib=libc++"],
+    link_flags = ["-fuse-ld=/usr/bin/ld.gold",
     "-Wl,-no-as-needed",
     "-Wl,-z,relro,-z,now",
     "-B/usr/lib/llvm-8/bin",
     "-lm",
+    "-pthread",
     "-fuse-ld=lld"],
-    link_libs = ["-l:libstdc++.a"],
+    link_libs = ["-l:libc++.a",
+    "-l:libc++abi.a"],
     opt_link_flags = ["-Wl,--gc-sections"],
     unfiltered_compile_flags = ["-no-canonical-prefixes",
     "-Wno-builtin-macro-redefined",

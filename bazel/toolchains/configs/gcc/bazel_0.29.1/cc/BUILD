@@ -18,6 +18,7 @@ package(default_visibility = ["//visibility:public"])
 
 load(":cc_toolchain_config.bzl", "cc_toolchain_config")
 load(":armeabi_cc_toolchain_config.bzl", "armeabi_cc_toolchain_config")
+load("@rules_cc//cc:defs.bzl", "cc_toolchain", "cc_toolchain_suite")
 
 licenses(["notice"])  # Apache 2.0
 
@@ -37,7 +38,7 @@ filegroup(
 
 filegroup(
     name = "compiler_deps",
-    srcs = glob(["extra_tools/**"], allow_empty = True) + [":empty"],
+    srcs = glob(["extra_tools/**"], allow_empty = True) + [":builtin_include_directory_paths"],
 )
 
 # This is the entry point for --crosstool_top.  Toolchains are found
