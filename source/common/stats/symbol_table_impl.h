@@ -318,19 +318,30 @@ public:
   StatName(const StatName& src, SymbolTable::Storage memory);
 
   /**
+   * Defines default hash function so StatName can be used as a key in an absl
+   * hash-table without specifying a functor. See
+   * https://abseil.io/docs/cpp/guides/hash for details.
+   */
+  template <typename H> friend H AbslHashValue(H h, StatName stat_name) {
+    if (stat_name.empty()) {
+      return H::combine(std::move(h), absl::string_view());
+    }
+
+    // Casts the raw data as a string_view. Note that this string_view will not
+    // be in human-readable form, but it will be compatible with a string-view
+    // hasher.
+    const char* cdata = reinterpret_cast<const char*>(stat_name.data());
+    absl::string_view data_as_string_view = absl::string_view(cdata, stat_name.dataSize());
+    return H::combine(std::move(h), data_as_string_view);
+  }
+
+  /**
    * Note that this hash function will return a different hash than that of
    * the elaborated string.
    *
    * @return uint64_t a hash of the underlying representation.
    */
-  uint64_t hash() const {
-    const char* cdata = reinterpret_cast<const char*>(data());
-    return HashUtil::xxHash64(absl::string_view(cdata, dataSize()));
-  }
-
-  template <typename H> friend H AbslHashValue(H h, StatName stat_name) {
-    return H::combine(std::move(h), stat_name.hash());
-  }
+  uint64_t hash() const { return absl::Hash<StatName>()(*this); }
 
   bool operator==(const StatName& rhs) const {
     const uint64_t sz = dataSize();
@@ -343,6 +354,9 @@ public:
    *                  overhead for the size itself.
    */
   uint64_t dataSize() const {
+    if (size_and_data_ == nullptr) {
+      return 0;
+    }
     return size_and_data_[0] | (static_cast<uint64_t>(size_and_data_[1]) << 8);
   }
 
@@ -525,11 +539,6 @@ private:
   void moveStorageIntoList(SymbolTable::StoragePtr&& storage) { storage_ = std::move(storage); }
 
   SymbolTable::StoragePtr storage_;
-};
-
-// Helper class for constructing hash-tables with StatName keys.
-struct StatNameHash {
-  size_t operator()(const StatName& a) const { return a.hash(); }
 };
 
 // Value-templatized hash-map with StatName key.

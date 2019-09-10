@@ -501,14 +501,6 @@ private:
 };
 
 /**
- * Hashing functor for use with absl hash tables, which can use hash on
- * string_view if this declaration is visible.
- */
-template <typename H> H AbslHashValue(H h, absl::string_view str) {
-  return H::combine(std::move(h), HashUtil::xxHash64(str));
-}
-
-/**
  * Hashing functor for use with enum class types.
  * This is needed for GCC 5.X; newer versions of GCC, as well as clang7, provide native hashing
  * specializations.
