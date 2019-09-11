@@ -37,12 +37,21 @@ void Dispatcher::DirectStreamCallbacks::onTrailers(HeaderMapPtr&& trailers) {
 void Dispatcher::DirectStreamCallbacks::onComplete() {
   ENVOY_LOG(debug, "[S{}] complete stream", stream_handle_);
   bridge_callbacks_.on_complete(bridge_callbacks_.context);
+  // Very important: onComplete and onReset both clean up stream state in the http dispatcher
+  // because the underlying async client implementation **guarantees** that only onComplete **or**
+  // onReset will be fired for a stream. This means it is safe to clean up the stream when either of
+  // the terminal callbacks fire without keeping additional state in this layer.
   http_dispatcher_.cleanup(stream_handle_);
 }
 
 void Dispatcher::DirectStreamCallbacks::onReset() {
   ENVOY_LOG(debug, "[S{}] remote reset stream", stream_handle_);
   bridge_callbacks_.on_error({ENVOY_STREAM_RESET, envoy_nodata}, bridge_callbacks_.context);
+  // Very important: onComplete and onReset both clean up stream state in the http dispatcher
+  // because the underlying async client implementation **guarantees** that only onComplete **or**
+  // onReset will be fired for a stream. This means it is safe to clean up the stream when either of
+  // the terminal callbacks fire without keeping additional state in this layer.
+  http_dispatcher_.cleanup(stream_handle_);
 }
 
 Dispatcher::DirectStream::DirectStream(envoy_stream_t stream_handle,
