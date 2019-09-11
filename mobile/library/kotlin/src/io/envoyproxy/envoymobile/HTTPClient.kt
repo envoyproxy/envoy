@@ -2,7 +2,7 @@ package io.envoyproxy.envoymobile
 
 import java.nio.ByteBuffer
 
-interface Client {
+interface HTTPClient {
   /**
    * For starting a stream.
    *

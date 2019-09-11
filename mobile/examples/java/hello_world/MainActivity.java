@@ -7,7 +7,7 @@ import android.os.HandlerThread;
 import android.support.v7.widget.DividerItemDecoration;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
-import io.envoyproxy.envoymobile.AndroidEnvoyBuilder;
+import io.envoyproxy.envoymobile.AndroidEnvoyClientBuilder;
 import io.envoyproxy.envoymobile.Envoy;
 import io.envoyproxy.envoymobile.Request;
 import io.envoyproxy.envoymobile.RequestBuilder;
@@ -39,7 +39,7 @@ public class MainActivity extends Activity {
     super.onCreate(savedInstanceState);
     setContentView(R.layout.activity_main);
 
-    envoy = new AndroidEnvoyBuilder(getBaseContext()).build();
+    envoy = new AndroidEnvoyClientBuilder(getBaseContext()).build();
 
     recyclerView = findViewById(R.id.recycler_view);
     recyclerView.setLayoutManager(new LinearLayoutManager(this));

@@ -25,7 +25,7 @@ class Envoy private constructor(
     internal val envoyConfiguration: EnvoyConfiguration?,
     internal val configurationYAML: String?,
     internal val logLevel: LogLevel
-) : Client {
+) : HTTPClient {
 
   constructor(engine: EnvoyEngine, envoyConfiguration: EnvoyConfiguration, logLevel: LogLevel = LogLevel.INFO) : this(engine, envoyConfiguration, null, logLevel)
   constructor(engine: EnvoyEngine, configurationYAML: String, logLevel: LogLevel = LogLevel.INFO) : this(engine, null, configurationYAML, logLevel)
