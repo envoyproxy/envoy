@@ -86,8 +86,9 @@ public class MainActivity extends Activity {
               }
               return Unit.INSTANCE;
             })
-            .onError(() -> {
-              recyclerView.post(() -> viewAdapter.add(new Failure("failed with error ")));
+            .onError((error) -> {
+              recyclerView.post(
+                  () -> viewAdapter.add(new Failure("failed with error " + error.message)));
               return Unit.INSTANCE;
             });
 

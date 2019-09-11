@@ -44,8 +44,10 @@ public interface EnvoyHTTPCallbacks {
 
   /**
    * Called when the async HTTP stream has an error.
+   *
+   * @param error, the error received.
    */
-  void onError();
+  void onError(EnvoyError error);
 
   /**
    * Called when the async HTTP stream is canceled.

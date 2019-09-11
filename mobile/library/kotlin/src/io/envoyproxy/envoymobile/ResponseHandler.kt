@@ -1,5 +1,6 @@
 package io.envoyproxy.envoymobile
 
+import io.envoyproxy.envoymobile.engine.types.EnvoyError
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks
 import java.nio.ByteBuffer
 import java.util.concurrent.Executor;
@@ -25,16 +26,16 @@ class ResponseHandler(val executor: Executor) {
       responseHandler.onDataClosure(byteBuffer, endStream)
     }
 
-    override fun onMetadata(metadata: Map<String, List<String>>?) {
-      responseHandler.onMetadataClosure(metadata!!)
+    override fun onMetadata(metadata: Map<String, List<String>>) {
+      responseHandler.onMetadataClosure(metadata)
     }
 
-    override fun onTrailers(trailers: Map<String, List<String>>?) {
-      responseHandler.onTrailersClosure(trailers!!)
+    override fun onTrailers(trailers: Map<String, List<String>>) {
+      responseHandler.onTrailersClosure(trailers)
     }
 
-    override fun onError() {
-      responseHandler.onErrorClosure()
+    override fun onError(error: EnvoyError) {
+      responseHandler.onErrorClosure(error)
     }
 
     override fun onCancel() {
@@ -48,7 +49,7 @@ class ResponseHandler(val executor: Executor) {
   private var onDataClosure: (byteBuffer: ByteBuffer, endStream: Boolean) -> Unit = { _, _ -> Unit }
   private var onMetadataClosure: (metadata: Map<String, List<String>>) -> Unit = { Unit }
   private var onTrailersClosure: (trailers: Map<String, List<String>>) -> Unit = { Unit }
-  private var onErrorClosure: () -> Unit = { Unit }
+  private var onErrorClosure: (error: EnvoyError) -> Unit = { Unit }
   private var onCancelClosure: () -> Unit = { Unit }
 
   /**
@@ -108,7 +109,7 @@ class ResponseHandler(val executor: Executor) {
    * @param closure: Closure which will be called when an error occurs.
    * @return ResponseHandler, this ResponseHandler.
    */
-  fun onError(closure: () -> Unit): ResponseHandler {
+  fun onError(closure: (error: EnvoyError) -> Unit): ResponseHandler {
     this.onErrorClosure = closure
     return this
   }

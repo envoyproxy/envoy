@@ -7,6 +7,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import io.envoyproxy.envoymobile.engine.types.EnvoyError;
+import io.envoyproxy.envoymobile.engine.types.EnvoyErrorCode;
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks;
 
 class JvmCallbackContext {
@@ -30,8 +32,8 @@ class JvmCallbackContext {
   public JvmCallbackContext(EnvoyHTTPCallbacks callbacks) { this.callbacks = callbacks; }
 
   /**
-   * Initializes state for accumulating header pairs via passHeaders, ultimately to be dispatched
-   * via the callback.
+   * Initializes state for accumulating header pairs via passHeaders, ultimately
+   * to be dispatched via the callback.
    *
    * @param length,    the total number of headers included in this header block.
    * @param endStream, whether this header block is the final remote frame.
@@ -41,12 +43,13 @@ class JvmCallbackContext {
   }
 
   /**
-   * Allows pairs of strings to be passed across the JVM, reducing overall calls (at the expense of
-   * some complexity).
+   * Allows pairs of strings to be passed across the JVM, reducing overall calls
+   * (at the expense of some complexity).
    *
    * @param key,        the name of the HTTP header.
    * @param value,      the value of the HTTP header.
-   * @param endHeaders, indicates this is the last header pair for this header block.
+   * @param endHeaders, indicates this is the last header pair for this header
+   *                    block.
    */
   public void passHeader(byte[] key, byte[] value, boolean endHeaders) {
     String headerKey;
@@ -120,6 +123,26 @@ class JvmCallbackContext {
         }
         ByteBuffer dataBuffer = ByteBuffer.wrap(data);
         callbacks.onData(dataBuffer, endStream);
+      }
+    });
+  }
+
+  /**
+   * Dispatches error received from the JNI layer up to the platform.
+   *
+   * @param message,   the error message.
+   * @param errorCode, the envoy_error_code_t.
+   */
+  public void onError(byte[] message, int errorCode) {
+
+    callbacks.getExecutor().execute(new Runnable() {
+      public void run() {
+        if (canceled.get()) {
+          return;
+        }
+        String errorMessage = new String(message);
+        EnvoyError error = new EnvoyError(EnvoyErrorCode.fromInt(errorCode), errorMessage);
+        callbacks.onError(error);
       }
     });
   }
