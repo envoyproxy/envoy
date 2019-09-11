@@ -243,7 +243,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
               .createActiveUdpListenerFactory(config.has_udp_listener_config()
                                                   ? config.udp_listener_config()
                                                   : envoy::api::v2::listener::UdpListenerConfig());
-    } catch (EnvoyException ex) {
+    } catch (const EnvoyException& ex) {
       // TODO(danzh): add implementation for quic_listener and do not catch
       // exception here.
       ENVOY_LOG(error, "{}", ex.what());
