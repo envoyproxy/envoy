@@ -61,6 +61,9 @@ void MetricsServiceSink::flushGauge(const Stats::Gauge& gauge) {
 }
 
 void MetricsServiceSink::flushHistogram(const Stats::ParentHistogram& envoy_histogram) {
+  // TODO(ramaraochavali): Currently we are sending both quantile information and bucket
+  // information. We should make sending both summary and bucket information configurable
+
   // Add summary information for histograms.
   io::prometheus::client::MetricFamily* summary_metrics_family = message_.add_envoy_metrics();
   summary_metrics_family->set_type(io::prometheus::client::MetricType::SUMMARY);
