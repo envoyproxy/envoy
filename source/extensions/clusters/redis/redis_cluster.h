@@ -214,6 +214,7 @@ private:
     uint32_t maxBufferSizeBeforeFlush() const override { return 0; }
     std::chrono::milliseconds bufferFlushTimeoutInMs() const override { return buffer_timeout_; }
     uint32_t maxUpstreamUnknownConnections() const override { return 0; }
+    bool enableCommandStats() const override { return false; }
     // This is effectively not in used for making the "Cluster Slots" calls.
     // since we call cluster slots on both the master and slaves, ANY is more appropriate here.
     Extensions::NetworkFilters::Common::Redis::Client::ReadPolicy readPolicy() const override {
@@ -241,6 +242,7 @@ private:
     Event::TimerPtr resolve_timer_;
     NetworkFilters::Common::Redis::Client::ClientFactory& client_factory_;
     const std::chrono::milliseconds buffer_timeout_;
+    NetworkFilters::Common::Redis::RedisCommandStatsSharedPtr redis_command_stats_;
   };
 
   Upstream::ClusterManager& cluster_manager_;
