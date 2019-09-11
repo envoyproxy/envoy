@@ -80,21 +80,18 @@ void EnvoyQuicServerStream::encodeMetadata(const Http::MetadataMapVector& /*meta
   ASSERT(false, "Metadata Frame is not supported in QUIC");
 }
 
-quic::QuicRstStreamErrorCode envoyResetReasonToQuicRstError(Http::StreamResetReason reason) {
-  switch (reason) {
-  case Http::StreamResetReason::LocalRefusedStreamReset:
-    return quic::QUIC_REFUSED_STREAM;
-  case Http::StreamResetReason::ConnectionTermination:
-    return quic::QUIC_STREAM_NO_ERROR;
-  case Http::StreamResetReason::ConnectionFailure:
-    return quic::QUIC_STREAM_CONNECTION_ERROR;
-  default:
-    return quic::QUIC_STREAM_NO_ERROR;
-  }
-}
-
 void EnvoyQuicServerStream::resetStream(Http::StreamResetReason reason) {
-  quic::QuicRstStreamErrorCode rst = envoyResetReasonToQuicRstError(reason);
+  quic::QuicRstStreamErrorCode rst;
+  switch (reason) {
+    case Http::StreamResetReason::LocalRefusedStreamReset:
+      rst = quic::QUIC_REFUSED_STREAM;
+    case Http::StreamResetReason::ConnectionTermination:
+      rst = quic::QUIC_STREAM_NO_ERROR;
+    case Http::StreamResetReason::ConnectionFailure:
+      rst = quic::QUIC_STREAM_CONNECTION_ERROR;
+    default:
+      rst = quic::QUIC_STREAM_NO_ERROR;
+  }
   Reset(rst);
 }
 

@@ -201,8 +201,7 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
     doDeferredStreamDestroy(stream);
   }
 
-  if (reset_stream && codec_->protocol() != Protocol::Http2 &&
-      codec_->protocol() != Protocol::Http3) {
+  if (reset_stream && codec_->protocol() < Protocol::Http2) {
     drain_state_ = DrainState::Closing;
   }
 
@@ -211,8 +210,7 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
   // Reading may have been disabled for the non-multiplexing case, so enable it again.
   // Also be sure to unwind any read-disable done by the prior downstream
   // connection.
-  if (drain_state_ != DrainState::Closing && codec_->protocol() != Protocol::Http2 &&
-      codec_->protocol() != Protocol::Http3) {
+  if (drain_state_ != DrainState::Closing && codec_->protocol() < Protocol::Http2) {
     while (!read_callbacks_->connection().readEnabled()) {
       read_callbacks_->connection().readDisable(false);
     }
@@ -327,7 +325,7 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
     // either redispatch if there are no streams and we have more data. If we have a single
     // complete non-WebSocket stream but have not responded yet we will pause socket reads
     // to apply back pressure.
-    if (codec_->protocol() != Protocol::Http2 && codec_->protocol() != Protocol::Http3) {
+    if (codec_->protocol() < Protocol::Http2) {
       if (read_callbacks_->connection().state() == Network::Connection::State::Open &&
           data.length() > 0 && streams_.empty()) {
         redispatch = true;
@@ -781,7 +779,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   // Note: Proxy-Connection is not a standard header, but is supported here
   // since it is supported by http-parser the underlying parser for http
   // requests.
-  if (protocol != Protocol::Http2 && protocol != Protocol::Http3 && !state_.saw_connection_close_ &&
+  if (protocol < Protocol::Http2 && !state_.saw_connection_close_ &&
       request_headers_->ProxyConnection() &&
       absl::EqualsIgnoreCase(request_headers_->ProxyConnection()->value().getStringView(),
                              Http::Headers::get().ConnectionValues.Close)) {
@@ -1464,8 +1462,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
   // multiplexing, we should disconnect since we don't want to wait around for the request to
   // finish.
   if (!state_.remote_complete_) {
-    if (connection_manager_.codec_->protocol() != Protocol::Http2 &&
-        connection_manager_.codec_->protocol() != Protocol::Http3) {
+    if (connection_manager_.codec_->protocol() < Protocol::Http2) {
       connection_manager_.drain_state_ = DrainState::Closing;
     }
 
@@ -1473,8 +1470,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
   }
 
   if (connection_manager_.drain_state_ != DrainState::NotDraining &&
-      connection_manager_.codec_->protocol() != Protocol::Http2 &&
-      connection_manager_.codec_->protocol() != Protocol::Http3) {
+      connection_manager_.codec_->protocol() < Protocol::Http2) {
     // If the connection manager is draining send "Connection: Close" on HTTP/1.1 connections.
     // Do not do this for H2 (which drains via GOAWAY) or Upgrade (as the upgrade
     // payload is no longer HTTP/1.1)
