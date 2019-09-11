@@ -214,6 +214,7 @@ envoy_cc_library(
     name = "active_quic_listener_config_lib",
     srcs = ["active_quic_listener_config.cc"],
     hdrs = ["active_quic_listener_config.h"],
+    tags = ["nofips"],
     deps = [
         ":active_quic_listener_lib",
         "//include/envoy/registry",
