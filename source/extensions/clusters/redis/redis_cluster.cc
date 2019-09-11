@@ -34,7 +34,8 @@ RedisCluster::RedisCluster(
                            : Config::Utility::translateClusterHosts(cluster.hosts())),
       local_info_(factory_context.localInfo()), random_(factory_context.random()),
       redis_discovery_session_(*this, redis_client_factory), lb_factory_(std::move(lb_factory)),
-      api_(api) {
+      auth_password_(
+          NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl::auth_password(info(), api)) {
   const auto& locality_lb_endpoints = load_assignment_.endpoints();
   for (const auto& locality_lb_endpoint : locality_lb_endpoints) {
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
@@ -42,13 +43,6 @@ RedisCluster::RedisCluster(
       dns_discovery_resolve_targets_.emplace_back(new DnsDiscoveryResolveTarget(
           *this, host.socket_address().address(), host.socket_address().port_value()));
     }
-  }
-
-  auto options =
-      info()->extensionProtocolOptionsTyped<NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl>(
-          NetworkFilters::NetworkFilterNames::get().RedisProxy);
-  if (options) {
-    auth_password_datasource_ = options->auth_password_datasource();
   }
 }
 
@@ -253,16 +247,8 @@ void RedisCluster::RedisDiscoverySession::startResolveRedis() {
     client = std::make_unique<RedisDiscoveryClient>(*this);
     client->host_ = current_host_address_;
     client->client_ = client_factory_.create(host, dispatcher_, *this, redis_command_stats_,
-                                             parent_.info()->statsScope());
+                                             parent_.info()->statsScope(), parent_.auth_password_);
     client->client_->addConnectionCallbacks(*client);
-    std::string auth_password =
-        Envoy::Config::DataSource::read(parent_.auth_password_datasource_, true, parent_.api_);
-    if (!auth_password.empty()) {
-      // Send an AUTH command to the upstream server.
-      client->client_->makeRequest(
-          Extensions::NetworkFilters::Common::Redis::Utility::makeAuthCommand(auth_password),
-          null_pool_callbacks);
-    }
   }
 
   current_request_ = client->client_->makeRequest(ClusterSlotsRequest::instance_, *this);
