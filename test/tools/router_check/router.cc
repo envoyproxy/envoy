@@ -106,7 +106,7 @@ bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_jso
     ToolConfig tool_config = ToolConfig::create(check_config);
     tool_config.route_ = config_->route(*tool_config.headers_, tool_config.random_value_);
     std::string test_name = check_config->getString("test_name", "");
-    tests_.emplace_back(std::pair<std::string, std::vector<std::string>>(test_name, {}));
+    tests_.emplace_back(test_name, std::vector<std::string>{});
     Json::ObjectSharedPtr validate = check_config->getObject("validate");
     using checkerFunc = std::function<bool(ToolConfig&, const std::string&)>;
     const std::unordered_map<std::string, checkerFunc> checkers = {
@@ -175,7 +175,7 @@ bool RouterCheckTool::compareEntries(const std::string& expected_routes) {
     tool_config.route_ = config_->route(*tool_config.headers_, tool_config.random_value_);
 
     const std::string& test_name = check_config.test_name();
-    tests_.emplace_back(std::pair<std::string, std::vector<std::string>>(test_name, {}));
+    tests_.emplace_back(test_name, std::vector<std::string>{});
     const envoy::RouterCheckToolSchema::ValidationAssert& validate = check_config.validate();
 
     using checkerFunc =
