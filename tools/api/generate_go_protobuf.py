@@ -6,11 +6,14 @@ import glob
 import os
 import shutil
 import sys
+import re
 
 targets = '@envoy_api//...'
 import_base = 'github.com/envoyproxy/go-control-plane'
 output_base = 'build_go'
 repo_base = 'go-control-plane'
+branch = 'sync'
+mirror_msg = "Mirrored from envoyproxy/envoy @ "
 
 
 def generateProtobufs(output):
@@ -50,17 +53,34 @@ def generateProtobufs(output):
 
 
 def cloneGoProtobufs(repo):
+  # Create a local clone of go-control-plane
   shutil.rmtree(repo, ignore_errors=True)
   check_call(['git', 'clone', 'git@git:envoyproxy/go-control-plane', repo])
-  check_call(['git', '-C', repo, 'config', 'user.name', 'go-control-plane(CircleCI)'])
-  check_call(
-      ['git', '-C', repo, 'config', 'user.email', 'go-control-plane@users.noreply.github.com'])
+  check_call(['git', '-C', repo, 'config', 'user.name', 'data-plane-api(CircleCI)'])
+  check_call(['git', '-C', repo, 'config', 'user.email', 'data-plane-api@users.noreply.github.com'])
   check_call(['git', '-C', repo, 'fetch'])
-  check_call(['git', '-C', repo, 'checkout', '-B', 'sync', 'origin/master'])
+  check_call(['git', '-C', repo, 'checkout', '-B', branch, 'origin/master'])
 
 
-# Sync generated content against repo and return true if there is a commit necessary
+def findLastSyncSHA(repo):
+  # Determine last envoyproxy/envoy SHA in envoyproxy/go-control-plane
+  last_commit = check_output(
+      ['git', '-C', repo, 'log', '--grep=' + mirror_msg, '-n', '1',
+       '--format=%B']).decode().strip()
+  if last_commit == "":
+    return 'e7f0b7176efdc65f96eb1697b829d1e6187f4502'
+  m = re.search(mirror_msg + '(\w+)', last_commit)
+  return m.group(1)
+
+
+def updatedSinceSHA(repo, last_sha):
+  # Determine if there are changes to api since last SHA
+  changes = check_output(['git', 'rev-list', '%s..HEAD' % last_sha, 'api/envoy']).decode().split()
+  return changes
+
+
 def syncGoProtobufs(output, repo):
+  # Sync generated content against repo and return true if there is a commit necessary
   dst = os.path.join(repo, 'envoy')
   # Remove subtree at envoy in repo
   shutil.rmtree(dst, ignore_errors=True)
@@ -68,18 +88,12 @@ def syncGoProtobufs(output, repo):
   shutil.copytree(os.path.join(output, 'envoy'), dst)
 
 
-# Publish if there is a change in the generated repo
-def publishGoProtobufs(repo):
-  diff = check_output(['git', '-C', repo, 'diff']).decode().strip()
-  if diff == '':
-    print('No changes detected: skip publishing')
-    return
-
-  # TODO
-  sha = '38b926c63f347a70c933e0854ee9f31b1d2e85ce'
+def publishGoProtobufs(repo, sha):
+  # Publish generated files with the last SHA changes to api
+  commit_msg = check_output(['git', 'log', sha, '-n', '1', '--format=%B']).decode().strip()
   check_call(['git', '-C', repo, 'add', 'envoy'])
-  check_call(['git', '-C', repo, 'commit', '-m', 'Mirrored from envoyproxy/envoy @ %s' % sha])
-  check_call(['git', '-C', repo, 'push', 'origin', '-f', 'sync'])
+  check_call(['git', '-C', repo, 'commit', '-m', commit_msg + '\n\n' + mirror_msg + sha])
+  check_call(['git', '-C', repo, 'push', 'origin', '-f', branch])
 
 
 if __name__ == "__main__":
@@ -88,5 +102,9 @@ if __name__ == "__main__":
   generateProtobufs(output)
   repo = os.path.join(workspace, repo_base)
   cloneGoProtobufs(repo)
-  syncGoProtobufs(output, repo)
-  publishGoProtobufs(repo)
+  last_sha = findLastSyncSHA(repo)
+  changes = updatedSinceSHA(repo, last_sha)
+  if changes:
+    print('Changes detected: %s' % changes)
+    syncGoProtobufs(output, repo)
+    publishGoProtobufs(repo, changes[0])
