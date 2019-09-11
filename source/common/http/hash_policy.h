@@ -15,7 +15,7 @@ public:
   explicit HashPolicyImpl(
       absl::Span<const envoy::api::v2::route::RouteAction::HashPolicy* const> hash_policy);
 
-  // Router::HashPolicy
+  // Http::HashPolicy
   absl::optional<uint64_t> generateHash(const Network::Address::Instance* downstream_addr,
                                         const HeaderMap& headers,
                                         const AddCookieCallback add_cookie) const override;
