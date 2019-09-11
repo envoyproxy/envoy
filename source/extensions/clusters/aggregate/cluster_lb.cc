@@ -17,9 +17,7 @@ void AggregateClusterLoadBalancer::initialize() {
   initialized_ = true;
   refresh();
   updatePrioritySetCallbacks(
-      clusters_,
-      [this](uint32_t, const Upstream::HostVector&, const Upstream::HostVector&) { refresh(); },
-      [this](const Upstream::HostVector&, const Upstream::HostVector&) { refresh(); });
+      clusters_, [this](const Upstream::HostVector&, const Upstream::HostVector&) { refresh(); });
 
   handle_ = cluster_manager_.addThreadLocalClusterUpdateCallbacks(*this);
 }
@@ -103,14 +101,13 @@ AggregateClusterLoadBalancer::linearizePrioritySet() {
 }
 
 void AggregateClusterLoadBalancer::updatePrioritySetCallbacks(
-    const std::vector<std::string>& clusters, PriorityCb priority_cb, MemberCb member_cb) {
+    const std::vector<std::string>& clusters, MemberCb member_cb) {
   for (const auto& cluster : clusters) {
     auto tlc = cluster_manager_.get(cluster);
     if (tlc == nullptr) {
       continue;
     }
 
-    tlc->prioritySet().addPriorityUpdateCb(priority_cb);
     tlc->prioritySet().addMemberUpdateCb(member_cb);
   }
 }
