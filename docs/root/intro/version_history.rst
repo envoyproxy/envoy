@@ -59,6 +59,7 @@ Version history
 * upstream: added :ref:`an option <envoy_api_field_Cluster.CommonLbConfig.close_connections_on_host_set_change>` that allows draining HTTP, TCP connection pools on cluster membership change.
 * upstream: added network filter chains to upstream connections, see :ref:`filters<envoy_api_field_Cluster.filters>`.
 * upstream: use p2c to select hosts for least-requests load balancers if all host weights are the same, even in cases where weights are not equal to 1.
+* upstream: added :ref:`fail_traffic_on_panic <envoy_api_field_Cluster.CommonLbConfig.ZoneAwareLbConfig.fail_traffic_on_panic>` to allow failing all requests to a cluster during panic state.
 * zookeeper: parse responses and emit latency stats.
 
 1.11.1 (August 13, 2019)
