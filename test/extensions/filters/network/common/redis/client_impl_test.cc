@@ -951,7 +951,8 @@ TEST(RedisClientFactoryImplTest, Basic) {
   auto redis_command_stats =
       Common::Redis::RedisCommandStats::createRedisCommandStats(stats_.symbolTable());
   const std::string auth_password;
-  ClientPtr client = factory.create(host, dispatcher, config, redis_command_stats, stats_, auth_password);
+  ClientPtr client =
+      factory.create(host, dispatcher, config, redis_command_stats, stats_, auth_password);
   client->close();
 }
 } // namespace Client

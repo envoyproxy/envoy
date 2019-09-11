@@ -297,9 +297,8 @@ ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
                                     Event::Dispatcher& dispatcher, const Config& config,
                                     const RedisCommandStatsSharedPtr& redis_command_stats,
                                     Stats::Scope& scope, const std::string& auth_password) {
-  ClientPtr client =
-      ClientImpl::create(host, dispatcher, EncoderPtr{new EncoderImpl()}, decoder_factory_,
-                            config, redis_command_stats, scope);
+  ClientPtr client = ClientImpl::create(host, dispatcher, EncoderPtr{new EncoderImpl()},
+                                        decoder_factory_, config, redis_command_stats, scope);
   client->initialize(auth_password);
   return client;
 }
