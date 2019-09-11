@@ -7,7 +7,7 @@ namespace TransportSockets {
 namespace Tls {
 
 /**
- * A factory to create server side Tls context config from a protobuf.
+ * A factory to create server side TLS context config from a protobuf.
  */
 class DownstreamContextConfigFactory : public Ssl::ContextConfigFactory {
 public:

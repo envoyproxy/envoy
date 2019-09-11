@@ -236,10 +236,6 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
     const std::string listener_name = udp_config.udp_listener_name().empty()
                                           ? UdpListenerNames::get().RawUdp
                                           : udp_config.udp_listener_name();
-    is_quic = listener_name == UdpListenerNames::get().Quic;
-    if (listener_name.empty()) {
-      listener_name = UdpListenerNames::get().RawUdp;
-    }
     udp_listener_factory_ =
         Config::Utility::getAndCheckFactory<ActiveUdpListenerConfigFactory>(listener_name)
             .createActiveUdpListenerFactory(config.has_udp_listener_config()

@@ -179,10 +179,10 @@ public:
   // Network::FilterChain
   const Network::TransportSocketFactory* transportSocketFactory() const override { return nullptr; }
 
-  Ssl::ContextConfig* tlsContextConfig() const { return tls_context_config_.get(); }
+  const Ssl::ContextConfig& tlsContextConfig() const { return tls_context_config_.get(); }
 
 private:
-  std::unique_ptr<Ssl::ContextConfig> tls_context_config_;
+  std::unique_ptr<const Ssl::ContextConfig> tls_context_config_;
 };
 
 } // namespace Server
