@@ -166,9 +166,25 @@ static void jvm_on_trailers(envoy_headers trailers, void* context) {
 
 static void jvm_on_error(envoy_error error, void* context) {
   __android_log_write(ANDROID_LOG_ERROR, "jni_lib", "jvm_on_error");
-  JNIEnv* env = nullptr;
-  static_jvm->GetEnv((void**)&env, JNI_VERSION);
+  JNIEnv* env = get_env();
   jobject j_context = static_cast<jobject>(context);
+
+  jclass jcls_JvmObserverContext = env->GetObjectClass(j_context);
+  jmethodID jmid_onError = env->GetMethodID(jcls_JvmObserverContext, "onError", "([BI)V");
+
+  jbyteArray j_error_message = env->NewByteArray(error.message.length);
+  // FIXME: check if copied via isCopy
+  void* critical_error_message =
+      env->GetPrimitiveArrayCritical(j_error_message, nullptr); // FIXME: check for NULL
+  memcpy(critical_error_message, error.message.bytes, error.message.length);
+  // Here '0' (for which there is no named constant) indicates we want to commit the changes back
+  // to the JVM and free the c array, where applicable.
+  env->ReleasePrimitiveArrayCritical(j_error_message, critical_error_message, 0);
+
+  env->CallVoidMethod(j_context, jmid_onError, j_error_message, error.error_code);
+
+  error.message.release(error.message.context);
+  // No further callbacks happen on this context. Delete the reference held by native code.
   env->DeleteGlobalRef(j_context);
 }
 
