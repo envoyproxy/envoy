@@ -42,8 +42,6 @@ void AggregateClusterLoadBalancer::onClusterAddOrUpdate(Upstream::ThreadLocalClu
 
     refresh();
 
-    cluster.prioritySet().addPriorityUpdateCb(
-        [this](uint32_t, const Upstream::HostVector&, const Upstream::HostVector&) { refresh(); });
     cluster.prioritySet().addMemberUpdateCb(
         [this](const Upstream::HostVector&, const Upstream::HostVector&) { refresh(); });
   }

@@ -117,10 +117,8 @@ private:
   // Update priority set callback
   // @param cluster_manager the cluster manager
   // @param clusters clusters in aggregate cluster
-  // @param priority_cb priority callback
   // @param member_cb member callback
-  void updatePrioritySetCallbacks(const std::vector<std::string>& clusters, PriorityCb priority_cb,
-                                  MemberCb member_cb);
+  void updatePrioritySetCallbacks(const std::vector<std::string>& clusters, MemberCb member_cb);
 
   class LoadBalancerImpl : public Upstream::LoadBalancerBase {
   public:
