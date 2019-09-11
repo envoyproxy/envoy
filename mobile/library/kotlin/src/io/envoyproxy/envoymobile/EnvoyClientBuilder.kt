@@ -5,7 +5,7 @@ import io.envoyproxy.envoymobile.engine.EnvoyEngine
 import io.envoyproxy.envoymobile.engine.EnvoyEngineImpl
 
 
-open class EnvoyBuilder internal constructor(
+open class EnvoyClientBuilder internal constructor(
 ) {
   private var logLevel = LogLevel.INFO
   private var configYAML: String? = null
@@ -19,7 +19,7 @@ open class EnvoyBuilder internal constructor(
    * Add a log level to use with Envoy.
    * @param logLevel the log level to use with Envoy.
    */
-  fun addLogLevel(logLevel: LogLevel): EnvoyBuilder {
+  fun addLogLevel(logLevel: LogLevel): EnvoyClientBuilder {
     this.logLevel = logLevel
     return this
   }
@@ -30,7 +30,7 @@ open class EnvoyBuilder internal constructor(
    *
    * @param configYAML the contents of a yaml file to use as a configuration.
    */
-  fun addConfigYAML(configYAML: String?): EnvoyBuilder {
+  fun addConfigYAML(configYAML: String?): EnvoyClientBuilder {
     this.configYAML = configYAML
     return this
   }
@@ -40,7 +40,7 @@ open class EnvoyBuilder internal constructor(
    *
    * @param connectTimeoutSeconds timeout for new network connections to hosts in the cluster.
    */
-  fun addConnectTimeoutSeconds(connectTimeoutSeconds: Int): EnvoyBuilder {
+  fun addConnectTimeoutSeconds(connectTimeoutSeconds: Int): EnvoyClientBuilder {
     this.connectTimeoutSeconds = connectTimeoutSeconds
     return this
   }
@@ -50,7 +50,7 @@ open class EnvoyBuilder internal constructor(
    *
    * @param dnsRefreshSeconds rate in seconds to refresh DNS.
    */
-  fun addDNSRefreshSeconds(dnsRefreshSeconds: Int): EnvoyBuilder {
+  fun addDNSRefreshSeconds(dnsRefreshSeconds: Int): EnvoyClientBuilder {
     this.dnsRefreshSeconds = dnsRefreshSeconds
     return this
   }
@@ -60,7 +60,7 @@ open class EnvoyBuilder internal constructor(
    *
    * @param statsFlushSeconds interval at which to flush Envoy stats.
    */
-  fun addStatsFlushSeconds(statsFlushSeconds: Int): EnvoyBuilder {
+  fun addStatsFlushSeconds(statsFlushSeconds: Int): EnvoyClientBuilder {
     this.statsFlushSeconds = statsFlushSeconds
     return this
   }
@@ -84,7 +84,7 @@ open class EnvoyBuilder internal constructor(
    *
    * A new instance of this engine will be created when `build()` is called.
    */
-  internal fun addEngineType(engineType: () -> EnvoyEngine): EnvoyBuilder {
+  internal fun addEngineType(engineType: () -> EnvoyEngine): EnvoyClientBuilder {
     this.engineType = engineType
     return this
   }
