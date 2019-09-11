@@ -1,8 +1,8 @@
 import Foundation
 
-/// Envoy's implementation of `Client`, buildable using `EnvoyBuilder`.
+/// Envoy's implementation of `HTTPClient`, buildable using `EnvoyClientBuilder`.
 @objcMembers
-public final class Envoy: NSObject {
+public final class EnvoyClient: NSObject {
   private let engine: EnvoyEngine
   private let runner: RunnerThread
 
@@ -67,7 +67,7 @@ public final class Envoy: NSObject {
   }
 }
 
-extension Envoy: Client {
+extension EnvoyClient: HTTPClient {
   public func send(_ request: Request, handler: ResponseHandler) -> StreamEmitter {
     let httpStream = self.engine.startStream(with: handler.underlyingCallbacks)
     httpStream.sendHeaders(request.outboundHeaders(), close: false)

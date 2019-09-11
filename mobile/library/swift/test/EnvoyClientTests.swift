@@ -16,7 +16,7 @@ private final class MockEnvoyEngine: EnvoyEngine {
   }
 }
 
-final class EnvoyTests: XCTestCase {
+final class EnvoyClientTests: XCTestCase {
   override func tearDown() {
     super.tearDown()
     MockEnvoyHTTPStream.onHeaders = nil
@@ -52,7 +52,7 @@ final class EnvoyTests: XCTestCase {
       closeExpectation.fulfill()
     }
 
-    let envoy = try EnvoyBuilder()
+    let envoy = try EnvoyClientBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .build()
     envoy.send(expectedRequest, body: expectedData, trailers: expectedTrailers,

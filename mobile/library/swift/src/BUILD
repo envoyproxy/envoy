@@ -5,11 +5,11 @@ load("//bazel:swift_static_framework.bzl", "swift_static_framework")
 swift_static_framework(
     name = "ios_framework",
     srcs = [
-        "Client.swift",
-        "Envoy.swift",
-        "EnvoyBuilder.swift",
+        "EnvoyClient.swift",
+        "EnvoyClientBuilder.swift",
         "EnvoyError.swift",
         "EnvoyStreamEmitter.swift",
+        "HTTPClient.swift",
         "LogLevel.swift",
         "Request.swift",
         "RequestBuilder.swift",
