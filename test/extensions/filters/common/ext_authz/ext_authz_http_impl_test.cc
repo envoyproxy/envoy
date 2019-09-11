@@ -16,6 +16,8 @@
 
 using testing::_;
 using testing::AllOf;
+using testing::Eq;
+using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
@@ -372,6 +374,18 @@ TEST_F(ExtAuthzHttpClientTest, CancelledAuthorizationRequest) {
 
   EXPECT_CALL(async_request_, cancel());
   client_.cancel();
+}
+
+// Test the client when the configured cluster is missing/removed.
+TEST_F(ExtAuthzHttpClientTest, NoCluster) {
+  InSequence s;
+
+  EXPECT_CALL(cm_, get(Eq("ext_authz"))).WillOnce(Return(nullptr));
+  EXPECT_CALL(cm_, httpAsyncClientForCluster("ext_authz")).Times(0);
+  EXPECT_CALL(request_callbacks_,
+              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
+  client_.check(request_callbacks_, envoy::service::auth::v2::CheckRequest{},
+                Tracing::NullSpan::instance());
 }
 
 } // namespace

@@ -49,10 +49,10 @@ public:
   bool peerCertificatePresented() const override;
   std::vector<std::string> uriSanLocalCertificate() const override;
   const std::string& sha256PeerCertificateDigest() const override;
-  std::string serialNumberPeerCertificate() const override;
-  std::string issuerPeerCertificate() const override;
-  std::string subjectPeerCertificate() const override;
-  std::string subjectLocalCertificate() const override;
+  const std::string& serialNumberPeerCertificate() const override;
+  const std::string& issuerPeerCertificate() const override;
+  const std::string& subjectPeerCertificate() const override;
+  const std::string& subjectLocalCertificate() const override;
   std::vector<std::string> uriSanPeerCertificate() const override;
   const std::string& urlEncodedPemEncodedPeerCertificate() const override;
   const std::string& urlEncodedPemEncodedPeerCertificateChain() const override;
@@ -60,10 +60,10 @@ public:
   std::vector<std::string> dnsSansLocalCertificate() const override;
   absl::optional<SystemTime> validFromPeerCertificate() const override;
   absl::optional<SystemTime> expirationPeerCertificate() const override;
-  std::string sessionId() const override;
+  const std::string& sessionId() const override;
   uint16_t ciphersuiteId() const override;
   std::string ciphersuiteString() const override;
-  std::string tlsVersion() const override;
+  const std::string& tlsVersion() const override;
 
   SSL* rawSslForTest() const { return ssl_.get(); }
 
@@ -82,6 +82,7 @@ private:
   mutable std::vector<std::string> cached_dns_san_peer_certificate_;
   mutable std::vector<std::string> cached_dns_san_local_certificate_;
   mutable std::string cached_session_id_;
+  mutable std::string cached_tls_version_;
 };
 
 class SslSocket : public Network::TransportSocket,

@@ -643,12 +643,24 @@ ClusterInfoImpl::ClusterInfoImpl(
                       envoy::api::v2::Cluster_LbPolicy_Name(config.lb_policy()),
                       envoy::api::v2::Cluster_DiscoveryType_Name(config.type())));
     }
+    if (config.has_lb_subset_config()) {
+      throw EnvoyException(
+          fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
+                      envoy::api::v2::Cluster_LbPolicy_Name(config.lb_policy())));
+    }
+
     lb_type_ = LoadBalancerType::ClusterProvided;
     break;
   case envoy::api::v2::Cluster::MAGLEV:
     lb_type_ = LoadBalancerType::Maglev;
     break;
   case envoy::api::v2::Cluster::CLUSTER_PROVIDED:
+    if (config.has_lb_subset_config()) {
+      throw EnvoyException(
+          fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
+                      envoy::api::v2::Cluster_LbPolicy_Name(config.lb_policy())));
+    }
+
     lb_type_ = LoadBalancerType::ClusterProvided;
     break;
   default:

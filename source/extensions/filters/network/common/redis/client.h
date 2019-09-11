@@ -5,6 +5,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "extensions/filters/network/common/redis/codec_impl.h"
+#include "extensions/filters/network/common/redis/redis_command_stats.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -164,6 +165,11 @@ public:
   virtual uint32_t maxUpstreamUnknownConnections() const PURE;
 
   /**
+   * @return when enabled, upstream cluster per-command statistics will be recorded.
+   */
+  virtual bool enableCommandStats() const PURE;
+
+  /**
    * @return the read policy the proxy should use.
    */
   virtual ReadPolicy readPolicy() const PURE;
@@ -184,7 +190,9 @@ public:
    * @return ClientPtr a new connection pool client.
    */
   virtual ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
-                           const Config& config) PURE;
+                           const Config& config,
+                           const RedisCommandStatsSharedPtr& redis_command_stats,
+                           Stats::Scope& scope) PURE;
 };
 
 } // namespace Client
