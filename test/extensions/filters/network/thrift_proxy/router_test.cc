@@ -24,7 +24,6 @@
 using testing::_;
 using testing::ContainsRegex;
 using testing::Eq;
-using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Ref;

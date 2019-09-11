@@ -8,7 +8,7 @@ API changes are regular PRs in https://github.com/envoyproxy/envoy for the API/c
 changes. They may be as part of a larger implementation PR. Please follow the standard Bazel and CI
 process for validating build/test sanity of `api/` before submitting a PR.
 
-*Note: New .proto files should be also included to [build.sh](https://github.com/envoyproxy/envoy/blob/master/docs/build.sh) and
+*Note: New .proto files should be added to
 [BUILD](https://github.com/envoyproxy/envoy/blob/master/api/docs/BUILD) in order to get the RSTs generated.*
 
 ## Documentation changes

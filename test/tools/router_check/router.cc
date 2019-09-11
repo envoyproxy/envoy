@@ -6,6 +6,7 @@
 #include <unordered_map>
 
 #include "common/network/utility.h"
+#include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/stream_info/stream_info_impl.h"
 
@@ -74,7 +75,9 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_file,
   auto factory_context = std::make_unique<NiceMock<Server::Configuration::MockFactoryContext>>();
   auto config = std::make_unique<Router::ConfigImpl>(route_config, *factory_context, false);
   if (!disableDeprecationCheck) {
-    MessageUtil::checkForDeprecation(route_config, &factory_context->runtime_loader_);
+    MessageUtil::checkForUnexpectedFields(route_config,
+                                          ProtobufMessage::getStrictValidationVisitor(),
+                                          &factory_context->runtime_loader_);
   }
 
   return RouterCheckTool(std::move(factory_context), std::move(config), std::move(stats),
