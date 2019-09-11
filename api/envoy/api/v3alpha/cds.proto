@@ -634,9 +634,9 @@ message Cluster {
   // checking before removing it from the cluster.
   bool drain_connections_on_host_removal = 32;
 
-  // An optional list of network filters that make up the filter chain for
-  // outgoing connections made by the cluster. Order matters as the filters are
-  // processed sequentially as connection events happen.
+  // An (optional) network filter chain, listed in the order the filters should be applied.
+  // The chain will be applied to all outgoing connections that Envoy makes to the upstream
+  // servers of this cluster.
   repeated cluster.Filter filters = 40;
 }
 

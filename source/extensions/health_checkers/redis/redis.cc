@@ -9,10 +9,12 @@ RedisHealthChecker::RedisHealthChecker(
     const Upstream::Cluster& cluster, const envoy::api::v2::core::HealthCheck& config,
     const envoy::config::health_checker::redis::v2::Redis& redis_config,
     Event::Dispatcher& dispatcher, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-    Upstream::HealthCheckEventLoggerPtr&& event_logger,
+    Upstream::HealthCheckEventLoggerPtr&& event_logger, Api::Api& api,
     Extensions::NetworkFilters::Common::Redis::Client::ClientFactory& client_factory)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger)),
-      client_factory_(client_factory), key_(redis_config.key()) {
+      client_factory_(client_factory), key_(redis_config.key()),
+      auth_password_(NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl::auth_password(
+          cluster.info(), api)) {
   if (!key_.empty()) {
     type_ = Type::Exists;
   } else {
@@ -55,9 +57,9 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onEvent(Network::Connect
 
 void RedisHealthChecker::RedisActiveHealthCheckSession::onInterval() {
   if (!client_) {
-    client_ =
-        parent_.client_factory_.create(host_, parent_.dispatcher_, *this, redis_command_stats_,
-                                       parent_.cluster_.info()->statsScope());
+    client_ = parent_.client_factory_.create(
+        host_, parent_.dispatcher_, *this, redis_command_stats_,
+        parent_.cluster_.info()->statsScope(), parent_.auth_password_);
     client_->addConnectionCallbacks(*this);
   }
 
