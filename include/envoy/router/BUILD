@@ -52,6 +52,7 @@ envoy_cc_library(
         "//include/envoy/config:typed_metadata_interface",
         "//include/envoy/http:codec_interface",
         "//include/envoy/http:codes_interface",
+        "//include/envoy/http:hash_policy_interface",
         "//include/envoy/http:header_map_interface",
         "//include/envoy/tracing:http_tracer_interface",
         "//include/envoy/upstream:resource_manager_interface",
