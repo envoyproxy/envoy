@@ -26,8 +26,8 @@ InstanceImpl::InstanceImpl(
     Api::Api& api, Stats::ScopePtr&& stats_scope,
     const Common::Redis::RedisCommandStatsSharedPtr& redis_command_stats,
     RedisProxy::RedirectionManagerSharedPtr redirection_manager)
-    : cm_(cm), client_factory_(client_factory), tls_(tls.allocateSlot()), config_(config),
-      api_(api), stats_scope_(std::move(stats_scope)),
+    : cluster_name_(cluster_name), cm_(cm), client_factory_(client_factory),
+      tls_(tls.allocateSlot()), config_(config), api_(api), stats_scope_(std::move(stats_scope)),
       redis_command_stats_(redis_command_stats), redis_cluster_stats_{REDIS_CLUSTER_STATS(
                                                      POOL_COUNTER(*stats_scope_))},
       redirection_manager_(std::move(redirection_manager)) {
