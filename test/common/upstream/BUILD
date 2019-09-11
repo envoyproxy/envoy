@@ -29,6 +29,9 @@ envoy_cc_test(
 envoy_cc_test(
     name = "cluster_manager_impl_test",
     srcs = ["cluster_manager_impl_test.cc"],
+    external_deps = [
+        "abseil_optional",
+    ],
     deps = [
         ":test_cluster_manager",
     ],
@@ -89,6 +92,7 @@ envoy_cc_test(
         "//source/common/upstream:upstream_lib",
         "//test/common/http:common_lib",
         "//test/mocks/access_log:access_log_mocks",
+        "//test/mocks/api:api_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/runtime:runtime_mocks",
@@ -393,8 +397,10 @@ envoy_cc_test_library(
         "//source/common/stats:stats_lib",
         "//source/common/upstream:cluster_factory_lib",
         "//source/common/upstream:cluster_manager_lib",
+        "//source/common/upstream:subset_lb_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:context_lib",
+        "//test/integration/clusters:custom_static_cluster",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/api:api_mocks",
         "//test/mocks/http:http_mocks",
@@ -411,6 +417,7 @@ envoy_cc_test_library(
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2:cds_cc",
     ],
 )
 
