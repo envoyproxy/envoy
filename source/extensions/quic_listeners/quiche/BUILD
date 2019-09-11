@@ -36,6 +36,18 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "envoy_quic_connection_helper_lib",
+    hdrs = ["envoy_quic_connection_helper.h"],
+    tags = ["nofips"],
+    deps = [
+        "//source/extensions/quic_listeners/quiche/platform:envoy_quic_clock_lib",
+        "@com_googlesource_quiche//:quic_core_buffer_allocator_lib",
+        "@com_googlesource_quiche//:quic_core_connection_lib",
+        "@com_googlesource_quiche//:quic_core_crypto_random_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "envoy_quic_packet_writer_lib",
     srcs = ["envoy_quic_packet_writer.cc"],
     hdrs = ["envoy_quic_packet_writer.h"],
@@ -81,9 +93,113 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "envoy_quic_stream_lib",
+    hdrs = ["envoy_quic_stream.h"],
+    tags = ["nofips"],
+    deps = [
+        "//include/envoy/http:codec_interface",
+        "//source/common/http:codec_helper_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "envoy_quic_server_stream_lib",
+    srcs = ["envoy_quic_server_stream.cc"],
+    hdrs = ["envoy_quic_server_stream.h"],
+    tags = ["nofips"],
+    deps = [
+        ":envoy_quic_stream_lib",
+        ":envoy_quic_utils_lib",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/http:header_map_lib",
+        "@com_googlesource_quiche//:quic_core_http_spdy_session_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "codec_impl_lib",
+    srcs = ["codec_impl.cc"],
+    hdrs = ["codec_impl.h"],
+    tags = ["nofips"],
+    deps = [
+        ":envoy_quic_server_session_lib",
+        "//include/envoy/http:codec_interface",
+        "@com_googlesource_quiche//:quic_core_http_spdy_session_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "envoy_quic_server_session_lib",
+    srcs = ["envoy_quic_server_session.cc"],
+    hdrs = ["envoy_quic_server_session.h"],
+    tags = ["nofips"],
+    deps = [
+        ":envoy_quic_connection_lib",
+        ":envoy_quic_server_stream_lib",
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/network:connection_interface",
+        "//source/common/common:empty_string",
+        "//source/common/network:filter_manager_lib",
+        "//source/common/stream_info:stream_info_lib",
+        "@com_googlesource_quiche//:quic_core_http_spdy_session_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "quic_io_handle_wrapper_lib",
+    hdrs = ["quic_io_handle_wrapper.h"],
+    deps = [
+        "//include/envoy/network:io_handle_interface",
+        "//source/common/network:io_socket_error_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "envoy_quic_connection_lib",
+    srcs = ["envoy_quic_connection.cc"],
+    hdrs = ["envoy_quic_connection.h"],
+    tags = ["nofips"],
+    deps = [
+        ":quic_io_handle_wrapper_lib",
+        "//include/envoy/network:connection_interface",
+        "//source/common/network:listen_socket_lib",
+        "//source/extensions/quic_listeners/quiche:envoy_quic_utils_lib",
+        "//source/server:connection_handler_lib",
+        "@com_googlesource_quiche//:quic_core_connection_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "envoy_quic_dispatcher_lib",
+    srcs = [
+        "envoy_quic_dispatcher.cc",
+    ],
+    hdrs = [
+        "envoy_quic_dispatcher.h",
+    ],
+    tags = ["nofips"],
+    deps = [
+        ":envoy_quic_connection_lib",
+        ":envoy_quic_proof_source_lib",
+        ":envoy_quic_server_session_lib",
+        "//include/envoy/network:listener_interface",
+        "//source/server:connection_handler_lib",
+        "@com_googlesource_quiche//:quic_core_server_lib",
+        "@com_googlesource_quiche//:quic_core_utils_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "envoy_quic_utils_lib",
+    srcs = ["envoy_quic_utils.cc"],
     hdrs = ["envoy_quic_utils.h"],
     external_deps = ["quiche_quic_platform"],
     tags = ["nofips"],
-    deps = ["//source/common/network:address_lib"],
+    deps = [
+        "//include/envoy/http:codec_interface",
+        "//source/common/http:header_map_lib",
+        "//source/common/network:address_lib",
+        "@com_googlesource_quiche//:quic_core_http_header_list_lib",
+    ],
 )

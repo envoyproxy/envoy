@@ -667,17 +667,22 @@ void ClusterManagerImpl::loadCluster(const envoy::api::v2::Cluster& cluster,
   const auto cluster_entry_it = cluster_map.find(cluster_reference.info()->name());
 
   // If an LB is thread aware, create it here. The LB is not initialized until cluster pre-init
-  // finishes.
+  // finishes. For RingHash/Maglev don't create the LB here if subset balancing is enabled,
+  // because the thread_aware_lb_ field takes precedence over the subset lb).
   if (cluster_reference.info()->lbType() == LoadBalancerType::RingHash) {
-    cluster_entry_it->second->thread_aware_lb_ = std::make_unique<RingHashLoadBalancer>(
-        cluster_reference.prioritySet(), cluster_reference.info()->stats(),
-        cluster_reference.info()->statsScope(), runtime_, random_,
-        cluster_reference.info()->lbRingHashConfig(), cluster_reference.info()->lbConfig());
+    if (!cluster_reference.info()->lbSubsetInfo().isEnabled()) {
+      cluster_entry_it->second->thread_aware_lb_ = std::make_unique<RingHashLoadBalancer>(
+          cluster_reference.prioritySet(), cluster_reference.info()->stats(),
+          cluster_reference.info()->statsScope(), runtime_, random_,
+          cluster_reference.info()->lbRingHashConfig(), cluster_reference.info()->lbConfig());
+    }
   } else if (cluster_reference.info()->lbType() == LoadBalancerType::Maglev) {
-    cluster_entry_it->second->thread_aware_lb_ = std::make_unique<MaglevLoadBalancer>(
-        cluster_reference.prioritySet(), cluster_reference.info()->stats(),
-        cluster_reference.info()->statsScope(), runtime_, random_,
-        cluster_reference.info()->lbConfig());
+    if (!cluster_reference.info()->lbSubsetInfo().isEnabled()) {
+      cluster_entry_it->second->thread_aware_lb_ = std::make_unique<MaglevLoadBalancer>(
+          cluster_reference.prioritySet(), cluster_reference.info()->stats(),
+          cluster_reference.info()->statsScope(), runtime_, random_,
+          cluster_reference.info()->lbConfig());
+    }
   } else if (cluster_reference.info()->lbType() == LoadBalancerType::ClusterProvided) {
     cluster_entry_it->second->thread_aware_lb_ = std::move(new_cluster_pair.second);
   }

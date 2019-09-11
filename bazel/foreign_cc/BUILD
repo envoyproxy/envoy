@@ -64,24 +64,47 @@ envoy_cmake_external(
 
 envoy_cmake_external(
     name = "curl",
+    # Options from https://github.com/curl/curl/blob/master/CMakeLists.txt.
     cache_entries = {
         "BUILD_CURL_EXE": "off",
-        "BUILD_SHARED_LIBS": "off",
-        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
-        "HTTP_ONLY": "on",
         "BUILD_TESTING": "off",
-        "CMAKE_USE_OPENSSL": "off",
-        "CURL_CA_PATH": "none",
+        "BUILD_SHARED_LIBS": "off",
         "CURL_HIDDEN_SYMBOLS": "off",
         "CMAKE_USE_LIBSSH2": "off",
+        "CURL_BROTLI": "off",
+        "CMAKE_USE_GSSAPI": "off",
+        "HTTP_ONLY": "on",
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
         "CMAKE_INSTALL_LIBDIR": "lib",
-        "INCLUDE_DIRECTORIES": "include/curl",
+        # C-Ares.
+        "ENABLE_ARES": "on",
+        "CARES_LIBRARY": "$EXT_BUILD_DEPS/ares",
+        "CARES_INCLUDE_DIR": "$EXT_BUILD_DEPS/ares/include",
+        # SSL (via Envoy's SSL dependency) is disabled, curl's CMake uses FindOpenSSL.cmake which fails at what looks like
+        # version parsing (the libraries are found ok).
+        "CURL_CA_PATH": "none",
+        "CMAKE_USE_OPENSSL": "off",
+        "OPENSSL_ROOT_DIR": "$EXT_BUILD_DEPS",
+        # NGHTTP2.
+        "USE_NGHTTP2": "on",
+        "NGHTTP2_LIBRARY": "$EXT_BUILD_DEPS/nghttp2",
+        "NGHTTP2_INCLUDE_DIR": "$EXT_BUILD_DEPS/nghttp2/include",
+        # ZLIB.
+        "CURL_ZLIB": "on",
+        "ZLIB_LIBRARY": "$EXT_BUILD_DEPS/zlib",
+        "ZLIB_INCLUDE_DIR": "$EXT_BUILD_DEPS/zlib/include",
     },
     lib_source = "@com_github_curl//:all",
     static_libraries = select({
         "//bazel:windows_x86_64": ["curl.lib"],
         "//conditions:default": ["libcurl.a"],
     }),
+    deps = [
+        ":ares",
+        ":nghttp2",
+        ":zlib",
+        "//external:ssl",
+    ],
 )
 
 envoy_cmake_external(
