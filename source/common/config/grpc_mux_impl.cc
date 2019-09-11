@@ -232,10 +232,7 @@ void GrpcMuxImpl::queueDiscoveryRequest(const std::string& queue_item) {
 
 void GrpcMuxImpl::clearRequestQueue() {
   grpc_stream_.maybeUpdateQueueSizeStat(0);
-  // TODO(fredlas) when we have C++17: request_queue_ = {};
-  while (!request_queue_.empty()) {
-    request_queue_.pop();
-  }
+  request_queue_ = {};
 }
 
 void GrpcMuxImpl::drainRequests() {

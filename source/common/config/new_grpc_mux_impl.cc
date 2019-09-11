@@ -185,7 +185,7 @@ void NewGrpcMuxImpl::trySendDiscoveryRequests() {
       grpc_stream_.sendMessage(sub->second->sub_state_.getNextRequestAckless());
     }
   }
-  if (old_queue_size != pausable_ack_queue_.size()) {
+  if (pausable_ack_queue_.size() != old_queue_size || pausable_ack_queue_.size() != 0) {
     grpc_stream_.maybeUpdateQueueSizeStat(pausable_ack_queue_.size());
   }
 }
