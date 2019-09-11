@@ -539,6 +539,12 @@ message Cluster {
       // * :ref:`runtime values <config_cluster_manager_cluster_runtime_zone_routing>`.
       // * :ref:`Zone aware routing support <arch_overview_load_balancing_zone_aware_routing>`.
       google.protobuf.UInt64Value min_cluster_size = 2;
+
+      // If set to true, Envoy will not consider any hosts when the cluster is in :ref:`panic
+      // mode<arch_overview_load_balancing_panic_threshold>`. Instead, the cluster will fail all
+      // requests as if all hosts are unhealthy. This can help avoid potentially overwhelming a
+      // failing service.
+      bool fail_traffic_on_panic = 3;
     }
     // Configuration for :ref:`locality weighted load balancing
     // <arch_overview_load_balancing_locality_weighted_lb>`
