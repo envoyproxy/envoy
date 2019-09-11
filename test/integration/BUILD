@@ -253,6 +253,17 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "http_subset_lb_integration_test",
+    srcs = [
+        "http_subset_lb_integration_test.cc",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//test/common/upstream:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "http_timeout_integration_test",
     srcs = [
         "http_timeout_integration_test.cc",
