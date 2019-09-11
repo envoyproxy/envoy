@@ -158,6 +158,10 @@ public:
   // Allow a finalized configuration to be edited for generating xDS responses
   void applyConfigModifiers();
 
+  // Skip validation that ensures that all upstream ports are referenced by the
+  // configuration generated in ConfigHelper::finalize.
+  void skipPortUsageValidation() { skip_port_usage_validation_ = true; }
+
 private:
   // Load the first HCM struct from the first listener into a parsed proto.
   bool loadHttpConnectionManager(
@@ -185,6 +189,11 @@ private:
   // Track if the connect timeout has been set (to avoid clobbering a custom setting with the
   // default).
   bool connect_timeout_set_{false};
+
+  // Option to disable port usage validation for cases where the number of
+  // upstream ports created is expected to be larger than the number of
+  // upstreams in the config.
+  bool skip_port_usage_validation_{false};
 
   // A sanity check guard to make sure config is not modified after handing it to Envoy.
   bool finalized_{false};
