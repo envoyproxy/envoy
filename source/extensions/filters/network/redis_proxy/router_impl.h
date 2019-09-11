@@ -37,7 +37,7 @@ public:
 
 private:
   const std::string runtime_key_;
-  const envoy::type::FractionalPercent default_value_;
+  const absl::optional<envoy::type::FractionalPercent> default_value_;
   const bool exclude_read_commands_;
   ConnPool::InstanceSharedPtr upstream_;
   Runtime::Loader& runtime_;
