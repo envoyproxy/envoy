@@ -28,8 +28,10 @@ TEST(ActiveQuicListenerConfigTest, CreateActiveQuicListenerFactory) {
   ProtobufTypes::MessagePtr config = config_factory.createEmptyConfigProto();
 
   std::string yaml = R"EOF(
-    max_streams_per_connection: 10
-    idle_network_timeout_ms: 2000
+    max_concurrent_streams: 10
+    idle_timeout: {
+      seconds: 2
+    }
   )EOF";
   TestUtility::loadFromYaml(yaml, *config);
   Network::ActiveUdpListenerFactoryPtr listener_factory =

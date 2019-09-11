@@ -4,6 +4,8 @@
 #include "envoy/network/connection_handler.h"
 #include "envoy/network/listener.h"
 
+#include "common/protobuf/utility.h"
+
 #include "server/connection_handler_impl.h"
 
 #include "extensions/quic_listeners/quiche/envoy_quic_dispatcher.h"
@@ -65,20 +67,21 @@ using ActiveQuicListenerPtr = std::unique_ptr<ActiveQuicListener>;
 // A factory to create ActiveQuicListener based on given config.
 class ActiveQuicListenerFactory : public Network::ActiveUdpListenerFactory {
 public:
-  ActiveQuicListenerFactory(const envoy::api::v2::listener::QuicConfigProto& config) {
-    int32_t idle_network_timeout_ms =
-        config.idle_network_timeout_ms() == 0 ? 300000 : config.idle_network_timeout_ms();
+  ActiveQuicListenerFactory(const envoy::api::v2::listener::QuicProtocolOptions& config) {
+    uint64_t idle_network_timeout_ms =
+        config.has_idle_timeout() ? DurationUtil::durationToMilliseconds(config.idle_timeout())
+                                  : 300000;
     quic_config_.SetIdleNetworkTimeout(
         quic::QuicTime::Delta::FromMilliseconds(idle_network_timeout_ms),
         quic::QuicTime::Delta::FromMilliseconds(idle_network_timeout_ms));
     int32_t max_time_before_crypto_handshake_ms =
-        config.max_time_before_crypto_handshake_ms() == 0
-            ? 20000
-            : config.max_time_before_crypto_handshake_ms();
+        config.has_crypto_handshake_timeout()
+            ? DurationUtil::durationToMilliseconds(config.crypto_handshake_timeout())
+            : 20000;
     quic_config_.set_max_time_before_crypto_handshake(
         quic::QuicTime::Delta::FromMilliseconds(max_time_before_crypto_handshake_ms));
     int32_t max_streams =
-        config.max_streams_per_connection() == 0 ? 100 : config.max_streams_per_connection();
+        config.max_concurrent_streams() == 0 ? 100 : config.max_concurrent_streams();
     quic_config_.SetMaxIncomingBidirectionalStreamsToSend(max_streams);
     quic_config_.SetMaxIncomingUnidirectionalStreamsToSend(max_streams);
   }

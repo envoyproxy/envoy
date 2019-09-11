@@ -204,6 +204,7 @@ envoy_cc_library(
         ":envoy_quic_utils_lib",
         "//include/envoy/network:listener_interface",
         "//source/common/network:listener_lib",
+        "//source/common/protobuf:utility_lib",
         "//source/server:connection_handler_lib",
         "@envoy_api//envoy/api/v2/listener:quic_config_cc",
     ],

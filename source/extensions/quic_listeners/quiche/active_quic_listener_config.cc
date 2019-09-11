@@ -10,12 +10,12 @@ namespace Envoy {
 namespace Quic {
 
 ProtobufTypes::MessagePtr ActiveQuicListenerConfigFactory::createEmptyConfigProto() {
-  return std::make_unique<envoy::api::v2::listener::QuicConfigProto>();
+  return std::make_unique<envoy::api::v2::listener::QuicProtocolOptions>();
 }
 
 Network::ActiveUdpListenerFactoryPtr
 ActiveQuicListenerConfigFactory::createActiveUdpListenerFactory(const Protobuf::Message& message) {
-  auto& config = dynamic_cast<const envoy::api::v2::listener::QuicConfigProto&>(message);
+  auto& config = dynamic_cast<const envoy::api::v2::listener::QuicProtocolOptions&>(message);
   return std::make_unique<ActiveQuicListenerFactory>(config);
 }
 
