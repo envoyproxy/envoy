@@ -434,7 +434,6 @@ udp_listener_config:
       findFilterChain(1234, "127.0.0.1", "", "quic", {}, "8.8.8.8", 111));
   ASSERT_NE(nullptr, filter_chain);
   EXPECT_EQ(nullptr, filter_chain->transportSocketFactory());
-  EXPECT_NE(nullptr, filter_chain->tlsContextConfig());
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
