@@ -1,5 +1,4 @@
 #include "extensions/health_checkers/redis/redis.h"
-#include "source/extensions/health_checkers/redis/redis.h"
 
 namespace Envoy {
 namespace Extensions {
