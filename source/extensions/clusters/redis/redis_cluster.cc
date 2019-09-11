@@ -162,7 +162,10 @@ RedisCluster::RedisDiscoverySession::RedisDiscoverySession(
     NetworkFilters::Common::Redis::Client::ClientFactory& client_factory)
     : parent_(parent), dispatcher_(parent.dispatcher_),
       resolve_timer_(parent.dispatcher_.createTimer([this]() -> void { startResolveRedis(); })),
-      client_factory_(client_factory), buffer_timeout_(0) {}
+      client_factory_(client_factory), buffer_timeout_(0),
+      redis_command_stats_(
+          NetworkFilters::Common::Redis::RedisCommandStats::createRedisCommandStats(
+              parent_.info()->statsScope().symbolTable())) {}
 
 // Convert the cluster slot IP/Port response to and address, return null if the response does not
 // match the expected type.
@@ -243,7 +246,8 @@ void RedisCluster::RedisDiscoverySession::startResolveRedis() {
   if (!client) {
     client = std::make_unique<RedisDiscoveryClient>(*this);
     client->host_ = current_host_address_;
-    client->client_ = client_factory_.create(host, dispatcher_, *this, parent_.auth_password_);
+    client->client_ = client_factory_.create(host, dispatcher_, *this, redis_command_stats_,
+                                             parent_.info()->statsScope(), parent_.auth_password_);
     client->client_->addConnectionCallbacks(*client);
   }
 

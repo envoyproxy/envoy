@@ -20,10 +20,12 @@ InstanceImpl::InstanceImpl(
     const std::string& cluster_name, Upstream::ClusterManager& cm,
     Common::Redis::Client::ClientFactory& client_factory, ThreadLocal::SlotAllocator& tls,
     const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config,
-    Api::Api& api, Stats::ScopePtr&& stats_scope)
+    Api::Api& api, Stats::ScopePtr&& stats_scope,
+    const Common::Redis::RedisCommandStatsSharedPtr& redis_command_stats)
     : cm_(cm), client_factory_(client_factory), tls_(tls.allocateSlot()), config_(config),
-      api_(api), stats_scope_(std::move(stats_scope)), redis_cluster_stats_{REDIS_CLUSTER_STATS(
-                                                           POOL_COUNTER(*stats_scope_))} {
+      api_(api), stats_scope_(std::move(stats_scope)),
+      redis_command_stats_(redis_command_stats), redis_cluster_stats_{REDIS_CLUSTER_STATS(
+                                                     POOL_COUNTER(*stats_scope_))} {
   tls_->set([this, cluster_name](
                 Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<ThreadLocalPool>(*this, dispatcher, cluster_name);
@@ -188,8 +190,8 @@ InstanceImpl::ThreadLocalPool::threadLocalActiveClient(Upstream::HostConstShared
   if (!client) {
     client = std::make_unique<ThreadLocalActiveClient>(*this);
     client->host_ = host;
-    client->redis_client_ =
-        parent_.client_factory_.create(host, dispatcher_, parent_.config_, auth_password_);
+    client->redis_client_ = parent_.client_factory_.create(
+        host, dispatcher_, parent_.config_, parent_.redis_command_stats_, *parent_.stats_scope_, auth_password_);
     client->redis_client_->addConnectionCallbacks(*client);
   }
   return client;

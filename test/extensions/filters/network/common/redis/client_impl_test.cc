@@ -71,8 +71,11 @@ public:
     EXPECT_CALL(*upstream_connection_, connect());
     EXPECT_CALL(*upstream_connection_, noDelay(true));
 
+    redis_command_stats_ =
+        Common::Redis::RedisCommandStats::createRedisCommandStats(stats_.symbolTable());
+
     client_ = ClientImpl::create(host_, dispatcher_, Common::Redis::EncoderPtr{encoder_}, *this,
-                                 *config_);
+                                 *config_, redis_command_stats_, stats_);
     EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_cx_total_.value());
     EXPECT_EQ(1UL, host_->stats_.cx_total_.value());
     EXPECT_EQ(false, client_->active());
@@ -131,6 +134,9 @@ public:
   Network::ReadFilterSharedPtr upstream_read_filter_;
   std::unique_ptr<Config> config_;
   ClientPtr client_;
+  Stats::IsolatedStoreImpl stats_;
+  Stats::ScopePtr stats_scope_;
+  Common::Redis::RedisCommandStatsSharedPtr redis_command_stats_;
   std::string auth_password_;
 };
 
@@ -176,6 +182,7 @@ class ConfigBufferSizeGTSingleRequest : public Config {
     return std::chrono::milliseconds(1);
   }
   uint32_t maxUpstreamUnknownConnections() const override { return 0; }
+  bool enableCommandStats() const override { return false; }
   ReadPolicy readPolicy() const override { return ReadPolicy::Master; }
 };
 
@@ -533,6 +540,7 @@ class ConfigOutlierDisabled : public Config {
   }
   ReadPolicy readPolicy() const override { return ReadPolicy::Master; }
   uint32_t maxUpstreamUnknownConnections() const override { return 0; }
+  bool enableCommandStats() const override { return false; }
 };
 
 TEST_F(RedisClientImplTest, OutlierDisabled) {
@@ -939,8 +947,11 @@ TEST(RedisClientFactoryImplTest, Basic) {
   EXPECT_CALL(*host, createConnection_(_, _)).WillOnce(Return(conn_info));
   NiceMock<Event::MockDispatcher> dispatcher;
   ConfigImpl config(createConnPoolSettings());
+  Stats::IsolatedStoreImpl stats_;
+  auto redis_command_stats =
+      Common::Redis::RedisCommandStats::createRedisCommandStats(stats_.symbolTable());
   const std::string auth_password;
-  ClientPtr client = factory.create(host, dispatcher, config, auth_password);
+  ClientPtr client = factory.create(host, dispatcher, config, redis_command_stats, stats_, auth_password);
   client->close();
 }
 } // namespace Client

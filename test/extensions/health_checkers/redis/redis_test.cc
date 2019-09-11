@@ -127,7 +127,8 @@ public:
   Extensions::NetworkFilters::Common::Redis::Client::ClientPtr
   create(Upstream::HostConstSharedPtr, Event::Dispatcher&,
          const Extensions::NetworkFilters::Common::Redis::Client::Config&,
-         const std::string&) override {
+         const Extensions::NetworkFilters::Common::Redis::RedisCommandStatsSharedPtr&,
+         Stats::Scope&, const std::string&) override {
     return Extensions::NetworkFilters::Common::Redis::Client::ClientPtr{create_()};
   }
 
@@ -169,6 +170,7 @@ public:
     EXPECT_EQ(session->maxBufferSizeBeforeFlush(), 0);
     EXPECT_EQ(session->bufferFlushTimeoutInMs(), std::chrono::milliseconds(1));
     EXPECT_EQ(session->maxUpstreamUnknownConnections(), 0);
+    EXPECT_FALSE(session->enableCommandStats());
     session->onDeferredDeleteBase(); // This must be called to pass assertions in the destructor.
   }
 
