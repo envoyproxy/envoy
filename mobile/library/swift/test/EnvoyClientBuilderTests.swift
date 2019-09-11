@@ -29,7 +29,7 @@ private final class MockEnvoyEngine: NSObject, EnvoyEngine {
   }
 }
 
-final class EnvoyBuilderTests: XCTestCase {
+final class EnvoyClientBuilderTests: XCTestCase {
   override func tearDown() {
     super.tearDown()
     MockEnvoyEngine.onRunWithConfig = nil
@@ -43,7 +43,7 @@ final class EnvoyBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = try EnvoyBuilder()
+    _ = try EnvoyClientBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addConfigYAML("foobar")
       .build()
@@ -57,7 +57,7 @@ final class EnvoyBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = try EnvoyBuilder()
+    _ = try EnvoyClientBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addLogLevel(.trace)
       .build()

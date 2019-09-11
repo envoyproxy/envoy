@@ -13,7 +13,7 @@ NSString *_REQUEST_SCHEME = @"http";
 #pragma mark - ViewController
 
 @interface ViewController ()
-@property (nonatomic, strong) Envoy *envoy;
+@property (nonatomic, strong) EnvoyClient *envoy;
 @property (nonatomic, assign) int requestCount;
 @property (nonatomic, strong) NSMutableArray<Result *> *results;
 @property (nonatomic, weak) NSTimer *requestTimer;
@@ -36,7 +36,7 @@ NSString *_REQUEST_SCHEME = @"http";
 - (void)startEnvoy {
   NSLog(@"Starting Envoy...");
   NSError *error;
-  self.envoy = [[EnvoyBuilder new] buildAndReturnError:&error];
+  self.envoy = [[EnvoyClientBuilder new] buildAndReturnError:&error];
   if (error) {
     NSLog(@"Starting Envoy failed: %@", error);
   } else {

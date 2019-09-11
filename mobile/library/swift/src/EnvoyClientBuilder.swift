@@ -1,8 +1,8 @@
 import Foundation
 
-/// Builder used for creating new instances of Envoy.
+/// Builder used for creating new instances of EnvoyClient.
 @objcMembers
-public final class EnvoyBuilder: NSObject {
+public final class EnvoyClientBuilder: NSObject {
   private var engineType: EnvoyEngine.Type = EnvoyEngineImpl.self
   private var logLevel: LogLevel = .info
   private var configYAML: String?
@@ -16,7 +16,7 @@ public final class EnvoyBuilder: NSObject {
   /// Add a log level to use with Envoy.
   ///
   /// - parameter logLevel: The log level to use with Envoy.
-  public func addLogLevel(_ logLevel: LogLevel) -> EnvoyBuilder {
+  public func addLogLevel(_ logLevel: LogLevel) -> EnvoyClientBuilder {
     self.logLevel = logLevel
     return self
   }
@@ -26,7 +26,7 @@ public final class EnvoyBuilder: NSObject {
   ///
   /// - parameter configYAML: the contents of a yaml file to use as a configuration.
   @discardableResult
-  public func addConfigYAML(_ configYAML: String?) -> EnvoyBuilder {
+  public func addConfigYAML(_ configYAML: String?) -> EnvoyClientBuilder {
     self.configYAML = configYAML
     return self
   }
@@ -36,7 +36,9 @@ public final class EnvoyBuilder: NSObject {
   /// - parameter connectTimeoutSeconds: Timeout for new network
   ///                                    connections to hosts in the cluster.
   @discardableResult
-  public func addConnectTimeoutSeconds(_ connectTimeoutSeconds: UInt32) -> EnvoyBuilder {
+  public func addConnectTimeoutSeconds(_ connectTimeoutSeconds: UInt32)
+    -> EnvoyClientBuilder
+  {
     self.connectTimeoutSeconds = connectTimeoutSeconds
     return self
   }
@@ -45,7 +47,7 @@ public final class EnvoyBuilder: NSObject {
   ///
   /// - parameter dnsRefreshSeconds: Rate in seconds to refresh DNS.
   @discardableResult
-  public func addDNSRefreshSeconds(_ dnsRefreshSeconds: UInt32) -> EnvoyBuilder {
+  public func addDNSRefreshSeconds(_ dnsRefreshSeconds: UInt32) -> EnvoyClientBuilder {
     self.dnsRefreshSeconds = dnsRefreshSeconds
     return self
   }
@@ -54,23 +56,23 @@ public final class EnvoyBuilder: NSObject {
   ///
   /// - parameter statsFlushSeconds: Interval at which to flush Envoy stats.
   @discardableResult
-  public func addStatsFlushSeconds(_ statsFlushSeconds: UInt32) -> EnvoyBuilder {
+  public func addStatsFlushSeconds(_ statsFlushSeconds: UInt32) -> EnvoyClientBuilder {
     self.statsFlushSeconds = statsFlushSeconds
     return self
   }
 
-  /// Builds a new instance of Envoy using the provided configurations.
+  /// Builds a new instance of EnvoyClient using the provided configurations.
   ///
-  /// - returns: A new instance of Envoy.
-  public func build() throws -> Envoy {
+  /// - returns: A new instance of EnvoyClient.
+  public func build() throws -> EnvoyClient {
     let engine = self.engineType.init()
     if let configYAML = self.configYAML {
-      return Envoy(configYAML: configYAML, logLevel: self.logLevel, engine: engine)
+      return EnvoyClient(configYAML: configYAML, logLevel: self.logLevel, engine: engine)
     } else {
       let config = EnvoyConfiguration(connectTimeoutSeconds: self.connectTimeoutSeconds,
                                       dnsRefreshSeconds: self.dnsRefreshSeconds,
                                       statsFlushSeconds: self.statsFlushSeconds)
-      return Envoy(config: config, logLevel: self.logLevel, engine: engine)
+      return EnvoyClient(config: config, logLevel: self.logLevel, engine: engine)
     }
   }
 
@@ -81,7 +83,7 @@ public final class EnvoyBuilder: NSObject {
   /// Used for testing, as initializing with `EnvoyEngine.Type` results in a
   /// segfault: https://github.com/lyft/envoy-mobile/issues/334
   @discardableResult
-  func addEngineType(_ engineType: EnvoyEngine.Type) -> EnvoyBuilder {
+  func addEngineType(_ engineType: EnvoyEngine.Type) -> EnvoyClientBuilder {
     self.engineType = engineType
     return self
   }
@@ -89,17 +91,17 @@ public final class EnvoyBuilder: NSObject {
 
 // MARK: - Objective-C helpers
 
-extension Envoy {
+extension EnvoyClient {
   /// Convenience builder function to allow for cleaner Objective-C syntax.
   ///
   /// For example:
   ///
-  /// Envoy *envoy = [EnvoyBuilder withBuild:^(EnvoyBuilder *builder) {
+  /// EnvoyClient *envoy = [EnvoyClientBuilder withBuild:^(EnvoyClientBuilder *builder) {
   ///   [builder addDNSRefreshSeconds:30];
   /// }];
   @objc
-  public static func with(build: (EnvoyBuilder) -> Void) throws -> Envoy {
-    let builder = EnvoyBuilder()
+  public static func with(build: (EnvoyClientBuilder) -> Void) throws -> EnvoyClient {
+    let builder = EnvoyClientBuilder()
     build(builder)
     return try builder.build()
   }

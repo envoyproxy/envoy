@@ -1,8 +1,8 @@
 import Foundation
 
-/// Client that is able to send and receive requests through Envoy.
+/// Client that is able to send and receive HTTP requests.
 @objc
-public protocol Client {
+public protocol HTTPClient {
   /// Start a new stream.
   ///
   /// - parameter request: The request for opening a stream.
