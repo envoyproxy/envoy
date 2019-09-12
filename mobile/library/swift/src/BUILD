@@ -5,10 +5,15 @@ load("//bazel:swift_static_framework.bzl", "swift_static_framework")
 swift_static_framework(
     name = "ios_framework",
     srcs = [
+        "Data+Extension.swift",
         "EnvoyClient.swift",
         "EnvoyClientBuilder.swift",
         "EnvoyError.swift",
         "EnvoyStreamEmitter.swift",
+        "GRPCClient.swift",
+        "GRPCRequestBuilder.swift",
+        "GRPCResponseHandler.swift",
+        "GRPCStreamEmitter.swift",
         "HTTPClient.swift",
         "LogLevel.swift",
         "Request.swift",

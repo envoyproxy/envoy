@@ -19,6 +19,27 @@ envoy_mobile_swift_test(
 )
 
 envoy_mobile_swift_test(
+    name = "grpc_request_builder_tests",
+    srcs = [
+        "GRPCRequestBuilderTests.swift",
+    ],
+)
+
+envoy_mobile_swift_test(
+    name = "grpc_response_handler_tests",
+    srcs = [
+        "GRPCResponseHandlerTests.swift",
+    ],
+)
+
+envoy_mobile_swift_test(
+    name = "grpc_stream_emitter_tests",
+    srcs = [
+        "GRPCStreamEmitterTests.swift",
+    ],
+)
+
+envoy_mobile_swift_test(
     name = "request_builder_tests",
     srcs = [
         "RequestBuilderTests.swift",
