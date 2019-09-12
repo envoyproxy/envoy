@@ -487,7 +487,7 @@ Http::FilterTrailersStatus JsonTranscoderFilter::encodeTrailers(Http::HeaderMap&
     // Drop the gRPC status headers, we already have them in the JSON body.
     response_headers_->removeGrpcStatus();
     response_headers_->removeGrpcMessage();
-    response_headers_->removeGrpcStatusDetailsBin();
+    response_headers_->remove(Http::Headers::get().GrpcStatusDetailsBin);
   } else if (!status_converted_to_json && !is_trailers_only_response) {
     // Copy the grpc-message header if it exists.
     const Http::HeaderEntry* grpc_message_header = trailers.GrpcMessage();

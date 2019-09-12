@@ -71,7 +71,7 @@ std::string Common::getGrpcMessage(const Http::HeaderMap& trailers) {
 
 absl::optional<google::rpc::Status>
 Common::getGrpcStatusDetailsBin(const Http::HeaderMap& trailers) {
-  const Http::HeaderEntry* details_header = trailers.GrpcStatusDetailsBin();
+  const Http::HeaderEntry* details_header = trailers.get(Http::Headers::get().GrpcStatusDetailsBin);
   if (!details_header) {
     return absl::nullopt;
   }
