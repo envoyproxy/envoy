@@ -54,7 +54,6 @@ public:
               network_connection_callbacks_);
         }}),
         connection_handler_(ENVOY_LOGGER(), *dispatcher_) {
-    EXPECT_CALL(listener_config_, listenerScope());
     EXPECT_CALL(listener_config_, listenerFiltersTimeout());
     EXPECT_CALL(listener_config_, continueOnListenerFiltersTimeout());
     EXPECT_CALL(listener_config_, listenerTag());
@@ -87,7 +86,6 @@ public:
   }
 
   void TearDown() override {
-    EXPECT_CALL(listener_config_, name());
     quic_listener_->onListenerShutdown();
     // Trigger alarm to fire before listener destruction.
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -105,7 +103,7 @@ protected:
   std::vector<Network::FilterFactoryCb> filter_factory_;
   Network::MockFilterChain filter_chain_;
   Network::MockFilterChainManager filter_chain_manager_;
-  Network::MockListenerConfig listener_config_;
+  NiceMock<Network::MockListenerConfig> listener_config_;
   quic::QuicConfig quic_config_;
   Server::ConnectionHandlerImpl connection_handler_;
   std::unique_ptr<ActiveQuicListener> quic_listener_;
