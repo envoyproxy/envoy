@@ -254,7 +254,7 @@ TEST(Context, ResponseAttributes) {
 
 TEST(Context, ConnectionAttributes) {
   NiceMock<StreamInfo::MockStreamInfo> info;
-  std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
+  std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> upstream_host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
   auto downstream_ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   auto upstream_ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
@@ -267,20 +267,20 @@ TEST(Context, ConnectionAttributes) {
       Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
   Network::Address::InstanceConstSharedPtr remote =
       Network::Utility::parseInternetAddress("10.20.30.40", 456, false);
-  Network::Address::InstanceConstSharedPtr upstream =
+  Network::Address::InstanceConstSharedPtr upstream_address =
       Network::Utility::parseInternetAddress("10.1.2.3", 679, false);
   const std::string sni_name = "kittens.com";
   EXPECT_CALL(info, downstreamLocalAddress()).WillRepeatedly(ReturnRef(local));
   EXPECT_CALL(info, downstreamRemoteAddress()).WillRepeatedly(ReturnRef(remote));
   EXPECT_CALL(info, downstreamSslConnection()).WillRepeatedly(Return(downstream_ssl_info));
   EXPECT_CALL(info, upstreamSslConnection()).WillRepeatedly(Return(upstream_ssl_info));
-  EXPECT_CALL(info, upstreamHost()).WillRepeatedly(Return(host));
+  EXPECT_CALL(info, upstreamHost()).WillRepeatedly(Return(upstream_host));
   EXPECT_CALL(info, requestedServerName()).WillRepeatedly(ReturnRef(sni_name));
   EXPECT_CALL(*downstream_ssl_info, peerCertificatePresented()).WillRepeatedly(Return(true));
   EXPECT_CALL(*upstream_ssl_info, peerCertificatePresented()).WillRepeatedly(Return(true));
   const std::string tls_version = "TLSv1";
   EXPECT_CALL(*downstream_ssl_info, tlsVersion()).WillRepeatedly(ReturnRef(tls_version));
-  EXPECT_CALL(*host, address()).WillRepeatedly(Return(upstream));
+  EXPECT_CALL(*upstream_host, address()).WillRepeatedly(Return(upstream_address));
 
   {
     auto value = connection[CelValue::CreateString(Undefined)];

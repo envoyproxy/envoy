@@ -61,40 +61,39 @@ whether the request path starts with `/v1/`:
 The following attributes are exposed to the language runtime:
 
 .. csv-table::
+   :header: Attribute, Type, Description
+   :widths: 1, 1, 2
 
-  :header: Attribute, Type, Description
-  :widths: 1, 1, 2
-
-  request.path, string, The path portion of the URL
-  request.url_path, string, The path portion of the URL without the query string
-  request.host, string, The host portion of the URL
-  request.scheme, string, The scheme portion of the URL
-  request.method, string, Request method
-  request.headers, map<string, string>, All request headers
-  request.referer, string, Referer request header
-  request.useragent, string, User agent request header
-  request.time, timestamp, Time of the first byte received
-  request.duration, duration, Total duration of the request
-  request.id, string, Request ID
-  request.size, int, Size of the request body
-  request.total_size, int, Total size of the request including the headers
-  response.code, int, Response HTTP status code
-  response.headers, map<string, string>, All response headers
-  response.trailers, map<string, string>, All response trailers
-  response.size, int, Size of the response body
-  source.address, string, Downstream connection remote address
-  source.port, int, Downstream connection remote port
-  destination.address, string, Downstream connection local address
-  destination.port, int, Downstream connection local port
-  metadata, :ref:`Metadata<envoy_api_msg_core.Metadata>`, Dynamic metadata
-  connection.mtls, bool, Indicates whether TLS is applied to the downstream connection and the peer ceritificate is presented
-  connection.requested_server_name, string, Requested server name in the downstream TLS connection
-  connection.tls_version, string, TLS version of the downstream TLS connection
-  upstream.address, string, Upstream connection remote address
-  upstream.port, int, Upstream connection remote port
-  upstream.mtls, bool, Indicates whether TLS is applied to the upstream connection and the peer ceritificate is presented
+   request.path, string, The path portion of the URL
+   request.url_path, string, The path portion of the URL without the query string
+   request.host, string, The host portion of the URL
+   request.scheme, string, The scheme portion of the URL
+   request.method, string, Request method
+   request.headers, `map<string, string>`, All request headers
+   request.referer, string, Referer request header
+   request.useragent, string, User agent request header
+   request.time, timestamp, Time of the first byte received
+   request.duration, duration, Total duration of the request
+   request.id, string, Request ID
+   request.size, int, Size of the request body
+   request.total_size, int, Total size of the request including the headers
+   response.code, int, Response HTTP status code
+   response.headers, `map<string, string>`, All response headers
+   response.trailers, `map<string, string>`, All response trailers
+   response.size, int, Size of the response body
+   source.address, string, Downstream connection remote address
+   source.port, int, Downstream connection remote port
+   destination.address, string, Downstream connection local address
+   destination.port, int, Downstream connection local port
+   metadata, :ref:`Metadata<envoy_api_msg_core.Metadata>`, Dynamic metadata
+   connection.mtls, bool, Indicates whether TLS is applied to the downstream connection and the peer ceritificate is presented
+   connection.requested_server_name, string, Requested server name in the downstream TLS connection
+   connection.tls_version, string, TLS version of the downstream TLS connection
+   upstream.address, string, Upstream connection remote address
+   upstream.port, int, Upstream connection remote port
+   upstream.mtls, bool, Indicates whether TLS is applied to the upstream connection and the peer ceritificate is presented
 
 
-Most attributes are optional and will provide the default values based on the type of the attribute.
+Most attributes are optional and provide the default value based on the type of the attribute.
 CEL supports presence checks for attributes and maps using `has()` syntax, e.g.
 `has(request.referer)`.
