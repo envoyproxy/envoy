@@ -139,7 +139,9 @@ void NewGrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
   auto added_removed = sub->second->watch_map_.updateWatchInterest(watch, resources);
   sub->second->sub_state_.updateSubscriptionInterest(added_removed.added_, added_removed.removed_);
   // Tell the server about our new interests, if there are any.
-  trySendDiscoveryRequests();
+  if (sub->second->sub_state_.subscriptionUpdatePending()) {
+    trySendDiscoveryRequests();
+  }
 }
 
 void NewGrpcMuxImpl::addSubscription(const std::string& type_url,
@@ -150,7 +152,6 @@ void NewGrpcMuxImpl::addSubscription(const std::string& type_url,
 }
 
 void NewGrpcMuxImpl::trySendDiscoveryRequests() {
-  auto old_queue_size = pausable_ack_queue_.size();
   while (true) {
     // Do any of our subscriptions even want to send a request?
     absl::optional<std::string> maybe_request_type = whoWantsToSendDiscoveryRequest();
@@ -185,9 +186,7 @@ void NewGrpcMuxImpl::trySendDiscoveryRequests() {
       grpc_stream_.sendMessage(sub->second->sub_state_.getNextRequestAckless());
     }
   }
-  if (pausable_ack_queue_.size() != old_queue_size || pausable_ack_queue_.size() != 0) {
-    grpc_stream_.maybeUpdateQueueSizeStat(pausable_ack_queue_.size());
-  }
+  grpc_stream_.maybeUpdateQueueSizeStat(pausable_ack_queue_.size());
 }
 
 // Checks whether external conditions allow sending a DeltaDiscoveryRequest. (Does not check
@@ -227,10 +226,7 @@ absl::optional<std::string> NewGrpcMuxImpl::whoWantsToSendDiscoveryRequest() {
   // subscriptions were initiated.
   for (const auto& sub_type : subscription_ordering_) {
     auto sub = subscriptions_.find(sub_type);
-    if (sub == subscriptions_.end()) {
-      continue;
-    }
-    if (sub->second->sub_state_.subscriptionUpdatePending() &&
+    if (sub != subscriptions_.end() && sub->second->sub_state_.subscriptionUpdatePending() &&
         !pausable_ack_queue_.paused(sub_type)) {
       return sub->first;
     }
