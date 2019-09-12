@@ -385,7 +385,6 @@ private:
   Network::ActiveUdpListenerFactoryPtr udp_listener_factory_;
   // to access ListenerManagerImpl::factory_.
   friend class ListenerFilterChainFactoryBuilder;
-  friend class QuicListenerFilterChainFactoryBuilder;
 };
 
 class ListenerFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
@@ -395,20 +394,9 @@ public:
   std::unique_ptr<Network::FilterChain>
   buildFilterChain(const ::envoy::api::v2::listener::FilterChain& filter_chain) const override;
 
-protected:
+private:
   ListenerImpl& parent_;
   Configuration::TransportSocketFactoryContextImpl& factory_context_;
-};
-
-using ListenerFilterChainFactoryBuilderPtr = std::unique_ptr<ListenerFilterChainFactoryBuilder>;
-
-class QuicListenerFilterChainFactoryBuilder : public ListenerFilterChainFactoryBuilder {
-public:
-  QuicListenerFilterChainFactoryBuilder(
-      ListenerImpl& listener, Configuration::TransportSocketFactoryContextImpl& factory_context);
-
-  std::unique_ptr<Network::FilterChain>
-  buildFilterChain(const ::envoy::api::v2::listener::FilterChain& filter_chain) const override;
 };
 
 } // namespace Server

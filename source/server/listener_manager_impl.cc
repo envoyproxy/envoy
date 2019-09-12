@@ -1,6 +1,7 @@
 #include "server/listener_manager_impl.h"
 
 #include <algorithm>
+#include <sys/socket.h>
 
 #include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/registry/registry.h"
@@ -223,21 +224,20 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
     addListenSocketOptions(
         Network::SocketOptionFactory::buildLiteralOptions(config.socket_options()));
   }
-  bool is_quic{false};
-
   if (socket_type_ == Network::Address::SocketType::Datagram) {
     // Needed for recvmsg to return destination address in IP header.
     addListenSocketOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
     // Needed to return receive buffer overflown indicator.
     addListenSocketOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
-    const auto& udp_config = config.has_udp_listener_config()
-                                 ? config.udp_listener_config()
-                                 : envoy::api::v2::listener::UdpListenerConfig();
-    const std::string listener_name = udp_config.udp_listener_name().empty()
-                                          ? UdpListenerNames::get().RawUdp
-                                          : udp_config.udp_listener_name();
-    is_quic = listener_name == UdpListenerNames::get().Quic;
-    try {
+    const auto& udp_config = config.udp_listener_config();
+    std::string listener_name =
+         udp_config.udp_listener_name().empty() ? UdpListenerNames::get().RawUdp : udp_config.udp_listener_name();
+    udp_listener_factory_ =
+        Config::Utility::getAndCheckFactory<ActiveUdpListenerConfigFactory>(listener_name)
+            .createActiveUdpListenerFactory(config.has_udp_listener_config()
+                                                ? config.udp_listener_config()
+                                                : envoy::api::v2::listener::UdpListenerConfig());
+     try {
       udp_listener_factory_ =
           Config::Utility::getAndCheckFactory<ActiveUdpListenerConfigFactory>(listener_name)
               .createActiveUdpListenerFactory(config.has_udp_listener_config()
@@ -245,7 +245,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
                                                   : envoy::api::v2::listener::UdpListenerConfig());
     } catch (const EnvoyException& ex) {
       // TODO(danzh): add implementation for quic_listener and do not catch
-      // exception here.
+       // exception here.
       ENVOY_LOG(error, "{}", ex.what());
       udp_listener_factory_ =
           Config::Utility::getAndCheckFactory<ActiveUdpListenerConfigFactory>(
@@ -277,21 +277,26 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
     }
   }
 
-  if (config.filter_chains().empty() &&
-      (socket_type_ == Network::Address::SocketType::Stream || is_quic)) {
+  if (config.filter_chains().empty() && (socket_type_ == Network::Address::SocketType::Stream || !udp_listener_factory_->isTransportConnectionless())) {
+    // If we got here, this is a tcp listener, so ensure there is a filter chain specified
     throw EnvoyException(fmt::format("error adding listener '{}': no filter chains specified",
                                      address_->asString()));
+  } else if (udp_listener_factory_ != nullptr && !udp_listener_factory_->isTransportConnectionless()) {
+    for(auto& filter_chain : config.filter_chains()) {
+      if (!filter_chain.has_transport_socket()) {
+    throw EnvoyException(fmt::format("error adding listener '{}': no transport socket specified for connection oriented UDP listener", address_->asString()));
+      }
+    }
   }
+
   Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       parent_.server_.admin(), parent_.server_.sslContextManager(), *listener_scope_,
       parent_.server_.clusterManager(), parent_.server_.localInfo(), parent_.server_.dispatcher(),
       parent_.server_.random(), parent_.server_.stats(), parent_.server_.singletonManager(),
       parent_.server_.threadLocal(), validation_visitor, parent_.server_.api());
   factory_context.setInitManager(initManager());
-  ListenerFilterChainFactoryBuilderPtr builder =
-      is_quic ? std::make_unique<QuicListenerFilterChainFactoryBuilder>(*this, factory_context)
-              : std::make_unique<ListenerFilterChainFactoryBuilder>(*this, factory_context);
-  filter_chain_manager_.addFilterChain(config.filter_chains(), *builder);
+  ListenerFilterChainFactoryBuilder builder(*this, factory_context);
+  filter_chain_manager_.addFilterChain(config.filter_chains(), builder);
 
   if (socket_type_ == Network::Address::SocketType::Datagram) {
     return;
@@ -846,8 +851,6 @@ ListenerFilterChainFactoryBuilder::ListenerFilterChainFactoryBuilder(
 
 std::unique_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFilterChain(
     const ::envoy::api::v2::listener::FilterChain& filter_chain) const {
-  std::vector<std::string> server_names(filter_chain.filter_chain_match().server_names().begin(),
-                                        filter_chain.filter_chain_match().server_names().end());
   // If the cluster doesn't have transport socket configured, then use the default "raw_buffer"
   // transport socket or BoringSSL-based "tls" transport socket if TLS settings are configured.
   // We copy by value first then override if necessary.
@@ -867,27 +870,12 @@ std::unique_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFi
   ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
       transport_socket, parent_.messageValidationVisitor(), config_factory);
 
-  return std::make_unique<TcpFilterChainImpl>(
+  std::vector<std::string> server_names(filter_chain.filter_chain_match().server_names().begin(),
+                                        filter_chain.filter_chain_match().server_names().end());
+
+  return std::make_unique<FilterChainImpl>(
       config_factory.createTransportSocketFactory(*message, factory_context_,
                                                   std::move(server_names)),
-      parent_.parent_.factory_.createNetworkFilterFactoryList(filter_chain.filters(), parent_));
-}
-
-QuicListenerFilterChainFactoryBuilder::QuicListenerFilterChainFactoryBuilder(
-    ListenerImpl& listener,
-    Server::Configuration::TransportSocketFactoryContextImpl& factory_context)
-    : ListenerFilterChainFactoryBuilder(listener, factory_context) {}
-
-std::unique_ptr<Network::FilterChain> QuicListenerFilterChainFactoryBuilder::buildFilterChain(
-    const ::envoy::api::v2::listener::FilterChain& filter_chain) const {
-  // Initialize filter chain for QUIC.
-  if (!filter_chain.has_tls_context()) {
-    return nullptr;
-  }
-  auto& tls_context_factory =
-      Config::Utility::getAndCheckFactory<Ssl::ContextConfigFactory>("downstream_tls_context");
-  return std::make_unique<QuicFilterChainImpl>(
-      tls_context_factory.createSslContextConfig(filter_chain.tls_context(), factory_context_),
       parent_.parent_.factory_.createNetworkFilterFactoryList(filter_chain.filters(), parent_));
 }
 

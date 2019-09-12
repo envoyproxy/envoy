@@ -118,6 +118,8 @@ public:
   virtual ConnectionHandler::ActiveListenerPtr
   createActiveUdpListener(ConnectionHandler& parent, Event::Dispatcher& disptacher,
                           spdlog::logger& logger, Network::ListenerConfig& config) const PURE;
+
+  virtual bool isTransportConnectionless() const PURE;
 };
 
 using ActiveUdpListenerFactoryPtr = std::unique_ptr<ActiveUdpListenerFactory>;

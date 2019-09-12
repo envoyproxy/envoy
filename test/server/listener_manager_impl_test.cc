@@ -176,6 +176,7 @@ public:
     socket_ = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
     local_address_.reset(new Network::Address::Ipv4Instance("127.0.0.1", 1234));
     remote_address_.reset(new Network::Address::Ipv4Instance("127.0.0.1", 1234));
+    EXPECT_CALL(os_sys_calls_, close(_)).WillRepeatedly(Return(Api::SysCallIntResult{0, errno}));
   }
 
   const Network::FilterChain*
@@ -265,11 +266,9 @@ public:
                         const envoy::api::v2::core::SocketOption::SocketState& expected_state,
                         const Network::SocketOptionName& expected_option, int expected_value,
                         uint32_t expected_num_options = 1) {
-    NiceMock<Api::MockOsSysCalls> os_sys_calls;
-    TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
     if (expected_option.has_value()) {
       expectCreateListenSocket(expected_state, expected_num_options);
-      expectSetsockopt(os_sys_calls, expected_option.level(), expected_option.option(),
+      expectSetsockopt(os_sys_calls_, expected_option.level(), expected_option.option(),
                        expected_value, expected_num_options);
       manager_->addOrUpdateListener(listener, "", true);
       EXPECT_EQ(1U, manager_->listeners().size());
@@ -279,6 +278,10 @@ public:
       EXPECT_EQ(0U, manager_->listeners().size());
     }
   }
+
+protected:
+  NiceMock<Api::MockOsSysCalls> os_sys_calls_;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&os_sys_calls_};
 
 private:
   std::unique_ptr<Network::MockConnectionSocket> socket_;
@@ -370,8 +373,9 @@ filter_chains:
 
   auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
   ASSERT_NE(filter_chain, nullptr);
-  EXPECT_TRUE(filter_chain->transportSocketFactory()->implementsSecureTransport());
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
 }
+
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, QuicUsesSslContext) {
   NiceMock<Api::MockOsSysCalls> os_sys_calls;
@@ -388,19 +392,21 @@ filter_chains:
 - filter_chain_match:
     transport_protocol: "quic"
   filters: []
-  tls_context:
-    common_tls_context:
-      tls_certificates:
-      - certificate_chain:
-          filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
-        private_key:
-          filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
-      validation_context:
-        trusted_ca:
-          filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-        verify_subject_alt_name:
-        - localhost
-        - 127.0.0.1
+  transport_socket:
+  - name: "quic"
+    tls_context:
+      common_tls_context:
+        tls_certificates:
+        - certificate_chain:
+            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+          private_key:
+            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+        validation_context:
+          trusted_ca:
+            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+          verify_subject_alt_name:
+          - localhost
+          - 127.0.0.1
 udp_listener_config:
   udp_listener_name: "quic_listener"
   )EOF",
@@ -436,6 +442,7 @@ udp_listener_config:
   EXPECT_EQ(nullptr, filter_chain->transportSocketFactory());
 }
 
+
 TEST_F(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
   const std::string proto_text = R"EOF(
     address: {
@@ -453,9 +460,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
   EXPECT_CALL(server_.random_, uuid());
   EXPECT_CALL(listener_factory_,
               createListenSocket(_, Network::Address::SocketType::Datagram, _, true));
-  NiceMock<Api::MockOsSysCalls> os_sys_calls;
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-  EXPECT_CALL(os_sys_calls, setsockopt_(_, _, _, _, _)).Times(testing::AtLeast(1));
+  EXPECT_CALL(os_sys_calls_, setsockopt_(_, _, _, _, _)).Times(testing::AtLeast(1));
+  EXPECT_CALL(os_sys_calls_, close(_)).WillRepeatedly(Return(Api::SysCallIntResult{0, errno}));
   manager_->addOrUpdateListener(listener_proto, "", true);
   EXPECT_EQ(1u, manager_->listeners().size());
 }
@@ -757,6 +763,7 @@ drain_type: default
 
   ON_CALL(os_sys_calls, socket(AF_INET, _, 0)).WillByDefault(Return(Api::SysCallIntResult{5, 0}));
   ON_CALL(os_sys_calls, socket(AF_INET6, _, 0)).WillByDefault(Return(Api::SysCallIntResult{-1, 0}));
+  ON_CALL(os_sys_calls, close(_)).WillByDefault(Return(Api::SysCallIntResult{0, 0}));
 
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
 
@@ -789,6 +796,7 @@ drain_type: default
 
   ON_CALL(os_sys_calls, socket(AF_INET, _, 0)).WillByDefault(Return(Api::SysCallIntResult{-1, 0}));
   ON_CALL(os_sys_calls, socket(AF_INET6, _, 0)).WillByDefault(Return(Api::SysCallIntResult{5, 0}));
+  ON_CALL(os_sys_calls, close(_)).WillByDefault(Return(Api::SysCallIntResult{0, 0}));
 
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
 
@@ -1492,11 +1500,11 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDestinationP
   // IPv4 client connects to valid port - using 1st filter chain.
   filter_chain = findFilterChain(8080, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
   ASSERT_NE(filter_chain, nullptr);
-  EXPECT_TRUE(filter_chain->transportSocketFactory()->implementsSecureTransport());
-  auto transport_socket = filter_chain->transportSocketFactory()->createTransportSocket(nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   auto ssl_socket =
       dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
-  auto server_names = ssl_socket->dnsSansLocalCertificate();
+  auto server_names = ssl_socket->ssl()->dnsSansLocalCertificate();
   EXPECT_EQ(server_names.size(), 1);
   EXPECT_EQ(server_names.front(), "server1.example.com");
 
@@ -1535,11 +1543,11 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDestinationI
   // IPv4 client connects to valid IP - using 1st filter chain.
   filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
   ASSERT_NE(filter_chain, nullptr);
-  EXPECT_TRUE(filter_chain->transportSocketFactory()->implementsSecureTransport());
-  auto transport_socket = filter_chain->transportSocketFactory()->createTransportSocket(nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   auto ssl_socket =
       dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
-  auto server_names = ssl_socket->dnsSansLocalCertificate();
+  auto server_names = ssl_socket->ssl()->dnsSansLocalCertificate();
   EXPECT_EQ(server_names.size(), 1);
   EXPECT_EQ(server_names.front(), "server1.example.com");
 
@@ -1583,11 +1591,11 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithServerNamesM
   filter_chain =
       findFilterChain(1234, "127.0.0.1", "server1.example.com", "tls", {}, "8.8.8.8", 111);
   ASSERT_NE(filter_chain, nullptr);
-  EXPECT_TRUE(filter_chain->transportSocketFactory()->implementsSecureTransport());
-  auto transport_socket = filter_chain->transportSocketFactory()->createTransportSocket(nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   auto ssl_socket =
       dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
-  auto server_names = ssl_socket->dnsSansLocalCertificate();
+  auto server_names = ssl_socket->ssl()->dnsSansLocalCertificate();
   EXPECT_EQ(server_names.size(), 1);
   EXPECT_EQ(server_names.front(), "server1.example.com");
 }
@@ -1622,11 +1630,11 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithTransportPro
   // TLS client - using 1st filter chain.
   filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
   ASSERT_NE(filter_chain, nullptr);
-  EXPECT_TRUE(filter_chain->transportSocketFactory()->implementsSecureTransport());
-  auto transport_socket = filter_chain->transportSocketFactory()->createTransportSocket(nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   auto ssl_socket =
       dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
-  auto server_names = ssl_socket->dnsSansLocalCertificate();
+  auto server_names = ssl_socket->ssl()->dnsSansLocalCertificate();
   EXPECT_EQ(server_names.size(), 1);
   EXPECT_EQ(server_names.front(), "server1.example.com");
 }
@@ -1662,11 +1670,11 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithApplicationP
   // TLS client with "http/1.1" ALPN - using 1st filter chain.
   filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {"h2", "http/1.1"}, "8.8.8.8", 111);
   ASSERT_NE(filter_chain, nullptr);
-  EXPECT_TRUE(filter_chain->transportSocketFactory()->implementsSecureTransport());
-  auto transport_socket = filter_chain->transportSocketFactory()->createTransportSocket(nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   auto ssl_socket =
       dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
-  auto server_names = ssl_socket->dnsSansLocalCertificate();
+  auto server_names = ssl_socket->ssl()->dnsSansLocalCertificate();
   EXPECT_EQ(server_names.size(), 1);
   EXPECT_EQ(server_names.front(), "server1.example.com");
 }
@@ -1703,11 +1711,11 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceTypeMa
   filter_chain =
       findFilterChain(1234, "127.0.0.1", "", "tls", {"h2", "http/1.1"}, "127.0.0.1", 111);
   ASSERT_NE(filter_chain, nullptr);
-  EXPECT_TRUE(filter_chain->transportSocketFactory()->implementsSecureTransport());
-  auto transport_socket = filter_chain->transportSocketFactory()->createTransportSocket(nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   auto ssl_socket =
       dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
-  auto server_names = ssl_socket->dnsSansLocalCertificate();
+  auto server_names = ssl_socket->ssl()->dnsSansLocalCertificate();
   EXPECT_EQ(server_names.size(), 1);
   EXPECT_EQ(server_names.front(), "server1.example.com");
 
@@ -1715,10 +1723,10 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceTypeMa
   filter_chain =
       findFilterChain(0, "/tmp/test.sock", "", "tls", {"h2", "http/1.1"}, "/tmp/test.sock", 111);
   ASSERT_NE(filter_chain, nullptr);
-  EXPECT_TRUE(filter_chain->transportSocketFactory()->implementsSecureTransport());
-  transport_socket = filter_chain->transportSocketFactory()->createTransportSocket(nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   ssl_socket = dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
-  server_names = ssl_socket->dnsSansLocalCertificate();
+  server_names = ssl_socket->ssl()->dnsSansLocalCertificate();
   EXPECT_EQ(server_names.size(), 1);
   EXPECT_EQ(server_names.front(), "server1.example.com");
 }
@@ -1757,11 +1765,11 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceIpMatc
   filter_chain =
       findFilterChain(1234, "127.0.0.1", "", "tls", {"h2", "http/1.1"}, "10.0.0.10", 111);
   ASSERT_NE(filter_chain, nullptr);
-  EXPECT_TRUE(filter_chain->transportSocketFactory()->implementsSecureTransport());
-  auto transport_socket = filter_chain->transportSocketFactory()->createTransportSocket(nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   auto ssl_socket =
       dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
-  auto server_names = ssl_socket->dnsSansLocalCertificate();
+  auto server_names = ssl_socket->ssl()->dnsSansLocalCertificate();
   EXPECT_EQ(server_names.size(), 1);
   EXPECT_EQ(server_names.front(), "server1.example.com");
 
@@ -1841,11 +1849,11 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourcePortMa
   // Client with source port 100. Match.
   auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "127.0.0.1", 100);
   ASSERT_NE(filter_chain, nullptr);
-  EXPECT_TRUE(filter_chain->transportSocketFactory()->implementsSecureTransport());
-  auto transport_socket = filter_chain->transportSocketFactory()->createTransportSocket(nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   auto ssl_socket =
       dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
-  auto server_names = ssl_socket->dnsSansLocalCertificate();
+  auto server_names = ssl_socket->ssl()->dnsSansLocalCertificate();
   EXPECT_EQ(server_names.size(), 1);
   EXPECT_EQ(server_names.front(), "server1.example.com");
 
@@ -1901,30 +1909,30 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainWithSourceType
   // LOCAL TLS client without "http/1.1" ALPN - using 1st filter chain.
   filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111);
   ASSERT_NE(filter_chain, nullptr);
-  EXPECT_TRUE(filter_chain->transportSocketFactory()->implementsSecureTransport());
-  auto transport_socket = filter_chain->transportSocketFactory()->createTransportSocket(nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   auto ssl_socket =
       dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
-  auto server_names = ssl_socket->dnsSansLocalCertificate();
+  auto server_names = ssl_socket->ssl()->dnsSansLocalCertificate();
   EXPECT_EQ(server_names.size(), 1);
   EXPECT_EQ(server_names.front(), "server1.example.com");
 
   // EXTERNAL TLS client with "http/1.1" ALPN - using 2nd filter chain.
   filter_chain = findFilterChain(1234, "8.8.8.8", "", "tls", {"h2", "http/1.1"}, "4.4.4.4", 111);
   ASSERT_NE(filter_chain, nullptr);
-  EXPECT_TRUE(filter_chain->transportSocketFactory()->implementsSecureTransport());
-  transport_socket = filter_chain->transportSocketFactory()->createTransportSocket(nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   ssl_socket = dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
-  auto uri = ssl_socket->uriSanLocalCertificate();
+  auto uri = ssl_socket->ssl()->uriSanLocalCertificate();
   EXPECT_EQ(uri[0], "spiffe://lyft.com/test-team");
 
   // EXTERNAL TLS client without "http/1.1" ALPN - using 3nd filter chain.
   filter_chain = findFilterChain(1234, "8.8.8.8", "", "tls", {}, "4.4.4.4", 111);
   ASSERT_NE(filter_chain, nullptr);
-  EXPECT_TRUE(filter_chain->transportSocketFactory()->implementsSecureTransport());
-  transport_socket = filter_chain->transportSocketFactory()->createTransportSocket(nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   ssl_socket = dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
-  server_names = ssl_socket->dnsSansLocalCertificate();
+  server_names = ssl_socket->ssl()->dnsSansLocalCertificate();
   EXPECT_EQ(server_names.size(), 2);
   EXPECT_EQ(server_names.front(), "*.example.com");
 }
@@ -1969,40 +1977,40 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
   // IPv4 client connects to default port - using 1st filter chain.
   auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111);
   ASSERT_NE(filter_chain, nullptr);
-  EXPECT_TRUE(filter_chain->transportSocketFactory()->implementsSecureTransport());
-  auto transport_socket = filter_chain->transportSocketFactory()->createTransportSocket(nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   auto ssl_socket =
       dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
-  auto uri = ssl_socket->uriSanLocalCertificate();
+  auto uri = ssl_socket->ssl()->uriSanLocalCertificate();
   EXPECT_EQ(uri[0], "spiffe://lyft.com/test-team");
 
   // IPv4 client connects to port 8080 - using 2nd filter chain.
   filter_chain = findFilterChain(8080, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111);
   ASSERT_NE(filter_chain, nullptr);
-  EXPECT_TRUE(filter_chain->transportSocketFactory()->implementsSecureTransport());
-  transport_socket = filter_chain->transportSocketFactory()->createTransportSocket(nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   ssl_socket = dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
-  auto server_names = ssl_socket->dnsSansLocalCertificate();
+  auto server_names = ssl_socket->ssl()->dnsSansLocalCertificate();
   EXPECT_EQ(server_names.size(), 1);
   EXPECT_EQ(server_names.front(), "server1.example.com");
 
   // IPv4 client connects to port 8081 - using 3nd filter chain.
   filter_chain = findFilterChain(8081, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111);
   ASSERT_NE(filter_chain, nullptr);
-  EXPECT_TRUE(filter_chain->transportSocketFactory()->implementsSecureTransport());
-  transport_socket = filter_chain->transportSocketFactory()->createTransportSocket(nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   ssl_socket = dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
-  server_names = ssl_socket->dnsSansLocalCertificate();
+  server_names = ssl_socket->ssl()->dnsSansLocalCertificate();
   EXPECT_EQ(server_names.size(), 2);
   EXPECT_EQ(server_names.front(), "*.example.com");
 
   // UDS client - using 1st filter chain.
   filter_chain = findFilterChain(0, "/tmp/test.sock", "", "tls", {}, "127.0.0.1", 111);
   ASSERT_NE(filter_chain, nullptr);
-  EXPECT_TRUE(filter_chain->transportSocketFactory()->implementsSecureTransport());
-  transport_socket = filter_chain->transportSocketFactory()->createTransportSocket(nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   ssl_socket = dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
-  uri = ssl_socket->uriSanLocalCertificate();
+  uri = ssl_socket->ssl()->uriSanLocalCertificate();
   EXPECT_EQ(uri[0], "spiffe://lyft.com/test-team");
 }
 
@@ -2046,40 +2054,40 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
   // IPv4 client connects to default IP - using 1st filter chain.
   auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111);
   ASSERT_NE(filter_chain, nullptr);
-  EXPECT_TRUE(filter_chain->transportSocketFactory()->implementsSecureTransport());
-  auto transport_socket = filter_chain->transportSocketFactory()->createTransportSocket(nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   auto ssl_socket =
       dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
-  auto uri = ssl_socket->uriSanLocalCertificate();
+  auto uri = ssl_socket->ssl()->uriSanLocalCertificate();
   EXPECT_EQ(uri[0], "spiffe://lyft.com/test-team");
 
   // IPv4 client connects to exact IP match - using 2nd filter chain.
   filter_chain = findFilterChain(1234, "192.168.0.1", "", "tls", {}, "127.0.0.1", 111);
   ASSERT_NE(filter_chain, nullptr);
-  EXPECT_TRUE(filter_chain->transportSocketFactory()->implementsSecureTransport());
-  transport_socket = filter_chain->transportSocketFactory()->createTransportSocket(nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   ssl_socket = dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
-  auto server_names = ssl_socket->dnsSansLocalCertificate();
+  auto server_names = ssl_socket->ssl()->dnsSansLocalCertificate();
   EXPECT_EQ(server_names.size(), 1);
   EXPECT_EQ(server_names.front(), "server1.example.com");
 
   // IPv4 client connects to wildcard IP match - using 3nd filter chain.
   filter_chain = findFilterChain(1234, "192.168.1.1", "", "tls", {}, "192.168.1.1", 111);
   ASSERT_NE(filter_chain, nullptr);
-  EXPECT_TRUE(filter_chain->transportSocketFactory()->implementsSecureTransport());
-  transport_socket = filter_chain->transportSocketFactory()->createTransportSocket(nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   ssl_socket = dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
-  server_names = ssl_socket->dnsSansLocalCertificate();
+  server_names = ssl_socket->ssl()->dnsSansLocalCertificate();
   EXPECT_EQ(server_names.size(), 2);
   EXPECT_EQ(server_names.front(), "*.example.com");
 
   // UDS client - using 1st filter chain.
   filter_chain = findFilterChain(0, "/tmp/test.sock", "", "tls", {}, "/tmp/test.sock", 111);
   ASSERT_NE(filter_chain, nullptr);
-  EXPECT_TRUE(filter_chain->transportSocketFactory()->implementsSecureTransport());
-  transport_socket = filter_chain->transportSocketFactory()->createTransportSocket(nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   ssl_socket = dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
-  uri = ssl_socket->uriSanLocalCertificate();
+  uri = ssl_socket->ssl()->uriSanLocalCertificate();
   EXPECT_EQ(uri[0], "spiffe://lyft.com/test-team");
 }
 
@@ -2132,21 +2140,21 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithServerNam
   // TLS client without SNI - using 1st filter chain.
   auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111);
   ASSERT_NE(filter_chain, nullptr);
-  EXPECT_TRUE(filter_chain->transportSocketFactory()->implementsSecureTransport());
-  auto transport_socket = filter_chain->transportSocketFactory()->createTransportSocket(nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   auto ssl_socket =
       dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
-  auto uri = ssl_socket->uriSanLocalCertificate();
+  auto uri = ssl_socket->ssl()->uriSanLocalCertificate();
   EXPECT_EQ(uri[0], "spiffe://lyft.com/test-team");
 
   // TLS client with exact SNI match - using 2nd filter chain.
   filter_chain =
       findFilterChain(1234, "127.0.0.1", "server1.example.com", "tls", {}, "127.0.0.1", 111);
   ASSERT_NE(filter_chain, nullptr);
-  EXPECT_TRUE(filter_chain->transportSocketFactory()->implementsSecureTransport());
-  transport_socket = filter_chain->transportSocketFactory()->createTransportSocket(nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   ssl_socket = dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
-  auto server_names = ssl_socket->dnsSansLocalCertificate();
+  auto server_names = ssl_socket->ssl()->dnsSansLocalCertificate();
   EXPECT_EQ(server_names.size(), 1);
   EXPECT_EQ(server_names.front(), "server1.example.com");
 
@@ -2154,10 +2162,10 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithServerNam
   filter_chain =
       findFilterChain(1234, "127.0.0.1", "server2.example.com", "tls", {}, "127.0.0.1", 111);
   ASSERT_NE(filter_chain, nullptr);
-  EXPECT_TRUE(filter_chain->transportSocketFactory()->implementsSecureTransport());
-  transport_socket = filter_chain->transportSocketFactory()->createTransportSocket(nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   ssl_socket = dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
-  server_names = ssl_socket->dnsSansLocalCertificate();
+  server_names = ssl_socket->ssl()->dnsSansLocalCertificate();
   EXPECT_EQ(server_names.size(), 2);
   EXPECT_EQ(server_names.front(), "*.example.com");
 
@@ -2165,10 +2173,10 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithServerNam
   filter_chain =
       findFilterChain(1234, "127.0.0.1", "www.wildcard.com", "tls", {}, "127.0.0.1", 111);
   ASSERT_NE(filter_chain, nullptr);
-  EXPECT_TRUE(filter_chain->transportSocketFactory()->implementsSecureTransport());
-  transport_socket = filter_chain->transportSocketFactory()->createTransportSocket(nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   ssl_socket = dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
-  server_names = ssl_socket->dnsSansLocalCertificate();
+  server_names = ssl_socket->ssl()->dnsSansLocalCertificate();
   EXPECT_EQ(server_names.size(), 2);
   EXPECT_EQ(server_names.front(), "*.example.com");
 }
@@ -2201,16 +2209,16 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithTransport
   // TCP client - using 1st filter chain.
   auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "raw_buffer", {}, "127.0.0.1", 111);
   ASSERT_NE(filter_chain, nullptr);
-  EXPECT_FALSE(filter_chain->transportSocketFactory()->implementsSecureTransport());
+  EXPECT_FALSE(filter_chain->transportSocketFactory().implementsSecureTransport());
 
   // TLS client - using 2nd filter chain.
   filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111);
   ASSERT_NE(filter_chain, nullptr);
-  EXPECT_TRUE(filter_chain->transportSocketFactory()->implementsSecureTransport());
-  auto transport_socket = filter_chain->transportSocketFactory()->createTransportSocket(nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   auto ssl_socket =
       dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
-  auto server_names = ssl_socket->dnsSansLocalCertificate();
+  auto server_names = ssl_socket->ssl()->dnsSansLocalCertificate();
   EXPECT_EQ(server_names.size(), 1);
   EXPECT_EQ(server_names.front(), "server1.example.com");
 }
@@ -2243,17 +2251,17 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithApplicati
   // TLS client without ALPN - using 1st filter chain.
   auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111);
   ASSERT_NE(filter_chain, nullptr);
-  EXPECT_FALSE(filter_chain->transportSocketFactory()->implementsSecureTransport());
+  EXPECT_FALSE(filter_chain->transportSocketFactory().implementsSecureTransport());
 
   // TLS client with "h2,http/1.1" ALPN - using 2nd filter chain.
   filter_chain =
       findFilterChain(1234, "127.0.0.1", "", "tls", {"h2", "http/1.1"}, "127.0.0.1", 111);
   ASSERT_NE(filter_chain, nullptr);
-  EXPECT_TRUE(filter_chain->transportSocketFactory()->implementsSecureTransport());
-  auto transport_socket = filter_chain->transportSocketFactory()->createTransportSocket(nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   auto ssl_socket =
       dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
-  auto server_names = ssl_socket->dnsSansLocalCertificate();
+  auto server_names = ssl_socket->ssl()->dnsSansLocalCertificate();
   EXPECT_EQ(server_names.size(), 1);
   EXPECT_EQ(server_names.front(), "server1.example.com");
 }
@@ -2288,7 +2296,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithMultipleR
   // TLS client without SNI and ALPN - using 1st filter chain.
   auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111);
   ASSERT_NE(filter_chain, nullptr);
-  EXPECT_FALSE(filter_chain->transportSocketFactory()->implementsSecureTransport());
+  EXPECT_FALSE(filter_chain->transportSocketFactory().implementsSecureTransport());
 
   // TLS client with exact SNI match but without ALPN - no match (SNI blackholed by configuration).
   filter_chain =
@@ -2299,17 +2307,17 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithMultipleR
   filter_chain =
       findFilterChain(1234, "127.0.0.1", "", "tls", {"h2", "http/1.1"}, "127.0.0.1", 111);
   ASSERT_NE(filter_chain, nullptr);
-  EXPECT_FALSE(filter_chain->transportSocketFactory()->implementsSecureTransport());
+  EXPECT_FALSE(filter_chain->transportSocketFactory().implementsSecureTransport());
 
   // TLS client with exact SNI match and ALPN match - using 2nd filter chain.
   filter_chain = findFilterChain(1234, "127.0.0.1", "server1.example.com", "tls",
                                  {"h2", "http/1.1"}, "127.0.0.1", 111);
   ASSERT_NE(filter_chain, nullptr);
-  EXPECT_TRUE(filter_chain->transportSocketFactory()->implementsSecureTransport());
-  auto transport_socket = filter_chain->transportSocketFactory()->createTransportSocket(nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   auto ssl_socket =
       dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
-  auto server_names = ssl_socket->dnsSansLocalCertificate();
+  auto server_names = ssl_socket->ssl()->dnsSansLocalCertificate();
   EXPECT_EQ(server_names.size(), 1);
   EXPECT_EQ(server_names.front(), "server1.example.com");
 }
@@ -2989,7 +2997,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TransparentFreebindListenerDisabl
 TEST_F(ListenerManagerImplWithRealFiltersTest, TransparentListenerEnabled) {
   auto listener = createIPv4Listener("TransparentListener");
   listener.mutable_transparent()->set_value(true);
-
   testSocketOption(listener, envoy::api::v2::core::SocketOption::STATE_PREBIND,
                    ENVOY_SOCKET_IP_TRANSPARENT, /* expected_value */ 1,
                    /* expected_num_options */ 2);
@@ -3024,9 +3031,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, FastOpenListenerEnabled) {
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, LiteralSockoptListenerEnabled) {
-  NiceMock<Api::MockOsSysCalls> os_sys_calls;
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-
   const envoy::api::v2::Listener listener = parseListenerFromV2Yaml(R"EOF(
     name: SockoptsListener
     address:
@@ -3044,11 +3048,11 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, LiteralSockoptListenerEnabled) {
 
   expectCreateListenSocket(envoy::api::v2::core::SocketOption::STATE_PREBIND,
                            /* expected_num_options */ 3);
-  expectSetsockopt(os_sys_calls,
+  expectSetsockopt(os_sys_calls_,
                    /* expected_sockopt_level */ 1,
                    /* expected_sockopt_name */ 2,
                    /* expected_value */ 3);
-  expectSetsockopt(os_sys_calls,
+  expectSetsockopt(os_sys_calls_,
                    /* expected_sockopt_level */ 4,
                    /* expected_sockopt_name */ 5,
                    /* expected_value */ 6);

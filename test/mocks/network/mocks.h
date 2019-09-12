@@ -187,7 +187,7 @@ public:
   ~MockFilterChain() override;
 
   // Network::FilterChain
-  MOCK_CONST_METHOD0(transportSocketFactory, const TransportSocketFactory*());
+  MOCK_CONST_METHOD0(transportSocketFactory, const TransportSocketFactory&());
   MOCK_CONST_METHOD0(networkFilterFactories, const std::vector<FilterFactoryCb>&());
 };
 
@@ -398,7 +398,7 @@ public:
   MOCK_METHOD1(doRead, IoResult(Buffer::Instance& buffer));
   MOCK_METHOD2(doWrite, IoResult(Buffer::Instance& buffer, bool end_stream));
   MOCK_METHOD0(onConnected, void());
-  MOCK_CONST_METHOD0(ssl, const Ssl::ConnectionInfo*());
+  MOCK_CONST_METHOD0(ssl, Ssl::ConnectionInfoConstSharedPtr());
 
   TransportSocketCallbacks* callbacks_{};
 };

@@ -82,5 +82,22 @@ envoy_cc_library(
     name = "envoy_quic_utils_lib",
     hdrs = ["envoy_quic_utils.h"],
     external_deps = ["quiche_quic_platform"],
+    tags = ["nofips"],
     deps = ["//source/common/network:address_lib"],
+)
+
+envoy_cc_library(
+    name = "quic_transport_socket_factory_lib",
+    srcs = ["quic_transport_socket_factory.cc"],
+    hdrs = ["quic_transport_socket_factory.h"],
+    tags = ["nofips"],
+    deps = [
+        "//include/envoy/network:transport_socket_interface",
+        "//include/envoy/server:transport_socket_config_interface",
+        "//include/envoy/ssl:context_config_interface",
+        "//source/common/common:assert_lib",
+        "//source/extensions/transport_sockets:well_known_names",
+        "//source/extensions/transport_sockets/tls:context_config_lib",
+        "@envoy_api//envoy/api/v2/auth:cert_cc",
+    ],
 )
