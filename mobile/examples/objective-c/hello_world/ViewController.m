@@ -36,7 +36,8 @@ NSString *_REQUEST_SCHEME = @"http";
 - (void)startEnvoy {
   NSLog(@"Starting Envoy...");
   NSError *error;
-  self.envoy = [[EnvoyClientBuilder new] buildAndReturnError:&error];
+  EnvoyClientBuilder *builder = [[EnvoyClientBuilder alloc] initWithDomain:_REQUEST_AUTHORITY];
+  self.envoy = [builder buildAndReturnError:&error];
   if (error) {
     NSLog(@"Starting Envoy failed: %@", error);
   } else {

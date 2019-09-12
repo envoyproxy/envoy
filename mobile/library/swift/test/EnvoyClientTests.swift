@@ -52,7 +52,7 @@ final class EnvoyClientTests: XCTestCase {
       closeExpectation.fulfill()
     }
 
-    let envoy = try EnvoyClientBuilder()
+    let envoy = try EnvoyClientBuilder(domain: "api.foo.com")
       .addEngineType(MockEnvoyEngine.self)
       .build()
     envoy.send(expectedRequest, body: expectedData, trailers: expectedTrailers,

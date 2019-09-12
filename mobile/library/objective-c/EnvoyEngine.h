@@ -122,6 +122,7 @@ typedef NSDictionary<NSString *, NSArray<NSString *> *> EnvoyHeaders;
 /// Typed configuration that may be used for starting Envoy.
 @interface EnvoyConfiguration : NSObject
 
+@property (nonatomic, strong) NSString *domain;
 @property (nonatomic, assign) UInt32 connectTimeoutSeconds;
 @property (nonatomic, assign) UInt32 dnsRefreshSeconds;
 @property (nonatomic, assign) UInt32 statsFlushSeconds;
@@ -129,9 +130,10 @@ typedef NSDictionary<NSString *, NSArray<NSString *> *> EnvoyHeaders;
 /**
  Create a new instance of the configuration.
  */
-- (instancetype)initWithConnectTimeoutSeconds:(UInt32)connectTimeoutSeconds
-                            dnsRefreshSeconds:(UInt32)dnsRefreshSeconds
-                            statsFlushSeconds:(UInt32)statsFlushSeconds;
+- (instancetype)initWithDomain:(NSString *)domain
+         connectTimeoutSeconds:(UInt32)connectTimeoutSeconds
+             dnsRefreshSeconds:(UInt32)dnsRefreshSeconds
+             statsFlushSeconds:(UInt32)statsFlushSeconds;
 
 /**
  Resolves the provided configuration template using properties on this configuration.

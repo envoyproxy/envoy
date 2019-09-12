@@ -31,8 +31,10 @@ public class EnvoyConfiguration {
    *                                 resolved.
    */
   String resolveTemplate(String templateYAML) {
+    // TODO(@buildbreaker): Implement actual domain template resolution
     String resolvedConfiguration =
-        templateYAML.replace("{{ connect_timeout }}", String.format("%ss", connectTimeoutSeconds))
+        templateYAML.replace("{{ domain }}", "s3.amazonaws.com")
+            .replace("{{ connect_timeout }}", String.format("%ss", connectTimeoutSeconds))
             .replace("{{ dns_refresh_rate }}", String.format("%ss", dnsRefreshSeconds))
             .replace("{{ stats_flush_interval }}", String.format("%ss", statsFlushSeconds));
 
