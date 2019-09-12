@@ -94,7 +94,7 @@ def publishGoProtobufs(repo, sha):
   check_call(['git', '-C', repo, 'config', 'user.email', user_email])
   check_call(['git', '-C', repo, 'add', 'envoy'])
   check_call(['git', '-C', repo, 'commit', '-s', '-m', mirror_msg + sha])
-  check_call(['git', '-C', repo, 'push', 'origin', '-f', branch])
+  check_call(['git', '-C', repo, 'push', 'origin', branch])
 
 
 if __name__ == "__main__":
