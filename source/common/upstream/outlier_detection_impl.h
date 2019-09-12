@@ -92,7 +92,7 @@ public:
    * @return a valid absl::optional<double> with the success rate. If there were not enough
    * requests, an invalid absl::optional<double> is returned.
    */
-  absl::optional<double> getSuccessRate(uint64_t success_rate_request_volume);
+  absl::optional<std::pair<double, uint64_t>> getSuccessRateAndVolume();
 
 private:
   std::unique_ptr<SuccessRateAccumulatorBucket> current_success_rate_bucket_;
@@ -214,13 +214,17 @@ private:
   COUNTER(ejections_detected_consecutive_5xx)                                                      \
   COUNTER(ejections_detected_consecutive_gateway_failure)                                          \
   COUNTER(ejections_detected_success_rate)                                                         \
+  COUNTER(ejections_detected_failure_percentage)                                                   \
   COUNTER(ejections_enforced_consecutive_5xx)                                                      \
   COUNTER(ejections_enforced_consecutive_gateway_failure)                                          \
   COUNTER(ejections_enforced_success_rate)                                                         \
+  COUNTER(ejections_enforced_failure_percentage)                                                   \
   COUNTER(ejections_detected_consecutive_local_origin_failure)                                     \
   COUNTER(ejections_enforced_consecutive_local_origin_failure)                                     \
   COUNTER(ejections_detected_local_origin_success_rate)                                            \
   COUNTER(ejections_enforced_local_origin_success_rate)                                            \
+  COUNTER(ejections_detected_local_origin_failure_percentage)                                      \
+  COUNTER(ejections_enforced_local_origin_failure_percentage)                                      \
   COUNTER(ejections_enforced_total)                                                                \
   COUNTER(ejections_overflow)                                                                      \
   COUNTER(ejections_success_rate)                                                                  \
@@ -249,11 +253,18 @@ public:
   uint64_t successRateMinimumHosts() const { return success_rate_minimum_hosts_; }
   uint64_t successRateRequestVolume() const { return success_rate_request_volume_; }
   uint64_t successRateStdevFactor() const { return success_rate_stdev_factor_; }
+  uint64_t failurePercentageThreshold() const { return failure_percentage_threshold_; }
+  uint64_t failurePercentageMinimumHosts() const { return failure_percentage_minimum_hosts_; }
+  uint64_t failurePercentageRequestVolume() const { return failure_percentage_request_volume_; }
   uint64_t enforcingConsecutive5xx() const { return enforcing_consecutive_5xx_; }
   uint64_t enforcingConsecutiveGatewayFailure() const {
     return enforcing_consecutive_gateway_failure_;
   }
   uint64_t enforcingSuccessRate() const { return enforcing_success_rate_; }
+  uint64_t enforcingFailurePercentage() const { return enforcing_failure_percentage_; }
+  uint64_t enforcingFailurePercentageLocalOrigin() const {
+    return enforcing_failure_percentage_local_origin_;
+  }
   bool splitExternalLocalOriginErrors() const { return split_external_local_origin_errors_; }
   uint64_t consecutiveLocalOriginFailure() const { return consecutive_local_origin_failure_; }
   uint64_t enforcingConsecutiveLocalOriginFailure() const {
@@ -270,9 +281,14 @@ private:
   const uint64_t success_rate_minimum_hosts_;
   const uint64_t success_rate_request_volume_;
   const uint64_t success_rate_stdev_factor_;
+  const uint64_t failure_percentage_threshold_;
+  const uint64_t failure_percentage_minimum_hosts_;
+  const uint64_t failure_percentage_request_volume_;
   const uint64_t enforcing_consecutive_5xx_;
   const uint64_t enforcing_consecutive_gateway_failure_;
   const uint64_t enforcing_success_rate_;
+  const uint64_t enforcing_failure_percentage_;
+  const uint64_t enforcing_failure_percentage_local_origin_;
   const bool split_external_local_origin_errors_;
   const uint64_t consecutive_local_origin_failure_;
   const uint64_t enforcing_consecutive_local_origin_failure_;
