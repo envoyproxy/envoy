@@ -8,9 +8,6 @@ namespace Server {
 namespace {
 
 class ListenerManagerImplQuicOnlyTest : public ListenerManagerImplTest {
-public:
-  ListenerManagerImplQuicOnlyTest() : ListenerManagerImplTest() {}
-
 protected:
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&os_sys_calls_};

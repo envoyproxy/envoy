@@ -57,7 +57,7 @@ protected:
       EXPECT_CALL(server_.validation_context_, staticValidationVisitor());
       EXPECT_CALL(server_.validation_context_, dynamicValidationVisitor()).Times(0);
     }
-    ListenerHandle* raw_listener = new ListenerHandle();
+    auto raw_listener = new ListenerHandle();
     EXPECT_CALL(listener_factory_, createDrainManager_(drain_type))
         .WillOnce(Return(raw_listener->drain_manager_));
     EXPECT_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
