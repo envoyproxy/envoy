@@ -100,19 +100,14 @@ RouterCheckTool::RouterCheckTool(
 bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_json) {
   Json::ObjectSharedPtr loader = Json::Factory::loadFromFile(expected_route_json, *api_);
   loader->validateSchema(Json::ToolSchema::routerCheckSchema());
-
   bool no_failures = true;
   for (const Json::ObjectSharedPtr& check_config : loader->asObjectArray()) {
     headers_finalized_ = false;
     ToolConfig tool_config = ToolConfig::create(check_config);
     tool_config.route_ = config_->route(*tool_config.headers_, tool_config.random_value_);
-
     std::string test_name = check_config->getString("test_name", "");
-    if (details_) {
-      std::cout << test_name << std::endl;
-    }
+    tests_.emplace_back(test_name, std::vector<std::string>{});
     Json::ObjectSharedPtr validate = check_config->getObject("validate");
-
     using checkerFunc = std::function<bool(ToolConfig&, const std::string&)>;
     const std::unordered_map<std::string, checkerFunc> checkers = {
         {"cluster_name",
@@ -128,7 +123,6 @@ bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_jso
         {"path_redirect",
          [this](auto&... params) -> bool { return this->compareRedirectPath(params...); }},
     };
-
     // Call appropriate function for each match case.
     for (const auto& test : checkers) {
       if (validate->hasObject(test.first)) {
@@ -142,7 +136,6 @@ bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_jso
         }
       }
     }
-
     if (validate->hasObject("header_fields")) {
       for (const Json::ObjectSharedPtr& header_field : validate->getObjectArray("header_fields")) {
         if (!compareHeaderField(tool_config, header_field->getString("field"),
@@ -151,7 +144,6 @@ bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_jso
         }
       }
     }
-
     if (validate->hasObject("custom_header_fields")) {
       for (const Json::ObjectSharedPtr& header_field :
            validate->getObjectArray("custom_header_fields")) {
@@ -162,7 +154,7 @@ bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_jso
       }
     }
   }
-
+  printResults();
   return no_failures;
 }
 
@@ -183,9 +175,7 @@ bool RouterCheckTool::compareEntries(const std::string& expected_routes) {
     tool_config.route_ = config_->route(*tool_config.headers_, tool_config.random_value_);
 
     const std::string& test_name = check_config.test_name();
-    if (details_) {
-      std::cout << test_name << std::endl;
-    }
+    tests_.emplace_back(test_name, std::vector<std::string>{});
     const envoy::RouterCheckToolSchema::ValidationAssert& validate = check_config.validate();
 
     using checkerFunc =
@@ -208,7 +198,7 @@ bool RouterCheckTool::compareEntries(const std::string& expected_routes) {
       }
     }
   }
-
+  printResults();
   return no_failures;
 }
 
@@ -424,13 +414,24 @@ bool RouterCheckTool::compareResults(const std::string& actual, const std::strin
   if (expected == actual) {
     return true;
   }
-
-  // Output failure details to stdout if details_ flag is set to true
-  if (details_) {
-    std::cerr << "expected: [" << expected << "], actual: [" << actual
-              << "], test type: " << test_type << std::endl;
-  }
+  tests_.back().second.emplace_back("expected: [" + expected + "], actual: [" + actual +
+                                    "], test type: " + test_type);
   return false;
+}
+
+void RouterCheckTool::printResults() {
+  // Output failure details to stdout if details_ flag is set to true
+  for (const auto& test_result : tests_) {
+    // All test names are printed if the details_ flag is true unless only_show_failures_ is also
+    // true.
+    if ((details_ && !only_show_failures_) ||
+        (only_show_failures_ && !test_result.second.empty())) {
+      std::cout << test_result.first << std::endl;
+      for (const auto& failure : test_result.second) {
+        std::cerr << failure << std::endl;
+      }
+    }
+  }
 }
 
 // The Mock for runtime value checks.
@@ -446,6 +447,8 @@ Options::Options(int argc, char** argv) {
   TCLAP::CmdLine cmd("router_check_tool", ' ', "none", true);
   TCLAP::SwitchArg is_proto("p", "useproto", "Use Proto test file schema", cmd, false);
   TCLAP::SwitchArg is_detailed("d", "details", "Show detailed test execution results", cmd, false);
+  TCLAP::SwitchArg only_show_failures("", "only-show-failures", "Only display failing tests", cmd,
+                                      false);
   TCLAP::SwitchArg disable_deprecation_check("", "disable-deprecation-check",
                                              "Disable deprecated fields check", cmd, false);
   TCLAP::ValueArg<double> fail_under("f", "fail-under",
@@ -468,6 +471,7 @@ Options::Options(int argc, char** argv) {
 
   is_proto_ = is_proto.getValue();
   is_detailed_ = is_detailed.getValue();
+  only_show_failures_ = only_show_failures.getValue();
   fail_under_ = fail_under.getValue();
   comprehensive_coverage_ = comprehensive_coverage.getValue();
   disable_deprecation_check_ = disable_deprecation_check.getValue();

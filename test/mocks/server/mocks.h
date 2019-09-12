@@ -549,6 +549,7 @@ public:
   MOCK_METHOD0(runtime, Envoy::Runtime::Loader&());
   MOCK_METHOD0(eventLogger_, Upstream::HealthCheckEventLogger*());
   MOCK_METHOD0(messageValidationVisitor, ProtobufMessage::ValidationVisitor&());
+  MOCK_METHOD0(api, Api::Api&());
   Upstream::HealthCheckEventLoggerPtr eventLogger() override {
     return Upstream::HealthCheckEventLoggerPtr(eventLogger_());
   }
@@ -558,6 +559,7 @@ public:
   testing::NiceMock<Envoy::Runtime::MockRandomGenerator> random_;
   testing::NiceMock<Envoy::Runtime::MockLoader> runtime_;
   testing::NiceMock<Envoy::Upstream::MockHealthCheckEventLogger>* event_logger_{};
+  testing::NiceMock<Envoy::Api::MockApi> api_{};
 };
 
 } // namespace Configuration

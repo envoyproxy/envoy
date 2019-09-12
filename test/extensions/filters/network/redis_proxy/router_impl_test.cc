@@ -225,6 +225,22 @@ TEST(MirrorPolicyImplTest, ExcludeReadCommands) {
   EXPECT_EQ(true, policy.shouldMirror("set"));
 }
 
+TEST(MirrorPolicyImplTest, DefaultValueZero) {
+  envoy::config::filter::network::redis_proxy::v2::RedisProxy::PrefixRoutes::Route::
+      RequestMirrorPolicy config;
+  auto* runtime_fraction = config.mutable_runtime_fraction();
+  auto* percentage = runtime_fraction->mutable_default_value();
+  percentage->set_numerator(0);
+  percentage->set_denominator(envoy::type::FractionalPercent::HUNDRED);
+  auto upstream = std::make_shared<ConnPool::MockInstance>();
+  NiceMock<Runtime::MockLoader> runtime;
+
+  MirrorPolicyImpl policy(config, upstream, runtime);
+
+  EXPECT_EQ(false, policy.shouldMirror("get"));
+  EXPECT_EQ(false, policy.shouldMirror("set"));
+}
+
 TEST(MirrorPolicyImplTest, DeterminedByRuntimeFraction) {
   envoy::config::filter::network::redis_proxy::v2::RedisProxy::PrefixRoutes::Route::
       RequestMirrorPolicy config;
