@@ -222,12 +222,22 @@ DetectorConfig::DetectorConfig(const envoy::api::v2::cluster::OutlierDetection& 
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, success_rate_request_volume, 100))),
       success_rate_stdev_factor_(static_cast<uint64_t>(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, success_rate_stdev_factor, 1900))),
+      failure_percentage_threshold_(static_cast<uint64_t>(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, failure_percentage_threshold, 85))),
+      failure_percentage_minimum_hosts_(static_cast<uint64_t>(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, failure_percentage_minimum_hosts, 5))),
+      failure_percentage_request_volume_(static_cast<uint64_t>(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, failure_percentage_request_volume, 50))),
       enforcing_consecutive_5xx_(static_cast<uint64_t>(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enforcing_consecutive_5xx, 100))),
       enforcing_consecutive_gateway_failure_(static_cast<uint64_t>(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enforcing_consecutive_gateway_failure, 0))),
       enforcing_success_rate_(static_cast<uint64_t>(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enforcing_success_rate, 100))),
+      enforcing_failure_percentage_(static_cast<uint64_t>(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enforcing_failure_percentage, 0))),
+      enforcing_failure_percentage_local_origin_(static_cast<uint64_t>(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enforcing_failure_percentage_local_origin, 0))),
       split_external_local_origin_errors_(config.split_external_local_origin_errors()),
       consecutive_local_origin_failure_(static_cast<uint64_t>(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, consecutive_local_origin_failure, 5))),
@@ -355,6 +365,13 @@ bool DetectorImpl::enforceEjection(envoy::data::cluster::v2alpha::OutlierEjectio
     return runtime_.snapshot().featureEnabled(
         "outlier_detection.enforcing_local_origin_success_rate",
         config_.enforcingLocalOriginSuccessRate());
+  case envoy::data::cluster::v2alpha::OutlierEjectionType::FAILURE_PERCENTAGE:
+    return runtime_.snapshot().featureEnabled("outlier_detection.enforcing_failure_percentage",
+                                              config_.enforcingFailurePercentage());
+  case envoy::data::cluster::v2alpha::OutlierEjectionType::FAILURE_PERCENTAGE_LOCAL_ORIGIN:
+    return runtime_.snapshot().featureEnabled(
+        "outlier_detection.enforcing_failure_percentage_local_origin",
+        config_.enforcingFailurePercentageLocalOrigin());
   default:
     // Checked by schema.
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -382,6 +399,12 @@ void DetectorImpl::updateEnforcedEjectionStats(
   case envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN:
     stats_.ejections_enforced_local_origin_success_rate_.inc();
     break;
+  case envoy::data::cluster::v2alpha::OutlierEjectionType::FAILURE_PERCENTAGE:
+    stats_.ejections_enforced_failure_percentage_.inc();
+    break;
+  case envoy::data::cluster::v2alpha::OutlierEjectionType::FAILURE_PERCENTAGE_LOCAL_ORIGIN:
+    stats_.ejections_enforced_local_origin_failure_percentage_.inc();
+    break;
   default:
     // Checked by schema.
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -405,6 +428,12 @@ void DetectorImpl::updateDetectedEjectionStats(
     break;
   case envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN:
     stats_.ejections_detected_local_origin_success_rate_.inc();
+    break;
+  case envoy::data::cluster::v2alpha::OutlierEjectionType::FAILURE_PERCENTAGE:
+    stats_.ejections_detected_failure_percentage_.inc();
+    break;
+  case envoy::data::cluster::v2alpha::OutlierEjectionType::FAILURE_PERCENTAGE_LOCAL_ORIGIN:
+    stats_.ejections_detected_local_origin_failure_percentage_.inc();
     break;
   default:
     // Checked by schema.
@@ -556,32 +585,55 @@ void DetectorImpl::processSuccessRateEjections(
       "outlier_detection.success_rate_minimum_hosts", config_.successRateMinimumHosts());
   uint64_t success_rate_request_volume = runtime_.snapshot().getInteger(
       "outlier_detection.success_rate_request_volume", config_.successRateRequestVolume());
+  uint64_t failure_percentage_minimum_hosts =
+      runtime_.snapshot().getInteger("outlier_detection.failure_percentage_minimum_hosts",
+                                     config_.failurePercentageMinimumHosts());
+  uint64_t failure_percentage_request_volume =
+      runtime_.snapshot().getInteger("outlier_detection.failure_percentage_request_volume",
+                                     config_.failurePercentageRequestVolume());
+
   std::vector<HostSuccessRatePair> valid_success_rate_hosts;
+  std::vector<HostSuccessRatePair> valid_failure_percentage_hosts;
   double success_rate_sum = 0;
 
   // Reset the Detector's success rate mean and stdev.
   getSRNums(monitor_type) = {-1, -1};
 
   // Exit early if there are not enough hosts.
-  if (host_monitors_.size() < success_rate_minimum_hosts) {
+  if (host_monitors_.size() < success_rate_minimum_hosts &&
+      host_monitors_.size() < failure_percentage_minimum_hosts) {
     return;
   }
 
   // reserve upper bound of vector size to avoid reallocation.
   valid_success_rate_hosts.reserve(host_monitors_.size());
+  valid_failure_percentage_hosts.reserve(host_monitors_.size());
 
   for (const auto& host : host_monitors_) {
     // Don't do work if the host is already ejected.
     if (!host.first->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
-      absl::optional<double> host_success_rate = host.second->getSRMonitor(monitor_type)
-                                                     .successRateAccumulator()
-                                                     .getSuccessRate(success_rate_request_volume);
+      absl::optional<std::pair<double, uint64_t>> host_success_rate_and_volume =
+          host.second->getSRMonitor(monitor_type)
+              .successRateAccumulator()
+              .getSuccessRateAndVolume();
 
-      if (host_success_rate) {
-        valid_success_rate_hosts.emplace_back(
-            HostSuccessRatePair(host.first, host_success_rate.value()));
-        success_rate_sum += host_success_rate.value();
-        host.second->successRate(monitor_type, host_success_rate.value());
+      if (!host_success_rate_and_volume) {
+        continue;
+      }
+      double success_rate = host_success_rate_and_volume.value().first;
+      double request_volume = host_success_rate_and_volume.value().second;
+
+      if (request_volume >=
+          std::min(success_rate_request_volume, failure_percentage_request_volume)) {
+        host.second->successRate(monitor_type, success_rate);
+      }
+
+      if (request_volume >= success_rate_request_volume) {
+        valid_success_rate_hosts.emplace_back(HostSuccessRatePair(host.first, success_rate));
+        success_rate_sum += success_rate;
+      }
+      if (request_volume >= failure_percentage_request_volume) {
+        valid_failure_percentage_hosts.emplace_back(HostSuccessRatePair(host.first, success_rate));
       }
     }
   }
@@ -602,6 +654,28 @@ void DetectorImpl::processSuccessRateEjections(
             host_monitors_[host_success_rate_pair.host_]
                 ->getSRMonitor(monitor_type)
                 .getEjectionType();
+        updateDetectedEjectionStats(type);
+        ejectHost(host_success_rate_pair.host_, type);
+      }
+    }
+  }
+
+  if (!valid_failure_percentage_hosts.empty() &&
+      valid_failure_percentage_hosts.size() >= failure_percentage_minimum_hosts) {
+    const double failure_percentage_threshold = runtime_.snapshot().getInteger(
+        "outlier_detection.failure_percentage_threshold", config_.failurePercentageThreshold());
+
+    for (const auto& host_success_rate_pair : valid_failure_percentage_hosts) {
+      if ((100.0 - host_success_rate_pair.success_rate_) >= failure_percentage_threshold) {
+        // We should eject.
+
+        // The ejection type returned by the SuccessRateMonitor's getEjectionType() will be a
+        // SUCCESS_RATE type, so we need to figure it out for ourselves.
+        const envoy::data::cluster::v2alpha::OutlierEjectionType type =
+            (monitor_type == DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin)
+                ? envoy::data::cluster::v2alpha::OutlierEjectionType::FAILURE_PERCENTAGE
+                : envoy::data::cluster::v2alpha::OutlierEjectionType::
+                      FAILURE_PERCENTAGE_LOCAL_ORIGIN;
         updateDetectedEjectionStats(type);
         ejectHost(host_success_rate_pair.host_, type);
       }
@@ -660,6 +734,15 @@ void EventLoggerImpl::logEject(const HostDescriptionConstSharedPtr& host, Detect
         detector.successRateEjectionThreshold(monitor_type));
     event.mutable_eject_success_rate_event()->set_host_success_rate(
         host->outlierDetector().successRate(monitor_type));
+  } else if ((type == envoy::data::cluster::v2alpha::OutlierEjectionType::FAILURE_PERCENTAGE) ||
+             (type == envoy::data::cluster::v2alpha::OutlierEjectionType::
+                          FAILURE_PERCENTAGE_LOCAL_ORIGIN)) {
+    const DetectorHostMonitor::SuccessRateMonitorType monitor_type =
+        (type == envoy::data::cluster::v2alpha::OutlierEjectionType::FAILURE_PERCENTAGE)
+            ? DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin
+            : DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin;
+    event.mutable_eject_failure_percentage_event()->set_host_success_rate(
+        host->outlierDetector().successRate(monitor_type));
   } else {
     event.mutable_eject_consecutive_event();
   }
@@ -707,14 +790,15 @@ SuccessRateAccumulatorBucket* SuccessRateAccumulator::updateCurrentWriter() {
   return current_success_rate_bucket_.get();
 }
 
-absl::optional<double>
-SuccessRateAccumulator::getSuccessRate(uint64_t success_rate_request_volume) {
-  if (backup_success_rate_bucket_->total_request_counter_ < success_rate_request_volume) {
-    return {};
+absl::optional<std::pair<double, uint64_t>> SuccessRateAccumulator::getSuccessRateAndVolume() {
+  if (!backup_success_rate_bucket_->total_request_counter_) {
+    return absl::nullopt;
   }
 
-  return {backup_success_rate_bucket_->success_request_counter_ * 100.0 /
-          backup_success_rate_bucket_->total_request_counter_};
+  double success_rate = backup_success_rate_bucket_->success_request_counter_ * 100.0 /
+                        backup_success_rate_bucket_->total_request_counter_;
+
+  return {{success_rate, backup_success_rate_bucket_->total_request_counter_}};
 }
 
 } // namespace Outlier
