@@ -250,7 +250,6 @@ message Cluster {
   }
 
   // Configuration to use different transport sockets for different endpoints.
-  // This should only be used for EDS typed cluster.
   //
   // An endpoint's *endpoint.Labels* is used to match against the *label_matches*
   // to decide which transport socket to use when connecting to that particular endpoint.
@@ -271,7 +270,7 @@ message Cluster {
   // If an endpoint can't be matched against any *TransportSockerMatcher*, connection socket
   // fallbacks to use the *tls_context* or *transport_socket* specified in this cluster.
   // [#not-implemented-hide:]
-  repeated TransportSocketMatcher endpoint_transport_socket_matchers = 41;
+  repeated TransportSocketMatcher endpoint_transport_socket_matchers = 42;
 
   reserved 12;
 
