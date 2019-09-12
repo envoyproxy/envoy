@@ -9,8 +9,6 @@
 #include "common/network/cidr_range.h"
 #include "common/network/lc_trie.h"
 
-#include "extensions/transport_sockets/tls/context_config_impl.h"
-
 #include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
@@ -136,53 +134,25 @@ private:
   const Network::Address::InstanceConstSharedPtr address_;
 };
 
-/**
- * Base implementation for TCP and QUIC filter chain.
- */
-class FilterChainImplBase : public Network::FilterChain {
+class FilterChainImpl : public Network::FilterChain {
 public:
-  FilterChainImplBase(std::vector<Network::FilterFactoryCb>&& filters_factory)
-      : filters_factory_(std::move(filters_factory)) {}
+  FilterChainImpl(Network::TransportSocketFactoryPtr&& transport_socket_factory,
+                  std::vector<Network::FilterFactoryCb>&& filters_factory)
+      : transport_socket_factory_(std::move(transport_socket_factory)),
+        filters_factory_(std::move(filters_factory)) {}
 
   // Network::FilterChain
+  const Network::TransportSocketFactory& transportSocketFactory() const override {
+    return *transport_socket_factory_;
+  }
+
   const std::vector<Network::FilterFactoryCb>& networkFilterFactories() const override {
     return filters_factory_;
   }
 
 private:
-  const std::vector<Network::FilterFactoryCb> filters_factory_;
-};
-
-class TcpFilterChainImpl : public FilterChainImplBase {
-public:
-  TcpFilterChainImpl(Network::TransportSocketFactoryPtr&& transport_socket_factory,
-                     std::vector<Network::FilterFactoryCb>&& filters_factory)
-      : FilterChainImplBase(std::move(filters_factory)),
-        transport_socket_factory_(std::move(transport_socket_factory)) {}
-
-  // Network::FilterChain
-  const Network::TransportSocketFactory* transportSocketFactory() const override {
-    return transport_socket_factory_.get();
-  }
-
-private:
   const Network::TransportSocketFactoryPtr transport_socket_factory_;
-};
-
-class QuicFilterChainImpl : public FilterChainImplBase {
-public:
-  QuicFilterChainImpl(std::unique_ptr<Ssl::ContextConfig> tls_context_config,
-                      std::vector<Network::FilterFactoryCb>&& filters_factory)
-      : FilterChainImplBase(std::move(filters_factory)),
-        tls_context_config_(std::move(tls_context_config)) {}
-
-  // Network::FilterChain
-  const Network::TransportSocketFactory* transportSocketFactory() const override { return nullptr; }
-
-  const Ssl::ContextConfig& tlsContextConfig() const { return *tls_context_config_.get(); }
-
-private:
-  std::unique_ptr<const Ssl::ContextConfig> tls_context_config_;
+  const std::vector<Network::FilterFactoryCb> filters_factory_;
 };
 
 } // namespace Server
