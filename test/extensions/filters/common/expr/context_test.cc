@@ -256,8 +256,10 @@ TEST(Context, ConnectionAttributes) {
   NiceMock<StreamInfo::MockStreamInfo> info;
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
-  auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  auto downstream_ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  auto upstream_ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   ConnectionWrapper connection(info);
+  UpstreamWrapper upstream(info);
   PeerWrapper source(info, false);
   PeerWrapper destination(info, true);
 
@@ -270,10 +272,14 @@ TEST(Context, ConnectionAttributes) {
   const std::string sni_name = "kittens.com";
   EXPECT_CALL(info, downstreamLocalAddress()).WillRepeatedly(ReturnRef(local));
   EXPECT_CALL(info, downstreamRemoteAddress()).WillRepeatedly(ReturnRef(remote));
-  EXPECT_CALL(info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
+  EXPECT_CALL(info, downstreamSslConnection()).WillRepeatedly(Return(downstream_ssl_info));
+  EXPECT_CALL(info, upstreamSslConnection()).WillRepeatedly(Return(upstream_ssl_info));
   EXPECT_CALL(info, upstreamHost()).WillRepeatedly(Return(host));
   EXPECT_CALL(info, requestedServerName()).WillRepeatedly(ReturnRef(sni_name));
-  EXPECT_CALL(*connection_info, peerCertificatePresented()).WillRepeatedly(Return(true));
+  EXPECT_CALL(*downstream_ssl_info, peerCertificatePresented()).WillRepeatedly(Return(true));
+  EXPECT_CALL(*upstream_ssl_info, peerCertificatePresented()).WillRepeatedly(Return(true));
+  const std::string tls_version = "TLSv1";
+  EXPECT_CALL(*downstream_ssl_info, tlsVersion()).WillRepeatedly(ReturnRef(tls_version));
   EXPECT_CALL(*host, address()).WillRepeatedly(Return(upstream));
 
   {
@@ -325,17 +331,24 @@ TEST(Context, ConnectionAttributes) {
   }
 
   {
-    auto value = connection[CelValue::CreateString(UpstreamAddress)];
+    auto value = upstream[CelValue::CreateString(Address)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsString());
     EXPECT_EQ("10.1.2.3:679", value.value().StringOrDie().value());
   }
 
   {
-    auto value = connection[CelValue::CreateString(UpstreamPort)];
+    auto value = upstream[CelValue::CreateString(Port)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsInt64());
     EXPECT_EQ(679, value.value().Int64OrDie());
+  }
+
+  {
+    auto value = upstream[CelValue::CreateString(MTLS)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsBool());
+    EXPECT_TRUE(value.value().BoolOrDie());
   }
 
   {
@@ -350,6 +363,13 @@ TEST(Context, ConnectionAttributes) {
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsString());
     EXPECT_EQ(sni_name, value.value().StringOrDie().value());
+  }
+
+  {
+    auto value = connection[CelValue::CreateString(TLSVersion)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ(tls_version, value.value().StringOrDie().value());
   }
 }
 
