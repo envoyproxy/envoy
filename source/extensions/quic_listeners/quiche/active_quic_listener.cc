@@ -20,7 +20,16 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
 
 ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
                                        Network::ConnectionHandler& parent,
-                                       Network::ListenerPtr&& listener, spdlog::logger& logger,
+                                       Network::UdpListenerPtr&& listener, spdlog::logger& logger,
+                                       Network::ListenerConfig& listener_config,
+                                       const quic::QuicConfig& quic_config)
+    : ActiveQuicListener(dispatcher, parent, std::make_unique<EnvoyQuicPacketWriter>(*listener),
+                         std::move(listener), logger, listener_config, quic_config) {}
+
+ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
+                                       Network::ConnectionHandler& parent,
+                                       std::unique_ptr<quic::QuicPacketWriter> writer,
+                                       Network::UdpListenerPtr&& listener, spdlog::logger& logger,
                                        Network::ListenerConfig& listener_config,
                                        const quic::QuicConfig& quic_config)
     : Server::ConnectionHandlerImpl::ActiveListenerImplBase(std::move(listener), listener_config),
@@ -38,12 +47,11 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
       crypto_config_.get(), quic_config, &version_manager_, std::move(connection_helper),
       std::move(alarm_factory), quic::kQuicDefaultConnectionIdLength, parent, config_, stats_,
       dispatcher);
-  quic_dispatcher_->InitializeWithWriter(
-      new EnvoyQuicPacketWriter(*dynamic_cast<Network::UdpListener*>(listener_.get())));
+  quic_dispatcher_->InitializeWithWriter(writer.release());
 }
 
 void ActiveQuicListener::onListenerShutdown() {
-  ENVOY_LOG_TO_LOGGER(logger_, info, "Listener with tag {} shutdown.", listenerTag());
+  ENVOY_LOG_TO_LOGGER(logger_, info, "Quic listener {} shutdown.", config_.name());
   quic_dispatcher_->Shutdown();
 }
 

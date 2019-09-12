@@ -87,6 +87,7 @@ public:
   }
 
   void TearDown() override {
+    EXPECT_CALL(listener_config_, name());
     quic_listener_->onListenerShutdown();
     // Trigger alarm to fire before listener destruction.
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);

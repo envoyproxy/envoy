@@ -19,7 +19,10 @@ ConnectionHandlerImpl::ConnectionHandlerImpl(spdlog::logger& logger, Event::Disp
 
 void ConnectionHandlerImpl::incNumConnections() { ++num_connections_; }
 
-void ConnectionHandlerImpl::decNumConnections() { --num_connections_; }
+void ConnectionHandlerImpl::decNumConnections() {
+  ASSERT(num_connections_ > 0);
+  --num_connections_;
+}
 
 void ConnectionHandlerImpl::addListener(Network::ListenerConfig& config) {
   Network::ConnectionHandler::ActiveListenerPtr listener;

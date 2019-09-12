@@ -31,7 +31,6 @@ void EnvoyQuicDispatcher::OnConnectionClosed(quic::QuicConnectionId connection_i
                                              const std::string& error_details,
                                              quic::ConnectionCloseSource source) {
   quic::QuicDispatcher::OnConnectionClosed(connection_id, error, error_details, source);
-  ASSERT(connection_handler_.numConnections() > 0);
   connection_handler_.decNumConnections();
 }
 

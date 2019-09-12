@@ -29,8 +29,9 @@ public:
                      const quic::QuicConfig& quic_config);
 
   ActiveQuicListener(Event::Dispatcher& dispatcher, Network::ConnectionHandler& parent,
-                     Network::ListenerPtr&& listener, spdlog::logger& logger,
+                     Network::UdpListenerPtr&& listener, spdlog::logger& logger,
                      Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config);
+
   // TODO(#7465): Make this a callback.
   void onListenerShutdown();
 
@@ -53,6 +54,11 @@ public:
 
 private:
   friend class ActiveQuicListenerPeer;
+
+  ActiveQuicListener(Event::Dispatcher& dispatcher, Network::ConnectionHandler& parent,
+                     std::unique_ptr<quic::QuicPacketWriter> writer,
+                     Network::UdpListenerPtr&& listener, spdlog::logger& logger,
+                     Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config);
 
   uint8_t random_seed_[16];
   std::unique_ptr<quic::QuicCryptoServerConfig> crypto_config_;

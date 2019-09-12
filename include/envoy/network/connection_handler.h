@@ -28,6 +28,9 @@ public:
 
   /**
    * Increment the return value of numConnections() by one.
+   * TODO(mattklein123): re-visit the connection accounting interface. Make TCP
+   * listener to do accounting through these interfaces instead of directly
+   * access the counter.
    */
   virtual void incNumConnections() PURE;
 
