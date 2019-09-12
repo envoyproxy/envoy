@@ -69,7 +69,7 @@ The following attributes are exposed to the language runtime:
    request.host, string, The host portion of the URL
    request.scheme, string, The scheme portion of the URL
    request.method, string, Request method
-   request.headers, `map<string, string>`, All request headers
+   request.headers, string map, All request headers
    request.referer, string, Referer request header
    request.useragent, string, User agent request header
    request.time, timestamp, Time of the first byte received
@@ -78,8 +78,8 @@ The following attributes are exposed to the language runtime:
    request.size, int, Size of the request body
    request.total_size, int, Total size of the request including the headers
    response.code, int, Response HTTP status code
-   response.headers, `map<string, string>`, All response headers
-   response.trailers, `map<string, string>`, All response trailers
+   response.headers, string map, All response headers
+   response.trailers, string map, All response trailers
    response.size, int, Size of the response body
    source.address, string, Downstream connection remote address
    source.port, int, Downstream connection remote port
