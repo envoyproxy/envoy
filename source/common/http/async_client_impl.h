@@ -132,7 +132,7 @@ private:
     const std::vector<uint32_t>& retriableStatusCodes() const override {
       return retriable_status_codes_;
     }
-    const std::vector<LowerCaseString>& retriableHeaders() const override {
+    const std::vector<Http::HeaderMatcherSharedPtr>& retriableHeaders() const override {
       return retriable_headers_;
     }
     absl::optional<std::chrono::milliseconds> baseInterval() const override {
@@ -141,7 +141,7 @@ private:
     absl::optional<std::chrono::milliseconds> maxInterval() const override { return absl::nullopt; }
 
     const std::vector<uint32_t> retriable_status_codes_{};
-    const std::vector<LowerCaseString> retriable_headers_{};
+    const std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_{};
   };
 
   struct NullShadowPolicy : public Router::ShadowPolicy {

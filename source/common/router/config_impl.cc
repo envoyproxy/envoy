@@ -67,7 +67,9 @@ HedgePolicyImpl::HedgePolicyImpl()
 
 RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RetryPolicy& retry_policy,
                                  ProtobufMessage::ValidationVisitor& validation_visitor)
-    : validation_visitor_(&validation_visitor) {
+    : retriable_headers_(
+          Http::HeaderUtility::buildHeaderMatcherVector(retry_policy.retriable_headers())),
+      validation_visitor_(&validation_visitor) {
   per_try_timeout_ =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(retry_policy, per_try_timeout, 0));
   num_retries_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(retry_policy, num_retries, 1);
@@ -98,10 +100,6 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RetryPolicy& retry
 
   for (auto code : retry_policy.retriable_status_codes()) {
     retriable_status_codes_.emplace_back(code);
-  }
-
-  for (auto& header : retry_policy.retriable_headers()) {
-    retriable_headers_.emplace_back(header);
   }
 
   if (retry_policy.has_retry_back_off()) {

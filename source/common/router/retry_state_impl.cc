@@ -107,9 +107,17 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
   }
 
   if (request_headers.EnvoyRetriableHeaders()) {
-    for (const auto header : StringUtil::splitToken(
+    // Retriable headers in the configuration are specified via HeaderMatcher.
+    // Giving the same flexibility via request header would require the user
+    // to provide HeaderMatcher serialized into a string. To avoid this extra
+    // complexity we only support name-only header matchers via request
+    // header. Anything more sophisticated needs to be provided via config.
+    for (const auto header_name : StringUtil::splitToken(
              request_headers.EnvoyRetriableHeaders()->value().getStringView(), ",")) {
-      retriable_headers_.emplace_back(std::string(absl::StripAsciiWhitespace(header)));
+      envoy::api::v2::route::HeaderMatcher header_matcher;
+      header_matcher.set_name(std::string(absl::StripAsciiWhitespace(header_name)));
+      retriable_headers_.emplace_back(
+          std::make_shared<Http::HeaderUtility::HeaderData>(header_matcher));
     }
   }
 }
@@ -278,8 +286,8 @@ bool RetryStateImpl::wouldRetryFromHeaders(const Http::HeaderMap& response_heade
   }
 
   if (retry_on_ & RetryPolicy::RETRY_ON_RETRIABLE_HEADERS) {
-    for (const auto& header_name : retriable_headers_) {
-      if (response_headers.get(header_name) != nullptr) {
+    for (const auto& retriable_header : retriable_headers_) {
+      if (retriable_header->matchesHeaders(response_headers)) {
         return true;
       }
     }

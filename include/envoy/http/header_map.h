@@ -556,5 +556,20 @@ using HeaderMapPtr = std::unique_ptr<HeaderMap>;
  */
 using HeaderVector = std::vector<std::pair<LowerCaseString, std::string>>;
 
+/**
+ * An interface to be implemented by header matchers.
+ */
+class HeaderMatcher {
+public:
+  virtual ~HeaderMatcher() = default;
+
+  /*
+   * Check whether header matcher matches any headers in a given HeaderMap.
+   */
+  virtual bool matchesHeaders(const HeaderMap& headers) const PURE;
+};
+
+using HeaderMatcherSharedPtr = std::shared_ptr<HeaderMatcher>;
+
 } // namespace Http
 } // namespace Envoy

@@ -206,10 +206,10 @@ public:
   virtual const std::vector<uint32_t>& retriableStatusCodes() const PURE;
 
   /**
-   * @return std::vector<Http::LowerCaseString>& list of response headers that should trigger a
-   * retry when the retriable-headers retry policy is enabled.
+   * @return std::vector<Http::HeaderMatcherSharedPtr>& list of response header matchers that
+   * will be checked when the 'retriable-headers' retry policy is enabled.
    */
-  virtual const std::vector<Http::LowerCaseString>& retriableHeaders() const PURE;
+  virtual const std::vector<Http::HeaderMatcherSharedPtr>& retriableHeaders() const PURE;
 
   /**
    * @return absl::optional<std::chrono::milliseconds> base retry interval
