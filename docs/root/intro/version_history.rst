@@ -22,6 +22,7 @@ Version history
 * config: async data access for local and remote data source.
 * config: changed the default value of :ref:`initial_fetch_timeout <envoy_api_field_core.ConfigSource.initial_fetch_timeout>` from 0s to 15s. This is a change in behaviour in the sense that Envoy will move to the next initialization phase, even if the first config is not delivered in 15s. Refer to :ref:`initialization process <arch_overview_initialization>` for more details.
 * config: added stat :ref:`init_fetch_timeout <config_cluster_manager_cds>`.
+* dns: added support for configuring :ref:`dns_failure_refresh_rate <envoy_api_field_Cluster.dns_failure_refresh_rate>` to set the DNS refresh rate during failures.
 * ext_authz: added :ref:`configurable ability <envoy_api_field_config.filter.http.ext_authz.v2.ExtAuthz.metadata_context_namespaces>` to send dynamic metadata to the `ext_authz` service.
 * ext_authz: added tracing to the HTTP client.
 * fault: added overrides for default runtime keys in :ref:`HTTPFault <envoy_api_msg_config.filter.http.fault.v2.HTTPFault>` filter.

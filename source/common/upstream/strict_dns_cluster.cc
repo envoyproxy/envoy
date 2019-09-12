@@ -14,6 +14,9 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
       respect_dns_ttl_(cluster.respect_dns_ttl()) {
+  failure_backoff_strategy_ = Config::Utility::prepareDnsRefreshStrategy(
+      cluster, dns_refresh_rate_ms_.count(), factory_context.random());
+
   std::list<ResolveTargetPtr> resolve_targets;
   const envoy::api::v2::ClusterLoadAssignment load_assignment(
       cluster.has_load_assignment() ? cluster.load_assignment()
@@ -138,12 +141,20 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
 
         std::chrono::milliseconds final_refresh_rate = parent_.dns_refresh_rate_ms_;
 
-        if (parent_.respect_dns_ttl_ && ttl_refresh_rate != std::chrono::seconds(0) &&
-            !response.empty()) {
-          final_refresh_rate = ttl_refresh_rate;
-          ASSERT(ttl_refresh_rate != std::chrono::seconds::max() && final_refresh_rate.count() > 0);
-          ENVOY_LOG(debug, "DNS refresh rate reset for {}, refresh rate {} ms", dns_address_,
-                    final_refresh_rate.count());
+        if (response.empty()) {
+          final_refresh_rate =
+              std::chrono::milliseconds(parent_.failure_backoff_strategy_->nextBackOffMs());
+          ENVOY_LOG(debug, "DNS refresh rate reset for {}, (failure) refresh rate {} ms",
+                    dns_address_, final_refresh_rate.count());
+        } else {
+          parent_.failure_backoff_strategy_->reset();
+          if (parent_.respect_dns_ttl_ && ttl_refresh_rate != std::chrono::seconds(0)) {
+            final_refresh_rate = ttl_refresh_rate;
+            ASSERT(ttl_refresh_rate != std::chrono::seconds::max() &&
+                   final_refresh_rate.count() > 0);
+            ENVOY_LOG(debug, "DNS refresh rate reset for {}, refresh rate {} ms", dns_address_,
+                      final_refresh_rate.count());
+          }
         }
 
         resolve_timer_->enableTimer(final_refresh_rate);
