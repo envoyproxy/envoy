@@ -39,7 +39,7 @@ def validateFormat(fix=False):
   successful_update_files = set()
   for python_file in collectFiles():
     reformatted_source, encoding, changed = FormatFile(python_file,
-                                                       style_config='.style.yapf',
+                                                       style_config='tools/.style.yapf',
                                                        in_place=fix,
                                                        print_diff=not fix)
     if not fix:

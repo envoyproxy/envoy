@@ -37,6 +37,8 @@ TEST_F(ProtobufUtilityTest, convertPercentNaN) {
   EXPECT_THROW(PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(common_config_,
                                                               healthy_panic_threshold, 100, 50),
                EnvoyException);
+  EXPECT_THROW(PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(common_config_, healthy_panic_threshold, 0.5),
+               EnvoyException);
 }
 
 namespace ProtobufPercentHelper {

@@ -79,27 +79,6 @@ static_resources:
             catch_all_route:
               cluster: redis
   clusters:
-  - name: cds
-    connect_timeout: 5s
-    hosts:
-    - socket_address:
-        address: {{ ip_loopback_address }}
-        port_value: 4
-    dns_lookup_family: "{{ dns_lookup_family }}"
-  - name: rds
-    connect_timeout: 5s
-    hosts:
-    - socket_address:
-        address: {{ ip_loopback_address }}
-        port_value: 4
-    dns_lookup_family: "{{ dns_lookup_family }}"
-  - name: lds
-    connect_timeout: 5s
-    hosts:
-    - socket_address:
-        address: {{ ip_loopback_address }}
-        port_value: 4
-    dns_lookup_family: "{{ dns_lookup_family }}"
   - name: cluster_1
     connect_timeout: 5s
     hosts:
@@ -141,19 +120,7 @@ static_resources:
         port_value: 4
     dns_lookup_family: "{{ dns_lookup_family }}"
     outlier_detection: {}
-dynamic_resources:
-  lds_config:
-    api_config_source:
-      api_type: REST
-      cluster_names:
-      - lds
-      refresh_delay: 30s
-  cds_config:
-    api_config_source:
-      api_type: REST
-      cluster_names:
-      - cds
-      refresh_delay: 30s
+dynamic_resources: {}
 cluster_manager: {}
 flags_path: "/invalid_flags"
 stats_sinks:

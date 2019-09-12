@@ -10,8 +10,6 @@
 
 #include "gtest/gtest.h"
 
-using testing::HasSubstr;
-
 namespace Envoy {
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http2UpstreamIntegrationTest,

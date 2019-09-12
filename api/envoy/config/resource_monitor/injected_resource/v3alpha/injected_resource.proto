@@ -5,7 +5,6 @@ package envoy.config.resource_monitor.injected_resource.v3alpha;
 option java_outer_classname = "InjectedResourceProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.resource_monitor.injected_resource.v3alpha";
-option go_package = "v2alpha";
 
 import "validate/validate.proto";
 

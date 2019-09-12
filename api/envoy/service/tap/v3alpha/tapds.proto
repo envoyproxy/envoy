@@ -27,7 +27,7 @@ service TapDiscoveryService {
   rpc FetchTapConfigs(envoy.api.v3alpha.DiscoveryRequest)
       returns (envoy.api.v3alpha.DiscoveryResponse) {
     option (google.api.http) = {
-      post: "/v2/discovery:tap_configs"
+      post: "/v3alpha/discovery:tap_configs"
       body: "*"
     };
   }

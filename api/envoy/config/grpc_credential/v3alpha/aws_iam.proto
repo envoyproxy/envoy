@@ -8,7 +8,6 @@ package envoy.config.grpc_credential.v3alpha;
 option java_outer_classname = "AwsIamProto";
 option java_package = "io.envoyproxy.envoy.config.grpc_credential.v3alpha";
 option java_multiple_files = true;
-option go_package = "v2alpha";
 
 import "validate/validate.proto";
 

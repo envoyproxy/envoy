@@ -5,7 +5,6 @@ package envoy.config.filter.http.grpc_http1_reverse_bridge.v2alpha1;
 option java_outer_classname = "ConfigProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.filter.http.grpc_http1_reverse_bridge.v2alpha1";
-option go_package = "v2";
 
 import "validate/validate.proto";
 

@@ -57,15 +57,19 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
   }
   addUniqueClusters(unique_clusters, prefix_routes.catch_all_route());
 
+  auto redis_command_stats =
+      Common::Redis::RedisCommandStats::createRedisCommandStats(context.scope().symbolTable());
+
   Upstreams upstreams;
   for (auto& cluster : unique_clusters) {
     Stats::ScopePtr stats_scope =
         context.scope().createScope(fmt::format("cluster.{}.redis_cluster", cluster));
+
     upstreams.emplace(cluster, std::make_shared<ConnPool::InstanceImpl>(
                                    cluster, context.clusterManager(),
                                    Common::Redis::Client::ClientFactoryImpl::instance_,
                                    context.threadLocal(), proto_config.settings(), context.api(),
-                                   std::move(stats_scope)));
+                                   std::move(stats_scope), redis_command_stats));
   }
 
   auto router =
