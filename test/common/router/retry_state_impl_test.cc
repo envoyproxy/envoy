@@ -558,7 +558,7 @@ TEST_F(RouterRetryStateImplTest, RetriableHeadersSetViaRequestHeader) {
   {
     Http::TestHeaderMapImpl request_headers{
         {"x-envoy-retry-on", "retriable-headers"},
-        {"x-envoy-retriable-headers", "X-Upstream-Pushback,FOOBAR"}};
+        {"x-envoy-retriable-header-names", "X-Upstream-Pushback,FOOBAR"}};
     setup(request_headers);
     EXPECT_TRUE(state_->enabled());
 
@@ -570,7 +570,7 @@ TEST_F(RouterRetryStateImplTest, RetriableHeadersSetViaRequestHeader) {
   {
     Http::TestHeaderMapImpl request_headers{
         {"x-envoy-retry-on", "retriable-headers"},
-        {"x-envoy-retriable-headers", "X-Upstream-Pushback,  FOOBAR  "}};
+        {"x-envoy-retriable-header-names", "X-Upstream-Pushback,  FOOBAR  "}};
     setup(request_headers);
     EXPECT_TRUE(state_->enabled());
 
@@ -582,7 +582,7 @@ TEST_F(RouterRetryStateImplTest, RetriableHeadersSetViaRequestHeader) {
   {
     Http::TestHeaderMapImpl request_headers{
         {"x-envoy-retry-on", "retriable-headers"},
-        {"x-envoy-retriable-headers", "X-Upstream-Pushback,,FOOBAR"}};
+        {"x-envoy-retriable-header-names", "X-Upstream-Pushback,,FOOBAR"}};
     setup(request_headers);
     EXPECT_TRUE(state_->enabled());
 
@@ -617,7 +617,7 @@ TEST_F(RouterRetryStateImplTest, RetriableHeadersMergedConfigAndRequestHeaders) 
 
   // Request header supplements the config: as a result we retry on 200.
   {
-    Http::TestHeaderMapImpl request_headers{{"x-envoy-retriable-headers", "  :status,  FOOBAR  "}};
+    Http::TestHeaderMapImpl request_headers{{"x-envoy-retriable-header-names", "  :status,  FOOBAR  "}};
     setup(request_headers);
     EXPECT_TRUE(state_->enabled());
 
