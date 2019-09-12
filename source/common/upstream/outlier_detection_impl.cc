@@ -223,12 +223,12 @@ DetectorConfig::DetectorConfig(const envoy::api::v2::cluster::OutlierDetection& 
           config, success_rate_request_volume, DEFAULT_SUCCESS_RATE_REQUEST_VOLUME))),
       success_rate_stdev_factor_(static_cast<uint64_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, success_rate_stdev_factor, DEFAULT_SUCCESS_RATE_STDEV_FACTOR))),
-      failure_percentage_threshold_(static_cast<uint64_t>(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, failure_percentage_threshold, 85))),
-      failure_percentage_minimum_hosts_(static_cast<uint64_t>(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, failure_percentage_minimum_hosts, 5))),
-      failure_percentage_request_volume_(static_cast<uint64_t>(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, failure_percentage_request_volume, 50))),
+      failure_percentage_threshold_(static_cast<uint64_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          config, failure_percentage_threshold, DEFAULT_FAILURE_PERCENTAGE_THRESHOLD))),
+      failure_percentage_minimum_hosts_(static_cast<uint64_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          config, failure_percentage_minimum_hosts, DEFAULT_FAILURE_PERCENTAGE_MINIMUM_HOSTS))),
+      failure_percentage_request_volume_(static_cast<uint64_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          config, failure_percentage_request_volume, DEFAULT_FAILURE_PERCENTAGE_REQUEST_VOLUME))),
       enforcing_consecutive_5xx_(static_cast<uint64_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, enforcing_consecutive_5xx, DEFAULT_ENFORCING_CONSECUTIVE_5XX))),
       enforcing_consecutive_gateway_failure_(static_cast<uint64_t>(
@@ -236,10 +236,11 @@ DetectorConfig::DetectorConfig(const envoy::api::v2::cluster::OutlierDetection& 
                                           DEFAULT_ENFORCING_CONSECUTIVE_GATEWAY_FAILURE))),
       enforcing_success_rate_(static_cast<uint64_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, enforcing_success_rate, DEFAULT_ENFORCING_SUCCESS_RATE))),
-      enforcing_failure_percentage_(static_cast<uint64_t>(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enforcing_failure_percentage, 0))),
+      enforcing_failure_percentage_(static_cast<uint64_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          config, enforcing_failure_percentage, DEFAULT_ENFORCING_FAILURE_PERCENTAGE))),
       enforcing_failure_percentage_local_origin_(static_cast<uint64_t>(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enforcing_failure_percentage_local_origin, 0))),
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enforcing_failure_percentage_local_origin,
+                                          DEFAULT_ENFORCING_FAILURE_PERCENTAGE_LOCAL_ORIGIN))),
       split_external_local_origin_errors_(config.split_external_local_origin_errors()),
       consecutive_local_origin_failure_(static_cast<uint64_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, consecutive_local_origin_failure, DEFAULT_CONSECUTIVE_LOCAL_ORIGIN_FAILURE))),
