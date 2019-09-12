@@ -11,7 +11,7 @@ package io.envoyproxy.envoymobile
  */
 class RequestBuilder(
     val method: RequestMethod,
-    val scheme: String,
+    val scheme: String = "https",
     val authority: String,
     val path: String
 ) {

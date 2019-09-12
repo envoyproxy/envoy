@@ -30,7 +30,11 @@ public final class RequestBuilder: NSObject {
   }
 
   /// Public initializer.
-  public init(method: RequestMethod, scheme: String, authority: String, path: String) {
+  public init(method: RequestMethod,
+              scheme: String = "https",
+              authority: String,
+              path: String)
+  {
     self.method = method
     self.scheme = scheme
     self.authority = authority
