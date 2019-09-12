@@ -501,13 +501,6 @@ private:
 };
 
 /**
- * Hashing functor for use with unordered_map and unordered_set with string_view as a key.
- */
-struct StringViewHash {
-  std::size_t operator()(const absl::string_view& k) const { return HashUtil::xxHash64(k); }
-};
-
-/**
  * Hashing functor for use with enum class types.
  * This is needed for GCC 5.X; newer versions of GCC, as well as clang7, provide native hashing
  * specializations.
