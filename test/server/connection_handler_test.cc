@@ -819,7 +819,7 @@ TEST_F(ConnectionHandlerTest, UdpListenerNoFilterThrowsException) {
                   std::chrono::milliseconds());
   Network::MockUdpListener* listener = new Network::MockUdpListener();
   EXPECT_CALL(dispatcher_, createUdpListener_(_, _))
-      .WillOnce(Invoke([&](Network::Socket&, Network::UdpListenerCallbacks&) -> Network::Listener* {
+      .WillOnce(Invoke([&](Network::Socket&, Network::UdpListenerCallbacks&) -> Network::UdpListener* {
         return listener;
       }));
   EXPECT_CALL(factory_, createUdpListenerFilterChain(_, _))
