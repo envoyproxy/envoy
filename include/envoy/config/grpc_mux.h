@@ -67,6 +67,8 @@ public:
 
 using GrpcMuxWatchPtr = std::unique_ptr<GrpcMuxWatch>;
 
+struct Watch;
+
 /**
  * Manage one or more gRPC subscriptions on a single stream to management server. This can be used
  * for a single xDS API, e.g. EDS, or to combined multiple xDS APIs for ADS.
@@ -79,21 +81,6 @@ public:
    * Initiate stream with management server.
    */
   virtual void start() PURE;
-
-  /**
-   * Start a configuration subscription asynchronously for some API type and resources.
-   * @param type_url type URL corresponding to xDS API, e.g.
-   * type.googleapis.com/envoy.api.v2.Cluster.
-   * @param resources set of resource names to watch for. If this is empty, then all
-   *                  resources for type_url will result in callbacks.
-   * @param callbacks the callbacks to be notified of configuration updates. These must be valid
-   *                  until GrpcMuxWatch is destroyed.
-   * @return GrpcMuxWatchPtr a handle to cancel the subscription with. E.g. when a cluster goes
-   * away, its EDS updates should be cancelled by destroying the GrpcMuxWatchPtr.
-   */
-  virtual GrpcMuxWatchPtr subscribe(const std::string& type_url,
-                                    const std::set<std::string>& resources,
-                                    GrpcMuxCallbacks& callbacks) PURE;
 
   /**
    * Pause discovery requests for a given API type. This is useful when we're processing an update
@@ -111,6 +98,12 @@ public:
    */
   virtual void resume(const std::string& type_url) PURE;
 
+  virtual Watch* addOrUpdateWatch(const std::string& type_url, Watch* watch,
+                                  const std::set<std::string>& resources,
+                                  SubscriptionCallbacks& callbacks,
+                                  std::chrono::milliseconds init_fetch_timeout) PURE;
+  virtual void removeWatch(const std::string& type_url, Watch* watch) PURE;
+
   /**
    * Retrieves the current pause state as set by pause()/resume().
    * @param type_url type URL corresponding to xDS API, e.g.
@@ -121,6 +114,37 @@ public:
 };
 
 using GrpcMuxPtr = std::unique_ptr<GrpcMux>;
+using GrpcMuxSharedPtr = std::shared_ptr<GrpcMux>;
+
+/**
+ * A grouping of callbacks that a GrpcMux should provide to its GrpcStream.
+ */
+template <class ResponseProto> class GrpcStreamCallbacks {
+public:
+  virtual ~GrpcStreamCallbacks() = default;
+
+  /**
+   * For the GrpcStream to prompt the context to take appropriate action in response to the
+   * gRPC stream having been successfully established.
+   */
+  virtual void onStreamEstablished() PURE;
+
+  /**
+   * For the GrpcStream to prompt the context to take appropriate action in response to
+   * failure to establish the gRPC stream.
+   */
+  virtual void onEstablishmentFailure() PURE;
+
+  /**
+   * For the GrpcStream to pass received protos to the context.
+   */
+  virtual void onDiscoveryResponse(std::unique_ptr<ResponseProto>&& message) PURE;
+
+  /**
+   * For the GrpcStream to call when its rate limiting logic allows more requests to be sent.
+   */
+  virtual void onWriteable() PURE;
+};
 
 } // namespace Config
 } // namespace Envoy

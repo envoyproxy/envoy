@@ -43,7 +43,7 @@ protected:
 
 // Tests that establishNewStream() establishes it, a second call does nothing, and a third call
 // after the stream was disconnected re-establishes it.
-TEST_F(GrpcStreamTest, EstablishNewStream) {
+TEST_F(GrpcStreamTest, EstablishStream) {
   EXPECT_FALSE(grpc_stream_.grpcStreamAvailable());
   // Successful establishment
   {
@@ -52,7 +52,7 @@ TEST_F(GrpcStreamTest, EstablishNewStream) {
     grpc_stream_.establishNewStream();
     EXPECT_TRUE(grpc_stream_.grpcStreamAvailable());
   }
-  // Idempotency: do nothing (other than logging a warning) if already connected
+  // Idempotent
   {
     EXPECT_CALL(*async_client_, startRaw(_, _, _)).Times(0);
     EXPECT_CALL(callbacks_, onStreamEstablished()).Times(0);

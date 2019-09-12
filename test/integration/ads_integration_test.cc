@@ -26,7 +26,8 @@ using testing::AssertionResult;
 
 namespace Envoy {
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, AdsIntegrationTest, GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, AdsIntegrationTest,
+                         DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Validate basic config delivery and upgrade.
 TEST_P(AdsIntegrationTest, Basic) {
@@ -111,6 +112,7 @@ TEST_P(AdsIntegrationTest, Failure) {
                                       {"route_config_0"}, {}, {}));
 
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+
   makeSingleRequest();
 }
 
@@ -261,7 +263,7 @@ TEST_P(AdsIntegrationTest, DuplicateWarmingClusters) {
       {buildListener("listener_0", "route_config_0")}, {}, "1");
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
-                                      {"cluster_0"}, {"cluster_0"}, {}));
+                                      {"cluster_0"}, {}, {}));
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "",
                                       {"route_config_0"}, {"route_config_0"}, {}));
   sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
@@ -321,30 +323,32 @@ TEST_P(AdsIntegrationTest, CdsPausedDuringWarming) {
   makeSingleRequest();
 
   EXPECT_FALSE(
-      test_server_->server().clusterManager().adsMux().paused(Config::TypeUrl::get().Cluster));
+      test_server_->server().clusterManager().adsMux()->paused(Config::TypeUrl::get().Cluster));
   // Send the first warming cluster.
   sendDiscoveryResponse<envoy::api::v2::Cluster>(
       Config::TypeUrl::get().Cluster, {buildCluster("warming_cluster_1")},
       {buildCluster("warming_cluster_1")}, {"cluster_0"}, "2");
+
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
   EXPECT_TRUE(
-      test_server_->server().clusterManager().adsMux().paused(Config::TypeUrl::get().Cluster));
+      test_server_->server().clusterManager().adsMux()->paused(Config::TypeUrl::get().Cluster));
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
                                       {"warming_cluster_1"}, {"warming_cluster_1"}, {"cluster_0"}));
 
   // Send the second warming cluster.
-  sendDiscoveryResponse<envoy::api::v2::Cluster>(
-      Config::TypeUrl::get().Cluster, {buildCluster("warming_cluster_2")},
-      {buildCluster("warming_cluster_2")}, {"warming_cluster_1"}, "3");
+  sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
+                                                 {buildCluster("warming_cluster_2")},
+                                                 {buildCluster("warming_cluster_2")}, {}, "3");
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 2);
   // We would've got a Cluster discovery request with version 2 here, had the CDS not been paused.
+
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
                                       {"warming_cluster_2", "warming_cluster_1"},
                                       {"warming_cluster_2"}, {}));
 
   EXPECT_TRUE(
-      test_server_->server().clusterManager().adsMux().paused(Config::TypeUrl::get().Cluster));
+      test_server_->server().clusterManager().adsMux()->paused(Config::TypeUrl::get().Cluster));
   // Finish warming the clusters.
   sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
       Config::TypeUrl::get().ClusterLoadAssignment,
@@ -357,7 +361,7 @@ TEST_P(AdsIntegrationTest, CdsPausedDuringWarming) {
   // Validate that clusters are warmed.
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
   EXPECT_FALSE(
-      test_server_->server().clusterManager().adsMux().paused(Config::TypeUrl::get().Cluster));
+      test_server_->server().clusterManager().adsMux()->paused(Config::TypeUrl::get().Cluster));
 
   // CDS is resumed and EDS response was acknowledged.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "3", {}, {}, {}));
@@ -412,9 +416,9 @@ TEST_P(AdsIntegrationTest, ClusterWarmingOnNamedResponse) {
                                       {"warming_cluster_1"}, {"warming_cluster_1"}, {"cluster_0"}));
 
   // Send the second warming cluster.
-  sendDiscoveryResponse<envoy::api::v2::Cluster>(
-      Config::TypeUrl::get().Cluster, {buildCluster("warming_cluster_2")},
-      {buildCluster("warming_cluster_2")}, {"warming_cluster_1"}, "3");
+  sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
+                                                 {buildCluster("warming_cluster_2")},
+                                                 {buildCluster("warming_cluster_2")}, {}, "3");
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 2);
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
@@ -425,7 +429,7 @@ TEST_P(AdsIntegrationTest, ClusterWarmingOnNamedResponse) {
   sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
       Config::TypeUrl::get().ClusterLoadAssignment,
       {buildClusterLoadAssignment("warming_cluster_1")},
-      {buildClusterLoadAssignment("warming_cluster_1")}, {"cluster_0"}, "2");
+      {buildClusterLoadAssignment("warming_cluster_1")}, {}, "2");
 
   // Envoy will not finish warming of the second cluster because of the missing load assignments
   // i,e. no named EDS response.
@@ -446,7 +450,7 @@ TEST_P(AdsIntegrationTest, ClusterWarmingOnNamedResponse) {
   sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
       Config::TypeUrl::get().ClusterLoadAssignment,
       {buildClusterLoadAssignment("warming_cluster_2")},
-      {buildClusterLoadAssignment("warming_cluster_2")}, {"warming_cluster_1"}, "3");
+      {buildClusterLoadAssignment("warming_cluster_2")}, {}, "3");
 
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
 }
@@ -580,13 +584,16 @@ TEST_P(AdsIntegrationTest, RdsAfterLdsInvalidated) {
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
 }
 
-class AdsFailIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
+class AdsFailIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest,
                                public HttpIntegrationTest {
 public:
   AdsFailIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), AdsIntegrationConfig()) {
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(),
+                            AdsIntegrationConfig(
+                                sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
     create_xds_upstream_ = true;
     use_lds_ = false;
+    sotw_or_delta_ = sotwOrDelta();
   }
 
   void TearDown() override {
@@ -609,8 +616,8 @@ public:
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, AdsFailIntegrationTest,
-                         GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, AdsFailIntegrationTest,
+                         DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Validate that we don't crash on failed ADS stream.
 TEST_P(AdsFailIntegrationTest, ConnectDisconnect) {
@@ -621,13 +628,16 @@ TEST_P(AdsFailIntegrationTest, ConnectDisconnect) {
   xds_stream_->finishGrpcStream(Grpc::Status::Internal);
 }
 
-class AdsConfigIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
+class AdsConfigIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest,
                                  public HttpIntegrationTest {
 public:
   AdsConfigIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), AdsIntegrationConfig()) {
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(),
+                            AdsIntegrationConfig(
+                                sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
     create_xds_upstream_ = true;
     use_lds_ = false;
+    sotw_or_delta_ = sotwOrDelta();
   }
 
   void TearDown() override {
@@ -658,8 +668,8 @@ public:
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, AdsConfigIntegrationTest,
-                         GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, AdsConfigIntegrationTest,
+                         DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // This is s regression validating that we don't crash on EDS static Cluster that uses ADS.
 TEST_P(AdsConfigIntegrationTest, EdsClusterWithAdsConfigSource) {

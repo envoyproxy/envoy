@@ -114,16 +114,17 @@ public:
       expectSendMessage(last_cluster_names_, version_, false, Grpc::Status::GrpcStatus::Internal,
                         "bad config");
     }
-    subscription_->grpcMux().onDiscoveryResponse(std::move(response));
+    subscription_->grpcMux()->onDiscoveryResponse(std::move(response));
     Mock::VerifyAndClearExpectations(&async_stream_);
   }
 
-  void updateResources(const std::set<std::string>& cluster_names) override {
+  void updateResourceInterest(const std::set<std::string>& cluster_names) override {
     // The "watch" mechanism means that updates that lose interest in a resource
     // will first generate a request for [still watched resources, i.e. without newly unwatched
     // ones] before generating the request for all of cluster_names.
     // TODO(fredlas) this unnecessary second request will stop happening once the watch mechanism is
     // no longer internally used by GrpcSubscriptionImpl.
+    // TODO TODO i think this should now be resolved
     std::set<std::string> both;
     for (const auto& n : cluster_names) {
       if (last_cluster_names_.find(n) != last_cluster_names_.end()) {
@@ -132,17 +133,22 @@ public:
     }
     expectSendMessage(both, version_);
     expectSendMessage(cluster_names, version_);
-    subscription_->updateResources(cluster_names);
+    subscription_->updateResourceInterest(cluster_names);
     last_cluster_names_ = cluster_names;
   }
 
   void expectConfigUpdateFailed() override {
-    EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, nullptr));
+    EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, nullptr))
+        .WillOnce([this](ConfigUpdateFailureReason reason, const EnvoyException*) {
+          if (reason == ConfigUpdateFailureReason::FetchTimedout) {
+            stats_.init_fetch_timeout_.inc();
+          }
+        });
   }
 
   void expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds timeout) override {
     init_timeout_timer_ = new Event::MockTimer(&dispatcher_);
-    EXPECT_CALL(*init_timeout_timer_, enableTimer(std::chrono::milliseconds(timeout), _));
+    EXPECT_CALL(*init_timeout_timer_, enableTimer(timeout, _));
   }
 
   void expectDisableInitFetchTimeoutTimer() override {

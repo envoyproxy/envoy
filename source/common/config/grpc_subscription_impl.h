@@ -1,48 +1,70 @@
 #pragma once
 
-#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/config/subscription.h"
-#include "envoy/event/dispatcher.h"
-#include "envoy/grpc/async_client.h"
 
-#include "common/config/grpc_mux_impl.h"
-#include "common/config/grpc_mux_subscription_impl.h"
+#include "common/config/new_grpc_mux_impl.h"
 #include "common/config/utility.h"
 
 namespace Envoy {
 namespace Config {
 
-class GrpcSubscriptionImpl : public Config::Subscription {
+// DeltaSubscriptionImpl provides a top-level interface to the Envoy's gRPC communication with
+// an xDS server, for use by the various xDS users within Envoy. It is built around a (shared)
+// NewGrpcMuxImpl, and the further machinery underlying that. An xDS user indicates interest in
+// various resources via start() and updateResourceInterest(). It receives updates to those
+// resources via the SubscriptionCallbacks it provides. Multiple users can each have their own
+// Subscription object for the same type_url; NewGrpcMuxImpl maintains a subscription to the
+// union of interested resources, and delivers to the users just the resource updates that they
+// are "watching" for.
+//
+// DeltaSubscriptionImpl and NewGrpcMuxImpl are both built to provide both regular xDS and ADS,
+// distinguished by whether multiple DeltaSubscriptionImpls are sharing a single
+// NewGrpcMuxImpl. (And by the gRPC method string, but that's taken care of over in
+// SubscriptionFactory).
+//
+// Why does DeltaSubscriptionImpl itself implement the SubscriptionCallbacks interface? So that it
+// can write to SubscriptionStats (which needs to live out here in the DeltaSubscriptionImpl) upon a
+// config update. The idea is, DeltaSubscriptionImpl presents itself to WatchMap as the
+// SubscriptionCallbacks, and then passes (after incrementing stats) all callbacks through to
+// callbacks_, which are the real SubscriptionCallbacks.
+class DeltaSubscriptionImpl : public Subscription, public SubscriptionCallbacks {
 public:
-  GrpcSubscriptionImpl(const LocalInfo::LocalInfo& local_info, Grpc::RawAsyncClientPtr async_client,
-                       Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
-                       const Protobuf::MethodDescriptor& service_method, absl::string_view type_url,
-                       SubscriptionCallbacks& callbacks, SubscriptionStats stats,
-                       Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
-                       std::chrono::milliseconds init_fetch_timeout, bool skip_subsequent_node)
-      : callbacks_(callbacks),
-        grpc_mux_(local_info, std::move(async_client), dispatcher, service_method, random, scope,
-                  rate_limit_settings, skip_subsequent_node),
-        grpc_mux_subscription_(grpc_mux_, callbacks_, stats, type_url, dispatcher,
-                               init_fetch_timeout) {}
+  // is_aggregated: whether the underlying mux/context is providing ADS to us and others, or whether
+  // it's all ours. The practical difference is that we ourselves must call start() on it only in
+  // the latter case.
+  DeltaSubscriptionImpl(GrpcMuxSharedPtr context, absl::string_view type_url,
+                        SubscriptionCallbacks& callbacks, SubscriptionStats stats,
+                        std::chrono::milliseconds init_fetch_timeout, bool is_aggregated);
+  ~DeltaSubscriptionImpl() override;
+
+  void pause();
+  void resume();
 
   // Config::Subscription
-  void start(const std::set<std::string>& resource_names) override {
-    // Subscribe first, so we get failure callbacks if grpc_mux_.start() fails.
-    grpc_mux_subscription_.start(resource_names);
-    grpc_mux_.start();
-  }
+  void start(const std::set<std::string>& resource_names) override;
+  void updateResourceInterest(const std::set<std::string>& update_to_these_names) override;
 
-  void updateResources(const std::set<std::string>& update_to_these_names) override {
-    grpc_mux_subscription_.updateResources(update_to_these_names);
-  }
+  // Config::SubscriptionCallbacks (all pass through to callbacks_!)
+  void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                      const std::string& version_info) override;
+  void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
+                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                      const std::string& system_version_info) override;
+  void onConfigUpdateFailed(ConfigUpdateFailureReason reason, const EnvoyException* e) override;
+  std::string resourceName(const ProtobufWkt::Any& resource) override;
 
-  GrpcMuxImpl& grpcMux() { return grpc_mux_; }
+  GrpcMuxSharedPtr getContextForTest() { return context_; }
 
 private:
-  Config::SubscriptionCallbacks& callbacks_;
-  GrpcMuxImpl grpc_mux_;
-  GrpcMuxSubscriptionImpl grpc_mux_subscription_;
+  GrpcMuxSharedPtr context_;
+  const std::string type_url_;
+  SubscriptionCallbacks& callbacks_;
+  SubscriptionStats stats_;
+  // NOTE: if another subscription of the same type_url has already been started, this value will be
+  // ignored in favor of the other subscription's.
+  std::chrono::milliseconds init_fetch_timeout_;
+  Watch* watch_{};
+  const bool is_aggregated_;
 };
 
 } // namespace Config

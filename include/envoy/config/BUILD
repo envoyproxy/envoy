@@ -65,20 +65,3 @@ envoy_cc_library(
         "//source/common/protobuf",
     ],
 )
-
-envoy_cc_library(
-    name = "watch_map_interface",
-    hdrs = ["watch_map.h"],
-    deps = [
-        ":subscription_interface",
-    ],
-)
-
-envoy_cc_library(
-    name = "xds_grpc_context_interface",
-    hdrs = ["xds_grpc_context.h"],
-    deps = [
-        ":subscription_interface",
-        "//source/common/protobuf",
-    ],
-)

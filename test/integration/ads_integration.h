@@ -13,35 +13,40 @@
 #include "test/integration/http_integration.h"
 
 namespace Envoy {
-static const std::string& AdsIntegrationConfig() {
-  CONSTRUCT_ON_FIRST_USE(std::string, R"EOF(
+static const std::string& AdsIntegrationConfig(const std::string& api_type) {
+  CONSTRUCT_ON_FIRST_USE(std::string, fmt::format(
+                                          R"EOF(
 dynamic_resources:
-  lds_config: {ads: {}}
-  cds_config: {ads: {}}
+  lds_config:
+    ads: {{}}
+  cds_config:
+    ads: {{}}
   ads_config:
-    api_type: GRPC
+    api_type: {}
     set_node_on_first_message_only: true
 static_resources:
   clusters:
     name: dummy_cluster
-    connect_timeout: { seconds: 5 }
+    connect_timeout:
+      seconds: 5
     type: STATIC
     hosts:
       socket_address:
         address: 127.0.0.1
         port_value: 0
     lb_policy: ROUND_ROBIN
-    http2_protocol_options: {}
+    http2_protocol_options: {{}}
 admin:
   access_log_path: /dev/null
   address:
     socket_address:
       address: 127.0.0.1
       port_value: 0
-)EOF");
+)EOF",
+                                          api_type));
 }
 
-class AdsIntegrationTest : public Grpc::GrpcClientIntegrationParamTest, public HttpIntegrationTest {
+class AdsIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest, public HttpIntegrationTest {
 public:
   AdsIntegrationTest();
 
