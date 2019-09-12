@@ -99,6 +99,8 @@ private:
   const ResponseParserResolver& response_parser_resolver_;
 };
 
+using ResponseDecoderSharedPtr = std::shared_ptr<ResponseDecoder>;
+
 /**
  * Encodes responses into underlying buffer.
  */

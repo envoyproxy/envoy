@@ -53,6 +53,7 @@ proto_library(
         "//envoy/config/filter/network/dubbo_proxy/v2alpha1:dubbo_proxy",
         "//envoy/config/filter/network/ext_authz/v2:ext_authz",
         "//envoy/config/filter/network/http_connection_manager/v2:http_connection_manager",
+        "//envoy/config/filter/network/kafka_broker/v2:kafka_broker",
         "//envoy/config/filter/network/mongo_proxy/v2:mongo_proxy",
         "//envoy/config/filter/network/rate_limit/v2:rate_limit",
         "//envoy/config/filter/network/rbac/v2:rbac",

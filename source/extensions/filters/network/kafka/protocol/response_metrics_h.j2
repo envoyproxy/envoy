@@ -1,0 +1,94 @@
+{#
+  Template for 'response_metrics.h'.
+
+  Generates the response metric names from Kafka message types.
+  The metrics structure (KAFKA_RESPONSE_METRICS) is wrapped by RichRequestMetrics instance, allowing
+  for easier access to metrics using message's api_key as array index (instead of requiring us to
+  explicitly specify the metric (field) name).
+
+  There are two metrics for each of response types (e.g. produce):
+  - number of responses received,
+  - response processing time in milliseconds (time between receiving a request and receiving a
+    response with the same correlation id).
+  There is also a single metric counting responses that could not be parsed.
+#}
+
+#pragma once
+
+#include <array>
+#include <functional>
+
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace NetworkFilters {
+namespace Kafka {
+
+#define KAFKA_RESPONSE_METRICS(COUNTER, HISTOGRAM)                                                 \
+{% for message_type in message_types %}                                                            \
+  COUNTER({{message_type.name_in_c_case()}})                                                       \
+  HISTOGRAM({{message_type.name_in_c_case()}}_duration)                                            \
+{% endfor %}                                                                                       \
+  COUNTER(failed_parse)
+
+struct KafkaResponseMetrics {
+  KAFKA_RESPONSE_METRICS(GENERATE_COUNTER_STRUCT, GENERATE_HISTOGRAM_STRUCT)
+};
+
+class RichResponseMetrics {
+public:
+  virtual ~RichResponseMetrics() = default;
+  virtual void onMessage(const int16_t api_key, const long long duration) PURE;
+  virtual void onFailure() PURE;
+};
+
+using RichResponseMetricsSharedPtr = std::shared_ptr<RichResponseMetrics>;
+
+class RichResponseMetricsImpl: public RichResponseMetrics {
+public:
+  RichResponseMetricsImpl(Stats::Scope& scope, std::string stat_prefix): RichResponseMetricsImpl({
+    KAFKA_RESPONSE_METRICS(POOL_COUNTER_PREFIX(scope, fmt::format("kafka.{}.response.",
+      stat_prefix)), POOL_HISTOGRAM_PREFIX(scope, fmt::format("kafka.{}.response.", stat_prefix)))})
+  {};
+
+  void onMessage(const int16_t api_key, const long long duration) override {
+    counters_[api_key].get().inc();
+    durations_[api_key].get().recordValue(duration);
+  }
+
+  void onFailure() override { raw_metrics_.failed_parse_.inc(); }
+
+private:
+  RichResponseMetricsImpl(const KafkaResponseMetrics& metrics):
+    counters_{setupCounters(metrics)}, durations_{setupDurations(metrics)}, raw_metrics_{metrics}
+    {};
+
+  static std::array<std::reference_wrapper<Envoy::Stats::Counter>, {{message_types|length}}>
+  setupCounters(const KafkaResponseMetrics& metrics) {
+    return {
+      {% for message_type in message_types %}
+      std::ref(metrics.{{message_type.name_in_c_case()}}_),
+      {% endfor %}
+    };
+  }
+
+  static std::array<std::reference_wrapper<Envoy::Stats::Histogram>, {{message_types|length}}>
+  setupDurations(const KafkaResponseMetrics& metrics) {
+    return {
+        {% for message_type in message_types %}
+        std::ref(metrics.{{message_type.name_in_c_case()}}_duration_),
+        {% endfor %}
+    };
+  }
+
+  std::array<std::reference_wrapper<Envoy::Stats::Counter>, {{message_types|length}}> counters_;
+  std::array<std::reference_wrapper<Envoy::Stats::Histogram>, {{message_types|length}}> durations_;
+  KafkaResponseMetrics raw_metrics_;
+};
+
+} // namespace Kafka
+} // namespace NetworkFilters
+} // namespace Extensions
+} // namespace Envoy

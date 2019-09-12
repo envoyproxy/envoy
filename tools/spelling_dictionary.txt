@@ -561,6 +561,7 @@ iteratively
 jitter
 jittered
 jittering
+kafka
 keepalive
 keepalives
 ketama

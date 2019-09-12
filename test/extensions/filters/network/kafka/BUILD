@@ -35,7 +35,7 @@ envoy_cc_test_library(
 envoy_extension_cc_test(
     name = "serialization_test",
     srcs = ["serialization_test.cc"],
-    extension_name = "envoy.filters.network.kafka",
+    extension_name = "envoy.filters.network.kafka_broker",
     deps = [
         ":serialization_utilities_lib",
         "//source/extensions/filters/network/kafka:serialization_lib",
@@ -46,7 +46,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "serialization_composite_test",
     srcs = ["external/serialization_composite_test.cc"],
-    extension_name = "envoy.filters.network.kafka",
+    extension_name = "envoy.filters.network.kafka_broker",
     deps = [
         ":serialization_utilities_lib",
         "//source/extensions/filters/network/kafka:serialization_lib",
@@ -81,7 +81,7 @@ py_binary(
 envoy_extension_cc_test(
     name = "kafka_request_parser_test",
     srcs = ["kafka_request_parser_test.cc"],
-    extension_name = "envoy.filters.network.kafka",
+    extension_name = "envoy.filters.network.kafka_broker",
     deps = [
         ":buffer_based_test_lib",
         ":serialization_utilities_lib",
@@ -93,7 +93,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "request_codec_unit_test",
     srcs = ["request_codec_unit_test.cc"],
-    extension_name = "envoy.filters.network.kafka",
+    extension_name = "envoy.filters.network.kafka_broker",
     deps = [
         ":buffer_based_test_lib",
         "//source/extensions/filters/network/kafka:kafka_request_codec_lib",
@@ -104,7 +104,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "request_codec_integration_test",
     srcs = ["request_codec_integration_test.cc"],
-    extension_name = "envoy.filters.network.kafka",
+    extension_name = "envoy.filters.network.kafka_broker",
     deps = [
         ":buffer_based_test_lib",
         ":serialization_utilities_lib",
@@ -116,7 +116,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "request_codec_request_test",
     srcs = ["external/request_codec_request_test.cc"],
-    extension_name = "envoy.filters.network.kafka",
+    extension_name = "envoy.filters.network.kafka_broker",
     deps = [
         ":buffer_based_test_lib",
         ":serialization_utilities_lib",
@@ -128,7 +128,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "requests_test",
     srcs = ["external/requests_test.cc"],
-    extension_name = "envoy.filters.network.kafka",
+    extension_name = "envoy.filters.network.kafka_broker",
     deps = [
         ":buffer_based_test_lib",
         "//source/extensions/filters/network/kafka:kafka_request_codec_lib",
@@ -158,7 +158,7 @@ genrule(
 envoy_extension_cc_test(
     name = "kafka_response_parser_test",
     srcs = ["kafka_response_parser_test.cc"],
-    extension_name = "envoy.filters.network.kafka",
+    extension_name = "envoy.filters.network.kafka_broker",
     deps = [
         ":buffer_based_test_lib",
         ":serialization_utilities_lib",
@@ -170,7 +170,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "response_codec_unit_test",
     srcs = ["response_codec_unit_test.cc"],
-    extension_name = "envoy.filters.network.kafka",
+    extension_name = "envoy.filters.network.kafka_broker",
     deps = [
         ":buffer_based_test_lib",
         "//source/extensions/filters/network/kafka:kafka_response_codec_lib",
@@ -181,7 +181,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "response_codec_integration_test",
     srcs = ["response_codec_integration_test.cc"],
-    extension_name = "envoy.filters.network.kafka",
+    extension_name = "envoy.filters.network.kafka_broker",
     deps = [
         ":buffer_based_test_lib",
         ":serialization_utilities_lib",
@@ -193,7 +193,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "response_codec_response_test",
     srcs = ["external/response_codec_response_test.cc"],
-    extension_name = "envoy.filters.network.kafka",
+    extension_name = "envoy.filters.network.kafka_broker",
     deps = [
         ":buffer_based_test_lib",
         ":serialization_utilities_lib",
@@ -205,7 +205,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "responses_test",
     srcs = ["external/responses_test.cc"],
-    extension_name = "envoy.filters.network.kafka",
+    extension_name = "envoy.filters.network.kafka_broker",
     deps = [
         ":buffer_based_test_lib",
         "//source/extensions/filters/network/kafka:kafka_response_codec_lib",
@@ -241,5 +241,25 @@ py_binary(
     deps = [
         "//source/extensions/filters/network/kafka:kafka_protocol_generator_lib",
         "@com_github_pallets_jinja//:jinja2",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "broker_filter_unit_test",
+    srcs = ["broker/filter_unit_test.cc"],
+    extension_name = "envoy.filters.network.kafka_broker",
+    deps = [
+        "//source/extensions/filters/network/kafka:kafka_broker_filter_lib",
+        "//test/mocks/server:server_mocks",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "broker_config_unit_test",
+    srcs = ["broker/config_unit_test.cc"],
+    extension_name = "envoy.filters.network.kafka_broker",
+    deps = [
+        "//source/extensions/filters/network/kafka:kafka_broker_config_lib",
+        "//test/mocks/server:server_mocks",
     ],
 )

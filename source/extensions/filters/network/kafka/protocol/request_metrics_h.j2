@@ -1,0 +1,77 @@
+{#
+  Template for 'request_metrics.h'.
+
+  Generates the request metric names from Kafka message types.
+  The metrics structure (KAFKA_REQUEST_METRICS) is wrapped by RichRequestMetrics instance, allowing
+  for easier access to metrics using message's api_key as array index (instead of requiring us to
+  explicitly specify the metric (field) name).
+
+  There is one metric for each of request types (e.g. produce) - number of responses received.
+  There is also a single metric counting requests that could not be parsed.
+#}
+
+#pragma once
+
+#include <array>
+#include <functional>
+
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace NetworkFilters {
+namespace Kafka {
+
+#define KAFKA_REQUEST_METRICS(COUNTER)                                                             \
+{% for message_type in message_types %}                                                            \
+  COUNTER({{message_type.name_in_c_case()}})                                                       \
+{% endfor %}                                                                                       \
+  COUNTER(failed_parse)
+
+struct KafkaRequestMetrics {
+  KAFKA_REQUEST_METRICS(GENERATE_COUNTER_STRUCT)
+};
+
+class RichRequestMetrics {
+public:
+  virtual ~RichRequestMetrics() = default;
+  virtual void onMessage(const int16_t api_key) PURE;
+  virtual void onFailure() PURE;
+};
+
+using RichRequestMetricsSharedPtr = std::shared_ptr<RichRequestMetrics>;
+
+class RichRequestMetricsImpl: public RichRequestMetrics {
+public:
+  RichRequestMetricsImpl(Stats::Scope& scope, std::string stat_prefix): RichRequestMetricsImpl({
+    KAFKA_REQUEST_METRICS(POOL_COUNTER_PREFIX(scope, fmt::format("kafka.{}.request.",
+      stat_prefix)))}) {};
+
+  void onMessage(const int16_t api_key) override {
+    counters_[api_key].get().inc();
+  }
+
+  void onFailure() override { raw_metrics_.failed_parse_.inc(); }
+
+private:
+  RichRequestMetricsImpl(const KafkaRequestMetrics& metrics):
+    counters_{setupCounters(metrics)}, raw_metrics_{metrics} {};
+
+  static std::array<std::reference_wrapper<Envoy::Stats::Counter>, {{message_types|length}}>
+  setupCounters(const KafkaRequestMetrics& metrics) {
+    return {
+        {% for message_type in message_types %}
+        std::ref(metrics.{{message_type.name_in_c_case()}}_),
+        {% endfor %}
+    };
+  }
+
+  std::array<std::reference_wrapper<Envoy::Stats::Counter>, {{message_types|length}}> counters_;
+  KafkaRequestMetrics raw_metrics_;
+};
+
+} // namespace Kafka
+} // namespace NetworkFilters
+} // namespace Extensions
+} // namespace Envoy
