@@ -13,7 +13,9 @@ import_base = 'github.com/envoyproxy/go-control-plane'
 output_base = 'build_go'
 repo_base = 'go-control-plane'
 branch = 'sync'
-mirror_msg = "Mirrored from envoyproxy/envoy @ "
+mirror_msg = 'Mirrored from envoyproxy/envoy @ '
+user_name = 'Kuat Yessenov'
+user_email = 'kuat@google.com'
 
 
 def generateProtobufs(output):
@@ -56,8 +58,6 @@ def cloneGoProtobufs(repo):
   # Create a local clone of go-control-plane
   shutil.rmtree(repo, ignore_errors=True)
   check_call(['git', 'clone', 'git@git:envoyproxy/go-control-plane', repo])
-  check_call(['git', '-C', repo, 'config', 'user.name', 'data-plane-api(CircleCI)'])
-  check_call(['git', '-C', repo, 'config', 'user.email', 'data-plane-api@users.noreply.github.com'])
   check_call(['git', '-C', repo, 'fetch'])
   check_call(['git', '-C', repo, 'checkout', '-B', branch, 'origin/master'])
 
@@ -90,9 +90,10 @@ def syncGoProtobufs(output, repo):
 
 def publishGoProtobufs(repo, sha):
   # Publish generated files with the last SHA changes to api
-  commit_msg = check_output(['git', 'log', sha, '-n', '1', '--format=%B']).decode().strip()
+  check_call(['git', '-C', repo, 'config', 'user.name', user_name])
+  check_call(['git', '-C', repo, 'config', 'user.email', user_email])
   check_call(['git', '-C', repo, 'add', 'envoy'])
-  check_call(['git', '-C', repo, 'commit', '-m', commit_msg + '\n\n' + mirror_msg + sha])
+  check_call(['git', '-C', repo, 'commit', '-s', '-m', mirror_msg + sha])
   check_call(['git', '-C', repo, 'push', 'origin', '-f', branch])
 
 
