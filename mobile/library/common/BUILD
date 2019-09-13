@@ -7,6 +7,7 @@ envoy_package()
 envoy_cc_library(
     name = "envoy_main_interface_lib",
     srcs = [
+        "certificates.inc",
         "config_template.cc",
         "main_interface.cc",
     ],

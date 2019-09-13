@@ -1,5 +1,8 @@
-// NOLINT(namespace-envoy)
-
+/**
+  * Templated default configuration
+  *
+  * Note: Parts of this configuration are required for the direct API to function.
+  */
 const char* config_template = R"(
 static_resources:
   listeners:
@@ -63,6 +66,15 @@ static_resources:
                 address:
                   socket_address: {address: {{ domain }}, port_value: 443}
     tls_context:
+      common_tls_context:
+        validation_context:
+          trusted_ca: &trusted_ca
+            inline_string: |
+)"
+#include "certificates.inc"
+R"(
+          verify_subject_alt_name:
+            - {{ domain }}
       sni: {{ domain }}
     type: LOGICAL_DNS
   - name: default_egress
@@ -76,13 +88,10 @@ static_resources:
         dns_cache_config:
           name: dynamic_forward_proxy_cache_config
           dns_lookup_family: AUTO
-    # WARNING!
-    # TODO: Enable TLS in https://github.com/lyft/envoy-mobile/issues/322
-    #
-    # tls_context:
-    #   common_tls_context:
-    #     validation_context:
-    #       trusted_ca: {filename: /etc/ssl/certs/ca-certificates.crt}
+    tls_context:
+      common_tls_context:
+        validation_context:
+          trusted_ca: *trusted_ca
 stats_flush_interval: {{ stats_flush_interval }}
 watchdog:
   megamiss_timeout: 60s
