@@ -219,21 +219,26 @@ protected:
   Thread::ThreadPtr startTestServer(const std::string& bootstrap_path,
                                     const bool use_intializing_instance) {
     absl::Notification started;
+    absl::Notification post_init;
 
     auto server_thread = Thread::threadFactoryForTest().createThread([&] {
       initialize(bootstrap_path, use_intializing_instance);
       auto startup_handle = server_->registerCallback(ServerLifecycleNotifier::Stage::Startup,
                                                       [&] { started.Notify(); });
+      auto post_init_handle = server_->registerCallback(ServerLifecycleNotifier::Stage::PostInit,
+                                                        [&] { post_init.Notify(); });
       auto shutdown_handle = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
                                                        [&](Event::PostCb) { FAIL(); });
       shutdown_handle = nullptr; // unregister callback
       server_->run();
       startup_handle = nullptr;
+      post_init_handle = nullptr;
       server_ = nullptr;
       thread_local_ = nullptr;
     });
 
     started.WaitForNotification();
+    post_init.WaitForNotification();
     return server_thread;
   }
 
@@ -321,8 +326,8 @@ TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
 }
 
 TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
-  bool startup = false, shutdown = false, shutdown_with_completion = false;
-  absl::Notification started, shutdown_begin, completion_block, completion_done;
+  bool startup = false, post_init = false, shutdown = false, shutdown_with_completion = false;
+  absl::Notification started, post_init_fired, shutdown_begin, completion_block, completion_done;
 
   // Run the server in a separate thread so we can test different lifecycle stages.
   auto server_thread = Thread::threadFactoryForTest().createThread([&] {
@@ -331,11 +336,15 @@ TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
       startup = true;
       started.Notify();
     });
-    auto handle2 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit, [&] {
+    auto handle2 = server_->registerCallback(ServerLifecycleNotifier::Stage::PostInit, [&] {
+      post_init = true;
+      post_init_fired.Notify();
+    });
+    auto handle3 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit, [&] {
       shutdown = true;
       shutdown_begin.Notify();
     });
-    auto handle3 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
+    auto handle4 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
                                              [&](Event::PostCb completion_cb) {
                                                // Block till we're told to complete
                                                completion_block.WaitForNotification();
@@ -343,22 +352,27 @@ TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
                                                server_->dispatcher().post(completion_cb);
                                                completion_done.Notify();
                                              });
-    auto handle4 =
+    auto handle5 =
         server_->registerCallback(ServerLifecycleNotifier::Stage::Startup, [&] { FAIL(); });
-    handle4 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
+    handle5 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
                                         [&](Event::PostCb) { FAIL(); });
-    handle4 = nullptr;
+    handle5 = nullptr;
 
     server_->run();
     handle1 = nullptr;
     handle2 = nullptr;
     handle3 = nullptr;
+    handle4 = nullptr;
     server_ = nullptr;
     thread_local_ = nullptr;
   });
 
   started.WaitForNotification();
   EXPECT_TRUE(startup);
+  EXPECT_FALSE(shutdown);
+
+  post_init_fired.WaitForNotification();
+  EXPECT_TRUE(post_init);
   EXPECT_FALSE(shutdown);
 
   server_->dispatcher().post([&] { server_->shutdown(); });
