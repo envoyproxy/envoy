@@ -293,6 +293,26 @@ private:
   const uint64_t consecutive_local_origin_failure_;
   const uint64_t enforcing_consecutive_local_origin_failure_;
   const uint64_t enforcing_local_origin_success_rate_;
+
+  static const uint64_t DEFAULT_INTERVAL_MS = 10000;
+  static const uint64_t DEFAULT_BASE_EJECTION_TIME_MS = 30000;
+  static const uint64_t DEFAULT_CONSECUTIVE_5XX = 5;
+  static const uint64_t DEFAULT_CONSECUTIVE_GATEWAY_FAILURE = 5;
+  static const uint64_t DEFAULT_MAX_EJECTION_PERCENT = 10;
+  static const uint64_t DEFAULT_SUCCESS_RATE_MINIMUM_HOSTS = 5;
+  static const uint64_t DEFAULT_SUCCESS_RATE_REQUEST_VOLUME = 100;
+  static const uint64_t DEFAULT_SUCCESS_RATE_STDEV_FACTOR = 1900;
+  static const uint64_t DEFAULT_FAILURE_PERCENTAGE_THRESHOLD = 85;
+  static const uint64_t DEFAULT_FAILURE_PERCENTAGE_MINIMUM_HOSTS = 5;
+  static const uint64_t DEFAULT_FAILURE_PERCENTAGE_REQUEST_VOLUME = 50;
+  static const uint64_t DEFAULT_ENFORCING_CONSECUTIVE_5XX = 100;
+  static const uint64_t DEFAULT_ENFORCING_CONSECUTIVE_GATEWAY_FAILURE = 0;
+  static const uint64_t DEFAULT_ENFORCING_SUCCESS_RATE = 100;
+  static const uint64_t DEFAULT_ENFORCING_FAILURE_PERCENTAGE = 0;
+  static const uint64_t DEFAULT_ENFORCING_FAILURE_PERCENTAGE_LOCAL_ORIGIN = 0;
+  static const uint64_t DEFAULT_CONSECUTIVE_LOCAL_ORIGIN_FAILURE = 5;
+  static const uint64_t DEFAULT_ENFORCING_CONSECUTIVE_LOCAL_ORIGIN_FAILURE = 100;
+  static const uint64_t DEFAULT_ENFORCING_LOCAL_ORIGIN_SUCCESS_RATE = 100;
 };
 
 /**
