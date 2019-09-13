@@ -376,7 +376,6 @@ filter_chains:
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
 }
 
-
 TEST_F(ListenerManagerImplWithRealFiltersTest, QuicUsesSslContext) {
   NiceMock<Api::MockOsSysCalls> os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
@@ -393,8 +392,8 @@ filter_chains:
     transport_protocol: "quic"
   filters: []
   transport_socket:
-  - name: "quic"
-    tls_context:
+    name: quic
+    config:
       common_tls_context:
         tls_certificates:
         - certificate_chain:
@@ -439,9 +438,11 @@ udp_listener_config:
   auto filter_chain = dynamic_cast<const QuicFilterChainImpl*>(
       findFilterChain(1234, "127.0.0.1", "", "quic", {}, "8.8.8.8", 111));
   ASSERT_NE(nullptr, filter_chain);
-  EXPECT_EQ(nullptr, filter_chain->transportSocketFactory());
+  auto& quic_socket_factory = dynamic_cast<const Quic::QuicServerTransportSocketFactory&>(
+      filter_chain->transportSocketFactory());
+  EXPECT_TRUE(quic_socket_factory.implementsSecureTransport());
+  EXPECT_TRUE(quic_socket_factory.serverContextConfig().isReady());
 }
-
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
   const std::string proto_text = R"EOF(

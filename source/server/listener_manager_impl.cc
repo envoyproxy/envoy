@@ -1,7 +1,8 @@
 #include "server/listener_manager_impl.h"
 
-#include <algorithm>
 #include <sys/socket.h>
+
+#include <algorithm>
 
 #include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/registry/registry.h"
@@ -263,14 +264,18 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
     }
   }
 
-  if (config.filter_chains().empty() && (socket_type_ == Network::Address::SocketType::Stream || !udp_listener_factory_->isTransportConnectionless())) {
+  if (config.filter_chains().empty() && (socket_type_ == Network::Address::SocketType::Stream ||
+                                         !udp_listener_factory_->isTransportConnectionless())) {
     // If we got here, this is a tcp listener, so ensure there is a filter chain specified
     throw EnvoyException(fmt::format("error adding listener '{}': no filter chains specified",
                                      address_->asString()));
-  } else if (udp_listener_factory_ != nullptr && !udp_listener_factory_->isTransportConnectionless()) {
-    for(auto& filter_chain : config.filter_chains()) {
+  } else if (udp_listener_factory_ != nullptr &&
+             !udp_listener_factory_->isTransportConnectionless()) {
+    for (auto& filter_chain : config.filter_chains()) {
       if (!filter_chain.has_transport_socket()) {
-    throw EnvoyException(fmt::format("error adding listener '{}': no transport socket specified for connection oriented UDP listener", address_->asString()));
+        throw EnvoyException(fmt::format("error adding listener '{}': no transport socket "
+                                         "specified for connection oriented UDP listener",
+                                         address_->asString()));
       }
     }
   }
