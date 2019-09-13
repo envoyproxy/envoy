@@ -240,10 +240,11 @@ message Cluster {
   message TransportSocketMatcher {
     string match = 1;
     auth.UpstreamTlsContext tls_context = 2;
+    core.TransportSocket transport_socket = 3;
   }
 
 
-  repeated TransportSocketMatcher transport_socket_matchers = 41;
+  repeated TransportSocketMatcher transport_socket_matchers = 42;
 
   reserved 12;
 

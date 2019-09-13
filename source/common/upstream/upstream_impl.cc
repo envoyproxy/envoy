@@ -786,20 +786,19 @@ TransportSocketMatcherPtr createTransportSocketMatcher(
   ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
       transport_socket, factory_context.messageValidationVisitor(), config_factory);
 
-  // TODO(incfly): later, use the only one default factory, not over creating.
+  // TODO(incfly): question, use the only one default factory, not over creating.
+  // or creating factory always and once api is stable deprecate the outer one?
   auto default_socket_factory = config_factory.createTransportSocketFactory(*message, factory_context);
   auto socket_factory_map = std::make_unique<std::map<std::string,
        Network::TransportSocketFactoryPtr>>();
   for (const auto& socket_matcher_iter : config.transport_socket_matchers()) {
     const auto& label = socket_matcher_iter.match();
     const auto& tls_config = socket_matcher_iter.tls_context();
-    //const auto& label = config.transport_socket_matchers().match();
-    //const auto& tls_config = config.transport_socket_matchers().tls_context();
 
     envoy::api::v2::core::TransportSocket socket;
-    socket.set_name("tls");
 
-    // ENVOY_LOG(info, "incfly debug0 {}", tls_config.DebugString());
+    // TODO(incfly): remove hardcode here before merge.
+    socket.set_name("tls");
     auto& tls_config_factory = Config::Utility::getAndCheckFactory<
       Server::Configuration::UpstreamTransportSocketConfigFactory>("tls");
     MessageUtil::jsonConvert(tls_config, *socket.mutable_config());
@@ -808,8 +807,8 @@ TransportSocketMatcherPtr createTransportSocketMatcher(
       socket, factory_context.messageValidationVisitor(), tls_config_factory);
     (*socket_factory_map)[label] = 
         tls_config_factory.createTransportSocketFactory(*message, factory_context);
-    //ENVOY_LOG_TO_LOGGER(logger, info, "incfly debug nullptr? {}, label value {} ", 
-        //(*socket_factory_map)[label].get() == nullptr, label);
+    ENVOY_LOG_TO_LOGGER(logger, info, "incfly debug nullptr? {}, label value {} ", 
+        (*socket_factory_map)[label].get() == nullptr, label);
   }
   return std::make_unique<TransportSocketMatcher>(
       std::move(default_socket_factory),  std::move(socket_factory_map));
