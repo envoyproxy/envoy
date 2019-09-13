@@ -1,7 +1,5 @@
 #include "server/listener_manager_impl.h"
 
-#include <sys/socket.h>
-
 #include <algorithm>
 
 #include "envoy/admin/v2alpha/config_dump.pb.h"
