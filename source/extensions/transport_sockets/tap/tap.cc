@@ -50,7 +50,7 @@ Network::IoResult TapSocket::doWrite(Buffer::Instance& buffer, bool end_stream) 
 
 void TapSocket::onConnected() { transport_socket_->onConnected(); }
 
-const Ssl::ConnectionInfo* TapSocket::ssl() const { return transport_socket_->ssl(); }
+Ssl::ConnectionInfoConstSharedPtr TapSocket::ssl() const { return transport_socket_->ssl(); }
 
 TapSocketFactory::TapSocketFactory(
     const envoy::config::transport_socket::tap::v2alpha::Tap& proto_config,

@@ -40,21 +40,21 @@ public:
   MOCK_CONST_METHOD0(peerCertificatePresented, bool());
   MOCK_CONST_METHOD0(uriSanLocalCertificate, std::vector<std::string>());
   MOCK_CONST_METHOD0(sha256PeerCertificateDigest, const std::string&());
-  MOCK_CONST_METHOD0(serialNumberPeerCertificate, std::string());
-  MOCK_CONST_METHOD0(issuerPeerCertificate, std::string());
-  MOCK_CONST_METHOD0(subjectPeerCertificate, std::string());
+  MOCK_CONST_METHOD0(serialNumberPeerCertificate, const std::string&());
+  MOCK_CONST_METHOD0(issuerPeerCertificate, const std::string&());
+  MOCK_CONST_METHOD0(subjectPeerCertificate, const std::string&());
   MOCK_CONST_METHOD0(uriSanPeerCertificate, std::vector<std::string>());
-  MOCK_CONST_METHOD0(subjectLocalCertificate, std::string());
+  MOCK_CONST_METHOD0(subjectLocalCertificate, const std::string&());
   MOCK_CONST_METHOD0(urlEncodedPemEncodedPeerCertificate, const std::string&());
   MOCK_CONST_METHOD0(urlEncodedPemEncodedPeerCertificateChain, const std::string&());
   MOCK_CONST_METHOD0(dnsSansPeerCertificate, std::vector<std::string>());
   MOCK_CONST_METHOD0(dnsSansLocalCertificate, std::vector<std::string>());
   MOCK_CONST_METHOD0(validFromPeerCertificate, absl::optional<SystemTime>());
   MOCK_CONST_METHOD0(expirationPeerCertificate, absl::optional<SystemTime>());
-  MOCK_CONST_METHOD0(sessionId, std::string());
+  MOCK_CONST_METHOD0(sessionId, const std::string&());
   MOCK_CONST_METHOD0(ciphersuiteId, uint16_t());
   MOCK_CONST_METHOD0(ciphersuiteString, std::string());
-  MOCK_CONST_METHOD0(tlsVersion, std::string());
+  MOCK_CONST_METHOD0(tlsVersion, const std::string&());
 };
 
 class MockClientContext : public ClientContext {

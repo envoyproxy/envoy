@@ -13,12 +13,8 @@ import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
-import "gogoproto/gogo.proto";
 
 import "envoy/type/percent.proto";
-
-option (gogoproto.equal_all) = true;
-option (gogoproto.stable_marshaler_all) = true;
 
 // [#protodoc-title: Common types]
 
@@ -131,7 +127,6 @@ enum RoutingPriority {
 
 // HTTP request method.
 enum RequestMethod {
-  option (gogoproto.goproto_enum_prefix) = false;
   METHOD_UNSPECIFIED = 0;
   GET = 1;
   HEAD = 2;
@@ -247,7 +242,6 @@ message SocketOption {
     bytes buf_value = 5;
   }
   enum SocketState {
-    option (gogoproto.goproto_enum_prefix) = false;
     // Socket options are applied after socket creation but before binding the socket to a port
     STATE_PREBIND = 0;
     // Socket options are applied after binding the socket to a port but before calling listen()

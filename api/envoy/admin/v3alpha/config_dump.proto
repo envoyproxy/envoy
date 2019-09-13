@@ -16,8 +16,6 @@ import "envoy/config/bootstrap/v3alpha/bootstrap.proto";
 import "google/protobuf/any.proto";
 import "google/protobuf/timestamp.proto";
 
-import "gogoproto/gogo.proto";
-
 // [#protodoc-title: ConfigDump]
 
 // The :ref:`/config_dump <operations_admin_interface_config_dump>` admin endpoint uses this wrapper

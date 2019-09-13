@@ -3,7 +3,6 @@ syntax = "proto3";
 package envoy.api.v3alpha;
 
 import "envoy/api/v3alpha/discovery.proto";
-import "gogoproto/gogo.proto";
 import "google/api/annotations.proto";
 import "validate/validate.proto";
 
@@ -11,7 +10,6 @@ option java_outer_classname = "SrdsProto";
 option java_package = "io.envoyproxy.envoy.api.v3alpha";
 option java_multiple_files = true;
 option java_generic_services = true;
-option (gogoproto.equal_all) = true;
 
 // [#protodoc-title: HTTP scoped routing configuration]
 // * Routing :ref:`architecture overview <arch_overview_http_routing>`

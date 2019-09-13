@@ -34,10 +34,14 @@ Version history
 * listeners: added :ref:`continue_on_listener_filters_timeout <envoy_api_field_Listener.continue_on_listener_filters_timeout>` to configure whether a listener will still create a connection when listener filters time out.
 * listeners: added :ref:`HTTP inspector listener filter <config_listener_filters_http_inspector>`.
 * lua: extended `httpCall()` and `respond()` APIs to accept headers with entry values that can be a string or table of strings.
+* metrics_service: added support for flushing histogram buckets.
+* outlier_detector: added :ref:`support for the grpc-status response header <arch_overview_outlier_detection_grpc>` by mapping it to HTTP status. Guarded by envoy.reloadable_features.outlier_detection_support_for_grpc_status which defaults to true.
 * performance: new buffer implementation enabled by default (to disable add "--use-libevent-buffers 1" to the command-line arguments when starting Envoy).
 * performance: stats symbol table implementation (disabled by default; to test it, add "--use-fake-symbol-table 0" to the command-line arguments when starting Envoy).
 * rbac: added support for DNS SAN as :ref:`principal_name <envoy_api_field_config.rbac.v2.Principal.Authenticated.principal_name>`.
+* redis: added :ref:`enable_command_stats <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.ConnPoolSettings.enable_command_stats>` to enable :ref:`per command statistics <arch_overview_redis_cluster_command_stats>` for upstream clusters.
 * redis: added :ref:`read_policy <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.ConnPoolSettings.read_policy>` to allow reading from redis replicas for Redis Cluster deployments.
+* redis: fix a bug where the redis health checker ignored the upstream auth password.
 * regex: introduce new :ref:`RegexMatcher <envoy_api_msg_type.matcher.RegexMatcher>` type that
   provides a safe regex implementation for untrusted user input. This type is now used in all
   configuration that processes user provided input. See :ref:`deprecated configuration details
@@ -48,13 +52,18 @@ Version history
 * router check tool: add coverage reporting & enforcement.
 * router check tool: add comprehensive coverage reporting.
 * router check tool: add deprecated field check.
+* router check tool: add flag for only printing results of failed tests.
+* thrift_proxy: fix crashing bug on invalid transport/protocol framing
 * tls: added verification of IP address SAN fields in certificates against configured SANs in the
 * tracing: added support to the Zipkin reporter for sending list of spans as Zipkin JSON v2 and protobuf message over HTTP.
   certificate validation context.
 * tracing: added tags for gRPC response status and meesage.
+* tracing: added :ref:`max_path_tag_length <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing>` to support customizing the length of the request path included in the extracted `http.url <https://github.com/opentracing/specification/blob/master/semantic_conventions.md#standard-span-tags-and-log-fields>` tag.
 * upstream: added :ref:`an option <envoy_api_field_Cluster.CommonLbConfig.close_connections_on_host_set_change>` that allows draining HTTP, TCP connection pools on cluster membership change.
 * upstream: added network filter chains to upstream connections, see :ref:`filters<envoy_api_field_Cluster.filters>`.
+* upstream: added new :ref:`failure-percentage based outlier detection<arch_overview_outlier_detection_failure_percentage>` mode.
 * upstream: use p2c to select hosts for least-requests load balancers if all host weights are the same, even in cases where weights are not equal to 1.
+* upstream: added :ref:`fail_traffic_on_panic <envoy_api_field_Cluster.CommonLbConfig.ZoneAwareLbConfig.fail_traffic_on_panic>` to allow failing all requests to a cluster during panic state.
 * zookeeper: parse responses and emit latency stats.
 
 1.11.1 (August 13, 2019)

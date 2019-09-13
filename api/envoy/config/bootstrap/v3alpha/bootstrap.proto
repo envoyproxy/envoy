@@ -25,7 +25,6 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 
 import "validate/validate.proto";
-import "gogoproto/gogo.proto";
 
 // Bootstrap :ref:`configuration overview <config_overview_v2_bootstrap>`.
 message Bootstrap {
@@ -98,13 +97,10 @@ message Bootstrap {
   // gauges at a periodic interval. If not specified the default is 5000ms (5
   // seconds).
   // Duration must be at least 1ms and at most 5 min.
-  google.protobuf.Duration stats_flush_interval = 7 [
-    (validate.rules).duration = {
-      lt: {seconds: 300},
-      gte: {nanos: 1000000}
-    },
-    (gogoproto.stdduration) = true
-  ];
+  google.protobuf.Duration stats_flush_interval = 7 [(validate.rules).duration = {
+    lt: {seconds: 300},
+    gte: {nanos: 1000000}
+  }];
 
   // Optional watchdog configuration.
   Watchdog watchdog = 8;

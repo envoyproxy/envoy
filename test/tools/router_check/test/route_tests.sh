@@ -64,10 +64,25 @@ if [[ "${BAD_CONFIG_OUTPUT}" != *"Unable to parse"* ]]; then
   exit 1
 fi
 
-# Failure test case
-echo "testing failure test case"
+# Failure output flag test cases
+echo "testing failure test cases"
+# Failure test case with only details flag set
 FAILURE_OUTPUT=$("${PATH_BIN}" "${PATH_CONFIG}/TestRoutes.yaml" "${PATH_CONFIG}/Weighted.golden.json" "--details" 2>&1) ||
   echo "${FAILURE_OUTPUT:-no-output}"
-if [[ "${FAILURE_OUTPUT}" != *"expected: [cluster1], actual: [instant-server], test type: cluster_name"* ]]; then
+if [[ "${FAILURE_OUTPUT}" != *"Test_1"*"Test_2"*"expected: [test_virtual_cluster], actual: [other], test type: virtual_cluster_name"*"expected: [cluster1], actual: [instant-server], test type: cluster_name"*"Test_3"* ]]; then
+  exit 1
+fi
+
+# Failure test case with details flag set and failures flag set
+FAILURE_OUTPUT=$("${PATH_BIN}" "-c" "${PATH_CONFIG}/TestRoutes.yaml" "-t" "${PATH_CONFIG}/Weighted.golden.proto.json" "--details"  "--only-show-failures" "--useproto" 2>&1) ||
+  echo "${FAILURE_OUTPUT:-no-output}"
+if [[ "${FAILURE_OUTPUT}" != *"Test_2"*"expected: [cluster1], actual: [instant-server], test type: cluster_name"* ]] || [[ "${FAILURE_OUTPUT}" == *"Test_1"* ]]; then
+  exit 1
+fi
+
+# Failure test case with details flag unset and failures flag set
+FAILURE_OUTPUT=$("${PATH_BIN}" "-c" "${PATH_CONFIG}/TestRoutes.yaml" "-t" "${PATH_CONFIG}/Weighted.golden.proto.json" "--only-show-failures" "--useproto" 2>&1) ||
+  echo "${FAILURE_OUTPUT:-no-output}"
+if [[ "${FAILURE_OUTPUT}" != *"Test_2"*"expected: [cluster1], actual: [instant-server], test type: cluster_name"* ]] || [[ "${FAILURE_OUTPUT}" == *"Test_1"* ]]; then
   exit 1
 fi
