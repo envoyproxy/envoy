@@ -17,8 +17,8 @@ namespace AdaptiveConcurrency {
 
 AdaptiveConcurrencyFilterConfig::AdaptiveConcurrencyFilterConfig(
     const envoy::config::filter::http::adaptive_concurrency::v2alpha::AdaptiveConcurrency&,
-    Runtime::Loader&, std::string stats_prefix, Stats::Scope&, TimeSource& time_source)
-    : stats_prefix_(std::move(stats_prefix)), time_source_(time_source) {}
+    Runtime::Loader&, const std::string& stats_prefix, Stats::Scope&, TimeSource& time_source)
+    : stats_prefix_(stats_prefix), time_source_(time_source) {}
 
 AdaptiveConcurrencyFilter::AdaptiveConcurrencyFilter(
     AdaptiveConcurrencyFilterConfigSharedPtr config, ConcurrencyControllerSharedPtr controller)
@@ -27,8 +27,8 @@ AdaptiveConcurrencyFilter::AdaptiveConcurrencyFilter(
 Http::FilterHeadersStatus AdaptiveConcurrencyFilter::decodeHeaders(Http::HeaderMap&, bool) {
   if (controller_->forwardingDecision() == ConcurrencyController::RequestForwardingAction::Block) {
     // TODO (tonya11en): Remove filler words.
-    decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "filler words", nullptr,
-                                       absl::nullopt, "more filler words");
+    decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "", nullptr,
+                                       absl::nullopt, "reached concurrency limit");
     return Http::FilterHeadersStatus::StopIteration;
   }
 

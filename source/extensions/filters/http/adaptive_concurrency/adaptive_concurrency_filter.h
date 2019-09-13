@@ -29,7 +29,7 @@ public:
   AdaptiveConcurrencyFilterConfig(
       const envoy::config::filter::http::adaptive_concurrency::v2alpha::AdaptiveConcurrency&
           adaptive_concurrency,
-      Runtime::Loader& runtime, std::string stats_prefix, Stats::Scope& scope,
+      Runtime::Loader& runtime, const std::string& stats_prefix, Stats::Scope& scope,
       TimeSource& time_source);
 
   TimeSource& timeSource() const { return time_source_; }

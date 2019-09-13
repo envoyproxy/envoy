@@ -24,7 +24,8 @@ namespace ConcurrencyController {
 /**
  * All stats for the gradient controller.
  */
-#define ALL_GRADIENT_CONTROLLER_STATS(GAUGE)                                                       \
+#define ALL_GRADIENT_CONTROLLER_STATS(COUNTER, GAUGE)                                                       \
+  COUNTER(rq_blocked)                  \
   GAUGE(concurrency_limit, NeverImport)                                                            \
   GAUGE(gradient, NeverImport)                                                                     \
   GAUGE(burst_queue_size, NeverImport)                                                             \
@@ -34,7 +35,7 @@ namespace ConcurrencyController {
  * Wrapper struct for gradient controller stats. @see stats_macros.h
  */
 struct GradientControllerStats {
-  ALL_GRADIENT_CONTROLLER_STATS(GENERATE_GAUGE_STRUCT)
+  ALL_GRADIENT_CONTROLLER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
 class GradientControllerConfig : public Logger::Loggable<Logger::Id::filter> {
@@ -156,7 +157,6 @@ private:
   bool inMinRTTSamplingWindow() const { return deferred_limit_value_.load() > 0; }
   void resetSampleWindow() ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
   void updateConcurrencyLimit(const uint32_t new_limit) {
-    std::cout << "@tallen updating limit to " << new_limit << std::endl;
     concurrency_limit_.store(new_limit);
     stats_.concurrency_limit_.set(concurrency_limit_.load());
   }

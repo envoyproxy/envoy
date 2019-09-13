@@ -34,16 +34,18 @@ config:
             denominator: HUNDRED
   )EOF";
 
+const std::string kConcurrencyLimitGaugeName = "http.config_test.adaptive_concurrency.gradient_controller.concurrency_limit";
+const std::string kRequestBlockCounterName = "http.config_test.adaptive_concurrency.gradient_controller.rq_blocked";
 
-class AdaptiveConcurrencyIntegrationTest : //public Event::TestUsingSimulatedTime,
-                                           public HttpIntegrationTest,
+class AdaptiveConcurrencyIntegrationTest : public HttpIntegrationTest,
                                            public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   AdaptiveConcurrencyIntegrationTest() :
     HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {}
 
   void initializeFilter() {
-    // We add the fault filter delay to introduce a "service latency" to the test.
+    // We use the fault filter (for delays) after the adaptive concurrency filter to introduce a
+    // "service latency" to the test. This way, time is moved forward with each response.
     config_helper_.addFilter(kFaultFilterConfig);
     config_helper_.addFilter(kAdaptiveConcurrencyFilterConfig);
   }
@@ -72,6 +74,9 @@ protected:
 
   // Responds to a single request in a FIFO manner.
   IntegrationStreamDecoderPtr respondToRequest();
+
+  // Inflates the concurrency limit to >= the specified value.
+  void inflateConcurrencyLimit(const uint64_t limit_lower_bound);
 
   void verifyResponseForwarded(IntegrationStreamDecoderPtr response) {
     EXPECT_EQ("200", response->headers().Status()->value().getStringView()); 

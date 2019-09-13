@@ -43,14 +43,27 @@ IntegrationStreamDecoderPtr AdaptiveConcurrencyIntegrationTest::respondToRequest
   return response;
 }
 
+void AdaptiveConcurrencyIntegrationTest::inflateConcurrencyLimit(const uint64_t limit_lower_bound) {
+  // Send requests until the gauge exists.
+  while (!test_server_->gauge(kConcurrencyLimitGaugeName)) {
+    sendRequests(1);
+    respondToAllRequests(1);
+  }
+
+  while (test_server_->gauge(kConcurrencyLimitGaugeName)->value() < limit_lower_bound) {
+    sendRequests(1);
+    respondToAllRequests(1);
+  }
+}
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, AdaptiveConcurrencyIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
 TEST_P(AdaptiveConcurrencyIntegrationTest, TestManyConcurrency1) {
   sendRequests(10);
   respondToAllRequests(1);
+  test_server_->waitForCounterGe(kRequestBlockCounterName, 9);
 }
-
 
 TEST_P(AdaptiveConcurrencyIntegrationTest, TestConcurrency1) {
   sendRequests(2);
@@ -60,20 +73,8 @@ TEST_P(AdaptiveConcurrencyIntegrationTest, TestConcurrency1) {
   verifyResponseBlocked(std::move(response));
 }
 
-TEST_P(AdaptiveConcurrencyIntegrationTest, TestConcurrencyInflation) {
-
-  // Exit the minRTT window.
-  for (int ii = 0; ii < 50; ++ii) {
-    sendRequests(1);
-    respondToAllRequests(1);
-  }
-
-  // Trigger ~5 concurrency limit calculations.
-  for (int ii = 0; ii < 100; ++ii) {
-    sendRequests(1);
-    respondToAllRequests(1);
-  }
-  
+TEST_P(AdaptiveConcurrencyIntegrationTest, TestConcurrencyLimitInflation) {
+  inflateConcurrencyLimit(100);
 }
 
 } // namespace Envoy

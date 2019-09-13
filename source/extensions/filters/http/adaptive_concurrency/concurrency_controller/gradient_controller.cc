@@ -69,7 +69,7 @@ GradientController::GradientController(GradientControllerConfig config,
 
 GradientControllerStats GradientController::generateStats(Stats::Scope& scope,
                                                           const std::string& stats_prefix) {
-  return {ALL_GRADIENT_CONTROLLER_STATS(POOL_GAUGE_PREFIX(scope, stats_prefix))};
+  return {ALL_GRADIENT_CONTROLLER_STATS(POOL_COUNTER_PREFIX (scope, stats_prefix), POOL_GAUGE_PREFIX(scope, stats_prefix))};
 }
 
 void GradientController::enterMinRTTSamplingWindow() {
@@ -111,7 +111,6 @@ void GradientController::resetSampleWindow() {
   }
 
   sample_rtt_ = processLatencySamplesAndClear();
-  std::cout << "@tallen sample rtt calculated: " << sample_rtt_.count() << std::endl;
   updateConcurrencyLimit(calculateNewLimit());
 }
 
@@ -153,6 +152,7 @@ RequestForwardingAction GradientController::forwardingDecision() {
     ++num_rq_outstanding_;
     return RequestForwardingAction::Forward;
   }
+  stats_.rq_blocked_.inc();
   return RequestForwardingAction::Block;
 }
 
