@@ -497,10 +497,9 @@ private:
 
     void traceRequest();
 
-    // Updates the snapped_route_config_ if scope found, or ends the stream by
-    // sending local reply.
-    // Returns true if scoped route config snapped, false otherwise.
-    bool snapScopedRouteConfig();
+    // Updates the snapped_route_config_, if scope not found for the header, a
+    // *Route::NullConfigImpl* is returned.
+    void snapScopedRouteConfig();
 
     void refreshCachedRoute();
 
