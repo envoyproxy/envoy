@@ -16,13 +16,11 @@
 using testing::_;
 using testing::ContainsRegex;
 using testing::Eq;
-using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
-using testing::Values;
 
 namespace Envoy {
 namespace Extensions {

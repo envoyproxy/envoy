@@ -9,6 +9,7 @@ ALPN
 ALS
 AMZ
 API
+ABI
 ASAN
 ASCII
 ASSERTs
@@ -121,6 +122,7 @@ HV
 IAM
 IANA
 IDL
+IETF
 INADDR
 INET
 IO
@@ -200,8 +202,10 @@ POSTs
 PREBIND
 PRNG
 PROT
+ProcessBufferedChlos
 PSS
 QPS
+QoS
 QUIC
 RAII
 RANLUX
@@ -294,6 +298,9 @@ VC
 VH
 VHDS
 VLOG
+VM
+WASM
+WAVM
 WKT
 WRR
 WS
@@ -414,6 +421,7 @@ decompressor
 decrement
 decrypt
 decrypting
+decls
 dedup
 dedupe
 deduplicate
@@ -451,6 +459,7 @@ dynamodb
 eg
 emplace
 emplaced
+emscripten
 enablement
 encodings
 endian
@@ -777,6 +786,7 @@ uint
 un
 unacked
 unary
+uncomment
 unconfigurable
 unconfigured
 uncontended
@@ -792,6 +802,7 @@ unescaping
 unindexed
 uninsantiated
 uninstantiated
+uniq
 unix
 unlink
 unlinked

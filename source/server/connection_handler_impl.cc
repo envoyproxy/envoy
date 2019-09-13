@@ -160,7 +160,11 @@ ConnectionHandlerImpl::findActiveListenerByAddress(const Network::Address::Insta
 void ConnectionHandlerImpl::ActiveSocket::onTimeout() {
   listener_.stats_.downstream_pre_cx_timeout_.inc();
   ASSERT(inserted());
+  ENVOY_LOG_TO_LOGGER(listener_.parent_.logger_, debug, "listener filter times out after {} ms",
+                      listener_.listener_filters_timeout_.count());
+
   if (listener_.continue_on_listener_filters_timeout_) {
+    ENVOY_LOG_TO_LOGGER(listener_.parent_.logger_, debug, "fallback to default listener filter");
     newConnection();
   }
   unlink();
@@ -183,6 +187,7 @@ void ConnectionHandlerImpl::ActiveSocket::unlink() {
 
 void ConnectionHandlerImpl::ActiveSocket::continueFilterChain(bool success) {
   if (success) {
+    bool no_error = true;
     if (iter_ == accept_filters_.end()) {
       iter_ = accept_filters_.begin();
     } else {
@@ -194,11 +199,23 @@ void ConnectionHandlerImpl::ActiveSocket::continueFilterChain(bool success) {
       if (status == Network::FilterStatus::StopIteration) {
         // The filter is responsible for calling us again at a later time to continue the filter
         // chain from the next filter.
-        return;
+        if (!socket().ioHandle().isOpen()) {
+          // break the loop but should not create new connection
+          no_error = false;
+          break;
+        } else {
+          // Blocking at the filter but no error
+          return;
+        }
       }
     }
     // Successfully ran all the accept filters.
-    newConnection();
+    if (no_error) {
+      newConnection();
+    } else {
+      // Signal the caller that no extra filter chain iteration is needed.
+      iter_ = accept_filters_.end();
+    }
   }
 
   // Filter execution concluded, unlink and delete this ActiveSocket if it was linked.
@@ -264,7 +281,7 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     return;
   }
 
-  auto transport_socket = filter_chain->transportSocketFactory()->createTransportSocket(nullptr);
+  auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   Network::ConnectionPtr new_connection =
       parent_.dispatcher_.createServerConnection(std::move(socket), std::move(transport_socket));
   new_connection->setBufferLimits(config_.perConnectionBufferLimitBytes());

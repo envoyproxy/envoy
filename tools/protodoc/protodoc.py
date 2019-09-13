@@ -6,9 +6,9 @@
 from collections import defaultdict
 import cProfile
 import functools
+import io
 import os
 import pstats
-import StringIO
 import re
 import sys
 
@@ -709,11 +709,21 @@ def GenerateRst(proto_file):
 def Main():
   # http://www.expobrain.net/2015/09/13/create-a-plugin-for-google-protocol-buffer/
   request = plugin_pb2.CodeGeneratorRequest()
-  request.ParseFromString(sys.stdin.read())
+  request.ParseFromString(sys.stdin.buffer.read())
   response = plugin_pb2.CodeGeneratorResponse()
   cprofile_enabled = os.getenv('CPROFILE_ENABLED')
 
-  for proto_file in request.proto_file:
+  # We use file_to_generate rather than proto_file here since we are invoked
+  # inside a Bazel aspect, each node in the DAG will be visited once by the
+  # aspect and we only want to generate docs for the current node.
+  for file_to_generate in request.file_to_generate:
+    # Find the FileDescriptorProto for the file we actually are generating.
+    proto_file = None
+    for pf in request.proto_file:
+      if pf.name == file_to_generate:
+        proto_file = pf
+        break
+    assert (proto_file is not None)
     f = response.file.add()
     f.name = proto_file.name + '.rst'
     if cprofile_enabled:
@@ -724,14 +734,14 @@ def Main():
     f.content = GenerateRst(proto_file)
     if cprofile_enabled:
       pr.disable()
-      stats_stream = StringIO.StringIO()
+      stats_stream = io.StringIO()
       ps = pstats.Stats(pr,
                         stream=stats_stream).sort_stats(os.getenv('CPROFILE_SORTBY', 'cumulative'))
       stats_file = response.file.add()
       stats_file.name = proto_file.name + '.rst.profile'
       ps.print_stats()
       stats_file.content = stats_stream.getvalue()
-  sys.stdout.write(response.SerializeToString())
+  sys.stdout.buffer.write(response.SerializeToString())
 
 
 if __name__ == '__main__':

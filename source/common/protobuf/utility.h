@@ -206,9 +206,6 @@ public:
     return HashUtil::xxHash64(text);
   }
 
-  static void checkUnknownFields(const Protobuf::Message& message,
-                                 ProtobufMessage::ValidationVisitor& validation_visitor);
-
   static void loadFromJson(const std::string& json, Protobuf::Message& message,
                            ProtobufMessage::ValidationVisitor& validation_visitor);
   static void loadFromJson(const std::string& json, ProtobufWkt::Struct& message);
@@ -225,8 +222,9 @@ public:
    *    in disallowed_features in runtime_features.h
    */
   static void
-  checkForDeprecation(const Protobuf::Message& message,
-                      Runtime::Loader* loader = Runtime::LoaderSingleton::getExisting());
+  checkForUnexpectedFields(const Protobuf::Message& message,
+                           ProtobufMessage::ValidationVisitor& validation_visitor,
+                           Runtime::Loader* loader = Runtime::LoaderSingleton::getExisting());
 
   /**
    * Validate protoc-gen-validate constraints on a given protobuf.
@@ -238,9 +236,8 @@ public:
   template <class MessageType>
   static void validate(const MessageType& message,
                        ProtobufMessage::ValidationVisitor& validation_visitor) {
-    // Log warnings or throw errors if deprecated fields are in use.
-    checkForDeprecation(message);
-    checkUnknownFields(message, validation_visitor);
+    // Log warnings or throw errors if deprecated fields or unknown fields are in use.
+    checkForUnexpectedFields(message, validation_visitor);
 
     std::string err;
     if (!Validate(message, &err)) {

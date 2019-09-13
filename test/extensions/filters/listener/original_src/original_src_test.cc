@@ -14,7 +14,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Exactly;
 using testing::SaveArg;
 
 namespace Envoy {

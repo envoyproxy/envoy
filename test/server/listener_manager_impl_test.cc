@@ -22,6 +22,7 @@
 
 #include "extensions/filters/listener/original_dst/original_dst.h"
 #include "extensions/transport_sockets/tls/ssl_socket.h"
+#include "extensions/quic_listeners/quiche/quic_transport_socket_factory.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
@@ -393,20 +394,22 @@ filter_chains:
     transport_protocol: "quic"
   filters: []
   transport_socket:
-  - name: "quic"
-    tls_context:
-      common_tls_context:
-        tls_certificates:
-        - certificate_chain:
-            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
-          private_key:
-            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
-        validation_context:
-          trusted_ca:
-            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-          verify_subject_alt_name:
-          - localhost
-          - 127.0.0.1
+    name: envoy.transport_sockets.quic
+    config: {
+      tls_context:
+        common_tls_context:
+          tls_certificates:
+          - certificate_chain:
+              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+            private_key:
+              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+          validation_context:
+            trusted_ca:
+              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+            verify_subject_alt_name:
+            - localhost
+            - 127.0.0.1
+    }
 udp_listener_config:
   udp_listener_name: "quic_listener"
   )EOF",
@@ -436,10 +439,9 @@ udp_listener_config:
   // No filter chain found with non-matching transport protocol.
   EXPECT_EQ(nullptr, findFilterChain(1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111));
 
-  auto filter_chain = dynamic_cast<const QuicFilterChainImpl*>(
-      findFilterChain(1234, "127.0.0.1", "", "quic", {}, "8.8.8.8", 111));
+  auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "quic", {}, "8.8.8.8", 111);
   ASSERT_NE(nullptr, filter_chain);
-  EXPECT_EQ(nullptr, filter_chain->transportSocketFactory());
+  EXPECT_TRUE(dynamic_cast<const Quic::QuicServerTransportSocketFactory&>(filter_chain->transportSocketFactory()).implementsSecureTransport());
 }
 
 

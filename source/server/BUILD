@@ -107,6 +107,7 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:thread_lib",
         "//source/common/event:libevent_lib",
+        "//source/common/stats:symbol_table_lib",
     ],
 )
 
@@ -228,6 +229,7 @@ envoy_cc_library(
         "//include/envoy/thread_local:thread_local_interface",
         "//source/common/common:logger_lib",
         "//source/common/config:utility_lib",
+        "//source/common/stats:symbol_table_lib",
         "//source/server:resource_monitor_config_lib",
         "@envoy_api//envoy/config/overload/v2alpha:overload_cc",
     ],

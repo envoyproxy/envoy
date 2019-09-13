@@ -5,17 +5,12 @@ package envoy.api.v2.cluster;
 option java_outer_classname = "CircuitBreakerProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.api.v2.cluster";
-option go_package = "cluster";
 option csharp_namespace = "Envoy.Api.V2.ClusterNS";
 option ruby_package = "Envoy.Api.V2.ClusterNS";
 
 import "envoy/api/v2/core/base.proto";
 
 import "google/protobuf/wrappers.proto";
-
-import "gogoproto/gogo.proto";
-
-option (gogoproto.equal_all) = true;
 
 // [#protodoc-title: Circuit breakers]
 

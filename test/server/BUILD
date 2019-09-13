@@ -58,6 +58,7 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:network_utility_lib",
+        "//test/test_common:threadsafe_singleton_injector_lib",
     ],
 )
 
@@ -178,6 +179,7 @@ envoy_cc_test(
         "//source/extensions/filters/listener/tls_inspector:config",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/filters/network/tcp_proxy:config",
+        "//source/extensions/quic_listeners/quiche:quic_transport_socket_factory_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:config",
         "//source/extensions/transport_sockets/tls:downstream_context_config_factory_lib",
