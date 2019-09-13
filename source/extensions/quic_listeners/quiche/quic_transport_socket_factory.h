@@ -9,6 +9,11 @@
 namespace Envoy {
 namespace Quic {
 
+// Base class for QUIC transport socket factory.
+// Because QUIC stack handles all L4 data, there is no need of a real transport
+// socket for QUIC in current implementation. This factory doesn't provides a
+// transport socket, instead, its derived class provides TLS context config for
+// server and client.
 class QuicTransportSocketFactoryBase : public Network::TransportSocketFactory {
 public:
   ~QuicTransportSocketFactoryBase() override = default;
@@ -21,6 +26,8 @@ public:
   bool implementsSecureTransport() const override { return true; }
 };
 
+// TODO(danzh): when implement ProofSource, examine of it's necessary to
+// differentiate server and client side context config.
 class QuicServerTransportSocketFactory : public QuicTransportSocketFactoryBase {
 public:
   QuicServerTransportSocketFactory(Envoy::Ssl::ServerContextConfigPtr config)
@@ -43,10 +50,14 @@ private:
   Ssl::ClientContextConfigPtr config_;
 };
 
+// Base class to create above QuicTransportSocketFactory for server and client
+// side.
 class QuicTransportSocketConfigFactory
     : public virtual Server::Configuration::TransportSocketConfigFactory {
 public:
   ~QuicTransportSocketConfigFactory() override = default;
+
+  // Server::Configuration::TransportSocketConfigFactory
   std::string name() const override {
     return Extensions::TransportSockets::TransportSocketNames::get().Quic;
   }
