@@ -1,7 +1,8 @@
 #include "server/listener_manager_impl.h"
 
-#include <algorithm>
 #include <sys/socket.h>
+
+#include <algorithm>
 
 #include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/registry/registry.h"
@@ -229,24 +230,18 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
     addListenSocketOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
     // Needed to return receive buffer overflown indicator.
     addListenSocketOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
-    const auto& udp_config = config.udp_listener_config();
-    std::string listener_name =
-         udp_config.udp_listener_name().empty() ? UdpListenerNames::get().RawUdp : udp_config.udp_listener_name();
-    udp_listener_factory_ =
-        Config::Utility::getAndCheckFactory<ActiveUdpListenerConfigFactory>(listener_name)
-            .createActiveUdpListenerFactory(config.has_udp_listener_config()
-                                                ? config.udp_listener_config()
-                                                : envoy::api::v2::listener::UdpListenerConfig());
-     try {
-      udp_listener_factory_ =
-          Config::Utility::getAndCheckFactory<ActiveUdpListenerConfigFactory>(listener_name)
-              .createActiveUdpListenerFactory(config.has_udp_listener_config()
-                                                  ? config.udp_listener_config()
-                                                  : envoy::api::v2::listener::UdpListenerConfig());
+    auto udp_config = config.udp_listener_config();
+    if (udp_config.udp_listener_name().empty()) {
+      udp_config.set_udp_listener_name(UdpListenerNames::get().RawUdp);
+    }
+    try {
+      udp_listener_factory_ = Config::Utility::getAndCheckFactory<ActiveUdpListenerConfigFactory>(
+                                  udp_config.udp_listener_name())
+                                  .createActiveUdpListenerFactory(udp_config);
     } catch (const EnvoyException& ex) {
       // TODO(danzh): add implementation for quic_listener and do not catch
-       // exception here.
-      ENVOY_LOG(error, "{}", ex.what());
+      // exception here.
+      ENVOY_LOG(error, "catch exception {}", ex.what());
       udp_listener_factory_ =
           Config::Utility::getAndCheckFactory<ActiveUdpListenerConfigFactory>(
               UdpListenerNames::get().RawUdp)
@@ -277,14 +272,18 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
     }
   }
 
-  if (config.filter_chains().empty() && (socket_type_ == Network::Address::SocketType::Stream || !udp_listener_factory_->isTransportConnectionless())) {
+  if (config.filter_chains().empty() && (socket_type_ == Network::Address::SocketType::Stream ||
+                                         !udp_listener_factory_->isTransportConnectionless())) {
     // If we got here, this is a tcp listener, so ensure there is a filter chain specified
     throw EnvoyException(fmt::format("error adding listener '{}': no filter chains specified",
                                      address_->asString()));
-  } else if (udp_listener_factory_ != nullptr && !udp_listener_factory_->isTransportConnectionless()) {
-    for(auto& filter_chain : config.filter_chains()) {
+  } else if (udp_listener_factory_ != nullptr &&
+             !udp_listener_factory_->isTransportConnectionless()) {
+    for (auto& filter_chain : config.filter_chains()) {
       if (!filter_chain.has_transport_socket()) {
-    throw EnvoyException(fmt::format("error adding listener '{}': no transport socket specified for connection oriented UDP listener", address_->asString()));
+        throw EnvoyException(fmt::format("error adding listener '{}': no transport socket "
+                                         "specified for connection oriented UDP listener",
+                                         address_->asString()));
       }
     }
   }

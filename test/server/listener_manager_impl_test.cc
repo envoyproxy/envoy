@@ -21,8 +21,8 @@
 #include "server/listener_manager_impl.h"
 
 #include "extensions/filters/listener/original_dst/original_dst.h"
-#include "extensions/transport_sockets/tls/ssl_socket.h"
 #include "extensions/quic_listeners/quiche/quic_transport_socket_factory.h"
+#include "extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
@@ -377,7 +377,6 @@ filter_chains:
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
 }
 
-
 TEST_F(ListenerManagerImplWithRealFiltersTest, QuicUsesSslContext) {
   NiceMock<Api::MockOsSysCalls> os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
@@ -394,22 +393,20 @@ filter_chains:
     transport_protocol: "quic"
   filters: []
   transport_socket:
-    name: envoy.transport_sockets.quic
-    config: {
-      tls_context:
-        common_tls_context:
-          tls_certificates:
-          - certificate_chain:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
-            private_key:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
-          validation_context:
-            trusted_ca:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-            verify_subject_alt_name:
-            - localhost
-            - 127.0.0.1
-    }
+    name: quic
+    config:
+      common_tls_context:
+        tls_certificates:
+        - certificate_chain:
+            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+          private_key:
+            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+        validation_context:
+          trusted_ca:
+            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+          verify_subject_alt_name:
+          - localhost
+          - 127.0.0.1
 udp_listener_config:
   udp_listener_name: "quic_listener"
   )EOF",
@@ -441,9 +438,11 @@ udp_listener_config:
 
   auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "quic", {}, "8.8.8.8", 111);
   ASSERT_NE(nullptr, filter_chain);
-  EXPECT_TRUE(dynamic_cast<const Quic::QuicServerTransportSocketFactory&>(filter_chain->transportSocketFactory()).implementsSecureTransport());
+  auto& quic_socket_factory = dynamic_cast<const Quic::QuicServerTransportSocketFactory&>(
+      filter_chain->transportSocketFactory());
+  EXPECT_TRUE(quic_socket_factory.implementsSecureTransport());
+  EXPECT_TRUE(quic_socket_factory.serverContextConfig().isReady());
 }
-
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
   const std::string proto_text = R"EOF(
