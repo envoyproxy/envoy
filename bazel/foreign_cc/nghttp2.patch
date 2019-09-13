@@ -1,5 +1,17 @@
+diff --git a/lib/CMakeLists.txt b/lib/CMakeLists.txt
+index 17e422b2..a10f82a5 100644
+--- a/lib/CMakeLists.txt
++++ b/lib/CMakeLists.txt
+@@ -56,6 +56,7 @@ if(HAVE_CUNIT OR ENABLE_STATIC_LIB)
+     COMPILE_FLAGS "${WARNCFLAGS}"
+     VERSION ${LT_VERSION} SOVERSION ${LT_SOVERSION}
+     ARCHIVE_OUTPUT_NAME nghttp2
++    ARCHIVE_OUTPUT_NAME nghttp2_static
+   )
+   target_compile_definitions(nghttp2_static PUBLIC "-DNGHTTP2_STATICLIB")
+   if(ENABLE_STATIC_LIB)
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index e70d2d49..f9c5340e 100644
+index 35c77d1d..47bd63f5 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -273,7 +273,11 @@ check_type_size("ssize_t" SIZEOF_SSIZE_T)
@@ -15,15 +27,31 @@ index e70d2d49..f9c5340e 100644
  endif()
  # AC_TYPE_UINT8_T
  # AC_TYPE_UINT16_T
-diff --git a/lib/CMakeLists.txt b/lib/CMakeLists.txt
-index 17e422b2..a10f82a5 100644
---- a/lib/CMakeLists.txt
-+++ b/lib/CMakeLists.txt
-@@ -56,6 +56,7 @@ if(HAVE_CUNIT OR ENABLE_STATIC_LIB)
-     COMPILE_FLAGS "${WARNCFLAGS}"
-     VERSION ${LT_VERSION} SOVERSION ${LT_SOVERSION}
-     ARCHIVE_OUTPUT_NAME nghttp2
-+    ARCHIVE_OUTPUT_NAME nghttp2_static
+@@ -385,6 +389,15 @@ else()
    )
-   target_compile_definitions(nghttp2_static PUBLIC "-DNGHTTP2_STATICLIB")
-   if(ENABLE_STATIC_LIB)
+ endif()
+ 
++if(ENABLE_STATIC_CRT)
++  foreach(lang C CXX)
++    foreach(suffix "" _DEBUG _MINSIZEREL _RELEASE _RELWITHDEBINFO)
++      set(var "CMAKE_${lang}_FLAGS${suffix}")
++      string(REPLACE "/MD" "/MT" ${var} "${${var}}")
++    endforeach()
++  endforeach()
++endif()
++
+ if(ENABLE_DEBUG)
+   set(DEBUGBUILD 1)
+ endif()
+diff --git a/CMakeOptions.txt b/CMakeOptions.txt
+index c342f35d..a8332bf0 100644
+--- a/CMakeOptions.txt
++++ b/CMakeOptions.txt
+@@ -16,6 +16,7 @@ option(ENABLE_FAILMALLOC "Build failmalloc test program" ON)
+ option(ENABLE_LIB_ONLY  "Build libnghttp2 only.  This is a short hand for -DENABLE_APP=0 -DENABLE_EXAMPLES=0 -DENABLE_HPACK_TOOLS=0 -DENABLE_PYTHON_BINDINGS=0")
+ option(ENABLE_STATIC_LIB "Build libnghttp2 in static mode also")
+ option(ENABLE_SHARED_LIB "Build libnghttp2 as a shared library" ON)
++option(ENABLE_STATIC_CRT "Build libnghttp2 against the MS LIBCMT[d]")
+ 
+ option(WITH_LIBXML2     "Use libxml2"
+   ${WITH_LIBXML2_DEFAULT})
