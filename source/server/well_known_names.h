@@ -13,7 +13,7 @@ namespace Server {
 class UdpListenerNameValues {
 public:
   const std::string RawUdp = "raw_udp_listener";
-  const std::string Quic = "quic_listener";
+  const std::string Quic = "quiche_quic_listener";
 };
 
 using UdpListenerNames = ConstSingleton<UdpListenerNameValues>;
