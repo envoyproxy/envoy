@@ -95,4 +95,3 @@ CocoaPods
 If you use CocoaPods, you can add the following to your Podfile to use the latest version of the prebuilt framework.
 
 ``pod 'EnvoyMobile'``
-

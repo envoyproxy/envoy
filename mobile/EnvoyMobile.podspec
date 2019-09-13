@@ -1,4 +1,4 @@
-Pod::Spec.new do |s|  
+Pod::Spec.new do |s|
     s.name              = 'EnvoyMobile'
     s.version           = '0.1.1'
     s.author            = 'Lyft, Inc.'
@@ -10,4 +10,4 @@ Pod::Spec.new do |s|
     s.platform          = :ios
     s.source            = { :http => "https://github.com/lyft/envoy-mobile/releases/download/v#{s.version}/envoy-ios-mac-v#{s.version}.zip" }
     s.ios.vendored_frameworks = 'Envoy.framework'
-end  
+end
