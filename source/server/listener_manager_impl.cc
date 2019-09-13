@@ -266,12 +266,14 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
 
   if (config.filter_chains().empty() && (socket_type_ == Network::Address::SocketType::Stream ||
                                          !udp_listener_factory_->isTransportConnectionless())) {
-    // If we got here, this is a tcp listener, so ensure there is a filter chain specified
+    // If we got here, this is a tcp listener or connection-oriented udp listener, so ensure there
+    // is a filter chain specified
     throw EnvoyException(fmt::format("error adding listener '{}': no filter chains specified",
                                      address_->asString()));
   } else if (udp_listener_factory_ != nullptr &&
              !udp_listener_factory_->isTransportConnectionless()) {
     for (auto& filter_chain : config.filter_chains()) {
+      // Early fail if any filter chain doesn't have transport socket configured.
       if (!filter_chain.has_transport_socket()) {
         throw EnvoyException(fmt::format("error adding listener '{}': no transport socket "
                                          "specified for connection oriented UDP listener",
