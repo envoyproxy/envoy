@@ -180,9 +180,10 @@ public:
   virtual Grpc::Context& grpcContext() PURE;
 
   /**
-   * @return ProcessContext& a reference to the process context.
+   * @return ProcessContext* a pointer to the process context. Will be null when running in
+   * validation mode.
    */
-  virtual ProcessContext& processContext() PURE;
+  virtual ProcessContext* processContext() PURE;
 };
 
 class ListenerFactoryContext : public virtual FactoryContext {

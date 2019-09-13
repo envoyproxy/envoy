@@ -196,7 +196,7 @@ public:
   /**
    * @return the server-wide process context.
    */
-  virtual ProcessContext& processContext() PURE;
+  virtual ProcessContext* processContext() PURE;
 
   /**
    * @return ThreadLocal::Instance& the thread local storage engine for the server. This is used to
