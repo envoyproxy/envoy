@@ -218,6 +218,8 @@ public:
   /**
    * A hash function that stable hashes known Any in the message. This is much slower than
    * hash above, should be used when known Any is in there.
+   * See https://github.com/protocolbuffers/protobuf/issues/5731 for more context, we use
+   * ShortDebugString because it does parse and serialize Anys as debug string recursively.
    */
   static std::size_t anyStableHash(const Protobuf::Message& message) {
     return HashUtil::xxHash64(message.ShortDebugString());
