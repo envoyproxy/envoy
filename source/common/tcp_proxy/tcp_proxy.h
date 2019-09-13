@@ -231,6 +231,8 @@ public:
     bool on_high_watermark_called_{false};
   };
 
+  virtual StreamInfo::StreamInfo& getStreamInfo() { return stream_info_; }
+
 protected:
   struct DownstreamCallbacks : public Network::ConnectionCallbacks {
     DownstreamCallbacks(Filter& parent) : parent_(parent) {}
@@ -259,8 +261,6 @@ protected:
   virtual void onInitFailure(UpstreamFailureReason) {
     read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
   }
-
-  virtual StreamInfo::StreamInfo& getStreamInfo() { return stream_info_; }
 
   void initialize(Network::ReadFilterCallbacks& callbacks, bool set_connection_stats);
   Network::FilterStatus initializeUpstreamConnection();
