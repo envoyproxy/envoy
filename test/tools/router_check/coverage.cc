@@ -63,36 +63,8 @@ void Coverage::printMissingTests(std::set<uint64_t> const& all_route_names,
   for (const auto& host : route_config_.virtual_hosts()) {
     for (const auto& route : host.routes()) {
       if (it != missing_route_names.end() && std::stoull(route.name()) == *it) {
-        std::string route_match_type = "";
-        std::string route_match_string = "";
-        switch (route.match().path_specifier_case()) {
-        case envoy::api::v2::route::RouteMatch::kPrefix: {
-          route_match_type = "PREFIX";
-          route_match_string = route.match().prefix();
-          break;
-        }
-        case envoy::api::v2::route::RouteMatch::kPath: {
-          route_match_type = "PATH";
-          route_match_string = route.match().path();
-          break;
-        }
-        case envoy::api::v2::route::RouteMatch::kRegex: {
-          route_match_type = "REGEX";
-          route_match_string = route.match().regex();
-          break;
-        }
-        case envoy::api::v2::route::RouteMatch::kSafeRegex: {
-          route_match_type = "SAFE REGEX";
-          route_match_string = route.match().safe_regex().regex();
-          break;
-        }
-        case envoy::api::v2::route::RouteMatch::PATH_SPECIFIER_NOT_SET: {
-          NOT_REACHED_GCOVR_EXCL_LINE;
-        }
-        }
         std::cout << "Missing test for host: " << host.name()
-                  << ", match type: " << route_match_type << ", match: " << route_match_string
-                  << std::endl;
+                  << ", route: " << route.match().DebugString() << std::endl;
         ++it;
       }
     }

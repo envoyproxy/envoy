@@ -91,6 +91,6 @@ fi
 echo "testing missing tests output test cases"
 MISSING_OUTPUT=$("${PATH_BIN}" "-c" "${PATH_CONFIG}/TestRoutes.yaml" "-t" "${PATH_CONFIG}/TestRoutes.golden.proto.json" "--details" "--useproto" "--covall" 2>&1) ||
   echo "${MISSING_OUTPUT:-no-output}"
-if [[ "${MISSING_OUTPUT}" != *"Missing test for host: www2_staging, match type: PREFIX, match: /"*"Missing test for host: default, match type: PREFIX, match: /api/application_data"* ]]; then
+if [[ "${MISSING_OUTPUT}" != *"Missing test for host: www2_staging, route: prefix: \"/\""*"Missing test for host: default, route: prefix: \"/api/application_data\""* ]]; then
   exit 1
 fi
