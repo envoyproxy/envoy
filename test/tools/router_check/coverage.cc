@@ -53,7 +53,55 @@ double Coverage::report() {
   return 100 * static_cast<double>(covered_routes_.size()) / num_routes;
 }
 
+void Coverage::printMissingTests(std::set<uint64_t> const& all_route_names,
+                                 std::set<uint64_t> const& covered_route_names) {
+  std::set<uint64_t> missing_route_names;
+  std::set_difference(all_route_names.begin(), all_route_names.end(), covered_route_names.begin(),
+                      covered_route_names.end(),
+                      std::inserter(missing_route_names, missing_route_names.end()));
+  std::set<uint64_t>::iterator it = missing_route_names.begin();
+  for (const auto& host : route_config_.virtual_hosts()) {
+    for (const auto& route : host.routes()) {
+      if (it != missing_route_names.end() && std::stoull(route.name()) == *it) {
+        std::string route_match_type = "";
+        std::string route_match_string = "";
+        switch (route.match().path_specifier_case()) {
+        case envoy::api::v2::route::RouteMatch::kPrefix: {
+          route_match_type = "PREFIX";
+          route_match_string = route.match().prefix();
+          break;
+        }
+        case envoy::api::v2::route::RouteMatch::kPath: {
+          route_match_type = "PATH";
+          route_match_string = route.match().path();
+          break;
+        }
+        case envoy::api::v2::route::RouteMatch::kRegex: {
+          route_match_type = "REGEX";
+          route_match_string = route.match().regex();
+          break;
+        }
+        case envoy::api::v2::route::RouteMatch::kSafeRegex: {
+          route_match_type = "SAFE REGEX";
+          route_match_string = route.match().safe_regex().regex();
+          break;
+        }
+        case envoy::api::v2::route::RouteMatch::PATH_SPECIFIER_NOT_SET: {
+          NOT_REACHED_GCOVR_EXCL_LINE;
+        }
+        }
+        std::cout << "Missing test for host: " << host.name()
+                  << ", match type: " << route_match_type << ", match: " << route_match_string
+                  << std::endl;
+        ++it;
+      }
+    }
+  }
+}
+
 double Coverage::detailedReport() {
+  std::set<uint64_t> all_route_names;
+  std::set<uint64_t> covered_route_names;
   uint64_t num_routes = 0;
   for (const auto& host : route_config_.virtual_hosts()) {
     for (const auto& route : host.routes()) {
@@ -62,12 +110,15 @@ double Coverage::detailedReport() {
       } else {
         num_routes += 1;
       }
+      all_route_names.emplace(std::stoull(route.name()));
     }
   }
   double cumulative_coverage = 0;
   for (auto& covered_route : covered_routes_) {
     cumulative_coverage += covered_route->report();
+    covered_route_names.emplace(std::stoull(covered_route->route().routeName()));
   }
+  printMissingTests(all_route_names, covered_route_names);
   return 100 * cumulative_coverage / num_routes;
 }
 
