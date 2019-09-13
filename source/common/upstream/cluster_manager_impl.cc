@@ -137,12 +137,13 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
       // If the first CDS response doesn't have any primary cluster, ClusterLoadAssignment
       // should be already paused by CdsApiImpl::onConfigUpdate(). Need to check that to
       // avoid double pause ClusterLoadAssignment.
-      if (cm_.adsMux().paused(Config::TypeUrl::get().ClusterLoadAssignment)) {
+      if (cm_.adsMux() == nullptr ||
+          cm_.adsMux()->paused(Config::TypeUrl::get().ClusterLoadAssignment)) {
         initializeSecondaryClusters();
       } else {
-        cm_.adsMux().pause(Config::TypeUrl::get().ClusterLoadAssignment);
+        cm_.adsMux()->pause(Config::TypeUrl::get().ClusterLoadAssignment);
         Cleanup eds_resume(
-            [this] { cm_.adsMux().resume(Config::TypeUrl::get().ClusterLoadAssignment); });
+            [this] { cm_.adsMux()->resume(Config::TypeUrl::get().ClusterLoadAssignment); });
         initializeSecondaryClusters();
       }
     }
@@ -233,18 +234,30 @@ ClusterManagerImpl::ClusterManagerImpl(
   }
 
   // Now setup ADS if needed, this might rely on a primary cluster.
+  // This is the only point where distinction between delta ADS and state-of-the-world ADS is made.
+  // After here, we just have a GrpcMux interface held in ads_mux_, which hides
+  // whether the backing implementation is delta or SotW.
   if (bootstrap.dynamic_resources().has_ads_config()) {
-    ads_mux_ = std::make_unique<Config::GrpcMuxImpl>(
-        local_info,
-        Config::Utility::factoryForGrpcApiConfigSource(
-            *async_client_manager_, bootstrap.dynamic_resources().ads_config(), stats)
-            ->create(),
-        main_thread_dispatcher,
-        *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-            "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-        random_, stats_,
-        Envoy::Config::Utility::parseRateLimitSettings(bootstrap.dynamic_resources().ads_config()),
-        bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only());
+    auto& ads_config = bootstrap.dynamic_resources().ads_config();
+    if (ads_config.api_type() == envoy::api::v2::core::ApiConfigSource::DELTA_GRPC) {
+      ads_mux_ = std::make_shared<Config::GrpcMuxDelta>(
+          Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, ads_config, stats)
+              ->create(),
+          main_thread_dispatcher,
+          *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+              "envoy.service.discovery.v2.AggregatedDiscoveryService.DeltaAggregatedResources"),
+          random_, stats_, Envoy::Config::Utility::parseRateLimitSettings(ads_config), local_info,
+          bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only());
+    } else {
+      ads_mux_ = std::make_shared<Config::GrpcMuxSotw>(
+          Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, ads_config, stats)
+              ->create(),
+          main_thread_dispatcher,
+          *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+              "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
+          random_, stats_, Envoy::Config::Utility::parseRateLimitSettings(ads_config), local_info,
+          bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only());
+    }
   } else {
     ads_mux_ = std::make_unique<Config::NullGrpcMuxImpl>();
   }

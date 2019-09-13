@@ -31,7 +31,7 @@ public:
 
   // Config::Subscription
   void start(const std::set<std::string>& resource_names) override;
-  void updateResources(const std::set<std::string>& update_to_these_names) override;
+  void updateResourceInterest(const std::set<std::string>& update_to_these_names) override;
 
   // Http::RestApiFetcher
   void createRequest(Http::Message& request) override;

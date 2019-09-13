@@ -6,7 +6,10 @@
 #include "envoy/api/v2/discovery.pb.h"
 #include "envoy/common/pure.h"
 #include "envoy/config/subscription.h"
+#include "envoy/event/dispatcher.h"
+#include "envoy/local_info/local_info.h"
 
+#include "common/config/update_ack.h"
 #include "common/protobuf/protobuf.h"
 
 #include "absl/strings/string_view.h"
@@ -14,28 +17,31 @@
 namespace Envoy {
 namespace Config {
 
-struct UpdateAck {
-  UpdateAck(absl::string_view nonce, absl::string_view type_url)
-      : nonce_(nonce), type_url_(type_url) {}
-  std::string nonce_;
-  std::string type_url_;
-  ::google::rpc::Status error_detail_;
-};
-
-class SubscriptionState {
+// Tracks the protocol state of an individual ongoing xDS-over-gRPC session, for a single type_url.
+// There can be multiple DeltaSubscriptionStates active, one per type_url. They will all be
+// blissfully unaware of each other's existence, even when their messages are being multiplexed
+// together by ADS.
+// This is the abstract parent class for both the delta and state-of-the-world xDS variants.
+class SubscriptionState : public Logger::Loggable<Logger::Id::config> {
 public:
+  SubscriptionState(const std::string& type_url, SubscriptionCallbacks& callbacks,
+                    const LocalInfo::LocalInfo& local_info,
+                    std::chrono::milliseconds init_fetch_timeout, Event::Dispatcher& dispatcher,
+                    bool skip_subsequent_node);
   virtual ~SubscriptionState() = default;
 
   // Update which resources we're interested in subscribing to.
-  virtual void updateResourceInterest(const std::set<std::string>& update_to_these_names) PURE;
+  virtual void updateSubscriptionInterest(const std::set<std::string>& cur_added,
+                                          const std::set<std::string>& cur_removed) PURE;
 
   // Whether there was a change in our subscription interest we have yet to inform the server of.
   virtual bool subscriptionUpdatePending() const PURE;
 
   virtual void markStreamFresh() PURE;
 
-  // Argument should have been static_cast from GrpcStream's ResponseProto type.
-  virtual UpdateAck handleResponse(const Protobuf::Message& message) PURE;
+  // Implementations expect either a DeltaDiscoveryResponse or DiscoveryResponse. The caller is
+  // expected to know which it should be providing.
+  virtual UpdateAck handleResponse(const void* reponse_proto_ptr) PURE;
 
   virtual void handleEstablishmentFailure() PURE;
 
@@ -43,21 +49,35 @@ public:
   // understanding of the current protocol state, and new resources that Envoy wants to request.
   // Returns a new'd pointer, meant to be owned by the caller, who is expected to know what type the
   // pointer actually is.
-  void* getNextRequestAckless();
+  virtual void* getNextRequestAckless() PURE;
   // The WithAck version first calls the Ackless version, then adds in the passed-in ack.
   // Returns a new'd pointer, meant to be owned by the caller, who is expected to know what type the
   // pointer actually is.
-  void* getNextRequestWithAck(const UpdateAck& ack);
+  virtual void* getNextRequestWithAck(const UpdateAck& ack) PURE;
+
+protected:
+  void disableInitFetchTimeoutTimer();
+
+  std::string type_url() const { return type_url_; }
+  const LocalInfo::LocalInfo& local_info() const { return local_info_; }
+  SubscriptionCallbacks& callbacks() const { return callbacks_; }
+  bool skip_subsequent_node() const { return skip_subsequent_node_; }
+
+private:
+  const std::string type_url_;
+  // callbacks_ is expected to be a WatchMap.
+  SubscriptionCallbacks& callbacks_;
+  const LocalInfo::LocalInfo& local_info_;
+  const bool skip_subsequent_node_;
+  Event::TimerPtr init_fetch_timeout_timer_;
 };
 
 class SubscriptionStateFactory {
 public:
   virtual ~SubscriptionStateFactory() = default;
-  virtual SubscriptionState makeSubscriptionState(const std::string& type_url,
-                                                  const std::set<std::string>& resource_names,
-                                                  SubscriptionCallbacks& callbacks,
-                                                  std::chrono::milliseconds init_fetch_timeout,
-                                                  SubscriptionStats& stats) PURE;
+  virtual std::unique_ptr<SubscriptionState>
+  makeSubscriptionState(const std::string& type_url, SubscriptionCallbacks& callbacks,
+                        std::chrono::milliseconds init_fetch_timeout) PURE;
 };
 
 } // namespace Config

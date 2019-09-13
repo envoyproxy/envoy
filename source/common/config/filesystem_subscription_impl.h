@@ -28,7 +28,7 @@ public:
   // We report all discovered resources in the watched file, so the resource names arguments are
   // unused, and updateResources is a no-op (other than updating a stat).
   void start(const std::set<std::string>&) override;
-  void updateResources(const std::set<std::string>&) override;
+  void updateResourceInterest(const std::set<std::string>&) override;
 
 private:
   void refresh();

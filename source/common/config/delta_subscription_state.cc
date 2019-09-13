@@ -1,6 +1,7 @@
+#include "common/config/delta_subscription_state.h"
+
 #include "common/common/assert.h"
 #include "common/common/hash.h"
-#include "common/config/delta_subscription_state.h"
 
 namespace Envoy {
 namespace Config {
@@ -9,16 +10,27 @@ DeltaSubscriptionState::DeltaSubscriptionState(const std::string& type_url,
                                                SubscriptionCallbacks& callbacks,
                                                const LocalInfo::LocalInfo& local_info,
                                                std::chrono::milliseconds init_fetch_timeout,
-                                               Event::Dispatcher& dispatcher)
-    : type_url_(type_url), callbacks_(callbacks), local_info_(local_info),
-      init_fetch_timeout_(init_fetch_timeout) {
-  if (init_fetch_timeout_.count() > 0 && !init_fetch_timeout_timer_) {
-    init_fetch_timeout_timer_ = dispatcher.createTimer([this]() -> void {
-      ENVOY_LOG(warn, "delta config: initial fetch timed out for {}", type_url_);
-      callbacks_.onConfigUpdateFailed(ConfigUpdateFailureReason::FetchTimedout, nullptr);
-    });
-    init_fetch_timeout_timer_->enableTimer(init_fetch_timeout_);
-  }
+                                               Event::Dispatcher& dispatcher,
+                                               bool skip_subsequent_node)
+    : SubscriptionState(type_url, callbacks, local_info, init_fetch_timeout, dispatcher,
+                        skip_subsequent_node) {}
+
+DeltaSubscriptionState::~DeltaSubscriptionState() {}
+
+DeltaSubscriptionStateFactory::DeltaSubscriptionStateFactory(Event::Dispatcher& dispatcher,
+                                                             const LocalInfo::LocalInfo& local_info,
+                                                             bool skip_subsequent_node)
+    : dispatcher_(dispatcher), local_info_(local_info),
+      skip_subsequent_node_(skip_subsequent_node) {}
+
+DeltaSubscriptionStateFactory::~DeltaSubscriptionStateFactory() {}
+
+std::unique_ptr<SubscriptionState>
+DeltaSubscriptionStateFactory::makeSubscriptionState(const std::string& type_url,
+                                                     SubscriptionCallbacks& callbacks,
+                                                     std::chrono::milliseconds init_fetch_timeout) {
+  return std::make_unique<DeltaSubscriptionState>(
+      type_url, callbacks, local_info_, init_fetch_timeout, dispatcher_, skip_subsequent_node_);
 }
 
 void DeltaSubscriptionState::updateSubscriptionInterest(const std::set<std::string>& cur_added,
@@ -50,13 +62,13 @@ bool DeltaSubscriptionState::subscriptionUpdatePending() const {
          !any_request_sent_yet_in_current_stream_;
 }
 
-UpdateAck
-DeltaSubscriptionState::handleResponse(const envoy::api::v2::DeltaDiscoveryResponse& message) {
+UpdateAck DeltaSubscriptionState::handleResponse(const void* reponse_proto_ptr) {
+  auto* response = static_cast<const envoy::api::v2::DeltaDiscoveryResponse*>(reponse_proto_ptr);
   // We *always* copy the response's nonce into the next request, even if we're going to make that
   // request a NACK by setting error_detail.
-  UpdateAck ack(message.nonce(), type_url_);
+  UpdateAck ack(response->nonce(), type_url());
   try {
-    handleGoodResponse(message);
+    handleGoodResponse(*response);
   } catch (const EnvoyException& e) {
     handleBadResponse(e, ack);
   }
@@ -85,8 +97,8 @@ void DeltaSubscriptionState::handleGoodResponse(
           fmt::format("duplicate name {} found in the union of added+removed resources", name));
     }
   }
-  callbacks_.onConfigUpdate(message.resources(), message.removed_resources(),
-                            message.system_version_info());
+  callbacks().onConfigUpdate(message.resources(), message.removed_resources(),
+                             message.system_version_info());
   for (const auto& resource : message.resources()) {
     setResourceVersion(resource.name(), resource.version());
   }
@@ -103,7 +115,7 @@ void DeltaSubscriptionState::handleGoodResponse(
       setResourceWaitingForServer(resource_name);
     }
   }
-  ENVOY_LOG(debug, "Delta config for {} accepted with {} resources added, {} removed", type_url_,
+  ENVOY_LOG(debug, "Delta config for {} accepted with {} resources added, {} removed", type_url(),
             message.resources().size(), message.removed_resources().size());
 }
 
@@ -112,18 +124,18 @@ void DeltaSubscriptionState::handleBadResponse(const EnvoyException& e, UpdateAc
   ack.error_detail_.set_code(Grpc::Status::GrpcStatus::Internal);
   ack.error_detail_.set_message(e.what());
   disableInitFetchTimeoutTimer();
-  ENVOY_LOG(warn, "delta config for {} rejected: {}", type_url_, e.what());
-  callbacks_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &e);
+  ENVOY_LOG(warn, "delta config for {} rejected: {}", type_url(), e.what());
+  callbacks().onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &e);
 }
 
 void DeltaSubscriptionState::handleEstablishmentFailure() {
   disableInitFetchTimeoutTimer();
-  ENVOY_LOG(debug, "gRPC update for {} failed", type_url_);
-  callbacks_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure,
-                                  nullptr);
+  ENVOY_LOG(debug, "gRPC update for {} failed", type_url());
+  callbacks().onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure,
+                                   nullptr);
 }
 
-envoy::api::v2::DeltaDiscoveryRequest* getNextRequestInternal() {
+envoy::api::v2::DeltaDiscoveryRequest* DeltaSubscriptionState::getNextRequestInternal() {
   auto* request = new envoy::api::v2::DeltaDiscoveryRequest;
   if (!any_request_sent_yet_in_current_stream_) {
     any_request_sent_yet_in_current_stream_ = true;
@@ -150,8 +162,10 @@ envoy::api::v2::DeltaDiscoveryRequest* getNextRequestInternal() {
   names_added_.clear();
   names_removed_.clear();
 
-  request->set_type_url(type_url_);
-  request->mutable_node()->MergeFrom(local_info_.node());
+  request->set_type_url(type_url());
+  if (!any_request_sent_yet_in_current_stream_ || !skip_subsequent_node()) {
+    request->mutable_node()->MergeFrom(local_info().node());
+  }
   return request;
 }
 
@@ -165,13 +179,6 @@ void* DeltaSubscriptionState::getNextRequestWithAck(const UpdateAck& ack) {
     request->mutable_error_detail()->CopyFrom(ack.error_detail_);
   }
   return request;
-}
-
-void DeltaSubscriptionState::disableInitFetchTimeoutTimer() {
-  if (init_fetch_timeout_timer_) {
-    init_fetch_timeout_timer_->disableTimer();
-    init_fetch_timeout_timer_.reset();
-  }
 }
 
 void DeltaSubscriptionState::setResourceVersion(const std::string& resource_name,

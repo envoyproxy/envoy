@@ -221,8 +221,10 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
     // Pause RDS to not send a burst of RDS requests until we start all the new subscriptions.
     // In the case if factory_context_.initManager() is uninitialized, RDS is already paused either
     // by Server init or LDS init.
-    factory_context_.clusterManager().adsMux().pause(
-        Envoy::Config::TypeUrl::get().RouteConfiguration);
+    if (factory_context_.clusterManager().adsMux()) {
+      factory_context_.clusterManager().adsMux()->pause(
+          Envoy::Config::TypeUrl::get().RouteConfiguration);
+    }
     resume_rds = std::make_unique<Cleanup>([this, &noop_init_manager, version_info] {
       // For new RDS subscriptions created after listener warming up, we don't wait for them to warm
       // up.
@@ -234,8 +236,10 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
       // New RDS subscriptions should have been created, now lift the floodgate.
       // Note in the case of partial acceptance, accepted RDS subscriptions should be started
       // despite of any error.
-      factory_context_.clusterManager().adsMux().resume(
-          Envoy::Config::TypeUrl::get().RouteConfiguration);
+      if (factory_context_.clusterManager().adsMux()) {
+        factory_context_.clusterManager().adsMux()->resume(
+            Envoy::Config::TypeUrl::get().RouteConfiguration);
+      }
     });
   }
   std::vector<std::string> exception_msgs;

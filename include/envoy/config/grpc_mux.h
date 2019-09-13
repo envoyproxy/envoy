@@ -57,16 +57,6 @@ public:
   virtual std::string resourceName(const ProtobufWkt::Any& resource) PURE;
 };
 
-/**
- * Handle on an muxed gRPC subscription. The subscription is canceled on destruction.
- */
-class GrpcMuxWatch {
-public:
-  virtual ~GrpcMuxWatch() = default;
-};
-
-using GrpcMuxWatchPtr = std::unique_ptr<GrpcMuxWatch>;
-
 struct Watch;
 
 /**

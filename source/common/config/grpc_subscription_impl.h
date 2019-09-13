@@ -2,40 +2,38 @@
 
 #include "envoy/config/subscription.h"
 
-#include "common/config/new_grpc_mux_impl.h"
+#include "common/config/grpc_mux_impl.h"
 #include "common/config/utility.h"
 
 namespace Envoy {
 namespace Config {
 
-// DeltaSubscriptionImpl provides a top-level interface to the Envoy's gRPC communication with
+// GrpcSubscriptionImpl provides a top-level interface to the Envoy's gRPC communication with
 // an xDS server, for use by the various xDS users within Envoy. It is built around a (shared)
-// NewGrpcMuxImpl, and the further machinery underlying that. An xDS user indicates interest in
+// GrpcMuxImpl, and the further machinery underlying that. An xDS user indicates interest in
 // various resources via start() and updateResourceInterest(). It receives updates to those
 // resources via the SubscriptionCallbacks it provides. Multiple users can each have their own
-// Subscription object for the same type_url; NewGrpcMuxImpl maintains a subscription to the
+// Subscription object for the same type_url; GrpcMuxImpl maintains a subscription to the
 // union of interested resources, and delivers to the users just the resource updates that they
 // are "watching" for.
 //
-// DeltaSubscriptionImpl and NewGrpcMuxImpl are both built to provide both regular xDS and ADS,
-// distinguished by whether multiple DeltaSubscriptionImpls are sharing a single
-// NewGrpcMuxImpl. (And by the gRPC method string, but that's taken care of over in
-// SubscriptionFactory).
+// GrpcSubscriptionImpl and GrpcMuxImpl are both built to provide both regular xDS and ADS,
+// distinguished by whether multiple GrpcSubscriptionImpls are sharing a single NewGrpcMuxImpl.
+// (Also distinguished by the gRPC method string, but that's taken care of in SubscriptionFactory).
 //
-// Why does DeltaSubscriptionImpl itself implement the SubscriptionCallbacks interface? So that it
-// can write to SubscriptionStats (which needs to live out here in the DeltaSubscriptionImpl) upon a
-// config update. The idea is, DeltaSubscriptionImpl presents itself to WatchMap as the
-// SubscriptionCallbacks, and then passes (after incrementing stats) all callbacks through to
-// callbacks_, which are the real SubscriptionCallbacks.
-class DeltaSubscriptionImpl : public Subscription, public SubscriptionCallbacks {
+// Why does GrpcSubscriptionImpl itself implement the SubscriptionCallbacks interface? So that it
+// can write to SubscriptionStats (which needs to live out here in the GrpcSubscriptionImpl) upon a
+// config update. GrpcSubscriptionImpl presents itself to WatchMap as the SubscriptionCallbacks,
+// and then, after incrementing stats, passes through to the real callbacks_.
+class GrpcSubscriptionImpl : public Subscription, public SubscriptionCallbacks {
 public:
-  // is_aggregated: whether the underlying mux/context is providing ADS to us and others, or whether
-  // it's all ours. The practical difference is that we ourselves must call start() on it only in
-  // the latter case.
-  DeltaSubscriptionImpl(GrpcMuxSharedPtr context, absl::string_view type_url,
-                        SubscriptionCallbacks& callbacks, SubscriptionStats stats,
-                        std::chrono::milliseconds init_fetch_timeout, bool is_aggregated);
-  ~DeltaSubscriptionImpl() override;
+  // is_aggregated: whether our GrpcMux is also providing ADS to other Subscriptions, or whether
+  // it's all ours. The practical difference is that we ourselves must call start() on it only if
+  // we are the sole owner.
+  GrpcSubscriptionImpl(GrpcMuxSharedPtr context, absl::string_view type_url,
+                       SubscriptionCallbacks& callbacks, SubscriptionStats stats,
+                       std::chrono::milliseconds init_fetch_timeout, bool is_aggregated);
+  ~GrpcSubscriptionImpl() override;
 
   void pause();
   void resume();
@@ -62,7 +60,7 @@ private:
   SubscriptionStats stats_;
   // NOTE: if another subscription of the same type_url has already been started, this value will be
   // ignored in favor of the other subscription's.
-  std::chrono::milliseconds init_fetch_timeout_;
+  const std::chrono::milliseconds init_fetch_timeout_;
   Watch* watch_{};
   const bool is_aggregated_;
 };

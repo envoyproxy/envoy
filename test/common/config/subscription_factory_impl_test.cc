@@ -38,7 +38,7 @@ public:
     return SubscriptionFactoryImpl(local_info_, dispatcher_, cm_, random_, validation_visitor_,
                                    *api_)
         .subscriptionFromConfigSource(config, Config::TypeUrl::get().ClusterLoadAssignment,
-                                      stats_store_, callbacks_, false);
+                                      stats_store_, callbacks_);
   }
 
   Upstream::MockClusterManager cm_;
