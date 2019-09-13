@@ -3,7 +3,9 @@
 #include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/api/v2/auth/cert.pb.h"
 #include "envoy/common/exception.h"
+#include "envoy/config/grpc_credential/v2alpha/file_based_metadata.pb.h"
 
+#include "common/common/base64.h"
 #include "common/common/logger.h"
 #include "common/secret/sds_api.h"
 #include "common/secret/secret_manager_impl.h"
@@ -163,6 +165,90 @@ session_ticket_keys:
 
   EXPECT_THROW_WITH_MESSAGE(secret_manager->addStaticSecret(secret_config), EnvoyException,
                             "Secret type not implemented");
+}
+
+// Validate that secret manager deduplicates dynamic TLS certificate secret provider.
+// Regression test of https://github.com/envoyproxy/envoy/issues/5744
+TEST_F(SecretManagerImplTest, DeduplicateDynamicTlsCertificateSecretProvider) {
+  Server::MockInstance server;
+  std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl(config_tracker_));
+
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
+
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Runtime::MockRandomGenerator> random;
+  Stats::IsolatedStoreImpl stats;
+  NiceMock<Init::MockManager> init_manager;
+  NiceMock<Init::ExpectableWatcherImpl> init_watcher;
+  Init::TargetHandlePtr init_target_handle;
+  EXPECT_CALL(init_manager, add(_))
+      .WillRepeatedly(Invoke([&init_target_handle](const Init::Target& target) {
+        init_target_handle = target.createHandle("test");
+      }));
+  EXPECT_CALL(secret_context, stats()).WillRepeatedly(ReturnRef(stats));
+  EXPECT_CALL(secret_context, initManager()).WillRepeatedly(Return(&init_manager));
+  EXPECT_CALL(secret_context, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
+  EXPECT_CALL(secret_context, localInfo()).WillRepeatedly(ReturnRef(local_info));
+
+  envoy::api::v2::core::ConfigSource config_source;
+  TestUtility::loadFromYaml(R"(
+api_config_source:
+  api_type: GRPC
+  grpc_services:
+  - google_grpc:
+      call_credentials:
+      - from_plugin:
+          name: envoy.grpc_credentials.file_based_metadata
+          typed_config:
+            "@type": type.googleapis.com/envoy.config.grpc_credential.v2alpha.FileBasedMetadataConfig
+      stat_prefix: sdsstat
+      credentials_factory_name: envoy.grpc_credentials.file_based_metadata
+  )",
+                            config_source);
+  config_source.mutable_api_config_source()
+      ->mutable_grpc_services(0)
+      ->mutable_google_grpc()
+      ->mutable_call_credentials(0)
+      ->mutable_from_plugin()
+      ->mutable_typed_config()
+      ->set_value(Base64::decode("CjUKMy92YXIvcnVuL3NlY3JldHMva3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3Vud"
+                                 "C90b2tlbhILeC10b2tlbi1iaW4="));
+  auto secret_provider1 =
+      secret_manager->findOrCreateTlsCertificateProvider(config_source, "abc.com", secret_context);
+
+  // The base64 encoded proto binary is identical to the one above, but in different field order.
+  // It is also identical to the YAML below.
+  config_source.mutable_api_config_source()
+      ->mutable_grpc_services(0)
+      ->mutable_google_grpc()
+      ->mutable_call_credentials(0)
+      ->mutable_from_plugin()
+      ->mutable_typed_config()
+      ->set_value(Base64::decode("Egt4LXRva2VuLWJpbgo1CjMvdmFyL3J1bi9zZWNyZXRzL2t1YmVybmV0ZXMuaW8vc"
+                                 "2VydmljZWFjY291bnQvdG9rZW4="));
+  auto secret_provider2 =
+      secret_manager->findOrCreateTlsCertificateProvider(config_source, "abc.com", secret_context);
+
+  envoy::config::grpc_credential::v2alpha::FileBasedMetadataConfig file_based_metadata_config;
+  TestUtility::loadFromYaml(R"(
+header_key: x-token-bin
+secret_data:
+  filename: "/var/run/secrets/kubernetes.io/serviceaccount/token"
+  )",
+                            file_based_metadata_config);
+  config_source.mutable_api_config_source()
+      ->mutable_grpc_services(0)
+      ->mutable_google_grpc()
+      ->mutable_call_credentials(0)
+      ->mutable_from_plugin()
+      ->mutable_typed_config()
+      ->PackFrom(file_based_metadata_config);
+  auto secret_provider3 =
+      secret_manager->findOrCreateTlsCertificateProvider(config_source, "abc.com", secret_context);
+
+  EXPECT_EQ(secret_provider1, secret_provider2);
+  EXPECT_EQ(secret_provider2, secret_provider3);
 }
 
 TEST_F(SecretManagerImplTest, SdsDynamicSecretUpdateSuccess) {

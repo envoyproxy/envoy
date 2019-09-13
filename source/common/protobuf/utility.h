@@ -215,6 +215,14 @@ public:
     return HashUtil::xxHash64(text);
   }
 
+  /**
+   * A hash function that stable hashes known Any in the message. This is much slower than
+   * hash above, should be used when known Any is in there.
+   */
+  static std::size_t anyStableHash(const Protobuf::Message& message) {
+    return HashUtil::xxHash64(message.ShortDebugString());
+  }
+
   static void loadFromJson(const std::string& json, Protobuf::Message& message,
                            ProtobufMessage::ValidationVisitor& validation_visitor);
   static void loadFromJson(const std::string& json, ProtobufWkt::Struct& message);
