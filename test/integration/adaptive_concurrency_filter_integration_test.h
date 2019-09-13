@@ -7,7 +7,7 @@
 namespace Envoy {
 
 const std::string kAdaptiveConcurrencyFilterConfig =
-  R"EOF(
+    R"EOF(
 name: envoy.filters.http.adaptive_concurrency
 config:
   gradient_controller_config:
@@ -23,7 +23,7 @@ config:
 )EOF";
 
 const std::string kFaultFilterConfig =
-  R"EOF(
+    R"EOF(
 name: envoy.fault
 config:
     delay:
@@ -34,14 +34,17 @@ config:
             denominator: HUNDRED
   )EOF";
 
-const std::string kConcurrencyLimitGaugeName = "http.config_test.adaptive_concurrency.gradient_controller.concurrency_limit";
-const std::string kRequestBlockCounterName = "http.config_test.adaptive_concurrency.gradient_controller.rq_blocked";
+const std::string kConcurrencyLimitGaugeName =
+    "http.config_test.adaptive_concurrency.gradient_controller.concurrency_limit";
+const std::string kRequestBlockCounterName =
+    "http.config_test.adaptive_concurrency.gradient_controller.rq_blocked";
 
-class AdaptiveConcurrencyIntegrationTest : public HttpIntegrationTest,
-                                           public testing::TestWithParam<Network::Address::IpVersion> {
+class AdaptiveConcurrencyIntegrationTest
+    : public HttpIntegrationTest,
+      public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  AdaptiveConcurrencyIntegrationTest() :
-    HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {}
+  AdaptiveConcurrencyIntegrationTest()
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {}
 
   void initializeFilter() {
     // We use the fault filter (for delays) after the adaptive concurrency filter to introduce a
@@ -58,8 +61,7 @@ public:
     codec_client_ = makeHttpConnection(lookupPort("http"));
   }
 
-  void TearDown() override {
-  }
+  void TearDown() override {}
 
   void initialize() override {
     initializeFilter();
@@ -79,11 +81,11 @@ protected:
   void inflateConcurrencyLimit(const uint64_t limit_lower_bound);
 
   void verifyResponseForwarded(IntegrationStreamDecoderPtr response) {
-    EXPECT_EQ("200", response->headers().Status()->value().getStringView()); 
+    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   }
 
   void verifyResponseBlocked(IntegrationStreamDecoderPtr response) {
-    EXPECT_EQ("503", response->headers().Status()->value().getStringView()); 
+    EXPECT_EQ("503", response->headers().Status()->value().getStringView());
   }
 
 private:

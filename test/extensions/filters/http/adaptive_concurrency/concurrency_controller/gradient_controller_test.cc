@@ -483,6 +483,7 @@ min_rtt_calc_params:
 
   // Set the minRTT- this will trigger the timer for the next minRTT calculation.
   EXPECT_CALL(*rtt_timer, enableTimer(std::chrono::milliseconds(45000), _));
+  EXPECT_CALL(*sample_timer, enableTimer(std::chrono::milliseconds(123), _));
   for (int ii = 1; ii <= 6; ++ii) {
     tryForward(controller, true);
     controller->recordLatencySample(std::chrono::milliseconds(5));

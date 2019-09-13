@@ -24,8 +24,8 @@ namespace ConcurrencyController {
 /**
  * All stats for the gradient controller.
  */
-#define ALL_GRADIENT_CONTROLLER_STATS(COUNTER, GAUGE)                                                       \
-  COUNTER(rq_blocked)                  \
+#define ALL_GRADIENT_CONTROLLER_STATS(COUNTER, GAUGE)                                              \
+  COUNTER(rq_blocked)                                                                              \
   GAUGE(concurrency_limit, NeverImport)                                                            \
   GAUGE(gradient, NeverImport)                                                                     \
   GAUGE(burst_queue_size, NeverImport)                                                             \

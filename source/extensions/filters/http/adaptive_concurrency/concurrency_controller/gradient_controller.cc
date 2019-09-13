@@ -69,7 +69,8 @@ GradientController::GradientController(GradientControllerConfig config,
 
 GradientControllerStats GradientController::generateStats(Stats::Scope& scope,
                                                           const std::string& stats_prefix) {
-  return {ALL_GRADIENT_CONTROLLER_STATS(POOL_COUNTER_PREFIX (scope, stats_prefix), POOL_GAUGE_PREFIX(scope, stats_prefix))};
+  return {ALL_GRADIENT_CONTROLLER_STATS(POOL_COUNTER_PREFIX(scope, stats_prefix),
+                                        POOL_GAUGE_PREFIX(scope, stats_prefix))};
 }
 
 void GradientController::enterMinRTTSamplingWindow() {

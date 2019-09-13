@@ -28,7 +28,7 @@ void AdaptiveConcurrencyIntegrationTest::respondToAllRequests(const int num_forw
     if (status_code == "200") {
       ++forwarded_count;
       continue;
-    } 
+    }
     EXPECT_EQ("503", status_code);
   }
 

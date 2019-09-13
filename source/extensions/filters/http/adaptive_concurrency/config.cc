@@ -24,15 +24,16 @@ Http::FilterFactoryCb AdaptiveConcurrencyFilterFactory::createFilterFactoryFromP
   switch (config.concurrency_controller_config_case()) {
   case proto::ConcurrencyControllerConfigCase::kGradientControllerConfig:
     controller = std::make_shared<ConcurrencyController::GradientController>(
-        config.gradient_controller_config(), context.dispatcher(), context.runtime(), acc_stats_prefix + "gradient_controller.",
-        context.scope());
+        config.gradient_controller_config(), context.dispatcher(), context.runtime(),
+        acc_stats_prefix + "gradient_controller.", context.scope());
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
-  AdaptiveConcurrencyFilterConfigSharedPtr filter_config(new AdaptiveConcurrencyFilterConfig(
-      config, context.runtime(), std::move(acc_stats_prefix), context.scope(), context.timeSource()));
+  AdaptiveConcurrencyFilterConfigSharedPtr filter_config(
+      new AdaptiveConcurrencyFilterConfig(config, context.runtime(), std::move(acc_stats_prefix),
+                                          context.scope(), context.timeSource()));
 
   return [filter_config, controller](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(

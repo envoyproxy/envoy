@@ -27,8 +27,8 @@ AdaptiveConcurrencyFilter::AdaptiveConcurrencyFilter(
 Http::FilterHeadersStatus AdaptiveConcurrencyFilter::decodeHeaders(Http::HeaderMap&, bool) {
   if (controller_->forwardingDecision() == ConcurrencyController::RequestForwardingAction::Block) {
     // TODO (tonya11en): Remove filler words.
-    decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "", nullptr,
-                                       absl::nullopt, "reached concurrency limit");
+    decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "", nullptr, absl::nullopt,
+                                       "reached concurrency limit");
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -46,9 +46,7 @@ Http::FilterHeadersStatus AdaptiveConcurrencyFilter::decodeHeaders(Http::HeaderM
   return Http::FilterHeadersStatus::Continue;
 }
 
-void AdaptiveConcurrencyFilter::encodeComplete() {
-  deferred_sample_task_.reset();
-}
+void AdaptiveConcurrencyFilter::encodeComplete() { deferred_sample_task_.reset(); }
 
 void AdaptiveConcurrencyFilter::onDestroy() {
   if (deferred_sample_task_) {

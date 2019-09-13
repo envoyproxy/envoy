@@ -739,15 +739,15 @@ envoy_cc_test(
     name = "adaptive_concurrency_test",
     srcs = [
         "adaptive_concurrency_filter_integration_test.cc",
-    "adaptive_concurrency_filter_integration_test.h",
+        "adaptive_concurrency_filter_integration_test.h",
     ],
     deps = [
         ":http_integration_lib",
         "//source/extensions/filters/http/adaptive_concurrency:config",
         "//source/extensions/filters/http/fault:config",
         "//test/test_common:utility_lib",
-      ],
-    )
+    ],
+)
 
 envoy_cc_test(
     name = "tcp_conn_pool_integration_test",
