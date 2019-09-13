@@ -1255,6 +1255,8 @@ void ConnectionManagerImpl::ActiveStream::snapScopedRouteConfig() {
   snapped_route_config_ = snapped_scoped_routes_config_->getRouteConfig(*request_headers_);
   if (snapped_route_config_ == nullptr) {
     ENVOY_STREAM_LOG(trace, "can't find SRDS scope.", *this);
+    // TODO(stevenzzzz): Consider to pass an error message to router filter, so that it can
+    // send back 404 with some more details.
     snapped_route_config_ = std::make_shared<Router::NullConfigImpl>();
   }
 }

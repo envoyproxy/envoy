@@ -4548,7 +4548,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsUpdate) {
       .Times(3)
       .WillOnce(Return(nullptr))
       .WillOnce(Return(nullptr))        // refreshCachedRoute first time.
-      .WillOnce(Return(route_config_)); // trigerred by callbacks_->route(), SRDS now updated.
+      .WillOnce(Return(route_config_)); // triggered by callbacks_->route(), SRDS now updated.
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
     StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
     HeaderMapPtr headers{
