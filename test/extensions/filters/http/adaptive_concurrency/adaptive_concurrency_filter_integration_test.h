@@ -80,8 +80,8 @@ protected:
   // Responds to a single request in a FIFO manner.
   IntegrationStreamDecoderPtr respondToRequest();
 
-  // Inflates the concurrency limit to >= the specified value.
-  void inflateConcurrencyLimit(const uint64_t limit_lower_bound);
+  // Inflates the concurrency limit to >= the specified value. Returns the concurrency limit.
+  uint32_t inflateConcurrencyLimit(const uint64_t limit_lower_bound);
 
   // Deflates the concurrency limit to <= the specified value.
   void deflateConcurrencyLimit(const uint64_t limit_upper_bound);
@@ -94,7 +94,6 @@ protected:
     EXPECT_EQ("503", response->headers().Status()->value().getStringView());
   }
 
-private:
   std::queue<IntegrationStreamDecoderPtr> response_q_;
 };
 

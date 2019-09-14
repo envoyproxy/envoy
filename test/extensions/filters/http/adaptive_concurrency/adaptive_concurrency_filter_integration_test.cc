@@ -48,7 +48,7 @@ IntegrationStreamDecoderPtr AdaptiveConcurrencyIntegrationTest::respondToRequest
   return response;
 }
 
-void AdaptiveConcurrencyIntegrationTest::inflateConcurrencyLimit(const uint64_t limit_lower_bound) {
+uint32_t AdaptiveConcurrencyIntegrationTest::inflateConcurrencyLimit(const uint64_t limit_lower_bound) {
   // Send requests until the gauge exists.
   while (!test_server_->gauge(kConcurrencyLimitGaugeName)) {
     sendRequests(1);
@@ -60,6 +60,7 @@ void AdaptiveConcurrencyIntegrationTest::inflateConcurrencyLimit(const uint64_t 
     sendRequests(1, min_rtt / 2);
     respondToAllRequests(1);
   }
+  return test_server_->gauge(kConcurrencyLimitGaugeName)->value();
 }
 
 void AdaptiveConcurrencyIntegrationTest::deflateConcurrencyLimit(const uint64_t limit_upper_bound) {
@@ -83,15 +84,9 @@ void AdaptiveConcurrencyIntegrationTest::deflateConcurrencyLimit(const uint64_t 
 INSTANTIATE_TEST_SUITE_P(IpVersions, AdaptiveConcurrencyIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
-TEST_P(AdaptiveConcurrencyIntegrationTest, TestManyConcurrency1) {
-  initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  sendRequests(10);
-  respondToAllRequests(1);
-  test_server_->waitForCounterGe(kRequestBlockCounterName, 9);
-}
-
+/**
+ * Test a single request returns successfully.
+ */
 TEST_P(AdaptiveConcurrencyIntegrationTest, TestConcurrency1) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -103,6 +98,22 @@ TEST_P(AdaptiveConcurrencyIntegrationTest, TestConcurrency1) {
   verifyResponseBlocked(std::move(response));
 }
 
+/**
+ * Test many requests, where only a single request returns 200 during the minRTT window.
+ */
+TEST_P(AdaptiveConcurrencyIntegrationTest, TestManyConcurrency1) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  sendRequests(10);
+  respondToAllRequests(1);
+  test_server_->waitForCounterGe(kRequestBlockCounterName, 9);
+}
+
+/**
+ * Test the ability to increase/decrease the concurrency limit with request latencies based on the
+ * minRTT value.
+ */
 TEST_P(AdaptiveConcurrencyIntegrationTest, TestConcurrencyLimitMovement) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -112,6 +123,34 @@ TEST_P(AdaptiveConcurrencyIntegrationTest, TestConcurrencyLimitMovement) {
     inflateConcurrencyLimit(100);
     deflateConcurrencyLimit(10);
   }
+}
+
+/**
+ * Verify concurrency limit is enforced outside of minRTT window.
+ */
+TEST_P(AdaptiveConcurrencyIntegrationTest, TestConcurrencyN) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const auto concurrency_limit = inflateConcurrencyLimit(50);
+  sendRequests(75, 1);
+
+  int forwarded_count = 0;
+  while (!response_q_.empty()) {
+    auto response = std::move(response_q_.front());
+    response_q_.pop();
+    response->waitForEndStream();
+    EXPECT_TRUE(response->complete());
+    const auto status_code = response->headers().Status()->value().getStringView();
+    if (status_code == "200") {
+      ++forwarded_count;
+      continue;
+    }
+  }
+
+  // The concurrency limit is eventually consistent, so we have no guarantee that these two numbers
+  // will be equal. We must simply check that we forwarded at least the concurrency limit.
+  EXPECT_GE(forwarded_count, concurrency_limit);
 }
 
 } // namespace Envoy
