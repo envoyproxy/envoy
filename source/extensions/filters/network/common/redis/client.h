@@ -96,6 +96,12 @@ public:
    *         for some reason.
    */
   virtual PoolRequest* makeRequest(const RespValue& request, PoolCallbacks& callbacks) PURE;
+
+  /**
+   * Initialize the connection. Issue the auth command and readonly command as needed.
+   * @param auth password for upstream host.
+   */
+  virtual void initialize(const std::string& auth_password) PURE;
 };
 
 using ClientPtr = std::unique_ptr<Client>;
@@ -187,12 +193,15 @@ public:
    * @param host supplies the upstream host.
    * @param dispatcher supplies the owning thread's dispatcher.
    * @param config supplies the connection pool configuration.
+   * @param redis_command_stats supplies the redis command stats.
+   * @param scope supplies the stats scope.
+   * @param auth password for upstream host.
    * @return ClientPtr a new connection pool client.
    */
   virtual ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                            const Config& config,
                            const RedisCommandStatsSharedPtr& redis_command_stats,
-                           Stats::Scope& scope) PURE;
+                           Stats::Scope& scope, const std::string& auth_password) PURE;
 };
 
 } // namespace Client

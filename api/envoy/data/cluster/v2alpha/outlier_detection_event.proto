@@ -39,6 +39,7 @@ message OutlierDetectionEvent {
     option (validate.required) = true;
     OutlierEjectSuccessRate eject_success_rate_event = 9;
     OutlierEjectConsecutive eject_consecutive_event = 10;
+    OutlierEjectFailurePercentage eject_failure_percentage_event = 11;
   }
 }
 
@@ -75,6 +76,12 @@ enum OutlierEjectionType {
   // is set to *true*.
   // See :ref:`Cluster outlier detection <arch_overview_outlier_detection>` documentation for
   SUCCESS_RATE_LOCAL_ORIGIN = 4;
+  // Runs over aggregated success rate statistics from every host in cluster and selects hosts for
+  // which ratio of failed replies is above configured value.
+  FAILURE_PERCENTAGE = 5;
+  // Runs over aggregated success rate statistics for local origin failures from every host in
+  // cluster and selects hosts for which ratio of failed replies is above configured value.
+  FAILURE_PERCENTAGE_LOCAL_ORIGIN = 6;
 }
 
 // Represents possible action applied to upstream host
@@ -96,4 +103,9 @@ message OutlierEjectSuccessRate {
 }
 
 message OutlierEjectConsecutive {
+}
+
+message OutlierEjectFailurePercentage {
+  // Host's success rate at the time of the ejection event on a 0-100 range.
+  uint32 host_success_rate = 1 [(validate.rules).uint32.lte = 100];
 }

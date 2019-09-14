@@ -125,6 +125,7 @@ envoy_cc_test(
         "//source/common/upstream:upstream_lib",
         "//test/common/http:common_lib",
         "//test/mocks/access_log:access_log_mocks",
+        "//test/mocks/api:api_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/runtime:runtime_mocks",
