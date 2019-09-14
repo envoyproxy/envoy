@@ -446,9 +446,7 @@ void StatNameSet::rememberBuiltin(absl::string_view str) {
 StatName StatNameSet::getBuiltin(absl::string_view token, StatName fallback) {
   StatName stat_name = getBuiltinHelper(token, fallback);
   if (stat_name == fallback) {
-    std::cerr << "JDM: dynamic token: " << token << "\n";
-    new std::string("leak this now");
-    // ASSERT(false);
+    // ENVOY_LOG_MISC(warn, "Builtin stat name not pre-registered: {}", token);
   }
   return stat_name;
 }
