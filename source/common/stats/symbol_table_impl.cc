@@ -1,6 +1,7 @@
 #include "common/stats/symbol_table_impl.h"
 
 #include <algorithm>
+#include <iostream>
 #include <memory>
 #include <unordered_map>
 #include <vector>
@@ -436,25 +437,42 @@ StatNameSet::StatNameSet(SymbolTable& symbol_table) : pool_(symbol_table) {
 void StatNameSet::rememberBuiltin(absl::string_view str) {
   StatName stat_name;
   {
-    absl::MutexLock lock(&mutex_);
+    // absl::MutexLock lock(&mutex_);
     stat_name = pool_.add(str);
   }
   builtin_stat_names_[str] = stat_name;
 }
 
-Stats::StatName StatNameSet::getStatName(absl::string_view token) {
+StatName StatNameSet::getBuiltin(absl::string_view token, StatName fallback) {
+  StatName stat_name = getBuiltinHelper(token, fallback);
+  if (stat_name == fallback) {
+    std::cerr << "JDM: dynamic token: " << token << "\n";
+    new std::string("leak this now");
+    // ASSERT(false);
+  }
+  return stat_name;
+}
+
+StatName StatNameSet::getBuiltinHelper(absl::string_view token, StatName fallback) {
   // If token was recorded as a built-in during initialization, we can
   // service this request lock-free.
   const auto iter = builtin_stat_names_.find(token);
   if (iter != builtin_stat_names_.end()) {
     return iter->second;
   }
+  return fallback;
+}
 
-  // Other tokens require holding a lock for our local cache.
-  absl::MutexLock lock(&mutex_);
-  Stats::StatName& stat_name = dynamic_stat_names_[token];
-  if (stat_name.empty()) { // Note that builtin_stat_names_ already has one for "".
-    stat_name = pool_.add(token);
+StatName StatNameSet::getDynamic(absl::string_view token) {
+  Stats::StatName stat_name = getBuiltinHelper(token, StatName());
+  if (stat_name.empty()) {
+    // Other tokens require holding a lock for our local cache.
+    absl::MutexLock lock(&mutex_);
+    Stats::StatName& stat_name_ref = dynamic_stat_names_[token];
+    if (stat_name_ref.empty()) { // Note that builtin_stat_names_ already has one for "".
+      stat_name_ref = pool_.add(token);
+    }
+    stat_name = stat_name_ref;
   }
   return stat_name;
 }

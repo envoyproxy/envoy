@@ -664,7 +664,8 @@ public:
    * set's mutex and also the SymbolTable mutex which must be taken during
    * StatNamePool::add().
    */
-  StatName getStatName(absl::string_view token);
+  StatName getDynamic(absl::string_view token);
+  StatName getBuiltin(absl::string_view token, StatName fallback);
 
   /**
    * Adds a StatName using the pool, but without remembering it in any maps.
@@ -672,6 +673,8 @@ public:
   StatName add(absl::string_view str) { return pool_.add(str); }
 
 private:
+  StatName getBuiltinHelper(absl::string_view token, StatName fallback);
+
   Stats::StatNamePool pool_;
   absl::Mutex mutex_;
   using StringStatNameMap = absl::flat_hash_map<std::string, Stats::StatName>;
