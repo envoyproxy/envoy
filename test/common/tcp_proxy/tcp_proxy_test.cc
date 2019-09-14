@@ -967,7 +967,7 @@ TEST_F(TcpProxyTest, AccessLogTlsSessionId) {
   const std::string tlsSessionId{
       "D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B"};
   auto mockConnectionInfo = std::make_shared<Ssl::MockConnectionInfo>();
-  EXPECT_CALL(*mockConnectionInfo, sessionId()).WillOnce(Return(tlsSessionId));
+  EXPECT_CALL(*mockConnectionInfo, sessionId()).WillOnce(ReturnRef(tlsSessionId));
   EXPECT_CALL(filter_callbacks_.connection_, ssl()).WillRepeatedly(Return(mockConnectionInfo));
 
   setup(1, accessLogConfig("%DOWNSTREAM_TLS_SESSION_ID%"));
@@ -1016,7 +1016,7 @@ TEST_F(TcpProxyTest, AccessLogUpstreamSSLConnection) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   const std::string session_id = "D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B";
   auto ssl_info = std::make_shared<Ssl::MockConnectionInfo>();
-  EXPECT_CALL(*ssl_info, sessionId()).WillRepeatedly(Return(session_id));
+  EXPECT_CALL(*ssl_info, sessionId()).WillRepeatedly(ReturnRef(session_id));
   stream_info.setDownstreamSslConnection(ssl_info);
   EXPECT_CALL(*upstream_connections_.at(0), streamInfo()).WillRepeatedly(ReturnRef(stream_info));
 

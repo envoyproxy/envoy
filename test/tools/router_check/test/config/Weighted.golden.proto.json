@@ -15,11 +15,11 @@
       "test_name": "Test_2",
       "input": {
         "authority": "www1.lyft.com",
-        "path": "/foo",
+        "path": "/test/123",
         "method": "GET",
         "random_value": 115
       },
-      "validate": {"cluster_name": "cluster1"}
+      "validate": {"cluster_name": "cluster1", "virtual_cluster_name": "test_virtual_cluster"}
     },
     {
       "test_name": "Test_3",

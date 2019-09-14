@@ -11,6 +11,7 @@
 #include "common/stream_info/stream_info_impl.h"
 #include "common/upstream/health_checker_base_impl.h"
 
+#include "include/envoy/api/_virtual_includes/api_interface/envoy/api/api.h"
 #include "src/proto/grpc/health/v1/health.pb.h"
 
 namespace Envoy {
@@ -32,12 +33,11 @@ public:
    * @param validation_visitor message validation visitor instance.
    * @return a health checker.
    */
-  static HealthCheckerSharedPtr create(const envoy::api::v2::core::HealthCheck& health_check_config,
-                                       Upstream::Cluster& cluster, Runtime::Loader& runtime,
-                                       Runtime::RandomGenerator& random,
-                                       Event::Dispatcher& dispatcher,
-                                       AccessLog::AccessLogManager& log_manager,
-                                       ProtobufMessage::ValidationVisitor& validation_visitor);
+  static HealthCheckerSharedPtr
+  create(const envoy::api::v2::core::HealthCheck& health_check_config, Upstream::Cluster& cluster,
+         Runtime::Loader& runtime, Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
+         AccessLog::AccessLogManager& log_manager,
+         ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 };
 
 /**

@@ -111,4 +111,34 @@ message OutlierDetection {
   // is set to true.
   google.protobuf.UInt32Value enforcing_local_origin_success_rate = 15
       [(validate.rules).uint32.lte = 100];
+
+  // The failure percentage to use when determining failure percentage-based outlier detection. If
+  // the failure percentage of a given host is greater than or equal to this value, it will be
+  // ejected. Defaults to 85.
+  google.protobuf.UInt32Value failure_percentage_threshold = 16 [(validate.rules).uint32.lte = 100];
+
+  // The % chance that a host will be actually ejected when an outlier status is detected through
+  // failure percentage statistics. This setting can be used to disable ejection or to ramp it up
+  // slowly. Defaults to 0.
+  //
+  // [#next-major-version: setting this without setting failure_percentage_threshold should be
+  // invalid in v4.]
+  google.protobuf.UInt32Value enforcing_failure_percentage = 17 [(validate.rules).uint32.lte = 100];
+
+  // The % chance that a host will be actually ejected when an outlier status is detected through
+  // local-origin failure percentage statistics. This setting can be used to disable ejection or to
+  // ramp it up slowly. Defaults to 0.
+  google.protobuf.UInt32Value enforcing_failure_percentage_local_origin = 18
+      [(validate.rules).uint32.lte = 100];
+
+  // The minimum number of hosts in a cluster in order to perform failure percentage-based ejection.
+  // If the total number of hosts in the cluster is less than this value, failure percentage-based
+  // ejection will not be performed. Defaults to 5.
+  google.protobuf.UInt32Value failure_percentage_minimum_hosts = 19;
+
+  // The minimum number of total requests that must be collected in one interval (as defined by the
+  // interval duration above) to perform failure percentage-based ejection for this host. If the
+  // volume is lower than this setting, failure percentage-based ejection will not be performed for
+  // this host. Defaults to 50.
+  google.protobuf.UInt32Value failure_percentage_request_volume = 20;
 }
