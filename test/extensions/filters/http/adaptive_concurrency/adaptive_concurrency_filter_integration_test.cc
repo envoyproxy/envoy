@@ -48,7 +48,8 @@ IntegrationStreamDecoderPtr AdaptiveConcurrencyIntegrationTest::respondToRequest
   return response;
 }
 
-uint32_t AdaptiveConcurrencyIntegrationTest::inflateConcurrencyLimit(const uint64_t limit_lower_bound) {
+uint32_t
+AdaptiveConcurrencyIntegrationTest::inflateConcurrencyLimit(const uint64_t limit_lower_bound) {
   // Send requests until the gauge exists.
   while (!test_server_->gauge(kConcurrencyLimitGaugeName)) {
     sendRequests(1);

@@ -35,10 +35,9 @@ envoy_extension_cc_test(
     ],
     extension_name = "envoy.filters.http.adaptive_concurrency",
     deps = [
-        "//test/integration:http_integration_lib",
         "//source/extensions/filters/http/adaptive_concurrency:config",
         "//source/extensions/filters/http/fault:config",
+        "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
     ],
 )
-
