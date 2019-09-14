@@ -1,4 +1,4 @@
-#include "test/integration/adaptive_concurrency_filter_integration_test.h"
+#include "test/extensions/filters/http/adaptive_concurrency/adaptive_concurrency_filter_integration_test.h"
 
 #include "common/http/header_map_impl.h"
 
@@ -84,12 +84,18 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AdaptiveConcurrencyIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
 TEST_P(AdaptiveConcurrencyIntegrationTest, TestManyConcurrency1) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
   sendRequests(10);
   respondToAllRequests(1);
   test_server_->waitForCounterGe(kRequestBlockCounterName, 9);
 }
 
 TEST_P(AdaptiveConcurrencyIntegrationTest, TestConcurrency1) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
   sendRequests(2);
   auto response = respondToRequest();
   verifyResponseForwarded(std::move(response));
@@ -98,8 +104,14 @@ TEST_P(AdaptiveConcurrencyIntegrationTest, TestConcurrency1) {
 }
 
 TEST_P(AdaptiveConcurrencyIntegrationTest, TestConcurrencyLimitMovement) {
-  inflateConcurrencyLimit(100);
-  deflateConcurrencyLimit(10);
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Cause the concurrency limit to oscillate.
+  for (int ii = 0; ii < 3; ++ii) {
+    inflateConcurrencyLimit(100);
+    deflateConcurrencyLimit(10);
+  }
 }
 
 } // namespace Envoy

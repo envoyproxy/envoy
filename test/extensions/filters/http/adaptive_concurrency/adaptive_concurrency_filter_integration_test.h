@@ -60,8 +60,6 @@ public:
     setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
     autonomous_upstream_ = true;
-    initialize();
-    codec_client_ = makeHttpConnection(lookupPort("http"));
   }
 
   void TearDown() override {}
