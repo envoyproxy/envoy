@@ -20,6 +20,8 @@ GrpcMuxSubscriptionImpl::GrpcMuxSubscriptionImpl(GrpcMux& grpc_mux,
 
 // Config::Subscription
 void GrpcMuxSubscriptionImpl::start(const std::set<std::string>& resources) {
+  init_fetch_timer_ =
+      std::make_unique<Stats::Timespan>(stats_.init_fetch_time_, dispatcher_.timeSource());
   if (init_fetch_timeout_.count() > 0) {
     init_fetch_timeout_timer_ = dispatcher_.createTimer([this]() -> void {
       callbacks_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout,
@@ -90,6 +92,10 @@ std::string GrpcMuxSubscriptionImpl::resourceName(const ProtobufWkt::Any& resour
 }
 
 void GrpcMuxSubscriptionImpl::disableInitFetchTimeoutTimer() {
+  if (init_fetch_timer_) {
+    init_fetch_timer_->complete();
+  }
+
   if (init_fetch_timeout_timer_) {
     init_fetch_timeout_timer_->disableTimer();
     init_fetch_timeout_timer_.reset();

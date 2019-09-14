@@ -4,6 +4,7 @@
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/stats/timespan.h"
 
 #include "common/common/logger.h"
 
@@ -44,6 +45,7 @@ private:
   Event::Dispatcher& dispatcher_;
   std::chrono::milliseconds init_fetch_timeout_;
   Event::TimerPtr init_fetch_timeout_timer_;
+  Stats::TimespanPtr init_fetch_timer_;
 };
 
 } // namespace Config

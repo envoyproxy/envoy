@@ -196,6 +196,7 @@ envoy_cc_library(
         "//include/envoy/config:grpc_mux_interface",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/stats:timespan",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/grpc:common_lib",
