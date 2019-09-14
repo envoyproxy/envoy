@@ -29,7 +29,8 @@ namespace ConcurrencyController {
   GAUGE(concurrency_limit, NeverImport)                                                            \
   GAUGE(gradient, NeverImport)                                                                     \
   GAUGE(burst_queue_size, NeverImport)                                                             \
-  GAUGE(min_rtt_msecs, NeverImport)
+  GAUGE(min_rtt_msecs, NeverImport)                                                                \
+  GAUGE(sample_rtt_msecs, NeverImport)
 
 /**
  * Wrapper struct for gradient controller stats. @see stats_macros.h

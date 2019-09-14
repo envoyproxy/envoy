@@ -112,6 +112,8 @@ void GradientController::resetSampleWindow() {
   }
 
   sample_rtt_ = processLatencySamplesAndClear();
+  stats_.sample_rtt_msecs_.set(
+      std::chrono::duration_cast<std::chrono::milliseconds>(sample_rtt_).count());
   updateConcurrencyLimit(calculateNewLimit());
 }
 

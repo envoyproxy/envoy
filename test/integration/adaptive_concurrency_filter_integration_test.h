@@ -1,5 +1,4 @@
 #include "test/integration/http_integration.h"
-#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -27,8 +26,7 @@ const std::string kFaultFilterConfig =
 name: envoy.fault
 config:
     delay:
-        fixed_delay:
-            nanos: 5000000 # 5ms
+        header_delay: {}
         percentage:
             numerator: 100
             denominator: HUNDRED
@@ -38,6 +36,11 @@ const std::string kConcurrencyLimitGaugeName =
     "http.config_test.adaptive_concurrency.gradient_controller.concurrency_limit";
 const std::string kRequestBlockCounterName =
     "http.config_test.adaptive_concurrency.gradient_controller.rq_blocked";
+const std::string kMinRTTGaugeName =
+    "http.config_test.adaptive_concurrency.gradient_controller.min_rtt_msecs";
+
+// The default delay introduced to each sent request.
+const uint32_t kDefaultRequestDelayMs = 50;
 
 class AdaptiveConcurrencyIntegrationTest
     : public HttpIntegrationTest,
@@ -69,7 +72,9 @@ public:
   }
 
 protected:
-  void sendRequests(const int request_count);
+  // Send some number of requests with 'delay_ms' specifying the amount of time the fault filter
+  // will delay them.
+  void sendRequests(const int request_count, const uint32_t delay_ms);
 
   // Responds to all queued up requests and asserts that the exact number specified are forwarded.
   void respondToAllRequests(const int num_forwarded);
@@ -79,6 +84,9 @@ protected:
 
   // Inflates the concurrency limit to >= the specified value.
   void inflateConcurrencyLimit(const uint64_t limit_lower_bound);
+
+  // Deflates the concurrency limit to <= the specified value.
+  void deflateConcurrencyLimit(const uint64_t limit_upper_bound);
 
   void verifyResponseForwarded(IntegrationStreamDecoderPtr response) {
     EXPECT_EQ("200", response->headers().Status()->value().getStringView());

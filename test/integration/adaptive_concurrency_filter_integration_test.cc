@@ -1,5 +1,7 @@
 #include "test/integration/adaptive_concurrency_filter_integration_test.h"
 
+#include "common/http/header_map_impl.h"
+
 #include "test/integration/autonomous_upstream.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/simulated_time_system.h"
@@ -9,9 +11,12 @@
 
 namespace Envoy {
 
-void AdaptiveConcurrencyIntegrationTest::sendRequests(const int request_count) {
+void AdaptiveConcurrencyIntegrationTest::sendRequests(
+    const int request_count, const uint32_t delay_ms = kDefaultRequestDelayMs) {
+  auto headers = default_request_headers_;
+  headers.addCopy("x-envoy-fault-delay-request", std::to_string(delay_ms));
   for (int ii = 0; ii < request_count; ++ii) {
-    auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+    auto encoder_decoder = codec_client_->startRequest(headers);
     response_q_.emplace(std::move(encoder_decoder.second));
     codec_client_->sendData(encoder_decoder.first, 0, true);
   }
@@ -51,7 +56,26 @@ void AdaptiveConcurrencyIntegrationTest::inflateConcurrencyLimit(const uint64_t 
   }
 
   while (test_server_->gauge(kConcurrencyLimitGaugeName)->value() < limit_lower_bound) {
+    const auto min_rtt = test_server_->gauge(kMinRTTGaugeName)->value();
+    sendRequests(1, min_rtt / 2);
+    respondToAllRequests(1);
+  }
+}
+
+void AdaptiveConcurrencyIntegrationTest::deflateConcurrencyLimit(const uint64_t limit_upper_bound) {
+  ASSERT(limit_upper_bound > 1);
+  // Send requests until the gauge exists.
+  while (!test_server_->gauge(kConcurrencyLimitGaugeName)) {
     sendRequests(1);
+    respondToAllRequests(1);
+  }
+
+  // We cannot break when the concurrency limit is 1, because this implies we're in a minRTT
+  // recalculation window. This is not a decrease in the concurrency limit due to latency samples.
+  while (test_server_->gauge(kConcurrencyLimitGaugeName)->value() != 1 &&
+         test_server_->gauge(kConcurrencyLimitGaugeName)->value() >= limit_upper_bound) {
+    const auto min_rtt = test_server_->gauge(kMinRTTGaugeName)->value();
+    sendRequests(1, min_rtt * 2);
     respondToAllRequests(1);
   }
 }
@@ -73,8 +97,9 @@ TEST_P(AdaptiveConcurrencyIntegrationTest, TestConcurrency1) {
   verifyResponseBlocked(std::move(response));
 }
 
-TEST_P(AdaptiveConcurrencyIntegrationTest, TestConcurrencyLimitInflation) {
+TEST_P(AdaptiveConcurrencyIntegrationTest, TestConcurrencyLimitMovement) {
   inflateConcurrencyLimit(100);
+  deflateConcurrencyLimit(10);
 }
 
 } // namespace Envoy
