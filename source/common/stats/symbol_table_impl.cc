@@ -436,7 +436,7 @@ StatNameSet::StatNameSet(SymbolTable& symbol_table) : pool_(symbol_table) {
 void StatNameSet::rememberBuiltin(absl::string_view str) {
   StatName stat_name;
   {
-    // absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(&mutex_);
     stat_name = pool_.add(str);
   }
   builtin_stat_names_[str] = stat_name;

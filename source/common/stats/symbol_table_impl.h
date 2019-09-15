@@ -689,12 +689,15 @@ public:
   /**
    * Adds a StatName using the pool, but without remembering it in any maps.
    */
-  StatName add(absl::string_view str) { return pool_.add(str); }
+  StatName add(absl::string_view str) {
+    absl::MutexLock lock(&mutex_);
+    return pool_.add(str);
+  }
 
 private:
   StatName getBuiltinHelper(absl::string_view token, StatName fallback);
 
-  Stats::StatNamePool pool_;
+  Stats::StatNamePool pool_ GUARDED_BY(mutex_);
   absl::Mutex mutex_;
   using StringStatNameMap = absl::flat_hash_map<std::string, Stats::StatName>;
   StringStatNameMap builtin_stat_names_;
