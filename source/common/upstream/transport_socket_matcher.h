@@ -58,7 +58,8 @@ namespace Upstream {
 class TransportSocketMatcher;
 
 using TransportSocketMatcherPtr = std::unique_ptr<TransportSocketMatcher>;
-using TransportSocketFactoryMapPtr = std::unique_ptr<std::map<std::string, Network::TransportSocketFactoryPtr>>;
+using TransportSocketFactoryMap = std::map<std::string, Network::TransportSocketFactoryPtr>;
+using TransportSocketFactoryMapPtr = std::unique_ptr<TransportSocketFactoryMap>;
 
 class TransportSocketMatcher : Logger::Loggable<Logger::Id::upstream> {
 public:

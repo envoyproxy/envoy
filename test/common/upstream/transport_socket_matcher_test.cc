@@ -54,22 +54,34 @@ namespace {
 class TransportSocketMatcherTest : public testing::Test {
 public:
   TransportSocketMatcherTest() {
-    //matcher_ = std::make_unique<TransportSocketMatcher>(default_fatory_);
+    default_factory_ = new Network::MockTransportSocketFactory();
+    factory_map_ = new TransportSocketFactoryMap();
+    (*factory_map_)["tls"] = std::make_unique<Network::MockTransportSocketFactory>();
+    (*factory_map_)["raw_buffer"] = std::make_unique<Network::MockTransportSocketFactory>();
+  }
+
+  void init() {
+    matcher_ = std::make_unique<TransportSocketMatcher>(
+        std::unique_ptr<Network::TransportSocketFactory>(default_factory_), 
+        std::unique_ptr<TransportSocketFactoryMap>(factory_map_));
   }
 protected:
   TransportSocketMatcherPtr matcher_;
-  // Weak pointer?
-  //testing::NiceMock<MockTransportSocketFactory> default_fatory_;
-  //testing::NiceMock<MockTransportSocketFactory> factory_a_;
-  //testing::NiceMock<MockTransportSocketFactory> factory_b_;
+  // Raw pointer since they will be owned by matcher_.
+  Network::TransportSocketFactory* default_factory_;
+  TransportSocketFactoryMap* factory_map_;
 };
 
 // This test ensures the matcher returns the default transport socket factory.
 TEST_F(TransportSocketMatcherTest, ReturnDefaultSocketFactory) {
+  // Get the raw pointer before constructing the matcher.
+  //EXPECT_CALL(default_factory_, 
+  init();
 }
 
 // TODO: defer when the matcher semantics is finalized.
 TEST_F(TransportSocketMatcherTest, CustomizedSocketFactory) {
+  init();
 }
 
 } // namespace
