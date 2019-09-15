@@ -1,7 +1,6 @@
 #include "common/stats/symbol_table_impl.h"
 
 #include <algorithm>
-#include <iostream>
 #include <memory>
 #include <unordered_map>
 #include <vector>
@@ -446,7 +445,7 @@ void StatNameSet::rememberBuiltin(absl::string_view str) {
 StatName StatNameSet::getBuiltin(absl::string_view token, StatName fallback) {
   StatName stat_name = getBuiltinHelper(token, fallback);
   if (stat_name == fallback) {
-    // ENVOY_LOG_MISC(warn, "Builtin stat name not pre-registered: {}", token);
+    ENVOY_LOG_MISC(warn, "Builtin stat name not pre-registered: {}", token);
   }
   return stat_name;
 }

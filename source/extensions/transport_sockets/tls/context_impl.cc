@@ -397,20 +397,14 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
 
   // Curves from
   // https://github.com/google/boringssl/blob/f4d8b969200f1ee2dd872ffb85802e6a0976afe7/ssl/ssl_key_share.cc#L384
-  for (const auto& curve_name :
-       {"P-224", "P-256", "P-384", "P-521", "X25519", "CECPQ2", "CECPQ2b"}) {
-    stat_name_set_.rememberBuiltin(curve_name);
-  }
+  stat_name_set_.rememberBuiltins(
+      {"P-224", "P-256", "P-384", "P-521", "X25519", "CECPQ2", "CECPQ2b"});
 
   // Algorithms
-  stat_name_set_.rememberBuiltin("ecdsa_secp256r1_sha256");
-  stat_name_set_.rememberBuiltin("rsa_pss_rsae_sha256");
+  stat_name_set_.rememberBuiltins({"ecdsa_secp256r1_sha256", "rsa_pss_rsae_sha256"});
 
   // Versions
-  stat_name_set_.rememberBuiltin("TLSv1");
-  stat_name_set_.rememberBuiltin("TLSv1.1");
-  stat_name_set_.rememberBuiltin("TLSv1.2");
-  stat_name_set_.rememberBuiltin("TLSv1.3");
+  stat_name_set_.rememberBuiltins({"TLSv1", "TLSv1.1", "TLSv1.2", "TLSv1.3"});
 }
 
 int ServerContextImpl::alpnSelectCallback(const unsigned char** out, unsigned char* outlen,

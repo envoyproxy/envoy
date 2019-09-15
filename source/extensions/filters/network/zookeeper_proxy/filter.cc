@@ -27,13 +27,8 @@ ZooKeeperFilterConfig::ZooKeeperFilterConfig(const std::string& stat_prefix,
   // https://zookeeper.apache.org/doc/r3.5.4-beta/zookeeperProgrammers.html#sc_BuiltinACLSchemes
   // lists commons schemes: "world", "auth", "digest", "host", "x509", and
   // "ip". These are used in filter.cc by appending "_rq".
-  stat_name_set_.rememberBuiltin("auth_rq");
-  stat_name_set_.rememberBuiltin("digest_rq");
-  stat_name_set_.rememberBuiltin("host_rq");
-  stat_name_set_.rememberBuiltin("ip_rq");
-  stat_name_set_.rememberBuiltin("ping_response_rq");
-  stat_name_set_.rememberBuiltin("world_rq");
-  stat_name_set_.rememberBuiltin("x509_rq");
+  stat_name_set_.rememberBuiltins(
+      {"auth_rq", "digest_rq", "host_rq", "ip_rq", "ping_response_rq", "world_rq", "x509_rq"});
 
   initOpCode(OpCodes::PING, stats_.ping_resp_, "ping_response");
   initOpCode(OpCodes::SETAUTH, stats_.auth_resp_, "auth_response");

@@ -26,9 +26,7 @@ MongoStats::MongoStats(Stats::Scope& scope, const std::string& prefix)
   // TODO(jmarantz): is this the right set of mongo commands to use as builtins?
   // Should we also have builtins for callsites or collections, or do those need
   // to be dynamic?
-  for (const auto& command : {"insert", "query", "update", "delete"}) {
-    stat_name_set_.rememberBuiltin(command);
-  }
+  stat_name_set_.rememberBuiltins({"insert", "query", "update", "delete"});
 }
 
 Stats::SymbolTable::StoragePtr MongoStats::addPrefix(const std::vector<Stats::StatName>& names) {

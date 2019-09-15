@@ -659,6 +659,18 @@ public:
   void rememberBuiltin(absl::string_view str);
 
   /**
+   * Remembers every string in a container as builtins.
+   */
+  template <class StringContainer> void rememberBuiltins(const StringContainer& container) {
+    for (const auto& str : container) {
+      rememberBuiltin(str);
+    }
+  }
+  void rememberBuiltins(const std::vector<const char*>& container) {
+    rememberBuiltins<std::vector<const char*>>(container);
+  }
+
+  /**
    * Finds a StatName by name. If 'token' has been remembered as a built-in,
    * then no lock is required. Otherwise we must consult dynamic_stat_names_
    * under a lock that's private to the StatNameSet. If that's empty, we need to
