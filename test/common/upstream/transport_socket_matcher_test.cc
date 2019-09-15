@@ -14,6 +14,7 @@
 #include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
 #include "common/upstream/transport_socket_matcher.h"
+#include "common/network/transport_socket_options_impl.h"
 #include "common/network/utility.h"
 
 #include "server/transport_socket_config_impl.h"
@@ -55,9 +56,11 @@ class TransportSocketMatcherTest : public testing::Test {
 public:
   TransportSocketMatcherTest() {
     default_factory_ = new Network::MockTransportSocketFactory();
+    tls_factory_ = new Network::MockTransportSocketFactory();
+    rawbuffer_factory_ = new Network::MockTransportSocketFactory();
     factory_map_ = new TransportSocketFactoryMap();
-    (*factory_map_)["tls"] = std::make_unique<Network::MockTransportSocketFactory>();
-    (*factory_map_)["raw_buffer"] = std::make_unique<Network::MockTransportSocketFactory>();
+    (*factory_map_)["tls"] = std::unique_ptr<Network::TransportSocketFactory>(tls_factory_);
+    (*factory_map_)["raw_buffer"] = std::unique_ptr<Network::TransportSocketFactory>(rawbuffer_factory_);
   }
 
   void init() {
@@ -68,15 +71,23 @@ public:
 protected:
   TransportSocketMatcherPtr matcher_;
   // Raw pointer since they will be owned by matcher_.
-  Network::TransportSocketFactory* default_factory_;
+  Network::MockTransportSocketFactory* default_factory_;
+  Network::MockTransportSocketFactory* tls_factory_;
+  Network::MockTransportSocketFactory* rawbuffer_factory_;
   TransportSocketFactoryMap* factory_map_;
 };
 
 // This test ensures the matcher returns the default transport socket factory.
 TEST_F(TransportSocketMatcherTest, ReturnDefaultSocketFactory) {
   // Get the raw pointer before constructing the matcher.
-  //EXPECT_CALL(default_factory_, 
+    envoy::api::v2::core::Metadata metadata;
+  Network::TransportSocketOptionsSharedPtr transport_socket_options = 
+    std::make_shared<Network::TransportSocketOptionsImpl>();
+  EXPECT_CALL(*default_factory_, createTransportSocket(_))
+    .Times(1);
   init();
+  Network::TransportSocketFactory& factory = matcher_->resolve("hardcodenotexists", metadata);
+  factory.createTransportSocket(transport_socket_options);
 }
 
 // TODO: defer when the matcher semantics is finalized.

@@ -379,6 +379,7 @@ envoy_cc_test(
         "//source/common/config:metadata_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/json:config_schemas_lib",
+        "//source/common/network:transport_socket_options_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
