@@ -297,13 +297,15 @@ void Utility::sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbac
         headers->insertContentType().value(Headers::get().ContentTypeValues.Json);
         return std::string{};
       },
+      [&](Code&) -> void {},
       is_reset, response_code, body_text, grpc_status, is_head_request);
 }
 
 void Utility::sendLocalReply(
     bool is_grpc, std::function<void(HeaderMapPtr&& headers, bool end_stream)> encode_headers,
     std::function<void(Buffer::Instance& data, bool end_stream)> encode_data,
-    std::function<std::string(absl::string_view& body, HeaderMapPtr&& headers)> format_data, const bool& is_reset,
+    std::function<std::string(absl::string_view& body, HeaderMapPtr&& headers)> format_data,
+    std::function<void(Code& response_code)> rewrite_response, const bool& is_reset,
     Code response_code, absl::string_view body_text,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, bool is_head_request) {
   // encode_headers() may reset the stream, so the stream must not be reset before calling it.
@@ -326,7 +328,7 @@ void Utility::sendLocalReply(
     return;
   }
 
-  
+  rewrite_response(response_code);
 
   HeaderMapPtr response_headers{
       new HeaderMapImpl{{Headers::get().Status, std::to_string(enumToInt(response_code))}}};

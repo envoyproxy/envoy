@@ -249,7 +249,10 @@ envoy_cc_library(
          "//include/envoy/http:local_reply_interface",
          "//include/envoy/access_log:access_log_interface",
          "//include/envoy/stream_info:stream_info_interface",
+         "//include/envoy/server:access_log_config_interface",
          "//source/common/access_log:access_log_formatter_lib",
+         "//source/common/access_log:access_log_lib",
+         "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:http_connection_manager_cc",
     ],
 )
 

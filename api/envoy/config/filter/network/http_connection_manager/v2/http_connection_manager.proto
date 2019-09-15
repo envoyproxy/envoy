@@ -463,16 +463,51 @@ message HttpConnectionManager {
 
   // Configuration of local reply send by envoy for http responses.
   message LocalReplyConfig {
+    repeated ResponseMapper mapper = 1;
+
     oneof format {
       // Response body text format
-      string text_format = 1;
+      string text_format = 2;
   
       // Response body json format as dictionary
-      google.protobuf.Struct json_format = 2;
+      google.protobuf.Struct json_format = 3;
     }
   };
 
   LocalReplyConfig local_reply_config = 35;
+}
+
+message ResponseMapper {
+  ResponseMatcher matcher = 1;
+
+  ResponseRewriter rewriter = 2;
+}
+
+message ResponseMatcher {
+  oneof matcher_specifier {
+    option (validate.required) = true;
+
+    // And filter.
+    AndFilter and_filter = 1;
+
+    // Or filter.
+    OrFilter or_filter = 2;
+
+    // Response flag filter.
+    envoy.config.filter.accesslog.v2.ResponseFlagFilter response_flag_filter = 3;
+  }
+}
+
+message ResponseRewriter {
+  google.protobuf.UInt32Value status_code = 1;
+}
+
+message AndFilter {
+  repeated ResponseMatcher filters = 1 [(validate.rules).repeated .min_items = 2];
+}
+
+message OrFilter {
+  repeated ResponseMatcher filters = 1 [(validate.rules).repeated .min_items = 2];
 }
 
 message Rds {

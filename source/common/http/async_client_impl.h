@@ -331,6 +331,7 @@ private:
         headers->insertContentType().value(Headers::get().ContentTypeValues.Json); 
         return std::string{};
         },
+        [](Code& )  -> void { },
         remote_closed_, code, body, grpc_status, is_head_request_);
   }
   // The async client won't pause if sending an Expect: 100-Continue so simply

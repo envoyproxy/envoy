@@ -1324,6 +1324,10 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
 
         return formatted_body;
       },
+      [this](Code& response_code) -> void{
+        this->connection_manager_.config_.localReplyFormatter()->rewriteMatchedResponse( request_headers_.get(),
+         response_headers_.get(), response_trailers_.get(), stream_info_, response_code);
+      },
       state_.destroyed_, code, body, grpc_status, is_head_request);
 }
 
@@ -2264,6 +2268,7 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataTooLarge() {
              response_headers->insertContentType().value(Headers::get().ContentTypeValues.Json); 
              return std::string{};
           },
+          [&] (Code&) -> void {},
           parent_.state_.destroyed_, Http::Code::InternalServerError,
           CodeUtility::toString(Http::Code::InternalServerError), absl::nullopt,
           parent_.is_head_request_);

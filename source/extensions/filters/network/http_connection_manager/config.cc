@@ -77,7 +77,8 @@ std::unordered_map<std::string, std::string>convertJsonFormatToMap(ProtobufWkt::
   return output;
 }
 
-std::unordered_map<std::string, std::string> createLocalReplyFormatter(const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& config) {
+std::unordered_map<std::string, std::string> createLocalReplyFormatter(
+  const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& config) {
   // AccessLog::Formatter formatter;
 
   // if (config.access_log_format_case() == envoy::config::accesslog::v2::FileAccessLog::kFormat ||
@@ -399,7 +400,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     }
   }
 
-  local_reply_formatter_ = std::make_unique<Http::JsonFormatterImpl>(createLocalReplyFormatter(config));
+  local_reply_formatter_ = std::make_unique<Http::JsonFormatterImpl>(
+    createLocalReplyFormatter(config), config, context);
 }
 
 void HttpConnectionManagerConfig::processFilter(
