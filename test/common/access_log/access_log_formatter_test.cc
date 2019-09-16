@@ -279,14 +279,17 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_SUBJECT");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
-    EXPECT_CALL(*connection_info, subjectLocalCertificate()).WillRepeatedly(Return("subject"));
+    const std::string subject_local = "subject";
+    EXPECT_CALL(*connection_info, subjectLocalCertificate())
+        .WillRepeatedly(ReturnRef(subject_local));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
     EXPECT_EQ("subject", upstream_format.format(header, header, header, stream_info));
   }
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_SUBJECT");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
-    EXPECT_CALL(*connection_info, subjectLocalCertificate()).WillRepeatedly(Return(""));
+    EXPECT_CALL(*connection_info, subjectLocalCertificate())
+        .WillRepeatedly(ReturnRef(EMPTY_STRING));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
   }
@@ -298,14 +301,15 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_SUBJECT");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
-    EXPECT_CALL(*connection_info, subjectPeerCertificate()).WillRepeatedly(Return("subject"));
+    const std::string subject_peer = "subject";
+    EXPECT_CALL(*connection_info, subjectPeerCertificate()).WillRepeatedly(ReturnRef(subject_peer));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
     EXPECT_EQ("subject", upstream_format.format(header, header, header, stream_info));
   }
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_SUBJECT");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
-    EXPECT_CALL(*connection_info, subjectPeerCertificate()).WillRepeatedly(Return(""));
+    EXPECT_CALL(*connection_info, subjectPeerCertificate()).WillRepeatedly(ReturnRef(EMPTY_STRING));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
   }
@@ -317,14 +321,15 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_TLS_SESSION_ID");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
-    EXPECT_CALL(*connection_info, sessionId()).WillRepeatedly(Return("deadbeef"));
+    const std::string session_id = "deadbeef";
+    EXPECT_CALL(*connection_info, sessionId()).WillRepeatedly(ReturnRef(session_id));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
     EXPECT_EQ("deadbeef", upstream_format.format(header, header, header, stream_info));
   }
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_TLS_SESSION_ID");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
-    EXPECT_CALL(*connection_info, sessionId()).WillRepeatedly(Return(""));
+    EXPECT_CALL(*connection_info, sessionId()).WillRepeatedly(ReturnRef(EMPTY_STRING));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
   }
@@ -357,14 +362,15 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_TLS_VERSION");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
-    EXPECT_CALL(*connection_info, tlsVersion()).WillRepeatedly(Return("TLSv1.2"));
+    std::string tlsVersion = "TLSv1.2";
+    EXPECT_CALL(*connection_info, tlsVersion()).WillRepeatedly(ReturnRef(tlsVersion));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
     EXPECT_EQ("TLSv1.2", upstream_format.format(header, header, header, stream_info));
   }
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_TLS_VERSION");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
-    EXPECT_CALL(*connection_info, tlsVersion()).WillRepeatedly(Return(""));
+    EXPECT_CALL(*connection_info, tlsVersion()).WillRepeatedly(ReturnRef(EMPTY_STRING));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
   }
@@ -399,15 +405,17 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_SERIAL");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    const std::string serial_number = "b8b5ecc898f2124a";
     EXPECT_CALL(*connection_info, serialNumberPeerCertificate())
-        .WillRepeatedly(Return("b8b5ecc898f2124a"));
+        .WillRepeatedly(ReturnRef(serial_number));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
     EXPECT_EQ("b8b5ecc898f2124a", upstream_format.format(header, header, header, stream_info));
   }
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_SERIAL");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
-    EXPECT_CALL(*connection_info, serialNumberPeerCertificate()).WillRepeatedly(Return(""));
+    EXPECT_CALL(*connection_info, serialNumberPeerCertificate())
+        .WillRepeatedly(ReturnRef(EMPTY_STRING));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
   }
@@ -419,9 +427,9 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_ISSUER");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
-    EXPECT_CALL(*connection_info, issuerPeerCertificate())
-        .WillRepeatedly(
-            Return("CN=Test CA,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US"));
+    const std::string issuer_peer =
+        "CN=Test CA,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US";
+    EXPECT_CALL(*connection_info, issuerPeerCertificate()).WillRepeatedly(ReturnRef(issuer_peer));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
     EXPECT_EQ("CN=Test CA,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US",
               upstream_format.format(header, header, header, stream_info));
@@ -429,7 +437,7 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_ISSUER");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
-    EXPECT_CALL(*connection_info, issuerPeerCertificate()).WillRepeatedly(Return(""));
+    EXPECT_CALL(*connection_info, issuerPeerCertificate()).WillRepeatedly(ReturnRef(EMPTY_STRING));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
   }
@@ -441,9 +449,9 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_SUBJECT");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
-    EXPECT_CALL(*connection_info, subjectPeerCertificate())
-        .WillRepeatedly(
-            Return("CN=Test Server,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US"));
+    const std::string subject_peer =
+        "CN=Test Server,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US";
+    EXPECT_CALL(*connection_info, subjectPeerCertificate()).WillRepeatedly(ReturnRef(subject_peer));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
     EXPECT_EQ("CN=Test Server,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US",
               upstream_format.format(header, header, header, stream_info));
@@ -451,7 +459,7 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_SUBJECT");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
-    EXPECT_CALL(*connection_info, subjectPeerCertificate()).WillRepeatedly(Return(""));
+    EXPECT_CALL(*connection_info, subjectPeerCertificate()).WillRepeatedly(ReturnRef(EMPTY_STRING));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
   }

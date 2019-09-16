@@ -21,6 +21,8 @@ public:
 // This is the default UDP listener if not specified in config.
 class ActiveRawUdpListenerConfigFactory : public ActiveUdpListenerConfigFactory {
 public:
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override;
+
   Network::ActiveUdpListenerFactoryPtr
   createActiveUdpListenerFactory(const Protobuf::Message&) override;
 

@@ -932,8 +932,8 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCert) {
   EXPECT_CALL(*ssl, uriSanLocalCertificate()).WillOnce(Return(local_uri_sans));
   std::string expected_sha("abcdefg");
   EXPECT_CALL(*ssl, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha));
-  EXPECT_CALL(*ssl, subjectPeerCertificate())
-      .WillOnce(Return("/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=test.lyft.com"));
+  std::string peer_subject("/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=test.lyft.com");
+  EXPECT_CALL(*ssl, subjectPeerCertificate()).WillOnce(ReturnRef(peer_subject));
   const std::vector<std::string> peer_uri_sans{"test://foo.com/fe"};
   EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(peer_uri_sans));
   std::string expected_pem("abcde=");
@@ -973,8 +973,8 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCertPeerSanEmpty) {
   EXPECT_CALL(*ssl, uriSanLocalCertificate()).WillOnce(Return(local_uri_sans));
   std::string expected_sha("abcdefg");
   EXPECT_CALL(*ssl, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha));
-  EXPECT_CALL(*ssl, subjectPeerCertificate())
-      .WillOnce(Return("/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=test.lyft.com"));
+  std::string peer_subject = "/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=test.lyft.com";
+  EXPECT_CALL(*ssl, subjectPeerCertificate()).WillOnce(ReturnRef(peer_subject));
   EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(std::vector<std::string>()));
   ON_CALL(connection_, ssl()).WillByDefault(Return(ssl));
   ON_CALL(config_, forwardClientCert())

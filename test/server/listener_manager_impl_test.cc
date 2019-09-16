@@ -1,10 +1,11 @@
+#include "test/server/listener_manager_impl_test.h"
+
 #include <chrono>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
@@ -12,203 +13,29 @@
 #include "common/config/metadata.h"
 #include "common/network/address_impl.h"
 #include "common/network/io_socket_handle_impl.h"
-#include "common/network/listen_socket_impl.h"
-#include "common/network/socket_option_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/protobuf.h"
 
-#include "server/configuration_impl.h"
-#include "server/listener_manager_impl.h"
-
 #include "extensions/filters/listener/original_dst/original_dst.h"
-#include "extensions/quic_listeners/quiche/quic_transport_socket_factory.h"
 #include "extensions/transport_sockets/tls/ssl_socket.h"
 
-#include "test/mocks/network/mocks.h"
-#include "test/mocks/server/mocks.h"
 #include "test/server/utility.h"
-#include "test/test_common/environment.h"
 #include "test/test_common/registry.h"
-#include "test/test_common/simulated_time_system.h"
-#include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
-#include "gtest/gtest.h"
 
-using testing::_;
 using testing::AtLeast;
 using testing::InSequence;
-using testing::Invoke;
-using testing::NiceMock;
-using testing::Return;
-using testing::ReturnRef;
 using testing::Throw;
 
 namespace Envoy {
 namespace Server {
 namespace {
 
-class ListenerHandle {
-public:
-  ListenerHandle() { EXPECT_CALL(*drain_manager_, startParentShutdownSequence()).Times(0); }
-  ~ListenerHandle() { onDestroy(); }
-
-  MOCK_METHOD0(onDestroy, void());
-
-  Init::ExpectableTargetImpl target_;
-  MockDrainManager* drain_manager_ = new MockDrainManager();
-  Configuration::FactoryContext* context_{};
-};
-
-class ListenerManagerImplTest : public testing::Test {
-protected:
-  ListenerManagerImplTest() : api_(Api::createApiForTest()) {
-    ON_CALL(server_, api()).WillByDefault(ReturnRef(*api_));
-    EXPECT_CALL(worker_factory_, createWorker_()).WillOnce(Return(worker_));
-    manager_ =
-        std::make_unique<ListenerManagerImpl>(server_, listener_factory_, worker_factory_, false);
-  }
-
-  /**
-   * This routing sets up an expectation that does various things:
-   * 1) Allows us to track listener destruction via filter factory destruction.
-   * 2) Allows us to register for init manager handling much like RDS, etc. would do.
-   * 3) Stores the factory context for later use.
-   * 4) Creates a mock local drain manager for the listener.
-   */
-  ListenerHandle* expectListenerCreate(
-      bool need_init, bool added_via_api,
-      envoy::api::v2::Listener::DrainType drain_type = envoy::api::v2::Listener_DrainType_DEFAULT) {
-    if (added_via_api) {
-      EXPECT_CALL(server_.validation_context_, staticValidationVisitor()).Times(0);
-      EXPECT_CALL(server_.validation_context_, dynamicValidationVisitor());
-    } else {
-      EXPECT_CALL(server_.validation_context_, staticValidationVisitor());
-      EXPECT_CALL(server_.validation_context_, dynamicValidationVisitor()).Times(0);
-    }
-    ListenerHandle* raw_listener = new ListenerHandle();
-    EXPECT_CALL(listener_factory_, createDrainManager_(drain_type))
-        .WillOnce(Return(raw_listener->drain_manager_));
-    EXPECT_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
-        .WillOnce(Invoke(
-            [raw_listener, need_init](
-                const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>&,
-                Configuration::FactoryContext& context) -> std::vector<Network::FilterFactoryCb> {
-              std::shared_ptr<ListenerHandle> notifier(raw_listener);
-              raw_listener->context_ = &context;
-              if (need_init) {
-                context.initManager().add(notifier->target_);
-              }
-              return {[notifier](Network::FilterManager&) -> void {}};
-            }));
-
-    return raw_listener;
-  }
-
-  void checkStats(uint64_t added, uint64_t modified, uint64_t removed, uint64_t warming,
-                  uint64_t active, uint64_t draining) {
-    EXPECT_EQ(added, server_.stats_store_.counter("listener_manager.listener_added").value());
-    EXPECT_EQ(modified, server_.stats_store_.counter("listener_manager.listener_modified").value());
-    EXPECT_EQ(removed, server_.stats_store_.counter("listener_manager.listener_removed").value());
-    EXPECT_EQ(warming, server_.stats_store_
-                           .gauge("listener_manager.total_listeners_warming",
-                                  Stats::Gauge::ImportMode::NeverImport)
-                           .value());
-    EXPECT_EQ(active, server_.stats_store_
-                          .gauge("listener_manager.total_listeners_active",
-                                 Stats::Gauge::ImportMode::NeverImport)
-                          .value());
-    EXPECT_EQ(draining, server_.stats_store_
-                            .gauge("listener_manager.total_listeners_draining",
-                                   Stats::Gauge::ImportMode::NeverImport)
-                            .value());
-  }
-
-  void checkConfigDump(const std::string& expected_dump_yaml) {
-    auto message_ptr = server_.admin_.config_tracker_.config_tracker_callbacks_["listeners"]();
-    const auto& listeners_config_dump =
-        dynamic_cast<const envoy::admin::v2alpha::ListenersConfigDump&>(*message_ptr);
-
-    envoy::admin::v2alpha::ListenersConfigDump expected_listeners_config_dump;
-    TestUtility::loadFromYaml(expected_dump_yaml, expected_listeners_config_dump);
-    EXPECT_EQ(expected_listeners_config_dump.DebugString(), listeners_config_dump.DebugString());
-  }
-
-  NiceMock<MockInstance> server_;
-  NiceMock<MockListenerComponentFactory> listener_factory_;
-  MockWorker* worker_ = new MockWorker();
-  NiceMock<MockWorkerFactory> worker_factory_;
-  std::unique_ptr<ListenerManagerImpl> manager_;
-  NiceMock<MockGuardDog> guard_dog_;
-  Event::SimulatedTimeSystem time_system_;
-  Api::ApiPtr api_;
-};
-
 class ListenerManagerImplWithRealFiltersTest : public ListenerManagerImplTest {
 public:
-  ListenerManagerImplWithRealFiltersTest() {
-    // Use real filter loading by default.
-    ON_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
-        .WillByDefault(Invoke(
-            [](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
-               Configuration::FactoryContext& context) -> std::vector<Network::FilterFactoryCb> {
-              return ProdListenerComponentFactory::createNetworkFilterFactoryList_(filters,
-                                                                                   context);
-            }));
-    ON_CALL(listener_factory_, createListenerFilterFactoryList(_, _))
-        .WillByDefault(Invoke(
-            [](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
-               Configuration::ListenerFactoryContext& context)
-                -> std::vector<Network::ListenerFilterFactoryCb> {
-              return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters,
-                                                                                    context);
-            }));
-    ON_CALL(listener_factory_, createUdpListenerFilterFactoryList(_, _))
-        .WillByDefault(Invoke(
-            [](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
-               Configuration::ListenerFactoryContext& context)
-                -> std::vector<Network::UdpListenerFilterFactoryCb> {
-              return ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(filters,
-                                                                                       context);
-            }));
-
-    socket_ = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
-    local_address_.reset(new Network::Address::Ipv4Instance("127.0.0.1", 1234));
-    remote_address_.reset(new Network::Address::Ipv4Instance("127.0.0.1", 1234));
-    EXPECT_CALL(os_sys_calls_, close(_)).WillRepeatedly(Return(Api::SysCallIntResult{0, errno}));
-  }
-
-  const Network::FilterChain*
-  findFilterChain(uint16_t destination_port, const std::string& destination_address,
-                  const std::string& server_name, const std::string& transport_protocol,
-                  const std::vector<std::string>& application_protocols,
-                  const std::string& source_address, uint16_t source_port) {
-    if (absl::StartsWith(destination_address, "/")) {
-      local_address_.reset(new Network::Address::PipeInstance(destination_address));
-    } else {
-      local_address_ =
-          Network::Utility::parseInternetAddress(destination_address, destination_port);
-    }
-    ON_CALL(*socket_, localAddress()).WillByDefault(ReturnRef(local_address_));
-
-    ON_CALL(*socket_, requestedServerName()).WillByDefault(Return(absl::string_view(server_name)));
-    ON_CALL(*socket_, detectedTransportProtocol())
-        .WillByDefault(Return(absl::string_view(transport_protocol)));
-    ON_CALL(*socket_, requestedApplicationProtocols())
-        .WillByDefault(ReturnRef(application_protocols));
-
-    if (absl::StartsWith(source_address, "/")) {
-      remote_address_.reset(new Network::Address::PipeInstance(source_address));
-    } else {
-      remote_address_ = Network::Utility::parseInternetAddress(source_address, source_port);
-    }
-    ON_CALL(*socket_, remoteAddress()).WillByDefault(ReturnRef(remote_address_));
-
-    return manager_->listeners().back().get().filterChainManager().findFilterChain(*socket_);
-  }
-
   /**
    * Create an IPv4 listener with a given name.
    */
@@ -221,41 +48,6 @@ public:
     )EOF");
     listener.set_name(name);
     return listener;
-  }
-
-  /**
-   * Validate that createListenSocket is called once with the expected options.
-   */
-  void
-  expectCreateListenSocket(const envoy::api::v2::core::SocketOption::SocketState& expected_state,
-                           Network::Socket::Options::size_type expected_num_options) {
-    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true))
-        .WillOnce(Invoke([this, expected_num_options, &expected_state](
-                             Network::Address::InstanceConstSharedPtr, Network::Address::SocketType,
-                             const Network::Socket::OptionsSharedPtr& options,
-                             bool) -> Network::SocketSharedPtr {
-          EXPECT_NE(options.get(), nullptr);
-          EXPECT_EQ(options->size(), expected_num_options);
-          EXPECT_TRUE(
-              Network::Socket::applyOptions(options, *listener_factory_.socket_, expected_state));
-          return listener_factory_.socket_;
-        }));
-  }
-
-  /**
-   * Validate that setsockopt() is called the expected number of times with the expected options.
-   */
-  void expectSetsockopt(NiceMock<Api::MockOsSysCalls>& os_sys_calls, int expected_sockopt_level,
-                        int expected_sockopt_name, int expected_value,
-                        uint32_t expected_num_calls = 1) {
-    EXPECT_CALL(os_sys_calls,
-                setsockopt_(_, expected_sockopt_level, expected_sockopt_name, _, sizeof(int)))
-        .Times(expected_num_calls)
-        .WillRepeatedly(
-            Invoke([expected_value](int, int, int, const void* optval, socklen_t) -> int {
-              EXPECT_EQ(expected_value, *static_cast<const int*>(optval));
-              return 0;
-            }));
   }
 
   /**
@@ -279,15 +71,6 @@ public:
       EXPECT_EQ(0U, manager_->listeners().size());
     }
   }
-
-protected:
-  NiceMock<Api::MockOsSysCalls> os_sys_calls_;
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&os_sys_calls_};
-
-private:
-  std::unique_ptr<Network::MockConnectionSocket> socket_;
-  Network::Address::InstanceConstSharedPtr local_address_;
-  Network::Address::InstanceConstSharedPtr remote_address_;
 };
 
 class MockLdsApi : public LdsApi {
@@ -375,73 +158,6 @@ filter_chains:
   auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
-}
-
-TEST_F(ListenerManagerImplWithRealFiltersTest, QuicUsesSslContext) {
-  NiceMock<Api::MockOsSysCalls> os_sys_calls;
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-  ON_CALL(os_sys_calls, socket(_, _, _)).WillByDefault(Return(Api::SysCallIntResult{1, 0}));
-  ON_CALL(os_sys_calls, close(_)).WillByDefault(Return(Api::SysCallIntResult{0, 0}));
-  const std::string yaml = TestEnvironment::substitute(R"EOF(
-address:
-  socket_address:
-    address: 127.0.0.1
-    protocol: UDP
-    port_value: 1234
-filter_chains:
-- filter_chain_match:
-    transport_protocol: "quic"
-  filters: []
-  transport_socket:
-    name: quic
-    config:
-      common_tls_context:
-        tls_certificates:
-        - certificate_chain:
-            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
-          private_key:
-            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
-        validation_context:
-          trusted_ca:
-            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-          verify_subject_alt_name:
-          - localhost
-          - 127.0.0.1
-udp_listener_config:
-  udp_listener_name: "quic_listener"
-  )EOF",
-                                                       Network::Address::IpVersion::v4);
-
-  expectCreateListenSocket(envoy::api::v2::core::SocketOption::STATE_PREBIND,
-#ifdef SO_RXQ_OVFL
-                           /* expected_num_options */ 2);
-#else
-                           /* expected_num_options */ 1);
-#endif
-  expectSetsockopt(os_sys_calls,
-                   /* expected_sockopt_level */ IPPROTO_IP,
-                   /* expected_sockopt_name */ ENVOY_IP_PKTINFO,
-                   /* expected_value */ 1,
-                   /* expected_num_calls */ 1);
-#ifdef SO_RXQ_OVFL
-  expectSetsockopt(os_sys_calls,
-                   /* expected_sockopt_level */ SOL_SOCKET,
-                   /* expected_sockopt_name */ SO_RXQ_OVFL,
-                   /* expected_value */ 1,
-                   /* expected_num_calls */ 1);
-#endif
-  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
-  EXPECT_EQ(1U, manager_->listeners().size());
-
-  // No filter chain found with non-matching transport protocol.
-  EXPECT_EQ(nullptr, findFilterChain(1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111));
-
-  auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "quic", {}, "8.8.8.8", 111);
-  ASSERT_NE(nullptr, filter_chain);
-  auto& quic_socket_factory = dynamic_cast<const Quic::QuicServerTransportSocketFactory&>(
-      filter_chain->transportSocketFactory());
-  EXPECT_TRUE(quic_socket_factory.implementsSecureTransport());
-  EXPECT_TRUE(quic_socket_factory.serverContextConfig().isReady());
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, UdpAddress) {

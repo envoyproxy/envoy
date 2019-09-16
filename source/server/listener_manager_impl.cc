@@ -232,21 +232,11 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
     if (udp_config.udp_listener_name().empty()) {
       udp_config.set_udp_listener_name(UdpListenerNames::get().RawUdp);
     }
-    try {
-      udp_listener_factory_ = Config::Utility::getAndCheckFactory<ActiveUdpListenerConfigFactory>(
-                                  udp_config.udp_listener_name())
-                                  .createActiveUdpListenerFactory(udp_config);
-    } catch (const EnvoyException& ex) {
-      // TODO(danzh): add implementation for quic_listener and do not catch
-      // exception here.
-      ENVOY_LOG(error, "catch exception {}", ex.what());
-      udp_listener_factory_ =
-          Config::Utility::getAndCheckFactory<ActiveUdpListenerConfigFactory>(
-              UdpListenerNames::get().RawUdp)
-              .createActiveUdpListenerFactory(config.has_udp_listener_config()
-                                                  ? config.udp_listener_config()
-                                                  : envoy::api::v2::listener::UdpListenerConfig());
-    }
+    auto& config_factory = Config::Utility::getAndCheckFactory<ActiveUdpListenerConfigFactory>(
+        udp_config.udp_listener_name());
+    ProtobufTypes::MessagePtr message =
+        Config::Utility::translateToFactoryConfig(udp_config, validation_visitor_, config_factory);
+    udp_listener_factory_ = config_factory.createActiveUdpListenerFactory(*message);
   }
 
   if (!config.listener_filters().empty()) {
