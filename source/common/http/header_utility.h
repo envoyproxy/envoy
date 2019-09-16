@@ -46,9 +46,7 @@ public:
     envoy::type::Int64Range range_;
     const bool invert_match_;
 
-    /**
-     * Returns true if any of the headers in HeaderMap matches this HeaderData.
-     */
+    // HeaderMatcher
     bool matchesHeaders(const HeaderMap& headers) const override {
       return HeaderUtility::matchHeaders(headers, *this);
     };
