@@ -3,6 +3,7 @@
 #include <string>
 
 #include "common/common/assert.h"
+#include "common/common/non_copyable.h"
 
 #include "absl/strings/string_view.h"
 
@@ -14,12 +15,9 @@ namespace Stats {
  * increment is added both to a global counter as well as periodic counter. Calling latch()
  * returns the periodic counter and clears it.
  */
-class PrimitiveCounter {
+class PrimitiveCounter : NonCopyable {
 public:
   PrimitiveCounter() = default;
-  // Disable copy constructors.
-  PrimitiveCounter(const PrimitiveCounter&) = delete;
-  PrimitiveCounter& operator=(const PrimitiveCounter&) = delete;
 
   uint64_t value() const { return value_; }
 
@@ -39,12 +37,9 @@ private:
 /**
  * Primitive, low-memory-overhead gauge with increment and decrement capabilities.
  */
-class PrimitiveGauge {
+class PrimitiveGauge : NonCopyable {
 public:
   PrimitiveGauge() = default;
-  // Disable copy constructors.
-  PrimitiveGauge(const PrimitiveGauge&) = delete;
-  PrimitiveGauge& operator=(const PrimitiveGauge&) = delete;
 
   uint64_t value() const { return value_; }
 
