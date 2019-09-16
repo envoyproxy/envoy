@@ -10,7 +10,6 @@ def envoy_http_archive(name, locations, **kwargs):
         # This repository has already been defined, probably because the user
         # wants to override the version. Do nothing.
         return
-
     loc_key = kwargs.pop("repository_key", name)
     location = locations[loc_key]
 
