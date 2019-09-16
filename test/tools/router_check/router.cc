@@ -8,6 +8,7 @@
 #include "common/network/utility.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
+#include "common/runtime/runtime_impl.h"
 #include "common/stream_info/stream_info_impl.h"
 
 #include "test/test_common/printers.h"
@@ -85,14 +86,15 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_file,
                          std::move(api), Coverage(route_config));
 }
 
-// Set a unique number as the name for each route for detecting missing tests during the coverage
+// Set UUID as the name for each route for detecting missing tests during the coverage
 // check.
 void RouterCheckTool::assignUniqueRouteNames(envoy::api::v2::RouteConfiguration& route_config) {
-  uint64_t route_name = 0;
+  Runtime::RandomGeneratorImpl random;
+  std::string route_name = random.uuid();
   for (auto& host : *route_config.mutable_virtual_hosts()) {
     for (auto& route : *host.mutable_routes()) {
-      route.set_name(std::to_string(route_name));
-      ++route_name;
+      route.set_name(route_name);
+      route_name = random.uuid();
     }
   }
 }

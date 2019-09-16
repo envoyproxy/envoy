@@ -46,8 +46,8 @@ public:
   void markRedirectPathCovered(const Envoy::Router::RouteEntry& route);
   double report();
   double detailedReport();
-  void printMissingTests(std::set<uint64_t> const& all_route_names,
-                         std::set<uint64_t> const& covered_route_names);
+  void printMissingTests(std::set<std::string> const& all_route_names,
+                         std::set<std::string> const& covered_route_names);
 
 private:
   RouteCoverage& coveredRoute(const Envoy::Router::RouteEntry& route);
