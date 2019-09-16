@@ -48,13 +48,14 @@ public:
 class EnvoyQuicDispatcher : public quic::QuicDispatcher {
 public:
   EnvoyQuicDispatcher(const quic::QuicCryptoServerConfig* crypto_config,
+                      const quic::QuicConfig& quic_config,
                       quic::QuicVersionManager* version_manager,
                       std::unique_ptr<quic::QuicConnectionHelperInterface> helper,
                       std::unique_ptr<quic::QuicAlarmFactory> alarm_factory,
                       uint8_t expected_server_connection_id_length,
-                      Server::ConnectionHandlerImpl& connection_handler,
+                      Network::ConnectionHandler& connection_handler,
                       Network::ListenerConfig& listener_config,
-                      Server::ListenerStats& listener_stats);
+                      Server::ListenerStats& listener_stats, Event::Dispatcher& dispatcher);
 
   void OnConnectionClosed(quic::QuicConnectionId connection_id, quic::QuicErrorCode error,
                           const std::string& error_details,
@@ -67,11 +68,10 @@ protected:
                                        const quic::ParsedQuicVersion& version) override;
 
 private:
-  // TODO(danzh): initialize from Envoy config.
-  quic::QuicConfig quic_config_;
-  Server::ConnectionHandlerImpl& connection_handler_;
+  Network::ConnectionHandler& connection_handler_;
   Network::ListenerConfig& listener_config_;
   Server::ListenerStats& listener_stats_;
+  Event::Dispatcher& dispatcher_;
 };
 
 } // namespace Quic
