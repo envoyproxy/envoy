@@ -560,18 +560,17 @@ bool OwnedImpl::startsWith(const void* data, uint64_t size) const {
     return result_ptr.pos == 0;
   } else {
     const uint8_t* prefix = static_cast<const uint8_t*>(data);
-    for (size_t slice_index = 0; slice_index < slices_.size(); slice_index++) {
-      const auto& slice = slices_[slice_index];
+    for (const auto& slice : slices_) {
       uint64_t slice_size = slice->dataSize();
       const uint8_t* slice_start = slice->data();
 
       if (slice_size >= size) {
         // The remaining size bytes of data are in this slice.
-        return !memcmp(prefix, slice_start, size);
+        return memcmp(prefix, slice_start, size) == 0;
       }
 
       // Slice is smaller than data, see if the prefix matches.
-      if (memcmp(prefix, slice_start, slice_size)) {
+      if (memcmp(prefix, slice_start, slice_size) != 0) {
         return false;
       }
 
