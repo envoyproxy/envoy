@@ -171,6 +171,17 @@ message TlsSessionTicketKeys {
 }
 
 message CertificateValidationContext {
+  enum TrustChainVerification {
+    // 
+    VERIFY_TRUST_CHAIN = 0;
+
+    // 
+    ACCEPT_UNTRUSTED = 1;
+
+    //
+    NOT_VERIFIED = 2;
+  }
+
   // TLS certificate data containing certificate authority certificates to use in verifying
   // a presented peer certificate (e.g. server certificate for clusters or client certificate
   // for listeners). If not specified and a peer certificate is presented it will not be
@@ -279,6 +290,10 @@ message CertificateValidationContext {
 
   // If specified, Envoy will not reject expired certificates.
   bool allow_expired_certificate = 8;
+
+  // If specified, Envoy will NOT reject connections using client certificates that have failed
+  // validation.
+  TrustChainVerification verify_certificate_trust_chain = 9 [(validate.rules).enum.defined_only = true];
 }
 
 // TLS context shared by both client and server TLS contexts.

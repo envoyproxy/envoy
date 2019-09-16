@@ -24,6 +24,11 @@ public:
   virtual bool peerCertificatePresented() const PURE;
 
   /**
+   * @return bool whether the peer certificate was validated.
+   **/
+  virtual bool peerCertificateValidated() const PURE;
+
+  /**
    * @return std::string the URIs in the SAN field of the local certificate. Returns {} if there is
    *         no local certificate, or no SAN field, or no URI.
    **/

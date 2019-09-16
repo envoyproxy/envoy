@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/auth/cert.pb.h"
 #include "envoy/common/pure.h"
 
 namespace Envoy {
@@ -54,6 +55,12 @@ public:
    * @return whether to ignore expired certificates (both too new and too old).
    */
   virtual bool allowExpiredCertificate() const PURE;
+
+  /**
+   * @return client certificate validation configuration.
+   */
+  virtual envoy::api::v2::auth::CertificateValidationContext_TrustChainVerification
+      verifyCertificateTrustChain() const PURE;
 };
 
 using CertificateValidationContextConfigPtr = std::unique_ptr<CertificateValidationContextConfig>;

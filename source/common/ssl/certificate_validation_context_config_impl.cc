@@ -26,7 +26,8 @@ CertificateValidationContextConfigImpl::CertificateValidationContextConfigImpl(
                                     config.verify_certificate_hash().end()),
       verify_certificate_spki_list_(config.verify_certificate_spki().begin(),
                                     config.verify_certificate_spki().end()),
-      allow_expired_certificate_(config.allow_expired_certificate()) {
+      allow_expired_certificate_(config.allow_expired_certificate()),
+      verify_certificate_trust_chain_(config.verify_certificate_trust_chain()) {
   if (ca_cert_.empty()) {
     if (!certificate_revocation_list_.empty()) {
       throw EnvoyException(fmt::format("Failed to load CRL from {} without trusted CA",

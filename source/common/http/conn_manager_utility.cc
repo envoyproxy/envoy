@@ -291,10 +291,11 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(HeaderMap& request_header
   if (config.forwardClientCert() == ForwardClientCertType::AlwaysForwardOnly) {
     return;
   }
-  // When Sanitize is set, or the connection is not mutual TLS, remove the XFCC header.
+  // When Sanitize is set, or the connection is not mutual TLS, remove the XFCC/XFUCC header.
   if (config.forwardClientCert() == ForwardClientCertType::Sanitize ||
       !(connection.ssl() && connection.ssl()->peerCertificatePresented())) {
     request_headers.removeForwardedClientCert();
+    request_headers.removeForwardedUntrustedClientCert();
     return;
   }
 
@@ -362,10 +363,19 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(HeaderMap& request_header
 
   const std::string client_cert_details_str = absl::StrJoin(client_cert_details, ";");
   if (config.forwardClientCert() == ForwardClientCertType::AppendForward) {
-    HeaderMapImpl::appendToHeader(request_headers.insertForwardedClientCert().value(),
-                                  client_cert_details_str);
+    HeaderMapImpl::appendToHeader(
+        connection.ssl()->peerCertificateValidated()
+            ? request_headers.insertForwardedClientCert().value()
+            : request_headers.insertForwardedUntrustedClientCert().value(),
+        client_cert_details_str);
   } else if (config.forwardClientCert() == ForwardClientCertType::SanitizeSet) {
-    request_headers.insertForwardedClientCert().value(client_cert_details_str);
+    if (connection.ssl()->peerCertificateValidated()) {
+      request_headers.insertForwardedClientCert().value(client_cert_details_str);
+      request_headers.removeForwardedUntrustedClientCert();
+    } else {
+      request_headers.removeForwardedClientCert();
+      request_headers.insertForwardedUntrustedClientCert().value(client_cert_details_str);
+    }
   } else {
     NOT_REACHED_GCOVR_EXCL_LINE;
   }

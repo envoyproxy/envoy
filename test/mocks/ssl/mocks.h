@@ -38,6 +38,7 @@ public:
   ~MockConnectionInfo() override;
 
   MOCK_CONST_METHOD0(peerCertificatePresented, bool());
+  MOCK_CONST_METHOD0(peerCertificateValidated, bool());
   MOCK_CONST_METHOD0(uriSanLocalCertificate, std::vector<std::string>());
   MOCK_CONST_METHOD0(sha256PeerCertificateDigest, const std::string&());
   MOCK_CONST_METHOD0(serialNumberPeerCertificate, const std::string&());
