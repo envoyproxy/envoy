@@ -1,10 +1,5 @@
 #pragma once
 
-#include <atomic>
-#include <cstdint>
-#include <list>
-#include <vector>
-
 #include "envoy/common/crypto/crypto.h"
 
 #include "openssl/base.h"

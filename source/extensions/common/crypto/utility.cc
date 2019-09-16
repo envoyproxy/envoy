@@ -8,7 +8,6 @@
 #include "absl/strings/ascii.h"
 #include "absl/strings/str_cat.h"
 #include "openssl/bytestring.h"
-#include "openssl/evp.h"
 #include "openssl/hmac.h"
 #include "openssl/sha.h"
 

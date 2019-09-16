@@ -5,7 +5,6 @@
 #include "extensions/common/crypto/crypto_impl.h"
 
 #include "gtest/gtest.h"
-#include "openssl/evp.h"
 
 namespace Envoy {
 namespace Common {

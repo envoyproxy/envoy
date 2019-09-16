@@ -1,9 +1,5 @@
 #include "extensions/common/crypto/crypto_impl.h"
 
-#include <atomic>
-#include <cstdint>
-#include <list>
-
 namespace Envoy {
 namespace Common {
 namespace Crypto {
