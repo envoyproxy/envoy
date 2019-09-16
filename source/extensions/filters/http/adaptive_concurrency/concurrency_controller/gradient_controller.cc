@@ -24,11 +24,13 @@ namespace ConcurrencyController {
 
 GradientControllerConfig::GradientControllerConfig(
     const envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig&
-        proto_config)
-    : min_rtt_calc_interval_(std::chrono::milliseconds(
+        proto_config,
+    Runtime::Loader& runtime)
+    : runtime_(runtime),
+      min_rtt_calc_interval_(std::chrono::milliseconds(
           DurationUtil::durationToMilliseconds(proto_config.min_rtt_calc_params().interval()))),
-      sample_rtt_calc_interval_(std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
-          proto_config.concurrency_limit_params().concurrency_update_interval()))),
+      sample_rtt_calc_interval_(DurationUtil::durationToMilliseconds(
+          proto_config.concurrency_limit_params().concurrency_update_interval())),
       max_concurrency_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           proto_config.concurrency_limit_params(), max_concurrency_limit, 1000)),
       min_rtt_aggregate_request_count_(
@@ -36,8 +38,7 @@ GradientControllerConfig::GradientControllerConfig(
       max_gradient_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config.concurrency_limit_params(),
                                                     max_gradient, 2.0)),
       sample_aggregate_percentile_(
-          PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(proto_config, sample_aggregate_percentile, 50) /
-          100.0) {}
+          PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(proto_config, sample_aggregate_percentile, 50)) {}
 
 GradientController::GradientController(GradientControllerConfigSharedPtr config,
                                        Event::Dispatcher& dispatcher, Runtime::Loader&,
@@ -114,7 +115,7 @@ void GradientController::resetSampleWindow() {
 }
 
 std::chrono::microseconds GradientController::processLatencySamplesAndClear() {
-  const std::array<double, 1> quantile{config_->sampleAggregatePercentile()};
+  const std::array<double, 1> quantile{config_->sampleAggregatePercentile() / 100.0};
   std::array<double, 1> calculated_quantile;
   hist_approx_quantile(latency_sample_hist_.get(), quantile.data(), 1, calculated_quantile.data());
   hist_clear(latency_sample_hist_.get());

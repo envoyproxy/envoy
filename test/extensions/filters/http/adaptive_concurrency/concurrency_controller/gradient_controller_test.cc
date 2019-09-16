@@ -34,6 +34,17 @@ namespace {
 class GradientControllerConfigTest : public testing::Test {
 public:
   GradientControllerConfigTest() = default;
+
+protected:
+  GradientControllerConfig makeConfig(const std::string& yaml_config) {
+    envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig proto =
+        TestUtility::parseYaml<
+            envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig>(
+            yaml_config);
+    return GradientControllerConfig(proto, runtime_);
+  }
+
+  NiceMock<Runtime::MockLoader> runtime_;
 };
 
 class GradientControllerTest : public testing::Test {
@@ -52,7 +63,7 @@ protected:
         TestUtility::parseYaml<
             envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig>(
             yaml_config);
-    return std::make_shared<GradientControllerConfig>(proto);
+    return std::make_shared<GradientControllerConfig>(proto, runtime_);
   }
 
   // Helper function that will attempt to pull forwarding decisions.
@@ -84,7 +95,7 @@ protected:
 TEST_F(GradientControllerConfigTest, BasicTest) {
   const std::string yaml = R"EOF(
 sample_aggregate_percentile:
-  value: 42
+  value: 42.5
 concurrency_limit_params:
   max_gradient: 2.1
   max_concurrency_limit: 1337
@@ -96,18 +107,50 @@ min_rtt_calc_params:
   request_count: 52
 )EOF";
 
-  envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig proto =
-      TestUtility::parseYaml<
-          envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig>(
-          yaml);
-  GradientControllerConfig config(proto);
+  auto config = makeConfig(yaml);
 
   EXPECT_EQ(config.minRTTCalcInterval(), std::chrono::seconds(31));
   EXPECT_EQ(config.sampleRTTCalcInterval(), std::chrono::milliseconds(123));
   EXPECT_EQ(config.maxConcurrencyLimit(), 1337);
   EXPECT_EQ(config.minRTTAggregateRequestCount(), 52);
   EXPECT_EQ(config.maxGradient(), 2.1);
-  EXPECT_EQ(config.sampleAggregatePercentile(), 0.42);
+  EXPECT_EQ(config.sampleAggregatePercentile(), 42.5);
+}
+
+TEST_F(GradientControllerConfigTest, BasicTestOverrides) {
+  const std::string yaml = R"EOF(
+sample_aggregate_percentile:
+  value: 42.5
+concurrency_limit_params:
+  max_gradient: 2.1
+  max_concurrency_limit: 1337
+  concurrency_update_interval:
+    nanos: 123000000
+min_rtt_calc_params:
+  interval:
+    seconds: 31
+  request_count: 52
+)EOF";
+
+  auto config = makeConfig(yaml);
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger(_, 31000)).WillOnce(Return(60000));
+  EXPECT_EQ(config.minRTTCalcInterval(), std::chrono::seconds(60));
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger(_, 123)).WillOnce(Return(456));
+  EXPECT_EQ(config.sampleRTTCalcInterval(), std::chrono::milliseconds(456));
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger(_, 1337)).WillOnce(Return(9000));
+  EXPECT_EQ(config.maxConcurrencyLimit(), 9000);
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger(_, 52)).WillOnce(Return(65));
+  EXPECT_EQ(config.minRTTAggregateRequestCount(), 65);
+
+  EXPECT_CALL(runtime_.snapshot_, getDouble(_, 2.1)).WillOnce(Return(12.3));
+  EXPECT_EQ(config.maxGradient(), 12.3);
+
+  EXPECT_CALL(runtime_.snapshot_, getDouble(_, 42.5)).WillOnce(Return(66.0));
+  EXPECT_EQ(config.sampleAggregatePercentile(), 66.0);
 }
 
 TEST_F(GradientControllerConfigTest, DefaultValuesTest) {
@@ -120,18 +163,14 @@ min_rtt_calc_params:
     seconds: 31
 )EOF";
 
-  envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig proto =
-      TestUtility::parseYaml<
-          envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig>(
-          yaml);
-  GradientControllerConfig config(proto);
+  auto config = makeConfig(yaml);
 
   EXPECT_EQ(config.minRTTCalcInterval(), std::chrono::seconds(31));
   EXPECT_EQ(config.sampleRTTCalcInterval(), std::chrono::milliseconds(123));
   EXPECT_EQ(config.maxConcurrencyLimit(), 1000);
   EXPECT_EQ(config.minRTTAggregateRequestCount(), 50);
   EXPECT_EQ(config.maxGradient(), 2.0);
-  EXPECT_EQ(config.sampleAggregatePercentile(), 0.5);
+  EXPECT_EQ(config.sampleAggregatePercentile(), 50.0);
 }
 
 TEST_F(GradientControllerTest, MinRTTLogicTest) {

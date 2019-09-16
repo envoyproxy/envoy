@@ -61,4 +61,7 @@ message AdaptiveConcurrency {
     GradientControllerConfig gradient_controller_config = 1
         [(validate.rules).message.required = true];
   }
+
+  // Whether to disable the filter by default.
+  bool disabled = 2;
 }

@@ -28,15 +28,33 @@ class AdaptiveConcurrencyFilterConfig {
 public:
   AdaptiveConcurrencyFilterConfig(
       const envoy::config::filter::http::adaptive_concurrency::v2alpha::AdaptiveConcurrency&
-          adaptive_concurrency,
-      Runtime::Loader& runtime, std::string stats_prefix, Stats::Scope& scope,
+          proto_config,
+      Runtime::Loader& runtime, const std::string& stats_prefix, Stats::Scope& scope,
       TimeSource& time_source);
+
+  // Returns whether the filter should operate as a pass-through for a request.
+  bool filterDisabled() const {
+    const auto disabled_int =
+        runtime_.snapshot().getInteger(RuntimeKeys::get().DisableKey, disabled_ ? 1 : 0);
+    return disabled_int != 0;
+  }
 
   TimeSource& timeSource() const { return time_source_; }
 
 private:
+  class RuntimeKeyValues {
+  public:
+    const std::string DisableKey{"http.adaptive_concurrency.disable"};
+  };
+
+  using RuntimeKeys = ConstSingleton<RuntimeKeyValues>;
+
   const std::string stats_prefix_;
+  Runtime::Loader& runtime_;
   TimeSource& time_source_;
+
+  // Whether to disable the filter by default. Can be overridden by
+  bool disabled_;
 };
 
 using AdaptiveConcurrencyFilterConfigSharedPtr =

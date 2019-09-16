@@ -30,6 +30,19 @@ public:
   uint32_t concurrencyLimit() const override { return 0; }
 };
 
+class AdaptiveConcurrencyFilterConfigTest : public testing::Test {
+public:
+  AdaptiveConcurrencyFilterConfigTest() = default;
+
+  envoy::config::filter::http::adaptive_concurrency::v2alpha::AdaptiveConcurrency
+  makeConfig(const std::string& yaml_config) {
+    auto proto = TestUtility::parseYaml<
+        envoy::config::filter::http::adaptive_concurrency::v2alpha::AdaptiveConcurrency>(
+        yaml_config);
+    return proto;
+  }
+};
+
 class AdaptiveConcurrencyFilterTest : public testing::Test {
 public:
   AdaptiveConcurrencyFilterTest() = default;
@@ -46,6 +59,14 @@ public:
 
   void TearDown() override { filter_.reset(); }
 
+  envoy::config::filter::http::adaptive_concurrency::v2alpha::AdaptiveConcurrency
+  makeConfig(const std::string& yaml_config) {
+    auto proto = TestUtility::parseYaml<
+        envoy::config::filter::http::adaptive_concurrency::v2alpha::AdaptiveConcurrency>(
+        yaml_config);
+    return proto;
+  }
+
   Event::SimulatedTimeSystem time_system_;
   Stats::IsolatedStoreImpl stats_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -54,6 +75,88 @@ public:
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   std::unique_ptr<AdaptiveConcurrencyFilter> filter_;
 };
+
+TEST_F(AdaptiveConcurrencyFilterConfigTest, TestRuntimeOverride) {}
+
+TEST_F(AdaptiveConcurrencyFilterTest, TestDisable2) {
+  std::string yaml_config =
+      R"EOF(
+gradient_controller_config:
+  sample_aggregate_percentile:
+    value: 50
+  concurrency_limit_params:
+    concurrency_update_interval:
+      nanos: 100000000 # 100ms
+  min_rtt_calc_params:
+    interval:
+      seconds: 30
+    request_count: 50
+
+disabled: false
+)EOF";
+
+  auto config = makeConfig(yaml_config);
+
+  auto config_ptr = std::make_shared<AdaptiveConcurrencyFilterConfig>(
+      config, runtime_, "testprefix.", stats_, time_system_);
+  filter_ = std::make_unique<AdaptiveConcurrencyFilter>(config_ptr, controller_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+  // The filter should behave as normal here.
+
+  Http::TestHeaderMapImpl request_headers;
+
+  EXPECT_CALL(*controller_, forwardingDecision())
+      .WillOnce(Return(RequestForwardingAction::Forward));
+  EXPECT_CALL(*controller_, recordLatencySample(_));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+
+  Buffer::OwnedImpl request_body;
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(request_body, false));
+
+  Http::TestHeaderMapImpl request_trailers;
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
+}
+
+TEST_F(AdaptiveConcurrencyFilterTest, TestDisable) {
+  std::string yaml_config =
+      R"EOF(
+gradient_controller_config:
+  sample_aggregate_percentile:
+    value: 50
+  concurrency_limit_params:
+    concurrency_update_interval:
+      nanos: 100000000 # 100ms
+  min_rtt_calc_params:
+    interval:
+      seconds: 30
+    request_count: 50
+
+disabled: true
+)EOF";
+
+  auto config = makeConfig(yaml_config);
+
+  auto config_ptr = std::make_shared<AdaptiveConcurrencyFilterConfig>(
+      config, runtime_, "testprefix.", stats_, time_system_);
+  filter_ = std::make_unique<AdaptiveConcurrencyFilter>(config_ptr, controller_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+  // We expect no calls to the concurrency controller.
+
+  Http::TestHeaderMapImpl request_headers;
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+
+  Buffer::OwnedImpl request_body;
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(request_body, false));
+
+  Http::TestHeaderMapImpl request_trailers;
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
+}
 
 TEST_F(AdaptiveConcurrencyFilterTest, DecodeHeadersTestForwarding) {
   Http::TestHeaderMapImpl request_headers;
