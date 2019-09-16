@@ -43,7 +43,7 @@ namespace Envoy {
 #define GENERATE_PRIMITIVE_COUNTER_STRUCT(NAME) Envoy::Stats::PrimitiveCounter NAME##_;
 #define GENERATE_PRIMITIVE_GAUGE_STRUCT(NAME) Envoy::Stats::PrimitiveGauge NAME##_;
 
-// Name and counter/gauge reference pair used to contruct map of counters/gauges.
+// Name and counter/gauge reference pair used to construct map of counters/gauges.
 #define PRIMITIVE_COUNTER_NAME_AND_REFERENCE(X) {std::string(#X), std::ref(X##_)},
 #define PRIMITIVE_GAUGE_NAME_AND_REFERENCE(X) {std::string(#X), std::ref(X##_)},
 
