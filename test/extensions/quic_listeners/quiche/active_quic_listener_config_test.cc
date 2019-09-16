@@ -2,8 +2,6 @@
 
 #include "common/config/utility.h"
 
-#include "server/well_known_names.h"
-
 #include "extensions/quic_listeners/quiche/active_quic_listener.h"
 #include "extensions/quic_listeners/quiche/active_quic_listener_config.h"
 
@@ -22,7 +20,7 @@ public:
 };
 
 TEST(ActiveQuicListenerConfigTest, CreateActiveQuicListenerFactory) {
-  std::string listener_name = Server::UdpListenerNames::get().Quic;
+  std::string listener_name = QuicListenerName;
   auto& config_factory =
       Config::Utility::getAndCheckFactory<Server::ActiveUdpListenerConfigFactory>(listener_name);
   ProtobufTypes::MessagePtr config = config_factory.createEmptyConfigProto();

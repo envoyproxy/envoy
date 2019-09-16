@@ -142,7 +142,7 @@ DispatcherImpl::createListener(Network::Socket& socket, Network::ListenerCallbac
 Network::UdpListenerPtr DispatcherImpl::createUdpListener(Network::Socket& socket,
                                                           Network::UdpListenerCallbacks& cb) {
   ASSERT(isThreadSafe());
-  return Network::UdpListenerPtr{new Network::UdpListenerImpl(*this, socket, cb, timeSource())};
+  return std::make_unique<Network::UdpListenerImpl>(*this, socket, cb, timeSource());
 }
 
 TimerPtr DispatcherImpl::createTimer(TimerCb cb) { return createTimerInternal(cb); }

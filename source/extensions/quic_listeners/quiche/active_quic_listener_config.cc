@@ -2,8 +2,6 @@
 
 #include "envoy/api/v2/listener/quic_config.pb.h"
 
-#include "server/well_known_names.h"
-
 #include "extensions/quic_listeners/quiche/active_quic_listener.h"
 
 namespace Envoy {
@@ -19,7 +17,7 @@ ActiveQuicListenerConfigFactory::createActiveUdpListenerFactory(const Protobuf::
   return std::make_unique<ActiveQuicListenerFactory>(config);
 }
 
-std::string ActiveQuicListenerConfigFactory::name() { return Server::UdpListenerNames::get().Quic; }
+std::string ActiveQuicListenerConfigFactory::name() { return QuicListenerName; }
 
 REGISTER_FACTORY(ActiveQuicListenerConfigFactory, Server::ActiveUdpListenerConfigFactory);
 

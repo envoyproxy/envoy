@@ -218,7 +218,6 @@ envoy_cc_library(
     deps = [
         ":active_quic_listener_lib",
         "//include/envoy/registry",
-        "//source/server:well_known_names_lib",
     ],
 )
 
