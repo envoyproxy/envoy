@@ -535,6 +535,56 @@ ssize_t OwnedImpl::search(const void* data, uint64_t size, size_t start) const {
   }
 }
 
+bool OwnedImpl::startsWith(const void* data, uint64_t size) const {
+  if (length() < size) {
+    // Buffer is too short to contain data.
+    return false;
+  }
+
+  if (size == 0) {
+    return true;
+  }
+
+  if (old_impl_) {
+    evbuffer_ptr start_ptr, end_ptr;
+    if (-1 == evbuffer_ptr_set(buffer_.get(), &start_ptr, 0, EVBUFFER_PTR_SET)) {
+      return false;
+    }
+
+    if (-1 == evbuffer_ptr_set(buffer_.get(), &end_ptr, size, EVBUFFER_PTR_SET)) {
+      return false;
+    }
+
+    evbuffer_ptr result_ptr = evbuffer_search_range(buffer_.get(), static_cast<const char*>(data),
+                                                    size, &start_ptr, &end_ptr);
+    return result_ptr.pos == 0;
+  } else {
+    const uint8_t* prefix = static_cast<const uint8_t*>(data);
+    for (size_t slice_index = 0; slice_index < slices_.size(); slice_index++) {
+      const auto& slice = slices_[slice_index];
+      uint64_t slice_size = slice->dataSize();
+      const uint8_t* slice_start = slice->data();
+
+      if (slice_size >= size) {
+        // The remaining size bytes of data are in this slice.
+        return !memcmp(prefix, slice_start, size);
+      }
+
+      // Slice is smaller than data, see if the prefix matches.
+      if (memcmp(prefix, slice_start, slice_size)) {
+        return false;
+      }
+
+      // Prefix matched. Continue looking at the next slice.
+      prefix += slice_size;
+      size -= slice_size;
+    }
+
+    // Less data in slices than length() reported.
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+}
+
 Api::IoCallUint64Result OwnedImpl::write(Network::IoHandle& io_handle) {
   constexpr uint64_t MaxSlices = 16;
   RawSlice slices[MaxSlices];

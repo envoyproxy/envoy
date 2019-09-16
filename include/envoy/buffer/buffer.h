@@ -190,6 +190,14 @@ public:
   virtual ssize_t search(const void* data, uint64_t size, size_t start) const PURE;
 
   /**
+   * Search for an occurrence of a buffer at the start of a larger buffer.
+   * @param data supplies the data to search for.
+   * @param size supplies the length of the data to search for.
+   * @return true if this buffer starts with data, false otherwise.
+   */
+  virtual bool startsWith(const void* data, uint64_t size) const PURE;
+
+  /**
    * Constructs a flattened string from a buffer.
    * @return the flattened string.
    */
