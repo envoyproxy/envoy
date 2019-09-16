@@ -196,7 +196,7 @@ public:
   /**
    * @return the server-wide process context.
    */
-  virtual ProcessContext& processContext() PURE;
+  virtual absl::optional<std::reference_wrapper<ProcessContext>> processContext() PURE;
 
   /**
    * @return ThreadLocal::Instance& the thread local storage engine for the server. This is used to

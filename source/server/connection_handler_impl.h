@@ -57,6 +57,8 @@ public:
 
   // Network::ConnectionHandler
   uint64_t numConnections() override { return num_connections_; }
+  void incNumConnections() override;
+  void decNumConnections() override;
   void addListener(Network::ListenerConfig& config) override;
   void removeListeners(uint64_t listener_tag) override;
   void stopListeners(uint64_t listener_tag) override;

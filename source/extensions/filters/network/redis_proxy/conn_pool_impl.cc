@@ -15,9 +15,6 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
 namespace ConnPool {
-namespace {
-Common::Redis::Client::DoNothingPoolCallbacks null_pool_callbacks;
-} // namespace
 
 InstanceImpl::InstanceImpl(
     const std::string& cluster_name, Upstream::ClusterManager& cm,
@@ -56,11 +53,7 @@ InstanceImpl::ThreadLocalPool::ThreadLocalPool(InstanceImpl& parent, Event::Disp
   cluster_update_handle_ = parent_.cm_.addThreadLocalClusterUpdateCallbacks(*this);
   Upstream::ThreadLocalCluster* cluster = parent_.cm_.get(cluster_name_);
   if (cluster != nullptr) {
-    auto options = cluster->info()->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
-        NetworkFilterNames::get().RedisProxy);
-    if (options) {
-      auth_password_ = options->auth_password(parent_.api_);
-    }
+    auth_password_ = ProtocolOptionsConfigImpl::auth_password(cluster->info(), parent_.api_);
     onClusterAddOrUpdateNonVirtual(*cluster);
   }
 }
@@ -197,22 +190,10 @@ InstanceImpl::ThreadLocalPool::threadLocalActiveClient(Upstream::HostConstShared
   if (!client) {
     client = std::make_unique<ThreadLocalActiveClient>(*this);
     client->host_ = host;
-    client->redis_client_ = parent_.client_factory_.create(
-        host, dispatcher_, parent_.config_, parent_.redis_command_stats_, *parent_.stats_scope_);
+    client->redis_client_ = parent_.client_factory_.create(host, dispatcher_, parent_.config_,
+                                                           parent_.redis_command_stats_,
+                                                           *parent_.stats_scope_, auth_password_);
     client->redis_client_->addConnectionCallbacks(*client);
-    // TODO(hyang): should the auth command and readonly command be moved to the factory method?
-    if (!auth_password_.empty()) {
-      // Send an AUTH command to the upstream server.
-      client->redis_client_->makeRequest(Common::Redis::Utility::makeAuthCommand(auth_password_),
-                                         null_pool_callbacks);
-    }
-    // Any connection to replica requires the READONLY command in order to perform read.
-    // Also the READONLY command is a no-opt for the master.
-    // We only need to send the READONLY command iff it's possible that the host is a replica.
-    if (parent_.config_.readPolicy() != Common::Redis::Client::ReadPolicy::Master) {
-      client->redis_client_->makeRequest(Common::Redis::Utility::ReadOnlyRequest::instance(),
-                                         null_pool_callbacks);
-    }
   }
   return client;
 }
