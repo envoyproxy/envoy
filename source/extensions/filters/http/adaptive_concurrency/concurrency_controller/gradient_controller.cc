@@ -133,7 +133,7 @@ uint32_t GradientController::calculateNewLimit() {
   stats_.gradient_.set(gradient);
 
   const double limit = concurrencyLimit() * gradient;
-  const double burst_headroom = std::max(1.0, sqrt(limit));
+  const double burst_headroom = sqrt(limit);
   stats_.burst_queue_size_.set(burst_headroom);
 
   // The final concurrency value factors in the burst headroom and must be clamped to keep the value
