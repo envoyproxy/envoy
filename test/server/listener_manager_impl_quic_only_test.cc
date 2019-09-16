@@ -24,7 +24,7 @@ address: {
 }
 filter_chains: {}
 udp_listener_config: {
-  udp_listener_name: "quic_listener"
+  udp_listener_name: "quiche_quic_listener"
   config: {}
 }
   )EOF";
