@@ -93,6 +93,22 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "active_quic_listener_test",
+    srcs = ["active_quic_listener_test.cc"],
+    tags = ["nofips"],
+    deps = [
+        ":quic_test_utils_for_envoy_lib",
+        "//source/extensions/quic_listeners/quiche:active_quic_listener_lib",
+        "//source/extensions/quic_listeners/quiche:envoy_quic_utils_lib",
+        "//source/server:configuration_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:network_utility_lib",
+        "//test/test_common:simulated_time_system_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "envoy_quic_dispatcher_test",
     srcs = ["envoy_quic_dispatcher_test.cc"],
     tags = ["nofips"],
@@ -147,5 +163,17 @@ envoy_cc_test(
         "//source/extensions/quic_listeners/quiche:envoy_quic_utils_lib",
         "//test/mocks/api:api_mocks",
         "//test/test_common:threadsafe_singleton_injector_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "active_quic_listener_config_test",
+    srcs = ["active_quic_listener_config_test.cc"],
+    tags = ["nofips"],
+    deps = [
+        "//source/common/config:utility_lib",
+        "//source/extensions/quic_listeners/quiche:active_quic_listener_config_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2/listener:quic_config_cc",
     ],
 )
