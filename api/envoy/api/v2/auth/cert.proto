@@ -171,14 +171,16 @@ message TlsSessionTicketKeys {
 }
 
 message CertificateValidationContext {
+
+  // Peer certificate verification mode.
   enum TrustChainVerification {
-    // 
+    // Perform default certificate verfication (eg, against CA / verification lists)
     VERIFY_TRUST_CHAIN = 0;
-
-    // 
+    // Certificates that fail verification will be permitted and their details hoisted in the
+    // x-forwarded-untrusted-client-cert HTTP Header.
     ACCEPT_UNTRUSTED = 1;
-
-    //
+    // Certificates will be permitted without verification and their details hoisted in the
+    // x-forwarded-untrusted-client-cert HTTP Header.
     NOT_VERIFIED = 2;
   }
 
@@ -291,8 +293,7 @@ message CertificateValidationContext {
   // If specified, Envoy will not reject expired certificates.
   bool allow_expired_certificate = 8;
 
-  // If specified, Envoy will NOT reject connections using client certificates that have failed
-  // validation.
+  // Certificate trust chain verification mode.
   TrustChainVerification verify_certificate_trust_chain = 9 [(validate.rules).enum.defined_only = true];
 }
 
