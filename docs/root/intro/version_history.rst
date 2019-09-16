@@ -49,6 +49,7 @@ Version history
 * rbac: added conditions to the policy, see :ref:`condition <envoy_api_field_config.rbac.v2.Policy.condition>`.
 * router: added :ref:`rq_retry_skipped_request_not_complete <config_http_filters_router_stats>` counter stat to router stats.
 * router: :ref:`Scoped routing <arch_overview_http_routing_route_scope>` is supported.
+* router: added new :ref:`retriable-headers <config_http_filters_router_x-envoy-retry-on>` retry policy. Retries can now be configured to trigger by arbitrary response header matching.
 * router check tool: add coverage reporting & enforcement.
 * router check tool: add comprehensive coverage reporting.
 * router check tool: add deprecated field check.
