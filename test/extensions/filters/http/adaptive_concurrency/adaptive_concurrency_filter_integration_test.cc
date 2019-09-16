@@ -140,8 +140,8 @@ TEST_P(AdaptiveConcurrencyIntegrationTest, TestConcurrencyN) {
   // at least one request gets blocked.
   //
   // Regarding the specified request delay, the default might not be enough here to ensure that all
-  // requests are sent through the ACC filter before the upstream has a chance to receive the first
-  // one, so let's delay the requests for 1sec.
+  // requests are sent through the filter before the upstream has a chance to receive the first one,
+  // so let's delay the requests for 1sec.
   sendRequests(concurrency_limit + 1, 1000);
 
   int forwarded_count = 0;
