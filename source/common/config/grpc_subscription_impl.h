@@ -54,7 +54,7 @@ public:
   GrpcMuxSharedPtr getContextForTest() { return context_; }
 
 private:
-  GrpcMuxSharedPtr context_;
+  GrpcMuxSharedPtr const context_;
   const std::string type_url_;
   SubscriptionCallbacks& callbacks_;
   SubscriptionStats stats_;

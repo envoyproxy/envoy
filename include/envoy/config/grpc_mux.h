@@ -101,6 +101,8 @@ public:
    * @return bool whether the API is paused.
    */
   virtual bool paused(const std::string& type_url) const PURE;
+
+  virtual void disableInitFetchTimeoutTimer() PURE;
 };
 
 using GrpcMuxPtr = std::unique_ptr<GrpcMux>;

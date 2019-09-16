@@ -52,9 +52,9 @@ public:
   // pointer actually is.
   virtual void* getNextRequestWithAck(const UpdateAck& ack) PURE;
 
-protected:
   void disableInitFetchTimeoutTimer();
 
+protected:
   std::string type_url() const { return type_url_; }
   SubscriptionCallbacks& callbacks() const { return callbacks_; }
 

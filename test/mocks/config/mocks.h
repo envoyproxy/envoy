@@ -76,6 +76,7 @@ public:
   MOCK_METHOD1(pause, void(const std::string& type_url));
   MOCK_METHOD1(resume, void(const std::string& type_url));
   MOCK_CONST_METHOD1(paused, bool(const std::string& type_url));
+  MOCK_METHOD0(disableInitFetchTimeoutTimer, void());
 };
 
 class MockGrpcMuxCallbacks : public GrpcMuxCallbacks {

@@ -48,6 +48,7 @@ void GrpcSubscriptionImpl::onConfigUpdate(
   stats_.update_attempt_.inc();
   stats_.version_.set(HashUtil::xxHash64(version_info));
 }
+
 void GrpcSubscriptionImpl::onConfigUpdate(
     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
@@ -57,18 +58,28 @@ void GrpcSubscriptionImpl::onConfigUpdate(
   stats_.update_attempt_.inc();
   stats_.version_.set(HashUtil::xxHash64(system_version_info));
 }
+
 void GrpcSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason reason,
                                                 const EnvoyException* e) {
-  stats_.update_attempt_.inc();
-  if (reason == ConfigUpdateFailureReason::FetchTimedout) {
-    stats_.init_fetch_timeout_.inc();
-  } else if (e == nullptr) {
+  switch (reason) {
+  case Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure:
     stats_.update_failure_.inc();
-  } else {
+    break;
+  case Envoy::Config::ConfigUpdateFailureReason::FetchTimedout:
+    stats_.init_fetch_timeout_.inc();
+    context_->disableInitFetchTimeoutTimer();
+    break;
+  case Envoy::Config::ConfigUpdateFailureReason::UpdateRejected:
+    // We expect Envoy exception to be thrown when update is rejected.
+    ASSERT(e != nullptr);
+    context_->disableInitFetchTimeoutTimer();
     stats_.update_rejected_.inc();
+    break;
   }
+  stats_.update_attempt_.inc();
   callbacks_.onConfigUpdateFailed(reason, e);
 }
+
 std::string GrpcSubscriptionImpl::resourceName(const ProtobufWkt::Any& resource) {
   return callbacks_.resourceName(resource);
 }

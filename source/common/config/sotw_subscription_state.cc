@@ -75,13 +75,13 @@ void SotwSubscriptionState::handleBadResponse(const EnvoyException& e, UpdateAck
   ack.error_detail_.set_code(Grpc::Status::GrpcStatus::Internal);
   ack.error_detail_.set_message(e.what());
   disableInitFetchTimeoutTimer();
-  ENVOY_LOG(warn, "Config update for {} rejected: {}", type_url(), e.what());
+  ENVOY_LOG(warn, "gRPC state-of-the-world config for {} rejected: {}", type_url(), e.what());
   callbacks().onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &e);
 }
 
 void SotwSubscriptionState::handleEstablishmentFailure() {
   disableInitFetchTimeoutTimer();
-  ENVOY_LOG(debug, "gRPC update for {} failed", type_url());
+  ENVOY_LOG(debug, "gRPC update for {} failed: couldn't connect", type_url());
   callbacks().onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure,
                                    nullptr);
 }

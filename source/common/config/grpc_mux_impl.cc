@@ -45,6 +45,12 @@ bool GrpcMuxImpl::paused(const std::string& type_url) const {
 
 void GrpcMuxImpl::start() { establishGrpcStream(); }
 
+void GrpcMuxImpl::disableInitFetchTimeoutTimer() {
+  for (auto& sub : subscriptions_) {
+    sub.second->disableInitFetchTimeoutTimer();
+  }
+}
+
 Watch* GrpcMuxImpl::addWatch(const std::string& type_url, const std::set<std::string>& resources,
                              SubscriptionCallbacks& callbacks,
                              std::chrono::milliseconds init_fetch_timeout) {

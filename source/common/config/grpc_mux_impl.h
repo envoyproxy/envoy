@@ -37,6 +37,7 @@ public:
   void resume(const std::string& type_url) override;
   bool paused(const std::string& type_url) const override;
   void start() override;
+  void disableInitFetchTimeoutTimer() override;
 
 protected:
   // Everything related to GrpcStream must remain abstract. GrpcStream (and the gRPC-using classes
@@ -220,6 +221,7 @@ public:
   void removeWatch(const std::string&, Watch*) override {
     throw EnvoyException("ADS must be configured to support an ADS config source");
   }
+  void disableInitFetchTimeoutTimer() override {}
 };
 
 } // namespace Config
