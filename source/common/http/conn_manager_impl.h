@@ -497,8 +497,8 @@ private:
 
     void traceRequest();
 
-    // Updates the snapped_route_config_, if scope not found for the header, a
-    // *Route::NullConfigImpl* is returned.
+    // Updates the snapped_route_config_ (by reselecting scoped route configuration), if a scope is
+    // not found, snapped_route_config_ is set to Router::NullConfigImpl.
     void snapScopedRouteConfig();
 
     void refreshCachedRoute();
