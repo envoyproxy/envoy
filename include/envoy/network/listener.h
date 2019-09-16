@@ -242,6 +242,8 @@ public:
   virtual Api::IoCallUint64Result send(const UdpSendData& data) PURE;
 };
 
+using UdpListenerPtr = std::unique_ptr<UdpListener>;
+
 /**
  * Thrown when there is a runtime error creating/binding a listener.
  */
