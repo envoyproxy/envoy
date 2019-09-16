@@ -46,30 +46,12 @@ service ListenerDiscoveryService {
   }
 }
 
-// [#comment:next free field: 21]
+// [#comment:next free field: 20]
 message Listener {
   // The unique name by which this listener is known. If no name is provided,
   // Envoy will allocate an internal UUID for the listener. If the listener is to be dynamically
   // updated or removed via :ref:`LDS <config_listeners_lds>` a unique name must be provided.
   string name = 1;
-
-  // [#not-implemented-hide:]
-  // [#next-major-version: In the v3 API, instead of this messy approach where the enum
-  // value dictates which fields should be set, we should refactor this message such that
-  // the fields for each type of listener are each in their own sub-message, and we put the
-  // sub-messages for each type into a oneof. That way, a given Listener message can
-  // structurally only contain the fields of the relevant type.]
-  enum Type {
-    // Default listener type. Binds to a port.
-    SOCKET = 0;
-    // HTTP API listener. This type of listener does not bind to a socket or support L3/L4
-    // filter chains; it simply exposes an HTTP API to the xDS client application.
-    // The only fields that should be set for this listener type are
-    // :ref:`name<envoy_api_field_Listener.name>` and
-    // :ref:`api_http_connection_manager<envoy_api_field_Listener.api_http_connection_manager>`,
-    API_HTTP = 1;
-  }
-  Type type = 19;
 
   // The address that the listener should listen on. In general, the address must be unique, though
   // that is governed by the bind rules of the OS. E.g., multiple listeners can listen on port 0 on
@@ -224,9 +206,26 @@ message Listener {
   listener.UdpListenerConfig udp_listener_config = 18;
 
   // [#not-implemented-hide:]
-  // Used only when the :ref:`type<envoy_api_field_Listener.type>` field is set to
-  // :ref:`API_HTTP<envoy_api_field_Listener.Type.API_HTTP>`.
-  // The HttpConnectionManager configuration to be used by the HTTP listener.
-  envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
-      api_http_connection_manager = 20;
+  // Used to represent an API listener, which is used in non-proxy clients. The type of API
+  // exposed to the non-proxy application depends on the type of API listener.
+  // When this field is set, no other field except for :ref:`name<envoy_api_field_Listener.name>`
+  // should be set.
+  // [#next-major-version: In the v3 API, instead of this messy approach where the socket
+  // listener fields are directly in the top-level Listener message and the API listener types
+  // are in the ApiListener message, the socket listener messages should be in their own message,
+  // and the top-level Listener should essentially be a oneof that selects between the
+  // socket listener and the various types of API listener. That way, a given Listener message
+  // can structurally only contain the fields of the relevant type.]
+  ApiListener api_listener = 19;
+}
+
+// [#not-implemented-hide:]
+// Describes a type of API listener, which is used in non-proxy clients. The type of API
+// exposed to the non-proxy application depends on the type of API listener.
+message ApiListener {
+  oneof api_type {
+    // HTTP API listener: specifies the HttpConnectionManager configuration to be used.
+    envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+        api_http_connection_manager = 1;
+  }
 }
