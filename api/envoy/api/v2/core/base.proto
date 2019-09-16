@@ -79,13 +79,6 @@ message Node {
   // version of Envoy is being tested in a heterogeneous fleet. This will be set
   // by Envoy in management server RPCs.
   string build_version = 5;
-
-  // A list of client capabilities indicating extensions that can be provided.
-  // Strings must be in reverse DNS notation. The following values are known:
-  //
-  // "envoy.grpc_client": Indicates that the client is a gRPC client and not a proxy. For
-  //     LDS, the server is required to provide exactly one HTTP API listener.
-  repeated string capabilities = 6;
 }
 
 // Metadata provides additional inputs to filters based on matched listeners,
