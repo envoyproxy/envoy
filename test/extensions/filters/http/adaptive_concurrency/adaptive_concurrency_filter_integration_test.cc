@@ -126,40 +126,4 @@ TEST_P(AdaptiveConcurrencyIntegrationTest, TestConcurrencyLimitMovement) {
   }
 }
 
-/**
- * Verify concurrency limit is enforced outside of minRTT window.
- */
-TEST_P(AdaptiveConcurrencyIntegrationTest, TestConcurrencyN) {
-  initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  // Break out of the minRTT window.
-  const auto concurrency_limit = inflateConcurrencyLimit(50);
-
-  // We'll send one more request than the concurrency limit (which should be ~50), so we can be sure
-  // at least one request gets blocked.
-  //
-  // Regarding the specified request delay, the default might not be enough here to ensure that all
-  // requests are sent through the filter before the upstream has a chance to receive the first one,
-  // so let's delay the requests for 1sec.
-  sendRequests(concurrency_limit + 1, 1000);
-
-  int forwarded_count = 0;
-  while (!response_q_.empty()) {
-    auto response = std::move(response_q_.front());
-    response_q_.pop();
-    response->waitForEndStream();
-    EXPECT_TRUE(response->complete());
-    const auto status_code = response->headers().Status()->value().getStringView();
-    if (status_code == "200") {
-      ++forwarded_count;
-      continue;
-    }
-  }
-
-  // The concurrency limit is eventually consistent, so we have no guarantee that these two numbers
-  // will be equal. We can only check that we forwarded at least the concurrency limit.
-  EXPECT_GE(forwarded_count, concurrency_limit);
-}
-
 } // namespace Envoy
