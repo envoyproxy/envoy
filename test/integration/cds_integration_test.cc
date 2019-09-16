@@ -137,7 +137,7 @@ TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
   testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex1, "/cluster1");
 
   // Tell Envoy that cluster_1 is gone.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "55", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "55", {}, {}, {}, true));
   sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster, {}, {},
                                                  {ClusterName1}, "42");
   // We can continue the test once we're sure that Envoy's ClusterManager has made use of
@@ -154,7 +154,7 @@ TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
   codec_client_->waitForDisconnect();
 
   // Tell Envoy that cluster_1 is back.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "42", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "42", {}, {}, {}, true));
   sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster, {cluster1_},
                                                  {cluster1_}, {}, "413");
 
@@ -177,7 +177,7 @@ TEST_P(CdsIntegrationTest, TwoClusters) {
   codec_client_->waitForDisconnect();
 
   // Tell Envoy that cluster_2 is here.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "55", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "55", {}, {}, {}, true));
   sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
                                                  {cluster1_, cluster2_}, {cluster2_}, {}, "42");
   // The '3' includes the fake CDS server.
@@ -189,7 +189,7 @@ TEST_P(CdsIntegrationTest, TwoClusters) {
   codec_client_->waitForDisconnect();
 
   // Tell Envoy that cluster_1 is gone.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "42", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "42", {}, {}, {}, true));
   sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster, {cluster2_}, {},
                                                  {ClusterName1}, "42");
   // We can continue the test once we're sure that Envoy's ClusterManager has made use of
@@ -202,7 +202,7 @@ TEST_P(CdsIntegrationTest, TwoClusters) {
   codec_client_->waitForDisconnect();
 
   // Tell Envoy that cluster_1 is back.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "42", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "42", {}, {}, {}, true));
   sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
                                                  {cluster1_, cluster2_}, {cluster1_}, {}, "413");
 

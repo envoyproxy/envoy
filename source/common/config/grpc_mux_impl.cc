@@ -10,8 +10,10 @@
 namespace Envoy {
 namespace Config {
 
-GrpcMuxImpl::GrpcMuxImpl(std::unique_ptr<SubscriptionStateFactory> subscription_state_factory)
-    : subscription_state_factory_(std::move(subscription_state_factory)) {}
+GrpcMuxImpl::GrpcMuxImpl(std::unique_ptr<SubscriptionStateFactory> subscription_state_factory,
+                         bool skip_subsequent_node, const LocalInfo::LocalInfo& local_info)
+    : subscription_state_factory_(std::move(subscription_state_factory)),
+      skip_subsequent_node_(skip_subsequent_node), local_info_(local_info) {}
 
 Watch* GrpcMuxImpl::addOrUpdateWatch(const std::string& type_url, Watch* watch,
                                      const std::set<std::string>& resources,
@@ -105,6 +107,7 @@ void GrpcMuxImpl::handleEstablishedStream() {
   for (auto& sub : subscriptions_) {
     sub.second->markStreamFresh();
   }
+  set_any_request_sent_yet_in_current_stream(false);
   trySendDiscoveryRequests();
 }
 

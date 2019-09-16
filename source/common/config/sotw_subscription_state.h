@@ -16,9 +16,8 @@ namespace Config {
 class SotwSubscriptionState : public SubscriptionState {
 public:
   SotwSubscriptionState(const std::string& type_url, SubscriptionCallbacks& callbacks,
-                        const LocalInfo::LocalInfo& local_info,
-                        std::chrono::milliseconds init_fetch_timeout, Event::Dispatcher& dispatcher,
-                        bool skip_subsequent_node);
+                        std::chrono::milliseconds init_fetch_timeout,
+                        Event::Dispatcher& dispatcher);
   ~SotwSubscriptionState() override;
 
   // Update which resources we're interested in subscribing to.
@@ -66,8 +65,7 @@ private:
 
 class SotwSubscriptionStateFactory : public SubscriptionStateFactory {
 public:
-  SotwSubscriptionStateFactory(Event::Dispatcher& dispatcher,
-                               const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node);
+  SotwSubscriptionStateFactory(Event::Dispatcher& dispatcher);
   ~SotwSubscriptionStateFactory() override;
   std::unique_ptr<SubscriptionState>
   makeSubscriptionState(const std::string& type_url, SubscriptionCallbacks& callbacks,
@@ -75,8 +73,6 @@ public:
 
 private:
   Event::Dispatcher& dispatcher_;
-  const LocalInfo::LocalInfo& local_info_;
-  const bool skip_subsequent_node_;
 };
 
 } // namespace Config

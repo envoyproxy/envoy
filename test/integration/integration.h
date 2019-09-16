@@ -227,7 +227,7 @@ public:
                           const std::vector<std::string>& expected_resource_names_removed,
                           bool expect_node = false,
                           const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
-                          const std::string& expected_error_message = "");
+                          const std::string& expected_error_substring = "");
   template <class T>
   void sendDiscoveryResponse(const std::string& type_url, const std::vector<T>& state_of_the_world,
                              const std::vector<T>& added_or_updated,
@@ -242,25 +242,25 @@ public:
   AssertionResult compareDeltaDiscoveryRequest(
       const std::string& expected_type_url,
       const std::vector<std::string>& expected_resource_subscriptions,
-      const std::vector<std::string>& expected_resource_unsubscriptions,
+      const std::vector<std::string>& expected_resource_unsubscriptions, bool expect_node,
       const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
-      const std::string& expected_error_message = "") {
+      const std::string& expected_error_substring = "") {
     return compareDeltaDiscoveryRequest(expected_type_url, expected_resource_subscriptions,
-                                        expected_resource_unsubscriptions, xds_stream_,
-                                        expected_error_code, expected_error_message);
+                                        expected_resource_unsubscriptions, xds_stream_, expect_node,
+                                        expected_error_code, expected_error_substring);
   }
 
   AssertionResult compareDeltaDiscoveryRequest(
       const std::string& expected_type_url,
       const std::vector<std::string>& expected_resource_subscriptions,
       const std::vector<std::string>& expected_resource_unsubscriptions, FakeStreamPtr& stream,
-      const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
-      const std::string& expected_error_message = "");
+      bool expect_node, const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
+      const std::string& expected_error_substring = "");
   AssertionResult compareSotwDiscoveryRequest(
       const std::string& expected_type_url, const std::string& expected_version,
       const std::vector<std::string>& expected_resource_names, bool expect_node = false,
       const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
-      const std::string& expected_error_message = "");
+      const std::string& expected_error_substring = "");
 
   template <class T>
   void sendSotwDiscoveryResponse(const std::string& type_url, const std::vector<T>& messages,

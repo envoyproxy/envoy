@@ -8,20 +8,14 @@ namespace Config {
 
 SotwSubscriptionState::SotwSubscriptionState(const std::string& type_url,
                                              SubscriptionCallbacks& callbacks,
-                                             const LocalInfo::LocalInfo& local_info,
                                              std::chrono::milliseconds init_fetch_timeout,
-                                             Event::Dispatcher& dispatcher,
-                                             bool skip_subsequent_node)
-    : SubscriptionState(type_url, callbacks, local_info, init_fetch_timeout, dispatcher,
-                        skip_subsequent_node) {}
+                                             Event::Dispatcher& dispatcher)
+    : SubscriptionState(type_url, callbacks, init_fetch_timeout, dispatcher) {}
 
 SotwSubscriptionState::~SotwSubscriptionState() {}
 
-SotwSubscriptionStateFactory::SotwSubscriptionStateFactory(Event::Dispatcher& dispatcher,
-                                                           const LocalInfo::LocalInfo& local_info,
-                                                           bool skip_subsequent_node)
-    : dispatcher_(dispatcher), local_info_(local_info),
-      skip_subsequent_node_(skip_subsequent_node) {}
+SotwSubscriptionStateFactory::SotwSubscriptionStateFactory(Event::Dispatcher& dispatcher)
+    : dispatcher_(dispatcher) {}
 
 SotwSubscriptionStateFactory::~SotwSubscriptionStateFactory() {}
 
@@ -29,8 +23,8 @@ std::unique_ptr<SubscriptionState>
 SotwSubscriptionStateFactory::makeSubscriptionState(const std::string& type_url,
                                                     SubscriptionCallbacks& callbacks,
                                                     std::chrono::milliseconds init_fetch_timeout) {
-  return std::make_unique<SotwSubscriptionState>(
-      type_url, callbacks, local_info_, init_fetch_timeout, dispatcher_, skip_subsequent_node_);
+  return std::make_unique<SotwSubscriptionState>(type_url, callbacks, init_fetch_timeout,
+                                                 dispatcher_);
 }
 
 void SotwSubscriptionState::updateSubscriptionInterest(const std::set<std::string>& cur_added,
@@ -63,6 +57,12 @@ UpdateAck SotwSubscriptionState::handleResponse(const void* reponse_proto_ptr) {
 
 void SotwSubscriptionState::handleGoodResponse(const envoy::api::v2::DiscoveryResponse& message) {
   disableInitFetchTimeoutTimer();
+  for (const auto& resource : message.resources()) {
+    if (resource.type_url() != type_url()) {
+      throw EnvoyException(fmt::format("{} does not match {} type URL in DiscoveryResponse {}",
+                                       resource.type_url(), type_url(), message.DebugString()));
+    }
+  }
   callbacks().onConfigUpdate(message.resources(), message.version_info());
   // Now that we're passed onConfigUpdate() without an exception thrown, we know we're good.
   last_good_version_info_ = message.version_info();
@@ -88,15 +88,14 @@ void SotwSubscriptionState::handleEstablishmentFailure() {
 
 envoy::api::v2::DiscoveryRequest* SotwSubscriptionState::getNextRequestInternal() {
   auto* request = new envoy::api::v2::DiscoveryRequest;
+  request->set_type_url(type_url());
 
   std::copy(names_tracked_.begin(), names_tracked_.end(),
             Protobuf::RepeatedFieldBackInserter(request->mutable_resource_names()));
-
-  request->set_type_url(type_url());
-  if (!any_request_sent_yet_in_current_stream_ || !skip_subsequent_node()) {
-    request->mutable_node()->MergeFrom(local_info().node());
+  if (last_good_version_info_.has_value()) {
+    request->set_version_info(last_good_version_info_.value());
   }
-  any_request_sent_yet_in_current_stream_ = true;
+
   update_pending_ = false;
   return request;
 }
@@ -106,9 +105,6 @@ void* SotwSubscriptionState::getNextRequestAckless() { return getNextRequestInte
 void* SotwSubscriptionState::getNextRequestWithAck(const UpdateAck& ack) {
   envoy::api::v2::DiscoveryRequest* request = getNextRequestInternal();
   request->set_response_nonce(ack.nonce_);
-  if (last_good_version_info_.has_value()) {
-    request->set_version_info(last_good_version_info_.value());
-  }
   if (ack.error_detail_.code() != Grpc::Status::GrpcStatus::Ok) {
     // Don't needlessly make the field present-but-empty if status is ok.
     request->mutable_error_detail()->CopyFrom(ack.error_detail_);

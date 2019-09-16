@@ -16,9 +16,8 @@ namespace Config {
 class DeltaSubscriptionState : public SubscriptionState {
 public:
   DeltaSubscriptionState(const std::string& type_url, SubscriptionCallbacks& callbacks,
-                         const LocalInfo::LocalInfo& local_info,
                          std::chrono::milliseconds init_fetch_timeout,
-                         Event::Dispatcher& dispatcher, bool skip_subsequent_node);
+                         Event::Dispatcher& dispatcher);
   ~DeltaSubscriptionState() override;
 
   // Update which resources we're interested in subscribing to.
@@ -96,8 +95,7 @@ private:
 
 class DeltaSubscriptionStateFactory : public SubscriptionStateFactory {
 public:
-  DeltaSubscriptionStateFactory(Event::Dispatcher& dispatcher,
-                                const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node);
+  DeltaSubscriptionStateFactory(Event::Dispatcher& dispatcher);
   ~DeltaSubscriptionStateFactory() override;
   std::unique_ptr<SubscriptionState>
   makeSubscriptionState(const std::string& type_url, SubscriptionCallbacks& callbacks,
@@ -105,8 +103,6 @@ public:
 
 private:
   Event::Dispatcher& dispatcher_;
-  const LocalInfo::LocalInfo& local_info_;
-  const bool skip_subsequent_node_;
 };
 
 } // namespace Config

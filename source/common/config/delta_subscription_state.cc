@@ -8,20 +8,14 @@ namespace Config {
 
 DeltaSubscriptionState::DeltaSubscriptionState(const std::string& type_url,
                                                SubscriptionCallbacks& callbacks,
-                                               const LocalInfo::LocalInfo& local_info,
                                                std::chrono::milliseconds init_fetch_timeout,
-                                               Event::Dispatcher& dispatcher,
-                                               bool skip_subsequent_node)
-    : SubscriptionState(type_url, callbacks, local_info, init_fetch_timeout, dispatcher,
-                        skip_subsequent_node) {}
+                                               Event::Dispatcher& dispatcher)
+    : SubscriptionState(type_url, callbacks, init_fetch_timeout, dispatcher) {}
 
 DeltaSubscriptionState::~DeltaSubscriptionState() {}
 
-DeltaSubscriptionStateFactory::DeltaSubscriptionStateFactory(Event::Dispatcher& dispatcher,
-                                                             const LocalInfo::LocalInfo& local_info,
-                                                             bool skip_subsequent_node)
-    : dispatcher_(dispatcher), local_info_(local_info),
-      skip_subsequent_node_(skip_subsequent_node) {}
+DeltaSubscriptionStateFactory::DeltaSubscriptionStateFactory(Event::Dispatcher& dispatcher)
+    : dispatcher_(dispatcher) {}
 
 DeltaSubscriptionStateFactory::~DeltaSubscriptionStateFactory() {}
 
@@ -29,8 +23,8 @@ std::unique_ptr<SubscriptionState>
 DeltaSubscriptionStateFactory::makeSubscriptionState(const std::string& type_url,
                                                      SubscriptionCallbacks& callbacks,
                                                      std::chrono::milliseconds init_fetch_timeout) {
-  return std::make_unique<DeltaSubscriptionState>(
-      type_url, callbacks, local_info_, init_fetch_timeout, dispatcher_, skip_subsequent_node_);
+  return std::make_unique<DeltaSubscriptionState>(type_url, callbacks, init_fetch_timeout,
+                                                  dispatcher_);
 }
 
 void DeltaSubscriptionState::updateSubscriptionInterest(const std::set<std::string>& cur_added,
@@ -80,6 +74,11 @@ void DeltaSubscriptionState::handleGoodResponse(
   disableInitFetchTimeoutTimer();
   absl::flat_hash_set<std::string> names_added_removed;
   for (const auto& resource : message.resources()) {
+    if (resource.resource().type_url() != type_url()) {
+      throw EnvoyException(fmt::format("{} does not match {} type URL in DeltaDiscoveryResponse {}",
+                                       resource.resource().type_url(), type_url(),
+                                       message.DebugString()));
+    }
     if (!names_added_removed.insert(resource.name()).second) {
       throw EnvoyException(
           fmt::format("duplicate name {} found among added/updated resources", resource.name()));
@@ -137,6 +136,8 @@ void DeltaSubscriptionState::handleEstablishmentFailure() {
 
 envoy::api::v2::DeltaDiscoveryRequest* DeltaSubscriptionState::getNextRequestInternal() {
   auto* request = new envoy::api::v2::DeltaDiscoveryRequest;
+  request->set_type_url(type_url());
+
   if (!any_request_sent_yet_in_current_stream_) {
     any_request_sent_yet_in_current_stream_ = true;
     // initial_resource_versions "must be populated for first request in a stream".
@@ -155,6 +156,7 @@ envoy::api::v2::DeltaDiscoveryRequest* DeltaSubscriptionState::getNextRequestInt
     }
     names_removed_.clear();
   }
+
   std::copy(names_added_.begin(), names_added_.end(),
             Protobuf::RepeatedFieldBackInserter(request->mutable_resource_names_subscribe()));
   std::copy(names_removed_.begin(), names_removed_.end(),
@@ -162,10 +164,6 @@ envoy::api::v2::DeltaDiscoveryRequest* DeltaSubscriptionState::getNextRequestInt
   names_added_.clear();
   names_removed_.clear();
 
-  request->set_type_url(type_url());
-  if (!any_request_sent_yet_in_current_stream_ || !skip_subsequent_node()) {
-    request->mutable_node()->MergeFrom(local_info().node());
-  }
   return request;
 }
 

@@ -25,7 +25,8 @@ namespace Config {
 //               work done so far. Should be changed.
 class GrpcMuxImpl : public GrpcMux, Logger::Loggable<Logger::Id::config> {
 public:
-  GrpcMuxImpl(std::unique_ptr<SubscriptionStateFactory> subscription_state_factory);
+  GrpcMuxImpl(std::unique_ptr<SubscriptionStateFactory> subscription_state_factory,
+              bool skip_subsequent_node, const LocalInfo::LocalInfo& local_info);
 
   Watch* addOrUpdateWatch(const std::string& type_url, Watch* watch,
                           const std::set<std::string>& resources, SubscriptionCallbacks& callbacks,
@@ -57,6 +58,14 @@ protected:
   void handleStreamEstablishmentFailure();
   void genericHandleResponse(const std::string& type_url, const void* response_proto_ptr);
   void trySendDiscoveryRequests();
+  bool skip_subsequent_node() const { return skip_subsequent_node_; }
+  bool any_request_sent_yet_in_current_stream() const {
+    return any_request_sent_yet_in_current_stream_;
+  }
+  void set_any_request_sent_yet_in_current_stream(bool value) {
+    any_request_sent_yet_in_current_stream_ = value;
+  }
+  const LocalInfo::LocalInfo& local_info() const { return local_info_; }
 
 private:
   Watch* addWatch(const std::string& type_url, const std::set<std::string>& resources,
@@ -99,6 +108,19 @@ private:
   // Determines the order of initial discovery requests. (Assumes that subscriptions are added
   // to this GrpcMux in the order of Envoy's dependency ordering).
   std::list<std::string> subscription_ordering_;
+
+  // Whether to enable the optimization of only including the node field in the very first
+  // discovery request in an xDS gRPC stream (really just one: *not* per-type_url).
+  const bool skip_subsequent_node_;
+
+  // State to help with skip_subsequent_node's logic.
+  bool any_request_sent_yet_in_current_stream_{};
+
+  // Used to populate the [Delta]DiscoveryRequest's node field. That field is the same across
+  // all type_urls, and moreover, the 'skip_subsequent_node' logic needs to operate across all
+  // the type_urls. So, while the SubscriptionStates populate every other field of these messages,
+  // this one is up to GrpcMux.
+  const LocalInfo::LocalInfo& local_info_;
 };
 
 class GrpcMuxDelta : public GrpcMuxImpl,
@@ -108,8 +130,8 @@ public:
                const Protobuf::MethodDescriptor& service_method, Runtime::RandomGenerator& random,
                Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
                const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node)
-      : GrpcMuxImpl(std::make_unique<DeltaSubscriptionStateFactory>(dispatcher, local_info,
-                                                                    skip_subsequent_node)),
+      : GrpcMuxImpl(std::make_unique<DeltaSubscriptionStateFactory>(dispatcher),
+                    skip_subsequent_node, local_info),
         grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                      rate_limit_settings) {}
 
@@ -125,9 +147,13 @@ public:
 protected:
   void establishGrpcStream() override { grpc_stream_.establishNewStream(); }
   void sendGrpcMessage(void* msg_proto_ptr) override {
-    auto* typed_proto_ptr = static_cast<envoy::api::v2::DeltaDiscoveryRequest*>(msg_proto_ptr);
-    grpc_stream_.sendMessage(*typed_proto_ptr);
-    delete typed_proto_ptr;
+    std::unique_ptr<envoy::api::v2::DeltaDiscoveryRequest> typed_proto(
+        static_cast<envoy::api::v2::DeltaDiscoveryRequest*>(msg_proto_ptr));
+    if (!any_request_sent_yet_in_current_stream() || !skip_subsequent_node()) {
+      typed_proto->mutable_node()->MergeFrom(local_info().node());
+    }
+    grpc_stream_.sendMessage(*typed_proto);
+    set_any_request_sent_yet_in_current_stream(true);
   }
   void maybeUpdateQueueSizeStat(uint64_t size) override {
     grpc_stream_.maybeUpdateQueueSizeStat(size);
@@ -146,8 +172,8 @@ public:
               const Protobuf::MethodDescriptor& service_method, Runtime::RandomGenerator& random,
               Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
               const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node)
-      : GrpcMuxImpl(std::make_unique<SotwSubscriptionStateFactory>(dispatcher, local_info,
-                                                                   skip_subsequent_node)),
+      : GrpcMuxImpl(std::make_unique<SotwSubscriptionStateFactory>(dispatcher),
+                    skip_subsequent_node, local_info),
         grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                      rate_limit_settings) {}
 
@@ -162,9 +188,13 @@ public:
 protected:
   void establishGrpcStream() override { grpc_stream_.establishNewStream(); }
   void sendGrpcMessage(void* msg_proto_ptr) override {
-    auto* typed_proto_ptr = static_cast<envoy::api::v2::DiscoveryRequest*>(msg_proto_ptr);
-    grpc_stream_.sendMessage(*typed_proto_ptr);
-    delete typed_proto_ptr;
+    std::unique_ptr<envoy::api::v2::DiscoveryRequest> typed_proto(
+        static_cast<envoy::api::v2::DiscoveryRequest*>(msg_proto_ptr));
+    if (!any_request_sent_yet_in_current_stream() || !skip_subsequent_node()) {
+      typed_proto->mutable_node()->MergeFrom(local_info().node());
+    }
+    grpc_stream_.sendMessage(*typed_proto);
+    set_any_request_sent_yet_in_current_stream(true);
   }
   void maybeUpdateQueueSizeStat(uint64_t size) override {
     grpc_stream_.maybeUpdateQueueSizeStat(size);

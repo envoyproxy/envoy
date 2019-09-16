@@ -7,7 +7,6 @@
 #include "envoy/common/pure.h"
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/local_info/local_info.h"
 
 #include "common/config/update_ack.h"
 #include "common/protobuf/protobuf.h"
@@ -25,9 +24,7 @@ namespace Config {
 class SubscriptionState : public Logger::Loggable<Logger::Id::config> {
 public:
   SubscriptionState(const std::string& type_url, SubscriptionCallbacks& callbacks,
-                    const LocalInfo::LocalInfo& local_info,
-                    std::chrono::milliseconds init_fetch_timeout, Event::Dispatcher& dispatcher,
-                    bool skip_subsequent_node);
+                    std::chrono::milliseconds init_fetch_timeout, Event::Dispatcher& dispatcher);
   virtual ~SubscriptionState() = default;
 
   // Update which resources we're interested in subscribing to.
@@ -59,16 +56,12 @@ protected:
   void disableInitFetchTimeoutTimer();
 
   std::string type_url() const { return type_url_; }
-  const LocalInfo::LocalInfo& local_info() const { return local_info_; }
   SubscriptionCallbacks& callbacks() const { return callbacks_; }
-  bool skip_subsequent_node() const { return skip_subsequent_node_; }
 
 private:
   const std::string type_url_;
   // callbacks_ is expected to be a WatchMap.
   SubscriptionCallbacks& callbacks_;
-  const LocalInfo::LocalInfo& local_info_;
-  const bool skip_subsequent_node_;
   Event::TimerPtr init_fetch_timeout_timer_;
 };
 
