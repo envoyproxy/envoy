@@ -77,6 +77,7 @@ public:
   void failHealthcheck(bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   HotRestart& hotRestart() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   Init::Manager& initManager() override { return init_manager_; }
+  StatusManager& statusManager() override { return status_manager_; }
   ServerLifecycleNotifier& lifecycleNotifier() override { return *this; }
   ListenerManager& listenerManager() override { return *listener_manager_; }
   Secret::SecretManager& secretManager() override { return *secret_manager_; }
@@ -110,8 +111,8 @@ public:
 
   // Server::ListenerComponentFactory
   LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config) override {
-    return std::make_unique<LdsApiImpl>(lds_config, clusterManager(), initManager(), stats(),
-                                        listenerManager(),
+    return std::make_unique<LdsApiImpl>(lds_config, clusterManager(), initManager(),
+                                        statusManager(), stats(), listenerManager(),
                                         messageValidationContext().dynamicValidationVisitor());
   }
   std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
@@ -165,6 +166,7 @@ private:
   // only after referencing members are gone, since initialization continuation can potentially
   // occur at any point during member lifetime.
   Init::ManagerImpl init_manager_{"Validation server"};
+  StatusManagerImpl status_manager_;
   Init::WatcherImpl init_watcher_{"(no-op)", []() {}};
   // secret_manager_ must come before listener_manager_, config_ and dispatcher_, and destructed
   // only after these members can no longer reference it, since:

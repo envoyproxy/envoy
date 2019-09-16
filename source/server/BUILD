@@ -240,6 +240,7 @@ envoy_cc_library(
     srcs = ["lds_api.cc"],
     hdrs = ["lds_api.h"],
     deps = [
+        ":status_manager_lib",
         "//include/envoy/config:subscription_factory_interface",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/init:manager_interface",
@@ -348,6 +349,7 @@ envoy_cc_library(
         ":listener_hooks_lib",
         ":listener_manager_lib",
         ":ssl_context_manager_lib",
+        ":status_manager_lib",
         ":worker_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:signal_interface",
@@ -400,6 +402,15 @@ envoy_cc_library(
     deps = [
         "//include/envoy/registry",
         "//include/envoy/ssl:context_manager_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "status_manager_lib",
+    srcs = ["status_manager_impl.cc"],
+    hdrs = ["status_manager_impl.h"],
+    deps = [
+        "//include/envoy/server:status_manager_interface",
     ],
 )
 

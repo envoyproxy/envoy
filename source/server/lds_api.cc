@@ -16,15 +16,16 @@ namespace Server {
 
 LdsApiImpl::LdsApiImpl(const envoy::api::v2::core::ConfigSource& lds_config,
                        Upstream::ClusterManager& cm, Init::Manager& init_manager,
-                       Stats::Scope& scope, ListenerManager& lm,
+                       StatusManager& status_manager, Stats::Scope& scope, ListenerManager& lm,
                        ProtobufMessage::ValidationVisitor& validation_visitor)
     : listener_manager_(lm), scope_(scope.createScope("listener_manager.lds.")), cm_(cm),
-      init_target_("LDS", [this]() { subscription_->start({}); }),
+      init_target_("LDS", [this]() { subscription_->start({}); }), status_manager_(status_manager),
       validation_visitor_(validation_visitor) {
   subscription_ = cm.subscriptionFactory().subscriptionFromConfigSource(
       lds_config, Grpc::Common::typeUrl(envoy::api::v2::Listener().GetDescriptor()->full_name()),
       *scope_, *this);
   init_manager.add(init_target_);
+  status_manager_.addComponent("LDS");
 }
 
 void LdsApiImpl::onConfigUpdate(
@@ -70,6 +71,13 @@ void LdsApiImpl::onConfigUpdate(
     system_version_info_ = system_version_info;
   }
   init_target_.ready();
+  auto status = std::make_unique<StatusManager::StatusHandle>(
+      exception_msgs.empty(), StringUtil::join(exception_msgs, ", "));
+  if (status->details_.empty()) {
+    status->details_ = "LDS updated successfully";
+  }
+  status_manager_.updateStatus("LDS", std::move(status));
+
   if (!exception_msgs.empty()) {
     throw EnvoyException(fmt::format("Error adding/updating listener(s) {}",
                                      StringUtil::join(exception_msgs, ", ")));

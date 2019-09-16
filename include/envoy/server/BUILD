@@ -94,6 +94,7 @@ envoy_cc_library(
         ":lifecycle_notifier_interface",
         ":listener_manager_interface",
         ":options_interface",
+        ":status_manager_interface",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/api:api_interface",
         "//include/envoy/common:mutex_tracer",
@@ -245,6 +246,11 @@ envoy_cc_library(
         "//include/envoy/thread_local:thread_local_interface",
         "//source/common/singleton:const_singleton",
     ],
+)
+
+envoy_cc_library(
+    name = "status_manager_interface",
+    hdrs = ["status_manager.h"],
 )
 
 envoy_cc_library(

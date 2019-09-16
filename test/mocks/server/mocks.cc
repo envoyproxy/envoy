@@ -153,6 +153,7 @@ MockInstance::MockInstance()
   ON_CALL(*this, options()).WillByDefault(ReturnRef(options_));
   ON_CALL(*this, drainManager()).WillByDefault(ReturnRef(drain_manager_));
   ON_CALL(*this, initManager()).WillByDefault(ReturnRef(init_manager_));
+  ON_CALL(*this, statusManager()).WillByDefault(ReturnRef(status_manager_));
   ON_CALL(*this, listenerManager()).WillByDefault(ReturnRef(listener_manager_));
   ON_CALL(*this, mutexTracer()).WillByDefault(Return(nullptr));
   ON_CALL(*this, singletonManager()).WillByDefault(ReturnRef(*singleton_manager_));

@@ -108,6 +108,13 @@ public:
   bool cpuset_threads_enabled_{};
 };
 
+class MockStatusManager : public StatusManager {
+public:
+  MOCK_METHOD1(addComponent, void(absl::string_view));
+  MOCK_METHOD2(updateStatus, void(absl::string_view, std::unique_ptr<StatusHandle>&&));
+  MOCK_METHOD1(status, StatusManager::StatusHandle(absl::string_view));
+};
+
 class MockConfigTracker : public ConfigTracker {
 public:
   MockConfigTracker();
@@ -366,6 +373,7 @@ public:
   MOCK_METHOD0(healthCheckFailed, bool());
   MOCK_METHOD0(hotRestart, HotRestart&());
   MOCK_METHOD0(initManager, Init::Manager&());
+  MOCK_METHOD0(statusManager, StatusManager&());
   MOCK_METHOD0(lifecycleNotifier, ServerLifecycleNotifier&());
   MOCK_METHOD0(listenerManager, ListenerManager&());
   MOCK_METHOD0(mutexTracer, Envoy::MutexTracer*());
@@ -411,6 +419,7 @@ public:
   testing::NiceMock<MockServerLifecycleNotifier> lifecycle_notifier_;
   testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;
   testing::NiceMock<Init::MockManager> init_manager_;
+  testing::NiceMock<MockStatusManager> status_manager_;
   testing::NiceMock<MockListenerManager> listener_manager_;
   testing::NiceMock<MockOverloadManager> overload_manager_;
   Singleton::ManagerPtr singleton_manager_;

@@ -241,6 +241,14 @@ envoy_cc_fuzz_test(
     ] + envoy_all_extensions(),
 )
 
+envoy_cc_test(
+    name = "status_manager_impl_test",
+    srcs = ["status_manager_impl_test.cc"],
+    deps = [
+        "//source/server:status_manager_lib",
+    ],
+)
+
 filegroup(
     name = "runtime_test_data",
     srcs = glob(["test_data/runtime/**"]),

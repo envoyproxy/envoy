@@ -22,6 +22,7 @@
 #include "envoy/server/listener_manager.h"
 #include "envoy/server/options.h"
 #include "envoy/server/overload_manager.h"
+#include "envoy/server/status_manager.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/tracing/http_tracer.h"
@@ -107,6 +108,13 @@ public:
    *         will start listening.
    */
   virtual Init::Manager& initManager() PURE;
+
+  /**
+   * @return the server's status manager. This can be used to track status for the status of
+   * arbitrary reloadable components in Envoy. Eventually it is likely this
+   * status will be exposed via the admin page.
+   */
+  virtual StatusManager& statusManager() PURE;
 
   /**
    * @return the server's listener manager.

@@ -7,6 +7,7 @@
 #include "envoy/config/subscription_factory.h"
 #include "envoy/init/manager.h"
 #include "envoy/server/listener_manager.h"
+#include "envoy/server/status_manager.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/logger.h"
@@ -23,8 +24,8 @@ class LdsApiImpl : public LdsApi,
                    Logger::Loggable<Logger::Id::upstream> {
 public:
   LdsApiImpl(const envoy::api::v2::core::ConfigSource& lds_config, Upstream::ClusterManager& cm,
-             Init::Manager& init_manager, Stats::Scope& scope, ListenerManager& lm,
-             ProtobufMessage::ValidationVisitor& validation_visitor);
+             Init::Manager& init_manager, StatusManager& status_manager, Stats::Scope& scope,
+             ListenerManager& lm, ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // Server::LdsApi
   std::string versionInfo() const override { return system_version_info_; }
@@ -48,6 +49,7 @@ private:
   Stats::ScopePtr scope_;
   Upstream::ClusterManager& cm_;
   Init::TargetImpl init_target_;
+  StatusManager& status_manager_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
 };
 
