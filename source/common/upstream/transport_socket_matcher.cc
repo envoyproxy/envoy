@@ -10,6 +10,22 @@ TransportSocketMatcher::TransportSocketMatcher(
   default_socket_factory_(std::move(socket_factory)),
   socket_factory_map_(std::move(socket_factory_overrides)) {}
 
+TransportSocketMatcher::TransportSocketMatcher(const Protobuf::RepeatedPtrField<
+      envoy::api::v2::Cluster_TransportSocketMatch>& socket_matches) {
+  for (const auto& socket_match : socket_matches) {
+    FactoryMatch factory_match;
+    factory_match.name = socket_match.name();
+    for (const auto& kv : socket_match.match().fields()) {
+      // TODO: question, what's the handling for non string value case?
+      if (kv.second.kind_case() == google::protobuf::Value::kStringValue) {
+        factory_match.match[kv.first] = kv.second.string_value();
+      }
+    }
+    matches_.emplace_back(std::move(factory_match));
+  }
+}
+
+
 Network::TransportSocketFactory& TransportSocketMatcher::resolve(
     const std::string& hardcode,
     const envoy::api::v2::core::Metadata& metadata) {

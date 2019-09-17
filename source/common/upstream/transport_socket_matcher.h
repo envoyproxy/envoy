@@ -50,11 +50,8 @@ namespace Envoy  {
 namespace Upstream {
 
 // TODO(incly):
-// [TODO] filter metadata is not propogated correctly,
-//   - upstream_impl.cc:223 print out metadata empty
+//   - change to metadata matching.
 //   - resolve to default ts config always.
-//   - should change to endpoint labels once api pr is okay.
-//   - update `HostImpl` constructor to pass in that, only in eds call site.
 class TransportSocketMatcher;
 
 using TransportSocketMatcherPtr = std::unique_ptr<TransportSocketMatcher>;
@@ -65,14 +62,27 @@ class TransportSocketMatcher : Logger::Loggable<Logger::Id::upstream> {
 public:
   TransportSocketMatcher(Network::TransportSocketFactoryPtr&& socket_factory,
   TransportSocketFactoryMapPtr&& socket_factory_overrides);
+  TransportSocketMatcher(const Protobuf::RepeatedPtrField<
+      envoy::api::v2::Cluster_TransportSocketMatch>& socket_matches);
+  
 
   Network::TransportSocketFactory& resolve(
       const std::string& hardcode,
       const envoy::api::v2::core::Metadata& metadata);
 
 protected:
+
+  struct FactoryMatch {
+    std::string name;
+    Network::TransportSocketFactoryPtr factory;
+    std::map<std::string, std::string> match;
+  };
+
+  // TODO: delete these two.
   Network::TransportSocketFactoryPtr default_socket_factory_;
   TransportSocketFactoryMapPtr socket_factory_map_;
+
+  std::vector<FactoryMatch> matches_;
 };
 
 } // namespace Upstream
