@@ -32,8 +32,8 @@ public:
       : http_context_(stats_store_.symbolTable()),
         client_(cm_.thread_local_cluster_.cluster_.info_, stats_store_, event_dispatcher_,
                 local_info_, cm_, runtime_, random_,
-                Router::ShadowWriterPtr{new NiceMock<Router::MockShadowWriter>()}, http_context_),
-        http_dispatcher_(event_dispatcher_, cm_) {
+                Router::ShadowWriterPtr{new NiceMock<Router::MockShadowWriter>()}, http_context_) {
+    http_dispatcher_.ready(event_dispatcher_, cm_);
     ON_CALL(*cm_.conn_pool_.host_, locality())
         .WillByDefault(ReturnRef(envoy::api::v2::core::Locality().default_instance()));
   }
