@@ -19,16 +19,19 @@ message Pipe {
   // abstract namespace. The starting '@' is replaced by a null byte by Envoy.
   // Paths starting with '@' will result in an error in environments other than
   // Linux.
-  string path = 1 [(validate.rules).string.min_bytes = 1];
+  string path = 1 [(validate.rules).string = {min_bytes: 1}];
 }
 
 message SocketAddress {
   enum Protocol {
     TCP = 0;
+
     // [#not-implemented-hide:]
     UDP = 1;
   }
-  Protocol protocol = 1 [(validate.rules).enum.defined_only = true];
+
+  Protocol protocol = 1 [(validate.rules).enum = {defined_only: true}];
+
   // The address for this socket. :ref:`Listeners <config_listeners>` will bind
   // to the address. An empty address is not allowed. Specify ``0.0.0.0`` or ``::``
   // to bind to any address. [#comment:TODO(zuercher) reinstate when implemented:
@@ -40,15 +43,19 @@ message SocketAddress {
   // address must be an IP (*STATIC* or *EDS* clusters) or a hostname resolved by DNS
   // (*STRICT_DNS* or *LOGICAL_DNS* clusters). Address resolution can be customized
   // via :ref:`resolver_name <envoy_api_field_core.SocketAddress.resolver_name>`.
-  string address = 2 [(validate.rules).string.min_bytes = 1];
+  string address = 2 [(validate.rules).string = {min_bytes: 1}];
+
   oneof port_specifier {
     option (validate.required) = true;
-    uint32 port_value = 3 [(validate.rules).uint32.lte = 65535];
+
+    uint32 port_value = 3 [(validate.rules).uint32 = {lte: 65535}];
+
     // This is only valid if :ref:`resolver_name
     // <envoy_api_field_core.SocketAddress.resolver_name>` is specified below and the
     // named resolver is capable of named port resolution.
     string named_port = 4;
   }
+
   // The name of the custom resolver. This must have been registered with Envoy. If
   // this is empty, a context dependent default applies. If the address is a concrete
   // IP address, no resolution will occur. If address is a hostname this
@@ -68,10 +75,12 @@ message TcpKeepalive {
   // the connection is dead. Default is to use the OS level configuration (unless
   // overridden, Linux defaults to 9.)
   google.protobuf.UInt32Value keepalive_probes = 1;
+
   // The number of seconds a connection needs to be idle before keep-alive probes
   // start being sent. Default is to use the OS level configuration (unless
   // overridden, Linux defaults to 7200s (ie 2 hours.)
   google.protobuf.UInt32Value keepalive_time = 2;
+
   // The number of seconds between keep-alive probes. Default is to use the OS
   // level configuration (unless overridden, Linux defaults to 75s.)
   google.protobuf.UInt32Value keepalive_interval = 3;
@@ -79,7 +88,7 @@ message TcpKeepalive {
 
 message BindConfig {
   // The address to bind to when creating a socket.
-  SocketAddress source_address = 1 [(validate.rules).message.required = true];
+  SocketAddress source_address = 1 [(validate.rules).message = {required: true}];
 
   // Whether to set the *IP_FREEBIND* option when creating the socket. When this
   // flag is set to true, allows the :ref:`source_address
@@ -103,6 +112,7 @@ message Address {
     option (validate.required) = true;
 
     SocketAddress socket_address = 1;
+
     Pipe pipe = 2;
   }
 }
@@ -111,7 +121,8 @@ message Address {
 // the subnet mask for a `CIDR <https://tools.ietf.org/html/rfc4632>`_ range.
 message CidrRange {
   // IPv4 or IPv6 address, e.g. ``192.0.0.0`` or ``2001:db8::``.
-  string address_prefix = 1 [(validate.rules).string.min_bytes = 1];
+  string address_prefix = 1 [(validate.rules).string = {min_bytes: 1}];
+
   // Length of prefix, e.g. 0, 32.
-  google.protobuf.UInt32Value prefix_len = 2 [(validate.rules).uint32.lte = 128];
+  google.protobuf.UInt32Value prefix_len = 2 [(validate.rules).uint32 = {lte: 128}];
 }
