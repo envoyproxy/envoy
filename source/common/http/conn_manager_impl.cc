@@ -34,6 +34,7 @@
 #include "common/http/path_utility.h"
 #include "common/http/utility.h"
 #include "common/network/utility.h"
+#include "common/router/config_impl.h"
 #include "common/runtime/runtime_impl.h"
 
 #include "absl/strings/escaping.h"
@@ -635,9 +636,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     ASSERT(snapped_route_config_ == nullptr,
            "Route config already latched to the active stream when scoped RDS is enabled.");
     // We need to snap snapped_route_config_ here as it's used in mutateRequestHeaders later.
-    if (!snapScopedRouteConfig()) {
-      return;
-    }
+    snapScopedRouteConfig();
   }
 
   if (Http::Headers::get().MethodValues.Head ==
@@ -1247,23 +1246,19 @@ void ConnectionManagerImpl::startDrainSequence() {
   drain_timer_->enableTimer(config_.drainTimeout());
 }
 
-bool ConnectionManagerImpl::ActiveStream::snapScopedRouteConfig() {
+void ConnectionManagerImpl::ActiveStream::snapScopedRouteConfig() {
   ASSERT(request_headers_ != nullptr,
          "Try to snap scoped route config when there is no request headers.");
 
-  snapped_route_config_ = snapped_scoped_routes_config_->getRouteConfig(*request_headers_);
   // NOTE: if a RDS subscription hasn't got a RouteConfiguration back, a Router::NullConfigImpl is
   // returned, in that case we let it pass.
+  snapped_route_config_ = snapped_scoped_routes_config_->getRouteConfig(*request_headers_);
   if (snapped_route_config_ == nullptr) {
     ENVOY_STREAM_LOG(trace, "can't find SRDS scope.", *this);
-    // Stop decoding now.
-    maybeEndDecode(true);
-    sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Http::Code::NotFound,
-                   "route scope not found", nullptr, is_head_request_, absl::nullopt,
-                   StreamInfo::ResponseCodeDetails::get().RouteConfigurationNotFound);
-    return false;
+    // TODO(stevenzzzz): Consider to pass an error message to router filter, so that it can
+    // send back 404 with some more details.
+    snapped_route_config_ = std::make_shared<Router::NullConfigImpl>();
   }
-  return true;
 }
 
 void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {

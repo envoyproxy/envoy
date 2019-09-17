@@ -2,6 +2,8 @@
 #include "common/common/hex.h"
 #include "common/crypto/utility.h"
 
+#include "extensions/common/crypto/crypto_impl.h"
+
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -59,13 +61,17 @@ TEST(UtilityTest, TestImportPublicKey) {
              "d5af8136a9630a6cc0cde157dc8e00f39540628d5f335b2c36c54c7c8bc3738a6b21acff815405afa28e5"
              "183f550dac19abcf1145a7f9ced987db680e4a229cac75dee347ec9ebce1fc3dbbbb0203010001";
 
-  auto pub_key = Utility::importPublicKey(Hex::decode(key));
-  EXPECT_NE(nullptr, pub_key.get());
+  Common::Crypto::CryptoObjectPtr crypto_ptr(
+      Common::Crypto::Utility::importPublicKey(Hex::decode(key)));
+  auto wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*crypto_ptr);
+  EVP_PKEY* pkey = wrapper->getEVP_PKEY();
+  EXPECT_NE(nullptr, pkey);
 
   key = "badkey";
-
-  pub_key = Utility::importPublicKey(Hex::decode(key));
-  EXPECT_EQ(nullptr, pub_key.get());
+  crypto_ptr = Common::Crypto::Utility::importPublicKey(Hex::decode(key));
+  wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*crypto_ptr);
+  pkey = wrapper->getEVP_PKEY();
+  EXPECT_EQ(nullptr, pkey);
 }
 
 TEST(UtilityTest, TestVerifySignature) {
@@ -86,33 +92,36 @@ TEST(UtilityTest, TestVerifySignature) {
       "295234f7c14fa46303b7e977d2c89ba8a39a46a35f33eb07a332";
   auto data = "hello";
 
-  auto pub_key = Utility::importPublicKey(Hex::decode(key));
+  Common::Crypto::CryptoObjectPtr crypto_ptr(
+      Common::Crypto::Utility::importPublicKey(Hex::decode(key)));
+  Common::Crypto::CryptoObject* crypto(crypto_ptr.get());
 
   std::vector<uint8_t> text(data, data + strlen(data));
 
   auto sig = Hex::decode(signature);
-  auto result = Utility::verifySignature(hash_func, pub_key.get(), sig, text);
+  auto result = Utility::verifySignature(hash_func, *crypto, sig, text);
 
   EXPECT_EQ(true, result.result_);
   EXPECT_EQ("", result.error_message_);
 
-  result = Utility::verifySignature("unknown", pub_key.get(), sig, text);
+  result = Utility::verifySignature("unknown", *crypto, sig, text);
   EXPECT_EQ(false, result.result_);
   EXPECT_EQ("unknown is not supported.", result.error_message_);
 
-  result = Utility::verifySignature(hash_func, nullptr, sig, text);
+  PublicKeyObject* empty_crypto = new PublicKeyObject();
+  result = Utility::verifySignature(hash_func, *empty_crypto, sig, text);
   EXPECT_EQ(false, result.result_);
   EXPECT_EQ("Failed to initialize digest verify.", result.error_message_);
 
   data = "baddata";
   text = std::vector<uint8_t>(data, data + strlen(data));
-  result = Utility::verifySignature(hash_func, pub_key.get(), sig, text);
+  result = Utility::verifySignature(hash_func, *crypto, sig, text);
   EXPECT_EQ(false, result.result_);
   EXPECT_EQ("Failed to verify digest. Error code: 0", result.error_message_);
 
   data = "hello";
   text = std::vector<uint8_t>(data, data + strlen(data));
-  result = Utility::verifySignature(hash_func, pub_key.get(), Hex::decode("000000"), text);
+  result = Utility::verifySignature(hash_func, *crypto, Hex::decode("000000"), text);
   EXPECT_EQ(false, result.result_);
   EXPECT_EQ("Failed to verify digest. Error code: 0", result.error_message_);
 }
