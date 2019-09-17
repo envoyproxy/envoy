@@ -49,6 +49,7 @@ public:
         Upstream::HostSetImpl::partitionHosts(std::make_shared<Upstream::HostVector>(hosts),
                                               Upstream::HostsPerLocalityImpl::empty()),
         nullptr, hosts, {}, 100);
+    cluster_->refresh();
   }
 
   void setupSecondary(int priority, int healthy_hosts, int degraded_hosts, int unhealthy_hosts) {
@@ -58,6 +59,7 @@ public:
         Upstream::HostSetImpl::partitionHosts(std::make_shared<Upstream::HostVector>(hosts),
                                               Upstream::HostsPerLocalityImpl::empty()),
         nullptr, hosts, {}, 100);
+    cluster_->refresh();
   }
 
   void setupPrioritySet() {
@@ -65,8 +67,6 @@ public:
     setupPrimary(1, 2, 2, 2);
     setupSecondary(0, 2, 2, 2);
     setupSecondary(1, 1, 1, 1);
-    ON_CALL(primary_, prioritySet()).WillByDefault(ReturnRef(primary_ps_));
-    ON_CALL(secondary_, prioritySet()).WillByDefault(ReturnRef(secondary_ps_));
   }
 
   void initialize(const std::string& yaml_config) {
@@ -80,23 +80,22 @@ public:
         admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_store_,
         singleton_manager_, tls_, validation_visitor_, *api_);
 
-    cluster_ = std::make_shared<Cluster>(cluster_config, config, runtime_, factory_context,
-                                         std::move(scope), false);
+    cluster_ = std::make_shared<Cluster>(cluster_config, config, cm_, runtime_, random_,
+                                         factory_context, std::move(scope), false);
 
-    thread_aware_lb_ = std::make_unique<AggregateThreadAwareLoadBalancer>(
-        *cluster_, cm_, stats_, runtime_, random_, common_config_);
+    thread_aware_lb_ = std::make_unique<AggregateThreadAwareLoadBalancer>(*cluster_);
     lb_factory_ = thread_aware_lb_->factory();
+    lb_ = lb_factory_->create();
 
     EXPECT_CALL(cm_, get(Eq("primary"))).WillRepeatedly(Return(&primary_));
     EXPECT_CALL(cm_, get(Eq("secondary"))).WillRepeatedly(Return(&secondary_));
     EXPECT_CALL(cm_, get(Eq("tertiary"))).WillRepeatedly(Return(nullptr));
+    ON_CALL(primary_, prioritySet()).WillByDefault(ReturnRef(primary_ps_));
+    ON_CALL(secondary_, prioritySet()).WillByDefault(ReturnRef(secondary_ps_));
+
     setupPrioritySet();
-    refreshLb();
   }
 
-  void refreshLb() { lb_ = lb_factory_->create(); }
-
-  envoy::api::v2::Cluster::CommonLbConfig common_config_;
   Stats::IsolatedStoreImpl stats_store_;
   Ssl::MockContextManager ssl_context_manager_;
   NiceMock<Upstream::MockClusterManager> cm_;
@@ -167,7 +166,6 @@ TEST_F(AggregateClusterTest, LoadBalancerTest) {
   // Set up the HostSet with 1 healthy, 1 degraded and 2 unhealthy.
   setupPrimary(0, 1, 1, 2);
 
-  refreshLb();
   // Health value:
   // Cluster 1:
   //     Priority 0: 25%
@@ -207,7 +205,6 @@ TEST_F(AggregateClusterTest, AllHostAreUnhealthyTest) {
   // Set up the HostSet with 0 healthy, 0 degraded and 2 unhealthy.
   setupSecondary(0, 0, 0, 2);
   setupSecondary(1, 0, 0, 2);
-  refreshLb();
   // Health value:
   // Cluster 1:
   //     Priority 0: 0%
@@ -234,7 +231,6 @@ TEST_F(AggregateClusterTest, ClusterInPanicTest) {
   setupPrimary(1, 1, 0, 4);
   setupSecondary(0, 1, 0, 4);
   setupSecondary(1, 1, 0, 4);
-  refreshLb();
   // Health value:
   // Cluster 1:
   //     Priority 0: 20%
@@ -269,7 +265,6 @@ TEST_F(AggregateClusterTest, ClusterInPanicTest) {
   setupPrimary(1, 1, 0, 9);
   setupSecondary(0, 1, 0, 9);
   setupSecondary(1, 1, 0, 1);
-  refreshLb();
   // Health value:
   // Cluster 1:
   //     Priority 0: 10%

@@ -34,7 +34,6 @@ public:
         parseBootstrapFromV2Yaml(yaml_config), factory_, factory_.stats_, factory_.tls_,
         factory_.runtime_, factory_.random_, factory_.local_info_, log_manager_,
         factory_.dispatcher_, admin_, validation_context_, *api_, http_context_);
-
     EXPECT_EQ(cluster_manager_->activeClusters().size(), 1);
     cluster_ = cluster_manager_->get("aggregate_cluster");
   }
