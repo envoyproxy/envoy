@@ -9,10 +9,7 @@ resources:
           socket_address:
             address: 127.0.0.1
             port_value: 9000
-       #metadata:
-          #envoy.transport_socket_selector:
-            #fields:
-              #label: "mtlsReady"
+      metadata: { filter_metadata: { envoy.transport_socket_selector: { istio: mtlsReady } } }
     - endpoint:
         address:
           socket_address:

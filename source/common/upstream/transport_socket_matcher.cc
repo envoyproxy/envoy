@@ -13,6 +13,7 @@ TransportSocketMatcher::TransportSocketMatcher(
 Network::TransportSocketFactory& TransportSocketMatcher::resolve(
     const std::string& hardcode,
     const envoy::api::v2::core::Metadata& metadata) {
+  ENVOY_LOG(info, "incfly debug resolve metadat, {}", metadata.DebugString());
   if (hardcode == "127.0.0.1:9000") {
     if (socket_factory_map_->find("mtlsReady") == socket_factory_map_->end()) {
       ENVOY_LOG(info, "incfly debug, harcode transport socket resolved default 0...");

@@ -763,7 +763,8 @@ Network::TransportSocketFactoryPtr createTransportSocketFactory(
   return config_factory.createTransportSocketFactory(*message, factory_context);
 }
 
-// TODO(icnfly): figure out here, what's about factory context.
+// TODO(incfly): here, next step to move to constructor of transports socketmatcher
+// unit test creates the same list of the factory, and check returns equals. due to lack of mock.
 TransportSocketMatcherPtr createTransportSocketMatcher(
     spdlog::logger& logger,
     const envoy::api::v2::Cluster& config,
@@ -796,14 +797,10 @@ TransportSocketMatcherPtr createTransportSocketMatcher(
     // const auto& match = socket_matcher_iter.match();
     const auto& socket = socket_matcher_iter.transport_socket();
 
-    //envoy::api::v2::core::TransportSocket socket;
 
     // TODO(incfly): remove hardcode here before merge.
-    // socket.set_name("tls");
     auto& tls_config_factory = Config::Utility::getAndCheckFactory<
       Server::Configuration::UpstreamTransportSocketConfigFactory>(socket.name());
-    //MessageUtil::jsonConvert(tls_config, *socket.mutable_config());
-
     ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
       socket, factory_context.messageValidationVisitor(), tls_config_factory);
     (*socket_factory_map)[name] = 
@@ -1122,6 +1119,8 @@ void PriorityStateManager::registerHostForPriority(
     const std::string& hostname, Network::Address::InstanceConstSharedPtr address,
     const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
     const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint) {
+  ENVOY_LOG(info, "incfly debug the endpoint information {}", lb_endpoint.DebugString());
+  ENVOY_LOG(info, "incfly debug the endpoint metadata information {}", lb_endpoint.metadata().DebugString());
   const HostSharedPtr host(
       new HostImpl(parent_.info(), hostname, address, lb_endpoint.metadata(),
                    lb_endpoint.load_balancing_weight().value(), locality_lb_endpoint.locality(),
