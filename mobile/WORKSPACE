@@ -42,7 +42,7 @@ load("@envoy//bazel:repositories.bzl", "envoy_dependencies")
 
 envoy_dependencies()
 
-load("@envoy//bazel:dependency_imports.bzl", "GO_VERSION", "envoy_dependency_imports")
+load("@envoy//bazel:dependency_imports.bzl", "envoy_dependency_imports")
 
 envoy_dependency_imports()
 
@@ -51,10 +51,6 @@ load("@rules_foreign_cc//:workspace_definitions.bzl", "rules_foreign_cc_dependen
 rules_foreign_cc_dependencies()
 
 load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
-
-go_rules_dependencies()
-
-go_register_toolchains(go_version = GO_VERSION)
 
 git_repository(
     name = "build_bazel_apple_support",
