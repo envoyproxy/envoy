@@ -228,17 +228,17 @@ Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::createRdsRo
   // RdsRouteConfigSubscriptions are unique based on their serialized RDS config.
   const uint64_t manager_identifier = MessageUtil::hash(rds);
 
-
   auto it = dynamic_route_config_providers_.find(manager_identifier);
   if (it == dynamic_route_config_providers_.end()) {
     // std::make_shared does not work for classes with private constructors. There are ways
     // around it. However, since this is not a performance critical path we err on the side
     // of simplicity.
-    RdsRouteConfigSubscriptionSharedPtr subscription(new RdsRouteConfigSubscription(rds, manager_identifier, factory_context,
-                                                      stat_prefix, *this));
+    RdsRouteConfigSubscriptionSharedPtr subscription(new RdsRouteConfigSubscription(
+        rds, manager_identifier, factory_context, stat_prefix, *this));
     init_manager.add(subscription->init_target_);
-    std::shared_ptr<RdsRouteConfigProviderImpl> provider {new RdsRouteConfigProviderImpl(std::move(subscription), factory_context)};
-    dynamic_route_config_providers_.insert({manager_identifier, provider /* to_weak */}); 
+    std::shared_ptr<RdsRouteConfigProviderImpl> provider{
+        new RdsRouteConfigProviderImpl(std::move(subscription), factory_context)};
+    dynamic_route_config_providers_.insert({manager_identifier, provider /* to_weak */});
     return provider;
   } else {
     // Because the RouteConfigProviderManager's weak_ptrs only get cleaned up
