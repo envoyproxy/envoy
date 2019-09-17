@@ -14,6 +14,7 @@
 
 namespace Envoy {
 static std::string AdsIntegrationConfig() {
+  // Note: do not use CONSTRUCT_ON_FIRST_USE here!
   return R"EOF(
 dynamic_resources:
   lds_config: {ads: {}}
