@@ -454,7 +454,10 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp1BadProtocol) {
 
   init();
 
-  const absl::string_view data = "GET /index HTT\r";
+  const std::string valid_header = "GET /index HTTP/1.1\r";
+  //  offset:                       0         10
+  const std::string truncate_header = valid_header.substr(0, 14).append("\r");
+
   {
     InSequence s;
 
@@ -462,14 +465,14 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp1BadProtocol) {
       return Api::SysCallSizeResult{ssize_t(-1), EAGAIN};
     }));
 
-    for (size_t i = 1; i <= data.length(); i++) {
+    for (size_t i = 1; i <= truncate_header.length(); i++) {
       EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-          .WillOnce(
-              Invoke([&data, i](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-                ASSERT(length >= data.size());
-                memcpy(buffer, data.data(), data.size());
-                return Api::SysCallSizeResult{ssize_t(i), 0};
-              }));
+          .WillOnce(Invoke([&truncate_header, i](int, void* buffer, size_t length,
+                                                 int) -> Api::SysCallSizeResult {
+            ASSERT(length >= truncate_header.size());
+            memcpy(buffer, truncate_header.data(), truncate_header.size());
+            return Api::SysCallSizeResult{ssize_t(i), 0};
+          }));
     }
   }
 
