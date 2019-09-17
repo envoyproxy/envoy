@@ -116,7 +116,7 @@ ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::RdsRouteConfigProvide
           parent_.route_config_provider_manager_
               .createRdsRouteConfigProvider(rds, parent_.factory_context_, parent_.stat_prefix_,
                                             init_manager)
-              .release())),
+              .get())),
       rds_update_callback_handle_(route_provider_->subscription().addUpdateCallback([this]() {
         // Subscribe to RDS update.
         parent_.onRdsConfigUpdate(scope_name_, route_provider_->subscription());
