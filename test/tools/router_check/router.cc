@@ -86,15 +86,11 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_file,
                          std::move(api), Coverage(route_config));
 }
 
-// Set UUID as the name for each route for detecting missing tests during the coverage
-// check.
 void RouterCheckTool::assignUniqueRouteNames(envoy::api::v2::RouteConfiguration& route_config) {
   Runtime::RandomGeneratorImpl random;
-  std::string route_name;
   for (auto& host : *route_config.mutable_virtual_hosts()) {
     for (auto& route : *host.mutable_routes()) {
-      route_name = random.uuid();
-      route.set_name(route_name);
+      route.set_name(random.uuid());
     }
   }
 }
