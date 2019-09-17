@@ -212,7 +212,7 @@ public:
     }
     RequestOptions& setHashPolicy(
         const Protobuf::RepeatedPtrField<envoy::api::v2::route::RouteAction::HashPolicy>& v) {
-      hash_policy = v;
+      StreamOptions::setHashPolicy(v);
       return *this;
     }
 
