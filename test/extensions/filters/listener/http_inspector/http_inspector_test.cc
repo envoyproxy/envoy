@@ -199,7 +199,7 @@ TEST_F(HttpInspectorTest, InspectHttp2) {
         return Api::SysCallSizeResult{ssize_t(data.size()), 0};
       }));
 
-  const std::vector<absl::string_view> alpn_protos{absl::string_view("h2")};
+  const std::vector<absl::string_view> alpn_protos{absl::string_view("h2c")};
 
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
   EXPECT_CALL(cb_, continueFilterChain(true));
@@ -240,7 +240,7 @@ TEST_F(HttpInspectorTest, ReadError) {
 TEST_F(HttpInspectorTest, MultipleReadsHttp2) {
 
   init();
-  const std::vector<absl::string_view> alpn_protos = {absl::string_view("h2")};
+  const std::vector<absl::string_view> alpn_protos = {absl::string_view("h2c")};
 
   const std::string header =
       "505249202a20485454502f322e300d0a0d0a534d0d0a0d0a00000c04000000000000041000000000020000000000"
