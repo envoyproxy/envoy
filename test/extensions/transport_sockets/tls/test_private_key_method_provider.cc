@@ -126,7 +126,7 @@ static ssl_private_key_result_t rsaPrivateKeySign(SSL* ssl, uint8_t* out, size_t
   // the bits.
   if (ops->test_options_.crypto_error_) {
     for (size_t i = 0; i < in_len; i++) {
-      in2.data()[i] ^= in2.data()[i];
+      in2[i] = ~in2[i];
     }
   }
 
