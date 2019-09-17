@@ -178,7 +178,7 @@ private:
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   std::chrono::milliseconds stream_idle_timeout_;
   std::chrono::milliseconds request_timeout_;
-  Router::RouteConfigProviderPtr route_config_provider_;
+  Router::RouteConfigProviderSharedPtr route_config_provider_;
   Config::ConfigProviderPtr scoped_routes_config_provider_;
   std::chrono::milliseconds drain_timeout_;
   bool generate_request_id_;
