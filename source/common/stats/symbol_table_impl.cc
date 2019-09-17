@@ -445,7 +445,8 @@ void StatNameSet::rememberBuiltin(absl::string_view str) {
 StatName StatNameSet::getBuiltin(absl::string_view token, StatName fallback) {
   StatName stat_name = getBuiltinHelper(token, fallback);
   if (stat_name == fallback) {
-    ENVOY_LOG_MISC(warn, "Builtin stat name not pre-registered: {}", token);
+    // TODO(#8116): do periodic logging here.
+    // ENVOY_LOG_MISC(warn, "Builtin stat name not pre-registered: {}", token);
   }
   return stat_name;
 }
