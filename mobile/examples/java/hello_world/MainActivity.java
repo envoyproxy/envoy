@@ -7,6 +7,7 @@ import android.os.HandlerThread;
 import android.support.v7.widget.DividerItemDecoration;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
+import android.util.Log;
 import io.envoyproxy.envoymobile.AndroidEnvoyClientBuilder;
 import io.envoyproxy.envoymobile.Domain;
 import io.envoyproxy.envoymobile.Envoy;
@@ -84,6 +85,7 @@ public class MainActivity extends Activity {
             .onHeaders((headers, status, endStream) -> {
               responseHeaders.putAll(headers);
               responseStatus.set(status);
+              Log.d("MainActivity", "successful response!");
               return Unit.INSTANCE;
             })
             .onData((buffer, endStream) -> {
