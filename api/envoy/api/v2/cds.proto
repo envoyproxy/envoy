@@ -257,7 +257,7 @@ message Cluster {
   //
   // The entry of *envoy.transport_socket* in endpoint :ref:`Metadata <envoy_api_msg_core.Metadata>`
   // is used to match against the transport sockets as they appear in the list. The first
-  // matched :ref:`TransportSockerMatch <envoy_api_msg_Cluster.TransportSocketMatch>` is used.
+  // :ref:`match <envoy_api_msg_Cluster.TransportSocketMatch>` is used.
   // For example, with the following match
   //
   // .. code-block:: json
@@ -280,17 +280,17 @@ message Cluster {
   // Connection to the endpoints whose metadata value under *envoy.transport_socket*
   // having "app"/"sidecar" key/value pair will use the "enable-mtls" socket configuration.
   //
-  // If :ref:`TransportSockerMatch <envoy_api_msg_Cluster.TransportSocketMatch>` with empty
-  // match is provided, that always match the endpoint. In above case, the "use-plaintext" config
-  // will be used always.
+  // If a :ref:`socket match <envoy_api_msg_Cluster.TransportSocketMatch>` with empty match
+  // criteria is provided, that always match any endpoint. For example, the "use-plaintext" socket
+  // configuration in case above.
   //
-  // If a endpoint metadata value under *envoy.transport_socket* can't matching againt any
-  // *TransportSockerMatch*, connection socket fallbacks to use the *tls_context* or
+  // If an endpoint metadata's value under *envoy.transport_socket* does not match against any
+  // *TransportSockerMatch*, socket configuration fallbacks to use the *tls_context* or
   // *transport_socket* specified in this cluster.
   //
   // This field allows gradual and flexible transport socket configuration changes.
-  // For example, for the same EDS typed cluster, in order to migrate from plain text traffic to
-  // mutual TLS, management server can configure different Envoy clients different
+  // For example, for the same EDS typed cluster, to migrate from plain text traffic to
+  // mutual TLS traffic, management server can configure different Envoy clients with different
   // *transport_socket_matches*.
   // [#not-implemented-hide:]
   repeated TransportSocketMatch transport_socket_matches = 42;
