@@ -101,13 +101,14 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
 
   int verify_mode = SSL_VERIFY_NONE;
   int verify_mode_validation_context = SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
-  
+
   if (config.certificateValidationContext() != nullptr) {
     envoy::api::v2::auth::CertificateValidationContext_TrustChainVerification verfication =
         config.certificateValidationContext()->verifyCertificateTrustChain();
     if (verfication == envoy::api::v2::auth::CertificateValidationContext::ACCEPT_UNTRUSTED ||
         verfication == envoy::api::v2::auth::CertificateValidationContext::NOT_VERIFIED) {
-      verify_mode = SSL_VERIFY_PEER;  // Ensure client-certs will be requested even if we have nothing to verify against
+      verify_mode = SSL_VERIFY_PEER; // Ensure client-certs will be requested even if we have
+                                     // nothing to verify against
       verify_mode_validation_context = SSL_VERIFY_PEER;
     }
   }
@@ -394,8 +395,10 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
 
   if (config.certificateValidationContext() != nullptr) {
     allow_untrusted_certificate_ =
-        config.certificateValidationContext()->verifyCertificateTrustChain() == envoy::api::v2::auth::CertificateValidationContext::ACCEPT_UNTRUSTED ||
-        config.certificateValidationContext()->verifyCertificateTrustChain() == envoy::api::v2::auth::CertificateValidationContext::NOT_VERIFIED;
+        config.certificateValidationContext()->verifyCertificateTrustChain() ==
+            envoy::api::v2::auth::CertificateValidationContext::ACCEPT_UNTRUSTED ||
+        config.certificateValidationContext()->verifyCertificateTrustChain() ==
+            envoy::api::v2::auth::CertificateValidationContext::NOT_VERIFIED;
   }
 
   parsed_alpn_protocols_ = parseAlpnProtocols(config.alpnProtocols());
@@ -499,8 +502,8 @@ int ContextImpl::verifyCallback(X509_STORE_CTX* store_ctx, void* arg) {
   if (impl->verify_trusted_ca_) {
     int ret = X509_verify_cert(store_ctx);
     if (clientValidationStatus) {
-      *clientValidationStatus = ret == 1 ? ClientValidationStatus::Validated
-                                         : ClientValidationStatus::Failed;
+      *clientValidationStatus =
+          ret == 1 ? ClientValidationStatus::Validated : ClientValidationStatus::Failed;
     }
 
     if (ret <= 0) {
@@ -527,11 +530,11 @@ int ContextImpl::verifyCallback(X509_STORE_CTX* store_ctx, void* arg) {
     }
   }
 
-  return impl->allow_untrusted_certificate_ ? 1
-                                            : (validated != ClientValidationStatus::Failed);
+  return impl->allow_untrusted_certificate_ ? 1 : (validated != ClientValidationStatus::Failed);
 }
 
-ClientValidationStatus ContextImpl::verifyCertificate(X509* cert, const std::vector<std::string>& verify_san_list) {
+ClientValidationStatus
+ContextImpl::verifyCertificate(X509* cert, const std::vector<std::string>& verify_san_list) {
   ClientValidationStatus validated = ClientValidationStatus::NotValidated;
 
   if (!verify_san_list.empty()) {

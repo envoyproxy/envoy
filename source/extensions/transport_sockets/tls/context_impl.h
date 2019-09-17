@@ -48,12 +48,7 @@ struct SslStats {
   ALL_SSL_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
 };
 
-enum class ClientValidationStatus {
-  NotValidated,
-  NoClientCertificate,
-  Validated,
-  Failed
-};
+enum class ClientValidationStatus { NotValidated, NoClientCertificate, Validated, Failed };
 
 class ContextImpl : public virtual Envoy::Ssl::Context {
 public:
@@ -113,7 +108,8 @@ protected:
   // A SSL_CTX_set_cert_verify_callback for custom cert validation.
   static int verifyCallback(X509_STORE_CTX* store_ctx, void* arg);
 
-  ClientValidationStatus verifyCertificate(X509* cert, const std::vector<std::string>& verify_san_list);
+  ClientValidationStatus verifyCertificate(X509* cert,
+                                           const std::vector<std::string>& verify_san_list);
 
   /**
    * Verifies certificate hash for pinning. The hash is a hex-encoded SHA-256 of the DER-encoded

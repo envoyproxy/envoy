@@ -784,8 +784,9 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeClientCert) {
       .WillByDefault(Return(Http::ForwardClientCertType::Sanitize));
   std::vector<Http::ClientCertDetailsType> details;
   ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
-  TestHeaderMapImpl headers{{"x-forwarded-client-cert", "By=test;URI=abc;DNS=example.com"},
-                            {"x-forwarded-untrusted-client-cert", "By=test;URI=abc;DNS=example.com"}};
+  TestHeaderMapImpl headers{
+      {"x-forwarded-client-cert", "By=test;URI=abc;DNS=example.com"},
+      {"x-forwarded-untrusted-client-cert", "By=test;URI=abc;DNS=example.com"}};
 
   EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false}),
             callMutateRequestHeaders(headers, Protocol::Http2));
@@ -936,9 +937,8 @@ TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardTrustedToUntrustedClientCe
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
   EXPECT_TRUE(headers.has("x-forwarded-untrusted-client-cert"));
-  EXPECT_EQ(
-      "By=test://foo.com/fe;URI=test://bar.com/be;DNS=test.com;DNS=test.com",
-      headers.get_("x-forwarded-client-cert"));
+  EXPECT_EQ("By=test://foo.com/fe;URI=test://bar.com/be;DNS=test.com;DNS=test.com",
+            headers.get_("x-forwarded-client-cert"));
   EXPECT_EQ(
       "By=test://foo.com/be;Hash=abcdefg;URI=test://foo.com/fe;"
       "Cert=\"%3D%3Dabc%0Ade%3D\";Chain=\"%3D%3Dabc%0Ade%3D%3D%3Dlmn%0Aop%3D\";DNS=www.example.com",
@@ -976,8 +976,8 @@ TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardUntrustedClientCert) {
   details.push_back(Http::ClientCertDetailsType::DNS);
   ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
   TestHeaderMapImpl headers{{"x-forwarded-untrusted-client-cert", "By=test://foo.com/fe;"
-                                                        "URI=test://bar.com/be;"
-                                                        "DNS=test.com;DNS=test.com"}};
+                                                                  "URI=test://bar.com/be;"
+                                                                  "DNS=test.com;DNS=test.com"}};
 
   EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false}),
             callMutateRequestHeaders(headers, Protocol::Http2));

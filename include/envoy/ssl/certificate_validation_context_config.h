@@ -60,7 +60,7 @@ public:
    * @return client certificate validation configuration.
    */
   virtual envoy::api::v2::auth::CertificateValidationContext_TrustChainVerification
-      verifyCertificateTrustChain() const PURE;
+  verifyCertificateTrustChain() const PURE;
 };
 
 using CertificateValidationContextConfigPtr = std::unique_ptr<CertificateValidationContextConfig>;

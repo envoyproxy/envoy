@@ -32,10 +32,10 @@ public:
     return verify_certificate_spki_list_;
   }
   bool allowExpiredCertificate() const override { return allow_expired_certificate_; }
-  envoy::api::v2::auth::CertificateValidationContext_TrustChainVerification verifyCertificateTrustChain() const override {
+  envoy::api::v2::auth::CertificateValidationContext_TrustChainVerification
+  verifyCertificateTrustChain() const override {
     return verify_certificate_trust_chain_;
   }
-
 
 private:
   const std::string ca_cert_;
