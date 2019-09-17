@@ -32,7 +32,7 @@ void ConnectionHandlerImpl::addListener(Network::ListenerConfig& config) {
     listener = std::make_unique<ActiveTcpListener>(*this, config);
   } else {
     RELEASE_ASSERT(config.udpListenerFactory() != nullptr,
-                   "UDP listner factory is not initialized.");
+                   "UDP listener factory is not initialized.");
     listener =
         config.udpListenerFactory()->createActiveUdpListener(*this, dispatcher_, logger_, config);
   }
