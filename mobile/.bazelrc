@@ -28,3 +28,11 @@ build:device --ios_multi_cpus=armv7,arm64 --fat_apk_cpu=armeabi-v7a,arm64-v8a
 build:sim --ios_multi_cpus=i386,x86_64 --fat_apk_cpu=x86,x86_64
 
 build:fat --ios_multi_cpus=i386,x86_64,armv7,arm64 --fat_apk_cpu=x86,x86_64,armeabi-v7a,arm64-v8a
+
+# TODO: Enable `--copt -ggdb3`. Using this configuration currently requires python3.
+# https://github.com/lyft/envoy-mobile/pull/155#issuecomment-507461500
+# https://stackoverflow.com/a/38177538/1145804
+build:release \
+  --linkopt=-s \
+  --copt=-O2 \
+  --config=fat
