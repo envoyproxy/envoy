@@ -17,7 +17,6 @@ import "envoy/api/v2/core/health_check.proto";
 import "envoy/api/v2/core/protocol.proto";
 import "envoy/api/v2/cluster/circuit_breaker.proto";
 import "envoy/api/v2/cluster/filter.proto";
-import "envoy/api/v2/endpoint/endpoint.proto";
 import "envoy/api/v2/cluster/outlier_detection.proto";
 import "envoy/api/v2/eds.proto";
 import "envoy/type/percent.proto";
