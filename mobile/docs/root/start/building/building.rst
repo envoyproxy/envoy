@@ -51,7 +51,7 @@ Android AAR
 Envoy Mobile can be compiled into an ``.aar`` file for use with Android apps.
 This command is defined in the main :repo:`BUILD <BUILD>` file of the repo, and may be run locally:
 
-``./bazelw build android_dist --config=android``
+``./bazelw build android_dist --config=android --config=release # omit release for development``
 
 Upon completion of the build, you'll see an ``envoy.aar`` file at :repo:`dist/envoy.aar <dist>`.
 
@@ -64,6 +64,8 @@ an example of how this artifact may be used.
 
 For a demo of a working app using this artifact, see the :ref:`hello_world` example.
 
+When building the artifact for release (usage outside of development), be sure to include ``--config=release``
+
 .. _ios_framework:
 
 --------------------
@@ -73,7 +75,7 @@ iOS static framework
 Envoy Mobile supports being compiled into a ``.framework`` directory for consumption by iOS apps.
 This command is defined in the main :repo:`BUILD <BUILD>` file of the repo, and may be run locally:
 
-``./bazelw build ios_dist --config=ios``
+``./bazelw build ios_dist --config=ios --config=release # omit release for development``
 
 Upon completion of the build, you'll see a ``Envoy.framework`` directory at
 :repo:`dist/Envoy.framework <dist>`.
@@ -85,6 +87,9 @@ The ``envoy_mobile_ios`` Bazel rule defined in the :repo:`dist BUILD file <dist/
 example of how this artifact may be used.
 
 For a demo of a working app using this artifact, see the :ref:`hello_world` example.
+
+When building the artifact for release (usage outside of development), be sure to include ``--config=release``
+in addition to ``--config=ios``.
 
 .. _releases: https://github.com/lyft/envoy-mobile/releases
 
