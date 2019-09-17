@@ -71,21 +71,24 @@ public class EnvoyHTTPStream {
   }
 
   /**
-   * Cancel the streamHandle. This functions as an interrupt, and aborts further
-   * callbacks and handling of the streamHandle.
-   *
-   * @return Success, unless the streamHandle has already been canceled.
-   */
-  public int resetStream() { return JniLibrary.resetStream(streamHandle); }
-
-  /**
    * Cancel the stream. This functions as an interrupt, and aborts further
    * callbacks and handling of the stream.
+   *
+   * @return int, success unless the stream has already been canceled.
    */
-  public void cancel() { JniLibrary.cancel(); }
+  public int cancel() {
+    if (callbacksContext.cancel()) {
+      // propagate the reset into native code.
+      JniLibrary.resetStream(streamHandle);
+      return 0;
+    } else {
+      return 1;
+    }
+  }
 
   private static byte[][] toJniLibraryHeaders(Map<String, List<String>> headers) {
-    // Create array with some room for potential headers that have more than one value.
+    // Create array with some room for potential headers that have more than one
+    // value.
     final List<byte[]> convertedHeaders = new ArrayList<byte[]>(2 * headers.size());
     for (Map.Entry<String, List<String>> entry : headers.entrySet()) {
       for (String value : entry.getValue()) {

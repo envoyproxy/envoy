@@ -119,14 +119,6 @@ class JniLibrary {
    */
   protected static native int resetStream(long stream);
 
-  /**
-   * Cancel the stream. This functions as an interrupt, and aborts further
-   * callbacks and handling of the stream.
-   *
-   * @return int, the result status of the operation.
-   */
-  protected static native int cancel();
-
   // Native entry point
 
   /**

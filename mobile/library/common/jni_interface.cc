@@ -315,3 +315,9 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
   return send_trailers(static_cast<envoy_stream_t>(stream_handle),
                        to_native_headers(env, trailers));
 }
+
+extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_resetStream(
+    JNIEnv* env, jclass, jlong stream_handle) {
+
+  return reset_stream(static_cast<envoy_stream_t>(stream_handle));
+}

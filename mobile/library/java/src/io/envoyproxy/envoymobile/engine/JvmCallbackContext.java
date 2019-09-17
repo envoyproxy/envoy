@@ -134,7 +134,6 @@ class JvmCallbackContext {
    * @param errorCode, the envoy_error_code_t.
    */
   public void onError(byte[] message, int errorCode) {
-
     callbacks.getExecutor().execute(new Runnable() {
       public void run() {
         if (canceled.get()) {
@@ -145,6 +144,32 @@ class JvmCallbackContext {
         callbacks.onError(error);
       }
     });
+  }
+
+  /**
+   * Dispatches cancellation notice up to the platform
+   */
+  public void onCancel() {
+    callbacks.getExecutor().execute(new Runnable() {
+      public void run() {
+        // This call is atomically gated at the call-site and will only happen once.
+        callbacks.onCancel();
+      }
+    });
+  }
+
+  /**
+   * Cancel the callback context atomically so that no further callbacks occur
+   * other than onCancel.
+   *
+   * @return boolean, whether the callback context was canceled or not.
+   */
+  public boolean cancel() {
+    boolean canceled = !this.canceled.getAndSet(true);
+    if (canceled) {
+      onCancel();
+    }
+    return canceled;
   }
 
   private void startAccumulation(FrameType type, long length, boolean endStream) {
