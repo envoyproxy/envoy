@@ -4,11 +4,17 @@ import io.envoyproxy.envoymobile.engine.EnvoyConfiguration
 import io.envoyproxy.envoymobile.engine.EnvoyEngine
 import io.envoyproxy.envoymobile.engine.EnvoyEngineImpl
 
+sealed class BaseConfiguration(
+    val value: String
+)
+
+class Domain(domain: String) : BaseConfiguration(domain)
+class Yaml(yaml: String) : BaseConfiguration(yaml)
 
 open class EnvoyClientBuilder internal constructor(
+    private val configuration: BaseConfiguration
 ) {
   private var logLevel = LogLevel.INFO
-  private var configYAML: String? = null
   private var engineType: () -> EnvoyEngine = { EnvoyEngineImpl() }
 
   private var connectTimeoutSeconds = 30
@@ -21,17 +27,6 @@ open class EnvoyClientBuilder internal constructor(
    */
   fun addLogLevel(logLevel: LogLevel): EnvoyClientBuilder {
     this.logLevel = logLevel
-    return this
-  }
-
-  /**
-   * Add contents of a yaml file to use as a configuration.
-   * Setting this will supersede any other configuration settings in the builder.
-   *
-   * @param configYAML the contents of a yaml file to use as a configuration.
-   */
-  fun addConfigYAML(configYAML: String?): EnvoyClientBuilder {
-    this.configYAML = configYAML
     return this
   }
 
@@ -71,11 +66,13 @@ open class EnvoyClientBuilder internal constructor(
    * @return A new instance of Envoy.
    */
   fun build(): Envoy {
-    val configurationYAML = configYAML
-    if (configurationYAML == null) {
-      return Envoy(engineType(), EnvoyConfiguration(connectTimeoutSeconds, dnsRefreshSeconds, statsFlushSeconds), logLevel)
-    } else {
-      return Envoy(engineType(), configurationYAML, logLevel)
+    return when (configuration) {
+      is Yaml -> {
+        return Envoy(engineType(), configuration.value, logLevel)
+      }
+      is Domain -> {
+        Envoy(engineType(), EnvoyConfiguration(configuration.value, connectTimeoutSeconds, dnsRefreshSeconds, statsFlushSeconds), logLevel)
+      }
     }
   }
 

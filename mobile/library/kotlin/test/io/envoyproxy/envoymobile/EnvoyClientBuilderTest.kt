@@ -1,7 +1,9 @@
 package io.envoyproxy.envoymobile.io.envoyproxy.envoymobile
 
+import io.envoyproxy.envoymobile.Domain
 import io.envoyproxy.envoymobile.EnvoyClientBuilder
 import io.envoyproxy.envoymobile.LogLevel
+import io.envoyproxy.envoymobile.Yaml
 import io.envoyproxy.envoymobile.engine.EnvoyEngine
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
@@ -22,20 +24,8 @@ class EnvoyBuilderTest {
   private var engine: EnvoyEngine = mock(EnvoyEngine::class.java)
 
   @Test
-  fun `adding custom config builder uses custom config for running Envoy`() {
-    clientBuilder = EnvoyClientBuilder()
-    clientBuilder.addConfigYAML(TEST_CONFIG)
-    clientBuilder.addEngineType { engine }
-
-    clientBuilder.addConfigYAML("mock_template:")
-    val envoy = clientBuilder.build()
-    assertThat(envoy.configurationYAML).isEqualTo("mock_template:")
-  }
-
-  @Test
   fun `adding log level builder uses log level for running Envoy`() {
-    clientBuilder = EnvoyClientBuilder()
-    clientBuilder.addConfigYAML(TEST_CONFIG)
+    clientBuilder = EnvoyClientBuilder(Yaml(TEST_CONFIG))
     clientBuilder.addEngineType { engine }
 
     clientBuilder.addLogLevel(LogLevel.DEBUG)
@@ -45,7 +35,7 @@ class EnvoyBuilderTest {
 
   @Test
   fun `specifying connection timeout overrides default`() {
-    clientBuilder = EnvoyClientBuilder()
+    clientBuilder = EnvoyClientBuilder(Domain("api.foo.com"))
     clientBuilder.addEngineType { engine }
 
     clientBuilder.addConnectTimeoutSeconds(1234)
@@ -55,7 +45,7 @@ class EnvoyBuilderTest {
 
   @Test
   fun `specifying DNS refresh overrides default`() {
-    clientBuilder = EnvoyClientBuilder()
+    clientBuilder = EnvoyClientBuilder(Domain("api.foo.com"))
     clientBuilder.addEngineType { engine }
 
     clientBuilder.addDNSRefreshSeconds(1234)
@@ -65,7 +55,7 @@ class EnvoyBuilderTest {
 
   @Test
   fun `specifying stats flush overrides default`() {
-    clientBuilder = EnvoyClientBuilder()
+    clientBuilder = EnvoyClientBuilder(Domain("api.foo.com"))
     clientBuilder.addEngineType { engine }
 
     clientBuilder.addStatsFlushSeconds(1234)
