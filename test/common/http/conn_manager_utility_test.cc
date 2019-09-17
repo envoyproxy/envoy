@@ -1071,8 +1071,8 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetUntrustedClientCert) {
   EXPECT_CALL(*ssl, uriSanLocalCertificate()).WillOnce(Return(local_uri_sans));
   std::string expected_sha("abcdefg");
   EXPECT_CALL(*ssl, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha));
-  EXPECT_CALL(*ssl, subjectPeerCertificate())
-      .WillOnce(Return("/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=test.lyft.com"));
+  std::string expected_subject("/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=test.lyft.com");
+  EXPECT_CALL(*ssl, subjectPeerCertificate()).WillOnce(ReturnRef(expected_subject));
   const std::vector<std::string> peer_uri_sans{"test://foo.com/fe"};
   EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(peer_uri_sans));
   std::string expected_pem("abcde=");
