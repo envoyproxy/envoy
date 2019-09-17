@@ -105,6 +105,7 @@ def api_proto_library(
         visibility = ["//visibility:private"],
         srcs = [],
         deps = [],
+        tags = [],
         external_proto_deps = [],
         external_cc_proto_deps = [],
         external_py_proto_deps = [],
@@ -116,6 +117,7 @@ def api_proto_library(
         name = name,
         srcs = srcs,
         deps = deps + external_proto_deps + _COMMON_PROTO_DEPS,
+        tags = tags,
         visibility = visibility,
     )
     cc_proto_library_name = _Suffix(name, _CC_SUFFIX)
