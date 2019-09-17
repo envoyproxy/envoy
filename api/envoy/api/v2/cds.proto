@@ -658,34 +658,20 @@ message Cluster {
   // :ref:`LOAD_BALANCING_POLICY_CONFIG<envoy_api_enum_value_Cluster.LbPolicy.LOAD_BALANCING_POLICY_CONFIG>`.
   LoadBalancingPolicy load_balancing_policy = 41;
 
-  // [#not-implemented-hide:] If present, tells the client where to send load reports via LRS.
+  // [#not-implemented-hide:]
+  // If present, tells the client where to send load reports via LRS. If not present, the
+  // client will fall back to a client-side default, which may be either (a) don't send any
+  // load reports or (b) send load reports for all clusters to a single default server.
   //
-  // If multiple clusters are configured to use the same LRS server, then the data for all of
-  // those clusters may be sent on the same LRS stream.
+  // Note that if multiple clusters point to the same LRS server, the client may choose to
+  // create a separate stream for each cluster or it may choose to coalesce the data for
+  // multiple clusters onto a single stream. Either way, the client must make sure to send
+  // the data for any given cluster on no more than one stream.
   //
-  // Note that if LRS is configured this way, then there is no need for the LRS server to send
-  // LoadStatsResponse messages on the LRS stream, because the data it would have sent is already
-  // configured here.
-  message LoadReportConfig {
-    // A management server endpoint to stream load stats to via
-    // *StreamLoadStats*. This must have :ref:`api_type
-    // <envoy_api_field_core.ApiConfigSource.api_type>` :ref:`GRPC
-    // <envoy_api_enum_value_core.ApiConfigSource.ApiType.GRPC>`.
-    core.ApiConfigSource lrs_server = 1;
-    // The minimum time interval to collect stats over. This is only a
-    // minimum for two reasons:
-    // 1. There may be some delay between when the timer fires and when
-    //    stats sampling occurs.
-    // 2. Whenever the load reporting interval for the cluster changes, any
-    //    traffic that is observed since the last load report for the
-    //    cluster will be included in the next load report. This avoids
-    //    a period of inobservability for the cluster.
-    google.protobuf.Duration load_reporting_interval = 2;
-    // If set to *true*, the client should generate endpoint-granularity
-    // load reports. Otherwise, load reports should be at locality granularity.
-    bool report_endpoint_granularity = 3;
-  }
-  LoadReportConfig load_report_config = 42;
+  // [#next-major-version: In the v3 API, we should consider restructuring this somehow,
+  // maybe by allowing LRS to go on the ADS stream, or maybe by moving some of the negotiation
+  // from the LRS stream here.]
+  core.ConfigSource lrs_server = 42;
 }
 
 // [#not-implemented-hide:] Extensible load balancing policy configuration.
