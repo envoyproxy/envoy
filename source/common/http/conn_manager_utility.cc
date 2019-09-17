@@ -176,6 +176,7 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
     }
 
     request_headers.removeEnvoyRetriableStatusCodes();
+    request_headers.removeEnvoyRetriableHeaderNames();
     request_headers.removeEnvoyRetryOn();
     request_headers.removeEnvoyRetryGrpcOn();
     request_headers.removeEnvoyMaxRetries();
