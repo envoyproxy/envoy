@@ -20,7 +20,9 @@ envoy_cc_library(
         "@envoy//include/envoy/http:header_map_interface",
         "@envoy//include/envoy/upstream:cluster_manager_interface",
         "@envoy//source/common/buffer:buffer_lib",
+        "@envoy//source/common/common:lock_guard_lib",
         "@envoy//source/common/common:minimal_logger_lib",
+        "@envoy//source/common/common:thread_lib",
     ],
 )
 
