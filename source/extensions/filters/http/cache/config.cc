@@ -1,5 +1,3 @@
-#include "extensions/filters/http/cache/config.h"
-
 #include <memory>
 
 #include "envoy/common/time.h"
@@ -8,6 +6,7 @@
 #include "envoy/stats/scope.h"
 
 #include "extensions/filters/http/cache/cache_filter.h"
+#include "extensions/filters/http/cache/config.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -24,7 +23,6 @@ Http::FilterFactoryCb CacheFilterFactory::createFilterFactoryFromProtoTyped(
 }
 
 REGISTER_FACTORY(CacheFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
-
 
 } // namespace Cache
 } // namespace HttpFilters

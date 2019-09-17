@@ -1,10 +1,9 @@
-#include "extensions/filters/http/cache/http_cache.h"
-
 #include <algorithm>
 
 #include "common/http/headers.h"
 #include "common/protobuf/utility.h"
 
+#include "extensions/filters/http/cache/http_cache.h"
 #include "extensions/filters/http/cache/http_cache_utils.h"
 
 #include "absl/time/time.h"

@@ -1,7 +1,7 @@
-#include "extensions/filters/http/cache/http_cache_utils.h"
-
 #include <array>
 #include <string>
+
+#include "extensions/filters/http/cache/http_cache_utils.h"
 
 #include "absl/algorithm/container.h"
 #include "absl/strings/ascii.h"

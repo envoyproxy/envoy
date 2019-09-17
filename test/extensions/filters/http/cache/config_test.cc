@@ -1,7 +1,9 @@
 #include "extensions/filters/http/cache/config.h"
 #include "extensions/filters/http/cache/simple_http_cache.h"
+
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/utility.h"
+
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -10,8 +12,8 @@ namespace HttpFilters {
 namespace Cache {
 namespace {
 
-class CacheFilterFactoryTest:public ::testing::Test{
- protected:
+class CacheFilterFactoryTest : public ::testing::Test {
+protected:
   envoy::config::filter::http::cache::v2alpha::Cache config_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   CacheFilterFactory factory_;
@@ -30,15 +32,17 @@ TEST_F(CacheFilterFactoryTest, Basic) {
 
 TEST_F(CacheFilterFactoryTest, NoName) {
   Http::FilterFactoryCb cb = factory_.createFilterFactoryFromProto(config_, "stats", context_);
-  EXPECT_THROW(cb(filter_callback_), ProtoValidationException);;
+  EXPECT_THROW(cb(filter_callback_), ProtoValidationException);
+  ;
 }
 
 TEST_F(CacheFilterFactoryTest, UnregisteredName) {
   config_.set_name("Wrong");
   Http::FilterFactoryCb cb = factory_.createFilterFactoryFromProto(config_, "stats", context_);
-  EXPECT_THROW(cb(filter_callback_), ProtoValidationException);;
+  EXPECT_THROW(cb(filter_callback_), ProtoValidationException);
+  ;
 }
-}  // namespace
+} // namespace
 } // namespace Cache
 } // namespace HttpFilters
 } // namespace Extensions

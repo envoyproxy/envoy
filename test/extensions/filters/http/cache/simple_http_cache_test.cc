@@ -194,8 +194,7 @@ TEST_F(SimpleHttpCacheTest, StreamingPut) {
                                            {"cache-control", "public, max-age=3600"}};
   InsertContextPtr inserter = cache_.makeInsertContext(lookup("request_path"));
   inserter->insertHeaders(response_headers, false);
-  inserter->insertBody(
-      Buffer::OwnedImpl("Hello, "), [](bool ready) { EXPECT_TRUE(ready); }, false);
+  inserter->insertBody(Buffer::OwnedImpl("Hello, "), [](bool ready) { EXPECT_TRUE(ready); }, false);
   inserter->insertBody(Buffer::OwnedImpl("World!"), nullptr, true);
   LookupContextPtr name_lookup_context = lookup("request_path");
   EXPECT_EQ(CacheEntryStatus::Ok, lookup_result_.cache_entry_status);
