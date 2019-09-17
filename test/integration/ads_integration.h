@@ -13,8 +13,8 @@
 #include "test/integration/http_integration.h"
 
 namespace Envoy {
-static const std::string& AdsIntegrationConfig() {
-  CONSTRUCT_ON_FIRST_USE(std::string, R"EOF(
+static std::string AdsIntegrationConfig() {
+  return R"EOF(
 dynamic_resources:
   lds_config: {ads: {}}
   cds_config: {ads: {}}
@@ -38,7 +38,7 @@ admin:
     socket_address:
       address: 127.0.0.1
       port_value: 0
-)EOF");
+)EOF";
 }
 
 class AdsIntegrationTest : public Grpc::GrpcClientIntegrationParamTest, public HttpIntegrationTest {
