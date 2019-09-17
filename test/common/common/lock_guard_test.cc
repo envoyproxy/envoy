@@ -9,7 +9,7 @@ namespace Thread {
 class ThreadTest : public testing::Test {
 protected:
   ThreadTest() = default;
-  int a_ GUARDED_BY(a_mutex_){0};
+  int a_ ABSL_GUARDED_BY(a_mutex_){0};
   MutexBasicLockable a_mutex_;
   int b_{0};
 };

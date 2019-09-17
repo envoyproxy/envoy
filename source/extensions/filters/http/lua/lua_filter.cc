@@ -455,11 +455,9 @@ int StreamHandleWrapper::luaVerifySignature(lua_State* state) {
   const char* clear_text = luaL_checkstring(state, 6);
   int text_len = luaL_checknumber(state, 7);
   const std::vector<uint8_t> text_vec(clear_text, clear_text + text_len);
-
   // Step 5: verify signature
-  auto output = Common::Crypto::Utility::verifySignature(hash, reinterpret_cast<EVP_PKEY*>(ptr),
-                                                         sig_vec, text_vec);
-
+  auto crypto = reinterpret_cast<Common::Crypto::CryptoObject*>(ptr);
+  auto output = Common::Crypto::Utility::verifySignature(hash, *crypto, sig_vec, text_vec);
   lua_pushboolean(state, output.result_);
   if (output.result_) {
     lua_pushnil(state);
@@ -474,12 +472,11 @@ int StreamHandleWrapper::luaImportPublicKey(lua_State* state) {
   const char* str = luaL_checkstring(state, 2);
   int n = luaL_checknumber(state, 3);
   std::vector<uint8_t> key(str, str + n);
-
   if (public_key_wrapper_.get() != nullptr) {
     public_key_wrapper_.pushStack();
   } else {
-    public_key_wrapper_.reset(
-        PublicKeyWrapper::create(state, Common::Crypto::Utility::importPublicKey(key)), true);
+    Common::Crypto::CryptoObjectPtr crypto_ptr = Common::Crypto::Utility::importPublicKey(key);
+    public_key_wrapper_.reset(PublicKeyWrapper::create(state, std::move(crypto_ptr)), true);
   }
 
   return 1;
