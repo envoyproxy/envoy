@@ -10,8 +10,9 @@ public class EnvoyConfiguration {
   /**
    * Create an EnvoyConfiguration with a user provided configuration values.
    *
-   * @param domain                The domain to use with Envoy (i.e., `api.foo.com`).
-   *                              TODO: https://github.com/lyft/envoy-mobile/issues/433
+   * @param domain                The domain to use with Envoy (i.e.,
+   *                              `api.foo.com`). TODO:
+   *                              https://github.com/lyft/envoy-mobile/issues/433
    * @param connectTimeoutSeconds timeout for new network connections to hosts in
    *                              the cluster.
    * @param dnsRefreshSeconds     rate in seconds to refresh DNS.
@@ -37,9 +38,9 @@ public class EnvoyConfiguration {
   String resolveTemplate(String templateYAML) {
     String resolvedConfiguration =
         templateYAML.replace("{{ domain }}", domain)
-            .replace("{{ connect_timeout }}", String.format("%ss", connectTimeoutSeconds))
-            .replace("{{ dns_refresh_rate }}", String.format("%ss", dnsRefreshSeconds))
-            .replace("{{ stats_flush_interval }}", String.format("%ss", statsFlushSeconds));
+            .replace("{{ connect_timeout_seconds }}", String.format("%s", connectTimeoutSeconds))
+            .replace("{{ dns_refresh_rate_seconds }}", String.format("%s", dnsRefreshSeconds))
+            .replace("{{ stats_flush_interval_seconds }}", String.format("%s", statsFlushSeconds));
 
     if (resolvedConfiguration.contains("{{")) {
       throw new ConfigurationException();
