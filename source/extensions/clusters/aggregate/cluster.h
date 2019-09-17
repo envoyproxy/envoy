@@ -39,7 +39,7 @@ private:
   // Upstream::ClusterImplBase
   void startPreInit() override;
 
-  void refresh(std::function<bool(const std::string&)> deleting);
+  void refresh(std::function<bool(const std::string&)>&& deleting);
   std::pair<Upstream::PrioritySetImpl,
             std::vector<std::pair<uint32_t, Upstream::ThreadLocalCluster*>>>
   linearizePrioritySet(std::function<bool(const std::string&)> deleting);

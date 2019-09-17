@@ -58,7 +58,7 @@ Cluster::linearizePrioritySet(std::function<bool(const std::string&)> deleting) 
 }
 
 void Cluster::startPreInit() {
-  for (const auto cluster : clusters_) {
+  for (const auto& cluster : clusters_) {
     auto tlc = cluster_manager_.get(cluster);
     if (tlc == nullptr) {
       continue;
@@ -66,15 +66,19 @@ void Cluster::startPreInit() {
 
     // Add callback for clusters initialized before aggregate cluster.
     tlc->prioritySet().addMemberUpdateCb(
-        [this](const Upstream::HostVector&, const Upstream::HostVector&) { refresh(); });
+        [this, cluster](const Upstream::HostVector&, const Upstream::HostVector&) {
+          ENVOY_LOG(info, "member update for cluster '{}'", cluster);
+          refresh();
+        });
   }
+  refresh();
   handle_ = cluster_manager_.addThreadLocalClusterUpdateCallbacks(*this);
 
   onPreInitComplete();
 }
 
-void Cluster::refresh(std::function<bool(const std::string&)> deleting) {
-  auto pair = linearizePrioritySet(deleting);
+void Cluster::refresh(std::function<bool(const std::string&)>&& deleting) {
+  auto pair = linearizePrioritySet(std::move(deleting));
   if (pair.first.hostSetsPerPriority().empty()) {
     if (load_balancer_ != nullptr) {
       load_balancer_.reset();
@@ -86,6 +90,7 @@ void Cluster::refresh(std::function<bool(const std::string&)> deleting) {
 
 void Cluster::onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) {
   if (std::find(clusters_.begin(), clusters_.end(), cluster.info()->name()) != clusters_.end()) {
+    ENVOY_LOG(info, "update or add cluster '{}'", cluster.info()->name());
     refresh();
     cluster.prioritySet().addMemberUpdateCb(
         [this](const Upstream::HostVector&, const Upstream::HostVector&) { refresh(); });
@@ -96,6 +101,7 @@ void Cluster::onClusterRemoval(const std::string& cluster_name) {
   //  The onClusterRemoval callback is called before the thread local cluster was removed. There
   //  will be a dangling pointer to the thread local cluster if delete cluster is not skipped.
   if (std::find(clusters_.begin(), clusters_.end(), cluster_name) != clusters_.end()) {
+    ENVOY_LOG(info, "remove cluster '{}'", cluster_name);
     refresh([&cluster_name](const std::string& c) { return cluster_name == c; });
   }
 }
