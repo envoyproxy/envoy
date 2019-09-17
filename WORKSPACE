@@ -1,5 +1,13 @@
 workspace(name = "envoy")
 
+local_repository(
+  name = "ssl",
+  path = "ssl",
+  repo_mapping = {
+    "@ssl": "@envoy",
+  },
+)
+
 load("//bazel:api_binding.bzl", "envoy_api_binding")
 
 envoy_api_binding()

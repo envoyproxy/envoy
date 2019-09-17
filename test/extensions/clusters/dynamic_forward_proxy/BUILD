@@ -21,12 +21,12 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/clusters/dynamic_forward_proxy:cluster",
         "//source/extensions/transport_sockets/raw_buffer:config",
-        "//source/extensions/transport_sockets/tls:config",
         "//test/common/upstream:utility_lib",
         "//test/extensions/common/dynamic_forward_proxy:mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/server:server_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/test_common:environment_lib",
+        "@ssl//:tls_config",
     ],
 )

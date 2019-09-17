@@ -454,7 +454,6 @@ envoy_cc_test_library(
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tap:config",
-        "//source/extensions/transport_sockets/tls:config",
         "//source/server:connection_handler_lib",
         "//source/server:hot_restart_nop_lib",
         "//source/server:listener_hooks_lib",
@@ -475,6 +474,7 @@ envoy_cc_test_library(
         "//test/test_common:test_time_lib",
         "//test/test_common:test_time_system_interface",
         "//test/test_common:utility_lib",
+        "@ssl//:tls_config",
     ],
 )
 
@@ -688,12 +688,12 @@ envoy_cc_test(
         "//source/common/event:dispatcher_lib",
         "//source/common/network:connection_lib",
         "//source/common/network:utility_lib",
-        "//source/extensions/filters/listener/tls_inspector:config",
-        "//source/extensions/transport_sockets/tls:config",
-        "//source/extensions/transport_sockets/tls:context_config_lib",
-        "//source/extensions/transport_sockets/tls:context_lib",
         "//test/mocks/secret:secret_mocks",
         "//test/test_common:utility_lib",
+        "@ssl//:tls_config",
+        "@ssl//:tls_context_config_lib",
+        "@ssl//:tls_context_lib",
+        "@ssl//:tls_inspector_config",
     ],
 )
 
@@ -713,14 +713,14 @@ envoy_cc_test(
         "//source/common/event:dispatcher_lib",
         "//source/common/network:connection_lib",
         "//source/common/network:utility_lib",
-        "//source/extensions/filters/listener/tls_inspector:config",
-        "//source/extensions/transport_sockets/tls:config",
-        "//source/extensions/transport_sockets/tls:context_config_lib",
-        "//source/extensions/transport_sockets/tls:context_lib",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
         "//test/test_common:utility_lib",
+        "@ssl//:tls_config",
+        "@ssl//:tls_context_config_lib",
+        "@ssl//:tls_context_lib",
+        "@ssl//:tls_inspector_config",
     ],
 )
 
@@ -740,12 +740,12 @@ envoy_cc_test(
         "//source/common/network:utility_lib",
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/filters/network/tcp_proxy:config",
-        "//source/extensions/transport_sockets/tls:config",
-        "//source/extensions/transport_sockets/tls:context_config_lib",
-        "//source/extensions/transport_sockets/tls:context_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
         "//test/test_common:utility_lib",
+        "@ssl//:tls_config",
+        "@ssl//:tls_context_config_lib",
+        "@ssl//:tls_context_lib",
     ],
 )
 
@@ -824,10 +824,10 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         "//source/common/http:header_map_lib",
-        "//source/extensions/filters/listener/tls_inspector:config",
-        "//source/extensions/transport_sockets/tls:config",
         "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
+        "@ssl//:tls_config",
+        "@ssl//:tls_inspector_config",
     ],
 )
 

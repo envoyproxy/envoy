@@ -31,7 +31,6 @@ envoy_cc_mock(
         "//source/common/secret:secret_manager_impl_lib",
         "//source/common/singleton:manager_impl_lib",
         "//source/common/stats:stats_lib",
-        "//source/extensions/transport_sockets/tls:context_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/api:api_mocks",
         "//test/mocks/http:http_mocks",
@@ -47,5 +46,6 @@ envoy_cc_mock(
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:test_time_lib",
         "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
+        "@ssl//:tls_context_lib",
     ],
 )

@@ -190,15 +190,15 @@ envoy_cc_test(
         "//source/common/network:utility_lib",
         "//source/common/protobuf",
         "//source/extensions/filters/listener/original_dst:config",
-        "//source/extensions/filters/listener/tls_inspector:config",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
-        "//source/extensions/transport_sockets/tls:config",
-        "//source/extensions/transport_sockets/tls:ssl_socket_lib",
         "//source/server:active_raw_udp_listener_config",
         "//test/test_common:registry_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
+        "@ssl//:tls_config",
+        "@ssl//:tls_inspector_config",
+        "@ssl//:tls_ssl_socket_lib",
     ],
 )
 
@@ -229,11 +229,8 @@ envoy_cc_test(
         "//source/common/network:utility_lib",
         "//source/common/protobuf",
         "//source/extensions/filters/listener/original_dst:config",
-        "//source/extensions/filters/listener/tls_inspector:config",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
-        "//source/extensions/transport_sockets/tls:config",
-        "//source/extensions/transport_sockets/tls:ssl_socket_lib",
         "//source/server:filter_chain_manager_lib",
         "//source/server:listener_manager_lib",
         "//test/mocks/network:network_mocks",
@@ -243,6 +240,9 @@ envoy_cc_test(
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_time_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
+        "@ssl//:tls_config",
+        "@ssl//:tls_inspector_config",
+        "@ssl//:tls_ssl_socket_lib",
     ],
 )
 
@@ -365,6 +365,6 @@ envoy_cc_test_binary(
         "//test/test_common:environment_lib",
         "//test/mocks/network:network_mocks",
         # tranport socket config registration
-        "//source/extensions/transport_sockets/tls:config",
+        "@ssl//:tls_config",
     ],
 )

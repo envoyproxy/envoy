@@ -48,7 +48,6 @@ envoy_cc_test(
         "//source/common/upstream:cluster_manager_lib",
         "//source/common/upstream:subset_lb_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
-        "//source/extensions/transport_sockets/tls:context_lib",
         "//test/integration/clusters:custom_static_cluster",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/api:api_mocks",
@@ -67,6 +66,7 @@ envoy_cc_test(
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:cds_cc",
+        "@ssl//:tls_context_lib",
     ],
 )
 
@@ -200,7 +200,6 @@ envoy_cc_test(
     srcs = ["hds_test.cc"],
     deps = [
         "//source/common/upstream:health_discovery_service_lib",
-        "//source/extensions/transport_sockets/tls:context_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/grpc:grpc_mocks",
@@ -213,6 +212,7 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2/endpoint:load_report_cc",
         "@envoy_api//envoy/service/discovery/v2:hds_cc",
+        "@ssl//:tls_context_lib",
     ],
 )
 

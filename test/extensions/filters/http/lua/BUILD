@@ -17,13 +17,13 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.http.lua",
     deps = [
         "//source/common/stream_info:stream_info_lib",
-        "//source/extensions/filters/http/lua:lua_filter_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
+        "@ssl//:lua_filter_lib",
     ],
 )
 
@@ -33,10 +33,10 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.http.lua",
     deps = [
         "//source/common/stream_info:stream_info_lib",
-        "//source/extensions/filters/http/lua:wrappers_lib",
         "//test/extensions/filters/common/lua:lua_wrappers_lib",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:utility_lib",
+        "@ssl//:lua_wrappers_lib",
     ],
 )
 
@@ -45,9 +45,9 @@ envoy_extension_cc_test(
     srcs = ["lua_integration_test.cc"],
     extension_name = "envoy.filters.http.lua",
     deps = [
-        "//source/extensions/filters/http/lua:config",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
+        "@ssl//:lua_config",
     ],
 )
 
@@ -56,7 +56,7 @@ envoy_extension_cc_test(
     srcs = ["config_test.cc"],
     extension_name = "envoy.filters.http.lua",
     deps = [
-        "//source/extensions/filters/http/lua:config",
         "//test/mocks/server:server_mocks",
+        "@ssl//:lua_config",
     ],
 )
