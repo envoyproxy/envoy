@@ -330,7 +330,7 @@ static void BufferStartsWith(benchmark::State& state) {
   Buffer::OwnedImpl buffer(input);
   ssize_t result = 0;
   for (auto _ : state) {
-    if (!buffer.startsWith(Pattern.c_str(), Pattern.length())) {
+    if (!buffer.startsWith({Pattern.c_str(), Pattern.length()})) {
       result++;
     }
   }
@@ -353,7 +353,7 @@ static void BufferStartsWithMatch(benchmark::State& state) {
   Buffer::OwnedImpl buffer(input);
   ssize_t result = 0;
   for (auto _ : state) {
-    if (buffer.startsWith(Prefix.c_str(), Prefix.length())) {
+    if (buffer.startsWith({Prefix.c_str(), Prefix.length()})) {
       result++;
     }
   }

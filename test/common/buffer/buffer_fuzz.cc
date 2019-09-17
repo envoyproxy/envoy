@@ -128,9 +128,7 @@ public:
     return data_.find(std::string(static_cast<const char*>(data), size), start);
   }
 
-  bool startsWith(const void* data, uint64_t size) const override {
-    return absl::StartsWith(data_, absl::string_view{static_cast<const char*>(data), size});
-  }
+  bool startsWith(absl::string_view data) const override { return absl::StartsWith(data_, data); }
 
   std::string toString() const override { return data_; }
 

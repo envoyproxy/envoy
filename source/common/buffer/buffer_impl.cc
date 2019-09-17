@@ -535,13 +535,13 @@ ssize_t OwnedImpl::search(const void* data, uint64_t size, size_t start) const {
   }
 }
 
-bool OwnedImpl::startsWith(const void* data, uint64_t size) const {
-  if (length() < size) {
+bool OwnedImpl::startsWith(absl::string_view data) const {
+  if (length() < data.length()) {
     // Buffer is too short to contain data.
     return false;
   }
 
-  if (size == 0) {
+  if (data.length() == 0) {
     return true;
   }
 
@@ -551,15 +551,16 @@ bool OwnedImpl::startsWith(const void* data, uint64_t size) const {
       return false;
     }
 
-    if (-1 == evbuffer_ptr_set(buffer_.get(), &end_ptr, size, EVBUFFER_PTR_SET)) {
+    if (-1 == evbuffer_ptr_set(buffer_.get(), &end_ptr, data.length(), EVBUFFER_PTR_SET)) {
       return false;
     }
 
-    evbuffer_ptr result_ptr = evbuffer_search_range(buffer_.get(), static_cast<const char*>(data),
-                                                    size, &start_ptr, &end_ptr);
+    evbuffer_ptr result_ptr =
+        evbuffer_search_range(buffer_.get(), data.data(), data.length(), &start_ptr, &end_ptr);
     return result_ptr.pos == 0;
   } else {
-    const uint8_t* prefix = static_cast<const uint8_t*>(data);
+    const uint8_t* prefix = reinterpret_cast<const uint8_t*>(data.data());
+    size_t size = data.length();
     for (const auto& slice : slices_) {
       uint64_t slice_size = slice->dataSize();
       const uint8_t* slice_start = slice->data();

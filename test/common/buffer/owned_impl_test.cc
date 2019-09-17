@@ -493,16 +493,16 @@ TEST_P(OwnedImplTest, StartsWith) {
   }
   EXPECT_STREQ("abaaaabaaaaaba", buffer.toString().c_str());
 
-  EXPECT_FALSE(buffer.startsWith("abaaaabaaaaabaXXX", 17));
-  EXPECT_FALSE(buffer.startsWith("c", 1));
-  EXPECT_TRUE(buffer.startsWith("", 0));
-  EXPECT_TRUE(buffer.startsWith("a", 1));
-  EXPECT_TRUE(buffer.startsWith("ab", 2));
-  EXPECT_TRUE(buffer.startsWith("aba", 3));
-  EXPECT_TRUE(buffer.startsWith("abaa", 4));
-  EXPECT_TRUE(buffer.startsWith("abaaaab", 7));
-  EXPECT_TRUE(buffer.startsWith("abaaaabaaaaaba", 14));
-  EXPECT_FALSE(buffer.startsWith("ba", 2));
+  EXPECT_FALSE(buffer.startsWith({"abaaaabaaaaabaXXX", 17}));
+  EXPECT_FALSE(buffer.startsWith({"c", 1}));
+  EXPECT_TRUE(buffer.startsWith({"", 0}));
+  EXPECT_TRUE(buffer.startsWith({"a", 1}));
+  EXPECT_TRUE(buffer.startsWith({"ab", 2}));
+  EXPECT_TRUE(buffer.startsWith({"aba", 3}));
+  EXPECT_TRUE(buffer.startsWith({"abaa", 4}));
+  EXPECT_TRUE(buffer.startsWith({"abaaaab", 7}));
+  EXPECT_TRUE(buffer.startsWith({"abaaaabaaaaaba", 14}));
+  EXPECT_FALSE(buffer.startsWith({"ba", 2}));
 }
 
 TEST_P(OwnedImplTest, ToString) {

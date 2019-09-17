@@ -256,9 +256,9 @@ TEST_P(WatermarkBufferTest, Search) {
 TEST_P(WatermarkBufferTest, StartsWith) {
   buffer_.add(TEN_BYTES, 10);
 
-  EXPECT_TRUE(buffer_.startsWith(TEN_BYTES, 2));
-  EXPECT_TRUE(buffer_.startsWith(TEN_BYTES, 10));
-  EXPECT_FALSE(buffer_.startsWith(&TEN_BYTES[1], 2));
+  EXPECT_TRUE(buffer_.startsWith({TEN_BYTES, 2}));
+  EXPECT_TRUE(buffer_.startsWith({TEN_BYTES, 10}));
+  EXPECT_FALSE(buffer_.startsWith({&TEN_BYTES[1], 2}));
 }
 
 TEST_P(WatermarkBufferTest, MoveBackWithWatermarks) {
