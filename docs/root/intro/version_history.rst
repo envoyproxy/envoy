@@ -54,6 +54,7 @@ Version history
 * router check tool: add comprehensive coverage reporting.
 * router check tool: add deprecated field check.
 * router check tool: add flag for only printing results of failed tests.
+* router check tool: add support for outputting missing tests in the detailed coverage report.
 * server: added a post initialization lifecycle event, in addition to the existing startup and shutdown events.
 * thrift_proxy: fix crashing bug on invalid transport/protocol framing
 * tls: added verification of IP address SAN fields in certificates against configured SANs in the
