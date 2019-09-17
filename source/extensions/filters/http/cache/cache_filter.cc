@@ -80,7 +80,8 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::HeaderMap& headers, b
 Http::FilterDataStatus CacheFilter::encodeData(Buffer::Instance& data, bool end_stream) {
   if (insert_) {
     // TODO(toddmgreer) Wait for the cache if necessary.
-    insert_->insertBody(data, [](bool) {}, end_stream);
+    insert_->insertBody(
+        data, [](bool) {}, end_stream);
   }
   return Http::FilterDataStatus::Continue;
 }
