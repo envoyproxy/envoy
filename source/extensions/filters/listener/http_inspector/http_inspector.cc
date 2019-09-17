@@ -122,7 +122,9 @@ void Filter::done(bool success) {
     } else {
       ASSERT(protocol_ == "HTTP/2");
       config_->stats().http2_found_.inc();
-      protocol = "h2";
+      // h2 HTTP/2 over TLS, h2c HTTP/2 over TCP
+      // TODO(yxue): use detected protocol from http inspector and support h2c token in HCM
+      protocol = "h2c";
     }
 
     cb_->socket().setRequestedApplicationProtocols({protocol});
