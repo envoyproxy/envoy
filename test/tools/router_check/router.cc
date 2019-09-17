@@ -8,6 +8,7 @@
 #include "common/network/utility.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
+#include "common/runtime/runtime_impl.h"
 #include "common/stream_info/stream_info_impl.h"
 
 #include "test/test_common/printers.h"
@@ -71,6 +72,7 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_file,
   auto stats = std::make_unique<Stats::IsolatedStoreImpl>();
   auto api = Api::createApiForTest(*stats);
   TestUtility::loadFromFile(router_config_file, route_config, *api);
+  assignUniqueRouteNames(route_config);
 
   auto factory_context = std::make_unique<NiceMock<Server::Configuration::MockFactoryContext>>();
   auto config = std::make_unique<Router::ConfigImpl>(route_config, *factory_context, false);
@@ -82,6 +84,15 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_file,
 
   return RouterCheckTool(std::move(factory_context), std::move(config), std::move(stats),
                          std::move(api), Coverage(route_config));
+}
+
+void RouterCheckTool::assignUniqueRouteNames(envoy::api::v2::RouteConfiguration& route_config) {
+  Runtime::RandomGeneratorImpl random;
+  for (auto& host : *route_config.mutable_virtual_hosts()) {
+    for (auto& route : *host.mutable_routes()) {
+      route.set_name(random.uuid());
+    }
+  }
 }
 
 RouterCheckTool::RouterCheckTool(
