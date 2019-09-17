@@ -1,8 +1,8 @@
+#include "extensions/filters/http/cache/cache_filter.h"
+
 #include "envoy/registry/registry.h"
 
 #include "common/http/headers.h"
-
-#include "extensions/filters/http/cache/cache_filter.h"
 
 #include "absl/memory/memory.h"
 #include "absl/strings/string_view.h"
