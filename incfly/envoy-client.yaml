@@ -41,11 +41,23 @@ static_resources:
     type: eds
     eds_cluster_config:
       eds_config: { path: "./incfly/eds.yaml" }
-    transport_socket_matchers:
-      match: mtlsReady
-      tls_context:
-        common_tls_context:
-          tls_certificates:
+    transport_socket_matches:
+    - name: "mtlsReady"
+      match: {} # hardcoded, change to metadata later.
+      transport_socket:
+        name: "tls"
+        # TODO(incfly): support other sockets.
+        # tls socket uses `struct` config other sockets may use `typed socket` need more impl.
+        config:
+          common_tls_context:
+            tls_certificates:
             - certificate_chain: { filename: "./test/config/integration/certs/clientcert.pem" }
               private_key: { filename: "./test/config/integration/certs/clientkey.pem" }
+    #transport_socket_matchers:
+      #match: mtlsReady
+      #tls_context:
+        #common_tls_context:
+          #tls_certificates:
+            #- certificate_chain: { filename: "./test/config/integration/certs/clientcert.pem" }
+              #private_key: { filename: "./test/config/integration/certs/clientkey.pem" }
 
