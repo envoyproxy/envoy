@@ -72,9 +72,6 @@ def FormatCommentWithAnnotations(comment, type_name=''):
   s = annotations.WithoutAnnotations(StripLeadingSpace(comment.raw) + '\n')
   if annotations.NOT_IMPLEMENTED_WARN_ANNOTATION in comment.annotations:
     s += '\n.. WARNING::\n  Not implemented yet\n'
-  if annotations.V2_API_DIFF_ANNOTATION in comment.annotations:
-    s += '\n.. NOTE::\n  **v2 API difference**: ' + comment.annotations[
-        annotations.V2_API_DIFF_ANNOTATION] + '\n'
   if type_name == 'message' or type_name == 'enum':
     if annotations.PROTO_STATUS_ANNOTATION in comment.annotations:
       status = comment.annotations[annotations.PROTO_STATUS_ANNOTATION]

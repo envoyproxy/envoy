@@ -386,7 +386,7 @@ message DownstreamTlsContext {
 message SdsSecretConfig {
   // Name (FQDN, UUID, SPKI, SHA256, etc.) by which the secret can be uniquely referred to.
   // When both name and config are specified, then secret can be fetched and/or reloaded via SDS.
-  // When only name is specified, then secret will be loaded from static resources [V2-API-DIFF].
+  // When only name is specified, then secret will be loaded from static resources.
   string name = 1;
   core.ConfigSource sds_config = 2;
 }
