@@ -5,3 +5,5 @@ build --define hot_restart=disabled
 build --define tcmalloc=disabled
 # Build GRPC without c-ares support -- otherwise it will not link
 build --define grpc_no_ares=true
+build --features=compiler_param_file
+build --workspace_status_command="bash bazel/get_workspace_status"
