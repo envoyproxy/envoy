@@ -242,35 +242,59 @@ message Cluster {
   message TransportSocketMatcher {
     // The name of the match.
     string name = 1;
-    // In order to be match, an endpoint must have all the label key/value pairs
-    // as specified in by *label_match*.
-    repeated endpoint.Label label_matches = 2;
+
+    // Optional endpoint metadata match criteria.
+    // The connection to the endpoint with metadata matching what is set in this field
+    // will use the transport socket configuration specified here.
+    // The endpoints metadata entry in *envoy.transport_socket* is used to match
+    // against the values specified in this field.
+    google.protobuf.Struct match = 2;
+
     // The configuration of the transport socket.
     core.TransportSocket transport_socket = 3;
   }
 
   // Configuration to use different transport sockets for different endpoints.
   //
-  // An endpoint's *endpoint.Labels* is used to match against the *label_matches*
-  // to decide which transport socket to use when connecting to that particular endpoint.
+  // The entry of *envoy.transport_socket* in endpoint :ref:`Metadata <envoy_api_msg_core.Metadata>`
+  // is used to match against the transport sockets as they appear in the list. The first
+  // matched :ref:`TransportSockerMatcher <envoy_api_msg_Cluster.TransportSocketMatcher>` is used.
   // For example, with following matcher
   //
   // .. code-block:: json
   //
   // {
   //   "endpoint_transport_socket_matchers": [
-  //     { "name": "enable-mtls", label_matches: [ { "label": "app": value: "foo" } ]
-  //     transport_socket: { "name": "tls", "config": { ... }
+  //     {
+  //       "name": "enable-mtls",
+  //       "match": { "app": "sidecar" },
+  //       "transport_socket": { "name": "tls", "config": { ... } }
+  //     },
+  //     {
+  //       "name": "use-plaintext",
+  //       "match": {},
+  //       "transport_socket": { "name": "rawbuffer", "config": { } }
+  //     },
   //   ]
   // }
   //
-  // Connection to the endpoints whose "app" label equals to "foo" value uses "enable-mtls"
-  // configuration, a tls socket with detailed configuration specified as *config*.
+  // Connection to the endpoints whose metadata value under *envoy.transport_socket*
+  // having "app"/"sidecar" key/value pair will use the "enable-mtls" socket configuration.
   //
-  // If an endpoint can't be matched against any *TransportSockerMatcher*, connection socket
-  // fallbacks to use the *tls_context* or *transport_socket* specified in this cluster.
+  // If :ref:`TransportSockerMatcher <envoy_api_msg_Cluster.TransportSocketMatcher>` with empty
+  // match is provided, that always match the endpoint. In above case, the "use-plaintext" config
+  // will be used always.
+  //
+  // If a endpoint metadata value under *envoy.transport_socket* can't matching againt any
+  // *TransportSockerMatcher*, connection socket fallbacks to use the *tls_context* or
+  // *transport_socket* specified in this cluster.
+  //
+  // This field allows gradual and flexible transport socket configuration changes.
+  // For example, for the same EDS typed cluster, in order to migrate from plain text traffic to
+  // mutual TLS, management server can configure different Envoy clients different
+  // *transport_socket_matchers*.
   // [#not-implemented-hide:]
-  repeated TransportSocketMatcher endpoint_transport_socket_matchers = 42;
+  repeated TransportSocketMatcher transport_socket_matchers = 42;
 
   reserved 12;
 
