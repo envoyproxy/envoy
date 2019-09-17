@@ -40,8 +40,8 @@ HttpCache& getCache(const envoy::config::filter::http::cache::v2alpha::Cache& co
   HttpCacheFactory* factory =
       Registry::FactoryRegistry<HttpCacheFactory>::getFactory(config.name());
   if (!factory) {
-    throw EnvoyException(
-        fmt::format("Didn't find a registered HttpCacheFactory for '{}'", config.name()));
+    throw ProtoValidationException(
+        fmt::format("Didn't find a registered HttpCacheFactory for '{}'", config.name()), config);
   }
   return factory->getCache();
 }
@@ -80,8 +80,7 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::HeaderMap& headers, b
 Http::FilterDataStatus CacheFilter::encodeData(Buffer::Instance& data, bool end_stream) {
   if (insert_) {
     // TODO(toddmgreer) Wait for the cache if necessary.
-    insert_->insertBody(
-        data, [](bool) {}, end_stream);
+    insert_->insertBody(data, [](bool) {}, end_stream);
   }
   return Http::FilterDataStatus::Continue;
 }

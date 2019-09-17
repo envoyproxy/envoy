@@ -19,11 +19,12 @@ Http::FilterFactoryCb CacheFilterFactory::createFilterFactoryFromProtoTyped(
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
   return [config, stats_prefix, &context](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(
-        std::make_shared<CacheFilter>(config, stats_prefix, context.scope(), context.timeSource()));
+        CacheFilter::make(config, stats_prefix, context.scope(), context.timeSource()));
   };
 }
 
 REGISTER_FACTORY(CacheFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
+
 
 } // namespace Cache
 } // namespace HttpFilters

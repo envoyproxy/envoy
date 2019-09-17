@@ -17,17 +17,18 @@ namespace Cache {
 
 /**
  * A filter that caches responses and attempts to satisfy requests from cache.
- * Must be owned by a shared_ptr.
  */
 class CacheFilter;
 using CacheFilterSharedPtr = std::shared_ptr<CacheFilter>;
 class CacheFilter : public Http::PassThroughFilter,
                     public std::enable_shared_from_this<CacheFilter> {
 public:
-  // Throws EnvoyException if no registered HttpCacheFactory for config.name.
-  CacheFilter(const envoy::config::filter::http::cache::v2alpha::Cache& config,
-              const std::string& stats_prefix, Stats::Scope& scope, TimeSource& time_source);
-
+  // Throws ProtoValidationException if no registered HttpCacheFactory for config.name.
+  static CacheFilterSharedPtr make(const envoy::config::filter::http::cache::v2alpha::Cache& config,
+                                   const std::string& stats_prefix, Stats::Scope& scope,
+                                   TimeSource& time_source) {
+    return std::shared_ptr<CacheFilter>(new CacheFilter(config, stats_prefix, scope, time_source));
+  }
   // Http::StreamFilterBase
   void onDestroy() override;
   // Http::StreamDecoderFilter
@@ -37,6 +38,12 @@ public:
   Http::FilterDataStatus encodeData(Buffer::Instance& buffer, bool end_stream) override;
 
 private:
+  // Throws EnvoyException if no registered HttpCacheFactory for config.name.
+  // Constructor is private to enforce enable_shared_from_this's requirement that this must be owned
+  // by a shared_ptr.
+  CacheFilter(const envoy::config::filter::http::cache::v2alpha::Cache& config,
+              const std::string& stats_prefix, Stats::Scope& scope, TimeSource& time_source);
+
   void getBody();
   void onOkHeaders(Http::HeaderMapPtr&& headers, std::vector<AdjustedByteRange>&& response_ranges,
                    uint64_t content_length, bool has_trailers);
