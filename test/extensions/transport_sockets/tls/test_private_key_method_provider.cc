@@ -100,7 +100,8 @@ static ssl_private_key_result_t rsaPrivateKeySign(SSL* ssl, uint8_t* out, size_t
   TestPrivateKeyConnection* ops = static_cast<TestPrivateKeyConnection*>(
       SSL_get_ex_data(ssl, TestPrivateKeyMethodProvider::rsaConnectionIndex()));
   unsigned char hash[EVP_MAX_MD_SIZE] = {0};
-  unsigned int hash_len;
+  unsigned int hash_len = EVP_MAX_MD_SIZE;
+  std::vector<uint8_t> in2;
 
   if (!ops) {
     return ssl_private_key_failure;
@@ -119,11 +120,18 @@ static ssl_private_key_result_t rsaPrivateKeySign(SSL* ssl, uint8_t* out, size_t
     return ssl_private_key_failure;
   }
 
-  // If crypto error is set, we'll just leave the hash to zeroes.
-  if (!ops->test_options_.crypto_error_) {
-    if (!calculateDigest(md, in, in_len, hash, &hash_len)) {
-      return ssl_private_key_failure;
+  in2.assign(in, in + in_len);
+
+  // If crypto error is set, we'll modify the incoming token by flipping
+  // the bits.
+  if (ops->test_options_.crypto_error_) {
+    for (size_t i = 0; i < in_len; i++) {
+      in2.data()[i] ^= in2.data()[i];
     }
+  }
+
+  if (!calculateDigest(md, in2.data(), in_len, hash, &hash_len)) {
+    return ssl_private_key_failure;
   }
 
   RSA* rsa = EVP_PKEY_get0_RSA(ops->getPrivateKey());
@@ -133,7 +141,9 @@ static ssl_private_key_result_t rsaPrivateKeySign(SSL* ssl, uint8_t* out, size_t
 
   // Perform RSA signing.
   if (SSL_is_signature_algorithm_rsa_pss(signature_algorithm)) {
-    RSA_sign_pss_mgf1(rsa, out_len, out, max_out, hash, hash_len, md, nullptr, -1);
+    if (!RSA_sign_pss_mgf1(rsa, out_len, out, max_out, hash, hash_len, md, nullptr, -1)) {
+      return ssl_private_key_failure;
+    }
   } else {
     unsigned int out_len_unsigned;
     if (!RSA_sign(EVP_MD_type(md), hash, hash_len, out, &out_len_unsigned, rsa)) {
