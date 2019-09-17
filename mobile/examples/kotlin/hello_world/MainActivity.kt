@@ -9,16 +9,20 @@ import android.support.v7.widget.LinearLayoutManager
 import android.support.v7.widget.RecyclerView
 import android.util.Log
 import io.envoyproxy.envoymobile.AndroidEnvoyClientBuilder
+import io.envoyproxy.envoymobile.Domain
 import io.envoyproxy.envoymobile.Envoy
 import io.envoyproxy.envoymobile.RequestBuilder
 import io.envoyproxy.envoymobile.RequestMethod
 import io.envoyproxy.envoymobile.ResponseHandler
+
 import io.envoyproxy.envoymobile.shared.Failure
 import io.envoyproxy.envoymobile.shared.ResponseRecyclerViewAdapter
 import io.envoyproxy.envoymobile.shared.Success
 import java.io.IOException
+import java.util.HashMap
 import java.util.concurrent.Executor
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 
 private const val REQUEST_HANDLER_THREAD_NAME = "hello_envoy_kt"
@@ -37,7 +41,7 @@ class MainActivity : Activity() {
     super.onCreate(savedInstanceState)
     setContentView(R.layout.activity_main)
 
-    envoy = AndroidEnvoyClientBuilder(baseContext).build()
+    envoy = AndroidEnvoyClientBuilder(baseContext, Domain(REQUEST_AUTHORITY)).build()
 
     recyclerView = findViewById(R.id.recycler_view) as RecyclerView
     recyclerView.layoutManager = LinearLayoutManager(this)
@@ -70,21 +74,29 @@ class MainActivity : Activity() {
   }
 
   private fun makeRequest() {
-    val request = RequestBuilder(RequestMethod.GET, REQUEST_SCHEME,
-        REQUEST_AUTHORITY, REQUEST_PATH).build()
-
-    val handler = ResponseHandler(Executor { r -> r.run() })
+    val request = RequestBuilder(RequestMethod.GET, REQUEST_SCHEME, REQUEST_AUTHORITY, REQUEST_PATH)
+        .build()
+    val responseHeaders = HashMap<String, List<String>>()
+    val responseStatus = AtomicInteger()
+    val handler = ResponseHandler(Executor { it.run() })
         .onHeaders { headers, status, _ ->
-          if (status == 200) {
-            val serverHeaderField = headers[ENVOY_SERVER_HEADER]?.first() ?: ""
-            val body = "" // fake data
+          responseHeaders.putAll(headers)
+          responseStatus.set(status)
+          Unit
+        }
+        .onData { buffer, _ ->
+          if (responseStatus.get() == 200 && buffer.hasArray()) {
+            val serverHeaderField = responseHeaders[ENVOY_SERVER_HEADER]!![0]
+            val body = String(buffer.array())
             recyclerView.post { viewAdapter.add(Success(body, serverHeaderField)) }
           } else {
-            recyclerView.post { viewAdapter.add(Failure("failed with status: $status")) }
+            recyclerView.post { viewAdapter.add(Failure("failed with status " + responseStatus.get())) }
           }
+          Unit
         }
-        .onError {
-          recyclerView.post { viewAdapter.add(Failure("failed with error ")) }
+        .onError { error ->
+          recyclerView.post { viewAdapter.add(Failure("failed with error " + error.message)) }
+          Unit
         }
 
     envoy.send(request, null, emptyMap(), handler)
