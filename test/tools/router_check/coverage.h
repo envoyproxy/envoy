@@ -17,6 +17,7 @@ public:
   void setHostRewriteCovered() { host_rewrite_covered_ = true; }
   void setRedirectPathCovered() { redirect_path_covered_ = true; }
   bool covers(const Envoy::Router::RouteEntry* route) { return &route_ == route; }
+  const Envoy::Router::RouteEntry& route() { return route_; }
 
 private:
   const Envoy::Router::RouteEntry& route_;
@@ -45,6 +46,8 @@ public:
   void markRedirectPathCovered(const Envoy::Router::RouteEntry& route);
   double report();
   double detailedReport();
+  void printMissingTests(const std::set<std::string>& all_route_names,
+                         const std::set<std::string>& covered_route_names);
 
 private:
   RouteCoverage& coveredRoute(const Envoy::Router::RouteEntry& route);
