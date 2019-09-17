@@ -92,6 +92,7 @@ public:
                       uint64_t random_value) const override;
   const std::string& get(const std::string& key) const override;
   uint64_t getInteger(const std::string& key, uint64_t default_value) const override;
+  double getDouble(const std::string& key, double default_value) const override;
   const std::vector<OverrideLayerConstPtr>& getLayers() const override;
 
   static Entry createEntry(const std::string& value);
@@ -109,11 +110,15 @@ private:
     if (parseEntryUintValue(entry)) {
       return;
     }
+    if (parseEntryDoubleValue(entry)) {
+      return;
+    }
     parseEntryFractionalPercentValue(entry);
   }
 
   static bool parseEntryBooleanValue(Entry& entry);
   static bool parseEntryUintValue(Entry& entry);
+  static bool parseEntryDoubleValue(Entry& entry);
   static void parseEntryFractionalPercentValue(Entry& entry);
 
   const std::vector<OverrideLayerConstPtr> layers_;
