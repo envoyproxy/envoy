@@ -45,6 +45,7 @@ envoy_cc_test(
     deps = [
         "//source/common/common:utility_lib",
         "//source/common/stats:recent_lookups_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:simulated_time_system_lib",
     ],
 )

@@ -1,46 +1,36 @@
 #pragma once
 
-#include <atomic>
 #include <deque>
 #include <functional>
 #include <utility>
 
 #include "envoy/common/time.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Stats {
 
 // Remembers the last 'Capacity' items passed to lookup().
-template <class T, size_t Capacity = 10> class RecentLookups {
+class RecentLookups {
 public:
   explicit RecentLookups(TimeSource& time_source) : time_source_(time_source) {}
 
   /**
-   * Records a lookup of an object of type T. Only the last 'Capacity' lookups
-   * are remembered.
+   * Records a lookup of a string. Only the last 'Capacity' lookups are remembered.
    *
-   * @param t the item being looked up.
+   * @param str the item being looked up.
    */
-  void lookup(T t) {
-    ++total_;
-    if (queue_.size() >= Capacity) {
-      queue_.pop_back();
-    }
-    queue_.push_front(ItemTime(t, time_source_.systemTime()));
-  }
+  void lookup(absl::string_view str);
 
-  using IterFn = std::function<void(T, SystemTime)>;
+  using IterFn = std::function<void(absl::string_view, SystemTime)>;
 
   /**
    * Calls fn(item, timestamp) for each of the remembered lookups.
    *
    * @param fn The function to call for every recently looked up item.
    */
-  void forEach(IterFn fn) const {
-    for (const ItemTime& item_time : queue_) {
-      fn(item_time.first, item_time.second);
-    }
-  }
+  void forEach(IterFn fn) const;
 
   /**
    * @return the time-source associated with the object.
@@ -53,10 +43,11 @@ public:
   uint64_t total() const { return total_; }
 
 private:
-  using ItemTime = std::pair<T, SystemTime>;
+  using ItemTime = std::pair<std::string, SystemTime>;
   std::deque<ItemTime> queue_;
   TimeSource& time_source_;
   uint64_t total_{0};
+  SystemTime last_log_time_;
 };
 
 } // namespace Stats

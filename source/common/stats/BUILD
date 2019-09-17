@@ -89,8 +89,12 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "recent_lookups_lib",
+    srcs = ["recent_lookups.cc"],
     hdrs = ["recent_lookups.h"],
-    deps = ["//include/envoy/common:time_interface"],
+    deps = [
+        "//include/envoy/common:time_interface",
+        "//source/common/common:logger_lib",
+    ],
 )
 
 envoy_cc_library(

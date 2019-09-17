@@ -248,7 +248,7 @@ private:
   // TODO(ambuc): There might be an optimization here relating to storing ranges of freed symbols
   // using an Envoy::IntervalSet.
   std::stack<Symbol> pool_ GUARDED_BY(lock_);
-  std::unique_ptr<RecentLookups<std::string>> recent_lookups_ GUARDED_BY(lock_);
+  std::unique_ptr<RecentLookups> recent_lookups_ GUARDED_BY(lock_);
 
   absl::flat_hash_set<StatNameSet*> stat_name_sets_ GUARDED_BY(stat_name_set_mutex_);
 };
@@ -696,7 +696,7 @@ private:
   friend class SymbolTableImpl;
 
   void trackRecentLookups(TimeSource& time_source);
-  uint64_t getRecentLookups(const RecentLookups<StatName>::IterFn& iter);
+  uint64_t getRecentLookups(const RecentLookups::IterFn& iter);
 
   Stats::SymbolTable& symbol_table_;
   Stats::StatNamePool pool_;
@@ -704,7 +704,7 @@ private:
   using StringStatNameMap = absl::flat_hash_map<std::string, Stats::StatName>;
   StringStatNameMap builtin_stat_names_;
   StringStatNameMap dynamic_stat_names_ GUARDED_BY(mutex_);
-  std::unique_ptr<RecentLookups<StatName>> recent_lookups_ GUARDED_BY(mutex_);
+  std::unique_ptr<RecentLookups> recent_lookups_ GUARDED_BY(mutex_);
 };
 
 } // namespace Stats

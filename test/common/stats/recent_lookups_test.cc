@@ -4,6 +4,7 @@
 #include "common/common/utility.h"
 #include "common/stats/recent_lookups.h"
 
+#include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
 
 #include "absl/strings/str_cat.h"
@@ -22,7 +23,7 @@ protected:
 
   std::string joinLookups() {
     std::vector<std::string> accum;
-    recent_lookups_.forEach([&accum](std::string item, SystemTime time) {
+    recent_lookups_.forEach([&accum](absl::string_view item, SystemTime time) {
       DateFormatter formatter("%Y-%m-%d,%H:%M:%S");
       accum.emplace_back(absl::StrCat(formatter.fromTime(time), ";Item=", item));
     });
@@ -31,7 +32,7 @@ protected:
   }
 
   Event::SimulatedTimeSystem time_system_;
-  RecentLookups<std::string> recent_lookups_;
+  RecentLookups recent_lookups_;
 };
 
 TEST_F(RecentLookupsTest, Empty) { EXPECT_EQ("", joinLookups()); }
@@ -77,6 +78,16 @@ TEST_F(RecentLookupsTest, RepeatDrop) {
             "2009-12-22,00:00:20;Item=lookup10 "
             "2009-12-22,00:00:21;Item=lookup10",
             joinLookups());
+}
+
+TEST_F(RecentLookupsTest, Log) {
+  EXPECT_LOG_CONTAINS("warn", "Recent lookups for alpha", recent_lookups_.lookup("alpha"));
+  EXPECT_NO_LOGS(recent_lookups_.lookup("beta"));
+  time_system_.sleep(std::chrono::seconds(100));
+  EXPECT_NO_LOGS(recent_lookups_.lookup("gamma"));
+  time_system_.sleep(std::chrono::seconds(250));
+  const Envoy::ExpectedLogMessages messages{{"warn", "gamma"}, {"warn", "delta"}};
+  EXPECT_LOG_CONTAINS_ALL_OF(messages, recent_lookups_.lookup("delta"));
 }
 
 } // namespace
