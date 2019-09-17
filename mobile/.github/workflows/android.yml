@@ -65,7 +65,7 @@ jobs:
         run: ./ci/mac_start_simulator.sh
       - run: ./bazelw mobile-install --fat_apk_cpu=x86 --start_app //examples/java/hello_world:hello_envoy
         name: 'Start java app'
-      - run: 'adb logcat -e "successful response!" -m 1'
+      - run: 'adb logcat -e "successful response" -m 1'
         name: 'Check liveliness'
   mackotlin:
     name: mac_kotlin_helloworld
@@ -87,7 +87,7 @@ jobs:
         run: ./ci/mac_start_simulator.sh
       - run: ./bazelw mobile-install --fat_apk_cpu=x86 --start_app //examples/kotlin/hello_world:hello_envoy_kt
         name: 'Start kotlin app'
-      - run: 'adb logcat -e "successful response!" -m 1'
+      - run: 'adb logcat -e "successful response" -m 1'
         name: 'Check liveliness'
   kotlintests:
     name: kotlin_tests

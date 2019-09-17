@@ -88,6 +88,7 @@ class MainActivity : Activity() {
           if (responseStatus.get() == 200 && buffer.hasArray()) {
             val serverHeaderField = responseHeaders[ENVOY_SERVER_HEADER]!![0]
             val body = String(buffer.array())
+            Log.d("MainActivity", "successful response!")
             recyclerView.post { viewAdapter.add(Success(body, serverHeaderField)) }
           } else {
             recyclerView.post { viewAdapter.add(Failure("failed with status " + responseStatus.get())) }
