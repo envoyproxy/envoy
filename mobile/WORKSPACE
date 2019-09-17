@@ -23,19 +23,11 @@ local_repository(
     path = "envoy_build_config",
 )
 
-# TODO: Remove once rules_apple > 0.17.2 is released
-http_file(
-    name = "xctestrunner",
-    executable = 1,
-    sha256 = "a3ff412deed453ebe4dc67a98db6ae388b58bd04974d0e862b951089efd26975",
-    urls = ["https://github.com/google/xctestrunner/releases/download/0.2.8/ios_test_runner.par"],
-)
-
 git_repository(
     name = "build_bazel_rules_apple",
-    commit = "821ca56c920f88679c90a807e6d7bd071950d7f8",
+    commit = "3443cecb9acc695087a8d09d8e66c4a024dff021",
     remote = "https://github.com/bazelbuild/rules_apple.git",
-    shallow_since = "1567794850 -0700",
+    shallow_since = "1568385986 -0700",
 )
 
 load("@envoy//bazel:api_binding.bzl", "envoy_api_binding")
@@ -66,16 +58,16 @@ go_register_toolchains(go_version = GO_VERSION)
 
 git_repository(
     name = "build_bazel_apple_support",
-    commit = "371f6863768c2cef0e02790a11bdbdc0a39f09fb",
+    commit = "e16463ef91ed77622c17441f9569bda139d45b18",
     remote = "https://github.com/bazelbuild/apple_support.git",
-    shallow_since = "1560187441 -0700",
+    shallow_since = "1565374645 -0700",
 )
 
 git_repository(
     name = "build_bazel_rules_swift",
-    commit = "770b1fe98693631e72a3b9cd5df4e2ae3d9c76ea",
+    commit = "b64895281fca35a3a4e35fd546e27f7fa90407ff",
     remote = "https://github.com/bazelbuild/rules_swift.git",
-    shallow_since = "1561403928 -0700",
+    shallow_since = "1568141376 -0700",
 )
 
 load("@build_bazel_apple_support//lib:repositories.bzl", "apple_support_dependencies")
