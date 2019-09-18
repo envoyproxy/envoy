@@ -104,7 +104,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
 
   if (config.certificateValidationContext() != nullptr) {
     envoy::api::v2::auth::CertificateValidationContext_TrustChainVerification verification =
-        config.certificateValidationContext()->verifyCertificateTrustChain();
+        config.certificateValidationContext()->trustChainVerification();
     if (verification == envoy::api::v2::auth::CertificateValidationContext::ACCEPT_UNTRUSTED ||
         verification == envoy::api::v2::auth::CertificateValidationContext::NOT_VERIFIED) {
       verify_mode = SSL_VERIFY_PEER; // Ensure client-certs will be requested even if we have
@@ -395,9 +395,9 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
 
   if (config.certificateValidationContext() != nullptr) {
     allow_untrusted_certificate_ =
-        config.certificateValidationContext()->verifyCertificateTrustChain() ==
+        config.certificateValidationContext()->trustChainVerification() ==
             envoy::api::v2::auth::CertificateValidationContext::ACCEPT_UNTRUSTED ||
-        config.certificateValidationContext()->verifyCertificateTrustChain() ==
+        config.certificateValidationContext()->trustChainVerification() ==
             envoy::api::v2::auth::CertificateValidationContext::NOT_VERIFIED;
   }
 
