@@ -174,13 +174,15 @@ message CertificateValidationContext {
 
   // Peer certificate verification mode.
   enum TrustChainVerification {
-    // Perform default certificate verification (eg, against CA / verification lists)
+    // Perform default certificate verification (e.g., against CA / verification lists)
     VERIFY_TRUST_CHAIN = 0;
-    // Certificates that fail verification will be permitted and their details hoisted in the
-    // x-forwarded-untrusted-client-cert HTTP Header.
+    // Connections where the certificate fails verification will be permitted.
+    // For HTTP connections, the certificate details will be unconditionally placed in the
+    // *x-forwarded-untrusted-client-cert* HTTP header.
     ACCEPT_UNTRUSTED = 1;
-    // Certificates will be permitted without verification and their details hoisted in the
-    // x-forwarded-untrusted-client-cert HTTP Header.
+    // Connections will be permitted without certificate verification performed.
+    // For HTTP connections, the certificate details will be unconditionally placed in the
+    // *x-forwarded-untrusted-client-cert* HTTP header.
     NOT_VERIFIED = 2;
   }
 
