@@ -115,7 +115,7 @@ void HttpSubscriptionImpl::handleFailure(Config::ConfigUpdateFailureReason reaso
     break;
   }
 
-  if (Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure == reason) {
+  if (reason == Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure) {
     // New requests will be sent again.
     // If init_fetch_timeout is non-zero, server will continue startup after it timeout
     return;

@@ -83,7 +83,7 @@ void GrpcMuxSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason rea
   }
 
   stats_.update_attempt_.inc();
-  if (Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure == reason) {
+  if (reason == Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure) {
     // New gRPC stream will be established and send requests again.
     // If init_fetch_timeout is non-zero, server will continue startup after it timeout
     return;
