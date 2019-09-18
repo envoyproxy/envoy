@@ -161,7 +161,7 @@ public:
     return bytes;
   }
 
-  //void trackRecentLookups(TimeSource& timeSource) override;
+  // void trackRecentLookups(TimeSource& timeSource) override;
   void rememberSet(StatNameSet& stat_name_set) override;
   void forgetSet(StatNameSet& stat_name_set) override;
   uint64_t getRecentLookups(const RecentLookupsFn&) override;
@@ -695,7 +695,7 @@ public:
 private:
   friend class SymbolTableImpl;
 
-  //void trackRecentLookups(TimeSource& time_source);
+  // void trackRecentLookups(TimeSource& time_source);
   uint64_t getRecentLookups(const RecentLookups::IterFn& iter);
 
   Stats::SymbolTable& symbol_table_;
@@ -704,7 +704,7 @@ private:
   using StringStatNameMap = absl::flat_hash_map<std::string, Stats::StatName>;
   StringStatNameMap builtin_stat_names_;
   StringStatNameMap dynamic_stat_names_ GUARDED_BY(mutex_);
-  //std::unique_ptr<RecentLookups> recent_lookups_ GUARDED_BY(mutex_);
+  // std::unique_ptr<RecentLookups> recent_lookups_ GUARDED_BY(mutex_);
   RecentLookups recent_lookups_ GUARDED_BY(mutex_);
 };
 
