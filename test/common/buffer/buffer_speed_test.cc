@@ -317,6 +317,54 @@ static void BufferSearchPartialMatch(benchmark::State& state) {
 }
 BENCHMARK(BufferSearchPartialMatch)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
 
+// Test buffer startsWith, for the simple case where there is no match for the pattern at the start
+// of the buffer.
+static void BufferStartsWith(benchmark::State& state) {
+  const std::string Pattern(16, 'b');
+  std::string data;
+  data.reserve(state.range(0) + Pattern.length());
+  data += std::string(state.range(0), 'a');
+  data += Pattern;
+
+  const absl::string_view input(data);
+  Buffer::OwnedImpl buffer(input);
+  ssize_t result = 0;
+  for (auto _ : state) {
+    if (!buffer.startsWith({Pattern.c_str(), Pattern.length()})) {
+      result++;
+    }
+  }
+  benchmark::DoNotOptimize(result);
+}
+BENCHMARK(BufferStartsWith)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
+
+// Test buffer startsWith, when there is a match at the start of the buffer.
+static void BufferStartsWithMatch(benchmark::State& state) {
+  const std::string Prefix(state.range(1), 'b');
+  const std::string Suffix("babbabbbabbbbabbbbbabbbbbbabbbbbbbabbbbbbbba");
+  std::string data = Prefix;
+  size_t num_suffixes = 1 + state.range(0) / Prefix.length();
+  data.reserve(Suffix.length() * num_suffixes + Prefix.length());
+  for (size_t i = 0; i < num_suffixes; i++) {
+    data += Suffix;
+  }
+
+  const absl::string_view input(data);
+  Buffer::OwnedImpl buffer(input);
+  ssize_t result = 0;
+  for (auto _ : state) {
+    if (buffer.startsWith({Prefix.c_str(), Prefix.length()})) {
+      result++;
+    }
+  }
+  benchmark::DoNotOptimize(result);
+}
+BENCHMARK(BufferStartsWithMatch)
+    ->Args({1, 1})
+    ->Args({4096, 16})
+    ->Args({16384, 256})
+    ->Args({65536, 4096});
+
 } // namespace Envoy
 
 // Boilerplate main(), which discovers benchmarks in the same file and runs them.
