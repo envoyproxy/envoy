@@ -10,8 +10,7 @@ class HttpSubsetLbIntegrationTest
           std::tuple<envoy::api::v2::Cluster_LbPolicy, Network::Address::IpVersion>>,
       public HttpIntegrationTest {
 public:
-  // Returns all load balancer types except ORIGINAL_DST_LB and
-  // CLUSTER_PROVIDED.
+  // Returns all load balancer types except ORIGINAL_DST_LB and CLUSTER_PROVIDED.
   static std::vector<envoy::api::v2::Cluster_LbPolicy> getSubsetLbTestParams() {
     int first = static_cast<int>(envoy::api::v2::Cluster_LbPolicy_LbPolicy_MIN);
     int last = static_cast<int>(envoy::api::v2::Cluster_LbPolicy_LbPolicy_MAX);
@@ -66,8 +65,8 @@ public:
 
       cluster->clear_hosts();
 
-      // Create a load assignment with num_hosts_ entries with metadata
-      // split evenly between type=a and type=b.
+      // Create a load assignment with num_hosts_ entries with metadata split evenly between type=a
+      // and type=b.
       auto* load_assignment = cluster->mutable_load_assignment();
       load_assignment->set_cluster_name(cluster->name());
       auto* endpoints = load_assignment->add_endpoints();
@@ -198,8 +197,7 @@ INSTANTIATE_TEST_SUITE_P(
                      testing::ValuesIn(TestEnvironment::getIpVersionsForTest())),
     HttpSubsetLbIntegrationTest::subsetLbTestParamsToString);
 
-// Tests each subset-compatible load balancer policy with 4 hosts divided into 2
-// subsets.
+// Tests each subset-compatible load balancer policy with 4 hosts divided into 2 subsets.
 TEST_P(HttpSubsetLbIntegrationTest, SubsetLoadBalancer) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
