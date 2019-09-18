@@ -91,6 +91,11 @@ public:
    */
   void setShowDetails() { details_ = true; }
 
+  /**
+   * Set whether to only print failing match cases.
+   */
+  void setOnlyShowFailures() { only_show_failures_ = true; }
+
   float coverage(bool detailed) {
     return detailed ? coverage_.detailedReport() : coverage_.report();
   }
@@ -100,6 +105,11 @@ private:
       std::unique_ptr<NiceMock<Server::Configuration::MockFactoryContext>> factory_context,
       std::unique_ptr<Router::ConfigImpl> config, std::unique_ptr<Stats::IsolatedStoreImpl> stats,
       Api::ApiPtr api, Coverage coverage);
+
+  /**
+   * Set UUID as the name for each route for detecting missing tests during the coverage check.
+   */
+  static void assignUniqueRouteNames(envoy::api::v2::RouteConfiguration& route_config);
 
   bool compareCluster(ToolConfig& tool_config, const std::string& expected);
   bool compareCluster(ToolConfig& tool_config,
@@ -137,12 +147,20 @@ private:
   bool compareResults(const std::string& actual, const std::string& expected,
                       const std::string& test_type);
 
+  void printResults();
+
   bool runtimeMock(const std::string& key, const envoy::type::FractionalPercent& default_value,
                    uint64_t random_value);
 
   bool headers_finalized_{false};
 
   bool details_{false};
+
+  bool only_show_failures_{false};
+
+  // The first member of each pair is the name of the test.
+  // The second member is a list of any failing results for that test as strings.
+  std::vector<std::pair<std::string, std::vector<std::string>>> tests_;
 
   // TODO(hennna): Switch away from mocks following work done by @rlazarus in github issue #499.
   std::unique_ptr<NiceMock<Server::Configuration::MockFactoryContext>> factory_context_;
@@ -196,9 +214,14 @@ public:
   bool isProto() const { return is_proto_; }
 
   /**
-   * @return true is detailed test execution results are displayed.
+   * @return true if detailed test execution results are displayed.
    */
   bool isDetailed() const { return is_detailed_; }
+
+  /**
+   * @return true if only test failures are displayed.
+   */
+  bool onlyShowFailures() const { return only_show_failures_; }
 
   /**
    * @return true if the deprecated field check for RouteConfiguration is disabled.
@@ -214,6 +237,7 @@ private:
   bool comprehensive_coverage_;
   bool is_proto_;
   bool is_detailed_;
+  bool only_show_failures_;
   bool disable_deprecation_check_;
 };
 } // namespace Envoy

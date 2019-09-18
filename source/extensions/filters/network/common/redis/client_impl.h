@@ -16,6 +16,7 @@
 #include "common/upstream/upstream_impl.h"
 
 #include "extensions/filters/network/common/redis/client.h"
+#include "extensions/filters/network/common/redis/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -85,6 +86,7 @@ public:
   PoolRequest* makeRequest(const RespValue& request, PoolCallbacks& callbacks) override;
   bool active() override { return !pending_requests_.empty(); }
   void flushBufferAndResetTimer();
+  void initialize(const std::string& auth_password) override;
 
 private:
   friend class RedisClientImplTest;
@@ -148,7 +150,7 @@ public:
   // RedisProxy::ConnPool::ClientFactoryImpl
   ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                    const Config& config, const RedisCommandStatsSharedPtr& redis_command_stats,
-                   Stats::Scope& scope) override;
+                   Stats::Scope& scope, const std::string& auth_password) override;
 
   static ClientFactoryImpl instance_;
 

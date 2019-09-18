@@ -500,6 +500,9 @@ def checkSourceLine(line, file_path, reportError):
     if invalid_construct in line:
       reportError("term %s should be replaced with standard library term %s" %
                   (invalid_construct, valid_construct))
+  # Do not include the virtual_includes headers.
+  if re.search("#include.*/_virtual_includes/", line):
+    reportError("Don't include the virtual includes headers.")
 
   # Some errors cannot be fixed automatically, and actionable, consistent,
   # navigable messages should be emitted to make it easy to find and fix
