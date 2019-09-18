@@ -75,7 +75,9 @@ public:
                     .bool_value()),
         metadata_(std::make_shared<envoy::api::v2::core::Metadata>(metadata)), locality_(locality),
         locality_zone_stat_name_(locality.zone(), cluster->statsScope().symbolTable()),
-        stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_), POOL_GAUGE(stats_store_))},
+        stats_store_(cluster->statsScope().symbolTable()), stats_{ALL_HOST_STATS(
+                                                               POOL_COUNTER(stats_store_),
+                                                               POOL_GAUGE(stats_store_))},
         priority_(priority) {
     if (health_check_config.port_value() != 0 &&
         dest_address->type() != Network::Address::Type::Ip) {
@@ -151,7 +153,7 @@ protected:
   Network::Address::InstanceConstSharedPtr health_check_address_;
   std::atomic<bool> canary_;
   mutable absl::Mutex metadata_mutex_;
-  std::shared_ptr<envoy::api::v2::core::Metadata> metadata_ GUARDED_BY(metadata_mutex_);
+  std::shared_ptr<envoy::api::v2::core::Metadata> metadata_ ABSL_GUARDED_BY(metadata_mutex_);
   const envoy::api::v2::core::Locality locality_;
   Stats::StatNameManagedStorage locality_zone_stat_name_;
   Stats::IsolatedStoreImpl stats_store_;

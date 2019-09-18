@@ -34,7 +34,6 @@
 
 using testing::_;
 using testing::InSequence;
-using testing::Mock;
 using testing::NiceMock;
 using testing::Return;
 

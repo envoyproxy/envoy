@@ -100,6 +100,9 @@ public:
   const std::vector<uint32_t>& retriableStatusCodes() const override {
     return retriable_status_codes_;
   }
+  const std::vector<Http::HeaderMatcherSharedPtr>& retriableHeaders() const override {
+    return retriable_headers_;
+  }
   absl::optional<std::chrono::milliseconds> baseInterval() const override { return base_interval_; }
   absl::optional<std::chrono::milliseconds> maxInterval() const override { return max_interval_; }
 
@@ -108,6 +111,7 @@ public:
   uint32_t retry_on_{};
   uint32_t host_selection_max_attempts_;
   std::vector<uint32_t> retriable_status_codes_;
+  std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_;
   absl::optional<std::chrono::milliseconds> base_interval_{};
   absl::optional<std::chrono::milliseconds> max_interval_{};
 };
@@ -391,6 +395,7 @@ public:
   MOCK_CONST_METHOD0(configInfo, absl::optional<ConfigInfo>());
   MOCK_CONST_METHOD0(lastUpdated, SystemTime());
   MOCK_METHOD0(onConfigUpdate, void());
+  MOCK_CONST_METHOD1(validateConfig, void(const envoy::api::v2::RouteConfiguration&));
 
   std::shared_ptr<NiceMock<MockConfig>> route_config_{new NiceMock<MockConfig>()};
 };

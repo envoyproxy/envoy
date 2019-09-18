@@ -6,6 +6,9 @@ namespace NetworkFilters {
 namespace Common {
 namespace Redis {
 namespace Client {
+namespace {
+Common::Redis::Client::DoNothingPoolCallbacks null_pool_callbacks;
+} // namespace
 
 ConfigImpl::ConfigImpl(
     const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config)
@@ -19,7 +22,8 @@ ConfigImpl::ConfigImpl(
           3)), // Default timeout is 3ms. If max_buffer_size_before_flush is zero, this is not used
                // as the buffer is flushed on each request immediately.
       max_upstream_unknown_connections_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_upstream_unknown_connections, 100)) {
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_upstream_unknown_connections, 100)),
+      enable_command_stats_(config.enable_command_stats()) {
   switch (config.read_policy()) {
   case envoy::config::filter::network::redis_proxy::v2::
       RedisProxy_ConnPoolSettings_ReadPolicy_MASTER:
@@ -31,14 +35,14 @@ ConfigImpl::ConfigImpl(
     break;
   case envoy::config::filter::network::redis_proxy::v2::
       RedisProxy_ConnPoolSettings_ReadPolicy_REPLICA:
-    read_policy_ = ReadPolicy::PreferMaster;
+    read_policy_ = ReadPolicy::Replica;
     break;
   case envoy::config::filter::network::redis_proxy::v2::
       RedisProxy_ConnPoolSettings_ReadPolicy_PREFER_REPLICA:
-    read_policy_ = ReadPolicy::PreferMaster;
+    read_policy_ = ReadPolicy::PreferReplica;
     break;
   case envoy::config::filter::network::redis_proxy::v2::RedisProxy_ConnPoolSettings_ReadPolicy_ANY:
-    read_policy_ = ReadPolicy::PreferMaster;
+    read_policy_ = ReadPolicy::Any;
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -48,10 +52,11 @@ ConfigImpl::ConfigImpl(
 
 ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                              EncoderPtr&& encoder, DecoderFactory& decoder_factory,
-                             const Config& config) {
-
-  std::unique_ptr<ClientImpl> client(
-      new ClientImpl(host, dispatcher, std::move(encoder), decoder_factory, config));
+                             const Config& config,
+                             const RedisCommandStatsSharedPtr& redis_command_stats,
+                             Stats::Scope& scope) {
+  auto client = std::make_unique<ClientImpl>(host, dispatcher, std::move(encoder), decoder_factory,
+                                             config, redis_command_stats, scope);
   client->connection_ = host->createConnection(dispatcher, nullptr, nullptr).connection_;
   client->connection_->addConnectionCallbacks(*client);
   client->connection_->addReadFilter(Network::ReadFilterSharedPtr{new UpstreamReadFilter(*client)});
@@ -61,11 +66,14 @@ ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatche
 }
 
 ClientImpl::ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
-                       EncoderPtr&& encoder, DecoderFactory& decoder_factory, const Config& config)
+                       EncoderPtr&& encoder, DecoderFactory& decoder_factory, const Config& config,
+                       const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope)
     : host_(host), encoder_(std::move(encoder)), decoder_(decoder_factory.create(*this)),
       config_(config),
-      connect_or_op_timer_(dispatcher.createTimer([this]() -> void { onConnectOrOpTimeout(); })),
-      flush_timer_(dispatcher.createTimer([this]() -> void { flushBufferAndResetTimer(); })) {
+      connect_or_op_timer_(dispatcher.createTimer([this]() { onConnectOrOpTimeout(); })),
+      flush_timer_(dispatcher.createTimer([this]() { flushBufferAndResetTimer(); })),
+      time_source_(dispatcher.timeSource()), redis_command_stats_(redis_command_stats),
+      scope_(scope) {
   host->cluster().stats().upstream_cx_total_.inc();
   host->stats().cx_total_.inc();
   host->cluster().stats().upstream_cx_active_.inc();
@@ -94,7 +102,17 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, PoolCallbacks& ca
 
   const bool empty_buffer = encoder_buffer_.length() == 0;
 
-  pending_requests_.emplace_back(*this, callbacks);
+  Stats::StatName command;
+  if (config_.enableCommandStats()) {
+    // Only lowercase command and get StatName if we enable command stats
+    command = redis_command_stats_->getCommandFromRequest(request);
+    redis_command_stats_->updateStatsTotal(scope_, command);
+  } else {
+    // If disabled, we use a placeholder stat name "unused" that is not used
+    command = redis_command_stats_->getUnusedStatName();
+  }
+
+  pending_requests_.emplace_back(*this, callbacks, command);
   encoder_->encode(request, encoder_buffer_);
 
   // If buffer is full, flush. If the buffer was empty before the request, start the timer.
@@ -186,6 +204,14 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
   ASSERT(!pending_requests_.empty());
   PendingRequest& request = pending_requests_.front();
   const bool canceled = request.canceled_;
+
+  if (config_.enableCommandStats()) {
+    bool success = !canceled && (value->type() != Common::Redis::RespType::Error);
+    redis_command_stats_->updateStats(scope_, request.command_, success);
+    request.command_request_timer_->complete();
+  }
+  request.aggregate_request_timer_->complete();
+
   PoolCallbacks& callbacks = request.callbacks_;
 
   // We need to ensure the request is popped before calling the callback, since the callback might
@@ -225,8 +251,15 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
   putOutlierEvent(Upstream::Outlier::Result::EXT_ORIGIN_REQUEST_SUCCESS);
 }
 
-ClientImpl::PendingRequest::PendingRequest(ClientImpl& parent, PoolCallbacks& callbacks)
-    : parent_(parent), callbacks_(callbacks) {
+ClientImpl::PendingRequest::PendingRequest(ClientImpl& parent, PoolCallbacks& callbacks,
+                                           Stats::StatName command)
+    : parent_(parent), callbacks_(callbacks), command_{command},
+      aggregate_request_timer_(parent_.redis_command_stats_->createAggregateTimer(
+          parent_.scope_, parent_.time_source_)) {
+  if (parent_.config_.enableCommandStats()) {
+    command_request_timer_ = parent_.redis_command_stats_->createCommandTimer(
+        parent_.scope_, command_, parent_.time_source_);
+  }
   parent.host_->cluster().stats().upstream_rq_total_.inc();
   parent.host_->stats().rq_total_.inc();
   parent.host_->cluster().stats().upstream_rq_active_.inc();
@@ -245,12 +278,29 @@ void ClientImpl::PendingRequest::cancel() {
   canceled_ = true;
 }
 
+void ClientImpl::initialize(const std::string& auth_password) {
+  if (!auth_password.empty()) {
+    // Send an AUTH command to the upstream server.
+    makeRequest(Utility::makeAuthCommand(auth_password), null_pool_callbacks);
+  }
+  // Any connection to replica requires the READONLY command in order to perform read.
+  // Also the READONLY command is a no-opt for the master.
+  // We only need to send the READONLY command iff it's possible that the host is a replica.
+  if (config_.readPolicy() != Common::Redis::Client::ReadPolicy::Master) {
+    makeRequest(Utility::ReadOnlyRequest::instance(), null_pool_callbacks);
+  }
+}
+
 ClientFactoryImpl ClientFactoryImpl::instance_;
 
 ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
-                                    Event::Dispatcher& dispatcher, const Config& config) {
-  return ClientImpl::create(host, dispatcher, EncoderPtr{new EncoderImpl()}, decoder_factory_,
-                            config);
+                                    Event::Dispatcher& dispatcher, const Config& config,
+                                    const RedisCommandStatsSharedPtr& redis_command_stats,
+                                    Stats::Scope& scope, const std::string& auth_password) {
+  ClientPtr client = ClientImpl::create(host, dispatcher, EncoderPtr{new EncoderImpl()},
+                                        decoder_factory_, config, redis_command_stats, scope);
+  client->initialize(auth_password);
+  return client;
 }
 
 } // namespace Client

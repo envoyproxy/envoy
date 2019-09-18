@@ -10,11 +10,19 @@ namespace Envoy {
 // RAII cleanup via functor.
 class Cleanup {
 public:
-  Cleanup(std::function<void()> f) : f_(std::move(f)) {}
+  Cleanup(std::function<void()> f) : f_(std::move(f)), cancelled_(false) {}
   ~Cleanup() { f_(); }
+
+  void cancel() {
+    cancelled_ = true;
+    f_ = []() {};
+  }
+
+  bool cancelled() { return cancelled_; }
 
 private:
   std::function<void()> f_;
+  bool cancelled_;
 };
 
 // RAII helper class to add an element to an std::list on construction and erase

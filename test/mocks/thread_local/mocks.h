@@ -63,6 +63,14 @@ public:
     void runOnAllThreads(Event::PostCb cb, Event::PostCb main_callback) override {
       parent_.runOnAllThreads(cb, main_callback);
     }
+    void runOnAllThreads(const UpdateCb& cb) override {
+      parent_.runOnAllThreads([cb, this]() { parent_.data_[index_] = cb(parent_.data_[index_]); });
+    }
+    void runOnAllThreads(const UpdateCb& cb, Event::PostCb main_callback) override {
+      parent_.runOnAllThreads([cb, this]() { parent_.data_[index_] = cb(parent_.data_[index_]); },
+                              main_callback);
+    }
+
     void set(InitializeCb cb) override { parent_.data_[index_] = cb(parent_.dispatcher_); }
 
     MockInstance& parent_;

@@ -293,8 +293,8 @@ public:
 private:
   Network::Connection& connection_;
   Thread::MutexBasicLockable lock_;
-  Common::CallbackManager<> disconnect_callback_manager_ GUARDED_BY(lock_);
-  bool disconnected_ GUARDED_BY(lock_){};
+  Common::CallbackManager<> disconnect_callback_manager_ ABSL_GUARDED_BY(lock_);
+  bool disconnected_ ABSL_GUARDED_BY(lock_){};
   const bool allow_unexpected_disconnects_;
 };
 
@@ -339,7 +339,7 @@ public:
 private:
   SharedConnectionWrapper shared_connection_;
   Thread::MutexBasicLockable lock_;
-  bool parented_ GUARDED_BY(lock_);
+  bool parented_ ABSL_GUARDED_BY(lock_);
   const bool allow_unexpected_disconnects_;
 };
 
@@ -399,7 +399,7 @@ protected:
   bool initialized_{};
   Thread::CondVar connection_event_;
   Thread::MutexBasicLockable lock_;
-  bool half_closed_ GUARDED_BY(lock_){};
+  bool half_closed_ ABSL_GUARDED_BY(lock_){};
   Event::TestTimeSystem& time_system_;
 };
 
@@ -605,13 +605,17 @@ private:
     Stats::Scope& listenerScope() override { return parent_.stats_store_; }
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
+    Network::ActiveUdpListenerFactory* udpListenerFactory() override {
+      return udp_listener_factory_.get();
+    }
 
     FakeUpstream& parent_;
+    Network::ActiveUdpListenerFactoryPtr udp_listener_factory_;
     std::string name_;
   };
 
   void threadRoutine();
-  SharedConnectionWrapper& consumeConnection() EXCLUSIVE_LOCKS_REQUIRED(lock_);
+  SharedConnectionWrapper& consumeConnection() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   Network::SocketPtr socket_;
   ConditionalInitializer server_initialized_;
@@ -624,11 +628,11 @@ private:
   Event::TestTimeSystem& time_system_;
   Event::DispatcherPtr dispatcher_;
   Network::ConnectionHandlerPtr handler_;
-  std::list<QueuedConnectionWrapperPtr> new_connections_ GUARDED_BY(lock_);
+  std::list<QueuedConnectionWrapperPtr> new_connections_ ABSL_GUARDED_BY(lock_);
   // When a QueuedConnectionWrapper is popped from new_connections_, ownership is transferred to
   // consumed_connections_. This allows later the Connection destruction (when the FakeUpstream is
   // deleted) on the same thread that allocated the connection.
-  std::list<QueuedConnectionWrapperPtr> consumed_connections_ GUARDED_BY(lock_);
+  std::list<QueuedConnectionWrapperPtr> consumed_connections_ ABSL_GUARDED_BY(lock_);
   bool allow_unexpected_disconnects_;
   bool read_disable_on_new_connection_;
   const bool enable_half_close_;

@@ -53,10 +53,12 @@ envoy_cc_test(
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
         "//source/common/stats:stats_lib",
+        "//source/server:active_raw_udp_listener_config",
         "//source/server:connection_handler_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:network_utility_lib",
+        "//test/test_common:threadsafe_singleton_injector_lib",
     ],
 )
 
@@ -160,11 +162,25 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test_library(
+    name = "listener_manager_impl_test_lib",
+    hdrs = ["listener_manager_impl_test.h"],
+    deps = [
+        "//source/server:listener_manager_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_time_lib",
+    ],
+)
+
 envoy_cc_test(
     name = "listener_manager_impl_test",
     srcs = ["listener_manager_impl_test.cc"],
     data = ["//test/extensions/transport_sockets/tls/test_data:certs"],
     deps = [
+        ":listener_manager_impl_test_lib",
         ":utility_lib",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/config:metadata_lib",
@@ -180,13 +196,21 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:config",
         "//source/extensions/transport_sockets/tls:ssl_socket_lib",
-        "//source/server:listener_manager_lib",
-        "//test/mocks/network:network_mocks",
-        "//test/mocks/server:server_mocks",
-        "//test/test_common:environment_lib",
+        "//source/server:active_raw_udp_listener_config",
         "//test/test_common:registry_lib",
-        "//test/test_common:simulated_time_system_lib",
-        "//test/test_common:test_time_lib",
+        "//test/test_common:threadsafe_singleton_injector_lib",
+    ],
+)
+
+# Stand-alone quic test because of FIPS.
+envoy_cc_test(
+    name = "listener_manager_impl_quic_only_test",
+    srcs = ["listener_manager_impl_quic_only_test.cc"],
+    tags = ["nofips"],
+    deps = [
+        ":listener_manager_impl_test_lib",
+        "//source/extensions/quic_listeners/quiche:active_quic_listener_config_lib",
+        "//source/extensions/transport_sockets/raw_buffer:config",
         "//test/test_common:threadsafe_singleton_injector_lib",
     ],
 )
@@ -259,6 +283,7 @@ envoy_cc_test(
         ":invalid_layered_runtime_duplicate_name.yaml",
         ":invalid_layered_runtime_missing_name.yaml",
         ":invalid_layered_runtime_no_layer_specifier.yaml",
+        ":invalid_legacy_runtime_bootstrap.yaml",
         ":invalid_runtime_bootstrap.yaml",
         ":node_bootstrap.yaml",
         ":node_bootstrap_no_admin_port.yaml",

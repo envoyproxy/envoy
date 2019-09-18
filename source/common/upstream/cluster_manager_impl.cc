@@ -487,9 +487,22 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& clust
 
   if (existing_active_cluster != active_clusters_.end() ||
       existing_warming_cluster != warming_clusters_.end()) {
-    // The following init manager remove call is a NOP in the case we are already initialized. It's
-    // just kept here to avoid additional logic.
-    init_helper_.removeCluster(*existing_active_cluster->second->cluster_);
+    if (existing_active_cluster != active_clusters_.end()) {
+      // The following init manager remove call is a NOP in the case we are already initialized.
+      // It's just kept here to avoid additional logic.
+      init_helper_.removeCluster(*existing_active_cluster->second->cluster_);
+    } else {
+      // Validate that warming clusters are not added to the init_helper_.
+      // NOTE: This loop is compiled out in optimized builds.
+      for (const std::list<Cluster*>& cluster_list :
+           {std::cref(init_helper_.primary_init_clusters_),
+            std::cref(init_helper_.secondary_init_clusters_)}) {
+        ASSERT(!std::any_of(cluster_list.begin(), cluster_list.end(),
+                            [&existing_warming_cluster](Cluster* cluster) {
+                              return existing_warming_cluster->second->cluster_.get() == cluster;
+                            }));
+      }
+    }
     cm_stats_.cluster_modified_.inc();
   } else {
     cm_stats_.cluster_added_.inc();
@@ -654,17 +667,22 @@ void ClusterManagerImpl::loadCluster(const envoy::api::v2::Cluster& cluster,
   const auto cluster_entry_it = cluster_map.find(cluster_reference.info()->name());
 
   // If an LB is thread aware, create it here. The LB is not initialized until cluster pre-init
-  // finishes.
+  // finishes. For RingHash/Maglev don't create the LB here if subset balancing is enabled,
+  // because the thread_aware_lb_ field takes precedence over the subset lb).
   if (cluster_reference.info()->lbType() == LoadBalancerType::RingHash) {
-    cluster_entry_it->second->thread_aware_lb_ = std::make_unique<RingHashLoadBalancer>(
-        cluster_reference.prioritySet(), cluster_reference.info()->stats(),
-        cluster_reference.info()->statsScope(), runtime_, random_,
-        cluster_reference.info()->lbRingHashConfig(), cluster_reference.info()->lbConfig());
+    if (!cluster_reference.info()->lbSubsetInfo().isEnabled()) {
+      cluster_entry_it->second->thread_aware_lb_ = std::make_unique<RingHashLoadBalancer>(
+          cluster_reference.prioritySet(), cluster_reference.info()->stats(),
+          cluster_reference.info()->statsScope(), runtime_, random_,
+          cluster_reference.info()->lbRingHashConfig(), cluster_reference.info()->lbConfig());
+    }
   } else if (cluster_reference.info()->lbType() == LoadBalancerType::Maglev) {
-    cluster_entry_it->second->thread_aware_lb_ = std::make_unique<MaglevLoadBalancer>(
-        cluster_reference.prioritySet(), cluster_reference.info()->stats(),
-        cluster_reference.info()->statsScope(), runtime_, random_,
-        cluster_reference.info()->lbConfig());
+    if (!cluster_reference.info()->lbSubsetInfo().isEnabled()) {
+      cluster_entry_it->second->thread_aware_lb_ = std::make_unique<MaglevLoadBalancer>(
+          cluster_reference.prioritySet(), cluster_reference.info()->stats(),
+          cluster_reference.info()->statsScope(), runtime_, random_,
+          cluster_reference.info()->lbConfig());
+    }
   } else if (cluster_reference.info()->lbType() == LoadBalancerType::ClusterProvided) {
     cluster_entry_it->second->thread_aware_lb_ = std::move(new_cluster_pair.second);
   }

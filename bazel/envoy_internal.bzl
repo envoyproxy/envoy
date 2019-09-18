@@ -89,6 +89,13 @@ def envoy_select_force_libcpp(if_libcpp, default = None):
         "//conditions:default": default or [],
     })
 
+def envoy_stdlib_deps():
+    return select({
+        "@envoy//bazel:asan_build": ["@envoy//bazel:dynamic_stdlib"],
+        "@envoy//bazel:tsan_build": ["@envoy//bazel:dynamic_stdlib"],
+        "//conditions:default": ["@envoy//bazel:static_stdlib"],
+    })
+
 # Dependencies on tcmalloc_and_profiler should be wrapped with this function.
 def tcmalloc_external_dep(repository):
     return select({

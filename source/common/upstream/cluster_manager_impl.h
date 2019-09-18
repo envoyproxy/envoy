@@ -90,6 +90,9 @@ protected:
   Singleton::Manager& singleton_manager_;
 };
 
+// For friend declaration in ClusterManagerInitHelper.
+class ClusterManagerImpl;
+
 /**
  * This is a helper class used during cluster management initialization. Dealing with primary
  * clusters, secondary clusters, and CDS, is quite complicated, so this makes it easier to test.
@@ -129,6 +132,9 @@ public:
   State state() const { return state_; }
 
 private:
+  // To enable invariant assertions on the cluster lists.
+  friend ClusterManagerImpl;
+
   void initializeSecondaryClusters();
   void maybeFinishInitialize();
   void onClusterInit(Cluster& cluster);

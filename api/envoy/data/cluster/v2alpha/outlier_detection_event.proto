@@ -10,9 +10,6 @@ import "google/protobuf/timestamp.proto";
 import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
-import "gogoproto/gogo.proto";
-
-option (gogoproto.equal_all) = true;
 
 // [#protodoc-title: Outlier detection logging events]
 // :ref:`Outlier detection logging <arch_overview_outlier_detection_logging>`.
@@ -21,7 +18,7 @@ message OutlierDetectionEvent {
   // In case of eject represents type of ejection that took place.
   OutlierEjectionType type = 1 [(validate.rules).enum.defined_only = true];
   // Timestamp for event.
-  google.protobuf.Timestamp timestamp = 2 [(gogoproto.stdtime) = true];
+  google.protobuf.Timestamp timestamp = 2;
   // The time in seconds since the last action (either an ejection or unejection) took place.
   google.protobuf.UInt64Value secs_since_last_action = 3;
   // The :ref:`cluster <envoy_api_msg_Cluster>` that owns the ejected host.
@@ -42,6 +39,7 @@ message OutlierDetectionEvent {
     option (validate.required) = true;
     OutlierEjectSuccessRate eject_success_rate_event = 9;
     OutlierEjectConsecutive eject_consecutive_event = 10;
+    OutlierEjectFailurePercentage eject_failure_percentage_event = 11;
   }
 }
 
@@ -78,6 +76,12 @@ enum OutlierEjectionType {
   // is set to *true*.
   // See :ref:`Cluster outlier detection <arch_overview_outlier_detection>` documentation for
   SUCCESS_RATE_LOCAL_ORIGIN = 4;
+  // Runs over aggregated success rate statistics from every host in cluster and selects hosts for
+  // which ratio of failed replies is above configured value.
+  FAILURE_PERCENTAGE = 5;
+  // Runs over aggregated success rate statistics for local origin failures from every host in
+  // cluster and selects hosts for which ratio of failed replies is above configured value.
+  FAILURE_PERCENTAGE_LOCAL_ORIGIN = 6;
 }
 
 // Represents possible action applied to upstream host
@@ -99,4 +103,9 @@ message OutlierEjectSuccessRate {
 }
 
 message OutlierEjectConsecutive {
+}
+
+message OutlierEjectFailurePercentage {
+  // Host's success rate at the time of the ejection event on a 0-100 range.
+  uint32 host_success_rate = 1 [(validate.rules).uint32.lte = 100];
 }

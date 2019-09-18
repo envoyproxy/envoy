@@ -598,7 +598,7 @@ ClusterInfoImpl::ClusterInfoImpl(
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       transport_socket_factory_(std::move(socket_factory)), stats_scope_(std::move(stats_scope)),
-      stats_(generateStats(*stats_scope_)),
+      stats_(generateStats(*stats_scope_)), load_report_stats_store_(stats_scope_->symbolTable()),
       load_report_stats_(generateLoadReportStats(load_report_stats_store_)),
       features_(parseFeatures(config)),
       http2_settings_(Http::Utility::parseHttp2Settings(config.http2_protocol_options())),
@@ -643,12 +643,24 @@ ClusterInfoImpl::ClusterInfoImpl(
                       envoy::api::v2::Cluster_LbPolicy_Name(config.lb_policy()),
                       envoy::api::v2::Cluster_DiscoveryType_Name(config.type())));
     }
+    if (config.has_lb_subset_config()) {
+      throw EnvoyException(
+          fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
+                      envoy::api::v2::Cluster_LbPolicy_Name(config.lb_policy())));
+    }
+
     lb_type_ = LoadBalancerType::ClusterProvided;
     break;
   case envoy::api::v2::Cluster::MAGLEV:
     lb_type_ = LoadBalancerType::Maglev;
     break;
   case envoy::api::v2::Cluster::CLUSTER_PROVIDED:
+    if (config.has_lb_subset_config()) {
+      throw EnvoyException(
+          fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
+                      envoy::api::v2::Cluster_LbPolicy_Name(config.lb_policy())));
+    }
+
     lb_type_ = LoadBalancerType::ClusterProvided;
     break;
   default:

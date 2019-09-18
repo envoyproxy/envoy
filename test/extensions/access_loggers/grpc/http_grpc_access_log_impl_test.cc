@@ -14,10 +14,12 @@
 
 using namespace std::chrono_literals;
 using testing::_;
+using testing::An;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -25,18 +27,22 @@ namespace AccessLoggers {
 namespace HttpGrpc {
 namespace {
 
+using envoy::data::accesslog::v2::HTTPAccessLogEntry;
+
 class MockGrpcAccessLogger : public GrpcCommon::GrpcAccessLogger {
 public:
   // GrpcAccessLogger
-  MOCK_METHOD1(log, void(envoy::data::accesslog::v2::HTTPAccessLogEntry&& entry));
+  MOCK_METHOD1(log, void(HTTPAccessLogEntry&& entry));
+  MOCK_METHOD1(log, void(envoy::data::accesslog::v2::TCPAccessLogEntry&& entry));
 };
 
 class MockGrpcAccessLoggerCache : public GrpcCommon::GrpcAccessLoggerCache {
 public:
   // GrpcAccessLoggerCache
-  MOCK_METHOD1(getOrCreateLogger,
+  MOCK_METHOD2(getOrCreateLogger,
                GrpcCommon::GrpcAccessLoggerSharedPtr(
-                   const ::envoy::config::accesslog::v2::CommonGrpcAccessLogConfig& config));
+                   const ::envoy::config::accesslog::v2::CommonGrpcAccessLogConfig& config,
+                   GrpcCommon::GrpcAccessLoggerType logger_type));
 };
 
 class HttpGrpcAccessLogTest : public testing::Test {
@@ -44,9 +50,11 @@ public:
   void init() {
     ON_CALL(*filter_, evaluate(_, _, _, _)).WillByDefault(Return(true));
     config_.mutable_common_config()->set_log_name("hello_log");
-    EXPECT_CALL(*logger_cache_, getOrCreateLogger(_))
-        .WillOnce([this](const ::envoy::config::accesslog::v2::CommonGrpcAccessLogConfig& config) {
+    EXPECT_CALL(*logger_cache_, getOrCreateLogger(_, _))
+        .WillOnce([this](const ::envoy::config::accesslog::v2::CommonGrpcAccessLogConfig& config,
+                         GrpcCommon::GrpcAccessLoggerType logger_type) {
           EXPECT_EQ(config.DebugString(), config_.common_config().DebugString());
+          EXPECT_EQ(GrpcCommon::GrpcAccessLoggerType::HTTP, logger_type);
           return logger_;
         });
     access_log_ = std::make_unique<HttpGrpcAccessLog>(AccessLog::FilterPtr{filter_}, config_, tls_,
@@ -58,9 +66,9 @@ public:
       init();
     }
 
-    envoy::data::accesslog::v2::HTTPAccessLogEntry expected_log_entry;
+    HTTPAccessLogEntry expected_log_entry;
     TestUtility::loadFromYaml(expected_log_entry_yaml, expected_log_entry);
-    EXPECT_CALL(*logger_, log(_))
+    EXPECT_CALL(*logger_, log(An<HTTPAccessLogEntry&&>()))
         .WillOnce(
             Invoke([expected_log_entry](envoy::data::accesslog::v2::HTTPAccessLogEntry&& entry) {
               EXPECT_EQ(entry.DebugString(), expected_log_entry.DebugString());
@@ -298,18 +306,22 @@ response: {}
     stream_info.host_ = nullptr;
     stream_info.start_time_ = SystemTime(1h);
 
-    NiceMock<Ssl::MockConnectionInfo> connection_info;
+    auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
     const std::vector<std::string> peerSans{"peerSan1", "peerSan2"};
-    ON_CALL(connection_info, uriSanPeerCertificate()).WillByDefault(Return(peerSans));
+    ON_CALL(*connection_info, uriSanPeerCertificate()).WillByDefault(Return(peerSans));
     const std::vector<std::string> localSans{"localSan1", "localSan2"};
-    ON_CALL(connection_info, uriSanLocalCertificate()).WillByDefault(Return(localSans));
-    ON_CALL(connection_info, subjectPeerCertificate()).WillByDefault(Return("peerSubject"));
-    ON_CALL(connection_info, subjectLocalCertificate()).WillByDefault(Return("localSubject"));
-    ON_CALL(connection_info, sessionId())
-        .WillByDefault(Return("D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B"));
-    ON_CALL(connection_info, tlsVersion()).WillByDefault(Return("TLSv1.3"));
-    ON_CALL(connection_info, ciphersuiteId()).WillByDefault(Return(0x2CC0));
-    stream_info.setDownstreamSslConnection(&connection_info);
+    ON_CALL(*connection_info, uriSanLocalCertificate()).WillByDefault(Return(localSans));
+    const std::string peerSubject = "peerSubject";
+    ON_CALL(*connection_info, subjectPeerCertificate()).WillByDefault(ReturnRef(peerSubject));
+    const std::string localSubject = "localSubject";
+    ON_CALL(*connection_info, subjectLocalCertificate()).WillByDefault(ReturnRef(localSubject));
+    const std::string sessionId =
+        "D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B";
+    ON_CALL(*connection_info, sessionId()).WillByDefault(ReturnRef(sessionId));
+    const std::string tlsVersion = "TLSv1.3";
+    ON_CALL(*connection_info, tlsVersion()).WillByDefault(ReturnRef(tlsVersion));
+    ON_CALL(*connection_info, ciphersuiteId()).WillByDefault(Return(0x2CC0));
+    stream_info.setDownstreamSslConnection(connection_info);
     stream_info.requested_server_name_ = "sni";
 
     Http::TestHeaderMapImpl request_headers{
@@ -357,10 +369,15 @@ response: {}
     stream_info.host_ = nullptr;
     stream_info.start_time_ = SystemTime(1h);
 
-    NiceMock<Ssl::MockConnectionInfo> connection_info;
-    ON_CALL(connection_info, tlsVersion()).WillByDefault(Return("TLSv1.2"));
-    ON_CALL(connection_info, ciphersuiteId()).WillByDefault(Return(0x2F));
-    stream_info.setDownstreamSslConnection(&connection_info);
+    auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+    const std::string empty;
+    ON_CALL(*connection_info, subjectPeerCertificate()).WillByDefault(ReturnRef(empty));
+    ON_CALL(*connection_info, subjectLocalCertificate()).WillByDefault(ReturnRef(empty));
+    ON_CALL(*connection_info, sessionId()).WillByDefault(ReturnRef(empty));
+    const std::string tlsVersion = "TLSv1.2";
+    ON_CALL(*connection_info, tlsVersion()).WillByDefault(ReturnRef(tlsVersion));
+    ON_CALL(*connection_info, ciphersuiteId()).WillByDefault(Return(0x2F));
+    stream_info.setDownstreamSslConnection(connection_info);
     stream_info.requested_server_name_ = "sni";
 
     Http::TestHeaderMapImpl request_headers{
@@ -398,10 +415,15 @@ response: {}
     stream_info.host_ = nullptr;
     stream_info.start_time_ = SystemTime(1h);
 
-    NiceMock<Ssl::MockConnectionInfo> connection_info;
-    ON_CALL(connection_info, tlsVersion()).WillByDefault(Return("TLSv1.1"));
-    ON_CALL(connection_info, ciphersuiteId()).WillByDefault(Return(0x2F));
-    stream_info.setDownstreamSslConnection(&connection_info);
+    auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+    const std::string empty;
+    ON_CALL(*connection_info, subjectPeerCertificate()).WillByDefault(ReturnRef(empty));
+    ON_CALL(*connection_info, subjectLocalCertificate()).WillByDefault(ReturnRef(empty));
+    ON_CALL(*connection_info, sessionId()).WillByDefault(ReturnRef(empty));
+    const std::string tlsVersion = "TLSv1.1";
+    ON_CALL(*connection_info, tlsVersion()).WillByDefault(ReturnRef(tlsVersion));
+    ON_CALL(*connection_info, ciphersuiteId()).WillByDefault(Return(0x2F));
+    stream_info.setDownstreamSslConnection(connection_info);
     stream_info.requested_server_name_ = "sni";
 
     Http::TestHeaderMapImpl request_headers{
@@ -439,10 +461,15 @@ response: {}
     stream_info.host_ = nullptr;
     stream_info.start_time_ = SystemTime(1h);
 
-    NiceMock<Ssl::MockConnectionInfo> connection_info;
-    ON_CALL(connection_info, tlsVersion()).WillByDefault(Return("TLSv1"));
-    ON_CALL(connection_info, ciphersuiteId()).WillByDefault(Return(0x2F));
-    stream_info.setDownstreamSslConnection(&connection_info);
+    auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+    const std::string empty;
+    ON_CALL(*connection_info, subjectPeerCertificate()).WillByDefault(ReturnRef(empty));
+    ON_CALL(*connection_info, subjectLocalCertificate()).WillByDefault(ReturnRef(empty));
+    ON_CALL(*connection_info, sessionId()).WillByDefault(ReturnRef(empty));
+    const std::string tlsVersion = "TLSv1";
+    ON_CALL(*connection_info, tlsVersion()).WillByDefault(ReturnRef(tlsVersion));
+    ON_CALL(*connection_info, ciphersuiteId()).WillByDefault(Return(0x2F));
+    stream_info.setDownstreamSslConnection(connection_info);
     stream_info.requested_server_name_ = "sni";
 
     Http::TestHeaderMapImpl request_headers{
@@ -480,10 +507,15 @@ response: {}
     stream_info.host_ = nullptr;
     stream_info.start_time_ = SystemTime(1h);
 
-    NiceMock<Ssl::MockConnectionInfo> connection_info;
-    ON_CALL(connection_info, tlsVersion()).WillByDefault(Return("TLSv1.4"));
-    ON_CALL(connection_info, ciphersuiteId()).WillByDefault(Return(0x2F));
-    stream_info.setDownstreamSslConnection(&connection_info);
+    auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+    const std::string empty;
+    ON_CALL(*connection_info, subjectPeerCertificate()).WillByDefault(ReturnRef(empty));
+    ON_CALL(*connection_info, subjectLocalCertificate()).WillByDefault(ReturnRef(empty));
+    ON_CALL(*connection_info, sessionId()).WillByDefault(ReturnRef(empty));
+    const std::string tlsVersion = "TLSv1.4";
+    ON_CALL(*connection_info, tlsVersion()).WillByDefault(ReturnRef(tlsVersion));
+    ON_CALL(*connection_info, ciphersuiteId()).WillByDefault(Return(0x2F));
+    stream_info.setDownstreamSslConnection(connection_info);
     stream_info.requested_server_name_ = "sni";
 
     Http::TestHeaderMapImpl request_headers{

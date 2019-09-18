@@ -13,10 +13,11 @@
     "test_name": "Test_2",
     "input": {
       ":authority": "www1.lyft.com",
-      ":path": "/foo",
-      "random_value": 115
+      ":path": "/test/123",
+      "random_value": 115,
+      ":method": "GET"
     },
-    "validate": {"cluster_name": "cluster1"}
+    "validate": {"cluster_name": "cluster1", "virtual_cluster_name": "test_virtual_cluster"}
   },
   {
     "test_name": "Test_3",

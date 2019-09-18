@@ -97,6 +97,8 @@ public:
   const LowerCaseString EnvoyRetryGrpcOn{absl::StrCat(prefix(), "-retry-grpc-on")};
   const LowerCaseString EnvoyRetriableStatusCodes{
       absl::StrCat(prefix(), "-retriable-status-codes")};
+  const LowerCaseString EnvoyRetriableHeaderNames{
+      absl::StrCat(prefix(), "-retriable-header-names")};
   const LowerCaseString EnvoyUpstreamAltStatName{absl::StrCat(prefix(), "-upstream-alt-stat-name")};
   const LowerCaseString EnvoyUpstreamCanary{absl::StrCat(prefix(), "-upstream-canary")};
   const LowerCaseString EnvoyUpstreamHostAddress{absl::StrCat(prefix(), "-upstream-host-address")};
@@ -125,6 +127,7 @@ public:
   const LowerCaseString GrpcAcceptEncoding{"grpc-accept-encoding"};
   const LowerCaseString Host{":authority"};
   const LowerCaseString HostLegacy{"host"};
+  const LowerCaseString Http2Settings{"http2-settings"};
   const LowerCaseString KeepAlive{"keep-alive"};
   const LowerCaseString LastModified{"last-modified"};
   const LowerCaseString Location{"location"};
@@ -153,11 +156,13 @@ public:
 
   struct {
     const std::string Close{"close"};
+    const std::string Http2Settings{"http2-settings"};
     const std::string KeepAlive{"keep-alive"};
     const std::string Upgrade{"upgrade"};
   } ConnectionValues;
 
   struct {
+    const std::string H2c{"h2c"};
     const std::string WebSocket{"websocket"};
   } UpgradeValues;
 
@@ -178,6 +183,7 @@ public:
     const std::string GrpcWebText{"application/grpc-web-text"};
     const std::string GrpcWebTextProto{"application/grpc-web-text+proto"};
     const std::string Json{"application/json"};
+    const std::string Protobuf{"application/x-protobuf"};
     const std::string FormUrlEncoded{"application/x-www-form-urlencoded"};
   } ContentTypeValues;
 
@@ -204,6 +210,7 @@ public:
     const std::string RefusedStream{"refused-stream"};
     const std::string Retriable4xx{"retriable-4xx"};
     const std::string RetriableStatusCodes{"retriable-status-codes"};
+    const std::string RetriableHeaders{"retriable-headers"};
     const std::string Reset{"reset"};
   } EnvoyRetryOnValues;
 

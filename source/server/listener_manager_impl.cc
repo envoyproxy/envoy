@@ -4,6 +4,7 @@
 
 #include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/registry/registry.h"
+#include "envoy/server/active_udp_listener_config.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/stats/scope.h"
 
@@ -23,6 +24,7 @@
 #include "server/drain_manager_impl.h"
 #include "server/filter_chain_manager_impl.h"
 #include "server/transport_socket_config_impl.h"
+#include "server/well_known_names.h"
 
 #include "extensions/filters/listener/well_known_names.h"
 #include "extensions/transport_sockets/well_known_names.h"
@@ -226,6 +228,15 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
     addListenSocketOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
     // Needed to return receive buffer overflown indicator.
     addListenSocketOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
+    auto udp_config = config.udp_listener_config();
+    if (udp_config.udp_listener_name().empty()) {
+      udp_config.set_udp_listener_name(UdpListenerNames::get().RawUdp);
+    }
+    auto& config_factory = Config::Utility::getAndCheckFactory<ActiveUdpListenerConfigFactory>(
+        udp_config.udp_listener_name());
+    ProtobufTypes::MessagePtr message =
+        Config::Utility::translateToFactoryConfig(udp_config, validation_visitor_, config_factory);
+    udp_listener_factory_ = config_factory.createActiveUdpListenerFactory(*message);
   }
 
   if (!config.listener_filters().empty()) {

@@ -311,6 +311,7 @@ public:
   MOCK_METHOD0(listenerScope, Stats::Scope&());
   MOCK_CONST_METHOD0(listenerTag, uint64_t());
   MOCK_CONST_METHOD0(name, const std::string&());
+  MOCK_METHOD0(udpListenerFactory, const Network::ActiveUdpListenerFactory*());
 
   testing::NiceMock<MockFilterChainFactory> filter_chain_factory_;
   testing::NiceMock<MockListenSocket> socket_;
@@ -334,6 +335,8 @@ public:
   ~MockConnectionHandler() override;
 
   MOCK_METHOD0(numConnections, uint64_t());
+  MOCK_METHOD0(incNumConnections, void());
+  MOCK_METHOD0(decNumConnections, void());
   MOCK_METHOD1(addListener, void(ListenerConfig& config));
   MOCK_METHOD1(findListenerByAddress,
                Network::Listener*(const Network::Address::Instance& address));
@@ -397,7 +400,7 @@ public:
   MOCK_METHOD1(doRead, IoResult(Buffer::Instance& buffer));
   MOCK_METHOD2(doWrite, IoResult(Buffer::Instance& buffer, bool end_stream));
   MOCK_METHOD0(onConnected, void());
-  MOCK_CONST_METHOD0(ssl, const Ssl::ConnectionInfo*());
+  MOCK_CONST_METHOD0(ssl, Ssl::ConnectionInfoConstSharedPtr());
 
   TransportSocketCallbacks* callbacks_{};
 };
