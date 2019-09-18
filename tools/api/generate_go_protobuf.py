@@ -51,6 +51,7 @@ def generateProtobufs(output):
       shutil.copy(generated_file, output_dir)
   print('Go artifacts placed into: ' + output)
 
+
 def git(repo, *args):
   cmd = ['git']
   if repo:
@@ -58,6 +59,7 @@ def git(repo, *args):
   for arg in args:
     cmd = cmd + [arg]
   return check_output(cmd).decode()
+
 
 def cloneGoProtobufs(repo):
   # Create a local clone of go-control-plane
