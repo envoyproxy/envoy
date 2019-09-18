@@ -110,6 +110,11 @@ retriable-status-codes
   in either :ref:`the retry policy <envoy_api_field_route.RetryPolicy.retriable_status_codes>`
   or in the :ref:`config_http_filters_router_x-envoy-retriable-status-codes` header.
 
+retriable-headers
+  Envoy will attempt a retry if the upstream server response includes any headers matching in either
+  :ref:`the retry policy <envoy_api_field_route.RetryPolicy.retriable_headers>` or in the
+  :ref:`config_http_filters_router_x-envoy-retriable-header-names` header.
+
 The number of retries can be controlled via the
 :ref:`config_http_filters_router_x-envoy-max-retries` header or via the :ref:`route
 configuration <envoy_api_field_route.RouteAction.retry_policy>` or via the
@@ -157,6 +162,25 @@ Note that retry policies can also be applied at the :ref:`route level
 :ref:`virtual host level <envoy_api_field_route.VirtualHost.retry_policy>`.
 
 By default, Envoy will *not* perform retries unless you've configured them per above.
+
+.. _config_http_filters_router_x-envoy-retriable-header-names:
+
+x-envoy-retriable-header-names
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Setting this header informs Envoy about what response headers should be considered retriable. It is used
+in conjunction with the :ref:`retriable-headers <config_http_filters_router_x-envoy-retry-on>` retry policy.
+When the corresponding retry policy is set, the response headers provided by this list header value will be
+considered retriable in addition to the response headers enabled for retry through other retry policies.
+
+The list is a comma-separated list of header names: "X-Upstream-Retry,X-Try-Again" would cause any upstream
+responses containing either one of the specified headers to be retriable if 'retriable-headers' retry policy
+is enabled. Header names are case-insensitive.
+
+Only the names of retriable response headers can be specified via the request header. A more sophisticated
+retry policy based on the response headers can be specified by using arbitrary header matching rules
+via :ref:`retry policy configuration <envoy_api_field_route.RetryPolicy.retriable_headers>`.
+
+This header will only be honored for requests from internal clients.
 
 .. _config_http_filters_router_x-envoy-retriable-status-codes:
 

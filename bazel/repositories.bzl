@@ -107,8 +107,9 @@ def envoy_dependencies(skip_targets = []):
     if "envoy_build_config" not in native.existing_rules().keys():
         _default_envoy_build_config(name = "envoy_build_config")
 
-    # Setup rules_foreign_cc
+    # Setup external Bazel rules
     _foreign_cc_dependencies()
+    _rules_proto_dependencies()
 
     # Binding to an alias pointing to the selected version of BoringSSL:
     # - BoringSSL FIPS from @boringssl_fips//:ssl,
@@ -317,6 +318,12 @@ def _net_zlib():
         actual = "@envoy//bazel/foreign_cc:zlib",
     )
 
+    # Bind for grpc.
+    native.bind(
+        name = "madler_zlib",
+        actual = "@envoy//bazel/foreign_cc:zlib",
+    )
+
 def _com_google_cel_cpp():
     _repository_impl("com_google_cel_cpp")
 
@@ -412,6 +419,12 @@ def _com_google_absl():
         name = "abseil_base",
         actual = "@com_google_absl//absl/base:base",
     )
+
+    # Bind for grpc.
+    native.bind(
+        name = "absl-base",
+        actual = "@com_google_absl//absl/base",
+    )
     native.bind(
         name = "abseil_flat_hash_map",
         actual = "@com_google_absl//absl/container:flat_hash_map",
@@ -477,6 +490,12 @@ def _com_google_absl():
     # direct dependency jwt_verify_lib.
     native.bind(
         name = "abseil_time",
+        actual = "@com_google_absl//absl/time:time",
+    )
+
+    # Bind for grpc.
+    native.bind(
+        name = "absl-time",
         actual = "@com_google_absl//absl/time:time",
     )
 
@@ -708,6 +727,9 @@ def _com_github_gperftools_gperftools():
 
 def _foreign_cc_dependencies():
     _repository_impl("rules_foreign_cc")
+
+def _rules_proto_dependencies():
+    _repository_impl("rules_proto")
 
 def _is_linux(ctxt):
     return ctxt.os.name == "linux"

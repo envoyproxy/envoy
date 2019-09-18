@@ -93,10 +93,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/gperftools/gperftools/archive/fc00474ddc21fff618fc3f009b46590e241e425e.tar.gz"],
     ),
     com_github_grpc_grpc = dict(
-        sha256 = "bcb01ac7029a7fb5219ad2cbbc4f0a2df3ef32db42e236ce7814597f4b04b541",
-        strip_prefix = "grpc-79a8b5289e3122d2cea2da3be7151d37313d6f46",
-        # Commit from 2019-05-30
-        urls = ["https://github.com/grpc/grpc/archive/79a8b5289e3122d2cea2da3be7151d37313d6f46.tar.gz"],
+        sha256 = "cce1d4585dd017980d4a407d8c5e9f8fc8c1dbb03f249b99e88a387ebb45a035",
+        strip_prefix = "grpc-1.22.1",
+        urls = ["https://github.com/grpc/grpc/archive/v1.22.1.tar.gz"],
     ),
     com_github_luajit_luajit = dict(
         sha256 = "409f7fe570d3c16558e594421c47bdd130238323c9d6fd6c83dedd2aaeb082a8",
@@ -210,9 +209,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/googletest/archive/d7003576dd133856432e2e07340f45926242cc3a.tar.gz"],
     ),
     com_google_protobuf = dict(
-        sha256 = "b7220b41481011305bf9100847cf294393973e869973a9661046601959b2960b",
-        strip_prefix = "protobuf-3.8.0",
-        urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v3.8.0/protobuf-all-3.8.0.tar.gz"],
+        sha256 = "3040a5b946d9df7aa89c0bf6981330bf92b7844fd90e71b61da0c721e421a421",
+        strip_prefix = "protobuf-3.9.1",
+        urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v3.9.1/protobuf-all-3.9.1.tar.gz"],
     ),
     grpc_httpjson_transcoding = dict(
         sha256 = "a447458b47ea4dc1d31499f555769af437c5d129d988ec1e13d5fdd0a6a36b4e",
@@ -230,15 +229,24 @@ REPOSITORY_LOCATIONS = dict(
         # 2019-07-17
         urls = ["https://github.com/bazelbuild/rules_foreign_cc/archive/a209b642c7687a8894c19b3dd40e43e6d3f38e83.tar.gz"],
     ),
+    rules_proto = dict(
+        sha256 = "602e7161d9195e50246177e7c55b2f39950a9cf7366f74ed5f22fd45750cd208",
+        strip_prefix = "rules_proto-97d8af4dc474595af3900dd85cb3a29ad28cc313",
+        # 2019-08-02
+        urls = [
+            "https://mirror.bazel.build/github.com/bazelbuild/rules_proto/archive/97d8af4dc474595af3900dd85cb3a29ad28cc313.tar.gz",
+            "https://github.com/bazelbuild/rules_proto/archive/97d8af4dc474595af3900dd85cb3a29ad28cc313.tar.gz",
+        ],
+    ),
     six_archive = dict(
         sha256 = "105f8d68616f8248e24bf0e9372ef04d3cc10104f1980f54d57b2ce73a5ad56a",
         urls = ["https://files.pythonhosted.org/packages/b3/b2/238e2590826bfdd113244a40d9d3eb26918bd798fc187e2360a8367068db/six-1.10.0.tar.gz"],
     ),
     io_opencensus_cpp = dict(
-        sha256 = "145e42594db358905737dc07400657be62a2961f4e93ab7f4c9765dd2441033c",
-        strip_prefix = "opencensus-cpp-cc198ff64569bc47beed5384777a4bb563d268e7",
-        # 2019-09-04
-        urls = ["https://github.com/census-instrumentation/opencensus-cpp/archive/cc198ff64569bc47beed5384777a4bb563d268e7.tar.gz"],
+        sha256 = "29b2be0d92523a20daef7045e547c517ca0f6e6a0ddd7e7fcd15d162c13b6d9a",
+        strip_prefix = "opencensus-cpp-1bbde06b72e0516b74b6992d204f254073047b10",
+        # 2019-09-17
+        urls = ["https://github.com/census-instrumentation/opencensus-cpp/archive/1bbde06b72e0516b74b6992d204f254073047b10.tar.gz"],
     ),
     com_github_curl = dict(
         sha256 = "4376ac72b95572fb6c4fbffefb97c7ea0dd083e1974c0e44cd7e49396f454839",
