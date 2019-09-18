@@ -5,10 +5,8 @@
 
 namespace Envoy {
 
-class HttpSubsetLbIntegrationTest
-    : public testing::TestWithParam<
-          std::tuple<envoy::api::v2::Cluster_LbPolicy, Network::Address::IpVersion>>,
-      public HttpIntegrationTest {
+class HttpSubsetLbIntegrationTest : public testing::TestWithParam<envoy::api::v2::Cluster_LbPolicy>,
+                                    public HttpIntegrationTest {
 public:
   // Returns all load balancer types except ORIGINAL_DST_LB and CLUSTER_PROVIDED.
   static std::vector<envoy::api::v2::Cluster_LbPolicy> getSubsetLbTestParams() {
@@ -37,20 +35,18 @@ public:
   }
 
   // Converts an LbPolicy to strings suitable for test names.
-  static std::string subsetLbTestParamsToString(
-      const testing::TestParamInfo<
-          std::tuple<envoy::api::v2::Cluster_LbPolicy, Network::Address::IpVersion>>& p) {
-    const std::string& policy_name = envoy::api::v2::Cluster_LbPolicy_Name(std::get<0>(p.param));
-    return fmt::format("{}_{}", absl::StrReplaceAll(policy_name, {{"_", ""}}),
-                       std::get<1>(p.param) == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6");
+  static std::string
+  subsetLbTestParamsToString(const testing::TestParamInfo<envoy::api::v2::Cluster_LbPolicy>& p) {
+    const std::string& policy_name = envoy::api::v2::Cluster_LbPolicy_Name(p.param);
+    return absl::StrReplaceAll(policy_name, {{"_", ""}});
   }
 
   HttpSubsetLbIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, std::get<1>(GetParam()),
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1,
+                            TestEnvironment::getIpVersionsForTest().front(),
                             ConfigHelper::HTTP_PROXY_CONFIG),
-        num_hosts_{4},
-        is_hash_lb_(std::get<0>(GetParam()) == envoy::api::v2::Cluster_LbPolicy_RING_HASH ||
-                    std::get<0>(GetParam()) == envoy::api::v2::Cluster_LbPolicy_MAGLEV) {
+        num_hosts_{4}, is_hash_lb_(GetParam() == envoy::api::v2::Cluster_LbPolicy_RING_HASH ||
+                                   GetParam() == envoy::api::v2::Cluster_LbPolicy_MAGLEV) {
     autonomous_upstream_ = true;
     setUpstreamCount(num_hosts_);
 
@@ -58,15 +54,15 @@ public:
       auto* static_resources = bootstrap.mutable_static_resources();
       auto* cluster = static_resources->mutable_clusters(0);
 
-      cluster->set_lb_policy(std::get<0>(GetParam()));
+      cluster->set_lb_policy(GetParam());
 
       // Create subsets based on type value of the "type" metadata.
       cluster->mutable_lb_subset_config()->add_subset_selectors()->add_keys(type_key_);
 
       cluster->clear_hosts();
 
-      // Create a load assignment with num_hosts_ entries with metadata split evenly between type=a
-      // and type=b.
+      // Create a load assignment with num_hosts_ entries with metadata split evenly between
+      // type=a and type=b.
       auto* load_assignment = cluster->mutable_load_assignment();
       load_assignment->set_cluster_name(cluster->name());
       auto* endpoints = load_assignment->add_endpoints();
@@ -76,7 +72,8 @@ public:
         // ConfigHelper will fill in ports later.
         auto* endpoint = lb_endpoint->mutable_endpoint();
         auto* addr = endpoint->mutable_address()->mutable_socket_address();
-        addr->set_address(Network::Test::getLoopbackAddressString(std::get<1>(GetParam())));
+        addr->set_address(Network::Test::getLoopbackAddressString(
+            TestEnvironment::getIpVersionsForTest().front()));
         addr->set_port_value(0);
 
         // Assign type metadata based on i.
@@ -167,10 +164,10 @@ public:
 
     if (is_hash_lb_) {
       EXPECT_EQ(hosts.size(), 1) << "Expected a single unique host to be selected for "
-                                 << envoy::api::v2::Cluster_LbPolicy_Name(std::get<0>(GetParam()));
+                                 << envoy::api::v2::Cluster_LbPolicy_Name(GetParam());
     } else {
       EXPECT_GT(hosts.size(), 1) << "Expected multiple hosts to be selected for "
-                                 << envoy::api::v2::Cluster_LbPolicy_Name(std::get<0>(GetParam()));
+                                 << envoy::api::v2::Cluster_LbPolicy_Name(GetParam());
     }
   }
 
@@ -191,11 +188,9 @@ public:
                                                   {"x-type", "b"},     {"x-hash", "hash-b"}};
 };
 
-INSTANTIATE_TEST_SUITE_P(
-    SubsetCompatibleLoadBalancers, HttpSubsetLbIntegrationTest,
-    testing::Combine(testing::ValuesIn(HttpSubsetLbIntegrationTest::getSubsetLbTestParams()),
-                     testing::ValuesIn(TestEnvironment::getIpVersionsForTest())),
-    HttpSubsetLbIntegrationTest::subsetLbTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(SubsetCompatibleLoadBalancers, HttpSubsetLbIntegrationTest,
+                         testing::ValuesIn(HttpSubsetLbIntegrationTest::getSubsetLbTestParams()),
+                         HttpSubsetLbIntegrationTest::subsetLbTestParamsToString);
 
 // Tests each subset-compatible load balancer policy with 4 hosts divided into 2 subsets.
 TEST_P(HttpSubsetLbIntegrationTest, SubsetLoadBalancer) {
