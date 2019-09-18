@@ -2,13 +2,6 @@ load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library_internal", "ap
 
 licenses(["notice"])  # Apache 2
 
-package_group(
-    name = "friends",
-    packages = [
-        "//envoy/config/api_listener/v2",
-    ],
-)
-
 api_proto_package(
     deps = [
         "//envoy/api/v2",
@@ -21,7 +14,6 @@ api_proto_package(
 api_proto_library_internal(
     name = "http_connection_manager",
     srcs = ["http_connection_manager.proto"],
-    visibility = [":friends"],
     deps = [
         "//envoy/api/v2:rds",
         "//envoy/api/v2:srds",

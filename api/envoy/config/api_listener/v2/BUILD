@@ -9,17 +9,10 @@ package_group(
     ],
 )
 
-api_proto_package(
-    deps = [
-        "//envoy/config/filter/network/http_connection_manager/v2:http_connection_manager",
-    ],
-)
+api_proto_package()
 
 api_proto_library_internal(
     name = "api_listener",
     srcs = ["api_listener.proto"],
     visibility = [":friends"],
-    deps = [
-        "//envoy/config/filter/network/http_connection_manager/v2:http_connection_manager",
-    ],
 )

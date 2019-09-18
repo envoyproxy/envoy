@@ -27,6 +27,7 @@ api_proto_package(
         "//envoy/api/v2/listener:pkg",
         "//envoy/api/v2/ratelimit:pkg",
         "//envoy/api/v2/route:pkg",
+        "//envoy/config/api_listener/v2:pkg",
         "//envoy/type",
     ],
 )
