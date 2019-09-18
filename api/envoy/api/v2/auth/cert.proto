@@ -296,8 +296,7 @@ message CertificateValidationContext {
   bool allow_expired_certificate = 8;
 
   // Certificate trust chain verification mode.
-  TrustChainVerification trust_chain_verification = 9
-      [(validate.rules).enum.defined_only = true];
+  TrustChainVerification trust_chain_verification = 9 [(validate.rules).enum.defined_only = true];
 }
 
 // TLS context shared by both client and server TLS contexts.
