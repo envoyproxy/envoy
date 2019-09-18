@@ -296,7 +296,7 @@ message Cluster {
   // socket match in case above.
   //
   // If an endpoint metadata's value under *envoy.transport_socket* does not match any
-  // *TransportSockerMatch*, socket configuration fallbacks to use the *tls_context* or
+  // *TransportSocketMatch*, socket configuration fallbacks to use the *tls_context* or
   // *transport_socket* specified in this cluster.
   //
   // This field allows gradual and flexible transport socket configuration changes.
