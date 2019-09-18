@@ -14,8 +14,8 @@ OUTPUT_BASE = 'build_go'
 REPO_BASE = 'go-control-plane'
 BRANCH = 'master'
 MIRROR_MSG = 'Mirrored from envoyproxy/envoy @ '
-USER_NAME = 'Kuat Yessenov'
-USER_EMAIL = 'kuat@google.com'
+USER_NAME = 'go-control-plane(CircleCI)'
+USER_EMAIL = 'go-control-plane@users.noreply.github.com'
 
 
 def generateProtobufs(output):
@@ -30,7 +30,6 @@ def generateProtobufs(output):
   # First build all the rules to ensure we have the output files.
   check_call(['bazel', 'build', '-c', 'fastbuild'] + go_protos)
 
-  shutil.rmtree(output, ignore_errors=True)
   for rule in go_protos:
     # Example rule:
     # @envoy_api//envoy/config/bootstrap/v2:pkg_go_proto
@@ -41,7 +40,6 @@ def generateProtobufs(output):
     # Example output directory:
     # go_out/envoy/config/bootstrap/v2
     rule_dir, proto = rule.decode()[len('@envoy_api//'):].rsplit(':', 1)
-
     input_dir = os.path.join(bazel_bin, 'external', 'envoy_api', rule_dir, 'linux_amd64_stripped',
                              proto + '%', IMPORT_BASE, rule_dir)
     input_files = glob.glob(os.path.join(input_dir, '*.go'))
@@ -53,20 +51,24 @@ def generateProtobufs(output):
       shutil.copy(generated_file, output_dir)
   print('Go artifacts placed into: ' + output)
 
+def git(repo, *args):
+  cmd = ['git']
+  if repo:
+    cmd = cmd + ['-C', repo]
+  for arg in args:
+    cmd = cmd + [arg]
+  return check_output(cmd).decode()
 
 def cloneGoProtobufs(repo):
   # Create a local clone of go-control-plane
-  shutil.rmtree(repo, ignore_errors=True)
-  check_call(['git', 'clone', 'git@git:envoyproxy/go-control-plane', repo])
-  check_call(['git', '-C', repo, 'fetch'])
-  check_call(['git', '-C', repo, 'checkout', '-B', BRANCH, 'origin/master'])
+  git(None, 'clone', 'git@github.com:envoyproxy/go-control-plane', repo)
+  git(repo, 'fetch')
+  git(repo, 'checkout', '-B', BRANCH, 'origin/master')
 
 
 def findLastSyncSHA(repo):
   # Determine last envoyproxy/envoy SHA in envoyproxy/go-control-plane
-  last_commit = check_output(
-      ['git', '-C', repo, 'log', '--grep=' + MIRROR_MSG, '-n', '1',
-       '--format=%B']).decode().strip()
+  last_commit = git(repo, 'log', '--grep=' + MIRROR_MSG, '-n', '1', '--format=%B').strip()
   # Initial SHA from which the APIs start syncing. Prior to that it was done manually.
   if last_commit == "":
     return 'e7f0b7176efdc65f96eb1697b829d1e6187f4502'
@@ -75,27 +77,26 @@ def findLastSyncSHA(repo):
 
 
 def updatedSinceSHA(repo, last_sha):
-  # Determine if there are changes to api since last SHA
-  changes = check_output(['git', 'rev-list', '%s..HEAD' % last_sha, 'api/envoy']).decode().split()
-  return changes
+  # Determine if there are changes to API since last SHA
+  return git(None, 'rev-list', '%s..HEAD' % last_sha, 'api/envoy').split()
 
 
 def syncGoProtobufs(output, repo):
   # Sync generated content against repo and return true if there is a commit necessary
   dst = os.path.join(repo, 'envoy')
   # Remove subtree at envoy in repo
-  shutil.rmtree(dst, ignore_errors=True)
+  git(repo, 'rm', '-r', 'envoy')
   # Copy subtree at envoy from output to repo
   shutil.copytree(os.path.join(output, 'envoy'), dst)
 
 
 def publishGoProtobufs(repo, sha):
-  # Publish generated files with the last SHA changes to api
-  check_call(['git', '-C', repo, 'config', 'user.name', USER_NAME])
-  check_call(['git', '-C', repo, 'config', 'user.email', USER_EMAIL])
-  check_call(['git', '-C', repo, 'add', 'envoy'])
-  check_call(['git', '-C', repo, 'commit', '-s', '-m', MIRROR_MSG + sha])
-  check_call(['git', '-C', repo, 'push', 'origin', BRANCH])
+  # Publish generated files with the last SHA changes to API
+  git(repo, 'config', 'user.name', USER_NAME)
+  git(repo, 'config', 'user.email', USER_EMAIL)
+  git(repo, 'add', 'envoy')
+  git(repo, 'commit', '-s', '-m', MIRROR_MSG + sha)
+  git(repo, 'push', 'origin', BRANCH)
 
 
 if __name__ == "__main__":
