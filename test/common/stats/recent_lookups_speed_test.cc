@@ -3,13 +3,11 @@
 //
 // NOLINT(namespace-envoy)
 
-#include "common/stats/recent_lookups.h"
 #include "common/runtime/runtime_impl.h"
+#include "common/stats/recent_lookups.h"
 
 #include "absl/strings/str_cat.h"
-
 #include "benchmark/benchmark.h"
-
 
 static void BM_Lookups(benchmark::State& state) {
   Envoy::Runtime::RandomGeneratorImpl random;
@@ -26,7 +24,6 @@ static void BM_Lookups(benchmark::State& state) {
   }
 }
 BENCHMARK(BM_Lookups);
-
 
 int main(int argc, char** argv) {
   Envoy::Thread::MutexBasicLockable lock;

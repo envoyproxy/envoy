@@ -17,7 +17,7 @@ namespace Stats {
 // Remembers the last 'Capacity' items passed to lookup().
 class RecentLookups {
 public:
-  //explicit RecentLookups(TimeSource& time_source) : time_source_(time_source) {}
+  // explicit RecentLookups(TimeSource& time_source) : time_source_(time_source) {}
 
   /**
    * Records a lookup of a string. Only the last 'Capacity' lookups are remembered.
@@ -38,7 +38,7 @@ public:
   /**
    * @return the time-source associated with the object.
    */
-  //TimeSource& timeSource() { return time_source_; }
+  // TimeSource& timeSource() { return time_source_; }
 
   /**
    * @return the total number of lookups since tracking began.

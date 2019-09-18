@@ -208,18 +208,18 @@ void SymbolTableImpl::free(const StatName& stat_name) {
   }
 }
 
-  /*
+/*
 void SymbolTableImpl::trackRecentLookups(TimeSource& time_source) {
-  {
-    Thread::LockGuard lock(lock_);
-    recent_lookups_ = std::make_unique<RecentLookups>(time_source);
+{
+  Thread::LockGuard lock(lock_);
+  recent_lookups_ = std::make_unique<RecentLookups>(time_source);
+}
+{
+  Thread::LockGuard lock(stat_name_set_mutex_);
+  for (StatNameSet* stat_name_set : stat_name_sets_) {
+    stat_name_set->trackRecentLookups(time_source);
   }
-  {
-    Thread::LockGuard lock(stat_name_set_mutex_);
-    for (StatNameSet* stat_name_set : stat_name_sets_) {
-      stat_name_set->trackRecentLookups(time_source);
-    }
-  }
+}
 }
 */
 
@@ -239,20 +239,20 @@ uint64_t SymbolTableImpl::getRecentLookups(const RecentLookupsFn& iter) {
     for (StatNameSet* stat_name_set : stat_name_sets_) {
       total +=
           stat_name_set->getRecentLookups([&lookup_data](absl::string_view str, uint64_t count) {
-                                            lookup_data.push_back({std::string(str), count});
+            lookup_data.push_back({std::string(str), count});
           });
     }
   }
 
   {
     Thread::LockGuard lock(lock_);
-    //if (recent_lookups_ != nullptr) {
-      recent_lookups_.forEach([&lookup_data](absl::string_view str, uint64_t count)
-                                   NO_THREAD_SAFETY_ANALYSIS {
-                                     lookup_data.push_back({std::string(str), count});
-                                   });
-      total += recent_lookups_.total();
-      //}
+    // if (recent_lookups_ != nullptr) {
+    recent_lookups_.forEach([&lookup_data](absl::string_view str, uint64_t count)
+                                NO_THREAD_SAFETY_ANALYSIS {
+                                  lookup_data.push_back({std::string(str), count});
+                                });
+    total += recent_lookups_.total();
+    //}
   }
   std::sort(lookup_data.begin(), lookup_data.end(),
             [](const LookupData& a, const LookupData& b) -> bool {
@@ -283,13 +283,13 @@ void SymbolTableImpl::rememberSet(StatNameSet& stat_name_set) {
       time_source = &recent_lookups_->timeSource();
     }
     }*/
-  //if (time_source != nullptr) {
-  //stat_name_set.trackRecentLookups()*time_source);
-    //}
+  // if (time_source != nullptr) {
+  // stat_name_set.trackRecentLookups()*time_source);
+  //}
   //{
-    Thread::LockGuard lock(stat_name_set_mutex_);
-    stat_name_sets_.insert(&stat_name_set);
-    //}
+  Thread::LockGuard lock(stat_name_set_mutex_);
+  stat_name_sets_.insert(&stat_name_set);
+  //}
 }
 
 void SymbolTableImpl::forgetSet(StatNameSet& stat_name_set) {
@@ -550,9 +550,9 @@ Stats::StatName StatNameSet::getStatName(absl::string_view token) {
   Stats::StatName& stat_name = dynamic_stat_names_[token];
   if (stat_name.empty()) { // Note that builtin_stat_names_ already has one for "".
     stat_name = pool_.add(token);
-    //if (recent_lookups_ != nullptr) {
-      recent_lookups_.lookup(token);
-      //}
+    // if (recent_lookups_ != nullptr) {
+    recent_lookups_.lookup(token);
+    //}
   }
   return stat_name;
 }

@@ -153,7 +153,7 @@ public:
    *
    * @param time_source used to help capture the time when a lookup occurs.
    */
-  //virtual void trackRecentLookups(TimeSource& time_source) PURE;
+  // virtual void trackRecentLookups(TimeSource& time_source) PURE;
 
   using RecentLookupsFn = std::function<void(absl::string_view, uint64_t)>;
 

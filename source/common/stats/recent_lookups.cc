@@ -15,7 +15,7 @@ namespace Stats {
 
 namespace {
 constexpr size_t Capacity = 10;
-//constexpr uint64_t LogIntervalSec = 300;
+// constexpr uint64_t LogIntervalSec = 300;
 } // namespace
 
 void RecentLookups::lookup(absl::string_view str) {
