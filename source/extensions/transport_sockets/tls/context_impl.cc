@@ -103,10 +103,10 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   int verify_mode_validation_context = SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
 
   if (config.certificateValidationContext() != nullptr) {
-    envoy::api::v2::auth::CertificateValidationContext_TrustChainVerification verfication =
+    envoy::api::v2::auth::CertificateValidationContext_TrustChainVerification verification =
         config.certificateValidationContext()->verifyCertificateTrustChain();
-    if (verfication == envoy::api::v2::auth::CertificateValidationContext::ACCEPT_UNTRUSTED ||
-        verfication == envoy::api::v2::auth::CertificateValidationContext::NOT_VERIFIED) {
+    if (verification == envoy::api::v2::auth::CertificateValidationContext::ACCEPT_UNTRUSTED ||
+        verification == envoy::api::v2::auth::CertificateValidationContext::NOT_VERIFIED) {
       verify_mode = SSL_VERIFY_PEER; // Ensure client-certs will be requested even if we have
                                      // nothing to verify against
       verify_mode_validation_context = SSL_VERIFY_PEER;
