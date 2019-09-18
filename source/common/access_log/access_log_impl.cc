@@ -233,7 +233,8 @@ bool GrpcStatusFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::
                                 const Http::HeaderMap& response_headers,
                                 const Http::HeaderMap& response_trailers) {
 
-  absl::optional<Grpc::Status::GrpcStatus> status = Grpc::Common::responseToGrpcStatus(info, response_headers, response_trailers);
+  absl::optional<Grpc::Status::GrpcStatus> status =
+      Grpc::Common::responseToGrpcStatus(info, response_headers, response_trailers);
 
   if (!status) {
     // Default in case response does not contain gRPC status.

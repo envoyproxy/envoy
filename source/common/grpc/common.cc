@@ -276,8 +276,8 @@ bool Common::parseBufferInstance(Buffer::InstancePtr&& buffer, Protobuf::Message
 }
 
 absl::optional<Status::GrpcStatus> responseToGrpcStatus(const StreamInfo::StreamInfo& info,
-                                                 const Http::HeaderMap& response_headers,
-                                                 const Http::HeaderMap& response_trailers) {
+                                                        const Http::HeaderMap& response_headers,
+                                                        const Http::HeaderMap& response_trailers) {
   const std::array<absl::optional<Grpc::Status::GrpcStatus>, 3> optional_statuses = {{
       {Grpc::Common::getGrpcStatus(response_trailers)},
       {Grpc::Common::getGrpcStatus(response_headers)},

@@ -833,15 +833,15 @@ void Filter::onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_
 
     callbacks_->streamInfo().setResponseFlag(response_flags);
 
-    callbacks_->sendLocalReply(
-        code, body,
-        [dropped, this](Http::HeaderMap& headers) {
-          if (dropped && !config_.suppress_envoy_headers_) {
-            headers.insertEnvoyOverloaded().value(Http::Headers::get().EnvoyOverloadedValues.True);
-          }
-          modify_headers_(headers);
-        },
-        absl::nullopt, details);
+    callbacks_->sendLocalReply(code, body,
+                               [dropped, this](Http::HeaderMap& headers) {
+                                 if (dropped && !config_.suppress_envoy_headers_) {
+                                   headers.insertEnvoyOverloaded().value(
+                                       Http::Headers::get().EnvoyOverloadedValues.True);
+                                 }
+                                 modify_headers_(headers);
+                               },
+                               absl::nullopt, details);
   }
 }
 
@@ -1333,15 +1333,14 @@ Filter::UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::I
 
     // Create span name based on attempt number.
     std::string span_base_name = "router " + parent.cluster_->name() + " egress";
-    std::string span_name_with_retry = parent.attempt_count_ == 1
-        ? span_base_name
-        : absl::StrCat(span_base_name, " - retry ", parent.attempt_count_ - 1);
+    std::string span_name_with_retry =
+        parent.attempt_count_ == 1
+            ? span_base_name
+            : absl::StrCat(span_base_name, " - retry ", parent.attempt_count_ - 1);
 
-    span_ = parent_.callbacks_->activeSpan().spawnChild(
-        parent_.callbacks_->tracingConfig(),
-        span_name_with_retry,
-        parent.timeSource().systemTime()
-    );
+    span_ = parent_.callbacks_->activeSpan().spawnChild(parent_.callbacks_->tracingConfig(),
+                                                        span_name_with_retry,
+                                                        parent.timeSource().systemTime());
     span_->setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy);
     span_->setTag(Tracing::Tags::get().UpstreamCluster, parent.cluster_->name());
   }
@@ -1355,22 +1354,21 @@ Filter::UpstreamRequest::~UpstreamRequest() {
     auto protocol = stream_info_.protocol();
     if (protocol) {
       span_->setTag(Tracing::Tags::get().HttpProtocol,
-          AccessLog::AccessLogFormatUtils::protocolToString(protocol));
+                    AccessLog::AccessLogFormatUtils::protocolToString(protocol));
     }
 
     if (parent_.grpc_request_) {
       // Add gRPC response code to span.
-      auto response_code = Grpc::Common::responseToGrpcStatus(stream_info_, *upstream_headers_, *upstream_trailers_);
+      auto response_code =
+          Grpc::Common::responseToGrpcStatus(stream_info_, *upstream_headers_, *upstream_trailers_);
       if (response_code) {
-        span_->setTag(Tracing::Tags::get().GrpcStatusCode,
-                      std::to_string(response_code.value()));
+        span_->setTag(Tracing::Tags::get().GrpcStatusCode, std::to_string(response_code.value()));
       }
     } else {
       // Add HTTP response code to span.
       auto response_code = stream_info_.responseCode();
       if (response_code) {
-        span_->setTag(Tracing::Tags::get().HttpStatusCode,
-                      std::to_string(response_code.value()));
+        span_->setTag(Tracing::Tags::get().HttpStatusCode, std::to_string(response_code.value()));
       }
     }
     span_->finishSpan();

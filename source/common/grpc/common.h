@@ -148,9 +148,9 @@ public:
    * @param response_trailers the response trailers to parse
    * @return absl::optional<Status::GrpcStatus> The parsed status code or empty if none is found
    */
-  static absl::optional<Status::GrpcStatus> responseToGrpcStatus(const StreamInfo::StreamInfo& info,
-                                                 const Http::HeaderMap& response_headers,
-                                                 const Http::HeaderMap& response_trailers);
+  static absl::optional<Status::GrpcStatus>
+  responseToGrpcStatus(const StreamInfo::StreamInfo& info, const Http::HeaderMap& response_headers,
+                       const Http::HeaderMap& response_trailers);
 
 private:
   static void checkForHeaderOnlyError(Http::Message& http_response);
