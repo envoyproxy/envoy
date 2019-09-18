@@ -107,12 +107,16 @@ private:
     if (parseEntryBooleanValue(entry)) {
       return;
     }
-    if (parseEntryUintValue(entry)) {
+
+    // For cases where a value can be parsed as both a uint and double (i.e. "2"), we want to store
+    // both parsed values and allow getInteger() and getDouble() to be used interchangeably. This
+    // prevents a scenario where a value cannot be retrieved by either function because it was
+    // parsed by the other type and returned.
+    const bool uint_parse = parseEntryUintValue(entry);
+    if (parseEntryDoubleValue(entry) || uint_parse) {
       return;
     }
-    if (parseEntryDoubleValue(entry)) {
-      return;
-    }
+
     parseEntryFractionalPercentValue(entry);
   }
 

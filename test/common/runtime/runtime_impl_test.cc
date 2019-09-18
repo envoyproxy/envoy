@@ -138,6 +138,14 @@ public:
   ProtobufWkt::Struct base_;
 };
 
+TEST_F(DiskLoaderImplTest, DoubleUintInteraction) {
+  setup();
+  run("test/common/runtime/test_data/current", "envoy_override");
+
+  EXPECT_EQ(2UL, loader_->snapshot().getInteger("file3", 1));
+  EXPECT_EQ(2.0, loader_->snapshot().getDouble("file3", 1.1));
+}
+
 TEST_F(DiskLoaderImplTest, All) {
   setup();
   run("test/common/runtime/test_data/current", "envoy_override");
