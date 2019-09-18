@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package envoy.config.api_listener.v2;
+
+option java_outer_classname = "ApiListenerProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.config.api_listener.v2";
+
+option java_generic_services = true;
+
+import "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.proto";
+
+import "gogoproto/gogo.proto";
+
+option (gogoproto.equal_all) = true;
+
+// [#not-implemented-hide:]
+// Describes a type of API listener, which is used in non-proxy clients. The type of API
+// exposed to the non-proxy application depends on the type of API listener.
+message ApiListener {
+  oneof api_type {
+    // HTTP API listener: specifies the HttpConnectionManager configuration to be used.
+    envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+        api_http_connection_manager = 1;
+  }
+}

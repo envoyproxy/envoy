@@ -86,7 +86,7 @@ api_proto_library_internal(
         "//envoy/api/v2/core:base",
         "//envoy/api/v2/listener",
         "//envoy/api/v2/listener:udp_listener_config",
-        "//envoy/config/filter/network/http_connection_manager/v2:http_connection_manager",
+        "//envoy/config/api_listener/v2:api_listener",
     ],
 )
 
