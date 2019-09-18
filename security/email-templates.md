@@ -28,7 +28,7 @@ $PERSON (on behalf of the Envoy maintainers)
 
 ```
 Subject: [CONFIDENTIAL] Further details on security release of Envoy $VERSION
-To: envoy-announce@googlegroups.com
+To: cncf-envoy-distributors-announce@lists.cncf.io
 Cc: envoy-security@googlegroups.com
 
 Hello Envoy Distributors,
