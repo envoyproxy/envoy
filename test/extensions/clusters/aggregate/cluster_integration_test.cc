@@ -162,30 +162,63 @@ TEST_F(AggregateClusterIntegrationTest, LoadBalancingTest) {
   Upstream::HostConstSharedPtr host;
   for (int i = 0; i < 33; ++i) {
     EXPECT_CALL(factory_.random_, random()).WillRepeatedly(Return(i));
+    EXPECT_EQ(host3, cluster_->loadBalancer().chooseHost(nullptr));
+  }
+
+  for (int i = 33; i < 66; ++i) {
+    EXPECT_CALL(factory_.random_, random()).WillRepeatedly(Return(i));
+    EXPECT_EQ(host6, cluster_->loadBalancer().chooseHost(nullptr));
+  }
+
+  for (int i = 66; i < 99; ++i) {
+    EXPECT_CALL(factory_.random_, random()).WillRepeatedly(Return(i));
+    EXPECT_EQ(host1, cluster_->loadBalancer().chooseHost(nullptr));
+  }
+
+  for (int i = 99; i < 100; ++i) {
+    EXPECT_CALL(factory_.random_, random()).WillRepeatedly(Return(i));
+    EXPECT_EQ(host4, cluster_->loadBalancer().chooseHost(nullptr));
+  }
+
+  EXPECT_TRUE(cluster_manager_->removeCluster("primary"));
+  EXPECT_EQ(nullptr, cluster_manager_->get("primary"));
+
+  // Set up the HostSet with 1 healthy, 1 degraded and 1 unhealthy.
+  Upstream::HostSharedPtr host7 = Upstream::makeTestHost(secondary->info(), "tcp://127.0.0.7:80");
+  host7->healthFlagSet(Upstream::HostImpl::HealthFlag::DEGRADED_ACTIVE_HC);
+  Upstream::HostSharedPtr host8 = Upstream::makeTestHost(secondary->info(), "tcp://127.0.0.8:80");
+  host8->healthFlagSet(Upstream::HostImpl::HealthFlag::FAILED_ACTIVE_HC);
+  Upstream::HostSharedPtr host9 = Upstream::makeTestHost(secondary->info(), "tcp://127.0.0.9:80");
+  cluster1.prioritySet().updateHosts(
+      1,
+      Upstream::HostSetImpl::partitionHosts(
+          std::make_shared<Upstream::HostVector>(Upstream::HostVector{host7, host8, host9}),
+          Upstream::HostsPerLocalityImpl::empty()),
+      nullptr, {host7, host8, host9}, {}, 100);
+
+  // Priority set
+  //   Priority 0: 1/3 healthy, 1/3 degraded
+  //   Priority 1: 1/3 healthy, 1/3 degraded
+  for (int i = 0; i < 33; ++i) {
+    EXPECT_CALL(factory_.random_, random()).WillRepeatedly(Return(i));
     host = cluster_->loadBalancer().chooseHost(nullptr);
-    EXPECT_EQ("primary", host->cluster().name());
-    EXPECT_EQ(Upstream::Host::Health::Healthy, host->health());
+    EXPECT_EQ(host6, cluster_->loadBalancer().chooseHost(nullptr));
   }
 
   for (int i = 33; i < 66; ++i) {
     EXPECT_CALL(factory_.random_, random()).WillRepeatedly(Return(i));
     host = cluster_->loadBalancer().chooseHost(nullptr);
-    EXPECT_EQ("secondary", host->cluster().name());
-    EXPECT_EQ(Upstream::Host::Health::Healthy, host->health());
+    EXPECT_EQ(host9, cluster_->loadBalancer().chooseHost(nullptr));
   }
 
   for (int i = 66; i < 99; ++i) {
     EXPECT_CALL(factory_.random_, random()).WillRepeatedly(Return(i));
-    host = cluster_->loadBalancer().chooseHost(nullptr);
-    EXPECT_EQ("primary", host->cluster().name());
-    EXPECT_EQ(Upstream::Host::Health::Degraded, host->health());
+    EXPECT_EQ(host4, cluster_->loadBalancer().chooseHost(nullptr));
   }
 
   for (int i = 99; i < 100; ++i) {
     EXPECT_CALL(factory_.random_, random()).WillRepeatedly(Return(i));
-    host = cluster_->loadBalancer().chooseHost(nullptr);
-    EXPECT_EQ("secondary", host->cluster().name());
-    EXPECT_EQ(Upstream::Host::Health::Degraded, host->health());
+    EXPECT_EQ(host7, cluster_->loadBalancer().chooseHost(nullptr));
   }
 }
 

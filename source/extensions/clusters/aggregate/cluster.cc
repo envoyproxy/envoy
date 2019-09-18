@@ -10,10 +10,11 @@ Cluster::Cluster(const envoy::api::v2::Cluster& cluster,
                  Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime,
                  Runtime::RandomGenerator& random,
                  Server::Configuration::TransportSocketFactoryContext& factory_context,
-                 Stats::ScopePtr&& stats_scope, bool added_via_api)
+                 Stats::ScopePtr&& stats_scope, ThreadLocal::SlotAllocator& tls, bool added_via_api)
     : Upstream::BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
                                        added_via_api),
-      cluster_manager_(cluster_manager), runtime_(runtime), random_(random) {
+      cluster_manager_(cluster_manager), runtime_(runtime), random_(random),
+      tls_(tls.allocateSlot()) {
   for (const auto& inner_cluster : config.clusters()) {
     clusters_.emplace_back(inner_cluster);
   }
@@ -21,7 +22,7 @@ Cluster::Cluster(const envoy::api::v2::Cluster& cluster,
 
 std::pair<Upstream::PrioritySetImpl,
           std::vector<std::pair<uint32_t, Upstream::ThreadLocalCluster*>>>
-Cluster::linearizePrioritySet(std::function<bool(const std::string&)> deleting) {
+Cluster::linearizePrioritySet(std::function<bool(const std::string&)> skip_predicate) {
   Upstream::PrioritySetImpl priority_set;
   std::vector<std::pair<uint32_t, Upstream::ThreadLocalCluster*>> priority_to_cluster;
   int next_priority_after_linearizing = 0;
@@ -34,7 +35,7 @@ Cluster::linearizePrioritySet(std::function<bool(const std::string&)> deleting) 
   //    [C_0.P_0, C_0.P_1, C_0.P_2, C_1.P_0, C_1.P_1, C_2.P_0, C_2.P_1, C_2.P_2, C_2.P_3]
   // and the traffic will be distributed among these priorities.
   for (const auto& cluster : clusters_) {
-    if (deleting(cluster)) {
+    if (skip_predicate(cluster)) {
       continue;
     }
     auto tlc = cluster_manager_.get(cluster);
@@ -77,15 +78,21 @@ void Cluster::startPreInit() {
   onPreInitComplete();
 }
 
-void Cluster::refresh(std::function<bool(const std::string&)>&& deleting) {
-  auto pair = linearizePrioritySet(std::move(deleting));
-  if (pair.first.hostSetsPerPriority().empty()) {
-    if (load_balancer_ != nullptr) {
-      load_balancer_.reset();
+void Cluster::refresh(std::function<bool(const std::string&)>&& skip_predicate) {
+  auto pair = linearizePrioritySet(std::move(skip_predicate));
+  // Post the priority set to worker threads.
+  tls_->runOnAllThreads([this, &pair, cluster_name = this->info()->name()]() {
+    LoadBalancerImplSharedPtr lb_ = nullptr;
+    if (!pair.first.hostSetsPerPriority().empty()) {
+      lb_ = std::make_shared<LoadBalancerImpl>(*this, std::move(pair));
     }
-  } else {
-    load_balancer_ = std::make_shared<LoadBalancerImpl>(*this, std::move(pair));
-  }
+    Upstream::ThreadLocalCluster* cluster = cluster_manager_.get(cluster_name);
+    if (cluster == nullptr) {
+      return;
+    }
+    // Downgrade cast to AggregateClusterLoadBalancer
+    dynamic_cast<AggregateClusterLoadBalancer&>(cluster->loadBalancer()).refresh(lb_);
+  });
 }
 
 void Cluster::onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) {
@@ -101,13 +108,12 @@ void Cluster::onClusterRemoval(const std::string& cluster_name) {
   //  The onClusterRemoval callback is called before the thread local cluster was removed. There
   //  will be a dangling pointer to the thread local cluster if delete cluster is not skipped.
   if (std::find(clusters_.begin(), clusters_.end(), cluster_name) != clusters_.end()) {
-    ENVOY_LOG(info, "remove cluster '{}'", cluster_name);
+    ENVOY_LOG(info, "remove cluster '{}' from aggreagte cluster", cluster_name);
     refresh([&cluster_name](const std::string& c) { return cluster_name == c; });
   }
 }
 
-Upstream::HostConstSharedPtr
-Cluster::LoadBalancerImpl::chooseHost(Upstream::LoadBalancerContext* context) {
+Upstream::HostConstSharedPtr LoadBalancerImpl::chooseHost(Upstream::LoadBalancerContext* context) {
   const auto priority_pair =
       choosePriority(random_.random(), per_priority_load_.healthy_priority_load_,
                      per_priority_load_.degraded_priority_load_);
@@ -119,9 +125,8 @@ Cluster::LoadBalancerImpl::chooseHost(Upstream::LoadBalancerContext* context) {
 
 Upstream::HostConstSharedPtr
 AggregateClusterLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
-  auto load_balancer = cluster_.getLoadBalancer();
-  if (load_balancer) {
-    return load_balancer->chooseHost(context);
+  if (load_balancer_) {
+    return load_balancer_->chooseHost(context);
   }
   return nullptr;
 }
@@ -135,8 +140,8 @@ ClusterFactory::createClusterWithConfig(
     Stats::ScopePtr&& stats_scope) {
   auto new_cluster = std::make_shared<Cluster>(
       cluster, proto_config, context.clusterManager(), context.runtime(), context.random(),
-      socket_factory_context, std::move(stats_scope), context.addedViaApi());
-  auto lb = std::make_unique<AggregateThreadAwareLoadBalancer>(*new_cluster);
+      socket_factory_context, std::move(stats_scope), context.tls(), context.addedViaApi());
+  auto lb = std::make_unique<AggregateThreadAwareLoadBalancer>();
   return std::make_pair(new_cluster, std::move(lb));
 }
 

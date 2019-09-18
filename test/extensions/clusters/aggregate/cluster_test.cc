@@ -81,17 +81,19 @@ public:
         singleton_manager_, tls_, validation_visitor_, *api_);
 
     cluster_ = std::make_shared<Cluster>(cluster_config, config, cm_, runtime_, random_,
-                                         factory_context, std::move(scope), false);
+                                         factory_context, std::move(scope), tls_, false);
 
-    thread_aware_lb_ = std::make_unique<AggregateThreadAwareLoadBalancer>(*cluster_);
+    thread_aware_lb_ = std::make_unique<AggregateThreadAwareLoadBalancer>();
     lb_factory_ = thread_aware_lb_->factory();
     lb_ = lb_factory_->create();
 
+    EXPECT_CALL(cm_, get(Eq("aggregate_cluster"))).WillRepeatedly(Return(&aggregate_cluster_));
     EXPECT_CALL(cm_, get(Eq("primary"))).WillRepeatedly(Return(&primary_));
     EXPECT_CALL(cm_, get(Eq("secondary"))).WillRepeatedly(Return(&secondary_));
     EXPECT_CALL(cm_, get(Eq("tertiary"))).WillRepeatedly(Return(nullptr));
     ON_CALL(primary_, prioritySet()).WillByDefault(ReturnRef(primary_ps_));
     ON_CALL(secondary_, prioritySet()).WillByDefault(ReturnRef(secondary_ps_));
+    ON_CALL(aggregate_cluster_, loadBalancer()).WillByDefault(ReturnRef(*lb_));
 
     setupPrioritySet();
   }
@@ -114,7 +116,7 @@ public:
   Upstream::LoadBalancerPtr lb_;
   Upstream::ClusterStats stats_;
   std::shared_ptr<Upstream::MockClusterInfo> info_{new NiceMock<Upstream::MockClusterInfo>()};
-  NiceMock<Upstream::MockThreadLocalCluster> primary_, secondary_;
+  NiceMock<Upstream::MockThreadLocalCluster> aggregate_cluster_, primary_, secondary_;
   Upstream::PrioritySetImpl primary_ps_, secondary_ps_;
   NiceMock<Upstream::MockLoadBalancer> primary_load_balancer_, secondary_load_balancer_;
 
@@ -133,7 +135,10 @@ public:
 }; // namespace Aggregate
 
 TEST_F(AggregateClusterTest, LoadBalancerTest) {
+  std::cout << "B" << std::endl;
+
   initialize(default_yaml_config_);
+  std::cout << "A" << std::endl;
   // Health value:
   // Cluster 1:
   //     Priority 0: 33.3%
