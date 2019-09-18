@@ -174,7 +174,7 @@ message CertificateValidationContext {
 
   // Peer certificate verification mode.
   enum TrustChainVerification {
-    // Perform default certificate verfication (eg, against CA / verification lists)
+    // Perform default certificate verification (eg, against CA / verification lists)
     VERIFY_TRUST_CHAIN = 0;
     // Certificates that fail verification will be permitted and their details hoisted in the
     // x-forwarded-untrusted-client-cert HTTP Header.
