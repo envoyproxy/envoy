@@ -482,6 +482,29 @@ TEST_P(OwnedImplTest, Search) {
   EXPECT_EQ(-1, buffer.search("abaaaabaaaaabaa", 15, 0));
 }
 
+TEST_P(OwnedImplTest, StartsWith) {
+  // Populate a buffer with a string split across many small slices, to
+  // exercise edge cases in the startsWith implementation.
+  static const char* Inputs[] = {"ab", "a", "", "aaa", "b", "a", "aaa", "ab", "a"};
+  Buffer::OwnedImpl buffer;
+  verifyImplementation(buffer);
+  for (const auto& input : Inputs) {
+    buffer.appendSliceForTest(input);
+  }
+  EXPECT_STREQ("abaaaabaaaaaba", buffer.toString().c_str());
+
+  EXPECT_FALSE(buffer.startsWith({"abaaaabaaaaabaXXX", 17}));
+  EXPECT_FALSE(buffer.startsWith({"c", 1}));
+  EXPECT_TRUE(buffer.startsWith({"", 0}));
+  EXPECT_TRUE(buffer.startsWith({"a", 1}));
+  EXPECT_TRUE(buffer.startsWith({"ab", 2}));
+  EXPECT_TRUE(buffer.startsWith({"aba", 3}));
+  EXPECT_TRUE(buffer.startsWith({"abaa", 4}));
+  EXPECT_TRUE(buffer.startsWith({"abaaaab", 7}));
+  EXPECT_TRUE(buffer.startsWith({"abaaaabaaaaaba", 14}));
+  EXPECT_FALSE(buffer.startsWith({"ba", 2}));
+}
+
 TEST_P(OwnedImplTest, ToString) {
   Buffer::OwnedImpl buffer;
   verifyImplementation(buffer);
