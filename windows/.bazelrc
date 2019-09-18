@@ -3,7 +3,20 @@
 build --define signal_trace=disabled
 build --define hot_restart=disabled
 build --define tcmalloc=disabled
-# Build GRPC without c-ares support -- otherwise it will not link
-build --define grpc_no_ares=true
-build --features=compiler_param_file
 build --workspace_status_command="bash bazel/get_workspace_status"
+
+build --experimental_enable_runfiles
+build --features=compiler_param_file
+build --features=static_link_msvcrt
+
+build --strategy=Genrule=standalone
+build --spawn_strategy=standalone
+build --jobs=$env:NUM_CPUS
+
+build --verbose_failures
+build --show_task_finish
+
+test --test_tag_filters=-skip_on_windows
+test --test_output=all
+test --cache_test_results=yes
+

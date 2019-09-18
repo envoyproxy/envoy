@@ -1,0 +1,43 @@
+diff --git a/BUILD b/BUILD
+index e0827d46cb..5601c0214b 100644
+--- a/BUILD
++++ b/BUILD
+@@ -1612,6 +1612,9 @@ grpc_cc_library(
+         "src/core/ext/filters/client_channel/resolver/dns/c_ares/grpc_ares_ev_driver.h",
+         "src/core/ext/filters/client_channel/resolver/dns/c_ares/grpc_ares_wrapper.h",
+     ],
++    copts = [
++        "-DCARES_STATICLIB",
++    ],
+     external_deps = [
+         "cares",
+         "address_sorting",
+diff --git a/bazel/grpc_build_system.bzl b/bazel/grpc_build_system.bzl
+index 5f8477d732..12b1e03fbb 100644
+--- a/bazel/grpc_build_system.bzl
++++ b/bazel/grpc_build_system.bzl
+@@ -81,10 +81,12 @@ def grpc_cc_library(
+         alwayslink = 0,
+         data = [],
+         use_cfstream = False,
+-        tags = []):
+-    copts = []
++        tags = [],
++        defines = [],
++        copts = [],
++    ):
+     if use_cfstream:
+-        copts = if_mac(["-DGRPC_CFSTREAM"])
++        copts = copts + if_mac(["-DGRPC_CFSTREAM"])
+     if language.upper() == "C":
+         copts = copts + if_not_windows(["-std=c99"])
+     linkopts = if_not_windows(["-pthread"])
+@@ -93,7 +95,7 @@ def grpc_cc_library(
+     native.cc_library(
+         name = name,
+         srcs = srcs,
+-        defines = select({
++        defines = defines + select({
+                       "//:grpc_no_ares": ["GRPC_ARES=0"],
+                       "//conditions:default": [],
+                   }) +

@@ -643,6 +643,8 @@ def _com_github_grpc_grpc():
             "@envoy//bazel:grpc-protoinfo-3.patch",
             # Pre-integration of https://github.com/grpc/grpc/pull/18950
             "@envoy//bazel:grpc-rename-gettid.patch",
+            # Pivotal patch
+            "@envoy//bazel:grpc_grpc.patch",
         ],
         patch_args = ["-p1"],
     )

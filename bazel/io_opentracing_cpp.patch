@@ -15,3 +15,25 @@ index 17e08fd..d25e0c8 100644
    if (handle == nullptr) {
      error_message = dlerror();
      return make_unexpected(dynamic_load_failure_error);
+# commit 3a6f049c123a1906c7381e824292c18fd8698293
+# Author: Christian Neumüller <cn00@gmx.at>
+# Date:   Wed Feb 27 01:48:17 2019 +0100
+#
+# Fix MSVC compiler flags. (#104)
+# 
+#    * All debug specific flags would be replaced by release specific on MSVC.
+#    * The OPENTRACING_STATIC flag would be missing from OpenTracingConfig.cmake when linking against OpenTracing::opentracing-static
+#
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 1721fb3..3873b3a 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -52,7 +52,7 @@ if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
+ elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
+ elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
+-  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_RELEASE} -D_SCL_SECURE_NO_WARNINGS")
++  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_SCL_SECURE_NO_WARNINGS")
+ endif()
+ 
+ # ==============================================================================

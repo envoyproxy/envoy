@@ -16,3 +16,31 @@ index 50cf4b4..e705576 100644
 -- 
 2.21.0.593.g511ec345e18-goog
 
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 0fe939d..a917fc7 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -7,6 +7,7 @@ set(VERSION "1.2.11")
+ 
+ option(ASM686 "Enable building i686 assembly implementation")
+ option(AMD64 "Enable building amd64 assembly implementation")
++option(ENABLE_STATIC_CRT "Build zlib against the MS LIBCMT[d]")
+ 
+ set(INSTALL_BIN_DIR "${CMAKE_INSTALL_PREFIX}/bin" CACHE PATH "Installation directory for executables")
+ set(INSTALL_LIB_DIR "${CMAKE_INSTALL_PREFIX}/lib" CACHE PATH "Installation directory for libraries")
+@@ -162,6 +163,15 @@ if(MSVC)
+ 	endif()
+ endif()
+ 
++if(ENABLE_STATIC_CRT)
++  foreach(lang C CXX)
++    foreach(suffix "" _DEBUG _MINSIZEREL _RELEASE _RELWITHDEBINFO)
++      set(var "CMAKE_${lang}_FLAGS${suffix}")
++      string(REPLACE "/MD" "/MT" ${var} "${${var}}")
++    endforeach()
++  endforeach()
++endif()
++
+ # parse the full version number from zlib.h and include in ZLIB_FULL_VERSION
+ file(READ ${CMAKE_CURRENT_SOURCE_DIR}/zlib.h _zlib_h_contents)
+ string(REGEX REPLACE ".*#define[ \t]+ZLIB_VERSION[ \t]+\"([-0-9A-Za-z.]+)\".*"

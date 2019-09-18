@@ -51,6 +51,7 @@ envoy_cmake_external(
     cache_entries = {
         "CARES_SHARED": "no",
         "CARES_STATIC": "on",
+        "CARES_MSVC_STATIC_RUNTIME": "on",
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
     },
     copy_pdb = True,
@@ -69,6 +70,7 @@ envoy_cmake_external(
         "BUILD_CURL_EXE": "off",
         "BUILD_TESTING": "off",
         "BUILD_SHARED_LIBS": "off",
+        "CURL_STATIC_CRT": "on",
         "CURL_HIDDEN_SYMBOLS": "off",
         "CMAKE_USE_LIBSSH2": "off",
         "CURL_BROTLI": "off",
@@ -96,7 +98,9 @@ envoy_cmake_external(
     },
     lib_source = "@com_github_curl//:all",
     static_libraries = select({
-        "//bazel:windows_x86_64": ["curl.lib"],
+        "//bazel:windows_dbg_build": ["libcurl-d.lib"],
+        "//bazel:windows_opt_build": ["libcurl.lib"],
+        "//bazel:windows_fastbuild_build": ["libcurl.lib"],
         "//conditions:default": ["libcurl.a"],
     }),
     deps = [
@@ -124,6 +128,7 @@ envoy_cmake_external(
         "_GNU_SOURCE": "on",
     },
     copy_pdb = True,
+    pdb_name = "event_static",
     lib_source = "@com_github_libevent_libevent//:all",
     static_libraries = select({
         "//bazel:windows_x86_64": ["event.lib"],
@@ -137,8 +142,10 @@ envoy_cmake_external(
 envoy_cmake_external(
     name = "nghttp2",
     cache_entries = {
-        "ENABLE_STATIC_LIB": "on",
         "ENABLE_LIB_ONLY": "on",
+        "ENABLE_SHARED_LIB": "off",
+        "ENABLE_STATIC_LIB": "on",
+        "ENABLE_STATIC_CRT": "on",
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
         "CMAKE_INSTALL_LIBDIR": "lib",
         "CMAKE_CXX_COMPILER_FORCED": "on",
@@ -159,14 +166,15 @@ envoy_cmake_external(
     cache_entries = {
         "YAML_CPP_BUILD_TESTS": "off",
         "YAML_CPP_BUILD_TOOLS": "off",
+        "MSVC_SHARED_RT": "off",
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
         "CMAKE_CXX_COMPILER_FORCED": "on",
     },
     lib_source = "@com_github_jbeder_yaml_cpp//:all",
     static_libraries = select({
-        "//bazel:windows_dbg_build": ["libyaml-cppmdd.lib"],
-        "//bazel:windows_fastbuild_build": ["libyaml-cppmd.lib"],
-        "//bazel:windows_opt_build": ["libyaml-cppmd.lib"],
+        "//bazel:windows_dbg_build": ["libyaml-cppmtd.lib"],
+        "//bazel:windows_fastbuild_build": ["libyaml-cppmt.lib"],
+        "//bazel:windows_opt_build": ["libyaml-cppmt.lib"],
         "//conditions:default": ["libyaml-cpp.a"],
     }),
 )
@@ -174,6 +182,8 @@ envoy_cmake_external(
 envoy_cmake_external(
     name = "zlib",
     cache_entries = {
+        "ENABLE_STATIC_CRT": "on",
+        "BUILD_SHARED_LIBS": "off",
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
     },
     copy_pdb = True,
