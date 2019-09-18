@@ -128,8 +128,8 @@ envoy_cmake_external(
         "_GNU_SOURCE": "on",
     },
     copy_pdb = True,
-    pdb_name = "event_static",
     lib_source = "@com_github_libevent_libevent//:all",
+    pdb_name = "event_static",
     static_libraries = select({
         "//bazel:windows_x86_64": ["event.lib"],
         "//conditions:default": [
