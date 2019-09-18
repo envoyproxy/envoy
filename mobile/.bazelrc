@@ -11,7 +11,7 @@ build \
   --spawn_strategy=local \
   --verbose_failures \
   --workspace_status_command=envoy/bazel/get_workspace_status \
-  --xcode_version=10.3.0 \
+  --xcode_version=11.0.0 \
   --incompatible_bzl_disallow_load_after_statement=false \
   --javabase=@bazel_tools//tools/jdk:jdk
 
