@@ -80,6 +80,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/http:header_map_interface",
         "//include/envoy/http:message_interface",
+        "//include/envoy/stream_info:stream_info_interface",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//include/envoy/upstream:upstream_interface",
