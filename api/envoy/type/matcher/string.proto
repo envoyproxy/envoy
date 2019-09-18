@@ -46,9 +46,9 @@ message StringMatcher {
     //
     // Examples:
     //
-    // * The regex *\d{3}* matches the value *123*
-    // * The regex *\d{3}* does not match the value *1234*
-    // * The regex *\d{3}* does not match the value *123.456*
+    // * The regex ``\d{3}`` matches the value *123*
+    // * The regex ``\d{3}`` does not match the value *1234*
+    // * The regex ``\d{3}`` does not match the value *123.456*
     //
     // .. attention::
     //   This field has been deprecated in favor of `safe_regex` as it is not safe for use with
