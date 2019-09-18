@@ -135,6 +135,8 @@ TEST_F(ProtobufUtilityTest, MessageUtilAnyStableHash) {
 
   EXPECT_EQ(MessageUtil::anyStableHash(a1), MessageUtil::anyStableHash(a2));
   EXPECT_EQ(MessageUtil::anyStableHash(a2), MessageUtil::anyStableHash(a3));
+  EXPECT_NE(0, MessageUtil::anyStableHash(a1));
+  EXPECT_NE(MessageUtil::anyStableHash(s), MessageUtil::anyStableHash(a1));
 }
 
 TEST_F(ProtobufUtilityTest, RepeatedPtrUtilDebugString) {
