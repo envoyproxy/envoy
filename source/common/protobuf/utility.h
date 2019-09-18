@@ -219,11 +219,10 @@ public:
    * A hash function that stable hashes known Any in the message. This is much slower than
    * hash above, should be used when known Any is in there.
    * See https://github.com/protocolbuffers/protobuf/issues/5731 for more context, we use
-   * ShortDebugString because it does parse and serialize Anys as debug string recursively.
+   * TextFormat to implement this because it can expand Anys recursively and deterministically
+   * serialize enclosed message.
    */
-  static std::size_t anyStableHash(const Protobuf::Message& message) {
-    return HashUtil::xxHash64(message.ShortDebugString());
-  }
+  static std::size_t anyStableHash(const Protobuf::Message& message);
 
   static void loadFromJson(const std::string& json, Protobuf::Message& message,
                            ProtobufMessage::ValidationVisitor& validation_visitor);
