@@ -576,7 +576,7 @@ TEST_P(StatNameTest, RecentLookups) {
   const uint64_t years = 365 * 24 * 3600;
   time_system.setSystemTime(SystemTime() + std::chrono::seconds(40 * years));
   StatNameSet set1(*table_);
-  table_->trackRecentLookups(time_system);
+  //table_->trackRecentLookups(time_system);
   StatNameSet set2(*table_);
   set1.getStatName("dynamic.stat1");
   time_system.sleep(std::chrono::seconds(1));

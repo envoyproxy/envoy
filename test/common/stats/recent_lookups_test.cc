@@ -1,7 +1,7 @@
 #include <algorithm>
 #include <string>
 
-#include "common/common/utility.h"
+//#include "common/common/utility.h"
 #include "common/stats/recent_lookups.h"
 
 #include "test/test_common/logging.h"
@@ -16,18 +16,27 @@ namespace {
 
 class RecentLookupsTest : public testing::Test {
 protected:
-  RecentLookupsTest() : recent_lookups_(time_system_) {
+  RecentLookupsTest() { //: recent_lookups_(time_system_) {
     const uint64_t years = 365 * 24 * 3600;
     time_system_.setSystemTime(SystemTime() + std::chrono::seconds(40 * years));
   }
 
   std::string joinLookups() {
+    using ItemCount = std::pair<std::string, uint64_t>;
+    std::vector<ItemCount> items;
+    recent_lookups_.forEach([&items](absl::string_view item, uint64_t count) {
+                              items.push_back(ItemCount(std::string(item), count));
+                            });
+    std::sort(items.begin(), items.end(), [](const ItemCount& a, const ItemCount& b) -> bool {
+                                            if (a.second == b.second) {
+                                              return a.first < b.first;
+                                            }
+                                            return a.second < b.second;
+                                          });
     std::vector<std::string> accum;
-    recent_lookups_.forEach([&accum](absl::string_view item, SystemTime time) {
-      DateFormatter formatter("%Y-%m-%d,%H:%M:%S");
-      accum.emplace_back(absl::StrCat(formatter.fromTime(time), ";Item=", item));
-    });
-    std::sort(accum.begin(), accum.end());
+    for (auto item : items) {
+      accum.push_back(absl::StrCat(item.second, ": ", item.first));
+    }
     return StringUtil::join(accum, " ");
   }
 
@@ -39,7 +48,7 @@ TEST_F(RecentLookupsTest, Empty) { EXPECT_EQ("", joinLookups()); }
 
 TEST_F(RecentLookupsTest, One) {
   recent_lookups_.lookup("Hello");
-  EXPECT_EQ("2009-12-22,00:00:00;Item=Hello", joinLookups());
+  EXPECT_EQ("1: Hello", joinLookups());
 }
 
 TEST_F(RecentLookupsTest, DropOne) {
@@ -47,40 +56,42 @@ TEST_F(RecentLookupsTest, DropOne) {
     recent_lookups_.lookup(absl::StrCat("lookup", i));
     time_system_.sleep(std::chrono::seconds(1));
   }
-  EXPECT_EQ("2009-12-22,00:00:01;Item=lookup1 "
-            "2009-12-22,00:00:02;Item=lookup2 "
-            "2009-12-22,00:00:03;Item=lookup3 "
-            "2009-12-22,00:00:04;Item=lookup4 "
-            "2009-12-22,00:00:05;Item=lookup5 "
-            "2009-12-22,00:00:06;Item=lookup6 "
-            "2009-12-22,00:00:07;Item=lookup7 "
-            "2009-12-22,00:00:08;Item=lookup8 "
-            "2009-12-22,00:00:09;Item=lookup9 "
-            "2009-12-22,00:00:10;Item=lookup10",
+  EXPECT_EQ("1: lookup1 "
+            "1: lookup10 "
+            "1: lookup2 "
+            "1: lookup3 "
+            "1: lookup4 "
+            "1: lookup5 "
+            "1: lookup6 "
+            "1: lookup7 "
+            "1: lookup8 "
+            "1: lookup9",
             joinLookups());
 }
 
 TEST_F(RecentLookupsTest, RepeatDrop) {
+  recent_lookups_.lookup("drop_early");
   for (int i = 0; i < 11; ++i) {
     recent_lookups_.lookup(absl::StrCat("lookup", i));
     time_system_.sleep(std::chrono::seconds(1));
     recent_lookups_.lookup(absl::StrCat("lookup", i));
     time_system_.sleep(std::chrono::seconds(1));
   }
-  EXPECT_EQ("2009-12-22,00:00:12;Item=lookup6 "
-            "2009-12-22,00:00:13;Item=lookup6 "
-            "2009-12-22,00:00:14;Item=lookup7 "
-            "2009-12-22,00:00:15;Item=lookup7 "
-            "2009-12-22,00:00:16;Item=lookup8 "
-            "2009-12-22,00:00:17;Item=lookup8 "
-            "2009-12-22,00:00:18;Item=lookup9 "
-            "2009-12-22,00:00:19;Item=lookup9 "
-            "2009-12-22,00:00:20;Item=lookup10 "
-            "2009-12-22,00:00:21;Item=lookup10",
+  recent_lookups_.lookup("add_late");
+  EXPECT_EQ("1: add_late "
+            "2: lookup10 "
+            "2: lookup2 "
+            "2: lookup3 "
+            "2: lookup4 "
+            "2: lookup5 "
+            "2: lookup6 "
+            "2: lookup7 "
+            "2: lookup8 "
+            "2: lookup9",
             joinLookups());
 }
 
-TEST_F(RecentLookupsTest, Log) {
+/*TEST_F(RecentLookupsTest, Log) {
   EXPECT_LOG_CONTAINS("warn", "Recent lookups for alpha", recent_lookups_.lookup("alpha"));
   EXPECT_NO_LOGS(recent_lookups_.lookup("beta"));
   time_system_.sleep(std::chrono::seconds(100));
@@ -88,7 +99,7 @@ TEST_F(RecentLookupsTest, Log) {
   time_system_.sleep(std::chrono::seconds(250));
   const Envoy::ExpectedLogMessages messages{{"warn", "gamma"}, {"warn", "delta"}};
   EXPECT_LOG_CONTAINS_ALL_OF(messages, recent_lookups_.lookup("delta"));
-}
+  }*/
 
 } // namespace
 } // namespace Stats

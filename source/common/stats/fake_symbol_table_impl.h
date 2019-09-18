@@ -125,7 +125,7 @@ public:
     fn(toStringView(stat_name));
   }
 
-  void trackRecentLookups(TimeSource&) override {}
+  //void trackRecentLookups(TimeSource&) override {}
   void rememberSet(StatNameSet&) override {}
   void forgetSet(StatNameSet&) override {}
   uint64_t getRecentLookups(const RecentLookupsFn&) override { return 0; }

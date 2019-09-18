@@ -126,9 +126,7 @@ void SymbolTableImpl::addTokensToEncoding(const absl::string_view name, Encoding
   // ref-counts in this.
   {
     Thread::LockGuard lock(lock_);
-    if (recent_lookups_ != nullptr) {
-      recent_lookups_->lookup(std::string(name));
-    }
+    recent_lookups_.lookup(name);
     for (auto& token : tokens) {
       symbols.push_back(toSymbol(token));
     }
@@ -210,12 +208,12 @@ void SymbolTableImpl::free(const StatName& stat_name) {
   }
 }
 
+  /*
 void SymbolTableImpl::trackRecentLookups(TimeSource& time_source) {
   {
     Thread::LockGuard lock(lock_);
     recent_lookups_ = std::make_unique<RecentLookups>(time_source);
   }
-
   {
     Thread::LockGuard lock(stat_name_set_mutex_);
     for (StatNameSet* stat_name_set : stat_name_sets_) {
@@ -223,12 +221,13 @@ void SymbolTableImpl::trackRecentLookups(TimeSource& time_source) {
     }
   }
 }
+*/
 
 uint64_t SymbolTableImpl::getRecentLookups(const RecentLookupsFn& iter) {
   uint64_t total = 0;
   struct LookupData {
     std::string name_;
-    SystemTime time_;
+    uint64_t count_;
   };
   std::vector<LookupData> lookup_data;
 
@@ -239,33 +238,33 @@ uint64_t SymbolTableImpl::getRecentLookups(const RecentLookupsFn& iter) {
     Thread::LockGuard lock(stat_name_set_mutex_);
     for (StatNameSet* stat_name_set : stat_name_sets_) {
       total +=
-          stat_name_set->getRecentLookups([&lookup_data](absl::string_view str, SystemTime time) {
-            lookup_data.push_back({std::string(str), time});
+          stat_name_set->getRecentLookups([&lookup_data](absl::string_view str, uint64_t count) {
+                                            lookup_data.push_back({std::string(str), count});
           });
     }
   }
 
   {
     Thread::LockGuard lock(lock_);
-    if (recent_lookups_ != nullptr) {
-      recent_lookups_->forEach([&lookup_data](absl::string_view str, SystemTime time)
+    //if (recent_lookups_ != nullptr) {
+      recent_lookups_.forEach([&lookup_data](absl::string_view str, uint64_t count)
                                    NO_THREAD_SAFETY_ANALYSIS {
-                                     lookup_data.push_back({std::string(str), time});
+                                     lookup_data.push_back({std::string(str), count});
                                    });
-      total += recent_lookups_->total();
-    }
+      total += recent_lookups_.total();
+      //}
   }
   std::sort(lookup_data.begin(), lookup_data.end(),
             [](const LookupData& a, const LookupData& b) -> bool {
-              if (a.time_ == b.time_) {
+              if (a.count_ == b.count_) {
                 return a.name_ < b.name_;
               }
-              return a.time_ > b.time_; // Sort latest first.
+              return a.count_ > b.count_; // Sort largest-counts first.
             });
   const LookupData* prev = nullptr;
   for (const LookupData& lookup : lookup_data) {
     if (prev == nullptr || prev->name_ != lookup.name_) {
-      iter(lookup.name_, lookup.time_);
+      iter(lookup.name_, lookup.count_);
       prev = &lookup;
     }
   }
@@ -277,20 +276,20 @@ void SymbolTableImpl::rememberSet(StatNameSet& stat_name_set) {
   // stat_name_set.trackRecentLookups() below, as that will result in a
   // false-positive in absl::Mutex's detection analysis. It is easy enough to
   // work around by capturing the TimeSource and then releasing lock_.
-  TimeSource* time_source = nullptr;
+  /*TimeSource* time_source = nullptr;
   {
     Thread::LockGuard lock(lock_);
     if (recent_lookups_ != nullptr) {
       time_source = &recent_lookups_->timeSource();
     }
-  }
-  if (time_source != nullptr) {
-    stat_name_set.trackRecentLookups(*time_source);
-  }
-  {
+    }*/
+  //if (time_source != nullptr) {
+  //stat_name_set.trackRecentLookups()*time_source);
+    //}
+  //{
     Thread::LockGuard lock(stat_name_set_mutex_);
     stat_name_sets_.insert(&stat_name_set);
-  }
+    //}
 }
 
 void SymbolTableImpl::forgetSet(StatNameSet& stat_name_set) {
@@ -551,25 +550,27 @@ Stats::StatName StatNameSet::getStatName(absl::string_view token) {
   Stats::StatName& stat_name = dynamic_stat_names_[token];
   if (stat_name.empty()) { // Note that builtin_stat_names_ already has one for "".
     stat_name = pool_.add(token);
-    if (recent_lookups_ != nullptr) {
-      recent_lookups_->lookup(token);
-    }
+    //if (recent_lookups_ != nullptr) {
+      recent_lookups_.lookup(token);
+      //}
   }
   return stat_name;
 }
 
+/*
 void StatNameSet::trackRecentLookups(TimeSource& time_source) {
   absl::MutexLock lock(&mutex_);
   recent_lookups_ = std::make_unique<RecentLookups>(time_source);
 }
+*/
 
 uint64_t StatNameSet::getRecentLookups(const RecentLookups::IterFn& iter) {
   absl::MutexLock lock(&mutex_);
-  if (recent_lookups_ == nullptr) {
+  /*if (recent_lookups_ == nullptr) {
     return 0;
-  }
-  recent_lookups_->forEach(iter);
-  return recent_lookups_->total();
+    }*/
+  recent_lookups_.forEach(iter);
+  return recent_lookups_.total();
 }
 
 } // namespace Stats
