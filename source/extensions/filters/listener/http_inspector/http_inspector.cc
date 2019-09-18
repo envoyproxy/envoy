@@ -41,45 +41,96 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
     return Network::FilterStatus::Continue;
   }
 
-  ASSERT(file_event_ == nullptr);
-
-  file_event_ = cb.dispatcher().createFileEvent(
-      socket.ioHandle().fd(),
-      [this](uint32_t events) {
-        ASSERT(events == Event::FileReadyType::Read);
-        onRead();
-      },
-      Event::FileTriggerType::Edge, Event::FileReadyType::Read);
-
   cb_ = &cb;
-  return Network::FilterStatus::StopIteration;
+  const ParseState parse_state = onRead();
+  switch (parse_state) {
+  case ParseState::Error:
+    // As per discussion in https://github.com/envoyproxy/envoy/issues/7864
+    // we don't add new enum in FilterStatus so we have to signal the caller
+    // the new condition.
+    cb.socket().close();
+    return Network::FilterStatus::StopIteration;
+  case ParseState::Done:
+    return Network::FilterStatus::Continue;
+  case ParseState::Continue:
+    // do nothing but create the event
+    ASSERT(file_event_ == nullptr);
+    file_event_ = cb.dispatcher().createFileEvent(
+        socket.ioHandle().fd(),
+        [this](uint32_t events) {
+          ENVOY_LOG(trace, "http inspector event: {}", events);
+          // inspector is always peeking and can never determine EOF.
+          // Use this event type to avoid listener timeout on the OS supporting
+          // FileReadyType::Closed.
+          bool end_stream = events & Event::FileReadyType::Closed;
+
+          const ParseState parse_state = onRead();
+          switch (parse_state) {
+          case ParseState::Error:
+            file_event_.reset();
+            cb_->continueFilterChain(false);
+            break;
+          case ParseState::Done:
+            file_event_.reset();
+            // Do not skip following listener filters.
+            cb_->continueFilterChain(true);
+            break;
+          case ParseState::Continue:
+            if (end_stream) {
+              // Parser fails to determine http but the end of stream is reached. Fallback to
+              // non-http.
+              done(false);
+              file_event_.reset();
+              cb_->continueFilterChain(true);
+            }
+            // do nothing but wait for the next event
+            break;
+          }
+        },
+        Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Closed);
+    return Network::FilterStatus::StopIteration;
+  }
+  NOT_REACHED_GCOVR_EXCL_LINE
 }
 
-void Filter::onRead() {
+ParseState Filter::onRead() {
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
   const Network::ConnectionSocket& socket = cb_->socket();
   const Api::SysCallSizeResult result =
       os_syscalls.recv(socket.ioHandle().fd(), buf_, Config::MAX_INSPECT_SIZE, MSG_PEEK);
   ENVOY_LOG(trace, "http inspector: recv: {}", result.rc_);
   if (result.rc_ == -1 && result.errno_ == EAGAIN) {
-    return;
+    return ParseState::Continue;
   } else if (result.rc_ < 0) {
     config_->stats().read_error_.inc();
-    return done(false);
+    return ParseState::Error;
   }
 
-  parseHttpHeader(absl::string_view(reinterpret_cast<const char*>(buf_), result.rc_));
+  const auto parse_state =
+      parseHttpHeader(absl::string_view(reinterpret_cast<const char*>(buf_), result.rc_));
+  switch (parse_state) {
+  case ParseState::Continue:
+    // do nothing but wait for the next event
+    return ParseState::Continue;
+  case ParseState::Error:
+    done(false);
+    return ParseState::Done;
+  case ParseState::Done:
+    done(true);
+    return ParseState::Done;
+  }
+  NOT_REACHED_GCOVR_EXCL_LINE
 }
 
-void Filter::parseHttpHeader(absl::string_view data) {
+ParseState Filter::parseHttpHeader(absl::string_view data) {
   const size_t len = std::min(data.length(), Filter::HTTP2_CONNECTION_PREFACE.length());
   if (Filter::HTTP2_CONNECTION_PREFACE.compare(0, len, data, 0, len) == 0) {
     if (data.length() < Filter::HTTP2_CONNECTION_PREFACE.length()) {
-      return;
+      return ParseState::Continue;
     }
     ENVOY_LOG(trace, "http inspector: http2 connection preface found");
     protocol_ = "HTTP/2";
-    done(true);
+    return ParseState::Done;
   } else {
     const size_t pos = data.find_first_of("\r\n");
     if (pos != absl::string_view::npos) {
@@ -90,20 +141,25 @@ void Filter::parseHttpHeader(absl::string_view data) {
       // Method SP Request-URI SP HTTP-Version
       if (fields.size() != 3) {
         ENVOY_LOG(trace, "http inspector: invalid http1x request line");
-        return done(false);
+        // done(false);
+        return ParseState::Error;
       }
 
       if (http1xMethods().count(fields[0]) == 0 || httpProtocols().count(fields[2]) == 0) {
         ENVOY_LOG(trace, "http inspector: method: {} or protocol: {} not valid", fields[0],
                   fields[2]);
-        return done(false);
+        // done(false);
+        return ParseState::Error;
       }
 
       ENVOY_LOG(trace, "http inspector: method: {}, request uri: {}, protocol: {}", fields[0],
                 fields[1], fields[2]);
 
       protocol_ = fields[2];
-      return done(true);
+      // done(true);
+      return ParseState::Done;
+    } else {
+      return ParseState::Continue;
     }
   }
 }
@@ -122,17 +178,15 @@ void Filter::done(bool success) {
     } else {
       ASSERT(protocol_ == "HTTP/2");
       config_->stats().http2_found_.inc();
-      protocol = "h2";
+      // h2 HTTP/2 over TLS, h2c HTTP/2 over TCP
+      // TODO(yxue): use detected protocol from http inspector and support h2c token in HCM
+      protocol = "h2c";
     }
 
     cb_->socket().setRequestedApplicationProtocols({protocol});
   } else {
     config_->stats().http_not_found_.inc();
   }
-
-  file_event_.reset();
-  // Do not skip following listener filters.
-  cb_->continueFilterChain(true);
 }
 
 const absl::flat_hash_set<std::string>& Filter::httpProtocols() const {
