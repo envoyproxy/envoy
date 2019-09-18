@@ -477,7 +477,7 @@ private:
 
     // Tracing::TracingConfig
     Tracing::OperationName operationName() const override;
-    const std::vector<Http::LowerCaseString>& requestHeadersForTags() const override;
+    const std::vector<Tracing::CustomTagPtr>& customTags() const override;
     bool verbose() const override;
     uint32_t maxPathTagLength() const override;
 
@@ -502,6 +502,8 @@ private:
     void snapScopedRouteConfig();
 
     void refreshCachedRoute();
+
+    void refreshCachedTracingCustomTags();
 
     // Pass on watermark callbacks to watermark subscribers. This boils down to passing watermark
     // events for this stream and the downstream connection to the router filter.
@@ -632,6 +634,7 @@ private:
     // response.
     bool encoding_headers_only_{};
     Network::Socket::OptionsSharedPtr upstream_options_;
+    std::vector<Tracing::CustomTagPtr> tracing_custom_tags_;
   };
 
   using ActiveStreamPtr = std::unique_ptr<ActiveStream>;

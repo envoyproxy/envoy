@@ -7,11 +7,13 @@
 #include "common/common/fmt.h"
 #include "common/common/macros.h"
 #include "common/common/utility.h"
+#include "common/config/metadata.h"
 #include "common/grpc/common.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
+#include "common/protobuf/utility.h"
 #include "common/runtime/uuid_util.h"
 #include "common/stream_info/utility.h"
 
@@ -163,14 +165,10 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span, const Http::HeaderMap
       span.setTag(Tracing::Tags::get().GuidXClientTraceId,
                   std::string(request_headers->ClientTraceId()->value().getStringView()));
     }
-
-    // Build tags based on the custom headers.
-    for (const Http::LowerCaseString& header : tracing_config.requestHeadersForTags()) {
-      const Http::HeaderEntry* entry = request_headers->get(header);
-      if (entry) {
-        span.setTag(header.get(), entry->value().getStringView());
-      }
-    }
+  }
+  CustomTagContext ctx{request_headers, stream_info};
+  for (const CustomTagPtr& custom_tag : tracing_config.customTags()) {
+    custom_tag->apply(span, ctx);
   }
   span.setTag(Tracing::Tags::get().RequestSize, std::to_string(stream_info.bytesReceived()));
   span.setTag(Tracing::Tags::get().ResponseSize, std::to_string(stream_info.bytesSent()));
@@ -224,6 +222,24 @@ void HttpTracerUtility::setCommonTags(Span& span, const Http::HeaderMap* respons
   }
 }
 
+CustomTagPtr HttpTracerUtility::createCustomTag(const envoy::type::TracingCustomTag& tag) {
+  switch (tag.type_case()) {
+  case envoy::type::TracingCustomTag::kLiteral:
+    return std::make_shared<Tracing::LiteralCustomTag>(tag.tag(), tag.literal());
+  case envoy::type::TracingCustomTag::kEnvironment:
+    return std::make_shared<Tracing::EnvironmentCustomTag>(tag.tag(), tag.environment());
+  case envoy::type::TracingCustomTag::kRequestHeader:
+    return std::make_shared<Tracing::RequestHeaderCustomTag>(tag.tag(), tag.request_header());
+  case envoy::type::TracingCustomTag::kRequestMetadata:
+    return std::make_shared<Tracing::RequestMetadataCustomTag>(tag.tag(), tag.request_metadata());
+  case envoy::type::TracingCustomTag::kRouteMetadata:
+    return std::make_shared<Tracing::RouteMetadataCustomTag>(tag.tag(), tag.route_metadata());
+  case envoy::type::TracingCustomTag::TYPE_NOT_SET:
+    return nullptr;
+  }
+  return nullptr;
+}
+
 HttpTracerImpl::HttpTracerImpl(DriverPtr&& driver, const LocalInfo::LocalInfo& local_info)
     : driver_(std::move(driver)), local_info_(local_info) {}
 
@@ -247,6 +263,124 @@ SpanPtr HttpTracerImpl::startSpan(const Config& config, Http::HeaderMap& request
   }
 
   return active_span;
+}
+
+void GeneralCustomTag::apply(Span& span, const CustomTagContext& ctx) const {
+  const absl::string_view& tag_value = value(ctx);
+  if (!tag_value.empty()) {
+    span.setTag(tag(), tag_value);
+  }
+}
+
+EnvironmentCustomTag::EnvironmentCustomTag(
+    const std::string& tag, const envoy::type::TracingCustomTag::Environment& environment)
+    : GeneralCustomTag(tag), name_(environment.name()),
+      default_value_(environment.default_value()) {
+  const char* env = std::getenv(name_.data());
+  final_value_ = env ? env : default_value_;
+}
+
+EnvironmentCustomTag::EnvironmentCustomTag(const std::string& tag, const std::string& name)
+    : GeneralCustomTag(tag), name_(name) {
+  const char* env = std::getenv(name_.data());
+  final_value_ = env ? env : default_value_;
+}
+
+EnvironmentCustomTag::EnvironmentCustomTag(const std::string& tag, const std::string& name,
+                                           const std::string& default_value)
+    : GeneralCustomTag(tag), name_(name), default_value_(default_value) {
+  const char* env = std::getenv(name_.data());
+  final_value_ = env ? env : default_value_;
+}
+
+RequestHeaderCustomTag::RequestHeaderCustomTag(
+    const std::string& tag, const envoy::type::TracingCustomTag::Header& request_header)
+    : GeneralCustomTag(tag), name_(Http::LowerCaseString(request_header.name())),
+      default_value_(request_header.default_value()) {}
+
+RequestHeaderCustomTag::RequestHeaderCustomTag(const std::string& tag, const std::string& name)
+    : GeneralCustomTag(tag), name_(Http::LowerCaseString(name)) {}
+
+RequestHeaderCustomTag::RequestHeaderCustomTag(const std::string& tag, const std::string& name,
+                                               const std::string& default_value)
+    : GeneralCustomTag(tag), name_(Http::LowerCaseString(name)), default_value_(default_value) {}
+
+absl::string_view RequestHeaderCustomTag::value(const CustomTagContext& ctx) const {
+  if (!ctx.request_headers) {
+    return default_value_;
+  }
+  const Http::HeaderEntry* entry = ctx.request_headers->get(name_);
+  return entry ? entry->value().getStringView() : default_value_;
+}
+
+const std::string MetadataCustomTag::DefaultSeparator = ".";
+
+MetadataCustomTag::MetadataCustomTag(const std::string& tag,
+                                     const envoy::type::TracingCustomTag::Metadata& metadata)
+    : GeneralCustomTag(tag), filter_namespace_(metadata.filter_namespace()),
+      raw_path_(metadata.path()),
+      separator_(metadata.path_separator().empty() ? DefaultSeparator : metadata.path_separator()),
+      default_value_(metadata.default_value()), path_(absl::StrSplit(raw_path_, separator_)) {}
+
+MetadataCustomTag::MetadataCustomTag(const std::string& tag, const std::string& filter_namespace,
+                                     const std::string& raw_path)
+    : GeneralCustomTag(tag), filter_namespace_(filter_namespace), raw_path_(raw_path),
+      separator_(DefaultSeparator), path_(absl::StrSplit(raw_path_, separator_)) {}
+
+MetadataCustomTag::MetadataCustomTag(const std::string& tag, const std::string& filter_namespace,
+                                     const std::string& raw_path, const std::string& separator,
+                                     const std::string& default_value)
+    : GeneralCustomTag(tag), filter_namespace_(filter_namespace), raw_path_(raw_path),
+      separator_(separator.empty() ? DefaultSeparator : separator), default_value_(default_value),
+      path_(absl::StrSplit(raw_path_, separator_)) {}
+
+void MetadataCustomTag::apply(Span& span, const CustomTagContext& ctx) const {
+  const envoy::api::v2::core::Metadata* meta = metadata(ctx);
+  if (!meta) {
+    if (!default_value_.empty()) {
+      span.setTag(tag(), default_value_);
+    }
+    return;
+  }
+  const ProtobufWkt::Value& value =
+      Envoy::Config::Metadata::metadataValue(*meta, filter_namespace_, path_);
+  switch (value.kind_case()) {
+  case ProtobufWkt::Value::kBoolValue:
+    span.setTag(tag(), value.bool_value() ? "true" : "false");
+    return;
+  case ProtobufWkt::Value::kNumberValue:
+    span.setTag(tag(), fmt::format("{}", value.number_value()));
+    return;
+  case ProtobufWkt::Value::kListValue:
+    span.setTag(tag(), MessageUtil::getJsonStringFromMessage(value.list_value()));
+    return;
+  case ProtobufWkt::Value::kStructValue:
+    span.setTag(tag(), MessageUtil::getJsonStringFromMessage(value.struct_value()));
+    return;
+  case ProtobufWkt::Value::kStringValue: {
+    if (!value.string_value().empty()) {
+      span.setTag(tag(), value.string_value());
+      return;
+    }
+    break;
+  }
+  default:
+    break;
+  }
+  if (!default_value_.empty()) {
+    span.setTag(tag(), default_value_);
+  }
+}
+
+const envoy::api::v2::core::Metadata*
+RequestMetadataCustomTag::metadata(const CustomTagContext& ctx) const {
+  return &ctx.stream_info.dynamicMetadata();
+}
+
+const envoy::api::v2::core::Metadata*
+RouteMetadataCustomTag::metadata(const CustomTagContext& ctx) const {
+  const Router::RouteEntry* route_entry = ctx.stream_info.routeEntry();
+  return route_entry ? &route_entry->metadata() : nullptr;
 }
 
 } // namespace Tracing

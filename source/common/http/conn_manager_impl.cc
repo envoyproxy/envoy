@@ -1283,6 +1283,27 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
         connection_manager_.cluster_manager_.get(stream_info_.route_entry_->clusterName());
     cached_cluster_info_ = (nullptr == local_cluster) ? nullptr : local_cluster->info();
   }
+  refreshCachedTracingCustomTags();
+}
+
+void ConnectionManagerImpl::ActiveStream::refreshCachedTracingCustomTags() {
+  std::map<absl::string_view, Tracing::CustomTagPtr> merged;
+  auto mp = [](const Tracing::CustomTagPtr& ct) { return std::make_pair(ct->tag(), ct); };
+  if (hasCachedRoute() && cached_route_.value()->tracingConfig()) {
+    const std::vector<Tracing::CustomTagPtr>& route_tags =
+        cached_route_.value()->tracingConfig()->getCustomTags();
+    std::transform(route_tags.begin(), route_tags.end(), std::inserter(merged, merged.end()), mp);
+  }
+  if (connection_manager_.config_.tracingConfig()) {
+    const std::vector<Tracing::CustomTagPtr>& conn_manager_tags =
+        connection_manager_.config_.tracingConfig()->custom_tags_;
+    std::transform(conn_manager_tags.begin(), conn_manager_tags.end(),
+                   std::inserter(merged, merged.end()), mp);
+  }
+  std::transform(merged.begin(), merged.end(), std::back_inserter(tracing_custom_tags_),
+                 [](const std::map<absl::string_view, Tracing::CustomTagPtr>::value_type& p) {
+                   return p.second;
+                 });
 }
 
 void ConnectionManagerImpl::ActiveStream::sendLocalReply(
@@ -1744,9 +1765,8 @@ Tracing::OperationName ConnectionManagerImpl::ActiveStream::operationName() cons
   return connection_manager_.config_.tracingConfig()->operation_name_;
 }
 
-const std::vector<Http::LowerCaseString>&
-ConnectionManagerImpl::ActiveStream::requestHeadersForTags() const {
-  return connection_manager_.config_.tracingConfig()->request_headers_for_tags_;
+const std::vector<Tracing::CustomTagPtr>& ConnectionManagerImpl::ActiveStream::customTags() const {
+  return tracing_custom_tags_;
 }
 
 bool ConnectionManagerImpl::ActiveStream::verbose() const {
@@ -2019,6 +2039,7 @@ Router::RouteConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::route
 void ConnectionManagerImpl::ActiveStreamFilterBase::clearRouteCache() {
   parent_.cached_route_ = absl::optional<Router::RouteConstSharedPtr>();
   parent_.cached_cluster_info_ = absl::optional<Upstream::ClusterInfoConstSharedPtr>();
+  parent_.tracing_custom_tags_.clear();
 }
 
 Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamDecoderFilter::createBuffer() {

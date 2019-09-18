@@ -30,6 +30,7 @@
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 #include "common/router/retry_state_impl.h"
+#include "common/tracing/http_tracer_impl.h"
 
 #include "extensions/filters/http/well_known_names.h"
 
@@ -218,6 +219,12 @@ RouteTracingImpl::RouteTracingImpl(const envoy::api::v2::route::Tracing& tracing
   } else {
     overall_sampling_ = tracing.overall_sampling();
   }
+  for (const auto& tag : tracing.custom_tags()) {
+    Tracing::CustomTagPtr ptr = Tracing::HttpTracerUtility::createCustomTag(tag);
+    if (ptr) {
+      custom_tags_.push_back(ptr);
+    }
+  }
 }
 
 const envoy::type::FractionalPercent& RouteTracingImpl::getClientSampling() const {
@@ -230,6 +237,9 @@ const envoy::type::FractionalPercent& RouteTracingImpl::getRandomSampling() cons
 
 const envoy::type::FractionalPercent& RouteTracingImpl::getOverallSampling() const {
   return overall_sampling_;
+}
+const std::vector<Tracing::CustomTagPtr>& RouteTracingImpl::getCustomTags() const {
+  return custom_tags_;
 }
 
 RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,

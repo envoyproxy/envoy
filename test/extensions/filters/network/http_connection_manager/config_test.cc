@@ -9,6 +9,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
@@ -224,18 +225,58 @@ tracing:
   operation_name: ingress
   request_headers_for_tags:
   - foo
+  custom_tags:
+  - tag: ltag
+    literal:
+      value: lvalue
+  - tag: etag
+    environment:
+      name: E_TAG
+  - tag: etag-n
+    environment:
+      name: E_TAG_N
+      default_value: evalue
+  - tag: rtag
+    request_header:
+      name: X-Tag
+  - tag: rtag-n
+    request_header:
+      name: X-Tag-N
+      default_value: rvalue
+  - tag: req_mtag
+    request_metadata:
+      filter_namespace: com.bar.foo
+      path: x.y.z
+  - tag: rot_mtag
+    route_metadata:
+      filter_namespace: com.bar.foo
+      path: x_y_z
+      path_separator: _
+      default_value: mvalue
   max_path_tag_length: 128
 http_filters:
 - name: envoy.router
   config: {}
   )EOF";
 
+  TestEnvironment::setEnvVar("E_TAG", "e_val", 0);
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_);
 
-  EXPECT_THAT(std::vector<Http::LowerCaseString>({Http::LowerCaseString("foo")}),
-              ContainerEq(config.tracingConfig()->request_headers_for_tags_));
+  const std::vector<Tracing::CustomTagPtr>& custom_tags = config.tracingConfig()->custom_tags_;
+  std::vector<std::string> custom_tag_views;
+  std::transform(custom_tags.begin(), custom_tags.end(), std::back_inserter(custom_tag_views),
+                 [](const Tracing::CustomTagPtr& ctp) {
+                   return dynamic_cast<Tracing::GeneralCustomTag*>(ctp.get())->toString();
+                 });
+  ASSERT_THAT(
+      custom_tag_views,
+      ContainerEq(std::vector<std::string>(
+          {"REQUEST_HEADER|foo|foo|", "LITERAL|ltag|lvalue", "ENVIRONMENT|etag|E_TAG|",
+           "ENVIRONMENT|etag-n|E_TAG_N|evalue", "REQUEST_HEADER|rtag|x-tag|",
+           "REQUEST_HEADER|rtag-n|x-tag-n|rvalue", "REQUEST_METADATA|req_mtag|com.bar.foo|x.y.z|",
+           "ROUTE_METADATA|rot_mtag|com.bar.foo|x_y_z|mvalue"})));
   EXPECT_EQ(128, config.tracingConfig()->max_path_tag_length_);
   EXPECT_EQ(*context_.local_info_.address_, config.localAddress());
   EXPECT_EQ("foo", config.serverName());

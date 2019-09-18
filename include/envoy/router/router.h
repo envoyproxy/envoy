@@ -764,6 +764,12 @@ public:
    * @return the overall sampling percentage
    */
   virtual const envoy::type::FractionalPercent& getOverallSampling() const PURE;
+
+  /**
+   * This method returns the route level tracing custom tags.
+   * @return the tracing custom tags.
+   */
+  virtual const std::vector<Tracing::CustomTagPtr>& getCustomTags() const PURE;
 };
 
 using RouteTracingConstPtr = std::unique_ptr<const RouteTracing>;

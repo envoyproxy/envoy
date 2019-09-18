@@ -10,15 +10,17 @@
 #include "common/runtime/uuid_util.h"
 #include "common/tracing/http_tracer_impl.h"
 
+#include "test/common/tracing/utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
+#include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -170,7 +172,7 @@ TEST(HttpConnManFinalizerImpl, NoGeneratedId) {
                                             &response_trailers, stream_info, config);
 }
 
-TEST(HttpConnManFinalizerImpl, NullRequestHeaders) {
+TEST(HttpConnManFinalizerImpl, NullRequestHeadersAndNullRouteEntry) {
   NiceMock<MockSpan> span;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
 
@@ -179,6 +181,7 @@ TEST(HttpConnManFinalizerImpl, NullRequestHeaders) {
   absl::optional<uint32_t> response_code;
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
   EXPECT_CALL(stream_info, upstreamHost()).WillOnce(Return(nullptr));
+  EXPECT_CALL(stream_info, routeEntry()).WillRepeatedly(Return(nullptr));
 
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("0")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
@@ -189,6 +192,10 @@ TEST(HttpConnManFinalizerImpl, NullRequestHeaders) {
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), _)).Times(0);
 
   NiceMock<MockConfig> config;
+  EXPECT_UNSET_CUSTOM_TAG(span, "a", config, RequestHeaderCustomTag, "X-Ax");
+  EXPECT_UNSET_CUSTOM_TAG(span, "b", config, RouteMetadataCustomTag, "m.rot", "path.to.no.where");
+  EXPECT_SET_CUSTOM_TAG(span, "c", "_c", config, RouteMetadataCustomTag, "m.rot",
+                        "path.to.no.where", "", "_c");
   HttpTracerUtility::finalizeDownstreamSpan(span, nullptr, nullptr, nullptr, stream_info, config);
 }
 
@@ -267,7 +274,6 @@ TEST(HttpConnManFinalizerImpl, SpanOptionalHeaders) {
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http10;
   EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(10));
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(ReturnPointee(&protocol));
-  const std::string service_node = "i-453";
 
   // Check that span is populated correctly.
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GuidXRequestId), Eq("id")));
@@ -295,6 +301,73 @@ TEST(HttpConnManFinalizerImpl, SpanOptionalHeaders) {
                                             &response_trailers, stream_info, config);
 }
 
+TEST(HttpConnManFinalizerImpl, SpanCustomTags) {
+  NiceMock<MockSpan> span;
+
+  TestEnvironment::setEnvVar("E_CC", "c", 1);
+
+  Http::TestHeaderMapImpl request_headers{{"x-request-id", "id"},
+                                          {":path", "/test"},
+                                          {":method", "GET"},
+                                          {"x-forwarded-proto", "https"},
+                                          {"x-bb", "b"}};
+
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  ProtobufWkt::Struct fake_struct;
+  std::string yaml = R"EOF(
+ree:
+  foo: bar
+  nuu: 1
+  boo: true
+  poo: false
+  stt: { some: thing }
+  lii: [ something ]
+  emp: "")EOF";
+  TestUtility::loadFromYaml(yaml, fake_struct);
+  (*stream_info.metadata_.mutable_filter_metadata())["m.req"].MergeFrom(fake_struct);
+  NiceMock<Router::MockRouteEntry> route_entry;
+  EXPECT_CALL(stream_info, routeEntry()).WillRepeatedly(Return(&route_entry));
+  (*route_entry.metadata_.mutable_filter_metadata())["m.rot"].MergeFrom(fake_struct);
+  absl::optional<Http::Protocol> protocol = Http::Protocol::Http10;
+  EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(10));
+  EXPECT_CALL(stream_info, protocol()).WillRepeatedly(ReturnPointee(&protocol));
+  absl::optional<uint32_t> response_code;
+  EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
+  EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(100));
+  EXPECT_CALL(stream_info, upstreamHost()).WillOnce(Return(nullptr));
+
+  NiceMock<MockConfig> config;
+  EXPECT_CALL(config, customTags());
+  EXPECT_CALL(span, setTag(_, _)).Times(testing::AnyNumber());
+
+  EXPECT_SET_CUSTOM_TAG(span, "aa", "a", config, LiteralCustomTag, "a");
+  EXPECT_SET_CUSTOM_TAG(span, "bb-1", "b", config, RequestHeaderCustomTag, "X-Bb", "_b");
+  EXPECT_SET_CUSTOM_TAG(span, "bb-2", "b2", config, RequestHeaderCustomTag, "X-Bb-Not-Found", "b2");
+  EXPECT_UNSET_CUSTOM_TAG(span, "bb-3", config, RequestHeaderCustomTag, "X-Bb-Not-Found");
+  EXPECT_SET_CUSTOM_TAG(span, "cc-1", "c", config, EnvironmentCustomTag, "E_CC");
+  EXPECT_SET_CUSTOM_TAG(span, "cc-1-a", "c", config, EnvironmentCustomTag, "E_CC", "_c");
+  EXPECT_SET_CUSTOM_TAG(span, "cc-2", "c2", config, EnvironmentCustomTag, "E_CC_NOT_FOUND", "c2");
+  EXPECT_UNSET_CUSTOM_TAG(span, "cc-3", config, EnvironmentCustomTag, "E_CC_NOT_FOUND");
+  EXPECT_SET_CUSTOM_TAG(span, "dd-1", "bar", config, RequestMetadataCustomTag, "m.req", "ree.foo");
+  EXPECT_SET_CUSTOM_TAG(span, "dd-2", "d2", config, RequestMetadataCustomTag, "m.req",
+                        "ree.not-found", ".", "d2");
+  EXPECT_UNSET_CUSTOM_TAG(span, "dd-3", config, RequestMetadataCustomTag, "m.req", "ree.not-found");
+  EXPECT_SET_CUSTOM_TAG(span, "ee-1", "1", config, RouteMetadataCustomTag, "m.rot", "ree_nuu", "_",
+                        "_e");
+  EXPECT_SET_CUSTOM_TAG(span, "ee-2", "true", config, RouteMetadataCustomTag, "m.rot", "ree.boo");
+  EXPECT_SET_CUSTOM_TAG(span, "ee-3", "false", config, RouteMetadataCustomTag, "m.rot", "ree.poo");
+  EXPECT_SET_CUSTOM_TAG(span, "ee-4", "e4", config, RouteMetadataCustomTag, "m.rot", "ree.emp", "",
+                        "e4");
+  EXPECT_SET_CUSTOM_TAG(span, "ee-5", "[\"something\"]", config, RouteMetadataCustomTag, "m.rot",
+                        "ree.lii", "", "_e");
+  EXPECT_SET_CUSTOM_TAG(span, "ee-6", "{\"some\":\"thing\"}", config, RouteMetadataCustomTag,
+                        "m.rot", "ree.stt");
+  EXPECT_UNSET_CUSTOM_TAG(span, "ee-7", config, RouteMetadataCustomTag, "m.rot", "ree.not-found");
+
+  HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, nullptr, nullptr, stream_info,
+                                            config);
+}
+
 TEST(HttpConnManFinalizerImpl, SpanPopulatedFailureResponse) {
   NiceMock<MockSpan> span;
   Http::TestHeaderMapImpl request_headers{{"x-request-id", "id"},
@@ -313,7 +386,6 @@ TEST(HttpConnManFinalizerImpl, SpanPopulatedFailureResponse) {
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http10;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(ReturnPointee(&protocol));
   EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(10));
-  const std::string service_node = "i-453";
 
   // Check that span is populated correctly.
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GuidXRequestId), Eq("id")));
@@ -325,17 +397,7 @@ TEST(HttpConnManFinalizerImpl, SpanPopulatedFailureResponse) {
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().RequestSize), Eq("10")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GuidXClientTraceId), Eq("client_trace_id")));
 
-  // Check that span has tags from custom headers.
-  request_headers.addCopy(Http::LowerCaseString("aa"), "a");
-  request_headers.addCopy(Http::LowerCaseString("bb"), "b");
-  request_headers.addCopy(Http::LowerCaseString("cc"), "c");
-  MockConfig config;
-  config.headers_.push_back(Http::LowerCaseString("aa"));
-  config.headers_.push_back(Http::LowerCaseString("cc"));
-  config.headers_.push_back(Http::LowerCaseString("ee"));
-  EXPECT_CALL(span, setTag(Eq("aa"), Eq("a")));
-  EXPECT_CALL(span, setTag(Eq("cc"), Eq("c")));
-  EXPECT_CALL(config, requestHeadersForTags());
+  NiceMock<MockConfig> config;
   EXPECT_CALL(config, verbose).WillOnce(Return(false));
   EXPECT_CALL(config, maxPathTagLength).WillOnce(Return(256));
 

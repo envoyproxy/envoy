@@ -1,0 +1,111 @@
+syntax = "proto3";
+
+package envoy.type;
+
+option java_outer_classname = "TracingProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.type";
+
+import "validate/validate.proto";
+
+// [#protodoc-title: Tracing Commons]
+
+// Describes custom tags for the active span.
+message TracingCustomTag {
+  // Literal type custom tag with static value for the tag value.
+  message Literal {
+    // Static literal value to populate the tag value.
+    string value = 1 [(validate.rules).string = {min_bytes: 1}];
+  }
+
+  // Environment type custom tag with environment name and default value.
+  message Environment {
+    // Environment variable name to obtain the value to populate the tag value.
+    string name = 1 [(validate.rules).string = {min_bytes: 1}];
+
+    // When the environment variable is not found,
+    // the tag value would be populated with this default value if specified,
+    // otherwise no tag would be populated.
+    string default_value = 2;
+  }
+
+  // Header type custom tag with header name and default value.
+  message Header {
+    // Request header name to obtain the value to populate the tag value.
+    string name = 1 [(validate.rules).string = {min_bytes: 1}];
+
+    // When the request header is not existed,
+    // the tag value would be populated with this default value if specified,
+    // otherwise no tag would be populated.
+    string default_value = 2;
+  }
+
+  // Metadata type custom tag with namespace, path, and default value
+  // for :ref:`metadata source <envoy_api_msg_core.Metadata>`.
+  // The value is obtained by the filter namespace and the full path in the struct
+  // and translate with following way by type:
+  //
+  // * `boolean`: populate with ``true`` or ``false`` string;
+  // * `number`: populate with number string;
+  // * `string`: populate with the string itself if not empty, otherwise considered as not found;
+  // * `list`/`struct`: populate with the corresponding JSON string
+  //   converted from the protobuf message;
+  // * otherwise: considered as no valid metadata is found.
+  //
+  // For example, a metadata like the following, if the filter namespace is specified
+  // as ``com.foo.bar`` and the path as ``field.value``, then the string ``xyz`` would be populated
+  // as tag value, and similarly, the string ``true`` would be populated if the path is specified
+  // as ``path.to.boolean``.
+  //
+  // .. code::
+  //
+  //   filter_metadata:
+  //     com.foo.bar:
+  //       field:
+  //         value: xyz
+  //       path:
+  //         to:
+  //           boolean: true
+  //
+  message Metadata {
+    // The namespace used in the metadata in reverse DNS format, i.e. the key of
+    // :ref:`filter metadata <envoy_api_field_core.Metadata.filter_metadata>`.
+    string filter_namespace = 1 [(validate.rules).string = {min_bytes: 1}];
+
+    // The full path filter in the metadata struct to lookup the value,
+    // e.g. ``field.value`` in the example.
+    string path = 2 [(validate.rules).string = {min_bytes: 1}];
+
+    // Specify the separator for the full path.
+    // Default: the dot.
+    string path_separator = 3;
+
+    // When no valid metadata is found,
+    // the tag value would be populated with this default value if specified,
+    // otherwise no tag would be populated.
+    string default_value = 4;
+  }
+
+  // Used to populate the tag name.
+  string tag = 1 [(validate.rules).string = {min_bytes: 1}];
+
+  // Used to specify what kind of custom tag.
+  oneof type {
+    option (validate.required) = true;
+
+    // A literal custom tag.
+    Literal literal = 2;
+
+    // An environment custom tag.
+    Environment environment = 3;
+
+    // A request header custom tag.
+    Header request_header = 4;
+
+    // A metadata custom tag associated with the request.
+    Metadata request_metadata = 5;
+
+    // A metadata custom tag associated with the route.
+    Metadata route_metadata = 6;
+  }
+}

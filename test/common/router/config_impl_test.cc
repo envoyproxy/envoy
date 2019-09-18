@@ -5241,8 +5241,37 @@ virtual_hosts:
             denominator: 1
           overall_sampling:
             numerator: 3
+          custom_tags:
+          - tag: ltag
+            literal:
+              value: lvalue
+          - tag: etag
+            environment:
+              name: E_TAG
+          - tag: etag-n
+            environment:
+              name: E_TAG_N
+              default_value: evalue
+          - tag: rtag
+            request_header:
+              name: X-Tag
+          - tag: rtag-n
+            request_header:
+              name: X-Tag-N
+              default_value: rvalue
+          - tag: req_mtag
+            request_metadata:
+              filter_namespace: com.bar.foo
+              path: x.y.z
+          - tag: rot_mtag
+            route_metadata:
+              filter_namespace: com.bar.foo
+              path: x_y_z
+              path_separator: _
+              default_value: mvalue
         route: { cluster: ww2 }
   )EOF";
+  TestEnvironment::setEnvVar("E_TAG", "e_val", 0);
   BazFactory baz_factory;
   Registry::InjectFactory<HttpRouteTypedMetadataFactory> registered_factory(baz_factory);
   const TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
@@ -5267,6 +5296,20 @@ virtual_hosts:
   EXPECT_EQ(1, route3->tracingConfig()->getRandomSampling().denominator());
   EXPECT_EQ(3, route3->tracingConfig()->getOverallSampling().numerator());
   EXPECT_EQ(0, route3->tracingConfig()->getOverallSampling().denominator());
+
+  const std::vector<Tracing::CustomTagPtr>& custom_tags = route3->tracingConfig()->getCustomTags();
+  std::vector<std::string> custom_tag_views;
+  std::transform(custom_tags.begin(), custom_tags.end(), std::back_inserter(custom_tag_views),
+                 [](const Tracing::CustomTagPtr& ctp) {
+                   return dynamic_cast<Tracing::GeneralCustomTag*>(ctp.get())->toString();
+                 });
+  EXPECT_THAT(
+      custom_tag_views,
+      ContainerEq(std::vector<std::string>(
+          {"LITERAL|ltag|lvalue", "ENVIRONMENT|etag|E_TAG|", "ENVIRONMENT|etag-n|E_TAG_N|evalue",
+           "REQUEST_HEADER|rtag|x-tag|", "REQUEST_HEADER|rtag-n|x-tag-n|rvalue",
+           "REQUEST_METADATA|req_mtag|com.bar.foo|x.y.z|",
+           "ROUTE_METADATA|rot_mtag|com.bar.foo|x_y_z|mvalue"})));
 }
 
 // Test to check Prefix Rewrite for redirects

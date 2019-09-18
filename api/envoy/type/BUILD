@@ -23,3 +23,9 @@ api_proto_library_internal(
     srcs = ["range.proto"],
     visibility = ["//visibility:public"],
 )
+
+api_proto_library_internal(
+    name = "tracing",
+    srcs = ["tracing.proto"],
+    visibility = ["//visibility:public"],
+)

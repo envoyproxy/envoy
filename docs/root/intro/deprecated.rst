@@ -39,6 +39,9 @@ Version 1.12.0 (pending)
   has been deprecated in favor of the `traffic_direction` field in
   :ref:`Listener <envoy_api_msg_Listener>`. The latter takes priority if
   specified.
+* The `request_headers_for_tags` field in :ref:`HTTP connection manager
+  <envoy_api_msg_config.filter.network.http_connection_manager.v2.HttpConnectionManager>`
+  has been deprecated in favor of the `custom_tags` field.
 
 Version 1.11.0 (July 11, 2019)
 ==============================

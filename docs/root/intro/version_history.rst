@@ -78,6 +78,7 @@ Version history
 * upstream: use p2c to select hosts for least-requests load balancers if all host weights are the same, even in cases where weights are not equal to 1.
 * upstream: added :ref:`fail_traffic_on_panic <envoy_api_field_Cluster.CommonLbConfig.ZoneAwareLbConfig.fail_traffic_on_panic>` to allow failing all requests to a cluster during panic state.
 * zookeeper: parse responses and emit latency stats.
+* tracing: added multiple kinds of custom tags for :ref:`HTTP connection manager<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.Tracing.custom_tags>` and :ref:`route <envoy_api_field_route.Tracing.custom_tags>` level both.
 
 1.11.1 (August 13, 2019)
 ========================
