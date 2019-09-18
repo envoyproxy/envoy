@@ -443,15 +443,6 @@ void StatNameSet::rememberBuiltin(absl::string_view str) {
 }
 
 StatName StatNameSet::getBuiltin(absl::string_view token, StatName fallback) {
-  StatName stat_name = getBuiltinHelper(token, fallback);
-  if (stat_name == fallback) {
-    // TODO(#8116): do periodic logging here.
-    // ENVOY_LOG_MISC(warn, "Builtin stat name not pre-registered: {}", token);
-  }
-  return stat_name;
-}
-
-StatName StatNameSet::getBuiltinHelper(absl::string_view token, StatName fallback) {
   // If token was recorded as a built-in during initialization, we can
   // service this request lock-free.
   const auto iter = builtin_stat_names_.find(token);
@@ -462,7 +453,7 @@ StatName StatNameSet::getBuiltinHelper(absl::string_view token, StatName fallbac
 }
 
 StatName StatNameSet::getDynamic(absl::string_view token) {
-  Stats::StatName stat_name = getBuiltinHelper(token, StatName());
+  Stats::StatName stat_name = getBuiltin(token, StatName());
   if (stat_name.empty()) {
     // Other tokens require holding a lock for our local cache.
     absl::MutexLock lock(&mutex_);

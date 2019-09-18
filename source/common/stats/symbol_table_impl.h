@@ -695,8 +695,6 @@ public:
   }
 
 private:
-  StatName getBuiltinHelper(absl::string_view token, StatName fallback);
-
   Stats::StatNamePool pool_ GUARDED_BY(mutex_);
   absl::Mutex mutex_;
   using StringStatNameMap = absl::flat_hash_map<std::string, Stats::StatName>;

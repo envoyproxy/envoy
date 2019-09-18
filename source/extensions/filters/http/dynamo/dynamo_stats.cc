@@ -39,7 +39,7 @@ DynamoStats::DynamoStats(Stats::Scope& scope, const std::string& prefix)
   }
   RequestParser::forEachStatString(
       [this](const std::string& str) { stat_name_set_.rememberBuiltin(str); });
-  for (int32_t status_code : {200, 400, 403, 502}) {
+  for (uint32_t status_code : {200, 400, 403, 502}) {
     stat_name_set_.rememberBuiltin(absl::StrCat("upstream_rq_time_", status_code));
     stat_name_set_.rememberBuiltin(absl::StrCat("upstream_rq_total_", status_code));
   }
