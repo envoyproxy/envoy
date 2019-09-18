@@ -8,6 +8,7 @@
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/message.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "common/common/hash.h"
 #include "common/grpc/status.h"
@@ -132,6 +133,24 @@ public:
    * @return bool true if the parse was successful.
    */
   static bool parseBufferInstance(Buffer::InstancePtr&& buffer, Protobuf::Message& proto);
+
+  /**
+   * The gRPC specification does not guarantee a gRPC status code will be returned from a gRPC
+   * request. When it is returned, it will be in the response trailers. With that said, Envoy will
+   * treat a trailers-only response as a headers-only response, so we have to check the following
+   * in order:
+   *   1. response_trailers gRPC status, if it exists.
+   *   2. response_headers gRPC status, if it exists.
+   *   3. Inferred from info HTTP status, if it exists.
+   *
+   * @param info the stream info to parse
+   * @param response_headers the response headers to parse
+   * @param response_trailers the response trailers to parse
+   * @return absl::optional<Status::GrpcStatus> The parsed status code or empty if none is found
+   */
+  static absl::optional<Status::GrpcStatus> responseToGrpcStatus(const StreamInfo::StreamInfo& info,
+                                                 const Http::HeaderMap& response_headers,
+                                                 const Http::HeaderMap& response_trailers);
 
 private:
   static void checkForHeaderOnlyError(Http::Message& http_response);

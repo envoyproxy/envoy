@@ -13,6 +13,7 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
+#include "common/access_log/access_log_formatter.h"
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
@@ -1329,10 +1330,20 @@ Filter::UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::I
       create_per_try_timeout_on_request_complete_(false) {
 
   if (parent_.config_.start_child_span_) {
+
+    // Create span name based on attempt number.
+    std::string span_base_name = "router " + parent.cluster_->name() + " egress";
+    std::string span_name_with_retry = parent.attempt_count_ == 1
+        ? span_base_name
+        : absl::StrCat(span_base_name, " - retry ", parent.attempt_count_ - 1);
+
     span_ = parent_.callbacks_->activeSpan().spawnChild(
-        parent_.callbacks_->tracingConfig(), "router " + parent.cluster_->name() + " egress",
-        parent.timeSource().systemTime());
+        parent_.callbacks_->tracingConfig(),
+        span_name_with_retry,
+        parent.timeSource().systemTime()
+    );
     span_->setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy);
+    span_->setTag(Tracing::Tags::get().UpstreamCluster, parent.cluster_->name());
   }
 
   stream_info_.healthCheck(parent_.callbacks_->streamInfo().healthCheck());
@@ -1340,9 +1351,31 @@ Filter::UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::I
 
 Filter::UpstreamRequest::~UpstreamRequest() {
   if (span_ != nullptr) {
-    // TODO(mattklein123): Add tags based on what happened to this request (retries, reset, etc.).
+    // Add protocol to the span.
+    auto protocol = stream_info_.protocol();
+    if (protocol) {
+      span_->setTag(Tracing::Tags::get().HttpProtocol,
+          AccessLog::AccessLogFormatUtils::protocolToString(protocol));
+    }
+
+    if (parent_.grpc_request_) {
+      // Add gRPC response code to span.
+      auto response_code = Grpc::Common::responseToGrpcStatus(stream_info_, *upstream_headers_, *upstream_trailers_);
+      if (response_code) {
+        span_->setTag(Tracing::Tags::get().GrpcStatusCode,
+                      std::to_string(response_code.value()));
+      }
+    } else {
+      // Add HTTP response code to span.
+      auto response_code = stream_info_.responseCode();
+      if (response_code) {
+        span_->setTag(Tracing::Tags::get().HttpStatusCode,
+                      std::to_string(response_code.value()));
+      }
+    }
     span_->finishSpan();
   }
+
   if (per_try_timeout_ != nullptr) {
     // Allows for testing.
     per_try_timeout_->disableTimer();
@@ -1481,6 +1514,11 @@ void Filter::UpstreamRequest::onResetStream(Http::StreamResetReason reason,
                                             absl::string_view transport_failure_reason) {
   ScopeTrackerScopeState scope(&parent_.callbacks_->scope(), parent_.callbacks_->dispatcher());
 
+  if (span_ != nullptr) {
+    // Add tags about reset.
+    span_->setTag(Tracing::Tags::get().Error, Http::Utility::resetReasonToString(reason));
+  }
+
   clearRequestEncoder();
   awaiting_headers_ = false;
   if (!calling_encode_headers_) {
@@ -1495,6 +1533,11 @@ void Filter::UpstreamRequest::resetStream() {
   // Don't reset the stream if we're already done with it.
   if (encode_complete_ && decode_complete_) {
     return;
+  }
+
+  if (span_ != nullptr) {
+    // Add tags about the cancellation.
+    span_->setTag(Tracing::Tags::get().Canceled, Tracing::Tags::get().True);
   }
 
   if (conn_pool_stream_handle_) {

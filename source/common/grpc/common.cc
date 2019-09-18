@@ -275,5 +275,25 @@ bool Common::parseBufferInstance(Buffer::InstancePtr&& buffer, Protobuf::Message
   return proto.ParseFromZeroCopyStream(&stream);
 }
 
+absl::optional<Status::GrpcStatus> responseToGrpcStatus(const StreamInfo::StreamInfo& info,
+                                                 const Http::HeaderMap& response_headers,
+                                                 const Http::HeaderMap& response_trailers) {
+  const std::array<absl::optional<Grpc::Status::GrpcStatus>, 3> optional_statuses = {{
+      {Grpc::Common::getGrpcStatus(response_trailers)},
+      {Grpc::Common::getGrpcStatus(response_headers)},
+      {info.responseCode() ? absl::optional<Grpc::Status::GrpcStatus>(
+                                 Grpc::Utility::httpToGrpcStatus(info.responseCode().value()))
+                           : absl::nullopt},
+  }};
+
+  for (const auto& optional_status : optional_statuses) {
+    if (optional_status.has_value()) {
+      return optional_status;
+    }
+  }
+
+  return absl::nullopt;
+}
+
 } // namespace Grpc
 } // namespace Envoy

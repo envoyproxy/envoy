@@ -232,33 +232,16 @@ GrpcStatusFilter::GrpcStatusFilter(
 bool GrpcStatusFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap&,
                                 const Http::HeaderMap& response_headers,
                                 const Http::HeaderMap& response_trailers) {
-  // The gRPC specification does not guarantee a gRPC status code will be returned from a gRPC
-  // request. When it is returned, it will be in the response trailers. With that said, Envoy will
-  // treat a trailers-only response as a headers-only response, so we have to check the following
-  // in order:
-  //   1. response_trailers gRPC status, if it exists.
-  //   2. response_headers gRPC status, if it exists.
-  //   3. Inferred from info HTTP status, if it exists.
-  //
-  // If none of those options exist, it will default to Grpc::Status::GrpcStatus::Unknown.
-  const std::array<absl::optional<Grpc::Status::GrpcStatus>, 3> optional_statuses = {{
-      {Grpc::Common::getGrpcStatus(response_trailers)},
-      {Grpc::Common::getGrpcStatus(response_headers)},
-      {info.responseCode() ? absl::optional<Grpc::Status::GrpcStatus>(
-                                 Grpc::Utility::httpToGrpcStatus(info.responseCode().value()))
-                           : absl::nullopt},
-  }};
 
-  Grpc::Status::GrpcStatus status = Grpc::Status::GrpcStatus::Unknown;
-  for (const auto& optional_status : optional_statuses) {
-    if (optional_status.has_value()) {
-      status = optional_status.value();
-      break;
-    }
+  absl::optional<Grpc::Status::GrpcStatus> status = Grpc::Common::responseToGrpcStatus(info, response_headers, response_trailers);
+
+  if (!status) {
+    // Default in case response does not contain gRPC status.
+    status = Grpc::Status::GrpcStatus::Unknown;
   }
 
-  const bool found = statuses_.find(status) != statuses_.end();
-  return exclude_ ? !found : found;
+  const bool found = statuses_.find(status.value()) != statuses_.end();
+  return exclude_ != found;
 }
 
 Grpc::Status::GrpcStatus GrpcStatusFilter::protoToGrpcStatus(
