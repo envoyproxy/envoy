@@ -16,8 +16,6 @@ namespace Quic {
 // server and client.
 class QuicTransportSocketFactoryBase : public Network::TransportSocketFactory {
 public:
-  ~QuicTransportSocketFactoryBase() override = default;
-
   // Network::TransportSocketFactory
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsSharedPtr /*options*/) const override {
@@ -30,13 +28,13 @@ public:
 // differentiate server and client side context config.
 class QuicServerTransportSocketFactory : public QuicTransportSocketFactoryBase {
 public:
-  QuicServerTransportSocketFactory(Envoy::Ssl::ServerContextConfigPtr config)
+  QuicServerTransportSocketFactory(Ssl::ServerContextConfigPtr config)
       : config_(std::move(config)) {}
 
-  Ssl::ServerContextConfig& serverContextConfig() const { return *config_; }
+  const Ssl::ServerContextConfig& serverContextConfig() const { return *config_; }
 
 private:
-  Ssl::ServerContextConfigPtr config_;
+  std::unique_ptr<const Ssl::ServerContextConfig> config_;
 };
 
 class QuicClientTransportSocketFactory : public QuicTransportSocketFactoryBase {
@@ -44,10 +42,10 @@ public:
   QuicClientTransportSocketFactory(Envoy::Ssl::ClientContextConfigPtr config)
       : config_(std::move(config)) {}
 
-  Ssl::ClientContextConfig& clientContextConfig() const { return *config_; }
+  const Ssl::ClientContextConfig& clientContextConfig() const { return *config_; }
 
 private:
-  Ssl::ClientContextConfigPtr config_;
+  std::unique_ptr<const Ssl::ClientContextConfig> config_;
 };
 
 // Base class to create above QuicTransportSocketFactory for server and client
@@ -55,8 +53,6 @@ private:
 class QuicTransportSocketConfigFactory
     : public virtual Server::Configuration::TransportSocketConfigFactory {
 public:
-  ~QuicTransportSocketConfigFactory() override = default;
-
   // Server::Configuration::TransportSocketConfigFactory
   std::string name() const override {
     return Extensions::TransportSockets::TransportSocketNames::get().Quic;
