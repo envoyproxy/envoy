@@ -172,8 +172,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
-  EXPECT_TRUE(absl::StartsWith(response->body(), "Date       Time     Lookup\n"))
-      << response->body();
+  EXPECT_TRUE(absl::StartsWith(response->body(), "   Count Lookup\n")) << response->body();
   EXPECT_LT(30, response->body().size());
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?usedonly", "",

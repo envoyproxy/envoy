@@ -756,10 +756,10 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
     Stats::SymbolTable& symbol_table = server_.stats().symbolTable();
     response_headers.insertContentType().value().setReference(
         Http::Headers::get().ContentTypeValues.TextUtf8);
-    response.add("Date       Time     Lookup\n");
+    response.add("   Count Lookup\n");
     uint64_t total =
         symbol_table.getRecentLookups([&response](absl::string_view name, uint64_t count) {
-          response.add(absl::StrCat(count, ": ", name, "\n"));
+          response.add(fmt::format("{:8d} {}\n", count, name));
         });
     response.add(absl::StrCat("\ntotal: ", total, "\n"));
     return rc;
