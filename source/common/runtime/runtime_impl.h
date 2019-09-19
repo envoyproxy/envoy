@@ -108,12 +108,11 @@ private:
       return;
     }
 
-    // For cases where a value can be parsed as both a uint and double (i.e. "2"), we want to store
-    // both parsed values and allow getInteger() and getDouble() to be used interchangeably. This
-    // prevents a scenario where a value cannot be retrieved by either function because it was
-    // parsed by the other type and returned.
-    const bool uint_parse = parseEntryUintValue(entry);
-    if (parseEntryDoubleValue(entry) || uint_parse) {
+    if (parseEntryDoubleValue(entry)) {
+      // Valid uint values will always be parseable as doubles, so we assign the value to both the
+      // uint and double fields. In cases where the value is something like "3.1", we will floor the
+      // number by casting it to a uint and assigning the uint value.
+      entry.uint_value_ = entry.double_value_;
       return;
     }
 
