@@ -592,12 +592,16 @@ def checkSourceLine(line, file_path, reportError):
     reportError("Don't use std::regex in code that handles untrusted input. Use RegexMatcher")
 
   if not whitelistedForGrpcInit(file_path):
-    grpc_init = line.find("grpc_init()")
-    if grpc_init != -1:
+    grpc_init_or_shutdown = line.find("grpc_init()")
+    grpc_shutdown = line.find("grpc_shutdown()")
+    if grpc_init_or_shutdown == -1 or (grpc_shutdown != -1 and
+                                       grpc_shutdown < grpc_init_or_shutdown):
+      grpc_init_or_shutdown = grpc_shutdown
+    if grpc_init_or_shutdown != -1:
       comment = line.find("// ")
-      if comment == -1 or comment > grpc_init:
-        reportError(
-            "Don't call grpc_init() directly, instantiate Grpc::GoogleGrpcContext. See #8282")
+      if comment == -1 or comment > grpc_init_or_shutdown:
+        reportError("Don't call grpc_init() or grpc_shutdown() directly, instantiate " +
+                    "Grpc::GoogleGrpcContext. See #8282")
 
 
 def checkBuildLine(line, file_path, reportError):

@@ -221,7 +221,12 @@ if __name__ == "__main__":
       "regex.cc", "Don't use std::regex in code that handles untrusted input. Use RegexMatcher")
   errors += checkUnfixableError(
       "grpc_init.cc",
-      "Don't call grpc_init() directly, instantiate Grpc::GoogleGrpcContext. See #8282")
+      "Don't call grpc_init() or grpc_shutdown() directly, instantiate Grpc::GoogleGrpcContext. " +
+      "See #8282")
+  errors += checkUnfixableError(
+      "grpc_shutdown.cc",
+      "Don't call grpc_init() or grpc_shutdown() directly, instantiate Grpc::GoogleGrpcContext. " +
+      "See #8282")
 
   errors += fixFileExpectingFailure(
       "api/missing_package.proto",

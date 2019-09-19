@@ -1,6 +1,6 @@
 #pragma once
 
-#include <atomic>
+#include "common/common/thread.h"
 
 namespace Envoy {
 namespace Grpc {
@@ -19,7 +19,14 @@ public:
   ~GoogleGrpcContext();
 
 private:
-  static std::atomic<uint64_t> live_instances_;
+  struct InstanceTracker {
+    Thread::MutexBasicLockable mutex_;
+    uint64_t live_instances_{0};
+  };
+
+  static InstanceTracker& instanceTracker();
+
+  InstanceTracker& instance_tracker_;
 };
 
 } // namespace Grpc

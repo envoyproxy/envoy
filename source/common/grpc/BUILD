@@ -163,7 +163,12 @@ envoy_cc_library(
     srcs = ["google_grpc_context.cc"],
     hdrs = ["google_grpc_context.h"],
     external_deps = ["grpc"],
-    deps = ["//source/common/common:assert_lib"],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/common:lock_guard_lib",
+        "//source/common/common:macros",
+        "//source/common/common:thread_lib",
+    ],
 )
 
 envoy_cc_library(
