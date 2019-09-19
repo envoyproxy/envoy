@@ -64,6 +64,7 @@ jobs:
            fingerprints:
              - "fb:f3:fe:be:1c:b2:ec:b6:25:f9:7b:a6:87:54:02:8c"
        - run: ci/api_mirror.sh
+       - run: ci/go_mirror.sh
        - store_artifacts:
            path: /build/envoy/generated
            destination: /
