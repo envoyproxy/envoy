@@ -25,7 +25,7 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "kafka_broker_filter_lib",
-    srcs = ["broker/filter.cc"],
+    srcs = ["broker/filter_impl.cc"],
     hdrs = [
         "broker/filter.h",
         "broker/filter_impl.h",

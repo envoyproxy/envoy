@@ -1,7 +1,5 @@
 #pragma once
 
-#include <sstream>
-
 #include "envoy/common/time.h"
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"

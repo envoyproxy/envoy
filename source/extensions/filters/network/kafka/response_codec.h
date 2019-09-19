@@ -89,7 +89,7 @@ public:
    * @param api_key api key of the next response to be parsed.
    * @param api_version api version of the next response to be parsed.
    */
-  void expectResponse(const int16_t api_key, const int16_t api_version);
+  virtual void expectResponse(const int16_t api_key, const int16_t api_version);
 
 protected:
   ResponseParserSharedPtr createStartParser() override;

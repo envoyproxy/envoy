@@ -17,10 +17,13 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace Broker {
 
+// Mocks.
+
 class MockResponseDecoder : public ResponseDecoder {
 public:
   MockResponseDecoder() : ResponseDecoder{{}} {};
   MOCK_METHOD1(onData, void(Buffer::Instance&));
+  MOCK_METHOD2(expectResponse, void(const int16_t, const int16_t));
 };
 
 using MockResponseDecoderSharedPtr = std::shared_ptr<MockResponseDecoder>;
@@ -32,6 +35,42 @@ public:
 };
 
 using MockRequestDecoderSharedPtr = std::shared_ptr<MockRequestDecoder>;
+
+class MockTimeSource : public TimeSource {
+public:
+  MOCK_METHOD0(systemTime, SystemTime());
+  MOCK_METHOD0(monotonicTime, MonotonicTime());
+};
+
+class MockRichRequestMetrics : public RichRequestMetrics {
+public:
+  MOCK_METHOD1(onMessage, void(const int16_t));
+  MOCK_METHOD0(onFailure, void());
+};
+
+class MockRichResponseMetrics : public RichResponseMetrics {
+public:
+  MOCK_METHOD2(onMessage, void(const int16_t, const long long duration));
+  MOCK_METHOD0(onFailure, void());
+};
+
+class MockRequest : public AbstractRequest {
+public:
+  MockRequest(const int16_t api_key, const int16_t api_version, const int32_t correlation_id)
+      : AbstractRequest{{api_key, api_version, correlation_id, ""}} {};
+  uint32_t computeSize() const override { return 0; };
+  uint32_t encode(Buffer::Instance&) const override { return 0; };
+};
+
+class MockResponse : public AbstractResponse {
+public:
+  MockResponse(const int16_t api_key, const int32_t correlation_id)
+      : AbstractResponse{{api_key, 0, correlation_id}} {};
+  uint32_t computeSize() const override { return 0; };
+  uint32_t encode(Buffer::Instance&) const override { return 0; };
+};
+
+// Tests.
 
 class KafkaBrokerFilterUnitTest : public testing::Test {
 protected:
@@ -74,39 +113,38 @@ TEST_F(KafkaBrokerFilterUnitTest, shouldForwardDataFromBroker) {
   // Also, request_decoder got invoked.
 }
 
-class MockTimeSource : public TimeSource {
-public:
-  MOCK_METHOD0(systemTime, SystemTime());
-  MOCK_METHOD0(monotonicTime, MonotonicTime());
+class ForwarderUnitTest : public testing::Test {
+protected:
+  MockResponseDecoderSharedPtr response_decoder_{std::make_shared<MockResponseDecoder>()};
+  Forwarder testee_{*response_decoder_};
 };
 
-class MockRichRequestMetrics : public RichRequestMetrics {
-public:
-  MOCK_METHOD1(onMessage, void(const int16_t));
-  MOCK_METHOD0(onFailure, void());
-};
+TEST_F(ForwarderUnitTest, shouldUpdateResponseDecoderState) {
+  // given
+  const int16_t api_key = 42;
+  const int32_t api_version = 13;
+  AbstractRequestSharedPtr request = std::make_shared<MockRequest>(api_key, api_version, 0);
 
-class MockRichResponseMetrics : public RichResponseMetrics {
-public:
-  MOCK_METHOD2(onMessage, void(const int16_t, const long long duration));
-  MOCK_METHOD0(onFailure, void());
-};
+  EXPECT_CALL(*response_decoder_, expectResponse(api_key, api_version));
 
-class MockRequest : public AbstractRequest {
-public:
-  MockRequest(const int16_t api_key, const int32_t correlation_id)
-      : AbstractRequest{{api_key, 0, correlation_id, ""}} {};
-  uint32_t computeSize() const override { return 0; };
-  uint32_t encode(Buffer::Instance&) const override { return 0; };
-};
+  // when
+  testee_.onMessage(request);
 
-class MockResponse : public AbstractResponse {
-public:
-  MockResponse(const int16_t api_key, const int32_t correlation_id)
-      : AbstractResponse{{api_key, 0, correlation_id}} {};
-  uint32_t computeSize() const override { return 0; };
-  uint32_t encode(Buffer::Instance&) const override { return 0; };
-};
+  // then - response_decoder_ had a new expected response registered.
+}
+
+TEST_F(ForwarderUnitTest, shouldDoNothingOnFailedRequestParse) {
+  // given
+  RequestHeader header = {0, 0, 0, ""};
+  RequestParseFailureSharedPtr parse_failure = std::make_shared<RequestParseFailure>(header);
+
+  EXPECT_CALL(*response_decoder_, expectResponse(_, _)).Times(0);
+
+  // when
+  testee_.onFailedParse(parse_failure);
+
+  // then - no interactions with response_decoder_.
+}
 
 class MetricTrackingCallbackUnitTest : public testing::Test {
 protected:
@@ -122,7 +160,7 @@ TEST_F(MetricTrackingCallbackUnitTest, shouldRegisterRequest) {
   // given
   const int16_t api_key = 42;
   const int32_t correlation_id = 1234;
-  AbstractRequestSharedPtr request = std::make_shared<MockRequest>(api_key, correlation_id);
+  AbstractRequestSharedPtr request = std::make_shared<MockRequest>(api_key, 0, correlation_id);
 
   EXPECT_CALL(*request_metrics_, onMessage(api_key));
 
@@ -172,22 +210,16 @@ TEST_F(MetricTrackingCallbackUnitTest, shouldRegisterResponse) {
   ASSERT_EQ(request_arrivals.find(correlation_id), request_arrivals.end());
 }
 
-TEST_F(MetricTrackingCallbackUnitTest, shouldRegisterUnknownResponse) {
-  // given
-
-  // when
-
-  // then
-  FAIL();
-}
-
 TEST_F(MetricTrackingCallbackUnitTest, shouldRegisterFailedResponseParse) {
   // given
+  ResponseMetadataSharedPtr parse_failure = std::make_shared<ResponseMetadata>(0, 0, 0);
+
+  EXPECT_CALL(*response_metrics_, onFailure());
 
   // when
+  testee_.onFailedParse(parse_failure);
 
-  // then
-  FAIL();
+  // then - response_metrics_ is updated.
 }
 
 } // namespace Broker
