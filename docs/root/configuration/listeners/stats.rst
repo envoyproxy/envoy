@@ -50,7 +50,7 @@ on either accepted or active connections.
    :widths: 1, 1, 2
 
    downstream_cx_total, Counter, Total connections on this handler.
-   downstream_cx_active, Counter, Total active connections on this handler.
+   downstream_cx_active, Gauge, Total active connections on this handler.
 
 Listener manager
 ----------------
