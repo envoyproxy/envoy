@@ -401,6 +401,15 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
       return StreamInfo::Utility::formatDownstreamAddressNoPort(
           *stream_info.downstreamRemoteAddress());
     };
+  } else if (field_name == "DOWNSTREAM_DIRECT_REMOTE_ADDRESS") {
+    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
+      return stream_info.downstreamDirectRemoteAddress()->asString();
+    };
+  } else if (field_name == "DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT") {
+    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
+      return StreamInfo::Utility::formatDownstreamAddressNoPort(
+          *stream_info.downstreamDirectRemoteAddress());
+    };
   } else if (field_name == "REQUESTED_SERVER_NAME") {
     field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
       if (!stream_info.requestedServerName().empty()) {

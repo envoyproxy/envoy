@@ -94,7 +94,9 @@ public:
   Stats::Store& stats() override { return stats_store_; }
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Http::Context& httpContext() override { return http_context_; }
-  ProcessContext& processContext() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  absl::optional<std::reference_wrapper<ProcessContext>> processContext() override {
+    return absl::nullopt;
+  }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
   TimeSource& timeSource() override { return api_->timeSource(); }

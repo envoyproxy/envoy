@@ -268,7 +268,7 @@ key:
                               {":scheme", "http"},
                               {"Addr", "x-foo-key=xyz-route"}});
   response->waitForEndStream();
-  verifyResponse(std::move(response), "404", Http::TestHeaderMapImpl{}, "route scope not found");
+  verifyResponse(std::move(response), "404", Http::TestHeaderMapImpl{}, "");
   cleanupUpstreamAndDownstream();
 
   // Test "foo-route" and 'bar-route' both gets routed to cluster_0.
@@ -339,7 +339,7 @@ key:
                               {":scheme", "http"},
                               {"Addr", "x-foo-key=foo-route"}});
   response->waitForEndStream();
-  verifyResponse(std::move(response), "404", Http::TestHeaderMapImpl{}, "route scope not found");
+  verifyResponse(std::move(response), "404", Http::TestHeaderMapImpl{}, "");
   cleanupUpstreamAndDownstream();
   // Add a new scope foo_scope4.
   const std::string& scope_route4 =
@@ -400,7 +400,7 @@ key:
                                                                    {":scheme", "http"},
                                                                    {"Addr", "x-foo-key=foo"}});
   response->waitForEndStream();
-  verifyResponse(std::move(response), "404", Http::TestHeaderMapImpl{}, "route scope not found");
+  verifyResponse(std::move(response), "404", Http::TestHeaderMapImpl{}, "");
   cleanupUpstreamAndDownstream();
 
   // SRDS update fixed the problem.

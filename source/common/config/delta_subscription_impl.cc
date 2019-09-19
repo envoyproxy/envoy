@@ -48,6 +48,7 @@ void DeltaSubscriptionImpl::onConfigUpdate(
   stats_.update_attempt_.inc();
   stats_.version_.set(HashUtil::xxHash64(version_info));
 }
+
 void DeltaSubscriptionImpl::onConfigUpdate(
     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
@@ -57,18 +58,30 @@ void DeltaSubscriptionImpl::onConfigUpdate(
   stats_.update_attempt_.inc();
   stats_.version_.set(HashUtil::xxHash64(system_version_info));
 }
+
 void DeltaSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason reason,
                                                  const EnvoyException* e) {
-  stats_.update_attempt_.inc();
-  if (reason == ConfigUpdateFailureReason::FetchTimedout) {
-    stats_.init_fetch_timeout_.inc();
-  } else if (e == nullptr) {
+  switch (reason) {
+  case Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure:
+    // This is a gRPC-stream-level establishment failure, not an xDS-protocol-level failure.
+    // So, don't onConfigUpdateFailed() here. Instead, allow a retry of the gRPC stream.
+    // If init_fetch_timeout_ is non-zero, the server will continue startup after that timeout.
     stats_.update_failure_.inc();
-  } else {
+    break;
+  case Envoy::Config::ConfigUpdateFailureReason::FetchTimedout:
+    stats_.init_fetch_timeout_.inc();
+    callbacks_.onConfigUpdateFailed(reason, e);
+    break;
+  case Envoy::Config::ConfigUpdateFailureReason::UpdateRejected:
+    // We expect Envoy exception to be thrown when update is rejected.
+    ASSERT(e != nullptr);
     stats_.update_rejected_.inc();
+    callbacks_.onConfigUpdateFailed(reason, e);
+    break;
   }
-  callbacks_.onConfigUpdateFailed(reason, e);
+  stats_.update_attempt_.inc();
 }
+
 std::string DeltaSubscriptionImpl::resourceName(const ProtobufWkt::Any& resource) {
   return callbacks_.resourceName(resource);
 }

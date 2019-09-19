@@ -118,8 +118,6 @@ void DeltaSubscriptionState::handleBadResponse(const EnvoyException& e, UpdateAc
 }
 
 void DeltaSubscriptionState::handleEstablishmentFailure() {
-  disableInitFetchTimeoutTimer();
-  ENVOY_LOG(debug, "gRPC update for {} failed", type_url_);
   callbacks_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure,
                                   nullptr);
 }

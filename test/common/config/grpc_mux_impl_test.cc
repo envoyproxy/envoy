@@ -213,13 +213,15 @@ TEST_F(GrpcMuxImplTest, TypeUrlMismatch) {
     invalid_response->mutable_resources()->Add()->set_type_url("bar");
     EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _))
         .WillOnce(Invoke([](Envoy::Config::ConfigUpdateFailureReason, const EnvoyException* e) {
-          EXPECT_TRUE(IsSubstring("", "", "bar does not match foo type URL in DiscoveryResponse",
-                                  e->what()));
+          EXPECT_TRUE(IsSubstring(
+              "", "", "bar does not match the message-wide type URL foo in DiscoveryResponse",
+              e->what()));
         }));
 
-    expectSendMessage("foo", {"x", "y"}, "", false, "", Grpc::Status::GrpcStatus::Internal,
-                      fmt::format("bar does not match foo type URL in DiscoveryResponse {}",
-                                  invalid_response->DebugString()));
+    expectSendMessage(
+        "foo", {"x", "y"}, "", false, "", Grpc::Status::GrpcStatus::Internal,
+        fmt::format("bar does not match the message-wide type URL foo in DiscoveryResponse {}",
+                    invalid_response->DebugString()));
     grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(invalid_response));
   }
   expectSendMessage("foo", {}, "");
