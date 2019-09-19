@@ -20,6 +20,9 @@ using Envoy::ProtobufWkt::Empty;
 namespace Envoy {
 namespace {
 
+// A magic header value which marks header as not expected.
+constexpr char UnexpectedHeaderValue[] = "Unexpected header value";
+
 class GrpcJsonTranscoderIntegrationTest
     : public testing::TestWithParam<Network::Address::IpVersion>,
       public HttpIntegrationTest {
@@ -135,8 +138,12 @@ protected:
         [](const Http::HeaderEntry& entry, void* context) -> Http::HeaderMap::Iterate {
           auto* response = static_cast<IntegrationStreamDecoder*>(context);
           Http::LowerCaseString lower_key{std::string(entry.key().getStringView())};
-          EXPECT_EQ(entry.value().getStringView(),
-                    response->headers().get(lower_key)->value().getStringView());
+          if (entry.value() == UnexpectedHeaderValue) {
+            EXPECT_FALSE(response->headers().get(lower_key));
+          } else {
+            EXPECT_EQ(entry.value().getStringView(),
+                      response->headers().get(lower_key)->value().getStringView());
+          }
           return Http::HeaderMap::Iterate::Continue;
         },
         response.get());
@@ -342,6 +349,30 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetError1) {
       Http::TestHeaderMapImpl{
           {":status", "404"}, {"grpc-status", "5"}, {"grpc-message", "Shelf 9999 Not Found"}},
       "");
+}
+
+// Test an upstream that returns an error in a trailer-only response.
+TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryErrorConvertedToJson) {
+  const std::string filter =
+      R"EOF(
+            name: envoy.grpc_json_transcoder
+            config:
+              proto_descriptor: "{}"
+              services: "bookstore.Bookstore"
+              convert_grpc_status: true
+            )EOF";
+  config_helper_.addFilter(
+      fmt::format(filter, TestEnvironment::runfilesPath("/test/proto/bookstore.descriptor")));
+  HttpIntegrationTest::initialize();
+  testTranscoding<bookstore::GetShelfRequest, bookstore::Shelf>(
+      Http::TestHeaderMapImpl{
+          {":method", "GET"}, {":path", "/shelves/100"}, {":authority", "host"}},
+      "", {"shelf: 100"}, {}, Status(Code::NOT_FOUND, "Shelf 100 Not Found"),
+      Http::TestHeaderMapImpl{{":status", "404"},
+                              {"content-type", "application/json"},
+                              {"grpc-status", UnexpectedHeaderValue},
+                              {"grpc-message", UnexpectedHeaderValue}},
+      R"({"code":5,"message":"Shelf 100 Not Found"})");
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryDelete) {
