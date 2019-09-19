@@ -1335,7 +1335,12 @@ Filter::UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::I
         parent.timeSource().systemTime());
     span_->setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy);
     span_->setTag(Tracing::Tags::get().UpstreamCluster, parent.cluster_->name());
-    span_->setTag(Tracing::Tags::get().RetryCount, std::to_string(parent.attempt_count_ - 1));
+    span_->setTag(Tracing::Tags::get().HttpProtocol,
+                  AccessLog::AccessLogFormatUtils::protocolToString(pool.protocol()));
+    if (parent.attempt_count_ != 1) {
+      // This is a retry request, add this metadata to span.
+      span_->setTag(Tracing::Tags::get().RetryCount, std::to_string(parent.attempt_count_ - 1));
+    }
   }
 
   stream_info_.healthCheck(parent_.callbacks_->streamInfo().healthCheck());
@@ -1343,23 +1348,16 @@ Filter::UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::I
 
 Filter::UpstreamRequest::~UpstreamRequest() {
   if (span_ != nullptr) {
-    // Add protocol to the span.
-    auto protocol = stream_info_.protocol();
-    if (protocol) {
-      span_->setTag(Tracing::Tags::get().HttpProtocol,
-                    AccessLog::AccessLogFormatUtils::protocolToString(protocol));
-    }
-
     if (parent_.grpc_request_) {
       // Add gRPC response code to span.
-      auto response_code =
+      const auto response_code =
           Grpc::Common::responseToGrpcStatus(stream_info_, *upstream_headers_, *upstream_trailers_);
       if (response_code) {
         span_->setTag(Tracing::Tags::get().GrpcStatusCode, std::to_string(response_code.value()));
       }
     } else {
       // Add HTTP response code to span.
-      auto response_code = stream_info_.responseCode();
+      const auto response_code = stream_info_.responseCode();
       if (response_code) {
         span_->setTag(Tracing::Tags::get().HttpStatusCode, std::to_string(response_code.value()));
       }
