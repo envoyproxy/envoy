@@ -833,15 +833,15 @@ void Filter::onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_
 
     callbacks_->streamInfo().setResponseFlag(response_flags);
 
-    callbacks_->sendLocalReply(code, body,
-                               [dropped, this](Http::HeaderMap& headers) {
-                                 if (dropped && !config_.suppress_envoy_headers_) {
-                                   headers.insertEnvoyOverloaded().value(
-                                       Http::Headers::get().EnvoyOverloadedValues.True);
-                                 }
-                                 modify_headers_(headers);
-                               },
-                               absl::nullopt, details);
+    callbacks_->sendLocalReply(
+        code, body,
+        [dropped, this](Http::HeaderMap& headers) {
+          if (dropped && !config_.suppress_envoy_headers_) {
+            headers.insertEnvoyOverloaded().value(Http::Headers::get().EnvoyOverloadedValues.True);
+          }
+          modify_headers_(headers);
+        },
+        absl::nullopt, details);
   }
 }
 
@@ -1330,19 +1330,12 @@ Filter::UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::I
       create_per_try_timeout_on_request_complete_(false) {
 
   if (parent_.config_.start_child_span_) {
-
-    // Create span name based on attempt number.
-    std::string span_base_name = "router " + parent.cluster_->name() + " egress";
-    std::string span_name_with_retry =
-        parent.attempt_count_ == 1
-            ? span_base_name
-            : absl::StrCat(span_base_name, " - retry ", parent.attempt_count_ - 1);
-
-    span_ = parent_.callbacks_->activeSpan().spawnChild(parent_.callbacks_->tracingConfig(),
-                                                        span_name_with_retry,
-                                                        parent.timeSource().systemTime());
+    span_ = parent_.callbacks_->activeSpan().spawnChild(
+        parent_.callbacks_->tracingConfig(), "router " + parent.cluster_->name() + " egress",
+        parent.timeSource().systemTime());
     span_->setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy);
     span_->setTag(Tracing::Tags::get().UpstreamCluster, parent.cluster_->name());
+    span_->setTag(Tracing::Tags::get().RetryCount, std::to_string(parent.attempt_count_ - 1));
   }
 
   stream_info_.healthCheck(parent_.callbacks_->streamInfo().healthCheck());
@@ -1514,7 +1507,8 @@ void Filter::UpstreamRequest::onResetStream(Http::StreamResetReason reason,
 
   if (span_ != nullptr) {
     // Add tags about reset.
-    span_->setTag(Tracing::Tags::get().Error, Http::Utility::resetReasonToString(reason));
+    span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+    span_->setTag(Tracing::Tags::get().ErrorReason, Http::Utility::resetReasonToString(reason));
   }
 
   clearRequestEncoder();

@@ -40,6 +40,7 @@ public:
 
   // Non-standard tag names.
   const std::string DownstreamCluster = "downstream_cluster";
+  const std::string ErrorReason = "error.reason";
   const std::string GrpcStatusCode = "grpc.status_code";
   const std::string GrpcMessage = "grpc.message";
   const std::string GuidXClientTraceId = "guid:x-client-trace-id";
@@ -49,6 +50,7 @@ public:
   const std::string RequestSize = "request_size";
   const std::string ResponseFlags = "response_flags";
   const std::string ResponseSize = "response_size";
+  const std::string RetryCount = "retry.count";
   const std::string Status = "status";
   const std::string UpstreamCluster = "upstream_cluster";
   const std::string UserAgent = "user_agent";
