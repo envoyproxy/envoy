@@ -12,6 +12,7 @@
 #include "common/common/linked_object.h"
 #include "common/common/thread.h"
 #include "common/common/thread_annotations.h"
+#include "common/grpc/google_grpc_context.h"
 #include "common/grpc/typed_async_client.h"
 #include "common/tracing/http_tracer_impl.h"
 
@@ -174,6 +175,7 @@ private:
   static std::shared_ptr<grpc::Channel>
   createChannel(const envoy::api::v2::core::GrpcService::GoogleGrpc& config);
 
+  GoogleGrpcContext google_grpc_context_;
   Event::Dispatcher& dispatcher_;
   GoogleAsyncClientThreadLocal& tls_;
   // This is shared with child streams, so that they can cleanup independent of

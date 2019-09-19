@@ -142,6 +142,7 @@ envoy_cc_library(
     ],
     deps = [
         ":context_lib",
+        ":google_grpc_context_lib",
         ":google_grpc_creds_lib",
         ":google_grpc_utils_lib",
         ":typed_async_client_lib",
@@ -154,6 +155,14 @@ envoy_cc_library(
         "//source/common/common:thread_annotations",
         "//source/common/tracing:http_tracer_lib",
     ],
+)
+
+envoy_cc_library(
+    name = "google_grpc_context_lib",
+    srcs = ["google_grpc_context.cc"],
+    hdrs = ["google_grpc_context.h"],
+    external_deps = ["grpc"],
+    deps = ["//source/common/common:assert_lib"],
 )
 
 envoy_cc_library(

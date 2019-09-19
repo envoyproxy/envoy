@@ -8,10 +8,6 @@
 
 #include "ares.h"
 
-#ifdef ENVOY_GOOGLE_GRPC
-#include "grpc/grpc.h"
-#endif
-
 namespace Envoy {
 namespace {
 // Static variable to count initialization pairs. For tests like
@@ -22,9 +18,6 @@ uint32_t process_wide_initialized;
 
 ProcessWide::ProcessWide() : initialization_depth_(process_wide_initialized) {
   if (process_wide_initialized++ == 0) {
-#ifdef ENVOY_GOOGLE_GRPC
-    grpc_init();
-#endif
     ares_library_init(ARES_LIB_INIT_ALL);
     Event::Libevent::Global::initialize();
     Envoy::Server::validateProtoDescriptors();
@@ -37,9 +30,6 @@ ProcessWide::~ProcessWide() {
   if (--process_wide_initialized == 0) {
     process_wide_initialized = false;
     ares_library_cleanup();
-#ifdef ENVOY_GOOGLE_GRPC
-    grpc_shutdown();
-#endif
   }
   ASSERT(process_wide_initialized == initialization_depth_);
 }

@@ -74,6 +74,8 @@ GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
                                              Api::Api& api)
     : dispatcher_(dispatcher), tls_(tls), stat_prefix_(config.google_grpc().stat_prefix()),
       initial_metadata_(config.initial_metadata()), scope_(scope) {
+  grpc_init();
+
   // We rebuild the channel each time we construct the channel. It appears that the gRPC library is
   // smart enough to do connection pooling and reuse with identical channel args, so this should
   // have comparable overhead to what we are doing in Grpc::AsyncClientImpl, i.e. no expensive
