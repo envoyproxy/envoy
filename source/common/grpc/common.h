@@ -135,6 +135,8 @@ public:
   static bool parseBufferInstance(Buffer::InstancePtr&& buffer, Protobuf::Message& proto);
 
   /**
+   * Returns the GrpcStatus code from a given response, if present.
+   *
    * The gRPC specification does not guarantee a gRPC status code will be returned from a gRPC
    * request. When it is returned, it will be in the response trailers. With that said, Envoy will
    * treat a trailers-only response as a headers-only response, so we have to check the following
