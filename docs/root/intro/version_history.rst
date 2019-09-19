@@ -4,6 +4,7 @@ Version history
 1.12.0 (pending)
 ================
 * access log: added :ref:`buffering <envoy_api_field_config.accesslog.v2.CommonGrpcAccessLogConfig.buffer_size_bytes>` and :ref:`periodical flushing <envoy_api_field_config.accesslog.v2.CommonGrpcAccessLogConfig.buffer_flush_interval>` support to gRPC access logger. Defaults to 16KB buffer and flushing every 1 second.
+* access log: added DOWNSTREAM_DIRECT_REMOTE_ADDRESS and DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT :ref:`access log formatters <config_access_log_format>` and gRPC access logger.
 * access log: gRPC Access Log Service (ALS) support added for :ref:`TCP access logs <envoy_api_msg_config.accesslog.v2.TcpGrpcAccessLogConfig>`.
 * access log: reintroduce :ref:`filesystem <filesystem_stats>` stats and added the `write_failed` counter to track failed log writes
 * admin: added ability to configure listener :ref:`socket options <envoy_api_field_config.bootstrap.v2.Admin.socket_options>`.
@@ -22,6 +23,7 @@ Version history
 * config: changed the default value of :ref:`initial_fetch_timeout <envoy_api_field_core.ConfigSource.initial_fetch_timeout>` from 0s to 15s. This is a change in behaviour in the sense that Envoy will move to the next initialization phase, even if the first config is not delivered in 15s. Refer to :ref:`initialization process <arch_overview_initialization>` for more details.
 * config: added stat :ref:`init_fetch_timeout <config_cluster_manager_cds>`.
 * ext_authz: added :ref:`configurable ability <envoy_api_field_config.filter.http.ext_authz.v2.ExtAuthz.metadata_context_namespaces>` to send dynamic metadata to the `ext_authz` service.
+* ext_authz: added tracing to the HTTP client.
 * fault: added overrides for default runtime keys in :ref:`HTTPFault <envoy_api_msg_config.filter.http.fault.v2.HTTPFault>` filter.
 * grpc: added :ref:`AWS IAM grpc credentials extension <envoy_api_file_envoy/config/grpc_credential/v2alpha/aws_iam.proto>` for AWS-managed xDS.
 * grpc-json: added support for :ref:`ignoring unknown query parameters<envoy_api_field_config.filter.http.transcoder.v2.GrpcJsonTranscoder.ignore_unknown_query_parameters>`.
@@ -30,6 +32,7 @@ Version history
 * http: changed Envoy to forward existing x-forwarded-proto from upstream trusted proxies. Guarded by `envoy.reloadable_features.trusted_forwarded_proto` which defaults true.
 * http: added the ability to configure the behavior of the server response header, via the :ref:`server_header_transformation<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.server_header_transformation>` field.
 * http: added the ability to :ref:`merge adjacent slashes<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.merge_slashes>` in the path.
+* http: :ref:`AUTO <envoy_api_enum_value_config.filter.network.http_connection_manager.v2.HttpConnectionManager.CodecType.AUTO>` codec protocol inference now requires the H2 magic bytes to be the first bytes transmitted by a downstream client.
 * http: remove h2c upgrade headers for HTTP/1 as h2c upgrades are currently not supported.
 * listeners: added :ref:`continue_on_listener_filters_timeout <envoy_api_field_Listener.continue_on_listener_filters_timeout>` to configure whether a listener will still create a connection when listener filters time out.
 * listeners: added :ref:`HTTP inspector listener filter <config_listener_filters_http_inspector>`.
@@ -49,10 +52,13 @@ Version history
 * rbac: added conditions to the policy, see :ref:`condition <envoy_api_field_config.rbac.v2.Policy.condition>`.
 * router: added :ref:`rq_retry_skipped_request_not_complete <config_http_filters_router_stats>` counter stat to router stats.
 * router: :ref:`Scoped routing <arch_overview_http_routing_route_scope>` is supported.
+* router: added new :ref:`retriable-headers <config_http_filters_router_x-envoy-retry-on>` retry policy. Retries can now be configured to trigger by arbitrary response header matching.
 * router check tool: add coverage reporting & enforcement.
 * router check tool: add comprehensive coverage reporting.
 * router check tool: add deprecated field check.
 * router check tool: add flag for only printing results of failed tests.
+* router check tool: add support for outputting missing tests in the detailed coverage report.
+* server: added a post initialization lifecycle event, in addition to the existing startup and shutdown events.
 * thrift_proxy: fix crashing bug on invalid transport/protocol framing
 * tls: added verification of IP address SAN fields in certificates against configured SANs in the
 * tracing: added support to the Zipkin reporter for sending list of spans as Zipkin JSON v2 and protobuf message over HTTP.

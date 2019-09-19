@@ -464,10 +464,10 @@ void InstanceImpl::loadServerFlags(const absl::optional<std::string>& flags_path
 RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatcher& dispatcher,
                      Upstream::ClusterManager& cm, AccessLog::AccessLogManager& access_log_manager,
                      Init::Manager& init_manager, OverloadManager& overload_manager,
-                     std::function<void()> workers_start_cb)
-    : init_watcher_("RunHelper", [&instance, workers_start_cb]() {
+                     std::function<void()> post_init_cb)
+    : init_watcher_("RunHelper", [&instance, post_init_cb]() {
         if (!instance.isShutdown()) {
-          workers_start_cb();
+          post_init_cb();
         }
       }) {
   // Setup signals.
@@ -522,9 +522,11 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
 void InstanceImpl::run() {
   // RunHelper exists primarily to facilitate testing of how we respond to early shutdown during
   // startup (see RunHelperTest in server_test.cc).
-  const auto run_helper =
-      RunHelper(*this, options_, *dispatcher_, clusterManager(), access_log_manager_, init_manager_,
-                overloadManager(), [this] { startWorkers(); });
+  const auto run_helper = RunHelper(*this, options_, *dispatcher_, clusterManager(),
+                                    access_log_manager_, init_manager_, overloadManager(), [this] {
+                                      notifyCallbacksForStage(Stage::PostInit);
+                                      startWorkers();
+                                    });
 
   // Run the main dispatch loop waiting to exit.
   ENVOY_LOG(info, "starting main dispatch loop");
