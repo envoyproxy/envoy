@@ -176,11 +176,11 @@ void DynamoFilter::chargeStatsPerEntity(const std::string& entity, const std::st
       time_source_.monotonicTime() - start_decode_);
 
   size_t group_index = DynamoStats::groupIndex(status);
-  const Stats::StatName entity_type_name = stats_->getStatName(entity_type);
-  const Stats::StatName entity_name = stats_->getStatName(entity);
-  const Stats::StatName total_name =
-      stats_->getStatName(absl::StrCat("upstream_rq_total_", status));
-  const Stats::StatName time_name = stats_->getStatName(absl::StrCat("upstream_rq_time_", status));
+  const Stats::StatName entity_type_name =
+      stats_->getBuiltin(entity_type, stats_->unknown_entity_type_);
+  const Stats::StatName entity_name = stats_->getDynamic(entity);
+  const Stats::StatName total_name = stats_->getDynamic(absl::StrCat("upstream_rq_total_", status));
+  const Stats::StatName time_name = stats_->getDynamic(absl::StrCat("upstream_rq_time_", status));
 
   stats_->counter({entity_type_name, entity_name, stats_->upstream_rq_total_}).inc();
   const Stats::StatName total_group = stats_->upstream_rq_total_groups_[group_index];
@@ -200,7 +200,7 @@ void DynamoFilter::chargeUnProcessedKeysStats(const Json::Object& json_body) {
   std::vector<std::string> unprocessed_tables = RequestParser::parseBatchUnProcessedKeys(json_body);
   for (const std::string& unprocessed_table : unprocessed_tables) {
     stats_
-        ->counter({stats_->error_, stats_->getStatName(unprocessed_table),
+        ->counter({stats_->error_, stats_->getDynamic(unprocessed_table),
                    stats_->batch_failure_unprocessed_keys_})
         .inc();
   }
@@ -211,11 +211,11 @@ void DynamoFilter::chargeFailureSpecificStats(const Json::Object& json_body) {
 
   if (!error_type.empty()) {
     if (table_descriptor_.table_name.empty()) {
-      stats_->counter({stats_->error_, stats_->no_table_, stats_->getStatName(error_type)}).inc();
+      stats_->counter({stats_->error_, stats_->no_table_, stats_->getDynamic(error_type)}).inc();
     } else {
       stats_
-          ->counter({stats_->error_, stats_->getStatName(table_descriptor_.table_name),
-                     stats_->getStatName(error_type)})
+          ->counter({stats_->error_, stats_->getDynamic(table_descriptor_.table_name),
+                     stats_->getDynamic(error_type)})
           .inc();
     }
   } else {
