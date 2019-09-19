@@ -54,7 +54,6 @@ NSString *_REQUEST_SCHEME = @"http";
 #pragma mark - Requests
 
 - (void)startRequests {
-  // Note that the first delay will give Envoy time to start up.
   self.requestTimer = [NSTimer scheduledTimerWithTimeInterval:1.0
                                                        target:self
                                                      selector:@selector(performRequest)
