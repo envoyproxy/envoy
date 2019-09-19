@@ -2,7 +2,6 @@
 
 #include "common/http/header_map_impl.h"
 
-#include "test/integration/autonomous_upstream.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
@@ -11,64 +10,93 @@
 
 namespace Envoy {
 
-void AdaptiveConcurrencyIntegrationTest::sendRequests(
-    const int request_count, const uint32_t delay_ms = DEFAULT_REQUEST_DELAY_MS) {
-  auto headers = default_request_headers_;
-  headers.addCopy("x-envoy-fault-delay-request", std::to_string(delay_ms));
-  for (int idx = 0; idx < request_count; ++idx) {
-    auto encoder_decoder = codec_client_->startRequest(headers);
-    response_q_.emplace(std::move(encoder_decoder.second));
-    codec_client_->sendData(encoder_decoder.first, 0, true);
+void AdaptiveConcurrencyIntegrationTest::sendRequests(const uint32_t request_count, const uint32_t num_forwarded) {
+  ASSERT_LE(num_forwarded, request_count);
+
+  // We expect these requests to reach the upstream.
+  for (uint32_t idx = 0; idx < num_forwarded; ++idx) {
+    auto response = codec_client_->makeRequestWithBody(default_request_headers_, 8);
+    responses_.emplace_back(std::move(response));
+    upstream_connections_.emplace_back();
+    upstream_requests_.emplace_back();
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, upstream_connections_.back()));
+    ASSERT_TRUE(upstream_connections_.back()->waitForNewStream(*dispatcher_, upstream_requests_.back()));
+    ASSERT(upstream_requests_.back()->waitForEndStream(*dispatcher_));
+  }
+
+  for (uint32_t idx = 0; idx < request_count - num_forwarded; ++idx) {
+    auto response = codec_client_->makeRequestWithBody(default_request_headers_, 8);
+    responses_.emplace_back(std::move(response));
+
+    // These will remain nullptr.
+    upstream_connections_.emplace_back();
+    upstream_requests_.emplace_back();
   }
 }
 
-void AdaptiveConcurrencyIntegrationTest::respondToAllRequests(const int num_forwarded) {
-  int forwarded_count = 0;
-  while (!response_q_.empty()) {
-    auto response = std::move(response_q_.front());
-    response_q_.pop();
-    response->waitForEndStream();
-    EXPECT_TRUE(response->complete());
-    const auto status_code = response->headers().Status()->value().getStringView();
-    if (status_code == "200") {
-      ++forwarded_count;
-      continue;
-    }
-    EXPECT_EQ("503", status_code);
-  }
+void AdaptiveConcurrencyIntegrationTest::respondToAllRequests(const int forwarded_count) {
+  ASSERT_GE(responses_.size(), static_cast<size_t>(forwarded_count));
 
-  EXPECT_EQ(num_forwarded, forwarded_count);
+  for (int idx = 0; idx < forwarded_count; ++idx) {
+    respondToRequest(true);
+  }
+  while (!responses_.empty()) {
+    respondToRequest(false);
+  }
 }
 
-IntegrationStreamDecoderPtr AdaptiveConcurrencyIntegrationTest::respondToRequest() {
-  auto response = std::move(response_q_.front());
-  response_q_.pop();
-  response->waitForEndStream();
-  EXPECT_TRUE(response->complete());
-  return response;
+void AdaptiveConcurrencyIntegrationTest::respondToRequest(const bool expect_forwarded) {
+  ASSERT_EQ(upstream_connections_.size(), upstream_requests_.size());
+  ASSERT_EQ(responses_.size(), upstream_requests_.size());
+
+  if (expect_forwarded) {
+    EXPECT_NE(upstream_connections_.front(), nullptr);
+    EXPECT_NE(upstream_requests_.front(), nullptr);
+    upstream_requests_.front()->encodeHeaders(default_response_headers_, true);
+  }
+
+  responses_.front()->waitForEndStream();
+  if (expect_forwarded) {
+    EXPECT_TRUE(upstream_requests_.front()->complete());
+  }
+
+  EXPECT_TRUE(responses_.front()->complete());
+  if (expect_forwarded) {
+    verifyResponseForwarded(std::move(responses_.front()));
+  } else {
+    verifyResponseBlocked(std::move(responses_.front()));
+  }
+  
+  upstream_connections_.pop_front();
+  upstream_requests_.pop_front();
+  responses_.pop_front();
 }
 
 uint32_t
 AdaptiveConcurrencyIntegrationTest::inflateConcurrencyLimit(const uint64_t limit_lower_bound) {
   // Send requests until the gauge exists.
   while (!test_server_->gauge(CONCURRENCY_LIMIT_GAUGE_NAME)) {
-    sendRequests(1);
+    sendRequests(1, 1);
     respondToAllRequests(1);
   }
 
   while (test_server_->gauge(CONCURRENCY_LIMIT_GAUGE_NAME)->value() < limit_lower_bound) {
     const auto min_rtt = test_server_->gauge(MIN_RTT_GAUGE_NAME)->value();
-    sendRequests(1, min_rtt / 2);
+    sendRequests(1, 1);
+    // Choosing a value less than the minRTT.
+    timeSystem().sleep(std::chrono::milliseconds(min_rtt) / 2);
     respondToAllRequests(1);
   }
   return test_server_->gauge(CONCURRENCY_LIMIT_GAUGE_NAME)->value();
 }
 
 void AdaptiveConcurrencyIntegrationTest::deflateConcurrencyLimit(const uint64_t limit_upper_bound) {
-  ASSERT(limit_upper_bound > 1);
+  ASSERT_GT(limit_upper_bound, 1);
+
   // Send requests until the gauge exists.
   while (!test_server_->gauge(CONCURRENCY_LIMIT_GAUGE_NAME)) {
-    sendRequests(1);
+    sendRequests(1, 1);
+    timeSystem().sleep(std::chrono::milliseconds(1));
     respondToAllRequests(1);
   }
 
@@ -77,7 +105,8 @@ void AdaptiveConcurrencyIntegrationTest::deflateConcurrencyLimit(const uint64_t 
   while (test_server_->gauge(CONCURRENCY_LIMIT_GAUGE_NAME)->value() != 1 &&
          test_server_->gauge(CONCURRENCY_LIMIT_GAUGE_NAME)->value() >= limit_upper_bound) {
     const auto min_rtt = test_server_->gauge(MIN_RTT_GAUGE_NAME)->value();
-    sendRequests(1, min_rtt * 2);
+    sendRequests(1, 1);
+    timeSystem().sleep(std::chrono::milliseconds(min_rtt * 2));
     respondToAllRequests(1);
   }
 }
@@ -89,24 +118,16 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AdaptiveConcurrencyIntegrationTest,
  * Test a single request returns successfully.
  */
 TEST_P(AdaptiveConcurrencyIntegrationTest, TestConcurrency1) {
-  initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  sendRequests(2);
-  auto response = respondToRequest();
-  verifyResponseForwarded(std::move(response));
-  response = respondToRequest();
-  verifyResponseBlocked(std::move(response));
+  sendRequests(2, 1);
+  respondToAllRequests(1);
+  test_server_->waitForCounterGe(REQUEST_BLOCK_COUNTER_NAME, 1);
 }
 
 /**
  * Test many requests, where only a single request returns 200 during the minRTT window.
  */
 TEST_P(AdaptiveConcurrencyIntegrationTest, TestManyConcurrency1) {
-  initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  sendRequests(10);
+  sendRequests(10, 1);
   respondToAllRequests(1);
   test_server_->waitForCounterGe(REQUEST_BLOCK_COUNTER_NAME, 9);
 }
@@ -116,9 +137,6 @@ TEST_P(AdaptiveConcurrencyIntegrationTest, TestManyConcurrency1) {
  * minRTT value.
  */
 TEST_P(AdaptiveConcurrencyIntegrationTest, TestConcurrencyLimitMovement) {
-  initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
   // Cause the concurrency limit to oscillate.
   for (int idx = 0; idx < 3; ++idx) {
     inflateConcurrencyLimit(100);
