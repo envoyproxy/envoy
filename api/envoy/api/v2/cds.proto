@@ -237,7 +237,7 @@ message Cluster {
   auth.UpstreamTlsContext tls_context = 11;
 
   // TransportSocketMatch specifies what transport socket config will be used
-  // when the matches conditions are satisfied.
+  // when the match conditions are satisfied.
   message TransportSocketMatch {
     // The name of the match.
     string name = 1;
@@ -245,7 +245,7 @@ message Cluster {
     // Optional endpoint metadata match criteria.
     // The connection to the endpoint with metadata matching what is set in this field
     // will use the transport socket configuration specified here.
-    // The endpoints metadata entry in *envoy.transport_socket* is used to match
+    // The endpoint's metadata entry in *envoy.transport_socket* is used to match
     // against the values specified in this field.
     google.protobuf.Struct match = 2;
 
@@ -254,8 +254,8 @@ message Cluster {
   }
 
   // Configuration to use different transport sockets for different endpoints.
-  //
-  // The entry of *envoy.transport_socket* in endpoint :ref:`Metadata <envoy_api_msg_core.Metadata>`
+  // The entry of *envoy.transport_socket* in the
+  // :ref:`LbEndpoint.Metadata <envoy_api_field_endpoint.LbEndpoint.metadata>`
   // is used to match against the transport sockets as they appear in the list. The first
   // :ref:`match <envoy_api_msg_Cluster.TransportSocketMatch>` is used.
   // For example, with the following match
@@ -273,20 +273,6 @@ message Cluster {
   //    match: {}
   //    transport_socket:
   //      name: "rawbuffer"
-
-  //   "transport_socket_matches": [
-  //     {
-  //       "name": "enable-mtls",
-  //       "match": { "app": "sidecar" },
-  //       "transport_socket": { "name": "tls", "config": { ... } }
-  //     },
-  //     {
-  //       "name": "use-plaintext",
-  //       "match": {},
-  //       "transport_socket": { "name": "rawbuffer", "config": { } }
-  //     },
-  //   ]
-  // }
   //
   // Connections to the endpoints whose metadata value under *envoy.transport_socket*
   // having "acceptMTLS"/"true" key/value pair use the "enableMTLS" socket configuration.
@@ -305,10 +291,13 @@ message Cluster {
   // an endpoint's metadata can have two key value pairs as "acceptMTLS": "true",
   // "acceptPlaintext": "true". While some other endpoints, only accepting plaintext traffic
   // has "accpetPlaintext": "true" metadata information.
+  //
   // Then the xDS server can configure the CDS to a client, Envoy A, to send mutual TLS
   // traffic for endpoints with "acceptMTLS": "true", by adding a corresponding
   // *TransportSocketMatch* in this field. Other client Envoys receive CDS without
   // *transport_socket_match* set, and still send plain text traffic to the same cluster.
+  //
+  // TODO(incfly): add a detailed architecture doc on intended usage.
   // [#not-implemented-hide:]
   repeated TransportSocketMatch transport_socket_matches = 42;
 
