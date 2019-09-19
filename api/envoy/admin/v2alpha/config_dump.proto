@@ -45,6 +45,22 @@ message BootstrapConfigDump {
   google.protobuf.Timestamp last_updated = 2;
 }
 
+// This is a general purpose proto for dynamic configuration to track information about both
+// currently loaded configuration and the most recent attempt to load configuration.
+message ConfigUpdateState {
+  // The name of the entity whose state is tracked here.
+  string name = 1;
+
+  // The timestamp of the last update attempt.
+  google.protobuf.Timestamp last_update = 2;
+
+  // Simple tracking if the last update attempt was successful.
+  bool update_successful = 3;
+
+  // Details about the last update attempt
+  string last_update_details = 4;
+}
+
 // Envoy's listener manager fills this message with all currently known listeners. Listener
 // configuration information can be used to recreate an Envoy configuration by populating all
 // listeners as static listeners or by returning them in a LDS response.
@@ -75,6 +91,10 @@ message ListenersConfigDump {
     envoy.api.v2.Listener listener = 2;
 
     // The timestamp when the Listener was last updated.
+    // FIXME: reviewer we may eventually want last updated and last _successfully_ updated.
+    // Given similarity between last_updated (attempt or success) and
+    // last_update should this maybe be last_update_attempt so last_update
+    // matches?
     google.protobuf.Timestamp last_updated = 3;
   }
 
@@ -96,6 +116,13 @@ message ListenersConfigDump {
   // recreate an Envoy configuration from a configuration dump, the draining listeners should
   // generally be discarded.
   repeated DynamicListener dynamic_draining_listeners = 5;
+
+  // Track the config update state of listeners.
+  // FIXME comment detail.
+  // Review: Should this be per DynamicListener?
+  // Really per name we want the latest where warming > active > draining and
+  // recent loads get mixed in so I think global is correct.
+  repeated ConfigUpdateState config_update_state = 6;
 }
 
 // Envoy's cluster manager fills this message with all currently known clusters. Cluster

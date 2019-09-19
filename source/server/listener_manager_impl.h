@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/api/v2/listener/listener.pb.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/filter_config.h"
@@ -145,6 +146,9 @@ public:
 private:
   using ListenerList = std::list<ListenerImplPtr>;
 
+  bool addOrUpdateListenerInternal(const envoy::api::v2::Listener& config,
+                                   const std::string& version_info, bool added_via_api,
+                                   const std::string& name);
   struct DrainingListener {
     DrainingListener(ListenerImplPtr&& listener, uint64_t workers_pending_removal)
         : listener_(std::move(listener)), workers_pending_removal_(workers_pending_removal) {}
@@ -198,6 +202,8 @@ private:
   ConfigTracker::EntryOwnerPtr config_tracker_entry_;
   LdsApiPtr lds_api_;
   const bool enable_dispatcher_stats_{};
+  using ConfigUpdateState = envoy::admin::v2alpha::ConfigUpdateState;
+  absl::flat_hash_map<std::string, std::unique_ptr<ConfigUpdateState>> state_tracker_;
 };
 
 // TODO(mattklein123): Consider getting rid of pre-worker start and post-worker start code by

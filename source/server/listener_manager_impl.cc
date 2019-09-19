@@ -491,6 +491,11 @@ ProtobufTypes::MessagePtr ListenerManagerImpl::dumpListenerConfigs() {
                                           *(dynamic_listener.mutable_last_updated()));
   }
 
+  for (const auto& state_and_name : state_tracker_) {
+    const envoy::admin::v2alpha::ConfigUpdateState& state = *state_and_name.second;
+    config_dump->mutable_config_update_state()->Add()->CopyFrom(state);
+  }
+
   return config_dump;
 }
 
@@ -506,6 +511,30 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
   } else {
     name = server_.random().uuid();
   }
+  auto it = state_tracker_.find(name);
+  if (it == state_tracker_.end()) {
+    it = state_tracker_.emplace(name, std::make_unique<ConfigUpdateState>()).first;
+  }
+  TimestampUtil::systemClockToTimestamp(server_.api().timeSource().systemTime(),
+                                        *(it->second->mutable_last_update()));
+  it->second->set_name(name);
+
+  try {
+    return addOrUpdateListenerInternal(config, version_info, added_via_api, name);
+  } catch (EnvoyException e) {
+    // FIXME handle removal of added listeners who flat out fail, or this will leak.
+    it->second->set_update_successful(false);
+    it->second->set_last_update_details(e.what());
+    throw e;
+  }
+  it->second->set_update_successful(true);
+  it->second->clear_last_update_details();
+  return false;
+}
+
+bool ListenerManagerImpl::addOrUpdateListenerInternal(const envoy::api::v2::Listener& config,
+                                                      const std::string& version_info,
+                                                      bool added_via_api, const std::string& name) {
   const uint64_t hash = MessageUtil::hash(config);
   ENVOY_LOG(debug, "begin add/update listener: name={} hash={}", name, hash);
 
@@ -779,6 +808,7 @@ bool ListenerManagerImpl::removeListener(const std::string& name) {
     active_listeners_.erase(existing_active_listener);
   }
 
+  state_tracker_.erase(name);
   stats_.listener_removed_.inc();
   updateWarmingActiveGauges();
   return true;
