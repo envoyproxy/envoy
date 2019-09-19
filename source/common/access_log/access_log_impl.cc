@@ -236,12 +236,10 @@ bool GrpcStatusFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::
   absl::optional<Grpc::Status::GrpcStatus> status =
       Grpc::Common::responseToGrpcStatus(info, response_headers, response_trailers);
 
-  if (!status) {
-    // Default in case response does not contain gRPC status.
-    status = Grpc::Status::GrpcStatus::Unknown;
-  }
+  // Check if the status is in the config. Default to Unknown if parsing failed.
+  const bool found =
+      statuses_.find(status.value_or(Grpc::Status::GrpcStatus::Unknown)) != statuses_.end();
 
-  const bool found = statuses_.find(status.value()) != statuses_.end();
   return exclude_ != found;
 }
 
