@@ -219,6 +219,9 @@ if __name__ == "__main__":
       "Don't lookup stats by name at runtime; use StatName saved during construction")
   errors += checkUnfixableError(
       "regex.cc", "Don't use std::regex in code that handles untrusted input. Use RegexMatcher")
+  errors += checkUnfixableError(
+      "grpc_init.cc",
+      "Don't call grpc_init() directly, instantiate Grpc::GoogleGrpcContext. See #8282")
 
   errors += fixFileExpectingFailure(
       "api/missing_package.proto",
