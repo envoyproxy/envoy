@@ -22,6 +22,17 @@ import "google/protobuf/timestamp.proto";
 // Each attribute has a type and a name, which is logically defined as a proto message field
 // of the `AttributeContext`. The `AttributeContext` is a collection of individual attributes
 // supported by Envoy authorization system.
+// [#comment: The following items are left out of this proto
+// Request.Auth field for jwt tokens
+// Request.Api for api management
+// Origin peer that originated the request
+// Caching Protocol
+// request_context return values to inject back into the filter chain
+// peer.claims -- from X.509 extensions
+// Configuration
+// - field mask to send
+// - which return values from request_context are copied back
+// - which return values are copied into request_headers]
 message AttributeContext {
   // This message defines attributes for a node that handles a network request.
   // The node can be either a service or an application that sends, forwards,
@@ -63,8 +74,6 @@ message AttributeContext {
 
     // Represents an HTTP request or an HTTP-like request.
     HttpRequest http = 2;
-
-    // More request types are added here as necessary.
   }
 
   // This message defines attributes for an HTTP request.
@@ -137,15 +146,3 @@ message AttributeContext {
   // Dynamic metadata associated with the request.
   envoy.api.v2.core.Metadata metadata_context = 11;
 }
-
-// The following items are left out of this proto
-// Request.Auth field for jwt tokens
-// Request.Api for api management
-// Origin peer that originated the request
-// Caching Protocol
-// request_context return values to inject back into the filter chain
-// peer.claims -- from X.509 extensions
-// Configuration
-// - field mask to send
-// - which return values from request_context are copied back
-// - which return values are copied into request_headers
