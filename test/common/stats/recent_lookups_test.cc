@@ -1,11 +1,10 @@
 #include <algorithm>
 #include <string>
 
-//#include "common/common/utility.h"
+#include "common/common/utility.h"
 #include "common/stats/recent_lookups.h"
 
 #include "test/test_common/logging.h"
-#include "test/test_common/simulated_time_system.h"
 
 #include "absl/strings/str_cat.h"
 #include "gtest/gtest.h"
@@ -16,11 +15,6 @@ namespace {
 
 class RecentLookupsTest : public testing::Test {
 protected:
-  RecentLookupsTest() { //: recent_lookups_(time_system_) {
-    const uint64_t years = 365 * 24 * 3600;
-    time_system_.setSystemTime(SystemTime() + std::chrono::seconds(40 * years));
-  }
-
   std::string joinLookups() {
     using ItemCount = std::pair<std::string, uint64_t>;
     std::vector<ItemCount> items;
@@ -40,7 +34,6 @@ protected:
     return StringUtil::join(accum, " ");
   }
 
-  Event::SimulatedTimeSystem time_system_;
   RecentLookups recent_lookups_;
 };
 
@@ -54,7 +47,6 @@ TEST_F(RecentLookupsTest, One) {
 TEST_F(RecentLookupsTest, DropOne) {
   for (int i = 0; i < 11; ++i) {
     recent_lookups_.lookup(absl::StrCat("lookup", i));
-    time_system_.sleep(std::chrono::seconds(1));
   }
   EXPECT_EQ("1: lookup1 "
             "1: lookup10 "
@@ -73,9 +65,7 @@ TEST_F(RecentLookupsTest, RepeatDrop) {
   recent_lookups_.lookup("drop_early");
   for (int i = 0; i < 11; ++i) {
     recent_lookups_.lookup(absl::StrCat("lookup", i));
-    time_system_.sleep(std::chrono::seconds(1));
     recent_lookups_.lookup(absl::StrCat("lookup", i));
-    time_system_.sleep(std::chrono::seconds(1));
   }
   recent_lookups_.lookup("add_late");
   EXPECT_EQ("1: add_late "
@@ -86,16 +76,6 @@ TEST_F(RecentLookupsTest, RepeatDrop) {
             "2: lookup9",
             joinLookups());
 }
-
-/*TEST_F(RecentLookupsTest, Log) {
-  EXPECT_LOG_CONTAINS("warn", "Recent lookups for alpha", recent_lookups_.lookup("alpha"));
-  EXPECT_NO_LOGS(recent_lookups_.lookup("beta"));
-  time_system_.sleep(std::chrono::seconds(100));
-  EXPECT_NO_LOGS(recent_lookups_.lookup("gamma"));
-  time_system_.sleep(std::chrono::seconds(250));
-  const Envoy::ExpectedLogMessages messages{{"warn", "gamma"}, {"warn", "delta"}};
-  EXPECT_LOG_CONTAINS_ALL_OF(messages, recent_lookups_.lookup("delta"));
-  }*/
 
 } // namespace
 } // namespace Stats

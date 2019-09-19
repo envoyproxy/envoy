@@ -757,10 +757,9 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
     response_headers.insertContentType().value().setReference(
         Http::Headers::get().ContentTypeValues.TextUtf8);
     response.add("Date       Time     Lookup\n");
-    DateFormatter formatter("%Y-%m-%d %H:%M:%S");
-    uint64_t total = symbol_table.getRecentLookups(
-        [&response, &formatter](absl::string_view name, SystemTime time) {
-          response.add(absl::StrCat(formatter.fromTime(time), " ", name, "\n"));
+    uint64_t total =
+        symbol_table.getRecentLookups([&response](absl::string_view name, uint64_t count) {
+          response.add(absl::StrCat(count, ": ", name, "\n"));
         });
     response.add(absl::StrCat("\ntotal: ", total, "\n"));
     return rc;

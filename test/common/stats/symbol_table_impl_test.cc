@@ -585,16 +585,15 @@ TEST_P(StatNameTest, RecentLookups) {
   encodeDecode("direct.stat");
 
   std::vector<std::string> accum;
-  uint64_t total = table_->getRecentLookups([&accum](absl::string_view name, SystemTime time) {
-    DateFormatter formatter("%Y-%m-%d,%H:%M:%S");
-    accum.emplace_back(absl::StrCat(formatter.fromTime(time), ";Item=", name));
+  uint64_t total = table_->getRecentLookups([&accum](absl::string_view name, uint64_t count) {
+    accum.emplace_back(absl::StrCat(count, ": ", name));
   });
   EXPECT_EQ(5, total);
   std::string recent_lookups_str = StringUtil::join(accum, " ");
 
-  EXPECT_EQ("2009-12-22,00:00:02;Item=direct.stat "
-            "2009-12-22,00:00:01;Item=dynamic.stat2 "
-            "2009-12-22,00:00:00;Item=dynamic.stat1",
+  EXPECT_EQ("1: direct.stat "
+            "1: dynamic.stat1 "
+            "1: dynamic.stat2",
             recent_lookups_str);
 }
 

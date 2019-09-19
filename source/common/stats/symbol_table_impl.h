@@ -9,7 +9,6 @@
 #include <vector>
 
 #include "envoy/common/exception.h"
-#include "envoy/common/time.h"
 #include "envoy/stats/symbol_table.h"
 
 #include "common/common/assert.h"
@@ -161,7 +160,6 @@ public:
     return bytes;
   }
 
-  // void trackRecentLookups(TimeSource& timeSource) override;
   void rememberSet(StatNameSet& stat_name_set) override;
   void forgetSet(StatNameSet& stat_name_set) override;
   uint64_t getRecentLookups(const RecentLookupsFn&) override;
@@ -180,7 +178,7 @@ private:
   // This must be held during both encode() and free().
   mutable Thread::MutexBasicLockable lock_;
 
-  // This must be held while updateing stat_name_sets_.
+  // This must be held while updating stat_name_sets_.
   mutable Thread::MutexBasicLockable stat_name_set_mutex_;
 
   /**
@@ -695,7 +693,6 @@ public:
 private:
   friend class SymbolTableImpl;
 
-  // void trackRecentLookups(TimeSource& time_source);
   uint64_t getRecentLookups(const RecentLookups::IterFn& iter);
 
   Stats::SymbolTable& symbol_table_;
