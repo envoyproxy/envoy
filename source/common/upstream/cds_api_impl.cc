@@ -77,6 +77,8 @@ void CdsApiImpl::onConfigUpdate(
       if (cm_.addOrUpdateCluster(cluster, resource.version())) {
         any_applied = true;
         ENVOY_LOG(debug, "cds: add/update cluster '{}'", cluster.name());
+      } else {
+        ENVOY_LOG(debug, "cds: add/update cluster '{}' skipped", cluster.name());
       }
     } catch (const EnvoyException& e) {
       exception_msgs.push_back(fmt::format("{}: {}", cluster.name(), e.what()));
