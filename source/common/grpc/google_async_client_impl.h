@@ -85,6 +85,9 @@ public:
 private:
   void completionThread();
 
+  // Instantiate this first to ensure grpc_init() is called.
+  GoogleGrpcContext google_grpc_context_;
+
   // The CompletionQueue for in-flight operations. This must precede completion_thread_ to ensure it
   // is constructed before the thread runs.
   grpc::CompletionQueue cq_;
@@ -175,7 +178,6 @@ private:
   static std::shared_ptr<grpc::Channel>
   createChannel(const envoy::api::v2::core::GrpcService::GoogleGrpc& config);
 
-  GoogleGrpcContext google_grpc_context_;
   Event::Dispatcher& dispatcher_;
   GoogleAsyncClientThreadLocal& tls_;
   // This is shared with child streams, so that they can cleanup independent of

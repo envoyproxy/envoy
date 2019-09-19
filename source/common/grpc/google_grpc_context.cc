@@ -23,7 +23,7 @@ GoogleGrpcContext::~GoogleGrpcContext() {
   ASSERT(live_instances_ > 0);
   if (--live_instances_ == 0) {
 #ifdef ENVOY_GOOGLE_GRPC
-    grpc_shutdown();
+    grpc_shutdown_blocking(); // Waiting for quiescence avoids non-determinism in tests.
 #endif
   }
 }
