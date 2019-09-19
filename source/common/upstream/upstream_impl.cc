@@ -808,8 +808,10 @@ TransportSocketMatcherPtr createTransportSocketMatcher(
     ENVOY_LOG_TO_LOGGER(logger, debug, "incfly debug nullptr? {}, match name {} ", 
         (*socket_factory_map)[name].get() == nullptr, name);
   }
-  return std::make_unique<TransportSocketMatcher>(
-      std::move(default_socket_factory),  std::move(socket_factory_map));
+  return std::make_unique<TransportSocketMatcher>(config.transport_socket_matches(),
+      factory_context);
+  //return std::make_unique<TransportSocketMatcher>(
+      //std::move(default_socket_factory),  std::move(socket_factory_map));
 }
 
 void ClusterInfoImpl::createNetworkFilterChain(Network::Connection& connection) const {

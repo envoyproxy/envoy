@@ -43,7 +43,7 @@ static_resources:
       eds_config: { path: "./incfly/eds.yaml" }
     transport_socket_matches:
     - name: "mtlsReady"
-      match: {} # hardcoded, change to metadata later.
+      match: { "istio": "mtlsReady" }
       transport_socket:
         name: "tls"
         # TODO(incfly): support other sockets.
@@ -53,6 +53,12 @@ static_resources:
             tls_certificates:
             - certificate_chain: { filename: "./test/config/integration/certs/clientcert.pem" }
               private_key: { filename: "./test/config/integration/certs/clientkey.pem" }
+    - name: "defaultToPlaintext"
+      match: {} # hardcoded, change to metadata later.
+      transport_socket:
+        name: "raw_buffer"
+        config: {} # raw buffer does not need any config.
+
     #transport_socket_matchers:
       #match: mtlsReady
       #tls_context:

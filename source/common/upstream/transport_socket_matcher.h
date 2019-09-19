@@ -63,7 +63,8 @@ public:
   TransportSocketMatcher(Network::TransportSocketFactoryPtr&& socket_factory,
   TransportSocketFactoryMapPtr&& socket_factory_overrides);
   TransportSocketMatcher(const Protobuf::RepeatedPtrField<
-      envoy::api::v2::Cluster_TransportSocketMatch>& socket_matches);
+      envoy::api::v2::Cluster_TransportSocketMatch>& socket_matches,
+      Server::Configuration::TransportSocketFactoryContext& factory_context);
   
 
   Network::TransportSocketFactory& resolve(
