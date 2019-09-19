@@ -253,8 +253,8 @@ TEST_F(RdsImplTest, FailureSubscription) {
   setup();
 
   EXPECT_CALL(init_watcher_, ready());
-  rds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure,
-                                       {});
+  // onConfigUpdateFailed() should not be called for gRPC stream connection failure
+  rds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout, {});
 }
 
 class RouteConfigProviderManagerImplTest : public RdsTestBase {
