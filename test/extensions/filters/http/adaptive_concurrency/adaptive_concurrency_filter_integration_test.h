@@ -5,7 +5,7 @@
 
 namespace Envoy {
 
-const std::string kAdaptiveConcurrencyFilterConfig =
+const std::string ADAPTIVE_CONCURRENCY_CONFIG =
     R"EOF(
 name: envoy.filters.http.adaptive_concurrency
 config:
@@ -21,7 +21,7 @@ config:
       request_count: 50
 )EOF";
 
-const std::string kFaultFilterConfig =
+const std::string FAULT_FILTER_CONFIG =
     R"EOF(
 name: envoy.fault
 config:
@@ -32,15 +32,15 @@ config:
             denominator: HUNDRED
   )EOF";
 
-const std::string kConcurrencyLimitGaugeName =
+const std::string CONCURRENCY_LIMIT_GAUGE_NAME =
     "http.config_test.adaptive_concurrency.gradient_controller.concurrency_limit";
-const std::string kRequestBlockCounterName =
+const std::string REQUEST_BLOCK_COUNTER_NAME =
     "http.config_test.adaptive_concurrency.gradient_controller.rq_blocked";
-const std::string kMinRTTGaugeName =
+const std::string MIN_RTT_GAUGE_NAME =
     "http.config_test.adaptive_concurrency.gradient_controller.min_rtt_msecs";
 
 // The default delay introduced to each sent request.
-const uint32_t kDefaultRequestDelayMs = 50;
+const uint32_t DEFAULT_REQUEST_DELAY_MS = 50;
 
 class AdaptiveConcurrencyIntegrationTest
     : public HttpIntegrationTest,
@@ -52,8 +52,8 @@ public:
   void initializeFilter() {
     // We use the fault filter (for delays) after the adaptive concurrency filter to introduce a
     // "service latency" to the test. This way, time is moved forward with each response.
-    config_helper_.addFilter(kFaultFilterConfig);
-    config_helper_.addFilter(kAdaptiveConcurrencyFilterConfig);
+    config_helper_.addFilter(FAULT_FILTER_CONFIG);
+    config_helper_.addFilter(ADAPTIVE_CONCURRENCY_CONFIG);
   }
 
   void SetUp() override {

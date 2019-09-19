@@ -21,15 +21,10 @@ Http::FilterFactoryCb AdaptiveConcurrencyFilterFactory::createFilterFactoryFromP
 
   std::shared_ptr<ConcurrencyController::ConcurrencyController> controller;
   using proto = envoy::config::filter::http::adaptive_concurrency::v2alpha::AdaptiveConcurrency;
-  switch (config.concurrency_controller_config_case()) {
-  case proto::ConcurrencyControllerConfigCase::kGradientControllerConfig:
-    controller = std::make_shared<ConcurrencyController::GradientController>(
-        config.gradient_controller_config(), context.dispatcher(), context.runtime(),
-        acc_stats_prefix + "gradient_controller.", context.scope());
-    break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
+  ASSERT(config.concurrency_controller_config_case() == proto::ConcurrencyControllerConfigCase::kGradientControllerConfig);
+  controller = std::make_shared<ConcurrencyController::GradientController>(
+      config.gradient_controller_config(), context.dispatcher(), context.runtime(),
+      acc_stats_prefix + "gradient_controller.", context.scope());
 
   AdaptiveConcurrencyFilterConfigSharedPtr filter_config(
       new AdaptiveConcurrencyFilterConfig(config, context.runtime(), std::move(acc_stats_prefix),
