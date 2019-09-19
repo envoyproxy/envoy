@@ -203,6 +203,16 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
   }
 
   {
+    StreamInfoFormatter upstream_format("DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT");
+    EXPECT_EQ("127.0.0.1", upstream_format.format(header, header, header, stream_info));
+  }
+
+  {
+    StreamInfoFormatter upstream_format("DOWNSTREAM_DIRECT_REMOTE_ADDRESS");
+    EXPECT_EQ("127.0.0.1:0", upstream_format.format(header, header, header, stream_info));
+  }
+
+  {
     StreamInfoFormatter upstream_format("REQUESTED_SERVER_NAME");
     std::string requested_server_name = "stub_server";
     EXPECT_CALL(stream_info, requestedServerName())
