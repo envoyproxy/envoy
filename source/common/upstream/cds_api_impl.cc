@@ -99,8 +99,9 @@ void CdsApiImpl::onConfigUpdate(
   }
 }
 
-void CdsApiImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason,
+void CdsApiImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                                       const EnvoyException*) {
+  ASSERT(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure != reason);
   // We need to allow server startup to continue, even if we have a bad
   // config.
   runInitializeCallbackIfAny();
