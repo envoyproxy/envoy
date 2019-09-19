@@ -7,13 +7,6 @@
 namespace Envoy {
 namespace Upstream {
 
-TransportSocketMatcher::TransportSocketMatcher(
-    Network::TransportSocketFactoryPtr&& socket_factory,
-
-  TransportSocketFactoryMapPtr&& socket_factory_overrides):
-  default_socket_factory_(std::move(socket_factory)),
-  socket_factory_map_(std::move(socket_factory_overrides)) {}
-
 TransportSocketMatcher::TransportSocketMatcher(const Protobuf::RepeatedPtrField<
       envoy::api::v2::Cluster_TransportSocketMatch>& socket_matches,
       Server::Configuration::TransportSocketFactoryContext& factory_context) {
@@ -67,12 +60,12 @@ bool metadataMatch(const envoy::api::v2::core::Metadata& metadata,
 }
 
 Network::TransportSocketFactory& TransportSocketMatcher::resolve(
-    const std::string& hardcode,
+    const std::string& endpoint_addr,
     const envoy::api::v2::core::Metadata& metadata) {
   for (const auto& socket_factory_match : matches_) { 
     if (metadataMatch(metadata, socket_factory_match.match)) {
         ENVOY_LOG(info, "incfly debug, match found {} for endpoint with metadata {} address {}",
-            socket_factory_match.name, metadata.DebugString(), hardcode);
+            socket_factory_match.name, metadata.DebugString(), endpoint_addr);
         return *socket_factory_match.factory;
     }
   }

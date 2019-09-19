@@ -49,9 +49,6 @@
 namespace Envoy  {
 namespace Upstream {
 
-// TODO(incly):
-//   - change to metadata matching.
-//   - resolve to default ts config always.
 class TransportSocketMatcher;
 
 using TransportSocketMatcherPtr = std::unique_ptr<TransportSocketMatcher>;
@@ -60,29 +57,23 @@ using TransportSocketFactoryMapPtr = std::unique_ptr<TransportSocketFactoryMap>;
 
 class TransportSocketMatcher : Logger::Loggable<Logger::Id::upstream> {
 public:
-  TransportSocketMatcher(Network::TransportSocketFactoryPtr&& socket_factory,
-  TransportSocketFactoryMapPtr&& socket_factory_overrides);
-  TransportSocketMatcher(const Protobuf::RepeatedPtrField<
+    TransportSocketMatcher(const Protobuf::RepeatedPtrField<
       envoy::api::v2::Cluster_TransportSocketMatch>& socket_matches,
       Server::Configuration::TransportSocketFactoryContext& factory_context);
   
-
   Network::TransportSocketFactory& resolve(
-      const std::string& hardcode,
+      const std::string& endpoint_addr,
       const envoy::api::v2::core::Metadata& metadata);
 
 protected:
-
   struct FactoryMatch {
     std::string name;
     Network::TransportSocketFactoryPtr factory;
     std::map<std::string, std::string> match;
   };
 
-  // TODO: delete these two.
+  // TODO(incfly): ask reviewer opinion about whether handle default within this lib.
   Network::TransportSocketFactoryPtr default_socket_factory_;
-  TransportSocketFactoryMapPtr socket_factory_map_;
-
   std::vector<FactoryMatch> matches_;
 };
 

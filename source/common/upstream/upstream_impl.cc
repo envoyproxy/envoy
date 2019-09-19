@@ -766,52 +766,14 @@ Network::TransportSocketFactoryPtr createTransportSocketFactory(
 // TODO(incfly): here, next step to move to constructor of transports socketmatcher
 // unit test creates the same list of the factory, and check returns equals. due to lack of mock.
 TransportSocketMatcherPtr createTransportSocketMatcher(
-    spdlog::logger& logger,
+    spdlog::logger&,
     const envoy::api::v2::Cluster& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context) {
-  // If the cluster config doesn't have a transport socket configured, override with the default
-  // transport socket implementation based on the tls_context. We copy by value first then override
-  // if necessary.
-  auto transport_socket = config.transport_socket();
-  if (!config.has_transport_socket()) {
-    if (config.has_tls_context()) {
-      transport_socket.set_name(Extensions::TransportSockets::TransportSocketNames::get().Tls);
-      MessageUtil::jsonConvert(config.tls_context(), *transport_socket.mutable_config());
-    } else {
-      transport_socket.set_name(
-          Extensions::TransportSockets::TransportSocketNames::get().RawBuffer);
-    }
-  }
-  auto& config_factory = Config::Utility::getAndCheckFactory<
-      Server::Configuration::UpstreamTransportSocketConfigFactory>(transport_socket.name());
-  ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-      transport_socket, factory_context.messageValidationVisitor(), config_factory);
-
   // TODO(incfly): question, use the only one default factory, not over creating.
   // or creating factory always and once api is stable deprecate the outer one?
-  auto default_socket_factory = config_factory.createTransportSocketFactory(*message, factory_context);
-  auto socket_factory_map = std::make_unique<std::map<std::string,
-       Network::TransportSocketFactoryPtr>>();
-  for (const auto& socket_matcher_iter : config.transport_socket_matches()) {
-    const auto& name = socket_matcher_iter.name();
-    // const auto& match = socket_matcher_iter.match();
-    const auto& socket = socket_matcher_iter.transport_socket();
-
-
-    // TODO(incfly): remove hardcode here before merge.
-    auto& tls_config_factory = Config::Utility::getAndCheckFactory<
-      Server::Configuration::UpstreamTransportSocketConfigFactory>(socket.name());
-    ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-      socket, factory_context.messageValidationVisitor(), tls_config_factory);
-    (*socket_factory_map)[name] = 
-        tls_config_factory.createTransportSocketFactory(*message, factory_context);
-    ENVOY_LOG_TO_LOGGER(logger, debug, "incfly debug nullptr? {}, match name {} ", 
-        (*socket_factory_map)[name].get() == nullptr, name);
-  }
+  // auto default_socket_factory = config_factory.createTransportSocketFactory(*message, factory_context);
   return std::make_unique<TransportSocketMatcher>(config.transport_socket_matches(),
       factory_context);
-  //return std::make_unique<TransportSocketMatcher>(
-      //std::move(default_socket_factory),  std::move(socket_factory_map));
 }
 
 void ClusterInfoImpl::createNetworkFilterChain(Network::Connection& connection) const {
