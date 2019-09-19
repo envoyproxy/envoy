@@ -31,8 +31,7 @@ void ConnectionHandlerImpl::addListener(Network::ListenerConfig& config) {
   if (socket_type == Network::Address::SocketType::Stream) {
     listener = std::make_unique<ActiveTcpListener>(*this, config);
   } else {
-    ASSERT(socket_type == Network::Address::SocketType::Datagram,
-           "Only datagram/stream listener supported");
+    ASSERT(config.udpListenerFactory() != nullptr, "UDP listener factory is not initialized.");
     listener =
         config.udpListenerFactory()->createActiveUdpListener(*this, dispatcher_, logger_, config);
   }
