@@ -33,7 +33,6 @@ final class ViewController: UITableViewController {
   // MARK: - Requests
 
   private func startRequests() {
-    // Note that the first delay will give Envoy time to start up.
     self.timer = .scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
       self?.performRequest()
     }
