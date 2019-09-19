@@ -111,6 +111,8 @@ class FactoryContext : public virtual CommonFactoryContext {
 public:
   ~FactoryContext() override = default;
 
+  virtual FactoryContext* getServerContext() { return nullptr; }
+
   /**
    * @return AccessLogManager for use by the entire server.
    */

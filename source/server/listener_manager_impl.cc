@@ -192,7 +192,8 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
                            ListenerManagerImpl& parent, const std::string& name, bool added_via_api,
                            bool workers_started, uint64_t hash,
                            ProtobufMessage::ValidationVisitor& validation_visitor)
-    : parent_(parent), address_(Network::Address::resolveProtoAddress(config.address())),
+    : parent_(parent), server_factory_context_(parent.server_factory_context_),
+      address_(Network::Address::resolveProtoAddress(config.address())),
       filter_chain_manager_(address_),
       socket_type_(Network::Utility::protobufAddressSocketType(config.address())),
       global_scope_(parent_.server_.stats().createScope("")),
@@ -341,6 +342,8 @@ ListenerImpl::~ListenerImpl() {
   init_watcher_.reset();
 }
 
+Configuration::FactoryContext* ListenerImpl::getServerContext() { return &server_factory_context_; }
+
 namespace {
 
 // Template function for creating a CIDR list entry for either source or destination address.
@@ -439,7 +442,7 @@ ListenerManagerImpl::ListenerManagerImpl(Instance& server,
                                          ListenerComponentFactory& listener_factory,
                                          WorkerFactory& worker_factory,
                                          bool enable_dispatcher_stats)
-    : server_(server), factory_(listener_factory),
+    : server_(server), server_factory_context_(server), factory_(listener_factory),
       scope_(server.stats().createScope("listener_manager.")), stats_(generateStats(*scope_)),
       config_tracker_entry_(server.admin().getConfigTracker().add(
           "listeners", [this] { return dumpListenerConfigs(); })),
