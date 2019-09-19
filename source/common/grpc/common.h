@@ -58,6 +58,15 @@ public:
   static std::string getGrpcMessage(const Http::HeaderMap& trailers);
 
   /**
+   * Returns the decoded google.rpc.Status message from a given set of trailers, if present.
+   * @param trailers the trailers to parse.
+   * @return std::unique_ptr<google::rpc::Status> the gRPC status message or empty pointer if no
+   *         grpc-status-details-bin trailer found or it was invalid.
+   */
+  static absl::optional<google::rpc::Status>
+  getGrpcStatusDetailsBin(const Http::HeaderMap& trailers);
+
+  /**
    * Parse gRPC header 'grpc-timeout' value to a duration in milliseconds.
    * @param request_headers the header map from which to extract the value of 'grpc-timeout' header.
    *        If this header is missing the timeout corresponds to infinity. The header is encoded in
