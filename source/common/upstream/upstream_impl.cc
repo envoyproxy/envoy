@@ -771,7 +771,6 @@ TransportSocketMatcherPtr createTransportSocketMatcher(
     Server::Configuration::TransportSocketFactoryContext& factory_context) {
   // TODO(incfly): question, use the only one default factory, not over creating.
   // or creating factory always and once api is stable deprecate the outer one?
-  // auto default_socket_factory = config_factory.createTransportSocketFactory(*message, factory_context);
   return std::make_unique<TransportSocketMatcher>(config.transport_socket_matches(),
       factory_context);
 }

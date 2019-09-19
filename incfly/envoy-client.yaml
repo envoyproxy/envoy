@@ -58,12 +58,3 @@ static_resources:
       transport_socket:
         name: "raw_buffer"
         config: {} # raw buffer does not need any config.
-
-    #transport_socket_matchers:
-      #match: mtlsReady
-      #tls_context:
-        #common_tls_context:
-          #tls_certificates:
-            #- certificate_chain: { filename: "./test/config/integration/certs/clientcert.pem" }
-              #private_key: { filename: "./test/config/integration/certs/clientkey.pem" }
-
