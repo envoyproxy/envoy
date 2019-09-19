@@ -1358,7 +1358,7 @@ TEST_P(AdminInstanceTest, RecentLookups) {
   Http::HeaderMapImpl response_headers;
   std::string body;
   EXPECT_EQ(Http::Code::OK, admin_.request("/stats?recentlookups", "GET", response_headers, body));
-  EXPECT_EQ("Date       Time     Lookup\n\ntotal: 0\n", body);
+  EXPECT_EQ("   Count Lookup\n\ntotal: 0\n", body);
   EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
               HasSubstr("text/plain"));
 }
