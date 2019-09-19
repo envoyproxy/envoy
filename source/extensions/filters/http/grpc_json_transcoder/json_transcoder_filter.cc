@@ -109,9 +109,13 @@ JsonTranscoderConfig::JsonTranscoderConfig(
   }
 
   for (const auto& file : descriptor_set.file()) {
-    if (descriptor_pool_.BuildFile(file) == nullptr) {
-      throw EnvoyException("transcoding_filter: Unable to build proto descriptor pool");
-    }
+    addFileDescriptor(file);
+  }
+
+  convert_grpc_status_ = proto_config.convert_grpc_status();
+  if (convert_grpc_status_) {
+    addBuiltinSymbolDescriptor("google.protobuf.Any");
+    addBuiltinSymbolDescriptor("google.rpc.Status");
   }
 
   PathMatcherBuilder<const Protobuf::MethodDescriptor*> pmb;
@@ -162,9 +166,33 @@ JsonTranscoderConfig::JsonTranscoderConfig(
   ignore_unknown_query_parameters_ = proto_config.ignore_unknown_query_parameters();
 }
 
+void JsonTranscoderConfig::addFileDescriptor(const Protobuf::FileDescriptorProto& file) {
+  if (descriptor_pool_.BuildFile(file) == nullptr) {
+    throw EnvoyException("transcoding_filter: Unable to build proto descriptor pool");
+  }
+}
+
+void JsonTranscoderConfig::addBuiltinSymbolDescriptor(const std::string& symbol_name) {
+  if (descriptor_pool_.FindFileContainingSymbol(symbol_name) != nullptr) {
+    return;
+  }
+
+  auto* builtin_pool = Protobuf::DescriptorPool::generated_pool();
+  if (!builtin_pool) {
+    return;
+  }
+
+  Protobuf::DescriptorPoolDatabase pool_database(*builtin_pool);
+  Protobuf::FileDescriptorProto file_proto;
+  pool_database.FindFileContainingSymbol(symbol_name, &file_proto);
+  addFileDescriptor(file_proto);
+}
+
 bool JsonTranscoderConfig::matchIncomingRequestInfo() const {
   return match_incoming_request_route_;
 }
+
+bool JsonTranscoderConfig::convertGrpcStatus() const { return convert_grpc_status_; }
 
 ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
     const Http::HeaderMap& headers, ZeroCopyInputStream& request_input,
@@ -240,6 +268,14 @@ JsonTranscoderConfig::methodToRequestInfo(const Protobuf::MethodDescriptor* meth
   }
 
   return ProtobufUtil::Status();
+}
+
+ProtobufUtil::Status
+JsonTranscoderConfig::translateProtoMessageToJson(const Protobuf::Message& message,
+                                                  std::string* json_out) {
+  return ProtobufUtil::BinaryToJsonString(
+      type_helper_->Resolver(), Grpc::Common::typeUrl(message.GetDescriptor()->full_name()),
+      message.SerializeAsString(), json_out, print_options_);
 }
 
 JsonTranscoderFilter::JsonTranscoderFilter(JsonTranscoderConfig& config) : config_(config) {}
@@ -383,6 +419,8 @@ Http::FilterDataStatus JsonTranscoderFilter::encodeData(Buffer::Instance& data, 
     return Http::FilterDataStatus::Continue;
   }
 
+  has_body_ = true;
+
   // TODO(dio): Add support for streaming case.
   if (has_http_body_output_) {
     buildResponseFromHttpBodyOutput(*response_headers_, data);
@@ -418,6 +456,7 @@ Http::FilterTrailersStatus JsonTranscoderFilter::encodeTrailers(Http::HeaderMap&
 
   if (data.length()) {
     encoder_callbacks_->addEncodedData(data, true);
+    has_body_ = true;
   }
 
   if (method_->server_streaming()) {
@@ -425,18 +464,34 @@ Http::FilterTrailersStatus JsonTranscoderFilter::encodeTrailers(Http::HeaderMap&
     return Http::FilterTrailersStatus::Continue;
   }
 
+  // If there was no previous headers frame, this |trailers| map is our |response_headers_|,
+  // so there is no need to copy headers from one to the other.
+  bool is_trailers_only_response = response_headers_ == &trailers;
+
   const absl::optional<Grpc::Status::GrpcStatus> grpc_status =
       Grpc::Common::getGrpcStatus(trailers);
+  bool status_converted_to_json = grpc_status && maybeConvertGrpcStatus(*grpc_status, trailers);
+
   if (!grpc_status || grpc_status.value() == Grpc::Status::GrpcStatus::InvalidCode) {
     response_headers_->Status()->value(enumToInt(Http::Code::ServiceUnavailable));
   } else {
     response_headers_->Status()->value(Grpc::Utility::grpcToHttpStatus(grpc_status.value()));
-    response_headers_->insertGrpcStatus().value(enumToInt(grpc_status.value()));
+    if (!status_converted_to_json && !is_trailers_only_response) {
+      response_headers_->insertGrpcStatus().value(enumToInt(grpc_status.value()));
+    }
   }
 
-  const Http::HeaderEntry* grpc_message_header = trailers.GrpcMessage();
-  if (grpc_message_header) {
-    response_headers_->insertGrpcMessage().value(*grpc_message_header);
+  if (status_converted_to_json && is_trailers_only_response) {
+    // Drop the gRPC status headers, we already have them in the JSON body.
+    response_headers_->removeGrpcStatus();
+    response_headers_->removeGrpcMessage();
+    response_headers_->remove(Http::Headers::get().GrpcStatusDetailsBin);
+  } else if (!status_converted_to_json && !is_trailers_only_response) {
+    // Copy the grpc-message header if it exists.
+    const Http::HeaderEntry* grpc_message_header = trailers.GrpcMessage();
+    if (grpc_message_header) {
+      response_headers_->insertGrpcMessage().value(*grpc_message_header);
+    }
   }
 
   // remove Trailer headers if the client connection was http/1
@@ -492,6 +547,56 @@ void JsonTranscoderFilter::buildResponseFromHttpBodyOutput(Http::HeaderMap& resp
       return;
     }
   }
+}
+
+bool JsonTranscoderFilter::maybeConvertGrpcStatus(Grpc::Status::GrpcStatus grpc_status,
+                                                  Http::HeaderMap& trailers) {
+  if (!config_.convertGrpcStatus()) {
+    return false;
+  }
+
+  // We do not support responses with a separate trailer frame.
+  // TODO(ascheglov): remove this if after HCM can buffer data added from |encodeTrailers|.
+  if (response_headers_ != &trailers) {
+    return false;
+  }
+
+  // Send a serialized status only if there was no body.
+  if (has_body_) {
+    return false;
+  }
+
+  if (grpc_status == Grpc::Status::GrpcStatus::Ok ||
+      grpc_status == Grpc::Status::GrpcStatus::InvalidCode) {
+    return false;
+  }
+
+  auto status_details = Grpc::Common::getGrpcStatusDetailsBin(trailers);
+  if (!status_details) {
+    // If no rpc.Status object was sent in the grpc-status-details-bin header,
+    // construct it from the grpc-status and grpc-message headers.
+    status_details.emplace();
+    status_details->set_code(grpc_status);
+
+    auto grpc_message_header = trailers.GrpcMessage();
+    if (grpc_message_header) {
+      auto message = grpc_message_header->value().getStringView();
+      status_details->set_message(message.data(), message.size());
+    }
+  }
+
+  std::string json_status;
+  auto translate_status = config_.translateProtoMessageToJson(*status_details, &json_status);
+  if (!translate_status.ok()) {
+    ENVOY_LOG(debug, "Transcoding status error {}", translate_status.ToString());
+    return false;
+  }
+
+  response_headers_->insertContentType().value().setReference(
+      Http::Headers::get().ContentTypeValues.Json);
+  Buffer::OwnedImpl status_data(json_status);
+  encoder_callbacks_->addEncodedData(status_data, false);
+  return true;
 }
 
 bool JsonTranscoderFilter::hasHttpBodyAsOutputType() {

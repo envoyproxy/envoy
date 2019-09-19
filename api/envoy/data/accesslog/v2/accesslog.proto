@@ -153,6 +153,11 @@ message AccessLogCommon {
 
   // The name of the route
   string route_name = 19;
+
+  // This field is the downstream direct remote address on which the request from the user was
+  // received. Note: This is always the physical peer, even if the remote address is inferred from
+  // for example the x-forwarder-for header, proxy protocol, etc.
+  envoy.api.v2.core.Address downstream_direct_remote_address = 20;
 }
 
 // Flags indicating occurrences during request/response processing.

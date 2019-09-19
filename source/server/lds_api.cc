@@ -106,8 +106,9 @@ void LdsApiImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::An
   onConfigUpdate(to_add_repeated, to_remove_repeated, version_info);
 }
 
-void LdsApiImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason,
+void LdsApiImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                                       const EnvoyException*) {
+  ASSERT(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure != reason);
   // We need to allow server startup to continue, even if we have a bad
   // config.
   init_target_.ready();

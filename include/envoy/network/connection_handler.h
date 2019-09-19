@@ -133,6 +133,11 @@ public:
   virtual ConnectionHandler::ActiveListenerPtr
   createActiveUdpListener(ConnectionHandler& parent, Event::Dispatcher& disptacher,
                           spdlog::logger& logger, Network::ListenerConfig& config) const PURE;
+
+  /**
+   * @return true if the UDP passing through listener doesn't form stateful connections.
+   */
+  virtual bool isTransportConnectionless() const PURE;
 };
 
 using ActiveUdpListenerFactoryPtr = std::unique_ptr<ActiveUdpListenerFactory>;
