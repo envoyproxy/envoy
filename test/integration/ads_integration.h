@@ -12,10 +12,12 @@
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
 
+// TODO(fredlas) set_node_on_first_message_only was true; the delta+SotW unification
+//               work restores it here.
 namespace Envoy {
-static const std::string& AdsIntegrationConfig(const std::string& api_type) {
-  CONSTRUCT_ON_FIRST_USE(std::string, fmt::format(
-                                          R"EOF(
+static std::string AdsIntegrationConfig(const std::string& api_type) {
+  // Note: do not use CONSTRUCT_ON_FIRST_USE here!
+  return fmt::format(R"EOF(
 dynamic_resources:
   lds_config:
     ads: {{}}
@@ -23,7 +25,7 @@ dynamic_resources:
     ads: {{}}
   ads_config:
     api_type: {}
-    set_node_on_first_message_only: true
+    set_node_on_first_message_only: false
 static_resources:
   clusters:
     name: dummy_cluster
@@ -43,7 +45,7 @@ admin:
       address: 127.0.0.1
       port_value: 0
 )EOF",
-                                          api_type));
+                     api_type);
 }
 
 class AdsIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest, public HttpIntegrationTest {

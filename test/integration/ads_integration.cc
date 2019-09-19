@@ -25,6 +25,7 @@ AdsIntegrationTest::AdsIntegrationTest()
   use_lds_ = false;
   create_xds_upstream_ = true;
   tls_xds_upstream_ = true;
+  sotw_or_delta_ = sotwOrDelta();
 }
 
 void AdsIntegrationTest::TearDown() {
