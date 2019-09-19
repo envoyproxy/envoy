@@ -72,11 +72,12 @@ public:
         window_bits: 10
         compression_level: best
         compression_strategy: rle
-        content_length: 100
-        content_type:
-          - text/html
-          - application/json
-        disable_on_etag_header: true
+        compressor:
+          disable_on_etag_header: true
+          content_length: 100
+          content_type:
+            - text/html
+            - application/json
     )EOF"};
 
   const std::string default_config{"name: envoy.gzip"};
