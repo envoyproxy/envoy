@@ -81,7 +81,14 @@ void GrpcMuxSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason rea
     ENVOY_LOG(warn, "gRPC config for {} rejected: {}", type_url_, e->what());
     break;
   }
+
   stats_.update_attempt_.inc();
+  if (reason == Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure) {
+    // New gRPC stream will be established and send requests again.
+    // If init_fetch_timeout is non-zero, server will continue startup after it timeout
+    return;
+  }
+
   callbacks_.onConfigUpdateFailed(reason, e);
 }
 
