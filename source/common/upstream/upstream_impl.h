@@ -170,8 +170,7 @@ protected:
 class HostImpl : public HostDescriptionImpl,
                  public Host,
                  public std::enable_shared_from_this<HostImpl>,
-            protected Logger::Loggable<Logger::Id::upstream> 
-{
+                 protected Logger::Loggable<Logger::Id::upstream> {
 public:
   HostImpl(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
            Network::Address::InstanceConstSharedPtr address,
@@ -515,9 +514,8 @@ public:
   ClusterInfoImpl(const envoy::api::v2::Cluster& config,
                   const envoy::api::v2::core::BindConfig& bind_config, Runtime::Loader& runtime,
                   Network::TransportSocketFactoryPtr&& socket_factory,
-                  TransportSocketMatcherPtr&& socket_overrides,
-                  Stats::ScopePtr&& stats_scope, bool added_via_api,
-                  ProtobufMessage::ValidationVisitor& validation_visitor,
+                  TransportSocketMatcherPtr&& socket_overrides, Stats::ScopePtr&& stats_scope,
+                  bool added_via_api, ProtobufMessage::ValidationVisitor& validation_visitor,
                   Server::Configuration::TransportSocketFactoryContext&);
 
   static ClusterStats generateStats(Stats::Scope& scope);
@@ -567,9 +565,9 @@ public:
   Network::TransportSocketFactory& transportSocketFactory() const override {
     return *transport_socket_factory_;
   }
-  Network::TransportSocketFactory& resolveTransportSocketFactory(
-      const std::string& hc,
-      const envoy::api::v2::core::Metadata& metadata) const override {
+  Network::TransportSocketFactory&
+  resolveTransportSocketFactory(const std::string& hc,
+                                const envoy::api::v2::core::Metadata& metadata) const override {
     return socket_overrides_->resolve(hc, metadata);
   }
   ClusterStats& stats() const override { return stats_; }
@@ -652,11 +650,9 @@ Network::TransportSocketFactoryPtr
 createTransportSocketFactory(const envoy::api::v2::Cluster& config,
                              Server::Configuration::TransportSocketFactoryContext& factory_context);
 
-
-TransportSocketMatcherPtr createTransportSocketMatcher(
-    spdlog::logger& logger,
-    const envoy::api::v2::Cluster& config,
-    Server::Configuration::TransportSocketFactoryContext& factory_context);
+TransportSocketMatcherPtr
+createTransportSocketMatcher(spdlog::logger& logger, const envoy::api::v2::Cluster& config,
+                             Server::Configuration::TransportSocketFactoryContext& factory_context);
 
 /**
  * Base class all primary clusters.

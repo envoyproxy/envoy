@@ -46,7 +46,7 @@
 
 #include "absl/synchronization/mutex.h"
 
-namespace Envoy  {
+namespace Envoy {
 namespace Upstream {
 
 class TransportSocketMatcher;
@@ -57,13 +57,12 @@ using TransportSocketFactoryMapPtr = std::unique_ptr<TransportSocketFactoryMap>;
 
 class TransportSocketMatcher : Logger::Loggable<Logger::Id::upstream> {
 public:
-    TransportSocketMatcher(const Protobuf::RepeatedPtrField<
-      envoy::api::v2::Cluster_TransportSocketMatch>& socket_matches,
-      Server::Configuration::TransportSocketFactoryContext& factory_context);
-  
-  Network::TransportSocketFactory& resolve(
-      const std::string& endpoint_addr,
-      const envoy::api::v2::core::Metadata& metadata);
+  TransportSocketMatcher(const Protobuf::RepeatedPtrField<
+                             envoy::api::v2::Cluster_TransportSocketMatch>& socket_matches,
+                         Server::Configuration::TransportSocketFactoryContext& factory_context);
+
+  Network::TransportSocketFactory& resolve(const std::string& endpoint_addr,
+                                           const envoy::api::v2::core::Metadata& metadata);
 
 protected:
   struct FactoryMatch {

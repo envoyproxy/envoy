@@ -454,8 +454,8 @@ envoy_cc_library(
     hdrs = [
         "upstream_impl.h",
         # TODO(incfly): this might not be a good way to include all the dependency.
-        "transport_socket_matcher.h"
-        ],
+        "transport_socket_matcher.h",
+    ],
     external_deps = ["abseil_synchronization"],
     deps = [
         ":load_balancer_lib",

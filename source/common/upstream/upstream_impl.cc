@@ -38,8 +38,8 @@
 #include "server/transport_socket_config_impl.h"
 
 #include "extensions/transport_sockets/well_known_names.h"
-#include "spdlog/spdlog.h"
 
+#include "spdlog/spdlog.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -222,8 +222,10 @@ Host::CreateConnectionData HostImpl::createConnection(
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsSharedPtr transport_socket_options) const {
 
-  // ENVOY_LOG(info, "incfly debug address {} metadata {}", address_->asString(), metadata()->DebugString());
-  return {createConnection(dispatcher, *cluster_, address_, *metadata(), options, transport_socket_options),
+  // ENVOY_LOG(info, "incfly debug address {} metadata {}", address_->asString(),
+  // metadata()->DebugString());
+  return {createConnection(dispatcher, *cluster_, address_, *metadata(), options,
+                           transport_socket_options),
           shared_from_this()};
 }
 
@@ -247,8 +249,9 @@ void HostImpl::setEdsHealthFlag(envoy::api::v2::core::HealthStatus health_status
 
 Host::CreateConnectionData
 HostImpl::createHealthCheckConnection(Event::Dispatcher& dispatcher) const {
-  return {createConnection(dispatcher, *cluster_, healthCheckAddress(), *metadata(), nullptr, nullptr),
-          shared_from_this()};
+  return {
+      createConnection(dispatcher, *cluster_, healthCheckAddress(), *metadata(), nullptr, nullptr),
+      shared_from_this()};
 }
 
 Network::ClientConnectionPtr
@@ -270,14 +273,12 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
   } else {
     connection_options = options;
   }
-  Network::TransportSocketFactory& socket_factory = cluster.resolveTransportSocketFactory(
-      address->asString(),
-      metadata);
+  Network::TransportSocketFactory& socket_factory =
+      cluster.resolveTransportSocketFactory(address->asString(), metadata);
   Network::ClientConnectionPtr connection = dispatcher.createClientConnection(
       address, cluster.sourceAddress(),
-      //cluster.transportSocketFactory().createTransportSocket(transport_socket_options),
-      socket_factory.createTransportSocket(transport_socket_options),
-      connection_options);
+      // cluster.transportSocketFactory().createTransportSocket(transport_socket_options),
+      socket_factory.createTransportSocket(transport_socket_options), connection_options);
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());
   cluster.createNetworkFilterChain(*connection);
   return connection;
@@ -595,8 +596,7 @@ private:
 ClusterInfoImpl::ClusterInfoImpl(
     const envoy::api::v2::Cluster& config, const envoy::api::v2::core::BindConfig& bind_config,
     Runtime::Loader& runtime, Network::TransportSocketFactoryPtr&& socket_factory,
-    TransportSocketMatcherPtr&& socket_overrides,
-    Stats::ScopePtr&& stats_scope, bool added_via_api,
+    TransportSocketMatcherPtr&& socket_overrides, Stats::ScopePtr&& stats_scope, bool added_via_api,
     ProtobufMessage::ValidationVisitor& validation_visitor,
     Server::Configuration::TransportSocketFactoryContext& factory_context)
     : runtime_(runtime), name_(config.name()), type_(config.type()),
@@ -607,10 +607,8 @@ ClusterInfoImpl::ClusterInfoImpl(
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       transport_socket_factory_(std::move(socket_factory)),
-      socket_overrides_(std::move(socket_overrides)),
-      stats_scope_(std::move(stats_scope)),
-      stats_(generateStats(*stats_scope_)),
-      load_report_stats_store_(stats_scope_->symbolTable()),
+      socket_overrides_(std::move(socket_overrides)), stats_scope_(std::move(stats_scope)),
+      stats_(generateStats(*stats_scope_)), load_report_stats_store_(stats_scope_->symbolTable()),
       load_report_stats_(generateLoadReportStats(load_report_stats_store_)),
       features_(parseFeatures(config)),
       http2_settings_(Http::Utility::parseHttp2Settings(config.http2_protocol_options())),
@@ -766,13 +764,12 @@ Network::TransportSocketFactoryPtr createTransportSocketFactory(
 // TODO(incfly): here, next step to move to constructor of transports socketmatcher
 // unit test creates the same list of the factory, and check returns equals. due to lack of mock.
 TransportSocketMatcherPtr createTransportSocketMatcher(
-    spdlog::logger&,
-    const envoy::api::v2::Cluster& config,
+    spdlog::logger&, const envoy::api::v2::Cluster& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context) {
   // TODO(incfly): question, use the only one default factory, not over creating.
   // or creating factory always and once api is stable deprecate the outer one?
   return std::make_unique<TransportSocketMatcher>(config.transport_socket_matches(),
-      factory_context);
+                                                  factory_context);
 }
 
 void ClusterInfoImpl::createNetworkFilterChain(Network::Connection& connection) const {
@@ -1083,7 +1080,8 @@ void PriorityStateManager::registerHostForPriority(
     const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
     const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint) {
   ENVOY_LOG(info, "incfly debug the endpoint information {}", lb_endpoint.DebugString());
-  ENVOY_LOG(info, "incfly debug the endpoint metadata information {}", lb_endpoint.metadata().DebugString());
+  ENVOY_LOG(info, "incfly debug the endpoint metadata information {}",
+            lb_endpoint.metadata().DebugString());
   const HostSharedPtr host(
       new HostImpl(parent_.info(), hostname, address, lb_endpoint.metadata(),
                    lb_endpoint.load_balancing_weight().value(), locality_lb_endpoint.locality(),

@@ -13,9 +13,9 @@
 #include "common/config/metadata.h"
 #include "common/json/config_schemas.h"
 #include "common/json/json_loader.h"
-#include "common/upstream/transport_socket_matcher.h"
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/utility.h"
+#include "common/upstream/transport_socket_matcher.h"
 
 #include "server/transport_socket_config_impl.h"
 
@@ -34,7 +34,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-
 using testing::_;
 using testing::AtLeast;
 using testing::Eq;
@@ -51,22 +50,13 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
-
 class TransportSocketMatcherTest : public testing::Test {
 public:
-  TransportSocketMatcherTest() {
-    //default_factory_ = new Network::MockTransportSocketFactory();
-    //tls_factory_ = new Network::MockTransportSocketFactory();
-    //rawbuffer_factory_ = new Network::MockTransportSocketFactory();
-    //factory_map_ = new TransportSocketFactoryMap();
-    //(*factory_map_)["tls"] = std::unique_ptr<Network::TransportSocketFactory>(tls_factory_);
-    //(*factory_map_)["raw_buffer"] = std::unique_ptr<Network::TransportSocketFactory>(rawbuffer_factory_);
-  }
+  // TransportSocketMatcherTest() {}
 
   void init() {
-    Protobuf::RepeatedPtrField<
-      envoy::api::v2::Cluster_TransportSocketMatch> matches;
-   std::vector<std::string> match_yaml = {R"EOF(
+    Protobuf::RepeatedPtrField<envoy::api::v2::Cluster_TransportSocketMatch> matches;
+    std::vector<std::string> match_yaml = {R"EOF(
 name: "enableMTLS"
 match:
   hasSidecar: "true"
@@ -79,20 +69,20 @@ transport_socket:
         private_key: { filename: "key.pem" }
 )EOF"};
 
-     for (const auto& yaml : match_yaml) {
-       auto transport_socket_match = matches.Add();
-       TestUtility::loadFromYaml(yaml, *transport_socket_match);
-     }
-    matcher_ = std::make_unique<TransportSocketMatcher>(
-        matches, mock_factory_context_);
+    for (const auto& yaml : match_yaml) {
+      auto transport_socket_match = matches.Add();
+      TestUtility::loadFromYaml(yaml, *transport_socket_match);
+    }
+    matcher_ = std::make_unique<TransportSocketMatcher>(matches, mock_factory_context_);
   }
+
 protected:
   TransportSocketMatcherPtr matcher_;
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_context_;
   // Raw pointer since they will be owned by matcher_.
-  //Network::MockTransportSocketFactory* default_factory_;
-  //Network::MockTransportSocketFactory* tls_factory_;
-  //Network::MockTransportSocketFactory* rawbuffer_factory_;
+  // Network::MockTransportSocketFactory* default_factory_;
+  // Network::MockTransportSocketFactory* tls_factory_;
+  // Network::MockTransportSocketFactory* rawbuffer_factory_;
 };
 
 // This test ensures the matcher returns the default transport socket factory.
@@ -102,9 +92,9 @@ TEST_F(TransportSocketMatcherTest, ReturnDefaultSocketFactory) {
   matcher_->resolve("hardcodenotexists", metadata);
 }
 
-//TODO: need to create more mock transport socket factory class and give them different name?
-//otherwise, error as, Didn't find a registered implementation for name: 'tls'
+// TODO: need to create more mock transport socket factory class and give them different name?
+// otherwise, error as, Didn't find a registered implementation for name: 'tls'
 
 } // namespace
-} // namespace Usptream
+} // namespace Upstream
 } // namespace Envoy
