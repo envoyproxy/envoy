@@ -12,6 +12,8 @@ public:
   Network::ConnectionHandler::ActiveListenerPtr
   createActiveUdpListener(Network::ConnectionHandler& parent, Event::Dispatcher& disptacher,
                           Network::ListenerConfig& config) const override;
+
+  bool isTransportConnectionless() const override { return true; }
 };
 
 // This class uses a protobuf config to create a UDP listener factory which
