@@ -5,7 +5,6 @@
 #include "envoy/http/filter.h"
 #include "envoy/router/rds.h"
 #include "envoy/stats/scope.h"
-#include "envoy/http/local_reply.h"
 
 #include "common/http/date_provider.h"
 #include "common/network/utility.h"
@@ -370,9 +369,6 @@ public:
    * one.
    */
   virtual bool shouldMergeSlashes() const PURE;
-
-  
-  virtual Http::Formatter* localReplyFormatter() const PURE;
 };
 } // namespace Http
 } // namespace Envoy

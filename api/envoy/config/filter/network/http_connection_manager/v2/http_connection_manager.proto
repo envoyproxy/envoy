@@ -454,30 +454,39 @@ message HttpConnectionManager {
   // `HTTP spec <https://tools.ietf.org/html/rfc3986>` and is provided for convenience.
   bool merge_slashes = 33;
 
-  // Configuration of local reply send by envoy for http responses.
   message LocalReplyConfig {
+    // Configuration of list of mappers which allows to filter and change local response. 
+    // Code iterate through mappers until first match of filter.
     repeated ResponseMapper mapper = 1;
 
-    oneof format {
-      // Response body text format
-      string text_format = 2;
+    // Allows to define custom format of local reply.
+    oneof reply_format {
+      // Response body plain text format.
+      string format = 2;
   
-      // Response body json format as dictionary
+      // Response body json format as dictionary.
       google.protobuf.Struct json_format = 3;
     }
   };
 
+  // Configuration of local reply returned by Envoy. Allows to specify mapping and format of response.
   LocalReplyConfig local_reply_config = 35;
 }
 
 message ResponseMapper {
-  envoy.config.filter.accesslog.v2.AccessLogFilter matcher = 1;
+  // Filter is used to determine if the response should be changed.
+  envoy.config.filter.accesslog.v2.AccessLogFilter filter = 1 [(validate.rules).message.required = true];
 
-  ResponseRewriter rewriter = 2;
+  // Rewriter defines which values in local reply should be changed.
+  ResponseRewriter rewriter = 2 [(validate.rules).message.required = true];
 }
 
+// Configuration of new value for matched local response.
 message ResponseRewriter {
+  // Status code for matched response.
   google.protobuf.UInt32Value status_code = 1;
+
+  // TODO: add support for GRPC rewrite.
 }
 
 message Rds {

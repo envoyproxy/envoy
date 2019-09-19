@@ -32,7 +32,6 @@ envoy_cc_library(
         "//source/common/http:conn_manager_lib",
         "//source/common/http:default_server_string_lib",
         "//source/common/http:utility_lib",
-        "//source/common/http:local_reply_formatter_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
         "//source/common/json:json_loader_lib",

@@ -1305,23 +1305,12 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
         response_headers_ = std::move(headers);
         // TODO: Start encoding from the last decoder filter that saw the
         // request instead.
-        encodeHeaders(nullptr, *response_headers_, end_stream); 
+        encodeHeaders(nullptr, *response_headers_, end_stream);
       },
       [this](Buffer::Instance& data, bool end_stream) -> void {
         // TODO: Start encoding from the last decoder filter that saw the
         // request instead.
         encodeData(nullptr, data, end_stream, FilterIterationStartState::CanStartFromCurrent);
-      },
-      [this](absl::string_view& body_text, HeaderMapPtr&& headers) -> std::string {
-        std::string formatted_body = this->connection_manager_.config_.localReplyFormatter()->format(
-          request_headers_.get(), response_headers_.get(), response_trailers_.get(), body_text, stream_info_);
-        this->connection_manager_.config_.localReplyFormatter()->insertContentHeaders(formatted_body, headers.get());
-
-        return formatted_body;
-      },
-      [this](Code& response_code) -> void{
-        this->connection_manager_.config_.localReplyFormatter()->rewriteMatchedResponse( request_headers_.get(),
-         response_headers_.get(), response_trailers_.get(), stream_info_, response_code);
       },
       state_.destroyed_, code, body, grpc_status, is_head_request);
 }
@@ -2257,13 +2246,6 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataTooLarge() {
             parent_.response_encoder_->encodeData(data, end_stream);
             parent_.state_.local_complete_ = end_stream;
           },
-          [&](absl::string_view& body_text, HeaderMapPtr&& response_headers) -> std::string {
-             std::cout<< body_text ;
-             response_headers->insertContentLength().value(body_text.size());
-             response_headers->insertContentType().value(Headers::get().ContentTypeValues.Json); 
-             return std::string{};
-          },
-          [&] (Code&) -> void {},
           parent_.state_.destroyed_, Http::Code::InternalServerError,
           CodeUtility::toString(Http::Code::InternalServerError), absl::nullopt,
           parent_.is_head_request_);

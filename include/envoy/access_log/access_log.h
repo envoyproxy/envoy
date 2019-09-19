@@ -110,8 +110,7 @@ public:
   virtual std::string format(const Http::HeaderMap& request_headers,
                              const Http::HeaderMap& response_headers,
                              const Http::HeaderMap& response_trailers,
-                             const StreamInfo::StreamInfo& stream_info,
-                             const absl::string_view& body) const PURE;
+                             const StreamInfo::StreamInfo& stream_info) const PURE;
 };
 
 using FormatterPtr = std::unique_ptr<Formatter>;
@@ -135,8 +134,7 @@ public:
   virtual std::string format(const Http::HeaderMap& request_headers,
                              const Http::HeaderMap& response_headers,
                              const Http::HeaderMap& response_trailers,
-                             const StreamInfo::StreamInfo& stream_info,
-                             const absl::string_view& body) const PURE;
+                             const StreamInfo::StreamInfo& stream_info) const PURE;
 };
 
 using FormatterProviderPtr = std::unique_ptr<FormatterProvider>;
