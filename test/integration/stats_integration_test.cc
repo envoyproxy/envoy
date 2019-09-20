@@ -328,7 +328,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
   // will need to find the correct value only after failing CI and looking
   // at the logs.
   EXPECT_MEMORY_EQ(m_per_host, 1283);
-  EXPECT_MEMORY_LE(m_per_host, 1500);
+  EXPECT_MEMORY_LE(m_per_host, 1283);
 }
 
 } // namespace
