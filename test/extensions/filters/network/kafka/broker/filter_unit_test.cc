@@ -133,17 +133,19 @@ TEST_F(ForwarderUnitTest, shouldUpdateResponseDecoderState) {
   // then - response_decoder_ had a new expected response registered.
 }
 
-TEST_F(ForwarderUnitTest, shouldDoNothingOnFailedRequestParse) {
+TEST_F(ForwarderUnitTest, shouldUpdateResponseDecoderStateOnFailedParse) {
   // given
-  RequestHeader header = {0, 0, 0, ""};
+  const int16_t api_key = 42;
+  const int32_t api_version = 13;
+  RequestHeader header = {api_key, api_version, 0, ""};
   RequestParseFailureSharedPtr parse_failure = std::make_shared<RequestParseFailure>(header);
 
-  EXPECT_CALL(*response_decoder_, expectResponse(_, _)).Times(0);
+  EXPECT_CALL(*response_decoder_, expectResponse(api_key, api_version));
 
   // when
   testee_.onFailedParse(parse_failure);
 
-  // then - no interactions with response_decoder_.
+  // then - response_decoder_ had a new expected response registered.
 }
 
 class MetricTrackingCallbackUnitTest : public testing::Test {

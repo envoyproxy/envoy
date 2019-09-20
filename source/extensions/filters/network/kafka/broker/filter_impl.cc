@@ -13,7 +13,10 @@ void Forwarder::onMessage(AbstractRequestSharedPtr request) {
   response_decoder_.expectResponse(header.api_key_, header.api_version_);
 }
 
-void Forwarder::onFailedParse(RequestParseFailureSharedPtr) {}
+void Forwarder::onFailedParse(RequestParseFailureSharedPtr parse_failure) {
+  const RequestHeader& header = parse_failure->request_header_;
+  response_decoder_.expectResponse(header.api_key_, header.api_version_);
+}
 
 MetricTrackingCallback::MetricTrackingCallback(Stats::Scope& scope, TimeSource& time_source,
                                                const std::string& stat_prefix)
@@ -82,14 +85,28 @@ void KafkaBrokerFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbac
 
 Network::FilterStatus KafkaBrokerFilter::onData(Buffer::Instance& data, bool) {
   ENVOY_LOG(trace, "data from Kafka client [{} request bytes]", data.length());
-  request_decoder_->onData(data);
-  return Network::FilterStatus::Continue;
+  try {
+    request_decoder_->onData(data);
+    return Network::FilterStatus::Continue;
+  } catch (const EnvoyException& e) {
+    ENVOY_LOG(info, "could not process data from Kafka client: {}", e.what());
+    return Network::FilterStatus::StopIteration;
+  }
 }
 
 Network::FilterStatus KafkaBrokerFilter::onWrite(Buffer::Instance& data, bool) {
   ENVOY_LOG(trace, "data from Kafka broker [{} response bytes]", data.length());
-  response_decoder_->onData(data);
-  return Network::FilterStatus::Continue;
+  try {
+    response_decoder_->onData(data);
+    return Network::FilterStatus::Continue;
+  } catch (const EnvoyException& e) {
+    ENVOY_LOG(info, "could not process data from Kafka broker: {}", e.what());
+    return Network::FilterStatus::StopIteration;
+  }
+}
+
+ResponseDecoderSharedPtr KafkaBrokerFilter::getResponseDecoderForTest() {
+  return response_decoder_;
 }
 
 } // namespace Broker

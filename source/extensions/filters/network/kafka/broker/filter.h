@@ -45,6 +45,8 @@ public:
   // Network::WriteFilter
   Network::FilterStatus onWrite(Buffer::Instance& data, bool end_stream) override;
 
+  ResponseDecoderSharedPtr getResponseDecoderForTest();
+
 private:
   KafkaBrokerFilter(const KafkaCallbackSharedPtr& callback);
 

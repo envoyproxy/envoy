@@ -21,18 +21,7 @@ RequestParseResponse RequestStartParser::parse(absl::string_view& data) {
 }
 
 RequestParseResponse RequestHeaderParser::parse(absl::string_view& data) {
-  const absl::string_view orig_data = data;
-  try {
-    context_->remaining_request_size_ -= deserializer_->feed(data);
-  } catch (const EnvoyException& e) {
-    // We were unable to compute the request header, but we still need to consume rest of request
-    // (some of the data might have been consumed during this attempt).
-    const int32_t consumed = static_cast<int32_t>(orig_data.size() - data.size());
-    context_->remaining_request_size_ -= consumed;
-    context_->request_header_ = {-1, -1, -1, absl::nullopt};
-    return RequestParseResponse::nextParser(std::make_shared<SentinelParser>(context_));
-  }
-
+  context_->remaining_request_size_ -= deserializer_->feed(data);
   if (deserializer_->ready()) {
     RequestHeader request_header = deserializer_->get();
     context_->request_header_ = request_header;
