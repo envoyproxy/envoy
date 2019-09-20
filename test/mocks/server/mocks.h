@@ -382,7 +382,7 @@ public:
   MOCK_METHOD0(stats, Stats::Store&());
   MOCK_METHOD0(grpcContext, Grpc::Context&());
   MOCK_METHOD0(httpContext, Http::Context&());
-  MOCK_METHOD0(processContext, ProcessContext&());
+  MOCK_METHOD0(processContext, absl::optional<std::reference_wrapper<ProcessContext>>());
   MOCK_METHOD0(threadLocal, ThreadLocal::Instance&());
   MOCK_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_CONST_METHOD0(statsFlushInterval, std::chrono::milliseconds());
@@ -470,7 +470,7 @@ public:
   Event::TestTimeSystem& timeSystem() { return time_system_; }
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Http::Context& httpContext() override { return http_context_; }
-  MOCK_METHOD0(processContext, ProcessContext&());
+  MOCK_METHOD0(processContext, absl::optional<std::reference_wrapper<ProcessContext>>());
   MOCK_METHOD0(messageValidationVisitor, ProtobufMessage::ValidationVisitor&());
   MOCK_METHOD0(api, Api::Api&());
 

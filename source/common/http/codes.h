@@ -62,7 +62,7 @@ private:
   Stats::StatName upstreamRqGroup(Code response_code) const;
   Stats::StatName upstreamRqStatName(Code response_code) const;
 
-  mutable Stats::StatNamePool stat_name_pool_ GUARDED_BY(mutex_);
+  mutable Stats::StatNamePool stat_name_pool_ ABSL_GUARDED_BY(mutex_);
   mutable absl::Mutex mutex_;
   Stats::SymbolTable& symbol_table_;
 

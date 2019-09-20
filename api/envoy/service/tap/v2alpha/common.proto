@@ -18,6 +18,8 @@ option java_package = "io.envoyproxy.envoy.service.tap.v2alpha";
 
 // Tap configuration.
 message TapConfig {
+  // [#comment:TODO(mattklein123): Rate limiting]
+
   // The match configuration. If the configuration matches the data source being tapped, a tap will
   // occur, with the result written to the configured output.
   MatchPredicate match_config = 1 [(validate.rules).message.required = true];
@@ -35,8 +37,6 @@ message TapConfig {
   //   This field defaults to 100/:ref:`HUNDRED
   //   <envoy_api_enum_type.FractionalPercent.DenominatorType>`.
   envoy.api.v2.core.RuntimeFractionalPercent tap_enabled = 3;
-
-  // [#comment:TODO(mattklein123): Rate limiting]
 }
 
 // Tap match configuration. This is a recursive structure which allows complex nested match

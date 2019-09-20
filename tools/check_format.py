@@ -43,8 +43,9 @@ REAL_TIME_WHITELIST = ("./source/common/common/utility.h",
                        "./test/integration/integration.h")
 
 # Files in these paths can use MessageLite::SerializeAsString
-SERIALIZE_AS_STRING_WHITELIST = ("./test/common/protobuf/utility_test.cc",
-                                 "./test/common/grpc/codec_test.cc")
+SERIALIZE_AS_STRING_WHITELIST = (
+    "./source/extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.cc",
+    "./test/common/protobuf/utility_test.cc", "./test/common/grpc/codec_test.cc")
 
 # Files in these paths can use Protobuf::util::JsonStringToMessage
 JSON_STRING_TO_MESSAGE_WHITELIST = ("./source/common/protobuf/utility.cc")
@@ -500,6 +501,9 @@ def checkSourceLine(line, file_path, reportError):
     if invalid_construct in line:
       reportError("term %s should be replaced with standard library term %s" %
                   (invalid_construct, valid_construct))
+  # Do not include the virtual_includes headers.
+  if re.search("#include.*/_virtual_includes/", line):
+    reportError("Don't include the virtual includes headers.")
 
   # Some errors cannot be fixed automatically, and actionable, consistent,
   # navigable messages should be emitted to make it easy to find and fix

@@ -10,11 +10,25 @@
 #include "envoy/service/auth/v2/external_auth.pb.h"
 #include "envoy/tracing/http_tracer.h"
 
+#include "common/singleton/const_singleton.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace ExtAuthz {
+
+/**
+ * Constant values used for tracing metadata.
+ */
+struct TracingContantValues {
+  const std::string TraceStatus = "ext_authz_status";
+  const std::string TraceUnauthz = "ext_authz_unauthorized";
+  const std::string TraceOk = "ext_authz_ok";
+  const std::string HttpStatus = "ext_authz_http_status";
+};
+
+using TracingConstants = ConstSingleton<TracingContantValues>;
 
 /**
  * Possible async results for a check call.

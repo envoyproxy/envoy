@@ -1433,7 +1433,7 @@ const int64_t TransmitThreshold = 100 * 1024 * 1024;
 
 void Http2FloodMitigationTest::setNetworkConnectionBufferSize() {
   // nghttp2 library has its own internal mitigation for outbound control frames. The mitigation is
-  // trigerred when there are more than 10000 PING or SETTINGS frames with ACK flag in the nghttp2
+  // triggered when there are more than 10000 PING or SETTINGS frames with ACK flag in the nghttp2
   // internal outbound queue. It is possible to trigger this mitigation in nghttp2 before triggering
   // Envoy's own flood mitigation. This can happen when a buffer larger enough to contain over 10K
   // PING or SETTINGS frames is dispatched to the nghttp2 library. To prevent this from happening
