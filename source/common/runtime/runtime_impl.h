@@ -108,7 +108,8 @@ private:
       return;
     }
 
-    if (parseEntryDoubleValue(entry) && entry.double_value_ >= 0 && entry.double_value_ <= std::numeric_limits<uint64_t>::max()) {
+    if (parseEntryDoubleValue(entry) && entry.double_value_ >= 0 &&
+        entry.double_value_ <= std::numeric_limits<uint64_t>::max()) {
       // Valid uint values will always be parseable as doubles, so we assign the value to both the
       // uint and double fields. In cases where the value is something like "3.1", we will floor the
       // number by casting it to a uint and assigning the uint value.
