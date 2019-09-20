@@ -22,7 +22,7 @@ message ApiConfigSource {
   enum ApiType {
     // Ideally this would be 'reserved 0' but one can't reserve the default
     // value. Instead we throw an exception if this is ever used.
-    UNSUPPORTED_REST_LEGACY = 0;
+    UNSUPPORTED_REST_LEGACY = 0 [deprecated = true];
 
     // REST-JSON v2 API. The `canonical JSON encoding
     // <https://developers.google.com/protocol-buffers/docs/proto3#json>`_ for
@@ -61,7 +61,7 @@ message ApiConfigSource {
   google.protobuf.Duration refresh_delay = 3;
 
   // For REST APIs, the request timeout. If not set, a default value of 1s will be used.
-  google.protobuf.Duration request_timeout = 5 [(validate.rules).duration = {gt {}}];
+  google.protobuf.Duration request_timeout = 5 [(validate.rules).duration = {gt {seconds: 0}}];
 
   // For GRPC APIs, the rate limit settings. If present, discovery requests made by Envoy will be
   // rate limited.

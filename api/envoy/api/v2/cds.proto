@@ -107,7 +107,7 @@ message Cluster {
     //
     //   **This load balancing policy is deprecated**. Use CLUSTER_PROVIDED instead.
     //
-    ORIGINAL_DST_LB = 4;
+    ORIGINAL_DST_LB = 4 [deprecated = true];
 
     // Refer to the :ref:`Maglev load balancing policy<arch_overview_load_balancing_types_maglev>`
     // for an explanation.

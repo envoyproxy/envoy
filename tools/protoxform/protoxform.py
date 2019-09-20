@@ -329,7 +329,12 @@ def FormatEnumValue(type_context, value):
     Formatted proto enum value as a string.
   """
   leading_comment, trailing_comment = FormatTypeContextComments(type_context)
-  return '%s%s = %d;\n%s' % (leading_comment, value.name, value.number, trailing_comment)
+  annotations = []
+  if value.options.deprecated:
+    annotations.append('deprecated = true')
+  formatted_annotations = '[ %s]' % ','.join(annotations) if annotations else ''
+  return '%s%s = %d%s;\n%s' % (leading_comment, value.name, value.number, formatted_annotations,
+                               trailing_comment)
 
 
 class ProtoFormatVisitor(visitor.Visitor):
