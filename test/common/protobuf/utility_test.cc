@@ -4,6 +4,7 @@
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.validate.h"
 
+#include "common/common/base64.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
@@ -117,6 +118,26 @@ TEST_F(ProtobufUtilityTest, evaluateFractionalPercent) {
 }
 
 } // namespace ProtobufPercentHelper
+
+TEST_F(ProtobufUtilityTest, MessageUtilHash) {
+  ProtobufWkt::Struct s;
+  (*s.mutable_fields())["ab"].set_string_value("fgh");
+  (*s.mutable_fields())["cde"].set_string_value("ij");
+
+  ProtobufWkt::Any a1;
+  a1.PackFrom(s);
+  // The two base64 encoded Struct to test map is identical to the struct above, this tests whether
+  // a map is deterministically serialized and hashed.
+  ProtobufWkt::Any a2 = a1;
+  a2.set_value(Base64::decode("CgsKA2NkZRIEGgJpagoLCgJhYhIFGgNmZ2g="));
+  ProtobufWkt::Any a3 = a1;
+  a3.set_value(Base64::decode("CgsKAmFiEgUaA2ZnaAoLCgNjZGUSBBoCaWo="));
+
+  EXPECT_EQ(MessageUtil::hash(a1), MessageUtil::hash(a2));
+  EXPECT_EQ(MessageUtil::hash(a2), MessageUtil::hash(a3));
+  EXPECT_NE(0, MessageUtil::hash(a1));
+  EXPECT_NE(MessageUtil::hash(s), MessageUtil::hash(a1));
+}
 
 TEST_F(ProtobufUtilityTest, RepeatedPtrUtilDebugString) {
   Protobuf::RepeatedPtrField<ProtobufWkt::UInt32Value> repeated;

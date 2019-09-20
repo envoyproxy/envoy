@@ -427,6 +427,7 @@ decls
 dedup
 dedupe
 deduplicate
+deduplicates
 deflateInit
 deletable
 deleter
