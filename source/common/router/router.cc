@@ -13,7 +13,6 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/access_log/access_log_formatter.h"
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
@@ -1334,9 +1333,6 @@ Filter::UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::I
         parent_.callbacks_->tracingConfig(), "router " + parent.cluster_->name() + " egress",
         parent.timeSource().systemTime());
     span_->setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy);
-    span_->setTag(Tracing::Tags::get().UpstreamCluster, parent.cluster_->name());
-    span_->setTag(Tracing::Tags::get().HttpProtocol,
-                  AccessLog::AccessLogFormatUtils::protocolToString(pool.protocol()));
     if (parent.attempt_count_ != 1) {
       // This is a retry request, add this metadata to span.
       span_->setTag(Tracing::Tags::get().RetryCount, std::to_string(parent.attempt_count_ - 1));
