@@ -68,7 +68,7 @@ protected:
   // will delay them.
   void sendRequests(const uint32_t request_count, const uint32_t num_forwarded);
 
-  // Waits for a specified durationa and then responds to all queued up requests in a FIFO manner.
+  // Waits for a specified duration and then responds to all queued up requests in a FIFO manner.
   // Asserts that the expected number of requests are forwarded through the filter. The oldest
   // requests are the forwarded requests.
   //
