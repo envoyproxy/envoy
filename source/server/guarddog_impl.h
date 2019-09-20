@@ -87,7 +87,8 @@ public:
   }
 
   // Server::GuardDog
-  WatchDogSharedPtr createWatchDog(Thread::ThreadId thread_id) override;
+  WatchDogSharedPtr createWatchDog(Thread::ThreadId thread_id,
+                                   const std::string& thread_name) override;
   void stopWatching(WatchDogSharedPtr wd) override;
 
 private:
@@ -100,13 +101,20 @@ private:
   bool multikillEnabled() const { return multi_kill_timeout_ > std::chrono::milliseconds(0); }
 
   struct WatchedDog {
-    WatchDogSharedPtr dog_;
+    WatchedDog(Stats::Scope& stats_scope, const std::string& thread_name,
+               const WatchDogSharedPtr& watch_dog);
+
+    const WatchDogSharedPtr dog_;
     absl::optional<MonotonicTime> last_alert_time_;
     bool miss_alerted_{};
     bool megamiss_alerted_{};
+    Stats::Counter& miss_counter_;
+    Stats::Counter& megamiss_counter_;
   };
+  using WatchedDogPtr = std::unique_ptr<WatchedDog>;
 
   std::unique_ptr<TestInterlockHook> test_interlock_hook_;
+  Stats::Scope& stats_scope_;
   TimeSource& time_source_;
   const std::chrono::milliseconds miss_timeout_;
   const std::chrono::milliseconds megamiss_timeout_;
@@ -115,7 +123,7 @@ private:
   const std::chrono::milliseconds loop_interval_;
   Stats::Counter& watchdog_miss_counter_;
   Stats::Counter& watchdog_megamiss_counter_;
-  std::vector<WatchedDog> watched_dogs_ ABSL_GUARDED_BY(wd_lock_);
+  std::vector<WatchedDogPtr> watched_dogs_ ABSL_GUARDED_BY(wd_lock_);
   Thread::MutexBasicLockable wd_lock_;
   Thread::ThreadPtr thread_;
   Event::DispatcherPtr dispatcher_;
