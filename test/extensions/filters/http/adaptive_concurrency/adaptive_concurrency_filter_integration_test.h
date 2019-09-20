@@ -42,31 +42,24 @@ const std::string MIN_RTT_GAUGE_NAME =
 const uint32_t DEFAULT_REQUEST_DELAY_MS = 50;
 
 class AdaptiveConcurrencyIntegrationTest
-    : public Event::TestUsingSimulatedTime,
-      public HttpIntegrationTest,
-      public testing::TestWithParam<Network::Address::IpVersion> {
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public Event::TestUsingSimulatedTime,
+      public HttpIntegrationTest {
 public:
   AdaptiveConcurrencyIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {}
 
-  void initializeFilter() {
-    // We use the fault filter (for delays) after the adaptive concurrency filter to introduce a
-    // "service latency" to the test. This way, time is moved forward with each response.
-    config_helper_.addFilter(ADAPTIVE_CONCURRENCY_CONFIG);
-  }
-
-  void SetUp() override {
+  void customInit() {
     setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+    config_helper_.addFilter(ADAPTIVE_CONCURRENCY_CONFIG);
     initialize();
     codec_client_ = makeHttpConnection(lookupPort("http"));
   }
 
-  void TearDown() override {}
-
-  void initialize() override {
-    initializeFilter();
-    HttpIntegrationTest::initialize();
+  void TearDown() override {
+    HttpIntegrationTest::cleanupUpstreamAndDownstream();
+    codec_client_.reset();
   }
 
 protected:

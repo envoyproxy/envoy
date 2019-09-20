@@ -15,23 +15,30 @@ void AdaptiveConcurrencyIntegrationTest::sendRequests(const uint32_t request_cou
 
   // We expect these requests to reach the upstream.
   for (uint32_t idx = 0; idx < num_forwarded; ++idx) {
-    auto response = codec_client_->makeRequestWithBody(default_request_headers_, 8);
-    responses_.emplace_back(std::move(response));
+    auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+    responses_.push_back(std::move(encoder_decoder.second));
     upstream_connections_.emplace_back();
     upstream_requests_.emplace_back();
+
     ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, upstream_connections_.back()));
     ASSERT_TRUE(upstream_connections_.back()->waitForNewStream(*dispatcher_, upstream_requests_.back()));
-    ASSERT(upstream_requests_.back()->waitForEndStream(*dispatcher_));
+
+    codec_client_->sendData(encoder_decoder.first, 0, true);
+    ASSERT_TRUE(upstream_requests_.back()->waitForEndStream(*dispatcher_));
   }
 
   for (uint32_t idx = 0; idx < request_count - num_forwarded; ++idx) {
-    auto response = codec_client_->makeRequestWithBody(default_request_headers_, 8);
-    responses_.emplace_back(std::move(response));
+    auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+    responses_.push_back(std::move(encoder_decoder.second));
+    codec_client_->sendData(encoder_decoder.first, 0, true);
 
     // These will remain nullptr.
     upstream_connections_.emplace_back();
     upstream_requests_.emplace_back();
   }
+
+  ASSERT_EQ(upstream_connections_.size(), upstream_requests_.size());
+  ASSERT_EQ(responses_.size(), upstream_requests_.size());
 }
 
 void AdaptiveConcurrencyIntegrationTest::respondToAllRequests(const int forwarded_count) {
@@ -50,19 +57,24 @@ void AdaptiveConcurrencyIntegrationTest::respondToRequest(const bool expect_forw
   ASSERT_EQ(responses_.size(), upstream_requests_.size());
 
   if (expect_forwarded) {
-    EXPECT_NE(upstream_connections_.front(), nullptr);
-    EXPECT_NE(upstream_requests_.front(), nullptr);
+    ASSERT_NE(upstream_connections_.front(), nullptr);
+    ASSERT_NE(upstream_requests_.front(), nullptr);
+    ASSERT_TRUE(upstream_requests_.front()->waitForEndStream(*dispatcher_));
     upstream_requests_.front()->encodeHeaders(default_response_headers_, true);
   }
 
   responses_.front()->waitForEndStream();
+
   if (expect_forwarded) {
     EXPECT_TRUE(upstream_requests_.front()->complete());
   }
 
   EXPECT_TRUE(responses_.front()->complete());
+
   if (expect_forwarded) {
     verifyResponseForwarded(std::move(responses_.front()));
+    ASSERT_TRUE(upstream_connections_.front()->close());
+    ASSERT_TRUE(upstream_connections_.front()->waitForDisconnect());
   } else {
     verifyResponseBlocked(std::move(responses_.front()));
   }
@@ -70,6 +82,7 @@ void AdaptiveConcurrencyIntegrationTest::respondToRequest(const bool expect_forw
   upstream_connections_.pop_front();
   upstream_requests_.pop_front();
   responses_.pop_front();
+  codec_client_->close();
 }
 
 uint32_t
@@ -118,6 +131,8 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AdaptiveConcurrencyIntegrationTest,
  * Test a single request returns successfully.
  */
 TEST_P(AdaptiveConcurrencyIntegrationTest, TestConcurrency1) {
+  customInit();
+
   sendRequests(2, 1);
   respondToAllRequests(1);
   test_server_->waitForCounterGe(REQUEST_BLOCK_COUNTER_NAME, 1);
@@ -127,6 +142,8 @@ TEST_P(AdaptiveConcurrencyIntegrationTest, TestConcurrency1) {
  * Test many requests, where only a single request returns 200 during the minRTT window.
  */
 TEST_P(AdaptiveConcurrencyIntegrationTest, TestManyConcurrency1) {
+  customInit();
+
   sendRequests(10, 1);
   respondToAllRequests(1);
   test_server_->waitForCounterGe(REQUEST_BLOCK_COUNTER_NAME, 9);
@@ -137,6 +154,8 @@ TEST_P(AdaptiveConcurrencyIntegrationTest, TestManyConcurrency1) {
  * minRTT value.
  */
 TEST_P(AdaptiveConcurrencyIntegrationTest, TestConcurrencyLimitMovement) {
+  customInit();
+
   // Cause the concurrency limit to oscillate.
   for (int idx = 0; idx < 3; ++idx) {
     inflateConcurrencyLimit(100);
