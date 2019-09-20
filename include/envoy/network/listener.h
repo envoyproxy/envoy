@@ -115,3 +115,140 @@ public:
    */
   virtual void onAccept(ConnectionSocketPtr&& socket,
                         bool hand_off_restored_destination_connections = true) PURE;
+
+  /**
+   * Called when a new connection is accepted.
+   * @param new_connection supplies the new connection that is moved into the callee.
+   */
+  virtual void onNewConnection(ConnectionPtr&& new_connection) PURE;
+};
+
+/**
+ * Utility struct that encapsulates the information from a udp socket's
+ * recvfrom/recvmmsg call.
+ *
+ * TODO(conqerAtapple): Maybe this belongs inside the UdpListenerCallbacks
+ * class.
+ */
+struct UdpRecvData {
+  Address::InstanceConstSharedPtr local_address_;
+  Address::InstanceConstSharedPtr peer_address_; // TODO(conquerAtapple): Fix ownership semantics.
+  Buffer::InstancePtr buffer_;
+  MonotonicTime receive_time_;
+
+  // TODO(conquerAtapple):
+  // Add UdpReader here so that the callback handler can
+  // then use the reader to do multiple reads(recvmmsg) once the OS notifies it
+  // has data. We could also just return a `ReaderFactory` that returns either a
+  // `recvfrom` reader (with peer information) or a `read/recvmmsg` reader. This
+  // is still being flushed out (Jan, 2019).
+};
+
+/**
+ * Encapsulates the information needed to send a udp packet to a target
+ */
+struct UdpSendData {
+  const Address::Ip* local_ip_;
+  const Address::Instance& peer_address_;
+
+  // The buffer is a reference so that it can be reused by the sender to send different
+  // messages
+  Buffer::Instance& buffer_;
+};
+
+/**
+ * UDP listener callbacks.
+ */
+class UdpListenerCallbacks {
+public:
+  enum class ErrorCode { SyscallError, UnknownError };
+
+  virtual ~UdpListenerCallbacks() = default;
+
+  /**
+   * Called whenever data is received by the underlying udp socket.
+   *
+   * @param data UdpRecvData from the underlying socket.
+   */
+  virtual void onData(UdpRecvData& data) PURE;
+
+  /**
+   * Called when the underlying socket is ready for write.
+   *
+   * @param socket Underlying server socket for the listener.
+   *
+   * TODO(conqerAtapple): Maybe we need a UdpWriter here instead of Socket.
+   */
+  virtual void onWriteReady(const Socket& socket) PURE;
+
+  /**
+   * Called when there is an error event in the receive data path.
+   * The send side error is a return type on the send method.
+   *
+   * @param error_code ErrorCode for the error event.
+   * @param error_number System error number.
+   */
+  virtual void onReceiveError(const ErrorCode& error_code, Api::IoError::IoErrorCode err) PURE;
+};
+
+/**
+ * An abstract socket listener. Free the listener to stop listening on the socket.
+ */
+class Listener {
+public:
+  virtual ~Listener() = default;
+
+  /**
+   * Temporarily disable accepting new connections.
+   */
+  virtual void disable() PURE;
+
+  /**
+   * Enable accepting new connections.
+   */
+  virtual void enable() PURE;
+};
+
+using ListenerPtr = std::unique_ptr<Listener>;
+
+/**
+ * A UDP listener interface.
+ */
+class UdpListener : public virtual Listener {
+public:
+  ~UdpListener() override = default;
+
+  /**
+   * @return Event::Dispatcher& the dispatcher backing this listener.
+   */
+  virtual Event::Dispatcher& dispatcher() PURE;
+
+  /**
+   * @return the local address of the socket.
+   */
+  virtual const Network::Address::InstanceConstSharedPtr& localAddress() const PURE;
+
+  /**
+   * Send data through the underlying udp socket. If the send buffer of the socket FD is full, an
+   * error code is returned.
+   * TODO(sumukhs): We do not currently handle max MTU size of the datagram. Determine if we could
+   * expose the path MTU information to the caller.
+   *
+   * @param data Supplies the data to send to a target using udp.
+   * @return the error code of the underlying send api. On successfully sending 'n' bytes, the
+   * underlying buffers in the data  are drained by 'n' bytes. The remaining can be retried by the
+   * sender.
+   */
+  virtual Api::IoCallUint64Result send(const UdpSendData& data) PURE;
+};
+
+/**
+ * Thrown when there is a runtime error creating/binding a listener.
+ */
+class CreateListenerException : public EnvoyException {
+public:
+  CreateListenerException(const std::string& what) : EnvoyException(what) {}
+};
+
+} // namespace Network
+} // namespace Envoy
