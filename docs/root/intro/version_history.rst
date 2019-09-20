@@ -60,6 +60,9 @@ Version history
 * router check tool: add flag for only printing results of failed tests.
 * router check tool: add support for outputting missing tests in the detailed coverage report.
 * server: added a post initialization lifecycle event, in addition to the existing startup and shutdown events.
+* server: added :ref:`per-handler listener stats <config_listener_stats_per_handler>` and
+  :ref:`per-worker watchdog stats <operations_performance_watchdog>` to help diagnosing event
+  loop imbalance and general performance issues.
 * thrift_proxy: fix crashing bug on invalid transport/protocol framing
 * tls: added verification of IP address SAN fields in certificates against configured SANs in the
 * tracing: added support to the Zipkin reporter for sending list of spans as Zipkin JSON v2 and protobuf message over HTTP.
