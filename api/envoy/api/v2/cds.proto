@@ -290,7 +290,7 @@ message Cluster {
   // The metadata of endpoints in EDS can indicate transport socket capabilities. For example,
   // an endpoint's metadata can have two key value pairs as "acceptMTLS": "true",
   // "acceptPlaintext": "true". While some other endpoints, only accepting plaintext traffic
-  // has "accpetPlaintext": "true" metadata information.
+  // has "acceptPlaintext": "true" metadata information.
   //
   // Then the xDS server can configure the CDS to a client, Envoy A, to send mutual TLS
   // traffic for endpoints with "acceptMTLS": "true", by adding a corresponding
