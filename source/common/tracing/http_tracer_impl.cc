@@ -180,24 +180,22 @@ void HttpTracerUtility::finalizeSpan(Span& span, const Http::HeaderMap* request_
   span.finishSpan();
 }
 
-void HttpTracerUtility::finalizeUpstreamSpan(Span& span,
-                                     const Http::HeaderMap* response_headers,
-                                     const Http::HeaderMap* response_trailers,
-                                     const StreamInfo::StreamInfo& stream_info,
-                                     const Config& tracing_config) {
+void HttpTracerUtility::finalizeUpstreamSpan(Span& span, const Http::HeaderMap* response_headers,
+                                             const Http::HeaderMap* response_trailers,
+                                             const StreamInfo::StreamInfo& stream_info,
+                                             const Config& tracing_config) {
   span.setTag(Tracing::Tags::get().HttpProtocol,
-                AccessLog::AccessLogFormatUtils::protocolToString(stream_info.protocol()));
+              AccessLog::AccessLogFormatUtils::protocolToString(stream_info.protocol()));
 
   setCommonTags(span, response_headers, response_trailers, stream_info, tracing_config);
 
   span.finishSpan();
 }
 
-void HttpTracerUtility::setCommonTags(Span& span,
-                                     const Http::HeaderMap* response_headers,
-                                     const Http::HeaderMap* response_trailers,
-                                     const StreamInfo::StreamInfo& stream_info,
-                                     const Config& tracing_config) {
+void HttpTracerUtility::setCommonTags(Span& span, const Http::HeaderMap* response_headers,
+                                      const Http::HeaderMap* response_trailers,
+                                      const StreamInfo::StreamInfo& stream_info,
+                                      const Config& tracing_config) {
 
   if (nullptr != stream_info.upstreamHost()) {
     span.setTag(Tracing::Tags::get().UpstreamCluster, stream_info.upstreamHost()->cluster().name());

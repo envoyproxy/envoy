@@ -112,16 +112,16 @@ public:
    * Fills in the active span that represents each upstream request with the proper headers.
    * Then finishes the span.
    */
-   static void finalizeUpstreamSpan(Span& span,
-                           const Http::HeaderMap* response_headers,
-                           const Http::HeaderMap* response_trailers,
-                           const StreamInfo::StreamInfo& stream_info, const Config& tracing_config);
+  static void finalizeUpstreamSpan(Span& span, const Http::HeaderMap* response_headers,
+                                   const Http::HeaderMap* response_trailers,
+                                   const StreamInfo::StreamInfo& stream_info,
+                                   const Config& tracing_config);
 
- private:
-  static void setCommonTags(Span& span,
-                           const Http::HeaderMap* response_headers,
-                           const Http::HeaderMap* response_trailers,
-                           const StreamInfo::StreamInfo& stream_info, const Config& tracing_config);
+private:
+  static void setCommonTags(Span& span, const Http::HeaderMap* response_headers,
+                            const Http::HeaderMap* response_trailers,
+                            const StreamInfo::StreamInfo& stream_info,
+                            const Config& tracing_config);
 
   static const std::string IngressOperation;
   static const std::string EgressOperation;

@@ -1344,9 +1344,9 @@ Filter::UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::I
 
 Filter::UpstreamRequest::~UpstreamRequest() {
   if (span_ != nullptr) {
-    Tracing::HttpTracerUtility::finalizeUpstreamSpan(*span_,
-                                             upstream_headers_.get(), upstream_trailers_.get(),
-                                             stream_info_, Tracing::EgressConfig::get());
+    Tracing::HttpTracerUtility::finalizeUpstreamSpan(*span_, upstream_headers_.get(),
+                                                     upstream_trailers_.get(), stream_info_,
+                                                     Tracing::EgressConfig::get());
   }
 
   if (per_try_timeout_ != nullptr) {
