@@ -4424,12 +4424,13 @@ TEST_F(RouterTestChildSpan, BasicFlow) {
   EXPECT_CALL(callbacks_, tracingConfig());
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.0")));
   router_.decodeHeaders(headers, true);
 
   Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.0")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
   EXPECT_CALL(*child_span, finishSpan());
   response_decoder->decodeHeaders(std::move(response_headers), true);
 }
@@ -4459,14 +4460,15 @@ TEST_F(RouterTestChildSpan, ResetFlow) {
   EXPECT_CALL(callbacks_, tracingConfig());
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
-  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.0")));
   router_.decodeHeaders(headers, true);
 
   Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
   response_decoder->decodeHeaders(std::move(response_headers), false);
 
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.0")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("UR")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ErrorReason), Eq("remote reset")));
   EXPECT_CALL(*child_span, finishSpan());
