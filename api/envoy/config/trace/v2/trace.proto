@@ -169,7 +169,7 @@ message OpenCensusConfig {
   // format: https://github.com/grpc/grpc/blob/master/doc/naming.md
   string ocagent_address = 12;
 
-  reserved 7; // Formerly zipkin_service_name.
+  reserved 7;
 
   enum TraceContext {
     // No-op default, no trace context is utilized.

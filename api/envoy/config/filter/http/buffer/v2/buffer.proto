@@ -14,7 +14,7 @@ import "validate/validate.proto";
 // Buffer :ref:`configuration overview <config_http_filters_buffer>`.
 
 message Buffer {
-  reserved 2; // formerly max_request_time
+  reserved 2;
 
   // The maximum request size that the filter will buffer before the connection
   // manager will stop buffering and return a 413 response.
