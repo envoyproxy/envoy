@@ -239,8 +239,8 @@ message Cluster {
   // TransportSocketMatch specifies what transport socket config will be used
   // when the match conditions are satisfied.
   message TransportSocketMatch {
-    // The name of the match.
-    string name = 1;
+    // The name of the match, used in stats generation.
+    string name = 1 [(validate.rules).string.min_len = 1];
 
     // Optional endpoint metadata match criteria.
     // The connection to the endpoint with metadata matching what is set in this field
