@@ -88,7 +88,7 @@ ProtoValidationException::ProtoValidationException(const std::string& validation
   ENVOY_LOG_MISC(debug, "Proto validation error; throwing {}", what());
 }
 
-size_t MessageUtil::anyStableHash(const Protobuf::Message& message) {
+size_t MessageUtil::hash(const Protobuf::Message& message) {
   std::string text_format;
 
   {

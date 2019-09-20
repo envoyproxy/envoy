@@ -119,7 +119,7 @@ TEST_F(ProtobufUtilityTest, evaluateFractionalPercent) {
 
 } // namespace ProtobufPercentHelper
 
-TEST_F(ProtobufUtilityTest, MessageUtilAnyStableHash) {
+TEST_F(ProtobufUtilityTest, MessageUtilHash) {
   ProtobufWkt::Struct s;
   (*s.mutable_fields())["ab"].set_string_value("fgh");
   (*s.mutable_fields())["cde"].set_string_value("ij");
@@ -133,10 +133,10 @@ TEST_F(ProtobufUtilityTest, MessageUtilAnyStableHash) {
   ProtobufWkt::Any a3 = a1;
   a3.set_value(Base64::decode("CgsKAmFiEgUaA2ZnaAoLCgNjZGUSBBoCaWo="));
 
-  EXPECT_EQ(MessageUtil::anyStableHash(a1), MessageUtil::anyStableHash(a2));
-  EXPECT_EQ(MessageUtil::anyStableHash(a2), MessageUtil::anyStableHash(a3));
-  EXPECT_NE(0, MessageUtil::anyStableHash(a1));
-  EXPECT_NE(MessageUtil::anyStableHash(s), MessageUtil::anyStableHash(a1));
+  EXPECT_EQ(MessageUtil::hash(a1), MessageUtil::hash(a2));
+  EXPECT_EQ(MessageUtil::hash(a2), MessageUtil::hash(a3));
+  EXPECT_NE(0, MessageUtil::hash(a1));
+  EXPECT_NE(MessageUtil::hash(s), MessageUtil::hash(a1));
 }
 
 TEST_F(ProtobufUtilityTest, RepeatedPtrUtilDebugString) {
