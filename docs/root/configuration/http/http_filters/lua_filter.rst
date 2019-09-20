@@ -504,7 +504,8 @@ set()
   dynamicMetadata:set(filterName, key, value)
 
 Sets key-value pair of a *filterName*'s metadata. *filterName* is a key specifying the target filter name,
-e.g. *envoy.lb*. The type of *key* and *value* is *string*.
+e.g. *envoy.lb*. The type of *key* is *string*. The type of *value* is any Lua type that can be mapped
+to a metadata value, including a Lua table with key/values.
 
 __pairs()
 ^^^^^^^^^
