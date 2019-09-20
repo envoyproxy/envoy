@@ -5,7 +5,6 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
-#include "envoy/common/time.h"
 
 #include "absl/strings/string_view.h"
 

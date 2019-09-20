@@ -40,7 +40,6 @@ envoy_cc_library(
     name = "symbol_table_interface",
     hdrs = ["symbol_table.h"],
     deps = [
-        "//include/envoy/common:time_interface",
         "//source/common/common:hash_lib",
     ],
 )

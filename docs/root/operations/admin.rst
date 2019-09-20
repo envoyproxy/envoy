@@ -366,10 +366,9 @@ modify different aspects of the server:
   lock. During startup this is expected, but in response to user requests on high
   core-count machines, this can cause performance issues due to mutex contention.
 
-  See `stats.md <https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md>`_
-  for more details.
+  See :repo:`source/docs/stats.md` for more details.
 
-  Note also that actual mutex contention can be tracked via `/contention`.
+  Note also that actual mutex contention can be tracked via :http:get:`/contention`.
 
 .. _operations_admin_interface_runtime:
 

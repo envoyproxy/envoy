@@ -22,7 +22,7 @@ public:
   using IterFn = std::function<void(absl::string_view, uint64_t)>;
 
   /**
-   * Calls fn(item, timestamp) for each of the remembered lookups.
+   * Calls fn(item, count) for each of the remembered lookups.
    *
    * @param fn The function to call for every recently looked up item.
    */

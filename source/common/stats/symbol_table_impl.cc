@@ -228,7 +228,7 @@ uint64_t SymbolTableImpl::getRecentLookups(const RecentLookupsFn& iter) {
     }
   }
 
-  // We also don't want to hold lock_ while calling the iterate, but we need it
+  // We also don't want to hold lock_ while calling the iterator, but we need it
   // to access recent_lookups_.
   {
     Thread::LockGuard lock(lock_);
