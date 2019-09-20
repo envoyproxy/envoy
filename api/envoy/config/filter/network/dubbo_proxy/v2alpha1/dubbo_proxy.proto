@@ -38,12 +38,14 @@ message DubboProxy {
 
 // Dubbo Protocol types supported by Envoy.
 enum ProtocolType {
-  Dubbo = 0; // the default protocol.
+  // the default protocol.
+  Dubbo = 0;
 }
 
 // Dubbo Serialization types supported by Envoy.
 enum SerializationType {
-  Hessian2 = 0; // the default serialization protocol.
+  // the default serialization protocol.
+  Hessian2 = 0;
 }
 
 // DubboFilter configures a Dubbo filter.
