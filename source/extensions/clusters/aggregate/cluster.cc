@@ -20,8 +20,7 @@ Cluster::Cluster(const envoy::api::v2::Cluster& cluster,
   }
 }
 
-std::pair<Upstream::PrioritySetImpl,
-          std::vector<std::pair<uint32_t, Upstream::ThreadLocalCluster*>>>
+PriorityContext
 Cluster::linearizePrioritySet(std::function<bool(const std::string&)> skip_predicate) {
   Upstream::PrioritySetImpl priority_set;
   std::vector<std::pair<uint32_t, Upstream::ThreadLocalCluster*>> priority_to_cluster;
@@ -68,7 +67,8 @@ void Cluster::startPreInit() {
     // Add callback for clusters initialized before aggregate cluster.
     tlc->prioritySet().addMemberUpdateCb(
         [this, cluster](const Upstream::HostVector&, const Upstream::HostVector&) {
-          ENVOY_LOG(info, "member update for cluster '{}'", cluster);
+          ENVOY_LOG(info, "member update for cluster '{}' in aggregate cluster '{}'", cluster,
+                    this->info()->name());
           refresh();
         });
   }
@@ -79,25 +79,26 @@ void Cluster::startPreInit() {
 }
 
 void Cluster::refresh(std::function<bool(const std::string&)>&& skip_predicate) {
-  auto pair = linearizePrioritySet(std::move(skip_predicate));
+  PriorityContext priority_set = linearizePrioritySet(std::move(skip_predicate));
   // Post the priority set to worker threads.
-  tls_->runOnAllThreads([this, &pair, cluster_name = this->info()->name()]() {
-    LoadBalancerImplSharedPtr lb_ = nullptr;
-    if (!pair.first.hostSetsPerPriority().empty()) {
-      lb_ = std::make_shared<LoadBalancerImpl>(*this, std::move(pair));
+  tls_->runOnAllThreads([this, &priority_set, cluster_name = this->info()->name()]() {
+    LoadBalancerImplSharedPtr lb = nullptr;
+    if (!priority_set.first.hostSetsPerPriority().empty()) {
+      lb = std::make_shared<LoadBalancerImpl>(*this, priority_set);
     }
     Upstream::ThreadLocalCluster* cluster = cluster_manager_.get(cluster_name);
     if (cluster == nullptr) {
       return;
     }
     // Downgrade cast to AggregateClusterLoadBalancer
-    dynamic_cast<AggregateClusterLoadBalancer&>(cluster->loadBalancer()).refresh(lb_);
+    dynamic_cast<AggregateClusterLoadBalancer&>(cluster->loadBalancer()).refresh(lb);
   });
 }
 
 void Cluster::onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) {
   if (std::find(clusters_.begin(), clusters_.end(), cluster.info()->name()) != clusters_.end()) {
-    ENVOY_LOG(info, "update or add cluster '{}'", cluster.info()->name());
+    ENVOY_LOG(info, "update or add cluster '{}' for aggregate cluster '{}'", cluster.info()->name(),
+              info()->name());
     refresh();
     cluster.prioritySet().addMemberUpdateCb(
         [this](const Upstream::HostVector&, const Upstream::HostVector&) { refresh(); });
@@ -106,9 +107,11 @@ void Cluster::onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) {
 
 void Cluster::onClusterRemoval(const std::string& cluster_name) {
   //  The onClusterRemoval callback is called before the thread local cluster was removed. There
-  //  will be a dangling pointer to the thread local cluster if delete cluster is not skipped.
+  //  will be a dangling pointer to the thread local cluster if delete cluster is not skipped when
+  //  we refresh the load balancer.
   if (std::find(clusters_.begin(), clusters_.end(), cluster_name) != clusters_.end()) {
-    ENVOY_LOG(info, "remove cluster '{}' from aggreagte cluster", cluster_name);
+    ENVOY_LOG(info, "remove cluster '{}' from aggreagte cluster '{}'", cluster_name,
+              info()->name());
     refresh([&cluster_name](const std::string& c) { return cluster_name == c; });
   }
 }

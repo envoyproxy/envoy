@@ -13,6 +13,9 @@ namespace Extensions {
 namespace Clusters {
 namespace Aggregate {
 
+using PriorityContext = std::pair<Upstream::PrioritySetImpl,
+                                  std::vector<std::pair<uint32_t, Upstream::ThreadLocalCluster*>>>;
+
 class Cluster : public Upstream::BaseDynamicClusterImpl, Upstream::ClusterUpdateCallbacks {
 public:
   Cluster(const envoy::api::v2::Cluster& cluster,
@@ -47,19 +50,15 @@ private:
   void startPreInit() override;
 
   void refresh(std::function<bool(const std::string&)>&& skip_predicate);
-  std::pair<Upstream::PrioritySetImpl,
-            std::vector<std::pair<uint32_t, Upstream::ThreadLocalCluster*>>>
-  linearizePrioritySet(std::function<bool(const std::string&)> skip_predicate);
+  PriorityContext linearizePrioritySet(std::function<bool(const std::string&)> skip_predicate);
 };
 
-using PriorityContext = std::pair<Upstream::PrioritySetImpl,
-                                  std::vector<std::pair<uint32_t, Upstream::ThreadLocalCluster*>>>;
 class LoadBalancerImpl : public Upstream::LoadBalancerBase {
 public:
-  LoadBalancerImpl(Cluster& cluster, PriorityContext&& priority_context)
+  LoadBalancerImpl(Cluster& cluster, PriorityContext& priority_context)
       : Upstream::LoadBalancerBase(priority_context.first, cluster.info()->stats(),
                                    cluster.runtime_, cluster.random_, cluster.info()->lbConfig()),
-        priority_to_cluster_(std::move(priority_context.second)) {}
+        priority_to_cluster_(priority_context.second) {}
 
   // Upstream::LoadBalancer
   Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext* context) override;
@@ -72,8 +71,11 @@ public:
 private:
   std::vector<std::pair<uint32_t, Upstream::ThreadLocalCluster*>> priority_to_cluster_;
 };
+
 using LoadBalancerImplSharedPtr = std::shared_ptr<LoadBalancerImpl>;
 
+// Load balancer used by each worker thread. It will be refreshed when clusters, hosts or priorities
+// are updated.
 class AggregateClusterLoadBalancer : public Upstream::LoadBalancer {
 public:
   // Upstream::LoadBalancer
@@ -92,6 +94,7 @@ struct AggregateLoadBalancerFactory : public Upstream::LoadBalancerFactory {
   }
 };
 
+// Thread aware load balancer created by the main thread.
 struct AggregateThreadAwareLoadBalancer : public Upstream::ThreadAwareLoadBalancer {
   // Upstream::ThreadAwareLoadBalancer
   Upstream::LoadBalancerFactorySharedPtr factory() override {
