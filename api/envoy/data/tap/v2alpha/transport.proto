@@ -31,10 +31,10 @@ message SocketEvent {
 
   // Data read by Envoy from the transport socket.
   message Read {
+    // TODO(htuch): Half-close for reads.
+
     // Binary data read.
     Body data = 1;
-
-    // TODO(htuch): Half-close for reads.
   }
 
   // Data written by Envoy to the transport socket.

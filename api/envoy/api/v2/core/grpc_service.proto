@@ -160,7 +160,6 @@ message GrpcService {
   // request.
   google.protobuf.Duration timeout = 3;
 
-  // Field 4 reserved due to moving credentials inside the GoogleGrpc message
   reserved 4;
 
   // Additional metadata to include in streams initiated to the GrpcService.

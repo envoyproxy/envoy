@@ -1291,11 +1291,8 @@ message HeaderMatcher {
   // Specifies the name of the header in the request.
   string name = 1 [(validate.rules).string.min_bytes = 1];
 
-  reserved 2; // value deprecated by :ref:`exact_match
-              // <envoy_api_field_route.HeaderMatcher.exact_match>`
-
-  reserved 3; // regex deprecated by :ref:`regex_match
-              // <envoy_api_field_route.HeaderMatcher.regex_match>`
+  reserved 2;
+  reserved 3;
 
   // Specifies how the header match will be performed to route the request.
   oneof header_match_specifier {
