@@ -143,7 +143,7 @@ public:
   uint64_t nextListenerTag() override { return 0; }
 
   // Server::WorkerFactory
-  WorkerPtr createWorker(OverloadManager&) override {
+  WorkerPtr createWorker(OverloadManager&, const std::string&) override {
     // Returned workers are not currently used so we can return nothing here safely vs. a
     // validation mock.
     return nullptr;
