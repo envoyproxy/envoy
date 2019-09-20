@@ -27,6 +27,7 @@
 #include "test/test_common/test_time_system.h"
 #include "test/test_common/thread_factory_for_test.h"
 
+#include "absl/strings/string_view.h"
 #include "absl/time/time.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -492,7 +493,8 @@ public:
    */
   static bool gaugesZeroed(const std::vector<Stats::GaugeSharedPtr>& gauges);
   static bool gaugesZeroed(
-      const std::map<std::string, std::reference_wrapper<const Stats::PrimitiveGauge>>& gauges);
+      const std::vector<std::pair<absl::string_view,
+                                  std::reference_wrapper<const Stats::PrimitiveGauge>>>& gauges);
 
   // Strict variants of Protobuf::MessageUtil
   static void loadFromJson(const std::string& json, Protobuf::Message& message) {

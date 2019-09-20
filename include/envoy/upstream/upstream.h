@@ -24,6 +24,7 @@
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/types.h"
 
+#include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -77,7 +78,8 @@ public:
   /**
    * @return host specific counters.
    */
-  virtual std::map<std::string, std::reference_wrapper<const Stats::PrimitiveCounter>>
+  virtual std::vector<
+      std::pair<absl::string_view, std::reference_wrapper<const Stats::PrimitiveCounter>>>
   counters() const PURE;
 
   /**
@@ -106,7 +108,8 @@ public:
   /**
    * @return host specific gauges.
    */
-  virtual std::map<std::string, std::reference_wrapper<const Stats::PrimitiveGauge>>
+  virtual std::vector<
+      std::pair<absl::string_view, std::reference_wrapper<const Stats::PrimitiveGauge>>>
   gauges() const PURE;
 
   /**

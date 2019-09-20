@@ -155,13 +155,16 @@ public:
   MOCK_METHOD1(metadata, void(const envoy::api::v2::core::Metadata&));
   MOCK_CONST_METHOD0(cluster, const ClusterInfo&());
   MOCK_CONST_METHOD0(
-      counters, std::map<std::string, std::reference_wrapper<const Stats::PrimitiveCounter>>());
+      counters,
+      std::vector<
+          std::pair<absl::string_view, std::reference_wrapper<const Stats::PrimitiveCounter>>>());
   MOCK_CONST_METHOD2(
       createConnection_,
       MockCreateConnectionData(Event::Dispatcher& dispatcher,
                                const Network::ConnectionSocket::OptionsSharedPtr& options));
   MOCK_CONST_METHOD0(gauges,
-                     std::map<std::string, std::reference_wrapper<const Stats::PrimitiveGauge>>());
+                     std::vector<std::pair<absl::string_view,
+                                           std::reference_wrapper<const Stats::PrimitiveGauge>>>());
   MOCK_CONST_METHOD0(healthChecker, HealthCheckHostMonitor&());
   MOCK_METHOD1(healthFlagClear, void(HealthFlag flag));
   MOCK_CONST_METHOD1(healthFlagGet, bool(HealthFlag flag));

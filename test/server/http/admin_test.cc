@@ -1097,19 +1097,21 @@ TEST_P(AdminInstanceTest, ClustersJson) {
   rest_counter.add(10);
   Stats::PrimitiveCounter arest_counter;
   arest_counter.add(5);
-  std::map<std::string, std::reference_wrapper<const Stats::PrimitiveCounter>> counters = {
-      {"test_counter", test_counter},
-      {"rest_counter", rest_counter},
-      {"arest_counter", arest_counter},
-  };
+  std::vector<std::pair<absl::string_view, std::reference_wrapper<const Stats::PrimitiveCounter>>>
+      counters = {
+          {"arest_counter", arest_counter},
+          {"rest_counter", rest_counter},
+          {"test_counter", test_counter},
+      };
   Stats::PrimitiveGauge test_gauge;
   test_gauge.set(11);
   Stats::PrimitiveGauge atest_gauge;
   atest_gauge.set(10);
-  std::map<std::string, std::reference_wrapper<const Stats::PrimitiveGauge>> gauges = {
-      {"test_gauge", test_gauge},
-      {"atest_gauge", atest_gauge},
-  };
+  std::vector<std::pair<absl::string_view, std::reference_wrapper<const Stats::PrimitiveGauge>>>
+      gauges = {
+          {"atest_gauge", atest_gauge},
+          {"test_gauge", test_gauge},
+      };
   ON_CALL(*host, counters()).WillByDefault(Invoke([&counters]() { return counters; }));
   ON_CALL(*host, gauges()).WillByDefault(Invoke([&gauges]() { return gauges; }));
 

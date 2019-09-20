@@ -379,14 +379,14 @@ void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
 
         for (const auto& named_counter : host->counters()) {
           auto& metric = *host_status.add_stats();
-          metric.set_name(named_counter.first);
+          metric.set_name(std::string(named_counter.first));
           metric.set_value(named_counter.second.get().value());
           metric.set_type(envoy::admin::v2alpha::SimpleMetric::COUNTER);
         }
 
         for (const auto& named_gauge : host->gauges()) {
           auto& metric = *host_status.add_stats();
-          metric.set_name(named_gauge.first);
+          metric.set_name(std::string(named_gauge.first));
           metric.set_value(named_gauge.second.get().value());
           metric.set_type(envoy::admin::v2alpha::SimpleMetric::GAUGE);
         }
@@ -437,7 +437,7 @@ void AdminImpl::writeClustersAsText(Buffer::Instance& response) {
                              cluster.second.get().info()->addedViaApi()));
     for (auto& host_set : cluster.second.get().prioritySet().hostSetsPerPriority()) {
       for (auto& host : host_set->hosts()) {
-        std::map<std::string, uint64_t> all_stats;
+        std::map<absl::string_view, uint64_t> all_stats;
         for (const auto& counter : host->counters()) {
           all_stats[counter.first] = counter.second.get().value();
         }

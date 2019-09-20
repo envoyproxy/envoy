@@ -11,6 +11,8 @@
 #include "envoy/upstream/health_check_host_monitor.h"
 #include "envoy/upstream/outlier_detection.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Upstream {
 
@@ -37,13 +39,15 @@ namespace Upstream {
 struct HostStats {
   ALL_HOST_STATS(GENERATE_PRIMITIVE_COUNTER_STRUCT, GENERATE_PRIMITIVE_GAUGE_STRUCT);
 
-  // Provide access to counters as a map.
-  std::map<std::string, std::reference_wrapper<const Stats::PrimitiveCounter>> counters() const {
+  // Provide access to name,counter pairs.
+  std::vector<std::pair<absl::string_view, std::reference_wrapper<const Stats::PrimitiveCounter>>>
+  counters() const {
     return {ALL_HOST_STATS(PRIMITIVE_COUNTER_NAME_AND_REFERENCE, IGNORE_PRIMITIVE_GAUGE)};
   }
 
-  // Provide access to gauges as a map.
-  std::map<std::string, std::reference_wrapper<const Stats::PrimitiveGauge>> gauges() const {
+  // Provide access to name,gauge pairs.
+  std::vector<std::pair<absl::string_view, std::reference_wrapper<const Stats::PrimitiveGauge>>>
+  gauges() const {
     return {ALL_HOST_STATS(IGNORE_PRIMITIVE_COUNTER, PRIMITIVE_GAUGE_NAME_AND_REFERENCE)};
   }
 };

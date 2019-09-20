@@ -2,6 +2,8 @@
 
 #include "envoy/stats/primitive_stats.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 /**
  * These are helper macros for allocating "fixed" stats throughout the code base in a way that
@@ -23,13 +25,15 @@ namespace Envoy {
  *     MY_COOL_STATS(GENERATE_PRIMITIVE_COUNTER_STRUCT, GENERATE_PRIMITIVE_GAUGE_STRUCT);
  *
  *     // Optional: Provide access to counters as a map.
- *     std::map<std::string, std::reference_wrapper<const Envoy::Stats::PrimitiveCounter>>
+ *     std::vector<
+ *         std::pair<absl::string_view, std::reference_wrapper<const Stats::PrimitiveCounter>>>
  *     counters() const {
- *       return {MY_COOL_STATS(PRIMITIVE_COUNTER_NAME_AND_REFERENCE, IGNORE_PRIMITIVE_GAUGE)};
+ *         return {MY_COOL_STATS(PRIMITIVE_COUNTER_NAME_AND_REFERENCE, IGNORE_PRIMITIVE_GAUGE)};
  *     }
  *
  *     // Optional: Provide access to gauges as a map.
- *     std::map<std::string, std::reference_wrapper<const Envoy::Stats::PrimitiveGauge>>
+ *     std::vector<
+ *         std::pair<absl::string_view, std::reference_wrapper<const Stats::PrimitiveGauge>>>
  *     gauges() const {
  *       return {MY_COOL_STATS(IGNORE_PRIMITIVE_COUNTER, PRIMITIVE_GAUGE_NAME_AND_REFERENCE)};
  *     }
@@ -44,8 +48,8 @@ namespace Envoy {
 #define GENERATE_PRIMITIVE_GAUGE_STRUCT(NAME) Envoy::Stats::PrimitiveGauge NAME##_;
 
 // Name and counter/gauge reference pair used to construct map of counters/gauges.
-#define PRIMITIVE_COUNTER_NAME_AND_REFERENCE(X) {std::string(#X), std::ref(X##_)},
-#define PRIMITIVE_GAUGE_NAME_AND_REFERENCE(X) {std::string(#X), std::ref(X##_)},
+#define PRIMITIVE_COUNTER_NAME_AND_REFERENCE(X) {absl::string_view(#X), std::ref(X##_)},
+#define PRIMITIVE_GAUGE_NAME_AND_REFERENCE(X) {absl::string_view(#X), std::ref(X##_)},
 
 // Ignore a counter or gauge.
 #define IGNORE_PRIMITIVE_COUNTER(X)

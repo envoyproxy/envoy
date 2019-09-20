@@ -180,7 +180,7 @@ public:
   }
 
   // Upstream::Host
-  std::map<std::string, std::reference_wrapper<const Stats::PrimitiveCounter>>
+  std::vector<std::pair<absl::string_view, std::reference_wrapper<const Stats::PrimitiveCounter>>>
   counters() const override {
     return stats_.counters();
   }
@@ -188,7 +188,7 @@ public:
       Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
       Network::TransportSocketOptionsSharedPtr transport_socket_options) const override;
   CreateConnectionData createHealthCheckConnection(Event::Dispatcher& dispatcher) const override;
-  std::map<std::string, std::reference_wrapper<const Stats::PrimitiveGauge>>
+  std::vector<std::pair<absl::string_view, std::reference_wrapper<const Stats::PrimitiveGauge>>>
   gauges() const override {
     return stats_.gauges();
   }
