@@ -118,7 +118,6 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
         if (item->x509) {
           X509_STORE_add_cert(store, item->x509);
           if (ca_cert_ == nullptr) {
-            X509_up_ref(item->x509);
             ca_cert_.reset(item->x509);
           }
         }
