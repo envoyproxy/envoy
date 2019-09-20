@@ -42,8 +42,7 @@ public:
   }
 };
 
-class ActiveQuicListenerTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                               protected Logger::Loggable<Logger::Id::main> {
+class ActiveQuicListenerTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   ActiveQuicListenerTest()
       : version_(GetParam()), api_(Api::createApiForTest(simulated_time_system_)),

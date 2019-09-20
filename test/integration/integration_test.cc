@@ -53,6 +53,10 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, IntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 // Make sure we have correctly specified per-worker performance stats.
+// TODO(mattklein123): We should flesh this test out to a) actually use more than 1 worker and
+// b) do some real requests and verify things work correctly on a per-worker basis. I will do this
+// in my next change when I add optional CX balancing as it well then be easier to write a
+// deterministic test.
 TEST_P(IntegrationTest, PerWorkerStats) {
   initialize();
 

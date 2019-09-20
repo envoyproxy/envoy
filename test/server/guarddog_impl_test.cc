@@ -197,17 +197,21 @@ class GuardDogMissTest : public GuardDogTestBase {
 protected:
   GuardDogMissTest() : config_miss_(500, 1000, 0, 0), config_mega_(1000, 500, 0, 0) {}
 
-  void checkMiss(uint64_t count) {
-    EXPECT_EQ(count, TestUtility::findCounter(stats_store_, "server.watchdog_miss")->value());
+  void checkMiss(uint64_t count, const std::string& descriptor) {
+    EXPECT_EQ(count, TestUtility::findCounter(stats_store_, "server.watchdog_miss")->value())
+        << descriptor;
     EXPECT_EQ(count,
-              TestUtility::findCounter(stats_store_, "server.test_thread.watchdog_miss")->value());
+              TestUtility::findCounter(stats_store_, "server.test_thread.watchdog_miss")->value())
+        << descriptor;
   }
 
-  void checkMegaMiss(uint64_t count) {
-    EXPECT_EQ(count, TestUtility::findCounter(stats_store_, "server.watchdog_mega_miss")->value());
+  void checkMegaMiss(uint64_t count, const std::string& descriptor) {
+    EXPECT_EQ(count, TestUtility::findCounter(stats_store_, "server.watchdog_mega_miss")->value())
+        << descriptor;
     EXPECT_EQ(
         count,
-        TestUtility::findCounter(stats_store_, "server.test_thread.watchdog_mega_miss")->value());
+        TestUtility::findCounter(stats_store_, "server.test_thread.watchdog_mega_miss")->value())
+        << descriptor;
   }
 
   NiceMock<Configuration::MockMain> config_miss_;
@@ -224,15 +228,15 @@ TEST_P(GuardDogMissTest, MissTest) {
   auto unpet_dog =
       guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
   // We'd better start at 0:
-  checkMiss(0);
+  checkMiss(0, "MissTest check 1");
   // At 300ms we shouldn't have hit the timeout yet:
   time_system_->sleep(std::chrono::milliseconds(300));
   guard_dog_->forceCheckForTest();
-  checkMiss(0);
+  checkMiss(0, "MissTest check 2");
   // This should push it past the 500ms limit:
   time_system_->sleep(std::chrono::milliseconds(250));
   guard_dog_->forceCheckForTest();
-  checkMiss(1);
+  checkMiss(1, "MissTest check 3");
   guard_dog_->stopWatching(unpet_dog);
   unpet_dog = nullptr;
 }
@@ -249,15 +253,15 @@ TEST_P(GuardDogMissTest, MegaMissTest) {
   auto unpet_dog =
       guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
   // We'd better start at 0:
-  checkMegaMiss(0);
+  checkMegaMiss(0, "MegaMissTest check 1");
   // This shouldn't be enough to increment the stat:
   time_system_->sleep(std::chrono::milliseconds(499));
   guard_dog_->forceCheckForTest();
-  checkMegaMiss(0);
+  checkMegaMiss(0, "MegaMissTest check 2");
   // Just 2ms more will make it greater than 500ms timeout:
   time_system_->sleep(std::chrono::milliseconds(2));
   guard_dog_->forceCheckForTest();
-  checkMegaMiss(1);
+  checkMegaMiss(1, "MegaMissTest check 3");
   guard_dog_->stopWatching(unpet_dog);
   unpet_dog = nullptr;
 }
@@ -282,17 +286,17 @@ TEST_P(GuardDogMissTest, MissCountTest) {
     // This shouldn't be enough to increment the stat:
     time_system_->sleep(std::chrono::milliseconds(499));
     guard_dog_->forceCheckForTest();
-    checkMiss(i);
+    checkMiss(i, "MissCountTest check 1");
     // And if we force re-execution of the loop it still shouldn't be:
     guard_dog_->forceCheckForTest();
-    checkMiss(i);
+    checkMiss(i, "MissCountTest check 2");
     // Just 2ms more will make it greater than 500ms timeout:
     time_system_->sleep(std::chrono::milliseconds(2));
     guard_dog_->forceCheckForTest();
-    checkMiss(i + 1);
+    checkMiss(i + 1, "MissCountTest check 3");
     // Spurious wakeup, we should still only have one miss counted.
     guard_dog_->forceCheckForTest();
-    checkMiss(i + 1);
+    checkMiss(i + 1, "MissCountTest check 4");
     // When we finally touch the dog we should get one more increment once the
     // timeout value expires:
     sometimes_pet_dog->touch();
@@ -300,10 +304,10 @@ TEST_P(GuardDogMissTest, MissCountTest) {
   time_system_->sleep(std::chrono::milliseconds(1000));
   sometimes_pet_dog->touch();
   // Make sure megamiss still works:
-  checkMegaMiss(0UL);
+  checkMegaMiss(0UL, "MissCountTest check 5");
   time_system_->sleep(std::chrono::milliseconds(1500));
   guard_dog_->forceCheckForTest();
-  checkMegaMiss(1UL);
+  checkMegaMiss(1UL, "MissCountTest check 6");
 
   guard_dog_->stopWatching(sometimes_pet_dog);
   sometimes_pet_dog = nullptr;
