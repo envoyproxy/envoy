@@ -27,6 +27,7 @@ Version history
 * fault: added overrides for default runtime keys in :ref:`HTTPFault <envoy_api_msg_config.filter.http.fault.v2.HTTPFault>` filter.
 * grpc: added :ref:`AWS IAM grpc credentials extension <envoy_api_file_envoy/config/grpc_credential/v2alpha/aws_iam.proto>` for AWS-managed xDS.
 * grpc-json: added support for :ref:`ignoring unknown query parameters<envoy_api_field_config.filter.http.transcoder.v2.GrpcJsonTranscoder.ignore_unknown_query_parameters>`.
+* grpc-json: added support for :ref:`the grpc-status-details-bin header<envoy_api_field_config.filter.http.transcoder.v2.GrpcJsonTranscoder.convert_grpc_status>`.
 * header to metadata: added :ref:`PROTOBUF_VALUE <envoy_api_enum_value_config.filter.http.header_to_metadata.v2.Config.ValueType.PROTOBUF_VALUE>` and :ref:`ValueEncode <envoy_api_enum_config.filter.http.header_to_metadata.v2.Config.ValueEncode>` to support protobuf Value and Base64 encoding.
 * http: added the ability to reject HTTP/1.1 requests with invalid HTTP header values, using the runtime feature `envoy.reloadable_features.strict_header_validation`.
 * http: changed Envoy to forward existing x-forwarded-proto from upstream trusted proxies. Guarded by `envoy.reloadable_features.trusted_forwarded_proto` which defaults true.
