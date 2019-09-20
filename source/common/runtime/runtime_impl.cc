@@ -342,15 +342,6 @@ bool SnapshotImpl::parseEntryBooleanValue(Entry& entry) {
   return false;
 }
 
-bool SnapshotImpl::parseEntryUintValue(Entry& entry) {
-  uint64_t converted_uint64;
-  if (absl::SimpleAtoi(entry.raw_string_value_, &converted_uint64)) {
-    entry.uint_value_ = converted_uint64;
-    return true;
-  }
-  return false;
-}
-
 bool SnapshotImpl::parseEntryDoubleValue(Entry& entry) {
   double converted_double;
   if (absl::SimpleAtod(entry.raw_string_value_, &converted_double)) {

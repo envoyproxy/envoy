@@ -108,7 +108,7 @@ private:
       return;
     }
 
-    if (parseEntryDoubleValue(entry)) {
+    if (parseEntryDoubleValue(entry) && entry.double_value_ >= 0) {
       // Valid uint values will always be parseable as doubles, so we assign the value to both the
       // uint and double fields. In cases where the value is something like "3.1", we will floor the
       // number by casting it to a uint and assigning the uint value.
@@ -120,7 +120,6 @@ private:
   }
 
   static bool parseEntryBooleanValue(Entry& entry);
-  static bool parseEntryUintValue(Entry& entry);
   static bool parseEntryDoubleValue(Entry& entry);
   static void parseEntryFractionalPercentValue(Entry& entry);
 

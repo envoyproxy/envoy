@@ -187,7 +187,8 @@ public:
   virtual const std::string& get(const std::string& key) const PURE;
 
   /**
-   * Fetch an integer runtime key.
+   * Fetch an integer runtime key. Runtime keys larger than ~2^53 may not be accurately converted
+   * into integers and will return default_value.
    * @param key supplies the key to fetch.
    * @param default_value supplies the value to return if the key does not exist or it does not
    *        contain an integer.

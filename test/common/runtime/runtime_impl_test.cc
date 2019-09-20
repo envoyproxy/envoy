@@ -146,6 +146,22 @@ TEST_F(DiskLoaderImplTest, DoubleUintInteraction) {
   EXPECT_EQ(2.0, loader_->snapshot().getDouble("file3", 1.1));
 }
 
+TEST_F(DiskLoaderImplTest, DoubleUintInteractionNegatives) {
+  setup();
+  run("test/common/runtime/test_data/current", "envoy_override");
+
+  EXPECT_EQ(1, loader_->snapshot().getInteger("file_with_negative_double", 1));
+  EXPECT_EQ(-4.2, loader_->snapshot().getDouble("file_with_negative_double", 1.1));
+}
+
+TEST_F(DiskLoaderImplTest, DoubleUintLargeIntegerConversion) {
+  setup();
+  run("test/common/runtime/test_data/current", "envoy_override");
+
+  EXPECT_EQ(1, loader_->snapshot().getInteger("file_with_negative_double", 1));
+  EXPECT_EQ(-4.2, loader_->snapshot().getDouble("file_with_negative_double", 1.1));
+}
+
 TEST_F(DiskLoaderImplTest, All) {
   setup();
   run("test/common/runtime/test_data/current", "envoy_override");
