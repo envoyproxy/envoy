@@ -132,16 +132,11 @@ ContextConfigImpl::ContextConfigImpl(
     // validation of combined certificate validation context fails,
     // getCombinedValidationContextConfig() throws exception, validation_context_config_ will not
     // get updated.
-    auto certificate_validation_context_sds_api_provider =
-        dynamic_cast<Secret::CertificateValidationContextSdsApi*>(
-            certificate_validation_context_provider_.get());
-    if (certificate_validation_context_sds_api_provider != nullptr) {
-      cvc_validation_callback_handle_ =
-          certificate_validation_context_sds_api_provider->addValidationCallback(
-              [this](const envoy::api::v2::auth::CertificateValidationContext& dynamic_cvc) {
-                getCombinedValidationContextConfig(dynamic_cvc);
-              });
-    }
+    cvc_validation_callback_handle_ =
+        certificate_validation_context_provider_->addValidationCallback(
+            [this](const envoy::api::v2::auth::CertificateValidationContext& dynamic_cvc) {
+              getCombinedValidationContextConfig(dynamic_cvc);
+            });
   }
   // Load inline or static secret into tls_certificate_config_.
   if (!tls_certificate_providers_.empty()) {
