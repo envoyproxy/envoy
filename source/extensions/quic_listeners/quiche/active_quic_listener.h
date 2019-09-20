@@ -91,11 +91,13 @@ public:
     quic_config_.SetMaxIncomingUnidirectionalStreamsToSend(max_streams);
   }
 
+  // Network::ActiveUdpListenerFactory.
   Network::ConnectionHandler::ActiveListenerPtr
   createActiveUdpListener(Network::ConnectionHandler& parent, Event::Dispatcher& disptacher,
                           spdlog::logger& logger, Network::ListenerConfig& config) const override {
     return std::make_unique<ActiveQuicListener>(disptacher, parent, logger, config, quic_config_);
   }
+  bool isTransportConnectionless() const override { return false; }
 
 private:
   friend class ActiveQuicListenerFactoryPeer;

@@ -69,11 +69,23 @@ public:
                    const Protobuf::MethodDescriptor*& method_descriptor);
 
   /**
+   * Converts an arbitrary protobuf message to JSON.
+   */
+  ProtobufUtil::Status translateProtoMessageToJson(const Protobuf::Message& message,
+                                                   std::string* json_out);
+
+  /**
    * If true, skip clearing the route cache after the incoming request has been modified.
    * This allows Envoy to select the upstream cluster based on the incoming request
    * rather than the outgoing.
    */
   bool matchIncomingRequestInfo() const;
+
+  /**
+   * If true, when trailer indicates a gRPC error and there was no HTTP body,
+   * make google.rpc.Status out of gRPC status headers and use it as JSON body.
+   */
+  bool convertGrpcStatus() const;
 
 private:
   /**
@@ -83,6 +95,9 @@ private:
                                            google::grpc::transcoding::RequestInfo* info);
 
 private:
+  void addFileDescriptor(const Protobuf::FileDescriptorProto& file);
+  void addBuiltinSymbolDescriptor(const std::string& symbol_name);
+
   Protobuf::DescriptorPool descriptor_pool_;
   google::grpc::transcoding::PathMatcherPtr<const Protobuf::MethodDescriptor*> path_matcher_;
   std::unique_ptr<google::grpc::transcoding::TypeHelper> type_helper_;
@@ -90,6 +105,7 @@ private:
 
   bool match_incoming_request_route_{false};
   bool ignore_unknown_query_parameters_{false};
+  bool convert_grpc_status_{false};
 };
 
 using JsonTranscoderConfigSharedPtr = std::shared_ptr<JsonTranscoderConfig>;
@@ -125,6 +141,7 @@ public:
 private:
   bool readToBuffer(Protobuf::io::ZeroCopyInputStream& stream, Buffer::Instance& data);
   void buildResponseFromHttpBodyOutput(Http::HeaderMap& response_headers, Buffer::Instance& data);
+  bool maybeConvertGrpcStatus(Grpc::Status::GrpcStatus grpc_status, Http::HeaderMap& trailers);
   bool hasHttpBodyAsOutputType();
 
   JsonTranscoderConfig& config_;
@@ -139,6 +156,7 @@ private:
 
   bool error_{false};
   bool has_http_body_output_{false};
+  bool has_body_{false};
 };
 
 } // namespace GrpcJsonTranscoder

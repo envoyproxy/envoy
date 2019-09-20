@@ -42,7 +42,8 @@ public:
   }
 
   HttpSubsetLbIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, Network::Address::IpVersion::v4,
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1,
+                            TestEnvironment::getIpVersionsForTest().front(),
                             ConfigHelper::HTTP_PROXY_CONFIG),
         num_hosts_{4}, is_hash_lb_(GetParam() == envoy::api::v2::Cluster_LbPolicy_RING_HASH ||
                                    GetParam() == envoy::api::v2::Cluster_LbPolicy_MAGLEV) {
@@ -60,8 +61,8 @@ public:
 
       cluster->clear_hosts();
 
-      // Create a load assignment with num_hosts_ entries with metadata split evenly between type=a
-      // and type=b.
+      // Create a load assignment with num_hosts_ entries with metadata split evenly between
+      // type=a and type=b.
       auto* load_assignment = cluster->mutable_load_assignment();
       load_assignment->set_cluster_name(cluster->name());
       auto* endpoints = load_assignment->add_endpoints();
@@ -71,7 +72,8 @@ public:
         // ConfigHelper will fill in ports later.
         auto* endpoint = lb_endpoint->mutable_endpoint();
         auto* addr = endpoint->mutable_address()->mutable_socket_address();
-        addr->set_address("127.0.0.1");
+        addr->set_address(Network::Test::getLoopbackAddressString(
+            TestEnvironment::getIpVersionsForTest().front()));
         addr->set_port_value(0);
 
         // Assign type metadata based on i.

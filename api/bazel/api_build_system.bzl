@@ -9,7 +9,7 @@ _CC_SUFFIX = "_cc"
 _CC_GRPC_SUFFIX = "_cc_grpc"
 _CC_EXPORT_SUFFIX = "_export_cc"
 _GO_PROTO_SUFFIX = "_go_proto"
-_GO_IMPORTPATH_PREFIX = "github.com/envoyproxy/data-plane-api/api/"
+_GO_IMPORTPATH_PREFIX = "github.com/envoyproxy/go-control-plane/"
 
 _COMMON_PROTO_DEPS = [
     "@com_google_protobuf//:any_proto",

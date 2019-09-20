@@ -9,34 +9,25 @@ namespace Common {
 namespace Redis {
 
 RedisCommandStats::RedisCommandStats(Stats::SymbolTable& symbol_table, const std::string& prefix)
-    : symbol_table_(symbol_table), stat_name_pool_(symbol_table_),
-      prefix_(stat_name_pool_.add(prefix)),
-      upstream_rq_time_(stat_name_pool_.add("upstream_rq_time")),
-      latency_(stat_name_pool_.add("latency")), total_(stat_name_pool_.add("total")),
-      success_(stat_name_pool_.add("success")), error_(stat_name_pool_.add("error")),
-      unused_metric_(stat_name_pool_.add("unused")), null_metric_(stat_name_pool_.add("null")),
-      unknown_metric_(stat_name_pool_.add("unknown")) {
+    : symbol_table_(symbol_table), stat_name_set_(symbol_table_),
+      prefix_(stat_name_set_.add(prefix)),
+      upstream_rq_time_(stat_name_set_.add("upstream_rq_time")),
+      latency_(stat_name_set_.add("latency")), total_(stat_name_set_.add("total")),
+      success_(stat_name_set_.add("success")), error_(stat_name_set_.add("error")),
+      unused_metric_(stat_name_set_.add("unused")), null_metric_(stat_name_set_.add("null")),
+      unknown_metric_(stat_name_set_.add("unknown")) {
   // Note: Even if this is disabled, we track the upstream_rq_time.
   // Create StatName for each Redis command. Note that we don't include Auth or Ping.
-  for (const std::string& command :
-       Extensions::NetworkFilters::Common::Redis::SupportedCommands::simpleCommands()) {
-    addCommandToPool(command);
-  }
-  for (const std::string& command :
-       Extensions::NetworkFilters::Common::Redis::SupportedCommands::evalCommands()) {
-    addCommandToPool(command);
-  }
-  for (const std::string& command : Extensions::NetworkFilters::Common::Redis::SupportedCommands::
-           hashMultipleSumResultCommands()) {
-    addCommandToPool(command);
-  }
-  addCommandToPool(Extensions::NetworkFilters::Common::Redis::SupportedCommands::mget());
-  addCommandToPool(Extensions::NetworkFilters::Common::Redis::SupportedCommands::mset());
-}
-
-void RedisCommandStats::addCommandToPool(const std::string& command_string) {
-  Stats::StatName command = stat_name_pool_.add(command_string);
-  stat_name_map_[command_string] = command;
+  stat_name_set_.rememberBuiltins(
+      Extensions::NetworkFilters::Common::Redis::SupportedCommands::simpleCommands());
+  stat_name_set_.rememberBuiltins(
+      Extensions::NetworkFilters::Common::Redis::SupportedCommands::evalCommands());
+  stat_name_set_.rememberBuiltins(Extensions::NetworkFilters::Common::Redis::SupportedCommands::
+                                      hashMultipleSumResultCommands());
+  stat_name_set_.rememberBuiltin(
+      Extensions::NetworkFilters::Common::Redis::SupportedCommands::mget());
+  stat_name_set_.rememberBuiltin(
+      Extensions::NetworkFilters::Common::Redis::SupportedCommands::mset());
 }
 
 Stats::Counter& RedisCommandStats::counter(Stats::Scope& scope,
@@ -76,17 +67,9 @@ Stats::StatName RedisCommandStats::getCommandFromRequest(const RespValue& reques
   case RespType::Null:
     return null_metric_;
   default:
-    // Once we have a RespType::String we lowercase it and then look it up in our stat_name_map.
-    // If it does not exist, we return our unknown stat name.
     std::string to_lower_command(request.asString());
     to_lower_table_.toLowerCase(to_lower_command);
-
-    auto iter = stat_name_map_.find(to_lower_command);
-    if (iter != stat_name_map_.end()) {
-      return iter->second;
-    } else {
-      return unknown_metric_;
-    }
+    return stat_name_set_.getBuiltin(to_lower_command, unknown_metric_);
   }
 }
 
