@@ -119,4 +119,34 @@ message GrpcJsonTranscoder {
   // not know them beforehand. Otherwise use ``ignored_query_parameters``.
   // Defaults to false.
   bool ignore_unknown_query_parameters = 8;
+
+  // Whether to convert gRPC status headers to JSON.
+  // When trailer indicates a gRPC error and there was no HTTP body, take ``google.rpc.Status``
+  // from the ``grpc-status-details-bin`` header and use it as JSON body.
+  // If there was no such header, make ``google.rpc.Status`` out of the ``grpc-status`` and
+  // ``grpc-message`` headers.
+  // The error details types must be present in the ``proto_descriptor``.
+  //
+  // For example, if an upstream server replies with headers:
+  //
+  // .. code-block:: none
+  //
+  //     grpc-status: 5
+  //     grpc-status-details-bin:
+  //         CAUaMwoqdHlwZS5nb29nbGVhcGlzLmNvbS9nb29nbGUucnBjLlJlcXVlc3RJbmZvEgUKA3ItMQ
+  //
+  // The ``grpc-status-details-bin`` header contains a base64-encoded protobuf message
+  // ``google.rpc.Status``. It will be transcoded into:
+  //
+  // .. code-block:: none
+  //
+  //     HTTP/1.1 404 Not Found
+  //     content-type: application/json
+  //
+  //     {"code":5,"details":[{"@type":"type.googleapis.com/google.rpc.RequestInfo","requestId":"r-1"}]}
+  //
+  //  In order to transcode the message, the ``google.rpc.RequestInfo`` type from
+  //  the ``google/rpc/error_details.proto`` should be included in the configured
+  //  :ref:`proto descriptor set <config_grpc_json_generate_proto_descriptor_set>`.
+  bool convert_grpc_status = 9;
 }

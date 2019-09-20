@@ -274,6 +274,26 @@ The following command operators are supported:
     :ref:`proxy proto <envoy_api_field_listener.FilterChain.use_proxy_proto>` or :ref:`x-forwarded-for
     <config_http_conn_man_headers_x-forwarded-for>`.
 
+%DOWNSTREAM_DIRECT_REMOTE_ADDRESS%
+  Direct remote address of the downstream connection. If the address is an IP address it includes both
+  address and port.
+
+  .. note::
+
+    This is always the physical remote address of the peer even if the downstream remote address has 
+    been inferred from :ref:`proxy proto <envoy_api_field_listener.FilterChain.use_proxy_proto>`
+    or :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`.
+
+%DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT%
+  The direct remote address of the downstream connection. If the address is an IP address the output does
+  *not* include port.
+
+  .. note::
+
+    This is always the physical remote address of the peer even if the downstream remote address has 
+    been inferred from :ref:`proxy proto <envoy_api_field_listener.FilterChain.use_proxy_proto>`
+    or :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`.
+
 %DOWNSTREAM_LOCAL_ADDRESS%
   Local address of the downstream connection. If the address is an IP address it includes both
   address and port.

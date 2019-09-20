@@ -1,0 +1,21 @@
+# Azure Pipelines
+# TODO(lizan): Consider rolling all presubmit jobs into one file.
+trigger:
+- master
+
+jobs:
+- job: Windows
+  timeoutInMinutes: 360
+  pool:
+    vmImage: 'windows-latest'
+
+  steps:
+  - powershell: |
+      .\ci\windows_ci_setup.ps1
+      Write-Host "##vso[task.prependpath]$env:TOOLS_BIN_DIR"
+    displayName: 'Install dependencies'
+    env:
+      TOOLS_BIN_DIR: $(Pipeline.Workspace)\bin
+
+  - powershell: .\ci\windows_ci_steps.ps1
+    displayName: 'Run Windows CI'

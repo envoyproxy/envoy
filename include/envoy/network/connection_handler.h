@@ -27,6 +27,19 @@ public:
   virtual uint64_t numConnections() PURE;
 
   /**
+   * Increment the return value of numConnections() by one.
+   * TODO(mattklein123): re-visit the connection accounting interface. Make TCP
+   * listener to do accounting through these interfaces instead of directly
+   * access the counter.
+   */
+  virtual void incNumConnections() PURE;
+
+  /**
+   * Decrement the return value of numConnections() by one.
+   */
+  virtual void decNumConnections() PURE;
+
+  /**
    * Adds a listener to the handler.
    * @param config listener configuration options.
    */
@@ -120,6 +133,11 @@ public:
   virtual ConnectionHandler::ActiveListenerPtr
   createActiveUdpListener(ConnectionHandler& parent, Event::Dispatcher& disptacher,
                           spdlog::logger& logger, Network::ListenerConfig& config) const PURE;
+
+  /**
+   * @return true if the UDP passing through listener doesn't form stateful connections.
+   */
+  virtual bool isTransportConnectionless() const PURE;
 };
 
 using ActiveUdpListenerFactoryPtr = std::unique_ptr<ActiveUdpListenerFactory>;

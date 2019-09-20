@@ -18,6 +18,7 @@ BSON
 CAS
 CB
 CBs
+CEL
 CDS
 CHACHA
 CHLO
@@ -426,6 +427,7 @@ decls
 dedup
 dedupe
 deduplicate
+deduplicates
 deflateInit
 deletable
 deleter
