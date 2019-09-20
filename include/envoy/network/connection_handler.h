@@ -9,8 +9,6 @@
 #include "envoy/network/listener.h"
 #include "envoy/ssl/context.h"
 
-#include "spdlog/spdlog.h"
-
 namespace Envoy {
 namespace Network {
 
@@ -85,6 +83,11 @@ public:
   virtual void enableListeners() PURE;
 
   /**
+   * @return the stat prefix used for per-handler stats.
+   */
+  virtual const std::string& statPrefix() PURE;
+
+  /**
    * Used by ConnectionHandler to manage listeners.
    */
   class ActiveListener {
@@ -95,10 +98,12 @@ public:
      * @return the tag value as configured.
      */
     virtual uint64_t listenerTag() PURE;
+
     /**
      * @return the actual Listener object.
      */
     virtual Listener* listener() PURE;
+
     /**
      * Destroy the actual Listener it wraps.
      */
@@ -111,8 +116,7 @@ public:
 using ConnectionHandlerPtr = std::unique_ptr<ConnectionHandler>;
 
 /**
- * A registered factory interface to create different kinds of
- * ActiveUdpListener.
+ * A registered factory interface to create different kinds of ActiveUdpListener.
  */
 class ActiveUdpListenerFactory {
 public:
@@ -123,16 +127,13 @@ public:
    * according to given config.
    * @param parent is the owner of the created ActiveListener objects.
    * @param dispatcher is used to create actual UDP listener.
-   * @param logger might not need to be passed in.
-   * TODO(danzh): investigate if possible to use statically defined logger in ActiveUdpListener
-   * implementation instead.
    * @param config provides information needed to create ActiveUdpListener and
    * UdpListener objects.
    * @return the ActiveUdpListener created.
    */
   virtual ConnectionHandler::ActiveListenerPtr
   createActiveUdpListener(ConnectionHandler& parent, Event::Dispatcher& disptacher,
-                          spdlog::logger& logger, Network::ListenerConfig& config) const PURE;
+                          Network::ListenerConfig& config) const PURE;
 
   /**
    * @return true if the UDP passing through listener doesn't form stateful connections.
