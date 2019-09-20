@@ -154,14 +154,6 @@ TEST_F(DiskLoaderImplTest, DoubleUintInteractionNegatives) {
   EXPECT_EQ(-4.2, loader_->snapshot().getDouble("file_with_negative_double", 1.1));
 }
 
-TEST_F(DiskLoaderImplTest, DoubleUintLargeIntegerConversion) {
-  setup();
-  run("test/common/runtime/test_data/current", "envoy_override");
-
-  EXPECT_EQ(1, loader_->snapshot().getInteger("file_with_negative_double", 1));
-  EXPECT_EQ(-4.2, loader_->snapshot().getDouble("file_with_negative_double", 1.1));
-}
-
 TEST_F(DiskLoaderImplTest, All) {
   setup();
   run("test/common/runtime/test_data/current", "envoy_override");
@@ -280,8 +272,15 @@ TEST_F(DiskLoaderImplTest, All) {
 
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(1, store_.counter("runtime.load_success").value());
-  EXPECT_EQ(21, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+  EXPECT_EQ(23, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
   EXPECT_EQ(4, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+}
+
+TEST_F(DiskLoaderImplTest, UintLargeIntegerConversion) {
+  setup();
+  run("test/common/runtime/test_data/current", "envoy_override");
+
+  EXPECT_EQ(1, loader_->snapshot().getInteger("file_with_large_integer", 1));
 }
 
 TEST_F(DiskLoaderImplTest, GetLayers) {
