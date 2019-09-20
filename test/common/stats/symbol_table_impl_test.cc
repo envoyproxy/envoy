@@ -573,7 +573,6 @@ TEST_P(StatNameTest, RecentLookups) {
     return;
   }
 
-  const uint64_t years = 365 * 24 * 3600;
   StatNameSet set1(*table_);
   StatNameSet set2(*table_);
   set1.getDynamic("dynamic.stat1");
