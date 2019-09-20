@@ -430,6 +430,8 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, BindingAndBody) {
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, ServerStreamingGet) {
   HttpIntegrationTest::initialize();
+
+  // 1: Normal streaming get
   testTranscoding<bookstore::ListBooksRequest, bookstore::Book>(
       Http::TestHeaderMapImpl{
           {":method", "GET"}, {":path", "/shelves/1/books"}, {":authority", "host"}},
@@ -439,6 +441,18 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, ServerStreamingGet) {
       Status(), Http::TestHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
       R"([{"id":"1","author":"Neal Stephenson","title":"Readme"})"
       R"(,{"id":"2","author":"George R.R. Martin","title":"A Game of Thrones"}])");
+
+  // 2: Empty response (trailers only) from streaming backend.
+  // Response type is a valid JSON, so content type should be application/json.
+  // Regression test for github.com/envoyproxy/envoy#5011
+  testTranscoding<bookstore::ListBooksRequest, bookstore::Book>(
+      Http::TestHeaderMapImpl{{":method", "GET"}, {":path", "/shelves/2/books"}, {":authority", "host"}},
+      "",
+      {"shelf: 2"},
+      {},
+      Status(),
+      Http::TestHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+      "[]");
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, StreamingPost) {
@@ -553,11 +567,12 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, DeepStruct) {
 
   // The valid deep struct is parsed successfully.
   // Since we didn't set the response, it return 503.
+  // Response body is empty (not a valid JSON), so content type should be application/grpc.
   testTranscoding<bookstore::EchoStructReqResp, bookstore::EchoStructReqResp>(
       Http::TestHeaderMapImpl{
           {":method", "POST"}, {":path", "/echoStruct"}, {":authority", "host"}},
       createDeepJson(100, true), {}, {}, Status(),
-      Http::TestHeaderMapImpl{{":status", "503"}, {"content-type", "application/json"}}, "");
+      Http::TestHeaderMapImpl{{":status", "503"}, {"content-type", "application/grpc"}}, "");
 
   // The invalid deep struct is detected.
   testTranscoding<bookstore::EchoStructReqResp, bookstore::EchoStructReqResp>(
