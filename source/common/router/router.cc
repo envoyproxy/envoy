@@ -1348,21 +1348,9 @@ Filter::UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::I
 
 Filter::UpstreamRequest::~UpstreamRequest() {
   if (span_ != nullptr) {
-    if (parent_.grpc_request_) {
-      // Add gRPC response code to span.
-      const auto response_code =
-          Grpc::Common::responseToGrpcStatus(stream_info_, *upstream_headers_, *upstream_trailers_);
-      if (response_code) {
-        span_->setTag(Tracing::Tags::get().GrpcStatusCode, std::to_string(response_code.value()));
-      }
-    } else {
-      // Add HTTP response code to span.
-      const auto response_code = stream_info_.responseCode();
-      if (response_code) {
-        span_->setTag(Tracing::Tags::get().HttpStatusCode, std::to_string(response_code.value()));
-      }
-    }
-    span_->finishSpan();
+    Tracing::HttpTracerUtility::finalizeSpan(*span_, nullptr,
+                                             upstream_headers_.get(), upstream_trailers_.get(),
+                                             stream_info_, Tracing::EgressConfig::get());
   }
 
   if (per_try_timeout_ != nullptr) {
