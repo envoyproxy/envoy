@@ -59,6 +59,7 @@ public:
 
   void TearDown() override {
     HttpIntegrationTest::cleanupUpstreamAndDownstream();
+    codec_client_->close();
     codec_client_.reset();
   }
 
@@ -67,11 +68,12 @@ protected:
   // will delay them.
   void sendRequests(const uint32_t request_count, const uint32_t num_forwarded);
 
-  // Responds to all queued up requests in a FIFO manner and asserts that the exact number specified
-  // are forwarded.  Assumes the oldest requests are the forwarded requests.
+  // Waits for a specified durationa and then responds to all queued up requests in a FIFO manner.
+  // Asserts that the expected number of requests are forwarded through the filter. The oldest
+  // requests are the forwarded requests.
   //
   // Note: For interleaved forwarded/blocked requests, use respondToRequest() directly.
-  void respondToAllRequests(const int forwarded_count);
+  void respondToAllRequests(const int forwarded_count, const std::chrono::milliseconds latency);
 
   // Responds to a single request in a FIFO manner. Asserts the forwarding expectation.
   void respondToRequest(const bool expect_forwarded);
