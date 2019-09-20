@@ -79,19 +79,15 @@ void Cluster::startPreInit() {
 }
 
 void Cluster::refresh(std::function<bool(const std::string&)>&& skip_predicate) {
-  PriorityContext priority_set = linearizePrioritySet(std::move(skip_predicate));
   // Post the priority set to worker threads.
-  tls_->runOnAllThreads([this, &priority_set, cluster_name = this->info()->name()]() {
-    LoadBalancerImplSharedPtr lb = nullptr;
-    if (!priority_set.first.hostSetsPerPriority().empty()) {
-      lb = std::make_shared<LoadBalancerImpl>(*this, priority_set);
-    }
+  tls_->runOnAllThreads([this, skip_predicate, cluster_name = this->info()->name()]() {
+    PriorityContext priority_set = linearizePrioritySet(std::move(skip_predicate));
     Upstream::ThreadLocalCluster* cluster = cluster_manager_.get(cluster_name);
     if (cluster == nullptr) {
       return;
     }
     // Downgrade cast to AggregateClusterLoadBalancer
-    dynamic_cast<AggregateClusterLoadBalancer&>(cluster->loadBalancer()).refresh(lb);
+    dynamic_cast<AggregateClusterLoadBalancer&>(cluster->loadBalancer()).refresh(priority_set);
   });
 }
 
@@ -116,7 +112,8 @@ void Cluster::onClusterRemoval(const std::string& cluster_name) {
   }
 }
 
-Upstream::HostConstSharedPtr LoadBalancerImpl::chooseHost(Upstream::LoadBalancerContext* context) {
+Upstream::HostConstSharedPtr
+AggregateClusterLoadBalancer::LoadBalancerImpl::chooseHost(Upstream::LoadBalancerContext* context) {
   const auto priority_pair =
       choosePriority(random_.random(), per_priority_load_.healthy_priority_load_,
                      per_priority_load_.degraded_priority_load_);
@@ -144,7 +141,7 @@ ClusterFactory::createClusterWithConfig(
   auto new_cluster = std::make_shared<Cluster>(
       cluster, proto_config, context.clusterManager(), context.runtime(), context.random(),
       socket_factory_context, std::move(stats_scope), context.tls(), context.addedViaApi());
-  auto lb = std::make_unique<AggregateThreadAwareLoadBalancer>();
+  auto lb = std::make_unique<AggregateThreadAwareLoadBalancer>(*new_cluster);
   return std::make_pair(new_cluster, std::move(lb));
 }
 

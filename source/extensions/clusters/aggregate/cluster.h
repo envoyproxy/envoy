@@ -53,54 +53,82 @@ private:
   PriorityContext linearizePrioritySet(std::function<bool(const std::string&)> skip_predicate);
 };
 
-class LoadBalancerImpl : public Upstream::LoadBalancerBase {
-public:
-  LoadBalancerImpl(Cluster& cluster, PriorityContext& priority_context)
-      : Upstream::LoadBalancerBase(priority_context.first, cluster.info()->stats(),
-                                   cluster.runtime_, cluster.random_, cluster.info()->lbConfig()),
-        priority_to_cluster_(priority_context.second) {}
-
-  // Upstream::LoadBalancer
-  Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext* context) override;
-
-  // Upstream::LoadBalancerBase
-  Upstream::HostConstSharedPtr chooseHostOnce(Upstream::LoadBalancerContext*) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE
-  }
-
-private:
-  std::vector<std::pair<uint32_t, Upstream::ThreadLocalCluster*>> priority_to_cluster_;
-};
-
-using LoadBalancerImplSharedPtr = std::shared_ptr<LoadBalancerImpl>;
-
 // Load balancer used by each worker thread. It will be refreshed when clusters, hosts or priorities
 // are updated.
 class AggregateClusterLoadBalancer : public Upstream::LoadBalancer {
 public:
+  AggregateClusterLoadBalancer(Upstream::ClusterStats& stats, Runtime::Loader& runtime,
+                               Runtime::RandomGenerator& random,
+                               const envoy::api::v2::Cluster::CommonLbConfig& common_config)
+      : stats_(stats), runtime_(runtime), random_(random), common_config_(common_config) {}
+
   // Upstream::LoadBalancer
   Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext* context) override;
 
-  void refresh(LoadBalancerImplSharedPtr load_balancer) { load_balancer_ = load_balancer; }
-
 private:
-  LoadBalancerImplSharedPtr load_balancer_;
+  class LoadBalancerImpl : public Upstream::LoadBalancerBase {
+  public:
+    LoadBalancerImpl(const PriorityContext& priority_context, Upstream::ClusterStats& stats,
+                     Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                     const envoy::api::v2::Cluster::CommonLbConfig& common_config)
+        : Upstream::LoadBalancerBase(priority_context.first, stats, runtime, random, common_config),
+          priority_to_cluster_(priority_context.second) {}
+
+    // Upstream::LoadBalancer
+    Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext* context) override;
+
+    // Upstream::LoadBalancerBase
+    Upstream::HostConstSharedPtr chooseHostOnce(Upstream::LoadBalancerContext*) override {
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE
+    }
+
+  private:
+    std::vector<std::pair<uint32_t, Upstream::ThreadLocalCluster*>> priority_to_cluster_;
+  };
+
+  using LoadBalancerImplPtr = std::unique_ptr<LoadBalancerImpl>;
+
+  LoadBalancerImplPtr load_balancer_;
+  Upstream::ClusterStats& stats_;
+  Runtime::Loader& runtime_;
+  Runtime::RandomGenerator& random_;
+  const envoy::api::v2::Cluster::CommonLbConfig& common_config_;
+
+public:
+  void refresh(const PriorityContext& priority_context) {
+    if (!priority_context.first.hostSetsPerPriority().empty()) {
+      load_balancer_ = std::make_unique<LoadBalancerImpl>(priority_context, stats_, runtime_,
+                                                          random_, common_config_);
+    } else {
+      load_balancer_ = nullptr;
+    }
+  }
 };
 
+// Load balancer factory created by the main thread and will be called in each worker thread to
+// create the thread local load balancer.
 struct AggregateLoadBalancerFactory : public Upstream::LoadBalancerFactory {
+  AggregateLoadBalancerFactory(const Cluster& cluster) : cluster_(cluster) {}
   // Upstream::LoadBalancerFactory
   Upstream::LoadBalancerPtr create() override {
-    return std::make_unique<AggregateClusterLoadBalancer>();
+    return std::make_unique<AggregateClusterLoadBalancer>(
+        cluster_.info()->stats(), cluster_.runtime_, cluster_.random_, cluster_.info()->lbConfig());
   }
+
+  const Cluster& cluster_;
 };
 
 // Thread aware load balancer created by the main thread.
 struct AggregateThreadAwareLoadBalancer : public Upstream::ThreadAwareLoadBalancer {
+  AggregateThreadAwareLoadBalancer(const Cluster& cluster) : cluster_(cluster) {}
+
   // Upstream::ThreadAwareLoadBalancer
   Upstream::LoadBalancerFactorySharedPtr factory() override {
-    return std::make_shared<AggregateLoadBalancerFactory>();
+    return std::make_shared<AggregateLoadBalancerFactory>(cluster_);
   }
   void initialize() override {}
+
+  const Cluster& cluster_;
 };
 
 class ClusterFactory : public Upstream::ConfigurableClusterFactoryBase<
