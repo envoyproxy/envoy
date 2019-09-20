@@ -8,7 +8,6 @@
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/logging.h"
-#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "absl/hash/hash_testing.h"
@@ -574,16 +573,11 @@ TEST_P(StatNameTest, RecentLookups) {
     return;
   }
 
-  Event::SimulatedTimeSystem time_system;
   const uint64_t years = 365 * 24 * 3600;
-  time_system.setSystemTime(SystemTime() + std::chrono::seconds(40 * years));
   StatNameSet set1(*table_);
-  // table_->trackRecentLookups(time_system);
   StatNameSet set2(*table_);
   set1.getDynamic("dynamic.stat1");
-  time_system.sleep(std::chrono::seconds(1));
   set2.getDynamic("dynamic.stat2");
-  time_system.sleep(std::chrono::seconds(1));
   encodeDecode("direct.stat");
 
   std::vector<std::string> accum;
@@ -594,8 +588,8 @@ TEST_P(StatNameTest, RecentLookups) {
   std::string recent_lookups_str = StringUtil::join(accum, " ");
 
   EXPECT_EQ("1: direct.stat "
-            "1: dynamic.stat1 "
-            "1: dynamic.stat2",
+            "2: dynamic.stat1 " // Combines entries from set and symbol-table.
+            "2: dynamic.stat2",
             recent_lookups_str);
 }
 

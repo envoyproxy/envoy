@@ -19,7 +19,7 @@ protected:
     using ItemCount = std::pair<std::string, uint64_t>;
     std::vector<ItemCount> items;
     recent_lookups_.forEach([&items](absl::string_view item, uint64_t count) {
-      items.push_back(ItemCount(std::string(item), count));
+      items.emplace_back(ItemCount(std::string(item), count));
     });
     std::sort(items.begin(), items.end(), [](const ItemCount& a, const ItemCount& b) -> bool {
       if (a.second == b.second) {
@@ -28,7 +28,8 @@ protected:
       return a.second < b.second;
     });
     std::vector<std::string> accum;
-    for (auto item : items) {
+    accum.reserve(items.size());
+    for (const auto& item : items) {
       accum.push_back(absl::StrCat(item.second, ": ", item.first));
     }
     return StringUtil::join(accum, " ");

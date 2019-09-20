@@ -26,7 +26,7 @@ public:
    *
    * @param fn The function to call for every recently looked up item.
    */
-  void forEach(IterFn fn) const;
+  void forEach(const IterFn& fn) const;
 
   /**
    * @return the total number of lookups since tracking began.

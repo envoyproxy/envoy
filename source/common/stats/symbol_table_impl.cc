@@ -210,11 +210,7 @@ void SymbolTableImpl::free(const StatName& stat_name) {
 
 uint64_t SymbolTableImpl::getRecentLookups(const RecentLookupsFn& iter) {
   uint64_t total = 0;
-  struct LookupData {
-    std::string name_;
-    uint64_t count_;
-  };
-  std::vector<LookupData> lookup_data;
+  absl::flat_hash_map<std::string, uint64_t> name_count_map;
 
   // We don't want to hold stat_name_set_mutex while calling the iterator, so
   // buffer lookup_data.
@@ -222,8 +218,8 @@ uint64_t SymbolTableImpl::getRecentLookups(const RecentLookupsFn& iter) {
     Thread::LockGuard lock(stat_name_set_mutex_);
     for (StatNameSet* stat_name_set : stat_name_sets_) {
       total +=
-          stat_name_set->getRecentLookups([&lookup_data](absl::string_view str, uint64_t count) {
-            lookup_data.push_back({std::string(str), count});
+          stat_name_set->getRecentLookups([&name_count_map](absl::string_view str, uint64_t count) {
+            name_count_map[std::string(str)] += count;
           });
     }
   }
@@ -232,26 +228,24 @@ uint64_t SymbolTableImpl::getRecentLookups(const RecentLookupsFn& iter) {
   // to access recent_lookups_.
   {
     Thread::LockGuard lock(lock_);
-    recent_lookups_.forEach([&lookup_data](absl::string_view str, uint64_t count)
-                                NO_THREAD_SAFETY_ANALYSIS {
-                                  lookup_data.push_back({std::string(str), count});
-                                });
+    recent_lookups_.forEach(
+        [&name_count_map](absl::string_view str, uint64_t count)
+            NO_THREAD_SAFETY_ANALYSIS { name_count_map[std::string(str)] += count; });
     total += recent_lookups_.total();
   }
-  std::sort(lookup_data.begin(), lookup_data.end(),
-            [](const LookupData& a, const LookupData& b) -> bool {
-              if (a.count_ == b.count_) {
-                return a.name_ < b.name_;
-              }
-              return a.count_ > b.count_; // Sort largest-counts first.
-            });
 
-  const LookupData* prev = nullptr;
-  for (const LookupData& lookup : lookup_data) {
-    if (prev == nullptr || prev->name_ != lookup.name_) {
-      iter(lookup.name_, lookup.count_);
-      prev = &lookup;
-    }
+  // Now we have the collated name-count map data: we need to vectorize and
+  // sort. We define the pair with the count first as std::pair::operator<
+  // prioritizes its first element over its second.
+  using LookupCount = std::pair<uint64_t, absl::string_view>;
+  std::vector<LookupCount> lookup_data;
+  lookup_data.reserve(name_count_map.size());
+  for (const auto& iter : name_count_map) {
+    lookup_data.emplace_back(LookupCount(iter.second, iter.first));
+  }
+  std::sort(lookup_data.begin(), lookup_data.end());
+  for (const LookupCount& lookup_count : lookup_data) {
+    iter(lookup_count.second, lookup_count.first);
   }
   return total;
 }

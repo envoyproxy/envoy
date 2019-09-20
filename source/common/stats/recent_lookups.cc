@@ -26,7 +26,7 @@ void RecentLookups::lookup(absl::string_view str) {
  *
  * @param fn The function to call for every recently looked up item.
  */
-void RecentLookups::forEach(IterFn fn) const {
+void RecentLookups::forEach(const IterFn& fn) const {
   absl::flat_hash_map<absl::string_view, uint64_t> counts;
   for (const std::string& item : queue_) {
     ++counts[item];
