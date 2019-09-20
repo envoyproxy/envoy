@@ -446,13 +446,10 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, ServerStreamingGet) {
   // Response type is a valid JSON, so content type should be application/json.
   // Regression test for github.com/envoyproxy/envoy#5011
   testTranscoding<bookstore::ListBooksRequest, bookstore::Book>(
-      Http::TestHeaderMapImpl{{":method", "GET"}, {":path", "/shelves/2/books"}, {":authority", "host"}},
-      "",
-      {"shelf: 2"},
-      {},
-      Status(),
-      Http::TestHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
-      "[]");
+      Http::TestHeaderMapImpl{
+          {":method", "GET"}, {":path", "/shelves/2/books"}, {":authority", "host"}},
+      "", {"shelf: 2"}, {}, Status(),
+      Http::TestHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}}, "[]");
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, StreamingPost) {
