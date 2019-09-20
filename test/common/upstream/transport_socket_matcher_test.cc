@@ -7,6 +7,7 @@
 
 #include "envoy/api/api.h"
 #include "envoy/http/codec.h"
+#include "envoy/network/transport_socket.h"
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -50,25 +51,69 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
+class FooTransportSocketFactory : public Network::TransportSocketFactory,
+        public Server::Configuration::UpstreamTransportSocketConfigFactory {
+public:
+  FooTransportSocketFactory() {}
+  ~FooTransportSocketFactory() override {}
+
+  MOCK_CONST_METHOD0(implementsSecureTransport, bool());
+  MOCK_CONST_METHOD1(createTransportSocket, Network::TransportSocketPtr(Network::TransportSocketOptionsSharedPtr));
+
+  Network::TransportSocketFactoryPtr createTransportSocketFactory(
+        const Protobuf::Message&, Server::Configuration::TransportSocketFactoryContext&) override {
+    return std::make_unique<FooTransportSocketFactory>();
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<envoy::api::v2::core::TransportSocket>();
+  }
+
+  std::string name() const override { return "foo"; }
+};
+
+
+class BarTransportSocketFactory : public Network::TransportSocketFactory,
+        public Server::Configuration::UpstreamTransportSocketConfigFactory {
+public:
+  BarTransportSocketFactory() {}
+  ~BarTransportSocketFactory() override {}
+
+  MOCK_CONST_METHOD0(implementsSecureTransport, bool());
+  MOCK_CONST_METHOD1(createTransportSocket, Network::TransportSocketPtr(Network::TransportSocketOptionsSharedPtr));
+
+  Network::TransportSocketFactoryPtr createTransportSocketFactory(
+        const Protobuf::Message&, Server::Configuration::TransportSocketFactoryContext&) override {
+    return std::make_unique<BarTransportSocketFactory>();
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<envoy::api::v2::core::TransportSocket>();
+  }
+
+  std::string name() const override { return "bar"; }
+};
+
+
 class TransportSocketMatcherTest : public testing::Test {
 public:
-  // TransportSocketMatcherTest() {}
-
-  void init() {
+  TransportSocketMatcherTest() {
     Protobuf::RepeatedPtrField<envoy::api::v2::Cluster_TransportSocketMatch> matches;
     std::vector<std::string> match_yaml = {R"EOF(
-name: "enableMTLS"
+name: "enableFooSocket"
 match:
   hasSidecar: "true"
 transport_socket:
-  name: "tls"
-  config:
-    common_tls_context:
-      tls_certificates:
-      - certificate_chain: { filename: "cert-chain.pem" }
-        private_key: { filename: "key.pem" }
-)EOF"};
-
+  name: "foo"
+  config: {}
+ )EOF", R"EOF(
+name: "defaultToBarSocket"
+match: {}
+transport_socket:
+  name: "bar"
+  config: {}
+)EOF"
+    };
     for (const auto& yaml : match_yaml) {
       auto transport_socket_match = matches.Add();
       TestUtility::loadFromYaml(yaml, *transport_socket_match);
@@ -79,21 +124,22 @@ transport_socket:
 protected:
   TransportSocketMatcherPtr matcher_;
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_context_;
-  // Raw pointer since they will be owned by matcher_.
-  // Network::MockTransportSocketFactory* default_factory_;
-  // Network::MockTransportSocketFactory* tls_factory_;
-  // Network::MockTransportSocketFactory* rawbuffer_factory_;
 };
 
 // This test ensures the matcher returns the default transport socket factory.
 TEST_F(TransportSocketMatcherTest, ReturnDefaultSocketFactory) {
-  init();
   envoy::api::v2::core::Metadata metadata;
-  matcher_->resolve("hardcodenotexists", metadata);
+  matcher_->resolve("10.0.0.1", metadata);
+  //auto config_factory = dynamic_cast<Server::Configuration::UpstreamTransportSocketConfigFactory>(socket);
+  //EXPECT_EQ("bar", config_factory.name());
 }
 
-// TODO: need to create more mock transport socket factory class and give them different name?
-// otherwise, error as, Didn't find a registered implementation for name: 'tls'
+REGISTER_FACTORY(FooTransportSocketFactory,
+    Server::Configuration::UpstreamTransportSocketConfigFactory);
+
+
+REGISTER_FACTORY(BarTransportSocketFactory,
+    Server::Configuration::UpstreamTransportSocketConfigFactory);
 
 } // namespace
 } // namespace Upstream
