@@ -470,7 +470,7 @@ public:
   Event::TestTimeSystem& timeSystem() { return time_system_; }
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Http::Context& httpContext() override { return http_context_; }
-  MOCK_METHOD0(processContext, absl::optional<std::reference_wrapper<ProcessContext>>());
+  MOCK_METHOD0(processContext, OptProcessContextRef());
   MOCK_METHOD0(messageValidationVisitor, ProtobufMessage::ValidationVisitor&());
   MOCK_METHOD0(api, Api::Api&());
 
