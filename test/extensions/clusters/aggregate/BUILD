@@ -29,8 +29,8 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
-    name = "cluster_integration_test",
-    srcs = ["cluster_integration_test.cc"],
+    name = "cluster_update_test",
+    srcs = ["cluster_update_test.cc"],
     extension_name = "envoy.clusters.aggregate",
     deps = [
         "//source/common/upstream:cluster_factory_lib",
