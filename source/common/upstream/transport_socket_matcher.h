@@ -49,6 +49,15 @@
 namespace Envoy {
 namespace Upstream {
 
+//#define ALL_TRANSPORT_SOCKET_MATCHER_STATS(COUNTER, GAUGE) \
+  //COUNTER(total_match_count)    \
+  //GAUGE(last_match_time)  \
+  //GAUGE(last_match_address)  \
+
+//struct TransportSocketMatchStats {
+  //ALL_TRANSPORT_SOCKET_MATCHER_STATS(GENERATE_COUNTER_STRUCT,GENERATE_GAUGE_STRUCT)
+//}
+
 class TransportSocketMatcher;
 
 using TransportSocketMatcherPtr = std::unique_ptr<TransportSocketMatcher>;
@@ -69,6 +78,7 @@ protected:
     std::string name;
     Network::TransportSocketFactoryPtr factory;
     std::map<std::string, std::string> match;
+    // TransportSocketMatchStats stats;
   };
 
   // TODO(incfly): ask reviewer opinion about whether handle default within this lib.

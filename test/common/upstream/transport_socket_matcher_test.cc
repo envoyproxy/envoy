@@ -66,6 +66,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    // TODO: here is wrong... need to create  another tyed proto, maybe struct, not transportsocket here...
     return std::make_unique<envoy::api::v2::core::TransportSocket>();
   }
 

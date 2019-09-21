@@ -58,12 +58,16 @@ bool metadataMatch(const envoy::api::v2::core::Metadata& metadata,
   return true;
 }
 
+//TransportSocketMatchStats generateStats(Stats::Scope& scope) {
+  // return {ALL_TRANSPORT_SOCKET_MATCHER_STATS(POOL_COUNTER_PREFIX(scope, 
+//}
+
 Network::TransportSocketFactory&
 TransportSocketMatcher::resolve(const std::string& endpoint_addr,
                                 const envoy::api::v2::core::Metadata& metadata) {
   for (const auto& socket_factory_match : matches_) {
     if (metadataMatch(metadata, socket_factory_match.match)) {
-      ENVOY_LOG(info, "incfly debug, match found {} for endpoint with metadata {} address {}",
+      ENVOY_LOG(info, "transport socket match found: name {}, metadata {}, address {}",
                 socket_factory_match.name, metadata.DebugString(), endpoint_addr);
       return *socket_factory_match.factory;
     }
