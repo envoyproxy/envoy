@@ -39,7 +39,7 @@ void LdsApiImpl::onConfigUpdate(
   // with the same address as a listener that is to be removed. Do not change the order.
   for (const auto& removed_listener : removed_resources) {
     if (listener_manager_.removeListener(removed_listener)) {
-      ENVOY_LOG(info, "lds: remove listener '{}'", removed_listener);
+      ENVOY_LOG(debug, "lds: remove listener '{}'", removed_listener);
       any_applied = true;
     }
   }
@@ -56,7 +56,7 @@ void LdsApiImpl::onConfigUpdate(
         throw EnvoyException(fmt::format("duplicate listener {} found", listener.name()));
       }
       if (listener_manager_.addOrUpdateListener(listener, resource.version(), true)) {
-        ENVOY_LOG(info, "lds: add/update listener '{}'", listener.name());
+        ENVOY_LOG(debug, "lds: add/update listener '{}'", listener.name());
         any_applied = true;
       } else {
         ENVOY_LOG(debug, "lds: add/update listener '{}' skipped", listener.name());
