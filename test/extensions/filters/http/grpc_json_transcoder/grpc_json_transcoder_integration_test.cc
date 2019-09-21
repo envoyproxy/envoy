@@ -450,6 +450,13 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, ServerStreamingGet) {
           {":method", "GET"}, {":path", "/shelves/2/books"}, {":authority", "host"}},
       "", {"shelf: 2"}, {}, Status(),
       Http::TestHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}}, "[]");
+
+  // 3: Empty response (trailers only) from streaming backend, with a gRPC error.
+  testTranscoding<bookstore::ListBooksRequest, bookstore::Book>(
+      Http::TestHeaderMapImpl{
+          {":method", "GET"}, {":path", "/shelves/37/books"}, {":authority", "host"}},
+      "", {"shelf: 37"}, {}, Status(Code::NOT_FOUND, "Shelf 37 not found"),
+      Http::TestHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}}, "[]");
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, StreamingPost) {
