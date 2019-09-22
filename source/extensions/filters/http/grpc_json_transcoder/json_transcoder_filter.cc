@@ -451,26 +451,32 @@ Http::FilterTrailersStatus JsonTranscoderFilter::encodeTrailers(Http::HeaderMap&
 
   response_in_.finish();
 
-  Buffer::OwnedImpl data;
-  readToBuffer(*transcoder_->ResponseOutput(), data);
-
-  if (data.length()) {
-    encoder_callbacks_->addEncodedData(data, true);
-    has_body_ = true;
-  }
-
-  if (method_->server_streaming()) {
-    // For streaming case, the headers are already sent, so just continue here.
-    return Http::FilterTrailersStatus::Continue;
-  }
-
-  // If there was no previous headers frame, this |trailers| map is our |response_headers_|,
-  // so there is no need to copy headers from one to the other.
-  bool is_trailers_only_response = response_headers_ == &trailers;
-
   const absl::optional<Grpc::Status::GrpcStatus> grpc_status =
       Grpc::Common::getGrpcStatus(trailers);
   bool status_converted_to_json = grpc_status && maybeConvertGrpcStatus(*grpc_status, trailers);
+
+  // Check if it's a trailers-only response (the first HEADERS frame has the end_stream flag set).
+  // This has the following implications:
+  // 1) The |trailers| map is our |response_headers_|, so there is no need to copy headers from one
+  // to the other.
+  // 2) There was no data from upstream, the |transcoder_| may return "[]" for streaming responses,
+  // but we can safely ignore that and return an error.
+  bool is_trailers_only_response = response_headers_ == &trailers;
+  if (!is_trailers_only_response || !status_converted_to_json) {
+    // Check for leftover data in the transcoder.
+    Buffer::OwnedImpl data;
+    readToBuffer(*transcoder_->ResponseOutput(), data);
+
+    if (data.length()) {
+      encoder_callbacks_->addEncodedData(data, true);
+      has_body_ = true;
+    }
+
+    if (method_->server_streaming()) {
+      // For streaming case, the headers are already sent, so just continue here.
+      return Http::FilterTrailersStatus::Continue;
+    }
+  }
 
   if (!grpc_status || grpc_status.value() == Grpc::Status::GrpcStatus::InvalidCode) {
     response_headers_->Status()->value(enumToInt(Http::Code::ServiceUnavailable));
