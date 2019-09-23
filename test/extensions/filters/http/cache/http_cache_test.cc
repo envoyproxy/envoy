@@ -121,7 +121,8 @@ TEST_F(LookupRequestDeathTest, makeLookupRequestWithNoPath) {
 
 TEST_F(LookupRequestDeathTest, makeLookupRequestWithNoScheme) {
   auto headerMap = Http::TestHeaderMapImpl({{":path", "/"}, {":authority", "example.com"}});
-  ASSERT_DEATH(LookupRequest(headerMap, current_time_), "malformed Http::HeaderMap with null Scheme");
+  ASSERT_DEATH(LookupRequest(headerMap, current_time_),
+               "malformed Http::HeaderMap with null Scheme");
 }
 
 TEST_F(LookupRequestDeathTest, makeLookupRequestWithNoHost) {
@@ -169,6 +170,26 @@ TEST_F(LookupRequestTest, Expired) {
       lookup_request_.makeLookupResult(std::move(response_headers), 0);
 
   EXPECT_EQ(CacheEntryStatus::RequiresValidation, lookup_response.cache_entry_status);
+}
+
+TEST_F(LookupRequestTest, ExpiredViaFallbackheader) {
+  Http::HeaderMapPtr response_headers = Http::makeHeaderMap(
+      {{"expires", formatter_.fromTime(current_time_ - std::chrono::seconds(5))},
+       {"date", formatter_.fromTime(current_time_)}});
+  const LookupResult lookup_response =
+      lookup_request_.makeLookupResult(std::move(response_headers), 0);
+
+  EXPECT_EQ(CacheEntryStatus::RequiresValidation, lookup_response.cache_entry_status);
+}
+
+TEST_F(LookupRequestTest, NotExpiredViaFallbackheader) {
+  Http::HeaderMapPtr response_headers = Http::makeHeaderMap(
+      {{"expires", formatter_.fromTime(current_time_ + std::chrono::seconds(5))},
+       {"date", formatter_.fromTime(current_time_)}});
+  const LookupResult lookup_response =
+      lookup_request_.makeLookupResult(std::move(response_headers), 0);
+
+  EXPECT_EQ(CacheEntryStatus::Ok, lookup_response.cache_entry_status);
 }
 
 } // namespace Cache
