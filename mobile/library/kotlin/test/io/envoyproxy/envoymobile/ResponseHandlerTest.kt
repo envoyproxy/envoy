@@ -1,6 +1,5 @@
-package library.kotlin.test.io.envoyproxy.envoymobile
+package io.envoyproxy.envoymobile
 
-import io.envoyproxy.envoymobile.ResponseHandler
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
 import java.util.concurrent.Executor;

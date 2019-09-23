@@ -1,8 +1,5 @@
-package library.kotlin.test.io.envoyproxy.envoymobile
+package io.envoyproxy.envoymobile
 
-import io.envoyproxy.envoymobile.RetryPolicy
-import io.envoyproxy.envoymobile.RetryRule
-import io.envoyproxy.envoymobile.outboundHeaders
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
 
