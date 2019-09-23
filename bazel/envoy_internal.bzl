@@ -25,8 +25,6 @@ def envoy_copts(repository, test = False):
         # https://msdn.microsoft.com/en-us/library/windows/desktop/aa383745(v=vs.85).aspx
         "-D_WIN32_WINNT=0x0602",
         "-DNTDDI_VERSION=0x06020000",
-        "-DCARES_STATICLIB",
-        "-DNGHTTP2_STATICLIB",
     ]
 
     return select({

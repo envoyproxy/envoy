@@ -55,6 +55,7 @@ envoy_cmake_external(
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
     },
     copy_pdb = True,
+    defines = ["CARES_STATICLIB"],
     lib_source = "@com_github_c_ares_c_ares//:all",
     pdb_name = "c-ares",
     static_libraries = select({
@@ -153,6 +154,7 @@ envoy_cmake_external(
     cmake_files_dir = "$BUILD_TMPDIR/lib/CMakeFiles",
     copy_pdb = True,
     debug_cache_entries = {"ENABLE_DEBUG": "on"},
+    defines = ["NGHTTP2_STATICLIB"],
     lib_source = "@com_github_nghttp2_nghttp2//:all",
     pdb_name = "nghttp2_static",
     static_libraries = select({
