@@ -16,7 +16,7 @@ class RawByteRangeTest : public testing::Test {};
 using RawByteRangeDeathTest = RawByteRangeTest;
 
 
-TEST_F(RawByteRangeTest, IsSuffix) {
+TEST_F(RawByteRangeTest, isSuffix) {
   auto r = RawByteRange(UINT64_MAX, 4);
   ASSERT_TRUE(r.isSuffix());
 }
@@ -26,11 +26,11 @@ TEST_F(RawByteRangeTest, IsNotSuffix) {
   ASSERT_FALSE(r.isSuffix());
 }
 
-TEST_F(RawByteRangeTest, IllegalByteRange) {
+TEST_F(RawByteRangeDeathTest, IllegalByteRange) {
   ASSERT_DEATH(RawByteRange(5, 4), "Illegal byte range");
 }
 
-TEST_F(RawByteRangeTest, IllegalByteRangeButIsSuffix) {
+TEST_F(RawByteRangeDeathTest, IllegalByteRangeButIsSuffix) {
   // no death here
   RawByteRange(UINT64_MAX, 3);
   ASSERT_TRUE(true);
@@ -51,7 +51,7 @@ TEST_F(RawByteRangeTest, LastBytePos) {
   ASSERT_EQ(4, r.lastBytePos());
 }
 
-TEST_F(RawByteRangeTest, LastBytePosIfSuffix) {
+TEST_F(RawByteRangeDeathTest, LastBytePosIfSuffix) {
   auto r = RawByteRange(UINT64_MAX, UINT64_MAX);
   ASSERT_DEATH(r.lastBytePos(), "!isSuffix()");
 }
@@ -68,7 +68,9 @@ TEST_F(RawByteRangeTest, suffixLength) {
 
 class AdjustedByteRangeTest : public testing::Test {};
 
-TEST_F(AdjustedByteRangeTest, IllegalByteRange) {
+using AdjustedByteRangeDeathTest = AdjustedByteRangeTest;
+
+TEST_F(AdjustedByteRangeDeathTest, IllegalByteRange) {
   ASSERT_DEATH(AdjustedByteRange(5, 4), "Illegal byte range.");
 }
 
@@ -83,7 +85,7 @@ TEST_F(AdjustedByteRangeTest, TrimFront) {
   ASSERT_EQ(5, a.firstBytePos());
 }
 
-TEST_F(AdjustedByteRangeTest, TrimFrontTooMuch) {
+TEST_F(AdjustedByteRangeDeathTest, TrimFrontTooMuch) {
   auto a = AdjustedByteRange(3, 6);
   ASSERT_DEATH(a.trimFront(5), "Attempt to trim too much from range.");
 }
