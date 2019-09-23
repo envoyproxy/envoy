@@ -68,7 +68,9 @@ public:
   ~AltsSharedState() override { grpc_alts_shared_resource_dedicated_shutdown(); }
 
 private:
+#ifdef ENVOY_GOOGLE_GRPC
   Grpc::GoogleGrpcContext google_grpc_context_;
+#endif
 };
 
 SINGLETON_MANAGER_REGISTRATION(alts_shared_state);

@@ -15,9 +15,7 @@ namespace Grpc {
 GoogleGrpcContext::GoogleGrpcContext() : instance_tracker_(instanceTracker()) {
   Thread::LockGuard lock(instance_tracker_.mutex_);
   if (++instance_tracker_.live_instances_ == 1) {
-#ifdef ENVOY_GOOGLE_GRPC
     grpc_init();
-#endif
   }
 }
 
@@ -30,9 +28,7 @@ GoogleGrpcContext::~GoogleGrpcContext() {
   Thread::LockGuard lock(instance_tracker_.mutex_);
   ASSERT(instance_tracker_.live_instances_ > 0);
   if (--instance_tracker_.live_instances_ == 0) {
-#ifdef ENVOY_GOOGLE_GRPC
     grpc_shutdown_blocking(); // Waiting for quiescence avoids non-determinism in tests.
-#endif
   }
 }
 

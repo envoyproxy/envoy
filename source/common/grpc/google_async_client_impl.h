@@ -86,7 +86,9 @@ private:
   void completionThread();
 
   // Instantiate this first to ensure grpc_init() is called.
+#ifdef ENVOY_GOOGLE_GRPC
   GoogleGrpcContext google_grpc_context_;
+#endif
 
   // The CompletionQueue for in-flight operations. This must precede completion_thread_ to ensure it
   // is constructed before the thread runs.
