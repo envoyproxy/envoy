@@ -13,6 +13,7 @@ import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/discovery.proto";
 import "envoy/api/v2/listener/listener.proto";
 import "envoy/api/v2/listener/udp_listener_config.proto";
+import "envoy/config/listener/v2/api_listener.proto";
 
 import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
@@ -42,7 +43,7 @@ service ListenerDiscoveryService {
   }
 }
 
-// [#comment:next free field: 19]
+// [#comment:next free field: 20]
 message Listener {
   // The unique name by which this listener is known. If no name is provided,
   // Envoy will allocate an internal UUID for the listener. If the listener is to be dynamically
@@ -200,4 +201,17 @@ message Listener {
   // <envoy_api_field_listener.UdpListenerConfig.udp_listener_name>` = "raw_udp_listener" for
   // creating a packet-oriented UDP listener. If not present, treat it as "raw_udp_listener".
   listener.UdpListenerConfig udp_listener_config = 18;
+
+  // [#not-implemented-hide:]
+  // Used to represent an API listener, which is used in non-proxy clients. The type of API
+  // exposed to the non-proxy application depends on the type of API listener.
+  // When this field is set, no other field except for :ref:`name<envoy_api_field_Listener.name>`
+  // should be set.
+  // [#next-major-version: In the v3 API, instead of this messy approach where the socket
+  // listener fields are directly in the top-level Listener message and the API listener types
+  // are in the ApiListener message, the socket listener messages should be in their own message,
+  // and the top-level Listener should essentially be a oneof that selects between the
+  // socket listener and the various types of API listener. That way, a given Listener message
+  // can structurally only contain the fields of the relevant type.]
+  envoy.config.listener.v2.ApiListener api_listener = 19;
 }
