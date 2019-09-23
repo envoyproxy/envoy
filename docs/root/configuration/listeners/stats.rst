@@ -32,6 +32,26 @@ Every listener has a statistics tree rooted at *listener.<address>.* with the fo
    ssl.sigalgs.<sigalg>, Counter, Total successful TLS connections that used signature algorithm <sigalg>
    ssl.versions.<version>, Counter, Total successful TLS connections that used protocol version <version>
 
+.. _config_listener_stats_per_handler:
+
+Per-handler Listener Stats
+--------------------------
+
+Every listener additionally has a statistics tree rooted at *listener.<address>.<handler>.* which
+contains *per-handler* statistics. As described in the
+:ref:`threading model <arch_overview_threading>` documentation, Envoy has a threading model which
+includes the *main thread* as well as a number of *worker threads* which are controlled by the
+:option:`--concurrency` option. Along these lines, *<handler>* is equal to *main_thread*,
+*worker_0*, *worker_1*, etc. These statistics can be used to look for per-handler/worker imbalance
+on either accepted or active connections.
+
+.. csv-table::
+   :header: Name, Type, Description
+   :widths: 1, 1, 2
+
+   downstream_cx_total, Counter, Total connections on this handler.
+   downstream_cx_active, Gauge, Total active connections on this handler.
+
 Listener manager
 ----------------
 

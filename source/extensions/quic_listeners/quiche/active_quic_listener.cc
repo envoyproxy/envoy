@@ -11,29 +11,30 @@ namespace Envoy {
 namespace Quic {
 
 ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
-                                       Network::ConnectionHandler& parent, spdlog::logger& logger,
+                                       Network::ConnectionHandler& parent,
                                        Network::ListenerConfig& listener_config,
                                        const quic::QuicConfig& quic_config)
     : ActiveQuicListener(dispatcher, parent,
-                         dispatcher.createUdpListener(listener_config.socket(), *this), logger,
+                         dispatcher.createUdpListener(listener_config.socket(), *this),
                          listener_config, quic_config) {}
 
 ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
                                        Network::ConnectionHandler& parent,
-                                       Network::UdpListenerPtr&& listener, spdlog::logger& logger,
+                                       Network::UdpListenerPtr&& listener,
                                        Network::ListenerConfig& listener_config,
                                        const quic::QuicConfig& quic_config)
     : ActiveQuicListener(dispatcher, parent, std::make_unique<EnvoyQuicPacketWriter>(*listener),
-                         std::move(listener), logger, listener_config, quic_config) {}
+                         std::move(listener), listener_config, quic_config) {}
 
 ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
                                        Network::ConnectionHandler& parent,
                                        std::unique_ptr<quic::QuicPacketWriter> writer,
-                                       Network::UdpListenerPtr&& listener, spdlog::logger& logger,
+                                       Network::UdpListenerPtr&& listener,
                                        Network::ListenerConfig& listener_config,
                                        const quic::QuicConfig& quic_config)
-    : Server::ConnectionHandlerImpl::ActiveListenerImplBase(std::move(listener), listener_config),
-      logger_(logger), dispatcher_(dispatcher), version_manager_(quic::CurrentSupportedVersions()) {
+    : Server::ConnectionHandlerImpl::ActiveListenerImplBase(parent, std::move(listener),
+                                                            listener_config),
+      dispatcher_(dispatcher), version_manager_(quic::CurrentSupportedVersions()) {
   quic::QuicRandom* const random = quic::QuicRandom::GetInstance();
   random->RandBytes(random_seed_, sizeof(random_seed_));
   crypto_config_ = std::make_unique<quic::QuicCryptoServerConfig>(
@@ -51,7 +52,7 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
 }
 
 void ActiveQuicListener::onListenerShutdown() {
-  ENVOY_LOG_TO_LOGGER(logger_, info, "Quic listener {} shutdown.", config_.name());
+  ENVOY_LOG(info, "Quic listener {} shutdown.", config_.name());
   quic_dispatcher_->Shutdown();
 }
 

@@ -72,6 +72,13 @@ message ApiConfigSource {
 message AggregatedConfigSource {
 }
 
+// [#not-implemented-hide:]
+// Self-referencing config source options. This is currently empty, but when
+// set in :ref:`ConfigSource <envoy_api_msg_core.ConfigSource>` can be used to
+// specify that other data can be obtained from the same server.
+message SelfConfigSource {
+}
+
 // Rate Limit settings to be applied for discovery requests made by Envoy.
 message RateLimitSettings {
   // Maximum number of tokens to be used for rate limiting discovery request calls. If not set, a
@@ -89,6 +96,7 @@ message RateLimitSettings {
 // <arch_overview_service_discovery>` etc. may either be sourced from the
 // filesystem or from an xDS API source. Filesystem configs are watched with
 // inotify for updates.
+// [#comment:next free field: 6]
 message ConfigSource {
   oneof config_source_specifier {
     option (validate.required) = true;
@@ -109,6 +117,18 @@ message ConfigSource {
     // When set, ADS will be used to fetch resources. The ADS API configuration
     // source in the bootstrap configuration is used.
     AggregatedConfigSource ads = 3;
+    // [#not-implemented-hide:]
+    // When set, the client will access the resources from the same server it got the
+    // ConfigSource from, although not necessarily from the same stream. This is similar to the
+    // :ref:`ads<envoy_api_field.ConfigSource.ads>` field, except that the client may use a
+    // different stream to the same server. As a result, this field can be used for things
+    // like LRS that cannot be sent on an ADS stream. It can also be used to link from (e.g.)
+    // LDS to RDS on the same server without requiring the management server to know its name
+    // or required credentials.
+    // [#next-major-version: In xDS v3, consider replacing the ads field with this one, since
+    // this field can implicitly mean to use the same stream in the case where the ConfigSource
+    // is provided via ADS and the specified data can also be obtained via ADS.]
+    SelfConfigSource self = 5;
   }
 
   // When this timeout is specified, Envoy will wait no longer than the specified time for first

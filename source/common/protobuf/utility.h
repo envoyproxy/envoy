@@ -200,20 +200,14 @@ public:
 
   using FileExtensions = ConstSingleton<FileExtensionValues>;
 
-  static std::size_t hash(const Protobuf::Message& message) {
-    // Use Protobuf::io::CodedOutputStream to force deterministic serialization, so that the same
-    // message doesn't hash to different values.
-    std::string text;
-    {
-      // For memory safety, the StringOutputStream needs to be destroyed before
-      // we read the string.
-      Protobuf::io::StringOutputStream string_stream(&text);
-      Protobuf::io::CodedOutputStream coded_stream(&string_stream);
-      coded_stream.SetSerializationDeterministic(true);
-      message.SerializeToCodedStream(&coded_stream);
-    }
-    return HashUtil::xxHash64(text);
-  }
+  /**
+   * A hash function uses Protobuf::TextFormat to force deterministic serialization recursively
+   * including known types in google.protobuf.Any. See
+   * https://github.com/protocolbuffers/protobuf/issues/5731 for the context.
+   * Using this function is discouraged, see discussion in
+   * https://github.com/envoyproxy/envoy/issues/8301.
+   */
+  static std::size_t hash(const Protobuf::Message& message);
 
   static void loadFromJson(const std::string& json, Protobuf::Message& message,
                            ProtobufMessage::ValidationVisitor& validation_visitor);
