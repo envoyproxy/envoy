@@ -7,6 +7,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/event/event_impl_base.h"
 #include "common/event/file_event_impl.h"
+#include "common/network/utility.h"
 
 #include "base_listener_impl.h"
 
@@ -18,6 +19,7 @@ namespace Network {
  */
 class UdpListenerImpl : public BaseListenerImpl,
                         public virtual UdpListener,
+                        public UdpPacketProcessor,
                         protected Logger::Loggable<Logger::Id::udp> {
 public:
   UdpListenerImpl(Event::DispatcherImpl& dispatcher, Socket& socket, UdpListenerCallbacks& cb,
@@ -33,6 +35,15 @@ public:
   Event::Dispatcher& dispatcher() override;
   const Address::InstanceConstSharedPtr& localAddress() const override;
   Api::IoCallUint64Result send(const UdpSendData& data) override;
+
+  void processPacket(Address::InstanceConstSharedPtr local_address,
+                     Address::InstanceConstSharedPtr peer_address, Buffer::InstancePtr buffer,
+                     MonotonicTime receive_time) override;
+
+  uint64_t maxPacketSize() const override {
+    // TODO(danzh) make this variable configurable to support jumbo frames.
+    return MAX_UDP_PACKET_SIZE;
+  }
 
 protected:
   void handleWriteCallback();
