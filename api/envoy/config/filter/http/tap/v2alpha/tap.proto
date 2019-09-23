@@ -1,14 +1,14 @@
 syntax = "proto3";
 
-import "envoy/config/common/tap/v2alpha/common.proto";
-
-import "validate/validate.proto";
-
 package envoy.config.filter.http.tap.v2alpha;
 
 option java_outer_classname = "TapProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.filter.http.tap.v2alpha";
+
+import "envoy/config/common/tap/v2alpha/common.proto";
+
+import "validate/validate.proto";
 
 // [#protodoc-title: Tap]
 // Tap :ref:`configuration overview <config_http_filters_tap>`.
@@ -17,5 +17,5 @@ option java_package = "io.envoyproxy.envoy.config.filter.http.tap.v2alpha";
 message Tap {
   // Common configuration for the HTTP tap filter.
   common.tap.v2alpha.CommonExtensionConfig common_config = 1
-      [(validate.rules).message.required = true];
+      [(validate.rules).message = {required: true}];
 }
