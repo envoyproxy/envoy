@@ -60,6 +60,9 @@ STD_REGEX_WHITELIST = ("./source/common/common/utility.cc", "./source/common/com
                        "./source/extensions/filters/http/squash/squash_filter.cc",
                        "./source/server/http/admin.h", "./source/server/http/admin.cc")
 
+# Only one C++ file should instantiate grpc_init
+GRPC_INIT_WHITELIST = ("./source/common/grpc/google_grpc_context.cc")
+
 CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-8")
 BUILDIFIER_PATH = os.getenv("BUILDIFIER_BIN", "$GOPATH/bin/buildifier")
 ENVOY_BUILD_FIXER_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])),
@@ -331,6 +334,10 @@ def whitelistedForStdRegex(file_path):
   return file_path.startswith("./test") or file_path in STD_REGEX_WHITELIST
 
 
+def whitelistedForGrpcInit(file_path):
+  return file_path in GRPC_INIT_WHITELIST
+
+
 def findSubstringAndReturnError(pattern, file_path, error_message):
   with open(file_path) as f:
     text = f.read()
@@ -583,6 +590,18 @@ def checkSourceLine(line, file_path, reportError):
 
   if not whitelistedForStdRegex(file_path) and "std::regex" in line:
     reportError("Don't use std::regex in code that handles untrusted input. Use RegexMatcher")
+
+  if not whitelistedForGrpcInit(file_path):
+    grpc_init_or_shutdown = line.find("grpc_init()")
+    grpc_shutdown = line.find("grpc_shutdown()")
+    if grpc_init_or_shutdown == -1 or (grpc_shutdown != -1 and
+                                       grpc_shutdown < grpc_init_or_shutdown):
+      grpc_init_or_shutdown = grpc_shutdown
+    if grpc_init_or_shutdown != -1:
+      comment = line.find("// ")
+      if comment == -1 or comment > grpc_init_or_shutdown:
+        reportError("Don't call grpc_init() or grpc_shutdown() directly, instantiate " +
+                    "Grpc::GoogleGrpcContext. See #8282")
 
 
 def checkBuildLine(line, file_path, reportError):
