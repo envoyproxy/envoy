@@ -261,12 +261,16 @@ elif [[ "$CI_TARGET" == "bazel.fuzz" ]]; then
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} --config=asan-fuzzer ${FUZZ_TEST_TARGETS} --test_arg="-runs=10"
   exit 0
 elif [[ "$CI_TARGET" == "fix_format" ]]; then
+  # proto_format.sh needs to build protobuf.
+  setup_clang_toolchain
   echo "fix_format..."
   ./tools/check_format.py fix
   ./tools/format_python_tools.sh fix
   ./tools/proto_format.sh fix
   exit 0
 elif [[ "$CI_TARGET" == "check_format" ]]; then
+  # proto_format.sh needs to build protobuf.
+  setup_clang_toolchain
   echo "check_format_test..."
   ./tools/check_format_test_helper.py --log=WARN
   echo "check_format..."
