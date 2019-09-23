@@ -101,3 +101,15 @@ jobs:
         run: ./ci/linux_ci_setup.sh
       - run: ./bazelw test --test_output=all --build_tests_only //library/kotlin/test/...
         name: 'Run Kotlin library tests'
+  javatests:
+    name: java_tests
+    runs-on: ubuntu-18.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          submodules: true
+      - name: 'Install dependencies'
+        run: ./ci/linux_ci_setup.sh
+      - run: ./bazelw test --test_output=all --build_tests_only //library/java/test/...
+        name: 'Run Java library tests'

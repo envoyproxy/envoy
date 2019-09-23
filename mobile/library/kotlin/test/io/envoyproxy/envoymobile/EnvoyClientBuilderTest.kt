@@ -1,9 +1,5 @@
-package io.envoyproxy.envoymobile.io.envoyproxy.envoymobile
+package io.envoyproxy.envoymobile
 
-import io.envoyproxy.envoymobile.Domain
-import io.envoyproxy.envoymobile.EnvoyClientBuilder
-import io.envoyproxy.envoymobile.LogLevel
-import io.envoyproxy.envoymobile.Yaml
 import io.envoyproxy.envoymobile.engine.EnvoyEngine
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
@@ -62,6 +58,5 @@ class EnvoyBuilderTest {
     clientBuilder.build()
     val envoy = clientBuilder.build()
     assertThat(envoy.envoyConfiguration!!.statsFlushSeconds).isEqualTo(1234)
-
   }
 }
