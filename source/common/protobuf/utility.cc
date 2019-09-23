@@ -88,6 +88,20 @@ ProtoValidationException::ProtoValidationException(const std::string& validation
   ENVOY_LOG_MISC(debug, "Proto validation error; throwing {}", what());
 }
 
+size_t MessageUtil::hash(const Protobuf::Message& message) {
+  std::string text_format;
+
+  {
+    Protobuf::TextFormat::Printer printer;
+    printer.SetExpandAny(true);
+    printer.SetUseFieldNumber(true);
+    printer.SetSingleLineMode(true);
+    printer.PrintToString(message, &text_format);
+  }
+
+  return HashUtil::xxHash64(text_format);
+}
+
 void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& message,
                                ProtobufMessage::ValidationVisitor& validation_visitor) {
   Protobuf::util::JsonParseOptions options;

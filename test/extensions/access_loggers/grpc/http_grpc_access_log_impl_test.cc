@@ -89,6 +89,10 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  downstream_direct_remote_address:
+    socket_address:
+      address: "127.0.0.1"
+      port_value: 0
   downstream_local_address:
     socket_address:
       address: "127.0.0.2"
@@ -130,6 +134,10 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  downstream_direct_remote_address:
+    socket_address:
+      address: "127.0.0.1"
+      port_value: 0
   downstream_local_address:
     pipe:
       path: "/foo"
@@ -155,6 +163,10 @@ response: {}
     expectLog(R"EOF(
 common_properties:
   downstream_remote_address:
+    socket_address:
+      address: "127.0.0.1"
+      port_value: 0
+  downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
@@ -212,6 +224,10 @@ response: {}
     expectLog(R"EOF(
 common_properties:
   downstream_remote_address:
+    socket_address:
+      address: "127.0.0.1"
+      port_value: 0
+  downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
@@ -286,6 +302,10 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  downstream_direct_remote_address:
+    socket_address:
+      address: "127.0.0.1"
+      port_value: 0
   downstream_local_address:
     socket_address:
       address: "127.0.0.2"
@@ -331,6 +351,10 @@ response: {}
     expectLog(R"EOF(
 common_properties:
   downstream_remote_address:
+    socket_address:
+      address: "127.0.0.1"
+      port_value: 0
+  downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
@@ -390,6 +414,10 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  downstream_direct_remote_address:
+    socket_address:
+      address: "127.0.0.1"
+      port_value: 0
   downstream_local_address:
     socket_address:
       address: "127.0.0.2"
@@ -433,6 +461,10 @@ response: {}
     expectLog(R"EOF(
 common_properties:
   downstream_remote_address:
+    socket_address:
+      address: "127.0.0.1"
+      port_value: 0
+  downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
@@ -482,6 +514,10 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  downstream_direct_remote_address:
+    socket_address:
+      address: "127.0.0.1"
+      port_value: 0
   downstream_local_address:
     socket_address:
       address: "127.0.0.2"
@@ -525,6 +561,10 @@ response: {}
     expectLog(R"EOF(
 common_properties:
   downstream_remote_address:
+    socket_address:
+      address: "127.0.0.1"
+      port_value: 0
+  downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
@@ -598,6 +638,10 @@ TEST_F(HttpGrpcAccessLogTest, MarshallingAdditionalHeaders) {
     expectLog(R"EOF(
 common_properties:
   downstream_remote_address:
+    socket_address:
+      address: "127.0.0.1"
+      port_value: 0
+  downstream_direct_remote_address:
     socket_address:
       address: "127.0.0.1"
       port_value: 0

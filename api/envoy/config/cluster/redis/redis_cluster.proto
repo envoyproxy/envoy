@@ -43,8 +43,8 @@ import "validate/validate.proto";
 
 message RedisClusterConfig {
   // Interval between successive topology refresh requests. If not set, this defaults to 5s.
-  google.protobuf.Duration cluster_refresh_rate = 1 [(validate.rules).duration.gt = {}];
+  google.protobuf.Duration cluster_refresh_rate = 1 [(validate.rules).duration = {gt {}}];
 
   // Timeout for topology refresh request. If not set, this defaults to 3s.
-  google.protobuf.Duration cluster_refresh_timeout = 2 [(validate.rules).duration.gt = {}];
+  google.protobuf.Duration cluster_refresh_timeout = 2 [(validate.rules).duration = {gt {}}];
 }

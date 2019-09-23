@@ -14,5 +14,5 @@ import "validate/validate.proto";
 // fraction of currently reserved heap memory divided by a statically configured maximum
 // specified in the FixedHeapConfig.
 message FixedHeapConfig {
-  uint64 max_heap_size_bytes = 1 [(validate.rules).uint64.gt = 0];
+  uint64 max_heap_size_bytes = 1 [(validate.rules).uint64 = {gt: 0}];
 }

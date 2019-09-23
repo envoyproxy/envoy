@@ -38,10 +38,7 @@ HttpSubscriptionImpl::HttpSubscriptionImpl(
 void HttpSubscriptionImpl::start(const std::set<std::string>& resource_names) {
   if (init_fetch_timeout_.count() > 0) {
     init_fetch_timeout_timer_ = dispatcher_.createTimer([this]() -> void {
-      ENVOY_LOG(warn, "REST config: initial fetch timed out for", path_);
-      stats_.init_fetch_timeout_.inc();
-      callbacks_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout,
-                                      nullptr);
+      handleFailure(Config::ConfigUpdateFailureReason::FetchTimedout, nullptr);
     });
     init_fetch_timeout_timer_->enableTimer(init_fetch_timeout_);
   }
@@ -77,8 +74,7 @@ void HttpSubscriptionImpl::parseResponse(const Http::Message& response) {
   try {
     MessageUtil::loadFromJson(response.bodyAsString(), message, validation_visitor_);
   } catch (const EnvoyException& e) {
-    ENVOY_LOG(warn, "REST config JSON conversion error: {}", e.what());
-    handleFailure(nullptr);
+    handleFailure(Config::ConfigUpdateFailureReason::UpdateRejected, &e);
     return;
   }
   try {
@@ -87,23 +83,45 @@ void HttpSubscriptionImpl::parseResponse(const Http::Message& response) {
     stats_.version_.set(HashUtil::xxHash64(request_.version_info()));
     stats_.update_success_.inc();
   } catch (const EnvoyException& e) {
-    ENVOY_LOG(warn, "REST config update rejected: {}", e.what());
-    stats_.update_rejected_.inc();
-    callbacks_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &e);
+    handleFailure(Config::ConfigUpdateFailureReason::UpdateRejected, &e);
   }
 }
 
 void HttpSubscriptionImpl::onFetchComplete() {}
 
-void HttpSubscriptionImpl::onFetchFailure(const EnvoyException* e) {
-  disableInitFetchTimeoutTimer();
-  ENVOY_LOG(warn, "REST config update failed: {}", e != nullptr ? e->what() : "fetch failure");
-  handleFailure(e);
+void HttpSubscriptionImpl::onFetchFailure(Config::ConfigUpdateFailureReason reason,
+                                          const EnvoyException* e) {
+  handleFailure(reason, e);
 }
 
-void HttpSubscriptionImpl::handleFailure(const EnvoyException* e) {
-  stats_.update_failure_.inc();
-  callbacks_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, e);
+void HttpSubscriptionImpl::handleFailure(Config::ConfigUpdateFailureReason reason,
+                                         const EnvoyException* e) {
+
+  switch (reason) {
+  case Config::ConfigUpdateFailureReason::ConnectionFailure:
+    ENVOY_LOG(warn, "REST update for {} failed", path_);
+    stats_.update_failure_.inc();
+    break;
+  case Config::ConfigUpdateFailureReason::FetchTimedout:
+    ENVOY_LOG(warn, "REST config: initial fetch timeout for {}", path_);
+    stats_.init_fetch_timeout_.inc();
+    disableInitFetchTimeoutTimer();
+    break;
+  case Config::ConfigUpdateFailureReason::UpdateRejected:
+    ASSERT(e != nullptr);
+    ENVOY_LOG(warn, "REST config for {} rejected: {}", path_, e->what());
+    stats_.update_rejected_.inc();
+    disableInitFetchTimeoutTimer();
+    break;
+  }
+
+  if (reason == Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure) {
+    // New requests will be sent again.
+    // If init_fetch_timeout is non-zero, server will continue startup after it timeout
+    return;
+  }
+
+  callbacks_.onConfigUpdateFailed(reason, e);
 }
 
 void HttpSubscriptionImpl::disableInitFetchTimeoutTimer() {

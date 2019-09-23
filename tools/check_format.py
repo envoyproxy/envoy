@@ -43,8 +43,9 @@ REAL_TIME_WHITELIST = ("./source/common/common/utility.h",
                        "./test/integration/integration.h")
 
 # Files in these paths can use MessageLite::SerializeAsString
-SERIALIZE_AS_STRING_WHITELIST = ("./test/common/protobuf/utility_test.cc",
-                                 "./test/common/grpc/codec_test.cc")
+SERIALIZE_AS_STRING_WHITELIST = (
+    "./source/extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.cc",
+    "./test/common/protobuf/utility_test.cc", "./test/common/grpc/codec_test.cc")
 
 # Files in these paths can use Protobuf::util::JsonStringToMessage
 JSON_STRING_TO_MESSAGE_WHITELIST = ("./source/common/protobuf/utility.cc")
@@ -58,6 +59,9 @@ STD_REGEX_WHITELIST = ("./source/common/common/utility.cc", "./source/common/com
                        "./source/extensions/filters/http/squash/squash_filter.h",
                        "./source/extensions/filters/http/squash/squash_filter.cc",
                        "./source/server/http/admin.h", "./source/server/http/admin.cc")
+
+# Only one C++ file should instantiate grpc_init
+GRPC_INIT_WHITELIST = ("./source/common/grpc/google_grpc_context.cc")
 
 CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-8")
 BUILDIFIER_PATH = os.getenv("BUILDIFIER_BIN", "$GOPATH/bin/buildifier")
@@ -330,6 +334,10 @@ def whitelistedForStdRegex(file_path):
   return file_path.startswith("./test") or file_path in STD_REGEX_WHITELIST
 
 
+def whitelistedForGrpcInit(file_path):
+  return file_path in GRPC_INIT_WHITELIST
+
+
 def findSubstringAndReturnError(pattern, file_path, error_message):
   with open(file_path) as f:
     text = f.read()
@@ -500,6 +508,9 @@ def checkSourceLine(line, file_path, reportError):
     if invalid_construct in line:
       reportError("term %s should be replaced with standard library term %s" %
                   (invalid_construct, valid_construct))
+  # Do not include the virtual_includes headers.
+  if re.search("#include.*/_virtual_includes/", line):
+    reportError("Don't include the virtual includes headers.")
 
   # Some errors cannot be fixed automatically, and actionable, consistent,
   # navigable messages should be emitted to make it easy to find and fix
@@ -579,6 +590,18 @@ def checkSourceLine(line, file_path, reportError):
 
   if not whitelistedForStdRegex(file_path) and "std::regex" in line:
     reportError("Don't use std::regex in code that handles untrusted input. Use RegexMatcher")
+
+  if not whitelistedForGrpcInit(file_path):
+    grpc_init_or_shutdown = line.find("grpc_init()")
+    grpc_shutdown = line.find("grpc_shutdown()")
+    if grpc_init_or_shutdown == -1 or (grpc_shutdown != -1 and
+                                       grpc_shutdown < grpc_init_or_shutdown):
+      grpc_init_or_shutdown = grpc_shutdown
+    if grpc_init_or_shutdown != -1:
+      comment = line.find("// ")
+      if comment == -1 or comment > grpc_init_or_shutdown:
+        reportError("Don't call grpc_init() or grpc_shutdown() directly, instantiate " +
+                    "Grpc::GoogleGrpcContext. See #8282")
 
 
 def checkBuildLine(line, file_path, reportError):
