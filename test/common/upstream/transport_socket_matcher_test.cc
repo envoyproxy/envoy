@@ -130,21 +130,85 @@ transport_socket:
   EXPECT_EQ("default", config_factory->id());
 }
 
+TEST_F(TransportSocketMatcherTest, BasicMatch) {
+  init({R"EOF(
+name: "sidecar_socket"
+match:
+  sidecar: "true"
+transport_socket:
+  name: "foo"
+  config:
+    id: "sidecar")EOF",
+      R"EOF(
+name: "http_socket"
+match:
+  protocol: "http"
+transport_socket:
+  name: "foo"
+  config:
+    id: "http"
+ )EOF"});
+
+  envoy::api::v2::core::Metadata metadata;
+  TestUtility::loadFromYaml(R"EOF(
+filter_metadata:
+  envoy.transport_socket: { sidecar: "true" } 
+)EOF", metadata);
+  auto& factory = matcher_->resolve("10.0.0.1", metadata);
+  const auto* config_factory = dynamic_cast<const FakeTransportSocketFactory*>(&factory);
+  EXPECT_EQ("sidecar", config_factory->id());
+  TestUtility::loadFromYaml(R"EOF(
+filter_metadata:
+  envoy.transport_socket: { protocol: "http" } 
+)EOF", metadata);
+  EXPECT_EQ("http", config_factory->id());
+}
+
+TEST_F(TransportSocketMatcherTest, MultipleMatchFirstWin) {
+  init({R"EOF(
+name: "sidecar_http_socket"
+match:
+  sidecar: "true"
+  protocol: "http"
+transport_socket:
+  name: "foo"
+  config:
+    id: "sidecar_http"
+ )EOF",
+R"EOF(
+name: "sidecar_socket"
+match:
+  sidecar: "true"
+transport_socket:
+  name: "foo"
+  config:
+    id: "sidecar"
+ )EOF"
+});
+  envoy::api::v2::core::Metadata metadata;
+  TestUtility::loadFromYaml(R"EOF(
+filter_metadata:
+  envoy.transport_socket: { sidecar: "true", protocol: "http" }
+)EOF", metadata);
+  auto& factory = matcher_->resolve("10.0.0.1", metadata);
+  const auto* config_factory = dynamic_cast<const FakeTransportSocketFactory*>(&factory);
+  EXPECT_EQ("sidecar_http", config_factory->id());
+}
+
 TEST_F(TransportSocketMatcherTest, MatchAllEndpointsFactory) {
   init({R"EOF(
-name: "enableFooSocket"
+name: "match_all"
 match: {}
 transport_socket:
   name: "foo"
   config:
-    id: "abc"
+    id: "match_all"
  )EOF"});
   envoy::api::v2::core::Metadata metadata;
   auto& factory = matcher_->resolve("10.0.0.1", metadata);
   const auto* config_factory = dynamic_cast<const FakeTransportSocketFactory*>(&factory);
-  EXPECT_EQ("abc", config_factory->id());
+  EXPECT_EQ("match_all", config_factory->id());
 }
-
 
 REGISTER_FACTORY(FooTransportSocketFactory,
     Server::Configuration::UpstreamTransportSocketConfigFactory);
