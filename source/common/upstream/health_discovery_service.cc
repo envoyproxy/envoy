@@ -237,7 +237,7 @@ ProdClusterInfoFactory::createClusterInfo(const CreateClusterInfoParams& params)
   Network::TransportSocketFactoryPtr socket_factory =
       Upstream::createTransportSocketFactory(params.cluster_, factory_context);
   auto socket_overrides =
-      createTransportSocketMatcher(ENVOY_LOGGER(), params.cluster_, factory_context);
+      createTransportSocketMatcher(ENVOY_LOGGER(), params.cluster_, factory_context, *socket_factory);
 
   return std::make_unique<ClusterInfoImpl>(params.cluster_, params.bind_config_, params.runtime_,
                                            std::move(socket_factory), std::move(socket_overrides),

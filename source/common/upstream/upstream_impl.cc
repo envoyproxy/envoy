@@ -761,15 +761,12 @@ Network::TransportSocketFactoryPtr createTransportSocketFactory(
   return config_factory.createTransportSocketFactory(*message, factory_context);
 }
 
-// TODO(incfly): here, next step to move to constructor of transports socketmatcher
-// unit test creates the same list of the factory, and check returns equals. due to lack of mock.
 TransportSocketMatcherPtr createTransportSocketMatcher(
     spdlog::logger&, const envoy::api::v2::Cluster& config,
-    Server::Configuration::TransportSocketFactoryContext& factory_context) {
-  // TODO(incfly): question, use the only one default factory, not over creating.
-  // or creating factory always and once api is stable deprecate the outer one?
-  return std::make_unique<TransportSocketMatcher>(config.transport_socket_matches(),
-                                                  factory_context);
+    Server::Configuration::TransportSocketFactoryContext& factory_context,
+    Network::TransportSocketFactory& default_factory) {
+  return std::make_unique<TransportSocketMatcher>(
+      config.transport_socket_matches(), factory_context, default_factory);
 }
 
 void ClusterInfoImpl::createNetworkFilterChain(Network::Connection& connection) const {
@@ -787,7 +784,7 @@ ClusterImplBase::ClusterImplBase(
       symbol_table_(stats_scope->symbolTable()) {
   factory_context.setInitManager(init_manager_);
   auto socket_factory = createTransportSocketFactory(cluster, factory_context);
-  auto socket_overrides = createTransportSocketMatcher(ENVOY_LOGGER(), cluster, factory_context);
+  auto socket_overrides = createTransportSocketMatcher(ENVOY_LOGGER(), cluster, factory_context, *socket_factory);
   info_ = std::make_unique<ClusterInfoImpl>(
       cluster, factory_context.clusterManager().bindConfig(), runtime, std::move(socket_factory),
       std::move(socket_overrides), std::move(stats_scope), added_via_api,

@@ -93,11 +93,9 @@ public:
   std::string name() const override { return "foo"; }
 };
 
-
-
 class TransportSocketMatcherTest : public testing::Test {
 public:
-  TransportSocketMatcherTest() {}
+  TransportSocketMatcherTest(): mock_default_factory_("default") {}
 
   void init(const std::vector<std::string>& match_yaml) {
     Protobuf::RepeatedPtrField<envoy::api::v2::Cluster_TransportSocketMatch> matches;
@@ -105,32 +103,32 @@ public:
       auto transport_socket_match = matches.Add();
       TestUtility::loadFromYaml(yaml, *transport_socket_match);
     }
-    matcher_ = std::make_unique<TransportSocketMatcher>(matches, mock_factory_context_);
+    matcher_ = std::make_unique<TransportSocketMatcher>(
+        matches, mock_factory_context_, mock_default_factory_);
   }
 
 protected:
   TransportSocketMatcherPtr matcher_;
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_context_;
+  NiceMock<FakeTransportSocketFactory> mock_default_factory_;
 };
 
-// This test ensures the matcher returns the default transport socket factory.
-// TODO: work this test out, currently segfault for the default factory.
-//TEST_F(TransportSocketMatcherTest, ReturnDefaultSocketFactory) {
-  //init({R"EOF(
-//name: "enableFooSocket"
-//match:
-  //hasSidecar: "true"
-//transport_socket:
-  //name: "foo"
-  //config:
-    //id: "abc"
- //)EOF"});
+TEST_F(TransportSocketMatcherTest, ReturnDefaultSocketFactoryWhenNoMatch) {
+  init({R"EOF(
+name: "enableFooSocket"
+match:
+  hasSidecar: "true"
+transport_socket:
+  name: "foo"
+  config:
+    id: "abc"
+ )EOF"});
 
-  //envoy::api::v2::core::Metadata metadata;
-  //auto& factory = matcher_->resolve("10.0.0.1", metadata);
-  //const auto* config_factory = dynamic_cast<const FakeTransportSocketFactory*>(&factory);
-  //EXPECT_EQ("abc", config_factory->id());
-//}
+  envoy::api::v2::core::Metadata metadata;
+  auto& factory = matcher_->resolve("10.0.0.1", metadata);
+  const auto* config_factory = dynamic_cast<const FakeTransportSocketFactory*>(&factory);
+  EXPECT_EQ("default", config_factory->id());
+}
 
 TEST_F(TransportSocketMatcherTest, MatchAllEndpointsFactory) {
   init({R"EOF(

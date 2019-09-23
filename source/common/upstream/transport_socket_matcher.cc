@@ -9,7 +9,9 @@ namespace Upstream {
 
 TransportSocketMatcher::TransportSocketMatcher(
     const Protobuf::RepeatedPtrField<envoy::api::v2::Cluster_TransportSocketMatch>& socket_matches,
-    Server::Configuration::TransportSocketFactoryContext& factory_context) {
+    Server::Configuration::TransportSocketFactoryContext& factory_context,
+    Network::TransportSocketFactory& default_factory): 
+  default_socket_factory_(default_factory) {
   for (const auto& socket_match : socket_matches) {
     FactoryMatch factory_match;
     factory_match.name = socket_match.name();
@@ -72,7 +74,7 @@ TransportSocketMatcher::resolve(const std::string& endpoint_addr,
       return *socket_factory_match.factory;
     }
   }
-  return *default_socket_factory_;
+  return default_socket_factory_;
 }
 
 } // namespace Upstream

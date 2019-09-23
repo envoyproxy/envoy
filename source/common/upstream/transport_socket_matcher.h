@@ -68,7 +68,8 @@ class TransportSocketMatcher : Logger::Loggable<Logger::Id::upstream> {
 public:
   TransportSocketMatcher(const Protobuf::RepeatedPtrField<
                              envoy::api::v2::Cluster_TransportSocketMatch>& socket_matches,
-                         Server::Configuration::TransportSocketFactoryContext& factory_context);
+                         Server::Configuration::TransportSocketFactoryContext& factory_context,
+                         Network::TransportSocketFactory& default_factory);
 
   Network::TransportSocketFactory& resolve(const std::string& endpoint_addr,
                                            const envoy::api::v2::core::Metadata& metadata);
@@ -81,8 +82,7 @@ protected:
     // TransportSocketMatchStats stats;
   };
 
-  // TODO(incfly): ask reviewer opinion about whether handle default within this lib.
-  Network::TransportSocketFactoryPtr default_socket_factory_;
+  Network::TransportSocketFactory& default_socket_factory_;
   std::vector<FactoryMatch> matches_;
 };
 
