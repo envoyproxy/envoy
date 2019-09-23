@@ -16,20 +16,15 @@ import "validate/validate.proto";
 message Gzip {
   enum CompressionStrategy {
     DEFAULT = 0;
-
     FILTERED = 1;
-
     HUFFMAN = 2;
-
     RLE = 3;
   }
 
   message CompressionLevel {
     enum Enum {
       DEFAULT = 0;
-
       BEST = 1;
-
       SPEED = 2;
     }
   }
