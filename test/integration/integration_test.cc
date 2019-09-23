@@ -35,9 +35,6 @@ std::string normalizeDate(const std::string& s) {
 
 void setDisallowAbsoluteUrl(
     envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
-  envoy::api::v2::core::Http1ProtocolOptions options;
-  //  options.mutable_allow_absolute_url()->set_value(false);
-  //  hcm.mutable_http_protocol_options()->CopyFrom(options);
   hcm.mutable_http_protocol_options()->mutable_allow_absolute_url()->set_value(false);
 };
 
