@@ -326,18 +326,38 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
 
-  // TODO(#8324): "http1.metadata_not_supported_error" should not still be in
-  // the 'recent lookups' output after reset_counters.
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?recentlookups",
                                                 "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
-  EXPECT_EQ("   Count Lookup\n"
-            "       1 http1.metadata_not_supported_error\n"
-            "\n"
-            "total: 1\n",
-            response->body());
+
+  // TODO(#8324): "http1.metadata_not_supported_error" should not still be in
+  // the 'recent lookups' output after reset_counters.
+  switch (GetParam().downstream_protocol) {
+  case Http::CodecClient::Type::HTTP1:
+    EXPECT_EQ("   Count Lookup\n"
+              "       1 http1.metadata_not_supported_error\n"
+              "\n"
+              "total: 1\n",
+              response->body());
+    break;
+  case Http::CodecClient::Type::HTTP2:
+    EXPECT_EQ("   Count Lookup\n"
+              "       1 http2.inbound_empty_frames_flood\n"
+              "       1 http2.inbound_priority_frames_flood\n"
+              "       1 http2.inbound_window_update_frames_flood\n"
+              "       1 http2.outbound_control_flood\n"
+              "       1 http2.outbound_flood\n"
+              "       1 http2.rx_messaging_error\n"
+              "       1 http2.rx_reset\n"
+              "       1 http2.too_many_header_frames\n"
+              "       1 http2.trailers\n"
+              "       1 http2.tx_reset\n"
+              "\n"
+              "total: 12\n",
+              response->body());
+  }
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/certs", "",
                                                 downstreamProtocol(), version_);
