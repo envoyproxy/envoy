@@ -451,52 +451,50 @@ Http::FilterTrailersStatus JsonTranscoderFilter::encodeTrailers(Http::HeaderMap&
 
   response_in_.finish();
 
+  // If there was no previous headers frame, this |trailers| map is our |response_headers_|,
+  // so there is no need to copy headers from one to the other.
+  bool is_trailers_only_response = response_headers_ == &trailers;
+
   const absl::optional<Grpc::Status::GrpcStatus> grpc_status =
       Grpc::Common::getGrpcStatus(trailers);
   bool status_converted_to_json = grpc_status && maybeConvertGrpcStatus(*grpc_status, trailers);
+  if (status_converted_to_json) {
+    response_headers_->Status()->value(Grpc::Utility::grpcToHttpStatus(grpc_status.value()));
 
-  // Check if it's a trailers-only response (the first HEADERS frame has the end_stream flag set).
-  // This has the following implications:
-  // 1) The |trailers| map is our |response_headers_|, so there is no need to copy headers from one
-  // to the other.
-  // 2) There was no data from upstream, the |transcoder_| may return "[]" for streaming responses,
-  // but we can safely ignore that and return an error.
-  bool is_trailers_only_response = response_headers_ == &trailers;
-  if (!is_trailers_only_response || !status_converted_to_json) {
-    // Check for leftover data in the transcoder.
+    if (is_trailers_only_response) {
+      // Drop the gRPC status headers, we already have them in the JSON body.
+      response_headers_->removeGrpcStatus();
+      response_headers_->removeGrpcMessage();
+      response_headers_->remove(Http::Headers::get().GrpcStatusDetailsBin);
+    }
+  } else {
     Buffer::OwnedImpl data;
     readToBuffer(*transcoder_->ResponseOutput(), data);
 
     if (data.length()) {
       encoder_callbacks_->addEncodedData(data, true);
-      has_body_ = true;
     }
 
     if (method_->server_streaming()) {
       // For streaming case, the headers are already sent, so just continue here.
       return Http::FilterTrailersStatus::Continue;
     }
-  }
 
-  if (!grpc_status || grpc_status.value() == Grpc::Status::GrpcStatus::InvalidCode) {
-    response_headers_->Status()->value(enumToInt(Http::Code::ServiceUnavailable));
-  } else {
-    response_headers_->Status()->value(Grpc::Utility::grpcToHttpStatus(grpc_status.value()));
-    if (!status_converted_to_json && !is_trailers_only_response) {
-      response_headers_->insertGrpcStatus().value(enumToInt(grpc_status.value()));
+    if (!grpc_status || grpc_status.value() == Grpc::Status::GrpcStatus::InvalidCode) {
+      response_headers_->Status()->value(enumToInt(Http::Code::ServiceUnavailable));
+    } else {
+      response_headers_->Status()->value(Grpc::Utility::grpcToHttpStatus(grpc_status.value()));
+      if (!is_trailers_only_response) {
+        response_headers_->insertGrpcStatus().value(enumToInt(grpc_status.value()));
+      }
     }
-  }
 
-  if (status_converted_to_json && is_trailers_only_response) {
-    // Drop the gRPC status headers, we already have them in the JSON body.
-    response_headers_->removeGrpcStatus();
-    response_headers_->removeGrpcMessage();
-    response_headers_->remove(Http::Headers::get().GrpcStatusDetailsBin);
-  } else if (!status_converted_to_json && !is_trailers_only_response) {
-    // Copy the grpc-message header if it exists.
-    const Http::HeaderEntry* grpc_message_header = trailers.GrpcMessage();
-    if (grpc_message_header) {
-      response_headers_->insertGrpcMessage().value(*grpc_message_header);
+    if (!is_trailers_only_response) {
+      // Copy the grpc-message header if it exists.
+      const Http::HeaderEntry* grpc_message_header = trailers.GrpcMessage();
+      if (grpc_message_header) {
+        response_headers_->insertGrpcMessage().value(*grpc_message_header);
+      }
     }
   }
 
