@@ -24,7 +24,7 @@ message FaultAbort {
     option (validate.required) = true;
 
     // HTTP status code to use to abort the HTTP request.
-    uint32 http_status = 2 [(validate.rules).uint32 = {gte: 200, lt: 600}];
+    uint32 http_status = 2 [(validate.rules).uint32 = {lt: 600 gte: 200}];
   }
 
   // The percentage of requests/operations/connections that will be aborted with the error code
@@ -55,7 +55,7 @@ message HTTPFault {
   // headers in the filter config. A match will happen if all the headers in the
   // config are present in the request with the same values (or based on
   // presence if the *value* field is not in the config).
-  repeated envoy.api.v2.route.HeaderMatcher headers = 4;
+  repeated api.v2.route.HeaderMatcher headers = 4;
 
   // Faults are injected for the specified list of downstream hosts. If this
   // setting is not set, faults are injected for all downstream nodes.
