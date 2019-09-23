@@ -10,6 +10,56 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 
+class RawByteRangeTest : public testing::Test {};
+
+
+using RawByteRangeDeathTest = RawByteRangeTest;
+
+
+TEST_F(RawByteRangeTest, IsSuffix) {
+  auto r = RawByteRange(UINT64_MAX, 4);
+  ASSERT_TRUE(r.isSuffix());
+}
+
+TEST_F(RawByteRangeTest, IsNotSuffix) {
+  auto r = RawByteRange(3, 4);
+  ASSERT_FALSE(r.isSuffix());
+}
+
+TEST_F(RawByteRangeTest, IllegalByteRange) {
+  ASSERT_DEATH(RawByteRange(5, 4), "Illegal byte range");
+}
+
+TEST_F(RawByteRangeTest, FirstBytePos) {
+  auto r = RawByteRange(3, 4);
+  ASSERT_EQ(3, r.firstBytePos());
+}
+
+TEST_F(RawByteRangeDeathTest, FirstBytePosIfSuffix) {
+  auto r = RawByteRange(UINT64_MAX, 4);
+  ASSERT_DEATH(r.firstBytePos(), "!isSuffix()");
+}
+
+TEST_F(RawByteRangeTest, LastBytePos) {
+  auto r = RawByteRange(3, 4);
+  ASSERT_EQ(4, r.lastBytePos());
+}
+
+TEST_F(RawByteRangeTest, LastBytePosIfSuffix) {
+  auto r = RawByteRange(UINT64_MAX, UINT64_MAX);
+  ASSERT_DEATH(r.lastBytePos(), "!isSuffix()");
+}
+
+TEST_F(RawByteRangeDeathTest, SuffixLengthOfNotSuffix) {
+  auto r = RawByteRange(3, 4);
+  ASSERT_DEATH(r.suffixLength(), "isSuffix()");
+}
+
+TEST_F(RawByteRangeTest, suffixLength) {
+  auto r = RawByteRange(UINT64_MAX, 4);
+  ASSERT_EQ(4, r.suffixLength());
+}
+
 class LookupRequestTest : public testing::Test {
 protected:
   Event::SimulatedTimeSystem time_source_;

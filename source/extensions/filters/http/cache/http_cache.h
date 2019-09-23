@@ -54,8 +54,12 @@ public:
     return last_byte_pos_;
   }
   uint64_t suffixLength() const {
+<<<<<<< HEAD
+    return last_byte_pos_ - first_byte_pos_;
+=======
     ASSERT(isSuffix());
     return last_byte_pos_;
+>>>>>>> bf972c452... fixupppp
   }
 
 private:
