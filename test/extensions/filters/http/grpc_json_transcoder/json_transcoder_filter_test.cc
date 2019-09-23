@@ -308,24 +308,24 @@ TEST_F(GrpcJsonTranscoderConfigTest, InvalidVariableBinding) {
 
 class GrpcJsonTranscoderFilterTest : public testing::Test, public GrpcJsonTranscoderFilterTestBase {
 protected:
-  GrpcJsonTranscoderFilterTest(const bool match_incoming_request_route = false)
-      : config_(bookstoreProtoConfig(match_incoming_request_route), *api_), filter_(config_) {
+  GrpcJsonTranscoderFilterTest(envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder
+                                   proto_config = bookstoreProtoConfig())
+      : config_(proto_config, *api_), filter_(config_) {
     filter_.setDecoderFilterCallbacks(decoder_callbacks_);
     filter_.setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
-  const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder
-  bookstoreProtoConfig(const bool match_incoming_request_route) {
+  static const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder
+  bookstoreProtoConfig() {
     std::string json_string = "{\"proto_descriptor\": \"" + bookstoreDescriptorPath() +
                               "\",\"services\": [\"bookstore.Bookstore\"]}";
     auto json_config = Json::Factory::loadFromString(json_string);
     envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder proto_config{};
     Envoy::Config::FilterJson::translateGrpcJsonTranscoder(*json_config, proto_config);
-    proto_config.set_match_incoming_request_route(match_incoming_request_route);
     return proto_config;
   }
 
-  const std::string bookstoreDescriptorPath() {
+  static const std::string bookstoreDescriptorPath() {
     return TestEnvironment::runfilesPath("test/proto/bookstore.descriptor");
   }
 
@@ -574,7 +574,15 @@ TEST_F(GrpcJsonTranscoderFilterTest, ForwardUnaryPostGrpc) {
 
 class GrpcJsonTranscoderFilterSkipRecalculatingTest : public GrpcJsonTranscoderFilterTest {
 public:
-  GrpcJsonTranscoderFilterSkipRecalculatingTest() : GrpcJsonTranscoderFilterTest(true) {}
+  GrpcJsonTranscoderFilterSkipRecalculatingTest()
+      : GrpcJsonTranscoderFilterTest(makeProtoConfig()) {}
+
+private:
+  const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder makeProtoConfig() {
+    auto proto_config = bookstoreProtoConfig();
+    proto_config.set_match_incoming_request_route(true);
+    return proto_config;
+  }
 };
 
 TEST_F(GrpcJsonTranscoderFilterSkipRecalculatingTest, TranscodingUnaryPostSkipRecalculate) {
@@ -732,6 +740,97 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryWithHttpBodyAsOutputAndSpli
 
   Http::TestHeaderMapImpl response_trailers{{"grpc-status", "0"}, {"grpc-message", ""}};
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(response_trailers));
+}
+
+class GrpcJsonTranscoderFilterConvertGrpcStatusTest : public GrpcJsonTranscoderFilterTest {
+public:
+  GrpcJsonTranscoderFilterConvertGrpcStatusTest()
+      : GrpcJsonTranscoderFilterTest(makeProtoConfig()) {}
+
+  void SetUp() override {
+    EXPECT_CALL(decoder_callbacks_, clearRouteCache());
+    Http::TestHeaderMapImpl request_headers{
+        {"content-type", "application/json"}, {":method", "POST"}, {":path", "/shelf"}};
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+
+    Buffer::OwnedImpl request_data{R"({"theme": "Children"})"};
+    EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(request_data, true));
+
+    Http::TestHeaderMapImpl continue_headers{{":status", "000"}};
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+              filter_.encode100ContinueHeaders(continue_headers));
+  }
+
+private:
+  const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder makeProtoConfig() {
+    auto proto_config = bookstoreProtoConfig();
+    proto_config.set_convert_grpc_status(true);
+    return proto_config;
+  }
+};
+
+// Single headers frame with end_stream flag (trailer), no grpc-status-details-bin header.
+TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest, TranscodingTextHeadersInTrailerOnlyResponse) {
+  std::string expected_response(R"({"code":5,"message":"Resource not found"})");
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
+      .WillOnce(Invoke([&expected_response](Buffer::Instance& data, bool) {
+        EXPECT_EQ(expected_response, data.toString());
+      }));
+
+  Http::TestHeaderMapImpl response_headers{{":status", "200"},
+                                           {"content-type", "application/grpc"},
+                                           {"grpc-status", "5"},
+                                           {"grpc-message", "Resource not found"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, true));
+  EXPECT_EQ("404", response_headers.get_(":status"));
+  EXPECT_EQ("application/json", response_headers.get_("content-type"));
+  EXPECT_FALSE(response_headers.has("grpc-status"));
+  EXPECT_FALSE(response_headers.has("grpc-message"));
+}
+
+// Trailer-only response with grpc-status-details-bin header.
+TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest,
+       TranscodingBinaryHeaderInTrailerOnlyResponse) {
+  std::string expected_response(R"({"code":5,"message":"Resource not found"})");
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
+      .WillOnce(Invoke([&expected_response](Buffer::Instance& data, bool) {
+        EXPECT_EQ(expected_response, data.toString());
+      }));
+
+  Http::TestHeaderMapImpl response_headers{
+      {":status", "200"},
+      {"content-type", "application/grpc"},
+      {"grpc-status", "5"},
+      {"grpc-message", "unused"},
+      {"grpc-status-details-bin", "CAUSElJlc291cmNlIG5vdCBmb3VuZA"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, true));
+  EXPECT_EQ("404", response_headers.get_(":status"));
+  EXPECT_EQ("application/json", response_headers.get_("content-type"));
+  EXPECT_FALSE(response_headers.has("grpc-status"));
+  EXPECT_FALSE(response_headers.has("grpc-message"));
+  EXPECT_FALSE(response_headers.has("grpc-status-details-bin"));
+}
+
+// Trailer-only response with grpc-status-details-bin header with details.
+// Also tests that a user-defined type from a proto descriptor in config can be used in details.
+TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest,
+       TranscodingBinaryHeaderWithDetailsInTrailerOnlyResponse) {
+  std::string expected_response(
+      "{\"code\":5,\"message\":\"Error\",\"details\":"
+      "[{\"@type\":\"type.googleapis.com/helloworld.HelloReply\",\"message\":\"details\"}]}");
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
+      .WillOnce(Invoke([&expected_response](Buffer::Instance& data, bool) {
+        EXPECT_EQ(expected_response, data.toString());
+      }));
+
+  Http::TestHeaderMapImpl response_headers{
+      {":status", "200"},
+      {"content-type", "application/grpc"},
+      {"grpc-status", "5"},
+      {"grpc-message", "unused"},
+      {"grpc-status-details-bin",
+       "CAUSBUVycm9yGjYKKXR5cGUuZ29vZ2xlYXBpcy5jb20vaGVsbG93b3JsZC5IZWxsb1JlcGx5EgkKB2RldGFpbHM"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, true));
 }
 
 struct GrpcJsonTranscoderFilterPrintTestParam {

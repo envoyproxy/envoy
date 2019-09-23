@@ -7,6 +7,7 @@ option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.type.matcher";
 
 import "google/protobuf/wrappers.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: RegexMatcher]
@@ -28,9 +29,9 @@ message RegexMatcher {
     option (validate.required) = true;
 
     // Google's RE2 regex engine.
-    GoogleRE2 google_re2 = 1 [(validate.rules).message.required = true];
+    GoogleRE2 google_re2 = 1 [(validate.rules).message = {required: true}];
   }
 
   // The regex match string. The string must be supported by the configured engine.
-  string regex = 2 [(validate.rules).string.min_bytes = 1];
+  string regex = 2 [(validate.rules).string = {min_bytes: 1}];
 }

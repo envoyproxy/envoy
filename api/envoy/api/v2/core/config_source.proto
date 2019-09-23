@@ -23,12 +23,15 @@ message ApiConfigSource {
     // Ideally this would be 'reserved 0' but one can't reserve the default
     // value. Instead we throw an exception if this is ever used.
     UNSUPPORTED_REST_LEGACY = 0 [deprecated = true];
+
     // REST-JSON v2 API. The `canonical JSON encoding
     // <https://developers.google.com/protocol-buffers/docs/proto3#json>`_ for
     // the v2 protos is used.
     REST = 1;
+
     // gRPC v2 API.
     GRPC = 2;
+
     // Using the delta xDS gRPC service, i.e. DeltaDiscovery{Request,Response}
     // rather than Discovery{Request,Response}. Rather than sending Envoy the entire state
     // with every update, the xDS server only sends what has changed since the last update.
@@ -37,7 +40,9 @@ message ApiConfigSource {
     // Do not use for other xDSes. TODO(fredlas) update/remove this warning when appropriate.
     DELTA_GRPC = 3;
   }
-  ApiType api_type = 1 [(validate.rules).enum.defined_only = true];
+
+  ApiType api_type = 1 [(validate.rules).enum = {defined_only: true}];
+
   // Cluster names should be used only with REST. If > 1
   // cluster is defined, clusters will be cycled through if any kind of failure
   // occurs.
@@ -56,7 +61,7 @@ message ApiConfigSource {
   google.protobuf.Duration refresh_delay = 3;
 
   // For REST APIs, the request timeout. If not set, a default value of 1s will be used.
-  google.protobuf.Duration request_timeout = 5 [(validate.rules).duration.gt.seconds = 0];
+  google.protobuf.Duration request_timeout = 5 [(validate.rules).duration = {gt {}}];
 
   // For GRPC APIs, the rate limit settings. If present, discovery requests made by Envoy will be
   // rate limited.
@@ -72,6 +77,13 @@ message ApiConfigSource {
 message AggregatedConfigSource {
 }
 
+// [#not-implemented-hide:]
+// Self-referencing config source options. This is currently empty, but when
+// set in :ref:`ConfigSource <envoy_api_msg_core.ConfigSource>` can be used to
+// specify that other data can be obtained from the same server.
+message SelfConfigSource {
+}
+
 // Rate Limit settings to be applied for discovery requests made by Envoy.
 message RateLimitSettings {
   // Maximum number of tokens to be used for rate limiting discovery request calls. If not set, a
@@ -80,7 +92,7 @@ message RateLimitSettings {
 
   // Rate at which tokens will be filled per second. If not set, a default fill rate of 10 tokens
   // per second will be used.
-  google.protobuf.DoubleValue fill_rate = 2 [(validate.rules).double.gt = 0.0];
+  google.protobuf.DoubleValue fill_rate = 2 [(validate.rules).double = {gt: 0.0}];
 }
 
 // Configuration for :ref:`listeners <config_listeners>`, :ref:`clusters
@@ -89,9 +101,11 @@ message RateLimitSettings {
 // <arch_overview_service_discovery>` etc. may either be sourced from the
 // filesystem or from an xDS API source. Filesystem configs are watched with
 // inotify for updates.
+// [#comment:next free field: 6]
 message ConfigSource {
   oneof config_source_specifier {
     option (validate.required) = true;
+
     // Path on the filesystem to source and watch for configuration updates.
     //
     // .. note::
@@ -104,11 +118,26 @@ message ConfigSource {
     //   are atomic. The same method of swapping files as is demonstrated in the
     //   :ref:`runtime documentation <config_runtime_symbolic_link_swap>` can be used here also.
     string path = 1;
+
     // API configuration source.
     ApiConfigSource api_config_source = 2;
+
     // When set, ADS will be used to fetch resources. The ADS API configuration
     // source in the bootstrap configuration is used.
     AggregatedConfigSource ads = 3;
+
+    // [#not-implemented-hide:]
+    // When set, the client will access the resources from the same server it got the
+    // ConfigSource from, although not necessarily from the same stream. This is similar to the
+    // :ref:`ads<envoy_api_field.ConfigSource.ads>` field, except that the client may use a
+    // different stream to the same server. As a result, this field can be used for things
+    // like LRS that cannot be sent on an ADS stream. It can also be used to link from (e.g.)
+    // LDS to RDS on the same server without requiring the management server to know its name
+    // or required credentials.
+    // [#next-major-version: In xDS v3, consider replacing the ads field with this one, since
+    // this field can implicitly mean to use the same stream in the case where the ConfigSource
+    // is provided via ADS and the specified data can also be obtained via ADS.]
+    SelfConfigSource self = 5;
   }
 
   // When this timeout is specified, Envoy will wait no longer than the specified time for first
