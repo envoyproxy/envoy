@@ -1,8 +1,8 @@
+#include "common/config/utility.h"
 #include "common/upstream/transport_socket_matcher.h"
 
 #include "envoy/server/transport_socket_config.h"
 
-#include "common/config/utility.h"
 
 namespace Envoy {
 namespace Upstream {
