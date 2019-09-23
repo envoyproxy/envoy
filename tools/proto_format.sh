@@ -3,7 +3,6 @@
 # Reformat API protos to canonical proto style using protoxform.
 
 set -e
-set -x
 
 # TODO(htuch): This script started life by cloning docs/build.sh. It depends on
 # the @envoy_api//docs:protos target in a few places as a result. This is not
