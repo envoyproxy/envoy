@@ -13,7 +13,7 @@ import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/discovery.proto";
 import "envoy/api/v2/listener/listener.proto";
 import "envoy/api/v2/listener/udp_listener_config.proto";
-import "envoy/config/api_listener/v2/api_listener.proto";
+import "envoy/config/listener/v2/api_listener.proto";
 
 import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";

@@ -27,7 +27,7 @@ api_proto_package(
         "//envoy/api/v2/listener:pkg",
         "//envoy/api/v2/ratelimit:pkg",
         "//envoy/api/v2/route:pkg",
-        "//envoy/config/api_listener/v2:pkg",
+        "//envoy/config/listener/v2:pkg",
         "//envoy/type",
     ],
 )
@@ -87,7 +87,7 @@ api_proto_library_internal(
         "//envoy/api/v2/core:base",
         "//envoy/api/v2/listener",
         "//envoy/api/v2/listener:udp_listener_config",
-        "//envoy/config/api_listener/v2:api_listener",
+        "//envoy/config/listener/v2:api_listener",
     ],
 )
 
