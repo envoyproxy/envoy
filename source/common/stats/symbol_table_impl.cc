@@ -263,9 +263,11 @@ void SymbolTableImpl::clearRecentLookups() {
   }
 }
 
-void SymbolTableImpl::rememberSet(StatNameSet& stat_name_set) {
+StatNameSetPtr SymbolTableImpl::makeSet(absl::string_view name) {
   Thread::LockGuard lock(stat_name_set_mutex_);
-  stat_name_sets_.insert(&stat_name_set);
+  auto stat_name_set = std::make_unique<StatNameSet>(*this, name);
+  stat_name_sets_.insert(stat_name_set.get());
+  return stat_name_set;
 }
 
 void SymbolTableImpl::forgetSet(StatNameSet& stat_name_set) {
@@ -496,10 +498,9 @@ void StatNameList::clear(SymbolTable& symbol_table) {
   storage_.reset();
 }
 
-StatNameSet::StatNameSet(SymbolTable& symbol_table)
-    : symbol_table_(symbol_table), pool_(symbol_table) {
+StatNameSet::StatNameSet(SymbolTable& symbol_table, absl::string_view name)
+    : name_(std::string(name)), symbol_table_(symbol_table), pool_(symbol_table) {
   builtin_stat_names_[""] = StatName();
-  symbol_table.rememberSet(*this);
 }
 
 StatNameSet::~StatNameSet() { symbol_table_.forgetSet(*this); }

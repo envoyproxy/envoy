@@ -125,7 +125,9 @@ public:
     fn(toStringView(stat_name));
   }
 
-  void rememberSet(StatNameSet&) override {}
+  StatNameSetPtr makeSet(absl::string_view name) override {
+    return std::make_unique<StatNameSet>(*this, name);
+  }
   void forgetSet(StatNameSet&) override {}
   uint64_t getRecentLookups(const RecentLookupsFn&) override { return 0; }
   void clearRecentLookups() override {}

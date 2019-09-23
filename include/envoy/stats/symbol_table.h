@@ -24,6 +24,8 @@ using StatNameVec = std::vector<StatName>;
 class StatNameList;
 class StatNameSet;
 
+using StatNameSetPtr = std::unique_ptr<StatNameSet>;
+
 /**
  * SymbolTable manages a namespace optimized for stat names, exploiting their
  * typical composition from "."-separated tokens, with a significant overlap
@@ -160,6 +162,14 @@ public:
    */
   virtual void clearRecentLookups() PURE;
 
+  /**
+   * Creates a StatNameSet.
+   *
+   * @param name the name of the set.
+   * @return the set.
+   */
+  virtual StatNameSetPtr makeSet(absl::string_view name) PURE;
+
 private:
   friend struct HeapStatData;
   friend class StatNameStorage;
@@ -201,15 +211,6 @@ private:
    *
    */
   virtual StoragePtr encode(absl::string_view name) PURE;
-
-  /**
-   * Enables trackRecentLookups to also track lookups that occur in
-   * StatNameSets, which has its own mutex. This function is called from
-   * StatNameSet's constructor.
-   *
-   * @param stat_name_set the set.
-   */
-  virtual void rememberSet(StatNameSet& stat_name_set) PURE;
 
   /**
    * Called by StatNameSet's destructor.

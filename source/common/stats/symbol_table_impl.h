@@ -160,7 +160,7 @@ public:
     return bytes;
   }
 
-  void rememberSet(StatNameSet& stat_name_set) override;
+  StatNameSetPtr makeSet(absl::string_view name) override;
   void forgetSet(StatNameSet& stat_name_set) override;
   uint64_t getRecentLookups(const RecentLookupsFn&) override;
   void clearRecentLookups() override;
@@ -659,7 +659,8 @@ private:
 // builtins must *not* be added in the request-path.
 class StatNameSet {
 public:
-  explicit StatNameSet(SymbolTable& symbol_table);
+  // This object must be instantiated via SymbolTable::makeSet(), thus constructor is private.
+
   ~StatNameSet();
 
   /**
@@ -712,18 +713,21 @@ public:
    */
   void clearRecentLookups();
 
+  StatNameSet(SymbolTable& symbol_table, absl::string_view name);
+
 private:
+  friend class FakeSymbolTableImpl;
   friend class SymbolTableImpl;
 
   uint64_t getRecentLookups(const RecentLookups::IterFn& iter);
 
+  std::string name_;
   Stats::SymbolTable& symbol_table_;
   Stats::StatNamePool pool_ GUARDED_BY(mutex_);
   absl::Mutex mutex_;
   using StringStatNameMap = absl::flat_hash_map<std::string, Stats::StatName>;
   StringStatNameMap builtin_stat_names_;
   StringStatNameMap dynamic_stat_names_ GUARDED_BY(mutex_);
-  // std::unique_ptr<RecentLookups> recent_lookups_ GUARDED_BY(mutex_);
   RecentLookups recent_lookups_ GUARDED_BY(mutex_);
 };
 

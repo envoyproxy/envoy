@@ -14,19 +14,21 @@ namespace NetworkFilters {
 namespace MongoProxy {
 
 MongoStats::MongoStats(Stats::Scope& scope, const std::string& prefix)
-    : scope_(scope), stat_name_set_(scope.symbolTable()), prefix_(stat_name_set_.add(prefix)),
-      callsite_(stat_name_set_.add("callsite")), cmd_(stat_name_set_.add("cmd")),
-      collection_(stat_name_set_.add("collection")), multi_get_(stat_name_set_.add("multi_get")),
-      reply_num_docs_(stat_name_set_.add("reply_num_docs")),
-      reply_size_(stat_name_set_.add("reply_size")),
-      reply_time_ms_(stat_name_set_.add("reply_time_ms")), time_ms_(stat_name_set_.add("time_ms")),
-      query_(stat_name_set_.add("query")), scatter_get_(stat_name_set_.add("scatter_get")),
-      total_(stat_name_set_.add("total")), unknown_command_(stat_name_set_.add("unknown_command")) {
+    : scope_(scope), stat_name_set_(scope.symbolTable().makeSet("Mongo")),
+      prefix_(stat_name_set_->add(prefix)), callsite_(stat_name_set_->add("callsite")),
+      cmd_(stat_name_set_->add("cmd")), collection_(stat_name_set_->add("collection")),
+      multi_get_(stat_name_set_->add("multi_get")),
+      reply_num_docs_(stat_name_set_->add("reply_num_docs")),
+      reply_size_(stat_name_set_->add("reply_size")),
+      reply_time_ms_(stat_name_set_->add("reply_time_ms")),
+      time_ms_(stat_name_set_->add("time_ms")), query_(stat_name_set_->add("query")),
+      scatter_get_(stat_name_set_->add("scatter_get")), total_(stat_name_set_->add("total")),
+      unknown_command_(stat_name_set_->add("unknown_command")) {
 
   // TODO(jmarantz): is this the right set of mongo commands to use as builtins?
   // Should we also have builtins for callsites or collections, or do those need
   // to be dynamic?
-  stat_name_set_.rememberBuiltins({"insert", "query", "update", "delete"});
+  stat_name_set_->rememberBuiltins({"insert", "query", "update", "delete"});
 }
 
 Stats::SymbolTable::StoragePtr MongoStats::addPrefix(const std::vector<Stats::StatName>& names) {
