@@ -211,6 +211,10 @@ An example representation of a setting for the *health_check.min_interval* key i
   health_check:
     min_interval: 5
 
+.. note::
+
+  Integer values that are parsed from doubles are rounded down to the nearest whole number.
+
 .. _config_runtime_comments:
 
 Comments

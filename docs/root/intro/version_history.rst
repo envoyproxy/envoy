@@ -66,6 +66,7 @@ Version history
 * upstream: added new :ref:`failure-percentage based outlier detection<arch_overview_outlier_detection_failure_percentage>` mode.
 * upstream: use p2c to select hosts for least-requests load balancers if all host weights are the same, even in cases where weights are not equal to 1.
 * upstream: added :ref:`fail_traffic_on_panic <envoy_api_field_Cluster.CommonLbConfig.ZoneAwareLbConfig.fail_traffic_on_panic>` to allow failing all requests to a cluster during panic state.
+* runtime: allow for the ability to parse integers as double values and vice-versa.
 * zookeeper: parse responses and emit latency stats.
 
 1.11.1 (August 13, 2019)
