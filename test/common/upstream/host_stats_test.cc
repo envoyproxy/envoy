@@ -9,30 +9,25 @@ namespace {
 // Verify that counters are sorted by name.
 TEST(HostStatsTest, CountersSortedByName) {
   HostStats host_stats;
-  auto counters = host_stats.counters();
+  using PrimitiveCounterReference = std::reference_wrapper<const Stats::PrimitiveCounter>;
+  std::vector<std::pair<absl::string_view, PrimitiveCounterReference>> counters =
+      host_stats.counters();
   EXPECT_FALSE(counters.empty());
 
-  const absl::string_view* prev_counter_name = nullptr;
-  for (const auto& counter : counters) {
-    if (prev_counter_name) {
-      EXPECT_LT(*prev_counter_name, counter.first);
-    }
-    prev_counter_name = &counter.first;
+  for (size_t i = 1; i < counters.size(); ++i) {
+    EXPECT_LT(counters[i - 1].first, counters[i].first);
   }
 }
 
 // Verify that gauges are sorted by name.
 TEST(HostStatsTest, GaugesSortedByName) {
   HostStats host_stats;
-  auto gauges = host_stats.gauges();
+  using PrimitiveGaugeReference = std::reference_wrapper<const Stats::PrimitiveGauge>;
+  std::vector<std::pair<absl::string_view, PrimitiveGaugeReference>> gauges = host_stats.gauges();
   EXPECT_FALSE(gauges.empty());
 
-  const absl::string_view* prev_gauge_name = nullptr;
-  for (const auto& gauge : gauges) {
-    if (prev_gauge_name) {
-      EXPECT_LT(*prev_gauge_name, gauge.first);
-    }
-    prev_gauge_name = &gauge.first;
+  for (size_t i = 1; i < gauges.size(); ++i) {
+    EXPECT_LT(gauges[i - 1].first, gauges[i].first);
   }
 }
 
