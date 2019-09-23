@@ -75,7 +75,7 @@ envoy_cc_test(
     deps = [
         ":quic_test_utils_for_envoy_lib",
         "//include/envoy/stats:stats_macros",
-        "//source/extensions/quic_listeners/quiche:codec_impl_lib",
+        "//source/extensions/quic_listeners/quiche:codec_lib",
         "//source/extensions/quic_listeners/quiche:envoy_quic_alarm_factory_lib",
         "//source/extensions/quic_listeners/quiche:envoy_quic_connection_helper_lib",
         "//source/extensions/quic_listeners/quiche:envoy_quic_proof_source_lib",

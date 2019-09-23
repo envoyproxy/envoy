@@ -28,6 +28,19 @@ private:
 
 using PortRangeList = std::list<PortRange>;
 
+class UdpPacketProcessor {
+public:
+  virtual ~UdpPacketProcessor() {}
+
+  virtual void processPacket(Address::InstanceConstSharedPtr local_address,
+                             Address::InstanceConstSharedPtr peer_address,
+                             Buffer::InstancePtr buffer, MonotonicTime receive_time) PURE;
+
+  virtual uint64_t maxPacketSize() const PURE;
+};
+
+static const uint64_t MAX_UDP_PACKET_SIZE = 1500;
+
 /**
  * Common network utility routines.
  */
@@ -257,6 +270,15 @@ public:
    */
   static Address::SocketType
   protobufAddressSocketType(const envoy::api::v2::core::Address& proto_address);
+
+  static Api::IoCallUint64Result writeToSocket(Network::Socket& socket, Buffer::RawSlice* slices,
+                                               uint64_t num_slices, const Address::Ip* local_ip,
+                                               const Address::Instance& peer_address);
+
+  static Api::IoCallUint64Result readFromSocket(Network::Socket& socket,
+                                                UdpPacketProcessor& udp_packet_processor,
+                                                uint32_t* packets_dropped,
+                                                MonotonicTime receive_time);
 
 private:
   static void throwWithMalformedIp(const std::string& ip_address);
