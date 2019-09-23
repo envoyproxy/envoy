@@ -155,6 +155,11 @@ public:
    */
   virtual uint64_t getRecentLookups(const RecentLookupsFn& iter) PURE;
 
+  /**
+   * Clears the recent-lookups structures.
+   */
+  virtual void clearRecentLookups() PURE;
+
 private:
   friend struct HeapStatData;
   friend class StatNameStorage;

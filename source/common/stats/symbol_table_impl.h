@@ -163,6 +163,7 @@ public:
   void rememberSet(StatNameSet& stat_name_set) override;
   void forgetSet(StatNameSet& stat_name_set) override;
   uint64_t getRecentLookups(const RecentLookupsFn&) override;
+  void clearRecentLookups() override;
 
 private:
   friend class StatName;
@@ -705,6 +706,11 @@ public:
     absl::MutexLock lock(&mutex_);
     return pool_.add(str);
   }
+
+  /**
+   * Clears recent lookups.
+   */
+  void clearRecentLookups();
 
 private:
   friend class SymbolTableImpl;

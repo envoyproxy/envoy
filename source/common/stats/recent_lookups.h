@@ -33,6 +33,14 @@ public:
    */
   uint64_t total() const { return total_; }
 
+  /**
+   * Clears out all contents.
+   */
+  void clear() {
+    total_ = 0;
+    queue_.clear();
+  }
+
 private:
   std::deque<std::string> queue_;
   uint64_t total_{0};

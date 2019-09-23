@@ -709,7 +709,7 @@ Http::Code AdminImpl::handlerResetCounters(absl::string_view, Http::HeaderMap&,
   for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
     counter->reset();
   }
-
+  server_.stats().symbolTable().clearRecentLookups();
   response.add("OK\n");
   return Http::Code::OK;
 }

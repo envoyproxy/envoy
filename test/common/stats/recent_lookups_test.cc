@@ -43,6 +43,8 @@ TEST_F(RecentLookupsTest, Empty) { EXPECT_EQ("", joinLookups()); }
 TEST_F(RecentLookupsTest, One) {
   recent_lookups_.lookup("Hello");
   EXPECT_EQ("1: Hello", joinLookups());
+  recent_lookups_.clear();
+  EXPECT_EQ("", joinLookups());
 }
 
 TEST_F(RecentLookupsTest, DropOne) {
@@ -60,6 +62,8 @@ TEST_F(RecentLookupsTest, DropOne) {
             "1: lookup8 "
             "1: lookup9",
             joinLookups());
+  recent_lookups_.clear();
+  EXPECT_EQ("", joinLookups());
 }
 
 TEST_F(RecentLookupsTest, RepeatDrop) {
@@ -76,6 +80,8 @@ TEST_F(RecentLookupsTest, RepeatDrop) {
             "2: lookup8 "
             "2: lookup9",
             joinLookups());
+  recent_lookups_.clear();
+  EXPECT_EQ("", joinLookups());
 }
 
 } // namespace

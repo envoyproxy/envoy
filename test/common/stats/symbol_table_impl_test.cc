@@ -590,6 +590,12 @@ TEST_P(StatNameTest, RecentLookups) {
             "2: dynamic.stat1 " // Combines entries from set and symbol-table.
             "2: dynamic.stat2",
             recent_lookups_str);
+
+  table_->clearRecentLookups();
+  uint32_t num_calls = 0;
+  EXPECT_EQ(0,
+            table_->getRecentLookups([&num_calls](absl::string_view, uint64_t) { ++num_calls; }));
+  EXPECT_EQ(0, num_calls);
 }
 
 TEST_P(StatNameTest, StatNameEmptyEquivalent) {

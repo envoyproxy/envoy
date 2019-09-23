@@ -326,6 +326,19 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
 
+  // TODO(#8324): "http1.metadata_not_supported_error" should not still be in
+  // the 'recent lookups' output after reset_counters.
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?recentlookups",
+                                                "", downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
+  EXPECT_EQ("   Count Lookup\n"
+            "       1 http1.metadata_not_supported_error\n"
+            "\n"
+            "total: 1\n",
+            response->body());
+
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/certs", "",
                                                 downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());

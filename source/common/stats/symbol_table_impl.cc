@@ -250,6 +250,19 @@ uint64_t SymbolTableImpl::getRecentLookups(const RecentLookupsFn& iter) {
   return total;
 }
 
+void SymbolTableImpl::clearRecentLookups() {
+  {
+    Thread::LockGuard lock(stat_name_set_mutex_);
+    for (StatNameSet* stat_name_set : stat_name_sets_) {
+      stat_name_set->clearRecentLookups();
+    }
+  }
+  {
+    Thread::LockGuard lock(lock_);
+    recent_lookups_.clear();
+  }
+}
+
 void SymbolTableImpl::rememberSet(StatNameSet& stat_name_set) {
   Thread::LockGuard lock(stat_name_set_mutex_);
   stat_name_sets_.insert(&stat_name_set);
@@ -529,6 +542,11 @@ uint64_t StatNameSet::getRecentLookups(const RecentLookups::IterFn& iter) {
   absl::MutexLock lock(&mutex_);
   recent_lookups_.forEach(iter);
   return recent_lookups_.total();
+}
+
+void StatNameSet::clearRecentLookups() {
+  absl::MutexLock lock(&mutex_);
+  recent_lookups_.clear();
 }
 
 } // namespace Stats
