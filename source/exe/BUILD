@@ -7,7 +7,6 @@ load(
     "envoy_cc_platform_dep",
     "envoy_cc_posix_library",
     "envoy_cc_win32_library",
-    "envoy_google_grpc_external_deps",
     "envoy_package",
 )
 load(
@@ -72,6 +71,7 @@ envoy_cc_library(
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:compiler_requirements_lib",
         "//source/common/common:perf_annotation_lib",
+        "//source/common/grpc:google_grpc_context_lib",
         "//source/common/stats:symbol_table_creator_lib",
         "//source/server:hot_restart_lib",
         "//source/server:hot_restart_nop_lib",
@@ -95,7 +95,7 @@ envoy_cc_library(
         "//source/common/event:libevent_lib",
         "//source/common/http/http2:nghttp2_lib",
         "//source/server:proto_descriptors_lib",
-    ] + envoy_google_grpc_external_deps(),
+    ],
 )
 
 envoy_cc_library(

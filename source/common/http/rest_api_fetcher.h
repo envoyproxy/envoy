@@ -3,6 +3,7 @@
 #include <chrono>
 #include <string>
 
+#include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -46,9 +47,11 @@ protected:
 
   /**
    * This will be called if the fetch fails (either due to non-200 response, network error, etc.).
+   * @param reason supplies the fetch failure reason.
    * @param e supplies any exception data on why the fetch failed. May be nullptr.
    */
-  virtual void onFetchFailure(const EnvoyException* e) PURE;
+  virtual void onFetchFailure(Config::ConfigUpdateFailureReason reason,
+                              const EnvoyException* e) PURE;
 
 protected:
   const std::string remote_cluster_name_;

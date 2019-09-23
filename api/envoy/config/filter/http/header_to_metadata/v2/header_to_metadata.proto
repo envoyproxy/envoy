@@ -18,6 +18,7 @@ import "validate/validate.proto";
 message Config {
   enum ValueType {
     STRING = 0;
+
     NUMBER = 1;
 
     // The value is a serialized `protobuf.Value
@@ -41,7 +42,7 @@ message Config {
     string metadata_namespace = 1;
 
     // The key to use within the namespace.
-    string key = 2 [(validate.rules).string.min_bytes = 1];
+    string key = 2 [(validate.rules).string = {min_bytes: 1}];
 
     // The value to pair with the given key.
     //
@@ -63,7 +64,7 @@ message Config {
   // A Rule defines what metadata to apply when a header is present or missing.
   message Rule {
     // The header that triggers this rule — required.
-    string header = 1 [(validate.rules).string.min_bytes = 1];
+    string header = 1 [(validate.rules).string = {min_bytes: 1}];
 
     // If the header is present, apply this metadata KeyValuePair.
     //
