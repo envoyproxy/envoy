@@ -23,12 +23,10 @@ EnvoyQuicServerSession::EnvoyQuicServerSession(
     uint32_t send_buffer_limit)
     : quic::QuicServerSessionBase(config, supported_versions, connection.get(), visitor, helper,
                                   crypto_config, compressed_certs_cache),
-      quic_connection_(std::move(connection)), filter_manager_(*this), dispatcher_(dispatcher),
-      stream_info_(dispatcher.timeSource()),
-      write_buffer_watermark_simulation_(
-          send_buffer_limit / 2, send_buffer_limit, [this]() { onSendBufferLowWatermark(); },
-          [this]() { onSendBufferHighWatermark(); }) {
-  stream_info_.protocol(Http::Protocol::Http3);
+      QuicFilterManagerConnectionImpl(std::move(connection), dispatcher) {}
+
+absl::string_view EnvoyQuicServerSession::requestedServerName() const {
+  return {GetCryptoStream()->crypto_negotiated_params().sni};
 }
 
 quic::QuicCryptoServerStreamBase* EnvoyQuicServerSession::CreateQuicCryptoServerStream(
@@ -72,14 +70,7 @@ void EnvoyQuicServerSession::setUpRequestDecoder(EnvoyQuicStream& stream) {
 void EnvoyQuicServerSession::OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
                                                 quic::ConnectionCloseSource source) {
   quic::QuicServerSessionBase::OnConnectionClosed(frame, source);
-  for (auto callback : network_connection_callbacks_) {
-    // Tell filters about connection close.
-    callback->onEvent(source == quic::ConnectionCloseSource::FROM_PEER
-                          ? Network::ConnectionEvent::RemoteClose
-                          : Network::ConnectionEvent::LocalClose);
-  }
-  transport_failure_reason_ = absl::StrCat(quic::QuicErrorCodeToString(frame.quic_error_code),
-                                           " with details: ", frame.error_details);
+  onConnectionCloseEvent(frame, source);
 }
 
 void EnvoyQuicServerSession::Initialize() {
@@ -93,6 +84,7 @@ void EnvoyQuicServerSession::SendGoAway(quic::QuicErrorCode error_code, const st
   }
 }
 
+<<<<<<< HEAD
 void EnvoyQuicServerSession::addWriteFilter(Network::WriteFilterSharedPtr filter) {
   filter_manager_.addWriteFilter(filter);
 }
@@ -139,55 +131,13 @@ void EnvoyQuicServerSession::close(Network::ConnectionCloseType type) {
   if (type != Network::ConnectionCloseType::NoFlush) {
     // TODO(danzh): Implement FlushWrite and FlushWriteAndDelay mode.
     ENVOY_CONN_LOG(error, "Flush write is not implemented for QUIC.", *this);
+=======
+void EnvoyQuicServerSession::OnCryptoHandshakeEvent(CryptoHandshakeEvent event) {
+  quic::QuicServerSessionBase::OnCryptoHandshakeEvent(event);
+  if (event == HANDSHAKE_CONFIRMED) {
+    raiseEvent(Network::ConnectionEvent::Connected);
+>>>>>>> add quic client impl
   }
-  connection()->CloseConnection(quic::QUIC_NO_ERROR, "Closed by application",
-                                quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
-}
-
-void EnvoyQuicServerSession::setDelayedCloseTimeout(std::chrono::milliseconds timeout) {
-  ASSERT(timeout == std::chrono::milliseconds::zero(),
-         "Delayed close of connection is not supported");
-}
-
-std::chrono::milliseconds EnvoyQuicServerSession::delayedCloseTimeout() const {
-  // Not called outside of Network::ConnectionImpl. Maybe remove this interface
-  // from Network::Connection.
-  NOT_REACHED_GCOVR_EXCL_LINE;
-}
-
-const Network::ConnectionSocket::OptionsSharedPtr& EnvoyQuicServerSession::socketOptions() const {
-  ENVOY_CONN_LOG(
-      error,
-      "QUIC connection socket is merely a wrapper, and doesn't have any specific socket options.",
-      *this);
-  return quic_connection_->connectionSocket()->options();
-}
-
-absl::string_view EnvoyQuicServerSession::requestedServerName() const {
-  return {GetCryptoStream()->crypto_negotiated_params().sni};
-}
-
-const Network::Address::InstanceConstSharedPtr& EnvoyQuicServerSession::remoteAddress() const {
-  ASSERT(quic_connection_->connectionSocket() != nullptr,
-         "remoteAddress() should only be called after OnPacketHeader");
-  return quic_connection_->connectionSocket()->remoteAddress();
-}
-
-const Network::Address::InstanceConstSharedPtr& EnvoyQuicServerSession::localAddress() const {
-  ASSERT(quic_connection_->connectionSocket() != nullptr,
-         "localAddress() should only be called after OnPacketHeader");
-  return quic_connection_->connectionSocket()->localAddress();
-}
-
-Ssl::ConnectionInfoConstSharedPtr EnvoyQuicServerSession::ssl() const {
-  // TODO(danzh): construct Ssl::ConnectionInfo from crypto stream
-  ENVOY_CONN_LOG(error, "Ssl::ConnectionInfo instance is not populated.", *this);
-  return nullptr;
-}
-
-void EnvoyQuicServerSession::rawWrite(Buffer::Instance& /*data*/, bool /*end_stream*/) {
-  // Network filter should stop iteration.
-  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 void EnvoyQuicServerSession::adjustBytesToSend(int64_t delta) {

@@ -17,8 +17,7 @@ namespace Quic {
 
 class EnvoyQuicPacketWriter : public quic::QuicPacketWriter {
 public:
-  EnvoyQuicPacketWriter(Network::UdpListener& listener)
-      : write_blocked_(false), listener_(listener) {}
+  EnvoyQuicPacketWriter(Network::Socket& socket);
 
   quic::WriteResult WritePacket(const char* buffer, size_t buf_len,
                                 const quic::QuicIpAddress& self_address,
@@ -44,7 +43,7 @@ public:
 private:
   // Modified by WritePacket() to indicate underlying IoHandle status.
   bool write_blocked_;
-  Network::UdpListener& listener_;
+  Network::Socket& socket_;
 };
 
 } // namespace Quic

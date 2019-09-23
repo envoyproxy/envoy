@@ -51,7 +51,7 @@ public:
   /**
    * Type of HTTP codec to use.
    */
-  enum class Type { HTTP1, HTTP2 };
+  enum class Type { HTTP1, HTTP2, HTTP3 };
 
   ~CodecClient() override;
 
