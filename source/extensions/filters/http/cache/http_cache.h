@@ -74,13 +74,13 @@ public:
   // response body. Prereq: first <= last Invariant: firstBytePos() <=
   // lastBytePos()
   AdjustedByteRange(uint64_t first, uint64_t last) : first_byte_pos_(first), last_byte_pos_(last) {
-    ASSERT(first <= last);
+    ASSERT(first <= last, "Illegal byte range.");
   }
   uint64_t firstBytePos() const { return first_byte_pos_; }
   uint64_t lastBytePos() const { return last_byte_pos_; }
   uint64_t length() const { return last_byte_pos_ - first_byte_pos_; }
   void trimFront(uint64_t n) {
-    RELEASE_ASSERT(n < length(), "Attempt to trim too much from range.");
+    RELEASE_ASSERT(n <= length(), "Attempt to trim too much from range.");
     first_byte_pos_ += n;
   }
 

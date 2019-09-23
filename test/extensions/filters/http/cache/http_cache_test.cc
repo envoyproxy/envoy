@@ -30,6 +30,12 @@ TEST_F(RawByteRangeTest, IllegalByteRange) {
   ASSERT_DEATH(RawByteRange(5, 4), "Illegal byte range");
 }
 
+TEST_F(RawByteRangeTest, IllegalByteRangeButIsSuffix) {
+  // no death here
+  RawByteRange(UINT64_MAX, 3);
+  ASSERT_TRUE(true);
+}
+
 TEST_F(RawByteRangeTest, FirstBytePos) {
   auto r = RawByteRange(3, 4);
   ASSERT_EQ(3, r.firstBytePos());
@@ -58,6 +64,40 @@ TEST_F(RawByteRangeDeathTest, SuffixLengthOfNotSuffix) {
 TEST_F(RawByteRangeTest, suffixLength) {
   auto r = RawByteRange(UINT64_MAX, 4);
   ASSERT_EQ(4, r.suffixLength());
+}
+
+class AdjustedByteRangeTest : public testing::Test {};
+
+TEST_F(AdjustedByteRangeTest, IllegalByteRange) {
+  ASSERT_DEATH(AdjustedByteRange(5, 4), "Illegal byte range.");
+}
+
+TEST_F(AdjustedByteRangeTest, Length) {
+  auto a = AdjustedByteRange(3, 6);
+  ASSERT_EQ(3, a.length());
+}
+
+TEST_F(AdjustedByteRangeTest, TrimFront) {
+  auto a = AdjustedByteRange(3, 6);
+  a.trimFront(2);
+  ASSERT_EQ(5, a.firstBytePos());
+}
+
+TEST_F(AdjustedByteRangeTest, TrimFrontTooMuch) {
+  auto a = AdjustedByteRange(3, 6);
+  ASSERT_DEATH(a.trimFront(5), "Attempt to trim too much from range.");
+}
+
+TEST_F(AdjustedByteRangeTest, MaxLength) {
+  auto a = AdjustedByteRange(0, UINT64_MAX);
+  ASSERT_EQ(UINT64_MAX, a.length());
+}
+
+TEST_F(AdjustedByteRangeTest, MaxTrim) {
+  auto a = AdjustedByteRange(0, UINT64_MAX);
+  a.trimFront(UINT64_MAX);
+  ASSERT_EQ(UINT64_MAX, a.firstBytePos());
+  ASSERT_EQ(0, a.length());
 }
 
 class LookupRequestTest : public testing::Test {
