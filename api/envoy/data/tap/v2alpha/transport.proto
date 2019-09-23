@@ -1,9 +1,5 @@
 syntax = "proto3";
 
-// [#protodoc-title: Transport tap data]
-// Trace format for the tap transport socket extension. This dumps plain text read/write
-// sequences on a socket.
-
 package envoy.data.tap.v2alpha;
 
 option java_outer_classname = "TransportProto";
@@ -15,20 +11,21 @@ import "envoy/data/tap/v2alpha/common.proto";
 
 import "google/protobuf/timestamp.proto";
 
+// [#protodoc-title: Transport tap data]
+// Trace format for the tap transport socket extension. This dumps plain text read/write
+// sequences on a socket.
+
 // Connection properties.
 message Connection {
   // Local address.
-  envoy.api.v2.core.Address local_address = 2;
+  api.v2.core.Address local_address = 2;
 
   // Remote address.
-  envoy.api.v2.core.Address remote_address = 3;
+  api.v2.core.Address remote_address = 3;
 }
 
 // Event in a socket trace.
 message SocketEvent {
-  // Timestamp for event.
-  google.protobuf.Timestamp timestamp = 1;
-
   // Data read by Envoy from the transport socket.
   message Read {
     // TODO(htuch): Half-close for reads.
@@ -51,10 +48,15 @@ message SocketEvent {
     // TODO(mattklein123): Close event type.
   }
 
+  // Timestamp for event.
+  google.protobuf.Timestamp timestamp = 1;
+
   // Read or write with content as bytes string.
   oneof event_selector {
     Read read = 2;
+
     Write write = 3;
+
     Closed closed = 4;
   }
 }

@@ -23,12 +23,6 @@
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
-
-namespace Quic {
-class ActiveQuicListener;
-class EnvoyQuicDispatcher;
-} // namespace Quic
-
 namespace Server {
 
 #define ALL_LISTENER_STATS(COUNTER, GAUGE, HISTOGRAM)                                              \
@@ -47,13 +41,26 @@ struct ListenerStats {
   ALL_LISTENER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
 };
 
+#define ALL_PER_HANDLER_LISTENER_STATS(COUNTER, GAUGE)                                             \
+  COUNTER(downstream_cx_total)                                                                     \
+  GAUGE(downstream_cx_active, Accumulate)
+
+/**
+ * Wrapper struct for per-handler listener stats. @see stats_macros.h
+ */
+struct PerHandlerListenerStats {
+  ALL_PER_HANDLER_LISTENER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
+};
+
 /**
  * Server side connection handler. This is used both by workers as well as the
  * main thread for non-threaded listeners.
  */
-class ConnectionHandlerImpl : public Network::ConnectionHandler, NonCopyable {
+class ConnectionHandlerImpl : public Network::ConnectionHandler,
+                              NonCopyable,
+                              Logger::Loggable<Logger::Id::conn_handler> {
 public:
-  ConnectionHandlerImpl(spdlog::logger& logger, Event::Dispatcher& dispatcher);
+  ConnectionHandlerImpl(Event::Dispatcher& dispatcher, const std::string& per_handler_stat_prefix);
 
   // Network::ConnectionHandler
   uint64_t numConnections() override { return num_connections_; }
@@ -65,6 +72,7 @@ public:
   void stopListeners() override;
   void disableListeners() override;
   void enableListeners() override;
+  const std::string& statPrefix() override { return per_handler_stat_prefix_; }
 
   Network::Listener* findListenerByAddress(const Network::Address::Instance& address) override;
 
@@ -76,7 +84,8 @@ public:
    */
   class ActiveListenerImplBase : public Network::ConnectionHandler::ActiveListener {
   public:
-    ActiveListenerImplBase(Network::ListenerPtr&& listener, Network::ListenerConfig& config);
+    ActiveListenerImplBase(Network::ConnectionHandler& parent, Network::ListenerPtr&& listener,
+                           Network::ListenerConfig& config);
 
     // Network::ConnectionHandler::ActiveListener.
     uint64_t listenerTag() override { return listener_tag_; }
@@ -85,6 +94,7 @@ public:
 
     Network::ListenerPtr listener_;
     ListenerStats stats_;
+    PerHandlerListenerStats per_worker_stats_;
     const std::chrono::milliseconds listener_filters_timeout_;
     const bool continue_on_listener_filters_timeout_;
     const uint64_t listener_tag_;
@@ -92,17 +102,10 @@ public:
   };
 
 private:
-  class ActiveUdpListener;
-  using ActiveUdpListenerPtr = std::unique_ptr<ActiveUdpListener>;
-  class ActiveTcpListener;
-  using ActiveTcpListenerPtr = std::unique_ptr<ActiveTcpListener>;
   struct ActiveConnection;
   using ActiveConnectionPtr = std::unique_ptr<ActiveConnection>;
   struct ActiveSocket;
   using ActiveSocketPtr = std::unique_ptr<ActiveSocket>;
-
-  friend class Quic::ActiveQuicListener;
-  friend class Quic::EnvoyQuicDispatcher;
 
   /**
    * Wrapper for an active tcp listener owned by this handler.
@@ -110,10 +113,8 @@ private:
   class ActiveTcpListener : public Network::ListenerCallbacks, public ActiveListenerImplBase {
   public:
     ActiveTcpListener(ConnectionHandlerImpl& parent, Network::ListenerConfig& config);
-
     ActiveTcpListener(ConnectionHandlerImpl& parent, Network::ListenerPtr&& listener,
                       Network::ListenerConfig& config);
-
     ~ActiveTcpListener() override;
 
     // Network::ListenerCallbacks
@@ -205,10 +206,8 @@ private:
     Event::TimerPtr timer_;
   };
 
-  static ListenerStats generateStats(Stats::Scope& scope);
-
-  spdlog::logger& logger_;
   Event::Dispatcher& dispatcher_;
+  const std::string per_handler_stat_prefix_;
   std::list<std::pair<Network::Address::InstanceConstSharedPtr,
                       Network::ConnectionHandler::ActiveListenerPtr>>
       listeners_;
@@ -225,9 +224,10 @@ class ActiveUdpListener : public Network::UdpListenerCallbacks,
                           public Network::UdpListenerFilterManager,
                           public Network::UdpReadFilterCallbacks {
 public:
-  ActiveUdpListener(Event::Dispatcher& dispatcher, Network::ListenerConfig& config);
-
-  ActiveUdpListener(Network::ListenerPtr&& listener, Network::ListenerConfig& config);
+  ActiveUdpListener(Network::ConnectionHandler& parent, Event::Dispatcher& dispatcher,
+                    Network::ListenerConfig& config);
+  ActiveUdpListener(Network::ConnectionHandler& parent, Network::ListenerPtr&& listener,
+                    Network::ListenerConfig& config);
 
   // Network::UdpListenerCallbacks
   void onData(Network::UdpRecvData& data) override;
@@ -242,7 +242,7 @@ public:
   Network::UdpListener& udpListener() override;
 
 private:
-  Network::UdpListener* udp_listener_;
+  Network::UdpListener& udp_listener_;
   Network::UdpListenerReadFilterPtr read_filter_;
 };
 
