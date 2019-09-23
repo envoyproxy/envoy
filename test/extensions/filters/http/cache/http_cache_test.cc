@@ -112,6 +112,23 @@ protected:
   const LookupRequest lookup_request_{request_headers_, current_time_};
 };
 
+using LookupRequestDeathTest = LookupRequestTest;
+
+TEST_F(LookupRequestDeathTest, makeLookupRequestWithNoPath) {
+  auto headerMap = Http::TestHeaderMapImpl({{":scheme", "http"}, {":authority", "example.com"}});
+  ASSERT_DEATH(LookupRequest(headerMap, current_time_), "malformed Http::HeaderMap with null Path");
+}
+
+TEST_F(LookupRequestDeathTest, makeLookupRequestWithNoScheme) {
+  auto headerMap = Http::TestHeaderMapImpl({{":path", "/"}, {":authority", "example.com"}});
+  ASSERT_DEATH(LookupRequest(headerMap, current_time_), "malformed Http::HeaderMap with null Scheme");
+}
+
+TEST_F(LookupRequestDeathTest, makeLookupRequestWithNoHost) {
+  auto headerMap = Http::TestHeaderMapImpl({{":path", "/"}, {":scheme", "http"}});
+  ASSERT_DEATH(LookupRequest(headerMap, current_time_), "malformed Http::HeaderMap with null Host");
+}
+
 TEST_F(LookupRequestTest, makeLookupResult) {
   Http::HeaderMapPtr response_headers = Http::makeHeaderMap(
       {{"date", formatter_.fromTime(current_time_)}, {"cache-control", "public, max-age=3600"}});
