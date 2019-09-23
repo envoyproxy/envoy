@@ -32,6 +32,12 @@ GoogleGrpcContext::~GoogleGrpcContext() {
   }
 }
 
+bool GoogleGrpcContext::isInitialized() {
+  InstanceTracker& tracker = instanceTracker();
+  Thread::LockGuard lock(tracker.mutex_);
+  return tracker.live_instances_ > 0;
+}
+
 GoogleGrpcContext::InstanceTracker& GoogleGrpcContext::instanceTracker() {
   MUTABLE_CONSTRUCT_ON_FIRST_USE(InstanceTracker);
 }
