@@ -124,6 +124,16 @@ def FormatHeaderFromFile(source_code_info, file_proto):
       'option java_multiple_files = true;',
       'option java_package = "io.envoyproxy.%s";' % file_proto.package,
   ]
+  # This is a workaround for C#/Ruby namespace conflicts between packages and
+  # objects, see https://github.com/envoyproxy/envoy/pull/3854.
+  # TODO(htuch): remove once v3 fixes this naming issue in
+  # https://github.com/envoyproxy/envoy/issues/8120.
+  if file_proto.package in ['envoy.api.v2.listener', 'envoy.api.v2.cluster']:
+    qualified_package = '.'.join(s.capitalize() for s in file_proto.package.split('.')) + 'NS'
+    options += [
+        'option csharp_namespace = "%s";' % qualified_package,
+        'option ruby_package = "%s";' % qualified_package,
+    ]
   if file_proto.service:
     options += ['option java_generic_services = true;']
   options_block = FormatBlock('\n'.join(options))

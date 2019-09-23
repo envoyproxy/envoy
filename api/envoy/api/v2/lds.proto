@@ -213,5 +213,5 @@ message Listener {
   // and the top-level Listener should essentially be a oneof that selects between the
   // socket listener and the various types of API listener. That way, a given Listener message
   // can structurally only contain the fields of the relevant type.]
-  envoy.config.listener.v2.ApiListener api_listener = 19;
+  config.listener.v2.ApiListener api_listener = 19;
 }
