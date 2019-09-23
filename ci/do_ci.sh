@@ -264,6 +264,7 @@ elif [[ "$CI_TARGET" == "fix_format" ]]; then
   echo "fix_format..."
   ./tools/check_format.py fix
   ./tools/format_python_tools.sh fix
+  ./tools/proto_format.sh fix
   exit 0
 elif [[ "$CI_TARGET" == "check_format" ]]; then
   echo "check_format_test..."
@@ -271,6 +272,7 @@ elif [[ "$CI_TARGET" == "check_format" ]]; then
   echo "check_format..."
   ./tools/check_format.py check
   ./tools/format_python_tools.sh check
+  ./tools/proto_format.sh check
   exit 0
 elif [[ "$CI_TARGET" == "check_repositories" ]]; then
   echo "check_repositories..."
