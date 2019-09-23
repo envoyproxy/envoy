@@ -1,0 +1,72 @@
+#include "common/common/utility.h"
+#include "common/stats/isolated_store_impl.h"
+
+#include "extensions/filters/network/kafka/broker/filter.h"
+#include "extensions/filters/network/kafka/external/responses.h"
+
+#include "test/extensions/filters/network/kafka/buffer_based_test.h"
+#include "test/test_common/test_time.h"
+
+#include "gtest/gtest.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace NetworkFilters {
+namespace Kafka {
+namespace Broker {
+
+using ResponseB = MessageBasedTest<ResponseEncoder>;
+
+class KafkaBrokerFilterResponseIntegrationTest : public testing::Test, protected ResponseB {
+protected:
+  Stats::IsolatedStoreImpl scope_;
+  Event::TestRealTimeSystem time_source_;
+  KafkaBrokerFilter testee_{scope_, time_source_, "prefix"};
+
+  Network::FilterStatus consume() {
+    return testee_.onWrite(buffer_, false);
+  }
+};
+
+TEST_F(KafkaBrokerFilterResponseIntegrationTest, shouldProcessTypeMessage) {
+  // given
+  int32_t correlation = 0;
+
+  // For every message type & version, put a corresponding request into the buffer.
+  {% for message_type in message_types %}
+    {% for field_list in message_type.compute_field_lists() %}
+  {
+    const ResponseMetadata response_metadata =
+        { {{ message_type.get_extra('api_key') }}, {{ field_list.version }}, correlation++ };
+    const {{ message_type.name }} response_data = { {{ field_list.example_value() }} };
+    const Response<{{ message_type.name }}> response = {response_metadata, response_data};
+    putMessageIntoBuffer(response);
+
+    // Codec is expecting this response.
+    testee_.getResponseDecoderForTest()->expectResponse(
+        {{ message_type.get_extra('api_key') }}, {{ field_list.version }});
+  }
+    {% endfor %}
+  {% endfor %}
+
+  // when
+  const Network::FilterStatus result = consume();
+
+  // then
+  ASSERT_EQ(result, Network::FilterStatus::Continue);
+
+  // Also, assert that every message type has been processed properly.
+  {% for message_type in message_types %}
+  {
+    const Stats::Counter& counter =
+          scope_.counter("kafka.prefix.response.{{message_type.name_in_c_case()}}");
+    ASSERT_EQ(counter.value(), {{ message_type.compute_field_lists() | length }});
+  }
+  {% endfor %}
+}
+
+} // namespace Broker
+} // namespace Kafka
+} // namespace NetworkFilters
+} // namespace Extensions
+} // namespace Envoy

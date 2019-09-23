@@ -144,10 +144,13 @@ genrule(
     outs = [
         "external/requests_test.cc",
         "external/request_codec_request_test.cc",
+        "external/filter_request_integration_test.cc",
     ],
     cmd = """
         ./$(location :kafka_protocol_test_generator_bin) request \
-        $(location external/requests_test.cc) $(location external/request_codec_request_test.cc) \
+        $(location external/requests_test.cc) \
+        $(location external/request_codec_request_test.cc) \
+        $(location external/filter_request_integration_test.cc) \
         $(SRCS)
     """,
     tools = [
@@ -221,11 +224,13 @@ genrule(
     outs = [
         "external/responses_test.cc",
         "external/response_codec_response_test.cc",
+        "external/filter_response_integration_test.cc",
     ],
     cmd = """
         ./$(location :kafka_protocol_test_generator_bin) response \
         $(location external/responses_test.cc) \
         $(location external/response_codec_response_test.cc) \
+        $(location external/filter_response_integration_test.cc) \
         $(SRCS)
     """,
     tools = [
@@ -255,8 +260,32 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
-    name = "broker_filter_integration_test",
-    srcs = ["broker/filter_integration_test.cc"],
+    name = "broker_filter_generic_integration_test",
+    srcs = ["broker/filter_generic_integration_test.cc"],
+    extension_name = "envoy.filters.network.kafka_broker",
+    deps = [
+        ":buffer_based_test_lib",
+        "//source/common/stats:isolated_store_lib",
+        "//source/extensions/filters/network/kafka:kafka_broker_filter_lib",
+        "//test/test_common:test_time_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "broker_filter_request_integration_test",
+    srcs = ["external/filter_request_integration_test.cc"],
+    extension_name = "envoy.filters.network.kafka_broker",
+    deps = [
+        ":buffer_based_test_lib",
+        "//source/common/stats:isolated_store_lib",
+        "//source/extensions/filters/network/kafka:kafka_broker_filter_lib",
+        "//test/test_common:test_time_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "broker_filter_response_integration_test",
+    srcs = ["external/filter_response_integration_test.cc"],
     extension_name = "envoy.filters.network.kafka_broker",
     deps = [
         ":buffer_based_test_lib",

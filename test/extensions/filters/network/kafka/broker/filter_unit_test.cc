@@ -93,6 +93,7 @@ TEST_F(KafkaBrokerFilterUnitTest, shouldForwardDataFromClient) {
   EXPECT_CALL(*request_decoder_, onData(_));
 
   // when
+  initialize();
   const auto result = testee_.onData(data, false);
 
   // then
@@ -106,6 +107,7 @@ TEST_F(KafkaBrokerFilterUnitTest, shouldForwardDataFromBroker) {
   EXPECT_CALL(*response_decoder_, onData(_));
 
   // when
+  initialize();
   const auto result = testee_.onWrite(data, false);
 
   // then
