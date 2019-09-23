@@ -78,8 +78,7 @@ public:
         const Protobuf::Message& proto,
         Server::Configuration::TransportSocketFactoryContext&) override {
     const auto* node= dynamic_cast<const envoy::api::v2::core::Node*>(&proto);
-    // ENVOY_LOG(error, "incfly debug the config is {}", node->DebugString());
-    std::string id = "defaultFooSocket";
+    std::string id = "default-foo";
     if (node->id() != "") {
       id = node->id();
     }
@@ -107,6 +106,12 @@ public:
         matches, mock_factory_context_, mock_default_factory_);
   }
 
+  void validate(const envoy::api::v2::core::Metadata& metadata, const std::string& expected) {
+    auto& factory = matcher_->resolve("10.0.0.1", metadata);
+    const auto* config_factory = dynamic_cast<const FakeTransportSocketFactory*>(&factory);
+    EXPECT_EQ(expected, config_factory->id());
+  }
+
 protected:
   TransportSocketMatcherPtr matcher_;
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_context_;
@@ -125,9 +130,7 @@ transport_socket:
  )EOF"});
 
   envoy::api::v2::core::Metadata metadata;
-  auto& factory = matcher_->resolve("10.0.0.1", metadata);
-  const auto* config_factory = dynamic_cast<const FakeTransportSocketFactory*>(&factory);
-  EXPECT_EQ("default", config_factory->id());
+  validate(metadata, "default");
 }
 
 TEST_F(TransportSocketMatcherTest, BasicMatch) {
@@ -154,14 +157,13 @@ transport_socket:
 filter_metadata:
   envoy.transport_socket: { sidecar: "true" } 
 )EOF", metadata);
-  auto& factory = matcher_->resolve("10.0.0.1", metadata);
-  const auto* config_factory = dynamic_cast<const FakeTransportSocketFactory*>(&factory);
-  EXPECT_EQ("sidecar", config_factory->id());
+
+  validate(metadata, "sidecar");
   TestUtility::loadFromYaml(R"EOF(
 filter_metadata:
   envoy.transport_socket: { protocol: "http" } 
 )EOF", metadata);
-  EXPECT_EQ("http", config_factory->id());
+  validate(metadata, "http");
 }
 
 TEST_F(TransportSocketMatcherTest, MultipleMatchFirstWin) {
@@ -190,9 +192,7 @@ transport_socket:
 filter_metadata:
   envoy.transport_socket: { sidecar: "true", protocol: "http" }
 )EOF", metadata);
-  auto& factory = matcher_->resolve("10.0.0.1", metadata);
-  const auto* config_factory = dynamic_cast<const FakeTransportSocketFactory*>(&factory);
-  EXPECT_EQ("sidecar_http", config_factory->id());
+  validate(metadata, "sidecar_http");
 }
 
 TEST_F(TransportSocketMatcherTest, MatchAllEndpointsFactory) {
@@ -205,9 +205,12 @@ transport_socket:
     id: "match_all"
  )EOF"});
   envoy::api::v2::core::Metadata metadata;
-  auto& factory = matcher_->resolve("10.0.0.1", metadata);
-  const auto* config_factory = dynamic_cast<const FakeTransportSocketFactory*>(&factory);
-  EXPECT_EQ("match_all", config_factory->id());
+  validate(metadata, "match_all");
+  TestUtility::loadFromYaml(R"EOF(
+filter_metadata:
+  envoy.transport_socket: { random_label: "random_value" }
+)EOF", metadata);
+  validate(metadata, "match_all");
 }
 
 REGISTER_FACTORY(FooTransportSocketFactory,
