@@ -138,9 +138,7 @@ message Cluster {
   // ignored.
   enum DnsLookupFamily {
     AUTO = 0;
-
     V4_ONLY = 1;
-
     V6_ONLY = 2;
   }
 
@@ -185,9 +183,7 @@ message Cluster {
     // endpoints matching the values from the default_subset field.
     enum LbSubsetFallbackPolicy {
       NO_FALLBACK = 0;
-
       ANY_ENDPOINT = 1;
-
       DEFAULT_SUBSET = 2;
     }
 

@@ -363,10 +363,13 @@ class ProtoFormatVisitor(visitor.Visitor):
 
   def VisitEnum(self, enum_proto, type_context):
     leading_comment, trailing_comment = FormatTypeContextComments(type_context)
-    values = '\n'.join(
+    values = [
         FormatEnumValue(type_context.ExtendField(index, value.name), value)
-        for index, value in enumerate(enum_proto.value))
-    return '%senum %s {\n%s%s\n}\n' % (leading_comment, enum_proto.name, trailing_comment, values)
+        for index, value in enumerate(enum_proto.value)
+    ]
+    joined_values = ('\n' if any('//' in v for v in values) else '').join(values)
+    return '%senum %s {\n%s%s\n}\n' % (leading_comment, enum_proto.name, trailing_comment,
+                                       joined_values)
 
   def VisitMessage(self, msg_proto, type_context, nested_msgs, nested_enums):
     leading_comment, trailing_comment = FormatTypeContextComments(type_context)
