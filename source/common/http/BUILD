@@ -189,7 +189,7 @@ envoy_cc_library(
         "//source/common/runtime:uuid_util_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/tracing:http_tracer_lib",
-        "//source/extensions/quic_listeners/quiche:codec_impl_lib",
+        "//source/extensions/quic_listeners/quiche:codec_lib",
     ],
 )
 

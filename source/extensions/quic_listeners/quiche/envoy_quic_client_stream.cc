@@ -16,14 +16,20 @@ namespace Envoy {
 namespace Quic {
 
 EnvoyQuicClientStream::EnvoyQuicClientStream(quic::QuicStreamId id,
-                                             quic::QuicSpdyClientSession* session,
+                                             quic::QuicSpdyClientSession* client_session,
                                              quic::StreamType type)
-    : quic::QuicSpdyClientStream(id, session, type) {}
+    : quic::QuicSpdyClientStream(id, client_session, type),
+      EnvoyQuicStream(
+          session()->config()->GetInitialStreamFlowControlWindowToSend(),
+          [this]() { runLowWatermarkCallbacks(); }, [this]() { runHighWatermarkCallbacks(); }) {}
 
 EnvoyQuicClientStream::EnvoyQuicClientStream(quic::PendingStream* pending,
-                                             quic::QuicSpdyClientSession* session,
+                                             quic::QuicSpdyClientSession* client_session,
                                              quic::StreamType type)
-    : quic::QuicSpdyClientStream(pending, session, type) {}
+    : quic::QuicSpdyClientStream(pending, client_session, type),
+      EnvoyQuicStream(
+          session()->config()->GetInitialStreamFlowControlWindowToSend(),
+          [this]() { runLowWatermarkCallbacks(); }, [this]() { runHighWatermarkCallbacks(); }) {}
 
 void EnvoyQuicClientStream::encode100ContinueHeaders(const Http::HeaderMap& headers) {
   ASSERT(headers.Status()->value() == "100");

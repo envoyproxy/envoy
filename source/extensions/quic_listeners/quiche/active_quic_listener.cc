@@ -23,7 +23,8 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
                                        Network::UdpListenerPtr&& listener,
                                        Network::ListenerConfig& listener_config,
                                        const quic::QuicConfig& quic_config)
-    : ActiveQuicListener(dispatcher, parent, std::make_unique<EnvoyQuicPacketWriter>(*listener),
+    : ActiveQuicListener(dispatcher, parent,
+                         std::make_unique<EnvoyQuicPacketWriter>(listener_config.socket()),
                          std::move(listener), listener_config, quic_config) {}
 
 ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,

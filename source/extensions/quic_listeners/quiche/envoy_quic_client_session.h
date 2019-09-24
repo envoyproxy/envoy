@@ -27,7 +27,7 @@ public:
                          const quic::QuicServerId& server_id,
                          quic::QuicCryptoClientConfig* crypto_config,
                          quic::QuicClientPushPromiseIndex* push_promise_index,
-                         Event::Dispatcher& dispatcher);
+                         Event::Dispatcher& dispatcher, uint32_t send_buffer_limit);
 
   // Called by QuicHttpClientConnectionImpl before creating data streams.
   void setHttpConnectionCallbacks(Http::ConnectionCallbacks& callbacks) {
@@ -47,6 +47,8 @@ public:
   void OnGoAway(const quic::QuicGoAwayFrame& frame) override;
   // quic::QuicSpdyClientSessionBase
   void OnCryptoHandshakeEvent(CryptoHandshakeEvent event) override;
+
+  using quic::QuicSpdyClientSession::stream_map;
 
 protected:
   // quic::QuicSpdyClientSession

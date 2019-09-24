@@ -7,10 +7,11 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
     const quic::QuicConfig& config, const quic::ParsedQuicVersionVector& supported_versions,
     std::unique_ptr<EnvoyQuicConnection> connection, const quic::QuicServerId& server_id,
     quic::QuicCryptoClientConfig* crypto_config,
-    quic::QuicClientPushPromiseIndex* push_promise_index, Event::Dispatcher& dispatcher)
+    quic::QuicClientPushPromiseIndex* push_promise_index, Event::Dispatcher& dispatcher,
+    uint32_t send_buffer_limit)
     : quic::QuicSpdyClientSession(config, supported_versions, connection.get(), server_id,
                                   crypto_config, push_promise_index),
-      QuicFilterManagerConnectionImpl(std::move(connection), dispatcher) {}
+      QuicFilterManagerConnectionImpl(std::move(connection), dispatcher, send_buffer_limit) {}
 
 absl::string_view EnvoyQuicClientSession::requestedServerName() const {
   return {GetCryptoStream()->crypto_negotiated_params().sni};

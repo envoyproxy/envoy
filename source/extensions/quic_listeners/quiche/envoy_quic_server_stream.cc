@@ -83,14 +83,14 @@ void EnvoyQuicServerStream::encodeMetadata(const Http::MetadataMapVector& /*meta
 void EnvoyQuicServerStream::resetStream(Http::StreamResetReason reason) {
   quic::QuicRstStreamErrorCode rst;
   switch (reason) {
-    case Http::StreamResetReason::LocalRefusedStreamReset:
-      rst = quic::QUIC_REFUSED_STREAM;
-    case Http::StreamResetReason::ConnectionTermination:
-      rst = quic::QUIC_STREAM_NO_ERROR;
-    case Http::StreamResetReason::ConnectionFailure:
-      rst = quic::QUIC_STREAM_CONNECTION_ERROR;
-    default:
-      rst = quic::QUIC_STREAM_NO_ERROR;
+  case Http::StreamResetReason::LocalRefusedStreamReset:
+    rst = quic::QUIC_REFUSED_STREAM;
+  case Http::StreamResetReason::ConnectionTermination:
+    rst = quic::QUIC_STREAM_NO_ERROR;
+  case Http::StreamResetReason::ConnectionFailure:
+    rst = quic::QUIC_STREAM_CONNECTION_ERROR;
+  default:
+    rst = quic::QUIC_STREAM_NO_ERROR;
   }
   Reset(rst);
 }

@@ -16,7 +16,7 @@ public:
       : low_watermark_(low_watermark), high_watermark_(high_watermark),
         below_low_watermark_(std::move(below_low_watermark)),
         above_high_watermark_(std::move(above_high_watermark)) {
-    ASSERT(high_watermark_ > low_watermark_);
+    ASSERT(high_watermark == 0 && low_watermark == 0 || high_watermark_ > low_watermark_);
   }
 
   void checkHighWatermark(uint32_t bytes_buffered) {
