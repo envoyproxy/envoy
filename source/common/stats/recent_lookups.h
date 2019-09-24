@@ -43,7 +43,17 @@ public:
     list_.clear();
   }
 
+  /**
+   * Controls the maximum number of recent lookups to remember. If set to 0,
+   * then only lookup counts is tracked.
+   * @param capacity The number of lookups to remember.
+   */
+  void setCapacity(uint64_t capacity);
+  uint64_t capacity() const { return capacity_; }
+
 private:
+  void evictOne();
+
   struct ItemCount {
     std::string item_;
     int64_t count_;
@@ -53,6 +63,7 @@ private:
   using Map = absl::flat_hash_map<absl::string_view, List::iterator>;
   Map map_;
   uint64_t total_{0};
+  uint64_t capacity_{0};
 };
 
 } // namespace Stats

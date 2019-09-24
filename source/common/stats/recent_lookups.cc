@@ -11,12 +11,11 @@
 namespace Envoy {
 namespace Stats {
 
-namespace {
-constexpr size_t Capacity = 10;
-} // namespace
-
 void RecentLookups::lookup(absl::string_view str) {
   ++total_;
+  if (capacity_ == 0) {
+    return;
+  }
   Map::iterator map_iter = map_.find(str);
   if (map_iter != map_.end()) {
     // The item is already in the list, but we need to bump its count and move
@@ -29,13 +28,10 @@ void RecentLookups::lookup(absl::string_view str) {
     list_.push_front(std::move(item_count));
     map_iter->second = list_.begin();
   } else {
-    ASSERT(list_.size() <= Capacity);
+    ASSERT(list_.size() <= capacity_);
     // Evict oldest item if needed.
-    if (list_.size() >= Capacity) {
-      const ItemCount& item_count = list_.back();
-      int erased = map_.erase(item_count.item_);
-      ASSERT(erased == 1);
-      list_.pop_back();
+    if (list_.size() >= capacity_) {
+      evictOne();
     }
 
     // The string storage is in the list entry.
@@ -55,6 +51,20 @@ void RecentLookups::forEach(const IterFn& fn) const {
   for (const ItemCount& item_count : list_) {
     fn(item_count.item_, item_count.count_);
   }
+}
+
+void RecentLookups::setCapacity(uint64_t capacity) {
+  capacity_ = capacity;
+  while (capacity_ < list_.size()) {
+    evictOne();
+  }
+}
+
+void RecentLookups::evictOne() {
+  const ItemCount& item_count = list_.back();
+  int erased = map_.erase(item_count.item_);
+  ASSERT(erased == 1);
+  list_.pop_back();
 }
 
 } // namespace Stats

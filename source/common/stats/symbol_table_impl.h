@@ -164,6 +164,8 @@ public:
   void forgetSet(StatNameSet& stat_name_set) override;
   uint64_t getRecentLookups(const RecentLookupsFn&) override;
   void clearRecentLookups() override;
+  void setRecentLookupCapacity(uint64_t capacity) override;
+  uint64_t recentLookupCapacity() const override;
 
 private:
   friend class StatName;
@@ -712,6 +714,8 @@ public:
    * Clears recent lookups.
    */
   void clearRecentLookups();
+
+  void setRecentLookupCapacity(uint64_t capacity);
 
   StatNameSet(SymbolTable& symbol_table, absl::string_view name);
 

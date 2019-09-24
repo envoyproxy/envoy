@@ -163,6 +163,12 @@ public:
   virtual void clearRecentLookups() PURE;
 
   /**
+   * Sets the recent-lookup capacity.
+   */
+  virtual void setRecentLookupCapacity(uint64_t capacity) PURE;
+  virtual uint64_t recentLookupCapacity() const PURE;
+
+  /**
    * Creates a StatNameSet.
    *
    * @param name the name of the set.

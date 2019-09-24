@@ -42,12 +42,26 @@ TEST_F(RecentLookupsTest, Empty) { EXPECT_EQ("", joinLookups()); }
 
 TEST_F(RecentLookupsTest, One) {
   recent_lookups_.lookup("Hello");
+  EXPECT_EQ("", joinLookups());
+  recent_lookups_.setCapacity(10);
+  EXPECT_EQ(1, recent_lookups_.total());
+  recent_lookups_.lookup("Hello");
+  EXPECT_EQ(2, recent_lookups_.total());
   EXPECT_EQ("1: Hello", joinLookups());
+
   recent_lookups_.clear();
   EXPECT_EQ("", joinLookups());
+  EXPECT_EQ(0, recent_lookups_.total());
+  recent_lookups_.lookup("Hello");
+  EXPECT_EQ(1, recent_lookups_.total());
+  EXPECT_EQ("1: Hello", joinLookups());
+  recent_lookups_.setCapacity(0);
+  EXPECT_EQ("", joinLookups());
+  EXPECT_EQ(1, recent_lookups_.total());
 }
 
 TEST_F(RecentLookupsTest, DropOne) {
+  recent_lookups_.setCapacity(10);
   for (int i = 0; i < 11; ++i) {
     recent_lookups_.lookup(absl::StrCat("lookup", i));
   }
@@ -67,6 +81,7 @@ TEST_F(RecentLookupsTest, DropOne) {
 }
 
 TEST_F(RecentLookupsTest, RepeatDrop) {
+  recent_lookups_.setCapacity(10);
   recent_lookups_.lookup("drop_early");
   for (int i = 0; i < 11; ++i) {
     recent_lookups_.lookup(absl::StrCat("lookup", i));

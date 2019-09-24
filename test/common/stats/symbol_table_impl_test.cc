@@ -574,6 +574,7 @@ TEST_P(StatNameTest, RecentLookups) {
   }
 
   StatNameSetPtr set1(table_->makeSet("set1"));
+  table_->setRecentLookupCapacity(10);
   StatNameSetPtr set2(table_->makeSet("set2"));
   set1->getDynamic("dynamic.stat1");
   set2->getDynamic("dynamic.stat2");

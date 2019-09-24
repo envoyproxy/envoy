@@ -250,6 +250,20 @@ uint64_t SymbolTableImpl::getRecentLookups(const RecentLookupsFn& iter) {
   return total;
 }
 
+void SymbolTableImpl::setRecentLookupCapacity(uint64_t capacity) {
+  {
+    Thread::LockGuard lock(stat_name_set_mutex_);
+    for (StatNameSet* stat_name_set : stat_name_sets_) {
+      stat_name_set->setRecentLookupCapacity(capacity);
+    }
+  }
+
+  {
+    Thread::LockGuard lock(lock_);
+    recent_lookups_.setCapacity(capacity);
+  }
+}
+
 void SymbolTableImpl::clearRecentLookups() {
   {
     Thread::LockGuard lock(stat_name_set_mutex_);
@@ -263,9 +277,16 @@ void SymbolTableImpl::clearRecentLookups() {
   }
 }
 
+uint64_t SymbolTableImpl::recentLookupCapacity() const {
+  Thread::LockGuard lock(lock_);
+  return recent_lookups_.capacity();
+}
+
 StatNameSetPtr SymbolTableImpl::makeSet(absl::string_view name) {
+  const uint64_t capacity = recentLookupCapacity();
   Thread::LockGuard lock(stat_name_set_mutex_);
   auto stat_name_set = std::make_unique<StatNameSet>(*this, name);
+  stat_name_set->setRecentLookupCapacity(capacity);
   stat_name_sets_.insert(stat_name_set.get());
   return stat_name_set;
 }
@@ -548,6 +569,11 @@ uint64_t StatNameSet::getRecentLookups(const RecentLookups::IterFn& iter) {
 void StatNameSet::clearRecentLookups() {
   absl::MutexLock lock(&mutex_);
   recent_lookups_.clear();
+}
+
+void StatNameSet::setRecentLookupCapacity(uint64_t capacity) {
+  absl::MutexLock lock(&mutex_);
+  recent_lookups_.setCapacity(capacity);
 }
 
 } // namespace Stats
