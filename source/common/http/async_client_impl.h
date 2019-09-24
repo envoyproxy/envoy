@@ -220,8 +220,6 @@ private:
       }
     }
     absl::optional<std::chrono::milliseconds> idleTimeout() const override { return absl::nullopt; }
-    absl::optional<std::chrono::milliseconds> connectionLifetimeTimeout() const override { return absl::nullopt; }
-
     absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const override {
       return absl::nullopt;
     }
