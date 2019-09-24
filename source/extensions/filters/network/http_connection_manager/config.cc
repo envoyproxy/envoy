@@ -154,6 +154,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       max_request_headers_kb_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, max_request_headers_kb, Http::DEFAULT_MAX_REQUEST_HEADERS_KB)),
       idle_timeout_(PROTOBUF_GET_OPTIONAL_MS(config, idle_timeout)),
+      connection_lifetime_timeout_(PROTOBUF_GET_OPTIONAL_MS(config, connection_lifetime_timeout)),
       stream_idle_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, stream_idle_timeout, StreamIdleTimeoutMs)),
       request_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, request_timeout, RequestTimeoutMs)),

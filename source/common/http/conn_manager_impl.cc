@@ -138,6 +138,12 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
     connection_idle_timer_->enableTimer(config_.idleTimeout().value());
   }
 
+  if (config_.connectionLifetimeTimeout()) {
+    connection_idle_timer_ = read_callbacks_->connection().dispatcher().createTimer(
+        [this]() -> void { onConnectionLifetimeTimeout(); });
+    connection_idle_timer_->enableTimer(config_.connectionLifetimeTimeout().value());
+  }
+
   read_callbacks_->connection().setDelayedCloseTimeout(config_.delayedCloseTimeout());
 
   read_callbacks_->connection().setConnectionStats(
@@ -395,6 +401,19 @@ void ConnectionManagerImpl::onIdleTimeout() {
   ENVOY_CONN_LOG(debug, "idle timeout", read_callbacks_->connection());
   stats_.named_.downstream_cx_idle_timeout_.inc();
   if (!codec_) {
+    // No need to delay close after flushing since an idle timeout has already fired. Attempt to
+    // write out buffered data one last time and issue a local close if successful.
+    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+  } else if (drain_state_ == DrainState::NotDraining) {
+    startDrainSequence();
+  }
+}
+
+void ConnectionManagerImpl::onConnectionLifetimeTimeout() {
+  ENVOY_CONN_LOG(debug, "lifetime timeout", read_callbacks_->connection());
+  stats_.named_.downstream_cx_lifetime_timeout_.inc();
+  if (!codec_) {
+    // TODO(oleg): figure out if folowing is true for closing non-idle connections.
     // No need to delay close after flushing since an idle timeout has already fired. Attempt to
     // write out buffered data one last time and issue a local close if successful.
     read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
