@@ -19,17 +19,18 @@ const std::string& VersionInfo::revisionStatus() {
 }
 
 const std::string& VersionInfo::version() {
-  CONSTRUCT_ON_FIRST_USE(std::string, fmt::format("{}/{}/{}/{}/{}", revision(), BUILD_VERSION_NUMBER, revisionStatus(),
+  CONSTRUCT_ON_FIRST_USE(std::string, fmt::format("{}/{}/{}/{}/{}", revision(),
+                                                  BUILD_VERSION_NUMBER, revisionStatus(),
 #ifdef NDEBUG
-                     "RELEASE",
+                                                  "RELEASE",
 #else
-                     "DEBUG",
+                                                  "DEBUG",
 #endif
 #ifdef ENVOY_SSL_VERSION
-                     ENVOY_SSL_VERSION
+                                                  ENVOY_SSL_VERSION
 #else
-                     "no-ssl"
+                                                  "no-ssl"
 #endif
-  ));
+                                                  ));
 }
 } // namespace Envoy
