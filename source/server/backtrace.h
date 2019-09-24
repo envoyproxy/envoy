@@ -3,6 +3,7 @@
 #include <functional>
 
 #include "common/common/logger.h"
+#include "common/common/version.h"
 
 #include "absl/debugging/stacktrace.h"
 #include "absl/debugging/symbolize.h"
@@ -67,6 +68,7 @@ public:
    */
   void logTrace() {
     ENVOY_LOG(critical, "Backtrace (use tools/stack_decode.py to get line numbers):");
+    ENVOY_LOG(critical, "Envoy version: {}", VersionInfo::version());
 
     visitTrace([](int index, const char* symbol, void* address) {
       if (symbol != nullptr) {

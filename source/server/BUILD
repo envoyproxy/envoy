@@ -18,7 +18,10 @@ envoy_cc_library(
         "abseil_symbolize",
     ],
     tags = ["backtrace"],
-    deps = ["//source/common/common:minimal_logger_lib"],
+    deps = [
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/common:version_lib",
+    ],
 )
 
 envoy_cc_library(
