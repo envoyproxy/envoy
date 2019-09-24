@@ -29,6 +29,14 @@ typedef enum { ENVOY_SUCCESS, ENVOY_FAILURE } envoy_status_t;
  */
 typedef enum { ENVOY_UNDEFINED_ERROR, ENVOY_STREAM_RESET } envoy_error_code_t;
 
+/**
+ * Networks classified by last physical link.
+ * ENVOY_GENERIC is default and includes cases where network characteristics are unknown.
+ * ENVOY_WLAN includes WiFi and other local area wireless networks.
+ * ENVOY_WWAN includes all mobile phone networks.
+ */
+typedef enum { ENVOY_GENERIC, ENVOY_WLAN, ENVOY_WWAN } envoy_network_t;
+
 #ifdef __cplusplus
 extern "C" { // release function
 #endif
