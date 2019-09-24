@@ -1,23 +1,19 @@
-#include "common/config/utility.h"
 #include "common/upstream/transport_socket_matcher.h"
 
 #include "envoy/server/transport_socket_config.h"
 
+#include "common/config/utility.h"
 
 namespace Envoy {
 namespace Upstream {
 
 TransportSocketMatcher::TransportSocketMatcher(
-    const Protobuf::RepeatedPtrField<
-      envoy::api::v2::Cluster_TransportSocketMatch>& socket_matches,
+    const Protobuf::RepeatedPtrField<envoy::api::v2::Cluster_TransportSocketMatch>& socket_matches,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
-    Network::TransportSocketFactory& default_factory,
-    Stats::Scope& stats_scope): 
-  default_socket_factory_(default_factory),
-  stats_scope_(stats_scope) {
+    Network::TransportSocketFactory& default_factory, Stats::Scope& stats_scope)
+    : default_socket_factory_(default_factory), stats_scope_(stats_scope) {
   for (const auto& socket_match : socket_matches) {
-    FactoryMatch factory_match(socket_match.name(),
-        generateStats(socket_match.name() + "."));
+    FactoryMatch factory_match(socket_match.name(), generateStats(socket_match.name() + "."));
     for (const auto& kv : socket_match.match().fields()) {
       // TODO: question, what's the handling for non string value case?
       if (kv.second.kind_case() == ProtobufWkt::Value::kStringValue) {
@@ -65,12 +61,8 @@ bool metadataMatch(const envoy::api::v2::core::Metadata& metadata,
   return true;
 }
 
-TransportSocketMatchStats TransportSocketMatcher::generateStats(
-    const std::string& prefix) {
-   return {
-     ALL_TRANSPORT_SOCKET_MATCHER_STATS(
-         POOL_COUNTER_PREFIX(stats_scope_, prefix))
-   };
+TransportSocketMatchStats TransportSocketMatcher::generateStats(const std::string& prefix) {
+  return {ALL_TRANSPORT_SOCKET_MATCHER_STATS(POOL_COUNTER_PREFIX(stats_scope_, prefix))};
 }
 
 Network::TransportSocketFactory&
@@ -84,9 +76,8 @@ TransportSocketMatcher::resolve(const std::string& endpoint_addr,
       return *socket_factory_match.factory;
     }
   }
-  ENVOY_LOG(debug,
-      "transport socket match, no match, return default: metadata {}, address {}",
-      metadata.DebugString(), endpoint_addr);
+  ENVOY_LOG(debug, "transport socket match, no match, return default: metadata {}, address {}",
+            metadata.DebugString(), endpoint_addr);
   return default_socket_factory_;
 }
 
