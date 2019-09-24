@@ -5,7 +5,7 @@
 namespace Envoy {
 namespace Quic {
 
-EnvoyQuicConnection::EnvoyQuicConnection(quic::QuicConnectionId server_connection_id,
+EnvoyQuicConnection::EnvoyQuicConnection(const quic::QuicConnectionId& server_connection_id,
                                          quic::QuicSocketAddress initial_peer_address,
                                          quic::QuicConnectionHelperInterface& helper,
                                          quic::QuicAlarmFactory& alarm_factory,

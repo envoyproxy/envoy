@@ -10,9 +10,9 @@ namespace Envoy {
 namespace Quic {
 
 EnvoyQuicServerConnection::EnvoyQuicServerConnection(
-    quic::QuicConnectionId server_connection_id, quic::QuicSocketAddress initial_peer_address,
-    quic::QuicConnectionHelperInterface& helper, quic::QuicAlarmFactory& alarm_factory,
-    quic::QuicPacketWriter* writer, bool owns_writer,
+    const quic::QuicConnectionId& server_connection_id,
+    quic::QuicSocketAddress initial_peer_address, quic::QuicConnectionHelperInterface& helper,
+    quic::QuicAlarmFactory& alarm_factory, quic::QuicPacketWriter* writer, bool owns_writer,
     const quic::ParsedQuicVersionVector& supported_versions,
     Network::ListenerConfig& listener_config, Server::ListenerStats& listener_stats)
     : EnvoyQuicConnection(

@@ -30,7 +30,7 @@ using PortRangeList = std::list<PortRange>;
 
 class UdpPacketProcessor {
 public:
-  virtual ~UdpPacketProcessor() {}
+  virtual ~UdpPacketProcessor() = default;
 
   virtual void processPacket(Address::InstanceConstSharedPtr local_address,
                              Address::InstanceConstSharedPtr peer_address,

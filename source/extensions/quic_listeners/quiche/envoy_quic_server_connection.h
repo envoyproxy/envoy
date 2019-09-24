@@ -9,7 +9,7 @@ namespace Quic {
 
 class EnvoyQuicServerConnection : public EnvoyQuicConnection {
 public:
-  EnvoyQuicServerConnection(quic::QuicConnectionId server_connection_id,
+  EnvoyQuicServerConnection(const quic::QuicConnectionId& server_connection_id,
                             quic::QuicSocketAddress initial_peer_address,
                             quic::QuicConnectionHelperInterface& helper,
                             quic::QuicAlarmFactory& alarm_factory, quic::QuicPacketWriter* writer,

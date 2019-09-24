@@ -23,7 +23,7 @@ namespace Quic {
 class EnvoyQuicConnection : public quic::QuicConnection,
                             protected Logger::Loggable<Logger::Id::connection> {
 public:
-  EnvoyQuicConnection(quic::QuicConnectionId server_connection_id,
+  EnvoyQuicConnection(const quic::QuicConnectionId& server_connection_id,
                       quic::QuicSocketAddress initial_peer_address,
                       quic::QuicConnectionHelperInterface& helper,
                       quic::QuicAlarmFactory& alarm_factory, quic::QuicPacketWriter* writer,
