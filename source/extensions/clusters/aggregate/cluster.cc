@@ -107,7 +107,7 @@ void Cluster::onClusterRemoval(const std::string& cluster_name) {
   if (std::find(clusters_.begin(), clusters_.end(), cluster_name) != clusters_.end()) {
     ENVOY_LOG(info, "removing cluster '{}' from aggreagte cluster '{}'", cluster_name,
               info()->name());
-    refresh([&cluster_name](const std::string& c) { return cluster_name == c; });
+    refresh([cluster_name](const std::string& c) { return cluster_name == c; });
   }
 }
 
