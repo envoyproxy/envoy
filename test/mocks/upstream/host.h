@@ -154,9 +154,8 @@ public:
   MOCK_CONST_METHOD0(metadata, const std::shared_ptr<envoy::api::v2::core::Metadata>());
   MOCK_METHOD1(metadata, void(const envoy::api::v2::core::Metadata&));
   MOCK_CONST_METHOD0(cluster, const ClusterInfo&());
-  MOCK_CONST_METHOD0(
-      counters,
-      std::vector<std::pair<absl::string_view, Stats::PrimitiveCounterReference>>());
+  MOCK_CONST_METHOD0(counters,
+                     std::vector<std::pair<absl::string_view, Stats::PrimitiveCounterReference>>());
   MOCK_CONST_METHOD2(
       createConnection_,
       MockCreateConnectionData(Event::Dispatcher& dispatcher,

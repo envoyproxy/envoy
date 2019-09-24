@@ -1097,12 +1097,11 @@ TEST_P(AdminInstanceTest, ClustersJson) {
   rest_counter.add(10);
   Stats::PrimitiveCounter arest_counter;
   arest_counter.add(5);
-  std::vector<std::pair<absl::string_view, Stats::PrimitiveCounterReference>>
-      counters = {
-          {"arest_counter", arest_counter},
-          {"rest_counter", rest_counter},
-          {"test_counter", test_counter},
-      };
+  std::vector<std::pair<absl::string_view, Stats::PrimitiveCounterReference>> counters = {
+      {"arest_counter", arest_counter},
+      {"rest_counter", rest_counter},
+      {"test_counter", test_counter},
+  };
   Stats::PrimitiveGauge test_gauge;
   test_gauge.set(11);
   Stats::PrimitiveGauge atest_gauge;
