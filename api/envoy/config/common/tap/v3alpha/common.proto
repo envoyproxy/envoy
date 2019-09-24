@@ -1,29 +1,27 @@
 syntax = "proto3";
 
-import "envoy/service/tap/v3alpha/common.proto";
-import "envoy/api/v3alpha/core/config_source.proto";
-
-import "validate/validate.proto";
-
 package envoy.config.common.tap.v3alpha;
 
 option java_outer_classname = "CommonProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.common.tap.v3alpha";
 
+import "envoy/api/v3alpha/core/config_source.proto";
+import "envoy/service/tap/v3alpha/common.proto";
+
+import "validate/validate.proto";
+
 // [#protodoc-title: Common tap extension configuration]
 
 // Common configuration for all tap extensions.
 message CommonExtensionConfig {
-
   // [#not-implemented-hide:]
   message TapDSConfig {
     // Configuration for the source of TapDS updates for this Cluster.
-    envoy.api.v3alpha.core.ConfigSource config_source = 1
-        [(validate.rules).message.required = true];
+    api.v3alpha.core.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
 
     // Tap config to request from XDS server.
-    string name = 2 [(validate.rules).string.min_bytes = 1];
+    string name = 2 [(validate.rules).string = {min_bytes: 1}];
   }
 
   oneof config_type {
@@ -46,5 +44,5 @@ message CommonExtensionConfig {
 message AdminConfig {
   // Opaque configuration ID. When requests are made to the admin handler, the passed opaque ID is
   // matched to the configured filter opaque ID to determine which filter to configure.
-  string config_id = 1 [(validate.rules).string.min_bytes = 1];
+  string config_id = 1 [(validate.rules).string = {min_bytes: 1}];
 }

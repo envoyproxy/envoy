@@ -30,7 +30,7 @@ message Router {
   // are configured in the same way as access logs, but each log entry represents
   // an upstream request. Presuming retries are configured, multiple upstream
   // requests may be made for each downstream (inbound) request.
-  repeated envoy.config.filter.accesslog.v3alpha.AccessLog upstream_log = 3;
+  repeated accesslog.v3alpha.AccessLog upstream_log = 3;
 
   // Do not add any additional *x-envoy-* headers to requests or responses. This
   // only affects the :ref:`router filter generated *x-envoy-* headers
@@ -54,13 +54,15 @@ message Router {
   // * :ref:`config_http_filters_router_x-envoy-max-retries`
   // * :ref:`config_http_filters_router_x-envoy-upstream-rq-timeout-ms`
   // * :ref:`config_http_filters_router_x-envoy-upstream-rq-per-try-timeout-ms`
-  repeated string strict_check_headers = 5 [(validate.rules).repeated .items.string = {
-    in: [
-      "x-envoy-upstream-rq-timeout-ms",
-      "x-envoy-upstream-rq-per-try-timeout-ms",
-      "x-envoy-max-retries",
-      "x-envoy-retry-grpc-on",
-      "x-envoy-retry-on"
-    ]
+  repeated string strict_check_headers = 5 [(validate.rules).repeated = {
+    items {
+      string {
+        in: "x-envoy-upstream-rq-timeout-ms"
+        in: "x-envoy-upstream-rq-per-try-timeout-ms"
+        in: "x-envoy-max-retries"
+        in: "x-envoy-retry-grpc-on"
+        in: "x-envoy-retry-on"
+      }
+    }
   }];
 }
