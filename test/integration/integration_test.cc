@@ -400,6 +400,32 @@ TEST_P(IntegrationTest, Http10WithHostandKeepAlive) {
   EXPECT_EQ(upstream_headers->Host()->value(), "foo.com");
 }
 
+TEST_P(IntegrationTest, Pipeline) {
+  autonomous_upstream_ = true;
+  initialize();
+  std::string response;
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nHost: host\r\n\r\nGET / HTTP/1.1\r\n\r\n");
+  RawConnectionDriver connection(
+      lookupPort("http"), buffer,
+      [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
+        response.append(data.toString());
+      },
+      version_);
+  // First response should be success.
+  while (response.find("200") == std::string::npos) {
+    connection.run(Event::Dispatcher::RunType::NonBlock);
+  }
+  EXPECT_THAT(response, HasSubstr("HTTP/1.1 200 OK\r\n"));
+
+  // Second response should be 400 (no host)
+  while (response.find("400") == std::string::npos) {
+    connection.run(Event::Dispatcher::RunType::NonBlock);
+  }
+  EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
+  connection.close();
+}
+
 TEST_P(IntegrationTest, NoHost) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));

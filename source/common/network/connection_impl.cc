@@ -509,9 +509,9 @@ void ConnectionImpl::onReadReady() {
   }
 
   read_end_stream_ |= result.end_stream_read_;
-  if (result.bytes_processed_ != 0 || result.end_stream_read_) {
-    // Skip onRead if no bytes were processed. For instance, if the connection was closed without
-    // producing more data.
+  if (result.bytes_processed_ != 0 || result.end_stream_read_ || read_buffer_.length() != 0) {
+    // Skip onRead if no bytes were processed and no bytes are buffered. For instance, if the
+    // connection was closed without producing more data.
     onRead(new_buffer_size);
   }
 
