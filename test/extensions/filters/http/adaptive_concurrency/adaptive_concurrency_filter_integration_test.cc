@@ -161,7 +161,7 @@ TEST_P(AdaptiveConcurrencyIntegrationTest, TestManyConcurrency1) {
  * TODO: This test is disabled for now since it doesn't play well with simulated time. It should be
  * revisited so we can test more complex scenarios.
  */
-TEST_P(AdaptiveConcurrencyIntegrationTest, DISABLED_TestConcurrencyLimitMovement) {
+TEST_P(AdaptiveConcurrencyIntegrationTest, TestConcurrencyLimitMovement) {
   customInit();
 
   // Cause the concurrency limit to oscillate.
