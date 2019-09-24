@@ -54,8 +54,17 @@ absl::flat_hash_set<Watch*> WatchMap::watchesInterestedIn(const std::string& res
 void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                               const std::string& version_info) {
   if (watches_.empty()) {
-    ENVOY_LOG(warn, "WatchMap::onConfigUpdate: there are no watches!");
-    return;
+    if (resources.empty()) {
+      // We have no watches, and the update contained no resources. This can happen when Envoy
+      // unregisters from a resource that's removed from the server as well. For example,
+      // a deleted cluster triggers un-watching the ClusterLoadAssignment watch, and at the
+      // same time the xDS server sends an empty list of ClusterLoadAssignment resources.
+      return;
+    } else {
+      // We have no watches, but the update contained resources. This should not happen.
+      ENVOY_LOG(warn, "Rejecting non-empty update for unwatched type URL");
+      throw EnvoyException("Rejecting non-empty update for unwatched type URL");
+    }
   }
   SubscriptionCallbacks& name_getter = (*watches_.begin())->callbacks_;
 
@@ -75,12 +84,21 @@ void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>
   for (auto& watch : watches_) {
     const auto this_watch_updates = per_watch_updates.find(watch);
     if (this_watch_updates == per_watch_updates.end()) {
-      // This update included no resources this watch cares about - so we do an empty
-      // onConfigUpdate(), to notify the watch that its resources - if they existed before this -
-      // were dropped.
-      watch->callbacks_.onConfigUpdate({}, version_info);
+      // This update included no resources this watch cares about.
+      // 1) If there is only a single, wildcard watch (i.e. Cluster or Listener), always call
+      //    its onConfigUpdate even if just a no-op, to properly maintain state-of-the-world
+      //    semantics and the update_empty stat.
+      // 2) If this watch previously had some resources, it means this update is removing all
+      //    of this watch's resources, so the watch must be informed with an onConfigUpdate.
+      // 3) Otherwise, we can skip onConfigUpdate for this watch.
+      if ((watches_.size() == 1 && wildcard_watches_.size() == 1) ||
+          !watch->state_of_the_world_empty_) {
+        watch->callbacks_.onConfigUpdate({}, version_info);
+      }
+      watch->state_of_the_world_empty_ = true;
     } else {
       watch->callbacks_.onConfigUpdate(this_watch_updates->second, version_info);
+      watch->state_of_the_world_empty_ = false;
     }
   }
 }
