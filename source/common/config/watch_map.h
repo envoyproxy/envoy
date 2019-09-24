@@ -26,6 +26,10 @@ struct Watch {
   Watch(SubscriptionCallbacks& callbacks) : callbacks_(callbacks) {}
   SubscriptionCallbacks& callbacks_;
   std::set<std::string> resource_names_; // must be sorted set, for set_difference.
+  // Needed only for state-of-the-world.
+  // Whether the most recent update contained any resources this watch cares about.
+  // If true, a new update that also contains no resources can skip this watch.
+  bool state_of_the_world_empty_{true};
 };
 
 // NOTE: Users are responsible for eventually calling removeWatch() on the Watch* returned
