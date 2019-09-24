@@ -103,7 +103,8 @@ AdaptiveConcurrencyIntegrationTest::inflateConcurrencyLimit(const uint64_t limit
     const auto min_rtt = test_server_->gauge(MIN_RTT_GAUGE_NAME)->value();
     sendRequests(1, 1);
     // Choosing a latency value less than the minRTT.
-    respondToAllRequests(1, std::chrono::milliseconds(std::max(1UL, min_rtt / 2)));
+    respondToAllRequests(
+        1, std::chrono::milliseconds(std::max(1UL, static_cast<unsigned long>(min_rtt / 2))));
   }
   return test_server_->gauge(CONCURRENCY_LIMIT_GAUGE_NAME)->value();
 }
@@ -123,7 +124,8 @@ void AdaptiveConcurrencyIntegrationTest::deflateConcurrencyLimit(const uint64_t 
          test_server_->gauge(CONCURRENCY_LIMIT_GAUGE_NAME)->value() >= limit_upper_bound) {
     const auto min_rtt = test_server_->gauge(MIN_RTT_GAUGE_NAME)->value();
     sendRequests(1, 1);
-    respondToAllRequests(1, std::chrono::milliseconds(std::max(1UL, min_rtt * 2)));
+    respondToAllRequests(
+        1, std::chrono::milliseconds(std::max(1UL, static_cast<unsigned long>(min_rtt * 2))));
   }
 }
 
