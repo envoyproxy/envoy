@@ -270,6 +270,9 @@ public:
   uint32_t maxRequestHeadersKb() const override { return max_request_headers_kb_; }
   uint32_t maxRequestHeadersCount() const override { return max_request_headers_count_; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
+  absl::optional<std::chrono::milliseconds> lifetimeTimeout() const override {
+    return lifetime_timeout_;
+  }
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
   std::chrono::milliseconds requestTimeout() const override { return request_timeout_; }
   std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
@@ -342,6 +345,7 @@ public:
   uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
   uint32_t max_request_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
   absl::optional<std::chrono::milliseconds> idle_timeout_;
+  absl::optional<std::chrono::milliseconds> lifetime_timeout_;
   std::chrono::milliseconds stream_idle_timeout_{};
   std::chrono::milliseconds request_timeout_{};
   std::chrono::milliseconds delayed_close_timeout_{};
@@ -2532,6 +2536,23 @@ TEST_F(HttpConnectionManagerImplTest, IdleTimeout) {
   drain_timer->invokeCallback();
 
   EXPECT_EQ(1U, stats_.named_.downstream_cx_idle_timeout_.value());
+}
+
+TEST_F(HttpConnectionManagerImplTest, LifetimeTimeoutBasic) {
+  // Not used in the test.
+  delete codec_;
+
+  lifetime_timeout_ = (std::chrono::milliseconds(10));
+  Event::MockTimer* lifetime_timer = setUpTimer();
+  EXPECT_CALL(*lifetime_timer, enableTimer(_, _));
+  setup(false, "");
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+  EXPECT_CALL(*lifetime_timer, disableTimer());
+
+  lifetime_timer->invokeCallback();
+
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_lifetime_timeout_.value());
 }
 
 TEST_F(HttpConnectionManagerImplTest, IntermediateBufferingEarlyResponse) {

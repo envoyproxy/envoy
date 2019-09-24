@@ -655,6 +655,7 @@ private:
 
   void resetAllStreams();
   void onIdleTimeout();
+  void onConnectionLifetimeTimeout();
   void onDrainTimeout();
   void startDrainSequence();
   Tracing::HttpTracer& tracer() { return http_context_.tracer(); }
