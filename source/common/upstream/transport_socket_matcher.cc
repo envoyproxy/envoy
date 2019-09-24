@@ -8,13 +8,16 @@ namespace Envoy {
 namespace Upstream {
 
 TransportSocketMatcher::TransportSocketMatcher(
-    const Protobuf::RepeatedPtrField<envoy::api::v2::Cluster_TransportSocketMatch>& socket_matches,
+    const Protobuf::RepeatedPtrField<
+      envoy::api::v2::Cluster_TransportSocketMatch>& socket_matches,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
-    Network::TransportSocketFactory& default_factory): 
-  default_socket_factory_(default_factory) {
+    Network::TransportSocketFactory& default_factory,
+    Stats::Scope& stats_scope): 
+  default_socket_factory_(default_factory),
+  stats_scope_(stats_scope) {
   for (const auto& socket_match : socket_matches) {
-    FactoryMatch factory_match;
-    factory_match.name = socket_match.name();
+    FactoryMatch factory_match(socket_match.name(),
+        generateStats(socket_match.name() + "."));
     for (const auto& kv : socket_match.match().fields()) {
       // TODO: question, what's the handling for non string value case?
       if (kv.second.kind_case() == ProtobufWkt::Value::kStringValue) {
@@ -36,6 +39,8 @@ bool metadataMatch(const envoy::api::v2::core::Metadata& metadata,
   if (match.empty()) {
     return true;
   }
+  // TODO: which header to put this names to? what the right name?
+  // maybe envoy.transport_socket_match?
   const auto socket_match_it = metadata.filter_metadata().find("envoy.transport_socket");
   if (socket_match_it == metadata.filter_metadata().end()) {
     return false;
@@ -60,20 +65,28 @@ bool metadataMatch(const envoy::api::v2::core::Metadata& metadata,
   return true;
 }
 
-//TransportSocketMatchStats generateStats(Stats::Scope& scope) {
-  // return {ALL_TRANSPORT_SOCKET_MATCHER_STATS(POOL_COUNTER_PREFIX(scope, 
-//}
+TransportSocketMatchStats TransportSocketMatcher::generateStats(
+    const std::string& prefix) {
+   return {
+     ALL_TRANSPORT_SOCKET_MATCHER_STATS(
+         POOL_COUNTER_PREFIX(stats_scope_, prefix))
+   };
+}
 
 Network::TransportSocketFactory&
 TransportSocketMatcher::resolve(const std::string& endpoint_addr,
                                 const envoy::api::v2::core::Metadata& metadata) {
   for (const auto& socket_factory_match : matches_) {
     if (metadataMatch(metadata, socket_factory_match.match)) {
-      ENVOY_LOG(info, "transport socket match found: name {}, metadata {}, address {}",
+      socket_factory_match.stats.total_match_count_.inc();
+      ENVOY_LOG(debug, "transport socket match found: name {}, metadata {}, address {}",
                 socket_factory_match.name, metadata.DebugString(), endpoint_addr);
       return *socket_factory_match.factory;
     }
   }
+  ENVOY_LOG(debug,
+      "transport socket match, no match, return default: metadata {}, address {}",
+      metadata.DebugString(), endpoint_addr);
   return default_socket_factory_;
 }
 

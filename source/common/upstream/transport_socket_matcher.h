@@ -29,14 +29,12 @@
 namespace Envoy {
 namespace Upstream {
 
-//#define ALL_TRANSPORT_SOCKET_MATCHER_STATS(COUNTER, GAUGE) \
-  //COUNTER(total_match_count)    \
-  //GAUGE(last_match_time)  \
-  //GAUGE(last_match_address)  \
+#define ALL_TRANSPORT_SOCKET_MATCHER_STATS(COUNTER) \
+  COUNTER(total_match_count)
 
-//struct TransportSocketMatchStats {
-  //ALL_TRANSPORT_SOCKET_MATCHER_STATS(GENERATE_COUNTER_STRUCT,GENERATE_GAUGE_STRUCT)
-//}
+struct TransportSocketMatchStats {
+  ALL_TRANSPORT_SOCKET_MATCHER_STATS(GENERATE_COUNTER_STRUCT)
+};
 
 class TransportSocketMatcher;
 
@@ -49,21 +47,27 @@ public:
   TransportSocketMatcher(const Protobuf::RepeatedPtrField<
                              envoy::api::v2::Cluster_TransportSocketMatch>& socket_matches,
                          Server::Configuration::TransportSocketFactoryContext& factory_context,
-                         Network::TransportSocketFactory& default_factory);
+                         Network::TransportSocketFactory& default_factory,
+                         Stats::Scope& stats_scope);
 
   Network::TransportSocketFactory& resolve(const std::string& endpoint_addr,
                                            const envoy::api::v2::core::Metadata& metadata);
 
 protected:
   struct FactoryMatch {
+    FactoryMatch(const std::string& match_name,
+        TransportSocketMatchStats match_stats):
+      name(match_name), stats(match_stats) {}
     std::string name;
     Network::TransportSocketFactoryPtr factory;
     std::map<std::string, std::string> match;
-    // TransportSocketMatchStats stats;
+    TransportSocketMatchStats stats;
   };
 
+  TransportSocketMatchStats generateStats(const std::string& prefix);
   Network::TransportSocketFactory& default_socket_factory_;
   std::vector<FactoryMatch> matches_;
+  Stats::Scope& stats_scope_;
 };
 
 } // namespace Upstream

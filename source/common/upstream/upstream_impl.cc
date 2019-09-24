@@ -764,9 +764,10 @@ Network::TransportSocketFactoryPtr createTransportSocketFactory(
 TransportSocketMatcherPtr createTransportSocketMatcher(
     spdlog::logger&, const envoy::api::v2::Cluster& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
-    Network::TransportSocketFactory& default_factory) {
+    Network::TransportSocketFactory& default_factory,
+    Stats::Scope& stats_scope) {
   return std::make_unique<TransportSocketMatcher>(
-      config.transport_socket_matches(), factory_context, default_factory);
+      config.transport_socket_matches(), factory_context, default_factory, stats_scope);
 }
 
 void ClusterInfoImpl::createNetworkFilterChain(Network::Connection& connection) const {
@@ -784,7 +785,8 @@ ClusterImplBase::ClusterImplBase(
       symbol_table_(stats_scope->symbolTable()) {
   factory_context.setInitManager(init_manager_);
   auto socket_factory = createTransportSocketFactory(cluster, factory_context);
-  auto socket_overrides = createTransportSocketMatcher(ENVOY_LOGGER(), cluster, factory_context, *socket_factory);
+  auto socket_overrides = createTransportSocketMatcher(
+      ENVOY_LOGGER(), cluster, factory_context, *socket_factory, *stats_scope);
   info_ = std::make_unique<ClusterInfoImpl>(
       cluster, factory_context.clusterManager().bindConfig(), runtime, std::move(socket_factory),
       std::move(socket_overrides), std::move(stats_scope), added_via_api,
