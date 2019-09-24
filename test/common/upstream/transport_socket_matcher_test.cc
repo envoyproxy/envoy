@@ -94,7 +94,9 @@ public:
 
 class TransportSocketMatcherTest : public testing::Test {
 public:
-  TransportSocketMatcherTest(): mock_default_factory_("default") {}
+  TransportSocketMatcherTest(): mock_default_factory_("default"),
+    stats_scope_(stats_store_.createScope("transport_socket_match.test"))
+  {}
 
   void init(const std::vector<std::string>& match_yaml) {
     Protobuf::RepeatedPtrField<envoy::api::v2::Cluster_TransportSocketMatch> matches;
@@ -103,7 +105,7 @@ public:
       TestUtility::loadFromYaml(yaml, *transport_socket_match);
     }
     matcher_ = std::make_unique<TransportSocketMatcher>(
-        matches, mock_factory_context_, mock_default_factory_);
+        matches, mock_factory_context_, mock_default_factory_, *stats_scope_);
   }
 
   void validate(const envoy::api::v2::core::Metadata& metadata, const std::string& expected) {
@@ -116,6 +118,8 @@ protected:
   TransportSocketMatcherPtr matcher_;
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_context_;
   NiceMock<FakeTransportSocketFactory> mock_default_factory_;
+  Stats::IsolatedStoreImpl stats_store_;
+  Stats::ScopePtr stats_scope_;
 };
 
 TEST_F(TransportSocketMatcherTest, ReturnDefaultSocketFactoryWhenNoMatch) {
