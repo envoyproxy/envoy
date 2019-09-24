@@ -60,6 +60,7 @@ Version history
 * router check tool: add deprecated field check.
 * router check tool: add flag for only printing results of failed tests.
 * router check tool: add support for outputting missing tests in the detailed coverage report.
+* runtime: allow for the ability to parse integers as double values and vice-versa.
 * server: added a post initialization lifecycle event, in addition to the existing startup and shutdown events.
 * server: added :ref:`per-handler listener stats <config_listener_stats_per_handler>` and
   :ref:`per-worker watchdog stats <operations_performance_watchdog>` to help diagnosing event

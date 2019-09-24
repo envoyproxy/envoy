@@ -27,6 +27,7 @@ api_proto_package(
         "//envoy/api/v3alpha/listener:pkg",
         "//envoy/api/v3alpha/ratelimit:pkg",
         "//envoy/api/v3alpha/route:pkg",
+        "//envoy/config/listener/v3alpha:pkg",
         "//envoy/type",
     ],
 )
@@ -34,6 +35,7 @@ api_proto_package(
 api_proto_library_internal(
     name = "discovery",
     srcs = ["discovery.proto"],
+    has_services = 1,
     visibility = [":friends"],
     deps = ["//envoy/api/v3alpha/core:base"],
 )
@@ -86,6 +88,7 @@ api_proto_library_internal(
         "//envoy/api/v3alpha/core:base",
         "//envoy/api/v3alpha/listener",
         "//envoy/api/v3alpha/listener:udp_listener_config",
+        "//envoy/config/listener/v3alpha:api_listener",
     ],
 )
 
