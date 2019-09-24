@@ -493,8 +493,7 @@ public:
    */
   static bool gaugesZeroed(const std::vector<Stats::GaugeSharedPtr>& gauges);
   static bool gaugesZeroed(
-      const std::vector<std::pair<absl::string_view,
-                                  std::reference_wrapper<const Stats::PrimitiveGauge>>>& gauges);
+      const std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>>& gauges);
 
   // Strict variants of Protobuf::MessageUtil
   static void loadFromJson(const std::string& json, Protobuf::Message& message) {

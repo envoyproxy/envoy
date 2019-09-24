@@ -156,15 +156,13 @@ public:
   MOCK_CONST_METHOD0(cluster, const ClusterInfo&());
   MOCK_CONST_METHOD0(
       counters,
-      std::vector<
-          std::pair<absl::string_view, std::reference_wrapper<const Stats::PrimitiveCounter>>>());
+      std::vector<std::pair<absl::string_view, Stats::PrimitiveCounterReference>>());
   MOCK_CONST_METHOD2(
       createConnection_,
       MockCreateConnectionData(Event::Dispatcher& dispatcher,
                                const Network::ConnectionSocket::OptionsSharedPtr& options));
   MOCK_CONST_METHOD0(gauges,
-                     std::vector<std::pair<absl::string_view,
-                                           std::reference_wrapper<const Stats::PrimitiveGauge>>>());
+                     std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>>());
   MOCK_CONST_METHOD0(healthChecker, HealthCheckHostMonitor&());
   MOCK_METHOD1(healthFlagClear, void(HealthFlag flag));
   MOCK_CONST_METHOD1(healthFlagGet, bool(HealthFlag flag));

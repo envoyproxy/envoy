@@ -9,9 +9,8 @@ namespace {
 // Verify that counters are sorted by name.
 TEST(HostStatsTest, CountersSortedByName) {
   HostStats host_stats;
-  using PrimitiveCounterReference = std::reference_wrapper<const Stats::PrimitiveCounter>;
-  std::vector<std::pair<absl::string_view, PrimitiveCounterReference>> counters =
-      host_stats.counters();
+  std::vector<std::pair<absl::string_view, Stats::PrimitiveCounterReference>>
+      counters = host_stats.counters();
   EXPECT_FALSE(counters.empty());
 
   for (size_t i = 1; i < counters.size(); ++i) {
@@ -22,8 +21,8 @@ TEST(HostStatsTest, CountersSortedByName) {
 // Verify that gauges are sorted by name.
 TEST(HostStatsTest, GaugesSortedByName) {
   HostStats host_stats;
-  using PrimitiveGaugeReference = std::reference_wrapper<const Stats::PrimitiveGauge>;
-  std::vector<std::pair<absl::string_view, PrimitiveGaugeReference>> gauges = host_stats.gauges();
+  std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>> gauges =
+      host_stats.gauges();
   EXPECT_FALSE(gauges.empty());
 
   for (size_t i = 1; i < gauges.size(); ++i) {

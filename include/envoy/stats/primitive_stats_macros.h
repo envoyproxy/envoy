@@ -26,14 +26,14 @@ namespace Envoy {
  *
  *     // Optional: Provide access to counters as a map.
  *     std::vector<
- *         std::pair<absl::string_view, std::reference_wrapper<const Stats::PrimitiveCounter>>>
+ *         std::pair<absl::string_view, PrimitiveCounterReference>>
  *     counters() const {
  *         return {MY_COOL_STATS(PRIMITIVE_COUNTER_NAME_AND_REFERENCE, IGNORE_PRIMITIVE_GAUGE)};
  *     }
  *
  *     // Optional: Provide access to gauges as a map.
  *     std::vector<
- *         std::pair<absl::string_view, std::reference_wrapper<const Stats::PrimitiveGauge>>>
+ *         std::pair<absl::string_view, PrimitiveGaugeReference>>
  *     gauges() const {
  *       return {MY_COOL_STATS(IGNORE_PRIMITIVE_COUNTER, PRIMITIVE_GAUGE_NAME_AND_REFERENCE)};
  *     }

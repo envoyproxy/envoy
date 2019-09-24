@@ -34,6 +34,8 @@ private:
   std::atomic<uint64_t> pending_increment_{0};
 };
 
+using PrimitiveCounterReference = std::reference_wrapper<const PrimitiveCounter>;
+
 /**
  * Primitive, low-memory-overhead gauge with increment and decrement capabilities.
  */
@@ -55,6 +57,8 @@ public:
 private:
   std::atomic<uint64_t> value_{0};
 };
+
+using PrimitiveGaugeReference = std::reference_wrapper<const PrimitiveGauge>;
 
 } // namespace Stats
 } // namespace Envoy

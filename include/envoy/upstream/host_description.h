@@ -40,14 +40,12 @@ struct HostStats {
   ALL_HOST_STATS(GENERATE_PRIMITIVE_COUNTER_STRUCT, GENERATE_PRIMITIVE_GAUGE_STRUCT);
 
   // Provide access to name,counter pairs.
-  std::vector<std::pair<absl::string_view, std::reference_wrapper<const Stats::PrimitiveCounter>>>
-  counters() const {
+  std::vector<std::pair<absl::string_view, Stats::PrimitiveCounterReference>> counters() const {
     return {ALL_HOST_STATS(PRIMITIVE_COUNTER_NAME_AND_REFERENCE, IGNORE_PRIMITIVE_GAUGE)};
   }
 
   // Provide access to name,gauge pairs.
-  std::vector<std::pair<absl::string_view, std::reference_wrapper<const Stats::PrimitiveGauge>>>
-  gauges() const {
+  std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>> gauges() const {
     return {ALL_HOST_STATS(IGNORE_PRIMITIVE_COUNTER, PRIMITIVE_GAUGE_NAME_AND_REFERENCE)};
   }
 };

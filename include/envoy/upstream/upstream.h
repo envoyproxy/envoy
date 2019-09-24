@@ -78,8 +78,7 @@ public:
   /**
    * @return host specific counters.
    */
-  virtual std::vector<
-      std::pair<absl::string_view, std::reference_wrapper<const Stats::PrimitiveCounter>>>
+  virtual std::vector<std::pair<absl::string_view, Stats::PrimitiveCounterReference>>
   counters() const PURE;
 
   /**
@@ -108,8 +107,7 @@ public:
   /**
    * @return host specific gauges.
    */
-  virtual std::vector<
-      std::pair<absl::string_view, std::reference_wrapper<const Stats::PrimitiveGauge>>>
+  virtual std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>>
   gauges() const PURE;
 
   /**

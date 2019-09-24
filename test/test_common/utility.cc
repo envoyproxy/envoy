@@ -331,8 +331,7 @@ bool TestUtility::gaugesZeroed(const std::vector<Stats::GaugeSharedPtr>& gauges)
 
 // static
 bool TestUtility::gaugesZeroed(
-    const std::vector<std::pair<absl::string_view,
-                                std::reference_wrapper<const Stats::PrimitiveGauge>>>& gauges) {
+    const std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>>& gauges) {
   // Returns true if all gauges are 0 except the circuit_breaker remaining resource
   // gauges which default to the resource max.
   std::regex omitted(".*circuit_breakers\\..*\\.remaining.*");
