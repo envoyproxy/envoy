@@ -107,7 +107,9 @@ public:
   bool preserveExternalRequestId() const override { return preserve_external_request_id_; }
   uint32_t maxRequestHeadersKb() const override { return max_request_headers_kb_; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
-  absl::optional<std::chrono::milliseconds> connectionsLifetimeTimeout() const override { return connection_lifetime_timeout_; }
+  absl::optional<std::chrono::milliseconds> connectionsLifetimeTimeout() const override {
+    return connection_lifetime_timeout_; 
+  }
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
   std::chrono::milliseconds requestTimeout() const override { return request_timeout_; }
   Router::RouteConfigProvider* routeConfigProvider() override {

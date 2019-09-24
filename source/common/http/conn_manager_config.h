@@ -229,7 +229,7 @@ public:
    */
   virtual absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
 
-    /**
+  /**
    * @return optional lifetime timeout for incoming connection manager connections.
    */
   virtual absl::optional<std::chrono::milliseconds> lifetimeTimeout() const PURE;
