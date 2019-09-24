@@ -73,10 +73,6 @@ INCLUDE_ANGLE = "#include <"
 INCLUDE_ANGLE_LEN = len(INCLUDE_ANGLE)
 PROTO_PACKAGE_REGEX = re.compile(r"^package (\S+);\n*", re.MULTILINE)
 X_ENVOY_USED_DIRECTLY_REGEX = re.compile(r'.*\"x-envoy-.*\".*')
-PROTO_OPTION_JAVA_PACKAGE = "option java_package = \""
-PROTO_OPTION_JAVA_OUTER_CLASSNAME = "option java_outer_classname = \""
-PROTO_OPTION_JAVA_MULTIPLE_FILES = "option java_multiple_files = "
-PROTO_OPTION_GO_PACKAGE = "option go_package = \""
 
 # yapf: disable
 PROTOBUF_TYPE_ERRORS = {
@@ -253,21 +249,6 @@ def checkNamespace(file_path):
   return []
 
 
-# If the substring is not found in the file, then insert to_add
-def insertProtoOptionIfNotFound(substring, file_path, to_add):
-  text = None
-  with open(file_path) as f:
-    text = f.read()
-
-  if not substring in text:
-
-    def repl(m):
-      return m.group(0).rstrip() + "\n\n" + to_add + "\n"
-
-    with open(file_path, "w") as f:
-      f.write(re.sub(PROTO_PACKAGE_REGEX, repl, text))
-
-
 def packageNameForProto(file_path):
   package_name = None
   error_message = []
@@ -279,32 +260,6 @@ def packageNameForProto(file_path):
       error_message = ["Unable to find package name for proto file: %s" % file_path]
 
   return [package_name, error_message]
-
-
-def fixJavaPackageProtoOption(file_path):
-  package_name = packageNameForProto(file_path)[0]
-  to_add = PROTO_OPTION_JAVA_PACKAGE + "io.envoyproxy.{}\";".format(package_name)
-  insertProtoOptionIfNotFound("\n" + PROTO_OPTION_JAVA_PACKAGE, file_path, to_add)
-  return []
-
-
-# Add "option java_outer_classname = FooBarProto;" for foo_bar.proto
-def fixJavaOuterClassnameProtoOption(file_path):
-  file_name = os.path.basename(file_path)[:-len(".proto")]
-  if "-" in file_name or "." in file_name or not file_name.islower():
-    return ["Unable to decide java_outer_classname for proto file: %s" % file_path]
-
-  to_add = PROTO_OPTION_JAVA_OUTER_CLASSNAME \
-       + "".join(x.title() for x in file_name.split("_")) \
-       + "Proto\";"
-  insertProtoOptionIfNotFound("\n" + PROTO_OPTION_JAVA_OUTER_CLASSNAME, file_path, to_add)
-  return []
-
-
-def fixJavaMultipleFilesProtoOption(file_path):
-  to_add = PROTO_OPTION_JAVA_MULTIPLE_FILES + "true;"
-  insertProtoOptionIfNotFound("\n" + PROTO_OPTION_JAVA_MULTIPLE_FILES, file_path, to_add)
-  return []
 
 
 # To avoid breaking the Lyft import, we just check for path inclusion here.
@@ -677,10 +632,6 @@ def fixSourcePath(file_path):
     package_name, error_message = packageNameForProto(file_path)
     if package_name is None:
       error_messages += error_message
-    else:
-      error_messages += fixJavaMultipleFilesProtoOption(file_path)
-      error_messages += fixJavaOuterClassnameProtoOption(file_path)
-      error_messages += fixJavaPackageProtoOption(file_path)
   return error_messages
 
 
@@ -700,16 +651,6 @@ def checkSourcePath(file_path):
     package_name, error_message = packageNameForProto(file_path)
     if package_name is None:
       error_messages += error_message
-    else:
-      error_messages += errorIfNoSubstringFound("\n" + PROTO_OPTION_JAVA_PACKAGE, file_path,
-                                                "Java proto option 'java_package' not set")
-      error_messages += errorIfNoSubstringFound("\n" + PROTO_OPTION_JAVA_OUTER_CLASSNAME, file_path,
-                                                "Java proto option 'java_outer_classname' not set")
-      error_messages += errorIfNoSubstringFound("\n" + PROTO_OPTION_JAVA_MULTIPLE_FILES, file_path,
-                                                "Java proto option 'java_multiple_files' not set")
-    with open(file_path) as f:
-      if PROTO_OPTION_GO_PACKAGE in f.read():
-        error_messages += ["go_package option should not be set in %s" % file_path]
   return error_messages
 
 
