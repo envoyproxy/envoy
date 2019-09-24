@@ -166,6 +166,11 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
                                  ? Network::Utility::TCP_SCHEME
                                  : Network::Utility::UDP_SCHEME;
   const std::string addr = absl::StrCat(scheme, address->asString());
+
+  if (!bind_to_port && socket_type == Network::Address::SocketType::Stream) {
+    return std::make_shared<Network::TcpListenSocket>(address, options, bind_to_port);
+  }
+
   const int fd = server_.hotRestart().duplicateParentListenSocket(addr);
   if (fd != -1) {
     ENVOY_LOG(debug, "obtained socket for address {} from parent", addr);
@@ -176,6 +181,7 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
       return std::make_shared<Network::UdpListenSocket>(std::move(io_handle), address, options);
     }
   }
+
   if (socket_type == Network::Address::SocketType::Stream) {
     return std::make_shared<Network::TcpListenSocket>(address, options, bind_to_port);
   } else {

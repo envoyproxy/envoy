@@ -93,6 +93,7 @@ envoy_cc_test(
     deps = [
         "//source/common/stats:stats_lib",
         "//source/server:hot_restart_lib",
+        "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
     ],
 )
