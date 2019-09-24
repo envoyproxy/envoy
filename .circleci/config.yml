@@ -115,16 +115,6 @@ jobs:
              ci/do_circle_ci.sh bazel.clang_tidy
            no_output_timeout: 60m
 
-   format:
-     executor: ubuntu-build
-     steps:
-       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
-       - checkout
-       - run: pip install -r tools/requirements.txt
-       - run: ci/do_circle_ci.sh check_format
-       - run: ci/do_circle_ci.sh check_repositories
-       - run: ci/do_circle_ci.sh check_spelling
-       - run: ci/do_circle_ci.sh check_spelling_pedantic
    build_image:
      docker:
        - image: google/cloud-sdk
@@ -165,7 +155,6 @@ workflows:
       - coverage
       - coverage_publish:
           requires: [coverage]
-      - format
       - clang_tidy
       - build_image
       - docs:
