@@ -14,12 +14,12 @@ import "validate/validate.proto";
 // Gzip :ref:`configuration overview <config_http_filters_gzip>`.
 
 message Gzip {
-  // Value from 1 to 9 that controls the amount of internal memory used by zlib. Higher values
-  // use more memory, but are faster and produce better compression results. The default value is 5.
-  google.protobuf.UInt32Value memory_level = 1 [(validate.rules).uint32 = {gte: 1, lte: 9}];
-
-  // Minimum response length, in bytes, which will trigger compression. The default value is 30.
-  google.protobuf.UInt32Value content_length = 2 [(validate.rules).uint32.gte = 30];
+  enum CompressionStrategy {
+    DEFAULT = 0;
+    FILTERED = 1;
+    HUFFMAN = 2;
+    RLE = 3;
+  }
 
   message CompressionLevel {
     enum Enum {
@@ -29,19 +29,19 @@ message Gzip {
     }
   }
 
+  // Value from 1 to 9 that controls the amount of internal memory used by zlib. Higher values
+  // use more memory, but are faster and produce better compression results. The default value is 5.
+  google.protobuf.UInt32Value memory_level = 1 [(validate.rules).uint32 = {lte: 9 gte: 1}];
+
+  // Minimum response length, in bytes, which will trigger compression. The default value is 30.
+  google.protobuf.UInt32Value content_length = 2 [(validate.rules).uint32 = {gte: 30}];
+
   // A value used for selecting the zlib compression level. This setting will affect speed and
   // amount of compression applied to the content. "BEST" provides higher compression at the cost of
   // higher latency, "SPEED" provides lower compression with minimum impact on response time.
   // "DEFAULT" provides an optimal result between speed and compression. This field will be set to
   // "DEFAULT" if not specified.
-  CompressionLevel.Enum compression_level = 3 [(validate.rules).enum.defined_only = true];
-
-  enum CompressionStrategy {
-    DEFAULT = 0;
-    FILTERED = 1;
-    HUFFMAN = 2;
-    RLE = 3;
-  }
+  CompressionLevel.Enum compression_level = 3 [(validate.rules).enum = {defined_only: true}];
 
   // A value used for selecting the zlib compression strategy which is directly related to the
   // characteristics of the content. Most of the time "DEFAULT" will be the best choice, though
@@ -49,7 +49,7 @@ message Gzip {
   // run-length encoding (RLE) is typically used when the content is known for having sequences
   // which same data occurs many consecutive times. For more information about each strategy, please
   // refer to zlib manual.
-  CompressionStrategy compression_strategy = 4 [(validate.rules).enum.defined_only = true];
+  CompressionStrategy compression_strategy = 4 [(validate.rules).enum = {defined_only: true}];
 
   // Set of strings that allows specifying which mime-types yield compression; e.g.,
   // application/json, text/html, etc. When this field is not defined, compression will be applied
@@ -69,5 +69,5 @@ message Gzip {
   // Larger window results in better compression at the expense of memory usage. The default is 12
   // which will produce a 4096 bytes window. For more details about this parameter, please refer to
   // zlib manual > deflateInit2.
-  google.protobuf.UInt32Value window_bits = 9 [(validate.rules).uint32 = {gte: 9, lte: 15}];
+  google.protobuf.UInt32Value window_bits = 9 [(validate.rules).uint32 = {lte: 15 gte: 9}];
 }

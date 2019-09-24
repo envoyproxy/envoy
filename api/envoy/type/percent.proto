@@ -12,7 +12,7 @@ import "validate/validate.proto";
 
 // Identifies a percentage, in the range [0.0, 100.0].
 message Percent {
-  double value = 1 [(validate.rules).double = {gte: 0, lte: 100}];
+  double value = 1 [(validate.rules).double = {lte: 100.0 gte: 0.0}];
 }
 
 // A fractional percentage is used in cases in which for performance reasons performing floating
@@ -22,9 +22,6 @@ message Percent {
 // * **Example**: 1/100 = 1%.
 // * **Example**: 3/10000 = 0.03%.
 message FractionalPercent {
-  // Specifies the numerator. Defaults to 0.
-  uint32 numerator = 1;
-
   // Fraction percentages support several fixed denominator values.
   enum DenominatorType {
     // 100.
@@ -43,7 +40,10 @@ message FractionalPercent {
     MILLION = 2;
   }
 
+  // Specifies the numerator. Defaults to 0.
+  uint32 numerator = 1;
+
   // Specifies the denominator. If the denominator specified is less than the numerator, the final
   // fractional percentage is capped at 1 (100%).
-  DenominatorType denominator = 2 [(validate.rules).enum.defined_only = true];
+  DenominatorType denominator = 2 [(validate.rules).enum = {defined_only: true}];
 }

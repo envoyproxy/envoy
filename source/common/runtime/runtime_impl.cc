@@ -19,6 +19,7 @@
 #include "common/runtime/runtime_features.h"
 
 #include "absl/strings/match.h"
+#include "absl/strings/numbers.h"
 #include "openssl/rand.h"
 
 namespace Envoy {
@@ -276,6 +277,15 @@ uint64_t SnapshotImpl::getInteger(const std::string& key, uint64_t default_value
   }
 }
 
+double SnapshotImpl::getDouble(const std::string& key, double default_value) const {
+  auto entry = values_.find(key);
+  if (entry == values_.end() || !entry->second.double_value_) {
+    return default_value;
+  } else {
+    return entry->second.double_value_.value();
+  }
+}
+
 bool SnapshotImpl::getBoolean(absl::string_view key, bool& value) const {
   auto entry = values_.find(key);
   if (entry != values_.end() && entry->second.bool_value_.has_value()) {
@@ -332,10 +342,10 @@ bool SnapshotImpl::parseEntryBooleanValue(Entry& entry) {
   return false;
 }
 
-bool SnapshotImpl::parseEntryUintValue(Entry& entry) {
-  uint64_t converted_uint64;
-  if (absl::SimpleAtoi(entry.raw_string_value_, &converted_uint64)) {
-    entry.uint_value_ = converted_uint64;
+bool SnapshotImpl::parseEntryDoubleValue(Entry& entry) {
+  double converted_double;
+  if (absl::SimpleAtod(entry.raw_string_value_, &converted_double)) {
+    entry.double_value_ = converted_double;
     return true;
   }
   return false;

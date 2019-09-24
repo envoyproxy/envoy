@@ -8,10 +8,6 @@
 
 #include "ares.h"
 
-#ifdef ENVOY_GOOGLE_GRPC
-#include "grpc/grpc.h"
-#endif
-
 namespace Envoy {
 namespace {
 // Static variable to count initialization pairs. For tests like
@@ -22,13 +18,25 @@ uint32_t process_wide_initialized;
 
 ProcessWide::ProcessWide() : initialization_depth_(process_wide_initialized) {
   if (process_wide_initialized++ == 0) {
-#ifdef ENVOY_GOOGLE_GRPC
-    grpc_init();
-#endif
     ares_library_init(ARES_LIB_INIT_ALL);
     Event::Libevent::Global::initialize();
     Envoy::Server::validateProtoDescriptors();
     Http::Http2::initializeNghttp2Logging();
+
+    // We do not initialize Google gRPC here -- we instead instantiate
+    // Grpc::GoogleGrpcContext in MainCommon immediately after instantiating
+    // ProcessWide. This is because ProcessWide is instantiated in the unit-test
+    // flow in test/test_runner.h, and grpc_init() instantiates threads which
+    // allocate memory asynchronous to running tests, making it hard to
+    // accurately measure memory consumption, and making unit-test debugging
+    // non-deterministic. See https://github.com/envoyproxy/envoy/issues/8282
+    // for details. Of course we also need grpc_init called in unit-tests that
+    // test Google gRPC, and the relevant classes must also instantiate
+    // Grpc::GoogleGrpcContext, which allows for nested instantiation.
+    //
+    // It appears that grpc_init() started instantiating threads in grpc 1.22.1,
+    // which was integrated in https://github.com/envoyproxy/envoy/pull/8196,
+    // around the time the flakes in #8282 started being reported.
   }
 }
 
@@ -37,9 +45,6 @@ ProcessWide::~ProcessWide() {
   if (--process_wide_initialized == 0) {
     process_wide_initialized = false;
     ares_library_cleanup();
-#ifdef ENVOY_GOOGLE_GRPC
-    grpc_shutdown();
-#endif
   }
   ASSERT(process_wide_initialized == initialization_depth_);
 }

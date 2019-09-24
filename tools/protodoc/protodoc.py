@@ -490,7 +490,7 @@ class RstFormatVisitor(visitor.Visitor):
         type_context, msg_proto) + FormatMessageAsDefinitionList(
             type_context, msg_proto) + '\n'.join(nested_msgs) + '\n' + '\n'.join(nested_enums)
 
-  def VisitFile(self, file_proto, type_context, msgs, enums):
+  def VisitFile(self, file_proto, type_context, services, msgs, enums):
     # Find the earliest detached comment, attribute it to file level.
     # Also extract file level titles if any.
     header, comment = FormatHeaderFromFile('=', type_context.source_code_info, file_proto.name)
