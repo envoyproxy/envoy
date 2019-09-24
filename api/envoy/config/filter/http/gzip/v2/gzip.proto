@@ -89,5 +89,5 @@ message Gzip {
   // Set of configuration parameters common for all compression filters. If this field is set then
   // the fields `content_length`, `content_type`, `disable_on_etag_header` and
   // `remove_accept_encoding_header` are ignored.
-  envoy.config.filter.http.compressor.v2.Compressor compressor = 10;
+  compressor.v2.Compressor compressor = 10;
 }
