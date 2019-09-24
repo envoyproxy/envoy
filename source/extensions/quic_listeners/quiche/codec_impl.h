@@ -3,7 +3,6 @@
 #include "common/common/assert.h"
 #include "common/common/logger.h"
 
-#include "extensions/quic_listeners/quiche/envoy_quic_client_session.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_server_session.h"
 
 namespace Envoy {
@@ -51,26 +50,6 @@ public:
 
 private:
   EnvoyQuicServerSession& quic_server_session_;
-};
-
-class QuicHttpClientConnectionImpl : public QuicHttpConnectionImplBase,
-                                     public Http::ClientConnection {
-public:
-  QuicHttpClientConnectionImpl(EnvoyQuicClientSession& session,
-                               Http::ConnectionCallbacks& callbacks)
-      : QuicHttpConnectionImplBase(session), quic_session_(session) {
-    quic_session_.setHttpConnectionCallbacks(callbacks);
-  }
-
-  // Http::ClientConnection
-  Http::StreamEncoder& newStream(Http::StreamDecoder& response_decoder) override;
-
-  // Http::Connection
-  void goAway() override { NOT_REACHED_GCOVR_EXCL_LINE; }
-  void shutdownNotice() override { NOT_REACHED_GCOVR_EXCL_LINE; }
-
-private:
-  EnvoyQuicClientSession& quic_session_;
 };
 
 } // namespace Quic
