@@ -57,7 +57,7 @@ protected:
 private:
   // TODO(danzh): populate stats.
   std::unique_ptr<Network::Connection::ConnectionStats> connection_stats_;
-  // Assigned upon construction. Constructed with empty local address if unkown
+  // Assigned upon construction. Constructed with empty local address if unknown
   // by then.
   Network::ConnectionSocketPtr connection_socket_;
   Network::Connection* envoy_connection_{nullptr};
