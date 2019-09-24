@@ -19,13 +19,5 @@ void QuicHttpServerConnectionImpl::goAway() {
   quic_server_session_.SendGoAway(quic::QUIC_PEER_GOING_AWAY, "server shutdown imminent");
 }
 
-Http::StreamEncoder&
-QuicHttpClientConnectionImpl::newStream(Http::StreamDecoder& response_decoder) {
-  auto stream =
-      dynamic_cast<EnvoyQuicClientStream*>(quic_session_.CreateOutgoingBidirectionalStream());
-  stream->setDecoder(response_decoder);
-  return *stream;
-}
-
 } // namespace Quic
 } // namespace Envoy
