@@ -23,7 +23,7 @@ EnvoyQuicServerSession::EnvoyQuicServerSession(
     uint32_t send_buffer_limit)
     : quic::QuicServerSessionBase(config, supported_versions, connection.get(), visitor, helper,
                                   crypto_config, compressed_certs_cache),
-      QuicFilterManagerConnectionImpl(std::move(connection), dispatcher) {}
+      QuicFilterManagerConnectionImpl(std::move(connection), dispatcher, send_buffer_limit) {}
 
 absl::string_view EnvoyQuicServerSession::requestedServerName() const {
   return {GetCryptoStream()->crypto_negotiated_params().sni};
@@ -84,79 +84,10 @@ void EnvoyQuicServerSession::SendGoAway(quic::QuicErrorCode error_code, const st
   }
 }
 
-<<<<<<< HEAD
-void EnvoyQuicServerSession::addWriteFilter(Network::WriteFilterSharedPtr filter) {
-  filter_manager_.addWriteFilter(filter);
-}
-
-void EnvoyQuicServerSession::addFilter(Network::FilterSharedPtr filter) {
-  filter_manager_.addFilter(filter);
-}
-
-void EnvoyQuicServerSession::addReadFilter(Network::ReadFilterSharedPtr filter) {
-  filter_manager_.addReadFilter(filter);
-}
-
-bool EnvoyQuicServerSession::initializeReadFilters() {
-  return filter_manager_.initializeReadFilters();
-}
-
-void EnvoyQuicServerSession::addConnectionCallbacks(Network::ConnectionCallbacks& cb) {
-  network_connection_callbacks_.push_back(&cb);
-}
-
-void EnvoyQuicServerSession::addBytesSentCallback(Network::Connection::BytesSentCb /*cb*/) {
-  // TODO(danzh): implement to support proxy. This interface is only called from
-  // TCP proxy code.
-  ASSERT(false, "addBytesSentCallback is not implemented for QUIC");
-}
-
-void EnvoyQuicServerSession::enableHalfClose(bool enabled) {
-  ASSERT(!enabled, "Quic connection doesn't support half close.");
-}
-
-void EnvoyQuicServerSession::setBufferLimits(uint32_t /*limit*/) {
-  // Unlike TCP, write buffer limits are already set during construction.
-  // Read buffer limits is not needed as connection level flow control should do
-  // the work.
-  ASSERT(false, "Buffer limit should be set during construction.");
-}
-
-uint32_t EnvoyQuicServerSession::bufferLimit() const {
-  // As quic connection is not HTTP1.1, this method shouldn't be called by HCM.
-  NOT_REACHED_GCOVR_EXCL_LINE;
-}
-
-void EnvoyQuicServerSession::close(Network::ConnectionCloseType type) {
-  if (type != Network::ConnectionCloseType::NoFlush) {
-    // TODO(danzh): Implement FlushWrite and FlushWriteAndDelay mode.
-    ENVOY_CONN_LOG(error, "Flush write is not implemented for QUIC.", *this);
-=======
 void EnvoyQuicServerSession::OnCryptoHandshakeEvent(CryptoHandshakeEvent event) {
   quic::QuicServerSessionBase::OnCryptoHandshakeEvent(event);
   if (event == HANDSHAKE_CONFIRMED) {
     raiseEvent(Network::ConnectionEvent::Connected);
->>>>>>> add quic client impl
-  }
-}
-
-void EnvoyQuicServerSession::adjustBytesToSend(int64_t delta) {
-  bytes_to_send_ += delta;
-  write_buffer_watermark_simulation_.checkHighWatermark(bytes_to_send_);
-  write_buffer_watermark_simulation_.checkLowWatermark(bytes_to_send_);
-}
-
-void EnvoyQuicServerSession::onSendBufferHighWatermark() {
-  ENVOY_CONN_LOG(trace, "onSendBufferHighWatermark", *this);
-  for (auto callback : network_connection_callbacks_) {
-    callback->onAboveWriteBufferHighWatermark();
-  }
-}
-
-void EnvoyQuicServerSession::onSendBufferLowWatermark() {
-  ENVOY_CONN_LOG(trace, "onSendBufferLowWatermark", *this);
-  for (auto callback : network_connection_callbacks_) {
-    callback->onBelowWriteBufferLowWatermark();
   }
 }
 

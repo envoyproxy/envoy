@@ -48,8 +48,6 @@ public:
   // quic::QuicSpdySession
   void OnCryptoHandshakeEvent(CryptoHandshakeEvent event) override;
 
-  void adjustBytesToSend(int64_t delta);
-
   using quic::QuicSession::stream_map;
 
 protected:

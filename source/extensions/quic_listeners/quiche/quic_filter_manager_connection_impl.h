@@ -19,7 +19,7 @@ class QuicFilterManagerConnectionImpl : public Network::FilterManagerConnection,
                                         protected Logger::Loggable<Logger::Id::connection> {
 public:
   QuicFilterManagerConnectionImpl(std::unique_ptr<EnvoyQuicConnection> connection,
-                                  Event::Dispatcher& dispatcher);
+                                  Event::Dispatcher& dispatcher, uint32_t send_buffer_limit);
 
   // Network::FilterManager
   // Overridden to delegate calls to filter_manager_.
@@ -96,6 +96,8 @@ public:
   // Network::WriteBufferSource
   Network::StreamBuffer getWriteBuffer() override { NOT_REACHED_GCOVR_EXCL_LINE; }
 
+  void adjustBytesToSend(int64_t delta);
+
 protected:
   // Propagate connection close to network_connection_callbacks_.
   void onConnectionCloseEvent(const quic::QuicConnectionCloseFrame& frame,
@@ -112,7 +114,7 @@ private:
   void onSendBufferHighWatermark();
   // Called when aggregated buffered bytes across all the streams declines to low watermark.
   void onSendBufferLowWatermark();
-  
+
   // Currently ConnectionManagerImpl is the one and only filter. If more network
   // filters are added, ConnectionManagerImpl should always be the last one.
   // Its onRead() is only called once to trigger ReadFilter::onNewConnection()

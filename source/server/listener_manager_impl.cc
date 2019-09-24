@@ -228,19 +228,6 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
     addListenSocketOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
     // Needed to return receive buffer overflown indicator.
     addListenSocketOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
-<<<<<<< HEAD
-    const auto& udp_config = config.has_udp_listener_config()
-                                 ? config.udp_listener_config()
-                                 : envoy::api::v2::listener::UdpListenerConfig();
-    const std::string listener_name = udp_config.udp_listener_name().empty()
-                                          ? UdpListenerNames::get().RawUdp
-                                          : udp_config.udp_listener_name();
-    udp_listener_factory_ =
-        Config::Utility::getAndCheckFactory<ActiveUdpListenerConfigFactory>(listener_name)
-            .createActiveUdpListenerFactory(config.has_udp_listener_config()
-                                                ? config.udp_listener_config()
-                                                : envoy::api::v2::listener::UdpListenerConfig());
-=======
     auto udp_config = config.udp_listener_config();
     if (udp_config.udp_listener_name().empty()) {
       udp_config.set_udp_listener_name(UdpListenerNames::get().RawUdp);
@@ -250,7 +237,6 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
     ProtobufTypes::MessagePtr message =
         Config::Utility::translateToFactoryConfig(udp_config, validation_visitor_, config_factory);
     udp_listener_factory_ = config_factory.createActiveUdpListenerFactory(*message);
->>>>>>> quiche: implement ActiveQuicListener (#7896)
   }
 
   if (!config.listener_filters().empty()) {

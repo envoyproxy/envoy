@@ -41,12 +41,6 @@ public:
   // Called in session Initialize().
   void setEnvoyConnection(Network::Connection& connection) { envoy_connection_ = &connection; }
 
-  // Needed for ENVOY_CONN_LOG.
-  uint64_t id() const {
-    ASSERT(envoy_connection_ != nullptr);
-    return envoy_connection_->id();
-  }
-
   const Network::ConnectionSocketPtr& connectionSocket() const { return connection_socket_; }
 
   // Needed for ENVOY_CONN_LOG.

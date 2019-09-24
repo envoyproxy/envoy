@@ -6,7 +6,8 @@ namespace Envoy {
 namespace Quic {
 
 QuicFilterManagerConnectionImpl::QuicFilterManagerConnectionImpl(
-    std::unique_ptr<EnvoyQuicConnection> connection, Event::Dispatcher& dispatcher)
+    std::unique_ptr<EnvoyQuicConnection> connection, Event::Dispatcher& dispatcher,
+    uint32_t send_buffer_limit)
     : quic_connection_(std::move(connection)), filter_manager_(*this), dispatcher_(dispatcher),
       stream_info_(dispatcher.timeSource()),
       write_buffer_watermark_simulation_(
@@ -112,6 +113,12 @@ void QuicFilterManagerConnectionImpl::rawWrite(Buffer::Instance& /*data*/, bool 
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
+void QuicFilterManagerConnectionImpl::adjustBytesToSend(int64_t delta) {
+  bytes_to_send_ += delta;
+  write_buffer_watermark_simulation_.checkHighWatermark(bytes_to_send_);
+  write_buffer_watermark_simulation_.checkLowWatermark(bytes_to_send_);
+}
+
 void QuicFilterManagerConnectionImpl::onConnectionCloseEvent(
     const quic::QuicConnectionCloseFrame& frame, quic::ConnectionCloseSource source) {
   // Tell network callbacks about connection close.
@@ -125,6 +132,20 @@ void QuicFilterManagerConnectionImpl::onConnectionCloseEvent(
 void QuicFilterManagerConnectionImpl::raiseEvent(Network::ConnectionEvent event) {
   for (auto callback : network_connection_callbacks_) {
     callback->onEvent(event);
+  }
+}
+
+void QuicFilterManagerConnectionImpl::onSendBufferHighWatermark() {
+  ENVOY_CONN_LOG(trace, "onSendBufferHighWatermark", *this);
+  for (auto callback : network_connection_callbacks_) {
+    callback->onAboveWriteBufferHighWatermark();
+  }
+}
+
+void QuicFilterManagerConnectionImpl::onSendBufferLowWatermark() {
+  ENVOY_CONN_LOG(trace, "onSendBufferLowWatermark", *this);
+  for (auto callback : network_connection_callbacks_) {
+    callback->onBelowWriteBufferLowWatermark();
   }
 }
 

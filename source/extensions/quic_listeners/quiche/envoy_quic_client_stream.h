@@ -17,9 +17,9 @@ namespace Quic {
 // This class is a quic stream and also a request encoder.
 class EnvoyQuicClientStream : public quic::QuicSpdyClientStream, public EnvoyQuicStream {
 public:
-  EnvoyQuicClientStream(quic::QuicStreamId id, quic::QuicSpdyClientSession* session,
+  EnvoyQuicClientStream(quic::QuicStreamId id, quic::QuicSpdyClientSession* client_session,
                         quic::StreamType type);
-  EnvoyQuicClientStream(quic::PendingStream* pending, quic::QuicSpdyClientSession* session,
+  EnvoyQuicClientStream(quic::PendingStream* pending, quic::QuicSpdyClientSession* client_session,
                         quic::StreamType type);
 
   // Http::StreamEncoder

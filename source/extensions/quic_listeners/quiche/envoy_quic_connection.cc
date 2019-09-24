@@ -19,7 +19,10 @@ EnvoyQuicConnection::EnvoyQuicConnection(quic::QuicConnectionId server_connectio
 
 EnvoyQuicConnection::~EnvoyQuicConnection() { connection_socket_->close(); }
 
-uint64_t EnvoyQuicConnection::id() const { return envoy_connection_->id(); }
+uint64_t EnvoyQuicConnection::id() const {
+  ASSERT(envoy_connection_ != nullptr);
+  return envoy_connection_->id();
+}
 
 } // namespace Quic
 } // namespace Envoy
