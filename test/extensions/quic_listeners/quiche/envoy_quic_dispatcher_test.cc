@@ -64,7 +64,7 @@ public:
         listener_stats_({ALL_LISTENER_STATS(POOL_COUNTER(listener_config_.listenerScope()),
                                             POOL_GAUGE(listener_config_.listenerScope()),
                                             POOL_HISTOGRAM(listener_config_.listenerScope()))}),
-        connection_handler_(ENVOY_LOGGER(), *dispatcher_),
+        connection_handler_(*dispatcher_, "test_thread"),
         envoy_quic_dispatcher_(
             &crypto_config_, quic_config_, &version_manager_,
             std::make_unique<EnvoyQuicConnectionHelper>(*dispatcher_),
@@ -181,6 +181,7 @@ TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponCHLO) {
   EXPECT_CALL(*read_filter, onNewConnection())
       // Stop iteration to avoid calling getRead/WriteBuffer().
       .WillOnce(Invoke([]() { return Network::FilterStatus::StopIteration; }));
+  EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
 
   quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);
   // Upon receiving a full CHLO. A new quic connection should be created and have its filter

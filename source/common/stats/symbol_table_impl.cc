@@ -442,19 +442,26 @@ void StatNameSet::rememberBuiltin(absl::string_view str) {
   builtin_stat_names_[str] = stat_name;
 }
 
-Stats::StatName StatNameSet::getStatName(absl::string_view token) {
+StatName StatNameSet::getBuiltin(absl::string_view token, StatName fallback) {
   // If token was recorded as a built-in during initialization, we can
   // service this request lock-free.
   const auto iter = builtin_stat_names_.find(token);
   if (iter != builtin_stat_names_.end()) {
     return iter->second;
   }
+  return fallback;
+}
 
-  // Other tokens require holding a lock for our local cache.
-  absl::MutexLock lock(&mutex_);
-  Stats::StatName& stat_name = dynamic_stat_names_[token];
-  if (stat_name.empty()) { // Note that builtin_stat_names_ already has one for "".
-    stat_name = pool_.add(token);
+StatName StatNameSet::getDynamic(absl::string_view token) {
+  Stats::StatName stat_name = getBuiltin(token, StatName());
+  if (stat_name.empty()) {
+    // Other tokens require holding a lock for our local cache.
+    absl::MutexLock lock(&mutex_);
+    Stats::StatName& stat_name_ref = dynamic_stat_names_[token];
+    if (stat_name_ref.empty()) { // Note that builtin_stat_names_ already has one for "".
+      stat_name_ref = pool_.add(token);
+    }
+    stat_name = stat_name_ref;
   }
   return stat_name;
 }

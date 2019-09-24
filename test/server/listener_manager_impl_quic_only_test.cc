@@ -4,8 +4,6 @@
 #include "test/server/utility.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
-using testing::AtLeast;
-
 namespace Envoy {
 namespace Server {
 namespace {

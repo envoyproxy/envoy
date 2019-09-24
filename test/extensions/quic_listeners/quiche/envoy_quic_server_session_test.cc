@@ -55,7 +55,7 @@ public:
                                 Server::ListenerStats& stats)
       : EnvoyQuicServerConnection(quic::test::TestConnectionId(),
                                   quic::QuicSocketAddress(quic::QuicIpAddress::Loopback4(), 12345),
-                                  helper, alarm_factory, writer, /*owns_writer=*/false,
+                                  helper, alarm_factory, &writer, /*owns_writer=*/false,
                                   supported_versions, listener_config, stats) {}
 
   Network::Connection::ConnectionStats& connectionStats() const {
@@ -85,7 +85,7 @@ public:
                        std::make_unique<EnvoyQuicFakeProofSource>(),
                        quic::KeyExchangeSource::Default()),
         envoy_quic_session_(quic_config_, quic_version_,
-                            std::unique_ptr<TestEnvoyQuicConnection>(quic_connection_),
+                            std::unique_ptr<TestEnvoyQuicServerConnection>(quic_connection_),
                             /*visitor=*/nullptr, &crypto_stream_helper_, &crypto_config_,
                             &compressed_certs_cache_, *dispatcher_),
         read_filter_(new Network::MockReadFilter()) {
@@ -140,7 +140,7 @@ protected:
   testing::NiceMock<quic::test::MockPacketWriter> writer_;
   testing::NiceMock<Network::MockListenerConfig> listener_config_;
   Server::ListenerStats listener_stats_;
-  TestEnvoyQuicConnection* quic_connection_;
+  TestEnvoyQuicServerConnection* quic_connection_;
   quic::QuicConfig quic_config_;
   quic::QuicCryptoServerConfig crypto_config_;
   testing::NiceMock<quic::test::MockQuicCryptoServerStreamHelper> crypto_stream_helper_;
