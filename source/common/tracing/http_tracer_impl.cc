@@ -138,11 +138,11 @@ static void annotateVerbose(Span& span, const StreamInfo::StreamInfo& stream_inf
   }
 }
 
-void HttpTracerUtility::finalizeSpan(Span& span, const Http::HeaderMap* request_headers,
-                                     const Http::HeaderMap* response_headers,
-                                     const Http::HeaderMap* response_trailers,
-                                     const StreamInfo::StreamInfo& stream_info,
-                                     const Config& tracing_config) {
+void HttpTracerUtility::finalizeDownstreamSpan(Span& span, const Http::HeaderMap* request_headers,
+                                               const Http::HeaderMap* response_headers,
+                                               const Http::HeaderMap* response_trailers,
+                                               const StreamInfo::StreamInfo& stream_info,
+                                               const Config& tracing_config) {
   // Pre response data.
   if (request_headers) {
     if (request_headers->RequestId()) {
@@ -197,6 +197,8 @@ void HttpTracerUtility::setCommonTags(Span& span, const Http::HeaderMap* respons
                                       const StreamInfo::StreamInfo& stream_info,
                                       const Config& tracing_config) {
 
+  span.setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy);
+
   if (nullptr != stream_info.upstreamHost()) {
     span.setTag(Tracing::Tags::get().UpstreamCluster, stream_info.upstreamHost()->cluster().name());
   }
@@ -237,8 +239,9 @@ SpanPtr HttpTracerImpl::startSpan(const Config& config, Http::HeaderMap& request
 
   SpanPtr active_span = driver_->startSpan(config, request_headers, span_name,
                                            stream_info.startTime(), tracing_decision);
+
+  // Set tags related to the local environment
   if (active_span) {
-    active_span->setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy);
     active_span->setTag(Tracing::Tags::get().NodeId, local_info_.nodeName());
     active_span->setTag(Tracing::Tags::get().Zone, local_info_.zoneName());
   }

@@ -1332,7 +1332,6 @@ Filter::UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::I
     span_ = parent_.callbacks_->activeSpan().spawnChild(
         parent_.callbacks_->tracingConfig(), "router " + parent.cluster_->name() + " egress",
         parent.timeSource().systemTime());
-    span_->setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy);
     if (parent.attempt_count_ != 1) {
       // This is a retry request, add this metadata to span.
       span_->setTag(Tracing::Tags::get().RetryCount, std::to_string(parent.attempt_count_ - 1));

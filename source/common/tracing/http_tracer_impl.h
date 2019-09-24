@@ -100,16 +100,17 @@ public:
                             const Http::HeaderMap& request_headers);
 
   /**
-   * Fills in the active span that represents the downstream request with the proper headers.
+   * Adds information obtained from the downstream request headers as tags to the active span.
    * Then finishes the span.
    */
-  static void finalizeSpan(Span& span, const Http::HeaderMap* request_headers,
-                           const Http::HeaderMap* response_headers,
-                           const Http::HeaderMap* response_trailers,
-                           const StreamInfo::StreamInfo& stream_info, const Config& tracing_config);
+  static void finalizeDownstreamSpan(Span& span, const Http::HeaderMap* request_headers,
+                                     const Http::HeaderMap* response_headers,
+                                     const Http::HeaderMap* response_trailers,
+                                     const StreamInfo::StreamInfo& stream_info,
+                                     const Config& tracing_config);
 
   /**
-   * Fills in the active span that represents each upstream request with the proper headers.
+   * Adds information obtained from the upstream request headers as tags to the active span.
    * Then finishes the span.
    */
   static void finalizeUpstreamSpan(Span& span, const Http::HeaderMap* response_headers,
