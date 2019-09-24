@@ -3,6 +3,8 @@
 #include <functional>
 #include <utility>
 
+#include "common/common/assert.h"
+
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/str_join.h"
 
@@ -15,10 +17,33 @@ constexpr size_t Capacity = 10;
 
 void RecentLookups::lookup(absl::string_view str) {
   ++total_;
-  if (queue_.size() >= Capacity) {
-    queue_.pop_back();
+  Map::iterator map_iter = map_.find(str);
+  if (map_iter != map_.end()) {
+    // The item is already in the list, but we need to bump its count and move
+    // it to the front, so we must re-order the list, which will invalidate the
+    // iterators to i.
+    List::iterator list_iter = map_iter->second;
+    ItemCount item_count = std::move(*list_iter);
+    list_.erase(list_iter);
+    ++item_count.count_;
+    list_.push_front(std::move(item_count));
+    map_iter->second = list_.begin();
+  } else {
+    ASSERT(list_.size() <= Capacity);
+    // Evict oldest item if needed.
+    if (list_.size() >= Capacity) {
+      const ItemCount& item_count = list_.back();
+      int erased = map_.erase(item_count.item_);
+      ASSERT(erased == 1);
+      list_.pop_back();
+    }
+
+    // The string storage is in the list entry.
+    list_.push_front(ItemCount{std::string(str), 1});
+    List::iterator list_iter = list_.begin();
+    map_[list_iter->item_] = list_iter;
   }
-  queue_.push_front(std::string(str));
+  ASSERT(list_.size() == map_.size());
 }
 
 /**
@@ -27,12 +52,8 @@ void RecentLookups::lookup(absl::string_view str) {
  * @param fn The function to call for every recently looked up item.
  */
 void RecentLookups::forEach(const IterFn& fn) const {
-  absl::flat_hash_map<absl::string_view, uint64_t> counts;
-  for (const std::string& item : queue_) {
-    ++counts[item];
-  }
-  for (auto iter : counts) {
-    fn(iter.first, iter.second);
+  for (const ItemCount& item_count : list_) {
+    fn(item_count.item_, item_count.count_);
   }
 }
 

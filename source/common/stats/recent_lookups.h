@@ -1,9 +1,10 @@
 #pragma once
 
-#include <deque>
 #include <functional>
+#include <list>
 #include <utility>
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -38,11 +39,19 @@ public:
    */
   void clear() {
     total_ = 0;
-    queue_.clear();
+    map_.clear();
+    list_.clear();
   }
 
 private:
-  std::deque<std::string> queue_;
+  struct ItemCount {
+    std::string item_;
+    int64_t count_;
+  };
+  using List = std::list<ItemCount>;
+  List list_;
+  using Map = absl::flat_hash_map<absl::string_view, List::iterator>;
+  Map map_;
   uint64_t total_{0};
 };
 

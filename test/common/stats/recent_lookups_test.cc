@@ -74,8 +74,12 @@ TEST_F(RecentLookupsTest, RepeatDrop) {
   }
   recent_lookups_.lookup("add_late");
   EXPECT_EQ("1: add_late "
-            "1: lookup6 "
             "2: lookup10 "
+            "2: lookup2 "
+            "2: lookup3 "
+            "2: lookup4 "
+            "2: lookup5 "
+            "2: lookup6 "
             "2: lookup7 "
             "2: lookup8 "
             "2: lookup9",
