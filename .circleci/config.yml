@@ -155,7 +155,6 @@ workflows:
       - coverage
       - coverage_publish:
           requires: [coverage]
-      - format
       - clang_tidy
       - build_image
       - docs:
