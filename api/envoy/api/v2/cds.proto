@@ -126,71 +126,6 @@ message Cluster {
     LOAD_BALANCING_POLICY_CONFIG = 7;
   }
 
-  // TransportSocketMatch specifies what transport socket config will be used
-  // when the match conditions are satisfied.
-  message TransportSocketMatch {
-    // The name of the match, used in stats generation.
-    string name = 1 [(validate.rules).string.min_len = 1];
-
-    // Optional endpoint metadata match criteria.
-    // The connection to the endpoint with metadata matching what is set in this field
-    // will use the transport socket configuration specified here.
-    // The endpoint's metadata entry in *envoy.transport_socket* is used to match
-    // against the values specified in this field.
-    google.protobuf.Struct match = 2;
-
-    // The configuration of the transport socket.
-    core.TransportSocket transport_socket = 3;
-  }
-
-  // Configuration to use different transport sockets for different endpoints.
-  // The entry of *envoy.transport_socket* in the
-  // :ref:`LbEndpoint.Metadata <envoy_api_field_endpoint.LbEndpoint.metadata>`
-  // is used to match against the transport sockets as they appear in the list. The first
-  // :ref:`match <envoy_api_msg_Cluster.TransportSocketMatch>` is used.
-  // For example, with the following match
-  //
-  // .. code-block:: yaml
-  //
-  //  transport_socket_matches:
-  //  - name: "enableMTLS"
-  //    match:
-  //      acceptMTLS: true
-  //    transport_socket:
-  //      name: tls
-  //      config: { ... } # tls socket configuration
-  //  - name: "defaultToPlaintext"
-  //    match: {}
-  //    transport_socket:
-  //      name: "rawbuffer"
-  //
-  // Connections to the endpoints whose metadata value under *envoy.transport_socket*
-  // having "acceptMTLS"/"true" key/value pair use the "enableMTLS" socket configuration.
-  //
-  // If a :ref:`socket match <envoy_api_msg_Cluster.TransportSocketMatch>` with empty match
-  // criteria is provided, that always match any endpoint. For example, the "defaultToPlaintext"
-  // socket match in case above.
-  //
-  // If an endpoint metadata's value under *envoy.transport_socket* does not match any
-  // *TransportSocketMatch*, socket configuration fallbacks to use the *tls_context* or
-  // *transport_socket* specified in this cluster.
-  //
-  // This field allows gradual and flexible transport socket configuration changes.
-  //
-  // The metadata of endpoints in EDS can indicate transport socket capabilities. For example,
-  // an endpoint's metadata can have two key value pairs as "acceptMTLS": "true",
-  // "acceptPlaintext": "true". While some other endpoints, only accepting plaintext traffic
-  // has "acceptPlaintext": "true" metadata information.
-  //
-  // Then the xDS server can configure the CDS to a client, Envoy A, to send mutual TLS
-  // traffic for endpoints with "acceptMTLS": "true", by adding a corresponding
-  // *TransportSocketMatch* in this field. Other client Envoys receive CDS without
-  // *transport_socket_match* set, and still send plain text traffic to the same cluster.
-  //
-  // TODO(incfly): add a detailed architecture doc on intended usage.
-  // [#not-implemented-hide:]
-  repeated TransportSocketMatch transport_socket_matches = 43;
-
   // When V4_ONLY is selected, the DNS resolver will only perform a lookup for
   // addresses in the IPv4 family. If V6_ONLY is selected, the DNS resolver will
   // only perform a lookup for addresses in the IPv6 family. If AUTO is
@@ -215,6 +150,23 @@ message Cluster {
 
     // Use HTTP1.1 or HTTP2, depending on which one is used on the downstream connection.
     USE_DOWNSTREAM_PROTOCOL = 1;
+  }
+
+  // TransportSocketMatch specifies what transport socket config will be used
+  // when the match conditions are satisfied.
+  message TransportSocketMatch {
+    // The name of the match, used in stats generation.
+    string name = 1 [(validate.rules).string = {min_len: 1}];
+
+    // Optional endpoint metadata match criteria.
+    // The connection to the endpoint with metadata matching what is set in this field
+    // will use the transport socket configuration specified here.
+    // The endpoint's metadata entry in *envoy.transport_socket* is used to match
+    // against the values specified in this field.
+    google.protobuf.Struct match = 2;
+
+    // The configuration of the transport socket.
+    core.TransportSocket transport_socket = 3;
   }
 
   // Extended cluster type.
@@ -485,6 +437,54 @@ message Cluster {
   }
 
   reserved 12, 15;
+
+  // Configuration to use different transport sockets for different endpoints.
+  // The entry of *envoy.transport_socket* in the
+  // :ref:`LbEndpoint.Metadata <envoy_api_field_endpoint.LbEndpoint.metadata>`
+  // is used to match against the transport sockets as they appear in the list. The first
+  // :ref:`match <envoy_api_msg_Cluster.TransportSocketMatch>` is used.
+  // For example, with the following match
+  //
+  // .. code-block:: yaml
+  //
+  //  transport_socket_matches:
+  //  - name: "enableMTLS"
+  //    match:
+  //      acceptMTLS: true
+  //    transport_socket:
+  //      name: tls
+  //      config: { ... } # tls socket configuration
+  //  - name: "defaultToPlaintext"
+  //    match: {}
+  //    transport_socket:
+  //      name: "rawbuffer"
+  //
+  // Connections to the endpoints whose metadata value under *envoy.transport_socket*
+  // having "acceptMTLS"/"true" key/value pair use the "enableMTLS" socket configuration.
+  //
+  // If a :ref:`socket match <envoy_api_msg_Cluster.TransportSocketMatch>` with empty match
+  // criteria is provided, that always match any endpoint. For example, the "defaultToPlaintext"
+  // socket match in case above.
+  //
+  // If an endpoint metadata's value under *envoy.transport_socket* does not match any
+  // *TransportSocketMatch*, socket configuration fallbacks to use the *tls_context* or
+  // *transport_socket* specified in this cluster.
+  //
+  // This field allows gradual and flexible transport socket configuration changes.
+  //
+  // The metadata of endpoints in EDS can indicate transport socket capabilities. For example,
+  // an endpoint's metadata can have two key value pairs as "acceptMTLS": "true",
+  // "acceptPlaintext": "true". While some other endpoints, only accepting plaintext traffic
+  // has "acceptPlaintext": "true" metadata information.
+  //
+  // Then the xDS server can configure the CDS to a client, Envoy A, to send mutual TLS
+  // traffic for endpoints with "acceptMTLS": "true", by adding a corresponding
+  // *TransportSocketMatch* in this field. Other client Envoys receive CDS without
+  // *transport_socket_match* set, and still send plain text traffic to the same cluster.
+  //
+  // TODO(incfly): add a detailed architecture doc on intended usage.
+  // [#not-implemented-hide:]
+  repeated TransportSocketMatch transport_socket_matches = 43;
 
   // Supplies the name of the cluster which must be unique across all clusters.
   // The cluster name is used when emitting
