@@ -363,6 +363,15 @@ TEST_F(DeltaSubscriptionStateTest, AddedAndRemoved) {
             ack.error_detail_.message());
 }
 
+TEST_F(DeltaSubscriptionStateTest, handleEstablishmentFailure) {
+  // Although establishment failure is not supposed to cause an onConfigUpdateFailed() on the
+  // ultimate actual subscription callbacks, DeltaSubscriptionState's callbacks are actually
+  // the WatchMap, which then calls GrpcSubscriptionImpl(s). It is the GrpcSubscriptionImpl
+  // that will decline to pass on an onConfigUpdateFailed(ConnectionFailure).
+  EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _));
+  state_.handleEstablishmentFailure();
+}
+
 } // namespace
 } // namespace Config
 } // namespace Envoy

@@ -23,7 +23,8 @@ public:
       : tls_(tls), api_(api), hooks_(hooks) {}
 
   // Server::WorkerFactory
-  WorkerPtr createWorker(OverloadManager& overload_manager) override;
+  WorkerPtr createWorker(OverloadManager& overload_manager,
+                         const std::string& worker_name) override;
 
 private:
   ThreadLocal::Instance& tls_;
@@ -38,7 +39,7 @@ class WorkerImpl : public Worker, Logger::Loggable<Logger::Id::main> {
 public:
   WorkerImpl(ThreadLocal::Instance& tls, ListenerHooks& hooks, Event::DispatcherPtr&& dispatcher,
              Network::ConnectionHandlerPtr handler, OverloadManager& overload_manager,
-             Api::Api& api);
+             Api::Api& api, const std::string& worker_name);
 
   // Server::Worker
   void addListener(Network::ListenerConfig& listener, AddListenerCompletion completion) override;
@@ -60,6 +61,8 @@ private:
   Network::ConnectionHandlerPtr handler_;
   Api::Api& api_;
   Thread::ThreadPtr thread_;
+  const std::string worker_name_;
+  WatchDogSharedPtr watch_dog_;
 };
 
 } // namespace Server

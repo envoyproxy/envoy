@@ -89,7 +89,7 @@ TEST_P(ProxyProtoIntegrationTest, RouterProxyUnknownLongRequestAndResponseWithBo
   testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
 }
 
-TEST_P(ProxyProtoIntegrationTest, OriginalDst) {
+TEST_P(ProxyProtoIntegrationTest, DEPRECATED_FEATURE_TEST(OriginalDst)) {
   // Change the cluster to an original destination cluster. An original destination cluster
   // ignores the configured hosts, and instead uses the restored destination address from the
   // incoming (server) connection as the destination address for the outgoing (client) connection.
@@ -98,6 +98,36 @@ TEST_P(ProxyProtoIntegrationTest, OriginalDst) {
     cluster->mutable_hosts()->Clear();
     cluster->set_type(envoy::api::v2::Cluster::ORIGINAL_DST);
     cluster->set_lb_policy(envoy::api::v2::Cluster::ORIGINAL_DST_LB);
+  });
+
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    Network::ClientConnectionPtr conn = makeClientConnection(lookupPort("http"));
+    // Create proxy protocol line that has the fake upstream address as the destination address.
+    // This address will become the "restored" address for the server connection and will
+    // be used as the destination address by the original destination cluster.
+    std::string proxyLine = fmt::format(
+        "PROXY {} {} 65535 {}\r\n",
+        GetParam() == Network::Address::IpVersion::v4 ? "TCP4 1.2.3.4" : "TCP6 1:2:3::4",
+        Network::Test::getLoopbackAddressString(GetParam()),
+        fake_upstreams_[0]->localAddress()->ip()->port());
+
+    Buffer::OwnedImpl buf(proxyLine);
+    conn->write(buf, false);
+    return conn;
+  };
+
+  testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
+}
+
+TEST_P(ProxyProtoIntegrationTest, ClusterProvided) {
+  // Change the cluster to an original destination cluster. An original destination cluster
+  // ignores the configured hosts, and instead uses the restored destination address from the
+  // incoming (server) connection as the destination address for the outgoing (client) connection.
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    cluster->mutable_hosts()->Clear();
+    cluster->set_type(envoy::api::v2::Cluster::ORIGINAL_DST);
+    cluster->set_lb_policy(envoy::api::v2::Cluster::CLUSTER_PROVIDED);
   });
 
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {

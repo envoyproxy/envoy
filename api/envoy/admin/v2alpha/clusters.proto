@@ -45,7 +45,7 @@ message ClusterStatus {
   // 2. The threshold is computed to be < 0 because a negative value implies that there was no
   //    threshold for that interval.
   // 3. Outlier detection is not enabled for this cluster.
-  envoy.type.Percent success_rate_ejection_threshold = 3;
+  type.Percent success_rate_ejection_threshold = 3;
 
   // Mapping from host address to the host's current status.
   repeated HostStatus host_statuses = 4;
@@ -65,13 +65,13 @@ message ClusterStatus {
   // 2. The threshold is computed to be < 0 because a negative value implies that there was no
   //    threshold for that interval.
   // 3. Outlier detection is not enabled for this cluster.
-  envoy.type.Percent local_origin_success_rate_ejection_threshold = 5;
+  type.Percent local_origin_success_rate_ejection_threshold = 5;
 }
 
 // Current state of a particular host.
 message HostStatus {
   // Address of this host.
-  envoy.api.v2.core.Address address = 1;
+  api.v2.core.Address address = 1;
 
   // List of stats specific to this host.
   repeated SimpleMetric stats = 2;
@@ -92,7 +92,7 @@ message HostStatus {
   // Note: the message will not be present if host did not have enough request volume to calculate
   // success rate or the cluster did not have enough hosts to run through success rate outlier
   // ejection.
-  envoy.type.Percent success_rate = 4;
+  type.Percent success_rate = 4;
 
   // The host's weight. If not configured, the value defaults to 1.
   uint32 weight = 5;
@@ -115,7 +115,7 @@ message HostStatus {
   // Note: the message will not be present if host did not have enough request volume to calculate
   // success rate or the cluster did not have enough hosts to run through success rate outlier
   // ejection.
-  envoy.type.Percent local_origin_success_rate = 8;
+  type.Percent local_origin_success_rate = 8;
 }
 
 // Health status for a host.
@@ -139,5 +139,5 @@ message HostHealthStatus {
   // Health status as reported by EDS. Note: only HEALTHY and UNHEALTHY are currently supported
   // here.
   // TODO(mrice32): pipe through remaining EDS health status possibilities.
-  envoy.api.v2.core.HealthStatus eds_health_status = 3;
+  api.v2.core.HealthStatus eds_health_status = 3;
 }

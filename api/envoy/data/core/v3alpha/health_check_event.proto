@@ -15,10 +15,25 @@ import "validate/validate.proto";
 // [#protodoc-title: Health check logging events]
 // :ref:`Health check logging <arch_overview_health_check_logging>`.
 
+enum HealthCheckFailureType {
+  ACTIVE = 0;
+  PASSIVE = 1;
+  NETWORK = 2;
+}
+
+enum HealthCheckerType {
+  HTTP = 0;
+  TCP = 1;
+  GRPC = 2;
+  REDIS = 3;
+}
+
 message HealthCheckEvent {
-  HealthCheckerType health_checker_type = 1 [(validate.rules).enum.defined_only = true];
-  envoy.api.v3alpha.core.Address host = 2;
-  string cluster_name = 3 [(validate.rules).string.min_bytes = 1];
+  HealthCheckerType health_checker_type = 1 [(validate.rules).enum = {defined_only: true}];
+
+  api.v3alpha.core.Address host = 2;
+
+  string cluster_name = 3 [(validate.rules).string = {min_bytes: 1}];
 
   oneof event {
     option (validate.required) = true;
@@ -43,22 +58,9 @@ message HealthCheckEvent {
   google.protobuf.Timestamp timestamp = 6;
 }
 
-enum HealthCheckFailureType {
-  ACTIVE = 0;
-  PASSIVE = 1;
-  NETWORK = 2;
-}
-
-enum HealthCheckerType {
-  HTTP = 0;
-  TCP = 1;
-  GRPC = 2;
-  REDIS = 3;
-}
-
 message HealthCheckEjectUnhealthy {
   // The type of failure that caused this ejection.
-  HealthCheckFailureType failure_type = 1 [(validate.rules).enum.defined_only = true];
+  HealthCheckFailureType failure_type = 1 [(validate.rules).enum = {defined_only: true}];
 }
 
 message HealthCheckAddHealthy {
@@ -70,7 +72,8 @@ message HealthCheckAddHealthy {
 
 message HealthCheckFailure {
   // The type of failure that caused this event.
-  HealthCheckFailureType failure_type = 1 [(validate.rules).enum.defined_only = true];
+  HealthCheckFailureType failure_type = 1 [(validate.rules).enum = {defined_only: true}];
+
   // Whether this event is the result of the first ever health check on a host.
   bool first_check = 2;
 }

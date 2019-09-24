@@ -4,6 +4,7 @@
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.validate.h"
 
+#include "common/common/base64.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
@@ -117,6 +118,26 @@ TEST_F(ProtobufUtilityTest, evaluateFractionalPercent) {
 }
 
 } // namespace ProtobufPercentHelper
+
+TEST_F(ProtobufUtilityTest, MessageUtilHash) {
+  ProtobufWkt::Struct s;
+  (*s.mutable_fields())["ab"].set_string_value("fgh");
+  (*s.mutable_fields())["cde"].set_string_value("ij");
+
+  ProtobufWkt::Any a1;
+  a1.PackFrom(s);
+  // The two base64 encoded Struct to test map is identical to the struct above, this tests whether
+  // a map is deterministically serialized and hashed.
+  ProtobufWkt::Any a2 = a1;
+  a2.set_value(Base64::decode("CgsKA2NkZRIEGgJpagoLCgJhYhIFGgNmZ2g="));
+  ProtobufWkt::Any a3 = a1;
+  a3.set_value(Base64::decode("CgsKAmFiEgUaA2ZnaAoLCgNjZGUSBBoCaWo="));
+
+  EXPECT_EQ(MessageUtil::hash(a1), MessageUtil::hash(a2));
+  EXPECT_EQ(MessageUtil::hash(a2), MessageUtil::hash(a3));
+  EXPECT_NE(0, MessageUtil::hash(a1));
+  EXPECT_NE(MessageUtil::hash(s), MessageUtil::hash(a1));
+}
 
 TEST_F(ProtobufUtilityTest, RepeatedPtrUtilDebugString) {
   Protobuf::RepeatedPtrField<ProtobufWkt::UInt32Value> repeated;
@@ -656,6 +677,48 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(RepeatedMessageDeprecated))
                       "Using deprecated option "
                       "'envoy.test.deprecation_test.Base.deprecated_repeated_message'",
                       checkForDeprecation(base));
+}
+
+// Check that deprecated enum values trigger for default values
+TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(EnumValuesDeprecatedDefault)) {
+  envoy::test::deprecation_test::Base base;
+  base.mutable_enum_container();
+
+  EXPECT_LOG_CONTAINS(
+      "warning",
+      "Using the default now-deprecated value DEPRECATED_DEFAULT for enum "
+      "'envoy.test.deprecation_test.Base.InnerMessageWithDeprecationEnum.deprecated_enum' from "
+      "file deprecated.proto. This enum value will be removed from Envoy soon so a non-default "
+      "value must now be explicitly set.",
+      checkForDeprecation(base));
+}
+
+// Check that deprecated enum values trigger for non-default values
+TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(EnumValuesDeprecated)) {
+  envoy::test::deprecation_test::Base base;
+  base.mutable_enum_container()->set_deprecated_enum(
+      envoy::test::deprecation_test::Base::DEPRECATED_NOT_DEFAULT);
+
+  EXPECT_LOG_CONTAINS(
+      "warning",
+      "Using deprecated value DEPRECATED_NOT_DEFAULT for enum "
+      "'envoy.test.deprecation_test.Base.InnerMessageWithDeprecationEnum.deprecated_enum' "
+      "from file deprecated.proto. This enum value will be removed from Envoy soon.",
+      checkForDeprecation(base));
+}
+
+// Make sure the runtime overrides for protos work, by checking the non-fatal to
+// fatal option.
+TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(RuntimeOverrideEnumDefault)) {
+  envoy::test::deprecation_test::Base base;
+  base.mutable_enum_container();
+
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.deprecated_features.deprecated.proto:DEPRECATED_DEFAULT", "false"}});
+
+  // Make sure this is set up right.
+  EXPECT_THROW_WITH_REGEX(checkForDeprecation(base), ProtoValidationException,
+                          "Using the default now-deprecated value DEPRECATED_DEFAULT");
 }
 
 class TimestampUtilTest : public testing::Test, public ::testing::WithParamInterface<int64_t> {};

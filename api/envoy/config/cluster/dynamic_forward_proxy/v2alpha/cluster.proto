@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.config.cluster.dynamic_forward_proxy.v2alpha;
 
-option java_outer_classname = "DynamicForwardProxyClusterProto";
+option java_outer_classname = "ClusterProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.cluster.dynamic_forward_proxy.v2alpha";
 
@@ -19,5 +19,5 @@ message ClusterConfig {
   // match that of associated :ref:`dynamic forward proxy HTTP filter configuration
   // <envoy_api_field_config.filter.http.dynamic_forward_proxy.v2alpha.FilterConfig.dns_cache_config>`.
   common.dynamic_forward_proxy.v2alpha.DnsCacheConfig dns_cache_config = 1
-      [(validate.rules).message.required = true];
+      [(validate.rules).message = {required: true}];
 }
