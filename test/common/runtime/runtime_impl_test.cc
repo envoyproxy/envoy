@@ -138,6 +138,22 @@ public:
   ProtobufWkt::Struct base_;
 };
 
+TEST_F(DiskLoaderImplTest, DoubleUintInteraction) {
+  setup();
+  run("test/common/runtime/test_data/current", "envoy_override");
+
+  EXPECT_EQ(2UL, loader_->snapshot().getInteger("file3", 1));
+  EXPECT_EQ(2.0, loader_->snapshot().getDouble("file3", 1.1));
+}
+
+TEST_F(DiskLoaderImplTest, DoubleUintInteractionNegatives) {
+  setup();
+  run("test/common/runtime/test_data/current", "envoy_override");
+
+  EXPECT_EQ(1, loader_->snapshot().getInteger("file_with_negative_double", 1));
+  EXPECT_EQ(-4.2, loader_->snapshot().getDouble("file_with_negative_double", 1.1));
+}
+
 TEST_F(DiskLoaderImplTest, All) {
   setup();
   run("test/common/runtime/test_data/current", "envoy_override");
@@ -151,6 +167,14 @@ TEST_F(DiskLoaderImplTest, All) {
   EXPECT_EQ(1UL, loader_->snapshot().getInteger("file1", 1));
   EXPECT_EQ(2UL, loader_->snapshot().getInteger("file3", 1));
   EXPECT_EQ(123UL, loader_->snapshot().getInteger("file4", 1));
+
+  // Double getting.
+  // Bogus string, expect default.
+  EXPECT_EQ(42.1, loader_->snapshot().getDouble("file_with_words", 42.1));
+  // Valid float string.
+  EXPECT_EQ(23.2, loader_->snapshot().getDouble("file_with_double", 1.1));
+  // Valid float string followed by newlines.
+  EXPECT_EQ(3.141, loader_->snapshot().getDouble("file_with_double_newlines", 1.1));
 
   bool value;
   const SnapshotImpl* snapshot = reinterpret_cast<const SnapshotImpl*>(&loader_->snapshot());
@@ -192,6 +216,7 @@ TEST_F(DiskLoaderImplTest, All) {
 
   // Files with comments.
   EXPECT_EQ(123UL, loader_->snapshot().getInteger("file5", 1));
+  EXPECT_EQ(2.718, loader_->snapshot().getDouble("file_with_double_comment", 1.1));
   EXPECT_EQ("/home#about-us", loader_->snapshot().get("file6"));
   EXPECT_EQ("", loader_->snapshot().get("file7"));
 
@@ -247,8 +272,15 @@ TEST_F(DiskLoaderImplTest, All) {
 
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(1, store_.counter("runtime.load_success").value());
-  EXPECT_EQ(17, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+  EXPECT_EQ(23, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
   EXPECT_EQ(4, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+}
+
+TEST_F(DiskLoaderImplTest, UintLargeIntegerConversion) {
+  setup();
+  run("test/common/runtime/test_data/current", "envoy_override");
+
+  EXPECT_EQ(1, loader_->snapshot().getInteger("file_with_large_integer", 1));
 }
 
 TEST_F(DiskLoaderImplTest, GetLayers) {
@@ -355,24 +387,34 @@ void testNewOverrides(Loader& loader, Stats::Store& store) {
   Stats::Gauge& admin_overrides_active =
       store.gauge("runtime.admin_overrides_active", Stats::Gauge::ImportMode::NeverImport);
 
-  // New string
+  // New string.
   loader.mergeValues({{"foo", "bar"}});
   EXPECT_EQ("bar", loader.snapshot().get("foo"));
   EXPECT_EQ(1, admin_overrides_active.value());
 
-  // Remove new string
+  // Remove new string.
   loader.mergeValues({{"foo", ""}});
   EXPECT_EQ("", loader.snapshot().get("foo"));
   EXPECT_EQ(0, admin_overrides_active.value());
 
-  // New integer
+  // New integer.
   loader.mergeValues({{"baz", "42"}});
   EXPECT_EQ(42, loader.snapshot().getInteger("baz", 0));
   EXPECT_EQ(1, admin_overrides_active.value());
 
-  // Remove new integer
+  // Remove new integer.
   loader.mergeValues({{"baz", ""}});
   EXPECT_EQ(0, loader.snapshot().getInteger("baz", 0));
+  EXPECT_EQ(0, admin_overrides_active.value());
+
+  // New double.
+  loader.mergeValues({{"beep", "42.1"}});
+  EXPECT_EQ(42.1, loader.snapshot().getDouble("beep", 1.2));
+  EXPECT_EQ(1, admin_overrides_active.value());
+
+  // Remove new double.
+  loader.mergeValues({{"beep", ""}});
+  EXPECT_EQ(1.2, loader.snapshot().getDouble("beep", 1.2));
   EXPECT_EQ(0, admin_overrides_active.value());
 }
 
@@ -403,6 +445,16 @@ TEST_F(DiskLoaderImplTest, MergeValues) {
   EXPECT_EQ(2, loader_->snapshot().getInteger("file3", 1));
   EXPECT_EQ(0, admin_overrides_active.value());
 
+  // Override double
+  loader_->mergeValues({{"file_with_double", "42.1"}});
+  EXPECT_EQ(42.1, loader_->snapshot().getDouble("file_with_double", 1.1));
+  EXPECT_EQ(1, admin_overrides_active.value());
+
+  // Remove overridden double
+  loader_->mergeValues({{"file_with_double", ""}});
+  EXPECT_EQ(23.2, loader_->snapshot().getDouble("file_with_double", 1.1));
+  EXPECT_EQ(0, admin_overrides_active.value());
+
   // Override override string
   loader_->mergeValues({{"file1", "hello overridden override"}});
   EXPECT_EQ("hello overridden override", loader_->snapshot().get("file1"));
@@ -415,7 +467,7 @@ TEST_F(DiskLoaderImplTest, MergeValues) {
   EXPECT_EQ(0, store_.gauge("runtime.admin_overrides_active", Stats::Gauge::ImportMode::NeverImport)
                    .value());
 
-  EXPECT_EQ(11, store_.counter("runtime.load_success").value());
+  EXPECT_EQ(15, store_.counter("runtime.load_success").value());
   EXPECT_EQ(4, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
 }
 
@@ -498,6 +550,7 @@ TEST_F(StaticLoaderImplTest, All) {
   setup();
   EXPECT_EQ("", loader_->snapshot().get("foo"));
   EXPECT_EQ(1UL, loader_->snapshot().getInteger("foo", 1));
+  EXPECT_EQ(1.1, loader_->snapshot().getDouble("foo", 1.1));
   EXPECT_CALL(generator_, random()).WillOnce(Return(49));
   EXPECT_TRUE(loader_->snapshot().featureEnabled("foo", 50));
   testNewOverrides(*loader_, store_);
@@ -530,6 +583,8 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
       numerator: 100
       foo: bar
     empty: {}
+    file_with_words: "some words"
+    file_with_double: 23.2
   )EOF");
   setup();
 
@@ -542,6 +597,10 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
   EXPECT_EQ(1UL, loader_->snapshot().getInteger("file1", 1));
   EXPECT_EQ(2UL, loader_->snapshot().getInteger("file3", 1));
   EXPECT_EQ(123UL, loader_->snapshot().getInteger("file4", 1));
+
+  // Double getting.
+  EXPECT_EQ(1.1, loader_->snapshot().getDouble("file_with_words", 1.1));
+  EXPECT_EQ(23.2, loader_->snapshot().getDouble("file_with_double", 1.1));
 
   // Boolean getting.
   bool value;
@@ -613,7 +672,7 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
 
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(1, store_.counter("runtime.load_success").value());
-  EXPECT_EQ(15, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+  EXPECT_EQ(17, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
   EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
 }
 

@@ -28,3 +28,9 @@ api_proto_library_internal(
         "//envoy/api/v3alpha/core:base",
     ],
 )
+
+api_proto_library_internal(
+    name = "quic_config",
+    srcs = ["quic_config.proto"],
+    visibility = ["//envoy/api/v3alpha:friends"],
+)
