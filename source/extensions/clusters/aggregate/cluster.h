@@ -16,7 +16,7 @@ namespace Aggregate {
 using PriorityContext = std::pair<Upstream::PrioritySetImpl,
                                   std::vector<std::pair<uint32_t, Upstream::ThreadLocalCluster*>>>;
 
-class Cluster : public Upstream::BaseDynamicClusterImpl, Upstream::ClusterUpdateCallbacks {
+class Cluster : public Upstream::ClusterImplBase, Upstream::ClusterUpdateCallbacks {
 public:
   Cluster(const envoy::api::v2::Cluster& cluster,
           const envoy::config::cluster::aggregate::ClusterConfig& config,

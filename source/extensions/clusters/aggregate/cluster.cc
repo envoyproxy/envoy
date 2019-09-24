@@ -11,8 +11,8 @@ Cluster::Cluster(const envoy::api::v2::Cluster& cluster,
                  Runtime::RandomGenerator& random,
                  Server::Configuration::TransportSocketFactoryContext& factory_context,
                  Stats::ScopePtr&& stats_scope, ThreadLocal::SlotAllocator& tls, bool added_via_api)
-    : Upstream::BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
-                                       added_via_api),
+    : Upstream::ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope),
+                                added_via_api),
       cluster_manager_(cluster_manager), runtime_(runtime), random_(random),
       tls_(tls.allocateSlot()) {
   for (const auto& inner_cluster : config.clusters()) {
@@ -86,15 +86,14 @@ void Cluster::refresh(const std::function<bool(const std::string&)>& skip_predic
     if (cluster == nullptr) {
       return;
     }
-    // Downgrade cast to AggregateClusterLoadBalancer
     dynamic_cast<AggregateClusterLoadBalancer&>(cluster->loadBalancer()).refresh(priority_set);
   });
 }
 
 void Cluster::onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) {
   if (std::find(clusters_.begin(), clusters_.end(), cluster.info()->name()) != clusters_.end()) {
-    ENVOY_LOG(info, "update or add cluster '{}' for aggregate cluster '{}'", cluster.info()->name(),
-              info()->name());
+    ENVOY_LOG(info, "adding or updating cluster '{}' for aggregate cluster '{}'",
+              cluster.info()->name(), info()->name());
     refresh();
     cluster.prioritySet().addMemberUpdateCb(
         [this](const Upstream::HostVector&, const Upstream::HostVector&) { refresh(); });
@@ -106,7 +105,7 @@ void Cluster::onClusterRemoval(const std::string& cluster_name) {
   //  will be a dangling pointer to the thread local cluster if delete cluster is not skipped when
   //  we refresh the load balancer.
   if (std::find(clusters_.begin(), clusters_.end(), cluster_name) != clusters_.end()) {
-    ENVOY_LOG(info, "remove cluster '{}' from aggreagte cluster '{}'", cluster_name,
+    ENVOY_LOG(info, "removing cluster '{}' from aggreagte cluster '{}'", cluster_name,
               info()->name());
     refresh([&cluster_name](const std::string& c) { return cluster_name == c; });
   }

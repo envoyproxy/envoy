@@ -135,10 +135,7 @@ public:
 }; // namespace Aggregate
 
 TEST_F(AggregateClusterTest, LoadBalancerTest) {
-  std::cout << "B" << std::endl;
-
   initialize(default_yaml_config_);
-  std::cout << "A" << std::endl;
   // Health value:
   // Cluster 1:
   //     Priority 0: 33.3%

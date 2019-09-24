@@ -29,9 +29,8 @@ const char ClusterName2[] = "cluster_2";
 const int UpstreamIndex1 = 2;
 const int UpstreamIndex2 = 3;
 
-const std::string config(const std::string& api_type) {
-  return fmt::format(
-      R"EOF(
+const std::string& config() {
+  CONSTRUCT_ON_FIRST_USE(std::string, R"EOF(
 admin:
   access_log_path: /dev/null
   address:
@@ -41,7 +40,7 @@ admin:
 dynamic_resources:
   cds_config:
     api_config_source:
-      api_type: {}
+      api_type: GRPC
       grpc_services:
         envoy_grpc:
           cluster_name: my_cds_cluster
@@ -49,7 +48,7 @@ dynamic_resources:
 static_resources:
   clusters:
   - name: my_cds_cluster
-    http2_protocol_options: {{}}
+    http2_protocol_options: {}
     hosts:
       socket_address:
         address: 127.0.0.1
@@ -77,7 +76,7 @@ static_resources:
           stat_prefix: config_test
           http_filters:
             name: envoy.router
-          codec_type: HTTP2
+          codec_type: HTTP1
           route_config:
             name: route_config_0
             validate_clusters: false
@@ -97,56 +96,31 @@ static_resources:
                 match:
                   prefix: "/aggregatecluster"
               domains: "*"
-)EOF",
-      api_type);
+)EOF");
 }
 
-class AggregateIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest,
+class AggregateIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                  public HttpIntegrationTest {
 public:
   AggregateIntegrationTest()
-      : HttpIntegrationTest(
-            Http::CodecClient::Type::HTTP2, ipVersion(),
-            config(sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), config()) {
     use_lds_ = false;
-    sotw_or_delta_ = sotwOrDelta();
   }
 
   void TearDown() override {
-    if (!test_skipped_) {
-      cleanUpXdsConnection();
-      test_server_.reset();
-      fake_upstreams_.clear();
-    }
+    cleanUpXdsConnection();
+    test_server_.reset();
+    fake_upstreams_.clear();
   }
 
-  // Overridden to insert this stuff into the initialize() at the very beginning of
-  // HttpIntegrationTest::testRouterHeaderOnlyRequestAndResponse().
   void initialize() override {
     use_lds_ = false;
-    test_skipped_ = false;
-    // Controls how many fake_upstreams_.emplace_back(new FakeUpstream) will happen in
-    // BaseIntegrationTest::createUpstreams() (which is part of initialize()).
-    // Make sure this number matches the size of the 'clusters' repeated field in the bootstrap
-    // config that you use!
     setUpstreamCount(2);                                  // the CDS cluster
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2); // CDS uses gRPC uses HTTP2.
 
-    // HttpIntegrationTest::initialize() does many things:
-    // 1) It appends to fake_upstreams_ as many as you asked for via setUpstreamCount().
-    // 2) It updates your bootstrap config with the ports your fake upstreams are actually listening
-    //    on (since you're supposed to leave them as 0).
-    // 3) It creates and starts an IntegrationTestServer - the thing that wraps the almost-actual
-    //    Envoy used in the tests.
-    // 4) Bringing up the server usually entails waiting to ensure that any listeners specified in
-    //    the bootstrap config have come up, and registering them in a port map (see lookupPort()).
-    //    However, this test needs to defer all of that to later.
     defer_listener_finalization_ = true;
     HttpIntegrationTest::initialize();
 
-    // Create the regular (i.e. not an xDS server) upstreams. We create them manually here after
-    // initialize() because finalize() expects all fake_upstreams_ to correspond to a static
-    // cluster in the bootstrap config - which we don't want since we're testing dynamic CDS!
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_,
                                                   timeSystem(), enable_half_close_));
     fake_upstreams_[UpstreamIndex1]->set_allow_unexpected_disconnects(false);
@@ -155,10 +129,10 @@ public:
     fake_upstreams_[UpstreamIndex2]->set_allow_unexpected_disconnects(false);
     cluster1_ = ConfigHelper::buildCluster(
         ClusterName1, fake_upstreams_[UpstreamIndex1]->localAddress()->ip()->port(),
-        Network::Test::getLoopbackAddressString(ipVersion()));
+        Network::Test::getLoopbackAddressString(GetParam()));
     cluster2_ = ConfigHelper::buildCluster(
         ClusterName2, fake_upstreams_[UpstreamIndex2]->localAddress()->ip()->port(),
-        Network::Test::getLoopbackAddressString(ipVersion()));
+        Network::Test::getLoopbackAddressString(GetParam()));
 
     // Let Envoy establish its connection to the CDS server.
     acceptXdsConnection();
@@ -168,9 +142,6 @@ public:
     sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster, {cluster1_},
                                                    {cluster1_}, {}, "55");
 
-    // We can continue the test once we're sure that Envoy's ClusterManager has made use of
-    // the DiscoveryResponse describing cluster_1 that we sent.
-    // 2 because the statically specified CDS server itself counts as a cluster.
     test_server_->waitForGaugeGe("cluster_manager.active_clusters", 3);
 
     // Wait for our statically specified listener to become ready, and register its port in the
@@ -191,12 +162,10 @@ public:
 
   envoy::api::v2::Cluster cluster1_;
   envoy::api::v2::Cluster cluster2_;
-  // True if we decided not to run the test after all.
-  bool test_skipped_{true};
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, AggregateIntegrationTest,
-                         DELTA_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersions, AggregateIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
 TEST_P(AggregateIntegrationTest, ClusterUpDownUp) {
   // Calls our initialize(), which includes establishing a listener, route, and cluster.
@@ -225,11 +194,7 @@ TEST_P(AggregateIntegrationTest, ClusterUpDownUp) {
   sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster, {cluster1_},
                                                  {cluster1_}, {}, "413");
 
-  // We can continue the test once we're sure that Envoy's ClusterManager has made use of
-  // the DiscoveryResponse describing cluster_1 that we sent. Again, 2 includes CDS server.
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 3);
-
-  // Does *not* call our initialize().
   testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex1, "/aggregatecluster");
 
   cleanupUpstreamAndDownstream();
@@ -247,7 +212,7 @@ TEST_P(AggregateIntegrationTest, TwoClusters) {
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "55", {}, {}, {}));
   sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
                                                  {cluster1_, cluster2_}, {cluster2_}, {}, "42");
-  // The '3' includes the fake CDS server.
+  // The '4' includes the fake CDS server and aggregate cluster.
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 4);
 
   // A request for aggregate cluster should be fine.
@@ -263,7 +228,6 @@ TEST_P(AggregateIntegrationTest, TwoClusters) {
   // the DiscoveryResponse that says cluster_1 is gone.
   test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
 
-  // Even with cluster_1 gone, a request for aggregate cluster should be fine.
   testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex2, "/aggregatecluster");
   cleanupUpstreamAndDownstream();
   codec_client_->waitForDisconnect();
@@ -274,8 +238,6 @@ TEST_P(AggregateIntegrationTest, TwoClusters) {
                                                  {cluster1_, cluster2_}, {cluster1_}, {}, "413");
 
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 4);
-
-  // Does *not* call our initialize().
   testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex1, "/aggregatecluster");
 
   cleanupUpstreamAndDownstream();

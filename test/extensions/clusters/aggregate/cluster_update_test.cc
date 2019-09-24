@@ -25,9 +25,9 @@ envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromV2Yaml(const std::stri
   return bootstrap;
 }
 
-class AggregateClusterIntegrationTest : public testing::Test {
+class AggregateClusterUpdateTest : public testing::Test {
 public:
-  AggregateClusterIntegrationTest() : http_context_(stats_store_.symbolTable()) {}
+  AggregateClusterUpdateTest() : http_context_(stats_store_.symbolTable()) {}
 
   void initialize(const std::string& yaml_config) {
     cluster_manager_ = std::make_unique<Upstream::TestClusterManagerImpl>(
@@ -66,12 +66,12 @@ public:
   )EOF";
 };
 
-TEST_F(AggregateClusterIntegrationTest, NoHealthyUpstream) {
+TEST_F(AggregateClusterUpdateTest, NoHealthyUpstream) {
   initialize(default_yaml_config_);
   EXPECT_EQ(nullptr, cluster_->loadBalancer().chooseHost(nullptr));
 }
 
-TEST_F(AggregateClusterIntegrationTest, BasicFlow) {
+TEST_F(AggregateClusterUpdateTest, BasicFlow) {
   initialize(default_yaml_config_);
 
   std::unique_ptr<Upstream::MockClusterUpdateCallbacks> callbacks(
@@ -121,7 +121,7 @@ TEST_F(AggregateClusterIntegrationTest, BasicFlow) {
   EXPECT_EQ("127.0.0.1:11001", host->address()->asString());
 }
 
-TEST_F(AggregateClusterIntegrationTest, LoadBalancingTest) {
+TEST_F(AggregateClusterUpdateTest, LoadBalancingTest) {
   initialize(default_yaml_config_);
   EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(Upstream::defaultStaticCluster("primary"), ""));
   auto primary = cluster_manager_->get("primary");
