@@ -6,8 +6,9 @@ option java_outer_classname = "FileProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.accesslog.v3alpha";
 
-import "validate/validate.proto";
 import "google/protobuf/struct.proto";
+
+import "validate/validate.proto";
 
 // [#protodoc-title: File access log]
 
@@ -16,7 +17,7 @@ import "google/protobuf/struct.proto";
 // file. Configures the built-in *envoy.file_access_log* AccessLog.
 message FileAccessLog {
   // A path to a local file to which to write the access log entries.
-  string path = 1 [(validate.rules).string.min_bytes = 1];
+  string path = 1 [(validate.rules).string = {min_bytes: 1}];
 
   // Access log format. Envoy supports :ref:`custom access log formats
   // <config_access_log_format>` as well as a :ref:`default format
