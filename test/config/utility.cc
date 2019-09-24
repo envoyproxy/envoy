@@ -94,7 +94,7 @@ const std::string ConfigHelper::HTTP_PROXY_CONFIG = BASE_CONFIG + R"EOF(
           stat_prefix: config_test
           http_filters:
             name: envoy.router
-          codec_type: HTTP3
+          codec_type: HTTP1
           access_log:
             name: envoy.file_access_log
             filter:
@@ -111,37 +111,6 @@ const std::string ConfigHelper::HTTP_PROXY_CONFIG = BASE_CONFIG + R"EOF(
                   prefix: "/"
               domains: "*"
             name: route_config_0
-)EOF";
-
-const std::string ConfigHelper::QUIC_HTTP_PROXY_CONFIG = BASE_UDP_LISTENER_CONFIG + R"EOF(
-    filter_chains:
-      transport_socket:
-        name: quic
-      filters:
-        name: envoy.http_connection_manager
-        config:
-          stat_prefix: config_test
-          http_filters:
-            name: envoy.router
-          codec_type: HTTP2
-          access_log:
-            name: envoy.file_access_log
-            filter:
-              not_health_check_filter:  {}
-            config:
-              path: /dev/null
-          route_config:
-            virtual_hosts:
-              name: integration
-              routes:
-                route:
-                  cluster: cluster_0
-                match:
-                  prefix: "/"
-              domains: "*"
-            name: route_config_0
-    udp_listener_config:
-      udp_listener_name: "quiche_quic_listener"
 )EOF";
 
 const std::string ConfigHelper::DEFAULT_BUFFER_FILTER =
