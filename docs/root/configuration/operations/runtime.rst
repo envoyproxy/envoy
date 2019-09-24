@@ -200,7 +200,7 @@ message as a `google.protobuf.Struct
 modeling a JSON object with the following rules:
 
 * Dot separators map to tree edges.
-* Scalar leaves (integer, strings, booleans) are represented with their respective JSON type.
+* Scalar leaves (integer, strings, booleans, doubles) are represented with their respective JSON type.
 * :ref:`FractionalPercent <envoy_api_msg_type.FractionalPercent>` is represented with via its
   `canonical JSON encoding <https://developers.google.com/protocol-buffers/docs/proto3#json>`_.
 
@@ -210,6 +210,10 @@ An example representation of a setting for the *health_check.min_interval* key i
 
   health_check:
     min_interval: 5
+
+.. note::
+
+  Integer values that are parsed from doubles are rounded down to the nearest whole number.
 
 .. _config_runtime_comments:
 
