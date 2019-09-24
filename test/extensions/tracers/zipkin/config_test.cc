@@ -26,6 +26,7 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracer) {
     config:
       collector_cluster: fake_cluster
       collector_endpoint: /api/v1/spans
+      collector_endpoint_version: HTTP_JSON
   )EOF";
 
   envoy::config::trace::v2::Tracing configuration;
