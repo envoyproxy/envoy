@@ -21,7 +21,7 @@ Cluster::Cluster(const envoy::api::v2::Cluster& cluster,
 }
 
 PriorityContext
-Cluster::linearizePrioritySet(std::function<bool(const std::string&)> skip_predicate) {
+Cluster::linearizePrioritySet(const std::function<bool(const std::string&)>& skip_predicate) {
   Upstream::PrioritySetImpl priority_set;
   std::vector<std::pair<uint32_t, Upstream::ThreadLocalCluster*>> priority_to_cluster;
   int next_priority_after_linearizing = 0;
@@ -78,10 +78,10 @@ void Cluster::startPreInit() {
   onPreInitComplete();
 }
 
-void Cluster::refresh(std::function<bool(const std::string&)>&& skip_predicate) {
+void Cluster::refresh(const std::function<bool(const std::string&)>& skip_predicate) {
   // Post the priority set to worker threads.
   tls_->runOnAllThreads([this, skip_predicate, cluster_name = this->info()->name()]() {
-    PriorityContext priority_set = linearizePrioritySet(std::move(skip_predicate));
+    PriorityContext priority_set = linearizePrioritySet(skip_predicate);
     Upstream::ThreadLocalCluster* cluster = cluster_manager_.get(cluster_name);
     if (cluster == nullptr) {
       return;

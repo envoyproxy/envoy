@@ -49,8 +49,9 @@ private:
   // Upstream::ClusterImplBase
   void startPreInit() override;
 
-  void refresh(std::function<bool(const std::string&)>&& skip_predicate);
-  PriorityContext linearizePrioritySet(std::function<bool(const std::string&)> skip_predicate);
+  void refresh(const std::function<bool(const std::string&)>& skip_predicate);
+  PriorityContext
+  linearizePrioritySet(const std::function<bool(const std::string&)>& skip_predicate);
 };
 
 // Load balancer used by each worker thread. It will be refreshed when clusters, hosts or priorities
