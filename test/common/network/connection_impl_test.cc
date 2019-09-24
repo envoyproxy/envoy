@@ -510,7 +510,7 @@ TEST_P(ConnectionImplTest, ReadDisable) {
 }
 
 // The HTTP/1 codec handles pipelined connecitons by relying on readDisable(false) resulting in the
-// subsquent request being dispatched. Regression test this behavior.
+// subsequent request being dispatched. Regression test this behavior.
 TEST_P(ConnectionImplTest, ReadEnableDispatches) {
   setUpBasicConnection();
   connect();
