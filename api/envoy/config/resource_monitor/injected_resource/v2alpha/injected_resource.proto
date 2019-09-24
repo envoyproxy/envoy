@@ -15,5 +15,5 @@ import "validate/validate.proto";
 // the resource pressure and be updated atomically by a symbolic link swap.
 // This is intended primarily for integration tests to force Envoy into an overloaded state.
 message InjectedResourceConfig {
-  string filename = 1 [(validate.rules).string.min_bytes = 1];
+  string filename = 1 [(validate.rules).string = {min_bytes: 1}];
 }

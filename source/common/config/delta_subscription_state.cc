@@ -151,11 +151,10 @@ void DeltaSubscriptionState::handleBadResponse(const EnvoyException& e, UpdateAc
 }
 
 void DeltaSubscriptionState::handleEstablishmentFailure() {
-  disableInitFetchTimeoutTimer();
+  // New gRPC stream will be established and send requests again.
+  // If init_fetch_timeout is non-zero, server will continue startup after it timeout
   stats_.update_failure_.inc();
   stats_.update_attempt_.inc();
-  callbacks_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure,
-                                  nullptr);
 }
 
 envoy::api::v2::DeltaDiscoveryRequest DeltaSubscriptionState::getNextRequest() {

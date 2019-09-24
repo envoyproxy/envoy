@@ -67,6 +67,7 @@ jobs:
        - store_artifacts:
            path: /build/envoy/generated
            destination: /
+
    filter_example_mirror:
      executor: ubuntu-build
      steps:
@@ -116,7 +117,6 @@ jobs:
 
    format:
      executor: ubuntu-build
-     resource_class: small
      steps:
        - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout

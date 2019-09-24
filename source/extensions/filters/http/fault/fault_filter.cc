@@ -86,7 +86,7 @@ FaultFilterConfig::FaultFilterConfig(const envoy::config::filter::http::fault::v
 void FaultFilterConfig::incCounter(absl::string_view downstream_cluster,
                                    Stats::StatName stat_name) {
   Stats::SymbolTable::StoragePtr storage = scope_.symbolTable().join(
-      {stats_prefix_, stat_name_set_.getStatName(downstream_cluster), stat_name});
+      {stats_prefix_, stat_name_set_.getDynamic(downstream_cluster), stat_name});
   scope_.counterFromStatName(Stats::StatName(storage.get())).inc();
 }
 

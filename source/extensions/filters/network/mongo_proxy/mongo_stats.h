@@ -26,7 +26,11 @@ public:
    * TODO(jmarantz): Potential perf issue here with mutex contention for names
    * that have not been remembered as builtins in the constructor.
    */
-  Stats::StatName getStatName(const std::string& str) { return stat_name_set_.getStatName(str); }
+  Stats::StatName getBuiltin(const std::string& str, Stats::StatName fallback) {
+    return stat_name_set_.getBuiltin(str, fallback);
+  }
+
+  Stats::StatName getDynamic(const std::string& str) { return stat_name_set_.getDynamic(str); }
 
 private:
   Stats::SymbolTable::StoragePtr addPrefix(const std::vector<Stats::StatName>& names);
@@ -47,6 +51,7 @@ public:
   const Stats::StatName query_;
   const Stats::StatName scatter_get_;
   const Stats::StatName total_;
+  const Stats::StatName unknown_command_;
 };
 using MongoStatsSharedPtr = std::shared_ptr<MongoStats>;
 

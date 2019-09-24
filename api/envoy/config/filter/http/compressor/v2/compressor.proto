@@ -14,7 +14,7 @@ import "validate/validate.proto";
 
 message Compressor {
   // Minimum response length, in bytes, which will trigger compression. The default value is 30.
-  google.protobuf.UInt32Value content_length = 1 [(validate.rules).uint32.gte = 30];
+  google.protobuf.UInt32Value content_length = 1 [(validate.rules).uint32 = {gte: 30}];
 
   // Set of strings that allows specifying which mime-types yield compression; e.g.,
   // application/json, text/html, etc. When this field is not defined, compression will be applied
