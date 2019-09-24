@@ -84,6 +84,14 @@ envoy_status_t reset_stream(envoy_stream_t stream);
 envoy_engine_t init_engine();
 
 /**
+ * Update the network interface to the preferred network for opening new streams.
+ * Note that this state is shared by all engines.
+ * @param network_interface, the interface to be preferred for new sockets.
+ * @return envoy_status_t, the resulting status of the operation.
+ */
+envoy_status_t set_preferred_network(envoy_network_t network_interface);
+
+/**
  * External entry point for library.
  * @param config, the configuration blob to run envoy with.
  * @param log_level, the logging level to run envoy with.
