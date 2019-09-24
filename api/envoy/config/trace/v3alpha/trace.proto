@@ -179,7 +179,7 @@ message OpenCensusConfig {
   // also be set.
   bool zipkin_exporter_enabled = 5;
 
-  // The URL to Zipkin, e.g. "http://127.0.0.1:9411/api/v3alpha/spans"
+  // The URL to Zipkin, e.g. "http://127.0.0.1:9411/api/v2/spans"
   string zipkin_url = 6;
 
   // Enables the OpenCensus Agent exporter if set to true. The address must also
