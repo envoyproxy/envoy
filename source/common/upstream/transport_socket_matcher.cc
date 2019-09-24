@@ -50,7 +50,7 @@ bool metadataMatch(const envoy::api::v2::core::Metadata& metadata,
       return false;
     }
     const ProtobufWkt::Value* val = &(entry_it->second);
-    // Only support string typed match, TBD for the reviweres to decide though.
+    // Only support string typed match, TBD for the reviewer's to decide though.
     if (val->kind_case() != ProtobufWkt::Value::kStringValue) {
       return false;
     }
