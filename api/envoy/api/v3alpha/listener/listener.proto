@@ -6,10 +6,10 @@ option java_outer_classname = "ListenerProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.api.v3alpha.listener";
 option csharp_namespace = "Envoy.Api.V2.ListenerNS";
-option ruby_package = "Envoy::Api::V2::ListenerNS";
+option ruby_package = "Envoy.Api.V2.ListenerNS";
 
-import "envoy/api/v3alpha/core/address.proto";
 import "envoy/api/v3alpha/auth/cert.proto";
+import "envoy/api/v3alpha/core/address.proto";
 import "envoy/api/v3alpha/core/base.proto";
 
 import "google/protobuf/any.proto";
@@ -22,9 +22,11 @@ import "validate/validate.proto";
 // Listener :ref:`configuration overview <config_listeners>`
 
 message Filter {
+  reserved 3;
+
   // The name of the filter to instantiate. The name must match a
   // :ref:`supported filter <config_network_filters>`.
-  string name = 1 [(validate.rules).string.min_bytes = 1];
+  string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
   // Filter specific configuration which depends on the filter being
   // instantiated. See the supported filters for further documentation.
@@ -33,8 +35,6 @@ message Filter {
 
     google.protobuf.Any typed_config = 4;
   }
-
-  reserved 3;
 }
 
 // Specifies the match criteria for selecting a specific filter chain for a
@@ -66,9 +66,22 @@ message Filter {
 //
 // [#comment:TODO(PiotrSikora): Add support for configurable precedence of the rules]
 message FilterChainMatch {
+  enum ConnectionSourceType {
+    // Any connection source matches.
+    ANY = 0;
+
+    // Match a connection originating from the same host.
+    LOCAL = 1;
+
+    // Match a connection originating from a different host.
+    EXTERNAL = 2;
+  }
+
+  reserved 1;
+
   // Optional destination port to consider when use_original_dst is set on the
   // listener in determining a filter chain match.
-  google.protobuf.UInt32Value destination_port = 8 [(validate.rules).uint32 = {gte: 1, lte: 65535}];
+  google.protobuf.UInt32Value destination_port = 8 [(validate.rules).uint32 = {lte: 65535 gte: 1}];
 
   // If non-empty, an IP address and prefix length to match addresses when the
   // listener is bound to 0.0.0.0/:: or when use_original_dst is specified.
@@ -82,17 +95,8 @@ message FilterChainMatch {
   // [#not-implemented-hide:]
   google.protobuf.UInt32Value suffix_len = 5;
 
-  enum ConnectionSourceType {
-    // Any connection source matches.
-    ANY = 0;
-    // Match a connection originating from the same host.
-    LOCAL = 1;
-    // Match a connection originating from a different host.
-    EXTERNAL = 2;
-  }
-
   // Specifies the connection source IP match type. Can be any, local or external network.
-  ConnectionSourceType source_type = 12 [(validate.rules).enum.defined_only = true];
+  ConnectionSourceType source_type = 12 [(validate.rules).enum = {defined_only: true}];
 
   // The criteria is satisfied if the source IP address of the downstream
   // connection is contained in at least one of the specified subnets. If the
@@ -103,7 +107,8 @@ message FilterChainMatch {
   // The criteria is satisfied if the source port of the downstream connection
   // is contained in at least one of the specified ports. If the parameter is
   // not specified, the source port is ignored.
-  repeated uint32 source_ports = 7 [(validate.rules).repeated .items.uint32 = {gte: 1, lte: 65535}];
+  repeated uint32 source_ports = 7
+      [(validate.rules).repeated = {items {uint32 {lte: 65535 gte: 1}}}];
 
   // If non-empty, a list of server names (e.g. SNI for TLS protocol) to consider when determining
   // a filter chain match. Those values will be compared against the server names of a new
@@ -151,9 +156,6 @@ message FilterChainMatch {
   //   and matching on values other than ``h2`` is going to lead to a lot of false negatives,
   //   unless all connecting clients are known to use ALPN.
   repeated string application_protocols = 10;
-
-  reserved 1;
-  reserved "sni_domains";
 }
 
 // A filter chain wraps a set of match criteria, an option TLS context, a set of filters, and
@@ -194,7 +196,7 @@ message FilterChain {
 message ListenerFilter {
   // The name of the filter to instantiate. The name must match a
   // :ref:`supported filter <config_listener_filters>`.
-  string name = 1 [(validate.rules).string.min_bytes = 1];
+  string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
   // Filter specific configuration which depends on the filter being instantiated.
   // See the supported filters for further documentation.

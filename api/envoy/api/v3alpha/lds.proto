@@ -5,7 +5,6 @@ package envoy.api.v3alpha;
 option java_outer_classname = "LdsProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.api.v3alpha";
-
 option java_generic_services = true;
 
 import "envoy/api/v3alpha/core/address.proto";
@@ -13,6 +12,7 @@ import "envoy/api/v3alpha/core/base.proto";
 import "envoy/api/v3alpha/discovery.proto";
 import "envoy/api/v3alpha/listener/listener.proto";
 import "envoy/api/v3alpha/listener/udp_listener_config.proto";
+import "envoy/config/listener/v3alpha/api_listener.proto";
 
 import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
@@ -42,8 +42,36 @@ service ListenerDiscoveryService {
   }
 }
 
-// [#comment:next free field: 19]
+// [#comment:next free field: 20]
 message Listener {
+  enum DrainType {
+    // Drain in response to calling /healthcheck/fail admin endpoint (along with the health check
+    // filter), listener removal/modification, and hot restart.
+    DEFAULT = 0;
+
+    // Drain in response to listener removal/modification and hot restart. This setting does not
+    // include /healthcheck/fail. This setting may be desirable if Envoy is hosting both ingress
+    // and egress listeners.
+    MODIFY_ONLY = 1;
+  }
+
+  // [#not-implemented-hide:]
+  message DeprecatedV1 {
+    // Whether the listener should bind to the port. A listener that doesn't
+    // bind can only receive connections redirected from other listeners that
+    // set use_original_dst parameter to true. Default is true.
+    //
+    // This is deprecated in v2, all Listeners will bind to their port. An
+    // additional filter chain must be created for every original destination
+    // port this listener may redirect to in v2, with the original port
+    // specified in the FilterChainMatch destination_port field.
+    //
+    // [#comment:TODO(PiotrSikora): Remove this once verified that we no longer need it.]
+    google.protobuf.BoolValue bind_to_port = 1;
+  }
+
+  reserved 14;
+
   // The unique name by which this listener is known. If no name is provided,
   // Envoy will allocate an internal UUID for the listener. If the listener is to be dynamically
   // updated or removed via :ref:`LDS <config_listeners_lds>` a unique name must be provided.
@@ -52,7 +80,7 @@ message Listener {
   // The address that the listener should listen on. In general, the address must be unique, though
   // that is governed by the bind rules of the OS. E.g., multiple listeners can listen on port 0 on
   // Linux as the actual port will be allocated by the OS.
-  core.Address address = 2 [(validate.rules).message.required = true];
+  core.Address address = 2 [(validate.rules).message = {required: true}];
 
   // A list of filter chains to consider for this listener. The
   // :ref:`FilterChain <envoy_api_msg_listener.FilterChain>` with the most specific
@@ -88,32 +116,7 @@ message Listener {
   core.Metadata metadata = 6;
 
   // [#not-implemented-hide:]
-  message DeprecatedV1 {
-    // Whether the listener should bind to the port. A listener that doesn't
-    // bind can only receive connections redirected from other listeners that
-    // set use_original_dst parameter to true. Default is true.
-    //
-    // This is deprecated in v2, all Listeners will bind to their port. An
-    // additional filter chain must be created for every original destination
-    // port this listener may redirect to in v2, with the original port
-    // specified in the FilterChainMatch destination_port field.
-    //
-    // [#comment:TODO(PiotrSikora): Remove this once verified that we no longer need it.]
-    google.protobuf.BoolValue bind_to_port = 1;
-  }
-
-  // [#not-implemented-hide:]
   DeprecatedV1 deprecated_v1 = 7;
-
-  enum DrainType {
-    // Drain in response to calling /healthcheck/fail admin endpoint (along with the health check
-    // filter), listener removal/modification, and hot restart.
-    DEFAULT = 0;
-    // Drain in response to listener removal/modification and hot restart. This setting does not
-    // include /healthcheck/fail. This setting may be desirable if Envoy is hosting both ingress
-    // and egress listeners.
-    MODIFY_ONLY = 1;
-  }
 
   // The type of draining to perform at a listener-wide level.
   DrainType drain_type = 8;
@@ -188,8 +191,6 @@ message Listener {
   // To set the queue length on macOS, set the net.inet.tcp.fastopen_backlog kernel parameter.
   google.protobuf.UInt32Value tcp_fast_open_queue_length = 12;
 
-  reserved 14;
-
   // Specifies the intended direction of the traffic relative to the local Envoy.
   core.TrafficDirection traffic_direction = 16;
 
@@ -200,4 +201,17 @@ message Listener {
   // <envoy_api_field_listener.UdpListenerConfig.udp_listener_name>` = "raw_udp_listener" for
   // creating a packet-oriented UDP listener. If not present, treat it as "raw_udp_listener".
   listener.UdpListenerConfig udp_listener_config = 18;
+
+  // [#not-implemented-hide:]
+  // Used to represent an API listener, which is used in non-proxy clients. The type of API
+  // exposed to the non-proxy application depends on the type of API listener.
+  // When this field is set, no other field except for :ref:`name<envoy_api_field_Listener.name>`
+  // should be set.
+  // [#next-major-version: In the v3 API, instead of this messy approach where the socket
+  // listener fields are directly in the top-level Listener message and the API listener types
+  // are in the ApiListener message, the socket listener messages should be in their own message,
+  // and the top-level Listener should essentially be a oneof that selects between the
+  // socket listener and the various types of API listener. That way, a given Listener message
+  // can structurally only contain the fields of the relevant type.]
+  config.listener.v3alpha.ApiListener api_listener = 19;
 }

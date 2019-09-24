@@ -15,16 +15,28 @@ import "validate/validate.proto";
 // [#protodoc-title: Dubbo Proxy]
 // Dubbo Proxy :ref:`configuration overview <config_network_filters_dubbo_proxy>`.
 
+// Dubbo Protocol types supported by Envoy.
+enum ProtocolType {
+  // the default protocol.
+  Dubbo = 0;
+}
+
+// Dubbo Serialization types supported by Envoy.
+enum SerializationType {
+  // the default serialization protocol.
+  Hessian2 = 0;
+}
+
 // [#comment:next free field: 6]
 message DubboProxy {
   // The human readable prefix to use when emitting statistics.
-  string stat_prefix = 1 [(validate.rules).string.min_bytes = 1];
+  string stat_prefix = 1 [(validate.rules).string = {min_bytes: 1}];
 
   // Configure the protocol used.
-  ProtocolType protocol_type = 2 [(validate.rules).enum.defined_only = true];
+  ProtocolType protocol_type = 2 [(validate.rules).enum = {defined_only: true}];
 
   // Configure the serialization protocol used.
-  SerializationType serialization_type = 3 [(validate.rules).enum.defined_only = true];
+  SerializationType serialization_type = 3 [(validate.rules).enum = {defined_only: true}];
 
   // The route table for the connection manager is static and is specified in this property.
   repeated RouteConfiguration route_config = 4;
@@ -36,22 +48,12 @@ message DubboProxy {
   repeated DubboFilter dubbo_filters = 5;
 }
 
-// Dubbo Protocol types supported by Envoy.
-enum ProtocolType {
-  Dubbo = 0; // the default protocol.
-}
-
-// Dubbo Serialization types supported by Envoy.
-enum SerializationType {
-  Hessian2 = 0; // the default serialization protocol.
-}
-
 // DubboFilter configures a Dubbo filter.
 // [#comment:next free field: 3]
 message DubboFilter {
   // The name of the filter to instantiate. The name must match a supported
   // filter.
-  string name = 1 [(validate.rules).string.min_bytes = 1];
+  string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
   // Filter specific configuration which depends on the filter being
   // instantiated. See the supported filters for further documentation.
