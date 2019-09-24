@@ -72,11 +72,11 @@ void expectNoUpdate(NamedMockSubscriptionCallbacks& callbacks, const std::string
   EXPECT_CALL(callbacks, onConfigUpdate(_, _, version)).Times(0);
 }
 
-void expectEmptySotwNoDeltaUpdate(NamedMockSubscriptionCallbacks& callbacks, const std::string& version) {
+void expectEmptySotwNoDeltaUpdate(NamedMockSubscriptionCallbacks& callbacks,
+                                  const std::string& version) {
   EXPECT_CALL(callbacks, onConfigUpdate(_, version))
-  .WillOnce(Invoke(
-          [](const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& gotten_resources,
-                               const std::string&) { EXPECT_EQ(gotten_resources.size(), 0); }));
+      .WillOnce(Invoke([](const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& gotten_resources,
+                          const std::string&) { EXPECT_EQ(gotten_resources.size(), 0); }));
   EXPECT_CALL(callbacks, onConfigUpdate(_, _, version)).Times(0);
 }
 
@@ -314,7 +314,6 @@ TEST(WatchMapTest, UninterestingUpdate) {
   bob.set_cluster_name("bob");
   bob_update.Add()->PackFrom(bob);
 
-
   // We are watching for alice, and an update for just bob arrives. It should be ignored.
   expectNoUpdate(callbacks, "version1");
   doDeltaAndSotwUpdate(watch_map, bob_update, {}, "version1");
@@ -336,9 +335,8 @@ TEST(WatchMapTest, UninterestingUpdate) {
 
   // Finally, test that calling onConfigUpdate on a map with no watches (which should not
   // happen) throws an exception.
-  EXPECT_THROW_WITH_MESSAGE(
-          doDeltaAndSotwUpdate(watch_map, bob_update, {}, "version4"),
-      EnvoyException, "Rejecting non-empty update for unwatched type URL");
+  EXPECT_THROW_WITH_MESSAGE(doDeltaAndSotwUpdate(watch_map, bob_update, {}, "version4"),
+                            EnvoyException, "Rejecting non-empty update for unwatched type URL");
 }
 
 // Tests that a watch that specifies no particular resource interest is treated as interested in

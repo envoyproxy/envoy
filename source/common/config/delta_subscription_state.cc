@@ -10,7 +10,9 @@ DeltaSubscriptionState::DeltaSubscriptionState(const std::string& type_url,
                                                SubscriptionCallbacks& callbacks,
                                                std::chrono::milliseconds init_fetch_timeout,
                                                Event::Dispatcher& dispatcher)
-    : SubscriptionState(type_url, callbacks, init_fetch_timeout, dispatcher) {}
+    : SubscriptionState(type_url, callbacks, init_fetch_timeout, dispatcher) {
+  std::cerr << "hi! constructing DELTA SubscriptionState" << std::endl;
+}
 
 DeltaSubscriptionState::~DeltaSubscriptionState() {}
 
@@ -74,11 +76,6 @@ void DeltaSubscriptionState::handleGoodResponse(
   disableInitFetchTimeoutTimer();
   absl::flat_hash_set<std::string> names_added_removed;
   for (const auto& resource : message.resources()) {
-    if (resource.resource().type_url() != type_url()) {
-      throw EnvoyException(fmt::format("{} does not match {} type URL in DeltaDiscoveryResponse {}",
-                                       resource.resource().type_url(), type_url(),
-                                       message.DebugString()));
-    }
     if (!names_added_removed.insert(resource.name()).second) {
       throw EnvoyException(
           fmt::format("duplicate name {} found among added/updated resources", resource.name()));
@@ -128,8 +125,6 @@ void DeltaSubscriptionState::handleBadResponse(const EnvoyException& e, UpdateAc
 }
 
 void DeltaSubscriptionState::handleEstablishmentFailure() {
-  disableInitFetchTimeoutTimer();
-  ENVOY_LOG(debug, "gRPC update for {} failed: couldn't connect", type_url());
   callbacks().onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure,
                                    nullptr);
 }

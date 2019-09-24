@@ -13,7 +13,9 @@ namespace Config {
 GrpcMuxImpl::GrpcMuxImpl(std::unique_ptr<SubscriptionStateFactory> subscription_state_factory,
                          bool skip_subsequent_node, const LocalInfo::LocalInfo& local_info)
     : subscription_state_factory_(std::move(subscription_state_factory)),
-      skip_subsequent_node_(skip_subsequent_node), local_info_(local_info) {}
+      skip_subsequent_node_(skip_subsequent_node), local_info_(local_info) {
+  Config::Utility::checkLocalInfo("ads", local_info);
+}
 
 Watch* GrpcMuxImpl::addOrUpdateWatch(const std::string& type_url, Watch* watch,
                                      const std::set<std::string>& resources,

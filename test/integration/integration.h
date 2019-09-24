@@ -242,7 +242,7 @@ public:
   AssertionResult compareDeltaDiscoveryRequest(
       const std::string& expected_type_url,
       const std::vector<std::string>& expected_resource_subscriptions,
-      const std::vector<std::string>& expected_resource_unsubscriptions, bool expect_node,
+      const std::vector<std::string>& expected_resource_unsubscriptions, bool expect_node = false,
       const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
       const std::string& expected_error_substring = "") {
     return compareDeltaDiscoveryRequest(expected_type_url, expected_resource_subscriptions,
@@ -254,7 +254,8 @@ public:
       const std::string& expected_type_url,
       const std::vector<std::string>& expected_resource_subscriptions,
       const std::vector<std::string>& expected_resource_unsubscriptions, FakeStreamPtr& stream,
-      bool expect_node, const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
+      bool expect_node = false,
+      const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
       const std::string& expected_error_substring = "");
   AssertionResult compareSotwDiscoveryRequest(
       const std::string& expected_type_url, const std::string& expected_version,

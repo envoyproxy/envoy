@@ -185,6 +185,10 @@ public:
   void onDiscoveryResponse(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) override {
     genericHandleResponse(message->type_url(), message.get());
   }
+  GrpcStream<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse>&
+  grpcStreamForTest() {
+    return grpc_stream_;
+  }
 
 protected:
   void establishGrpcStream() override { grpc_stream_.establishNewStream(); }
@@ -194,6 +198,7 @@ protected:
     if (!any_request_sent_yet_in_current_stream() || !skip_subsequent_node()) {
       typed_proto->mutable_node()->MergeFrom(local_info().node());
     }
+
     grpc_stream_.sendMessage(*typed_proto);
     set_any_request_sent_yet_in_current_stream(true);
   }

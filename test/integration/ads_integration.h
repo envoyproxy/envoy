@@ -13,9 +13,9 @@
 #include "test/integration/http_integration.h"
 
 namespace Envoy {
-static const std::string& AdsIntegrationConfig(const std::string& api_type) {
-  CONSTRUCT_ON_FIRST_USE(std::string, fmt::format(
-                                          R"EOF(
+static std::string AdsIntegrationConfig(const std::string& api_type) {
+  // Note: do not use CONSTRUCT_ON_FIRST_USE here!
+  return fmt::format(R"EOF(
 dynamic_resources:
   lds_config:
     ads: {{}}
@@ -43,7 +43,7 @@ admin:
       address: 127.0.0.1
       port_value: 0
 )EOF",
-                                          api_type));
+                     api_type);
 }
 
 class AdsIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest, public HttpIntegrationTest {

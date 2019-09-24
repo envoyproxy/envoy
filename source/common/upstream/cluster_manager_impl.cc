@@ -247,7 +247,7 @@ ClusterManagerImpl::ClusterManagerImpl(
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.discovery.v2.AggregatedDiscoveryService.DeltaAggregatedResources"),
           random_, stats_, Envoy::Config::Utility::parseRateLimitSettings(ads_config), local_info,
-          bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only());
+          ads_config.set_node_on_first_message_only());
     } else {
       ads_mux_ = std::make_shared<Config::GrpcMuxSotw>(
           Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, ads_config, stats)
@@ -256,7 +256,7 @@ ClusterManagerImpl::ClusterManagerImpl(
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
           random_, stats_, Envoy::Config::Utility::parseRateLimitSettings(ads_config), local_info,
-          bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only());
+          ads_config.set_node_on_first_message_only());
     }
   } else {
     ads_mux_ = std::make_unique<Config::NullGrpcMuxImpl>();

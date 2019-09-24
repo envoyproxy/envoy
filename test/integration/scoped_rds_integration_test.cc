@@ -13,7 +13,7 @@ namespace Envoy {
 namespace {
 
 class ScopedRdsIntegrationTest : public HttpIntegrationTest,
-                                 public Grpc::DeltaSotwGrpcClientIntegrationParamTest {
+                                 public Grpc::DeltaSotwIntegrationParamTest {
 protected:
   struct FakeUpstreamInfo {
     FakeHttpConnectionPtr connection_;
@@ -82,7 +82,7 @@ fragments:
               scoped_routes->mutable_scoped_rds()
                   ->mutable_scoped_rds_config_source()
                   ->mutable_api_config_source();
-          if (isDelta()) {
+          if (sotwOrDelta() == Grpc::SotwOrDelta::Delta) {
             srds_api_config_source->set_api_type(envoy::api::v2::core::ApiConfigSource::DELTA_GRPC);
           } else {
             srds_api_config_source->set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
@@ -169,7 +169,7 @@ fragments:
                         const std::vector<std::string>& to_add_list,
                         const std::vector<std::string>& to_delete_list,
                         const std::string& version) {
-    if (isDelta()) {
+    if (sotwOrDelta() == Grpc::SotwOrDelta::Delta) {
       sendDeltaScopedRdsResponse(to_add_list, to_delete_list, version);
     } else {
       sendSotwScopedRdsResponse(sotw_list, version);
@@ -283,7 +283,7 @@ key:
   }
   test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_attempt",
                                  // update_attempt only increase after a response
-                                 isDelta() ? 1 : 2);
+                                 sotwOrDelta() == Grpc::SotwOrDelta::Delta ? 1 : 2);
   test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_success", 1);
   // The version gauge should be set to xxHash64("1").
   test_server_->waitForGaugeEq("http.config_test.scoped_rds.foo-scoped-routes.version",

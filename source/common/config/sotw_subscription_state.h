@@ -27,7 +27,7 @@ public:
   // Whether there was a change in our subscription interest we have yet to inform the server of.
   bool subscriptionUpdatePending() const override;
 
-  void markStreamFresh() override { any_request_sent_yet_in_current_stream_ = false; }
+  void markStreamFresh() override;
 
   // message is expected to be a envoy::api::v2::DiscoveryResponse.
   UpdateAck handleResponse(const void* reponse_proto_ptr) override;
@@ -49,11 +49,14 @@ private:
   void handleGoodResponse(const envoy::api::v2::DiscoveryResponse& message);
   void handleBadResponse(const EnvoyException& e, UpdateAck& ack);
 
-  // The version_info value most recently received in a DiscoveryResponse that was accepted.
+  // The version_info carried by the last accepted DiscoveryResponse.
   // Remains empty until one is accepted.
   absl::optional<std::string> last_good_version_info_;
+  // The nonce carried by the last accepted DiscoveryResponse.
+  // Remains empty until one is accepted.
+  // Used when it's time to make a spontaneous (i.e. not primarily meant as an ACK) request.
+  absl::optional<std::string> last_good_nonce_;
 
-  bool any_request_sent_yet_in_current_stream_{};
   // Starts true because we should send a request upon subscription start.
   bool update_pending_{true};
 

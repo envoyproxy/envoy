@@ -63,21 +63,25 @@ void GrpcSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason reason
                                                 const EnvoyException* e) {
   switch (reason) {
   case Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure:
+    // This is a gRPC-stream-level establishment failure, not an xDS-protocol-level failure.
+    // So, don't onConfigUpdateFailed() here. Instead, allow a retry of the gRPC stream.
+    // If init_fetch_timeout_ is non-zero, the server will continue startup after that timeout.
     stats_.update_failure_.inc();
     break;
   case Envoy::Config::ConfigUpdateFailureReason::FetchTimedout:
     stats_.init_fetch_timeout_.inc();
     context_->disableInitFetchTimeoutTimer();
+    callbacks_.onConfigUpdateFailed(reason, e);
     break;
   case Envoy::Config::ConfigUpdateFailureReason::UpdateRejected:
     // We expect Envoy exception to be thrown when update is rejected.
     ASSERT(e != nullptr);
     context_->disableInitFetchTimeoutTimer();
     stats_.update_rejected_.inc();
+    callbacks_.onConfigUpdateFailed(reason, e);
     break;
   }
   stats_.update_attempt_.inc();
-  callbacks_.onConfigUpdateFailed(reason, e);
 }
 
 std::string GrpcSubscriptionImpl::resourceName(const ProtobufWkt::Any& resource) {

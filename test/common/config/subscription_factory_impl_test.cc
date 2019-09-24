@@ -302,7 +302,6 @@ TEST_F(SubscriptionFactoryTest, GrpcSubscription) {
       }));
   EXPECT_CALL(random_, random());
   EXPECT_CALL(dispatcher_, createTimer_(_)).Times(2);
-  EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _));
   subscriptionFromConfigSource(config)->start({"static_cluster"});
 }
 

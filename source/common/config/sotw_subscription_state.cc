@@ -10,7 +10,9 @@ SotwSubscriptionState::SotwSubscriptionState(const std::string& type_url,
                                              SubscriptionCallbacks& callbacks,
                                              std::chrono::milliseconds init_fetch_timeout,
                                              Event::Dispatcher& dispatcher)
-    : SubscriptionState(type_url, callbacks, init_fetch_timeout, dispatcher) {}
+    : SubscriptionState(type_url, callbacks, init_fetch_timeout, dispatcher) {
+  std::cerr << "hi! constructing SOTW SubscriptionState" << std::endl;
+}
 
 SotwSubscriptionState::~SotwSubscriptionState() {}
 
@@ -35,12 +37,20 @@ void SotwSubscriptionState::updateSubscriptionInterest(const std::set<std::strin
   for (const auto& r : cur_removed) {
     names_tracked_.erase(r);
   }
-  update_pending_ = true;
+  if (!cur_added.empty() || !cur_removed.empty()) {
+    update_pending_ = true;
+  }
 }
 
 // Not having sent any requests yet counts as an "update pending" since you're supposed to resend
 // the entirety of your interest at the start of a stream, even if nothing has changed.
 bool SotwSubscriptionState::subscriptionUpdatePending() const { return update_pending_; }
+
+void SotwSubscriptionState::markStreamFresh() {
+  last_good_version_info_ = absl::nullopt;
+  last_good_nonce_ = absl::nullopt;
+  update_pending_ = true;
+}
 
 UpdateAck SotwSubscriptionState::handleResponse(const void* reponse_proto_ptr) {
   auto* response = static_cast<const envoy::api::v2::DiscoveryResponse*>(reponse_proto_ptr);
@@ -59,13 +69,15 @@ void SotwSubscriptionState::handleGoodResponse(const envoy::api::v2::DiscoveryRe
   disableInitFetchTimeoutTimer();
   for (const auto& resource : message.resources()) {
     if (resource.type_url() != type_url()) {
-      throw EnvoyException(fmt::format("{} does not match {} type URL in DiscoveryResponse {}",
+      throw EnvoyException(fmt::format("type URL {} embedded in an individual Any does not match "
+                                       "the message-wide type URL {} in DiscoveryResponse {}",
                                        resource.type_url(), type_url(), message.DebugString()));
     }
   }
   callbacks().onConfigUpdate(message.resources(), message.version_info());
   // Now that we're passed onConfigUpdate() without an exception thrown, we know we're good.
   last_good_version_info_ = message.version_info();
+  last_good_nonce_ = message.nonce();
   ENVOY_LOG(debug, "Config update for {} accepted with {} resources", type_url(),
             message.resources().size());
 }
@@ -80,8 +92,6 @@ void SotwSubscriptionState::handleBadResponse(const EnvoyException& e, UpdateAck
 }
 
 void SotwSubscriptionState::handleEstablishmentFailure() {
-  disableInitFetchTimeoutTimer();
-  ENVOY_LOG(debug, "gRPC update for {} failed: couldn't connect", type_url());
   callbacks().onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure,
                                    nullptr);
 }
@@ -94,6 +104,11 @@ envoy::api::v2::DiscoveryRequest* SotwSubscriptionState::getNextRequestInternal(
             Protobuf::RepeatedFieldBackInserter(request->mutable_resource_names()));
   if (last_good_version_info_.has_value()) {
     request->set_version_info(last_good_version_info_.value());
+  }
+  // Default response_nonce to the last known good one. If we are being called by
+  // getNextRequestWithAck(), this value will be overwritten.
+  if (last_good_nonce_.has_value()) {
+    request->set_response_nonce(last_good_nonce_.value());
   }
 
   update_pending_ = false;

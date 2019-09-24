@@ -22,7 +22,7 @@ const char TypeUrl[] = "type.googleapis.com/envoy.api.v2.Cluster";
 class DeltaSubscriptionStateTest : public testing::Test {
 protected:
   DeltaSubscriptionStateTest()
-      : state_(TypeUrl, callbacks_, local_info_, std::chrono::milliseconds(0U), dispatcher_) {
+      : state_(TypeUrl, callbacks_, std::chrono::milliseconds(0U), dispatcher_) {
     state_.updateSubscriptionInterest({"name1", "name2", "name3"}, {});
     auto cur_request = getNextDeltaDiscoveryRequestAckless();
     EXPECT_THAT(cur_request->resource_names_subscribe(),
@@ -64,7 +64,6 @@ protected:
   }
 
   NiceMock<MockSubscriptionCallbacks<envoy::api::v2::Cluster>> callbacks_;
-  NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   // We start out interested in three resources: name1, name2, and name3.
   DeltaSubscriptionState state_;
