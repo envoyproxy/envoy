@@ -41,18 +41,15 @@ jobs:
       - run: ls -lh dist/
       - name: 'Build swift app'
         run: ./bazelw build --config=ios //examples/swift/hello_world:app
-      # TODO: re-enable liveliness test.
-      # - run: npm install -g ios-sim && ios-sim start --devicetypeid "iPhone-X, 12.2"
-      #   name: 'Start the iOS simulator'
-      # # Run the app in the background and redirect logs.
-      # - run: ./bazelw run --config=ios //examples/swift/hello_world:app &> /tmp/envoy.log &
-      #   name: 'Run swift app'
-      # # Wait for the app to start and get some requests/responses.
-      # - run: sleep 60
-      #   name: 'Sleep'
-      # # Check for the sentinel value that shows the app is alive and well.
-      # - run: cat /tmp/envoy.log | grep 'Hello, world!'
-      #   name: 'Check liveliness'
+      # Run the app in the background and redirect logs.
+      - name: 'Run swift app'
+        run: ./bazelw run --config=ios //examples/swift/hello_world:app &> /tmp/envoy.log &
+      # Wait for the app to start and get some requests/responses.
+      - name: 'Sleep'
+        run: sleep 120
+      # Check for the sentinel value that shows the app is alive and well.
+      - name: 'Check liveliness'
+        run: 'cat /tmp/envoy.log'
   macobjc:
     name: mac_objc_helloworld
     needs: macdist
@@ -72,7 +69,15 @@ jobs:
       - run: ls -lh dist/
       - name: 'Build objective-c app'
         run: ./bazelw build --config=ios //examples/objective-c/hello_world:app
-      # TODO: re-enable liveliness test (same as swift).
+      # Run the app in the background and redirect logs.
+      - name: 'Run objective-c app'
+        run: ./bazelw run --config=ios //examples/objective-c/hello_world:app &> /tmp/envoy.log &
+      # Wait for the app to start and get some requests/responses.
+      - name: 'Sleep'
+        run: sleep 120
+      # Check for the sentinel value that shows the app is alive and well.
+      - name: 'Check liveliness'
+        run: 'cat /tmp/envoy.log'
   swifttests:
     name: swift_tests
     runs-on: macOS-10.14
