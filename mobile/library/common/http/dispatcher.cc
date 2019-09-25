@@ -90,15 +90,16 @@ void Dispatcher::post(Event::PostCb callback) {
   init_queue_.push_back(callback);
 }
 
+Dispatcher::Dispatcher(std::atomic<envoy_network_t>& preferred_network)
+    : preferred_network_(preferred_network) {}
+
 envoy_status_t Dispatcher::startStream(envoy_stream_t new_stream_handle,
                                        envoy_http_callbacks bridge_callbacks) {
   post([this, bridge_callbacks, new_stream_handle]() -> void {
     DirectStreamCallbacksPtr callbacks =
         std::make_unique<DirectStreamCallbacks>(new_stream_handle, bridge_callbacks, *this);
-    // The dispatch_lock_ does not need to guard the cluster_manager_ pointer here because this
-    // functor is only executed once the init_queue_ has been flushed to Envoy's event dispatcher.
-    AsyncClient& async_client =
-        TS_UNCHECKED_READ(cluster_manager_)->httpAsyncClientForCluster("base");
+
+    AsyncClient& async_client = getClient();
     AsyncClient::Stream* underlying_stream = async_client.start(*callbacks, {});
 
     if (!underlying_stream) {
@@ -193,6 +194,25 @@ envoy_status_t Dispatcher::resetStream(envoy_stream_t stream) {
     }
   });
   return ENVOY_SUCCESS;
+}
+
+// Select the client based on the current preferred network. This helps to ensure that
+// the engine uses connections opened on the current favored interface.
+AsyncClient& Dispatcher::getClient() {
+  // This function must be called from the dispatcher's own thread and so this state
+  // is safe to access without holding the dispatch_lock_.
+  ASSERT(TS_UNCHECKED_READ(event_dispatcher_)->isThreadSafe(),
+         "cluster interaction must be performed on the event_dispatcher_'s thread.");
+  switch (preferred_network_.load()) {
+  case ENVOY_NET_WLAN:
+    // The ASSERT above ensures the cluster_manager_ is safe to access.
+    return TS_UNCHECKED_READ(cluster_manager_)->httpAsyncClientForCluster("base_wlan");
+  case ENVOY_NET_WWAN:
+    return TS_UNCHECKED_READ(cluster_manager_)->httpAsyncClientForCluster("base_wwan");
+  case ENVOY_NET_GENERIC:
+  default:
+    return TS_UNCHECKED_READ(cluster_manager_)->httpAsyncClientForCluster("base");
+  }
 }
 
 Dispatcher::DirectStream* Dispatcher::getStream(envoy_stream_t stream) {
