@@ -695,11 +695,20 @@ public:
    * subsequent lookups of the same string to take only the set's lock, and not
    * the whole symbol-table lock.
    *
+   * @return a StatName corresponding to the passed-in token, owned by the set.
+   *
    * TODO(jmarantz): Potential perf issue here with contention, both on this
    * set's mutex and also the SymbolTable mutex which must be taken during
    * StatNamePool::add().
    */
   StatName getDynamic(absl::string_view token);
+
+  /**
+   * Finds a builtin StatName by name. If the builtin has not been registered,
+   * then the fallback is returned.
+   *
+   * @return the StatName or fallback.
+   */
   StatName getBuiltin(absl::string_view token, StatName fallback);
 
   /**
@@ -715,14 +724,18 @@ public:
    */
   void clearRecentLookups();
 
+  /**
+   * Sets the number of names recorded in the recent-lookups set.
+   *
+   * @param capacity the capacity to configure.
+   */
   void setRecentLookupCapacity(uint64_t capacity);
-
-  StatNameSet(SymbolTable& symbol_table, absl::string_view name);
 
 private:
   friend class FakeSymbolTableImpl;
   friend class SymbolTableImpl;
 
+  StatNameSet(SymbolTable& symbol_table, absl::string_view name);
   uint64_t getRecentLookups(const RecentLookups::IterFn& iter);
 
   std::string name_;

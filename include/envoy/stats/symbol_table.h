@@ -166,6 +166,10 @@ public:
    * Sets the recent-lookup capacity.
    */
   virtual void setRecentLookupCapacity(uint64_t capacity) PURE;
+
+  /**
+   * @return The configured recent-lookup tracking capacity.
+   */
   virtual uint64_t recentLookupCapacity() const PURE;
 
   /**

@@ -140,6 +140,8 @@ const char AdminHtmlEnd[] = R"(
 
 const std::regex PromRegex("[^a-zA-Z0-9_]");
 
+const uint64_t RecentLookupsCapacity = 100;
+
 void populateFallbackResponseHeaders(Http::Code code, Http::HeaderMap& header_map) {
   header_map.insertStatus().value(std::to_string(enumToInt(code)));
   const auto& headers = Http::Headers::get();
@@ -749,7 +751,7 @@ Http::Code AdminImpl::handlerStatsRecentLookupsDisable(absl::string_view, Http::
 
 Http::Code AdminImpl::handlerStatsRecentLookupsEnable(absl::string_view, Http::HeaderMap&,
                                                       Buffer::Instance& response, AdminStream&) {
-  server_.stats().symbolTable().setRecentLookupCapacity(100);
+  server_.stats().symbolTable().setRecentLookupCapacity(RecentLookupsCapacity);
   response.add("OK\n");
   return Http::Code::OK;
 }

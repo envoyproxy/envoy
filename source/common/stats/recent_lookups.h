@@ -49,6 +49,10 @@ public:
    * @param capacity The number of lookups to remember.
    */
   void setCapacity(uint64_t capacity);
+
+  /**
+   * @return The configured capacity.
+   */
   uint64_t capacity() const { return capacity_; }
 
 private:

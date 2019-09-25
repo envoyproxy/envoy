@@ -126,7 +126,8 @@ public:
   }
 
   StatNameSetPtr makeSet(absl::string_view name) override {
-    return std::make_unique<StatNameSet>(*this, name);
+    // make_unique does not work with private ctor, even though FakeSymbolTableImpl is friended.
+    return StatNameSetPtr(new StatNameSet(*this, name));
   }
   void forgetSet(StatNameSet&) override {}
   uint64_t getRecentLookups(const RecentLookupsFn&) override { return 0; }
