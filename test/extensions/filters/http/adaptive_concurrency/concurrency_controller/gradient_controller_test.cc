@@ -41,7 +41,7 @@ protected:
         TestUtility::parseYaml<
             envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig>(
             yaml_config);
-    return GradientControllerConfig(proto, runtime_);
+    return GradientControllerConfig{proto, runtime_};
   }
 
   NiceMock<Runtime::MockLoader> runtime_;

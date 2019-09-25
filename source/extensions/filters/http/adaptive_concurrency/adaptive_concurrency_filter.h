@@ -29,7 +29,7 @@ public:
   AdaptiveConcurrencyFilterConfig(
       const envoy::config::filter::http::adaptive_concurrency::v2alpha::AdaptiveConcurrency&
           proto_config,
-      Runtime::Loader& runtime, const std::string& stats_prefix, Stats::Scope& scope,
+      Runtime::Loader& runtime, std::string stats_prefix, Stats::Scope& scope,
       TimeSource& time_source);
 
   // Returns whether the filter should operate as a pass-through for a request.

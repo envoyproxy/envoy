@@ -19,9 +19,9 @@ namespace AdaptiveConcurrency {
 AdaptiveConcurrencyFilterConfig::AdaptiveConcurrencyFilterConfig(
     const envoy::config::filter::http::adaptive_concurrency::v2alpha::AdaptiveConcurrency&
         proto_config,
-    Runtime::Loader& runtime, const std::string& stats_prefix, Stats::Scope&,
+    Runtime::Loader& runtime, std::string stats_prefix, Stats::Scope&,
     TimeSource& time_source)
-    : stats_prefix_(stats_prefix), runtime_(runtime), time_source_(time_source),
+    : stats_prefix_(std::move(stats_prefix)), runtime_(runtime), time_source_(time_source),
       disabled_(proto_config.disabled()) {}
 
 AdaptiveConcurrencyFilter::AdaptiveConcurrencyFilter(
