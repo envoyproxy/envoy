@@ -323,13 +323,14 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
   //                      exact upper-bound
   // ----------  -----    -----------------   -----
   // 2019/09/09  8189     2739         3100   Initial per-host memory snapshot
+  // 2019/09/10  8216     1283         1315   Use primitive counters for host stats
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
   // will need to find the correct value only after failing CI and looking
   // at the logs.
-  EXPECT_MEMORY_EQ(m_per_host, 2739);
-  EXPECT_MEMORY_LE(m_per_host, 3100);
+  EXPECT_MEMORY_EQ(m_per_host, 1283);
+  EXPECT_MEMORY_LE(m_per_host, 1315);
 }
 
 } // namespace

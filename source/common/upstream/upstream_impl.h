@@ -75,9 +75,6 @@ public:
                     .bool_value()),
         metadata_(std::make_shared<envoy::api::v2::core::Metadata>(metadata)), locality_(locality),
         locality_zone_stat_name_(locality.zone(), cluster->statsScope().symbolTable()),
-        stats_store_(cluster->statsScope().symbolTable()), stats_{ALL_HOST_STATS(
-                                                               POOL_COUNTER(stats_store_),
-                                                               POOL_GAUGE(stats_store_))},
         priority_(priority) {
     if (health_check_config.port_value() != 0 &&
         dest_address->type() != Network::Address::Type::Ip) {
@@ -133,7 +130,7 @@ public:
       return *null_outlier_detector;
     }
   }
-  const HostStats& stats() const override { return stats_; }
+  HostStats& stats() const override { return stats_; }
   const std::string& hostname() const override { return hostname_; }
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
   Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
@@ -156,8 +153,7 @@ protected:
   std::shared_ptr<envoy::api::v2::core::Metadata> metadata_ ABSL_GUARDED_BY(metadata_mutex_);
   const envoy::api::v2::core::Locality locality_;
   Stats::StatNameManagedStorage locality_zone_stat_name_;
-  Stats::IsolatedStoreImpl stats_store_;
-  HostStats stats_;
+  mutable HostStats stats_;
   Outlier::DetectorHostMonitorPtr outlier_detector_;
   HealthCheckHostMonitorPtr health_checker_;
   std::atomic<uint32_t> priority_;
@@ -184,12 +180,18 @@ public:
   }
 
   // Upstream::Host
-  std::vector<Stats::CounterSharedPtr> counters() const override { return stats_store_.counters(); }
+  std::vector<std::pair<absl::string_view, Stats::PrimitiveCounterReference>>
+  counters() const override {
+    return stats_.counters();
+  }
   CreateConnectionData createConnection(
       Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
       Network::TransportSocketOptionsSharedPtr transport_socket_options) const override;
   CreateConnectionData createHealthCheckConnection(Event::Dispatcher& dispatcher) const override;
-  std::vector<Stats::GaugeSharedPtr> gauges() const override { return stats_store_.gauges(); }
+  std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>>
+  gauges() const override {
+    return stats_.gauges();
+  }
   void healthFlagClear(HealthFlag flag) override { health_flags_ &= ~enumToInt(flag); }
   bool healthFlagGet(HealthFlag flag) const override { return health_flags_ & enumToInt(flag); }
   void healthFlagSet(HealthFlag flag) override { health_flags_ |= enumToInt(flag); }
