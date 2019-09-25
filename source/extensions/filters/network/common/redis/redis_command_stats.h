@@ -41,11 +41,8 @@ public:
   Stats::StatName getUnusedStatName() { return unused_metric_; }
 
 private:
-  void addCommandToPool(const std::string& command_string);
-
   Stats::SymbolTable& symbol_table_;
-  Stats::StatNamePool stat_name_pool_;
-  StringMap<Stats::StatName> stat_name_map_;
+  Stats::StatNameSet stat_name_set_;
   const Stats::StatName prefix_;
   const Stats::StatName upstream_rq_time_;
   const Stats::StatName latency_;

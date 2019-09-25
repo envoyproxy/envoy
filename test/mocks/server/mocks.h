@@ -193,7 +193,8 @@ public:
   ~MockGuardDog() override;
 
   // Server::GuardDog
-  MOCK_METHOD1(createWatchDog, WatchDogSharedPtr(Thread::ThreadId));
+  MOCK_METHOD2(createWatchDog,
+               WatchDogSharedPtr(Thread::ThreadId thread_id, const std::string& thread_name));
   MOCK_METHOD1(stopWatching, void(WatchDogSharedPtr wd));
 
   std::shared_ptr<MockWatchDog> watch_dog_;
@@ -293,7 +294,9 @@ public:
   ~MockWorkerFactory() override;
 
   // Server::WorkerFactory
-  WorkerPtr createWorker(OverloadManager&) override { return WorkerPtr{createWorker_()}; }
+  WorkerPtr createWorker(OverloadManager&, const std::string&) override {
+    return WorkerPtr{createWorker_()};
+  }
 
   MOCK_METHOD0(createWorker_, Worker*());
 };
@@ -470,7 +473,7 @@ public:
   Event::TestTimeSystem& timeSystem() { return time_system_; }
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Http::Context& httpContext() override { return http_context_; }
-  MOCK_METHOD0(processContext, absl::optional<std::reference_wrapper<ProcessContext>>());
+  MOCK_METHOD0(processContext, OptProcessContextRef());
   MOCK_METHOD0(messageValidationVisitor, ProtobufMessage::ValidationVisitor&());
   MOCK_METHOD0(api, Api::Api&());
 

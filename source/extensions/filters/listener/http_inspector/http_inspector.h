@@ -32,6 +32,15 @@ struct HttpInspectorStats {
   ALL_HTTP_INSPECTOR_STATS(GENERATE_COUNTER_STRUCT)
 };
 
+enum class ParseState {
+  // Parse result is out. It could be http family or empty.
+  Done,
+  // Parser expects more data.
+  Continue,
+  // Parser reports unrecoverable error.
+  Error
+};
+
 /**
  * Global configuration for http inspector.
  */
@@ -62,9 +71,9 @@ public:
 private:
   static const absl::string_view HTTP2_CONNECTION_PREFACE;
 
-  void onRead();
+  ParseState onRead();
   void done(bool success);
-  void parseHttpHeader(absl::string_view data);
+  ParseState parseHttpHeader(absl::string_view data);
 
   const absl::flat_hash_set<std::string>& httpProtocols() const;
   const absl::flat_hash_set<std::string>& http1xMethods() const;

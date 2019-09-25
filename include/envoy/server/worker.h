@@ -91,9 +91,12 @@ public:
   virtual ~WorkerFactory() = default;
 
   /**
+   * @param overload_manager supplies the server's overload manager.
+   * @param worker_name supplies the name of the worker, used for per-worker stats.
    * @return WorkerPtr a new worker.
    */
-  virtual WorkerPtr createWorker(OverloadManager& overload_manager) PURE;
+  virtual WorkerPtr createWorker(OverloadManager& overload_manager,
+                                 const std::string& worker_name) PURE;
 };
 
 } // namespace Server

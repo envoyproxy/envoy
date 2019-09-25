@@ -6,20 +6,21 @@ option java_outer_classname = "TapProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.transport_socket.tap.v3alpha";
 
-// [#protodoc-title: Tap]
-
-import "envoy/config/common/tap/v3alpha/common.proto";
 import "envoy/api/v3alpha/core/base.proto";
+import "envoy/config/common/tap/v3alpha/common.proto";
 
 import "validate/validate.proto";
+
+// [#protodoc-title: Tap]
 
 // Configuration for tap transport socket. This wraps another transport socket, providing the
 // ability to interpose and record in plain text any traffic that is surfaced to Envoy.
 message Tap {
   // Common configuration for the tap transport socket.
   common.tap.v3alpha.CommonExtensionConfig common_config = 1
-      [(validate.rules).message.required = true];
+      [(validate.rules).message = {required: true}];
 
   // The underlying transport socket being wrapped.
-  api.v3alpha.core.TransportSocket transport_socket = 2 [(validate.rules).message.required = true];
+  api.v3alpha.core.TransportSocket transport_socket = 2
+      [(validate.rules).message = {required: true}];
 }

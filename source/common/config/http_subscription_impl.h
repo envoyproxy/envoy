@@ -37,10 +37,10 @@ public:
   void createRequest(Http::Message& request) override;
   void parseResponse(const Http::Message& response) override;
   void onFetchComplete() override;
-  void onFetchFailure(const EnvoyException* e) override;
+  void onFetchFailure(Config::ConfigUpdateFailureReason reason, const EnvoyException* e) override;
 
 private:
-  void handleFailure(const EnvoyException* e);
+  void handleFailure(Config::ConfigUpdateFailureReason reason, const EnvoyException* e);
   void disableInitFetchTimeoutTimer();
 
   std::string path_;

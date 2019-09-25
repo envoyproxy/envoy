@@ -374,6 +374,14 @@ TEST_F(DeltaSubscriptionStateTest, AddedAndRemoved) {
             ack.error_detail_.message());
 }
 
+TEST_F(DeltaSubscriptionStateTest, handleEstablishmentFailure) {
+  EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _)).Times(0);
+
+  state_.handleEstablishmentFailure();
+  EXPECT_EQ(stats_.update_failure_.value(), 1);
+  EXPECT_EQ(stats_.update_attempt_.value(), 1);
+}
+
 } // namespace
 } // namespace Config
 } // namespace Envoy

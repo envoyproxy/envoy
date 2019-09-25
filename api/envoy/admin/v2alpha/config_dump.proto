@@ -39,7 +39,7 @@ message ConfigDump {
 // the static portions of an Envoy configuration by reusing the output as the bootstrap
 // configuration for another Envoy.
 message BootstrapConfigDump {
-  envoy.config.bootstrap.v2.Bootstrap bootstrap = 1;
+  config.bootstrap.v2.Bootstrap bootstrap = 1;
 
   // The timestamp when the BootstrapConfig was last updated.
   google.protobuf.Timestamp last_updated = 2;
@@ -49,15 +49,10 @@ message BootstrapConfigDump {
 // configuration information can be used to recreate an Envoy configuration by populating all
 // listeners as static listeners or by returning them in a LDS response.
 message ListenersConfigDump {
-  // This is the :ref:`version_info <envoy_api_field_DiscoveryResponse.version_info>` in the
-  // last processed LDS discovery response. If there are only static bootstrap listeners, this field
-  // will be "".
-  string version_info = 1;
-
   // Describes a statically loaded listener.
   message StaticListener {
     // The listener config.
-    envoy.api.v2.Listener listener = 1;
+    api.v2.Listener listener = 1;
 
     // The timestamp when the Listener was last updated.
     google.protobuf.Timestamp last_updated = 2;
@@ -72,11 +67,16 @@ message ListenersConfigDump {
     string version_info = 1;
 
     // The listener config.
-    envoy.api.v2.Listener listener = 2;
+    api.v2.Listener listener = 2;
 
     // The timestamp when the Listener was last updated.
     google.protobuf.Timestamp last_updated = 3;
   }
+
+  // This is the :ref:`version_info <envoy_api_field_DiscoveryResponse.version_info>` in the
+  // last processed LDS discovery response. If there are only static bootstrap listeners, this field
+  // will be "".
+  string version_info = 1;
 
   // The statically loaded listener configs.
   repeated StaticListener static_listeners = 2;
@@ -102,15 +102,10 @@ message ListenersConfigDump {
 // configuration information can be used to recreate an Envoy configuration by populating all
 // clusters as static clusters or by returning them in a CDS response.
 message ClustersConfigDump {
-  // This is the :ref:`version_info <envoy_api_field_DiscoveryResponse.version_info>` in the
-  // last processed CDS discovery response. If there are only static bootstrap clusters, this field
-  // will be "".
-  string version_info = 1;
-
   // Describes a statically loaded cluster.
   message StaticCluster {
     // The cluster config.
-    envoy.api.v2.Cluster cluster = 1;
+    api.v2.Cluster cluster = 1;
 
     // The timestamp when the Cluster was last updated.
     google.protobuf.Timestamp last_updated = 2;
@@ -125,11 +120,16 @@ message ClustersConfigDump {
     string version_info = 1;
 
     // The cluster config.
-    envoy.api.v2.Cluster cluster = 2;
+    api.v2.Cluster cluster = 2;
 
     // The timestamp when the Cluster was last updated.
     google.protobuf.Timestamp last_updated = 3;
   }
+
+  // This is the :ref:`version_info <envoy_api_field_DiscoveryResponse.version_info>` in the
+  // last processed CDS discovery response. If there are only static bootstrap clusters, this field
+  // will be "".
+  string version_info = 1;
 
   // The statically loaded cluster configs.
   repeated StaticCluster static_clusters = 2;
@@ -153,7 +153,7 @@ message ClustersConfigDump {
 message RoutesConfigDump {
   message StaticRouteConfig {
     // The route config.
-    envoy.api.v2.RouteConfiguration route_config = 1;
+    api.v2.RouteConfiguration route_config = 1;
 
     // The timestamp when the Route was last updated.
     google.protobuf.Timestamp last_updated = 2;
@@ -166,7 +166,7 @@ message RoutesConfigDump {
     string version_info = 1;
 
     // The route config.
-    envoy.api.v2.RouteConfiguration route_config = 2;
+    api.v2.RouteConfiguration route_config = 2;
 
     // The timestamp when the Route was last updated.
     google.protobuf.Timestamp last_updated = 3;
@@ -189,7 +189,7 @@ message ScopedRoutesConfigDump {
     string name = 1;
 
     // The scoped route configurations.
-    repeated envoy.api.v2.ScopedRouteConfiguration scoped_route_configs = 2;
+    repeated api.v2.ScopedRouteConfiguration scoped_route_configs = 2;
 
     // The timestamp when the scoped route config set was last updated.
     google.protobuf.Timestamp last_updated = 3;
@@ -205,7 +205,7 @@ message ScopedRoutesConfigDump {
     string version_info = 2;
 
     // The scoped route configurations.
-    repeated envoy.api.v2.ScopedRouteConfiguration scoped_route_configs = 3;
+    repeated api.v2.ScopedRouteConfiguration scoped_route_configs = 3;
 
     // The timestamp when the scoped route config set was last updated.
     google.protobuf.Timestamp last_updated = 4;
@@ -234,7 +234,7 @@ message SecretsConfigDump {
     // The actual secret information.
     // Security sensitive information is redacted (replaced with "[redacted]") for
     // private keys and passwords in TLS certificates.
-    envoy.api.v2.auth.Secret secret = 4;
+    api.v2.auth.Secret secret = 4;
   }
 
   // StaticSecret specifies statically loaded secret in bootstrap.
@@ -248,7 +248,7 @@ message SecretsConfigDump {
     // The actual secret information.
     // Security sensitive information is redacted (replaced with "[redacted]") for
     // private keys and passwords in TLS certificates.
-    envoy.api.v2.auth.Secret secret = 3;
+    api.v2.auth.Secret secret = 3;
   }
 
   // The statically loaded secrets.

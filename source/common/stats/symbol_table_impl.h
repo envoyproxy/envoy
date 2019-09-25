@@ -659,6 +659,18 @@ public:
   void rememberBuiltin(absl::string_view str);
 
   /**
+   * Remembers every string in a container as builtins.
+   */
+  template <class StringContainer> void rememberBuiltins(const StringContainer& container) {
+    for (const auto& str : container) {
+      rememberBuiltin(str);
+    }
+  }
+  void rememberBuiltins(const std::vector<const char*>& container) {
+    rememberBuiltins<std::vector<const char*>>(container);
+  }
+
+  /**
    * Finds a StatName by name. If 'token' has been remembered as a built-in,
    * then no lock is required. Otherwise we must consult dynamic_stat_names_
    * under a lock that's private to the StatNameSet. If that's empty, we need to
@@ -671,15 +683,19 @@ public:
    * set's mutex and also the SymbolTable mutex which must be taken during
    * StatNamePool::add().
    */
-  StatName getStatName(absl::string_view token);
+  StatName getDynamic(absl::string_view token);
+  StatName getBuiltin(absl::string_view token, StatName fallback);
 
   /**
    * Adds a StatName using the pool, but without remembering it in any maps.
    */
-  StatName add(absl::string_view str) { return pool_.add(str); }
+  StatName add(absl::string_view str) {
+    absl::MutexLock lock(&mutex_);
+    return pool_.add(str);
+  }
 
 private:
-  Stats::StatNamePool pool_;
+  Stats::StatNamePool pool_ GUARDED_BY(mutex_);
   absl::Mutex mutex_;
   using StringStatNameMap = absl::flat_hash_map<std::string, Stats::StatName>;
   StringStatNameMap builtin_stat_names_;

@@ -50,7 +50,8 @@ bool ipFamilySupported(int domain) {
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
   const Api::SysCallIntResult result = os_sys_calls.socket(domain, SOCK_STREAM, 0);
   if (result.rc_ >= 0) {
-    RELEASE_ASSERT(os_sys_calls.close(result.rc_).rc_ == 0, "");
+    RELEASE_ASSERT(os_sys_calls.close(result.rc_).rc_ == 0,
+                   absl::StrCat("Fail to close fd: response code ", result.rc_));
   }
   return result.rc_ != -1;
 }

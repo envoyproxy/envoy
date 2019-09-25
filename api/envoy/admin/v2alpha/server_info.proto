@@ -13,19 +13,22 @@ import "google/protobuf/duration.proto";
 // Proto representation of the value returned by /server_info, containing
 // server version/server status information.
 message ServerInfo {
-  // Server version.
-  string version = 1;
-
   enum State {
     // Server is live and serving traffic.
     LIVE = 0;
+
     // Server is draining listeners in response to external health checks failing.
     DRAINING = 1;
+
     // Server has not yet completed cluster manager initialization.
     PRE_INITIALIZING = 2;
+
     // Server is running the cluster manager initialization callbacks (e.g., RDS).
     INITIALIZING = 3;
   }
+
+  // Server version.
+  string version = 1;
 
   // State of the server.
   State state = 2;
@@ -44,6 +47,24 @@ message ServerInfo {
 }
 
 message CommandLineOptions {
+  enum IpVersion {
+    v4 = 0;
+    v6 = 1;
+  }
+
+  enum Mode {
+    // Validate configs and then serve traffic normally.
+    Serve = 0;
+
+    // Validate configs and exit.
+    Validate = 1;
+
+    // Completely load and initialize the config, and then exit without running the listener loop.
+    InitOnly = 2;
+  }
+
+  reserved 12;
+
   // See :option:`--base-id` for details.
   uint64 base_id = 1;
 
@@ -65,11 +86,6 @@ message CommandLineOptions {
   // See :option:`--admin-address-path` for details.
   string admin_address_path = 6;
 
-  enum IpVersion {
-    v4 = 0;
-    v6 = 1;
-  }
-
   // See :option:`--local-address-ip-version` for details.
   IpVersion local_address_ip_version = 7;
 
@@ -84,8 +100,6 @@ message CommandLineOptions {
 
   // See :option:`--log-path` for details.
   string log_path = 11;
-
-  reserved 12;
 
   // See :option:`--service-cluster` for details.
   string service_cluster = 13;
@@ -105,22 +119,12 @@ message CommandLineOptions {
   // See :option:`--parent-shutdown-time-s` for details.
   google.protobuf.Duration parent_shutdown_time = 18;
 
-  enum Mode {
-    // Validate configs and then serve traffic normally.
-    Serve = 0;
-
-    // Validate configs and exit.
-    Validate = 1;
-
-    // Completely load and initialize the config, and then exit without running the listener loop.
-    InitOnly = 2;
-  }
-
   // See :option:`--mode` for details.
   Mode mode = 19;
 
   // max_stats and max_obj_name_len are now unused and have no effect.
   uint64 max_stats = 20 [deprecated = true];
+
   uint64 max_obj_name_len = 21 [deprecated = true];
 
   // See :option:`--disable-hot-restart` for details.
