@@ -64,6 +64,9 @@ private:
   };
   using List = std::list<ItemCount>;
   List list_;
+
+  // TODO(jmarantz): we could make this more compact by making this a set of
+  // list-iterators with heterogeneous hash/compare functors.
   using Map = absl::flat_hash_map<absl::string_view, List::iterator>;
   Map map_;
   uint64_t total_{0};
