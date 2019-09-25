@@ -80,6 +80,7 @@ void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>
     }
   }
 
+  bool map_is_single_wildcard = (watches_.size() == 1 && wildcard_watches_.size() == 1);
   // We just bundled up the updates into nice per-watch packages. Now, deliver them.
   for (auto& watch : watches_) {
     const auto this_watch_updates = per_watch_updates.find(watch);
@@ -91,8 +92,7 @@ void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>
       // 2) If this watch previously had some resources, it means this update is removing all
       //    of this watch's resources, so the watch must be informed with an onConfigUpdate.
       // 3) Otherwise, we can skip onConfigUpdate for this watch.
-      if ((watches_.size() == 1 && wildcard_watches_.size() == 1) ||
-          !watch->state_of_the_world_empty_) {
+      if (map_is_single_wildcard || !watch->state_of_the_world_empty_) {
         watch->callbacks_.onConfigUpdate({}, version_info);
       }
       watch->state_of_the_world_empty_ = true;
