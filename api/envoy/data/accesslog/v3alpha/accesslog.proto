@@ -12,6 +12,7 @@ import "envoy/api/v3alpha/core/base.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/wrappers.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: gRPC access logs]
@@ -34,9 +35,6 @@ message TCPAccessLogEntry {
 }
 
 message HTTPAccessLogEntry {
-  // Common properties shared by all Envoy access logs.
-  AccessLogCommon common_properties = 1;
-
   // HTTP version
   enum HTTPVersion {
     PROTOCOL_UNSPECIFIED = 0;
@@ -44,6 +42,10 @@ message HTTPAccessLogEntry {
     HTTP11 = 2;
     HTTP2 = 3;
   }
+
+  // Common properties shared by all Envoy access logs.
+  AccessLogCommon common_properties = 1;
+
   HTTPVersion protocol_version = 2;
 
   // Description of the incoming HTTP request.
@@ -67,15 +69,15 @@ message AccessLogCommon {
   // [#not-implemented-hide:]
   // This field indicates the rate at which this log entry was sampled.
   // Valid range is (0.0, 1.0].
-  double sample_rate = 1 [(validate.rules).double.gt = 0.0, (validate.rules).double.lte = 1.0];
+  double sample_rate = 1 [(validate.rules).double = {lte: 1.0 gt: 0.0}];
 
   // This field is the remote/origin address on which the request from the user was received.
   // Note: This may not be the physical peer. E.g, if the remote address is inferred from for
   // example the x-forwarder-for header, proxy protocol, etc.
-  envoy.api.v3alpha.core.Address downstream_remote_address = 2;
+  api.v3alpha.core.Address downstream_remote_address = 2;
 
   // This field is the local/destination address on which the request from the user was received.
-  envoy.api.v3alpha.core.Address downstream_local_address = 3;
+  api.v3alpha.core.Address downstream_local_address = 3;
 
   // If the connection is secure,S this field will contain TLS properties.
   TLSProperties tls_properties = 4;
@@ -124,10 +126,10 @@ message AccessLogCommon {
 
   // The upstream remote/destination address that handles this exchange. This does not include
   // retries.
-  envoy.api.v3alpha.core.Address upstream_remote_address = 13;
+  api.v3alpha.core.Address upstream_remote_address = 13;
 
   // The upstream local/origin address that handles this exchange. This does not include retries.
-  envoy.api.v3alpha.core.Address upstream_local_address = 14;
+  api.v3alpha.core.Address upstream_local_address = 14;
 
   // The upstream cluster that *upstream_remote_address* belongs to.
   string upstream_cluster = 15;
@@ -143,7 +145,7 @@ message AccessLogCommon {
   // route created from a higher level forwarding rule with some ID can place
   // that ID in this field and cross reference later. It can also be used to
   // determine if a canary endpoint was used or not.
-  envoy.api.v3alpha.core.Metadata metadata = 17;
+  api.v3alpha.core.Metadata metadata = 17;
 
   // If upstream connection failed due to transport socket (e.g. TLS handshake), provides the
   // failure reason from the transport socket. The format of this field depends on the configured
@@ -153,10 +155,27 @@ message AccessLogCommon {
 
   // The name of the route
   string route_name = 19;
+
+  // This field is the downstream direct remote address on which the request from the user was
+  // received. Note: This is always the physical peer, even if the remote address is inferred from
+  // for example the x-forwarder-for header, proxy protocol, etc.
+  api.v3alpha.core.Address downstream_direct_remote_address = 20;
 }
 
 // Flags indicating occurrences during request/response processing.
 message ResponseFlags {
+  message Unauthorized {
+    // Reasons why the request was unauthorized
+    enum Reason {
+      REASON_UNSPECIFIED = 0;
+
+      // The request was denied by the external authorization service.
+      EXTERNAL_SERVICE = 1;
+    }
+
+    Reason reason = 1;
+  }
+
   // Indicates local server healthcheck failed.
   bool failed_local_healthcheck = 1;
 
@@ -193,17 +212,6 @@ message ResponseFlags {
   // Indicates that the request was rate-limited locally.
   bool rate_limited = 12;
 
-  message Unauthorized {
-    // Reasons why the request was unauthorized
-    enum Reason {
-      REASON_UNSPECIFIED = 0;
-      // The request was denied by the external authorization service.
-      EXTERNAL_SERVICE = 1;
-    }
-
-    Reason reason = 1;
-  }
-
   // Indicates if the request was deemed unauthorized and the reason for it.
   Unauthorized unauthorized_details = 13;
 
@@ -233,6 +241,24 @@ message TLSProperties {
     TLSv1_2 = 3;
     TLSv1_3 = 4;
   }
+
+  message CertificateProperties {
+    message SubjectAltName {
+      oneof san {
+        string uri = 1;
+
+        // [#not-implemented-hide:]
+        string dns = 2;
+      }
+    }
+
+    // SANs present in the certificate.
+    repeated SubjectAltName subject_alt_name = 1;
+
+    // The subject field of the certificate.
+    string subject = 2;
+  }
+
   // Version of TLS that was negotiated.
   TLSVersion tls_version = 1;
 
@@ -245,22 +271,6 @@ message TLSProperties {
 
   // SNI hostname from handshake.
   string tls_sni_hostname = 3;
-
-  message CertificateProperties {
-    message SubjectAltName {
-      oneof san {
-        string uri = 1;
-        // [#not-implemented-hide:]
-        string dns = 2;
-      }
-    }
-
-    // SANs present in the certificate.
-    repeated SubjectAltName subject_alt_name = 1;
-
-    // The subject field of the certificate.
-    string subject = 2;
-  }
 
   // Properties of the local certificate used to negotiate TLS.
   CertificateProperties local_certificate_properties = 4;
@@ -276,7 +286,7 @@ message HTTPRequestProperties {
   // The request method (RFC 7231/2616).
   // [#comment:TODO(htuch): add (validate.rules).enum.defined_only = true once
   // https://github.com/lyft/protoc-gen-validate/issues/42 is resolved.]
-  envoy.api.v3alpha.core.RequestMethod request_method = 1;
+  api.v3alpha.core.RequestMethod request_method = 1;
 
   // The scheme portion of the incoming request URI.
   string scheme = 2;

@@ -12,7 +12,6 @@ option java_package = "io.envoyproxy.envoy.admin.v2alpha";
 message SimpleMetric {
   enum Type {
     COUNTER = 0;
-
     GAUGE = 1;
   }
 
