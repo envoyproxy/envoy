@@ -286,7 +286,7 @@ TEST_F(AggregateClusterTest, LBContextTest) {
   AggregateLoadBalancerContext context(nullptr,
                                        Upstream::LoadBalancerBase::HostAvailability::Healthy, 0);
 
-  EXPECT_EQ(context.computeHashKey().value, {});
+  EXPECT_EQ(context.computeHashKey().has_value(), false);
   EXPECT_EQ(context.downstreamConnection(), nullptr);
   EXPECT_EQ(context.metadataMatchCriteria(), nullptr);
   EXPECT_EQ(context.downstreamHeaders(), nullptr);
