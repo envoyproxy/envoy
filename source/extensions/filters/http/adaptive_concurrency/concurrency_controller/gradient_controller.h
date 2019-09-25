@@ -140,8 +140,8 @@ using GradientControllerConfigSharedPtr = std::shared_ptr<GradientControllerConf
 class GradientController : public ConcurrencyController {
 public:
   GradientController(GradientControllerConfigSharedPtr config, Event::Dispatcher& dispatcher,
-                     Runtime::Loader& runtime, const std::string& stats_prefix,
-                     Stats::Scope& scope, Runtime::RandomGenerator& random);
+                     Runtime::Loader& runtime, const std::string& stats_prefix, Stats::Scope& scope,
+                     Runtime::RandomGenerator& random);
 
   // ConcurrencyController.
   RequestForwardingAction forwardingDecision() override;
@@ -163,7 +163,8 @@ private:
     concurrency_limit_.store(new_limit);
     stats_.concurrency_limit_.set(concurrency_limit_.load());
   }
-  std::chrono::milliseconds applyJitter(const std::chrono::milliseconds& interval, const double jitter_pct);
+  std::chrono::milliseconds applyJitter(const std::chrono::milliseconds& interval,
+                                        const double jitter_pct);
 
   const GradientControllerConfigSharedPtr config_;
   Event::Dispatcher& dispatcher_;

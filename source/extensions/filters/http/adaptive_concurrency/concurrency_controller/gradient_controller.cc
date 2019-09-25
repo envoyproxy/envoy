@@ -47,8 +47,9 @@ GradientController::GradientController(GradientControllerConfigSharedPtr config,
                                        const std::string& stats_prefix, Stats::Scope& scope,
                                        Runtime::RandomGenerator& random)
     : config_(std::move(config)), dispatcher_(dispatcher), scope_(scope),
-      stats_(generateStats(scope_, stats_prefix)),  random_(random), deferred_limit_value_(1), num_rq_outstanding_(0),
-      concurrency_limit_(1), latency_sample_hist_(hist_fast_alloc(), hist_free) {
+      stats_(generateStats(scope_, stats_prefix)), random_(random), deferred_limit_value_(1),
+      num_rq_outstanding_(0), concurrency_limit_(1),
+      latency_sample_hist_(hist_fast_alloc(), hist_free) {
   min_rtt_calc_timer_ = dispatcher_.createTimer([this]() -> void { enterMinRTTSamplingWindow(); });
 
   sample_reset_timer_ = dispatcher_.createTimer([this]() -> void {
@@ -106,7 +107,8 @@ void GradientController::updateMinRTT() {
       applyJitter(config_->minRTTCalcInterval(), config_->jitterPercent()));
 }
 
-std::chrono::milliseconds GradientController::applyJitter(const std::chrono::milliseconds& interval, const double jitter_pct) {
+std::chrono::milliseconds GradientController::applyJitter(const std::chrono::milliseconds& interval,
+                                                          const double jitter_pct) {
   if (jitter_pct == 0) {
     return interval;
   }
