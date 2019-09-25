@@ -3,7 +3,7 @@
 #include <atomic>
 #include <chrono>
 
-#include "envoy/config/filter/http/adaptive_concurrency/v2alpha/adaptive_concurrency.pb.h"
+#include "envoy/config/filter/http/adaptive_concurrency/v3alpha/adaptive_concurrency.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats.h"
@@ -23,13 +23,13 @@ namespace AdaptiveConcurrency {
 namespace ConcurrencyController {
 
 GradientControllerConfig::GradientControllerConfig(
-    const envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig&
+    const envoy::config::filter::http::adaptive_concurrency::v3alpha::GradientControllerConfig&
         proto_config)
     : min_rtt_calc_interval_(std::chrono::milliseconds(
           DurationUtil::durationToMilliseconds(proto_config.min_rtt_calc_params().interval()))),
       jitter_pct_(
           PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(proto_config.min_rtt_calc_params(), jitter, 15) /
-          100.0) {}
+          100.0),
       sample_rtt_calc_interval_(std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
           proto_config.concurrency_limit_params().concurrency_update_interval()))),
       max_concurrency_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
@@ -44,9 +44,10 @@ GradientControllerConfig::GradientControllerConfig(
 
 GradientController::GradientController(GradientControllerConfigSharedPtr config,
                                        Event::Dispatcher& dispatcher, Runtime::Loader&,
-                                       const std::string& stats_prefix, Stats::Scope& scope)
+                                       const std::string& stats_prefix, Stats::Scope& scope,
+                                       Runtime::RandomGenerator& random)
     : config_(std::move(config)), dispatcher_(dispatcher), scope_(scope),
-      stats_(generateStats(scope_, stats_prefix)), deferred_limit_value_(1), num_rq_outstanding_(0),
+      stats_(generateStats(scope_, stats_prefix)),  random_(random), deferred_limit_value_(1), num_rq_outstanding_(0),
       concurrency_limit_(1), latency_sample_hist_(hist_fast_alloc(), hist_free) {
   min_rtt_calc_timer_ = dispatcher_.createTimer([this]() -> void { enterMinRTTSamplingWindow(); });
 
@@ -101,11 +102,17 @@ void GradientController::updateMinRTT() {
     deferred_limit_value_.store(0);
   }
 
-  // Make a copy of the minRTT interval duration so it does not change during the calculation of the
-  // next minRTT calculation window.
-  const auto min_rtt_interval = config_->minRTTCalcInterval();
   min_rtt_calc_timer_->enableTimer(
-      min_rtt_interval - min_rtt_interval * config_->jitterPercent() / 2);
+      applyJitter(config_->minRTTCalcInterval(), config_->jitterPercent()));
+}
+
+std::chrono::milliseconds GradientController::applyJitter(const std::chrono::milliseconds& interval, const double jitter_pct) {
+  if (jitter_pct == 0) {
+    return interval;
+  }
+
+  const int jitter_range_ms = interval.count() * jitter_pct;
+  return std::chrono::milliseconds(interval.count() + random_.random() % jitter_range_ms);
 }
 
 void GradientController::resetSampleWindow() {

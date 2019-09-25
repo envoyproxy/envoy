@@ -3,8 +3,8 @@
 #include <chrono>
 #include <vector>
 
-#include "envoy/config/filter/http/adaptive_concurrency/v2alpha/adaptive_concurrency.pb.h"
-#include "envoy/config/filter/http/adaptive_concurrency/v2alpha/adaptive_concurrency.pb.validate.h"
+#include "envoy/config/filter/http/adaptive_concurrency/v3alpha/adaptive_concurrency.pb.h"
+#include "envoy/config/filter/http/adaptive_concurrency/v3alpha/adaptive_concurrency.pb.validate.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats_macros.h"
@@ -40,15 +40,11 @@ struct GradientControllerStats {
 class GradientControllerConfig {
 public:
   GradientControllerConfig(
-      const envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig&
+      const envoy::config::filter::http::adaptive_concurrency::v3alpha::GradientControllerConfig&
           proto_config);
 
-  double jitterPercent() const {
-    ASSERT(jitter_pct_ >= 0);
-    ASSERT(jitter_pct_ <= 100);
-    return jitter_pct_;
-  }
   std::chrono::milliseconds minRTTCalcInterval() const { return min_rtt_calc_interval_; }
+  double jitterPercent() const { return jitter_pct_; }
   std::chrono::milliseconds sampleRTTCalcInterval() const { return sample_rtt_calc_interval_; }
   uint32_t maxConcurrencyLimit() const { return max_concurrency_limit_; }
   uint32_t minRTTAggregateRequestCount() const { return min_rtt_aggregate_request_count_; }
@@ -145,7 +141,7 @@ class GradientController : public ConcurrencyController {
 public:
   GradientController(GradientControllerConfigSharedPtr config, Event::Dispatcher& dispatcher,
                      Runtime::Loader& runtime, const std::string& stats_prefix,
-                     Stats::Scope& scope);
+                     Stats::Scope& scope, Runtime::RandomGenerator& random);
 
   // ConcurrencyController.
   RequestForwardingAction forwardingDecision() override;
@@ -167,11 +163,13 @@ private:
     concurrency_limit_.store(new_limit);
     stats_.concurrency_limit_.set(concurrency_limit_.load());
   }
+  std::chrono::milliseconds applyJitter(const std::chrono::milliseconds& interval, const double jitter_pct);
 
   const GradientControllerConfigSharedPtr config_;
   Event::Dispatcher& dispatcher_;
   Stats::Scope& scope_;
   GradientControllerStats stats_;
+  Runtime::RandomGenerator& random_;
 
   // Protects data related to latency sampling and RTT values. In addition to protecting the latency
   // sample histogram, the mutex ensures that the minRTT calculation window and the sample window
