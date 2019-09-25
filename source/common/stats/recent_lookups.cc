@@ -18,17 +18,13 @@ void RecentLookups::lookup(absl::string_view str) {
   }
   Map::iterator map_iter = map_.find(str);
   if (map_iter != map_.end()) {
-    // The item is already in the list. We need to bump its count and move it to
-    // the front. Moving the item invalidates the iterator, so we need to update
-    // the map entry. The map's string_View references the std::string item in
-    // the list, so we need to be careful to move it out of and back into the
-    // list, to avoid invalidating the map key.
+    // The item is already in the list. Bump its reference-count and move it to
+    // the front of the list.
     List::iterator list_iter = map_iter->second;
-    ItemCount item_count = std::move(*list_iter); // Preserves map's string_view key.
-    list_.erase(list_iter);
-    ++item_count.count_;
-    list_.push_front(std::move(item_count)); // Preserves map's string_view key.
-    map_iter->second = list_.begin();
+    ++list_iter->count_;
+    if (list_iter != list_.begin()) {
+      list_.splice(list_.begin(), list_, list_iter);
+    }
   } else {
     ASSERT(list_.size() <= capacity_);
     // Evict oldest item if needed.
