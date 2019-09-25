@@ -148,7 +148,6 @@ workflows:
       - coverage_publish:
           requires: [coverage]
       - clang_tidy
-      - build_image
       - docs:
           filters:
             tags:
