@@ -51,7 +51,10 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
       write_buffer_(
           dispatcher.getWatermarkFactory().create([this]() -> void { this->onLowWatermark(); },
                                                   [this]() -> void { this->onHighWatermark(); })),
-      dispatcher_(dispatcher), id_(next_global_id_++) {
+      dispatcher_(dispatcher), id_(next_global_id_++), read_enabled_(true),
+      above_high_watermark_(false), detect_early_close_(true), enable_half_close_(false),
+      read_end_stream_raised_(false), read_end_stream_(false), write_end_stream_(false),
+      current_write_end_stream_(false) {
   // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
   // condition and just crash.
   RELEASE_ASSERT(ioHandle().fd() != -1, "");
@@ -323,8 +326,9 @@ void ConnectionImpl::readDisable(bool disable) {
     file_event_->setEnabled(Event::FileReadyType::Read | Event::FileReadyType::Write);
     // If the connection has data buffered there's no guarantee there's also data in the kernel
     // which will kick off the filter chain. Instead fake an event to make sure the buffered data
-    // gets processed regardless.
+    // gets processed regardless and ensure that we push it up via onRead.
     if (read_buffer_.length() > 0) {
+      force_on_read_ = true;
       file_event_->activate(Event::FileReadyType::Read);
     }
   }
@@ -509,9 +513,10 @@ void ConnectionImpl::onReadReady() {
   }
 
   read_end_stream_ |= result.end_stream_read_;
-  if (result.bytes_processed_ != 0 || result.end_stream_read_ || read_buffer_.length() != 0) {
-    // Skip onRead if no bytes were processed and no bytes are buffered. For instance, if the
-    // connection was closed without producing more data.
+  if (result.bytes_processed_ != 0 || result.end_stream_read_ || force_on_read_) {
+    force_on_read_ = false;
+    // Skip onRead if no bytes were processed unless we explicitly want to force onRead.
+    // For instance, skip onRead if the connection was closed without producing more data.
     onRead(new_buffer_size);
   }
 

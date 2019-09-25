@@ -979,30 +979,8 @@ TEST_P(ConnectionImplTest, EmptyReadOnCloseTest) {
   EXPECT_CALL(*read_filter_, onNewConnection());
   EXPECT_CALL(*read_filter_, onData(_, _))
       .Times(1)
-      .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> FilterStatus {
-        EXPECT_EQ(buffer_size, buffer.length());
-        buffer.drain(buffer.length());
-        dispatcher_->exit();
-        return FilterStatus::StopIteration;
-      }));
-  client_connection_->write(data, false);
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
-
-  disconnect(true);
-}
-
-// Unlike EmptyReadOnCloseTest above, the read on close will result in an onData
-// call if there was buffered data.
-TEST_P(ConnectionImplTest, ReadEventIfBufferedDataOnClose) {
-  setUpBasicConnection();
-  connect();
-
-  const int buffer_size = 32;
-  Buffer::OwnedImpl data(std::string(buffer_size, 'a'));
-  EXPECT_CALL(*read_filter_, onNewConnection());
-  EXPECT_CALL(*read_filter_, onData(_, _))
-      .Times(2)
-      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterStatus {
+      .WillOnce(Invoke([&](Buffer::Instance& data, bool) -> FilterStatus {
+        EXPECT_EQ(buffer_size, data.length());
         dispatcher_->exit();
         return FilterStatus::StopIteration;
       }));
@@ -1077,11 +1055,10 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayCloseTest) {
 
   EXPECT_CALL(*client_read_filter, onData(BufferStringEqual("Connection: Close"), false))
       .Times(1)
-      .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> FilterStatus {
+      .WillOnce(InvokeWithoutArgs([&]() -> FilterStatus {
         // Advance time by 50ms; delayed close timer should _not_ trigger.
         time_system_.setMonotonicTime(std::chrono::milliseconds(50));
         client_connection_->close(ConnectionCloseType::NoFlush);
-        buffer.drain(buffer.length());
         return FilterStatus::StopIteration;
       }));
 
@@ -1121,8 +1098,7 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayCloseTimerTriggerTest) {
   // on the server connection.
   EXPECT_CALL(*client_read_filter, onData(BufferStringEqual("Connection: Close"), false))
       .Times(1)
-      .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> FilterStatus {
-        buffer.drain(buffer.length());
+      .WillOnce(InvokeWithoutArgs([&]() -> FilterStatus {
         time_system_.setMonotonicTime(std::chrono::milliseconds(100));
         return FilterStatus::StopIteration;
       }));
@@ -1201,8 +1177,7 @@ TEST_P(ConnectionImplTest, FlushWriteAfterFlushWriteAndDelayWithoutPendingWrite)
   server_connection_->close(ConnectionCloseType::FlushWriteAndDelay);
   EXPECT_CALL(*client_read_filter, onData(BufferStringEqual("Connection: Close"), false))
       .Times(1)
-      .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> FilterStatus {
-        buffer.drain(buffer.length());
+      .WillOnce(InvokeWithoutArgs([&]() -> FilterStatus {
         dispatcher_->exit();
         return FilterStatus::StopIteration;
       }));
