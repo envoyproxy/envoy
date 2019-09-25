@@ -62,6 +62,6 @@ message AdaptiveConcurrency {
         [(validate.rules).message.required = true];
   }
 
-  // Whether to disable the filter by default.
+  // If set to true, the adaptive concurrency filter will operate as a pass-through filter.
   bool disabled = 2;
 }

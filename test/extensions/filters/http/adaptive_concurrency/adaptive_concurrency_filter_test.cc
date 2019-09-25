@@ -76,9 +76,7 @@ public:
   std::unique_ptr<AdaptiveConcurrencyFilter> filter_;
 };
 
-TEST_F(AdaptiveConcurrencyFilterConfigTest, TestRuntimeOverride) {}
-
-TEST_F(AdaptiveConcurrencyFilterTest, TestDisable2) {
+TEST_F(AdaptiveConcurrencyFilterTest, TestDisableOverriddenFromRuntime) {
   std::string yaml_config =
       R"EOF(
 gradient_controller_config:
@@ -120,7 +118,7 @@ disabled: false
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 }
 
-TEST_F(AdaptiveConcurrencyFilterTest, TestDisable) {
+TEST_F(AdaptiveConcurrencyFilterTest, TestDisableConfiguredInProto) {
   std::string yaml_config =
       R"EOF(
 gradient_controller_config:

@@ -34,9 +34,7 @@ public:
 
   // Returns whether the filter should operate as a pass-through for a request.
   bool filterDisabled() const {
-    const auto disabled_int =
-        runtime_.snapshot().getInteger(RuntimeKeys::get().DisableKey, disabled_ ? 1 : 0);
-    return disabled_int != 0;
+    return runtime_.snapshot().getInteger(RuntimeKeys::get().DisableKey, disabled_ ? 1 : 0) > 0;
   }
 
   TimeSource& timeSource() const { return time_source_; }
