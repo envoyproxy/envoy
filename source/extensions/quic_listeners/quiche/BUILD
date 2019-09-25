@@ -230,6 +230,7 @@ envoy_cc_library(
         ":envoy_quic_connection_lib",
         ":envoy_quic_packet_writer_lib",
         "//include/envoy/event:dispatcher_interface",
+        "//source/common/network:socket_option_factory_lib",
     ],
 )
 

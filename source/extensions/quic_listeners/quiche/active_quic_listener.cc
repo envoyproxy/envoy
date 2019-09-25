@@ -43,6 +43,7 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
       quic::QuicRandom::GetInstance(), std::make_unique<EnvoyQuicFakeProofSource>(),
       quic::KeyExchangeSource::Default());
   auto connection_helper = std::make_unique<EnvoyQuicConnectionHelper>(dispatcher_);
+  crypto_config_->AddDefaultConfig(random, connection_helper->GetClock(), quic::QuicCryptoServerConfig::ConfigOptions());
   auto alarm_factory =
       std::make_unique<EnvoyQuicAlarmFactory>(dispatcher_, *connection_helper->GetClock());
   quic_dispatcher_ = std::make_unique<EnvoyQuicDispatcher>(
