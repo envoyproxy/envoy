@@ -27,6 +27,9 @@ GradientControllerConfig::GradientControllerConfig(
         proto_config)
     : min_rtt_calc_interval_(std::chrono::milliseconds(
           DurationUtil::durationToMilliseconds(proto_config.min_rtt_calc_params().interval()))),
+      jitter_pct_(
+          PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(proto_config.min_rtt_calc_params(), jitter, 15) /
+          100.0) {}
       sample_rtt_calc_interval_(std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
           proto_config.concurrency_limit_params().concurrency_update_interval()))),
       max_concurrency_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
@@ -98,7 +101,11 @@ void GradientController::updateMinRTT() {
     deferred_limit_value_.store(0);
   }
 
-  min_rtt_calc_timer_->enableTimer(config_->minRTTCalcInterval());
+  // Make a copy of the minRTT interval duration so it does not change during the calculation of the
+  // next minRTT calculation window.
+  const auto min_rtt_interval = config_->minRTTCalcInterval();
+  min_rtt_calc_timer_->enableTimer(
+      min_rtt_interval - min_rtt_interval * config_->jitterPercent() / 2);
 }
 
 void GradientController::resetSampleWindow() {

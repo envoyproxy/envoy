@@ -43,6 +43,11 @@ public:
       const envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig&
           proto_config);
 
+  double jitterPercent() const {
+    ASSERT(jitter_pct_ >= 0);
+    ASSERT(jitter_pct_ <= 100);
+    return jitter_pct_;
+  }
   std::chrono::milliseconds minRTTCalcInterval() const { return min_rtt_calc_interval_; }
   std::chrono::milliseconds sampleRTTCalcInterval() const { return sample_rtt_calc_interval_; }
   uint32_t maxConcurrencyLimit() const { return max_concurrency_limit_; }
@@ -53,6 +58,9 @@ public:
 private:
   // The measured request round-trip time under ideal conditions.
   const std::chrono::milliseconds min_rtt_calc_interval_;
+
+  // Randomized time delta added/subtracted from the min_rtt_calc_interval_.
+  const double jitter_pct_;
 
   // The measured sample round-trip time from the previous time window.
   const std::chrono::milliseconds sample_rtt_calc_interval_;
