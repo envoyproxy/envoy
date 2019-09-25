@@ -41,18 +41,6 @@ jobs:
        - run: ci/docker_build.sh
        - run: ci/docker_push.sh
        - run: ci/docker_tag.sh
-   asan:
-     executor: ubuntu-build
-     steps:
-       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
-       - run: echo $CIRCLE_SHA1
-       - run: echo $CIRCLE_PR_NUMBER
-       - run: curl https://api.github.com/repos/envoyproxy/envoy/pulls/$CIRCLE_PR_NUMBER/commits
-       - checkout
-       - run: ci/do_circle_ci.sh bazel.asan
-       - store_artifacts:
-           path: /build/envoy/generated
-           destination: /
 
    api:
      executor: ubuntu-build
@@ -149,7 +137,6 @@ workflows:
           filters:
             tags:
               only: /^v.*/
-      - asan
       - api
       - filter_example_mirror
       - coverage
