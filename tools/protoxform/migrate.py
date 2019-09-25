@@ -57,21 +57,36 @@ def Deprecate(proto, field_or_value):
   options.AddHideOption(field_or_value.options)
 
 
-def UpgradeMessage(msg_proto):
+def UpgradeMessage(msg_proto, file_proto):
   """In-place upgrade a DescriptorProto from v2[alpha\d] to v3alpha.
 
   Args:
     msg_proto: v2[alpha\d] DescriptorProto message.
+    file_proto: v2[alpha\d] FileDescriptorProto message.
   """
   if msg_proto.options.deprecated:
     options.AddHideOption(msg_proto.options)
+  # Today we don't use extension except to support v(N-1) embedding, so clear
+  # them.
+  has_deprecated_field = False
   for f in msg_proto.field:
     if f.options.deprecated:
       Deprecate(msg_proto, f)
+      has_deprecated_field = True
     else:
       f.type_name = UpgradedType(f.type_name)
+  if has_deprecated_field:
+    internal_field = msg_proto.field.add()
+    internal_field.name = '_api_internal_do_not_use'
+    internal_field.number = 1 + max(max(f.number for f in msg_proto.field),
+                                    max(r.end for r in msg_proto.reserved_range))
+    internal_field.type = internal_field.TYPE_MESSAGE
+    internal_field.type_name = '.google.protobuf.Any'
+    any_import_path = 'google/protobuf/any.proto'
+    if any_import_path not in file_proto.dependency:
+      file_proto.dependency.append(any_import_path)
   for m in msg_proto.nested_type:
-    UpgradeMessage(m)
+    UpgradeMessage(m, file_proto)
   for e in msg_proto.enum_type:
     UpgradeEnum(e)
 
@@ -114,7 +129,7 @@ def UpgradeFile(file_proto):
     UpgradeService(s)
   # Upgrade messages.
   for m in file_proto.message_type:
-    UpgradeMessage(m)
+    UpgradeMessage(m, file_proto)
   for e in file_proto.enum_type:
     UpgradeEnum(e)
   return file_proto

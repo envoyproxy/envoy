@@ -6,6 +6,7 @@ option java_outer_classname = "ServerInfoProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.admin.v3alpha";
 
+import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 
 // [#protodoc-title: Server State]
@@ -135,4 +136,6 @@ message CommandLineOptions {
 
   // See :option:`--cpuset-threads` for details.
   bool cpuset_threads = 25;
+
+  google.protobuf.Any _api_internal_do_not_use = 27;
 }

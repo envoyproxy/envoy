@@ -8,6 +8,7 @@ option java_package = "io.envoyproxy.envoy.config.filter.network.redis_proxy.v3a
 
 import "envoy/api/v3alpha/core/base.proto";
 
+import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
@@ -163,6 +164,8 @@ message RedisProxy {
     // Optional catch-all route to forward commands that doesn't match any of the routes. The
     // catch-all route becomes required when no routes are specified.
     Route catch_all_route = 4;
+
+    google.protobuf.Any _api_internal_do_not_use = 5;
   }
 
   reserved 2;
@@ -217,6 +220,8 @@ message RedisProxy {
   // client. If an AUTH command is received when the password is not set, then an "ERR Client sent
   // AUTH, but no password is set" error will be returned.
   api.v3alpha.core.DataSource downstream_auth_password = 6;
+
+  google.protobuf.Any _api_internal_do_not_use = 7;
 }
 
 // RedisProtocolOptions specifies Redis upstream protocol options. This object is used in

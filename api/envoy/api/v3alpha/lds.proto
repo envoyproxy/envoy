@@ -15,6 +15,7 @@ import "envoy/api/v3alpha/listener/udp_listener_config.proto";
 import "envoy/config/listener/v3alpha/api_listener.proto";
 
 import "google/api/annotations.proto";
+import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
@@ -199,4 +200,6 @@ message Listener {
   // socket listener and the various types of API listener. That way, a given Listener message
   // can structurally only contain the fields of the relevant type.]
   config.listener.v3alpha.ApiListener api_listener = 19;
+
+  google.protobuf.Any _api_internal_do_not_use = 20;
 }

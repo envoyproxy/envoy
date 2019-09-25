@@ -8,6 +8,7 @@ option java_package = "io.envoyproxy.envoy.config.filter.fault.v3alpha";
 
 import "envoy/type/percent.proto";
 
+import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 
 import "validate/validate.proto";
@@ -49,6 +50,8 @@ message FaultDelay {
 
   // The percentage of operations/connections/requests on which the delay will be injected.
   type.FractionalPercent percentage = 4;
+
+  google.protobuf.Any _api_internal_do_not_use = 6;
 }
 
 // Describes a rate limit to be applied.

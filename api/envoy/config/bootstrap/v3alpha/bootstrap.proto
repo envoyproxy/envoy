@@ -16,6 +16,7 @@ import "envoy/config/metrics/v3alpha/stats.proto";
 import "envoy/config/overload/v3alpha/overload.proto";
 import "envoy/config/trace/v3alpha/trace.proto";
 
+import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
@@ -150,6 +151,8 @@ message Bootstrap {
   // <server_statistics>` if specified. Envoy will not process this value, it will be sent as is to
   // :ref:<stats sinks <envoy_api_msg_config.metrics.v3alpha.StatsSink>.
   google.protobuf.UInt64Value stats_server_version_override = 19;
+
+  google.protobuf.Any _api_internal_do_not_use = 20;
 }
 
 // Administration interface :ref:`operations documentation
