@@ -26,7 +26,6 @@ AdaptiveConcurrencyFilter::AdaptiveConcurrencyFilter(
 
 Http::FilterHeadersStatus AdaptiveConcurrencyFilter::decodeHeaders(Http::HeaderMap&, bool) {
   if (controller_->forwardingDecision() == ConcurrencyController::RequestForwardingAction::Block) {
-    // TODO (tonya11en): Remove filler words.
     decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "", nullptr, absl::nullopt,
                                        "reached concurrency limit");
     return Http::FilterHeadersStatus::StopIteration;
