@@ -94,8 +94,8 @@ void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>
       // 3) Otherwise, we can skip onConfigUpdate for this watch.
       if (map_is_single_wildcard || !watch->state_of_the_world_empty_) {
         watch->callbacks_.onConfigUpdate({}, version_info);
+        watch->state_of_the_world_empty_ = true;
       }
-      watch->state_of_the_world_empty_ = true;
     } else {
       watch->callbacks_.onConfigUpdate(this_watch_updates->second, version_info);
       watch->state_of_the_world_empty_ = false;
