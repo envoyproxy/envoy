@@ -4,6 +4,7 @@ py_binary(
     name = "protoxform",
     srcs = [
         "migrate.py",
+        "options.py",
         "protoxform.py",
     ],
     python_version = "PY3",
