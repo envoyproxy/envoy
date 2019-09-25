@@ -782,11 +782,14 @@ public:
   virtual Network::TransportSocketFactory& transportSocketFactory() const PURE;
 
   /**
+   * @param address is the upstream networking address trying to connect to.
+   * @param metadata is the metadata associated with upstream endpoint, used to determine
+   *        the type of transport socket for connection.
    * @return Network::TransportSocketFactory& the factory of transport socket to use when
    *         communicating with the cluster.
    */
   virtual Network::TransportSocketFactory&
-  resolveTransportSocketFactory(const std::string& hardcode,
+  resolveTransportSocketFactory(const std::string& address,
                                 const envoy::api::v2::core::Metadata& metadata) const PURE;
 
   /**
