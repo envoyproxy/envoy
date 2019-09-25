@@ -186,8 +186,8 @@ void HttpPerRequestTapperImpl::onBody(
       // If we have already started streaming, flush a body segment now.
       TapCommon::TraceWrapperPtr trace = makeTraceSegment();
       TapCommon::Utility::addBufferToProtoBytes(
-          *(trace->mutable_http_streamed_trace_segment()->*mutable_body_chunk)(), max_buffered_bytes,
-          data, 0, data.length());
+          *(trace->mutable_http_streamed_trace_segment()->*mutable_body_chunk)(),
+          max_buffered_bytes, data, 0, data.length());
       sink_handle_->submitTrace(std::move(trace));
     } else if (match_status.might_change_status_) {
       // If we might still match, start buffering the body up to our limit.
@@ -206,8 +206,8 @@ void HttpPerRequestTapperImpl::onBody(
     auto& body =
         *(buffered_full_trace_->mutable_http_buffered_trace()->*mutable_message)()->mutable_body();
     ASSERT(body.as_bytes().size() <= max_buffered_bytes);
-    TapCommon::Utility::addBufferToProtoBytes(body, max_buffered_bytes - body.as_bytes().size(), data,
-                                              0, data.length());
+    TapCommon::Utility::addBufferToProtoBytes(body, max_buffered_bytes - body.as_bytes().size(),
+                                              data, 0, data.length());
   }
 }
 
