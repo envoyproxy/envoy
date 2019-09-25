@@ -36,11 +36,11 @@ message TlsParameters {
   }
 
   // Minimum TLS protocol version. By default, it's ``TLSv1_0``.
-  TlsProtocol tls_minimum_protocol_version = 1 [(validate.rules).enum.defined_only = true];
+  TlsProtocol tls_minimum_protocol_version = 1 [(validate.rules).enum = {defined_only: true}];
 
   // Maximum TLS protocol version. By default, it's ``TLSv1_3`` for servers in non-FIPS builds, and
   // ``TLSv1_2`` for clients and for servers using :ref:`BoringSSL FIPS <arch_overview_ssl_fips>`.
-  TlsProtocol tls_maximum_protocol_version = 2 [(validate.rules).enum.defined_only = true];
+  TlsProtocol tls_maximum_protocol_version = 2 [(validate.rules).enum = {defined_only: true}];
 
   // If specified, the TLS listener will only support the specified `cipher list
   // <https://commondatastorage.googleapis.com/chromium-boringssl-docs/ssl.h.html#Cipher-suite-configuration>`_
@@ -106,7 +106,7 @@ message TlsParameters {
 message PrivateKeyProvider {
   // Private key method provider name. The name must match a
   // supported private key method provider type.
-  string provider_name = 1 [(validate.rules).string.min_bytes = 1];
+  string provider_name = 1 [(validate.rules).string = {min_bytes: 1}];
 
   // Private key method provider specific configuration.
   oneof config_type {
@@ -167,7 +167,7 @@ message TlsSessionTicketKeys {
   //   * Keep the session ticket keys at least as secure as your TLS certificate private keys
   //   * Rotate session ticket keys at least daily, and preferably hourly
   //   * Always generate keys using a cryptographically-secure random data source
-  repeated core.DataSource keys = 1 [(validate.rules).repeated .min_items = 1];
+  repeated core.DataSource keys = 1 [(validate.rules).repeated = {min_items: 1}];
 }
 
 message CertificateValidationContext {
@@ -201,9 +201,9 @@ message CertificateValidationContext {
   //
   // .. code-block:: bash
   //
-  //   $ openssl x509 -in path/to/client.crt -noout -pubkey \
-  //     | openssl pkey -pubin -outform DER \
-  //     | openssl dgst -sha256 -binary \
+  //   $ openssl x509 -in path/to/client.crt -noout -pubkey
+  //     | openssl pkey -pubin -outform DER
+  //     | openssl dgst -sha256 -binary
   //     | openssl enc -base64
   //   NvqYIYSbgK2vCJpQhObf77vv+bQWtc5ek5RIOwPiC9A=
   //
@@ -223,7 +223,7 @@ message CertificateValidationContext {
   //   because SPKI is tied to a private key, so it doesn't change when the certificate
   //   is renewed using the same private key.
   repeated string verify_certificate_spki = 3
-      [(validate.rules).repeated .items.string = {min_bytes: 44, max_bytes: 44}];
+      [(validate.rules).repeated = {items {string {min_bytes: 44 max_bytes: 44}}}];
 
   // An optional list of hex-encoded SHA-256 hashes. If specified, Envoy will verify that
   // the SHA-256 of the DER-encoded presented certificate matches one of the specified values.
@@ -252,7 +252,7 @@ message CertificateValidationContext {
   // <envoy_api_field_auth.CertificateValidationContext.verify_certificate_spki>` are specified,
   // a hash matching value from either of the lists will result in the certificate being accepted.
   repeated string verify_certificate_hash = 2
-      [(validate.rules).repeated .items.string = {min_bytes: 64, max_bytes: 95}];
+      [(validate.rules).repeated = {items {string {min_bytes: 64 max_bytes: 95}}}];
 
   // An optional list of Subject Alternative Names. If specified, Envoy will verify that the
   // Subject Alternative Name of the presented certificate matches one of the specified values.
@@ -283,6 +283,18 @@ message CertificateValidationContext {
 
 // TLS context shared by both client and server TLS contexts.
 message CommonTlsContext {
+  message CombinedCertificateValidationContext {
+    // How to validate peer certificates.
+    CertificateValidationContext default_validation_context = 1
+        [(validate.rules).message = {required: true}];
+
+    // Config for fetching validation context via SDS API.
+    SdsSecretConfig validation_context_sds_secret_config = 2
+        [(validate.rules).message = {required: true}];
+  }
+
+  reserved 5;
+
   // TLS protocol versions, cipher suites etc.
   TlsParameters tls_params = 1;
 
@@ -296,17 +308,7 @@ message CommonTlsContext {
 
   // Configs for fetching TLS certificates via SDS API.
   repeated SdsSecretConfig tls_certificate_sds_secret_configs = 6
-      [(validate.rules).repeated .max_items = 1];
-
-  message CombinedCertificateValidationContext {
-    // How to validate peer certificates.
-    CertificateValidationContext default_validation_context = 1
-        [(validate.rules).message.required = true];
-
-    // Config for fetching validation context via SDS API.
-    SdsSecretConfig validation_context_sds_secret_config = 2
-        [(validate.rules).message.required = true];
-  };
+      [(validate.rules).repeated = {max_items: 1}];
 
   oneof validation_context_type {
     // How to validate peer certificates.
@@ -336,8 +338,6 @@ message CommonTlsContext {
   //
   // There is no default for this parameter. If empty, Envoy will not expose ALPN.
   repeated string alpn_protocols = 4;
-
-  reserved 5;
 }
 
 message UpstreamTlsContext {
@@ -345,7 +345,7 @@ message UpstreamTlsContext {
   CommonTlsContext common_tls_context = 1;
 
   // SNI string to use when creating TLS backend connections.
-  string sni = 2 [(validate.rules).string.max_bytes = 255];
+  string sni = 2 [(validate.rules).string = {max_bytes: 255}];
 
   // If true, server-initiated TLS renegotiation will be allowed.
   //
@@ -389,6 +389,7 @@ message SdsSecretConfig {
   // When only name is specified, then secret will be loaded from static
   // resources.
   string name = 1;
+
   core.ConfigSource sds_config = 2;
 }
 
@@ -396,9 +397,12 @@ message SdsSecretConfig {
 message Secret {
   // Name (FQDN, UUID, SPKI, SHA256, etc.) by which the secret can be uniquely referred to.
   string name = 1;
+
   oneof type {
     TlsCertificate tls_certificate = 2;
+
     TlsSessionTicketKeys session_ticket_keys = 3;
+
     CertificateValidationContext validation_context = 4;
   }
 }

@@ -26,7 +26,6 @@ import "validate/validate.proto";
 // [#comment:next free field: 35]
 message HttpConnectionManager {
   enum CodecType {
-
     // For every new connection, the connection manager will determine which
     // codec to use. This mode supports both ALPN for TLS listeners as well as
     // protocol inference for plaintext listeners. If ALPN data is available, it
@@ -43,13 +42,172 @@ message HttpConnectionManager {
     HTTP2 = 2;
   }
 
+  enum ServerHeaderTransformation {
+    // Overwrite any Server header with the contents of server_name.
+    OVERWRITE = 0;
+
+    // If no Server header is present, append Server server_name
+    // If a Server header is present, pass it through.
+    APPEND_IF_ABSENT = 1;
+
+    // Pass through the value of the server header, and do not append a header
+    // if none is present.
+    PASS_THROUGH = 2;
+  }
+
+  // How to handle the :ref:`config_http_conn_man_headers_x-forwarded-client-cert` (XFCC) HTTP
+  // header.
+  enum ForwardClientCertDetails {
+    // Do not send the XFCC header to the next hop. This is the default value.
+    SANITIZE = 0;
+
+    // When the client connection is mTLS (Mutual TLS), forward the XFCC header
+    // in the request.
+    FORWARD_ONLY = 1;
+
+    // When the client connection is mTLS, append the client certificate
+    // information to the request’s XFCC header and forward it.
+    APPEND_FORWARD = 2;
+
+    // When the client connection is mTLS, reset the XFCC header with the client
+    // certificate information and send it to the next hop.
+    SANITIZE_SET = 3;
+
+    // Always forward the XFCC header in the request, regardless of whether the
+    // client connection is mTLS.
+    ALWAYS_FORWARD_ONLY = 4;
+  }
+
+  message Tracing {
+    enum OperationName {
+      // The HTTP listener is used for ingress/incoming requests.
+      INGRESS = 0;
+
+      // The HTTP listener is used for egress/outgoing requests.
+      EGRESS = 1;
+    }
+
+    // The span name will be derived from this field. If
+    // :ref:`traffic_direction <envoy_api_field_Listener.traffic_direction>` is
+    // specified on the parent listener, then it is used instead of this field.
+    //
+    // .. attention::
+    //  This field has been deprecated in favor of `traffic_direction`.
+    OperationName operation_name = 1
+        [(validate.rules).enum = {defined_only: true}, deprecated = true];
+
+    // A list of header names used to create tags for the active span. The header name is used to
+    // populate the tag name, and the header value is used to populate the tag value. The tag is
+    // created if the specified header name is present in the request's headers.
+    repeated string request_headers_for_tags = 2;
+
+    // Target percentage of requests managed by this HTTP connection manager that will be force
+    // traced if the :ref:`x-client-trace-id <config_http_conn_man_headers_x-client-trace-id>`
+    // header is set. This field is a direct analog for the runtime variable
+    // 'tracing.client_sampling' in the :ref:`HTTP Connection Manager
+    // <config_http_conn_man_runtime>`.
+    // Default: 100%
+    type.Percent client_sampling = 3;
+
+    // Target percentage of requests managed by this HTTP connection manager that will be randomly
+    // selected for trace generation, if not requested by the client or not forced. This field is
+    // a direct analog for the runtime variable 'tracing.random_sampling' in the
+    // :ref:`HTTP Connection Manager <config_http_conn_man_runtime>`.
+    // Default: 100%
+    type.Percent random_sampling = 4;
+
+    // Target percentage of requests managed by this HTTP connection manager that will be traced
+    // after all other sampling checks have been applied (client-directed, force tracing, random
+    // sampling). This field functions as an upper limit on the total configured sampling rate. For
+    // instance, setting client_sampling to 100% but overall_sampling to 1% will result in only 1%
+    // of client requests with the appropriate headers to be force traced. This field is a direct
+    // analog for the runtime variable 'tracing.global_enabled' in the
+    // :ref:`HTTP Connection Manager <config_http_conn_man_runtime>`.
+    // Default: 100%
+    type.Percent overall_sampling = 5;
+
+    // Whether to annotate spans with additional data. If true, spans will include logs for stream
+    // events.
+    bool verbose = 6;
+
+    // Maximum length of the request path to extract and include in the HttpUrl tag. Used to
+    // truncate lengthy request paths to meet the needs of a tracing backend.
+    // Default: 256
+    google.protobuf.UInt32Value max_path_tag_length = 7;
+  }
+
+  message InternalAddressConfig {
+    // Whether unix socket addresses should be considered internal.
+    bool unix_sockets = 1;
+  }
+
+  // [#comment:next free field: 7]
+  message SetCurrentClientCertDetails {
+    reserved 2;
+
+    // Whether to forward the subject of the client cert. Defaults to false.
+    google.protobuf.BoolValue subject = 1;
+
+    // Whether to forward the entire client cert in URL encoded PEM format. This will appear in the
+    // XFCC header comma separated from other values with the value Cert="PEM".
+    // Defaults to false.
+    bool cert = 3;
+
+    // Whether to forward the entire client cert chain (including the leaf cert) in URL encoded PEM
+    // format. This will appear in the XFCC header comma separated from other values with the value
+    // Chain="PEM".
+    // Defaults to false.
+    bool chain = 6;
+
+    // Whether to forward the DNS type Subject Alternative Names of the client cert.
+    // Defaults to false.
+    bool dns = 4;
+
+    // Whether to forward the URI type Subject Alternative Name of the client cert. Defaults to
+    // false.
+    bool uri = 5;
+  }
+
+  // The configuration for HTTP upgrades.
+  // For each upgrade type desired, an UpgradeConfig must be added.
+  //
+  // .. warning::
+  //
+  //    The current implementation of upgrade headers does not handle
+  //    multi-valued upgrade headers. Support for multi-valued headers may be
+  //    added in the future if needed.
+  //
+  // .. warning::
+  //    The current implementation of upgrade headers does not work with HTTP/2
+  //    upstreams.
+  message UpgradeConfig {
+    // The case-insensitive name of this upgrade, e.g. "websocket".
+    // For each upgrade type present in upgrade_configs, requests with
+    // Upgrade: [upgrade_type]
+    // will be proxied upstream.
+    string upgrade_type = 1;
+
+    // If present, this represents the filter chain which will be created for
+    // this type of upgrade. If no filters are present, the filter chain for
+    // HTTP connections will be used for this upgrade type.
+    repeated HttpFilter filters = 2;
+
+    // Determines if upgrades are enabled or disabled by default. Defaults to true.
+    // This can be overridden on a per-route basis with :ref:`cluster
+    // <envoy_api_field_route.RouteAction.upgrade_configs>` as documented in the
+    // :ref:`upgrade documentation <arch_overview_websocket>`.
+    google.protobuf.BoolValue enabled = 3;
+  }
+
+  reserved 27;
+
   // Supplies the type of codec that the connection manager should use.
-  CodecType codec_type = 1 [(validate.rules).enum.defined_only = true];
+  CodecType codec_type = 1 [(validate.rules).enum = {defined_only: true}];
 
   // The human readable prefix to use when emitting statistics for the
   // connection manager. See the :ref:`statistics documentation <config_http_conn_man_stats>` for
   // more information.
-  string stat_prefix = 2 [(validate.rules).string.min_bytes = 1];
+  string stat_prefix = 2 [(validate.rules).string = {min_bytes: 1}];
 
   oneof route_specifier {
     option (validate.required) = true;
@@ -58,7 +216,7 @@ message HttpConnectionManager {
     Rds rds = 3;
 
     // The route table for the connection manager is static and is specified in this property.
-    envoy.api.v3alpha.RouteConfiguration route_config = 4;
+    api.v3alpha.RouteConfiguration route_config = 4;
 
     // A route table will be dynamically assigned to each request based on request attributes
     // (e.g., the value of a header). The "routing scopes" (i.e., route tables) and "scope keys" are
@@ -76,86 +234,26 @@ message HttpConnectionManager {
   // documentation for more information. Defaults to false.
   google.protobuf.BoolValue add_user_agent = 6;
 
-  message Tracing {
-    // [#comment:TODO(kyessenov): Align this field with listener traffic direction field.]
-    enum OperationName {
-
-      // The HTTP listener is used for ingress/incoming requests.
-      INGRESS = 0;
-
-      // The HTTP listener is used for egress/outgoing requests.
-      EGRESS = 1;
-    }
-
-    // The span name will be derived from this field.
-    OperationName operation_name = 1 [(validate.rules).enum.defined_only = true];
-
-    // A list of header names used to create tags for the active span. The header name is used to
-    // populate the tag name, and the header value is used to populate the tag value. The tag is
-    // created if the specified header name is present in the request's headers.
-    repeated string request_headers_for_tags = 2;
-
-    // Target percentage of requests managed by this HTTP connection manager that will be force
-    // traced if the :ref:`x-client-trace-id <config_http_conn_man_headers_x-client-trace-id>`
-    // header is set. This field is a direct analog for the runtime variable
-    // 'tracing.client_sampling' in the :ref:`HTTP Connection Manager
-    // <config_http_conn_man_runtime>`.
-    // Default: 100%
-    envoy.type.Percent client_sampling = 3;
-
-    // Target percentage of requests managed by this HTTP connection manager that will be randomly
-    // selected for trace generation, if not requested by the client or not forced. This field is
-    // a direct analog for the runtime variable 'tracing.random_sampling' in the
-    // :ref:`HTTP Connection Manager <config_http_conn_man_runtime>`.
-    // Default: 100%
-    envoy.type.Percent random_sampling = 4;
-
-    // Target percentage of requests managed by this HTTP connection manager that will be traced
-    // after all other sampling checks have been applied (client-directed, force tracing, random
-    // sampling). This field functions as an upper limit on the total configured sampling rate. For
-    // instance, setting client_sampling to 100% but overall_sampling to 1% will result in only 1%
-    // of client requests with the appropriate headers to be force traced. This field is a direct
-    // analog for the runtime variable 'tracing.global_enabled' in the
-    // :ref:`HTTP Connection Manager <config_http_conn_man_runtime>`.
-    // Default: 100%
-    envoy.type.Percent overall_sampling = 5;
-
-    // Whether to annotate spans with additional data. If true, spans will include logs for stream
-    // events.
-    bool verbose = 6;
-  }
-
   // Presence of the object defines whether the connection manager
   // emits :ref:`tracing <arch_overview_tracing>` data to the :ref:`configured tracing provider
   // <envoy_api_msg_config.trace.v3alpha.Tracing>`.
   Tracing tracing = 7;
 
   // Additional HTTP/1 settings that are passed to the HTTP/1 codec.
-  envoy.api.v3alpha.core.Http1ProtocolOptions http_protocol_options = 8;
+  api.v3alpha.core.Http1ProtocolOptions http_protocol_options = 8;
 
   // Additional HTTP/2 settings that are passed directly to the HTTP/2 codec.
-  envoy.api.v3alpha.core.Http2ProtocolOptions http2_protocol_options = 9;
+  api.v3alpha.core.Http2ProtocolOptions http2_protocol_options = 9;
 
   // An optional override that the connection manager will write to the server
   // header in responses. If not set, the default is *envoy*.
   string server_name = 10;
 
-  enum ServerHeaderTransformation {
-
-    // Overwrite any Server header with the contents of server_name.
-    OVERWRITE = 0;
-    // If no Server header is present, append Server server_name
-    // If a Server header is present, pass it through.
-    APPEND_IF_ABSENT = 1;
-    // Pass through the value of the server header, and do not append a header
-    // if none is present.
-    PASS_THROUGH = 2;
-  }
   // Defines the action to be applied to the Server header on the response path.
   // By default, Envoy will overwrite the header with the value specified in
   // server_name.
   ServerHeaderTransformation server_header_transformation = 34
-      [(validate.rules).enum.defined_only = true];
+      [(validate.rules).enum = {defined_only: true}];
 
   // The maximum request headers size for incoming connections.
   // If unconfigured, the default max request headers allowed is 60 KiB.
@@ -163,7 +261,7 @@ message HttpConnectionManager {
   // The max configurable limit is 96 KiB, based on current implementation
   // constraints.
   google.protobuf.UInt32Value max_request_headers_kb = 29
-      [(validate.rules).uint32.gt = 0, (validate.rules).uint32.lte = 96];
+      [(validate.rules).uint32 = {lte: 96 gt: 0}];
 
   // The idle timeout for connections managed by the connection manager. The
   // idle timeout is defined as the period in which there are no active
@@ -252,7 +350,7 @@ message HttpConnectionManager {
 
   // Configuration for :ref:`HTTP access logs <arch_overview_access_logs>`
   // emitted by the connection manager.
-  repeated envoy.config.filter.accesslog.v3alpha.AccessLog access_log = 13;
+  repeated accesslog.v3alpha.AccessLog access_log = 13;
 
   // If set to true, the connection manager will use the real remote address
   // of the client connection when determining internal versus external origin and manipulating
@@ -269,11 +367,6 @@ message HttpConnectionManager {
   // is not specified. See the documentation for
   // :ref:`config_http_conn_man_headers_x-forwarded-for` for more information.
   uint32 xff_num_trusted_hops = 19;
-
-  message InternalAddressConfig {
-    // Whether unix socket addresses should be considered internal.
-    bool unix_sockets = 1;
-  }
 
   // Configures what network addresses are considered internal for stats and header sanitation
   // purposes. If unspecified, only RFC1918 IP addresses will be considered internal.
@@ -309,59 +402,8 @@ message HttpConnectionManager {
 
   // How to handle the :ref:`config_http_conn_man_headers_x-forwarded-client-cert` (XFCC) HTTP
   // header.
-  enum ForwardClientCertDetails {
-
-    // Do not send the XFCC header to the next hop. This is the default value.
-    SANITIZE = 0;
-
-    // When the client connection is mTLS (Mutual TLS), forward the XFCC header
-    // in the request.
-    FORWARD_ONLY = 1;
-
-    // When the client connection is mTLS, append the client certificate
-    // information to the request’s XFCC header and forward it.
-    APPEND_FORWARD = 2;
-
-    // When the client connection is mTLS, reset the XFCC header with the client
-    // certificate information and send it to the next hop.
-    SANITIZE_SET = 3;
-
-    // Always forward the XFCC header in the request, regardless of whether the
-    // client connection is mTLS.
-    ALWAYS_FORWARD_ONLY = 4;
-  };
-
-  // How to handle the :ref:`config_http_conn_man_headers_x-forwarded-client-cert` (XFCC) HTTP
-  // header.
   ForwardClientCertDetails forward_client_cert_details = 16
-      [(validate.rules).enum.defined_only = true];
-
-  // [#comment:next free field: 7]
-  message SetCurrentClientCertDetails {
-    // Whether to forward the subject of the client cert. Defaults to false.
-    google.protobuf.BoolValue subject = 1;
-
-    reserved 2; // san deprecated by uri
-
-    // Whether to forward the entire client cert in URL encoded PEM format. This will appear in the
-    // XFCC header comma separated from other values with the value Cert="PEM".
-    // Defaults to false.
-    bool cert = 3;
-
-    // Whether to forward the entire client cert chain (including the leaf cert) in URL encoded PEM
-    // format. This will appear in the XFCC header comma separated from other values with the value
-    // Chain="PEM".
-    // Defaults to false.
-    bool chain = 6;
-
-    // Whether to forward the DNS type Subject Alternative Names of the client cert.
-    // Defaults to false.
-    bool dns = 4;
-
-    // Whether to forward the URI type Subject Alternative Name of the client cert. Defaults to
-    // false.
-    bool uri = 5;
-  };
+      [(validate.rules).enum = {defined_only: true}];
 
   // This field is valid only when :ref:`forward_client_cert_details
   // <envoy_api_field_config.filter.network.http_connection_manager.v3alpha.HttpConnectionManager.forward_client_cert_details>`
@@ -393,37 +435,7 @@ message HttpConnectionManager {
   // [#not-implemented-hide:]
   bool represent_ipv4_remote_address_as_ipv4_mapped_ipv6 = 20;
 
-  // The configuration for HTTP upgrades.
-  // For each upgrade type desired, an UpgradeConfig must be added.
-  //
-  // .. warning::
-  //
-  //    The current implementation of upgrade headers does not handle
-  //    multi-valued upgrade headers. Support for multi-valued headers may be
-  //    added in the future if needed.
-  //
-  // .. warning::
-  //    The current implementation of upgrade headers does not work with HTTP/2
-  //    upstreams.
-  message UpgradeConfig {
-    // The case-insensitive name of this upgrade, e.g. "websocket".
-    // For each upgrade type present in upgrade_configs, requests with
-    // Upgrade: [upgrade_type]
-    // will be proxied upstream.
-    string upgrade_type = 1;
-    // If present, this represents the filter chain which will be created for
-    // this type of upgrade. If no filters are present, the filter chain for
-    // HTTP connections will be used for this upgrade type.
-    repeated HttpFilter filters = 2;
-    // Determines if upgrades are enabled or disabled by default. Defaults to true.
-    // This can be overridden on a per-route basis with :ref:`cluster
-    // <envoy_api_field_route.RouteAction.upgrade_configs>` as documented in the
-    // :ref:`upgrade documentation <arch_overview_websocket>`.
-    google.protobuf.BoolValue enabled = 3;
-  };
   repeated UpgradeConfig upgrade_configs = 23;
-
-  reserved 27;
 
   // Should paths be normalized according to RFC 3986 before any processing of
   // requests by HTTP filters or routing? This affects the upstream *:path* header
@@ -448,25 +460,22 @@ message HttpConnectionManager {
 
 message Rds {
   // Configuration source specifier for RDS.
-  envoy.api.v3alpha.core.ConfigSource config_source = 1 [(validate.rules).message.required = true];
+  api.v3alpha.core.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
 
   // The name of the route configuration. This name will be passed to the RDS
   // API. This allows an Envoy configuration with multiple HTTP listeners (and
   // associated HTTP connection manager filters) to use different route
   // configurations.
-  string route_config_name = 2 [(validate.rules).string.min_bytes = 1];
+  string route_config_name = 2 [(validate.rules).string = {min_bytes: 1}];
 }
 
 // This message is used to work around the limitations with 'oneof' and repeated fields.
 message ScopedRouteConfigurationsList {
-  repeated envoy.api.v3alpha.ScopedRouteConfiguration scoped_route_configurations = 1
-      [(validate.rules).repeated .min_items = 1];
+  repeated api.v3alpha.ScopedRouteConfiguration scoped_route_configurations = 1
+      [(validate.rules).repeated = {min_items: 1}];
 }
 
 message ScopedRoutes {
-  // The name assigned to the scoped routing configuration.
-  string name = 1 [(validate.rules).string.min_bytes = 1];
-
   // Specifies the mechanism for constructing "scope keys" based on HTTP request attributes. These
   // keys are matched against a set of :ref:`Key<envoy_api_msg_ScopedRouteConfiguration.Key>`
   // objects assembled from :ref:`ScopedRouteConfiguration<envoy_api_msg_ScopedRouteConfiguration>`
@@ -497,15 +506,6 @@ message ScopedRoutes {
       //
       //    Each 'a=b' key-value pair constitutes an 'element' of the header field.
       message HeaderValueExtractor {
-        // The name of the header field to extract the value from.
-        string name = 1 [(validate.rules).string.min_bytes = 1];
-
-        // The element separator (e.g., ';' separates 'a;b;c;d').
-        // Default: empty string. This causes the entirety of the header field to be extracted.
-        // If this field is set to an empty string and 'index' is used in the oneof below, 'index'
-        // must be set to 0.
-        string element_separator = 2;
-
         // Specifies a header field's key value pair to match on.
         message KvElement {
           // The separator between key and value (e.g., '=' separates 'k=v;...').
@@ -513,11 +513,20 @@ message ScopedRoutes {
           // If an element contains no separator, the whole element is parsed as key and the
           // fragment value is an empty string.
           // If there are multiple values for a matched key, the first value is returned.
-          string separator = 1 [(validate.rules).string.min_bytes = 1];
+          string separator = 1 [(validate.rules).string = {min_bytes: 1}];
 
           // The key to match on.
-          string key = 2 [(validate.rules).string.min_bytes = 1];
+          string key = 2 [(validate.rules).string = {min_bytes: 1}];
         }
+
+        // The name of the header field to extract the value from.
+        string name = 1 [(validate.rules).string = {min_bytes: 1}];
+
+        // The element separator (e.g., ';' separates 'a;b;c;d').
+        // Default: empty string. This causes the entirety of the header field to be extracted.
+        // If this field is set to an empty string and 'index' is used in the oneof below, 'index'
+        // must be set to 0.
+        string element_separator = 2;
 
         oneof extract_type {
           // Specifies the zero based index of the element to extract.
@@ -539,17 +548,19 @@ message ScopedRoutes {
     }
 
     // The final scope key consists of the ordered union of these fragments.
-    repeated FragmentBuilder fragments = 1 [(validate.rules).repeated .min_items = 1];
+    repeated FragmentBuilder fragments = 1 [(validate.rules).repeated = {min_items: 1}];
   }
 
+  // The name assigned to the scoped routing configuration.
+  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+
   // The algorithm to use for constructing a scope key for each request.
-  ScopeKeyBuilder scope_key_builder = 2 [(validate.rules).message.required = true];
+  ScopeKeyBuilder scope_key_builder = 2 [(validate.rules).message = {required: true}];
 
   // Configuration source specifier for RDS.
   // This config source is used to subscribe to RouteConfiguration resources specified in
   // ScopedRouteConfiguration messages.
-  envoy.api.v3alpha.core.ConfigSource rds_config_source = 3
-      [(validate.rules).message.required = true];
+  api.v3alpha.core.ConfigSource rds_config_source = 3 [(validate.rules).message = {required: true}];
 
   oneof config_specifier {
     option (validate.required) = true;
@@ -572,14 +583,16 @@ message ScopedRoutes {
 
 message ScopedRds {
   // Configuration source specifier for scoped RDS.
-  envoy.api.v3alpha.core.ConfigSource scoped_rds_config_source = 1
-      [(validate.rules).message.required = true];
+  api.v3alpha.core.ConfigSource scoped_rds_config_source = 1
+      [(validate.rules).message = {required: true}];
 }
 
 message HttpFilter {
+  reserved 3;
+
   // The name of the filter to instantiate. The name must match a
   // :ref:`supported filter <config_http_filters>`.
-  string name = 1 [(validate.rules).string.min_bytes = 1];
+  string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
   // Filter specific configuration which depends on the filter being instantiated. See the supported
   // filters for further documentation.
@@ -588,6 +601,4 @@ message HttpFilter {
 
     google.protobuf.Any typed_config = 4;
   }
-
-  reserved 3;
 }

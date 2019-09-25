@@ -1,8 +1,3 @@
-// [#protodoc-title: Bootstrap]
-// This proto is supplied via the :option:`-c` CLI flag and acts as the root
-// of the Envoy v2 configuration. See the :ref:`v2 configuration overview
-// <config_overview_v2_bootstrap>` for more detail.
-
 syntax = "proto3";
 
 package envoy.config.bootstrap.v3alpha;
@@ -11,55 +6,56 @@ option java_outer_classname = "BootstrapProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.bootstrap.v3alpha";
 
+import "envoy/api/v3alpha/auth/cert.proto";
+import "envoy/api/v3alpha/cds.proto";
 import "envoy/api/v3alpha/core/address.proto";
 import "envoy/api/v3alpha/core/base.proto";
-import "envoy/api/v3alpha/auth/cert.proto";
 import "envoy/api/v3alpha/core/config_source.proto";
-import "envoy/api/v3alpha/cds.proto";
 import "envoy/api/v3alpha/lds.proto";
-import "envoy/config/trace/v3alpha/trace.proto";
 import "envoy/config/metrics/v3alpha/stats.proto";
 import "envoy/config/overload/v3alpha/overload.proto";
+import "envoy/config/trace/v3alpha/trace.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 
 import "validate/validate.proto";
 
+// [#protodoc-title: Bootstrap]
+// This proto is supplied via the :option:`-c` CLI flag and acts as the root
+// of the Envoy v2 configuration. See the :ref:`v2 configuration overview
+// <config_overview_v2_bootstrap>` for more detail.
+
 // Bootstrap :ref:`configuration overview <config_overview_v2_bootstrap>`.
 message Bootstrap {
-  // Node identity to present to the management server and for instance
-  // identification purposes (e.g. in generated headers).
-  envoy.api.v3alpha.core.Node node = 1;
-
   message StaticResources {
     // Static :ref:`Listeners <envoy_api_msg_Listener>`. These listeners are
     // available regardless of LDS configuration.
-    repeated envoy.api.v3alpha.Listener listeners = 1;
+    repeated api.v3alpha.Listener listeners = 1;
 
     // If a network based configuration source is specified for :ref:`cds_config
     // <envoy_api_field_config.bootstrap.v3alpha.Bootstrap.DynamicResources.cds_config>`, it's
     // necessary to have some initial cluster definitions available to allow Envoy to know how to
     // speak to the management server. These cluster definitions may not use :ref:`EDS
     // <arch_overview_dynamic_config_eds>` (i.e. they should be static IP or DNS-based).
-    repeated envoy.api.v3alpha.Cluster clusters = 2;
+    repeated api.v3alpha.Cluster clusters = 2;
 
     // These static secrets can be used by :ref:`SdsSecretConfig
     // <envoy_api_msg_auth.SdsSecretConfig>`
-    repeated envoy.api.v3alpha.auth.Secret secrets = 3;
+    repeated api.v3alpha.auth.Secret secrets = 3;
   }
-  // Statically specified resources.
-  StaticResources static_resources = 2;
 
   message DynamicResources {
+    reserved 4;
+
     // All :ref:`Listeners <envoy_api_msg_Listener>` are provided by a single
     // :ref:`LDS <arch_overview_dynamic_config_lds>` configuration source.
-    envoy.api.v3alpha.core.ConfigSource lds_config = 1;
+    api.v3alpha.core.ConfigSource lds_config = 1;
 
     // All post-bootstrap :ref:`Cluster <envoy_api_msg_Cluster>` definitions are
     // provided by a single :ref:`CDS <arch_overview_dynamic_config_cds>`
     // configuration source.
-    envoy.api.v3alpha.core.ConfigSource cds_config = 2;
+    api.v3alpha.core.ConfigSource cds_config = 2;
 
     // A single :ref:`ADS <config_overview_v2_ads>` source may be optionally
     // specified. This must have :ref:`api_type
@@ -68,10 +64,18 @@ message Bootstrap {
     // :ref:`ConfigSources <envoy_api_msg_core.ConfigSource>` that have
     // the :ref:`ads <envoy_api_field_core.ConfigSource.ads>` field set will be
     // streamed on the ADS channel.
-    envoy.api.v3alpha.core.ApiConfigSource ads_config = 3;
-
-    reserved 4;
+    api.v3alpha.core.ApiConfigSource ads_config = 3;
   }
+
+  reserved 10;
+
+  // Node identity to present to the management server and for instance
+  // identification purposes (e.g. in generated headers).
+  api.v3alpha.core.Node node = 1;
+
+  // Statically specified resources.
+  StaticResources static_resources = 2;
+
   // xDS configuration sources.
   DynamicResources dynamic_resources = 3;
 
@@ -81,16 +85,16 @@ message Bootstrap {
 
   // Health discovery service config option.
   // (:ref:`core.ApiConfigSource <envoy_api_msg_core.ApiConfigSource>`)
-  envoy.api.v3alpha.core.ApiConfigSource hds_config = 14;
+  api.v3alpha.core.ApiConfigSource hds_config = 14;
 
   // Optional file system path to search for startup flag files.
   string flags_path = 5;
 
   // Optional set of stats sinks.
-  repeated envoy.config.metrics.v3alpha.StatsSink stats_sinks = 6;
+  repeated metrics.v3alpha.StatsSink stats_sinks = 6;
 
   // Configuration for internal processing of stats.
-  envoy.config.metrics.v3alpha.StatsConfig stats_config = 13;
+  metrics.v3alpha.StatsConfig stats_config = 13;
 
   // Optional duration between flushes to configured stats sinks. For
   // performance reasons Envoy latches counters and only flushes counters and
@@ -98,8 +102,8 @@ message Bootstrap {
   // seconds).
   // Duration must be at least 1ms and at most 5 min.
   google.protobuf.Duration stats_flush_interval = 7 [(validate.rules).duration = {
-    lt: {seconds: 300},
-    gte: {nanos: 1000000}
+    lt {seconds: 300}
+    gte {nanos: 1000000}
   }];
 
   // Optional watchdog configuration.
@@ -107,9 +111,7 @@ message Bootstrap {
 
   // Configuration for an external tracing provider. If not specified, no
   // tracing will be performed.
-  envoy.config.trace.v3alpha.Tracing tracing = 9;
-
-  reserved 10;
+  trace.v3alpha.Tracing tracing = 9;
 
   // Configuration for the runtime configuration provider (deprecated). If not
   // specified, a “null” provider will be used which will result in all defaults
@@ -125,7 +127,7 @@ message Bootstrap {
   Admin admin = 12;
 
   // Optional overload manager configuration.
-  envoy.config.overload.v3alpha.OverloadManager overload_manager = 15;
+  overload.v3alpha.OverloadManager overload_manager = 15;
 
   // Enable :ref:`stats for event dispatcher <operations_performance>`, defaults to false.
   // Note that this records a value for each iteration of the event loop on every thread. This
@@ -161,15 +163,20 @@ message Admin {
 
   // The TCP address that the administration server will listen on.
   // If not specified, Envoy will not start an administration server.
-  envoy.api.v3alpha.core.Address address = 3;
+  api.v3alpha.core.Address address = 3;
 
   // Additional socket options that may not be present in Envoy source code or
   // precompiled binaries.
-  repeated envoy.api.v3alpha.core.SocketOption socket_options = 4;
+  repeated api.v3alpha.core.SocketOption socket_options = 4;
 }
 
 // Cluster manager :ref:`architecture overview <arch_overview_cluster_manager>`.
 message ClusterManager {
+  message OutlierDetection {
+    // Specifies the path to the outlier event log.
+    string event_log_path = 1;
+  }
+
   // Name of the local cluster (i.e., the cluster that owns the Envoy running
   // this configuration). In order to enable :ref:`zone aware routing
   // <arch_overview_load_balancing_zone_aware_routing>` this option must be set.
@@ -181,33 +188,30 @@ message ClusterManager {
   // <https://github.com/envoyproxy/envoy/issues/774>`_.
   string local_cluster_name = 1;
 
-  message OutlierDetection {
-    // Specifies the path to the outlier event log.
-    string event_log_path = 1;
-  }
   // Optional global configuration for outlier detection.
   OutlierDetection outlier_detection = 2;
 
   // Optional configuration used to bind newly established upstream connections.
   // This may be overridden on a per-cluster basis by upstream_bind_config in the cds_config.
-  envoy.api.v3alpha.core.BindConfig upstream_bind_config = 3;
+  api.v3alpha.core.BindConfig upstream_bind_config = 3;
 
   // A management server endpoint to stream load stats to via
   // *StreamLoadStats*. This must have :ref:`api_type
   // <envoy_api_field_core.ApiConfigSource.api_type>` :ref:`GRPC
   // <envoy_api_enum_value_core.ApiConfigSource.ApiType.GRPC>`.
-  envoy.api.v3alpha.core.ApiConfigSource load_stats_config = 4;
+  api.v3alpha.core.ApiConfigSource load_stats_config = 4;
 }
 
 // Envoy process watchdog configuration. When configured, this monitors for
 // nonresponsive threads and kills the process after the configured thresholds.
+// See the :ref:`watchdog documentation <operations_performance_watchdog>` for more information.
 message Watchdog {
   // The duration after which Envoy counts a nonresponsive thread in the
-  // *server.watchdog_miss* statistic. If not specified the default is 200ms.
+  // *watchdog_miss* statistic. If not specified the default is 200ms.
   google.protobuf.Duration miss_timeout = 1;
 
   // The duration after which Envoy counts a nonresponsive thread in the
-  // *server.watchdog_mega_miss* statistic. If not specified the default is
+  // *watchdog_mega_miss* statistic. If not specified the default is
   // 1000ms.
   google.protobuf.Duration megamiss_timeout = 2;
 
@@ -284,23 +288,26 @@ message RuntimeLayer {
     string name = 1;
 
     // RTDS configuration source.
-    envoy.api.v3alpha.core.ConfigSource rtds_config = 2;
+    api.v3alpha.core.ConfigSource rtds_config = 2;
   }
 
   // Descriptive name for the runtime layer. This is only used for the runtime
   // :http:get:`/runtime` output.
-  string name = 1 [(validate.rules).string.min_bytes = 1];
+  string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
   oneof layer_specifier {
+    option (validate.required) = true;
+
     // :ref:`Static runtime <config_runtime_bootstrap>` layer.
     // This follows the :ref:`runtime protobuf JSON representation encoding
     // <config_runtime_proto_json>`. Unlike static xDS resources, this static
     // layer is overridable by later layers in the runtime virtual filesystem.
-    option (validate.required) = true;
-
     google.protobuf.Struct static_layer = 2;
+
     DiskLayer disk_layer = 3;
+
     AdminLayer admin_layer = 4;
+
     RtdsLayer rtds_layer = 5;
   }
 }
