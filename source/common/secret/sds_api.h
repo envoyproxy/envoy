@@ -117,8 +117,8 @@ public:
   const envoy::api::v2::auth::TlsCertificate* secret() const override {
     return tls_certificate_secrets_.get();
   }
-  Common::CallbackHandle* addValidationCallback(
-      std::function<void(const envoy::api::v2::auth::CertificateValidationContext&)>) override {
+  Common::CallbackHandle*
+  addValidationCallback(std::function<void(const envoy::api::v2::auth::TlsCertificate&)>) override {
     return nullptr;
   }
   Common::CallbackHandle* addUpdateCallback(std::function<void()> callback) override {

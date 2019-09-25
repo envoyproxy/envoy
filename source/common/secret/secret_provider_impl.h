@@ -18,8 +18,8 @@ public:
     return tls_certificate_.get();
   }
 
-  Common::CallbackHandle* addValidationCallback(
-      std::function<void(const envoy::api::v2::auth::CertificateValidationContext&)>) override {
+  Common::CallbackHandle*
+  addValidationCallback(std::function<void(const envoy::api::v2::auth::TlsCertificate&)>) override {
     return nullptr;
   }
 
