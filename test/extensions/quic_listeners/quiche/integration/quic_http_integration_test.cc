@@ -40,7 +40,7 @@ public:
         Network::Test::getCanonicalLoopbackAddress(version_);
     auto connection = std::make_unique<EnvoyQuicClientConnection>(
         getNextServerDesignatedConnectionId(), server_addr, conn_helper_, alarm_factory_,
-        supported_versions_, local_addr, *dispatcher_);
+        supported_versions_, local_addr, *dispatcher_, nullptr);
     auto session = std::make_unique<EnvoyQuicClientSession>(
         quic_config_, supported_versions_, std::move(connection), server_id_, &crypto_config_,
         &push_promise_index_, *dispatcher_, 0);

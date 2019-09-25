@@ -1,6 +1,7 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_client_connection.h"
 
 #include "common/network/listen_socket_impl.h"
+#include "common/network/socket_option_factory.h"
 
 #include "extensions/quic_listeners/quiche/envoy_quic_packet_writer.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
@@ -14,10 +15,11 @@ EnvoyQuicClientConnection::EnvoyQuicClientConnection(
     Network::Address::InstanceConstSharedPtr& initial_peer_address,
     quic::QuicConnectionHelperInterface& helper, quic::QuicAlarmFactory& alarm_factory,
     const quic::ParsedQuicVersionVector& supported_versions,
-    Network::Address::InstanceConstSharedPtr local_addr, Event::Dispatcher& dispatcher)
+    Network::Address::InstanceConstSharedPtr local_addr, Event::Dispatcher& dispatcher,
+    const Network::ConnectionSocket::OptionsSharedPtr& options)
     : EnvoyQuicClientConnection(server_connection_id, helper, alarm_factory, supported_versions,
                                 dispatcher,
-                                createConnectionSocket(initial_peer_address, local_addr)) {}
+                                createConnectionSocket(initial_peer_address, local_addr, options)) {}
 
 EnvoyQuicClientConnection::EnvoyQuicClientConnection(
     quic::QuicConnectionId server_connection_id, quic::QuicConnectionHelperInterface& helper,
@@ -37,11 +39,23 @@ EnvoyQuicClientConnection::EnvoyQuicClientConnection(
           envoyAddressInstanceToQuicSocketAddress(connection_socket->remoteAddress()), helper,
           alarm_factory, writer, owns_writer, quic::Perspective::IS_CLIENT, supported_versions,
           std::move(connection_socket)),
-      dispatcher_(dispatcher),
-      file_event_(dispatcher.createFileEvent(
+      dispatcher_(dispatcher) {
+     if (connectionSocket()->ioHandle().isOpen()) {
+      file_event_ = dispatcher.createFileEvent(
           connectionSocket()->ioHandle().fd(),
           [this](uint32_t events) -> void { onFileEvent(events); }, Event::FileTriggerType::Edge,
-          Event::FileReadyType::Read | Event::FileReadyType::Write)) {}
+          Event::FileReadyType::Read | Event::FileReadyType::Write);
+
+     if (!Network::Socket::applyOptions(connectionSocket()->options(), *connectionSocket(),
+                                       envoy::api::v2::core::SocketOption::STATE_LISTENING)) {
+           ENVOY_LOG_MISC(error, "Fail to apply listening options");
+    connectionSocket()->close();
+  }
+     }
+     if (!connectionSocket()->ioHandle().isOpen()) {
+       CloseConnection(quic::QUIC_CONNECTION_CANCELLED, "Fail to setup connection socket.", quic::ConnectionCloseBehavior::SILENT_CLOSE);
+     }
+      }
 
 EnvoyQuicClientConnection::~EnvoyQuicClientConnection() { file_event_->setEnabled(0); }
 
@@ -124,15 +138,34 @@ void EnvoyQuicClientConnection::onFileEvent(uint32_t events) {
 
 Network::ConnectionSocketPtr EnvoyQuicClientConnection::createConnectionSocket(
     Network::Address::InstanceConstSharedPtr& peer_addr,
-    Network::Address::InstanceConstSharedPtr& local_addr) {
+    Network::Address::InstanceConstSharedPtr& local_addr,
+    const Network::ConnectionSocket::OptionsSharedPtr& options) {
   Network::IoHandlePtr io_handle = peer_addr->socket(Network::Address::SocketType::Datagram);
-  local_addr->bind(io_handle->fd());
+  auto connection_socket = std::make_unique<Network::ConnectionSocketImpl>(std::move(io_handle), local_addr,
+                                                         peer_addr);
+  connection_socket->addOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
+  connection_socket->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
+  if (options != nullptr) {
+  connection_socket->addOptions(options);
+  }
+  if (!Network::Socket::applyOptions(connection_socket->options(), *connection_socket,
+                                       envoy::api::v2::core::SocketOption::STATE_PREBIND)) {
+    connection_socket->close();
+    ENVOY_LOG_MISC(error, "Fail to apply pre-bind options");
+    return connection_socket;
+  }
+  local_addr->bind(connection_socket->ioHandle().fd());
+  ASSERT(local_addr->ip());
   if (local_addr->ip()->port() == 0) {
     // Get ephemeral port number.
-    local_addr = Network::Address::addressFromFd(io_handle->fd());
+    local_addr = Network::Address::addressFromFd(connection_socket->ioHandle().fd());
   }
-  return std::make_unique<Network::ConnectionSocketImpl>(std::move(io_handle), local_addr,
-                                                         peer_addr);
+  if (!Network::Socket::applyOptions(connection_socket->options(), *connection_socket,
+                                       envoy::api::v2::core::SocketOption::STATE_BOUND)) {
+        ENVOY_LOG_MISC(error, "Fail to apply post-bind options");
+    connection_socket->close();
+  }
+  return connection_socket;
 }
 
 } // namespace Quic

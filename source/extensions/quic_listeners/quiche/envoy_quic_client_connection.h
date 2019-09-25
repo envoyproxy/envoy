@@ -18,7 +18,8 @@ public:
                             quic::QuicAlarmFactory& alarm_factory,
                             const quic::ParsedQuicVersionVector& supported_versions,
                             Network::Address::InstanceConstSharedPtr local_addr,
-                            Event::Dispatcher& dispatcher);
+                            Event::Dispatcher& dispatcher,
+    const Network::ConnectionSocket::OptionsSharedPtr& options);
 
   // Overridden to un-register all file events.
   ~EnvoyQuicClientConnection() override;
@@ -47,7 +48,8 @@ private:
 
   Network::ConnectionSocketPtr
   createConnectionSocket(Network::Address::InstanceConstSharedPtr& peer_addr,
-                         Network::Address::InstanceConstSharedPtr& local_addr);
+                         Network::Address::InstanceConstSharedPtr& local_addr,
+                         const Network::ConnectionSocket::OptionsSharedPtr& options);
 
   void onFileEvent(uint32_t events);
   uint32_t packets_dropped_{0};
