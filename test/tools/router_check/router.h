@@ -106,6 +106,11 @@ private:
       std::unique_ptr<Router::ConfigImpl> config, std::unique_ptr<Stats::IsolatedStoreImpl> stats,
       Api::ApiPtr api, Coverage coverage);
 
+  /**
+   * Set UUID as the name for each route for detecting missing tests during the coverage check.
+   */
+  static void assignUniqueRouteNames(envoy::api::v2::RouteConfiguration& route_config);
+
   bool compareCluster(ToolConfig& tool_config, const std::string& expected);
   bool compareCluster(ToolConfig& tool_config,
                       const envoy::RouterCheckToolSchema::ValidationAssert& expected);

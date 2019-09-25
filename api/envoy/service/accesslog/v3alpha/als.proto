@@ -35,28 +35,28 @@ message StreamAccessLogsResponse {
 message StreamAccessLogsMessage {
   message Identifier {
     // The node sending the access log messages over the stream.
-    envoy.api.v3alpha.core.Node node = 1 [(validate.rules).message.required = true];
+    api.v3alpha.core.Node node = 1 [(validate.rules).message = {required: true}];
 
     // The friendly name of the log configured in :ref:`CommonGrpcAccessLogConfig
     // <envoy_api_msg_config.accesslog.v3alpha.CommonGrpcAccessLogConfig>`.
-    string log_name = 2 [(validate.rules).string.min_bytes = 1];
+    string log_name = 2 [(validate.rules).string = {min_bytes: 1}];
+  }
+
+  // Wrapper for batches of HTTP access log entries.
+  message HTTPAccessLogEntries {
+    repeated data.accesslog.v3alpha.HTTPAccessLogEntry log_entry = 1
+        [(validate.rules).repeated = {min_items: 1}];
+  }
+
+  // Wrapper for batches of TCP access log entries.
+  message TCPAccessLogEntries {
+    repeated data.accesslog.v3alpha.TCPAccessLogEntry log_entry = 1
+        [(validate.rules).repeated = {min_items: 1}];
   }
 
   // Identifier data that will only be sent in the first message on the stream. This is effectively
   // structured metadata and is a performance optimization.
   Identifier identifier = 1;
-
-  // Wrapper for batches of HTTP access log entries.
-  message HTTPAccessLogEntries {
-    repeated envoy.data.accesslog.v3alpha.HTTPAccessLogEntry log_entry = 1
-        [(validate.rules).repeated .min_items = 1];
-  }
-
-  // Wrapper for batches of TCP access log entries.
-  message TCPAccessLogEntries {
-    repeated envoy.data.accesslog.v3alpha.TCPAccessLogEntry log_entry = 1
-        [(validate.rules).repeated .min_items = 1];
-  }
 
   // Batches of log entries of a single type. Generally speaking, a given stream should only
   // ever include one type of log entry.

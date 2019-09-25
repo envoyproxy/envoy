@@ -3,6 +3,20 @@
 from tools.api_proto_plugin import type_context
 
 
+def TraverseService(type_context, service_proto, visitor):
+  """Traverse a service definition.
+
+  Args:
+    type_context: type_context.TypeContext for service type.
+    service_proto: ServiceDescriptorProto for service.
+    visitor: visitor.Visitor defining the business logic of the plugin.
+
+  Returns:
+    Plugin specific output.
+  """
+  return visitor.VisitService(service_proto, type_context)
+
+
 def TraverseEnum(type_context, enum_proto, visitor):
   """Traverse an enum definition.
 
@@ -61,6 +75,10 @@ def TraverseFile(file_proto, visitor):
   """
   source_code_info = type_context.SourceCodeInfo(file_proto.name, file_proto.source_code_info)
   package_type_context = type_context.TypeContext(source_code_info, file_proto.package)
+  services = [
+      TraverseService(package_type_context.ExtendService(index, service.name), service, visitor)
+      for index, service in enumerate(file_proto.service)
+  ]
   msgs = [
       TraverseMessage(package_type_context.ExtendMessage(index, msg.name), msg, visitor)
       for index, msg in enumerate(file_proto.message_type)
@@ -69,4 +87,4 @@ def TraverseFile(file_proto, visitor):
       TraverseEnum(package_type_context.ExtendEnum(index, enum.name), enum, visitor)
       for index, enum in enumerate(file_proto.enum_type)
   ]
-  return visitor.VisitFile(file_proto, package_type_context, msgs, enums)
+  return visitor.VisitFile(file_proto, package_type_context, services, msgs, enums)

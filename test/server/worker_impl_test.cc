@@ -28,7 +28,7 @@ public:
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()),
         no_exit_timer_(dispatcher_->createTimer([]() -> void {})),
         worker_(tls_, hooks_, std::move(dispatcher_), Network::ConnectionHandlerPtr{handler_},
-                overload_manager_, *api_) {
+                overload_manager_, *api_, "worker_test") {
     // In the real worker the watchdog has timers that prevent exit. Here we need to prevent event
     // loop exit since we use mock timers.
     no_exit_timer_->enableTimer(std::chrono::hours(1));

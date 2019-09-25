@@ -1,6 +1,7 @@
 """Python protoc plugin for Envoy APIs."""
 
 import cProfile
+from collections import namedtuple
 import io
 import os
 import pstats
@@ -10,8 +11,26 @@ from tools.api_proto_plugin import traverse
 
 from google.protobuf.compiler import plugin_pb2
 
+OutputDescriptor = namedtuple(
+    'OutputDescriptor',
+    [
+        # Output files are generated alongside their corresponding input .proto,
+        # with the output_suffix appended.
+        'output_suffix',
+        # The visitor is a visitor.Visitor defining the business logic of the plugin
+        # for the specific output descriptor.
+        'visitor',
+        # FileDescriptorProto transformer; this is applied to the input
+        # before any output generation.
+        'xform',
+    ])
 
-def Plugin(output_suffix, visitor):
+
+def DirectOutputDescriptor(output_suffix, visitor):
+  return OutputDescriptor(output_suffix, visitor, lambda x: x)
+
+
+def Plugin(output_descriptors):
   """Protoc plugin entry point.
 
   This defines protoc plugin and manages the stdin -> stdout flow. An
@@ -22,9 +41,7 @@ def Plugin(output_suffix, visitor):
   for further details on protoc plugin basics.
 
   Args:
-    output_suffix: output files are generated alongside their corresponding
-      input .proto, with this filename suffix.
-    visitor: visitor.Visitor defining the business logic of the plugin.
+    output_descriptors: a list of OutputDescriptors.
   """
   request = plugin_pb2.CodeGeneratorRequest()
   request.ParseFromString(sys.stdin.buffer.read())
@@ -37,21 +54,25 @@ def Plugin(output_suffix, visitor):
   for file_to_generate in request.file_to_generate:
     # Find the FileDescriptorProto for the file we actually are generating.
     file_proto = [pf for pf in request.proto_file if pf.name == file_to_generate][0]
-    f = response.file.add()
-    f.name = file_proto.name + output_suffix
     if cprofile_enabled:
       pr = cProfile.Profile()
       pr.enable()
-    # We don't actually generate any RST right now, we just string dump the
-    # input proto file descriptor into the output file.
-    f.content = traverse.TraverseFile(file_proto, visitor)
+      for od in output_descriptors:
+        f = response.file.add()
+        f.name = file_proto.name + od.output_suffix
+        f.content = traverse.TraverseFile(od.xform(file_proto), od.visitor)
     if cprofile_enabled:
       pr.disable()
       stats_stream = io.StringIO()
       ps = pstats.Stats(pr,
                         stream=stats_stream).sort_stats(os.getenv('CPROFILE_SORTBY', 'cumulative'))
       stats_file = response.file.add()
-      stats_file.name = file_proto.name + output_suffix + '.profile'
+      stats_file.name = file_proto.name + '.profile'
       ps.print_stats()
       stats_file.content = stats_stream.getvalue()
+    # Also include the original FileDescriptorProto as text proto, this is
+    # useful when debugging.
+    descriptor_file = response.file.add()
+    descriptor_file.name = file_proto.name + ".descriptor.proto"
+    descriptor_file.content = str(file_proto)
   sys.stdout.buffer.write(response.SerializeToString())
