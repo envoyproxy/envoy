@@ -17,6 +17,7 @@ import subprocess
 
 from tools.api_proto_plugin import plugin
 from tools.api_proto_plugin import visitor
+from tools.protoxform import migrate
 
 from google.api import annotations_pb2
 from google.protobuf import text_format
@@ -416,7 +417,10 @@ class ProtoFormatVisitor(visitor.Visitor):
 
 
 def Main():
-  plugin.Plugin('.proto', ProtoFormatVisitor())
+  plugin.Plugin([
+      plugin.DirectOutputDescriptor('.v2.proto', ProtoFormatVisitor()),
+      plugin.OutputDescriptor('.v3alpha.proto', ProtoFormatVisitor(), migrate.V3MigrationXform)
+  ])
 
 
 if __name__ == '__main__':
