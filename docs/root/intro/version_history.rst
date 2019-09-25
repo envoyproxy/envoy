@@ -4,6 +4,7 @@ Version history
 1.12.0 (pending)
 ================
 * access log: added :ref:`buffering <envoy_api_field_config.accesslog.v2.CommonGrpcAccessLogConfig.buffer_size_bytes>` and :ref:`periodical flushing <envoy_api_field_config.accesslog.v2.CommonGrpcAccessLogConfig.buffer_flush_interval>` support to gRPC access logger. Defaults to 16KB buffer and flushing every 1 second.
+* access log: added DOWNSTREAM_DIRECT_REMOTE_ADDRESS and DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT :ref:`access log formatters <config_access_log_format>` and gRPC access logger.
 * access log: gRPC Access Log Service (ALS) support added for :ref:`TCP access logs <envoy_api_msg_config.accesslog.v2.TcpGrpcAccessLogConfig>`.
 * access log: reintroduce :ref:`filesystem <filesystem_stats>` stats and added the `write_failed` counter to track failed log writes
 * admin: added ability to configure listener :ref:`socket options <envoy_api_field_config.bootstrap.v2.Admin.socket_options>`.
@@ -26,6 +27,7 @@ Version history
 * fault: added overrides for default runtime keys in :ref:`HTTPFault <envoy_api_msg_config.filter.http.fault.v2.HTTPFault>` filter.
 * grpc: added :ref:`AWS IAM grpc credentials extension <envoy_api_file_envoy/config/grpc_credential/v2alpha/aws_iam.proto>` for AWS-managed xDS.
 * grpc-json: added support for :ref:`ignoring unknown query parameters<envoy_api_field_config.filter.http.transcoder.v2.GrpcJsonTranscoder.ignore_unknown_query_parameters>`.
+* grpc-json: added support for :ref:`the grpc-status-details-bin header<envoy_api_field_config.filter.http.transcoder.v2.GrpcJsonTranscoder.convert_grpc_status>`.
 * header to metadata: added :ref:`PROTOBUF_VALUE <envoy_api_enum_value_config.filter.http.header_to_metadata.v2.Config.ValueType.PROTOBUF_VALUE>` and :ref:`ValueEncode <envoy_api_enum_config.filter.http.header_to_metadata.v2.Config.ValueEncode>` to support protobuf Value and Base64 encoding.
 * http: added the ability to reject HTTP/1.1 requests with invalid HTTP header values, using the runtime feature `envoy.reloadable_features.strict_header_validation`.
 * http: changed Envoy to forward existing x-forwarded-proto from upstream trusted proxies. Guarded by `envoy.reloadable_features.trusted_forwarded_proto` which defaults true.
@@ -33,6 +35,7 @@ Version history
 * http: added the ability to :ref:`merge adjacent slashes<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.merge_slashes>` in the path.
 * http: :ref:`AUTO <envoy_api_enum_value_config.filter.network.http_connection_manager.v2.HttpConnectionManager.CodecType.AUTO>` codec protocol inference now requires the H2 magic bytes to be the first bytes transmitted by a downstream client.
 * http: remove h2c upgrade headers for HTTP/1 as h2c upgrades are currently not supported.
+* http: absolute URL support is now on by default. The prior behavior can be reinstated by setting :ref:`allow_absolute_url <envoy_api_field_core.Http1ProtocolOptions.allow_absolute_url>` to false.
 * listeners: added :ref:`continue_on_listener_filters_timeout <envoy_api_field_Listener.continue_on_listener_filters_timeout>` to configure whether a listener will still create a connection when listener filters time out.
 * listeners: added :ref:`HTTP inspector listener filter <config_listener_filters_http_inspector>`.
 * lua: extended `httpCall()` and `respond()` APIs to accept headers with entry values that can be a string or table of strings.
@@ -57,7 +60,11 @@ Version history
 * router check tool: add deprecated field check.
 * router check tool: add flag for only printing results of failed tests.
 * router check tool: add support for outputting missing tests in the detailed coverage report.
+* runtime: allow for the ability to parse integers as double values and vice-versa.
 * server: added a post initialization lifecycle event, in addition to the existing startup and shutdown events.
+* server: added :ref:`per-handler listener stats <config_listener_stats_per_handler>` and
+  :ref:`per-worker watchdog stats <operations_performance_watchdog>` to help diagnosing event
+  loop imbalance and general performance issues.
 * thrift_proxy: fix crashing bug on invalid transport/protocol framing
 * tls: added verification of IP address SAN fields in certificates against configured SANs in the
 * tracing: added support to the Zipkin reporter for sending list of spans as Zipkin JSON v2 and protobuf message over HTTP.

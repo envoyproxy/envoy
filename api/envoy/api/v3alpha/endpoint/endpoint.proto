@@ -18,6 +18,17 @@ import "validate/validate.proto";
 
 // Upstream host identifier.
 message Endpoint {
+  // The optional health check configuration.
+  message HealthCheckConfig {
+    // Optional alternative health check port value.
+    //
+    // By default the health check address port of an upstream host is the same
+    // as the host's serving address port. This provides an alternative health
+    // check port. Setting this with a non-zero value allows an upstream host
+    // to have different health check address port.
+    uint32 port_value = 1 [(validate.rules).uint32 = {lte: 65535}];
+  }
+
   // The upstream host address.
   //
   // .. attention::
@@ -28,17 +39,6 @@ message Endpoint {
   //   in the Address). For LOGICAL or STRICT DNS, it is expected to be hostname,
   //   and will be resolved via DNS.
   core.Address address = 1;
-
-  // The optional health check configuration.
-  message HealthCheckConfig {
-    // Optional alternative health check port value.
-    //
-    // By default the health check address port of an upstream host is the same
-    // as the host's serving address port. This provides an alternative health
-    // check port. Setting this with a non-zero value allows an upstream host
-    // to have different health check address port.
-    uint32 port_value = 1 [(validate.rules).uint32.lte = 65535];
-  }
 
   // The optional health check configuration is used as configuration for the
   // health checker to contact the health checked host.
@@ -55,6 +55,7 @@ message LbEndpoint {
   // Upstream host identifier or a named reference.
   oneof host_identifier {
     Endpoint endpoint = 1;
+
     string endpoint_name = 5;
   }
 

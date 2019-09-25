@@ -88,6 +88,20 @@ ProtoValidationException::ProtoValidationException(const std::string& validation
   ENVOY_LOG_MISC(debug, "Proto validation error; throwing {}", what());
 }
 
+size_t MessageUtil::hash(const Protobuf::Message& message) {
+  std::string text_format;
+
+  {
+    Protobuf::TextFormat::Printer printer;
+    printer.SetExpandAny(true);
+    printer.SetUseFieldNumber(true);
+    printer.SetSingleLineMode(true);
+    printer.PrintToString(message, &text_format);
+  }
+
+  return HashUtil::xxHash64(text_format);
+}
+
 void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& message,
                                ProtobufMessage::ValidationVisitor& validation_visitor) {
   Protobuf::util::JsonParseOptions options;
@@ -165,6 +179,51 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
   }
 }
 
+void checkForDeprecatedNonRepeatedEnumValue(const Protobuf::Message& message,
+                                            absl::string_view filename,
+                                            const Protobuf::FieldDescriptor* field,
+                                            const Protobuf::Reflection* reflection,
+                                            Runtime::Loader* runtime) {
+  // Repeated fields will be handled by recursion in checkForUnexpectedFields.
+  if (field->is_repeated() || field->cpp_type() != Protobuf::FieldDescriptor::CPPTYPE_ENUM) {
+    return;
+  }
+
+  bool default_value = !reflection->HasField(message, field);
+
+  const Protobuf::EnumValueDescriptor* enum_value_descriptor = reflection->GetEnum(message, field);
+  if (!enum_value_descriptor->options().deprecated()) {
+    return;
+  }
+  std::string err = fmt::format(
+      "Using {}deprecated value {} for enum '{}' from file {}. This enum value will be removed "
+      "from Envoy soon{}. Please see https://www.envoyproxy.io/docs/envoy/latest/intro/deprecated "
+      "for details.",
+      (default_value ? "the default now-" : ""), enum_value_descriptor->name(), field->full_name(),
+      filename, (default_value ? " so a non-default value must now be explicitly set" : ""));
+#ifdef ENVOY_DISABLE_DEPRECATED_FEATURES
+  bool warn_only = false;
+#else
+  bool warn_only = true;
+#endif
+
+  if (runtime && !runtime->snapshot().deprecatedFeatureEnabled(absl::StrCat(
+                     "envoy.deprecated_features.", filename, ":", enum_value_descriptor->name()))) {
+    warn_only = false;
+  }
+
+  if (warn_only) {
+    ENVOY_LOG_MISC(warn, "{}", err);
+  } else {
+    const char fatal_error[] =
+        " If continued use of this field is absolutely necessary, see "
+        "https://www.envoyproxy.io/docs/envoy/latest/configuration/operations/runtime"
+        "#using-runtime-overrides-for-deprecated-features for how to apply a temporary and "
+        "highly discouraged override.";
+    throw ProtoValidationException(err + fatal_error, message);
+  }
+}
+
 void MessageUtil::checkForUnexpectedFields(const Protobuf::Message& message,
                                            ProtobufMessage::ValidationVisitor& validation_visitor,
                                            Runtime::Loader* runtime) {
@@ -185,7 +244,12 @@ void MessageUtil::checkForUnexpectedFields(const Protobuf::Message& message,
   const Protobuf::Descriptor* descriptor = message.GetDescriptor();
   const Protobuf::Reflection* reflection = message.GetReflection();
   for (int i = 0; i < descriptor->field_count(); ++i) {
-    const auto* field = descriptor->field(i);
+    const Protobuf::FieldDescriptor* field = descriptor->field(i);
+    absl::string_view filename = filenameFromPath(field->file()->name());
+
+    // Before we check to see if the field is in use, see if there's a
+    // deprecated default enum value.
+    checkForDeprecatedNonRepeatedEnumValue(message, filename, field, reflection, runtime);
 
     // If this field is not in use, continue.
     if ((field->is_repeated() && reflection->FieldSize(message, field) == 0) ||
@@ -198,7 +262,6 @@ void MessageUtil::checkForUnexpectedFields(const Protobuf::Message& message,
 #else
     bool warn_only = true;
 #endif
-    absl::string_view filename = filenameFromPath(field->file()->name());
     // Allow runtime to be null both to not crash if this is called before server initialization,
     // and so proto validation works in context where runtime singleton is not set up (e.g.
     // standalone config validation utilities)

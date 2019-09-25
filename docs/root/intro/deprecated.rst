@@ -38,9 +38,7 @@ Version 1.12.0 (pending)
   <envoy_api_msg_config.filter.network.http_connection_manager.v2.HttpConnectionManager>`
   has been deprecated in favor of the `traffic_direction` field in
   :ref:`Listener <envoy_api_msg_Listener>`. The latter takes priority if
-  specified. Note that the default value `INGRESS` of the `operation_name`
-  field is not detected as being set, so the deprecation warning is not
-  triggered for it.
+  specified.
 
 Version 1.11.0 (July 11, 2019)
 ==============================

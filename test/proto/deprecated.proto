@@ -15,4 +15,16 @@ message Base {
   InnerMessage not_deprecated_message = 5;
   repeated InnerMessage repeated_message = 6;
   repeated InnerMessage deprecated_repeated_message = 7 [deprecated = true];
+
+  // For deprecated enum value testing, stick the enum in a container, to avoid
+  // the default instantiation of Base having a deprecated-by-default value.
+  enum DeprecationEnum {
+    DEPRECATED_DEFAULT = 0 [deprecated = true];
+    NOT_DEPRECATED = 1;
+    DEPRECATED_NOT_DEFAULT = 2 [deprecated = true];
+  }
+  message InnerMessageWithDeprecationEnum {
+    DeprecationEnum deprecated_enum = 1;
+  }
+  InnerMessageWithDeprecationEnum enum_container = 8;
 }

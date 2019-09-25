@@ -12,6 +12,7 @@
 #include "common/common/linked_object.h"
 #include "common/common/thread.h"
 #include "common/common/thread_annotations.h"
+#include "common/grpc/google_grpc_context.h"
 #include "common/grpc/typed_async_client.h"
 #include "common/tracing/http_tracer_impl.h"
 
@@ -83,6 +84,9 @@ public:
 
 private:
   void completionThread();
+
+  // Instantiate this first to ensure grpc_init() is called.
+  GoogleGrpcContext google_grpc_context_;
 
   // The CompletionQueue for in-flight operations. This must precede completion_thread_ to ensure it
   // is constructed before the thread runs.

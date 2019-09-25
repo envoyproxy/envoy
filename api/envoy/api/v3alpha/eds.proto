@@ -5,7 +5,6 @@ package envoy.api.v3alpha;
 option java_outer_classname = "EdsProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.api.v3alpha";
-
 option java_generic_services = true;
 
 import "envoy/api/v3alpha/discovery.proto";
@@ -13,10 +12,10 @@ import "envoy/api/v3alpha/endpoint/endpoint.proto";
 import "envoy/type/percent.proto";
 
 import "google/api/annotations.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
-import "google/protobuf/wrappers.proto";
-import "google/protobuf/duration.proto";
 
 // [#protodoc-title: EDS]
 // Endpoint discovery :ref:`architecture overview <arch_overview_service_discovery_types_eds>`
@@ -48,29 +47,18 @@ service EndpointDiscoveryService {
 // load_balancing_weight of its locality. First, a locality will be selected,
 // then an endpoint within that locality will be chose based on its weight.
 message ClusterLoadAssignment {
-  // Name of the cluster. This will be the :ref:`service_name
-  // <envoy_api_field_Cluster.EdsClusterConfig.service_name>` value if specified
-  // in the cluster :ref:`EdsClusterConfig
-  // <envoy_api_msg_Cluster.EdsClusterConfig>`.
-  string cluster_name = 1 [(validate.rules).string.min_bytes = 1];
-
-  // List of endpoints to load balance to.
-  repeated endpoint.LocalityLbEndpoints endpoints = 2;
-
-  // Map of named endpoints that can be referenced in LocalityLbEndpoints.
-  map<string, endpoint.Endpoint> named_endpoints = 5;
-
   // Load balancing policy settings.
   message Policy {
-    reserved 1;
-
     message DropOverload {
       // Identifier for the policy specifying the drop.
-      string category = 1 [(validate.rules).string.min_bytes = 1];
+      string category = 1 [(validate.rules).string = {min_bytes: 1}];
 
       // Percentage of traffic that should be dropped for the category.
-      envoy.type.FractionalPercent drop_percentage = 2;
+      type.FractionalPercent drop_percentage = 2;
     }
+
+    reserved 1;
+
     // Action to trim the overall incoming traffic to protect the upstream
     // hosts. This action allows protection in case the hosts are unable to
     // recover from an outage, or unable to autoscale or unable to handle
@@ -106,13 +94,13 @@ message ClusterLoadAssignment {
     //
     // Read more at :ref:`priority levels <arch_overview_load_balancing_priority_levels>` and
     // :ref:`localities <arch_overview_load_balancing_locality_weighted_lb>`.
-    google.protobuf.UInt32Value overprovisioning_factor = 3 [(validate.rules).uint32.gt = 0];
+    google.protobuf.UInt32Value overprovisioning_factor = 3 [(validate.rules).uint32 = {gt: 0}];
 
     // The max time until which the endpoints from this assignment can be used.
     // If no new assignments are received before this time expires the endpoints
     // are considered stale and should be marked unhealthy.
     // Defaults to 0 which means endpoints never go stale.
-    google.protobuf.Duration endpoint_stale_after = 4 [(validate.rules).duration.gt.seconds = 0];
+    google.protobuf.Duration endpoint_stale_after = 4 [(validate.rules).duration = {gt {}}];
 
     // The flag to disable overprovisioning. If it is set to true,
     // :ref:`overprovisioning factor
@@ -125,6 +113,18 @@ message ClusterLoadAssignment {
     // [#not-implemented-hide:]
     bool disable_overprovisioning = 5;
   }
+
+  // Name of the cluster. This will be the :ref:`service_name
+  // <envoy_api_field_Cluster.EdsClusterConfig.service_name>` value if specified
+  // in the cluster :ref:`EdsClusterConfig
+  // <envoy_api_msg_Cluster.EdsClusterConfig>`.
+  string cluster_name = 1 [(validate.rules).string = {min_bytes: 1}];
+
+  // List of endpoints to load balance to.
+  repeated endpoint.LocalityLbEndpoints endpoints = 2;
+
+  // Map of named endpoints that can be referenced in LocalityLbEndpoints.
+  map<string, endpoint.Endpoint> named_endpoints = 5;
 
   // Load balancing policy settings.
   Policy policy = 4;
