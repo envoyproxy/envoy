@@ -54,17 +54,7 @@ absl::flat_hash_set<Watch*> WatchMap::watchesInterestedIn(const std::string& res
 void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                               const std::string& version_info) {
   if (watches_.empty()) {
-    if (resources.empty()) {
-      // We have no watches, and the update contained no resources. This can happen when Envoy
-      // unregisters from a resource that's removed from the server as well. For example,
-      // a deleted cluster triggers un-watching the ClusterLoadAssignment watch, and at the
-      // same time the xDS server sends an empty list of ClusterLoadAssignment resources.
-      return;
-    } else {
-      // We have no watches, but the update contained resources. This should not happen.
-      ENVOY_LOG(warn, "Rejecting non-empty update for unwatched type URL");
-      throw EnvoyException("Rejecting non-empty update for unwatched type URL");
-    }
+    return;
   }
   SubscriptionCallbacks& name_getter = (*watches_.begin())->callbacks_;
 
