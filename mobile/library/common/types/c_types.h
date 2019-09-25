@@ -27,7 +27,11 @@ typedef enum { ENVOY_SUCCESS, ENVOY_FAILURE } envoy_status_t;
 /**
  * Error code associated with terminal status of a HTTP stream.
  */
-typedef enum { ENVOY_UNDEFINED_ERROR, ENVOY_STREAM_RESET } envoy_error_code_t;
+typedef enum {
+  ENVOY_UNDEFINED_ERROR,
+  ENVOY_STREAM_RESET,
+  ENVOY_CONNECTION_FAILURE
+} envoy_error_code_t;
 
 /**
  * Networks classified by last physical link.

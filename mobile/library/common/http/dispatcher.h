@@ -11,6 +11,7 @@
 #include "common/common/logger.h"
 #include "common/common/thread.h"
 
+#include "absl/types/optional.h"
 #include "library/common/types/c_types.h"
 
 namespace Envoy {
@@ -104,6 +105,8 @@ private:
   private:
     const envoy_stream_t stream_handle_;
     const envoy_http_callbacks bridge_callbacks_;
+    absl::optional<envoy_error_code_t> error_code_;
+    absl::optional<envoy_data> error_message_;
     Dispatcher& http_dispatcher_;
   };
 
