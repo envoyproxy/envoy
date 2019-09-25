@@ -83,9 +83,7 @@ void Cluster::refresh(const std::function<bool(const std::string&)>& skip_predic
   tls_->runOnAllThreads([this, skip_predicate, cluster_name = this->info()->name()]() {
     PriorityContext priority_set = linearizePrioritySet(skip_predicate);
     Upstream::ThreadLocalCluster* cluster = cluster_manager_.get(cluster_name);
-    if (cluster == nullptr) {
-      return;
-    }
+    ASSERT(cluster != nullptr);
     dynamic_cast<AggregateClusterLoadBalancer&>(cluster->loadBalancer()).refresh(priority_set);
   });
 }

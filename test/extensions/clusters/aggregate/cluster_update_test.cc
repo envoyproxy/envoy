@@ -222,6 +222,73 @@ TEST_F(AggregateClusterUpdateTest, LoadBalancingTest) {
   }
 }
 
+TEST_F(AggregateClusterUpdateTest, InitializeAggregateClusterAfterOtherClusters) {
+  const std::string config = R"EOF(
+ static_resources:
+  clusters:
+  - name: primary
+    connect_timeout: 5s
+    type: STATIC
+    load_assignment:
+      cluster_name: primary
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 80
+    lb_policy: ROUND_ROBIN
+  - name: aggregate_cluster
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    cluster_type:
+      name: envoy.clusters.aggregate
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.cluster.aggregate.ClusterConfig
+        clusters:
+        - primary
+        - secondary
+  )EOF";
+
+  cluster_manager_ = std::make_unique<Upstream::TestClusterManagerImpl>(
+      parseBootstrapFromV2Yaml(config), factory_, factory_.stats_, factory_.tls_, factory_.runtime_,
+      factory_.random_, factory_.local_info_, log_manager_, factory_.dispatcher_, admin_,
+      validation_context_, *api_, http_context_);
+  EXPECT_EQ(cluster_manager_->activeClusters().size(), 2);
+  cluster_ = cluster_manager_->get("aggregate_cluster");
+  auto primary = cluster_manager_->get("primary");
+  EXPECT_NE(nullptr, primary);
+  auto host = cluster_->loadBalancer().chooseHost(nullptr);
+  EXPECT_NE(nullptr, host);
+  EXPECT_EQ("primary", host->cluster().name());
+  EXPECT_EQ("127.0.0.1:80", host->address()->asString());
+
+  // Set up the HostSet with 1 healthy, 1 degraded and 1 unhealthy.
+  Upstream::HostSharedPtr host1 = Upstream::makeTestHost(primary->info(), "tcp://127.0.0.1:80");
+  host1->healthFlagSet(Upstream::HostImpl::HealthFlag::DEGRADED_ACTIVE_HC);
+  Upstream::HostSharedPtr host2 = Upstream::makeTestHost(primary->info(), "tcp://127.0.0.2:80");
+  host2->healthFlagSet(Upstream::HostImpl::HealthFlag::FAILED_ACTIVE_HC);
+  Upstream::HostSharedPtr host3 = Upstream::makeTestHost(primary->info(), "tcp://127.0.0.3:80");
+  Upstream::Cluster& cluster = cluster_manager_->activeClusters().find("primary")->second;
+  cluster.prioritySet().updateHosts(
+      0,
+      Upstream::HostSetImpl::partitionHosts(
+          std::make_shared<Upstream::HostVector>(Upstream::HostVector{host1, host2, host3}),
+          Upstream::HostsPerLocalityImpl::empty()),
+      nullptr, {host1, host2, host3}, {}, 100);
+
+  for (int i = 0; i < 50; ++i) {
+    EXPECT_CALL(factory_.random_, random()).WillRepeatedly(Return(i));
+    EXPECT_EQ(host3, cluster_->loadBalancer().chooseHost(nullptr));
+  }
+
+  for (int i = 50; i < 100; ++i) {
+    EXPECT_CALL(factory_.random_, random()).WillRepeatedly(Return(i));
+    EXPECT_EQ(host1, cluster_->loadBalancer().chooseHost(nullptr));
+  }
+}
+
 } // namespace Aggregate
 } // namespace Clusters
 } // namespace Extensions

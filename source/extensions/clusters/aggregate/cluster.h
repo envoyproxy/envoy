@@ -67,6 +67,8 @@ public:
   Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext* context) override;
 
 private:
+  // Use inner class to extend LoadBalancerBase. When initializing AggregateClusterLoadBalancer, the
+  // priority set could be empty, we cannot initialize LoadBalancerBase when priority set is empty.
   class LoadBalancerImpl : public Upstream::LoadBalancerBase {
   public:
     LoadBalancerImpl(const PriorityContext& priority_context, Upstream::ClusterStats& stats,

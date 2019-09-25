@@ -96,6 +96,9 @@ public:
     ON_CALL(aggregate_cluster_, loadBalancer()).WillByDefault(ReturnRef(*lb_));
 
     setupPrioritySet();
+
+    ON_CALL(primary_, loadBalancer()).WillByDefault(ReturnRef(primary_load_balancer_));
+    ON_CALL(secondary_, loadBalancer()).WillByDefault(ReturnRef(secondary_load_balancer_));
   }
 
   Stats::IsolatedStoreImpl stats_store_;
@@ -144,9 +147,7 @@ TEST_F(AggregateClusterTest, LoadBalancerTest) {
   //     Priority 0: 33.3%
   //     Priority 1: 33.3%
   Upstream::HostSharedPtr host = Upstream::makeTestHost(info_, "tcp://127.0.0.1:80");
-  EXPECT_CALL(primary_, loadBalancer()).WillRepeatedly(ReturnRef(primary_load_balancer_));
   EXPECT_CALL(primary_load_balancer_, chooseHost(_)).WillRepeatedly(Return(host));
-  EXPECT_CALL(secondary_, loadBalancer()).WillRepeatedly(ReturnRef(secondary_load_balancer_));
   EXPECT_CALL(secondary_load_balancer_, chooseHost(_)).WillRepeatedly(Return(nullptr));
 
   for (int i = 0; i <= 65; ++i) {
@@ -155,9 +156,7 @@ TEST_F(AggregateClusterTest, LoadBalancerTest) {
     EXPECT_EQ(host.get(), target.get());
   }
 
-  EXPECT_CALL(primary_, loadBalancer()).WillRepeatedly(ReturnRef(primary_load_balancer_));
   EXPECT_CALL(primary_load_balancer_, chooseHost(_)).WillRepeatedly(Return(nullptr));
-  EXPECT_CALL(secondary_, loadBalancer()).WillRepeatedly(ReturnRef(secondary_load_balancer_));
   EXPECT_CALL(secondary_load_balancer_, chooseHost(_)).WillRepeatedly(Return(host));
   for (int i = 66; i < 100; ++i) {
     EXPECT_CALL(random_, random()).WillOnce(Return(i));
@@ -175,9 +174,7 @@ TEST_F(AggregateClusterTest, LoadBalancerTest) {
   // Cluster 2:
   //     Priority 0: 33.3%
   //     Priority 1: 33.3%
-  EXPECT_CALL(primary_, loadBalancer()).WillRepeatedly(ReturnRef(primary_load_balancer_));
   EXPECT_CALL(primary_load_balancer_, chooseHost(_)).WillRepeatedly(Return(host));
-  EXPECT_CALL(secondary_, loadBalancer()).WillRepeatedly(ReturnRef(secondary_load_balancer_));
   EXPECT_CALL(secondary_load_balancer_, chooseHost(_)).WillRepeatedly(Return(nullptr));
 
   for (int i = 0; i <= 57; ++i) {
@@ -186,9 +183,7 @@ TEST_F(AggregateClusterTest, LoadBalancerTest) {
     EXPECT_EQ(host.get(), target.get());
   }
 
-  EXPECT_CALL(primary_, loadBalancer()).WillRepeatedly(ReturnRef(primary_load_balancer_));
   EXPECT_CALL(primary_load_balancer_, chooseHost(_)).WillRepeatedly(Return(nullptr));
-  EXPECT_CALL(secondary_, loadBalancer()).WillRepeatedly(ReturnRef(secondary_load_balancer_));
   EXPECT_CALL(secondary_load_balancer_, chooseHost(_)).WillRepeatedly(Return(host));
   for (int i = 58; i < 100; ++i) {
     EXPECT_CALL(random_, random()).WillOnce(Return(i));
@@ -214,9 +209,7 @@ TEST_F(AggregateClusterTest, AllHostAreUnhealthyTest) {
   // Cluster 2:
   //     Priority 0: 0%
   //     Priority 1: 0%
-  EXPECT_CALL(primary_, loadBalancer()).WillRepeatedly(ReturnRef(primary_load_balancer_));
   EXPECT_CALL(primary_load_balancer_, chooseHost(_)).WillRepeatedly(Return(host));
-  EXPECT_CALL(secondary_, loadBalancer()).WillRepeatedly(ReturnRef(secondary_load_balancer_));
   EXPECT_CALL(secondary_load_balancer_, chooseHost(_)).WillRepeatedly(Return(nullptr));
 
   for (int i = 0; i < 100; ++i) {
@@ -241,9 +234,7 @@ TEST_F(AggregateClusterTest, ClusterInPanicTest) {
   //     Priority 0: 20%
   //     Priority 1: 20%
   // All priorities are in panic mode. Traffic will be distributed evenly among four priorities.
-  EXPECT_CALL(primary_, loadBalancer()).WillRepeatedly(ReturnRef(primary_load_balancer_));
   EXPECT_CALL(primary_load_balancer_, chooseHost(_)).WillRepeatedly(Return(host));
-  EXPECT_CALL(secondary_, loadBalancer()).WillRepeatedly(ReturnRef(secondary_load_balancer_));
   EXPECT_CALL(secondary_load_balancer_, chooseHost(_)).WillRepeatedly(Return(nullptr));
 
   for (int i = 0; i < 50; ++i) {
@@ -252,9 +243,7 @@ TEST_F(AggregateClusterTest, ClusterInPanicTest) {
     EXPECT_EQ(host.get(), target.get());
   }
 
-  EXPECT_CALL(primary_, loadBalancer()).WillRepeatedly(ReturnRef(primary_load_balancer_));
   EXPECT_CALL(primary_load_balancer_, chooseHost(_)).WillRepeatedly(Return(nullptr));
-  EXPECT_CALL(secondary_, loadBalancer()).WillRepeatedly(ReturnRef(secondary_load_balancer_));
   EXPECT_CALL(secondary_load_balancer_, chooseHost(_)).WillRepeatedly(Return(host));
 
   for (int i = 50; i < 100; ++i) {
@@ -274,9 +263,7 @@ TEST_F(AggregateClusterTest, ClusterInPanicTest) {
   // Cluster 2:
   //     Priority 0: 10%
   //     Priority 0: 50%
-  EXPECT_CALL(primary_, loadBalancer()).WillRepeatedly(ReturnRef(primary_load_balancer_));
   EXPECT_CALL(primary_load_balancer_, chooseHost(_)).WillRepeatedly(Return(host));
-  EXPECT_CALL(secondary_, loadBalancer()).WillRepeatedly(ReturnRef(secondary_load_balancer_));
   EXPECT_CALL(secondary_load_balancer_, chooseHost(_)).WillRepeatedly(Return(nullptr));
 
   for (int i = 0; i <= 25; ++i) {
@@ -285,9 +272,7 @@ TEST_F(AggregateClusterTest, ClusterInPanicTest) {
     EXPECT_EQ(host.get(), target.get());
   }
 
-  EXPECT_CALL(primary_, loadBalancer()).WillRepeatedly(ReturnRef(primary_load_balancer_));
   EXPECT_CALL(primary_load_balancer_, chooseHost(_)).WillRepeatedly(Return(nullptr));
-  EXPECT_CALL(secondary_, loadBalancer()).WillRepeatedly(ReturnRef(secondary_load_balancer_));
   EXPECT_CALL(secondary_load_balancer_, chooseHost(_)).WillRepeatedly(Return(host));
 
   for (int i = 26; i < 100; ++i) {
@@ -295,6 +280,17 @@ TEST_F(AggregateClusterTest, ClusterInPanicTest) {
     Upstream::HostConstSharedPtr target = lb_->chooseHost(nullptr);
     EXPECT_EQ(host.get(), target.get());
   }
+}
+
+TEST_F(AggregateClusterTest, LBContextTest) {
+  AggregateLoadBalancerContext context(nullptr,
+                                       Upstream::LoadBalancerBase::HostAvailability::Healthy, 0);
+
+  EXPECT_EQ(context.computeHashKey().value, {});
+  EXPECT_EQ(context.downstreamConnection(), nullptr);
+  EXPECT_EQ(context.metadataMatchCriteria(), nullptr);
+  EXPECT_EQ(context.downstreamHeaders(), nullptr);
+  EXPECT_EQ(context.upstreamSocketOptions(), nullptr);
 }
 
 } // namespace Aggregate

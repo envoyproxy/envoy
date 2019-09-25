@@ -8,7 +8,7 @@ failover from EDS upstream cluster to STRICT_DNS upstream cluster. Aggregate clu
 clusters by referencing their name in the :ref:`configuration <envoy_api_msg_config.cluster.aggregate.ClusterConfig>`. 
 The fallback priority is defined implicitly by the ordering in the :ref:`clusters <envoy_api_field_config.cluster.aggregate.ClusterConfig.clusters>`.
 Aggregate cluster uses tiered load balancing. The load balancer chooses cluster and piority first and then deletgates the load balancing from that priority
-to the load balancer of the seleted cluster. The top level load balancer reuse the existing load balancing algorithm by linearizing the 
+to the load balancer of the seleted cluster. The top level load balancer reuses the existing load balancing algorithm by linearizing the 
 priority set of multiple clusters into one. 
 
 Linearize Priority Set
