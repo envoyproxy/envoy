@@ -1,4 +1,9 @@
 REPOSITORY_LOCATIONS = dict(
+    bazel_compdb = dict(
+        sha256 = "bb1b812396e2ee36a50a13b03ae6833173ce643e8a4bd50731067d0b4e5c6e86",
+        strip_prefix = "bazel-compilation-database-0.3.5",
+        urls = ["https://github.com/grailbio/bazel-compilation-database/archive/0.3.5.tar.gz"],
+    ),
     bazel_gazelle = dict(
         sha256 = "be9296bfd64882e3c08e3283c58fcb461fa6dd3c171764fcc4cf322f60615a9b",
         urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/0.18.1/bazel-gazelle-0.18.1.tar.gz"],
