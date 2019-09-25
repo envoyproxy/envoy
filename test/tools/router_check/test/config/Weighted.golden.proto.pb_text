@@ -16,11 +16,12 @@ tests {
   test_name: "Test_2"
   input: {
     authority: "www1.lyft.com"
-    path: "/foo"
+    path: "/test/123"
     method: "GET"
     random_value: 115
   }
   validate: {
-    cluster_name: { value: "cluster1" }
+    cluster_name: { value: "cluster1"}
+    virtual_cluster_name: { value: "test_virtual_cluster" }
   }
 }

@@ -160,6 +160,7 @@ public:
   static const uint32_t RETRY_ON_GRPC_INTERNAL           = 0x200;
   static const uint32_t RETRY_ON_RETRIABLE_STATUS_CODES  = 0x400;
   static const uint32_t RETRY_ON_RESET                   = 0x800;
+  static const uint32_t RETRY_ON_RETRIABLE_HEADERS       = 0x1000;
   // clang-format on
 
   virtual ~RetryPolicy() = default;
@@ -203,6 +204,12 @@ public:
    * policy is enabled.
    */
   virtual const std::vector<uint32_t>& retriableStatusCodes() const PURE;
+
+  /**
+   * @return std::vector<Http::HeaderMatcherSharedPtr>& list of response header matchers that
+   * will be checked when the 'retriable-headers' retry policy is enabled.
+   */
+  virtual const std::vector<Http::HeaderMatcherSharedPtr>& retriableHeaders() const PURE;
 
   /**
    * @return absl::optional<std::chrono::milliseconds> base retry interval

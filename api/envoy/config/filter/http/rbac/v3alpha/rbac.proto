@@ -28,8 +28,6 @@ message RBAC {
 message RBACPerRoute {
   reserved 1;
 
-  reserved "disabled";
-
   // Override the global configuration of the filter with this new config.
   // If absent, the global RBAC policy will be disabled for this route.
   RBAC rbac = 2;

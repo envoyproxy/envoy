@@ -63,6 +63,7 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/http:async_client_lib",
         "//source/common/http:codes_lib",
+        "//source/common/tracing:http_tracer_lib",
         "@envoy_api//envoy/config/filter/http/ext_authz/v2:ext_authz_cc",
     ],
 )

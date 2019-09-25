@@ -57,3 +57,5 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/common/expr @kyessenov @yangminzhu
 # webassembly common extension
 /*/extensions/common/wasm @jplevyak @PiotrSikora
+# common crypto extension
+/*/extensions/common/crypto @lizan @PiotrSikora @bdecoste

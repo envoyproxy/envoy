@@ -61,10 +61,12 @@ InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_syste
                           !options.rejectUnknownDynamicFields()),
       time_source_(time_system), restarter_(restarter), start_time_(time(nullptr)),
       original_start_time_(start_time_), stats_store_(store), thread_local_(tls),
-      api_(new Api::Impl(thread_factory, store, time_system, file_system)),
+      api_(new Api::Impl(thread_factory, store, time_system, file_system,
+                         process_context ? OptProcessContextRef(std::ref(*process_context))
+                                         : absl::nullopt)),
       dispatcher_(api_->allocateDispatcher()),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
-      handler_(new ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
+      handler_(new ConnectionHandlerImpl(*dispatcher_, "main_thread")),
       random_generator_(std::move(random_generator)), listener_component_factory_(*this),
       worker_factory_(thread_local_, *api_, hooks),
       dns_resolver_(dispatcher_->createDnsResolver({})),
@@ -464,10 +466,10 @@ void InstanceImpl::loadServerFlags(const absl::optional<std::string>& flags_path
 RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatcher& dispatcher,
                      Upstream::ClusterManager& cm, AccessLog::AccessLogManager& access_log_manager,
                      Init::Manager& init_manager, OverloadManager& overload_manager,
-                     std::function<void()> workers_start_cb)
-    : init_watcher_("RunHelper", [&instance, workers_start_cb]() {
+                     std::function<void()> post_init_cb)
+    : init_watcher_("RunHelper", [&instance, post_init_cb]() {
         if (!instance.isShutdown()) {
-          workers_start_cb();
+          post_init_cb();
         }
       }) {
   // Setup signals.
@@ -522,13 +524,16 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
 void InstanceImpl::run() {
   // RunHelper exists primarily to facilitate testing of how we respond to early shutdown during
   // startup (see RunHelperTest in server_test.cc).
-  const auto run_helper =
-      RunHelper(*this, options_, *dispatcher_, clusterManager(), access_log_manager_, init_manager_,
-                overloadManager(), [this] { startWorkers(); });
+  const auto run_helper = RunHelper(*this, options_, *dispatcher_, clusterManager(),
+                                    access_log_manager_, init_manager_, overloadManager(), [this] {
+                                      notifyCallbacksForStage(Stage::PostInit);
+                                      startWorkers();
+                                    });
 
   // Run the main dispatch loop waiting to exit.
   ENVOY_LOG(info, "starting main dispatch loop");
-  auto watchdog = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId());
+  auto watchdog =
+      guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "main_thread");
   watchdog->startWatchdog(*dispatcher_);
   dispatcher_->post([this] { notifyCallbacksForStage(Stage::Startup); });
   dispatcher_->run(Event::Dispatcher::RunType::Block);

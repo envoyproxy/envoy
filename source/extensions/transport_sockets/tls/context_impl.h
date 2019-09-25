@@ -128,7 +128,8 @@ protected:
   static SslStats generateStats(Stats::Scope& scope);
 
   std::string getCaFileName() const { return ca_file_path_; };
-  void incCounter(const Stats::StatName name, absl::string_view value) const;
+  void incCounter(const Stats::StatName name, absl::string_view value,
+                  const Stats::StatName fallback) const;
 
   Envoy::Ssl::CertificateDetailsPtr certificateDetails(X509* cert, const std::string& path) const;
 
@@ -171,6 +172,10 @@ protected:
   TimeSource& time_source_;
   const unsigned tls_max_version_;
   mutable Stats::StatNameSet stat_name_set_;
+  const Stats::StatName unknown_ssl_cipher_;
+  const Stats::StatName unknown_ssl_curve_;
+  const Stats::StatName unknown_ssl_algorithm_;
+  const Stats::StatName unknown_ssl_version_;
   const Stats::StatName ssl_ciphers_;
   const Stats::StatName ssl_versions_;
   const Stats::StatName ssl_curves_;
@@ -194,7 +199,7 @@ private:
   const bool allow_renegotiation_;
   const size_t max_session_keys_;
   absl::Mutex session_keys_mu_;
-  std::deque<bssl::UniquePtr<SSL_SESSION>> session_keys_ GUARDED_BY(session_keys_mu_);
+  std::deque<bssl::UniquePtr<SSL_SESSION>> session_keys_ ABSL_GUARDED_BY(session_keys_mu_);
   bool session_keys_single_use_{false};
 };
 

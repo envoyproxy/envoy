@@ -97,6 +97,9 @@ TEST_F(CheckRequestUtilsTest, BasicTcp) {
   EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(Const(connection_), ssl()).Times(2).WillRepeatedly(Return(ssl_));
+  EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
+  EXPECT_CALL(*ssl_, uriSanLocalCertificate())
+      .WillOnce(Return(std::vector<std::string>{"destination"}));
 
   CheckRequestUtils::createTcpCheck(&net_callbacks_, request);
 }
@@ -112,6 +115,9 @@ TEST_F(CheckRequestUtilsTest, BasicHttp) {
   // A client supplied EnvoyAuthPartialBody header should be ignored.
   Http::TestHeaderMapImpl request_headers{{Http::Headers::get().EnvoyAuthPartialBody.get(), "1"}};
 
+  EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
+  EXPECT_CALL(*ssl_, uriSanLocalCertificate())
+      .WillOnce(Return(std::vector<std::string>{"destination"}));
   expectBasicHttp();
   CheckRequestUtils::createHttpCheck(&callbacks_, request_headers,
                                      Protobuf::Map<std::string, std::string>(),
@@ -129,6 +135,9 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithPartialBody) {
   Http::HeaderMapImpl headers_;
   envoy::service::auth::v2::CheckRequest request_;
 
+  EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
+  EXPECT_CALL(*ssl_, uriSanLocalCertificate())
+      .WillOnce(Return(std::vector<std::string>{"destination"}));
   expectBasicHttp();
   CheckRequestUtils::createHttpCheck(&callbacks_, headers_,
                                      Protobuf::Map<std::string, std::string>(),
@@ -144,6 +153,9 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithFullBody) {
   Http::HeaderMapImpl headers_;
   envoy::service::auth::v2::CheckRequest request_;
 
+  EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
+  EXPECT_CALL(*ssl_, uriSanLocalCertificate())
+      .WillOnce(Return(std::vector<std::string>{"destination"}));
   expectBasicHttp();
   CheckRequestUtils::createHttpCheck(&callbacks_, headers_,
                                      Protobuf::Map<std::string, std::string>(),
@@ -213,11 +225,13 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextSubject) {
 
   EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{}));
   EXPECT_CALL(*ssl_, dnsSansPeerCertificate()).WillOnce(Return(std::vector<std::string>{}));
-  EXPECT_CALL(*ssl_, subjectPeerCertificate()).WillOnce(Return("source"));
+  std::string subject_peer = "source";
+  EXPECT_CALL(*ssl_, subjectPeerCertificate()).WillOnce(ReturnRef(subject_peer));
 
   EXPECT_CALL(*ssl_, uriSanLocalCertificate()).WillOnce(Return(std::vector<std::string>{}));
   EXPECT_CALL(*ssl_, dnsSansLocalCertificate()).WillOnce(Return(std::vector<std::string>{}));
-  EXPECT_CALL(*ssl_, subjectLocalCertificate()).WillOnce(Return("destination"));
+  std::string subject_local = "destination";
+  EXPECT_CALL(*ssl_, subjectLocalCertificate()).WillOnce(ReturnRef(subject_local));
 
   callHttpCheckAndValidateRequestAttributes();
 }

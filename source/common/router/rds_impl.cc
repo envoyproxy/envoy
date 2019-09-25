@@ -148,8 +148,9 @@ void RdsRouteConfigSubscription::onConfigUpdate(
   }
 }
 
-void RdsRouteConfigSubscription::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason,
-                                                      const EnvoyException*) {
+void RdsRouteConfigSubscription::onConfigUpdateFailed(
+    Envoy::Config::ConfigUpdateFailureReason reason, const EnvoyException*) {
+  ASSERT(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure != reason);
   // We need to allow server startup to continue, even if we have a bad
   // config.
   init_target_.ready();
@@ -199,8 +200,12 @@ Router::ConfigConstSharedPtr RdsRouteConfigProviderImpl::config() {
 void RdsRouteConfigProviderImpl::onConfigUpdate() {
   ConfigConstSharedPtr new_config(
       new ConfigImpl(config_update_info_->routeConfiguration(), factory_context_, false));
-  tls_->runOnAllThreads(
-      [this, new_config]() -> void { tls_->getTyped<ThreadLocalConfig>().config_ = new_config; });
+  tls_->runOnAllThreads([new_config](ThreadLocal::ThreadLocalObjectSharedPtr previous)
+                            -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    auto prev_config = std::dynamic_pointer_cast<ThreadLocalConfig>(previous);
+    prev_config->config_ = new_config;
+    return previous;
+  });
 }
 
 void RdsRouteConfigProviderImpl::validateConfig(

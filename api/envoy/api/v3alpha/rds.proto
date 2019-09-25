@@ -5,7 +5,6 @@ package envoy.api.v3alpha;
 option java_outer_classname = "RdsProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.api.v3alpha";
-
 option java_generic_services = true;
 
 import "envoy/api/v3alpha/core/base.proto";
@@ -90,7 +89,7 @@ message RouteConfiguration {
   // header value syntax, see the documentation on :ref:`custom request headers
   // <config_http_conn_man_headers_custom_request_headers>`.
   repeated core.HeaderValueOption response_headers_to_add = 4
-      [(validate.rules).repeated .max_items = 1000];
+      [(validate.rules).repeated = {max_items: 1000}];
 
   // Specifies a list of HTTP headers that should be removed from each response
   // that the connection manager encodes.
@@ -103,7 +102,7 @@ message RouteConfiguration {
   // header value syntax, see the documentation on :ref:`custom request headers
   // <config_http_conn_man_headers_custom_request_headers>`.
   repeated core.HeaderValueOption request_headers_to_add = 6
-      [(validate.rules).repeated .max_items = 1000];
+      [(validate.rules).repeated = {max_items: 1000}];
 
   // Specifies a list of HTTP headers that should be removed from each request
   // routed by the HTTP connection manager.
@@ -128,5 +127,5 @@ message RouteConfiguration {
 // [#not-implemented-hide:]
 message Vhds {
   // Configuration source specifier for VHDS.
-  envoy.api.v3alpha.core.ConfigSource config_source = 1 [(validate.rules).message.required = true];
+  core.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
 }

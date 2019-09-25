@@ -5,7 +5,10 @@
 
 #include "common/crypto/utility.h"
 
+#include "extensions/common/crypto/crypto_impl.h"
 #include "extensions/filters/common/lua/lua.h"
+
+#include "openssl/evp.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -208,7 +211,7 @@ private:
  */
 class PublicKeyWrapper : public Filters::Common::Lua::BaseLuaObject<PublicKeyWrapper> {
 public:
-  PublicKeyWrapper(Envoy::Common::Crypto::PublicKeyPtr key) : public_key_(std::move(key)) {}
+  PublicKeyWrapper(Envoy::Common::Crypto::CryptoObjectPtr key) : public_key_(std::move(key)) {}
   static ExportedFunctions exportedFunctions() { return {{"get", static_luaGet}}; }
 
 private:
@@ -218,7 +221,7 @@ private:
    */
   DECLARE_LUA_FUNCTION(PublicKeyWrapper, luaGet);
 
-  Envoy::Common::Crypto::PublicKeyPtr public_key_;
+  Envoy::Common::Crypto::CryptoObjectPtr public_key_;
 };
 
 } // namespace Lua

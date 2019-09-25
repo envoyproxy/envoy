@@ -116,15 +116,15 @@ public:
   }
 
   AssertionResult verifyHostUpstreamStats(uint64_t success, uint64_t error) {
-    if (success != cm_.conn_pool_.host_->stats_store_.counter("rq_success").value()) {
-      return AssertionFailure() << fmt::format(
-                 "rq_success {} does not match expected {}",
-                 cm_.conn_pool_.host_->stats_store_.counter("rq_success").value(), success);
+    if (success != cm_.conn_pool_.host_->stats_.rq_success_.value()) {
+      return AssertionFailure() << fmt::format("rq_success {} does not match expected {}",
+                                               cm_.conn_pool_.host_->stats_.rq_success_.value(),
+                                               success);
     }
-    if (error != cm_.conn_pool_.host_->stats_store_.counter("rq_error").value()) {
-      return AssertionFailure() << fmt::format(
-                 "rq_error {} does not match expected {}",
-                 cm_.conn_pool_.host_->stats_store_.counter("rq_error").value(), error);
+    if (error != cm_.conn_pool_.host_->stats_.rq_error_.value()) {
+      return AssertionFailure() << fmt::format("rq_error {} does not match expected {}",
+                                               cm_.conn_pool_.host_->stats_.rq_error_.value(),
+                                               error);
     }
     return AssertionSuccess();
   }
@@ -2116,7 +2116,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutGlobalTimeout) {
       }));
   response_timeout_->invokeCallback();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 2));
-  EXPECT_EQ(2, cm_.conn_pool_.host_->stats_store_.counter("rq_timeout").value());
+  EXPECT_EQ(2, cm_.conn_pool_.host_->stats_.rq_timeout_.value());
   // TODO: Verify hedge stats here once they are implemented.
 }
 
@@ -3419,9 +3419,9 @@ TEST_F(RouterTest, UpstreamSSLConnection) {
   NiceMock<Http::MockStreamEncoder> encoder;
   Http::StreamDecoder* response_decoder = nullptr;
 
-  const auto session_id = "D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B";
+  std::string session_id = "D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B";
   auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
-  ON_CALL(*connection_info, sessionId()).WillByDefault(Return(session_id));
+  ON_CALL(*connection_info, sessionId()).WillByDefault(ReturnRef(session_id));
   upstream_stream_info_.setDownstreamSslConnection(connection_info);
 
   expectResponseTimerCreate();

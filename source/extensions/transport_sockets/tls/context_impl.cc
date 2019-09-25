@@ -52,6 +52,10 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
                          TimeSource& time_source)
     : scope_(scope), stats_(generateStats(scope)), time_source_(time_source),
       tls_max_version_(config.maxProtocolVersion()), stat_name_set_(scope.symbolTable()),
+      unknown_ssl_cipher_(stat_name_set_.add("unknown_ssl_cipher")),
+      unknown_ssl_curve_(stat_name_set_.add("unknown_ssl_curve")),
+      unknown_ssl_algorithm_(stat_name_set_.add("unknown_ssl_algorithm")),
+      unknown_ssl_version_(stat_name_set_.add("unknown_ssl_version")),
       ssl_ciphers_(stat_name_set_.add("ssl.ciphers")),
       ssl_versions_(stat_name_set_.add("ssl.versions")),
       ssl_curves_(stat_name_set_.add("ssl.curves")),
@@ -389,19 +393,18 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   stat_name_set_.rememberBuiltin("ECDHE-RSA-AES128-GCM-SHA256");
   stat_name_set_.rememberBuiltin("ECDHE-RSA-AES128-SHA");
   stat_name_set_.rememberBuiltin("ECDHE-RSA-CHACHA20-POLY1305");
+  stat_name_set_.rememberBuiltin("TLS_AES_128_GCM_SHA256");
 
-  // Curves
-  stat_name_set_.rememberBuiltin("X25519");
+  // Curves from
+  // https://github.com/google/boringssl/blob/f4d8b969200f1ee2dd872ffb85802e6a0976afe7/ssl/ssl_key_share.cc#L384
+  stat_name_set_.rememberBuiltins(
+      {"P-224", "P-256", "P-384", "P-521", "X25519", "CECPQ2", "CECPQ2b"});
 
   // Algorithms
-  stat_name_set_.rememberBuiltin("ecdsa_secp256r1_sha256");
-  stat_name_set_.rememberBuiltin("rsa_pss_rsae_sha256");
+  stat_name_set_.rememberBuiltins({"ecdsa_secp256r1_sha256", "rsa_pss_rsae_sha256"});
 
   // Versions
-  stat_name_set_.rememberBuiltin("TLSv1");
-  stat_name_set_.rememberBuiltin("TLSv1.1");
-  stat_name_set_.rememberBuiltin("TLSv1.2");
-  stat_name_set_.rememberBuiltin("TLSv1.3");
+  stat_name_set_.rememberBuiltins({"TLSv1", "TLSv1.1", "TLSv1.2", "TLSv1.3"});
 }
 
 int ServerContextImpl::alpnSelectCallback(const unsigned char** out, unsigned char* outlen,
@@ -510,10 +513,11 @@ int ContextImpl::verifyCertificate(X509* cert, const std::vector<std::string>& v
   return 1;
 }
 
-void ContextImpl::incCounter(const Stats::StatName name, absl::string_view value) const {
+void ContextImpl::incCounter(const Stats::StatName name, absl::string_view value,
+                             const Stats::StatName fallback) const {
   Stats::SymbolTable& symbol_table = scope_.symbolTable();
   Stats::SymbolTable::StoragePtr storage =
-      symbol_table.join({name, stat_name_set_.getStatName(value)});
+      symbol_table.join({name, stat_name_set_.getBuiltin(value, fallback)});
   scope_.counterFromStatName(Stats::StatName(storage.get())).inc();
 
 #ifdef LOG_BUILTIN_STAT_NAMES
@@ -529,19 +533,18 @@ void ContextImpl::logHandshake(SSL* ssl) const {
     stats_.session_reused_.inc();
   }
 
-  incCounter(ssl_ciphers_, SSL_get_cipher_name(ssl));
-  incCounter(ssl_versions_, SSL_get_version(ssl));
+  incCounter(ssl_ciphers_, SSL_get_cipher_name(ssl), unknown_ssl_cipher_);
+  incCounter(ssl_versions_, SSL_get_version(ssl), unknown_ssl_version_);
 
   uint16_t curve_id = SSL_get_curve_id(ssl);
   if (curve_id) {
-    // Note: in the unit tests, this curve name is always literal "X25519"
-    incCounter(ssl_curves_, SSL_get_curve_name(curve_id));
+    incCounter(ssl_curves_, SSL_get_curve_name(curve_id), unknown_ssl_curve_);
   }
 
   uint16_t sigalg_id = SSL_get_peer_signature_algorithm(ssl);
   if (sigalg_id) {
     const char* sigalg = SSL_get_signature_algorithm_name(sigalg_id, 1 /* include curve */);
-    incCounter(ssl_sigalgs_, sigalg);
+    incCounter(ssl_sigalgs_, sigalg, unknown_ssl_algorithm_);
   }
 
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));

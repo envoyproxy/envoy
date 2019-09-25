@@ -33,7 +33,7 @@ public:
    * @return std::string the subject field of the local certificate in RFC 2253 format. Returns ""
    *         if there is no local certificate, or no subject.
    **/
-  virtual std::string subjectLocalCertificate() const PURE;
+  virtual const std::string& subjectLocalCertificate() const PURE;
 
   /**
    * @return std::string the SHA256 digest of the peer certificate. Returns "" if there is no peer
@@ -45,19 +45,19 @@ public:
    * @return std::string the serial number field of the peer certificate. Returns "" if
    *         there is no peer certificate, or no serial number.
    **/
-  virtual std::string serialNumberPeerCertificate() const PURE;
+  virtual const std::string& serialNumberPeerCertificate() const PURE;
 
   /**
    * @return std::string the issuer field of the peer certificate in RFC 2253 format. Returns "" if
    *         there is no peer certificate, or no issuer.
    **/
-  virtual std::string issuerPeerCertificate() const PURE;
+  virtual const std::string& issuerPeerCertificate() const PURE;
 
   /**
    * @return std::string the subject field of the peer certificate in RFC 2253 format. Returns "" if
    *         there is no peer certificate, or no subject.
    **/
-  virtual std::string subjectPeerCertificate() const PURE;
+  virtual const std::string& subjectPeerCertificate() const PURE;
 
   /**
    * @return std::string the URIs in the SAN field of the peer certificate. Returns {} if there is
@@ -105,7 +105,7 @@ public:
   /**
    * @return std::string the hex-encoded TLS session ID as defined in rfc5246.
    **/
-  virtual std::string sessionId() const PURE;
+  virtual const std::string& sessionId() const PURE;
 
   /**
    * @return uint16_t the standard ID for the ciphers used in the established TLS connection.
@@ -123,7 +123,7 @@ public:
    * @return std::string the TLS version (e.g., TLSv1.2, TLSv1.3) used in the established TLS
    *         connection.
    **/
-  virtual std::string tlsVersion() const PURE;
+  virtual const std::string& tlsVersion() const PURE;
 };
 
 using ConnectionInfoConstSharedPtr = std::shared_ptr<const ConnectionInfo>;

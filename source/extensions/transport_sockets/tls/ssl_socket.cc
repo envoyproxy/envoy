@@ -475,11 +475,17 @@ std::string SslSocketInfo::ciphersuiteString() const {
   return SSL_CIPHER_get_name(cipher);
 }
 
-std::string SslSocketInfo::tlsVersion() const { return SSL_get_version(ssl_.get()); }
+const std::string& SslSocketInfo::tlsVersion() const {
+  if (!cached_tls_version_.empty()) {
+    return cached_tls_version_;
+  }
+  cached_tls_version_ = SSL_get_version(ssl_.get());
+  return cached_tls_version_;
+}
 
 absl::string_view SslSocket::failureReason() const { return failure_reason_; }
 
-std::string SslSocketInfo::serialNumberPeerCertificate() const {
+const std::string& SslSocketInfo::serialNumberPeerCertificate() const {
   if (!cached_serial_number_peer_certificate_.empty()) {
     return cached_serial_number_peer_certificate_;
   }
@@ -492,7 +498,7 @@ std::string SslSocketInfo::serialNumberPeerCertificate() const {
   return cached_serial_number_peer_certificate_;
 }
 
-std::string SslSocketInfo::issuerPeerCertificate() const {
+const std::string& SslSocketInfo::issuerPeerCertificate() const {
   if (!cached_issuer_peer_certificate_.empty()) {
     return cached_issuer_peer_certificate_;
   }
@@ -505,7 +511,7 @@ std::string SslSocketInfo::issuerPeerCertificate() const {
   return cached_issuer_peer_certificate_;
 }
 
-std::string SslSocketInfo::subjectPeerCertificate() const {
+const std::string& SslSocketInfo::subjectPeerCertificate() const {
   if (!cached_subject_peer_certificate_.empty()) {
     return cached_subject_peer_certificate_;
   }
@@ -518,7 +524,7 @@ std::string SslSocketInfo::subjectPeerCertificate() const {
   return cached_subject_peer_certificate_;
 }
 
-std::string SslSocketInfo::subjectLocalCertificate() const {
+const std::string& SslSocketInfo::subjectLocalCertificate() const {
   if (!cached_subject_local_certificate_.empty()) {
     return cached_subject_local_certificate_;
   }
@@ -547,7 +553,7 @@ absl::optional<SystemTime> SslSocketInfo::expirationPeerCertificate() const {
   return Utility::getExpirationTime(*cert);
 }
 
-std::string SslSocketInfo::sessionId() const {
+const std::string& SslSocketInfo::sessionId() const {
   if (!cached_session_id_.empty()) {
     return cached_session_id_;
   }

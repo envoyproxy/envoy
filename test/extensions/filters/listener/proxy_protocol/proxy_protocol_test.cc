@@ -51,7 +51,7 @@ public:
   ProxyProtocolTest()
       : api_(Api::createApiForTest(stats_store_)), dispatcher_(api_->allocateDispatcher()),
         socket_(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true),
-        connection_handler_(new Server::ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
+        connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, "test_thread")),
         name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()) {
 
     connection_handler_->addListener(*this);
@@ -890,7 +890,7 @@ public:
         local_dst_address_(Network::Utility::getAddressWithPort(
             *Network::Test::getCanonicalLoopbackAddress(GetParam()),
             socket_.localAddress()->ip()->port())),
-        connection_handler_(new Server::ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
+        connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, "test_thread")),
         name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()) {
     connection_handler_->addListener(*this);
     conn_ = dispatcher_->createClientConnection(local_dst_address_,

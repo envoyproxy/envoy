@@ -16,5 +16,5 @@ message Lua {
   // further loads code from disk if desired. Note that if JSON configuration is used, the code must
   // be properly escaped. YAML configuration may be easier to read since YAML supports multi-line
   // strings so complex scripts can be easily expressed inline in the configuration.
-  string inline_code = 1 [(validate.rules).string.min_bytes = 1];
+  string inline_code = 1 [(validate.rules).string = {min_bytes: 1}];
 }

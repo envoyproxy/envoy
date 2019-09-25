@@ -365,8 +365,8 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
                             *cluster->mutable_transport_socket(), tls_config);
     }
   }
-  ASSERT(port_idx == ports.size() || eds_hosts || original_dst_cluster || custom_cluster ||
-         bootstrap_.dynamic_resources().has_cds_config());
+  ASSERT(skip_port_usage_validation_ || port_idx == ports.size() || eds_hosts ||
+         original_dst_cluster || custom_cluster || bootstrap_.dynamic_resources().has_cds_config());
 
   if (!connect_timeout_set_) {
 #ifdef __APPLE__

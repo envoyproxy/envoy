@@ -124,13 +124,12 @@ build:remote --auth_enabled=true
 build:remote --experimental_inmemory_jdeps_files
 build:remote --experimental_inmemory_dotd_files
 build:remote --experimental_remote_download_outputs=toplevel
-test:remote --experimental_remote_download_outputs=minimal
 
 build:remote-clang --config=remote
 build:remote-clang --config=rbe-toolchain-clang
 
 # Docker sandbox
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build:8246167b9d238797cbc6c03dccc9e3921c37617d
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build@sha256:9236915d10004a35f2439ce4a1c33c1dbb06f95f84c4a4497d4e4f95cdc9e07f
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker
