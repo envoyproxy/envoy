@@ -73,7 +73,7 @@ void UdpListenerImpl::handleReadCallback() {
     uint32_t old_packets_dropped = packets_dropped_;
     MonotonicTime receive_time = time_source_.monotonicTime();
     Api::IoCallUint64Result result =
-        Utility::readFromSocket(socket_, *this, &packets_dropped_, receive_time);
+        Utility::readFromSocket(socket_, *this, receive_time, &packets_dropped_);
 
     if (!result.ok()) {
       // No more to read or encountered a system error.

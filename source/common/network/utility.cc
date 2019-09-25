@@ -531,8 +531,8 @@ Api::IoCallUint64Result Utility::writeToSocket(Network::Socket& socket, Buffer::
 
 Api::IoCallUint64Result Utility::readFromSocket(Network::Socket& socket,
                                                 UdpPacketProcessor& udp_packet_processor,
-                                                uint32_t* packets_dropped,
-                                                MonotonicTime receive_time) {
+                                                MonotonicTime receive_time,
+                                                uint32_t* packets_dropped) {
   Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
   Buffer::RawSlice slice;
   const uint64_t num_slices = buffer->reserve(udp_packet_processor.maxPacketSize(), &slice, 1);
