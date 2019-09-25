@@ -116,7 +116,7 @@ public:
   Stats::Scope& scope_;
   const uint32_t max_packet_bytes_;
   ZooKeeperProxyStats stats_;
-  Stats::StatNameSet stat_name_set_;
+  Stats::StatNameSetPtr stat_name_set_;
   const Stats::StatName stat_prefix_;
   const Stats::StatName auth_;
   const Stats::StatName connect_latency_;

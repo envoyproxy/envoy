@@ -14,10 +14,10 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
     const envoy::config::filter::http::ip_tagging::v2::IPTagging& config,
     const std::string& stat_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
     : request_type_(requestTypeEnum(config.request_type())), scope_(scope), runtime_(runtime),
-      stat_name_set_(scope.symbolTable()),
-      stats_prefix_(stat_name_set_.add(stat_prefix + "ip_tagging")),
-      hit_(stat_name_set_.add("hit")), no_hit_(stat_name_set_.add("no_hit")),
-      total_(stat_name_set_.add("total")) {
+      stat_name_set_(scope.symbolTable().makeSet("IpTagging")),
+      stats_prefix_(stat_name_set_->add(stat_prefix + "ip_tagging")),
+      hit_(stat_name_set_->add("hit")), no_hit_(stat_name_set_->add("no_hit")),
+      total_(stat_name_set_->add("total")) {
 
   // Once loading IP tags from a file system is supported, the restriction on the size
   // of the set should be removed and observability into what tags are loaded needs
@@ -52,7 +52,7 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
 
 void IpTaggingFilterConfig::incCounter(Stats::StatName name, absl::string_view tag) {
   Stats::SymbolTable::StoragePtr storage =
-      scope_.symbolTable().join({stats_prefix_, stat_name_set_.getDynamic(tag), name});
+      scope_.symbolTable().join({stats_prefix_, stat_name_set_->getDynamic(tag), name});
   scope_.counterFromStatName(Stats::StatName(storage.get())).inc();
 }
 

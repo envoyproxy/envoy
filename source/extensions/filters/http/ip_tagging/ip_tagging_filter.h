@@ -64,7 +64,7 @@ private:
   const FilterRequestType request_type_;
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
-  Stats::StatNameSet stat_name_set_;
+  Stats::StatNameSetPtr stat_name_set_;
   const Stats::StatName stats_prefix_;
   const Stats::StatName hit_;
   const Stats::StatName no_hit_;

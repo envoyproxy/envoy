@@ -171,7 +171,7 @@ protected:
   std::string cert_chain_file_path_;
   TimeSource& time_source_;
   const unsigned tls_max_version_;
-  mutable Stats::StatNameSet stat_name_set_;
+  mutable Stats::StatNameSetPtr stat_name_set_;
   const Stats::StatName unknown_ssl_cipher_;
   const Stats::StatName unknown_ssl_curve_;
   const Stats::StatName unknown_ssl_algorithm_;

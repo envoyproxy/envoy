@@ -37,16 +37,16 @@ public:
    * TODO(jmarantz): Potential perf issue here with mutex contention for names
    * that have not been remembered as builtins in the constructor.
    */
-  Stats::StatName getDynamic(const std::string& str) { return stat_name_set_.getDynamic(str); }
+  Stats::StatName getDynamic(const std::string& str) { return stat_name_set_->getDynamic(str); }
   Stats::StatName getBuiltin(const std::string& str, Stats::StatName fallback) {
-    return stat_name_set_.getBuiltin(str, fallback);
+    return stat_name_set_->getBuiltin(str, fallback);
   }
 
 private:
   Stats::SymbolTable::StoragePtr addPrefix(const Stats::StatNameVec& names);
 
   Stats::Scope& scope_;
-  Stats::StatNameSet stat_name_set_;
+  Stats::StatNameSetPtr stat_name_set_;
   const Stats::StatName prefix_;
 
 public:
