@@ -91,44 +91,6 @@ void AdaptiveConcurrencyIntegrationTest::respondToRequest(const bool expect_forw
   responses_.pop_front();
 }
 
-uint32_t
-AdaptiveConcurrencyIntegrationTest::inflateConcurrencyLimit(const uint64_t limit_lower_bound) {
-  // Send requests until the gauge exists.
-  while (!test_server_->gauge(CONCURRENCY_LIMIT_GAUGE_NAME)) {
-    sendRequests(1, 1);
-    respondToAllRequests(1, std::chrono::milliseconds(1));
-  }
-
-  while (test_server_->gauge(CONCURRENCY_LIMIT_GAUGE_NAME)->value() < limit_lower_bound) {
-    const auto min_rtt = test_server_->gauge(MIN_RTT_GAUGE_NAME)->value();
-    sendRequests(1, 1);
-    // Choosing a latency value less than the minRTT.
-    respondToAllRequests(
-        1, std::chrono::milliseconds(std::max(1UL, static_cast<unsigned long>(min_rtt / 2))));
-  }
-  return test_server_->gauge(CONCURRENCY_LIMIT_GAUGE_NAME)->value();
-}
-
-void AdaptiveConcurrencyIntegrationTest::deflateConcurrencyLimit(const uint64_t limit_upper_bound) {
-  ASSERT_GT(limit_upper_bound, 1);
-
-  // Send requests until the gauge exists.
-  while (!test_server_->gauge(CONCURRENCY_LIMIT_GAUGE_NAME)) {
-    sendRequests(1, 1);
-    respondToAllRequests(1, std::chrono::milliseconds(1));
-  }
-
-  // We cannot break when the concurrency limit is 1, because this implies we're in a minRTT
-  // recalculation window. This is not a decrease in the concurrency limit due to latency samples.
-  while (test_server_->gauge(CONCURRENCY_LIMIT_GAUGE_NAME)->value() != 1 &&
-         test_server_->gauge(CONCURRENCY_LIMIT_GAUGE_NAME)->value() >= limit_upper_bound) {
-    const auto min_rtt = test_server_->gauge(MIN_RTT_GAUGE_NAME)->value();
-    sendRequests(1, 1);
-    respondToAllRequests(
-        1, std::chrono::milliseconds(std::max(1UL, static_cast<unsigned long>(min_rtt * 2))));
-  }
-}
-
 INSTANTIATE_TEST_SUITE_P(IpVersions, AdaptiveConcurrencyIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
@@ -155,43 +117,12 @@ TEST_P(AdaptiveConcurrencyIntegrationTest, TestManyConcurrency1) {
 }
 
 /**
- * Test the ability to increase/decrease the concurrency limit with request latencies based on the
- * minRTT value.
- *
- * TODO (tonya11en): This test is disabled for now due to simulated time causing the test to take
- * longer than it should, resulting in CI timeouts. Should investigate why simulated time is taking
- * longer than real time.
+ * TODO: Test the ability to increase/decrease the concurrency limit with request latencies based on
+ * the minRTT value.
  */
-TEST_P(AdaptiveConcurrencyIntegrationTest, DISABLED_TestConcurrencyLimitMovement) {
-  customInit();
-
-  // Cause the concurrency limit to oscillate.
-  for (int idx = 0; idx < 3; ++idx) {
-    inflateConcurrencyLimit(100);
-    deflateConcurrencyLimit(10);
-  }
-}
 
 /**
- * Test the ability to enforce the concurrency limit outside of the minRTT calculation window.
- *
- * TODO (tonya11en): This test is disabled for the reasons in the previous test, as well as timeouts
- * related to waiting for HTTP connections after the concurrency limit is raised.
+ * TODO: Test the ability to enforce the concurrency limit outside of the minRTT calculation window.
  */
-TEST_P(AdaptiveConcurrencyIntegrationTest, DISABLED_TestConcurrencyLimitEnforced) {
-  customInit();
-
-  // Break out of the minRTT calculation window.
-  inflateConcurrencyLimit(25);
-
-  const auto concurrency_limit = test_server_->gauge(CONCURRENCY_LIMIT_GAUGE_NAME)->value();
-
-  // Let's send more requests than the concurrency limit will allow, so we can verify they are
-  // blocked at the filter.
-  const int excess_request_count = 10;
-  sendRequests(concurrency_limit + excess_request_count, excess_request_count);
-  respondToAllRequests(concurrency_limit, std::chrono::milliseconds(5));
-  test_server_->waitForCounterEq(REQUEST_BLOCK_COUNTER_NAME, excess_request_count);
-}
 
 } // namespace Envoy

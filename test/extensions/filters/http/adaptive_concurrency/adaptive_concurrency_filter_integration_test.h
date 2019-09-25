@@ -20,26 +20,12 @@ config:
       request_count: 50
 )EOF";
 
-const std::string FAULT_FILTER_CONFIG =
-    R"EOF(
-name: envoy.fault
-config:
-    delay:
-        header_delay: {}
-        percentage:
-            numerator: 100
-            denominator: HUNDRED
-  )EOF";
-
 const std::string CONCURRENCY_LIMIT_GAUGE_NAME =
     "http.config_test.adaptive_concurrency.gradient_controller.concurrency_limit";
 const std::string REQUEST_BLOCK_COUNTER_NAME =
     "http.config_test.adaptive_concurrency.gradient_controller.rq_blocked";
 const std::string MIN_RTT_GAUGE_NAME =
     "http.config_test.adaptive_concurrency.gradient_controller.min_rtt_msecs";
-
-// The default delay introduced to each sent request.
-const uint32_t DEFAULT_REQUEST_DELAY_MS = 50;
 
 class AdaptiveConcurrencyIntegrationTest
     : public testing::TestWithParam<Network::Address::IpVersion>,
@@ -77,12 +63,6 @@ protected:
 
   // Responds to a single request in a FIFO manner. Asserts the forwarding expectation.
   void respondToRequest(const bool expect_forwarded);
-
-  // Inflates the concurrency limit to >= the specified value. Returns the concurrency limit.
-  uint32_t inflateConcurrencyLimit(const uint64_t limit_lower_bound);
-
-  // Deflates the concurrency limit to <= the specified value.
-  void deflateConcurrencyLimit(const uint64_t limit_upper_bound);
 
   void verifyResponseForwarded(IntegrationStreamDecoderPtr response) {
     EXPECT_EQ("200", response->headers().Status()->value().getStringView());
