@@ -325,7 +325,9 @@ message RouteMatch {
   message GrpcRouteMatchOptions {
   }
 
-  reserved 5;
+  reserved 5, 3;
+
+  reserved "regex";
 
   oneof path_specifier {
     option (validate.required) = true;
@@ -337,24 +339,6 @@ message RouteMatch {
     // If specified, the route is an exact path rule meaning that the path must
     // exactly match the *:path* header once the query string is removed.
     string path = 2;
-
-    // If specified, the route is a regular expression rule meaning that the
-    // regex must match the *:path* header once the query string is removed. The entire path
-    // (without the query string) must match the regex. The rule will not match if only a
-    // subsequence of the *:path* header matches the regex. The regex grammar is defined `here
-    // <https://en.cppreference.com/w/cpp/regex/ecmascript>`_.
-    //
-    // Examples:
-    //
-    // * The regex ``/b[io]t`` matches the path */bit*
-    // * The regex ``/b[io]t`` matches the path */bot*
-    // * The regex ``/b[io]t`` does not match the path */bite*
-    // * The regex ``/b[io]t`` does not match the path */bit/bot*
-    //
-    // .. attention::
-    //   This field has been deprecated in favor of `safe_regex` as it is not safe for use with
-    //   untrusted input in all cases.
-    string regex = 3 [(validate.rules).string = {max_bytes: 1024}, deprecated = true];
 
     // If specified, the route is a regular expression rule meaning that the
     // regex must match the *:path* header once the query string is removed. The entire path
@@ -415,23 +399,9 @@ message RouteMatch {
 
 // [#comment:next free field: 11]
 message CorsPolicy {
-  // Specifies the origins that will be allowed to do CORS requests.
-  //
-  // An origin is allowed if either allow_origin or allow_origin_regex match.
-  //
-  // .. attention::
-  //  This field has been deprecated in favor of `allow_origin_string_match`.
-  repeated string allow_origin = 1 [deprecated = true];
+  reserved 1, 8, 7;
 
-  // Specifies regex patterns that match allowed origins.
-  //
-  // An origin is allowed if either allow_origin or allow_origin_regex match.
-  //
-  // .. attention::
-  //   This field has been deprecated in favor of `allow_origin_string_match` as it is not safe for
-  //   use with untrusted input in all cases.
-  repeated string allow_origin_regex = 8
-      [(validate.rules).repeated = {items {string {max_bytes: 1024}}}, deprecated = true];
+  reserved "allow_origin", "allow_origin_regex", "enabled";
 
   // Specifies string patterns that match allowed origins. An origin is allowed if any of the
   // string matchers match.
@@ -453,14 +423,6 @@ message CorsPolicy {
   google.protobuf.BoolValue allow_credentials = 6;
 
   oneof enabled_specifier {
-    // Specifies if CORS is enabled. Defaults to true. Only effective on route.
-    //
-    // .. attention::
-    //
-    //   **This field is deprecated**. Set the
-    //   :ref:`filter_enabled<envoy_api_field_route.CorsPolicy.filter_enabled>` field instead.
-    google.protobuf.BoolValue enabled = 7 [deprecated = true];
-
     // Specifies if CORS is enabled.
     //
     // More information on how this can be controlled via runtime can be found
@@ -510,23 +472,13 @@ message RouteAction {
   // During shadowing, the host/authority header is altered such that *-shadow* is appended. This is
   // useful for logging. For example, *cluster1* becomes *cluster1-shadow*.
   message RequestMirrorPolicy {
+    reserved 2;
+
+    reserved "runtime_key";
+
     // Specifies the cluster that requests will be mirrored to. The cluster must
     // exist in the cluster manager configuration.
     string cluster = 1 [(validate.rules).string = {min_bytes: 1}];
-
-    // If not specified, all requests to the target cluster will be mirrored. If
-    // specified, Envoy will lookup the runtime key to get the % of requests to
-    // mirror. Valid values are from 0 to 10000, allowing for increments of
-    // 0.01% of requests to be mirrored. If the runtime key is specified in the
-    // configuration but not present in runtime, 0 is the default and thus 0% of
-    // requests will be mirrored.
-    //
-    // .. attention::
-    //
-    //   **This field is deprecated**. Set the
-    //   :ref:`runtime_fraction
-    //   <envoy_api_field_route.RouteAction.RequestMirrorPolicy.runtime_fraction>` field instead.
-    string runtime_key = 2 [deprecated = true];
 
     // If both :ref:`runtime_key
     // <envoy_api_field_route.RouteAction.RequestMirrorPolicy.runtime_key>` and this field are not
@@ -1095,20 +1047,9 @@ message Tracing {
 //    every application endpoint. This is both not easily maintainable and as well the matching and
 //    statistics output are not free.
 message VirtualCluster {
-  // Specifies a regex pattern to use for matching requests. The entire path of the request
-  // must match the regex. The regex grammar used is defined `here
-  // <https://en.cppreference.com/w/cpp/regex/ecmascript>`_.
-  //
-  // Examples:
-  //
-  // * The regex ``/rides/\d+`` matches the path */rides/0*
-  // * The regex ``/rides/\d+`` matches the path */rides/123*
-  // * The regex ``/rides/\d+`` does not match the path */rides/123/456*
-  //
-  // .. attention::
-  //   This field has been deprecated in favor of `headers` as it is not safe for use with
-  //   untrusted input in all cases.
-  string pattern = 1 [(validate.rules).string = {max_bytes: 1024}, deprecated = true];
+  reserved 1, 3;
+
+  reserved "pattern", "method";
 
   // Specifies a list of header matchers to use for matching requests. Each specified header must
   // match. The pseudo-headers `:path` and `:method` can be used to match the request path and
@@ -1119,13 +1060,6 @@ message VirtualCluster {
   // as the virtual host name are used when emitting statistics. The statistics are emitted by the
   // router filter and are documented :ref:`here <config_http_filters_router_stats>`.
   string name = 2 [(validate.rules).string = {min_bytes: 1}];
-
-  // Optionally specifies the HTTP method to match on. For example GET, PUT,
-  // etc.
-  //
-  // .. attention::
-  //   This field has been deprecated in favor of `headers`.
-  core.RequestMethod method = 3 [deprecated = true];
 }
 
 // Global rate limiting :ref:`architecture overview <arch_overview_rate_limit>`.
@@ -1287,7 +1221,9 @@ message RateLimit {
 //
 //  [#next-major-version: HeaderMatcher should be refactored to use StringMatcher.]
 message HeaderMatcher {
-  reserved 2, 3;
+  reserved 2, 3, 5;
+
+  reserved "regex_match";
 
   // Specifies the name of the header in the request.
   string name = 1 [(validate.rules).string = {min_bytes: 1}];
@@ -1296,22 +1232,6 @@ message HeaderMatcher {
   oneof header_match_specifier {
     // If specified, header match will be performed based on the value of the header.
     string exact_match = 4;
-
-    // If specified, this regex string is a regular expression rule which implies the entire request
-    // header value must match the regex. The rule will not match if only a subsequence of the
-    // request header value matches the regex. The regex grammar used in the value field is defined
-    // `here <https://en.cppreference.com/w/cpp/regex/ecmascript>`_.
-    //
-    // Examples:
-    //
-    // * The regex ``\d{3}`` matches the value *123*
-    // * The regex ``\d{3}`` does not match the value *1234*
-    // * The regex ``\d{3}`` does not match the value *123.456*
-    //
-    // .. attention::
-    //   This field has been deprecated in favor of `safe_regex_match` as it is not safe for use
-    //   with untrusted input in all cases.
-    string regex_match = 5 [(validate.rules).string = {max_bytes: 1024}, deprecated = true];
 
     // If specified, this regex string is a regular expression rule which implies the entire request
     // header value must match the regex. The rule will not match if only a subsequence of the
@@ -1364,26 +1284,13 @@ message HeaderMatcher {
 // Query parameter matching treats the query string of a request's :path header
 // as an ampersand-separated list of keys and/or key=value elements.
 message QueryParameterMatcher {
+  reserved 3, 4;
+
+  reserved "value", "regex";
+
   // Specifies the name of a key that must be present in the requested
   // *path*'s query string.
   string name = 1 [(validate.rules).string = {min_bytes: 1 max_bytes: 1024}];
-
-  // Specifies the value of the key. If the value is absent, a request
-  // that contains the key in its query string will match, whether the
-  // key appears with a value (e.g., "?debug=true") or not (e.g., "?debug")
-  //
-  // ..attention::
-  //   This field is deprecated. Use an `exact` match inside the `string_match` field.
-  string value = 3 [deprecated = true];
-
-  // Specifies whether the query parameter value is a regular expression.
-  // Defaults to false. The entire query parameter value (i.e., the part to
-  // the right of the equals sign in "key=value") must match the regex.
-  // E.g., the regex ``\d+$`` will match *123* but not *a123* or *123a*.
-  //
-  // ..attention::
-  //   This field is deprecated. Use a `safe_regex` match inside the `string_match` field.
-  google.protobuf.BoolValue regex = 4 [deprecated = true];
 
   oneof query_parameter_match_specifier {
     // Specifies whether a query parameter value should match against a string.
