@@ -16,11 +16,11 @@ void RecentLookups::lookup(absl::string_view str) {
   if (capacity_ == 0) {
     return;
   }
-  Map::iterator map_iter = map_.find(str);
+  auto map_iter = map_.find(str);
   if (map_iter != map_.end()) {
     // The item is already in the list. Bump its reference-count and move it to
     // the front of the list.
-    List::iterator list_iter = map_iter->second;
+    auto list_iter = map_iter->second;
     ++list_iter->count_;
     if (list_iter != list_.begin()) {
       list_.splice(list_.begin(), list_, list_iter);
@@ -34,7 +34,7 @@ void RecentLookups::lookup(absl::string_view str) {
 
     // The string storage is in the list entry.
     list_.push_front(ItemCount{std::string(str), 1});
-    List::iterator list_iter = list_.begin();
+    auto list_iter = list_.begin();
     map_[list_iter->item_] = list_iter;
   }
   ASSERT(list_.size() == map_.size());

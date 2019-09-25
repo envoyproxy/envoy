@@ -40,7 +40,7 @@ public:
   void test(benchmark::State& state) {
     for (auto _ : state) {
       Envoy::Runtime::RandomGeneratorImpl random;
-      for (const std::string lookup : lookups_) {
+      for (const std::string& lookup : lookups_) {
         recent_lookups_.lookup(lookups_[random.random() % lookups_.size()]);
       }
     }
