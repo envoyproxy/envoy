@@ -141,10 +141,10 @@ TEST_P(StatsIntegrationTest, WithTagSpecifierWithFixedValue) {
 // TODO(cmluciano) Add options to measure multiple workers & without stats
 // This class itself does not add additional tests. It is a helper for use in other tests measuring
 // cluster overhead.
-class ClusterMemoryTestHelper : public BaseIntegrationTest {
+class StatsMemoryTestHelper : public BaseIntegrationTest {
 public:
-  ClusterMemoryTestHelper()
-      : BaseIntegrationTest(testing::TestWithParam<Network::Address::IpVersion>::GetParam()) {}
+  StatsMemoryTestHelper()
+      : BaseIntegrationTest(Network::Address::IpVersion::v4) {}
 
   static size_t computeMemoryDelta(int initial_num_clusters, int initial_num_hosts,
                                    int final_num_clusters, int final_num_hosts, bool allow_stats) {
@@ -154,14 +154,14 @@ public:
 
     size_t initial_memory;
     {
-      ClusterMemoryTestHelper helper;
+      StatsMemoryTestHelper helper;
       helper.setUpstreamCount(fake_upstreams_count);
       helper.skipPortUsageValidation();
       initial_memory =
           helper.clusterMemoryHelper(initial_num_clusters, initial_num_hosts, allow_stats);
     }
 
-    ClusterMemoryTestHelper helper;
+    StatsMemoryTestHelper helper;
     helper.setUpstreamCount(fake_upstreams_count);
     return helper.clusterMemoryHelper(final_num_clusters, final_num_hosts, allow_stats) -
            initial_memory;
@@ -200,10 +200,11 @@ private:
     return memory_test.consumedBytes();
   }
 };
-class ClusterMemoryTestRunner : public testing::TestWithParam<Network::Address::IpVersion> {
+
+class StatsMemoryTest : public testing::Test {
 protected:
-  ClusterMemoryTestRunner() : save_use_fakes_(Stats::SymbolTableCreator::useFakeSymbolTables()) {}
-  ~ClusterMemoryTestRunner() override {
+  StatsMemoryTest() : save_use_fakes_(Stats::SymbolTableCreator::useFakeSymbolTables()) {}
+  ~StatsMemoryTest() {
     Stats::TestUtil::SymbolTableCreatorTestPeer::setUseFakeSymbolTables(save_use_fakes_);
   }
 
@@ -211,17 +212,13 @@ private:
   const bool save_use_fakes_;
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, ClusterMemoryTestRunner,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
-
-TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
+TEST_F(StatsMemoryTest, LargeClusterSizeWithFakeSymbolTable) {
   Stats::TestUtil::SymbolTableCreatorTestPeer::setUseFakeSymbolTables(true);
 
   // A unique instance of ClusterMemoryTest allows for multiple runs of Envoy with
   // differing configuration. This is necessary for measuring the memory consumption
   // between the different instances within the same test.
-  const size_t m1000 = ClusterMemoryTestHelper::computeMemoryDelta(1, 0, 1001, 0, true);
+  const size_t m1000 = StatsMemoryTestHelper::computeMemoryDelta(1, 0, 1001, 0, true);
   const size_t m_per_cluster = (m1000) / 1000;
 
   // Note: if you are increasing this golden value because you are adding a
@@ -265,13 +262,11 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   EXPECT_MEMORY_LE(m_per_cluster, 44000);
 }
 
-TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
-  Stats::TestUtil::SymbolTableCreatorTestPeer::setUseFakeSymbolTables(false);
-
+TEST_F(StatsMemoryTest, LargeClusterSizeWithNoStats) {
   // A unique instance of ClusterMemoryTest allows for multiple runs of Envoy with
   // differing configuration. This is necessary for measuring the memory consumption
   // between the different instances within the same test.
-  const size_t m1000 = ClusterMemoryTestHelper::computeMemoryDelta(1, 0, 1001, 0, true);
+  const size_t m1000 = StatsMemoryTestHelper::computeMemoryDelta(1, 0, 1001, 0, false);
   const size_t m_per_cluster = (m1000) / 1000;
 
   // Note: if you are increasing this golden value because you are adding a
@@ -300,13 +295,49 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   EXPECT_MEMORY_LE(m_per_cluster, 36000);
 }
 
-TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
+
+TEST_F(StatsMemoryTest, LargeClusterSizeWithRealSymbolTable) {
   Stats::TestUtil::SymbolTableCreatorTestPeer::setUseFakeSymbolTables(false);
 
   // A unique instance of ClusterMemoryTest allows for multiple runs of Envoy with
   // differing configuration. This is necessary for measuring the memory consumption
   // between the different instances within the same test.
-  const size_t m1000 = ClusterMemoryTestHelper::computeMemoryDelta(1, 1, 1, 1001, true);
+  const size_t m1000 = StatsMemoryTestHelper::computeMemoryDelta(1, 0, 1001, 0, true);
+  const size_t m_per_cluster = (m1000) / 1000;
+
+  // Note: if you are increasing this golden value because you are adding a
+  // stat, please confirm that this will be generally useful to most Envoy
+  // users. Otherwise you are adding to the per-cluster memory overhead, which
+  // will be significant for Envoy installations that are massively
+  // multi-tenant.
+  //
+  // History of golden values:
+  //
+  // Date        PR       Bytes Per Cluster   Notes
+  //                      exact upper-bound
+  // ----------  -----    -----------------   -----
+  // 2019/08/09  7882     35489       36000   Initial version
+  // 2019/09/02  8118     34585       34500   Share symbol-tables in cluster/host stats.
+
+  // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
+  // 'release' builds, where we control the platform and tool-chain. So you
+  // will need to find the correct value only after failing CI and looking
+  // at the logs.
+  //
+  // On a local clang8/libstdc++/linux flow, the memory usage was observed in
+  // June 2019 to be 64 bytes higher than it is in CI/release. Your mileage may
+  // vary.
+  EXPECT_MEMORY_EQ(m_per_cluster, 34585); // 104 bytes higher than a debug build.
+  EXPECT_MEMORY_LE(m_per_cluster, 36000);
+}
+
+TEST_F(StatsMemoryTest, LargeHostSizeWithStats) {
+  Stats::TestUtil::SymbolTableCreatorTestPeer::setUseFakeSymbolTables(false);
+
+  // A unique instance of ClusterMemoryTest allows for multiple runs of Envoy with
+  // differing configuration. This is necessary for measuring the memory consumption
+  // between the different instances within the same test.
+  const size_t m1000 = StatsMemoryTestHelper::computeMemoryDelta(1, 1, 1, 1001, true);
   const size_t m_per_host = (m1000) / 1000;
 
   // Note: if you are increasing this golden value because you are adding a
