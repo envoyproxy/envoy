@@ -19,10 +19,10 @@ namespace AdaptiveConcurrency {
 AdaptiveConcurrencyFilterConfig::AdaptiveConcurrencyFilterConfig(
     const envoy::config::filter::http::adaptive_concurrency::v2alpha::AdaptiveConcurrency&
         proto_config,
-    Runtime::Loader& runtime, std::string stats_prefix, Stats::Scope&,
-    TimeSource& time_source)
+    Runtime::Loader& runtime, std::string stats_prefix, Stats::Scope&, TimeSource& time_source)
     : stats_prefix_(std::move(stats_prefix)), runtime_(runtime), time_source_(time_source),
-      disabled_(proto_config.disabled()) {}
+      disabled_runtime_key_(proto_config.disabled().runtime_key()),
+      disabled_default_value_(proto_config.disabled().default_value() > 0) {}
 
 AdaptiveConcurrencyFilter::AdaptiveConcurrencyFilter(
     AdaptiveConcurrencyFilterConfigSharedPtr config, ConcurrencyControllerSharedPtr controller)
@@ -54,10 +54,7 @@ Http::FilterHeadersStatus AdaptiveConcurrencyFilter::decodeHeaders(Http::HeaderM
   return Http::FilterHeadersStatus::Continue;
 }
 
-void AdaptiveConcurrencyFilter::encodeComplete() {
-  ASSERT(deferred_sample_task_);
-  deferred_sample_task_.reset();
-}
+void AdaptiveConcurrencyFilter::encodeComplete() { deferred_sample_task_.reset(); }
 
 void AdaptiveConcurrencyFilter::onDestroy() {
   if (deferred_sample_task_) {

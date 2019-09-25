@@ -76,6 +76,52 @@ public:
   std::unique_ptr<AdaptiveConcurrencyFilter> filter_;
 };
 
+TEST_F(AdaptiveConcurrencyFilterTest, TestDisabledNoDefaultValue) {
+  std::string yaml_config =
+      R"EOF(
+gradient_controller_config:
+  sample_aggregate_percentile:
+    value: 50
+  concurrency_limit_params:
+    concurrency_update_interval:
+      nanos: 100000000 # 100ms
+  min_rtt_calc_params:
+    interval:
+      seconds: 30
+    request_count: 50
+disabled:
+  runtime_key: "adaptive_concurrency.disabled"
+)EOF";
+
+  auto config = makeConfig(yaml_config);
+
+  auto config_ptr = std::make_shared<AdaptiveConcurrencyFilterConfig>(
+      config, runtime_, "testprefix.", stats_, time_system_);
+  filter_ = std::make_unique<AdaptiveConcurrencyFilter>(config_ptr, controller_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+  // We expect the default disabled value to be 0 if unspecified, meaning the filter is not
+  // disabled.
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("adaptive_concurrency.disabled", 0));
+
+  EXPECT_CALL(*controller_, forwardingDecision())
+      .WillOnce(Return(RequestForwardingAction::Forward));
+
+  // This will be called in the destructor.
+  EXPECT_CALL(*controller_, recordLatencySample(_));
+
+  Http::TestHeaderMapImpl request_headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+
+  Buffer::OwnedImpl request_body;
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(request_body, false));
+
+  Http::TestHeaderMapImpl request_trailers;
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
+}
+
 TEST_F(AdaptiveConcurrencyFilterTest, TestDisableOverriddenFromRuntime) {
   std::string yaml_config =
       R"EOF(
@@ -89,8 +135,9 @@ gradient_controller_config:
     interval:
       seconds: 30
     request_count: 50
-
-disabled: false
+disabled:
+  default_value: 0
+  runtime_key: "adaptive_concurrency.disabled"
 )EOF";
 
   auto config = makeConfig(yaml_config);
@@ -116,6 +163,19 @@ disabled: false
 
   Http::TestHeaderMapImpl request_trailers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
+
+  Http::TestHeaderMapImpl response_headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+  filter_->encodeComplete();
+
+  // Request should be blocked when flag is overridden. Note there is no expected call to
+  // forwardingDecision() or recordLatencySample().
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("adaptive_concurrency.disabled", 0))
+      .WillOnce(Return(1));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(request_body, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 }
 
 TEST_F(AdaptiveConcurrencyFilterTest, TestDisableConfiguredInProto) {
@@ -131,8 +191,9 @@ gradient_controller_config:
     interval:
       seconds: 30
     request_count: 50
-
-disabled: true
+disabled:
+  default_value: 1
+  runtime_key: "adaptive_concurrency.disabled"
 )EOF";
 
   auto config = makeConfig(yaml_config);
@@ -154,6 +215,10 @@ disabled: true
 
   Http::TestHeaderMapImpl request_trailers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
+
+  Http::TestHeaderMapImpl response_headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+  filter_->encodeComplete();
 }
 
 TEST_F(AdaptiveConcurrencyFilterTest, DecodeHeadersTestForwarding) {

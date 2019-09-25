@@ -34,25 +34,23 @@ public:
 
   // Returns whether the filter should operate as a pass-through for a request.
   bool filterDisabled() const {
-    return runtime_.snapshot().getInteger(RuntimeKeys::get().DisableKey, disabled_ ? 1 : 0) > 0;
+    // RuntimeUInt32 proto validates that the runtime key must have at least a single character. If
+    // the key is empty, the field was never specified.
+    if (disabled_runtime_key_.empty()) {
+      return false;
+    }
+
+    return runtime_.snapshot().getInteger(disabled_runtime_key_, disabled_default_value_) > 0;
   }
 
   TimeSource& timeSource() const { return time_source_; }
 
 private:
-  class RuntimeKeyValues {
-  public:
-    const std::string DisableKey{"http.adaptive_concurrency.disable"};
-  };
-
-  using RuntimeKeys = ConstSingleton<RuntimeKeyValues>;
-
   const std::string stats_prefix_;
   Runtime::Loader& runtime_;
   TimeSource& time_source_;
-
-  // Whether to disable the filter by default. Can be overridden by
-  bool disabled_;
+  const std::string disabled_runtime_key_;
+  const bool disabled_default_value_;
 };
 
 using AdaptiveConcurrencyFilterConfigSharedPtr =
