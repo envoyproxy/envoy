@@ -142,6 +142,9 @@ elif [[ "$CI_TARGET" == "bazel.debug.server_only" ]]; then
   exit 0
 elif [[ "$CI_TARGET" == "bazel.asan" ]]; then
   setup_clang_toolchain
+  if [[ ! -z "${ENVOY_RBE}" ]]; then
+    export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_env=ENVOY_IP_TEST_VERSIONS=v4only"
+  fi
   echo "bazel ASAN/UBSAN debug build with tests"
   echo "Building and testing envoy tests ${TEST_TARGETS}"
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-asan ${TEST_TARGETS}
