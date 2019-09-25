@@ -58,7 +58,7 @@ public:
    * Visible for testing.
    * Allows injecting initial parser factory and parser resolver.
    * @param factory parser factory to be used when new message is to be processed.
-   * @param parserResolver supported parser resolver.
+   * @param parser_resolver supported parser resolver.
    * @param callbacks callbacks to be invoked (in order).
    */
   RequestDecoder(const InitialParserFactory& factory, const RequestParserResolver& parser_resolver,

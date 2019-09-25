@@ -519,7 +519,7 @@ class WelfordStandardDeviation {
 public:
   /**
    * Accumulates a new value into the standard deviation.
-   * @param newValue the new value
+   * @param new_value the new value
    */
   void update(double new_value);
 
