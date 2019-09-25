@@ -50,7 +50,7 @@ public:
 
   /**
    * The expected max size of the packet to be read. If it's smaller than
-   * actually packets received, the payload will be trancated.
+   * actually packets received, the payload will be truncated.
    */
   virtual uint64_t maxPacketSize() const PURE;
 };
