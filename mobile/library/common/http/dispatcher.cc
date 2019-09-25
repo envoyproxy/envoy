@@ -2,6 +2,8 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/lock_guard.h"
+#include "common/http/headers.h"
+#include "common/http/utility.h"
 
 #include "library/common/buffer/bridge_fragment.h"
 #include "library/common/buffer/utility.h"
@@ -19,15 +21,59 @@ Dispatcher::DirectStreamCallbacks::DirectStreamCallbacks(envoy_stream_t stream,
 void Dispatcher::DirectStreamCallbacks::onHeaders(HeaderMapPtr&& headers, bool end_stream) {
   ENVOY_LOG(debug, "[S{}] response headers for stream (end_stream={}):\n{}", stream_handle_,
             end_stream, *headers);
-  envoy_headers bridge_headers = Utility::toBridgeHeaders(*headers);
-  bridge_callbacks_.on_headers(bridge_headers, end_stream, bridge_callbacks_.context);
+  // TODO: ***HACK*** currently Envoy sends local replies in cases where an error ought to be
+  // surfaced via the error path. There are ways we can clean up Envoy's local reply path to
+  // make this possible, but nothing expedient. For the immediate term this is our only real
+  // option. See https://github.com/lyft/envoy-mobile/issues/460
+
+  // The presence of EnvoyUpstreamServiceTime implies these headers are not due to a local reply.
+  if (headers->get(Headers::get().EnvoyUpstreamServiceTime) != nullptr) {
+    envoy_headers bridge_headers = Utility::toBridgeHeaders(*headers);
+    bridge_callbacks_.on_headers(bridge_headers, end_stream, bridge_callbacks_.context);
+    return;
+  }
+
+  // We assume that local replies represent error conditions, having audited occurrences in
+  // Envoy today. This is not a good long-term solution.
+  uint64_t response_status = Http::Utility::getResponseStatus(*headers);
+  switch (response_status) {
+  case 200: {
+    // We still treat successful local responses as actual success.
+    envoy_headers bridge_headers = Utility::toBridgeHeaders(*headers);
+    bridge_callbacks_.on_headers(bridge_headers, end_stream, bridge_callbacks_.context);
+    return;
+  }
+  case 503:
+    error_code_ = ENVOY_CONNECTION_FAILURE;
+    break;
+  default:
+    error_code_ = ENVOY_UNDEFINED_ERROR;
+  }
+  ENVOY_LOG(debug, "[S{}] intercepted local response", stream_handle_);
+  if (end_stream) {
+    // The local stream may or may not have completed. We don't want to be tracking/synchronized
+    // on that state, so we just reset everything now to ensure teardown.
+    auto stream = http_dispatcher_.getStream(stream_handle_);
+    ASSERT(stream);
+    stream->underlying_stream_.reset();
+  }
 }
 
 void Dispatcher::DirectStreamCallbacks::onData(Buffer::Instance& data, bool end_stream) {
   ENVOY_LOG(debug, "[S{}] response data for stream (length={} end_stream={})", stream_handle_,
             data.length(), end_stream);
-  bridge_callbacks_.on_data(Buffer::Utility::toBridgeData(data), end_stream,
-                            bridge_callbacks_.context);
+  if (!error_code_.has_value()) {
+    bridge_callbacks_.on_data(Buffer::Utility::toBridgeData(data), end_stream,
+                              bridge_callbacks_.context);
+  } else {
+    ASSERT(end_stream);
+    error_message_ = Buffer::Utility::toBridgeData(data);
+    // The local stream may or may not have completed. We don't want to be tracking/synchronized on
+    // that state, so we just reset everything now to ensure teardown.
+    auto stream = http_dispatcher_.getStream(stream_handle_);
+    ASSERT(stream);
+    stream->underlying_stream_.reset();
+  }
 }
 
 void Dispatcher::DirectStreamCallbacks::onTrailers(HeaderMapPtr&& trailers) {
@@ -47,7 +93,9 @@ void Dispatcher::DirectStreamCallbacks::onComplete() {
 
 void Dispatcher::DirectStreamCallbacks::onReset() {
   ENVOY_LOG(debug, "[S{}] remote reset stream", stream_handle_);
-  bridge_callbacks_.on_error({ENVOY_STREAM_RESET, envoy_nodata}, bridge_callbacks_.context);
+  envoy_error_code_t code = error_code_.value_or(ENVOY_STREAM_RESET);
+  envoy_data message = error_message_.value_or(envoy_nodata);
+  bridge_callbacks_.on_error({code, message}, bridge_callbacks_.context);
   // Very important: onComplete and onReset both clean up stream state in the http dispatcher
   // because the underlying async client implementation **guarantees** that only onComplete **or**
   // onReset will be fired for a stream. This means it is safe to clean up the stream when either of
