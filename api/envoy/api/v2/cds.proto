@@ -436,6 +436,22 @@ message Cluster {
     bool close_connections_on_host_set_change = 6;
   }
 
+  message RefreshRate {
+    // Specifies the base interval between refreshes. This parameter is required and must be greater
+    // than zero and less than
+    // :ref:`max_interval <envoy_api_field_Cluster.RefreshRate.max_interval>`.
+    google.protobuf.Duration base_interval = 1 [(validate.rules).duration = {
+      required: true
+      gt {nanos: 1000000}
+    }];
+
+    // Specifies the maximum interval between refreshes. This parameter is optional, but must be
+    // greater than or equal to the
+    // :ref:`base_interval <envoy_api_field_Cluster.RefreshRate.base_interval>`  if set. The default
+    // is 10 times the :ref:`base_interval <envoy_api_field_Cluster.RefreshRate.base_interval>`.
+    google.protobuf.Duration max_interval = 2 [(validate.rules).duration = {gt {nanos: 1000000}}];
+  }
+
   reserved 12, 15;
 
   // Configuration to use different transport sockets for different endpoints.
@@ -613,22 +629,6 @@ message Cluster {
   // and :ref:`LOGICAL_DNS<envoy_api_enum_value_Cluster.DiscoveryType.LOGICAL_DNS>`
   // this setting is ignored.
   google.protobuf.Duration dns_refresh_rate = 16 [(validate.rules).duration = {gt {}}];
-
-  message RefreshRate {
-    // Specifies the base interval between refreshes. This parameter is required and must be greater
-    // than zero and less than
-    // :ref:`max_interval <envoy_api_field_Cluster.RefreshRate.max_interval>`.
-    google.protobuf.Duration base_interval = 1 [(validate.rules).duration = {
-      required: true
-      gt {nanos: 1000000}
-    }];
-
-    // Specifies the maximum interval between refreshes. This parameter is optional, but must be
-    // greater than or equal to the
-    // :ref:`base_interval <envoy_api_field_Cluster.RefreshRate.base_interval>`  if set. The default
-    // is 10 times the :ref:`base_interval <envoy_api_field_Cluster.RefreshRate.base_interval>`.
-    google.protobuf.Duration max_interval = 2 [(validate.rules).duration = {gt {nanos: 1000000}}];
-  }
 
   // If the DNS failure refresh rate is specified and the cluster type is either
   // :ref:`STRICT_DNS<envoy_api_enum_value_Cluster.DiscoveryType.STRICT_DNS>`,
