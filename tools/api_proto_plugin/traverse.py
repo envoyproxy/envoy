@@ -4,7 +4,7 @@ from tools.api_proto_plugin import type_context
 
 
 def TraverseService(type_context, service_proto, visitor):
-  """Traverse an enum definition.
+  """Traverse a service definition.
 
   Args:
     type_context: type_context.TypeContext for service type.
