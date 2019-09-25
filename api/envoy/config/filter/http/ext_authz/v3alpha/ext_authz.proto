@@ -18,6 +18,10 @@ import "validate/validate.proto";
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 
 message ExtAuthz {
+  reserved 4;
+
+  reserved "use_alpha";
+
   // External authorization service configuration.
   oneof services {
     // gRPC service configuration (default timeout: 200ms).
@@ -40,12 +44,6 @@ message ExtAuthz {
   // Note that errors can be *always* tracked in the :ref:`stats
   // <config_http_filters_ext_authz_stats>`.
   bool failure_mode_allow = 2;
-
-  // Sets the package version the gRPC service should use. This is particularly
-  // useful when transitioning from alpha to release versions assuming that both definitions are
-  // semantically compatible. Deprecation note: This field is deprecated and should only be used for
-  // version upgrade. See release notes for more details.
-  bool use_alpha = 4 [deprecated = true];
 
   // Enables filter to buffer the client request body and send it within the authorization request.
   // A ``x-envoy-auth-partial-body: false|true`` metadata header will be added to the authorization

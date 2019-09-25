@@ -63,7 +63,9 @@ message CommandLineOptions {
     InitOnly = 2;
   }
 
-  reserved 12;
+  reserved 12, 20, 21;
+
+  reserved "max_stats", "max_obj_name_len";
 
   // See :option:`--base-id` for details.
   uint64 base_id = 1;
@@ -121,11 +123,6 @@ message CommandLineOptions {
 
   // See :option:`--mode` for details.
   Mode mode = 19;
-
-  // max_stats and max_obj_name_len are now unused and have no effect.
-  uint64 max_stats = 20 [deprecated = true];
-
-  uint64 max_obj_name_len = 21 [deprecated = true];
 
   // See :option:`--disable-hot-restart` for details.
   bool disable_hot_restart = 22;

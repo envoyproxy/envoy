@@ -22,6 +22,8 @@ message TcpProxy {
   // [#not-implemented-hide:] Deprecated.
   // TCP Proxy filter configuration using V1 format.
   message DeprecatedV1 {
+    option deprecated = true;
+
     // A TCP proxy route consists of a set of optional L4 criteria and the
     // name of a cluster. If a downstream connection matches all the
     // specified criteria, the cluster in the route is used for the

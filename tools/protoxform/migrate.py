@@ -4,6 +4,7 @@ import copy
 import re
 
 from tools.api_proto_plugin import visitor
+from tools.protoxform import options
 
 from google.api import annotations_pb2
 
@@ -42,16 +43,53 @@ def UpgradeService(service_proto):
     m.output_type = UpgradedType(m.output_type)
 
 
+def Deprecate(proto, field_or_value):
+  """Deprecate a field or value in a message/enum proto.
+
+  Args:
+    proto: DescriptorProto or EnumDescriptorProto message.
+    field_or_value: field or value inside proto.
+  """
+  reserved = proto.reserved_range.add()
+  reserved.start = field_or_value.number
+  reserved.end = field_or_value.number + 1
+  proto.reserved_name.append(field_or_value.name)
+  options.AddHideOption(field_or_value.options)
+
+
 def UpgradeMessage(msg_proto):
   """In-place upgrade a DescriptorProto from v2[alpha\d] to v3alpha.
 
   Args:
     msg_proto: v2[alpha\d] DescriptorProto message.
   """
+  if msg_proto.options.deprecated:
+    options.AddHideOption(msg_proto.options)
   for f in msg_proto.field:
-    f.type_name = UpgradedType(f.type_name)
+    if f.options.deprecated:
+      Deprecate(msg_proto, f)
+    else:
+      f.type_name = UpgradedType(f.type_name)
   for m in msg_proto.nested_type:
     UpgradeMessage(m)
+  for e in msg_proto.enum_type:
+    UpgradeEnum(e)
+
+
+def UpgradeEnum(enum_proto):
+  """In-place upgrade an EnumDescriptorProto from v2[alpha\d] to v3alpha.
+
+  Args:
+    enum_proto: v2[alpha\d] EnumDescriptorProto message.
+  """
+  for v in enum_proto.value:
+    if v.options.deprecated:
+      # We need special handling for the zero field, as proto3 needs some value
+      # here.
+      if v.number == 0:
+        v.name = 'DEPRECATED_AND_UNAVAILABLE_DO_NOT_USE'
+      else:
+        Deprecate(enum_proto, v)
 
 
 def UpgradeFile(file_proto):
@@ -77,6 +115,8 @@ def UpgradeFile(file_proto):
   # Upgrade messages.
   for m in file_proto.message_type:
     UpgradeMessage(m)
+  for e in file_proto.enum_type:
+    UpgradeEnum(e)
   return file_proto
 
 
@@ -85,6 +125,7 @@ def V3MigrationXform(file_proto):
 
   Args:
     file_proto: v2[alpha\d] FileDescriptorProto message.
+
   Returns:
     v3 FileDescriptorProto message.
   """
