@@ -126,7 +126,7 @@ public:
   }
 
   StatNameSetPtr makeSet(absl::string_view name) override {
-    // make_unique does not work with private ctor, even though FakeSymbolTableImpl is friended.
+    // make_unique does not work with private ctor, even though FakeSymbolTableImpl is a friend.
     return StatNameSetPtr(new StatNameSet(*this, name));
   }
   void forgetSet(StatNameSet&) override {}
