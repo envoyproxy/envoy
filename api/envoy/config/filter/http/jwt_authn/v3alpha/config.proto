@@ -1,4 +1,3 @@
-
 syntax = "proto3";
 
 package envoy.config.filter.http.jwt_authn.v3alpha;
@@ -10,8 +9,10 @@ option java_package = "io.envoyproxy.envoy.config.filter.http.jwt_authn.v3alpha"
 import "envoy/api/v3alpha/core/base.proto";
 import "envoy/api/v3alpha/core/http_uri.proto";
 import "envoy/api/v3alpha/route/route.proto";
+
 import "google/protobuf/duration.proto";
 import "google/protobuf/empty.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: JWT Authentication]
@@ -53,7 +54,7 @@ message JwtProvider {
   // Example: https://securetoken.google.com
   // Example: 1234567-compute@developer.gserviceaccount.com
   //
-  string issuer = 1 [(validate.rules).string.min_bytes = 1];
+  string issuer = 1 [(validate.rules).string = {min_bytes: 1}];
 
   // The list of JWT `audiences <https://tools.ietf.org/html/rfc7519#section-4.1.3>`_ are
   // allowed to access. A JWT containing any of these audiences will be accepted. If not specified,
@@ -107,7 +108,7 @@ message JwtProvider {
     //    local_jwks:
     //      inline_string: ACADADADADA
     //
-    envoy.api.v3alpha.core.DataSource local_jwks = 4;
+    api.v3alpha.core.DataSource local_jwks = 4;
   }
 
   // If false, the JWT is removed in the request after a success verification. If true, the JWT is
@@ -193,7 +194,7 @@ message RemoteJwks {
   //      uri: https://www.googleapis.com/oauth2/v1/certs
   //      cluster: jwt.www.googleapis.com|443
   //
-  envoy.api.v3alpha.core.HttpUri http_uri = 1;
+  api.v3alpha.core.HttpUri http_uri = 1;
 
   // Duration after which the cached JWKS should be expired. If not specified, default cache
   // duration is 5 minutes.
@@ -203,7 +204,7 @@ message RemoteJwks {
 // This message specifies a header location to extract JWT token.
 message JwtHeader {
   // The HTTP header name.
-  string name = 1 [(validate.rules).string.min_bytes = 1];
+  string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
   // The value prefix. The value format is "value_prefix<token>"
   // For example, for "Authorization: Bearer <token>", value_prefix="Bearer " with a space at the
@@ -288,14 +289,14 @@ message JwtRequirement {
 // Their results are OR-ed; if any one of them passes, the result is passed
 message JwtRequirementOrList {
   // Specify a list of JwtRequirement.
-  repeated JwtRequirement requirements = 1 [(validate.rules).repeated .min_items = 2];
+  repeated JwtRequirement requirements = 1 [(validate.rules).repeated = {min_items: 2}];
 }
 
 // This message specifies a list of RequiredProvider.
 // Their results are AND-ed; all of them must pass, if one of them fails or missing, it fails.
 message JwtRequirementAndList {
   // Specify a list of JwtRequirement.
-  repeated JwtRequirement requirements = 1 [(validate.rules).repeated .min_items = 2];
+  repeated JwtRequirement requirements = 1 [(validate.rules).repeated = {min_items: 2}];
 }
 
 // This message specifies a Jwt requirement for a specific Route condition.
@@ -330,7 +331,7 @@ message RequirementRule {
   //    match:
   //      prefix: /
   //
-  envoy.api.v3alpha.route.RouteMatch match = 1 [(validate.rules).message.required = true];
+  api.v3alpha.route.RouteMatch match = 1 [(validate.rules).message = {required: true}];
 
   // Specify a Jwt Requirement. Please detail comment in message JwtRequirement.
   JwtRequirement requires = 2;
@@ -355,7 +356,7 @@ message RequirementRule {
 // jwt_authn filter will use JwtRequirement{"provider_name": "issuer1"} to verify.
 message FilterStateRule {
   // The filter state name to retrieve the `Router::StringAccessor` object.
-  string name = 1 [(validate.rules).string.min_bytes = 1];
+  string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
   // A map of string keys to requirements. The string key is the string value
   // in the FilterState with the name specified in the *name* field above.

@@ -17,7 +17,7 @@ done
 
 
 # run fuzzing regression or upload to Fuzzit for long running fuzzing job ($1 is either local-regression or fuzzing)
-wget -O fuzzit https://github.com/fuzzitdev/fuzzit/releases/download/v2.4.55/fuzzit_Linux_x86_64
+wget -O fuzzit https://github.com/fuzzitdev/fuzzit/releases/download/v2.4.57/fuzzit_Linux_x86_64
 chmod a+x fuzzit
 
 PREFIX=$(realpath /build/tmp/_bazel_bazel/*/execroot/envoy/bazel-out/k8-fastbuild/bin)

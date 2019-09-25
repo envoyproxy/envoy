@@ -54,6 +54,7 @@ public:
   struct Entry {
     std::string raw_string_value_;
     absl::optional<uint64_t> uint_value_;
+    absl::optional<double> double_value_;
     absl::optional<envoy::type::FractionalPercent> fractional_percent_value_;
     absl::optional<bool> bool_value_;
   };
@@ -186,13 +187,23 @@ public:
   virtual const std::string& get(const std::string& key) const PURE;
 
   /**
-   * Fetch an integer runtime key.
+   * Fetch an integer runtime key. Runtime keys larger than ~2^53 may not be accurately converted
+   * into integers and will return default_value.
    * @param key supplies the key to fetch.
    * @param default_value supplies the value to return if the key does not exist or it does not
    *        contain an integer.
    * @return uint64_t the runtime value or the default value.
    */
   virtual uint64_t getInteger(const std::string& key, uint64_t default_value) const PURE;
+
+  /**
+   * Fetch a double runtime key.
+   * @param key supplies the key to fetch.
+   * @param default_value supplies the value to return if the key does not exist or it does not
+   *        contain a double.
+   * @return double the runtime value or the default value.
+   */
+  virtual double getDouble(const std::string& key, double default_value) const PURE;
 
   /**
    * Fetch the OverrideLayers that provide values in this snapshot. Layers are ordered from bottom

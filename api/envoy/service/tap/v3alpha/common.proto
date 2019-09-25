@@ -1,30 +1,32 @@
 syntax = "proto3";
 
-import "envoy/api/v3alpha/route/route.proto";
-import "envoy/api/v3alpha/core/base.proto";
-import "envoy/api/v3alpha/core/grpc_service.proto";
-
-import "google/protobuf/wrappers.proto";
-
-import "validate/validate.proto";
-
 package envoy.service.tap.v3alpha;
 
 option java_outer_classname = "CommonProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.service.tap.v3alpha";
 
+import "envoy/api/v3alpha/core/base.proto";
+import "envoy/api/v3alpha/core/grpc_service.proto";
+import "envoy/api/v3alpha/route/route.proto";
+
+import "google/protobuf/wrappers.proto";
+
+import "validate/validate.proto";
+
 // [#protodoc-title: Common tap configuration]
 
 // Tap configuration.
 message TapConfig {
+  // [#comment:TODO(mattklein123): Rate limiting]
+
   // The match configuration. If the configuration matches the data source being tapped, a tap will
   // occur, with the result written to the configured output.
-  MatchPredicate match_config = 1 [(validate.rules).message.required = true];
+  MatchPredicate match_config = 1 [(validate.rules).message = {required: true}];
 
   // The tap output configuration. If a match configuration matches a data source being tapped,
   // a tap will occur and the data will be written to the configured output.
-  OutputConfig output_config = 2 [(validate.rules).message.required = true];
+  OutputConfig output_config = 2 [(validate.rules).message = {required: true}];
 
   // [#not-implemented-hide:] Specify if Tap matching is enabled. The % of requests\connections for
   // which the tap matching is enabled. When not enabled, the request\connection will not be
@@ -34,9 +36,7 @@ message TapConfig {
   //
   //   This field defaults to 100/:ref:`HUNDRED
   //   <envoy_api_enum_type.FractionalPercent.DenominatorType>`.
-  envoy.api.v3alpha.core.RuntimeFractionalPercent tap_enabled = 3;
-
-  // [#comment:TODO(mattklein123): Rate limiting]
+  api.v3alpha.core.RuntimeFractionalPercent tap_enabled = 3;
 }
 
 // Tap match configuration. This is a recursive structure which allows complex nested match
@@ -45,7 +45,7 @@ message MatchPredicate {
   // A set of match configurations used for logical operations.
   message MatchSet {
     // The list of rules that make up the set.
-    repeated MatchPredicate rules = 1 [(validate.rules).repeated .min_items = 2];
+    repeated MatchPredicate rules = 1 [(validate.rules).repeated = {min_items: 2}];
   }
 
   oneof rule {
@@ -63,7 +63,7 @@ message MatchPredicate {
     MatchPredicate not_match = 3;
 
     // The match configuration will always match.
-    bool any_match = 4 [(validate.rules).bool.const = true];
+    bool any_match = 4 [(validate.rules).bool = {const: true}];
 
     // HTTP request headers match configuration.
     HttpHeadersMatch http_request_headers_match = 5;
@@ -89,7 +89,7 @@ message HttpHeadersMatch {
 message OutputConfig {
   // Output sinks for tap data. Currently a single sink is allowed in the list. Once multiple
   // sink types are supported this constraint will be relaxed.
-  repeated OutputSink sinks = 1 [(validate.rules).repeated = {min_items: 1, max_items: 1}];
+  repeated OutputSink sinks = 1 [(validate.rules).repeated = {min_items: 1 max_items: 1}];
 
   // For buffered tapping, the maximum amount of received body that will be buffered prior to
   // truncation. If truncation occurs, the :ref:`truncated
@@ -153,7 +153,7 @@ message OutputSink {
   }
 
   // Sink output format.
-  Format format = 1 [(validate.rules).enum.defined_only = true];
+  Format format = 1 [(validate.rules).enum = {defined_only: true}];
 
   oneof output_sink_type {
     option (validate.required) = true;
@@ -186,7 +186,7 @@ message FilePerTapSink {
   // Path prefix. The output file will be of the form <path_prefix>_<id>.pb, where <id> is an
   // identifier distinguishing the recorded trace for stream instances (the Envoy
   // connection ID, HTTP stream ID, etc.).
-  string path_prefix = 1 [(validate.rules).string.min_bytes = 1];
+  string path_prefix = 1 [(validate.rules).string = {min_bytes: 1}];
 }
 
 // [#not-implemented-hide:] Streaming gRPC sink configuration sends the taps to an external gRPC
@@ -196,5 +196,5 @@ message StreamingGrpcSink {
   string tap_id = 1;
 
   // The gRPC server that hosts the Tap Sink Service.
-  envoy.api.v3alpha.core.GrpcService grpc_service = 2 [(validate.rules).message.required = true];
+  api.v3alpha.core.GrpcService grpc_service = 2 [(validate.rules).message = {required: true}];
 }
