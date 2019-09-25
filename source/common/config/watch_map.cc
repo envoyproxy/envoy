@@ -80,7 +80,7 @@ void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>
     }
   }
 
-  bool map_is_single_wildcard = (watches_.size() == 1 && wildcard_watches_.size() == 1);
+  const bool map_is_single_wildcard = (watches_.size() == 1 && wildcard_watches_.size() == 1);
   // We just bundled up the updates into nice per-watch packages. Now, deliver them.
   for (auto& watch : watches_) {
     const auto this_watch_updates = per_watch_updates.find(watch);
