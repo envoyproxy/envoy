@@ -18,8 +18,6 @@ public:
   GoogleGrpcContext();
   ~GoogleGrpcContext();
 
-  static bool isInitialized();
-
 private:
   struct InstanceTracker {
     Thread::MutexBasicLockable mutex_;
