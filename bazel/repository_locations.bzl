@@ -4,12 +4,17 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/0.18.1/bazel-gazelle-0.18.1.tar.gz"],
     ),
     bazel_toolchains = dict(
-        sha256 = "ab0d8aaeaeeef413ddb03922dbdb99bbae9e1b2c157a87c77d70d45a830be5b0",
-        strip_prefix = "bazel-toolchains-0.29.1",
+        sha256 = "a1e273b6159ae858f53046f5bab9678cffa82a72f0bf0c0a9e4af8fddb91209c",
+        strip_prefix = "bazel-toolchains-0.29.6",
         urls = [
-            "https://github.com/bazelbuild/bazel-toolchains/releases/download/0.29.1/bazel-toolchains-0.29.1.tar.gz",
-            "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/0.29.1.tar.gz",
+            "https://github.com/bazelbuild/bazel-toolchains/releases/download/0.29.6/bazel-toolchains-0.29.6.tar.gz",
+            "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/0.29.6.tar.gz",
         ],
+    ),
+    envoy_build_tools = dict(
+        sha256 = "87e0968792b139b462621f5bd56c03126bc06ae4d408f1e956749f12fcc090d9",
+        strip_prefix = "envoy-build-tools-4433e52437af6936d0af95ebc3b16b4b6df38618",
+        urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/4433e52437af6936d0af95ebc3b16b4b6df38618.tar.gz"],
     ),
     boringssl = dict(
         sha256 = "c712766ddc844de2a38e686e1cdd7288795e9a6fe7f699c6636f1b76703db84e",
@@ -224,10 +229,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/bazelbuild/rules_go/releases/download/0.19.2/rules_go-0.19.2.tar.gz"],
     ),
     rules_foreign_cc = dict(
-        sha256 = "ea7e4f13b66009d46c01a0292cf1d590d8ea06775c315263abb66022dde25315",
-        strip_prefix = "rules_foreign_cc-16ddc00bd4e1b3daf3faee1605a168f5283326fa",
-        # 2019-09-18
-        urls = ["https://github.com/bazelbuild/rules_foreign_cc/archive/16ddc00bd4e1b3daf3faee1605a168f5283326fa.tar.gz"],
+        sha256 = "3184c244b32e65637a74213fc448964b687390eeeca42a36286f874c046bba15",
+        strip_prefix = "rules_foreign_cc-7bc4be735b0560289f6b86ab6136ee25d20b65b7",
+        # 2019-09-26
+        urls = ["https://github.com/bazelbuild/rules_foreign_cc/archive/7bc4be735b0560289f6b86ab6136ee25d20b65b7.tar.gz"],
     ),
     rules_proto = dict(
         sha256 = "602e7161d9195e50246177e7c55b2f39950a9cf7366f74ed5f22fd45750cd208",

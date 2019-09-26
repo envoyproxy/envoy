@@ -19,15 +19,15 @@ namespace ZooKeeperProxy {
 ZooKeeperFilterConfig::ZooKeeperFilterConfig(const std::string& stat_prefix,
                                              const uint32_t max_packet_bytes, Stats::Scope& scope)
     : scope_(scope), max_packet_bytes_(max_packet_bytes), stats_(generateStats(stat_prefix, scope)),
-      stat_name_set_(scope.symbolTable()), stat_prefix_(stat_name_set_.add(stat_prefix)),
-      auth_(stat_name_set_.add("auth")),
-      connect_latency_(stat_name_set_.add("connect_response_latency")),
-      unknown_scheme_rq_(stat_name_set_.add("unknown_scheme_rq")),
-      unknown_opcode_latency_(stat_name_set_.add("unknown_opcode_latency")) {
+      stat_name_set_(scope.symbolTable().makeSet("Zookeeper")),
+      stat_prefix_(stat_name_set_->add(stat_prefix)), auth_(stat_name_set_->add("auth")),
+      connect_latency_(stat_name_set_->add("connect_response_latency")),
+      unknown_scheme_rq_(stat_name_set_->add("unknown_scheme_rq")),
+      unknown_opcode_latency_(stat_name_set_->add("unknown_opcode_latency")) {
   // https://zookeeper.apache.org/doc/r3.5.4-beta/zookeeperProgrammers.html#sc_BuiltinACLSchemes
   // lists commons schemes: "world", "auth", "digest", "host", "x509", and
   // "ip". These are used in filter.cc by appending "_rq".
-  stat_name_set_.rememberBuiltins(
+  stat_name_set_->rememberBuiltins(
       {"auth_rq", "digest_rq", "host_rq", "ip_rq", "ping_response_rq", "world_rq", "x509_rq"});
 
   initOpCode(OpCodes::PING, stats_.ping_resp_, "ping_response");
@@ -62,7 +62,7 @@ void ZooKeeperFilterConfig::initOpCode(OpCodes opcode, Stats::Counter& counter,
   OpCodeInfo& opcode_info = op_code_map_[opcode];
   opcode_info.counter_ = &counter;
   opcode_info.opname_ = std::string(name);
-  opcode_info.latency_name_ = stat_name_set_.add(absl::StrCat(name, "_latency"));
+  opcode_info.latency_name_ = stat_name_set_->add(absl::StrCat(name, "_latency"));
 }
 
 ZooKeeperFilter::ZooKeeperFilter(ZooKeeperFilterConfigSharedPtr config, TimeSource& time_source)
@@ -153,8 +153,8 @@ void ZooKeeperFilter::onPing() {
 void ZooKeeperFilter::onAuthRequest(const std::string& scheme) {
   Stats::SymbolTable::StoragePtr storage = config_->scope_.symbolTable().join(
       {config_->stat_prefix_, config_->auth_,
-       config_->stat_name_set_.getBuiltin(absl::StrCat(scheme, "_rq"),
-                                          config_->unknown_scheme_rq_)});
+       config_->stat_name_set_->getBuiltin(absl::StrCat(scheme, "_rq"),
+                                           config_->unknown_scheme_rq_)});
   config_->scope_.counterFromStatName(Stats::StatName(storage.get())).inc();
   setDynamicMetadata("opname", "auth");
 }

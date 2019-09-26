@@ -203,22 +203,23 @@ private:
   Event::TimerPtr delayed_close_timer_;
   std::list<ConnectionCallbacks*> callbacks_;
   std::list<BytesSentCb> bytes_sent_callbacks_;
-  bool read_enabled_{true};
-  bool above_high_watermark_{false};
-  bool detect_early_close_{true};
-  bool enable_half_close_{false};
-  bool read_end_stream_raised_{false};
-  bool read_end_stream_{false};
-  bool write_end_stream_{false};
-  bool current_write_end_stream_{false};
-  Buffer::Instance* current_write_buffer_{};
-  uint64_t last_read_buffer_size_{};
-  uint64_t last_write_buffer_size_{};
-  std::unique_ptr<ConnectionStats> connection_stats_;
   // Tracks the number of times reads have been disabled. If N different components call
   // readDisabled(true) this allows the connection to only resume reads when readDisabled(false)
   // has been called N times.
+  uint64_t last_read_buffer_size_{};
+  uint64_t last_write_buffer_size_{};
+  std::unique_ptr<ConnectionStats> connection_stats_;
+  Buffer::Instance* current_write_buffer_{};
   uint32_t read_disable_count_{0};
+  bool read_enabled_ : 1;
+  bool above_high_watermark_ : 1;
+  bool detect_early_close_ : 1;
+  bool enable_half_close_ : 1;
+  bool read_end_stream_raised_ : 1;
+  bool read_end_stream_ : 1;
+  bool write_end_stream_ : 1;
+  bool current_write_end_stream_ : 1;
+  bool dispatch_buffered_data_ : 1;
 };
 
 /**

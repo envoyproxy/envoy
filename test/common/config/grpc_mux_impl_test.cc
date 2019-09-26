@@ -580,6 +580,9 @@ TEST_F(GrpcMuxImplTest, UnwatchedTypeAcceptsEmptyResources) {
   response->set_version_info("1");
   response->set_type_url(type_url);
 
+  // TODO(fredlas) the expectation of no discovery request here is against the xDS spec.
+  // The upcoming xDS overhaul (part of/followup to PR7293) will fix this.
+  //
   // This contains zero resources. No discovery request should be sent.
   grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response));
 
