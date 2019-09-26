@@ -12,6 +12,7 @@
 #include "envoy/config/config_provider.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/http/hash_policy.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/router/rds.h"
 #include "envoy/router/route_config_provider_manager.h"
@@ -237,12 +238,12 @@ public:
   TestCorsPolicy cors_policy_;
 };
 
-class MockHashPolicy : public HashPolicy {
+class MockHashPolicy : public Http::HashPolicy {
 public:
   MockHashPolicy();
   ~MockHashPolicy() override;
 
-  // Router::HashPolicy
+  // Http::HashPolicy
   MOCK_CONST_METHOD3(generateHash,
                      absl::optional<uint64_t>(const Network::Address::Instance* downstream_address,
                                               const Http::HeaderMap& headers,
@@ -286,7 +287,7 @@ public:
                           bool insert_envoy_original_path));
   MOCK_CONST_METHOD2(finalizeResponseHeaders,
                      void(Http::HeaderMap& headers, const StreamInfo::StreamInfo& stream_info));
-  MOCK_CONST_METHOD0(hashPolicy, const HashPolicy*());
+  MOCK_CONST_METHOD0(hashPolicy, const Http::HashPolicy*());
   MOCK_CONST_METHOD0(hedgePolicy, const HedgePolicy&());
   MOCK_CONST_METHOD0(metadataMatchCriteria, const Router::MetadataMatchCriteria*());
   MOCK_CONST_METHOD0(priority, Upstream::ResourcePriority());
