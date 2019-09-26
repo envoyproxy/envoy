@@ -162,7 +162,7 @@ REPOSITORY_LOCATIONS = dict(
     com_github_google_jwt_verify = dict(
         sha256 = "38a93926f362a330a2a4489ed799c260df0bc305417e2bb44d6745671d9641d7",
         strip_prefix = "jwt_verify_lib-7e3191b0dcb72835aa63e308a53b541e7fda5458",
-        # 2019-09-23
+        # 2019-09-23 
         urls = ["https://github.com/google/jwt_verify_lib/archive/7e3191b0dcb72835aa63e308a53b541e7fda5458.tar.gz"],
     ),
     com_github_nodejs_http_parser = dict(
