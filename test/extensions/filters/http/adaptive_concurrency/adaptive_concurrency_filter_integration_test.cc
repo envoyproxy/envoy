@@ -45,8 +45,8 @@ void AdaptiveConcurrencyIntegrationTest::sendRequests(const uint32_t request_cou
   ASSERT_EQ(responses_.size(), upstream_requests_.size());
 }
 
-void AdaptiveConcurrencyIntegrationTest::respondToAllRequests(
-    int forwarded_count, std::chrono::milliseconds latency) {
+void AdaptiveConcurrencyIntegrationTest::respondToAllRequests(int forwarded_count,
+                                                              std::chrono::milliseconds latency) {
   ASSERT_GE(responses_.size(), static_cast<size_t>(forwarded_count));
 
   timeSystem().sleep(latency);
