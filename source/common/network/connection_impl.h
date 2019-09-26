@@ -113,7 +113,11 @@ public:
   void raiseEvent(ConnectionEvent event) override;
   // Should the read buffer be drained?
   bool shouldDrainReadBuffer() override {
-    return read_buffer_limit_ > 0 && read_buffer_.length() >= read_buffer_limit_;
+    if (read_buffer_limit_ > 0 && read_buffer_.length() >= read_buffer_limit_) {
+      ENVOY_CONN_LOG(warn, "read buffer size exceeded limit", *this);
+      return true;
+    }
+    return false;
   }
   // Mark read buffer ready to read in the event loop. This is used when yielding following
   // shouldDrainReadBuffer().
