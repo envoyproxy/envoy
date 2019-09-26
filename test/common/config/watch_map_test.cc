@@ -333,10 +333,8 @@ TEST(WatchMapTest, UninterestingUpdate) {
   watch_map.updateWatchInterest(watch, {});
   watch_map.removeWatch(watch);
 
-  // Finally, test that calling onConfigUpdate on a map with no watches (which should not
-  // happen) throws an exception.
-  EXPECT_THROW_WITH_MESSAGE(doDeltaAndSotwUpdate(watch_map, bob_update, {}, "version4"),
-                            EnvoyException, "Rejecting non-empty update for unwatched type URL");
+  // Finally, test that calling onConfigUpdate on a map with no watches doesn't break.
+  doDeltaAndSotwUpdate(watch_map, bob_update, {}, "version4");
 }
 
 // Tests that a watch that specifies no particular resource interest is treated as interested in

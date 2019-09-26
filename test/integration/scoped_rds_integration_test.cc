@@ -25,8 +25,11 @@ protected:
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion(), realTime()) {}
 
   ~ScopedRdsIntegrationTest() override {
+    std::cerr << "hmm1" << std::endl;
     resetConnections();
+    std::cerr << "hmm2" << std::endl;
     cleanupUpstreamAndDownstream();
+    std::cerr << "hmm3" << std::endl;
   }
 
   void initialize() override {

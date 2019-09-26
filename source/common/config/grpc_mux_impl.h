@@ -37,6 +37,7 @@ public:
   void resume(const std::string& type_url) override;
   bool paused(const std::string& type_url) const override;
   void start() override;
+  //  void shutdown() override;
   void disableInitFetchTimeoutTimer() override;
 
 protected:
@@ -122,6 +123,10 @@ private:
   // the type_urls. So, while the SubscriptionStates populate every other field of these messages,
   // this one is up to GrpcMux.
   const LocalInfo::LocalInfo& local_info_;
+
+  // Demonstrates that when the maybeUpdateQueueSizeStat() segfault happens, this object is
+  // still valid.
+  int vinny_the_variable_{};
 };
 
 class GrpcMuxDelta : public GrpcMuxImpl,
@@ -176,8 +181,10 @@ public:
       : GrpcMuxImpl(std::make_unique<SotwSubscriptionStateFactory>(dispatcher),
                     skip_subsequent_node, local_info),
         grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
-                     rate_limit_settings) {}
-
+                     rate_limit_settings) {
+    std::cerr << "creating STOW mux " << this << std::endl;
+  }
+  ~GrpcMuxSotw() { std::cerr << "destroying STOW mux " << this << std::endl; } // TODO REMOVE
   // GrpcStreamCallbacks
   void onStreamEstablished() override { handleEstablishedStream(); }
   void onEstablishmentFailure() override { handleStreamEstablishmentFailure(); }

@@ -69,6 +69,7 @@ class TestScopeWrapper : public Scope {
 public:
   TestScopeWrapper(Thread::MutexBasicLockable& lock, ScopePtr wrapped_scope)
       : lock_(lock), wrapped_scope_(std::move(wrapped_scope)) {}
+  ~TestScopeWrapper() { std::cerr << "destroying TestScopeWrapper" << std::endl; } // TODO REMOVE
 
   ScopePtr createScope(const std::string& name) override {
     Thread::LockGuard lock(lock_);
@@ -140,6 +141,9 @@ private:
  */
 class TestIsolatedStoreImpl : public StoreRoot {
 public:
+  ~TestIsolatedStoreImpl() override {
+    std::cerr << "destroying TestIsolatedStoreImpl" << std::endl;
+  } // TODO REMOVE
   // Stats::Scope
   Counter& counterFromStatName(StatName name) override {
     Thread::LockGuard lock(lock_);

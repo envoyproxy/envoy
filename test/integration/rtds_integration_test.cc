@@ -36,7 +36,7 @@ layered_runtime:
           grpc_services:
             envoy_grpc:
               cluster_name: rtds_cluster
-          set_node_on_first_message_only: true
+          set_node_on_first_message_only: false
   - name: some_admin_layer
     admin_layer: {{}}
 admin:

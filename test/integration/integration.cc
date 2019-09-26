@@ -592,8 +592,6 @@ AssertionResult BaseIntegrationTest::compareSotwDiscoveryRequest(
     EXPECT_TRUE(discovery_request.has_node());
     EXPECT_FALSE(discovery_request.node().id().empty());
     EXPECT_FALSE(discovery_request.node().cluster().empty());
-  } else {
-    EXPECT_FALSE(discovery_request.has_node());
   }
 
   if (expected_type_url != discovery_request.type_url()) {
@@ -644,8 +642,6 @@ AssertionResult BaseIntegrationTest::compareDeltaDiscoveryRequest(
     EXPECT_TRUE(request.has_node());
     EXPECT_FALSE(request.node().id().empty());
     EXPECT_FALSE(request.node().cluster().empty());
-  } else {
-    EXPECT_FALSE(request.has_node());
   }
 
   if (request.type_url() != expected_type_url) {

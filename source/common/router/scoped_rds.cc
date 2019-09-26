@@ -87,8 +87,8 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
     ScopedRoutesConfigProviderManager& config_provider_manager)
     : DeltaConfigSubscriptionInstance("SRDS", manager_identifier, config_provider_manager,
                                       factory_context),
-      factory_context_(factory_context), name_(name), scope_key_builder_(scope_key_builder),
       scope_(factory_context.scope().createScope(stat_prefix + "scoped_rds." + name + ".")),
+      factory_context_(factory_context), name_(name), scope_key_builder_(scope_key_builder),
       stats_({ALL_SCOPED_RDS_STATS(POOL_COUNTER(*scope_))}),
       rds_config_source_(std::move(rds_config_source)),
       validation_visitor_(factory_context.messageValidationVisitor()), stat_prefix_(stat_prefix),
@@ -99,6 +99,7 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
           Grpc::Common::typeUrl(
               envoy::api::v2::ScopedRouteConfiguration().GetDescriptor()->full_name()),
           *scope_, *this);
+  std::cerr << "made SRDS with scope " << scope_.get() << std::endl;
 
   initialize([scope_key_builder]() -> Envoy::Config::ConfigProvider::ConfigConstSharedPtr {
     return std::make_shared<ScopedConfigImpl>(

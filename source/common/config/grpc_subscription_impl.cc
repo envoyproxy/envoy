@@ -9,10 +9,17 @@ GrpcSubscriptionImpl::GrpcSubscriptionImpl(GrpcMuxSharedPtr context, absl::strin
                                            std::chrono::milliseconds init_fetch_timeout,
                                            bool is_aggregated)
     : context_(std::move(context)), type_url_(type_url), callbacks_(callbacks), stats_(stats),
-      init_fetch_timeout_(init_fetch_timeout), is_aggregated_(is_aggregated) {}
+      init_fetch_timeout_(init_fetch_timeout), is_aggregated_(is_aggregated) {
+  if (!context_) {
+    std::cerr << "HEY you gave me a null context_!!!!!!!" << std::endl;
+  }
+  std::cerr << "GrpcSubscriptionImpl CTOR " << this << std::endl;
+}
 
 GrpcSubscriptionImpl::~GrpcSubscriptionImpl() {
+  std::cerr << "~GrpcSubscriptionImpl " << this << std::endl;
   if (watch_) {
+    std::cerr << "~GrpcSubscriptionImpl removing wathc" << std::endl;
     context_->removeWatch(type_url_, watch_);
   }
 }

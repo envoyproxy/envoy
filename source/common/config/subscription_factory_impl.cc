@@ -46,6 +46,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
           Utility::apiConfigSourceRequestTimeout(api_config_source), restMethod(type_url),
           callbacks, stats, Utility::configSourceInitialFetchTimeout(config), validation_visitor_);
     case envoy::api::v2::core::ApiConfigSource::GRPC:
+      std::cerr << "subscriptionFromConfigSource single SOTW" << std::endl;
       return std::make_unique<GrpcSubscriptionImpl>(
           std::make_shared<GrpcMuxSotw>(Utility::factoryForGrpcApiConfigSource(
                                             cm_.grpcAsyncClientManager(), api_config_source, scope)
@@ -56,6 +57,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
           type_url, callbacks, stats, Utility::configSourceInitialFetchTimeout(config),
           /*is_aggregated=*/false);
     case envoy::api::v2::core::ApiConfigSource::DELTA_GRPC:
+      std::cerr << "subscriptionFromConfigSource single DELTA" << std::endl;
       return std::make_unique<GrpcSubscriptionImpl>(
           std::make_shared<GrpcMuxDelta>(Utility::factoryForGrpcApiConfigSource(
                                              cm_.grpcAsyncClientManager(), api_config_source, scope)
@@ -70,6 +72,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     }
   }
   case envoy::api::v2::core::ConfigSource::kAds: {
+    std::cerr << "subscriptionFromConfigSource ADS" << std::endl;
     return std::make_unique<GrpcSubscriptionImpl>(cm_.adsMux(), type_url, callbacks, stats,
                                                   Utility::configSourceInitialFetchTimeout(config),
                                                   /*is_aggregated=*/true);
