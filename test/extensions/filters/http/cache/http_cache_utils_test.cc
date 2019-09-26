@@ -20,7 +20,7 @@ protected:
   Http::TestHeaderMapImpl response_headers_{{"date", GetParam()}};
 };
 
-const char*const ok_times[] = {
+const char* const ok_times[] = {
     "Sun, 06 Nov 1994 08:49:37 GMT",  // IMF-fixdate
     "Sunday, 06-Nov-94 08:49:37 GMT", // obsolete RFC 850 format
     "Sun Nov  6 08:49:37 1994"        // ANSI C's asctime() format
