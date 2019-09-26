@@ -1765,7 +1765,7 @@ virtual_hosts:
   }
 
   envoy::api::v2::RouteConfiguration route_config_;
-  HashPolicy::AddCookieCallback add_cookie_nop_;
+  Http::HashPolicy::AddCookieCallback add_cookie_nop_;
 
 private:
   std::unique_ptr<TestConfigImpl> config_;

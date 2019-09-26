@@ -25,6 +25,8 @@ jobs:
     matrix:
       release:
         CI_TARGET: 'bazel.release'
+      asan:
+        CI_TARGET: 'bazel.asan'
       tsan:
         CI_TARGET: 'bazel.tsan'
       gcc:
