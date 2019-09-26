@@ -18,6 +18,11 @@ public:
     return tls_certificate_.get();
   }
 
+  Common::CallbackHandle*
+  addValidationCallback(std::function<void(const envoy::api::v2::auth::TlsCertificate&)>) override {
+    return nullptr;
+  }
+
   Common::CallbackHandle* addUpdateCallback(std::function<void()>) override { return nullptr; }
 
 private:
@@ -32,6 +37,11 @@ public:
 
   const envoy::api::v2::auth::CertificateValidationContext* secret() const override {
     return certificate_validation_context_.get();
+  }
+
+  Common::CallbackHandle* addValidationCallback(
+      std::function<void(const envoy::api::v2::auth::CertificateValidationContext&)>) override {
+    return nullptr;
   }
 
   Common::CallbackHandle* addUpdateCallback(std::function<void()>) override { return nullptr; }
