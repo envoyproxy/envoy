@@ -1,0 +1,6 @@
+config {
+  virtual_hosts {
+    name: "Post"
+    domains: "\001\000"
+  }
+}

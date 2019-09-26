@@ -36,7 +36,6 @@ cleanRouteConfig(envoy::api::v2::RouteConfiguration route_config) {
   // headers.
   envoy::api::v2::RouteConfiguration clean_config =
       replaceInvalidHeaders<envoy::api::v2::RouteConfiguration>(route_config);
-  // Replace invalid characters from
   auto internal_only_headers = clean_config.mutable_internal_only_headers();
   std::for_each(internal_only_headers->begin(), internal_only_headers->end(),
                 [](std::string& n) { n = Fuzz::replaceInvalidCharacters(n); });
@@ -48,6 +47,10 @@ cleanRouteConfig(envoy::api::v2::RouteConfiguration route_config) {
         // remove from each request and response that get routed through it. This replaces invalid
         // header characters in these fields.
         virtual_host = replaceInvalidHeaders<envoy::api::v2::route::VirtualHost>(virtual_host);
+        // Replace invalid characters from the list of domains matched to this virtual host.
+        std::for_each(virtual_host.mutable_domains()->begin(),
+                      virtual_host.mutable_domains()->end(),
+                      [](std::string& n) { n = Fuzz::replaceInvalidCharacters(n); });
         // Envoy can determine the cluster to route to by reading the HTTP header named by the
         // cluster_header from the request header. Because these cluster_headers are destined to be
         // added to a Header Map, we iterate through each route in and remove invalid characters
@@ -69,9 +72,9 @@ cleanRouteConfig(envoy::api::v2::RouteConfiguration route_config) {
 
 // TODO(htuch): figure out how to generate via a genrule from config_impl_test the full corpus.
 DEFINE_PROTO_FUZZER(const test::common::router::RouteTestCase& input) {
+  static NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  static NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   try {
-    NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-    NiceMock<Server::Configuration::MockFactoryContext> factory_context;
     TestUtility::validate(input.config());
     ConfigImpl config(cleanRouteConfig(input.config()), factory_context, true);
     Http::TestHeaderMapImpl headers = Fuzz::fromHeaders(input.headers());
