@@ -29,6 +29,8 @@ public:
                          quic::QuicClientPushPromiseIndex* push_promise_index,
                          Event::Dispatcher& dispatcher, uint32_t send_buffer_limit);
 
+  ~EnvoyQuicClientSession() override;
+
   // Called by QuicHttpClientConnectionImpl before creating data streams.
   void setHttpConnectionCallbacks(Http::ConnectionCallbacks& callbacks) {
     http_connection_callbacks_ = &callbacks;

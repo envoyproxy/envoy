@@ -13,6 +13,11 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
       quic::QuicSpdyClientSession(config, supported_versions, connection.release(), server_id,
                                   crypto_config, push_promise_index) {}
 
+EnvoyQuicClientSession::~EnvoyQuicClientSession() {
+  QuicFilterManagerConnectionImpl::quic_connection_ = nullptr;
+  ASSERT(!connection()->connected());
+}
+
 absl::string_view EnvoyQuicClientSession::requestedServerName() const {
   return {GetCryptoStream()->crypto_negotiated_params().sni};
 }
@@ -31,7 +36,7 @@ void EnvoyQuicClientSession::OnConnectionClosed(const quic::QuicConnectionCloseF
 
 void EnvoyQuicClientSession::Initialize() {
   quic::QuicSpdyClientSession::Initialize();
-  quic_connection_.setEnvoyConnection(*this);
+  quic_connection_->setEnvoyConnection(*this);
 }
 
 void EnvoyQuicClientSession::OnGoAway(const quic::QuicGoAwayFrame& frame) {

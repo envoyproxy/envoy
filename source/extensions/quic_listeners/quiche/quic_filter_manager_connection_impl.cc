@@ -8,7 +8,7 @@ namespace Quic {
 QuicFilterManagerConnectionImpl::QuicFilterManagerConnectionImpl(EnvoyQuicConnection& connection,
                                                                  Event::Dispatcher& dispatcher,
                                                                  uint32_t send_buffer_limit)
-    : quic_connection_(connection), filter_manager_(*this), dispatcher_(dispatcher),
+    : quic_connection_(&connection), filter_manager_(*this), dispatcher_(dispatcher),
       stream_info_(dispatcher.timeSource()),
       write_buffer_watermark_simulation_(
           send_buffer_limit / 2, send_buffer_limit, [this]() { onSendBufferLowWatermark(); },
@@ -64,8 +64,19 @@ void QuicFilterManagerConnectionImpl::close(Network::ConnectionCloseType type) {
     // TODO(danzh): Implement FlushWrite and FlushWriteAndDelay mode.
     ENVOY_CONN_LOG(error, "Flush write is not implemented for QUIC.", *this);
   }
-  quic_connection_.CloseConnection(quic::QUIC_NO_ERROR, "Closed by application",
-                                   quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
+  if (quic_connection_ == nullptr) {
+    // Already detached from quic connection.
+    return;
+  }
+  quic_connection_->CloseConnection(quic::QUIC_NO_ERROR, "Closed by application",
+                                    quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
+  quic_connection_ = nullptr;
+}
+
+uint64_t QuicFilterManagerConnectionImpl::id() const {
+  // QUIC connection id can be 18 types. It's easier to use hash value instead
+  // of trying to map it into a 64-bit space.
+  return quic_connection_ == nullptr ? 0 : quic_connection_->connection_id().Hash();
 }
 
 void QuicFilterManagerConnectionImpl::setDelayedCloseTimeout(std::chrono::milliseconds timeout) {
@@ -85,21 +96,21 @@ QuicFilterManagerConnectionImpl::socketOptions() const {
       error,
       "QUIC connection socket is merely a wrapper, and doesn't have any specific socket options.",
       *this);
-  return quic_connection_.connectionSocket()->options();
+  return quic_connection_->connectionSocket()->options();
 }
 
 const Network::Address::InstanceConstSharedPtr&
 QuicFilterManagerConnectionImpl::remoteAddress() const {
-  ASSERT(quic_connection_.connectionSocket() != nullptr,
+  ASSERT(quic_connection_->connectionSocket() != nullptr,
          "remoteAddress() should only be called after OnPacketHeader");
-  return quic_connection_.connectionSocket()->remoteAddress();
+  return quic_connection_->connectionSocket()->remoteAddress();
 }
 
 const Network::Address::InstanceConstSharedPtr&
 QuicFilterManagerConnectionImpl::localAddress() const {
-  ASSERT(quic_connection_.connectionSocket() != nullptr,
+  ASSERT(quic_connection_->connectionSocket() != nullptr,
          "localAddress() should only be called after OnPacketHeader");
-  return quic_connection_.connectionSocket()->localAddress();
+  return quic_connection_->connectionSocket()->localAddress();
 }
 
 Ssl::ConnectionInfoConstSharedPtr QuicFilterManagerConnectionImpl::ssl() const {
@@ -121,12 +132,14 @@ void QuicFilterManagerConnectionImpl::adjustBytesToSend(int64_t delta) {
 
 void QuicFilterManagerConnectionImpl::onConnectionCloseEvent(
     const quic::QuicConnectionCloseFrame& frame, quic::ConnectionCloseSource source) {
-  // Tell network callbacks about connection close.
-  raiseEvent(source == quic::ConnectionCloseSource::FROM_PEER
-                 ? Network::ConnectionEvent::RemoteClose
-                 : Network::ConnectionEvent::LocalClose);
   transport_failure_reason_ = absl::StrCat(quic::QuicErrorCodeToString(frame.quic_error_code),
                                            " with details: ", frame.error_details);
+  if (quic_connection_ != nullptr) {
+    // Tell network callbacks about connection close if not detached yet.
+    raiseEvent(source == quic::ConnectionCloseSource::FROM_PEER
+                   ? Network::ConnectionEvent::RemoteClose
+                   : Network::ConnectionEvent::LocalClose);
+  }
 }
 
 void QuicFilterManagerConnectionImpl::raiseEvent(Network::ConnectionEvent event) {

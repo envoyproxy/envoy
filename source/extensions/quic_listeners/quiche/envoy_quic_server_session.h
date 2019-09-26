@@ -32,6 +32,8 @@ public:
                          quic::QuicCompressedCertsCache* compressed_certs_cache,
                          Event::Dispatcher& dispatcher, uint32_t send_buffer_limit);
 
+  ~EnvoyQuicServerSession() override;
+
   // Network::Connection
   absl::string_view requestedServerName() const override;
 

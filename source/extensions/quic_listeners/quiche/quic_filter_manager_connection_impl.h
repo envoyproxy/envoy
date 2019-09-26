@@ -34,11 +34,7 @@ public:
   void enableHalfClose(bool enabled) override;
   void close(Network::ConnectionCloseType type) override;
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
-  uint64_t id() const override {
-    // QUIC connection id can be 18 types. It's easier to use hash value instead
-    // of trying to map it into a 64-bit space.
-    return quic_connection_.connection_id().Hash();
-  }
+  uint64_t id() const override;
   std::string nextProtocol() const override { return EMPTY_STRING; }
   void noDelay(bool /*enable*/) override {
     // No-op. TCP_NODELAY doesn't apply to UDP.
@@ -59,12 +55,12 @@ public:
   }
   void setConnectionStats(const Network::Connection::ConnectionStats& stats) override {
     stats_ = std::make_unique<Network::Connection::ConnectionStats>(stats);
-    quic_connection_.setConnectionStats(stats);
+    quic_connection_->setConnectionStats(stats);
   }
   Ssl::ConnectionInfoConstSharedPtr ssl() const override;
   Network::Connection::State state() const override {
-    return quic_connection_.connected() ? Network::Connection::State::Open
-                                        : Network::Connection::State::Closed;
+    return quic_connection_->connected() ? Network::Connection::State::Open
+                                         : Network::Connection::State::Closed;
   }
   void write(Buffer::Instance& /*data*/, bool /*end_stream*/) override {
     // All writes should be handled by Quic internally.
@@ -105,7 +101,7 @@ protected:
 
   void raiseEvent(Network::ConnectionEvent event);
 
-  EnvoyQuicConnection& quic_connection_;
+  EnvoyQuicConnection* quic_connection_{nullptr};
   // TODO(danzh): populate stats.
   std::unique_ptr<Network::Connection::ConnectionStats> stats_;
 

@@ -12,7 +12,8 @@ namespace Quic {
 // Base class for EnvoyQuicServer|ClientStream.
 class EnvoyQuicStream : public Http::StreamEncoder,
                         public Http::Stream,
-                        public Http::StreamCallbackHelper {
+                        public Http::StreamCallbackHelper,
+                        protected Logger::Loggable<Logger::Id::quic_stream> {
 public:
   EnvoyQuicStream(uint32_t buffer_limit, std::function<void()> below_low_watermark,
                   std::function<void()> above_high_watermark)

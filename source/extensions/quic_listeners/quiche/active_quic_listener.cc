@@ -54,6 +54,8 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
   quic_dispatcher_->InitializeWithWriter(writer.release());
 }
 
+ActiveQuicListener::~ActiveQuicListener() { onListenerShutdown(); }
+
 void ActiveQuicListener::onListenerShutdown() {
   ENVOY_LOG(info, "Quic listener {} shutdown.", config_.name());
   quic_dispatcher_->Shutdown();

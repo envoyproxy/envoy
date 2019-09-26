@@ -31,7 +31,9 @@ public:
                             ConfigHelper::QUIC_HTTP_PROXY_CONFIG),
         supported_versions_(quic::CurrentSupportedVersions()),
         crypto_config_(std::make_unique<EnvoyQuicFakeProofVerifier>()), conn_helper_(*dispatcher_),
-        alarm_factory_(*dispatcher_, *conn_helper_.GetClock()) {}
+        alarm_factory_(*dispatcher_, *conn_helper_.GetClock()) {
+    // quic::SetVerbosityLogThreshold(1);
+  }
 
   Network::ClientConnectionPtr makeClientConnection(uint32_t port) override {
     Network::Address::InstanceConstSharedPtr server_addr = Network::Utility::resolveUrl(
@@ -88,9 +90,36 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, QuicHttpIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(QuicHttpIntegrationTest, SimpleGetRequestResponse) {
-  quic::SetVerbosityLogThreshold(1);
+TEST_P(QuicHttpIntegrationTest, GetRequestAndEmptyResponse) {
   testRouterHeaderOnlyRequestAndResponse();
+}
+
+TEST_P(QuicHttpIntegrationTest, PostRequestAndResponseWithBody) {
+  testRouterRequestAndResponseWithBody(1024, 512, false);
+}
+
+TEST_P(QuicHttpIntegrationTest, PostRequestWithBigHeadersAndResponseWithBody) {
+  testRouterRequestAndResponseWithBody(1024, 512, true);
+}
+
+TEST_P(QuicHttpIntegrationTest, RouterUpstreamDisconnectBeforeRequestcomplete) {
+  testRouterUpstreamDisconnectBeforeRequestComplete();
+}
+
+TEST_P(QuicHttpIntegrationTest, RouterUpstreamDisconnectBeforeResponseComplete) {
+  testRouterUpstreamDisconnectBeforeResponseComplete();
+}
+
+TEST_P(QuicHttpIntegrationTest, RouterDownstreamDisconnectBeforeRequestComplete) {
+  testRouterDownstreamDisconnectBeforeRequestComplete();
+}
+
+TEST_P(QuicHttpIntegrationTest, RouterDownstreamDisconnectBeforeResponseComplete) {
+  testRouterDownstreamDisconnectBeforeResponseComplete();
+}
+
+TEST_P(QuicHttpIntegrationTest, RouterUpstreamResponseBeforeRequestComplete) {
+  testRouterUpstreamResponseBeforeRequestComplete();
 }
 
 } // namespace Quic

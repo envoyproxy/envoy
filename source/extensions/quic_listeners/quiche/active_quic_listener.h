@@ -32,6 +32,8 @@ public:
                      Network::UdpListenerPtr&& listener, Network::ListenerConfig& listener_config,
                      const quic::QuicConfig& quic_config);
 
+  ~ActiveQuicListener() override;
+
   // TODO(#7465): Make this a callback.
   void onListenerShutdown();
 
