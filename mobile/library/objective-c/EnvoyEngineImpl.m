@@ -12,7 +12,9 @@
   if (!self) {
     return nil;
   }
+
   _engineHandle = init_engine();
+  [EnvoyNetworkMonitor startReachabilityIfNeeded];
   return self;
 }
 
