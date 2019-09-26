@@ -46,7 +46,7 @@ void AdaptiveConcurrencyIntegrationTest::sendRequests(const uint32_t request_cou
 }
 
 void AdaptiveConcurrencyIntegrationTest::respondToAllRequests(
-    const int forwarded_count, const std::chrono::milliseconds latency) {
+    int forwarded_count, std::chrono::milliseconds latency) {
   ASSERT_GE(responses_.size(), static_cast<size_t>(forwarded_count));
 
   timeSystem().sleep(latency);
@@ -119,10 +119,29 @@ TEST_P(AdaptiveConcurrencyIntegrationTest, TestManyConcurrency1) {
 /**
  * TODO: Test the ability to increase/decrease the concurrency limit with request latencies based on
  * the minRTT value.
+ *
+ * Previous attempts at this test took a long time when using simulated time, which resulted in
+ * intermittent timeouts in CI.
  */
 
 /**
  * TODO: Test the ability to enforce the concurrency limit outside of the minRTT calculation window.
+ *
+ * Previous attempts at this test would hang during waitForHttpConnection after successfully sending
+ * several requests to inflate the minRTT value. Alternative approaches that circumvented the need
+ * for manually waiting included:
+ *
+ *   - Using a fault filter to inject delay into requests after passing the adaptive concurrency
+ *   filter. This fails when using simulated time due to the fault filter's delay mechanism not
+ *   being governed by the simulated time class. This required usage of real time, which sacrificed
+ *   determinism.
+ *
+ *   - Buffering requests at the fake upstream and releasing them manually. Buffering via simulated
+ *   time and releasing by advancing time does not work due to the only_one_thread.h assertions
+ *   requiring simulated time to advance on a single thread. Buffering via a request queue and
+ *   changes to the fake upstream requires too many changes to the fake upstream to be worth the
+ *   investment of time, since it would be more worthwhile to overhaul the integration test
+ *   framework to be event-driven rather than waitFor* driven.
  */
 
 } // namespace Envoy

@@ -68,7 +68,7 @@ protected:
                               const std::string& yaml_config,
                               std::chrono::milliseconds latency = std::chrono::milliseconds(5)) {
     const auto config = makeConfig(yaml_config);
-    for (uint32_t ii = 0; ii <= config.minRTTAggregateRequestCount(); ++ii) {
+    for (uint32_t i = 0; i <= config.minRTTAggregateRequestCount(); ++i) {
       tryForward(controller, true);
       controller->recordLatencySample(latency);
     }
@@ -160,7 +160,7 @@ min_rtt_calc_params:
   controller->recordLatencySample(min_rtt);
 
   // 49 more requests should cause the minRTT to be done calculating.
-  for (int ii = 0; ii < 49; ++ii) {
+  for (int i = 0; i < 49; ++i) {
     EXPECT_EQ(controller->concurrencyLimit(), 1);
     tryForward(controller, true);
     tryForward(controller, false);
@@ -189,9 +189,9 @@ min_rtt_calc_params:
 
   auto controller = makeController(yaml);
 
-  for (int ii = 1; ii <= 5; ++ii) {
+  for (int i = 1; i <= 5; ++i) {
     tryForward(controller, true);
-    controller->recordLatencySample(std::chrono::milliseconds(ii));
+    controller->recordLatencySample(std::chrono::milliseconds(i));
   }
   EXPECT_EQ(
       3, stats_.gauge("test_prefix.min_rtt_msecs", Stats::Gauge::ImportMode::NeverImport).value());
@@ -253,7 +253,7 @@ min_rtt_calc_params:
   // Ensure that it grows.
   for (int recalcs = 0; recalcs < 10; ++recalcs) {
     const auto last_concurrency = controller->concurrencyLimit();
-    for (int ii = 1; ii <= 5; ++ii) {
+    for (int i = 1; i <= 5; ++i) {
       tryForward(controller, true);
       controller->recordLatencySample(std::chrono::milliseconds(4));
     }
@@ -265,7 +265,7 @@ min_rtt_calc_params:
   // Verify that the concurrency limit can now shrink as necessary.
   for (int recalcs = 0; recalcs < 10; ++recalcs) {
     const auto last_concurrency = controller->concurrencyLimit();
-    for (int ii = 1; ii <= 5; ++ii) {
+    for (int i = 1; i <= 5; ++i) {
       tryForward(controller, true);
       controller->recordLatencySample(std::chrono::milliseconds(6));
     }
@@ -302,7 +302,7 @@ min_rtt_calc_params:
       AllOf(Ge(4950), Le(5050)));
 
   // Now verify max gradient value by forcing dramatically faster latency measurements..
-  for (int ii = 1; ii <= 5; ++ii) {
+  for (int i = 1; i <= 5; ++i) {
     tryForward(controller, true);
     controller->recordLatencySample(std::chrono::milliseconds(4));
   }
@@ -336,7 +336,7 @@ min_rtt_calc_params:
   // Force the limit calculation to run a few times from some measurements.
   for (int sample_iters = 0; sample_iters < 5; ++sample_iters) {
     const auto last_concurrency = controller->concurrencyLimit();
-    for (int ii = 1; ii <= 5; ++ii) {
+    for (int i = 1; i <= 5; ++i) {
       tryForward(controller, true);
       controller->recordLatencySample(std::chrono::milliseconds(4));
     }
@@ -354,7 +354,7 @@ min_rtt_calc_params:
   EXPECT_EQ(controller->concurrencyLimit(), 1);
 
   // 49 more requests should cause the minRTT to be done calculating.
-  for (int ii = 0; ii < 5; ++ii) {
+  for (int i = 0; i < 5; ++i) {
     EXPECT_EQ(controller->concurrencyLimit(), 1);
     tryForward(controller, true);
     controller->recordLatencySample(std::chrono::milliseconds(13));
@@ -388,7 +388,7 @@ min_rtt_calc_params:
   // Force the limit calculation to run a few times from some measurements.
   for (int sample_iters = 0; sample_iters < 5; ++sample_iters) {
     const auto last_concurrency = controller->concurrencyLimit();
-    for (int ii = 1; ii <= 5; ++ii) {
+    for (int i = 1; i <= 5; ++i) {
       tryForward(controller, true);
       controller->recordLatencySample(std::chrono::milliseconds(4));
     }
@@ -433,7 +433,7 @@ min_rtt_calc_params:
   // Force the limit calculation to run a few times from some measurements.
   for (int sample_iters = 0; sample_iters < 5; ++sample_iters) {
     const auto last_concurrency = controller->concurrencyLimit();
-    for (int ii = 1; ii <= 5; ++ii) {
+    for (int i = 1; i <= 5; ++i) {
       tryForward(controller, true);
       controller->recordLatencySample(std::chrono::milliseconds(4));
     }
@@ -484,7 +484,7 @@ min_rtt_calc_params:
   // Set the minRTT- this will trigger the timer for the next minRTT calculation.
   EXPECT_CALL(*rtt_timer, enableTimer(std::chrono::milliseconds(45000), _));
   EXPECT_CALL(*sample_timer, enableTimer(std::chrono::milliseconds(123), _));
-  for (int ii = 1; ii <= 6; ++ii) {
+  for (int i = 1; i <= 6; ++i) {
     tryForward(controller, true);
     controller->recordLatencySample(std::chrono::milliseconds(5));
   }

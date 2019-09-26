@@ -59,7 +59,7 @@ protected:
   // requests are the forwarded requests.
   //
   // Note: For interleaved forwarded/blocked requests, use respondToRequest() directly.
-  void respondToAllRequests(const int forwarded_count, const std::chrono::milliseconds latency);
+  void respondToAllRequests(int forwarded_count, std::chrono::milliseconds latency);
 
   // Responds to a single request in a FIFO manner. Asserts the forwarding expectation.
   void respondToRequest(const bool expect_forwarded);
