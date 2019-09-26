@@ -16,9 +16,9 @@
 // -----------------------------------------------------------------
 // Benchmark                       Time             CPU   Iterations
 // -----------------------------------------------------------------
-// BM_LookupsMixed             94282 ns        94282 ns         6492
-// BM_LookupsNoEvictions       54149 ns        54149 ns        12918
-// BM_LookupsAllEvictions      90508 ns        90508 ns         7765
+// BM_LookupsMixed             87068 ns        87068 ns         6955
+// BM_LookupsNoEvictions       45662 ns        45662 ns        15329
+// BM_LookupsAllEvictions      83015 ns        83015 ns         8435
 
 #include "common/runtime/runtime_impl.h"
 #include "common/stats/recent_lookups.h"
@@ -40,7 +40,7 @@ public:
   void test(benchmark::State& state) {
     for (auto _ : state) {
       Envoy::Runtime::RandomGeneratorImpl random;
-      for (const std::string& lookup : lookups_) {
+      for (uint64_t i = 0; i < lookups_.size(); ++i) {
         recent_lookups_.lookup(lookups_[random.random() % lookups_.size()]);
       }
     }
