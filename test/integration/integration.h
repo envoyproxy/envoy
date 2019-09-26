@@ -38,7 +38,11 @@ public:
   bool reset() { return saw_reset_; }
   Http::StreamResetReason reset_reason() { return reset_reason_; }
   const Http::HeaderMap* continue_headers() { return continue_headers_.get(); }
-  const Http::HeaderMap& headers() { return *headers_; }
+  const Http::HeaderMap& headers() {
+    ASSERT(headers_);
+    return *headers_;
+    std::cerr << "========== return headers" << *headers_ << "\n";
+  }
   const Http::HeaderMapPtr& trailers() { return trailers_; }
   const Http::MetadataMap& metadata_map() { return *metadata_map_; }
   uint64_t keyCount(std::string key) { return duplicated_metadata_key_count_[key]; }

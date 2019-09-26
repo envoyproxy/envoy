@@ -20,8 +20,8 @@ namespace Envoy {
 namespace Quic {
 
 // Act as a Network::Connection to HCM and a FilterManager to FilterFactoryCb.
-class EnvoyQuicServerSession : public quic::QuicServerSessionBase,
-                               public QuicFilterManagerConnectionImpl {
+class EnvoyQuicServerSession : public QuicFilterManagerConnectionImpl,
+                               public quic::QuicServerSessionBase {
 public:
   EnvoyQuicServerSession(const quic::QuicConfig& config,
                          const quic::ParsedQuicVersionVector& supported_versions,
@@ -66,6 +66,7 @@ protected:
 private:
   void setUpRequestDecoder(EnvoyQuicStream& stream);
 
+  std::unique_ptr<EnvoyQuicConnection> quic_connection_;
   // These callbacks are owned by network filters and quic session should out live
   // them.
   Http::ServerConnectionCallbacks* http_connection_callbacks_{nullptr};

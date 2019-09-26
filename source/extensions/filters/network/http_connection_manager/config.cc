@@ -25,6 +25,8 @@
 #include "common/router/rds_impl.h"
 #include "common/router/scoped_rds.h"
 
+#include "extensions/quic_listeners/quiche/codec_impl.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -323,6 +325,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::HTTP2:
     codec_type_ = CodecType::HTTP2;
     break;
+  case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::HTTP3:
+    codec_type_ = CodecType::HTTP3;
+    break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
@@ -403,6 +408,9 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
   case CodecType::HTTP2:
     return std::make_unique<Http::Http2::ServerConnectionImpl>(
         connection, callbacks, context_.scope(), http2_settings_, maxRequestHeadersKb());
+  case CodecType::HTTP3:
+    return std::make_unique<Quic::QuicHttpServerConnectionImpl>(
+        dynamic_cast<Quic::EnvoyQuicServerSession&>(connection), callbacks);
   case CodecType::AUTO:
     return Http::ConnectionManagerUtility::autoCreateCodec(connection, data, callbacks,
                                                            context_.scope(), http1_settings_,

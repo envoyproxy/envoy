@@ -44,9 +44,11 @@ typeToCodecType(Http::CodecClient::Type type) {
     return envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
         HTTP1;
   case Http::CodecClient::Type::HTTP2:
-  case Http::CodecClient::Type::HTTP3:
     return envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
         HTTP2;
+  case Http::CodecClient::Type::HTTP3:
+    return envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+        HTTP3;
   default:
     RELEASE_ASSERT(0, "");
   }
@@ -369,12 +371,16 @@ void HttpIntegrationTest::waitForNextUpstreamRequest(uint64_t upstream_index) {
 void HttpIntegrationTest::checkSimpleRequestSuccess(uint64_t expected_request_size,
                                                     uint64_t expected_response_size,
                                                     IntegrationStreamDecoder* response) {
+  std::cerr << "========= checkSimpleRequestSuccess upstream_request_" << upstream_request_.get()
+            << "\n";
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(expected_request_size, upstream_request_->bodyLength());
 
   ASSERT_TRUE(response->complete());
+  std::cerr << "========= response complete \n";
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ(expected_response_size, response->body().size());
+  std::cerr << "======== exit\n";
 }
 
 void HttpIntegrationTest::testRouterRequestAndResponseWithBody(

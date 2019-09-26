@@ -89,6 +89,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, QuicHttpIntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(QuicHttpIntegrationTest, SimpleGetRequestResponse) {
+  quic::SetVerbosityLogThreshold(1);
   testRouterHeaderOnlyRequestAndResponse();
 }
 

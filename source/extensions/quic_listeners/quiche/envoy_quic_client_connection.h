@@ -19,7 +19,7 @@ public:
                             const quic::ParsedQuicVersionVector& supported_versions,
                             Network::Address::InstanceConstSharedPtr local_addr,
                             Event::Dispatcher& dispatcher,
-    const Network::ConnectionSocket::OptionsSharedPtr& options);
+                            const Network::ConnectionSocket::OptionsSharedPtr& options);
 
   // Overridden to un-register all file events.
   ~EnvoyQuicClientConnection() override;

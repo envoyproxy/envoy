@@ -17,8 +17,8 @@
 namespace Envoy {
 namespace Quic {
 
-class EnvoyQuicClientSession : public quic::QuicSpdyClientSession,
-                               public QuicFilterManagerConnectionImpl,
+class EnvoyQuicClientSession : public QuicFilterManagerConnectionImpl,
+                               public quic::QuicSpdyClientSession,
                                public Network::ClientConnection {
 public:
   EnvoyQuicClientSession(const quic::QuicConfig& config,
