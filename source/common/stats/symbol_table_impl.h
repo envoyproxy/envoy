@@ -176,9 +176,6 @@ private:
   // This must be held during both encode() and free().
   mutable Thread::MutexBasicLockable lock_;
 
-  // This must be held while updating stat_name_sets_.
-  mutable Thread::MutexBasicLockable stat_name_set_mutex_;
-
   /**
    * Decodes a vector of symbols back into its period-delimited stat name. If
    * decoding fails on any part of the symbol_vec, we release_assert and crash
@@ -244,7 +241,7 @@ private:
   // TODO(ambuc): There might be an optimization here relating to storing ranges of freed symbols
   // using an Envoy::IntervalSet.
   std::stack<Symbol> pool_ GUARDED_BY(lock_);
-  absl::flat_hash_set<StatNameSet*> stat_name_sets_ GUARDED_BY(stat_name_set_mutex_);
+  absl::flat_hash_set<StatNameSet*> stat_name_sets_ GUARDED_BY(lock_);
 };
 
 /**

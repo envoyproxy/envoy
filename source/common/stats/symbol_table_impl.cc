@@ -208,7 +208,7 @@ void SymbolTableImpl::free(const StatName& stat_name) {
 }
 
 StatNameSetPtr SymbolTableImpl::makeSet(absl::string_view name) {
-  Thread::LockGuard lock(stat_name_set_mutex_);
+  Thread::LockGuard lock(lock_);
   // make_unique does not work with private ctor, even though FakeSymbolTableImpl is a friend.
   StatNameSetPtr stat_name_set(new StatNameSet(*this, name));
   stat_name_sets_.insert(stat_name_set.get());
@@ -216,7 +216,7 @@ StatNameSetPtr SymbolTableImpl::makeSet(absl::string_view name) {
 }
 
 void SymbolTableImpl::forgetSet(StatNameSet& stat_name_set) {
-  Thread::LockGuard lock(stat_name_set_mutex_);
+  Thread::LockGuard lock(lock_);
   stat_name_sets_.erase(&stat_name_set);
 }
 
