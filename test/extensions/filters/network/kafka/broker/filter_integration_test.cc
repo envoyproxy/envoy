@@ -6,6 +6,7 @@
 #include "extensions/filters/network/kafka/external/responses.h"
 
 #include "test/extensions/filters/network/kafka/buffer_based_test.h"
+#include "test/extensions/filters/network/kafka/message_utilities.h"
 #include "test/test_common/test_time.h"
 
 #include "gtest/gtest.h"
@@ -118,6 +119,35 @@ TEST_F(KafkaBrokerFilterIntegrationTest, shouldAbortOnUnregisteredResponse) {
 
   // then
   ASSERT_EQ(result, Network::FilterStatus::StopIteration);
+}
+
+TEST_F(KafkaBrokerFilterIntegrationTest, shouldProcessMessages) {
+  // given
+  // For every request/response type & version, put a corresponding request into the buffer.
+  for (const AbstractRequestSharedPtr& message : MessageUtilities::makeAllRequests()) {
+    RequestB::putMessageIntoBuffer(*message);
+  }
+  for (const AbstractResponseSharedPtr& message : MessageUtilities::makeAllResponses()) {
+    ResponseB::putMessageIntoBuffer(*message);
+  }
+
+  // when
+  const Network::FilterStatus result1 = consumeRequestFromBuffer();
+  const Network::FilterStatus result2 = consumeResponseFromBuffer();
+
+  // then
+  ASSERT_EQ(result1, Network::FilterStatus::Continue);
+  ASSERT_EQ(result2, Network::FilterStatus::Continue);
+
+  // Also, assert that every message type has been processed properly.
+  for (int16_t i = 0; i < MessageUtilities::apiKeys(); ++i) {
+    // We should have received one request per api version.
+    const Stats::Counter& request_counter = scope_.counter(MessageUtilities::requestMetric(i));
+    ASSERT_EQ(request_counter.value(), MessageUtilities::requestApiVersions(i));
+    // We should have received one response per api version.
+    const Stats::Counter& response_counter = scope_.counter(MessageUtilities::responseMetric(i));
+    ASSERT_EQ(response_counter.value(), MessageUtilities::responseApiVersions(i));
+  }
 }
 
 } // namespace Broker
