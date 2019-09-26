@@ -326,9 +326,9 @@ void ConnectionImpl::readDisable(bool disable) {
     file_event_->setEnabled(Event::FileReadyType::Read | Event::FileReadyType::Write);
     // If the connection has data buffered there's no guarantee there's also data in the kernel
     // which will kick off the filter chain. Instead fake an event to make sure the buffered data
-    // gets processed regardless and ensure that we push it up via onRead.
+    // gets processed regardless and ensure that we dispatch it via onRead.
     if (read_buffer_.length() > 0) {
-      force_on_read_ = true;
+      dispatch_buffered_data_ = true;
       file_event_->activate(Event::FileReadyType::Read);
     }
   }
@@ -513,12 +513,14 @@ void ConnectionImpl::onReadReady() {
   }
 
   read_end_stream_ |= result.end_stream_read_;
-  if (result.bytes_processed_ != 0 || result.end_stream_read_ || force_on_read_) {
-    force_on_read_ = false;
-    // Skip onRead if no bytes were processed unless we explicitly want to force onRead.
-    // For instance, skip onRead if the connection was closed without producing more data.
+  if (result.bytes_processed_ != 0 || result.end_stream_read_ ||
+      (dispatch_buffered_data_ && read_buffer_.length() > 0)) {
+    // Skip onRead if no bytes were processed unless we explicitly want to force onRead for
+    // buffered data. For instance, skip onRead if the connection was closed without producing
+    // more data.
     onRead(new_buffer_size);
   }
+  dispatch_buffered_data_ = false;
 
   // The read callback may have already closed the connection.
   if (result.action_ == PostIoAction::Close || bothSidesHalfClosed()) {

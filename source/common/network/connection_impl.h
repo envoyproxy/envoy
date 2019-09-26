@@ -219,7 +219,7 @@ private:
   bool read_end_stream_ : 1;
   bool write_end_stream_ : 1;
   bool current_write_end_stream_ : 1;
-  bool force_on_read_ : 1;
+  bool dispatch_buffered_data_ : 1;
 };
 
 /**
