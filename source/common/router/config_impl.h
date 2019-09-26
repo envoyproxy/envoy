@@ -18,6 +18,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/config/metadata.h"
+#include "common/http/hash_policy.h"
 #include "common/http/header_utility.h"
 #include "common/router/config_utility.h"
 #include "common/router/header_formatter.h"
@@ -283,38 +284,6 @@ private:
 };
 
 /**
- * Implementation of HashPolicy that reads from the proto route config and only currently supports
- * hashing on an HTTP header.
- */
-class HashPolicyImpl : public HashPolicy {
-public:
-  explicit HashPolicyImpl(
-      const Protobuf::RepeatedPtrField<envoy::api::v2::route::RouteAction::HashPolicy>&
-          hash_policy);
-
-  // Router::HashPolicy
-  absl::optional<uint64_t> generateHash(const Network::Address::Instance* downstream_addr,
-                                        const Http::HeaderMap& headers,
-                                        const AddCookieCallback add_cookie) const override;
-
-  class HashMethod {
-  public:
-    virtual ~HashMethod() = default;
-    virtual absl::optional<uint64_t> evaluate(const Network::Address::Instance* downstream_addr,
-                                              const Http::HeaderMap& headers,
-                                              const AddCookieCallback add_cookie) const PURE;
-
-    // If the method is a terminal method, ignore rest of the hash policy chain.
-    virtual bool terminal() const PURE;
-  };
-
-  using HashMethodPtr = std::unique_ptr<HashMethod>;
-
-private:
-  std::vector<HashMethodPtr> hash_impls_;
-};
-
-/**
  * Implementation of HedgePolicy that reads from the proto route or virtual host config.
  */
 class HedgePolicyImpl : public HedgePolicy {
@@ -415,7 +384,7 @@ public:
                               bool insert_envoy_original_path) const override;
   void finalizeResponseHeaders(Http::HeaderMap& headers,
                                const StreamInfo::StreamInfo& stream_info) const override;
-  const HashPolicy* hashPolicy() const override { return hash_policy_.get(); }
+  const Http::HashPolicy* hashPolicy() const override { return hash_policy_.get(); }
 
   const HedgePolicy& hedgePolicy() const override { return hedge_policy_; }
 
@@ -514,7 +483,7 @@ private:
     }
 
     const CorsPolicy* corsPolicy() const override { return parent_->corsPolicy(); }
-    const HashPolicy* hashPolicy() const override { return parent_->hashPolicy(); }
+    const Http::HashPolicy* hashPolicy() const override { return parent_->hashPolicy(); }
     const HedgePolicy& hedgePolicy() const override { return parent_->hedgePolicy(); }
     Upstream::ResourcePriority priority() const override { return parent_->priority(); }
     const RateLimitPolicy& rateLimitPolicy() const override { return parent_->rateLimitPolicy(); }
@@ -679,7 +648,7 @@ private:
 
   UpgradeMap upgrade_map_;
   const uint64_t total_cluster_weight_;
-  std::unique_ptr<const HashPolicyImpl> hash_policy_;
+  std::unique_ptr<const Http::HashPolicyImpl> hash_policy_;
   MetadataMatchCriteriaConstPtr metadata_match_criteria_;
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;

@@ -158,6 +158,7 @@ def envoy_dependencies(skip_targets = []):
     _com_google_cel_cpp()
     _repository_impl("bazel_toolchains")
     _repository_impl("bazel_compdb")
+    _repository_impl("envoy_build_tools")
 
     _python_deps()
     _cc_deps()
