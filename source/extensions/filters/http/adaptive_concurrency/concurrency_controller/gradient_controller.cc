@@ -3,7 +3,7 @@
 #include <atomic>
 #include <chrono>
 
-#include "envoy/config/filter/http/adaptive_concurrency/v3alpha/adaptive_concurrency.pb.h"
+#include "envoy/config/filter/http/adaptive_concurrency/v2alpha/adaptive_concurrency.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats.h"
@@ -23,7 +23,7 @@ namespace AdaptiveConcurrency {
 namespace ConcurrencyController {
 
 GradientControllerConfig::GradientControllerConfig(
-    const envoy::config::filter::http::adaptive_concurrency::v3alpha::GradientControllerConfig&
+    const envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig&
         proto_config)
     : min_rtt_calc_interval_(std::chrono::milliseconds(
           DurationUtil::durationToMilliseconds(proto_config.min_rtt_calc_params().interval()))),
@@ -107,13 +107,13 @@ void GradientController::updateMinRTT() {
       applyJitter(config_->minRTTCalcInterval(), config_->jitterPercent()));
 }
 
-std::chrono::milliseconds GradientController::applyJitter(const std::chrono::milliseconds& interval,
-                                                          const double jitter_pct) {
+std::chrono::milliseconds GradientController::applyJitter(std::chrono::milliseconds interval,
+                                                          double jitter_pct) const {
   if (jitter_pct == 0) {
     return interval;
   }
 
-  const int jitter_range_ms = interval.count() * jitter_pct;
+  const uint32_t jitter_range_ms = interval.count() * jitter_pct;
   return std::chrono::milliseconds(interval.count() + random_.random() % jitter_range_ms);
 }
 

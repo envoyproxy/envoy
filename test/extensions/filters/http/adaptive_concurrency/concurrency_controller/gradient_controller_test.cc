@@ -1,8 +1,8 @@
 #include <chrono>
 #include <iostream>
 
-#include "envoy/config/filter/http/adaptive_concurrency/v3alpha/adaptive_concurrency.pb.h"
-#include "envoy/config/filter/http/adaptive_concurrency/v3alpha/adaptive_concurrency.pb.validate.h"
+#include "envoy/config/filter/http/adaptive_concurrency/v2alpha/adaptive_concurrency.pb.h"
+#include "envoy/config/filter/http/adaptive_concurrency/v2alpha/adaptive_concurrency.pb.validate.h"
 
 #include "common/stats/isolated_store_impl.h"
 
@@ -48,9 +48,9 @@ public:
 
 protected:
   GradientControllerConfigSharedPtr makeConfig(const std::string& yaml_config) {
-    envoy::config::filter::http::adaptive_concurrency::v3alpha::GradientControllerConfig proto =
+    envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig proto =
         TestUtility::parseYaml<
-            envoy::config::filter::http::adaptive_concurrency::v3alpha::GradientControllerConfig>(
+            envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig>(
             yaml_config);
     return std::make_shared<GradientControllerConfig>(proto);
   }
@@ -68,7 +68,7 @@ protected:
                               const std::string& yaml_config,
                               std::chrono::milliseconds latency = std::chrono::milliseconds(5)) {
     const auto config = makeConfig(yaml_config);
-    for (uint32_t idx = 0; idx <= config->minRTTAggregateRequestCount(); ++idx) {
+    for (uint32_t i = 0; i <= config->minRTTAggregateRequestCount(); ++i) {
       tryForward(controller, true);
       controller->recordLatencySample(latency);
     }
@@ -99,9 +99,9 @@ min_rtt_calc_params:
   request_count: 52
 )EOF";
 
-  envoy::config::filter::http::adaptive_concurrency::v3alpha::GradientControllerConfig proto =
+  envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig proto =
       TestUtility::parseYaml<
-          envoy::config::filter::http::adaptive_concurrency::v3alpha::GradientControllerConfig>(
+          envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig>(
           yaml);
   GradientControllerConfig config(proto);
 
@@ -124,9 +124,9 @@ min_rtt_calc_params:
     seconds: 31
 )EOF";
 
-  envoy::config::filter::http::adaptive_concurrency::v3alpha::GradientControllerConfig proto =
+  envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig proto =
       TestUtility::parseYaml<
-          envoy::config::filter::http::adaptive_concurrency::v3alpha::GradientControllerConfig>(
+          envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig>(
           yaml);
   GradientControllerConfig config(proto);
 
@@ -167,7 +167,7 @@ min_rtt_calc_params:
   controller->recordLatencySample(min_rtt);
 
   // 49 more requests should cause the minRTT to be done calculating.
-  for (int idx = 0; idx < 49; ++idx) {
+  for (int i = 0; i < 49; ++i) {
     EXPECT_EQ(controller->concurrencyLimit(), 1);
     tryForward(controller, true);
     tryForward(controller, false);
@@ -198,9 +198,9 @@ min_rtt_calc_params:
 
   auto controller = makeController(yaml);
 
-  for (int idx = 1; idx <= 5; ++idx) {
+  for (int i = 1; i <= 5; ++i) {
     tryForward(controller, true);
-    controller->recordLatencySample(std::chrono::milliseconds(idx));
+    controller->recordLatencySample(std::chrono::milliseconds(i));
   }
   EXPECT_EQ(
       3, stats_.gauge("test_prefix.min_rtt_msecs", Stats::Gauge::ImportMode::NeverImport).value());
@@ -266,7 +266,7 @@ min_rtt_calc_params:
   // Ensure that it grows.
   for (int recalcs = 0; recalcs < 10; ++recalcs) {
     const auto last_concurrency = controller->concurrencyLimit();
-    for (int idx = 1; idx <= 5; ++idx) {
+    for (int i = 1; i <= 5; ++i) {
       tryForward(controller, true);
       controller->recordLatencySample(std::chrono::milliseconds(4));
     }
@@ -278,7 +278,7 @@ min_rtt_calc_params:
   // Verify that the concurrency limit can now shrink as necessary.
   for (int recalcs = 0; recalcs < 10; ++recalcs) {
     const auto last_concurrency = controller->concurrencyLimit();
-    for (int idx = 1; idx <= 5; ++idx) {
+    for (int i = 1; i <= 5; ++i) {
       tryForward(controller, true);
       controller->recordLatencySample(std::chrono::milliseconds(6));
     }
@@ -317,7 +317,7 @@ min_rtt_calc_params:
       AllOf(Ge(4950), Le(5050)));
 
   // Now verify max gradient value by forcing dramatically faster latency measurements..
-  for (int idx = 1; idx <= 5; ++idx) {
+  for (int i = 1; i <= 5; ++i) {
     tryForward(controller, true);
     controller->recordLatencySample(std::chrono::milliseconds(4));
   }
@@ -353,7 +353,7 @@ min_rtt_calc_params:
   // Force the limit calculation to run a few times from some measurements.
   for (int sample_iters = 0; sample_iters < 5; ++sample_iters) {
     const auto last_concurrency = controller->concurrencyLimit();
-    for (int idx = 1; idx <= 5; ++idx) {
+    for (int i = 1; i <= 5; ++i) {
       tryForward(controller, true);
       controller->recordLatencySample(std::chrono::milliseconds(4));
     }
@@ -371,7 +371,7 @@ min_rtt_calc_params:
   EXPECT_EQ(controller->concurrencyLimit(), 1);
 
   // 49 more requests should cause the minRTT to be done calculating.
-  for (int idx = 0; idx < 5; ++idx) {
+  for (int i = 0; i < 5; ++i) {
     EXPECT_EQ(controller->concurrencyLimit(), 1);
     tryForward(controller, true);
     controller->recordLatencySample(std::chrono::milliseconds(13));
@@ -407,7 +407,7 @@ min_rtt_calc_params:
   // Force the limit calculation to run a few times from some measurements.
   for (int sample_iters = 0; sample_iters < 5; ++sample_iters) {
     const auto last_concurrency = controller->concurrencyLimit();
-    for (int idx = 1; idx <= 5; ++idx) {
+    for (int i = 1; i <= 5; ++i) {
       tryForward(controller, true);
       controller->recordLatencySample(std::chrono::milliseconds(4));
     }
@@ -454,7 +454,7 @@ min_rtt_calc_params:
   // Force the limit calculation to run a few times from some measurements.
   for (int sample_iters = 0; sample_iters < 5; ++sample_iters) {
     const auto last_concurrency = controller->concurrencyLimit();
-    for (int idx = 1; idx <= 5; ++idx) {
+    for (int i = 1; i <= 5; ++i) {
       tryForward(controller, true);
       controller->recordLatencySample(std::chrono::milliseconds(4));
     }
@@ -510,7 +510,7 @@ min_rtt_calc_params:
   // random value > 10% of the interval.
   EXPECT_CALL(random_, random()).WillOnce(Return(15000));
   EXPECT_CALL(*rtt_timer, enableTimer(std::chrono::milliseconds(105000), _));
-  for (int idx = 0; idx < 6; ++idx) {
+  for (int i = 0; i < 6; ++i) {
     tryForward(controller, true);
     controller->recordLatencySample(std::chrono::milliseconds(5));
   }
@@ -549,7 +549,7 @@ min_rtt_calc_params:
 
   // Set the minRTT- this will trigger the timer for the next minRTT calculation.
   EXPECT_CALL(*rtt_timer, enableTimer(std::chrono::milliseconds(45000), _));
-  for (int idx = 0; idx < 6; ++idx) {
+  for (int i = 0; i < 6; ++i) {
     tryForward(controller, true);
     controller->recordLatencySample(std::chrono::milliseconds(5));
   }
