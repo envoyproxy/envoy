@@ -20,5 +20,8 @@ apple_static_framework_import(
         "resolv.9",
         "c++",
     ],
+    sdk_frameworks = [
+        "SystemConfiguration",
+    ],
     visibility = ["//visibility:public"],
 )

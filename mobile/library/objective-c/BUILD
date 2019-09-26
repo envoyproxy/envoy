@@ -14,6 +14,7 @@ objc_library(
         "EnvoyEngineImpl.m",
         "EnvoyHTTPCallbacks.m",
         "EnvoyHTTPStreamImpl.m",
+        "EnvoyNetworkMonitor.m",
     ],
     hdrs = [
         "EnvoyEngine.h",
