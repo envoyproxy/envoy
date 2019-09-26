@@ -4463,6 +4463,8 @@ TEST_F(RouterTestChildSpan, ResetFlow) {
   Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
   response_decoder->decodeHeaders(std::move(response_headers), false);
 
+  // The reset occurs after the upstream response, so the span has a valid status code but also an
+  // error.
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.0")));
@@ -4479,7 +4481,7 @@ TEST_F(RouterTestChildSpan, ResetFlow) {
 // First request times out and is retried, and then a response is received.
 // Second request is then cancelled: we don't attempt to retry because we already retried for
 // timeout.
-TEST_F(RouterTestChildSpan, RetryOnlyOnceForSameUpstreamRequest) {
+TEST_F(RouterTestChildSpan, RetryCancelFlow) {
   enableHedgeOnPerTryTimeout();
 
   NiceMock<Http::MockStreamEncoder> encoder1;
@@ -4568,6 +4570,76 @@ TEST_F(RouterTestChildSpan, RetryOnlyOnceForSameUpstreamRequest) {
       putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, absl::optional<uint64_t>(504)));
 
   response_timeout_->invokeCallback();
+}
+
+// Make sure child spans start/inject/finish with retry flow.
+// The first request will fail because of an upstream reset, so the span will be annotated with the
+// reset reason. The second request will succeed, so the span will be annotated with 200 OK.
+TEST_F(RouterTestChildSpan, ResetRetryFlow) {
+  NiceMock<Http::MockStreamEncoder> encoder1;
+  Http::StreamDecoder* response_decoder = nullptr;
+  Tracing::MockSpan* child_span_1{new Tracing::MockSpan()};
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder = &decoder;
+        EXPECT_CALL(*child_span_1, injectContext(_));
+        callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+        return nullptr;
+      }));
+  expectResponseTimerCreate();
+
+  Http::TestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  EXPECT_CALL(callbacks_.active_span_, spawnChild_(_, "router fake_cluster egress", _))
+      .WillOnce(Return(child_span_1));
+  EXPECT_CALL(callbacks_, tracingConfig());
+  router_.decodeHeaders(headers, true);
+
+  EXPECT_CALL(*child_span_1,
+              setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
+  EXPECT_CALL(*child_span_1, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.0")));
+  EXPECT_CALL(*child_span_1, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
+  EXPECT_CALL(*child_span_1, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("0")));
+  EXPECT_CALL(*child_span_1, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("UR")));
+  EXPECT_CALL(*child_span_1, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)))
+      .Times(2);
+  EXPECT_CALL(*child_span_1, setTag(Eq(Tracing::Tags::get().ErrorReason), Eq("remote reset")));
+  EXPECT_CALL(*child_span_1, finishSpan());
+
+  router_.retry_state_->expectResetRetry();
+  encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
+
+  // We expect this reset to kick off a new request.
+  NiceMock<Http::MockStreamEncoder> encoder2;
+  Tracing::MockSpan* child_span_2{new Tracing::MockSpan()};
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder = &decoder;
+        EXPECT_CALL(*child_span_2, injectContext(_));
+        EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
+        callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_);
+        return nullptr;
+      }));
+
+  EXPECT_CALL(callbacks_.active_span_, spawnChild_(_, "router fake_cluster egress", _))
+      .WillOnce(Return(child_span_2));
+  EXPECT_CALL(callbacks_, tracingConfig());
+  EXPECT_CALL(*child_span_2, setTag(Eq(Tracing::Tags::get().RetryCount), Eq("1")));
+
+  router_.retry_state_->callback_();
+
+  // Normal response.
+  Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
+  EXPECT_CALL(*child_span_2,
+              setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
+  EXPECT_CALL(*child_span_2, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.0")));
+  EXPECT_CALL(*child_span_2, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
+  EXPECT_CALL(*child_span_2, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
+  EXPECT_CALL(*child_span_2, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
+  EXPECT_CALL(*child_span_2, finishSpan());
+  response_decoder->decodeHeaders(std::move(response_headers), true);
 }
 
 Protobuf::RepeatedPtrField<std::string> protobufStrList(const std::vector<std::string>& v) {
