@@ -152,8 +152,8 @@ private:
   // be accessed from a thread other than the event_dispatcher's own thread.
   Thread::MutexBasicLockable dispatch_lock_;
   std::list<Event::PostCb> init_queue_ GUARDED_BY(dispatch_lock_);
-  Event::Dispatcher* event_dispatcher_ GUARDED_BY(dispatch_lock_);
-  Upstream::ClusterManager* cluster_manager_ GUARDED_BY(dispatch_lock_);
+  Event::Dispatcher* event_dispatcher_ GUARDED_BY(dispatch_lock_){};
+  Upstream::ClusterManager* cluster_manager_ GUARDED_BY(dispatch_lock_){};
   std::unordered_map<envoy_stream_t, DirectStreamPtr> streams_;
   std::atomic<envoy_network_t>& preferred_network_;
 };
