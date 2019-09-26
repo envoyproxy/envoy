@@ -238,7 +238,7 @@ public:
   /**
    * Sets the binary's annotation type.
    */
-  void setAnnotationType(AnnotationType annotationType) { annotation_type_ = annotationType; }
+  void setAnnotationType(AnnotationType annotation_type) { annotation_type_ = annotation_type; }
 
   /**
    * @return the annotation's endpoint attribute.

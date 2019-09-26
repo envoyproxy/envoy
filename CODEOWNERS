@@ -59,3 +59,30 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/common/wasm @jplevyak @PiotrSikora
 # common crypto extension
 /*/extensions/common/crypto @lizan @PiotrSikora @bdecoste
+/*/extensions/filters/http/grpc_http1_bridge @snowp @jose
+/*/extensions/filters/http/gzip @gsagula @dio
+/*/extensions/filters/http/fault @rshriram @alyssawilk
+/*/extensions/filters/common/fault @rshriram @alyssawilk
+/*/extensions/filters/http/grpc_json_transcoder @qiwzhang @lizan
+/*/extensions/filters/http/router @alyssawilk @mattklein123 @snowp
+/*/extensions/filters/http/ext_authz @gsagula @dio
+/*/extensions/filters/http/grpc_web @fengli79 @lizan
+/*/extensions/filters/http/squash @yuval-k @alyssawilk
+/*/extensions/filters/common/ext_authz @gsagula @dio
+/*/extensions/filters/common/original_src @klarose @snowp
+/*/extensions/filters/listener/tls_inspector @piotrsikora @htuch
+/*/extensions/grpc_credentials/example @wozz @htuch
+/*/extensions/grpc_credentials/file_based_metadata @wozz @htuch
+/*/extensions/stat_sinks/dog_statsd @taiki45 @jmarantz
+/*/extensions/stat_sinks/hystrix @trabetti @jmarantz
+/*/extensions/stat_sinks/metrics_service @ramaraochavali @jmarantz
+/*/extensions/resource_monitors/injected_resource @eziskind @htuch
+/*/extensions/resource_monitors/common @eziskind @htuch
+/*/extensions/resource_monitors/fixed_heap @eziskind @htuch
+/*/extensions/retry/priority @snowp @alyssawilk
+/*/extensions/retry/priority/previous_priorities @snowp @alyssawilk
+/*/extensions/retry/host @snowp @alyssawilk
+/*/extensions/filters/network/http_connection_manager @alyssawilk @mattklein123
+/*/extensions/filters/network/ext_authz @gsagula @dio
+/*/extensions/filters/network/tcp_proxy @alyssawilk @zuercher
+/*/extensions/filters/network/echo @htuch @alyssawilk

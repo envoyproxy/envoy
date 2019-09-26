@@ -155,8 +155,8 @@ protected:
     ON_CALL(random_, random()).WillByDefault(Return(0));
   }
 
-  void expectRedisResolve(bool createClient = false) {
-    if (createClient) {
+  void expectRedisResolve(bool create_client = false) {
+    if (create_client) {
       client_ = new Extensions::NetworkFilters::Common::Redis::Client::MockClient();
       EXPECT_CALL(*this, create_(_)).WillOnce(Return(client_));
       EXPECT_CALL(*client_, addConnectionCallbacks(_));

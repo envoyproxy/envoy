@@ -579,7 +579,7 @@ bool ContextImpl::verifySubjectAltName(X509* cert,
       ASN1_STRING* str = san->d.dNSName;
       const char* dns_name = reinterpret_cast<const char*>(ASN1_STRING_data(str));
       for (auto& config_san : subject_alt_names) {
-        if (dNSNameMatch(config_san, dns_name)) {
+        if (dnsNameMatch(config_san, dns_name)) {
           return true;
         }
       }
@@ -626,16 +626,16 @@ bool ContextImpl::verifySubjectAltName(X509* cert,
   return false;
 }
 
-bool ContextImpl::dNSNameMatch(const std::string& dNSName, const char* pattern) {
-  if (dNSName == pattern) {
+bool ContextImpl::dnsNameMatch(const std::string& dns_name, const char* pattern) {
+  if (dns_name == pattern) {
     return true;
   }
 
   size_t pattern_len = strlen(pattern);
   if (pattern_len > 1 && pattern[0] == '*' && pattern[1] == '.') {
-    if (dNSName.length() > pattern_len - 1) {
-      size_t off = dNSName.length() - pattern_len + 1;
-      return dNSName.compare(off, pattern_len - 1, pattern + 1) == 0;
+    if (dns_name.length() > pattern_len - 1) {
+      size_t off = dns_name.length() - pattern_len + 1;
+      return dns_name.compare(off, pattern_len - 1, pattern + 1) == 0;
     }
   }
 

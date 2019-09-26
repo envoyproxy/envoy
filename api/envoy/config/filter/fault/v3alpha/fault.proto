@@ -28,10 +28,9 @@ message FaultDelay {
   message HeaderDelay {
   }
 
-  reserved 2;
+  reserved 2, 1;
 
-  // Unused and deprecated. Will be removed in the next release.
-  FaultDelayType type = 1 [deprecated = true];
+  reserved "type";
 
   oneof fault_delay_secifier {
     option (validate.required) = true;
