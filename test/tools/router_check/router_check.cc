@@ -18,6 +18,10 @@ int main(int argc, char* argv[]) {
       checktool.setShowDetails();
     }
 
+    if (options.onlyShowFailures()) {
+      checktool.setOnlyShowFailures();
+    }
+
     bool is_equal = options.isProto()
                         ? checktool.compareEntries(options.testPath())
                         : checktool.compareEntriesInJson(options.unlabelledTestPath());

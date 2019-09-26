@@ -335,6 +335,8 @@ public:
   ~MockConnectionHandler() override;
 
   MOCK_METHOD0(numConnections, uint64_t());
+  MOCK_METHOD0(incNumConnections, void());
+  MOCK_METHOD0(decNumConnections, void());
   MOCK_METHOD1(addListener, void(ListenerConfig& config));
   MOCK_METHOD1(findListenerByAddress,
                Network::Listener*(const Network::Address::Instance& address));

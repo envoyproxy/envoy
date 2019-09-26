@@ -324,7 +324,9 @@ public:
   ServerLifecycleNotifier& lifecycleNotifier() override {
     return parent_.server_.lifecycleNotifier();
   }
-  ProcessContext& processContext() override { return parent_.server_.processContext(); }
+  absl::optional<std::reference_wrapper<ProcessContext>> processContext() override {
+    return parent_.server_.processContext();
+  }
 
   // Network::DrainDecision
   bool drainClose() const override;

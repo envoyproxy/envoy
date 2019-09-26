@@ -115,13 +115,13 @@ private:
   const std::chrono::milliseconds loop_interval_;
   Stats::Counter& watchdog_miss_counter_;
   Stats::Counter& watchdog_megamiss_counter_;
-  std::vector<WatchedDog> watched_dogs_ GUARDED_BY(wd_lock_);
+  std::vector<WatchedDog> watched_dogs_ ABSL_GUARDED_BY(wd_lock_);
   Thread::MutexBasicLockable wd_lock_;
   Thread::ThreadPtr thread_;
   Event::DispatcherPtr dispatcher_;
   Event::TimerPtr loop_timer_;
   Thread::MutexBasicLockable mutex_;
-  bool run_thread_ GUARDED_BY(mutex_);
+  bool run_thread_ ABSL_GUARDED_BY(mutex_);
 };
 
 } // namespace Server

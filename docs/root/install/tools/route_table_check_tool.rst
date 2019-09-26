@@ -37,6 +37,9 @@ Usage
     -d,  --details
       Show detailed test execution results. The first line indicates the test name.
 
+    --only-show-failures
+      Displays test results for failed tests. Omits test names for passing tests if the details flag is set.
+
     -p,  --useproto
       Use Proto test file schema
 

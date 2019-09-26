@@ -91,8 +91,9 @@ message Policy {
   // Principal with the `any` field set to true should be used.
   repeated Principal principals = 2 [(validate.rules).repeated .min_items = 1];
 
-  // An optional symbolic expression specifying an access control condition.
-  // The condition is combined with AND semantics.
+  // An optional symbolic expression specifying an access control
+  // :ref:`condition <arch_overview_condition>`. The condition is combined
+  // with the permissions and the principals as a clause with AND semantics.
   google.api.expr.v1alpha1.Expr condition = 3;
 }
 

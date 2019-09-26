@@ -202,9 +202,20 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
         std::make_unique<Buffer::OwnedImpl>(request.attributes().request().http().body());
   }
 
-  request_ = cm_.httpAsyncClientForCluster(config_->cluster())
-                 .send(std::move(message), *this,
-                       Http::AsyncClient::RequestOptions().setTimeout(config_->timeout()));
+  const std::string& cluster = config_->cluster();
+
+  // It's possible that the cluster specified in the filter configuration no longer exists due to a
+  // CDS removal.
+  if (cm_.get(cluster) == nullptr) {
+    // TODO(dio): Add stats and tracing related to this.
+    ENVOY_LOG(debug, "ext_authz cluster '{}' does not exist", cluster);
+    callbacks_->onComplete(std::make_unique<Response>(errorResponse()));
+    callbacks_ = nullptr;
+  } else {
+    request_ = cm_.httpAsyncClientForCluster(cluster).send(
+        std::move(message), *this,
+        Http::AsyncClient::RequestOptions().setTimeout(config_->timeout()));
+  }
 }
 
 void RawHttpClientImpl::onSuccess(Http::MessagePtr&& message) {

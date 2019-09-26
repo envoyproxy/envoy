@@ -153,7 +153,7 @@ protected:
   Network::Address::InstanceConstSharedPtr health_check_address_;
   std::atomic<bool> canary_;
   mutable absl::Mutex metadata_mutex_;
-  std::shared_ptr<envoy::api::v2::core::Metadata> metadata_ GUARDED_BY(metadata_mutex_);
+  std::shared_ptr<envoy::api::v2::core::Metadata> metadata_ ABSL_GUARDED_BY(metadata_mutex_);
   const envoy::api::v2::core::Locality locality_;
   Stats::StatNameManagedStorage locality_zone_stat_name_;
   Stats::IsolatedStoreImpl stats_store_;

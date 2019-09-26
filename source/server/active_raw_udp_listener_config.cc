@@ -12,6 +12,10 @@ Network::ConnectionHandler::ActiveListenerPtr ActiveRawUdpListenerFactory::creat
   return std::make_unique<ActiveUdpListener>(dispatcher, config);
 }
 
+ProtobufTypes::MessagePtr ActiveRawUdpListenerConfigFactory::createEmptyConfigProto() {
+  return std::make_unique<ProtobufWkt::Empty>();
+}
+
 Network::ActiveUdpListenerFactoryPtr
 ActiveRawUdpListenerConfigFactory::createActiveUdpListenerFactory(
     const Protobuf::Message& /*message*/) {

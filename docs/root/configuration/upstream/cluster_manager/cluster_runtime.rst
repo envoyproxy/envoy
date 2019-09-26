@@ -102,6 +102,31 @@ outlier_detection.success_rate_stdev_factor
   <envoy_api_field_cluster.OutlierDetection.success_rate_stdev_factor>`
   setting in outlier detection
 
+outlier_detection.enforcing_failure_percentage
+  :ref:`enforcing_failure_percentage
+  <envoy_api_field_cluster.OutlierDetection.enforcing_failure_percentage>`
+  setting in outlier detection
+
+outlier_detection.enforcing_failure_percentage_local_origin
+  :ref:`enforcing_failure_percentage_local_origin
+  <envoy_api_field_cluster.OutlierDetection.enforcing_failure_percentage_local_origin>`
+  setting in outlier detection
+
+outlier_detection.failure_percentage_request_volume
+  :ref:`failure_percentage_request_volume
+  <envoy_api_field_cluster.OutlierDetection.failure_percentage_request_volume>`
+  setting in outlier detection
+
+outlier_detection.failure_percentage_minimum_hosts
+  :ref:`failure_percentage_minimum_hosts
+  <envoy_api_field_cluster.OutlierDetection.failure_percentage_minimum_hosts>`
+  setting in outlier detection
+
+outlier_detection.failure_percentage_threshold
+  :ref:`failure_percentage_threshold
+  <envoy_api_field_cluster.OutlierDetection.failure_percentage_threshold>`
+  setting in outlier detection
+
 Core
 ----
 

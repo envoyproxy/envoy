@@ -184,10 +184,6 @@ OriginalDstClusterFactory::createClusterImpl(
         envoy::api::v2::Cluster_LbPolicy_Name(cluster.lb_policy()),
         envoy::api::v2::Cluster_DiscoveryType_Name(cluster.type())));
   }
-  if (cluster.has_lb_subset_config() && cluster.lb_subset_config().subset_selectors_size() != 0) {
-    throw EnvoyException(
-        fmt::format("cluster: cluster type 'original_dst' may not be used with lb_subset_config"));
-  }
 
   // TODO(mattklein123): The original DST load balancer type should be deprecated and instead
   //                     the cluster should directly supply the load balancer. This will remove

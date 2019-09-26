@@ -34,6 +34,7 @@ api_proto_package(
 api_proto_library_internal(
     name = "discovery",
     srcs = ["discovery.proto"],
+    has_services = 1,
     visibility = [":friends"],
     deps = ["//envoy/api/v2/core:base"],
 )

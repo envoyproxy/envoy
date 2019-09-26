@@ -59,7 +59,8 @@ public:
 
   // Creates and starts healthcheckers to its endpoints
   void startHealthchecks(AccessLog::AccessLogManager& access_log_manager, Runtime::Loader& runtime,
-                         Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher);
+                         Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
+                         Api::Api& api);
 
   std::vector<Upstream::HealthCheckerSharedPtr> healthCheckers() { return health_checkers_; };
 

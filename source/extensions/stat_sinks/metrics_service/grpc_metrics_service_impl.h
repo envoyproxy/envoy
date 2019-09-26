@@ -80,7 +80,7 @@ public:
 
   void flushCounter(const Stats::Counter& counter);
   void flushGauge(const Stats::Gauge& gauge);
-  void flushHistogram(const Stats::ParentHistogram& histogram);
+  void flushHistogram(const Stats::ParentHistogram& envoy_histogram);
 
 private:
   GrpcMetricsStreamerSharedPtr grpc_metrics_streamer_;

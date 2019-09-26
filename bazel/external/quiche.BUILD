@@ -59,6 +59,8 @@ quiche_copt = [
     "-Wno-type-limits",
     # quic_inlined_frame.h uses offsetof() to optimize memory usage in frames.
     "-Wno-invalid-offsetof",
+    "-Wno-type-limits",
+    "-Wno-return-type",
 ]
 
 envoy_cc_test_library(
@@ -2014,6 +2016,7 @@ envoy_cc_library(
     copts = quiche_copt,
     repository = "@envoy",
     tags = ["nofips"],
+    visibility = ["//visibility:public"],
     deps = [
         ":quic_core_packets_lib",
         ":quic_platform_base",

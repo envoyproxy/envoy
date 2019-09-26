@@ -6,6 +6,7 @@ py_binary(
     python_version = "PY3",
     visibility = ["//visibility:public"],
     deps = [
+        "//tools/api_proto_plugin",
         "@com_envoyproxy_protoc_gen_validate//validate:validate_py",
         "@com_google_protobuf//:protobuf_python",
     ],

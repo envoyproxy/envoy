@@ -2,9 +2,11 @@ load("@com_google_protobuf//:protobuf.bzl", _py_proto_library = "py_proto_librar
 load("@com_envoyproxy_protoc_gen_validate//bazel:pgv_proto_library.bzl", "pgv_cc_proto_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_grpc_library", "go_proto_library")
 load("@io_bazel_rules_go//go:def.bzl", "go_test")
+load("@com_github_grpc_grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
 
 _PY_SUFFIX = "_py"
 _CC_SUFFIX = "_cc"
+_CC_GRPC_SUFFIX = "_cc_grpc"
 _CC_EXPORT_SUFFIX = "_export_cc"
 _GO_PROTO_SUFFIX = "_go_proto"
 _GO_IMPORTPATH_PREFIX = "github.com/envoyproxy/data-plane-api/api/"
@@ -32,12 +34,10 @@ def _LibrarySuffix(library_name, suffix):
         library_name += ":" + Label(library_name).name
     return _Suffix(library_name, suffix)
 
-# TODO(htuch): has_services is currently ignored but will in future support
-# gRPC stub generation.
 # TODO(htuch): Convert this to native py_proto_library once
 # https://github.com/bazelbuild/bazel/issues/3935 and/or
 # https://github.com/bazelbuild/bazel/issues/2626 are resolved.
-def api_py_proto_library(name, srcs = [], deps = [], external_py_proto_deps = [], has_services = 0):
+def api_py_proto_library(name, srcs = [], deps = [], external_py_proto_deps = []):
     _py_proto_library(
         name = _Suffix(name, _PY_SUFFIX),
         srcs = srcs,
@@ -73,6 +73,23 @@ def py_proto_library(name, deps = []):
         visibility = ["//visibility:public"],
     )
 
+def _api_cc_grpc_library(name, proto, deps = []):
+    cc_grpc_library(
+        name = name,
+        srcs = [proto],
+        deps = deps,
+        proto_only = False,
+        grpc_only = True,
+        visibility = ["//visibility:public"],
+    )
+
+def _ToCanonicalLabel(label):
+    # //my/app and //my/app:app are the same label. In places we mutate the incoming label adding different suffixes
+    # in order to generate multiple targets in a single rule. //my/app:app_grpc_cc.
+    # Skylark formatters and linters prefer the shorthand label whilst we need the latter.
+    rel = Label("//" + native.package_name()).relative(label)
+    return "//" + rel.package + ":" + rel.name
+
 # This is api_proto_library plus some logic internal to //envoy/api.
 def api_proto_library_internal(visibility = ["//visibility:private"], **kwargs):
     # //envoy/docs/build.sh needs visibility in order to generate documents.
@@ -83,8 +100,6 @@ def api_proto_library_internal(visibility = ["//visibility:private"], **kwargs):
 
     api_proto_library(visibility = visibility, **kwargs)
 
-# TODO(htuch): has_services is currently ignored but will in future support
-# gRPC stub generation.
 def api_proto_library(
         name,
         visibility = ["//visibility:private"],
@@ -96,27 +111,36 @@ def api_proto_library(
         has_services = 0,
         linkstatic = None,
         require_py = 1):
+    relative_name = ":" + name
     native.proto_library(
         name = name,
         srcs = srcs,
         deps = deps + external_proto_deps + _COMMON_PROTO_DEPS,
         visibility = visibility,
     )
+    cc_proto_library_name = _Suffix(name, _CC_SUFFIX)
     pgv_cc_proto_library(
-        name = _Suffix(name, _CC_SUFFIX),
+        name = cc_proto_library_name,
         linkstatic = linkstatic,
         cc_deps = [_LibrarySuffix(d, _CC_SUFFIX) for d in deps] + external_cc_proto_deps + [
             "@com_google_googleapis//google/api:http_cc_proto",
             "@com_google_googleapis//google/api:annotations_cc_proto",
             "@com_google_googleapis//google/rpc:status_cc_proto",
         ],
-        deps = [":" + name],
+        deps = [relative_name],
         visibility = ["//visibility:public"],
     )
     py_export_suffixes = []
-    if (require_py == 1):
-        api_py_proto_library(name, srcs, deps, external_py_proto_deps, has_services)
+    if require_py:
+        api_py_proto_library(name, srcs, deps, external_py_proto_deps)
         py_export_suffixes = ["_py", "_py_genproto"]
+
+    # Optionally define gRPC services
+    if has_services:
+        # TODO: when Python services are required, add to the below stub generations.
+        cc_grpc_name = _Suffix(name, _CC_GRPC_SUFFIX)
+        cc_proto_deps = [cc_proto_library_name] + [_Suffix(_ToCanonicalLabel(x), _CC_SUFFIX) for x in deps]
+        _api_cc_grpc_library(name = cc_grpc_name, proto = relative_name, deps = cc_proto_deps)
 
     # Allow unlimited visibility for consumers
     export_suffixes = ["", "_cc", "_cc_validate"] + py_export_suffixes

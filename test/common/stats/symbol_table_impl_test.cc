@@ -10,6 +10,7 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
+#include "absl/hash/hash_testing.h"
 #include "absl/synchronization/blocking_counter.h"
 #include "gtest/gtest.h"
 
@@ -563,6 +564,26 @@ TEST_P(StatNameTest, StatNameSet) {
   EXPECT_EQ("dynamic", table_->toString(dynamic2));
   EXPECT_EQ(dynamic2.data(), set2.getStatName("dynamic").data());
   EXPECT_NE(dynamic2.data(), dynamic.data());
+}
+
+TEST_P(StatNameTest, StatNameEmptyEquivalent) {
+  StatName empty1;
+  StatName empty2 = makeStat("");
+  StatName non_empty = makeStat("a");
+  EXPECT_EQ(empty1, empty2);
+  EXPECT_EQ(empty1.hash(), empty2.hash());
+  EXPECT_NE(empty1, non_empty);
+  EXPECT_NE(empty2, non_empty);
+  EXPECT_NE(empty1.hash(), non_empty.hash());
+  EXPECT_NE(empty2.hash(), non_empty.hash());
+}
+
+TEST_P(StatNameTest, SupportsAbslHash) {
+  EXPECT_TRUE(absl::VerifyTypeImplementsAbslHashCorrectly({
+      StatName(),
+      makeStat(""),
+      makeStat("hello.world"),
+  }));
 }
 
 // Tests the memory savings realized from using symbol tables with 1k

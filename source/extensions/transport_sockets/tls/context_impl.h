@@ -194,7 +194,7 @@ private:
   const bool allow_renegotiation_;
   const size_t max_session_keys_;
   absl::Mutex session_keys_mu_;
-  std::deque<bssl::UniquePtr<SSL_SESSION>> session_keys_ GUARDED_BY(session_keys_mu_);
+  std::deque<bssl::UniquePtr<SSL_SESSION>> session_keys_ ABSL_GUARDED_BY(session_keys_mu_);
   bool session_keys_single_use_{false};
 };
 

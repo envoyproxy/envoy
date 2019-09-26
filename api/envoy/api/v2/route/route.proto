@@ -848,7 +848,7 @@ message RouteAction {
 }
 
 // HTTP retry :ref:`architecture overview <arch_overview_http_routing_retry>`.
-// [#comment:next free field: 9]
+// [#comment:next free field: 10]
 message RetryPolicy {
   // Specifies the conditions under which retry takes place. These are the same
   // conditions documented for :ref:`config_http_filters_router_x-envoy-retry-on` and
@@ -933,6 +933,11 @@ message RetryPolicy {
   // the base interval. The documentation for :ref:`config_http_filters_router_x-envoy-max-retries`
   // describes Envoy's back-off algorithm.
   RetryBackOff retry_back_off = 8;
+
+  // HTTP headers that trigger a retry if present in the response. A retry will be
+  // triggered if any of the header matches match the upstream response headers.
+  // The field is only consulted if 'retriable-headers' retry policy is active.
+  repeated HeaderMatcher retriable_headers = 9;
 }
 
 // HTTP request hedging :ref:`architecture overview <arch_overview_http_routing_hedging>`.

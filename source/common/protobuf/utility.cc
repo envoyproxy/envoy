@@ -220,7 +220,7 @@ void MessageUtil::checkForUnexpectedFields(const Protobuf::Message& message,
       } else {
         const char fatal_error[] =
             " If continued use of this field is absolutely necessary, see "
-            "https://www.envoyproxy.io/docs/envoy/latest/configuration/runtime"
+            "https://www.envoyproxy.io/docs/envoy/latest/configuration/operations/runtime"
             "#using-runtime-overrides-for-deprecated-features for how to apply a temporary and "
             "highly discouraged override.";
         throw ProtoValidationException(err + fatal_error, message);

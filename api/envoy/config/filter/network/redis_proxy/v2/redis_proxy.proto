@@ -88,6 +88,10 @@ message RedisProxy {
     // downstream unchanged. This limit defaults to 100.
     google.protobuf.UInt32Value max_upstream_unknown_connections = 6;
 
+    // Enable per-command statistics per upstream cluster, in addition to the filter level aggregate
+    // count.
+    bool enable_command_stats = 8;
+
     // ReadPolicy controls how Envoy routes read commands to Redis nodes. This is currently
     // supported for Redis Cluster. All ReadPolicy settings except MASTER may return stale data
     // because replication is asynchronous and requires some delay. You need to ensure that your

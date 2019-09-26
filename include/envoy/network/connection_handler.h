@@ -27,6 +27,19 @@ public:
   virtual uint64_t numConnections() PURE;
 
   /**
+   * Increment the return value of numConnections() by one.
+   * TODO(mattklein123): re-visit the connection accounting interface. Make TCP
+   * listener to do accounting through these interfaces instead of directly
+   * access the counter.
+   */
+  virtual void incNumConnections() PURE;
+
+  /**
+   * Decrement the return value of numConnections() by one.
+   */
+  virtual void decNumConnections() PURE;
+
+  /**
    * Adds a listener to the handler.
    * @param config listener configuration options.
    */
