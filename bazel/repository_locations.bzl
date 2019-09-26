@@ -160,10 +160,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/msgpack/msgpack-c/releases/download/cpp-3.2.0/msgpack-3.2.0.tar.gz"],
     ),
     com_github_google_jwt_verify = dict(
-        sha256 = "2d57d336239d5fe36a03849ddbea1bff09a1720e1c4a46bbb9743c71732b0d43",
-        strip_prefix = "jwt_verify_lib-0f14d43f20381cfae0469cb2309b2e220c0f0ea3",
-        # 2019-07-08
-        urls = ["https://github.com/google/jwt_verify_lib/archive/0f14d43f20381cfae0469cb2309b2e220c0f0ea3.tar.gz"],
+        sha256 = "38a93926f362a330a2a4489ed799c260df0bc305417e2bb44d6745671d9641d7",
+        strip_prefix = "jwt_verify_lib-7e3191b0dcb72835aa63e308a53b541e7fda5458",
+        # 2019-09-23
+        urls = ["https://github.com/google/jwt_verify_lib/archive/7e3191b0dcb72835aa63e308a53b541e7fda5458.tar.gz"],
     ),
     com_github_nodejs_http_parser = dict(
         sha256 = "ef26268c54c8084d17654ba2ed5140bffeffd2a040a895ffb22a6cca3f6c613f",

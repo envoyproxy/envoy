@@ -67,7 +67,9 @@ public:
 
 protected:
   ProcessWide process_wide_; // Process-wide state setup/teardown (excluding grpc).
+#ifdef ENVOY_GOOGLE_GRPC
   Grpc::GoogleGrpcContext google_grpc_context_;
+#endif
   const Envoy::OptionsImpl& options_;
   Server::ComponentFactory& component_factory_;
   Thread::ThreadFactory& thread_factory_;
