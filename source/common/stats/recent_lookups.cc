@@ -1,12 +1,6 @@
 #include "common/stats/recent_lookups.h"
 
-#include <functional>
-#include <utility>
-
 #include "common/common/assert.h"
-
-#include "absl/container/flat_hash_map.h"
-#include "absl/strings/str_join.h"
 
 namespace Envoy {
 namespace Stats {
@@ -40,11 +34,6 @@ void RecentLookups::lookup(absl::string_view str) {
   ASSERT(list_.size() == map_.size());
 }
 
-/**
- * Calls fn(item, timestamp) for each of the remembered lookups.
- *
- * @param fn The function to call for every recently looked up item.
- */
 void RecentLookups::forEach(const IterFn& fn) const {
   for (const ItemCount& item_count : list_) {
     fn(item_count.item_, item_count.count_);
