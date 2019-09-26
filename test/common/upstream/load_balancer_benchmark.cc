@@ -68,7 +68,9 @@ void BM_RoundRobinLoadBalancerBuild(benchmark::State& state) {
     const uint64_t weighted_subset_percent = state.range(1);
     const uint64_t weight = state.range(2);
 
+    const size_t start_tester_mem = Memory::Stats::totalCurrentlyAllocated();
     RoundRobinTester tester(num_hosts, weighted_subset_percent, weight);
+    const size_t end_tester_mem = Memory::Stats::totalCurrentlyAllocated();
     const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
 
     // We are only interested in timing the initial build.
@@ -76,6 +78,7 @@ void BM_RoundRobinLoadBalancerBuild(benchmark::State& state) {
     tester.initialize();
     state.PauseTiming();
     const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
+    state.counters["tester_memory"] = end_tester_mem - start_tester_mem;
     state.counters["memory"] = end_mem - start_mem;
     state.counters["memory_per_host"] = (end_mem - start_mem) / num_hosts;
     state.ResumeTiming();
@@ -135,10 +138,17 @@ void BM_RingHashLoadBalancerBuildRing(benchmark::State& state) {
     const uint64_t num_hosts = state.range(0);
     const uint64_t min_ring_size = state.range(1);
     RingHashTester tester(num_hosts, min_ring_size);
-    state.ResumeTiming();
+
+    const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
 
     // We are only interested in timing the initial ring build.
+    state.ResumeTiming();
     tester.ring_hash_lb_->initialize();
+    state.PauseTiming();
+    const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
+    state.counters["memory"] = end_mem - start_mem;
+    state.counters["memory_per_host"] = (end_mem - start_mem) / num_hosts;
+    state.ResumeTiming();
   }
 }
 BENCHMARK(BM_RingHashLoadBalancerBuildRing)
@@ -155,10 +165,17 @@ void BM_MaglevLoadBalancerBuildTable(benchmark::State& state) {
     state.PauseTiming();
     const uint64_t num_hosts = state.range(0);
     MaglevTester tester(num_hosts);
-    state.ResumeTiming();
+
+    const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
 
     // We are only interested in timing the initial table build.
+    state.ResumeTiming();
     tester.maglev_lb_->initialize();
+    state.PauseTiming();
+    const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
+    state.counters["memory"] = end_mem - start_mem;
+    state.counters["memory_per_host"] = (end_mem - start_mem) / num_hosts;
+    state.ResumeTiming();
   }
 }
 BENCHMARK(BM_MaglevLoadBalancerBuildTable)

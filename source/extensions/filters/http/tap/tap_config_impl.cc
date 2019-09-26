@@ -174,7 +174,7 @@ bool HttpPerRequestTapperImpl::onDestroyLog() {
 
 void HttpPerRequestTapperImpl::onBody(
     const Buffer::Instance& data, Extensions::Common::Tap::TraceWrapperPtr& buffered_streamed_body,
-    uint32_t maxBufferedBytes, MutableBodyChunk mutable_body_chunk,
+    uint32_t max_buffered_bytes, MutableBodyChunk mutable_body_chunk,
     MutableMessage mutable_message) {
   // TODO(mattklein123): Body matching.
   if (config_->streaming()) {
@@ -186,8 +186,8 @@ void HttpPerRequestTapperImpl::onBody(
       // If we have already started streaming, flush a body segment now.
       TapCommon::TraceWrapperPtr trace = makeTraceSegment();
       TapCommon::Utility::addBufferToProtoBytes(
-          *(trace->mutable_http_streamed_trace_segment()->*mutable_body_chunk)(), maxBufferedBytes,
-          data, 0, data.length());
+          *(trace->mutable_http_streamed_trace_segment()->*mutable_body_chunk)(),
+          max_buffered_bytes, data, 0, data.length());
       sink_handle_->submitTrace(std::move(trace));
     } else if (match_status.might_change_status_) {
       // If we might still match, start buffering the body up to our limit.
@@ -196,8 +196,8 @@ void HttpPerRequestTapperImpl::onBody(
       }
       auto& body =
           *(buffered_streamed_body->mutable_http_streamed_trace_segment()->*mutable_body_chunk)();
-      ASSERT(body.as_bytes().size() <= maxBufferedBytes);
-      TapCommon::Utility::addBufferToProtoBytes(body, maxBufferedBytes - body.as_bytes().size(),
+      ASSERT(body.as_bytes().size() <= max_buffered_bytes);
+      TapCommon::Utility::addBufferToProtoBytes(body, max_buffered_bytes - body.as_bytes().size(),
                                                 data, 0, data.length());
     }
   } else {
@@ -205,9 +205,9 @@ void HttpPerRequestTapperImpl::onBody(
     makeBufferedFullTraceIfNeeded();
     auto& body =
         *(buffered_full_trace_->mutable_http_buffered_trace()->*mutable_message)()->mutable_body();
-    ASSERT(body.as_bytes().size() <= maxBufferedBytes);
-    TapCommon::Utility::addBufferToProtoBytes(body, maxBufferedBytes - body.as_bytes().size(), data,
-                                              0, data.length());
+    ASSERT(body.as_bytes().size() <= max_buffered_bytes);
+    TapCommon::Utility::addBufferToProtoBytes(body, max_buffered_bytes - body.as_bytes().size(),
+                                              data, 0, data.length());
   }
 }
 

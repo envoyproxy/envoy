@@ -67,7 +67,9 @@ message Bootstrap {
     api.v3alpha.core.ApiConfigSource ads_config = 3;
   }
 
-  reserved 10;
+  reserved 10, 11;
+
+  reserved "runtime";
 
   // Node identity to present to the management server and for instance
   // identification purposes (e.g. in generated headers).
@@ -112,11 +114,6 @@ message Bootstrap {
   // Configuration for an external tracing provider. If not specified, no
   // tracing will be performed.
   trace.v3alpha.Tracing tracing = 9;
-
-  // Configuration for the runtime configuration provider (deprecated). If not
-  // specified, a “null” provider will be used which will result in all defaults
-  // being used.
-  Runtime runtime = 11 [deprecated = true];
 
   // Configuration for the runtime configuration provider. If not
   // specified, a “null” provider will be used which will result in all defaults

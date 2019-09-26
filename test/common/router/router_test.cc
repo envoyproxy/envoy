@@ -116,15 +116,15 @@ public:
   }
 
   AssertionResult verifyHostUpstreamStats(uint64_t success, uint64_t error) {
-    if (success != cm_.conn_pool_.host_->stats_store_.counter("rq_success").value()) {
-      return AssertionFailure() << fmt::format(
-                 "rq_success {} does not match expected {}",
-                 cm_.conn_pool_.host_->stats_store_.counter("rq_success").value(), success);
+    if (success != cm_.conn_pool_.host_->stats_.rq_success_.value()) {
+      return AssertionFailure() << fmt::format("rq_success {} does not match expected {}",
+                                               cm_.conn_pool_.host_->stats_.rq_success_.value(),
+                                               success);
     }
-    if (error != cm_.conn_pool_.host_->stats_store_.counter("rq_error").value()) {
-      return AssertionFailure() << fmt::format(
-                 "rq_error {} does not match expected {}",
-                 cm_.conn_pool_.host_->stats_store_.counter("rq_error").value(), error);
+    if (error != cm_.conn_pool_.host_->stats_.rq_error_.value()) {
+      return AssertionFailure() << fmt::format("rq_error {} does not match expected {}",
+                                               cm_.conn_pool_.host_->stats_.rq_error_.value(),
+                                               error);
     }
     return AssertionSuccess();
   }
@@ -2116,7 +2116,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutGlobalTimeout) {
       }));
   response_timeout_->invokeCallback();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 2));
-  EXPECT_EQ(2, cm_.conn_pool_.host_->stats_store_.counter("rq_timeout").value());
+  EXPECT_EQ(2, cm_.conn_pool_.host_->stats_.rq_timeout_.value());
   // TODO: Verify hedge stats here once they are implemented.
 }
 
