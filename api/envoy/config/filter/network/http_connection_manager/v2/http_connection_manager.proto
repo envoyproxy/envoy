@@ -482,6 +482,14 @@ message ResponseMapper {
 
   // Rewriter defines which values in local reply should be changed.
   ResponseRewriter rewriter = 2 [(validate.rules).message.required = true];
+
+  oneof reply_format {
+    // Response body plain text format.
+    string format = 3;
+
+    // Response body json format as dictionary.
+    google.protobuf.Struct json_format = 4;
+  }
 }
 
 // Configuration of new value for matched local response.

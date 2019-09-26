@@ -711,6 +711,7 @@ resolvers
 resync
 ret
 retriable
+rewriter
 rpcs
 rq
 rtrim
