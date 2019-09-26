@@ -10,15 +10,9 @@
 namespace Envoy {
 
 // TODO(incfly):
-// - upstream setup
-//    use the FakeUpstream with transport socket factory typed constructor.
-//    override the createUpstreams()
-//    src/test/integration/integration.cc:517 is the example of creating the fake upstream
-//     with tls configuration, also see how Network::Test::createRawBufferSocket is invoked.
-//    just creating the fake upstream right away here...inline code for now.
-//    get rid of autonomous_upstream_
-//    line 71
-// - Client envoy configuration modifying
+// - upstream setup, finish multiple endpiont upstream setup.
+//   for now wait on 'waitforindex 0' hardcoded. maybe using some route api to achieve.
+// - Client envoy configuration modifying, use matcher!
 // bazel test //test/integration:transport_socket_match_integration_test --test_output=streamed
 // --test_arg='-l info'
 class TransportSockeMatchIntegrationTest : public testing::Test, public HttpIntegrationTest {
@@ -32,6 +26,13 @@ public:
     config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       auto* static_resources = bootstrap.mutable_static_resources();
       auto* cluster = static_resources->mutable_clusters(0);
+      auto* common_tls_context = cluster->mutable_tls_context()->mutable_common_tls_context();
+      auto* tls_cert = common_tls_context->add_tls_certificates();
+      tls_cert->mutable_certificate_chain()->set_filename(
+          TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem"));
+      tls_cert->mutable_private_key()->set_filename(
+          TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
+      // Setup the client Envoy TLS config.
       cluster->clear_hosts();
       auto* load_assignment = cluster->mutable_load_assignment();
       load_assignment->set_cluster_name(cluster->name());
@@ -77,12 +78,14 @@ public:
 
   void createUpstreams() override {
     for (uint32_t i = 0; i < num_hosts_; i++) {
-      // Use below ssl upstream fails as expected...
-      // fake_upstreams_.emplace_back(
-      // std::make_unique<FakeUpstream>(createUpstreamSslContext(), 0,
-      // FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
-      fake_upstreams_.emplace_back(
-          new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
+//      if (i%2) {
+        fake_upstreams_.emplace_back(std::make_unique<FakeUpstream>(
+              createUpstreamSslContext(), 0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
+      //} else {
+    //// backup, plaintext upstream setup.
+     //fake_upstreams_.emplace_back(
+         //new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
+      //}
     }
   }
   const uint32_t num_hosts_;
@@ -91,9 +94,11 @@ public:
 TEST_F(TransportSockeMatchIntegrationTest, BasicMatch) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response =
-      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  for (int i = 0; i < 3; i++) {
+    auto response = sendRequestAndWaitForResponse(
+        default_request_headers_, 0, default_response_headers_, 0);
+    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  }
 }
 
 } // namespace Envoy
