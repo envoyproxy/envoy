@@ -45,22 +45,6 @@ message BootstrapConfigDump {
   google.protobuf.Timestamp last_updated = 2;
 }
 
-// This is a general purpose proto for dynamic configuration to track information about both
-// currently loaded configuration and the most recent attempt to load configuration.
-message ConfigUpdateState {
-  // The name of the entity whose state is tracked here.
-  string name = 1;
-
-  // The timestamp of the last update attempt.
-  google.protobuf.Timestamp last_update = 2;
-
-  // Simple tracking if the last update attempt was successful.
-  bool update_successful = 3;
-
-  // Details about the last update attempt
-  string last_update_details = 4;
-}
-
 // Envoy's listener manager fills this message with all currently known listeners. Listener
 // configuration information can be used to recreate an Envoy configuration by populating all
 // listeners as static listeners or by returning them in a LDS response.
@@ -74,8 +58,7 @@ message ListenersConfigDump {
     google.protobuf.Timestamp last_updated = 2;
   }
 
-  // Describes a dynamically loaded cluster via the LDS API.
-  message DynamicListener {
+  message DynamicListenerState {
     // This is the per-resource version information. This version is currently taken from the
     // :ref:`version_info <envoy_api_field_DiscoveryResponse.version_info>` field at the time
     // that the listener was loaded. In the future, discrete per-listener versions may be supported
@@ -93,6 +76,45 @@ message ListenersConfigDump {
     google.protobuf.Timestamp last_updated = 3;
   }
 
+  // Describes a dynamically loaded listener via the LDS API.
+  // FIXME rename? because otherwise v2->alpha is super confusing but this seems
+  // like the right name :-/
+  message DynamicListener {
+    // FIXME worth splitting name out for easy reference, duplicate cruft?
+    // The name or uniqe id of this listener, pulled from the DynamicListenerState config.
+    string name = 1;
+
+    // The listener state for any active listener by this name.
+    DynamicListenerState active_state = 2;
+
+    // The listener state for any warming listener by this name.
+    DynamicListenerState warming_state = 2;
+
+    // The listener state for any draining listener by this name.
+    DynamicListenerState draining_state = 3;
+
+    // FIXME alternately we could just have
+    // DynamicListenerState failure_state = 4;
+    // string error_details = 5;
+    // rather than the sub-message
+    //
+    // FIXME alternately alternately we could have shared UpdateErrorState with
+    // a Message error_state (which would be DynamicListenerState for listeners,
+    // DynamicClusterState for clusters, and error details for all.
+    // I like shared structures but hate "casting" so I'm scrapping reuse.
+    message ListenerUpdateErrorState {
+      // What this listener would have looked like if it had succeeded
+      // FIXME is it confusing to use last_updated to last_attempted_update?
+      DynamicListenerState failed_state = 1;
+
+      // Details about the last update attempt
+      string details = 4;
+    }
+
+    // Set if the last update failed, cleared after the next successful update.
+    ListenerUpdateFailureState error_state = 4;
+  }
+
   // This is the :ref:`version_info <envoy_api_field_DiscoveryResponse.version_info>` in the
   // last processed LDS discovery response. If there are only static bootstrap listeners, this field
   // will be "".
@@ -103,26 +125,7 @@ message ListenersConfigDump {
 
   // The dynamically loaded active listeners. These are listeners that are available to service
   // data plane traffic.
-  repeated DynamicListener dynamic_active_listeners = 3;
-
-  // The dynamically loaded warming listeners. These are listeners that are currently undergoing
-  // warming in preparation to service data plane traffic. Note that if attempting to recreate an
-  // Envoy configuration from a configuration dump, the warming listeners should generally be
-  // discarded.
-  repeated DynamicListener dynamic_warming_listeners = 4;
-
-  // The dynamically loaded draining listeners. These are listeners that are currently undergoing
-  // draining in preparation to stop servicing data plane traffic. Note that if attempting to
-  // recreate an Envoy configuration from a configuration dump, the draining listeners should
-  // generally be discarded.
-  repeated DynamicListener dynamic_draining_listeners = 5;
-
-  // Track the config update state of listeners.
-  // FIXME comment detail.
-  // Review: Should this be per DynamicListener?
-  // Really per name we want the latest where warming > active > draining and
-  // recent loads get mixed in so I think global is correct.
-  repeated ConfigUpdateState config_update_state = 6;
+  repeated DynamicListener dynamic_listeners = 3;
 }
 
 // Envoy's cluster manager fills this message with all currently known clusters. Cluster
@@ -138,19 +141,28 @@ message ClustersConfigDump {
     google.protobuf.Timestamp last_updated = 2;
   }
 
-  // Describes a dynamically loaded cluster via the CDS API.
   message DynamicCluster {
-    // This is the per-resource version information. This version is currently taken from the
-    // :ref:`version_info <envoy_api_field_DiscoveryResponse.version_info>` field at the time
-    // that the cluster was loaded. In the future, discrete per-cluster versions may be supported by
-    // the API.
-    string version_info = 1;
+    // The name or uniqe id of this cluster, pulled from config.
+    string name = 1;
 
-    // The cluster config.
-    api.v2.Cluster cluster = 2;
+    // The cluster state for any active cluster by this name.
+    DynamicClusterState active_state = 2;
 
-    // The timestamp when the Cluster was last updated.
-    google.protobuf.Timestamp last_updated = 3;
+    // The cluster state for any warming cluster by this name.
+    DynamicClusterState warming_state = 2;
+
+    // The cluster state for any draining cluster by this name.
+    DynamicClusterState draining_state = 3;
+
+    message ClusterUpdateErrorState {
+      DynamicClusterState failed_state = 1;
+
+      // Details about the last update attempt
+      string details = 4;
+    }
+
+    // Set if the last update failed, cleared after the next successful update.
+    ClusterUpdateFailureState error_state = 4;
   }
 
   // This is the :ref:`version_info <envoy_api_field_DiscoveryResponse.version_info>` in the
@@ -163,13 +175,7 @@ message ClustersConfigDump {
 
   // The dynamically loaded active clusters. These are clusters that are available to service
   // data plane traffic.
-  repeated DynamicCluster dynamic_active_clusters = 3;
-
-  // The dynamically loaded warming clusters. These are clusters that are currently undergoing
-  // warming in preparation to service data plane traffic. Note that if attempting to recreate an
-  // Envoy configuration from a configuration dump, the warming clusters should generally be
-  // discarded.
-  repeated DynamicCluster dynamic_warming_clusters = 4;
+  repeated DynamicCluster dynamic_clusters = 3;
 }
 
 // Envoy's RDS implementation fills this message with all currently loaded routes, as described by
@@ -186,7 +192,7 @@ message RoutesConfigDump {
     google.protobuf.Timestamp last_updated = 2;
   }
 
-  message DynamicRouteConfig {
+  message DynamicRouteState {
     // This is the per-resource version information. This version is currently taken from the
     // :ref:`version_info <envoy_api_field_DiscoveryResponse.version_info>` field at the time that
     // the route configuration was loaded.
@@ -199,11 +205,30 @@ message RoutesConfigDump {
     google.protobuf.Timestamp last_updated = 3;
   }
 
-  // The statically loaded route configs.
-  repeated StaticRouteConfig static_route_configs = 2;
+  message DynamicRoute {
+    // The name or uniqe id of this route, pulled from config.
+    string name = 1;
 
-  // The dynamically loaded route configs.
-  repeated DynamicRouteConfig dynamic_route_configs = 3;
+    // The route state for any active route by this name.
+    DynamicRouetState route_state = 2;
+
+    message RouteUpdateErrorState {
+      // What this route would have looked like if it had succeeded
+      DynamicRouteState failed_state = 1;
+
+      // Details about the last update attempt
+      string details = 4;
+    }
+
+    // Set if the last update failed, cleared after the next successful update.
+    RouteUpdateFailureState error_state = 4;
+  }
+
+  // The statically loaded routes.
+  repeated StaticRouteConfig static_routes = 2;
+
+  // The dynamically loaded routes.
+  repeated DynamicRoute dynamic_routes = 3;
 }
 
 // Envoy's scoped RDS implementation fills this message with all currently loaded route
@@ -211,18 +236,18 @@ message RoutesConfigDump {
 // the scopes defined inline with the higher order object (i.e., the HttpConnectionManager) and the
 // dynamically obtained scopes via the SRDS API.
 message ScopedRoutesConfigDump {
-  message InlineScopedRouteConfigs {
+  message InlineScopedRoutes {
     // The name assigned to the scoped route configurations.
     string name = 1;
 
     // The scoped route configurations.
-    repeated api.v2.ScopedRouteConfiguration scoped_route_configs = 2;
+    repeated api.v2.ScopedRouteConfiguration scoped_routes = 2;
 
     // The timestamp when the scoped route config set was last updated.
     google.protobuf.Timestamp last_updated = 3;
   }
 
-  message DynamicScopedRouteConfigs {
+  message DynamicScopedRouteState {
     // The name assigned to the scoped route configurations.
     string name = 1;
 
@@ -232,60 +257,76 @@ message ScopedRoutesConfigDump {
     string version_info = 2;
 
     // The scoped route configurations.
-    repeated api.v2.ScopedRouteConfiguration scoped_route_configs = 3;
+    repeated api.v2.ScopedRouteConfiguration scoped_routes = 3;
 
     // The timestamp when the scoped route config set was last updated.
     google.protobuf.Timestamp last_updated = 4;
   }
 
-  // The statically loaded scoped route configs.
-  repeated InlineScopedRouteConfigs inline_scoped_route_configs = 1;
-
-  // The dynamically loaded scoped route configs.
-  repeated DynamicScopedRouteConfigs dynamic_scoped_route_configs = 2;
-}
-
-// Envoys SDS implementation fills this message with all secrets fetched dynamically via SDS.
-message SecretsConfigDump {
-  // DynamicSecret contains secret information fetched via SDS.
-  message DynamicSecret {
-    // The name assigned to the secret.
+  message DynamicScopedRoute {
+    // The name or uniqe id of this route, pulled from config.
     string name = 1;
 
-    // This is the per-resource version information.
-    string version_info = 2;
+    // The scoped route state for any active route by this name.
+    DynamicScopedState scoped_route_state = 2;
 
-    // The timestamp when the secret was last updated.
-    google.protobuf.Timestamp last_updated = 3;
+    message RouteUpdateErrorState {
+      // What this route would have looked like if it had succeeded
+      DynamicScopedRouteState failed_state = 1;
 
-    // The actual secret information.
-    // Security sensitive information is redacted (replaced with "[redacted]") for
-    // private keys and passwords in TLS certificates.
-    api.v2.auth.Secret secret = 4;
+      // Details about the last update attempt
+      string details = 4;
+    }
+
+    // The statically loaded scoped route configs.
+    repeated InlineScopedRoutes inline_scoped_routes = 1;
+
+    // The dynamically loaded scoped route configs.
+    repeated DynamicScopedRoute dynamic_scoped_routes = 2;
   }
 
-  // StaticSecret specifies statically loaded secret in bootstrap.
-  message StaticSecret {
-    // The name assigned to the secret.
-    string name = 1;
+  // FIXME do secrets too.
+  // Envoys SDS implementation fills this message with all secrets fetched dynamically via SDS.
+  message SecretsConfigDump {
+    // DynamicSecret contains secret information fetched via SDS.
+    message DynamicSecret {
+      // The name assigned to the secret.
+      string name = 1;
 
-    // The timestamp when the secret was last updated.
-    google.protobuf.Timestamp last_updated = 2;
+      // This is the per-resource version information.
+      string version_info = 2;
 
-    // The actual secret information.
-    // Security sensitive information is redacted (replaced with "[redacted]") for
-    // private keys and passwords in TLS certificates.
-    api.v2.auth.Secret secret = 3;
+      // The timestamp when the secret was last updated.
+      google.protobuf.Timestamp last_updated = 3;
+
+      // The actual secret information.
+      // Security sensitive information is redacted (replaced with "[redacted]") for
+      // private keys and passwords in TLS certificates.
+      api.v2.auth.Secret secret = 4;
+    }
+
+    // StaticSecret specifies statically loaded secret in bootstrap.
+    message StaticSecret {
+      // The name assigned to the secret.
+      string name = 1;
+
+      // The timestamp when the secret was last updated.
+      google.protobuf.Timestamp last_updated = 2;
+
+      // The actual secret information.
+      // Security sensitive information is redacted (replaced with "[redacted]") for
+      // private keys and passwords in TLS certificates.
+      api.v2.auth.Secret secret = 3;
+    }
+
+    // The statically loaded secrets.
+    repeated StaticSecret static_secrets = 1;
+
+    // The dynamically loaded active secrets. These are secrets that are available to service
+    // clusters or listeners.
+    repeated DynamicSecret dynamic_active_secrets = 2;
+
+    // The dynamically loaded warming secrets. These are secrets that are currently undergoing
+    // warming in preparation to service clusters or listeners.
+    repeated DynamicSecret dynamic_warming_secrets = 3;
   }
-
-  // The statically loaded secrets.
-  repeated StaticSecret static_secrets = 1;
-
-  // The dynamically loaded active secrets. These are secrets that are available to service
-  // clusters or listeners.
-  repeated DynamicSecret dynamic_active_secrets = 2;
-
-  // The dynamically loaded warming secrets. These are secrets that are currently undergoing
-  // warming in preparation to service clusters or listeners.
-  repeated DynamicSecret dynamic_warming_secrets = 3;
-}
