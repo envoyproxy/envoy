@@ -26,30 +26,20 @@ import "validate/validate.proto";
 // over a single upstream connection.
 enum RoutingPriority {
   DEFAULT = 0;
-
   HIGH = 1;
 }
 
 // HTTP request method.
 enum RequestMethod {
   METHOD_UNSPECIFIED = 0;
-
   GET = 1;
-
   HEAD = 2;
-
   POST = 3;
-
   PUT = 4;
-
   DELETE = 5;
-
   CONNECT = 6;
-
   OPTIONS = 7;
-
   TRACE = 8;
-
   PATCH = 9;
 }
 
