@@ -59,5 +59,8 @@ CheckOptions:
   - key:             modernize-use-auto.MinTypeNameLength
     value:           '10'
 
+  - key:             readability-identifier-naming.EnumCase
+    value:           'CamelCase'
+
   - key:             readability-identifier-naming.ParameterCase
     value:           'lower_case'
