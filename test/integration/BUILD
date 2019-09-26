@@ -268,6 +268,9 @@ envoy_cc_test(
     srcs = [
         "transport_socket_match_integration_test.cc",
     ],
+    data = [
+        "//test/config/integration/certs",
+    ],
     deps = [
         ":http_integration_lib",
         "//test/common/upstream:utility_lib",
