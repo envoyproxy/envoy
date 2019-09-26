@@ -26,6 +26,11 @@ EnvoyQuicServerSession::EnvoyQuicServerSession(
                                   crypto_config, compressed_certs_cache),
       quic_connection_(std::move(connection)) {}
 
+EnvoyQuicServerSession::~EnvoyQuicServerSession() {
+  ASSERT(!quic_connection_->connected());
+  QuicFilterManagerConnectionImpl::quic_connection_ = nullptr;
+}
+
 absl::string_view EnvoyQuicServerSession::requestedServerName() const {
   return {GetCryptoStream()->crypto_negotiated_params().sni};
 }
