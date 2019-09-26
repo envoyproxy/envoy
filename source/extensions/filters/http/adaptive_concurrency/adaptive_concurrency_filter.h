@@ -34,13 +34,13 @@ public:
 
   // Returns whether the filter should operate as a pass-through for a request.
   bool filterDisabled() const {
-    // RuntimeUInt32 proto validates that the runtime key must have at least a single character. If
-    // the key is empty, the field was never specified.
+    // RuntimeFeatureFlag proto validates that the runtime key must have at least a single
+    // character. If the key is empty, the field was never specified.
     if (disabled_runtime_key_.empty()) {
       return false;
     }
 
-    return runtime_.snapshot().getInteger(disabled_runtime_key_, disabled_default_value_) > 0;
+    return runtime_.snapshot().getBoolean(disabled_runtime_key_, disabled_default_value_);
   }
 
   TimeSource& timeSource() const { return time_source_; }

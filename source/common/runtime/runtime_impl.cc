@@ -286,7 +286,7 @@ double SnapshotImpl::getDouble(const std::string& key, double default_value) con
   }
 }
 
-bool SnapshotImpl::getBoolean(absl::string_view key, bool& value) const {
+bool SnapshotImpl::getBoolean(absl::string_view key, bool value) const {
   auto entry = values_.find(key);
   if (entry != values_.end() && entry->second.bool_value_.has_value()) {
     value = entry->second.bool_value_.value();

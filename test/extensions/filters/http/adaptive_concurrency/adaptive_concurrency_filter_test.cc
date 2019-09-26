@@ -104,7 +104,7 @@ disabled:
   // We expect the default disabled value to be 0 if unspecified, meaning the filter is not
   // disabled.
 
-  EXPECT_CALL(runtime_.snapshot_, getInteger("adaptive_concurrency.disabled", 0));
+  EXPECT_CALL(runtime_.snapshot_, getBoolean("adaptive_concurrency.disabled", false));
 
   EXPECT_CALL(*controller_, forwardingDecision())
       .WillOnce(Return(RequestForwardingAction::Forward));
@@ -136,7 +136,7 @@ gradient_controller_config:
       seconds: 30
     request_count: 50
 disabled:
-  default_value: 0
+  default_value: false
   runtime_key: "adaptive_concurrency.disabled"
 )EOF";
 
@@ -171,8 +171,8 @@ disabled:
   // Request should be blocked when flag is overridden. Note there is no expected call to
   // forwardingDecision() or recordLatencySample().
 
-  EXPECT_CALL(runtime_.snapshot_, getInteger("adaptive_concurrency.disabled", 0))
-      .WillOnce(Return(1));
+  EXPECT_CALL(runtime_.snapshot_, getBoolean("adaptive_concurrency.disabled", false))
+      .WillOnce(Return(true));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(request_body, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
@@ -192,7 +192,7 @@ gradient_controller_config:
       seconds: 30
     request_count: 50
 disabled:
-  default_value: 1
+  default_value: true
   runtime_key: "adaptive_concurrency.disabled"
 )EOF";
 

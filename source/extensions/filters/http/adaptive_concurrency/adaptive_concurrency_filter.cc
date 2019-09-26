@@ -22,7 +22,7 @@ AdaptiveConcurrencyFilterConfig::AdaptiveConcurrencyFilterConfig(
     Runtime::Loader& runtime, std::string stats_prefix, Stats::Scope&, TimeSource& time_source)
     : stats_prefix_(std::move(stats_prefix)), runtime_(runtime), time_source_(time_source),
       disabled_runtime_key_(proto_config.disabled().runtime_key()),
-      disabled_default_value_(proto_config.disabled().default_value() > 0) {}
+      disabled_default_value_(proto_config.disabled().default_value()) {}
 
 AdaptiveConcurrencyFilter::AdaptiveConcurrencyFilter(
     AdaptiveConcurrencyFilterConfigSharedPtr config, ConcurrencyControllerSharedPtr controller)

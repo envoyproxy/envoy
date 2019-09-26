@@ -6,7 +6,7 @@ option java_package = "io.envoyproxy.envoy.config.filter.http.adaptive_concurren
 option java_outer_classname = "AdaptiveConcurrencyProto";
 option java_multiple_files = true;
 
-import "envoy/api/v3alpha/core/base.proto";
+import "envoy/api/v2/core/base.proto";
 import "envoy/type/percent.proto";
 
 import "google/protobuf/duration.proto";
@@ -64,5 +64,5 @@ message AdaptiveConcurrency {
   }
 
   // If set to true, the adaptive concurrency filter will operate as a pass-through filter.
-  api.v3alpha.core.RuntimeUInt32 disabled = 2;
+  api.v2.core.RuntimeFeatureFlag disabled = 2;
 }
