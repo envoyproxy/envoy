@@ -55,7 +55,7 @@ private:
   // The measured request round-trip time under ideal conditions.
   const std::chrono::milliseconds min_rtt_calc_interval_;
 
-  // Randomized time delta added/subtracted from the min_rtt_calc_interval_.
+  // Randomized time delta added to the start of the minRTT calculation window.
   const double jitter_pct_;
 
   // The measured sample round-trip time from the previous time window.
