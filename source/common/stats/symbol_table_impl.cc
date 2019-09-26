@@ -206,6 +206,20 @@ void SymbolTableImpl::free(const StatName& stat_name) {
     }
   }
 }
+
+StatNameSetPtr SymbolTableImpl::makeSet(absl::string_view name) {
+  Thread::LockGuard lock(lock_);
+  // make_unique does not work with private ctor, even though FakeSymbolTableImpl is a friend.
+  StatNameSetPtr stat_name_set(new StatNameSet(*this, name));
+  stat_name_sets_.insert(stat_name_set.get());
+  return stat_name_set;
+}
+
+void SymbolTableImpl::forgetSet(StatNameSet& stat_name_set) {
+  Thread::LockGuard lock(lock_);
+  stat_name_sets_.erase(&stat_name_set);
+}
+
 Symbol SymbolTableImpl::toSymbol(absl::string_view sv) {
   Symbol result;
   auto encode_find = encode_map_.find(sv);
@@ -429,9 +443,12 @@ void StatNameList::clear(SymbolTable& symbol_table) {
   storage_.reset();
 }
 
-StatNameSet::StatNameSet(SymbolTable& symbol_table) : pool_(symbol_table) {
+StatNameSet::StatNameSet(SymbolTable& symbol_table, absl::string_view name)
+    : name_(std::string(name)), symbol_table_(symbol_table), pool_(symbol_table) {
   builtin_stat_names_[""] = StatName();
 }
+
+StatNameSet::~StatNameSet() { symbol_table_.forgetSet(*this); }
 
 void StatNameSet::rememberBuiltin(absl::string_view str) {
   StatName stat_name;
