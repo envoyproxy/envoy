@@ -309,12 +309,17 @@ void InstanceImpl::initialize(const Options& options,
 
   InstanceImpl::failHealthcheck(false);
 
+  // Check if bootstrap has proxy version set, if yes, we should use that as 'server.version' stat.
   uint64_t version_int;
-  if (!StringUtil::atoull(VersionInfo::revision().substr(0, 6).c_str(), version_int, 16)) {
-    throw EnvoyException("compiled GIT SHA is invalid. Invalid build.");
+  if (bootstrap_.proxy_version().value() > 0) {
+    version_int = bootstrap_.proxy_version().value();
+  } else {
+    if (!StringUtil::atoull(VersionInfo::revision().substr(0, 6).c_str(), version_int, 16)) {
+      throw EnvoyException("compiled GIT SHA is invalid. Invalid build.");
+    }
   }
-
   server_stats_->version_.set(version_int);
+
   bootstrap_.mutable_node()->set_build_version(VersionInfo::version());
 
   local_info_ = std::make_unique<LocalInfo::LocalInfoImpl>(
