@@ -23,7 +23,7 @@ public:
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1,
                             TestEnvironment::getIpVersionsForTest().front(),
                             ConfigHelper::HTTP_PROXY_CONFIG),
-        num_hosts_{2} {
+        num_hosts_{1} {
     // xds_upstream is the control plane management server, not the upstream...
     // create_xds_upstream_ = true;
     // tls_xds_upstream_ = true;
@@ -65,13 +65,32 @@ public:
     }
   }
 
-  void runTest(Http::TestHeaderMapImpl& request_headers) {
+  void runTest(Http::TestHeaderMapImpl&) {
     // TODO: here... how to get the fake upstream working with real response...
     // look at the fake upstream, waitForHTTPConnection, needs to manually manage the upstream
     // side...
-    IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
-    response->waitForEndStream(); // note to myself required to obtain response.
-    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+    //IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+    //auto upstream_idx = waitForNextUpstreamRequest({0,1});
+    //ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+    //ASSERT_TRUE(fake_upstreams_[upstream_idx]->waitForHttpConnection(*dispatcher_,
+                                                                     //fake_upstream_connection_));
+    //waitForNextUpstreamRequest(upstream_idx);
+		//upstream_request_->encodeHeaders(default_response_headers_, false);
+		//upstream_request_->encodeData(512, true);
+    //response->waitForEndStream(); // note to myself required to obtain response.
+		//EXPECT_TRUE(upstream_request_->complete());
+    //EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  //const uint64_t second_id = Network::ConnectionImpl::nextGlobalIdForTest() + 1;
+  //codec_client_ = makeHttpConnection(creator());
+  //Http::TestHeaderMapImpl get_request_headers{
+      //{":method", "GET"},     {":path", "/test/long/url"}, {":scheme", "http"},
+      //{":authority", "host"}, {"x-lyft-user-id", "123"},   {"x-forwarded-for", "10.0.0.1"}};
+  //response =
+      //sendRequestAndWaitForResponse(get_request_headers, 128, default_response_headers_, 256);
+  //EXPECT_TRUE(upstream_request_->complete());
+  //EXPECT_EQ(128, upstream_request_->bodyLength());
+  //ASSERT_TRUE(response->complete());
+  //EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   }
   const uint32_t num_hosts_;
   const std::string host_type_header_{"x-host-type"};
@@ -86,9 +105,17 @@ public:
 
 TEST_F(TransportSockeMatchIntegrationTest, BasicMatch) {
   initialize();
-  // codec_client_ = makeHttpConnection(lookupPort("http"));
-  // runTest(type_a_request_headers_);
-  timeSystem().sleep(std::chrono::milliseconds(10000000));
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  //EXPECT_TRUE(response->headers().get(
+                  //Envoy::Http::LowerCaseString{"x-custom-upstream-service-time"}) != nullptr);
+  //EXPECT_EQ("x-custom-upstream-service-time",
+            //response->headers().EnvoyUpstreamServiceTime()->key().getStringView());
+  //codec_client_ = makeHttpConnection(lookupPort("http"));
+  //runTest(type_a_request_headers_);
+  //timeSystem().sleep(std::chrono::milliseconds(10000000));
 }
 
 } // namespace Envoy
