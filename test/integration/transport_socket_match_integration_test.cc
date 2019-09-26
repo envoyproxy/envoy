@@ -93,10 +93,27 @@ public:
 
 TEST_F(TransportSockeMatchIntegrationTest, BasicMatch) {
   initialize();
+  // Test code to the envoy connection, no need to recreate.
   codec_client_ = makeHttpConnection(lookupPort("http"));
   for (int i = 0; i < 3; i++) {
-    auto response = sendRequestAndWaitForResponse(
-        default_request_headers_, 0, default_response_headers_, 0);
+    //auto response = sendRequestAndWaitForResponse(
+        //default_request_headers_, 0, default_response_headers_, 0);
+  IntegrationStreamDecoderPtr response;
+  //if (request_body_size) {
+    //response = codec_client_->makeRequestWithBody(request_headers, request_body_size);
+  //} else {
+    response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  //}
+  waitForNextUpstreamRequest(0);
+  // Send response headers, and end_stream if there is no response body.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  // Send any response data, with end_stream true.
+  //if (response_size) {
+    //upstream_request_->encodeData(response_size, true);
+  //}
+  // Wait for the response to be read by the codec client.
+  response->waitForEndStream();
+
     EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   }
 }
