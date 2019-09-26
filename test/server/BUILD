@@ -20,7 +20,10 @@ envoy_cc_test(
     name = "backtrace_test",
     srcs = ["backtrace_test.cc"],
     tags = ["backtrace"],
-    deps = ["//source/server:backtrace_lib"],
+    deps = [
+        "//source/server:backtrace_lib",
+        "//test/test_common:logging_lib",
+    ],
 )
 
 envoy_cc_test(
@@ -165,6 +168,7 @@ envoy_cc_test(
 envoy_cc_test_library(
     name = "listener_manager_impl_test_lib",
     hdrs = ["listener_manager_impl_test.h"],
+    data = ["//test/extensions/transport_sockets/tls/test_data:certs"],
     deps = [
         "//source/server:listener_manager_lib",
         "//test/mocks/network:network_mocks",
@@ -172,13 +176,13 @@ envoy_cc_test_library(
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_time_lib",
+        "//test/test_common:threadsafe_singleton_injector_lib",
     ],
 )
 
 envoy_cc_test(
     name = "listener_manager_impl_test",
     srcs = ["listener_manager_impl_test.cc"],
-    data = ["//test/extensions/transport_sockets/tls/test_data:certs"],
     deps = [
         ":listener_manager_impl_test_lib",
         ":utility_lib",
@@ -198,7 +202,6 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/tls:ssl_socket_lib",
         "//source/server:active_raw_udp_listener_config",
         "//test/test_common:registry_lib",
-        "//test/test_common:threadsafe_singleton_injector_lib",
     ],
 )
 
@@ -209,7 +212,9 @@ envoy_cc_test(
     tags = ["nofips"],
     deps = [
         ":listener_manager_impl_test_lib",
+        ":utility_lib",
         "//source/extensions/quic_listeners/quiche:active_quic_listener_config_lib",
+        "//source/extensions/quic_listeners/quiche:quic_transport_socket_factory_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//test/test_common:threadsafe_singleton_injector_lib",
     ],

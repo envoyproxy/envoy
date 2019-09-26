@@ -77,7 +77,7 @@ def envoy_external_dep_path(dep):
 
 def envoy_linkstatic():
     return select({
-        "@envoy//bazel:asan_build": 0,
+        "@envoy//bazel:dynamic_link_tests": 0,
         "//conditions:default": 1,
     })
 

@@ -1,6 +1,3 @@
-// [#protodoc-title: Stats]
-// Statistics :ref:`architecture overview <arch_overview_statistics>`.
-
 syntax = "proto3";
 
 package envoy.config.metrics.v2;
@@ -17,6 +14,9 @@ import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
+
+// [#protodoc-title: Stats]
+// Statistics :ref:`architecture overview <arch_overview_statistics>`.
 
 // Configuration for pluggable stats sinks.
 message StatsSink {
@@ -149,12 +149,12 @@ message StatsMatcher {
 
     // Exclusive match. All stats are enabled except for those matching one of the supplied
     // StringMatcher protos.
-    envoy.type.matcher.ListStringMatcher exclusion_list = 2;
+    type.matcher.ListStringMatcher exclusion_list = 2;
 
     // Inclusive match. No stats are enabled except for those matching one of the supplied
     // StringMatcher protos.
-    envoy.type.matcher.ListStringMatcher inclusion_list = 3;
-  };
+    type.matcher.ListStringMatcher inclusion_list = 3;
+  }
 }
 
 // Designates a tag name and value pair. The value may be either a fixed value
@@ -231,7 +231,7 @@ message TagSpecifier {
     // ``http.user_agent.downstream_cx_total`` as the tag extracted name. The tag
     // ``envoy.http_conn_manager_prefix`` will be added with the tag value
     // ``connection_manager_1``.
-    string regex = 2 [(validate.rules).string.max_bytes = 1024];
+    string regex = 2 [(validate.rules).string = {max_bytes: 1024}];
 
     // Specifies a fixed tag value for the ``tag_name``.
     string fixed_value = 3;
@@ -247,13 +247,14 @@ message StatsdSink {
     // The UDP address of a running `statsd <https://github.com/etsy/statsd>`_
     // compliant listener. If specified, statistics will be flushed to this
     // address.
-    envoy.api.v2.core.Address address = 1;
+    api.v2.core.Address address = 1;
 
     // The name of a cluster that is running a TCP `statsd
     // <https://github.com/etsy/statsd>`_ compliant listener. If specified,
     // Envoy will connect to this cluster to flush statistics.
     string tcp_cluster_name = 2;
   }
+
   // Optional custom prefix for StatsdSink. If
   // specified, this will override the default prefix.
   // For example:
@@ -289,15 +290,15 @@ message StatsdSink {
 // <envoy_api_msg_config.metrics.v2.StatsConfig>`.
 // [#comment:next free field: 3]
 message DogStatsdSink {
+  reserved 2;
+
   oneof dog_statsd_specifier {
     option (validate.required) = true;
 
     // The UDP address of a running DogStatsD compliant listener. If specified,
     // statistics will be flushed to this address.
-    envoy.api.v2.core.Address address = 1;
+    api.v2.core.Address address = 1;
   }
-
-  reserved 2;
 
   // Optional custom metric name prefix. See :ref:`StatsdSink's prefix field
   // <envoy_api_field_config.metrics.v2.StatsdSink.prefix>` for more details.

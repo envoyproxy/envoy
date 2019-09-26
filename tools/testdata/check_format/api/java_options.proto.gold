@@ -1,5 +1,0 @@
-package envoy.foo;
-
-option java_package = "io.envoyproxy.envoy.foo";
-option java_outer_classname = "JavaOptionsProto";
-option java_multiple_files = true;

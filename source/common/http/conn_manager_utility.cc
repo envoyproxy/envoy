@@ -31,7 +31,7 @@ std::string ConnectionManagerUtility::determineNextProtocol(Network::Connection&
   // See if the data we have so far shows the HTTP/2 prefix. We ignore the case where someone sends
   // us the first few bytes of the HTTP/2 prefix since in all public cases we use SSL/ALPN. For
   // internal cases this should practically never happen.
-  if (-1 != data.search(Http2::CLIENT_MAGIC_PREFIX.c_str(), Http2::CLIENT_MAGIC_PREFIX.size(), 0)) {
+  if (data.startsWith(Http2::CLIENT_MAGIC_PREFIX)) {
     return Http2::ALPN_STRING;
   }
 

@@ -24,5 +24,5 @@ message ListenerStatus {
 
   // The actual local address that the listener is listening on. If a listener was configured
   // to listen on port 0, then this address has the port that was allocated by the OS.
-  envoy.api.v2.core.Address local_address = 2;
+  api.v2.core.Address local_address = 2;
 }

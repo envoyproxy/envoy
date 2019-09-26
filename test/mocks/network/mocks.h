@@ -345,6 +345,7 @@ public:
   MOCK_METHOD0(stopListeners, void());
   MOCK_METHOD0(disableListeners, void());
   MOCK_METHOD0(enableListeners, void());
+  MOCK_METHOD0(statPrefix, const std::string&());
 };
 
 class MockIp : public Address::Ip {

@@ -1,6 +1,11 @@
 syntax = "proto3";
 
-import "validate/validate.proto";
+package envoy.config.rbac.v2;
+
+option java_outer_classname = "RbacProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.config.rbac.v2";
+
 import "envoy/api/v2/core/address.proto";
 import "envoy/api/v2/route/route.proto";
 import "envoy/type/matcher/metadata.proto";
@@ -8,11 +13,7 @@ import "envoy/type/matcher/string.proto";
 
 import "google/api/expr/v1alpha1/syntax.proto";
 
-package envoy.config.rbac.v2;
-
-option java_outer_classname = "RbacProto";
-option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.config.rbac.v2";
+import "validate/validate.proto";
 
 // [#protodoc-title: Role Based Access Control (RBAC)]
 
@@ -84,12 +85,12 @@ message Policy {
   // Required. The set of permissions that define a role. Each permission is matched with OR
   // semantics. To match all actions for this policy, a single Permission with the `any` field set
   // to true should be used.
-  repeated Permission permissions = 1 [(validate.rules).repeated .min_items = 1];
+  repeated Permission permissions = 1 [(validate.rules).repeated = {min_items: 1}];
 
   // Required. The set of principals that are assigned/denied the role based on “action”. Each
   // principal is matched with OR semantics. To match all downstreams for this policy, a single
   // Principal with the `any` field set to true should be used.
-  repeated Principal principals = 2 [(validate.rules).repeated .min_items = 1];
+  repeated Principal principals = 2 [(validate.rules).repeated = {min_items: 1}];
 
   // An optional symbolic expression specifying an access control
   // :ref:`condition <arch_overview_condition>`. The condition is combined
@@ -99,11 +100,10 @@ message Policy {
 
 // Permission defines an action (or actions) that a principal can take.
 message Permission {
-
   // Used in the `and_rules` and `or_rules` fields in the `rule` oneof. Depending on the context,
   // each are applied with the associated behavior.
   message Set {
-    repeated Permission rules = 1 [(validate.rules).repeated .min_items = 1];
+    repeated Permission rules = 1 [(validate.rules).repeated = {min_items: 1}];
   }
 
   oneof rule {
@@ -116,20 +116,20 @@ message Permission {
     Set or_rules = 2;
 
     // When any is set, it matches any action.
-    bool any = 3 [(validate.rules).bool.const = true];
+    bool any = 3 [(validate.rules).bool = {const: true}];
 
     // A header (or pseudo-header such as :path or :method) on the incoming HTTP request. Only
     // available for HTTP request.
-    envoy.api.v2.route.HeaderMatcher header = 4;
+    api.v2.route.HeaderMatcher header = 4;
 
     // A CIDR block that describes the destination IP.
-    envoy.api.v2.core.CidrRange destination_ip = 5;
+    api.v2.core.CidrRange destination_ip = 5;
 
     // A port number that describes the destination port connecting to.
-    uint32 destination_port = 6 [(validate.rules).uint32.lte = 65535];
+    uint32 destination_port = 6 [(validate.rules).uint32 = {lte: 65535}];
 
     // Metadata that describes additional information about the action.
-    envoy.type.matcher.MetadataMatcher metadata = 7;
+    type.matcher.MetadataMatcher metadata = 7;
 
     // Negates matching the provided permission. For instance, if the value of `not_rule` would
     // match, this permission would not match. Conversely, if the value of `not_rule` would not
@@ -155,28 +155,26 @@ message Permission {
     //
     // Please refer to :ref:`this FAQ entry <faq_how_to_setup_sni>` to learn to
     // setup SNI.
-    envoy.type.matcher.StringMatcher requested_server_name = 9;
+    type.matcher.StringMatcher requested_server_name = 9;
   }
 }
 
 // Principal defines an identity or a group of identities for a downstream subject.
 message Principal {
-
   // Used in the `and_ids` and `or_ids` fields in the `identifier` oneof. Depending on the context,
   // each are applied with the associated behavior.
   message Set {
-    repeated Principal ids = 1 [(validate.rules).repeated .min_items = 1];
+    repeated Principal ids = 1 [(validate.rules).repeated = {min_items: 1}];
   }
 
   // Authentication attributes for a downstream.
   message Authenticated {
     reserved 1;
-    reserved "name";
 
     // The name of the principal. If set, The URI SAN or DNS SAN in that order is used from the
     // certificate, otherwise the subject field is used. If unset, it applies to any user that is
     // authenticated.
-    envoy.type.matcher.StringMatcher principal_name = 2;
+    type.matcher.StringMatcher principal_name = 2;
   }
 
   oneof identifier {
@@ -189,20 +187,20 @@ message Principal {
     Set or_ids = 2;
 
     // When any is set, it matches any downstream.
-    bool any = 3 [(validate.rules).bool.const = true];
+    bool any = 3 [(validate.rules).bool = {const: true}];
 
     // Authenticated attributes that identify the downstream.
     Authenticated authenticated = 4;
 
     // A CIDR block that describes the downstream IP.
-    envoy.api.v2.core.CidrRange source_ip = 5;
+    api.v2.core.CidrRange source_ip = 5;
 
     // A header (or pseudo-header such as :path or :method) on the incoming HTTP request. Only
     // available for HTTP request.
-    envoy.api.v2.route.HeaderMatcher header = 6;
+    api.v2.route.HeaderMatcher header = 6;
 
     // Metadata that describes additional information about the principal.
-    envoy.type.matcher.MetadataMatcher metadata = 7;
+    type.matcher.MetadataMatcher metadata = 7;
 
     // Negates matching the provided principal. For instance, if the value of `not_id` would match,
     // this principal would not match. Conversely, if the value of `not_id` would not match, this

@@ -32,7 +32,7 @@ namespace {
 class ConnectionHandlerTest : public testing::Test, protected Logger::Loggable<Logger::Id::main> {
 public:
   ConnectionHandlerTest()
-      : handler_(new ConnectionHandlerImpl(ENVOY_LOGGER(), dispatcher_)),
+      : handler_(new ConnectionHandlerImpl(dispatcher_, "test")),
         filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()) {}
 
   class TestListener : public Network::ListenerConfig, public LinkedObject<TestListener> {
@@ -379,7 +379,18 @@ TEST_F(ConnectionHandlerTest, NormalRedirect) {
   EXPECT_CALL(dispatcher_, createServerConnection_(_, _)).WillOnce(Return(connection));
   EXPECT_CALL(factory_, createNetworkFilterChain(_, _)).WillOnce(Return(true));
   listener_callbacks1->onAccept(Network::ConnectionSocketPtr{accepted_socket}, true);
+
+  // Verify per-listener connection stats.
   EXPECT_EQ(1UL, handler_->numConnections());
+  EXPECT_EQ(1UL, TestUtility::findCounter(stats_store_, "downstream_cx_total")->value());
+  EXPECT_EQ(1UL, TestUtility::findGauge(stats_store_, "downstream_cx_active")->value());
+  EXPECT_EQ(1UL, TestUtility::findCounter(stats_store_, "test.downstream_cx_total")->value());
+  EXPECT_EQ(1UL, TestUtility::findGauge(stats_store_, "test.downstream_cx_active")->value());
+
+  connection->close(Network::ConnectionCloseType::NoFlush);
+  dispatcher_.clearDeferredDeleteList();
+  EXPECT_EQ(0UL, TestUtility::findGauge(stats_store_, "downstream_cx_active")->value());
+  EXPECT_EQ(0UL, TestUtility::findGauge(stats_store_, "test.downstream_cx_active")->value());
 
   EXPECT_CALL(*listener2, onDestroy());
   EXPECT_CALL(*listener1, onDestroy());

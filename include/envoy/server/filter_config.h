@@ -180,10 +180,10 @@ public:
   virtual Grpc::Context& grpcContext() PURE;
 
   /**
-   * @return absl::optional<std::reference_wrapper<ProcessContext>> an optional reference to the
+   * @return OptProcessContextRef an optional reference to the
    * process context. Will be unset when running in validation mode.
    */
-  virtual absl::optional<std::reference_wrapper<ProcessContext>> processContext() PURE;
+  virtual OptProcessContextRef processContext() PURE;
 };
 
 class ListenerFactoryContext : public virtual FactoryContext {

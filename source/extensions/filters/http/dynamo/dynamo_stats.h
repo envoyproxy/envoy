@@ -37,7 +37,10 @@ public:
    * TODO(jmarantz): Potential perf issue here with mutex contention for names
    * that have not been remembered as builtins in the constructor.
    */
-  Stats::StatName getStatName(const std::string& str) { return stat_name_set_.getStatName(str); }
+  Stats::StatName getDynamic(const std::string& str) { return stat_name_set_.getDynamic(str); }
+  Stats::StatName getBuiltin(const std::string& str, Stats::StatName fallback) {
+    return stat_name_set_.getBuiltin(str, fallback);
+  }
 
 private:
   Stats::SymbolTable::StoragePtr addPrefix(const Stats::StatNameVec& names);
@@ -61,6 +64,8 @@ public:
   const Stats::StatName upstream_rq_time_;
   const Stats::StatName upstream_rq_total_;
   const Stats::StatName upstream_rq_unknown_;
+  const Stats::StatName unknown_entity_type_;
+  const Stats::StatName unknown_operation_;
 
   // Keep group codes for HTTP status codes through the 500s.
   static constexpr size_t NumGroupEntries = 6;
