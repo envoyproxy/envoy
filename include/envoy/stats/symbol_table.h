@@ -22,6 +22,9 @@ class StatName;
 using StatNameVec = std::vector<StatName>;
 
 class StatNameList;
+class StatNameSet;
+
+using StatNameSetPtr = std::unique_ptr<StatNameSet>;
 
 /**
  * SymbolTable manages a namespace optimized for stat names, exploiting their
@@ -143,10 +146,19 @@ public:
   virtual void callWithStringView(StatName stat_name,
                                   const std::function<void(absl::string_view)>& fn) const PURE;
 
+  /**
+   * Creates a StatNameSet.
+   *
+   * @param name the name of the set.
+   * @return the set.
+   */
+  virtual StatNameSetPtr makeSet(absl::string_view name) PURE;
+
 private:
   friend struct HeapStatData;
   friend class StatNameStorage;
   friend class StatNameList;
+  friend class StatNameSet;
 
   // The following methods are private, but are called by friend classes
   // StatNameStorage and StatNameList, which must be friendly with SymbolTable
@@ -183,6 +195,13 @@ private:
    *
    */
   virtual StoragePtr encode(absl::string_view name) PURE;
+
+  /**
+   * Called by StatNameSet's destructor.
+   *
+   * @param stat_name_set the set.
+   */
+  virtual void forgetSet(StatNameSet& stat_name_set) PURE;
 };
 
 using SymbolTablePtr = std::unique_ptr<SymbolTable>;

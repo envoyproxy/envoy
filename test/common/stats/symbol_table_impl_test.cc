@@ -539,32 +539,32 @@ TEST_P(StatNameTest, SharedStatNameStorageSetSwap) {
 }
 
 TEST_P(StatNameTest, StatNameSet) {
-  StatNameSet set(*table_);
+  StatNameSetPtr set(table_->makeSet("set"));
 
   // Test that we get a consistent StatName object from a remembered name.
-  set.rememberBuiltin("remembered");
-  const StatName fallback = set.add("fallback");
-  const Stats::StatName remembered = set.getBuiltin("remembered", fallback);
+  set->rememberBuiltin("remembered");
+  const StatName fallback = set->add("fallback");
+  const Stats::StatName remembered = set->getBuiltin("remembered", fallback);
   EXPECT_EQ("remembered", table_->toString(remembered));
-  EXPECT_EQ(remembered.data(), set.getBuiltin("remembered", fallback).data());
-  EXPECT_EQ(fallback.data(), set.getBuiltin("not_remembered", fallback).data());
+  EXPECT_EQ(remembered.data(), set->getBuiltin("remembered", fallback).data());
+  EXPECT_EQ(fallback.data(), set->getBuiltin("not_remembered", fallback).data());
 
   // Same test for a dynamically allocated name. The only difference between
   // the behavior with a remembered vs dynamic name is that when looking
   // up a remembered name, a mutex is not taken. But we have no easy way
   // to test for that. So we'll at least cover the code.
-  const Stats::StatName dynamic = set.getDynamic("dynamic");
+  const Stats::StatName dynamic = set->getDynamic("dynamic");
   EXPECT_EQ("dynamic", table_->toString(dynamic));
-  EXPECT_EQ(dynamic.data(), set.getDynamic("dynamic").data());
+  EXPECT_EQ(dynamic.data(), set->getDynamic("dynamic").data());
 
   // There's another corner case for the same "dynamic" name from a
   // different set. Here we will get a different StatName object
   // out of the second set, though it will share the same underlying
   // symbol-table symbol.
-  StatNameSet set2(*table_);
-  const Stats::StatName dynamic2 = set2.getDynamic("dynamic");
+  StatNameSetPtr set2(table_->makeSet("set2"));
+  const Stats::StatName dynamic2 = set2->getDynamic("dynamic");
   EXPECT_EQ("dynamic", table_->toString(dynamic2));
-  EXPECT_EQ(dynamic2.data(), set2.getDynamic("dynamic").data());
+  EXPECT_EQ(dynamic2.data(), set2->getDynamic("dynamic").data());
   EXPECT_NE(dynamic2.data(), dynamic.data());
 }
 
