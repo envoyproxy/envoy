@@ -815,11 +815,11 @@ std::string PrometheusStatsFormatter::formattedTags(const std::vector<Stats::Tag
   return StringUtil::join(buf, ",");
 }
 
-std::string PrometheusStatsFormatter::metricName(const std::string& extractedName) {
+std::string PrometheusStatsFormatter::metricName(const std::string& extracted_name) {
   // Add namespacing prefix to avoid conflicts, as per best practice:
   // https://prometheus.io/docs/practices/naming/#metric-names
   // Also, naming conventions on https://prometheus.io/docs/concepts/data_model/
-  return sanitizeName(fmt::format("envoy_{0}", extractedName));
+  return sanitizeName(fmt::format("envoy_{0}", extracted_name));
 }
 
 uint64_t PrometheusStatsFormatter::statsAsPrometheus(
