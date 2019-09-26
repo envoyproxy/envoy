@@ -16,7 +16,7 @@ namespace HttpFilters {
 namespace Cache {
 namespace {
 
-const std::string kEpochDate = "Thu, 01 Jan 1970 00:00:00 GMT";
+const std::string EpochDate = "Thu, 01 Jan 1970 00:00:00 GMT";
 
 class SimpleHttpCacheTest : public testing::Test {
 protected:
@@ -63,9 +63,9 @@ protected:
   LookupRequest makeLookupRequest(absl::string_view request_path) {
     request_headers_.insertPath().value(request_path);
     return LookupRequest(request_headers_, current_time_);
-  };
+  }
 
-  AssertionResult ExpectLookupSuccessWithBody(LookupContext* lookup_context,
+  AssertionResult expectLookupSuccessWithBody(LookupContext* lookup_context,
                                               absl::string_view body) {
     if (lookup_result_.cache_entry_status != CacheEntryStatus::Ok) {
       return AssertionFailure() << "Expected: lookup_result_.cache_entry_status == "
@@ -95,25 +95,25 @@ protected:
 
 // Simple flow of putting in an item, getting it, deleting it.
 TEST_F(SimpleHttpCacheTest, PutGet) {
-  const std::string kRequestPath1("Name");
-  LookupContextPtr name_lookup_context = lookup(kRequestPath1);
+  const std::string RequestPath1("Name");
+  LookupContextPtr name_lookup_context = lookup(RequestPath1);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status);
 
   Http::TestHeaderMapImpl response_headers{{"date", formatter_.fromTime(current_time_)},
                                            {"cache-control", "public,max-age=3600"}};
 
-  const std::string kBody1("Value");
-  insert(move(name_lookup_context), response_headers, kBody1);
-  name_lookup_context = lookup(kRequestPath1);
-  EXPECT_TRUE(ExpectLookupSuccessWithBody(name_lookup_context.get(), kBody1));
+  const std::string Body1("Value");
+  insert(move(name_lookup_context), response_headers, Body1);
+  name_lookup_context = lookup(RequestPath1);
+  EXPECT_TRUE(expectLookupSuccessWithBody(name_lookup_context.get(), Body1));
 
-  const std::string& kRequestPath2("Another Name");
-  LookupContextPtr another_name_lookup_context = lookup(kRequestPath2);
+  const std::string& RequestPath2("Another Name");
+  LookupContextPtr another_name_lookup_context = lookup(RequestPath2);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status);
 
-  const std::string kNewBody1("NewValue");
-  insert(move(name_lookup_context), response_headers, kNewBody1);
-  EXPECT_TRUE(ExpectLookupSuccessWithBody(lookup(kRequestPath1).get(), kNewBody1));
+  const std::string NewBody1("NewValue");
+  insert(move(name_lookup_context), response_headers, NewBody1);
+  EXPECT_TRUE(expectLookupSuccessWithBody(lookup(RequestPath1).get(), NewBody1));
 }
 
 TEST_F(SimpleHttpCacheTest, PrivateResponse) {
@@ -125,12 +125,12 @@ TEST_F(SimpleHttpCacheTest, PrivateResponse) {
   LookupContextPtr name_lookup_context = lookup(request_path);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status);
 
-  const std::string kBody("Value");
+  const std::string Body("Value");
   // We must make sure at cache insertion time, private responses must not be
   // inserted. However, if the insertion did happen, it would be served at the
   // time of lookup.
-  insert(move(name_lookup_context), response_headers, kBody);
-  EXPECT_TRUE(ExpectLookupSuccessWithBody(lookup(request_path).get(), kBody));
+  insert(move(name_lookup_context), response_headers, Body);
+  EXPECT_TRUE(expectLookupSuccessWithBody(lookup(request_path).get(), Body));
 }
 
 TEST_F(SimpleHttpCacheTest, Miss) {
@@ -167,9 +167,9 @@ TEST_F(SimpleHttpCacheTest, RequestSmallMinFresh) {
   Http::TestHeaderMapImpl response_headers{{"date", formatter_.fromTime(current_time_)},
                                            {"age", "6000"},
                                            {"cache-control", "public, max-age=9000"}};
-  const std::string kBody("Value");
-  insert(move(name_lookup_context), response_headers, kBody);
-  EXPECT_TRUE(ExpectLookupSuccessWithBody(lookup(request_path).get(), kBody));
+  const std::string Body("Value");
+  insert(move(name_lookup_context), response_headers, Body);
+  EXPECT_TRUE(expectLookupSuccessWithBody(lookup(request_path).get(), Body));
 }
 
 TEST_F(SimpleHttpCacheTest, ResponseStaleWithRequestLargeMaxStale) {
@@ -183,9 +183,9 @@ TEST_F(SimpleHttpCacheTest, ResponseStaleWithRequestLargeMaxStale) {
                                            {"age", "7200"},
                                            {"cache-control", "public, max-age=3600"}};
 
-  const std::string kBody("Value");
-  insert(move(name_lookup_context), response_headers, kBody);
-  EXPECT_TRUE(ExpectLookupSuccessWithBody(lookup(request_path).get(), kBody));
+  const std::string Body("Value");
+  insert(move(name_lookup_context), response_headers, Body);
+  EXPECT_TRUE(expectLookupSuccessWithBody(lookup(request_path).get(), Body));
 }
 
 TEST_F(SimpleHttpCacheTest, StreamingPut) {
