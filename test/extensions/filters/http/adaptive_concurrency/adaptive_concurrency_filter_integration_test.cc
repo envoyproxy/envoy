@@ -120,12 +120,16 @@ TEST_P(AdaptiveConcurrencyIntegrationTest, TestManyConcurrency1) {
  * TODO: Test the ability to increase/decrease the concurrency limit with request latencies based on
  * the minRTT value.
  *
+ * See PR #8405.
+ *
  * Previous attempts at this test took a long time when using simulated time, which resulted in
  * intermittent timeouts in CI.
  */
 
 /**
  * TODO: Test the ability to enforce the concurrency limit outside of the minRTT calculation window.
+ *
+ * See PR #8405.
  *
  * Previous attempts at this test would hang during waitForHttpConnection after successfully sending
  * several requests to inflate the minRTT value. Alternative approaches that circumvented the need
