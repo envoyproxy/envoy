@@ -154,6 +154,46 @@ TEST_F(AsyncClientImplTest, Basic) {
                      .value());
 }
 
+TEST_F(AsyncClientImplTest, BasicHashPolicy) {
+  message_->body() = std::make_unique<Buffer::OwnedImpl>("test body");
+  Buffer::Instance& data = *message_->body();
+
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](StreamDecoder& decoder,
+                           ConnectionPool::Callbacks& callbacks) -> ConnectionPool::Cancellable* {
+        callbacks.onPoolReady(stream_encoder_, cm_.conn_pool_.host_, stream_info_);
+        response_decoder_ = &decoder;
+        return nullptr;
+      }));
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
+      .WillOnce(
+          Invoke([&](const std::string&, Upstream::ResourcePriority, Http::Protocol,
+                     Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
+            // this is the hash of :path header value "/"
+            EXPECT_EQ(16761507700594825962UL, context->computeHashKey().value());
+            return &cm_.conn_pool_;
+          }));
+
+  TestHeaderMapImpl copy(message_->headers());
+  copy.addCopy("x-envoy-internal", "true");
+  copy.addCopy("x-forwarded-for", "127.0.0.1");
+  copy.addCopy(":scheme", "http");
+
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&copy), false));
+  EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data), true));
+  expectSuccess(200);
+
+  AsyncClient::RequestOptions options;
+  Protobuf::RepeatedPtrField<envoy::api::v2::route::RouteAction::HashPolicy> hash_policy;
+  hash_policy.Add()->mutable_header()->set_header_name(":path");
+  options.setHashPolicy(hash_policy);
+  client_.send(std::move(message_), callbacks_, options);
+
+  HeaderMapPtr response_headers(new TestHeaderMapImpl{{":status", "200"}});
+  response_decoder_->decodeHeaders(std::move(response_headers), false);
+  response_decoder_->decodeData(data, true);
+}
+
 TEST_F(AsyncClientImplTest, Retry) {
   ON_CALL(runtime_.snapshot_, featureEnabled("upstream.use_retry", 100))
       .WillByDefault(Return(true));
@@ -937,7 +977,9 @@ TEST_F(AsyncClientImplTest, DumpState) {
 // Must not be in anonymous namespace for friend to work.
 class AsyncClientImplRouteTest : public testing::Test {
 public:
-  AsyncStreamImpl::RouteImpl route_impl{"foo", absl::nullopt};
+  AsyncStreamImpl::RouteImpl route_impl{
+      "foo", absl::nullopt,
+      Protobuf::RepeatedPtrField<envoy::api::v2::route::RouteAction::HashPolicy>()};
 };
 
 // Test the extended fake route that AsyncClient uses.

@@ -66,7 +66,7 @@ ToolConfig::ToolConfig(std::unique_ptr<Http::TestHeaderMapImpl> headers, int ran
 
 // static
 RouterCheckTool RouterCheckTool::create(const std::string& router_config_file,
-                                        const bool disableDeprecationCheck) {
+                                        const bool disable_deprecation_check) {
   // TODO(hennna): Allow users to load a full config and extract the route configuration from it.
   envoy::api::v2::RouteConfiguration route_config;
   auto stats = std::make_unique<Stats::IsolatedStoreImpl>();
@@ -76,7 +76,7 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_file,
 
   auto factory_context = std::make_unique<NiceMock<Server::Configuration::MockFactoryContext>>();
   auto config = std::make_unique<Router::ConfigImpl>(route_config, *factory_context, false);
-  if (!disableDeprecationCheck) {
+  if (!disable_deprecation_check) {
     MessageUtil::checkForUnexpectedFields(route_config,
                                           ProtobufMessage::getStrictValidationVisitor(),
                                           &factory_context->runtime_loader_);
