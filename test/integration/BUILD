@@ -273,6 +273,7 @@ envoy_cc_test(
     ],
     deps = [
         ":http_integration_lib",
+        "//source/extensions/transport_sockets/tls:context_lib",
         "//test/common/upstream:utility_lib",
     ],
 )
