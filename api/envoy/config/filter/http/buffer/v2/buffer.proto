@@ -18,7 +18,7 @@ message Buffer {
 
   // The maximum request size that the filter will buffer before the connection
   // manager will stop buffering and return a 413 response.
-  google.protobuf.UInt32Value max_request_bytes = 1 [(validate.rules).uint32.gt = 0];
+  google.protobuf.UInt32Value max_request_bytes = 1 [(validate.rules).uint32 = {gt: 0}];
 }
 
 message BufferPerRoute {
@@ -26,9 +26,9 @@ message BufferPerRoute {
     option (validate.required) = true;
 
     // Disable the buffer filter for this particular vhost or route.
-    bool disabled = 1 [(validate.rules).bool.const = true];
+    bool disabled = 1 [(validate.rules).bool = {const: true}];
 
     // Override the global configuration of the filter with this new config.
-    Buffer buffer = 2 [(validate.rules).message.required = true];
+    Buffer buffer = 2 [(validate.rules).message = {required: true}];
   }
 }

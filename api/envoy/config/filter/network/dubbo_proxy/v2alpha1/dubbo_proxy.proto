@@ -15,27 +15,6 @@ import "validate/validate.proto";
 // [#protodoc-title: Dubbo Proxy]
 // Dubbo Proxy :ref:`configuration overview <config_network_filters_dubbo_proxy>`.
 
-// [#comment:next free field: 6]
-message DubboProxy {
-  // The human readable prefix to use when emitting statistics.
-  string stat_prefix = 1 [(validate.rules).string.min_bytes = 1];
-
-  // Configure the protocol used.
-  ProtocolType protocol_type = 2 [(validate.rules).enum.defined_only = true];
-
-  // Configure the serialization protocol used.
-  SerializationType serialization_type = 3 [(validate.rules).enum.defined_only = true];
-
-  // The route table for the connection manager is static and is specified in this property.
-  repeated RouteConfiguration route_config = 4;
-
-  // A list of individual Dubbo filters that make up the filter chain for requests made to the
-  // Dubbo proxy. Order matters as the filters are processed sequentially. For backwards
-  // compatibility, if no dubbo_filters are specified, a default Dubbo router filter
-  // (`envoy.filters.dubbo.router`) is used.
-  repeated DubboFilter dubbo_filters = 5;
-}
-
 // Dubbo Protocol types supported by Envoy.
 enum ProtocolType {
   // the default protocol.
@@ -48,12 +27,33 @@ enum SerializationType {
   Hessian2 = 0;
 }
 
+// [#comment:next free field: 6]
+message DubboProxy {
+  // The human readable prefix to use when emitting statistics.
+  string stat_prefix = 1 [(validate.rules).string = {min_bytes: 1}];
+
+  // Configure the protocol used.
+  ProtocolType protocol_type = 2 [(validate.rules).enum = {defined_only: true}];
+
+  // Configure the serialization protocol used.
+  SerializationType serialization_type = 3 [(validate.rules).enum = {defined_only: true}];
+
+  // The route table for the connection manager is static and is specified in this property.
+  repeated RouteConfiguration route_config = 4;
+
+  // A list of individual Dubbo filters that make up the filter chain for requests made to the
+  // Dubbo proxy. Order matters as the filters are processed sequentially. For backwards
+  // compatibility, if no dubbo_filters are specified, a default Dubbo router filter
+  // (`envoy.filters.dubbo.router`) is used.
+  repeated DubboFilter dubbo_filters = 5;
+}
+
 // DubboFilter configures a Dubbo filter.
 // [#comment:next free field: 3]
 message DubboFilter {
   // The name of the filter to instantiate. The name must match a supported
   // filter.
-  string name = 1 [(validate.rules).string.min_bytes = 1];
+  string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
   // Filter specific configuration which depends on the filter being
   // instantiated. See the supported filters for further documentation.
