@@ -30,7 +30,7 @@ const std::string SquashFilter::ERROR_STATE = "error";
 
 SquashFilterConfig::SquashFilterConfig(
     const envoy::config::filter::http::squash::v2::Squash& proto_config,
-    Upstream::ClusterManager& clusterManager)
+    Upstream::ClusterManager& cluster_manager)
     : cluster_name_(proto_config.cluster()),
       attachment_json_(getAttachment(proto_config.attachment_template())),
       attachment_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(proto_config, attachment_timeout, 60000)),
@@ -38,7 +38,7 @@ SquashFilterConfig::SquashFilterConfig(
           PROTOBUF_GET_MS_OR_DEFAULT(proto_config, attachment_poll_period, 1000)),
       request_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(proto_config, request_timeout, 1000)) {
 
-  if (!clusterManager.get(cluster_name_)) {
+  if (!cluster_manager.get(cluster_name_)) {
     throw EnvoyException(
         fmt::format("squash filter: unknown cluster '{}' in squash config", cluster_name_));
   }

@@ -65,12 +65,12 @@ class RouterCheckTool : Logger::Loggable<Logger::Id::testing> {
 public:
   /**
    * @param router_config_file v2 router config file.
-   * @param disableDeprecationCheck flag to disable the RouteConfig deprecated field check
+   * @param disable_deprecation_check flag to disable the RouteConfig deprecated field check
    * @return RouterCheckTool a RouterCheckTool instance with member variables set by the router
    * config file.
    * */
   static RouterCheckTool create(const std::string& router_config_file,
-                                const bool disableDeprecationCheck);
+                                const bool disable_deprecation_check);
 
   /**
    * TODO(tonya11en): Use a YAML format for the expected routes. This will require a proto.
