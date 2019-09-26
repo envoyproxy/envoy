@@ -2917,6 +2917,48 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyInTrailersCallback) {
       HeaderMapPtr{new TestHeaderMapImpl{{"some", "trailer"}}});
 }
 
+// Upstream doesn't send data frames, only headers and trailers.
+TEST_F(HttpConnectionManagerImplTest, FilterAddBodyInTrailersCallbackForHeaderOnlyResponse) {
+  InSequence s;
+  setup(false, "");
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    HeaderMapPtr headers{
+        new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+    conn_manager_->newStream(response_encoder_).decodeHeaders(std::move(headers), true);
+  }));
+
+  setupFilterChain(1, 1);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+
+  // Kick off the incoming data.
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  decoder_filters_[0]->callbacks_->encodeHeaders(
+      HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, false);
+
+  Buffer::OwnedImpl trailers_data("body");
+  EXPECT_CALL(*encoder_filters_[0], encodeTrailers(_))
+      .WillOnce(InvokeWithoutArgs([&]() -> FilterTrailersStatus {
+        encoder_filters_[0]->callbacks_->addEncodedData(trailers_data, false);
+        return FilterTrailersStatus::Continue;
+      }));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
+  EXPECT_CALL(response_encoder_, encodeData(_, false));
+  EXPECT_CALL(response_encoder_, encodeTrailers(_));
+  expectOnDestroy();
+
+  decoder_filters_[0]->callbacks_->encodeTrailers(
+      HeaderMapPtr{new TestHeaderMapImpl{{"some", "trailer"}}});
+}
+
 // Add*Data during the *Data callbacks.
 TEST_F(HttpConnectionManagerImplTest, FilterAddBodyDuringDecodeData) {
   InSequence s;
