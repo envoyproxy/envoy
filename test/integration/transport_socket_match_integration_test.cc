@@ -11,7 +11,10 @@ namespace Envoy {
 
 // TODO(incfly):
 // - upstream setup, finish multiple endpiont upstream setup.
-//   for now wait on 'waitforindex 0' hardcoded. maybe using some route api to achieve.
+//    use autonomous_upstream_ = true... otherwise too complicated.
+//   for now wait on 'waitforindex 0' hardcoded.
+//   blocking on the failure of the multi endpoints same ssl context.
+//   maybe using some route api to achieve.
 // - Client envoy configuration modifying, use matcher!
 // bazel test //test/integration:transport_socket_match_integration_test --test_output=streamed
 // --test_arg='-l info'
@@ -78,14 +81,15 @@ public:
 
   void createUpstreams() override {
     for (uint32_t i = 0; i < num_hosts_; i++) {
-//      if (i%2) {
+      // TODO: remove the second condition once multi endpoint is resolved.
+      if (i%2 == 0 || i%2 == 1) {
         fake_upstreams_.emplace_back(std::make_unique<FakeUpstream>(
               createUpstreamSslContext(), 0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
-      //} else {
-    //// backup, plaintext upstream setup.
-     //fake_upstreams_.emplace_back(
-         //new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
-      //}
+      } else {
+    // backup, plaintext upstream setup.
+     fake_upstreams_.emplace_back(
+         new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
+      }
     }
   }
   const uint32_t num_hosts_;
@@ -93,28 +97,22 @@ public:
 
 TEST_F(TransportSockeMatchIntegrationTest, BasicMatch) {
   initialize();
-  // Test code to the envoy connection, no need to recreate.
-  codec_client_ = makeHttpConnection(lookupPort("http"));
   for (int i = 0; i < 3; i++) {
-    //auto response = sendRequestAndWaitForResponse(
-        //default_request_headers_, 0, default_response_headers_, 0);
-  IntegrationStreamDecoderPtr response;
-  //if (request_body_size) {
-    //response = codec_client_->makeRequestWithBody(request_headers, request_body_size);
-  //} else {
-    response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  //}
-  waitForNextUpstreamRequest(0);
-  // Send response headers, and end_stream if there is no response body.
-  upstream_request_->encodeHeaders(default_response_headers_, true);
-  // Send any response data, with end_stream true.
-  //if (response_size) {
-    //upstream_request_->encodeData(response_size, true);
-  //}
-  // Wait for the response to be read by the codec client.
-  response->waitForEndStream();
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+    IntegrationStreamDecoderPtr response;
+        response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+    //}
+    // TODO: get this back, protocol_integration_test.cc, subset_lb_integrationt-test.cc
+      //std::vector<int> index;
+    //for (uint32_t i = 0; i < num_hosts_; i++) { index.push_back(i); }
+    waitForNextUpstreamRequest(0);
+    // Send response headers, and end_stream if there is no response body.
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    // Wait for the response to be read by the codec client.
+    response->waitForEndStream();
 
     EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+    cleanupUpstreamAndDownstream();
   }
 }
 
