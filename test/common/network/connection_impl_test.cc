@@ -559,10 +559,11 @@ TEST_P(ConnectionImplTest, KickUndone) {
     server_connection_->write(buffer, false);
     EXPECT_CALL(*client_read_filter, onData(BufferStringEqual("data"), false))
         .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> FilterStatus {
+          dispatcher_->exit();
           connection_buffer = &buffer;
           return FilterStatus::StopIteration;
         }));
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
 
   {
