@@ -60,6 +60,7 @@ private:
   // Assigned upon construction. Constructed with empty local address if unknown
   // by then.
   Network::ConnectionSocketPtr connection_socket_;
+  // Points to an instance of EnvoyQuicServerSession or EnvoyQuicClientSession.
   Network::Connection* envoy_connection_{nullptr};
 };
 

@@ -304,7 +304,7 @@ public:
    * UdpPacketProcessor.
    * @param socket is the UDP socket to read from.
    * @param udp_packet_processor is the callback to receive the packet.
-   * @param recevie_time is the timestamp passed to udp_packet_processor for the
+   * @param receive_time is the timestamp passed to udp_packet_processor for the
    * receive time of the packet.
    * @param packets_dropped is the output parameter for number of packets dropped in kernel. If the
    * caller is not interested in it, nullptr can be passed in.
