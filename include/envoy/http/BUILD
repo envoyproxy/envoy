@@ -15,6 +15,8 @@ envoy_cc_library(
     deps = [
         ":message_interface",
         "//include/envoy/event:dispatcher_interface",
+        "//source/common/protobuf",
+        "@envoy_api//envoy/api/v2/route:route_cc",
     ],
 )
 
@@ -68,6 +70,15 @@ envoy_cc_library(
         "//include/envoy/router:router_interface",
         "//include/envoy/ssl:connection_interface",
         "//include/envoy/tracing:http_tracer_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "hash_policy_interface",
+    hdrs = ["hash_policy.h"],
+    deps = [
+        ":header_map_interface",
+        "//include/envoy/network:address_interface",
     ],
 )
 

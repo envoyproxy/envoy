@@ -22,7 +22,7 @@ message ApiConfigSource {
   enum ApiType {
     // Ideally this would be 'reserved 0' but one can't reserve the default
     // value. Instead we throw an exception if this is ever used.
-    UNSUPPORTED_REST_LEGACY = 0 [deprecated = true];
+    DEPRECATED_AND_UNAVAILABLE_DO_NOT_USE = 0 [deprecated = true];
 
     // REST-JSON v2 API. The `canonical JSON encoding
     // <https://developers.google.com/protocol-buffers/docs/proto3#json>`_ for

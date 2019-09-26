@@ -136,14 +136,14 @@ InstanceConstSharedPtr peerAddressFromFd(int fd) {
   return addressFromSockAddr(ss, ss_len);
 }
 
-IoHandlePtr InstanceBase::socketFromSocketType(SocketType socketType) const {
+IoHandlePtr InstanceBase::socketFromSocketType(SocketType socket_type) const {
 #if defined(__APPLE__)
   int flags = 0;
 #else
   int flags = SOCK_NONBLOCK;
 #endif
 
-  if (socketType == SocketType::Stream) {
+  if (socket_type == SocketType::Stream) {
     flags |= SOCK_STREAM;
   } else {
     flags |= SOCK_DGRAM;
