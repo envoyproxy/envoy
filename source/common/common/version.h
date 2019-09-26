@@ -16,6 +16,6 @@ public:
   // Repository status (e.g. clean, modified).
   static const std::string& revisionStatus();
   // Repository information and build type.
-  static std::string version();
+  static const std::string& version();
 };
 } // namespace Envoy

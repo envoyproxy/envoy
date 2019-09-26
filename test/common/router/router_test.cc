@@ -116,15 +116,15 @@ public:
   }
 
   AssertionResult verifyHostUpstreamStats(uint64_t success, uint64_t error) {
-    if (success != cm_.conn_pool_.host_->stats_store_.counter("rq_success").value()) {
-      return AssertionFailure() << fmt::format(
-                 "rq_success {} does not match expected {}",
-                 cm_.conn_pool_.host_->stats_store_.counter("rq_success").value(), success);
+    if (success != cm_.conn_pool_.host_->stats_.rq_success_.value()) {
+      return AssertionFailure() << fmt::format("rq_success {} does not match expected {}",
+                                               cm_.conn_pool_.host_->stats_.rq_success_.value(),
+                                               success);
     }
-    if (error != cm_.conn_pool_.host_->stats_store_.counter("rq_error").value()) {
-      return AssertionFailure() << fmt::format(
-                 "rq_error {} does not match expected {}",
-                 cm_.conn_pool_.host_->stats_store_.counter("rq_error").value(), error);
+    if (error != cm_.conn_pool_.host_->stats_.rq_error_.value()) {
+      return AssertionFailure() << fmt::format("rq_error {} does not match expected {}",
+                                               cm_.conn_pool_.host_->stats_.rq_error_.value(),
+                                               error);
     }
     return AssertionSuccess();
   }
@@ -512,7 +512,7 @@ TEST_F(RouterTest, AddCookie) {
   std::string cookie_value;
   EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _, _))
       .WillOnce(Invoke([&](const Network::Address::Instance*, const Http::HeaderMap&,
-                           const HashPolicy::AddCookieCallback add_cookie) {
+                           const Http::HashPolicy::AddCookieCallback add_cookie) {
         cookie_value = add_cookie("foo", "", std::chrono::seconds(1337));
         return absl::optional<uint64_t>(10);
       }));
@@ -560,7 +560,7 @@ TEST_F(RouterTest, AddCookieNoDuplicate) {
 
   EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _, _))
       .WillOnce(Invoke([&](const Network::Address::Instance*, const Http::HeaderMap&,
-                           const HashPolicy::AddCookieCallback add_cookie) {
+                           const Http::HashPolicy::AddCookieCallback add_cookie) {
         // this should be ignored
         add_cookie("foo", "", std::chrono::seconds(1337));
         return absl::optional<uint64_t>(10);
@@ -608,7 +608,7 @@ TEST_F(RouterTest, AddMultipleCookies) {
   std::string choco_c, foo_c;
   EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _, _))
       .WillOnce(Invoke([&](const Network::Address::Instance*, const Http::HeaderMap&,
-                           const HashPolicy::AddCookieCallback add_cookie) {
+                           const Http::HashPolicy::AddCookieCallback add_cookie) {
         choco_c = add_cookie("choco", "", std::chrono::seconds(15));
         foo_c = add_cookie("foo", "/path", std::chrono::seconds(1337));
         return absl::optional<uint64_t>(10);
@@ -2116,7 +2116,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutGlobalTimeout) {
       }));
   response_timeout_->invokeCallback();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 2));
-  EXPECT_EQ(2, cm_.conn_pool_.host_->stats_store_.counter("rq_timeout").value());
+  EXPECT_EQ(2, cm_.conn_pool_.host_->stats_.rq_timeout_.value());
   // TODO: Verify hedge stats here once they are implemented.
 }
 

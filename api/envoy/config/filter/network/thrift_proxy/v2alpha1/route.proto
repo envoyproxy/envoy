@@ -29,10 +29,10 @@ message RouteConfiguration {
 // [#comment:next free field: 3]
 message Route {
   // Route matching parameters.
-  RouteMatch match = 1 [(validate.rules).message.required = true];
+  RouteMatch match = 1 [(validate.rules).message = {required: true}];
 
   // Route request to some upstream cluster.
-  RouteAction route = 2 [(validate.rules).message.required = true];
+  RouteAction route = 2 [(validate.rules).message = {required: true}];
 }
 
 // [#comment:next free field: 5]
@@ -69,7 +69,7 @@ message RouteMatch {
   // headers in the route are present in the request with the same values (or based on presence if
   // the value field is not in the config). Note that this only applies for Thrift transports and/or
   // protocols that support headers.
-  repeated envoy.api.v2.route.HeaderMatcher headers = 4;
+  repeated api.v2.route.HeaderMatcher headers = 4;
 }
 
 // [#comment:next free field: 5]
@@ -79,7 +79,7 @@ message RouteAction {
 
     // Indicates a single upstream cluster to which the request should be routed
     // to.
-    string cluster = 1 [(validate.rules).string.min_bytes = 1];
+    string cluster = 1 [(validate.rules).string = {min_bytes: 1}];
 
     // Multiple upstream clusters can be specified for a given route. The
     // request is routed to one of the upstream clusters based on weights
@@ -93,12 +93,12 @@ message RouteAction {
   // <envoy_api_field_config.filter.network.thrift_proxy.v2alpha1.WeightedCluster.ClusterWeight.metadata_match>`,
   // with values there taking precedence. Keys and values should be provided under the "envoy.lb"
   // metadata key.
-  envoy.api.v2.core.Metadata metadata_match = 3;
+  api.v2.core.Metadata metadata_match = 3;
 
   // Specifies a set of rate limit configurations that could be applied to the route.
   // N.B. Thrift service or method name matching can be achieved by specifying a RequestHeaders
   // action with the header name ":method-name".
-  repeated envoy.api.v2.route.RateLimit rate_limits = 4;
+  repeated api.v2.route.RateLimit rate_limits = 4;
 }
 
 // Allows for specification of multiple upstream clusters along with weights that indicate the
@@ -107,12 +107,12 @@ message RouteAction {
 message WeightedCluster {
   message ClusterWeight {
     // Name of the upstream cluster.
-    string name = 1 [(validate.rules).string.min_bytes = 1];
+    string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
     // When a request matches the route, the choice of an upstream cluster is determined by its
     // weight. The sum of weights across all entries in the clusters array determines the total
     // weight.
-    google.protobuf.UInt32Value weight = 2 [(validate.rules).uint32.gte = 1];
+    google.protobuf.UInt32Value weight = 2 [(validate.rules).uint32 = {gte: 1}];
 
     // Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints in
     // the upstream cluster with metadata matching what is set in this field, combined with what's
@@ -120,9 +120,9 @@ message WeightedCluster {
     // <envoy_api_field_config.filter.network.thrift_proxy.v2alpha1.RouteAction.metadata_match>`,
     // will be considered. Values here will take precedence. Keys and values should be provided
     // under the "envoy.lb" metadata key.
-    envoy.api.v2.core.Metadata metadata_match = 3;
+    api.v2.core.Metadata metadata_match = 3;
   }
 
   // Specifies one or more upstream clusters associated with the route.
-  repeated ClusterWeight clusters = 1 [(validate.rules).repeated .min_items = 1];
+  repeated ClusterWeight clusters = 1 [(validate.rules).repeated = {min_items: 1}];
 }

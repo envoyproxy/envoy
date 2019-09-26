@@ -461,7 +461,8 @@ ListenerManagerImpl::ListenerManagerImpl(Instance& server,
           "listeners", [this] { return dumpListenerConfigs(); })),
       enable_dispatcher_stats_(enable_dispatcher_stats) {
   for (uint32_t i = 0; i < server.options().concurrency(); i++) {
-    workers_.emplace_back(worker_factory.createWorker(server.overloadManager()));
+    workers_.emplace_back(
+        worker_factory.createWorker(server.overloadManager(), fmt::format("worker_{}", i)));
   }
 }
 

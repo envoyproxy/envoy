@@ -64,7 +64,7 @@ public:
         listener_stats_({ALL_LISTENER_STATS(POOL_COUNTER(listener_config_.listenerScope()),
                                             POOL_GAUGE(listener_config_.listenerScope()),
                                             POOL_HISTOGRAM(listener_config_.listenerScope()))}),
-        connection_handler_(ENVOY_LOGGER(), *dispatcher_),
+        connection_handler_(*dispatcher_, "test_thread"),
         envoy_quic_dispatcher_(
             &crypto_config_, quic_config_, &version_manager_,
             std::make_unique<EnvoyQuicConnectionHelper>(*dispatcher_),

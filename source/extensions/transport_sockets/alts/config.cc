@@ -6,6 +6,7 @@
 #include "envoy/server/transport_socket_config.h"
 
 #include "common/common/assert.h"
+#include "common/grpc/google_grpc_context.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 
@@ -65,6 +66,17 @@ public:
   AltsSharedState() { grpc_alts_shared_resource_dedicated_init(); }
 
   ~AltsSharedState() override { grpc_alts_shared_resource_dedicated_shutdown(); }
+
+private:
+  // There is blanket google-grpc initialization in MainCommonBase, but that
+  // doesn't cover unit tests. However, putting blanket coverage in ProcessWide
+  // causes background threaded memory allocation in all unit tests making it
+  // hard to measure memory. Thus we also initialize grpc using our idempotent
+  // wrapper-class in classes that need it. See
+  // https://github.com/envoyproxy/envoy/issues/8282 for details.
+#ifdef ENVOY_GOOGLE_GRPC
+  Grpc::GoogleGrpcContext google_grpc_context_;
+#endif
 };
 
 SINGLETON_MANAGER_REGISTRATION(alts_shared_state);

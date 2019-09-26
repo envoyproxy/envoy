@@ -160,10 +160,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/msgpack/msgpack-c/releases/download/cpp-3.2.0/msgpack-3.2.0.tar.gz"],
     ),
     com_github_google_jwt_verify = dict(
-        sha256 = "2d57d336239d5fe36a03849ddbea1bff09a1720e1c4a46bbb9743c71732b0d43",
-        strip_prefix = "jwt_verify_lib-0f14d43f20381cfae0469cb2309b2e220c0f0ea3",
-        # 2019-07-08
-        urls = ["https://github.com/google/jwt_verify_lib/archive/0f14d43f20381cfae0469cb2309b2e220c0f0ea3.tar.gz"],
+        sha256 = "38a93926f362a330a2a4489ed799c260df0bc305417e2bb44d6745671d9641d7",
+        strip_prefix = "jwt_verify_lib-7e3191b0dcb72835aa63e308a53b541e7fda5458",
+        # 2019-09-23
+        urls = ["https://github.com/google/jwt_verify_lib/archive/7e3191b0dcb72835aa63e308a53b541e7fda5458.tar.gz"],
     ),
     com_github_nodejs_http_parser = dict(
         sha256 = "ef26268c54c8084d17654ba2ed5140bffeffd2a040a895ffb22a6cca3f6c613f",
@@ -224,10 +224,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/bazelbuild/rules_go/releases/download/0.19.2/rules_go-0.19.2.tar.gz"],
     ),
     rules_foreign_cc = dict(
-        sha256 = "c957e6663094a1478c43330c1bbfa71afeaf1ab86b7565233783301240c7a0ab",
-        strip_prefix = "rules_foreign_cc-a209b642c7687a8894c19b3dd40e43e6d3f38e83",
-        # 2019-07-17
-        urls = ["https://github.com/bazelbuild/rules_foreign_cc/archive/a209b642c7687a8894c19b3dd40e43e6d3f38e83.tar.gz"],
+        sha256 = "ea7e4f13b66009d46c01a0292cf1d590d8ea06775c315263abb66022dde25315",
+        strip_prefix = "rules_foreign_cc-16ddc00bd4e1b3daf3faee1605a168f5283326fa",
+        # 2019-09-18
+        urls = ["https://github.com/bazelbuild/rules_foreign_cc/archive/16ddc00bd4e1b3daf3faee1605a168f5283326fa.tar.gz"],
     ),
     rules_proto = dict(
         sha256 = "602e7161d9195e50246177e7c55b2f39950a9cf7366f74ed5f22fd45750cd208",

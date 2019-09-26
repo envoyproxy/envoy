@@ -102,6 +102,17 @@ public:
   const ZooKeeperProxyStats& stats() { return stats_; }
   uint32_t maxPacketBytes() const { return max_packet_bytes_; }
 
+  // Captures the counter used to track total op-code usage, as well as the
+  // StatName under which to collect the latency for that op-code. The
+  // latency-name will be joined with the stat_prefix_, which varies per filter
+  // instance.
+  struct OpCodeInfo {
+    Stats::Counter* counter_;
+    std::string opname_;
+    Stats::StatName latency_name_;
+  };
+
+  absl::flat_hash_map<OpCodes, OpCodeInfo> op_code_map_;
   Stats::Scope& scope_;
   const uint32_t max_packet_bytes_;
   ZooKeeperProxyStats stats_;
@@ -109,8 +120,12 @@ public:
   const Stats::StatName stat_prefix_;
   const Stats::StatName auth_;
   const Stats::StatName connect_latency_;
+  const Stats::StatName unknown_scheme_rq_;
+  const Stats::StatName unknown_opcode_latency_;
 
 private:
+  void initOpCode(OpCodes opcode, Stats::Counter& counter, absl::string_view name);
+
   ZooKeeperProxyStats generateStats(const std::string& prefix, Stats::Scope& scope) {
     return ZooKeeperProxyStats{ALL_ZOOKEEPER_PROXY_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
   }
