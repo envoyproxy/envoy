@@ -114,7 +114,7 @@ std::chrono::milliseconds GradientController::applyJitter(std::chrono::milliseco
   }
 
   const uint32_t jitter_range_ms = interval.count() * jitter_pct;
-  return std::chrono::milliseconds(interval.count() + random_.random() % jitter_range_ms);
+  return std::chrono::milliseconds(interval.count() + (random_.random() % jitter_range_ms));
 }
 
 void GradientController::resetSampleWindow() {

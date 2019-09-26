@@ -89,13 +89,11 @@ sample_aggregate_percentile:
 concurrency_limit_params:
   max_gradient: 2.1
   max_concurrency_limit: 1337
-  concurrency_update_interval:
-    nanos: 123000000
+  concurrency_update_interval: 0.123s
 min_rtt_calc_params:
   jitter:
     value: 13.2
-  interval:
-    seconds: 31
+  interval: 31s
   request_count: 52
 )EOF";
 
@@ -117,11 +115,9 @@ min_rtt_calc_params:
 TEST_F(GradientControllerConfigTest, DefaultValuesTest) {
   const std::string yaml = R"EOF(
 concurrency_limit_params:
-  concurrency_update_interval:
-    nanos: 123000000
+  concurrency_update_interval: 0.123s
 min_rtt_calc_params:
-  interval:
-    seconds: 31
+  interval: 31s
 )EOF";
 
   envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig proto =
@@ -146,13 +142,11 @@ sample_aggregate_percentile:
 concurrency_limit_params:
   max_gradient: 2.0
   max_concurrency_limit:
-  concurrency_update_interval:
-    nanos: 100000000 # 100ms
+  concurrency_update_interval: 0.1s
 min_rtt_calc_params:
   jitter:
     value: 0.0
-  interval:
-    seconds: 30
+  interval: 30s
   request_count: 50
 )EOF";
 
@@ -186,13 +180,11 @@ sample_aggregate_percentile:
 concurrency_limit_params:
   max_gradient: 2.0
   max_concurrency_limit:
-  concurrency_update_interval:
-    nanos: 100000000 # 100ms
+  concurrency_update_interval: 0.1s
 min_rtt_calc_params:
   jitter:
     value: 0.0
-  interval:
-    seconds: 30
+  interval: 30s
   request_count: 5
 )EOF";
 
@@ -213,13 +205,11 @@ sample_aggregate_percentile:
 concurrency_limit_params:
   max_gradient: 2.0
   max_concurrency_limit:
-  concurrency_update_interval:
-    nanos: 100000000 # 100ms
+  concurrency_update_interval: 0.1s
 min_rtt_calc_params:
   jitter:
     value: 0.0
-  interval:
-    seconds: 30
+  interval: 30s
   request_count: 5
 )EOF";
 
@@ -239,13 +229,11 @@ sample_aggregate_percentile:
 concurrency_limit_params:
   max_gradient: 2.0
   max_concurrency_limit:
-  concurrency_update_interval:
-    nanos: 100000000 # 100ms
+  concurrency_update_interval: 0.1s
 min_rtt_calc_params:
   jitter:
     value: 0.0
-  interval:
-    seconds: 30
+  interval: 30s
   request_count: 5
 )EOF";
 
@@ -295,13 +283,11 @@ sample_aggregate_percentile:
 concurrency_limit_params:
   max_gradient: 3.0
   max_concurrency_limit:
-  concurrency_update_interval:
-    nanos: 100000000 # 100ms
+  concurrency_update_interval: 0.1s
 min_rtt_calc_params:
   jitter:
     value: 0.0
-  interval:
-    seconds: 30
+  interval: 30s
   request_count: 5
 )EOF";
 
@@ -334,13 +320,11 @@ sample_aggregate_percentile:
 concurrency_limit_params:
   max_gradient: 3.0
   max_concurrency_limit:
-  concurrency_update_interval:
-    nanos: 100000000 # 100ms
+  concurrency_update_interval: 0.1s
 min_rtt_calc_params:
   jitter:
     value: 0.0
-  interval:
-    seconds: 30
+  interval: 30s
   request_count: 5
 )EOF";
 
@@ -388,13 +372,11 @@ sample_aggregate_percentile:
 concurrency_limit_params:
   max_gradient: 3.0
   max_concurrency_limit:
-  concurrency_update_interval:
-    nanos: 100000000 # 100ms
+  concurrency_update_interval: 0.1s
 min_rtt_calc_params:
   jitter:
     value: 0.0
-  interval:
-    seconds: 30
+  interval: 30s
   request_count: 5
 )EOF";
 
@@ -435,13 +417,11 @@ sample_aggregate_percentile:
 concurrency_limit_params:
   max_gradient: 3.0
   max_concurrency_limit:
-  concurrency_update_interval:
-    nanos: 100000000 # 100ms
+  concurrency_update_interval: 0.1s
 min_rtt_calc_params:
   jitter:
     value: 0.0
-  interval:
-    seconds: 30
+  interval: 30s
   request_count: 5
 )EOF";
 
@@ -480,13 +460,11 @@ sample_aggregate_percentile:
 concurrency_limit_params:
   max_gradient: 3.0
   max_concurrency_limit:
-  concurrency_update_interval:
-    nanos: 123000000 # 123ms
+  concurrency_update_interval: 0.123s
 min_rtt_calc_params:
   jitter:
     value: 10.0
-  interval:
-    seconds: 100
+  interval: 100s
   request_count: 5
 )EOF";
 
@@ -523,13 +501,11 @@ sample_aggregate_percentile:
 concurrency_limit_params:
   max_gradient: 3.0
   max_concurrency_limit:
-  concurrency_update_interval:
-    nanos: 123000000 # 123ms
+  concurrency_update_interval: 0.123s
 min_rtt_calc_params:
   jitter:
     value: 0.0
-  interval:
-    seconds: 45
+  interval: 45s
   request_count: 5
 )EOF";
 
