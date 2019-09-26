@@ -499,7 +499,7 @@ class RstFormatVisitor(visitor.Visitor):
 
 
 def Main():
-  plugin.Plugin('.rst', RstFormatVisitor())
+  plugin.Plugin([plugin.DirectOutputDescriptor('.rst', RstFormatVisitor())])
 
 
 if __name__ == '__main__':

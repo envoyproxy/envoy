@@ -2,7 +2,11 @@ licenses(["notice"])  # Apache 2
 
 py_binary(
     name = "protoxform",
-    srcs = ["protoxform.py"],
+    srcs = [
+        "migrate.py",
+        "options.py",
+        "protoxform.py",
+    ],
     python_version = "PY3",
     visibility = ["//visibility:public"],
     deps = [

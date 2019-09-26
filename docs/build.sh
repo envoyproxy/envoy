@@ -46,26 +46,40 @@ mkdir -p "${GENERATED_RST_DIR}"
 source_venv "$BUILD_DIR"
 pip3 install -r "${SCRIPT_DIR}"/requirements.txt
 
+# Clean up any stale files in the API tree output. Bazel remembers valid cached
+# files still.
+rm -rf bazel-bin/external/envoy_api
+
 bazel build ${BAZEL_BUILD_OPTIONS} @envoy_api//docs:protos --aspects \
   tools/protodoc/protodoc.bzl%proto_doc_aspect --output_groups=rst --action_env=CPROFILE_ENABLED=1 \
   --action_env=ENVOY_BLOB_SHA --spawn_strategy=standalone --host_force_python=PY3
 
-declare -r DOCS_DEPS=$(bazel query "labels(deps, @envoy_api//docs:protos)")
+# We do ** matching below to deal with Bazel cache blah (source proto artifacts
+# are nested inside source package targets).
+shopt -s globstar
+
+# Find all source protos.
+declare -r PROTO_TARGET=$(bazel query "labels(srcs, labels(deps, @envoy_api//docs:protos))")
 
 # Only copy in the protos we care about and know how to deal with in protodoc.
-for PROTO_TARGET in ${DOCS_DEPS}
+for p in ${PROTO_TARGET}
 do
-  for p in $(bazel query "labels(srcs, ${PROTO_TARGET})" )
-  do
-    declare PROTO_TARGET_WITHOUT_PREFIX="${PROTO_TARGET#@envoy_api//}"
-    declare PROTO_TARGET_CANONICAL="${PROTO_TARGET_WITHOUT_PREFIX/://}"
-    declare PROTO_FILE_WITHOUT_PREFIX="${p#@envoy_api//}"
-    declare PROTO_FILE_CANONICAL="${PROTO_FILE_WITHOUT_PREFIX/://}"
-    declare DEST="${GENERATED_RST_DIR}/api-v2/${PROTO_FILE_CANONICAL#envoy/}".rst
-    mkdir -p "$(dirname "${DEST}")"
-    cp -f bazel-bin/external/envoy_api/"${PROTO_TARGET_CANONICAL}/${PROTO_FILE_CANONICAL}.rst" "$(dirname "${DEST}")"
-    [ -n "${CPROFILE_ENABLED}" ] && cp -f bazel-bin/"${p}".profile "$(dirname "${DEST}")"
-  done
+  declare PROTO_FILE_WITHOUT_PREFIX="${p#@envoy_api//}"
+  declare PROTO_FILE_CANONICAL="${PROTO_FILE_WITHOUT_PREFIX/://}"
+  # We use ** glob matching here to deal with the fact that we have something
+  # like
+  # bazel-bin/external/envoy_api/envoy/admin/v2alpha/pkg/envoy/admin/v2alpha/certs.proto.proto
+  # and we don't want to have to do a nested loop and slow bazel query to
+  # recover the canonical package part of the path.
+  declare SRCS=(bazel-bin/external/envoy_api/**/"${PROTO_FILE_CANONICAL}.rst")
+  # While we may have reformatted the file multiple times due to the transitive
+  # dependencies in the aspect above, they all look the same. So, just pick an
+  # arbitrary match and we're done.
+  declare SRC="${SRCS[0]}"
+  declare DST="${GENERATED_RST_DIR}/api-v2/${PROTO_FILE_CANONICAL#envoy/}".rst
+
+  mkdir -p "$(dirname "${DST}")"
+  cp -f "${SRC}" "$(dirname "${DST}")"
 done
 
 mkdir -p ${GENERATED_RST_DIR}/api-docs

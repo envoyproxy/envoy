@@ -92,6 +92,7 @@ public:
                       uint64_t random_value) const override;
   const std::string& get(const std::string& key) const override;
   uint64_t getInteger(const std::string& key, uint64_t default_value) const override;
+  double getDouble(const std::string& key, double default_value) const override;
   const std::vector<OverrideLayerConstPtr>& getLayers() const override;
 
   static Entry createEntry(const std::string& value);
@@ -106,14 +107,21 @@ private:
     if (parseEntryBooleanValue(entry)) {
       return;
     }
-    if (parseEntryUintValue(entry)) {
+
+    if (parseEntryDoubleValue(entry) && entry.double_value_ >= 0 &&
+        entry.double_value_ <= std::numeric_limits<uint64_t>::max()) {
+      // Valid uint values will always be parseable as doubles, so we assign the value to both the
+      // uint and double fields. In cases where the value is something like "3.1", we will floor the
+      // number by casting it to a uint and assigning the uint value.
+      entry.uint_value_ = entry.double_value_;
       return;
     }
+
     parseEntryFractionalPercentValue(entry);
   }
 
   static bool parseEntryBooleanValue(Entry& entry);
-  static bool parseEntryUintValue(Entry& entry);
+  static bool parseEntryDoubleValue(Entry& entry);
   static void parseEntryFractionalPercentValue(Entry& entry);
 
   const std::vector<OverrideLayerConstPtr> layers_;

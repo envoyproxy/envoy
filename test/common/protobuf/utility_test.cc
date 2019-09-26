@@ -679,6 +679,48 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(RepeatedMessageDeprecated))
                       checkForDeprecation(base));
 }
 
+// Check that deprecated enum values trigger for default values
+TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(EnumValuesDeprecatedDefault)) {
+  envoy::test::deprecation_test::Base base;
+  base.mutable_enum_container();
+
+  EXPECT_LOG_CONTAINS(
+      "warning",
+      "Using the default now-deprecated value DEPRECATED_DEFAULT for enum "
+      "'envoy.test.deprecation_test.Base.InnerMessageWithDeprecationEnum.deprecated_enum' from "
+      "file deprecated.proto. This enum value will be removed from Envoy soon so a non-default "
+      "value must now be explicitly set.",
+      checkForDeprecation(base));
+}
+
+// Check that deprecated enum values trigger for non-default values
+TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(EnumValuesDeprecated)) {
+  envoy::test::deprecation_test::Base base;
+  base.mutable_enum_container()->set_deprecated_enum(
+      envoy::test::deprecation_test::Base::DEPRECATED_NOT_DEFAULT);
+
+  EXPECT_LOG_CONTAINS(
+      "warning",
+      "Using deprecated value DEPRECATED_NOT_DEFAULT for enum "
+      "'envoy.test.deprecation_test.Base.InnerMessageWithDeprecationEnum.deprecated_enum' "
+      "from file deprecated.proto. This enum value will be removed from Envoy soon.",
+      checkForDeprecation(base));
+}
+
+// Make sure the runtime overrides for protos work, by checking the non-fatal to
+// fatal option.
+TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(RuntimeOverrideEnumDefault)) {
+  envoy::test::deprecation_test::Base base;
+  base.mutable_enum_container();
+
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.deprecated_features.deprecated.proto:DEPRECATED_DEFAULT", "false"}});
+
+  // Make sure this is set up right.
+  EXPECT_THROW_WITH_REGEX(checkForDeprecation(base), ProtoValidationException,
+                          "Using the default now-deprecated value DEPRECATED_DEFAULT");
+}
+
 class TimestampUtilTest : public testing::Test, public ::testing::WithParamInterface<int64_t> {};
 
 TEST_P(TimestampUtilTest, SystemClockToTimestampTest) {
