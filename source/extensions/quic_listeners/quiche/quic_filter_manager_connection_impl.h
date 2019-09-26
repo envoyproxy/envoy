@@ -18,8 +18,8 @@ namespace Quic {
 class QuicFilterManagerConnectionImpl : public Network::FilterManagerConnection,
                                         protected Logger::Loggable<Logger::Id::connection> {
 public:
-  QuicFilterManagerConnectionImpl(std::unique_ptr<EnvoyQuicConnection> connection,
-                                  Event::Dispatcher& dispatcher, uint32_t send_buffer_limit);
+  QuicFilterManagerConnectionImpl(EnvoyQuicConnection& connection, Event::Dispatcher& dispatcher,
+                                  uint32_t send_buffer_limit);
 
   // Network::FilterManager
   // Overridden to delegate calls to filter_manager_.
@@ -37,7 +37,7 @@ public:
   uint64_t id() const override {
     // QUIC connection id can be 18 types. It's easier to use hash value instead
     // of trying to map it into a 64-bit space.
-    return quic_connection_->connection_id().Hash();
+    return quic_connection_.connection_id().Hash();
   }
   std::string nextProtocol() const override { return EMPTY_STRING; }
   void noDelay(bool /*enable*/) override {
@@ -59,12 +59,12 @@ public:
   }
   void setConnectionStats(const Network::Connection::ConnectionStats& stats) override {
     stats_ = std::make_unique<Network::Connection::ConnectionStats>(stats);
-    quic_connection_->setConnectionStats(stats);
+    quic_connection_.setConnectionStats(stats);
   }
   Ssl::ConnectionInfoConstSharedPtr ssl() const override;
   Network::Connection::State state() const override {
-    return quic_connection_->connected() ? Network::Connection::State::Open
-                                         : Network::Connection::State::Closed;
+    return quic_connection_.connected() ? Network::Connection::State::Open
+                                        : Network::Connection::State::Closed;
   }
   void write(Buffer::Instance& /*data*/, bool /*end_stream*/) override {
     // All writes should be handled by Quic internally.
@@ -105,7 +105,7 @@ protected:
 
   void raiseEvent(Network::ConnectionEvent event);
 
-  std::unique_ptr<EnvoyQuicConnection> quic_connection_;
+  EnvoyQuicConnection& quic_connection_;
   // TODO(danzh): populate stats.
   std::unique_ptr<Network::Connection::ConnectionStats> stats_;
 

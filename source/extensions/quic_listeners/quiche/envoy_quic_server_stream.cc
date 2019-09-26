@@ -16,9 +16,10 @@
 #include "quiche/quic/core/quic_session.h"
 #include "quiche/spdy/core/spdy_header_block.h"
 #include "quiche/quic/platform/api/quic_mem_slice_span.h"
+#pragma GCC diagnostic pop
+
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_server_session.h"
-#pragma GCC diagnostic pop
 
 #include "common/buffer/buffer_impl.h"
 #include "common/http/header_map_impl.h"
@@ -106,10 +107,17 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   ASSERT(decoder() != nullptr);
   ASSERT(headers_decompressed());
   decoder()->decodeHeaders(quicHeadersToEnvoyHeaders(header_list), /*end_stream=*/fin);
+  if (fin) {
+    end_stream_decoded_ = true;
+  }
   ConsumeHeaderList();
 }
 
 void EnvoyQuicServerStream::OnBodyAvailable() {
+  if (!FinishedReadingHeaders()) {
+    return;
+  }
+
   Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
   // TODO(danzh): check Envoy per stream buffer limit.
   // Currently read out all the data.
@@ -129,18 +137,25 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
 
   // True if no trailer and FIN read.
   bool finished_reading = IsDoneReading();
-  // If this is the last stream data, set end_stream if there is no
-  // trailers.
-  ASSERT(decoder() != nullptr);
-  decoder()->decodeData(*buffer, finished_reading);
-  if (!quic::VersionUsesQpack(transport_version()) && sequencer()->IsClosed() &&
-      !FinishedReadingTrailers()) {
+  bool empty_payload_with_fin = buffer->length() == 0 && finished_reading;
+  if (!empty_payload_with_fin || !end_stream_decoded_) {
+    ASSERT(decoder() != nullptr);
+    decoder()->decodeData(*buffer, finished_reading);
+  }
+
+  if (!sequencer()->IsClosed()) {
+    sequencer()->SetUnblocked();
+    return;
+  }
+
+  if (!quic::VersionUsesQpack(transport_version()) && !FinishedReadingTrailers()) {
     // For Google QUIC implementation, trailers may arrived earlier and wait to
     // be consumed after reading all the body. Consume it here.
     // IETF QUIC shouldn't reach here because trailers are sent on same stream.
     decoder()->decodeTrailers(spdyHeaderBlockToEnvoyHeaders(received_trailers()));
     MarkTrailersConsumed();
   }
+  OnFinRead();
 }
 
 void EnvoyQuicServerStream::OnTrailingHeadersComplete(bool fin, size_t frame_len,

@@ -5,10 +5,10 @@
 namespace Envoy {
 namespace Quic {
 
-QuicFilterManagerConnectionImpl::QuicFilterManagerConnectionImpl(
-    std::unique_ptr<EnvoyQuicConnection> connection, Event::Dispatcher& dispatcher,
-    uint32_t send_buffer_limit)
-    : quic_connection_(std::move(connection)), filter_manager_(*this), dispatcher_(dispatcher),
+QuicFilterManagerConnectionImpl::QuicFilterManagerConnectionImpl(EnvoyQuicConnection& connection,
+                                                                 Event::Dispatcher& dispatcher,
+                                                                 uint32_t send_buffer_limit)
+    : quic_connection_(connection), filter_manager_(*this), dispatcher_(dispatcher),
       stream_info_(dispatcher.timeSource()),
       write_buffer_watermark_simulation_(
           send_buffer_limit / 2, send_buffer_limit, [this]() { onSendBufferLowWatermark(); },
@@ -64,8 +64,8 @@ void QuicFilterManagerConnectionImpl::close(Network::ConnectionCloseType type) {
     // TODO(danzh): Implement FlushWrite and FlushWriteAndDelay mode.
     ENVOY_CONN_LOG(error, "Flush write is not implemented for QUIC.", *this);
   }
-  quic_connection_->CloseConnection(quic::QUIC_NO_ERROR, "Closed by application",
-                                    quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
+  quic_connection_.CloseConnection(quic::QUIC_NO_ERROR, "Closed by application",
+                                   quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
 }
 
 void QuicFilterManagerConnectionImpl::setDelayedCloseTimeout(std::chrono::milliseconds timeout) {
@@ -85,21 +85,21 @@ QuicFilterManagerConnectionImpl::socketOptions() const {
       error,
       "QUIC connection socket is merely a wrapper, and doesn't have any specific socket options.",
       *this);
-  return quic_connection_->connectionSocket()->options();
+  return quic_connection_.connectionSocket()->options();
 }
 
 const Network::Address::InstanceConstSharedPtr&
 QuicFilterManagerConnectionImpl::remoteAddress() const {
-  ASSERT(quic_connection_->connectionSocket() != nullptr,
+  ASSERT(quic_connection_.connectionSocket() != nullptr,
          "remoteAddress() should only be called after OnPacketHeader");
-  return quic_connection_->connectionSocket()->remoteAddress();
+  return quic_connection_.connectionSocket()->remoteAddress();
 }
 
 const Network::Address::InstanceConstSharedPtr&
 QuicFilterManagerConnectionImpl::localAddress() const {
-  ASSERT(quic_connection_->connectionSocket() != nullptr,
+  ASSERT(quic_connection_.connectionSocket() != nullptr,
          "localAddress() should only be called after OnPacketHeader");
-  return quic_connection_->connectionSocket()->localAddress();
+  return quic_connection_.connectionSocket()->localAddress();
 }
 
 Ssl::ConnectionInfoConstSharedPtr QuicFilterManagerConnectionImpl::ssl() const {

@@ -28,7 +28,7 @@ public:
     addCallbacks_(callbacks);
   }
   void removeCallbacks(Http::StreamCallbacks& callbacks) override { removeCallbacks_(callbacks); }
-  uint32_t bufferLimit() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  uint32_t bufferLimit() override { return quic::kStreamReceiveWindowLimit; }
 
   // Needs to be called during quic stream creation before the stream receives
   // any headers and data.
@@ -41,6 +41,7 @@ protected:
   }
 
   EnvoyQuicSimulatedWatermarkBuffer& sendBufferSimulation() { return send_buffer_simulation_; }
+  bool end_stream_decoded_{false};
 
 private:
   // Not owned.

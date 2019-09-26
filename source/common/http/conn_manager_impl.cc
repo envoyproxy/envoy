@@ -37,8 +37,6 @@
 #include "common/router/config_impl.h"
 #include "common/runtime/runtime_impl.h"
 
-#include "extensions/quic_listeners/quiche/codec_impl.h"
-
 #include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
 
@@ -345,8 +343,10 @@ Network::FilterStatus ConnectionManagerImpl::onNewConnection() {
   if (!read_callbacks_->connection().streamInfo().protocol()) {
     return Network::FilterStatus::Continue;
   }
-  codec_ = std::make_unique<Quic::QuicHttpServerConnectionImpl>(
-      dynamic_cast<Quic::EnvoyQuicServerSession&>(read_callbacks_->connection()), *this);
+  // Only QUIC connection's stream_info_ specifies protocol.
+  Buffer::OwnedImpl dummy;
+  codec_ = config_.createCodec(read_callbacks_->connection(), dummy, *this);
+  stats_.named_.downstream_cx_http3_active_.inc();
   return Network::FilterStatus::StopIteration;
 }
 

@@ -59,6 +59,7 @@ StreamEncoder& CodecClient::newStream(StreamDecoder& response_decoder) {
   ActiveRequestPtr request(new ActiveRequest(*this, response_decoder));
   request->encoder_ = &codec_->newStream(*request);
   request->encoder_->getStream().addCallbacks(*request);
+  std::cerr << "========= insert new request " << request.get() << "\n";
   request->moveIntoList(std::move(request), active_requests_);
   disableIdleTimer();
   return *active_requests_.front()->encoder_;

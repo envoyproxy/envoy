@@ -7,10 +7,19 @@
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
 
 #include "quiche/quic/core/quic_session.h"
+#include "quiche/quic/core/http/quic_header_list.h"
+#include "quiche/quic/core/quic_session.h"
+#include "quiche/spdy/core/spdy_header_block.h"
+#include "quiche/quic/platform/api/quic_mem_slice_span.h"
 
 #pragma GCC diagnostic pop
 
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
+#include "extensions/quic_listeners/quiche/envoy_quic_client_session.h"
+
+#include "common/buffer/buffer_impl.h"
+#include "common/http/header_map_impl.h"
+#include "common/common/assert.h"
 
 namespace Envoy {
 namespace Quic {
@@ -36,17 +45,38 @@ void EnvoyQuicClientStream::encode100ContinueHeaders(const Http::HeaderMap& head
   encodeHeaders(headers, false);
 }
 
-void EnvoyQuicClientStream::encodeHeaders(const Http::HeaderMap& /*headers*/, bool /*end_stream*/) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+void EnvoyQuicClientStream::encodeHeaders(const Http::HeaderMap& headers, bool end_stream) {
+  WriteHeaders(envoyHeadersToSpdyHeaderBlock(headers), end_stream, nullptr);
 }
-void EnvoyQuicClientStream::encodeData(Buffer::Instance& /*data*/, bool /*end_stream*/) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+
+void EnvoyQuicClientStream::encodeData(Buffer::Instance& data, bool end_stream) {
+  if (data.length() == 0) {
+    return;
+  }
+  // This is counting not serialized bytes in the send buffer.
+  uint64_t bytes_to_send_old = BufferedDataBytes();
+  // QUIC stream must take all.
+  quic::QuicConsumedData bytes_consumed =
+      WriteBodySlices(quic::QuicMemSliceSpan(quic::QuicMemSliceSpanImpl(data)), end_stream);
+  ASSERT(bytes_consumed.bytes_consumed == data.length());
+
+  uint64_t bytes_to_send_new = BufferedDataBytes();
+  ASSERT(bytes_to_send_old <= bytes_to_send_new);
+  if (bytes_to_send_new > bytes_to_send_old) {
+    // If buffered bytes changed, update stream and session's watermark book
+    // keeping.
+    sendBufferSimulation().checkHighWatermark(bytes_to_send_new);
+    dynamic_cast<EnvoyQuicClientSession*>(session())->adjustBytesToSend(bytes_to_send_new -
+                                                                        bytes_to_send_old);
+  }
 }
-void EnvoyQuicClientStream::encodeTrailers(const Http::HeaderMap& /*trailers*/) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+
+void EnvoyQuicClientStream::encodeTrailers(const Http::HeaderMap& trailers) {
+  WriteTrailers(envoyHeadersToSpdyHeaderBlock(trailers), nullptr);
 }
+
 void EnvoyQuicClientStream::encodeMetadata(const Http::MetadataMapVector& /*metadata_map_vector*/) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  ASSERT(false, "Metadata Frame is not supported in QUIC");
 }
 
 void EnvoyQuicClientStream::resetStream(Http::StreamResetReason /*reason*/) {
@@ -57,15 +87,25 @@ void EnvoyQuicClientStream::readDisable(bool /*disable*/) { NOT_IMPLEMENTED_GCOV
 
 void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
                                                      const quic::QuicHeaderList& header_list) {
-  quic::QuicSpdyClientStream::OnInitialHeadersComplete(fin, frame_len, header_list);
-  if (!rst_sent()) {
-    ASSERT(FinishedReadingHeaders());
-    ASSERT(decoder() != nullptr);
-    decoder()->decodeHeaders(spdyHeaderBlockToEnvoyHeaders(response_headers()), /*end_stream=*/fin);
+  std::cerr << "============= OnInitialHeadersComplete() \n";
+  quic::QuicSpdyStream::OnInitialHeadersComplete(fin, frame_len, header_list);
+  if (rst_sent()) {
+    return;
   }
+  ASSERT(decoder() != nullptr);
+  ASSERT(headers_decompressed());
+  std::cerr << "============= decodeHeaders() \n";
+  decoder()->decodeHeaders(quicHeadersToEnvoyHeaders(header_list), /*end_stream=*/fin);
+  if (fin) {
+    end_stream_decoded_ = true;
+  }
+  ConsumeHeaderList();
 }
 
 void EnvoyQuicClientStream::OnBodyAvailable() {
+  if (!FinishedReadingHeaders()) {
+    return;
+  }
   Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
   // TODO(danzh): check Envoy per stream buffer limit.
   // Currently read out all the data.
@@ -85,10 +125,11 @@ void EnvoyQuicClientStream::OnBodyAvailable() {
 
   // True if no trailer and FIN read.
   bool finished_reading = IsDoneReading();
-  // If this is the last stream data, set end_stream if there is no
-  // trailers.
-  ASSERT(decoder() != nullptr);
-  decoder()->decodeData(*buffer, finished_reading);
+  bool empty_payload_with_fin = buffer->length() == 0 && finished_reading;
+  if (!empty_payload_with_fin || !end_stream_decoded_) {
+    ASSERT(decoder() != nullptr);
+    decoder()->decodeData(*buffer, finished_reading);
+  }
 
   if (!sequencer()->IsClosed()) {
     sequencer()->SetUnblocked();
