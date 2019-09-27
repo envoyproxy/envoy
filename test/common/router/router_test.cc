@@ -4013,8 +4013,8 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
   {
     NiceMock<MockRouteEntry> route;
     EXPECT_CALL(route, timeout()).WillOnce(Return(std::chrono::milliseconds(10)));
-    Http::TestHeaderMapImpl headers{
-        {"x-envoy-expected-rq-timeout-ms", "8"}, {"x-envoy-upstream-rq-per-try-timeout-ms", "4"}};
+    Http::TestHeaderMapImpl headers{{"x-envoy-expected-rq-timeout-ms", "8"},
+                                    {"x-envoy-upstream-rq-per-try-timeout-ms", "4"}};
     // Make ingress envoy respect `x-envoy-expected-rq-timeout-ms` header.
     bool respect_expected_rq_timeout = true;
     FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(
