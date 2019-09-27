@@ -64,9 +64,7 @@ message Router {
     ]
   }];
 
-  // If set to true, envoy first will check if `x-envoy-expected-timeout-ms` header is present
-  // and use it's value as timeout to upstream cluster. If header is not present or
-  // `respect_expected_rq_timeout` is set to false, envoy will derive timeout value from
-  // `x-envoy-upstream-rq-timeout-ms` header.
+    // If not set, ingress Envoy will ignore :ref:`config_http_filters_router_x-envoy-expected-rq-timeout-ms` header,
+    // populated by egress Envoy, when deriving timeout for upstream cluster.
   bool respect_expected_rq_timeout = 6;
 }

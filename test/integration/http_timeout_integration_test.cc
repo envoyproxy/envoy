@@ -156,7 +156,7 @@ TEST_P(HttpTimeoutIntegrationTest, IgnoreTimeoutSetByEgressEnvoy) {
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
   // Trigger global timeout, populated from `x-envoy-expected-rq-timeout-ms` header.
-  timeSystem().sleep(std::chrono::milliseconds(501));
+  timeSystem().sleep(std::chrono::milliseconds(301));
 
   // Ensure we got a timeout downstream and canceled the upstream request.
   response->waitForHeaders();

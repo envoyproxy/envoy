@@ -155,15 +155,13 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
   uint64_t header_timeout;
 
   if (respect_expected_rq_timeout) {
-    // Check if there is timeout set by egress envoy.
+    // Check if there is timeout set by egress Envoy.
     // If present, use that value as route timeout and don't override
-    // `x-envoy-expected-rq-timeout-ms` header. At this point `x-envoy-upstream-rq-timeout-ms`
-    // header should have been sanitized by egress envoy.
+    // *x-envoy-expected-rq-timeout-ms* header. At this point *x-envoy-upstream-rq-timeout-ms*
+    // header should have been sanitized by egress Envoy.
     Http::HeaderEntry* header_expected_timeout_entry =
         request_headers.EnvoyExpectedRequestTimeoutMs();
     if (header_expected_timeout_entry) {
-      // This will prevent from overriding `x-envoy-expected-rq-timeout-ms` header.
-      insert_envoy_expected_request_timeout_ms = false;
       if (absl::SimpleAtoi(header_expected_timeout_entry->value().getStringView(),
                            &header_timeout)) {
         timeout.global_timeout_ = std::chrono::milliseconds(header_timeout);

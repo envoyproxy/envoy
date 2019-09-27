@@ -4013,6 +4013,20 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
   {
     NiceMock<MockRouteEntry> route;
     EXPECT_CALL(route, timeout()).WillOnce(Return(std::chrono::milliseconds(10)));
+    Http::TestHeaderMapImpl headers{
+        {"x-envoy-expected-rq-timeout-ms", "8"}, {"x-envoy-upstream-rq-per-try-timeout-ms", "4"}};
+    // Make ingress envoy respect `x-envoy-expected-rq-timeout-ms` header.
+    bool respect_expected_rq_timeout = true;
+    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(
+        route, headers, true, false, false, respect_expected_rq_timeout);
+    EXPECT_EQ(std::chrono::milliseconds(8), timeout.global_timeout_);
+    EXPECT_EQ(std::chrono::milliseconds(4), timeout.per_try_timeout_);
+    EXPECT_EQ("4", headers.get_("x-envoy-expected-rq-timeout-ms"));
+    EXPECT_FALSE(headers.has("grpc-timeout"));
+  }
+  {
+    NiceMock<MockRouteEntry> route;
+    EXPECT_CALL(route, timeout()).WillOnce(Return(std::chrono::milliseconds(10)));
     Http::TestHeaderMapImpl headers{{"x-envoy-upstream-rq-timeout-ms", "8"}};
     // Test that ingress envoy populates `x-envoy-expected-rq-timeout-ms` header if it has not been
     // set by egress envoy.
