@@ -87,7 +87,7 @@ TEST(Logger, logAsStatement) {
 }
 
 TEST(Logger, checkLoggerLevel) {
-  class logTestClass : public Logger::Loggable<Logger::Id::misc> {
+  class LogTestClass : public Logger::Loggable<Logger::Id::misc> {
   public:
     void setLevel(const spdlog::level::level_enum level) { ENVOY_LOGGER().set_level(level); }
     uint32_t executeAtTraceLevel() {
@@ -101,7 +101,7 @@ TEST(Logger, checkLoggerLevel) {
     }
   };
 
-  logTestClass testObj;
+  LogTestClass testObj;
 
   // Set Loggers severity low
   testObj.setLevel(spdlog::level::trace);
