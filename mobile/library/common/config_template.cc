@@ -11,15 +11,15 @@ static_resources:
     lb_policy: ROUND_ROBIN
     load_assignment:
       cluster_name: base
-      endpoints:
+      endpoints: &base_endpoints
         - lb_endpoints:
             - endpoint:
                 address:
                   socket_address: {address: {{ domain }}, port_value: 443}
-    tls_context:
+    tls_context: &base_tls_context
       common_tls_context:
         validation_context:
-          trusted_ca: &trusted_ca
+          trusted_ca:
             inline_string: |
 )"
 #include "certificates.inc"
@@ -35,18 +35,8 @@ R"(
     lb_policy: ROUND_ROBIN
     load_assignment:
       cluster_name: base_wlan
-      endpoints:
-        - lb_endpoints:
-            - endpoint:
-                address:
-                  socket_address: {address: {{ domain }}, port_value: 443}
-    tls_context:
-      common_tls_context:
-        validation_context:
-          trusted_ca: *trusted_ca
-          verify_subject_alt_name:
-            - {{ domain }}
-      sni: {{ domain }}
+      endpoints: *base_endpoints
+    tls_context: *base_tls_context
     type: LOGICAL_DNS
   - name: base_wwan # Note: the direct API depends on the existence of a cluster with this name.
     connect_timeout: {{ connect_timeout_seconds }}s
@@ -55,18 +45,8 @@ R"(
     lb_policy: ROUND_ROBIN
     load_assignment:
       cluster_name: base_wwan
-      endpoints:
-        - lb_endpoints:
-            - endpoint:
-                address:
-                  socket_address: {address: {{ domain }}, port_value: 443}
-    tls_context:
-      common_tls_context:
-        validation_context:
-          trusted_ca: *trusted_ca
-          verify_subject_alt_name:
-            - {{ domain }}
-      sni: {{ domain }}
+      endpoints: *base_endpoints
+    tls_context: *base_tls_context
     type: LOGICAL_DNS
 stats_flush_interval: {{ stats_flush_interval_seconds }}s
 watchdog:
