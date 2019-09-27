@@ -400,9 +400,17 @@ Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::HeaderMap& h
   response_headers_ = &headers;
 
   if (end_stream) {
+
+    if (method_->server_streaming()) {
+      // When there is no body in a streaming response, a empty JSON array is
+      // returned by default. Set the content type correctly.
+      headers.insertContentType().value().setReference(Http::Headers::get().ContentTypeValues.Json);
+    }
+
     // In gRPC wire protocol, headers frame with end_stream is a trailers-only response.
     // The return value from encodeTrailers is ignored since it is always continue.
     encodeTrailers(headers);
+
     return Http::FilterHeadersStatus::Continue;
   }
 

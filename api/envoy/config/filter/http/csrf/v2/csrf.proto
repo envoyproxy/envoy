@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.config.filter.http.csrf.v2;
 
-option java_outer_classname = "CsrfPolicyProto";
+option java_outer_classname = "CsrfProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.filter.http.csrf.v2";
 
@@ -25,8 +25,8 @@ message CsrfPolicy {
   //
   //   This field defaults to 100/:ref:`HUNDRED
   //   <envoy_api_enum_type.FractionalPercent.DenominatorType>`.
-  envoy.api.v2.core.RuntimeFractionalPercent filter_enabled = 1
-      [(validate.rules).message.required = true];
+  api.v2.core.RuntimeFractionalPercent filter_enabled = 1
+      [(validate.rules).message = {required: true}];
 
   // Specifies that CSRF policies will be evaluated and tracked, but not enforced.
   // This is intended to be used when filter_enabled is off.
@@ -38,12 +38,12 @@ message CsrfPolicy {
   //
   //   This field defaults to 100/:ref:`HUNDRED
   //   <envoy_api_enum_type.FractionalPercent.DenominatorType>`.
-  envoy.api.v2.core.RuntimeFractionalPercent shadow_enabled = 2;
+  api.v2.core.RuntimeFractionalPercent shadow_enabled = 2;
 
   // Specifies additional source origins that will be allowed in addition to
   // the destination origin.
   //
   // More information on how this can be configured via runtime can be found
   // :ref:`here <csrf-configuration>`.
-  repeated envoy.type.matcher.StringMatcher additional_origins = 3;
+  repeated type.matcher.StringMatcher additional_origins = 3;
 }

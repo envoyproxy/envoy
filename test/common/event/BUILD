@@ -35,19 +35,3 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
-
-envoy_cc_test(
-    name = "dispatched_thread_impl_test",
-    srcs = ["dispatched_thread_impl_test.cc"],
-    deps = [
-        "//source/common/api:api_lib",
-        "//source/common/common:utility_lib",
-        "//source/common/event:dispatched_thread_lib",
-        "//source/server:guarddog_lib",
-        "//test/mocks:common_lib",
-        "//test/mocks/server:server_mocks",
-        "//test/mocks/stats:stats_mocks",
-        "//test/test_common:test_time_lib",
-        "//test/test_common:utility_lib",
-    ],
-)

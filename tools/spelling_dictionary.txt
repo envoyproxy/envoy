@@ -154,6 +154,7 @@ LDS
 LEV
 LHS
 LF
+LRS
 MB
 MD
 MGET
@@ -333,6 +334,7 @@ acks
 acls
 addr
 agg
+alice
 alignas
 alignof
 alloc
@@ -428,6 +430,7 @@ decls
 dedup
 dedupe
 deduplicate
+deduplicates
 deflateInit
 deletable
 deleter

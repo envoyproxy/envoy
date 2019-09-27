@@ -3,7 +3,7 @@
 set -e
 
 # Quick syntax check of .clang-tidy using PyYAML.
-if ! python -c 'import yaml, sys; yaml.safe_load(sys.stdin)' < .clang-tidy > /dev/null; then
+if ! python3 -c 'import yaml, sys; yaml.safe_load(sys.stdin)' < .clang-tidy > /dev/null; then
   echo ".clang-tidy has a syntax error"
   exit 1
 fi
@@ -17,10 +17,6 @@ function cleanup() {
   rm -f .bazelrc.bak
 }
 trap cleanup EXIT
-
-# The compilation database generate script doesn't support passing build options via CLI.
-# Writing them into bazelrc
-echo "build ${BAZEL_BUILD_OPTIONS}" >> .bazelrc
 
 # bazel build need to be run to setup virtual includes, generating files which are consumed
 # by clang-tidy

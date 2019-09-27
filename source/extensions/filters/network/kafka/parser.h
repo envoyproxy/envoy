@@ -43,7 +43,7 @@ using ParserSharedPtr = std::shared_ptr<Parser<MessageType, FailureDataType>>;
  */
 template <typename MessageType, typename FailureDataType> class ParseResponse {
 public:
-  using failure_type = FailureDataType;
+  using FailureType = FailureDataType;
 
   /**
    * Constructs a response that states that parser still needs data and should not be replaced.
@@ -99,8 +99,8 @@ public:
     data = {data.data() + min, data.size() - min};
     context_->remaining() -= min;
     if (0 == context_->remaining()) {
-      using failure_type = typename ResponseType::failure_type::element_type;
-      auto failure_data = std::make_shared<failure_type>(context_->asFailureData());
+      using FailureType = typename ResponseType::FailureType::element_type;
+      auto failure_data = std::make_shared<FailureType>(context_->asFailureData());
       return ResponseType::parseFailure(failure_data);
     } else {
       return ResponseType::stillWaiting();

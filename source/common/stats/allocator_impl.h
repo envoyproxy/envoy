@@ -36,13 +36,13 @@ public:
 
 private:
   struct HeapStatHash {
-    using is_transparent = void;
+    using is_transparent = void; // NOLINT(readability-identifier-naming)
     size_t operator()(const Metric* a) const { return a->statName().hash(); }
     size_t operator()(StatName a) const { return a.hash(); }
   };
 
   struct HeapStatCompare {
-    using is_transparent = void;
+    using is_transparent = void; // NOLINT(readability-identifier-naming)
     bool operator()(const Metric* a, const Metric* b) const {
       return a->statName() == b->statName();
     }

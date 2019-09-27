@@ -397,7 +397,7 @@ FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket
     : http_type_(type), socket_(std::move(listen_socket)),
       api_(Api::createApiForTest(stats_store_)), time_system_(time_system),
       dispatcher_(api_->allocateDispatcher()),
-      handler_(new Server::ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
+      handler_(new Server::ConnectionHandlerImpl(*dispatcher_, "fake_upstream")),
       allow_unexpected_disconnects_(false), read_disable_on_new_connection_(true),
       enable_half_close_(enable_half_close), listener_(*this),
       filter_chain_(Network::Test::createEmptyFilterChain(std::move(transport_socket_factory))) {

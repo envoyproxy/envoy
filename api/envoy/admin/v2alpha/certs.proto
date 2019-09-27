@@ -19,7 +19,6 @@ message Certificates {
 }
 
 message Certificate {
-
   // Details of CA certificate.
   repeated CertificateDetails ca_cert = 1;
 
@@ -48,10 +47,10 @@ message CertificateDetails {
 }
 
 message SubjectAlternateName {
-
   // Subject Alternate Name.
   oneof name {
     string dns = 1;
+
     string uri = 2;
   }
 }
