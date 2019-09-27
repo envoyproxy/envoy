@@ -10,15 +10,11 @@
 
 namespace Envoy {
 
-// TODO(incfly):
-// - upstream setup, finish multiple endpiont upstream setup.
-//    use autonomous_upstream_ = true... otherwise too complicated.
-//   for now wait on 'waitforindex 0' hardcoded.
-//   blocking on the failure of the multi endpoints same ssl context.
-//   maybe using some route api to achieve.
-// - Client envoy configuration modifying, use matcher!
 // bazel test //test/integration:transport_socket_match_integration_test --test_output=streamed
 // --test_arg='-l info'
+// TODO(incfly):
+// - Keep negative test, mixed endpoints will fail without setting this transport_socket_match
+// - Client envoy configuration modifying, use matcher!
 class TransportSockeMatchIntegrationTest : public testing::Test, public HttpIntegrationTest {
 public:
   TransportSockeMatchIntegrationTest()
@@ -35,12 +31,30 @@ public:
       cluster->mutable_lb_subset_config()->add_subset_selectors()->add_keys(type_key_);
       cluster->set_lb_policy(envoy::api::v2::Cluster_LbPolicy_RING_HASH);
 
-      auto* common_tls_context = cluster->mutable_tls_context()->mutable_common_tls_context();
-      auto* tls_cert = common_tls_context->add_tls_certificates();
-      tls_cert->mutable_certificate_chain()->set_filename(
-          TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem"));
-      tls_cert->mutable_private_key()->set_filename(
-          TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
+      //auto* matches = cluster->mutable_transport_socket_matches();
+      std::vector<std::string> yamls{R"EOF(
+name: "tls_socket"
+match:
+  sidecar: "true"
+transport_socket:
+  name: "tls"
+  config:
+    common_tls_context:
+      tls_certificates:
+      - certificate_chain: { filename: "./test/config/integration/certs/clientcert.pem" }
+        private_key: { filename: "./test/config/integration/certs/clientkey.pem" }
+ )EOF"};
+      for (const auto& yaml : yamls) {
+        auto* transport_socket_match = cluster->add_transport_socket_matches();
+        TestUtility::loadFromYaml(yaml, *transport_socket_match);
+    }
+      // TODO(incfly): refactor to have the negative test, not working with this as well...
+      //auto* common_tls_context = cluster->mutable_tls_context()->mutable_common_tls_context();
+      //auto* tls_cert = common_tls_context->add_tls_certificates();
+      //tls_cert->mutable_certificate_chain()->set_filename(
+          //TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem"));
+      //tls_cert->mutable_private_key()->set_filename(
+          //TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
       // Setup the client Envoy TLS config.
       cluster->clear_hosts();
       auto* load_assignment = cluster->mutable_load_assignment();
@@ -165,11 +179,20 @@ public:
 TEST_F(TransportSockeMatchIntegrationTest, BasicMatch) {
 	initialize();
 	codec_client_ = makeHttpConnection(lookupPort("http"));
-	Http::TestHeaderMapImpl response_headers{{":status", "200"}};
 	// Send header only request.
 	IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(type_a_request_headers_);
 	response->waitForEndStream();
+	EXPECT_EQ("503", response->headers().Status()->value().getStringView());
+}
+
+TEST_F(TransportSockeMatchIntegrationTest, MatchForTLSEndpoint) {
+	initialize();
+	codec_client_ = makeHttpConnection(lookupPort("http"));
+	// Send header only request.
+	IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(type_b_request_headers_);
+	response->waitForEndStream();
 	EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
+
 
 } // namespace Envoy
