@@ -284,11 +284,13 @@ uint64_t SymbolTableImpl::recentLookupCapacity() const {
 
 StatNameSetPtr SymbolTableImpl::makeSet(absl::string_view name) {
   const uint64_t capacity = recentLookupCapacity();
-  Thread::LockGuard lock(stat_name_set_mutex_);
-  // make_unique does not work with private ctor, even though FakeSymbolTableImpl is a friend.
+  // make_unique does not work with private ctor, even though SymbolTableImpl is a friend.
   StatNameSetPtr stat_name_set(new StatNameSet(*this, name));
   stat_name_set->setRecentLookupCapacity(capacity);
-  stat_name_sets_.insert(stat_name_set.get());
+  {
+    Thread::LockGuard lock(stat_name_set_mutex_);
+    stat_name_sets_.insert(stat_name_set.get());
+  }
   return stat_name_set;
 }
 
