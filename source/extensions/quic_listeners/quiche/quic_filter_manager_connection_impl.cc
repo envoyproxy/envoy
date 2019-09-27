@@ -73,8 +73,8 @@ void QuicFilterManagerConnectionImpl::setDelayedCloseTimeout(std::chrono::millis
 }
 
 std::chrono::milliseconds QuicFilterManagerConnectionImpl::delayedCloseTimeout() const {
-  // Not called outside of Network::ConnectionImpl. Maybe remove this interface
-  // from Network::Connection.
+  // Not called outside of Network::ConnectionImpl.
+  // TODO(#8419): Try remove this interface from Network::Connection.
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
