@@ -221,8 +221,6 @@ HostVector filterHosts(const std::unordered_set<HostSharedPtr>& hosts,
 Host::CreateConnectionData HostImpl::createConnection(
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsSharedPtr transport_socket_options) const {
-
-   ENVOY_LOG(info, "incfly debug connection address {} metadata {}", address_->asString(), metadata()->DebugString());
   return {createConnection(dispatcher, *cluster_, address_, *metadata(), options,
                            transport_socket_options),
           shared_from_this()};
