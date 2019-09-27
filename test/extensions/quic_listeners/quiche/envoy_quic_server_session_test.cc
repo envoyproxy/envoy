@@ -317,7 +317,8 @@ TEST_P(EnvoyQuicServerSessionTest, ShutdownNotice) {
   envoy_quic_session_.setBufferLimits(1024 * 1024);
   EXPECT_EQ(nullptr, envoy_quic_session_.ssl());
   EXPECT_DEATH(envoy_quic_session_.aboveHighWatermark(), "not implemented");
-  EXPECT_DEBUG_DEATH(envoy_quic_session_.setDelayedCloseTimeout(std::chrono::milliseconds(1)), "");
+  EXPECT_DEATH(envoy_quic_session_.setDelayedCloseTimeout(std::chrono::milliseconds(1)),
+               "not implemented");
   http_connection_->shutdownNotice();
 }
 
