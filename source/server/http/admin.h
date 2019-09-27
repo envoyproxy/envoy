@@ -284,8 +284,8 @@ private:
                                  Http::HeaderMap& response_headers, Buffer::Instance& response,
                                  AdminStream&);
   Http::Code handlerDrainListeners(absl::string_view path_and_query,
-                                  Http::HeaderMap& response_headers, Buffer::Instance& response,
-                                  AdminStream&);
+                                   Http::HeaderMap& response_headers, Buffer::Instance& response,
+                                   AdminStream&);
   Http::Code handlerResetCounters(absl::string_view path_and_query,
                                   Http::HeaderMap& response_headers, Buffer::Instance& response,
                                   AdminStream&);

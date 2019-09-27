@@ -98,6 +98,9 @@ public:
    */
   virtual const ActiveUdpListenerFactory* udpListenerFactory() PURE;
 
+  /**
+   * @return traffic direction of the listener.
+   */
   virtual envoy::api::v2::core::TrafficDirection direction() const PURE;
 };
 

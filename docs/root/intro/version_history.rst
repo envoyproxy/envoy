@@ -107,6 +107,7 @@ Version history
 * admin: added host priority to :http:get:`/clusters` and :http:get:`/clusters?format=json` endpoint response
 * admin: the :ref:`/clusters endpoint <operations_admin_interface_clusters>` now shows hostname
   for each host, useful for DNS based clusters.
+* admin: added support for :ref:`draining <operations_admin_interface_drain>` listeners via admin interface.
 * api: track and report requests issued since last load report.
 * build: releases are built with Clang and linked with LLD.
 * control-plane: management servers can respond with HTTP 304 to indicate that config is up to date for Envoy proxies polling a :ref:`REST API Config Type <envoy_api_field_core.ApiConfigSource.api_type>`

@@ -686,11 +686,12 @@ Http::Code AdminImpl::handlerMemory(absl::string_view, Http::HeaderMap& response
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerDrainListeners(absl::string_view, Http::HeaderMap&,
-                                           Buffer::Instance& response, AdminStream&) {
+Http::Code AdminImpl::handlerDrainListeners(absl::string_view url, Http::HeaderMap&,
+                                            Buffer::Instance& response, AdminStream&) {
+  const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
+  const bool inbound_only = params.find("inboundonly") != params.end();
   for (const Network::ListenerConfig& listener : server_.listenerManager().listeners()) {
-     if (listener.name().find("ingress") != std::string::npos) {
-   // if (listener.direction() == envoy::api::v2::core::TrafficDirection::INBOUND) {
+    if (!inbound_only || listener.direction() == envoy::api::v2::core::TrafficDirection::INBOUND) {
       server_.listenerManager().removeListener(listener.name());
     }
   }
