@@ -6,9 +6,9 @@ private let kMockTemplate = """
 mock_template:
 - name: mock
   domain: {{ domain }}
-  connect_timeout: {{ connect_timeout_seconds }}
-  dns_refresh_rate: {{ dns_refresh_rate_seconds }}
-  stats_flush_interval: {{ stats_flush_interval_seconds }}
+  connect_timeout: {{ connect_timeout_seconds }}s
+  dns_refresh_rate: {{ dns_refresh_rate_seconds }}s
+  stats_flush_interval: {{ stats_flush_interval_seconds }}s
 """
 
 private final class MockEnvoyEngine: NSObject, EnvoyEngine {
