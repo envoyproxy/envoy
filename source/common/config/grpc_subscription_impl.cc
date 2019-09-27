@@ -78,7 +78,7 @@ void GrpcSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason reason
     // So, don't onConfigUpdateFailed() here. Instead, allow a retry of the gRPC stream.
     // If init_fetch_timeout_ is non-zero, the server will continue startup after that timeout.
     stats_.update_failure_.inc();
-    // TODO remove; it only makes sense to count start() and updateResourceInterest()
+    // TODO(fredlas) remove; it only makes sense to count start() and updateResourceInterest()
     // as attempts.
     stats_.update_attempt_.inc();
     break;
@@ -86,7 +86,7 @@ void GrpcSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason reason
     stats_.init_fetch_timeout_.inc();
     context_->disableInitFetchTimeoutTimer();
     callbacks_.onConfigUpdateFailed(reason, e);
-    // TODO remove; it only makes sense to count start() and updateResourceInterest()
+    // TODO(fredlas) remove; it only makes sense to count start() and updateResourceInterest()
     // as attempts.
     stats_.update_attempt_.inc();
     break;
