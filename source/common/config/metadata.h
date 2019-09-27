@@ -48,6 +48,17 @@ public:
   static ProtobufWkt::Value& mutableMetadataValue(envoy::api::v2::core::Metadata& metadata,
                                                   const std::string& filter,
                                                   const std::string& key);
+
+  using LabelSet  = std::vector<std::pair<std::string, ProtobufWkt::Value>>;
+
+  /**
+   * Returns whether a set of the labels match a particular host's metadtata.
+   * @param label_set the target label key/value pair set.
+   * @param host_metadata a given host's metadata.
+   * @param filter_key identifies the entry in the metadata entry for the match.
+   */
+  static bool metadataLabelMatch(const LabelSet& label_set,
+      envoy::api::v2::core::Metadata& host_metadata, const std::string& filter_key);
 };
 
 template <typename factoryClass> class TypedMetadataImpl : public TypedMetadata {
