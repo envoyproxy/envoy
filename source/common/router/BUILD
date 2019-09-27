@@ -43,6 +43,7 @@ envoy_cc_library(
         "//source/common/config:metadata_lib",
         "//source/common/config:rds_json_lib",
         "//source/common/config:well_known_names",
+        "//source/common/http:hash_policy_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",

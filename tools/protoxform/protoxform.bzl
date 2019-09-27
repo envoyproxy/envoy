@@ -54,8 +54,11 @@ def _proto_xform_aspect_impl(target, ctx):
 
     # The outputs live in the ctx.label's package root. We add some additional
     # path information to match with protoc's notion of path relative locations.
-    outputs = [ctx.actions.declare_file(ctx.label.name + "/" + _proto_path(f) +
-                                        ".proto") for f in proto_sources]
+    api_versions = ["v2", "v3alpha"]
+    outputs = []
+    for api_version in api_versions:
+        outputs += [ctx.actions.declare_file(ctx.label.name + "/" + _proto_path(f) +
+                                             ".%s.proto" % api_version) for f in proto_sources]
 
     # Create the protoc command-line args.
     ctx_path = ctx.label.package + "/" + ctx.label.name

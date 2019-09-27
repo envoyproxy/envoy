@@ -15,35 +15,35 @@ namespace HttpFilters {
 namespace Dynamo {
 
 DynamoStats::DynamoStats(Stats::Scope& scope, const std::string& prefix)
-    : scope_(scope), stat_name_set_(scope.symbolTable()),
-      prefix_(stat_name_set_.add(prefix + "dynamodb")),
-      batch_failure_unprocessed_keys_(stat_name_set_.add("BatchFailureUnprocessedKeys")),
-      capacity_(stat_name_set_.add("capacity")),
-      empty_response_body_(stat_name_set_.add("empty_response_body")),
-      error_(stat_name_set_.add("error")),
-      invalid_req_body_(stat_name_set_.add("invalid_req_body")),
-      invalid_resp_body_(stat_name_set_.add("invalid_resp_body")),
-      multiple_tables_(stat_name_set_.add("multiple_tables")),
-      no_table_(stat_name_set_.add("no_table")),
-      operation_missing_(stat_name_set_.add("operation_missing")),
-      table_(stat_name_set_.add("table")), table_missing_(stat_name_set_.add("table_missing")),
-      upstream_rq_time_(stat_name_set_.add("upstream_rq_time")),
-      upstream_rq_total_(stat_name_set_.add("upstream_rq_total")),
-      unknown_entity_type_(stat_name_set_.add("unknown_entity_type")),
-      unknown_operation_(stat_name_set_.add("unknown_operation")) {
-  upstream_rq_total_groups_[0] = stat_name_set_.add("upstream_rq_total_unknown");
-  upstream_rq_time_groups_[0] = stat_name_set_.add("upstream_rq_time_unknown");
+    : scope_(scope), stat_name_set_(scope.symbolTable().makeSet("Dynamo")),
+      prefix_(stat_name_set_->add(prefix + "dynamodb")),
+      batch_failure_unprocessed_keys_(stat_name_set_->add("BatchFailureUnprocessedKeys")),
+      capacity_(stat_name_set_->add("capacity")),
+      empty_response_body_(stat_name_set_->add("empty_response_body")),
+      error_(stat_name_set_->add("error")),
+      invalid_req_body_(stat_name_set_->add("invalid_req_body")),
+      invalid_resp_body_(stat_name_set_->add("invalid_resp_body")),
+      multiple_tables_(stat_name_set_->add("multiple_tables")),
+      no_table_(stat_name_set_->add("no_table")),
+      operation_missing_(stat_name_set_->add("operation_missing")),
+      table_(stat_name_set_->add("table")), table_missing_(stat_name_set_->add("table_missing")),
+      upstream_rq_time_(stat_name_set_->add("upstream_rq_time")),
+      upstream_rq_total_(stat_name_set_->add("upstream_rq_total")),
+      unknown_entity_type_(stat_name_set_->add("unknown_entity_type")),
+      unknown_operation_(stat_name_set_->add("unknown_operation")) {
+  upstream_rq_total_groups_[0] = stat_name_set_->add("upstream_rq_total_unknown");
+  upstream_rq_time_groups_[0] = stat_name_set_->add("upstream_rq_time_unknown");
   for (size_t i = 1; i < DynamoStats::NumGroupEntries; ++i) {
-    upstream_rq_total_groups_[i] = stat_name_set_.add(fmt::format("upstream_rq_total_{}xx", i));
-    upstream_rq_time_groups_[i] = stat_name_set_.add(fmt::format("upstream_rq_time_{}xx", i));
+    upstream_rq_total_groups_[i] = stat_name_set_->add(fmt::format("upstream_rq_total_{}xx", i));
+    upstream_rq_time_groups_[i] = stat_name_set_->add(fmt::format("upstream_rq_time_{}xx", i));
   }
   RequestParser::forEachStatString(
-      [this](const std::string& str) { stat_name_set_.rememberBuiltin(str); });
+      [this](const std::string& str) { stat_name_set_->rememberBuiltin(str); });
   for (uint32_t status_code : {200, 400, 403, 502}) {
-    stat_name_set_.rememberBuiltin(absl::StrCat("upstream_rq_time_", status_code));
-    stat_name_set_.rememberBuiltin(absl::StrCat("upstream_rq_total_", status_code));
+    stat_name_set_->rememberBuiltin(absl::StrCat("upstream_rq_time_", status_code));
+    stat_name_set_->rememberBuiltin(absl::StrCat("upstream_rq_total_", status_code));
   }
-  stat_name_set_.rememberBuiltins({"operation", "table"});
+  stat_name_set_->rememberBuiltins({"operation", "table"});
 }
 
 Stats::SymbolTable::StoragePtr DynamoStats::addPrefix(const Stats::StatNameVec& names) {
