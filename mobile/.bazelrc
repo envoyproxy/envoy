@@ -35,4 +35,5 @@ build:release \
   --linkopt=-s \
   --copt=-O2 \
   --config=fat \
-  --apple_bitcode=embedded
+  --apple_bitcode=embedded \
+  --copt=-fembed-bitcode
