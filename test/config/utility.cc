@@ -94,7 +94,7 @@ const std::string ConfigHelper::HTTP_PROXY_CONFIG = BASE_CONFIG + R"EOF(
           stat_prefix: config_test
           http_filters:
             name: envoy.router
-          codec_type: HTTP3
+          codec_type: HTTP1
           access_log:
             name: envoy.file_access_log
             filter:
@@ -123,7 +123,7 @@ const std::string ConfigHelper::QUIC_HTTP_PROXY_CONFIG = BASE_UDP_LISTENER_CONFI
           stat_prefix: config_test
           http_filters:
             name: envoy.router
-          codec_type: HTTP2
+          codec_type: HTTP3
           access_log:
             name: envoy.file_access_log
             filter:

@@ -25,8 +25,6 @@ Api::IoError::IoErrorCode IoSocketError::getErrorCode() const {
     return IoErrorCode::Interrupt;
   case EADDRNOTAVAIL:
     return IoErrorCode::AddressNotAvailable;
-  case EBADF:
-    return IoErrorCode::BadFd;
   default:
     ENVOY_LOG_MISC(debug, "Unknown error code {} details {}", errno_, ::strerror(errno_));
     return IoErrorCode::UnknownError;
