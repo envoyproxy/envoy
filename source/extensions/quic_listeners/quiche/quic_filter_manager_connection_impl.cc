@@ -8,7 +8,7 @@ namespace Quic {
 QuicFilterManagerConnectionImpl::QuicFilterManagerConnectionImpl(
     std::unique_ptr<EnvoyQuicConnection> connection, Event::Dispatcher& dispatcher)
     : quic_connection_(std::move(connection)), filter_manager_(*this), dispatcher_(dispatcher),
-      // QUIC connection id can be 18 bypes. It's easier to use hash value instead
+      // QUIC connection id can be 18 bytes. It's easier to use hash value instead
       // of trying to map it into a 64-bit space.
       stream_info_(dispatcher.timeSource()), id_(quic_connection_->connection_id().Hash()) {
   // TODO(danzh): Use QUIC specific enum value.
