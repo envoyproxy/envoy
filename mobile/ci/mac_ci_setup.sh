@@ -25,3 +25,6 @@ for DEP in ${DEPS}
 do
     is_installed "${DEP}" || install "${DEP}"
 done
+
+# https://github.com/Microsoft/azure-pipelines-image-generation/blob/master/images/macos/macos-10.14-Readme.md#xcode
+sudo xcode-select --switch /Applications/Xcode_11.app
