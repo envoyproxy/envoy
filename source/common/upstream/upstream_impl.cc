@@ -222,8 +222,7 @@ Host::CreateConnectionData HostImpl::createConnection(
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsSharedPtr transport_socket_options) const {
 
-  // ENVOY_LOG(info, "incfly debug address {} metadata {}", address_->asString(),
-  // metadata()->DebugString());
+   ENVOY_LOG(info, "incfly debug connection address {} metadata {}", address_->asString(), metadata()->DebugString());
   return {createConnection(dispatcher, *cluster_, address_, *metadata(), options,
                            transport_socket_options),
           shared_from_this()};
@@ -1078,9 +1077,6 @@ void PriorityStateManager::registerHostForPriority(
     const std::string& hostname, Network::Address::InstanceConstSharedPtr address,
     const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
     const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint) {
-  ENVOY_LOG(info, "incfly debug the endpoint information {}", lb_endpoint.DebugString());
-  ENVOY_LOG(info, "incfly debug the endpoint metadata information {}",
-            lb_endpoint.metadata().DebugString());
   const HostSharedPtr host(
       new HostImpl(parent_.info(), hostname, address, lb_endpoint.metadata(),
                    lb_endpoint.load_balancing_weight().value(), locality_lb_endpoint.locality(),
