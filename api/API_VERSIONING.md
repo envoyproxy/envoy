@@ -200,3 +200,7 @@ Other mechanical breaking changes are considered *discretionary*. These include 
 field renames and are largely reflected in protobuf comments. The `protoxform` tool may decide to
 minimize API churn by deferring application of discretionary changes until a major version cycle
 where the respective message is undergoing a mandatory change.
+
+The Envoy API structure helps with minimizing churn between versions. Developers should architect
+and split packages such that high churn protos, e.g. HTTP connection manager, are isolated in
+packages and have a shallow reference hierarchy.
