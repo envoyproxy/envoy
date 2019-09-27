@@ -155,7 +155,9 @@ message RuntimeFeatureFlag {
   // Default value if runtime value is not available.
   bool default_value = 1;
 
-  // Runtime key to get value for comparison. This value is used if defined.
+  // Runtime key to get value for comparison. This value is used if defined. The boolean value must
+  // be represented via its
+  // `canonical JSON encoding <https://developers.google.com/protocol-buffers/docs/proto3#json>`_.
   string runtime_key = 2 [(validate.rules).string = {min_bytes: 1}];
 }
 
