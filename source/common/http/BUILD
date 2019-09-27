@@ -214,6 +214,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "hash_policy_lib",
+    srcs = ["hash_policy.cc"],
+    hdrs = ["hash_policy.h"],
+    deps = [
+        ":utility_lib",
+        "//include/envoy/http:hash_policy_interface",
+        "@envoy_api//envoy/api/v2/route:route_cc",
+    ],
+)
+
+envoy_cc_library(
     name = "header_map_lib",
     srcs = ["header_map_impl.cc"],
     hdrs = ["header_map_impl.h"],

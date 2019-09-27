@@ -284,6 +284,7 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
     }
   }
 
+  // TODO(alyssawilk) clean this up after #8352 is well vetted.
   bool redispatch;
   do {
     redispatch = false;

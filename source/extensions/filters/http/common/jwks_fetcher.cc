@@ -32,9 +32,22 @@ public:
              JwksFetcher::JwksReceiver& receiver) override {
     ENVOY_LOG(trace, "{}", __func__);
     ASSERT(!receiver_);
+
     complete_ = false;
     receiver_ = &receiver;
     uri_ = &uri;
+
+    // Check if cluster is configured, fail the request if not.
+    // Otherwise cm_.httpAsyncClientForCluster will throw exception.
+    if (cm_.get(uri.cluster()) == nullptr) {
+      ENVOY_LOG(error, "{}: fetch pubkey [uri = {}] failed: [cluster = {}] is not configured",
+                __func__, uri.uri(), uri.cluster());
+      complete_ = true;
+      receiver_->onJwksError(JwksFetcher::JwksReceiver::Failure::Network);
+      reset();
+      return;
+    }
+
     Http::MessagePtr message = Http::Utility::prepareHeaders(uri);
     message->headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Get);
     ENVOY_LOG(debug, "fetch pubkey from [uri = {}]: start", uri_->uri());

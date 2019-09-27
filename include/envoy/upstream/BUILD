@@ -55,6 +55,7 @@ envoy_cc_library(
         ":health_check_host_monitor_interface",
         ":outlier_detection_interface",
         "//include/envoy/network:address_interface",
+        "//include/envoy/stats:primitive_stats_macros",
         "//include/envoy/stats:stats_macros",
         "@envoy_api//envoy/api/v2/core:base_cc",
     ],
