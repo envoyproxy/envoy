@@ -77,6 +77,9 @@ public:
     const Network::ActiveUdpListenerFactory* udpListenerFactory() override {
       return udp_listener_factory_.get();
     }
+    envoy::api::v2::core::TrafficDirection direction() const override {
+      return envoy::api::v2::core::TrafficDirection::UNSPECIFIED;
+    }
 
     ConnectionHandlerTest& parent_;
     Network::MockListenSocket socket_;
