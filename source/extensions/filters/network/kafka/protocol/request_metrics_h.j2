@@ -27,7 +27,7 @@ namespace Kafka {
 {% for message_type in message_types %}                                                            \
   COUNTER({{message_type.name_in_c_case()}})                                                       \
 {% endfor %}                                                                                       \
-  COUNTER(failed_parse)
+  COUNTER(unknown)
 
 struct KafkaRequestMetrics {
   KAFKA_REQUEST_METRICS(GENERATE_COUNTER_STRUCT)
@@ -36,8 +36,8 @@ struct KafkaRequestMetrics {
 class RichRequestMetrics {
 public:
   virtual ~RichRequestMetrics() = default;
-  virtual void onMessage(const int16_t api_key) PURE;
-  virtual void onFailure() PURE;
+  virtual void onRequest(const int16_t api_key) PURE;
+  virtual void onUnknownRequest() PURE;
 };
 
 using RichRequestMetricsSharedPtr = std::shared_ptr<RichRequestMetrics>;
@@ -48,11 +48,11 @@ public:
     KAFKA_REQUEST_METRICS(POOL_COUNTER_PREFIX(scope, fmt::format("kafka.{}.request.",
       stat_prefix)))}) {};
 
-  void onMessage(const int16_t api_key) override {
+  void onRequest(const int16_t api_key) override {
     counters_[api_key].get().inc();
   }
 
-  void onFailure() override { raw_metrics_.failed_parse_.inc(); }
+  void onUnknownRequest() override { raw_metrics_.unknown_.inc(); }
 
 private:
   RichRequestMetricsImpl(const KafkaRequestMetrics& metrics):

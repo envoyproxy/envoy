@@ -58,8 +58,8 @@ TEST_F(KafkaBrokerFilterIntegrationTest, shouldHandleUnknownRequestAndResponseWi
   // then
   ASSERT_EQ(result1, Network::FilterStatus::Continue);
   ASSERT_EQ(result2, Network::FilterStatus::Continue);
-  ASSERT_EQ(scope_.counter("kafka.prefix.request.failed_parse").value(), 1);
-  ASSERT_EQ(scope_.counter("kafka.prefix.response.failed_parse").value(), 1);
+  ASSERT_EQ(scope_.counter("kafka.prefix.request.unknown").value(), 1);
+  ASSERT_EQ(scope_.counter("kafka.prefix.response.unknown").value(), 1);
 }
 
 TEST_F(KafkaBrokerFilterIntegrationTest, shouldHandleBrokenRequestPayload) {

@@ -44,14 +44,14 @@ public:
 
 class MockRichRequestMetrics : public RichRequestMetrics {
 public:
-  MOCK_METHOD1(onMessage, void(const int16_t));
-  MOCK_METHOD0(onFailure, void());
+  MOCK_METHOD1(onRequest, void(const int16_t));
+  MOCK_METHOD0(onUnknownRequest, void());
 };
 
 class MockRichResponseMetrics : public RichResponseMetrics {
 public:
-  MOCK_METHOD2(onMessage, void(const int16_t, const long long duration));
-  MOCK_METHOD0(onFailure, void());
+  MOCK_METHOD2(onResponse, void(const int16_t, const long long duration));
+  MOCK_METHOD0(onUnknownResponse, void());
 };
 
 class MockRequest : public AbstractRequest {
@@ -166,7 +166,7 @@ TEST_F(MetricTrackingCallbackUnitTest, shouldRegisterRequest) {
   const int32_t correlation_id = 1234;
   AbstractRequestSharedPtr request = std::make_shared<MockRequest>(api_key, 0, correlation_id);
 
-  EXPECT_CALL(*request_metrics_, onMessage(api_key));
+  EXPECT_CALL(*request_metrics_, onRequest(api_key));
 
   MonotonicTime time_point{MonotonicTime::duration(1234)};
   EXPECT_CALL(time_source_, monotonicTime()).WillOnce(Return(time_point));
@@ -179,15 +179,15 @@ TEST_F(MetricTrackingCallbackUnitTest, shouldRegisterRequest) {
   ASSERT_EQ(request_arrivals.at(correlation_id), time_point);
 }
 
-TEST_F(MetricTrackingCallbackUnitTest, shouldRegisterFailedRequestParse) {
+TEST_F(MetricTrackingCallbackUnitTest, shouldRegisterUnknownRequest) {
   // given
   RequestHeader header = {0, 0, 0, ""};
-  RequestParseFailureSharedPtr parse_failure = std::make_shared<RequestParseFailure>(header);
+  RequestParseFailureSharedPtr unknown_request = std::make_shared<RequestParseFailure>(header);
 
-  EXPECT_CALL(*request_metrics_, onFailure());
+  EXPECT_CALL(*request_metrics_, onUnknownRequest());
 
   // when
-  testee_.onFailedParse(parse_failure);
+  testee_.onFailedParse(unknown_request);
 
   // then - request_metrics_ is updated.
 }
@@ -203,7 +203,7 @@ TEST_F(MetricTrackingCallbackUnitTest, shouldRegisterResponse) {
 
   MonotonicTime response_time_point{MonotonicTime::duration(2345000000)};
 
-  EXPECT_CALL(*response_metrics_, onMessage(api_key, 1111));
+  EXPECT_CALL(*response_metrics_, onResponse(api_key, 1111));
   EXPECT_CALL(time_source_, monotonicTime()).WillOnce(Return(response_time_point));
 
   // when
@@ -214,14 +214,14 @@ TEST_F(MetricTrackingCallbackUnitTest, shouldRegisterResponse) {
   ASSERT_EQ(request_arrivals.find(correlation_id), request_arrivals.end());
 }
 
-TEST_F(MetricTrackingCallbackUnitTest, shouldRegisterFailedResponseParse) {
+TEST_F(MetricTrackingCallbackUnitTest, shouldRegisterUnknownResponse) {
   // given
-  ResponseMetadataSharedPtr parse_failure = std::make_shared<ResponseMetadata>(0, 0, 0);
+  ResponseMetadataSharedPtr unknown_response = std::make_shared<ResponseMetadata>(0, 0, 0);
 
-  EXPECT_CALL(*response_metrics_, onFailure());
+  EXPECT_CALL(*response_metrics_, onUnknownResponse());
 
   // when
-  testee_.onFailedParse(parse_failure);
+  testee_.onFailedParse(unknown_response);
 
   // then - response_metrics_ is updated.
 }

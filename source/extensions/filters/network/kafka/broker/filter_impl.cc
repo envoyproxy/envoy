@@ -32,7 +32,7 @@ MetricTrackingCallback::MetricTrackingCallback(TimeSource& time_source,
 
 void MetricTrackingCallback::onMessage(AbstractRequestSharedPtr request) {
   const RequestHeader& header = request->request_header_;
-  request_metrics_->onMessage(header.api_key_);
+  request_metrics_->onRequest(header.api_key_);
 
   const MonotonicTime request_arrival_ts = time_source_.monotonicTime();
   request_arrivals_[header.correlation_id_] = request_arrival_ts;
@@ -48,15 +48,15 @@ void MetricTrackingCallback::onMessage(AbstractResponseSharedPtr response) {
   const MonotonicTime::duration time_in_broker = response_arrival_ts - request_arrival_ts;
   const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(time_in_broker);
 
-  response_metrics_->onMessage(metadata.api_key_, ms.count());
+  response_metrics_->onResponse(metadata.api_key_, ms.count());
 }
 
 void MetricTrackingCallback::onFailedParse(RequestParseFailureSharedPtr) {
-  request_metrics_->onFailure();
+  request_metrics_->onUnknownRequest();
 }
 
 void MetricTrackingCallback::onFailedParse(ResponseMetadataSharedPtr) {
-  response_metrics_->onFailure();
+  response_metrics_->onUnknownResponse();
 }
 
 std::map<int32_t, MonotonicTime>& MetricTrackingCallback::getRequestArrivalsForTest() {

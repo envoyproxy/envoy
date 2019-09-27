@@ -263,6 +263,17 @@ py_binary(
 )
 
 envoy_extension_cc_test(
+    name = "metrics_integration_test",
+    srcs = ["metrics_integration_test.cc"],
+    extension_name = "envoy.filters.network.kafka_broker",
+    deps = [
+        ":message_utilities",
+        "//source/common/stats:isolated_store_lib",
+        "//source/extensions/filters/network/kafka:kafka_broker_filter_lib",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "broker_filter_unit_test",
     srcs = ["broker/filter_unit_test.cc"],
     extension_name = "envoy.filters.network.kafka_broker",

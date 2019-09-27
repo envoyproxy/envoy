@@ -2,9 +2,9 @@
   Template for 'response_metrics.h'.
 
   Generates the response metric names from Kafka message types.
-  The metrics structure (KAFKA_RESPONSE_METRICS) is wrapped by RichRequestMetrics instance, allowing
-  for easier access to metrics using message's api_key as array index (instead of requiring us to
-  explicitly specify the metric (field) name).
+  The metrics structure (KAFKA_RESPONSE_METRICS) is wrapped by RichResponseMetrics instance,
+  allowing for easier access to metrics using message's api_key as array index (instead of
+  requiring us to explicitly specify the metric (field) name).
 
   There are two metrics for each of response types (e.g. produce):
   - number of responses received,
@@ -31,7 +31,7 @@ namespace Kafka {
   COUNTER({{message_type.name_in_c_case()}})                                                       \
   HISTOGRAM({{message_type.name_in_c_case()}}_duration)                                            \
 {% endfor %}                                                                                       \
-  COUNTER(failed_parse)
+  COUNTER(unknown)
 
 struct KafkaResponseMetrics {
   KAFKA_RESPONSE_METRICS(GENERATE_COUNTER_STRUCT, GENERATE_HISTOGRAM_STRUCT)
@@ -40,8 +40,8 @@ struct KafkaResponseMetrics {
 class RichResponseMetrics {
 public:
   virtual ~RichResponseMetrics() = default;
-  virtual void onMessage(const int16_t api_key, const long long duration) PURE;
-  virtual void onFailure() PURE;
+  virtual void onResponse(const int16_t api_key, const long long duration) PURE;
+  virtual void onUnknownResponse() PURE;
 };
 
 using RichResponseMetricsSharedPtr = std::shared_ptr<RichResponseMetrics>;
@@ -53,12 +53,12 @@ public:
       stat_prefix)), POOL_HISTOGRAM_PREFIX(scope, fmt::format("kafka.{}.response.", stat_prefix)))})
   {};
 
-  void onMessage(const int16_t api_key, const long long duration) override {
+  void onResponse(const int16_t api_key, const long long duration) override {
     counters_[api_key].get().inc();
     durations_[api_key].get().recordValue(duration);
   }
 
-  void onFailure() override { raw_metrics_.failed_parse_.inc(); }
+  void onUnknownResponse() override { raw_metrics_.unknown_.inc(); }
 
 private:
   RichResponseMetricsImpl(const KafkaResponseMetrics& metrics):
