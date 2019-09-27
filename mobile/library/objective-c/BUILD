@@ -19,6 +19,9 @@ objc_library(
     hdrs = [
         "EnvoyEngine.h",
     ],
+    sdk_frameworks = [
+        "SystemConfiguration",
+    ],
     visibility = ["//visibility:public"],
     deps = ["//library/common:envoy_main_interface_lib"],
 )
