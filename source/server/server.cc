@@ -309,10 +309,11 @@ void InstanceImpl::initialize(const Options& options,
 
   InstanceImpl::failHealthcheck(false);
 
-  // Check if bootstrap has proxy version set, if yes, we should use that as 'server.version' stat.
+  // Check if bootstrap has server version override set, if yes, we should use that as
+  // 'server.version' stat.
   uint64_t version_int;
-  if (bootstrap_.proxy_version().value() > 0) {
-    version_int = bootstrap_.proxy_version().value();
+  if (bootstrap_.stats_server_version_override().value() > 0) {
+    version_int = bootstrap_.stats_server_version_override().value();
   } else {
     if (!StringUtil::atoull(VersionInfo::revision().substr(0, 6).c_str(), version_int, 16)) {
       throw EnvoyException("compiled GIT SHA is invalid. Invalid build.");

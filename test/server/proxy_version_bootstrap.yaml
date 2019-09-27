@@ -11,4 +11,4 @@ admin:
     socket_address:
       address: {{ ntop_ip_loopback_address }}
       port_value: 0
-proxy_version: 100012001
+stats_server_version_override: 100012001

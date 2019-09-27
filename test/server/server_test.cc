@@ -316,7 +316,7 @@ TEST_P(ServerInstanceImplTest, StatsFlushWhenServerIsStillInitializing) {
   server_thread->join();
 }
 
-// Validates that the "server.version" is updated with proxy_version specified in bootstrap.
+// Validates that the "server.version" is updated with stats_server_version_override from bootstrap.
 TEST_P(ServerInstanceImplTest, ProxyVersionOveridesFromBootstrap) {
   auto server_thread = startTestServer("test/server/proxy_version_bootstrap.yaml", true);
 
