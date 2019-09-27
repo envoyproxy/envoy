@@ -80,10 +80,6 @@ std::chrono::milliseconds QuicFilterManagerConnectionImpl::delayedCloseTimeout()
 
 const Network::ConnectionSocket::OptionsSharedPtr&
 QuicFilterManagerConnectionImpl::socketOptions() const {
-  ENVOY_CONN_LOG(
-      error,
-      "QUIC connection socket is merely a wrapper, and doesn't have any specific socket options.",
-      *this);
   return quic_connection_->connectionSocket()->options();
 }
 
