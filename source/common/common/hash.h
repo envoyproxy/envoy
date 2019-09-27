@@ -109,7 +109,7 @@ struct HeterogeneousStringHash {
 
 struct HeterogeneousStringEqual {
   // See description for HeterogeneousStringHash::is_transparent.
-  using is_transparent = void; // NOLINT(readability-identifer-naming)
+  using is_transparent = void; // NOLINT(readability-identifier-naming)
 
   size_t operator()(absl::string_view a, absl::string_view b) const { return a == b; }
   size_t operator()(const SharedString& a, const SharedString& b) const { return *a == *b; }
