@@ -24,8 +24,12 @@ struct Word {
 };
 
 // Convert Word type for use by 32-bit VMs.
-template <typename T> struct ConvertWordTypeToUint32 { using type = T; };
-template <> struct ConvertWordTypeToUint32<Word> { using type = uint32_t; };
+template <typename T> struct ConvertWordTypeToUint32 {
+  using type = T; // NOLINT(readability-identifier-naming)
+};
+template <> struct ConvertWordTypeToUint32<Word> {
+  using type = uint32_t; // NOLINT(readability-identifier-naming)
+};
 
 // Convert Word-based function types for 32-bit VMs.
 template <typename F> struct ConvertFunctionTypeWordToUint32 {};
@@ -55,13 +59,14 @@ struct WasmFuncTypeHelper {};
 
 template <size_t N, class ReturnType, class ContextType, class ParamType, class... Args>
 struct WasmFuncTypeHelper<N, ReturnType, ContextType, ParamType, ReturnType(ContextType, Args...)> {
+  // NOLINTNEXTLINE(readability-identifier-naming)
   using type = typename WasmFuncTypeHelper<N - 1, ReturnType, ContextType, ParamType,
                                            ReturnType(ContextType, Args..., ParamType)>::type;
 };
 
 template <class ReturnType, class ContextType, class ParamType, class... Args>
 struct WasmFuncTypeHelper<0, ReturnType, ContextType, ParamType, ReturnType(ContextType, Args...)> {
-  using type = ReturnType(ContextType, Args...);
+  using type = ReturnType(ContextType, Args...); // NOLINT(readability-identifier-naming)
 };
 
 template <size_t N, class ReturnType, class ContextType, class ParamType>
