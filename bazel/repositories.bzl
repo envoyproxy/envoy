@@ -506,7 +506,7 @@ def _com_google_protobuf():
         # The patch includes
         # https://github.com/protocolbuffers/protobuf/pull/6333 and also uses
         # foreign_cc build for zlib as its dependency.
-        # TODO(asraa): remove this when > protobuf 3.8.0 is released.
+        # TODO(asraa): remove this when protobuf 3.10 is released.
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:protobuf.patch"],
     )
@@ -520,7 +520,7 @@ def _com_google_protobuf():
         # The patch includes
         # https://github.com/protocolbuffers/protobuf/pull/6333 and also uses
         # foreign_cc build for zlib as its dependency.
-        # TODO(asraa): remove this when > protobuf 3.8.0 is released.
+        # TODO(asraa): remove this when protobuf 3.10 is released.
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:protobuf.patch"],
     )
