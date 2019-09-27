@@ -3,6 +3,7 @@
 #include "extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/integration/http_integration.h"
+#include "test/integration/autonomous_upstream.h"
 
 #include "absl/strings/str_replace.h"
 #include "gtest/gtest.h"
@@ -30,12 +31,12 @@ public:
     config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       auto* static_resources = bootstrap.mutable_static_resources();
       auto* cluster = static_resources->mutable_clusters(0);
-      //auto* common_tls_context = cluster->mutable_tls_context()->mutable_common_tls_context();
-      //auto* tls_cert = common_tls_context->add_tls_certificates();
-      //tls_cert->mutable_certificate_chain()->set_filename(
-          //TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem"));
-      //tls_cert->mutable_private_key()->set_filename(
-          //TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
+      auto* common_tls_context = cluster->mutable_tls_context()->mutable_common_tls_context();
+      auto* tls_cert = common_tls_context->add_tls_certificates();
+      tls_cert->mutable_certificate_chain()->set_filename(
+          TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem"));
+      tls_cert->mutable_private_key()->set_filename(
+          TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
       // Setup the client Envoy TLS config.
       cluster->clear_hosts();
       auto* load_assignment = cluster->mutable_load_assignment();
@@ -80,19 +81,21 @@ public:
         std::move(cfg), context_manager_, *upstream_stats_store, std::vector<std::string>{});
   }
 
-  //void createUpstreams() override {
-    //for (uint32_t i = 0; i < num_hosts_; i++) {
-      //// TODO: remove the second condition once multi endpoint is resolved.
-      //if (i%2 == 0 || i%2 == 1) {
-        //fake_upstreams_.emplace_back(std::make_unique<FakeUpstream>(
-              //createUpstreamSslContext(), 0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
-      //} else {
-    //// backup, plaintext upstream setup.
-     //fake_upstreams_.emplace_back(
-         //new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
-      //}
-    //}
-  //}
+  void createUpstreams() override {
+	 for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
+			auto endpoint = upstream_address_fn_(i);
+      // Makes difference, 3/10 requests are failing.
+      if (i%2 == 0 || i % 2 == 1) {
+      fake_upstreams_.emplace_back(
+          new AutonomousUpstream(createUpstreamSslContext(), endpoint->ip()->port(),
+                FakeHttpConnection::Type::HTTP1, endpoint->ip()->version(),timeSystem()));
+      } else {
+        fake_upstreams_.emplace_back(
+            new AutonomousUpstream(Network::Test::createRawBufferSocketFactory(), endpoint->ip()->port(),
+                  FakeHttpConnection::Type::HTTP1, endpoint->ip()->version(),timeSystem()));
+      }
+		}
+  }
 
   void SetUp() override {
     setDownstreamProtocol(Http::CodecClient::Type::HTTP1);
@@ -115,12 +118,7 @@ TEST_F(TransportSockeMatchIntegrationTest, BasicMatch) {
 	IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
 	response->waitForEndStream();
 	EXPECT_EQ("200", response->headers().Status()->value().getStringView());
-	//EXPECT_EQ(response->headers()
-			//.get(Envoy::Http::LowerCaseString{host_type_header_})
-			//->value()
-			//.getStringView(),
-			//expected_host_type);
-	//IntegrationStreamDecoderPtr response;
+  //IntegrationStreamDecoderPtr response;
 	//response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
 	//}
 	// TODO: get this back, protocol_integration_test.cc, subset_lb_integrationt-test.cc
