@@ -50,13 +50,18 @@ void QuicFilterManagerConnectionImpl::enableHalfClose(bool enabled) {
 void QuicFilterManagerConnectionImpl::setBufferLimits(uint32_t /*limit*/) {
   // TODO(danzh): add interface to quic for connection level buffer throttling.
   // Currently read buffer is capped by connection level flow control. And
-  // write buffer is not capped.
-  ENVOY_CONN_LOG(error, "Quic manages its own buffer currently.", *this);
+  // write buffer limit is set during construction. Change buffer limit during
+  // the life time of connection is not supported.
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 uint32_t QuicFilterManagerConnectionImpl::bufferLimit() const {
   // As quic connection is not HTTP1.1, this method shouldn't be called by HCM.
   NOT_REACHED_GCOVR_EXCL_LINE;
+}
+
+bool QuicFilterManagerConnectionImpl::aboveHighWatermark() const {
+  return write_buffer_watermark_simulation_.isAboveHighWatermark();
 }
 
 void QuicFilterManagerConnectionImpl::close(Network::ConnectionCloseType type) {

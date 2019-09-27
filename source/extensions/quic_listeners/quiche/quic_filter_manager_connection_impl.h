@@ -72,10 +72,7 @@ public:
     // SO_ORIGINAL_DST not supported by QUIC.
     return false;
   }
-  bool aboveHighWatermark() const override {
-    ENVOY_CONN_LOG(error, "QUIC doesn't have connection level write buffer limit.", *this);
-    return false;
-  }
+  bool aboveHighWatermark() const override;
   const Network::ConnectionSocket::OptionsSharedPtr& socketOptions() const override;
   StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
   const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
