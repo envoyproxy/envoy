@@ -8,6 +8,7 @@ load(
     "envoy_cc_posix_library",
     "envoy_cc_win32_library",
     "envoy_package",
+    "envoy_select_google_grpc",
 )
 load(
     "//source/extensions:all_extensions.bzl",
@@ -65,24 +66,25 @@ envoy_cc_library(
     srcs = ["main_common.cc"],
     hdrs = ["main_common.h"],
     deps = [
-        ":envoy_common_lib",
-        ":platform_impl_lib",
-        ":process_wide_lib",
-        "//source/common/api:os_sys_calls_lib",
-        "//source/common/common:compiler_requirements_lib",
-        "//source/common/common:perf_annotation_lib",
-        "//source/common/grpc:google_grpc_context_lib",
-        "//source/common/stats:symbol_table_creator_lib",
-        "//source/server:hot_restart_lib",
-        "//source/server:hot_restart_nop_lib",
-        "//source/server/config_validation:server_lib",
-    ] + select({
-        "//bazel:disable_signal_trace": [],
-        "//conditions:default": [
-            "//source/common/signal:sigaction_lib",
-            ":terminate_handler_lib",
-        ],
-    }),
+               ":envoy_common_lib",
+               ":platform_impl_lib",
+               ":process_wide_lib",
+               "//source/common/api:os_sys_calls_lib",
+               "//source/common/common:compiler_requirements_lib",
+               "//source/common/common:perf_annotation_lib",
+               "//source/common/stats:symbol_table_creator_lib",
+               "//source/server:hot_restart_lib",
+               "//source/server:hot_restart_nop_lib",
+               "//source/server/config_validation:server_lib",
+           ] + 
+           select({
+               "//bazel:disable_signal_trace": [],
+               "//conditions:default": [
+                   "//source/common/signal:sigaction_lib",
+                   ":terminate_handler_lib",
+               ],
+           }) +
+           envoy_select_google_grpc(["//source/common/grpc:google_grpc_context_lib"]),
 )
 
 envoy_cc_library(
