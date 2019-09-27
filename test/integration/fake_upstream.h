@@ -608,6 +608,9 @@ private:
     Network::ActiveUdpListenerFactory* udpListenerFactory() override {
       return udp_listener_factory_.get();
     }
+        envoy::api::v2::core::TrafficDirection direction() const override {
+      return envoy::api::v2::core::TrafficDirection::UNSPECIFIED;
+    }
 
     FakeUpstream& parent_;
     Network::ActiveUdpListenerFactoryPtr udp_listener_factory_;

@@ -686,6 +686,19 @@ Http::Code AdminImpl::handlerMemory(absl::string_view, Http::HeaderMap& response
   return Http::Code::OK;
 }
 
+Http::Code AdminImpl::handlerDrainListeners(absl::string_view, Http::HeaderMap&,
+                                           Buffer::Instance& response, AdminStream&) {
+  for (const Network::ListenerConfig& listener : server_.listenerManager().listeners()) {
+     if (listener.name().find("ingress") != std::string::npos) {
+   // if (listener.direction() == envoy::api::v2::core::TrafficDirection::INBOUND) {
+      server_.listenerManager().removeListener(listener.name());
+    }
+  }
+
+  response.add("OK\n");
+  return Http::Code::OK;
+}
+
 Http::Code AdminImpl::handlerResetCounters(absl::string_view, Http::HeaderMap&,
                                            Buffer::Instance& response, AdminStream&) {
   for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
@@ -1207,6 +1220,8 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
            true},
           {"/reset_counters", "reset all counters to zero",
            MAKE_ADMIN_HANDLER(handlerResetCounters), false, true},
+          {"/drain_listeners", "drains all inbound listeners",
+           MAKE_ADMIN_HANDLER(handlerDrainListeners), false, true},
           {"/server_info", "print server version/status information",
            MAKE_ADMIN_HANDLER(handlerServerInfo), false, false},
           {"/ready", "print server state, return 200 if LIVE, otherwise return 503",

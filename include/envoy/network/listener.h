@@ -97,6 +97,8 @@ public:
    * nullptr.
    */
   virtual const ActiveUdpListenerFactory* udpListenerFactory() PURE;
+
+  virtual envoy::api::v2::core::TrafficDirection direction() const PURE;
 };
 
 /**
