@@ -39,8 +39,7 @@ message Gzip {
   // .. attention:
   //
   //    **This field is deprecated**. Set the `compressor` field instead.
-  google.protobuf.UInt32Value content_length = 2
-      [(validate.rules).uint32 = {gte: 30}, deprecated = true];
+  google.protobuf.UInt32Value content_length = 2 [deprecated = true];
 
   // A value used for selecting the zlib compression level. This setting will affect speed and
   // amount of compression applied to the content. "BEST" provides higher compression at the cost of
@@ -64,7 +63,7 @@ message Gzip {
   // .. attention:
   //
   //    **This field is deprecated**. Set the `compressor` field instead.
-  repeated string content_type = 6 [(validate.rules).repeated = {max_items: 50}, deprecated = true];
+  repeated string content_type = 6 [deprecated = true];
 
   // If true, disables compression when the response contains an etag header. When it is false, the
   // filter will preserve weak etags and remove the ones that require strong validation.

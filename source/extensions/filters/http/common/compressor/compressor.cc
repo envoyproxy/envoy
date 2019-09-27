@@ -10,8 +10,8 @@ namespace Compressors {
 
 namespace {
 
-// Minimum length of an upstream response that allows compression.
-const uint64_t MinimumContentLength = 30;
+// Default minimum length of an upstream response that allows compression.
+const uint64_t DefaultMinimumContentLength = 30;
 
 // Default content types will be used if any is provided by the user.
 const std::vector<std::string>& defaultContentEncoding() {
@@ -53,7 +53,7 @@ CompressorFilterConfig::contentTypeSet(const Protobuf::RepeatedPtrField<std::str
 }
 
 uint32_t CompressorFilterConfig::contentLengthUint(Protobuf::uint32 length) {
-  return length >= MinimumContentLength ? length : MinimumContentLength;
+  return length > 0 ? length : DefaultMinimumContentLength;
 }
 
 CompressorFilter::CompressorFilter(CompressorFilterConfigSharedPtr config)
