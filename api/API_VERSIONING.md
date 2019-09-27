@@ -57,7 +57,7 @@ experience a backward compatible break on a change. Specifically:
   terms of protobuf wire compatibility:
   * Upgrading a singleton field to a repeated, e.g. `uint32 foo = 1;` to `repeated uint32 foo = 1`.
     This changes the JSON wire representation and hence is considered a breaking change.
-  
+
   * Wrapping an existing field with `oneof`. This has no protobuf or JSON/YAML wire implications,
     but is disruptive to various consuming stubs in languages such as Go, creating unnecessary
     churn.
@@ -68,15 +68,7 @@ experience a backward compatible break on a change. Specifically:
     structurally or by documentation.
 
 The exception to the above policy is for API versions tagged `vNalpha`. Within an alpha major
-version, arbitrary breaking changes are allowed. Also, within a `vN` major version, messages
-annotated as draft or experimental are exempt from this policy. The following annotations may be
-applied to a protobuf file, message, enum, field or enum value:
-* `[#proto-status: experimental]` indicating that backwards incompatible changes are likely and
-  major restructuring is anticipated.
-* `[#proto-status: draft]` indicating that backwards incompatible changes are possible but the
-  entity is near finalized and some implementation exists.
-* `[#not-implemented-hide:]` indicating that the entity is not implemented in Envoy and the entity
-  should be hidden from the Envoy documentation. No backwards incompatible changes are allowed.
+version, arbitrary breaking changes are allowed.
 
 Note that changes to default values for wrapped types, e.g. `google.protobuf.UInt32Value` are not
 governed by the above policy. Any management server requiring stability across Envoy API or

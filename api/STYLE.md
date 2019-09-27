@@ -31,6 +31,10 @@ In addition, the following conventions should be followed:
   logic, e.g. enable vs. disable for a `bool` field, such that the proto3
   defaults work, but only where this doesn't result in API gymnastics.
 
+* Use a `[#not-implemented-hide:]` `protodoc` annotation in comments for fields that lack Envoy
+  implementation. These indicate that the entity is not implemented in Envoy and the entity
+  should be hidden from the Envoy documentation.
+
 * Always use plural field names for `repeated` fields, such as `filters`.
 
 * Due to the fact that we consider JSON/YAML to be first class inputs, we cannot easily change a
