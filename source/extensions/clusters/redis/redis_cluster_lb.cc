@@ -179,8 +179,9 @@ RedisLoadBalancerContextImpl::RedisLoadBalancerContextImpl(
     const std::string& key, bool enabled_hashtagging, bool use_crc16,
     const NetworkFilters::Common::Redis::RespValue& request,
     NetworkFilters::Common::Redis::Client::ReadPolicy read_policy)
-    : hash_key_(use_crc16 ? Crc16::crc16(hashtag(key, enabled_hashtagging))
-                          : MurmurHash::murmurHash2_64(hashtag(key, enabled_hashtagging))),
+    : hash_key_(use_crc16
+                    ? Crc16::crc16(hashtag(key, use_crc16 || enabled_hashtagging))
+                    : MurmurHash::murmurHash2_64(hashtag(key, use_crc16 || enabled_hashtagging))),
       is_read_(isReadRequest(request)), read_policy_(read_policy) {}
 
 // Inspired by the redis-cluster hashtagging algorithm
