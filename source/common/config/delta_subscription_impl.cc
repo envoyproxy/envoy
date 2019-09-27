@@ -43,9 +43,9 @@ void DeltaSubscriptionImpl::updateResourceInterest(
 void DeltaSubscriptionImpl::onConfigUpdate(
     const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
     const std::string& version_info) {
+  stats_.update_attempt_.inc();
   callbacks_.onConfigUpdate(resources, version_info);
   stats_.update_success_.inc();
-  stats_.update_attempt_.inc();
   stats_.version_.set(HashUtil::xxHash64(version_info));
 }
 
@@ -53,9 +53,9 @@ void DeltaSubscriptionImpl::onConfigUpdate(
     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& system_version_info) {
+  stats_.update_attempt_.inc();
   callbacks_.onConfigUpdate(added_resources, removed_resources, system_version_info);
   stats_.update_success_.inc();
-  stats_.update_attempt_.inc();
   stats_.version_.set(HashUtil::xxHash64(system_version_info));
 }
 
@@ -67,9 +67,15 @@ void DeltaSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason reaso
     // So, don't onConfigUpdateFailed() here. Instead, allow a retry of the gRPC stream.
     // If init_fetch_timeout_ is non-zero, the server will continue startup after that timeout.
     stats_.update_failure_.inc();
+    // TODO(fredlas) remove; it only makes sense to count start() and updateResourceInterest()
+    // as attempts.
+    stats_.update_attempt_.inc();
     break;
   case Envoy::Config::ConfigUpdateFailureReason::FetchTimedout:
     stats_.init_fetch_timeout_.inc();
+    // TODO(fredlas) remove; it only makes sense to count start() and updateResourceInterest()
+    // as attempts.
+    stats_.update_attempt_.inc();
     callbacks_.onConfigUpdateFailed(reason, e);
     break;
   case Envoy::Config::ConfigUpdateFailureReason::UpdateRejected:
@@ -79,7 +85,6 @@ void DeltaSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason reaso
     callbacks_.onConfigUpdateFailed(reason, e);
     break;
   }
-  stats_.update_attempt_.inc();
 }
 
 std::string DeltaSubscriptionImpl::resourceName(const ProtobufWkt::Any& resource) {

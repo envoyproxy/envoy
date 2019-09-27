@@ -35,10 +35,8 @@ Watch* NewGrpcMuxImpl::addOrUpdateWatch(const std::string& type_url, Watch* watc
 void NewGrpcMuxImpl::removeWatch(const std::string& type_url, Watch* watch) {
   updateWatch(type_url, watch, {});
   auto entry = subscriptions_.find(type_url);
-  if (entry == subscriptions_.end()) {
-    ENVOY_LOG(error, "removeWatch() called for non-existent subscription {}.", type_url);
-    return;
-  }
+  RELEASE_ASSERT(entry != subscriptions_.end(),
+                 fmt::format("removeWatch() called for non-existent subscription {}.", type_url));
   entry->second->watch_map_.removeWatch(watch);
 }
 
@@ -102,11 +100,12 @@ void NewGrpcMuxImpl::kickOffAck(UpdateAck ack) {
   trySendDiscoveryRequests();
 }
 
-// TODO TODO but yeah this should just be gone!!!!!!!!!
+// TODO(fredlas) to be removed from the GrpcMux interface very soon.
 GrpcMuxWatchPtr NewGrpcMuxImpl::subscribe(const std::string&, const std::set<std::string>&,
                                           GrpcMuxCallbacks&) {
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
+
 void NewGrpcMuxImpl::start() { grpc_stream_.establishNewStream(); }
 
 Watch* NewGrpcMuxImpl::addWatch(const std::string& type_url, const std::set<std::string>& resources,
@@ -132,13 +131,11 @@ void NewGrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
                                  const std::set<std::string>& resources) {
   ASSERT(watch != nullptr);
   auto sub = subscriptions_.find(type_url);
-  if (sub == subscriptions_.end()) {
-    ENVOY_LOG(error, "Watch of {} has no subscription to update.", type_url);
-    return;
-  }
+  RELEASE_ASSERT(sub != subscriptions_.end(),
+                 fmt::format("Watch of {} has no subscription to update.", type_url));
   auto added_removed = sub->second->watch_map_.updateWatchInterest(watch, resources);
   sub->second->sub_state_.updateSubscriptionInterest(added_removed.added_, added_removed.removed_);
-  // Tell the server about our new interests, if there are any.
+  // Tell the server about our change in interest, if any.
   if (sub->second->sub_state_.subscriptionUpdatePending()) {
     trySendDiscoveryRequests();
   }
@@ -162,15 +159,10 @@ void NewGrpcMuxImpl::trySendDiscoveryRequests() {
     std::string next_request_type_url = maybe_request_type.value();
     // If we don't have a subscription object for this request's type_url, drop the request.
     auto sub = subscriptions_.find(next_request_type_url);
-    if (sub == subscriptions_.end()) {
-      ENVOY_LOG(error, "Not sending discovery request for non-existent subscription {}.",
-                next_request_type_url);
-      // It's safe to assume the front of the ACK queue is of this type, because that's the only
-      // way whoWantsToSendDiscoveryRequest() could return something for a non-existent
-      // subscription.
-      pausable_ack_queue_.pop();
-      continue;
-    }
+    RELEASE_ASSERT(sub != subscriptions_.end(),
+                   fmt::format("Tried to send discovery request for non-existent subscription {}.",
+                               next_request_type_url));
+
     // Try again later if paused/rate limited/stream down.
     if (!canSendDiscoveryRequest(next_request_type_url)) {
       break;
@@ -192,15 +184,13 @@ void NewGrpcMuxImpl::trySendDiscoveryRequests() {
 // Checks whether external conditions allow sending a DeltaDiscoveryRequest. (Does not check
 // whether we *want* to send a DeltaDiscoveryRequest).
 bool NewGrpcMuxImpl::canSendDiscoveryRequest(const std::string& type_url) {
-  if (pausable_ack_queue_.paused(type_url)) {
-    ASSERT(false,
-           fmt::format("canSendDiscoveryRequest() called on paused type_url {}. Pausedness is "
-                       "supposed to be filtered out by whoWantsToSendDiscoveryRequest(). "
-                       "Returning false, but your xDS might be about to get head-of-line blocked "
-                       "- permanently, if the pause is never undone.",
-                       type_url));
-    return false;
-  } else if (!grpc_stream_.grpcStreamAvailable()) {
+  RELEASE_ASSERT(
+      !pausable_ack_queue_.paused(type_url),
+      fmt::format("canSendDiscoveryRequest() called on paused type_url {}. Pausedness is "
+                  "supposed to be filtered out by whoWantsToSendDiscoveryRequest(). ",
+                  type_url));
+
+  if (!grpc_stream_.grpcStreamAvailable()) {
     ENVOY_LOG(trace, "No stream available to send a discovery request for {}.", type_url);
     return false;
   } else if (!grpc_stream_.checkRateLimitAllowsDrain()) {
