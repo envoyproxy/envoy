@@ -70,7 +70,11 @@ public:
     });
     config_helper_.addConfigModifier(
         [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
-               hcm) { hcm.mutable_delayed_close_timeout()->set_nanos(0); });
+               hcm) {
+          hcm.mutable_delayed_close_timeout()->set_nanos(0);
+        EXPECT_EQ(hcm.codec_type(),
+                  envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::HTTP3);
+        });
 
     HttpIntegrationTest::initialize();
     registerTestServerPorts({"http"});

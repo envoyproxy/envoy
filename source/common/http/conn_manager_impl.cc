@@ -276,14 +276,13 @@ void ConnectionManagerImpl::handleCodecException(const char* error) {
 
 Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool) {
   if (!codec_) {
+    // Http3 codec should have been instantiated by now.
     codec_ = config_.createCodec(read_callbacks_->connection(), data, *this);
     if (codec_->protocol() == Protocol::Http2) {
       stats_.named_.downstream_cx_http2_total_.inc();
       stats_.named_.downstream_cx_http2_active_.inc();
-    } else if (codec_->protocol() == Protocol::Http3) {
-      stats_.named_.downstream_cx_http3_total_.inc();
-      stats_.named_.downstream_cx_http3_active_.inc();
     } else {
+      ASSERT(codec_->protocol() != Protocol::Http3);
       stats_.named_.downstream_cx_http1_total_.inc();
       stats_.named_.downstream_cx_http1_active_.inc();
     }
@@ -346,6 +345,7 @@ Network::FilterStatus ConnectionManagerImpl::onNewConnection() {
   // Only QUIC connection's stream_info_ specifies protocol.
   Buffer::OwnedImpl dummy;
   codec_ = config_.createCodec(read_callbacks_->connection(), dummy, *this);
+  stats_.named_.downstream_cx_http3_total_.inc();
   stats_.named_.downstream_cx_http3_active_.inc();
   return Network::FilterStatus::StopIteration;
 }
