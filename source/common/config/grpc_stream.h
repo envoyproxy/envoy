@@ -93,7 +93,7 @@ public:
     setRetryTimer();
   }
 
-  void maybeUpdateQueueSizeStat(uint64_t /*size*/) {
+  void maybeUpdateQueueSizeStat(uint64_t size) {
     // Although request_queue_.push() happens elsewhere, the only time the queue is non-transiently
     // non-empty is when it remains non-empty after a drain attempt. (The push() doesn't matter
     // because we always attempt this drain immediately after the push). Basically, a change in
@@ -102,9 +102,9 @@ public:
     // and needlessly taking up space. The first time we set(123), used becomes true, and so we will
     // subsequently always do the set (including set(0)).
     // TODO TODO segfault here in test teardown
-    //    if (size > 0 || control_plane_stats_.pending_requests_.used()) {
-    //      control_plane_stats_.pending_requests_.set(size);
-    //  }
+    if (size > 0 || control_plane_stats_.pending_requests_.used()) {
+      control_plane_stats_.pending_requests_.set(size);
+    }
     std::cerr << ++vinny_the_variable_ << std::endl;
   }
 
