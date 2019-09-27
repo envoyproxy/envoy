@@ -33,11 +33,7 @@ public:
   void enableHalfClose(bool enabled) override;
   void close(Network::ConnectionCloseType type) override;
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
-  uint64_t id() const override {
-    // QUIC connection id can be 18 types. It's easier to use hash value instead
-    // of trying to map it into a 64-bit space.
-    return quic_connection_->connection_id().Hash();
-  }
+  uint64_t id() const override { return id_; }
   std::string nextProtocol() const override { return EMPTY_STRING; }
   void noDelay(bool /*enable*/) override {
     // No-op. TCP_NODELAY doesn't apply to UDP.
@@ -118,6 +114,7 @@ private:
   // them.
   std::list<Network::ConnectionCallbacks*> network_connection_callbacks_;
   std::string transport_failure_reason_;
+  uint64_t id_;
 };
 
 } // namespace Quic
