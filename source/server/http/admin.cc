@@ -1221,7 +1221,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
            true},
           {"/reset_counters", "reset all counters to zero",
            MAKE_ADMIN_HANDLER(handlerResetCounters), false, true},
-          {"/drain_listeners", "drains all inbound listeners",
+          {"/drain_listeners", "drain listeners",
            MAKE_ADMIN_HANDLER(handlerDrainListeners), false, true},
           {"/server_info", "print server version/status information",
            MAKE_ADMIN_HANDLER(handlerServerInfo), false, false},
