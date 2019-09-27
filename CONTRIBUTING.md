@@ -23,12 +23,12 @@ maximize the chances of your PR being merged.
 
 # Breaking change policy
 
-Both API and implementation stability are important Envoy. Since the API is consumed by clients
+Both API and implementation stability are important to Envoy. Since the API is consumed by clients
 beyond Envoy, it has a distinct set of [versioning guidelines](api/API_VERSIONING.md). Below, we
 articulate the Envoy implementation stability rules, which operate within the context of the API
 versioning guidelines:
 
-* Features may be marked as deprected in a given versioned API at any point in time, but this may
+* Features may be marked as deprecated in a given versioned API at any point in time, but this may
   only be done when a replacement implementation and configuration path is available in Envoy on
   master. The litmus test is to imagine that a stateless translation tool exists that
   could convert from the earlier API to the new API. A field may be deprecated

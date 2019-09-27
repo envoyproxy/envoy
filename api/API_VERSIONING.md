@@ -16,17 +16,17 @@ of the tracing API package is named `envoy.service.trace.v2` and its constituent
 in `api/envoy/service/trace/v2`. Every protobuf must live directly in a versioned package namespace,
 we do not allow subpackages such as `envoy.service.trace.v2.somethingelse`.
 
-Minor and patch versions will be implemented in the future as described in
-https://github.com/envoyproxy/envoy/issues/6271.
+Minor and patch versions will be implemented in the future, this effort is tracked in
+https://github.com/envoyproxy/envoy/issues/8416.
 
 In everyday discussion and GitHub labels, we refer to the `v2`, `v3`, `vN`, `...` APIs. This has a
 specific technical meaning. Any given message in the Envoy API, e.g. the `Bootstrap` at
 `envoy.config.bootstrap.v3.Boostrap`, will transitively reference a number of packages in the Envoy
 API. These may be at `vN`, `v(N-1)`, etc. The Envoy API is technically a DAG of versioned package
 namespaces. When we talk about the `vN xDS API`, we really refer to the `N` of the root
-configuration resources (e.g. bootstrap, xDS resources such as `Cluster`). Even though
-`envoy.config.bootstrap.v3.Boostrap` might transitively reference `envoy.service.trace.v2`, this is
-the Envoy static configuration for the v3 API.
+configuration resources (e.g. bootstrap, xDS resources such as `Cluster`). The
+v3 API bootstrap configuration is `envoy.config.bootstrap.v3.Boostrap`, even
+though it might might transitively reference `envoy.service.trace.v2`.
 
 # Backwards compatibility
 
@@ -39,7 +39,7 @@ experience a backward compatible break on a change. Specifically:
 
 * Renaming of fields or package namespaces for a proto must not occur. This is inherently dangerous,
   since:
-  * Fields renames break wire compatibility. This is stricter than standard proto development
+  * Field renames break wire compatibility. This is stricter than standard proto development
     procedure in the sense that it does not break binary wire format. However, it **does** break
     loading of YAML/JSON into protos as well as text protos. Since we consider YAML/JSON to be first
     class inputs, we must not change field names.
@@ -77,9 +77,6 @@ applied to a protobuf file, message, enum, field or enum value:
   entity is near finalized and some implementation exists.
 * `[#not-implemented-hide:]` indicating that the entity is not implemented in Envoy and the entity
   should be hidden from the Envoy documentation. No backwards incompatible changes are allowed.
-* `[#not-implemented-warn:]` indicating that the entity is not implemented in Envoy and the entity
-  should be included in the Envoy documentation with a warning. No backwards incompatible changes
-  are allowed.
 
 Note that changes to default values for wrapped types, e.g. `google.protobuf.UInt32Value` are not
 governed by the above policy. Any management server requiring stability across Envoy API or
@@ -127,6 +124,8 @@ only be made to the *current stable major version*. The rationale for this polic
   feature in both locations.
 * We encourage Envoy users to move to the current stable major version from the previous one to
   consume new functionality.
+
+# When can an API change be made to a package's previous stable major version?
 
 As a pragmatic concession, we allow API feature additions to the previous stable major version for a
 single quarter following a major API version increment. Any changes to the previous stable major
