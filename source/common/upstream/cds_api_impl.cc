@@ -80,7 +80,7 @@ void CdsApiImpl::onConfigUpdate(
       }
       if (cm_.addOrUpdateCluster(cluster, resource.version())) {
         any_applied = true;
-        ENVOY_LOG(debug, "cds: add/update cluster '{}'", cluster.name());
+        ENVOY_LOG(info, "cds: add/update cluster '{}'", cluster.name());
       } else {
         ENVOY_LOG(debug, "cds: add/update cluster '{}' skipped", cluster.name());
       }
@@ -91,7 +91,7 @@ void CdsApiImpl::onConfigUpdate(
   for (const auto& resource_name : removed_resources) {
     if (cm_.removeCluster(resource_name)) {
       any_applied = true;
-      ENVOY_LOG(debug, "cds: remove cluster '{}'", resource_name);
+      ENVOY_LOG(info, "cds: remove cluster '{}'", resource_name);
     }
   }
 

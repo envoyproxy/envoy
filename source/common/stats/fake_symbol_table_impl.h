@@ -125,6 +125,12 @@ public:
     fn(toStringView(stat_name));
   }
 
+  StatNameSetPtr makeSet(absl::string_view name) override {
+    // make_unique does not work with private ctor, even though FakeSymbolTableImpl is a friend.
+    return StatNameSetPtr(new StatNameSet(*this, name));
+  }
+  void forgetSet(StatNameSet&) override {}
+
 private:
   absl::string_view toStringView(const StatName& stat_name) const {
     return {reinterpret_cast<const char*>(stat_name.data()),

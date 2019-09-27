@@ -50,6 +50,8 @@ void GrpcSubscriptionImpl::updateResourceInterest(
 void GrpcSubscriptionImpl::onConfigUpdate(
     const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
     const std::string& version_info) {
+  // TODO remove; it only makes sense to count start() and updateResourceInterest()
+  // as attempts.
   stats_.update_attempt_.inc();
   callbacks_.onConfigUpdate(resources, version_info);
   stats_.update_success_.inc();
@@ -60,6 +62,8 @@ void GrpcSubscriptionImpl::onConfigUpdate(
     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& system_version_info) {
+  // TODO remove; it only makes sense to count start() and updateResourceInterest()
+  // as attempts.
   stats_.update_attempt_.inc();
   callbacks_.onConfigUpdate(added_resources, removed_resources, system_version_info);
   stats_.update_success_.inc();

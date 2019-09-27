@@ -4,8 +4,8 @@ executors:
   ubuntu-build:
     description: "A regular build executor based on ubuntu image"
     docker:
-      # NOTE: Update bazel/toolchains/rbe_toolchains_config.bzl with sha256 digest to match the image here.
-      - image: envoyproxy/envoy-build:cb15cc3d2010aff77d6e022ddf6d723fa8becbc0
+      # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/master/toolchains/rbe_toolchains_config.bzl#L7
+      - image: envoyproxy/envoy-build-ubuntu@sha256:1500b75cb9bc2184a26f72f63631e926cd05d6ee628e6fd005f069d2f9756ac7
     resource_class: xlarge
     working_directory: /source
 
@@ -103,14 +103,6 @@ jobs:
              ci/do_circle_ci.sh bazel.clang_tidy
            no_output_timeout: 60m
 
-   build_image:
-     docker:
-       - image: google/cloud-sdk
-     steps:
-       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
-       - checkout
-       - setup_remote_docker
-       - run: ci/build_container/docker_push.sh
    docs:
      executor: ubuntu-build
      steps:
@@ -143,7 +135,6 @@ workflows:
       - coverage_publish:
           requires: [coverage]
       - clang_tidy
-      - build_image
       - docs:
           filters:
             tags:

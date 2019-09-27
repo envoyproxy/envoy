@@ -16,6 +16,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/assert.h"
+#include "common/common/backoff_strategy.h"
 #include "common/common/hash.h"
 #include "common/common/hex.h"
 #include "common/grpc/common.h"
@@ -311,6 +312,17 @@ public:
                       name, filter_type));
     }
   }
+
+  /**
+   * Prepares the DNS failure refresh backoff strategy given the cluster configuration.
+   * @param cluster the cluster configuration.
+   * @param dns_refresh_rate_ms the default DNS refresh rate.
+   * @param random the random generator.
+   * @return BackOffStrategyPtr for scheduling refreshes.
+   */
+  static BackOffStrategyPtr prepareDnsRefreshStrategy(const envoy::api::v2::Cluster& cluster,
+                                                      uint64_t dns_refresh_rate_ms,
+                                                      Runtime::RandomGenerator& random);
 };
 
 } // namespace Config

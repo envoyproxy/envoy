@@ -27,16 +27,16 @@ public:
    * that have not been remembered as builtins in the constructor.
    */
   Stats::StatName getBuiltin(const std::string& str, Stats::StatName fallback) {
-    return stat_name_set_.getBuiltin(str, fallback);
+    return stat_name_set_->getBuiltin(str, fallback);
   }
 
-  Stats::StatName getDynamic(const std::string& str) { return stat_name_set_.getDynamic(str); }
+  Stats::StatName getDynamic(const std::string& str) { return stat_name_set_->getDynamic(str); }
 
 private:
   Stats::SymbolTable::StoragePtr addPrefix(const std::vector<Stats::StatName>& names);
 
   Stats::Scope& scope_;
-  Stats::StatNameSet stat_name_set_;
+  Stats::StatNameSetPtr stat_name_set_;
 
 public:
   const Stats::StatName prefix_;
