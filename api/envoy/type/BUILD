@@ -7,6 +7,12 @@ api_proto_package(
 )
 
 api_proto_library_internal(
+    name = "format",
+    srcs = ["format.proto"],
+    visibility = ["//visibility:public"],
+)
+
+api_proto_library_internal(
     name = "http_status",
     srcs = ["http_status.proto"],
     visibility = ["//visibility:public"],

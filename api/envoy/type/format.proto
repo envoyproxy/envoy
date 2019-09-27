@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package envoy.type;
+
+option java_outer_classname = "FormatProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.type";
+
+import "google/protobuf/struct.proto";
+
+message StringOrJson {
+  // Allows to define custom format of returned data.
+  oneof format {
+    // Plain text format.
+    string string_format = 2;
+
+    // Json format as dictionary.
+    google.protobuf.Struct json_format = 3;
+  }
+}

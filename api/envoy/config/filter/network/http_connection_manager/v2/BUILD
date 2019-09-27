@@ -21,6 +21,7 @@ api_proto_library_internal(
         "//envoy/api/v2/core:config_source",
         "//envoy/api/v2/core:protocol",
         "//envoy/config/filter/accesslog/v2:accesslog",
+        "//envoy/type:format",
         "//envoy/type:percent",
     ],
 )

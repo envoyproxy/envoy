@@ -12,6 +12,7 @@ import "envoy/api/v2/rds.proto";
 import "envoy/api/v2/srds.proto";
 import "envoy/config/filter/accesslog/v2/accesslog.proto";
 import "envoy/type/percent.proto";
+import "envoy/type/format.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
@@ -469,13 +470,7 @@ message LocalReplyConfig {
   repeated ResponseMapper mapper = 1;
 
   // Allows to define custom format of local reply.
-  oneof reply_format {
-    // Response body plain text format.
-    string format = 2;
-
-    // Response body json format as dictionary.
-    google.protobuf.Struct json_format = 3;
-  }
+  type.StringOrJson format = 2;
 };
 
 message ResponseMapper {
@@ -485,14 +480,6 @@ message ResponseMapper {
 
   // Rewriter defines which values in local reply should be changed.
   ResponseRewriter rewriter = 2 [(validate.rules).message.required = true];
-
-  oneof reply_format {
-    // Response body plain text format.
-    string format = 3;
-
-    // Response body json format as dictionary.
-    google.protobuf.Struct json_format = 4;
-  }
 }
 
 // Configuration of new value for matched local response.
