@@ -430,7 +430,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
   EXPECT_EQ(0, test_server_->counter("listener_manager.listener_removed")->value());
 
-  // Validate taht the outbound listener is drained on drain listeners.
+  // Validate that the outbound listener is drained on drain listeners.
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST", "/drain_listeners", "",
                                                 downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
