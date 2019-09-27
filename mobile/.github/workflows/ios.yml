@@ -86,9 +86,7 @@ jobs:
       - uses: actions/checkout@v1
         with:
           submodules: true
-  # TODO: Fix and re-enable swift unit tests:
-  # https://github.com/lyft/envoy-mobile/issues/383
-  #     - name: 'Install dependencies'
-  #       run: ./ci/mac_ci_setup.sh
-  #     - name: 'Run swift library tests'
-  #       run: ./bazelw test --test_output=all --config=ios --build_tests_only //library/swift/test/...
+      - name: 'Install dependencies'
+        run: ./ci/mac_ci_setup.sh
+      - name: 'Run swift library tests'
+        run: ./bazelw test --test_output=all --config=ios --build_tests_only //library/swift/test/...

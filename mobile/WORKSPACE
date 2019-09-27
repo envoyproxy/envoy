@@ -23,11 +23,18 @@ local_repository(
     path = "envoy_build_config",
 )
 
+http_file(
+    name = "xctestrunner",
+    executable = 1,
+    sha256 = "9e46d5782a9dc7d40bc93c99377c091886c180b8c4ffb9f79a19a58e234cdb09",
+    urls = ["https://github.com/google/xctestrunner/releases/download/0.2.10/ios_test_runner.par"],
+)
+
 git_repository(
     name = "build_bazel_rules_apple",
-    commit = "3443cecb9acc695087a8d09d8e66c4a024dff021",
+    commit = "a595f71b94f75d531ebdf8ae31cc8eb1ead6a480",
     remote = "https://github.com/bazelbuild/rules_apple.git",
-    shallow_since = "1568385986 -0700",
+    shallow_since = "1568153651 -0700",
 )
 
 load("@envoy//bazel:api_binding.bzl", "envoy_api_binding")
@@ -61,9 +68,9 @@ git_repository(
 
 git_repository(
     name = "build_bazel_rules_swift",
-    commit = "b64895281fca35a3a4e35fd546e27f7fa90407ff",
+    commit = "90995572723ed47cbf2968480db250e97a9f5894",
     remote = "https://github.com/bazelbuild/rules_swift.git",
-    shallow_since = "1568141376 -0700",
+    shallow_since = "1568067570 -0700",
 )
 
 load("@build_bazel_apple_support//lib:repositories.bzl", "apple_support_dependencies")
