@@ -77,6 +77,9 @@ public:
   uint64_t listenerTag() const override { return 1; }
   const std::string& name() const override { return name_; }
   const Network::ActiveUdpListenerFactory* udpListenerFactory() override { return nullptr; }
+  envoy::api::v2::core::TrafficDirection direction() const override {
+    return envoy::api::v2::core::TrafficDirection::UNSPECIFIED;
+  }
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
