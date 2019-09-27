@@ -35,13 +35,6 @@ void QuicFilterManagerConnectionImpl::addConnectionCallbacks(Network::Connection
   network_connection_callbacks_.push_back(&cb);
 }
 
-void QuicFilterManagerConnectionImpl::addBytesSentCallback(
-    Network::Connection::BytesSentCb /*cb*/) {
-  // TODO(danzh): implement to support proxy. This interface is only called from
-  // TCP proxy code.
-  ASSERT(false, "addBytesSentCallback is not implemented for QUIC");
-}
-
 void QuicFilterManagerConnectionImpl::enableHalfClose(bool enabled) {
   ASSERT(!enabled, "Quic connection doesn't support half close.");
 }
@@ -51,11 +44,6 @@ void QuicFilterManagerConnectionImpl::setBufferLimits(uint32_t /*limit*/) {
   // Currently read buffer is capped by connection level flow control. And
   // write buffer is not capped.
   ENVOY_CONN_LOG(error, "Quic manages its own buffer currently.", *this);
-}
-
-uint32_t QuicFilterManagerConnectionImpl::bufferLimit() const {
-  // As quic connection is not HTTP1.1, this method shouldn't be called by HCM.
-  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 void QuicFilterManagerConnectionImpl::close(Network::ConnectionCloseType type) {
@@ -68,8 +56,10 @@ void QuicFilterManagerConnectionImpl::close(Network::ConnectionCloseType type) {
 }
 
 void QuicFilterManagerConnectionImpl::setDelayedCloseTimeout(std::chrono::milliseconds timeout) {
-  ASSERT(timeout == std::chrono::milliseconds::zero(),
-         "Delayed close of connection is not supported");
+  if (timeout != std::chrono::milliseconds::zero()) {
+    // TODO(danzh) support delayed close of connection.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
 }
 
 std::chrono::milliseconds QuicFilterManagerConnectionImpl::delayedCloseTimeout() const {

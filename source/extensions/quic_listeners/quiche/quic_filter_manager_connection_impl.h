@@ -29,7 +29,11 @@ public:
 
   // Network::Connection
   void addConnectionCallbacks(Network::ConnectionCallbacks& cb) override;
-  void addBytesSentCallback(Network::Connection::BytesSentCb /*cb*/) override;
+  void addBytesSentCallback(Network::Connection::BytesSentCb /*cb*/) override {
+    // TODO(danzh): implement to support proxy. This interface is only called from
+    // TCP proxy code.
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
   void enableHalfClose(bool enabled) override;
   void close(Network::ConnectionCloseType type) override;
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
@@ -66,14 +70,18 @@ public:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
   void setBufferLimits(uint32_t limit) override;
-  uint32_t bufferLimit() const override;
+  uint32_t bufferLimit() const override {
+    // As quic connection is not HTTP1.1, this method shouldn't be called by HCM.
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
   bool localAddressRestored() const override {
     // SO_ORIGINAL_DST not supported by QUIC.
     return false;
   }
   bool aboveHighWatermark() const override {
-    ENVOY_CONN_LOG(error, "QUIC doesn't have connection level write buffer limit.", *this);
-    return false;
+    // TODO(danzh) Aggregate the write buffer usage cross all the streams and
+    // add an upper limit for this connection.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
   const Network::ConnectionSocket::OptionsSharedPtr& socketOptions() const override;
   StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
