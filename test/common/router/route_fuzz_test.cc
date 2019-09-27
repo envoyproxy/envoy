@@ -47,10 +47,6 @@ cleanRouteConfig(envoy::api::v2::RouteConfiguration route_config) {
         // remove from each request and response that get routed through it. This replaces invalid
         // header characters in these fields.
         virtual_host = replaceInvalidHeaders<envoy::api::v2::route::VirtualHost>(virtual_host);
-        // Replace invalid characters from the list of domains matched to this virtual host.
-        std::for_each(virtual_host.mutable_domains()->begin(),
-                      virtual_host.mutable_domains()->end(),
-                      [](std::string& n) { n = Fuzz::replaceInvalidCharacters(n); });
         // Envoy can determine the cluster to route to by reading the HTTP header named by the
         // cluster_header from the request header. Because these cluster_headers are destined to be
         // added to a Header Map, we iterate through each route in and remove invalid characters
