@@ -144,7 +144,7 @@ TEST_P(HttpTimeoutIntegrationTest, IgnoreTimeoutSetByEgressEnvoy) {
                               {":authority", "host"},
                               {"x-forwarded-for", "10.0.0.1"},
                               {"x-envoy-upstream-rq-timeout-ms", "500"},
-                              {"x-envoy-expected-rq-timeout-ms", "300"}});
+                              {"x-envoy-expected-rq-timeout-ms", "600"}});
   auto response = std::move(encoder_decoder.second);
   request_encoder_ = &encoder_decoder.first;
 
@@ -156,7 +156,7 @@ TEST_P(HttpTimeoutIntegrationTest, IgnoreTimeoutSetByEgressEnvoy) {
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
   // Trigger global timeout, populated from `x-envoy-expected-rq-timeout-ms` header.
-  timeSystem().sleep(std::chrono::milliseconds(301));
+  timeSystem().sleep(std::chrono::milliseconds(501));
 
   // Ensure we got a timeout downstream and canceled the upstream request.
   response->waitForHeaders();
