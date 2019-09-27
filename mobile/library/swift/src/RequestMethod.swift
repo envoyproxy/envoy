@@ -13,7 +13,7 @@ public enum RequestMethod: Int {
   case trace
 
   /// String representation of this method.
-  var stringValue: String {
+  public var stringValue: String {
     switch self {
     case .delete:
       return "DELETE"
