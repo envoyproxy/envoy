@@ -2,6 +2,7 @@
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/un.h>
 #include <unistd.h>
 
@@ -11,6 +12,7 @@
 
 #include "envoy/common/exception.h"
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
@@ -318,6 +320,29 @@ TEST(PipeInstanceTest, Basic) {
   EXPECT_EQ(nullptr, address.ip());
 }
 
+TEST(PipeInstanceTest, BasicPermission) {
+  std::string path = TestEnvironment::unixDomainSocketPath("foo.sock");
+
+  const mode_t mode = 777;
+  PipeInstance address(path, mode);
+
+  IoHandlePtr io_handle = address.socket(SocketType::Stream);
+  ASSERT_GE(io_handle->fd(), 0) << address.asString();
+
+  Api::SysCallIntResult result = address.bind(io_handle->fd());
+  ASSERT_EQ(result.rc_, 0) << address.asString() << "\nerror: " << strerror(result.errno_)
+                           << "\terrno: " << result.errno_;
+
+  Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
+  struct stat stat_buf;
+  result = os_sys_calls.stat(path.c_str(), &stat_buf);
+  EXPECT_EQ(result.rc_, 0);
+  // Get file permissions bits
+  ASSERT_EQ(stat_buf.st_mode & 07777, mode)
+      << path << std::oct << "\t" << (stat_buf.st_mode & 07777) << std::dec << "\t"
+      << (stat_buf.st_mode) << strerror(result.errno_);
+}
+
 TEST(PipeInstanceTest, AbstractNamespace) {
 #if defined(__linux__)
   PipeInstance address("@/foo");
@@ -482,7 +507,6 @@ struct TestCase test_cases[] = {
 INSTANTIATE_TEST_SUITE_P(AddressCrossProduct, MixedAddressTest,
                          ::testing::Combine(::testing::ValuesIn(test_cases),
                                             ::testing::ValuesIn(test_cases)));
-
 } // namespace Address
 } // namespace Network
 } // namespace Envoy
