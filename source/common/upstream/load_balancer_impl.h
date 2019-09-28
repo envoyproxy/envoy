@@ -149,7 +149,9 @@ public:
 
   uint32_t hostSelectionRetryCount() const override { return 1; }
 
-  Network::Socket::OptionsSharedPtr upstreamSocketOptions() const override { return {}; }
+  Network::Socket::OptionsSharedPtr upstreamSocketOptions() const override { return nullptr; }
+
+  Network::TransportSocketOptionsSharedPtr upstreamTransportSocketOptions() const override { return nullptr; }
 };
 
 /**
