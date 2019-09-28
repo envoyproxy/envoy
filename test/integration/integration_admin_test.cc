@@ -122,7 +122,6 @@ std::string ContentType(const BufferingStreamDecoderPtr& response) {
 } // namespace
 
 TEST_P(IntegrationAdminTest, Admin) {
-
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
     auto* outbound_listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     outbound_listener->set_traffic_direction(envoy::api::v2::core::TrafficDirection::OUTBOUND);
@@ -441,7 +440,6 @@ TEST_P(IntegrationAdminTest, Admin) {
 
 // Validates that the inboundonly drains inbound listeners.
 TEST_P(IntegrationAdminTest, AdminDrainInboundOnly) {
-
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
     auto* inbound_listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     inbound_listener->set_traffic_direction(envoy::api::v2::core::TrafficDirection::INBOUND);

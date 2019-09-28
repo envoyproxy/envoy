@@ -73,6 +73,38 @@ TEST_P(IntegrationTest, PerWorkerStats) {
   EXPECT_NE(nullptr, test_server_->counter("server.worker_0.watchdog_miss"));
 }
 
+// Validates that the drain actually drains the listeners.
+TEST_P(IntegrationTest, AdminDrainDrainsListeners) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestHeaderMapImpl request_headers{{":method", "HEAD"},
+                                          {":path", "/test/long/url"},
+                                          {":scheme", "http"},
+                                          {":authority", "host"}};
+  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+
+  // Invoke drain listeners endpoint and validate that the listener is actually draining.
+  BufferingStreamDecoderPtr admin_response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "POST", "/drain_listeners", "", downstreamProtocol(), version_);
+  EXPECT_TRUE(admin_response->complete());
+  EXPECT_EQ("200", admin_response->headers().Status()->value().getStringView());
+
+  upstream_request_->encodeData(512, true);
+
+  // Wait for the response to be read by the codec client.
+  response->waitForEndStream();
+
+  ASSERT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
+
+  test_server_->waitForCounterGe("listener_manager.listener_removed", 1);
+
+  cleanupUpstreamAndDownstream();
+}
+
 TEST_P(IntegrationTest, RouterDirectResponse) {
   const std::string body = "Response body";
   const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", body);
