@@ -3,6 +3,7 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/un.h>
 
 #include <array>
@@ -329,7 +330,7 @@ IoHandlePtr Ipv6Instance::socket(SocketType type) const {
   return io_handle;
 }
 
-PipeInstance::PipeInstance(const sockaddr_un* address, socklen_t ss_len)
+PipeInstance::PipeInstance(const sockaddr_un* address, socklen_t ss_len, mode_t mode)
     : InstanceBase(Type::Pipe) {
   if (address->sun_path[0] == '\0') {
 #if !defined(__linux__)
@@ -345,9 +346,10 @@ PipeInstance::PipeInstance(const sockaddr_un* address, socklen_t ss_len)
       abstract_namespace_
           ? fmt::format("@{}", absl::string_view(address_.sun_path + 1, address_length_ - 1))
           : address_.sun_path;
+  this->mode = mode;
 }
 
-PipeInstance::PipeInstance(const std::string& pipe_path) : InstanceBase(Type::Pipe) {
+PipeInstance::PipeInstance(const std::string& pipe_path, mode_t mode) : InstanceBase(Type::Pipe) {
   if (pipe_path.size() >= sizeof(address_.sun_path)) {
     throw EnvoyException(
         fmt::format("Path \"{}\" exceeds maximum UNIX domain socket path size of {}.", pipe_path,
@@ -365,6 +367,7 @@ PipeInstance::PipeInstance(const std::string& pipe_path) : InstanceBase(Type::Pi
     address_length_ = strlen(address_.sun_path);
     address_.sun_path[0] = '\0';
   }
+  this->mode = mode;
 }
 
 bool PipeInstance::operator==(const Instance& rhs) const { return asString() == rhs.asString(); }
@@ -377,7 +380,14 @@ Api::SysCallIntResult PipeInstance::bind(int fd) const {
     unlink(address_.sun_path);
   }
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  return os_syscalls.bind(fd, sockAddr(), sockAddrLen());
+  auto bind_result = os_syscalls.bind(fd, sockAddr(), sockAddrLen());
+  if (mode != 0 and !abstract_namespace_ and bind_result.rc_ == 0) {
+    auto set_permissions = os_syscalls.chmod(address_.sun_path, mode);
+    if (set_permissions.rc_ != 0) {
+      throw EnvoyException(fmt::format("Failed to create socket with mode {}", mode));
+    }
+  }
+  return bind_result;
 }
 
 Api::SysCallIntResult PipeInstance::connect(int fd) const {
