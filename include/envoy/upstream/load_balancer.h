@@ -4,10 +4,10 @@
 #include <memory>
 
 #include "envoy/common/pure.h"
+#include "envoy/network/transport_socket.h"
 #include "envoy/router/router.h"
 #include "envoy/upstream/types.h"
 #include "envoy/upstream/upstream.h"
-#include "envoy/network/transport_socket.h"
 
 namespace Envoy {
 namespace Upstream {

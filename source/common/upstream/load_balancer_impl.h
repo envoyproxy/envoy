@@ -151,7 +151,9 @@ public:
 
   Network::Socket::OptionsSharedPtr upstreamSocketOptions() const override { return nullptr; }
 
-  Network::TransportSocketOptionsSharedPtr upstreamTransportSocketOptions() const override { return nullptr; }
+  Network::TransportSocketOptionsSharedPtr upstreamTransportSocketOptions() const override {
+    return nullptr;
+  }
 };
 
 /**
