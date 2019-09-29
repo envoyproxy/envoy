@@ -58,7 +58,9 @@ protected:
         : name(match_name), stats(match_stats) {}
     std::string name;
     Network::TransportSocketFactoryPtr factory;
+    // TODO: delete this.
     std::map<std::string, std::string> match;
+    Config::Metadata::LabelSet label_set;
     TransportSocketMatchStats stats;
   };
 
