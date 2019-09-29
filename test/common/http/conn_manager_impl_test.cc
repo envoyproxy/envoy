@@ -2917,22 +2917,40 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyInTrailersCallback) {
       HeaderMapPtr{new TestHeaderMapImpl{{"some", "trailer"}}});
 }
 
-// Upstream doesn't send data frames, only headers and trailers.
-TEST_F(HttpConnectionManagerImplTest, FilterAddBodyInTrailersCallbackForHeaderOnlyResponse) {
+// Don't send data frames, only headers and trailers.
+TEST_F(HttpConnectionManagerImplTest, FilterAddBodyInTrailersCallback_NoDataFrames) {
   InSequence s;
   setup(false, "");
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
     HeaderMapPtr headers{
         new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
-    conn_manager_->newStream(response_encoder_).decodeHeaders(std::move(headers), true);
+    decoder->decodeHeaders(std::move(headers), false);
+
+    HeaderMapPtr trailers{new TestHeaderMapImpl{{"foo", "bar"}}};
+    decoder->decodeTrailers(std::move(trailers));
   }));
 
-  setupFilterChain(1, 1);
+  setupFilterChain(2, 1);
 
-  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
       .WillOnce(Return(FilterHeadersStatus::StopIteration));
+
+  Buffer::OwnedImpl trailers_data("hello");
+  EXPECT_CALL(*decoder_filters_[0], decodeTrailers(_))
+      .WillOnce(InvokeWithoutArgs([&]() -> FilterTrailersStatus {
+        decoder_filters_[0]->callbacks_->addDecodedData(trailers_data, false);
+        return FilterTrailersStatus::Continue;
+      }));
   EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*decoder_filters_[1], decodeData(_, false))
+      .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
+  EXPECT_CALL(*decoder_filters_[1], decodeTrailers(_))
+      .WillOnce(Return(FilterTrailersStatus::StopIteration));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
@@ -2943,7 +2961,6 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyInTrailersCallbackForHeaderOn
   decoder_filters_[0]->callbacks_->encodeHeaders(
       HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, false);
 
-  Buffer::OwnedImpl trailers_data("body");
   EXPECT_CALL(*encoder_filters_[0], encodeTrailers(_))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterTrailersStatus {
         encoder_filters_[0]->callbacks_->addEncodedData(trailers_data, false);
