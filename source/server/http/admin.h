@@ -446,7 +446,7 @@ public:
   /**
    * Format the given metric name, prefixed with "envoy_".
    */
-  static std::string metricName(const std::string& extractedName);
+  static std::string metricName(const std::string& extracted_name);
 
 private:
   /**

@@ -10,7 +10,9 @@ namespace {
 uint32_t makeRequestStreamId(uint32_t stream_id) { return htonl((stream_id << 1) | 1); }
 
 // All this templatized stuff is for the typesafe constexpr bitwise ORing of the "enum class" values
-template <typename First, typename... Rest> struct FirstArgType { using type = First; };
+template <typename First, typename... Rest> struct FirstArgType {
+  using type = First; // NOLINT(readability-identifier-naming)
+};
 
 template <typename Flag> constexpr uint8_t orFlags(Flag flag) { return static_cast<uint8_t>(flag); }
 

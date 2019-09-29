@@ -18,6 +18,7 @@ import "envoy/config/trace/v3alpha/trace.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
+import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
 
@@ -67,7 +68,9 @@ message Bootstrap {
     api.v3alpha.core.ApiConfigSource ads_config = 3;
   }
 
-  reserved 10;
+  reserved 10, 11;
+
+  reserved "runtime";
 
   // Node identity to present to the management server and for instance
   // identification purposes (e.g. in generated headers).
@@ -113,11 +116,6 @@ message Bootstrap {
   // tracing will be performed.
   trace.v3alpha.Tracing tracing = 9;
 
-  // Configuration for the runtime configuration provider (deprecated). If not
-  // specified, a “null” provider will be used which will result in all defaults
-  // being used.
-  Runtime runtime = 11 [deprecated = true];
-
   // Configuration for the runtime configuration provider. If not
   // specified, a “null” provider will be used which will result in all defaults
   // being used.
@@ -147,6 +145,11 @@ message Bootstrap {
   // changes to this string, especially in multi-layer Envoy deployments or deployments using
   // extensions which are not upstream.
   string header_prefix = 18;
+
+  // Optional proxy version which will be used to set the value of :ref:`server.version statistic
+  // <server_statistics>` if specified. Envoy will not process this value, it will be sent as is to
+  // :ref:<stats sinks <envoy_api_msg_config.metrics.v3alpha.StatsSink>.
+  google.protobuf.UInt64Value stats_server_version_override = 19;
 }
 
 // Administration interface :ref:`operations documentation

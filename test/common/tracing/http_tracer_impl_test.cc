@@ -137,8 +137,8 @@ TEST(HttpConnManFinalizerImpl, OriginalAndLongPath) {
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/2")));
 
   NiceMock<MockConfig> config;
-  HttpTracerUtility::finalizeSpan(span, &request_headers, &response_headers, &response_trailers,
-                                  stream_info, config);
+  HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
+                                            &response_trailers, stream_info, config);
 }
 
 TEST(HttpConnManFinalizerImpl, NoGeneratedId) {
@@ -166,8 +166,8 @@ TEST(HttpConnManFinalizerImpl, NoGeneratedId) {
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/2")));
 
   NiceMock<MockConfig> config;
-  HttpTracerUtility::finalizeSpan(span, &request_headers, &response_headers, &response_trailers,
-                                  stream_info, config);
+  HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
+                                            &response_trailers, stream_info, config);
 }
 
 TEST(HttpConnManFinalizerImpl, NullRequestHeaders) {
@@ -185,10 +185,11 @@ TEST(HttpConnManFinalizerImpl, NullRequestHeaders) {
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().ResponseSize), Eq("11")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().RequestSize), Eq("10")));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), _)).Times(0);
 
   NiceMock<MockConfig> config;
-  HttpTracerUtility::finalizeSpan(span, nullptr, nullptr, nullptr, stream_info, config);
+  HttpTracerUtility::finalizeDownstreamSpan(span, nullptr, nullptr, nullptr, stream_info, config);
 }
 
 TEST(HttpConnManFinalizerImpl, StreamInfoLogs) {
@@ -226,7 +227,7 @@ TEST(HttpConnManFinalizerImpl, StreamInfoLogs) {
 
   NiceMock<MockConfig> config;
   EXPECT_CALL(config, verbose).WillOnce(Return(true));
-  HttpTracerUtility::finalizeSpan(span, nullptr, nullptr, nullptr, stream_info, config);
+  HttpTracerUtility::finalizeDownstreamSpan(span, nullptr, nullptr, nullptr, stream_info, config);
 }
 
 TEST(HttpConnManFinalizerImpl, UpstreamClusterTagSet) {
@@ -240,6 +241,7 @@ TEST(HttpConnManFinalizerImpl, UpstreamClusterTagSet) {
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
   EXPECT_CALL(stream_info, upstreamHost()).Times(2);
 
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("my_upstream_cluster")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("0")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
@@ -248,7 +250,7 @@ TEST(HttpConnManFinalizerImpl, UpstreamClusterTagSet) {
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().RequestSize), Eq("10")));
 
   NiceMock<MockConfig> config;
-  HttpTracerUtility::finalizeSpan(span, nullptr, nullptr, nullptr, stream_info, config);
+  HttpTracerUtility::finalizeDownstreamSpan(span, nullptr, nullptr, nullptr, stream_info, config);
 }
 
 TEST(HttpConnManFinalizerImpl, SpanOptionalHeaders) {
@@ -285,11 +287,12 @@ TEST(HttpConnManFinalizerImpl, SpanOptionalHeaders) {
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().ResponseSize), Eq("100")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), _)).Times(0);
 
   NiceMock<MockConfig> config;
-  HttpTracerUtility::finalizeSpan(span, &request_headers, &response_headers, &response_trailers,
-                                  stream_info, config);
+  HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
+                                            &response_trailers, stream_info, config);
 }
 
 TEST(HttpConnManFinalizerImpl, SpanPopulatedFailureResponse) {
@@ -347,10 +350,11 @@ TEST(HttpConnManFinalizerImpl, SpanPopulatedFailureResponse) {
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("503")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().ResponseSize), Eq("100")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("UT")));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), _)).Times(0);
 
-  HttpTracerUtility::finalizeSpan(span, &request_headers, &response_headers, &response_trailers,
-                                  stream_info, config);
+  HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
+                                            &response_trailers, stream_info, config);
 }
 
 TEST(HttpConnManFinalizerImpl, GrpcOkStatus) {
@@ -384,8 +388,8 @@ TEST(HttpConnManFinalizerImpl, GrpcOkStatus) {
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcMessage), Eq("")));
 
   NiceMock<MockConfig> config;
-  HttpTracerUtility::finalizeSpan(span, &request_headers, &response_headers, &response_trailers,
-                                  stream_info, config);
+  HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
+                                            &response_trailers, stream_info, config);
 }
 
 TEST(HttpConnManFinalizerImpl, GrpcErrorTag) {
@@ -421,8 +425,8 @@ TEST(HttpConnManFinalizerImpl, GrpcErrorTag) {
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcMessage), Eq("permission denied")));
 
   NiceMock<MockConfig> config;
-  HttpTracerUtility::finalizeSpan(span, &request_headers, &response_headers, &response_trailers,
-                                  stream_info, config);
+  HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
+                                            &response_trailers, stream_info, config);
 }
 
 TEST(HttpConnManFinalizerImpl, GrpcTrailersOnly) {
@@ -459,8 +463,8 @@ TEST(HttpConnManFinalizerImpl, GrpcTrailersOnly) {
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcMessage), Eq("permission denied")));
 
   NiceMock<MockConfig> config;
-  HttpTracerUtility::finalizeSpan(span, &request_headers, &response_headers, &response_trailers,
-                                  stream_info, config);
+  HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
+                                            &response_trailers, stream_info, config);
 }
 
 TEST(HttpTracerUtilityTest, operationTypeToString) {

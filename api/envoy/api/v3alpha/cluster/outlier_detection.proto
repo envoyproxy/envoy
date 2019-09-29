@@ -5,8 +5,6 @@ package envoy.api.v3alpha.cluster;
 option java_outer_classname = "OutlierDetectionProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.api.v3alpha.cluster";
-option csharp_namespace = "Envoy.Api.V2.ClusterNS";
-option ruby_package = "Envoy.Api.V2.ClusterNS";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";

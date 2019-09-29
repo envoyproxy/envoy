@@ -136,6 +136,14 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "host_stats_test",
+    srcs = ["host_stats_test.cc"],
+    deps = [
+        "//include/envoy/upstream:host_description_interface",
+    ],
+)
+
+envoy_cc_test(
     name = "host_utility_test",
     srcs = ["host_utility_test.cc"],
     deps = [

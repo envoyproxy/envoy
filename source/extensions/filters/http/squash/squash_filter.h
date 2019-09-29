@@ -20,12 +20,12 @@ namespace Squash {
 class SquashFilterConfig : protected Logger::Loggable<Logger::Id::config> {
 public:
   SquashFilterConfig(const envoy::config::filter::http::squash::v2::Squash& proto_config,
-                     Upstream::ClusterManager& clusterManager);
-  const std::string& clusterName() { return cluster_name_; }
-  const std::string& attachmentJson() { return attachment_json_; }
-  const std::chrono::milliseconds& attachmentTimeout() { return attachment_timeout_; }
-  const std::chrono::milliseconds& attachmentPollPeriod() { return attachment_poll_period_; }
-  const std::chrono::milliseconds& requestTimeout() { return request_timeout_; }
+                     Upstream::ClusterManager& cluster_manager);
+  const std::string& clusterName() const { return cluster_name_; }
+  const std::string& attachmentJson() const { return attachment_json_; }
+  const std::chrono::milliseconds& attachmentTimeout() const { return attachment_timeout_; }
+  const std::chrono::milliseconds& attachmentPollPeriod() const { return attachment_poll_period_; }
+  const std::chrono::milliseconds& requestTimeout() const { return request_timeout_; }
 
 private:
   // Get the attachment body, and returns a JSON representations with environment variables
