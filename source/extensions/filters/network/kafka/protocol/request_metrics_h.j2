@@ -3,8 +3,7 @@
 
   Generates the request metric names from Kafka message types.
   The metrics structure (KAFKA_REQUEST_METRICS) is wrapped by RichRequestMetrics instance, allowing
-  for easier access to metrics using message's api_key as array index (instead of requiring us to
-  explicitly specify the metric (field) name).
+  for easier access to metrics using message's api_key.
 
   There is one metric for each of request types (e.g. produce) - number of responses received.
   There is also a single metric counting requests that could not be parsed.
@@ -23,9 +22,12 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
 
+/**
+ * Generated metrics, we have a counter for each request type.
+ */
 #define KAFKA_REQUEST_METRICS(COUNTER)                                                             \
 {% for message_type in message_types %}                                                            \
-  COUNTER({{message_type.name_in_c_case()}})                                                       \
+  COUNTER({{ message_type.name_in_c_case() }})                                                     \
 {% endfor %}                                                                                       \
   COUNTER(unknown)
 
@@ -33,42 +35,52 @@ struct KafkaRequestMetrics {
   KAFKA_REQUEST_METRICS(GENERATE_COUNTER_STRUCT)
 };
 
+/**
+ * Abstraction layer over request-related metrics.
+ * Pure interface so that it can be mocked easily.
+ */
 class RichRequestMetrics {
 public:
   virtual ~RichRequestMetrics() = default;
+
+  /**
+   * Invoked when properly-parsed message is received.
+   */
   virtual void onRequest(const int16_t api_key) PURE;
+
+  /**
+   * Invoked when an unknown message is received.
+   */
   virtual void onUnknownRequest() PURE;
 };
 
 using RichRequestMetricsSharedPtr = std::shared_ptr<RichRequestMetrics>;
 
+/**
+ * Metrics implementation that uses Envoy Scope to store metrics.
+ */
 class RichRequestMetricsImpl: public RichRequestMetrics {
 public:
-  RichRequestMetricsImpl(Stats::Scope& scope, std::string stat_prefix): RichRequestMetricsImpl({
+  RichRequestMetricsImpl(Stats::Scope& scope, std::string stat_prefix): metrics_({
     KAFKA_REQUEST_METRICS(POOL_COUNTER_PREFIX(scope, fmt::format("kafka.{}.request.",
       stat_prefix)))}) {};
 
   void onRequest(const int16_t api_key) override {
-    counters_[api_key].get().inc();
+    // Both successful message parsing & metrics list depend on protocol-generated code, what means
+    // both do support the same api keys.
+    switch (api_key) {
+    {% for message_type in message_types %}
+    case {{ message_type.get_extra('api_key') }} :
+      metrics_.{{ message_type.name_in_c_case() }}_.inc();
+      return;
+    {% endfor %}
+    }
   }
 
-  void onUnknownRequest() override { raw_metrics_.unknown_.inc(); }
+  void onUnknownRequest() override { metrics_.unknown_.inc(); }
 
 private:
-  RichRequestMetricsImpl(const KafkaRequestMetrics& metrics):
-    counters_{setupCounters(metrics)}, raw_metrics_{metrics} {};
-
-  static std::array<std::reference_wrapper<Envoy::Stats::Counter>, {{message_types|length}}>
-  setupCounters(const KafkaRequestMetrics& metrics) {
-    return {
-        {% for message_type in message_types %}
-        std::ref(metrics.{{message_type.name_in_c_case()}}_),
-        {% endfor %}
-    };
-  }
-
-  std::array<std::reference_wrapper<Envoy::Stats::Counter>, {{message_types|length}}> counters_;
-  KafkaRequestMetrics raw_metrics_;
+  KafkaRequestMetrics metrics_;
 };
 
 } // namespace Kafka

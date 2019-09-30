@@ -19,7 +19,7 @@ namespace Kafka {
  */
 class MessageUtilities {
 private:
-  MessageUtilities(){};
+  MessageUtilities() = default;
 
 public:
   /**
