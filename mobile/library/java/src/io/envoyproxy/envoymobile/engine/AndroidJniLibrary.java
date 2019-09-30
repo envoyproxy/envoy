@@ -40,4 +40,6 @@ public class AndroidJniLibrary {
    * @return int for successful initialization
    */
   protected static native int initialize(ConnectivityManager connectivityManager);
+
+  protected static native int setPreferredNetwork(int network);
 }

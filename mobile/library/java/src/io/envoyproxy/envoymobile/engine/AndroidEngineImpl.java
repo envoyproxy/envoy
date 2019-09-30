@@ -7,5 +7,6 @@ public class AndroidEngineImpl extends EnvoyEngineImpl {
   public AndroidEngineImpl(Context context) {
     super();
     AndroidJniLibrary.load(context);
+    AndroidNetworkMonitor.load(context);
   }
 }
