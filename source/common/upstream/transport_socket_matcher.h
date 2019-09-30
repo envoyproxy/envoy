@@ -18,12 +18,9 @@
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/callback_impl.h"
-#include "common/common/enum_to_int.h"
 #include "common/common/logger.h"
 #include "common/config/metadata.h"
 #include "common/config/well_known_names.h"
-#include "common/network/utility.h"
 #include "common/protobuf/protobuf.h"
 
 namespace Envoy {
