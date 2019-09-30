@@ -15,10 +15,6 @@ TransportSocketMatcher::TransportSocketMatcher(
   for (const auto& socket_match : socket_matches) {
     FactoryMatch factory_match(socket_match.name(), generateStats(socket_match.name() + "."));
     for (const auto& kv : socket_match.match().fields()) {
-      // TODO: question, what's the handling for non string value case?
-      if (kv.second.kind_case() == ProtobufWkt::Value::kStringValue) {
-        factory_match.match[kv.first] = kv.second.string_value();
-      }
       factory_match.label_set.emplace_back(kv.first, kv.second);
     }
     const auto& socket_config = socket_match.transport_socket();
