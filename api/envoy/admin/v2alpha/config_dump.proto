@@ -34,6 +34,17 @@ message ConfigDump {
   repeated google.protobuf.Any configs = 1;
 }
 
+message UpdateFailureState {
+  // What the component configuration would have been if the update had succeeded.
+  google.protobuf.Any failed_state = 1;
+
+  // Time of the latest failed update attempt.
+  google.protobuf.Timestamp last_update_attempt = 2;
+
+  // Details about the last failed update attempt.
+  string details = 3;
+}
+
 // This message describes the bootstrap configuration that Envoy was started with. This includes
 // any CLI overrides that were merged. Bootstrap configuration information can be used to recreate
 // the static portions of an Envoy configuration by reusing the output as the bootstrap
@@ -41,7 +52,7 @@ message ConfigDump {
 message BootstrapConfigDump {
   config.bootstrap.v2.Bootstrap bootstrap = 1;
 
-  // The timestamp when the BootstrapConfig was last updated.
+  // The timestamp when the BootstrapConfig was last successfully updated.
   google.protobuf.Timestamp last_updated = 2;
 }
 
@@ -54,7 +65,7 @@ message ListenersConfigDump {
     // The listener config.
     api.v2.Listener listener = 1;
 
-    // The timestamp when the Listener was last updated.
+    // The timestamp when the Listener was last successfully updated.
     google.protobuf.Timestamp last_updated = 2;
   }
 
@@ -68,51 +79,26 @@ message ListenersConfigDump {
     // The listener config.
     api.v2.Listener listener = 2;
 
-    // The timestamp when the Listener was last updated.
-    // FIXME: reviewer we may eventually want last updated and last _successfully_ updated.
-    // Given similarity between last_updated (attempt or success) and
-    // last_update should this maybe be last_update_attempt so last_update
-    // matches?
+    // The timestamp when the Listener was last successfully updated.
     google.protobuf.Timestamp last_updated = 3;
   }
 
   // Describes a dynamically loaded listener via the LDS API.
-  // FIXME rename? because otherwise v2->alpha is super confusing but this seems
-  // like the right name :-/
   message DynamicListener {
-    // FIXME worth splitting name out for easy reference, duplicate cruft?
-    // The name or uniqe id of this listener, pulled from the DynamicListenerState config.
+    // The name or unique id of this listener, pulled from the DynamicListenerState config.
     string name = 1;
 
     // The listener state for any active listener by this name.
     DynamicListenerState active_state = 2;
 
     // The listener state for any warming listener by this name.
-    DynamicListenerState warming_state = 2;
+    DynamicListenerState warming_state = 3;
 
     // The listener state for any draining listener by this name.
-    DynamicListenerState draining_state = 3;
-
-    // FIXME alternately we could just have
-    // DynamicListenerState failure_state = 4;
-    // string error_details = 5;
-    // rather than the sub-message
-    //
-    // FIXME alternately alternately we could have shared UpdateErrorState with
-    // a Message error_state (which would be DynamicListenerState for listeners,
-    // DynamicClusterState for clusters, and error details for all.
-    // I like shared structures but hate "casting" so I'm scrapping reuse.
-    message ListenerUpdateErrorState {
-      // What this listener would have looked like if it had succeeded
-      // FIXME is it confusing to use last_updated to last_attempted_update?
-      DynamicListenerState failed_state = 1;
-
-      // Details about the last update attempt
-      string details = 4;
-    }
+    DynamicListenerState draining_state = 4;
 
     // Set if the last update failed, cleared after the next successful update.
-    ListenerUpdateFailureState error_state = 4;
+    UpdateFailureState error_state = 5;
   }
 
   // This is the :ref:`version_info <envoy_api_field_DiscoveryResponse.version_info>` in the
@@ -137,32 +123,37 @@ message ClustersConfigDump {
     // The cluster config.
     api.v2.Cluster cluster = 1;
 
-    // The timestamp when the Cluster was last updated.
+    // The timestamp when the Cluster was last successfully updated.
     google.protobuf.Timestamp last_updated = 2;
   }
 
+  message DynamicClusterState {
+    // This is the per-resource version information. This version is currently taken from the
+    // :ref:`version_info <envoy_api_field_DiscoveryResponse.version_info>` field at the time
+    // that the cluster was loaded. In the future, discrete per-cluster versions may be supported by
+    // the API.
+    string version_info = 1;
+
+    // The cluster config.
+    api.v2.Cluster cluster = 2;
+
+    // The timestamp when the Cluster was last successfully updated.
+    google.protobuf.Timestamp last_updated = 3;
+  }
+
   message DynamicCluster {
-    // The name or uniqe id of this cluster, pulled from config.
+    // The name or unique id of this cluster, pulled from config.
     string name = 1;
 
-    // The cluster state for any active cluster by this name.
+    // The dynamically loaded active cluster. This is the cluster available to service data plane
+    // traffic.
     DynamicClusterState active_state = 2;
 
     // The cluster state for any warming cluster by this name.
-    DynamicClusterState warming_state = 2;
-
-    // The cluster state for any draining cluster by this name.
-    DynamicClusterState draining_state = 3;
-
-    message ClusterUpdateErrorState {
-      DynamicClusterState failed_state = 1;
-
-      // Details about the last update attempt
-      string details = 4;
-    }
+    DynamicClusterState warming_state = 3;
 
     // Set if the last update failed, cleared after the next successful update.
-    ClusterUpdateFailureState error_state = 4;
+    UpdateFailureState error_state = 5;
   }
 
   // This is the :ref:`version_info <envoy_api_field_DiscoveryResponse.version_info>` in the
@@ -188,7 +179,7 @@ message RoutesConfigDump {
     // The route config.
     api.v2.RouteConfiguration route_config = 1;
 
-    // The timestamp when the Route was last updated.
+    // The timestamp when the Route was last successfully updated.
     google.protobuf.Timestamp last_updated = 2;
   }
 
@@ -201,27 +192,19 @@ message RoutesConfigDump {
     // The route config.
     api.v2.RouteConfiguration route_config = 2;
 
-    // The timestamp when the Route was last updated.
+    // The timestamp when the Route was last successfully updated.
     google.protobuf.Timestamp last_updated = 3;
   }
 
   message DynamicRoute {
-    // The name or uniqe id of this route, pulled from config.
+    // The name or unique id of this route, pulled from config.
     string name = 1;
 
     // The route state for any active route by this name.
-    DynamicRouetState route_state = 2;
-
-    message RouteUpdateErrorState {
-      // What this route would have looked like if it had succeeded
-      DynamicRouteState failed_state = 1;
-
-      // Details about the last update attempt
-      string details = 4;
-    }
+    DynamicRouteState route_state = 2;
 
     // Set if the last update failed, cleared after the next successful update.
-    RouteUpdateFailureState error_state = 4;
+    UpdateFailureState error_state = 3;
   }
 
   // The statically loaded routes.
@@ -243,7 +226,7 @@ message ScopedRoutesConfigDump {
     // The scoped route configurations.
     repeated api.v2.ScopedRouteConfiguration scoped_routes = 2;
 
-    // The timestamp when the scoped route config set was last updated.
+    // The timestamp when the scoped route config set was last successfully updated.
     google.protobuf.Timestamp last_updated = 3;
   }
 
@@ -259,74 +242,80 @@ message ScopedRoutesConfigDump {
     // The scoped route configurations.
     repeated api.v2.ScopedRouteConfiguration scoped_routes = 3;
 
-    // The timestamp when the scoped route config set was last updated.
+    // The timestamp when the scoped route config set was last successfully updated.
     google.protobuf.Timestamp last_updated = 4;
   }
 
   message DynamicScopedRoute {
-    // The name or uniqe id of this route, pulled from config.
+    // The name or unique id of this route, pulled from config.
     string name = 1;
 
     // The scoped route state for any active route by this name.
-    DynamicScopedState scoped_route_state = 2;
+    DynamicScopedRouteState scoped_route_state = 2;
 
-    message RouteUpdateErrorState {
-      // What this route would have looked like if it had succeeded
-      DynamicScopedRouteState failed_state = 1;
-
-      // Details about the last update attempt
-      string details = 4;
-    }
-
-    // The statically loaded scoped route configs.
-    repeated InlineScopedRoutes inline_scoped_routes = 1;
-
-    // The dynamically loaded scoped route configs.
-    repeated DynamicScopedRoute dynamic_scoped_routes = 2;
+    google.protobuf.Timestamp last_updated = 3;
   }
 
-  // FIXME do secrets too.
-  // Envoys SDS implementation fills this message with all secrets fetched dynamically via SDS.
-  message SecretsConfigDump {
-    // DynamicSecret contains secret information fetched via SDS.
-    message DynamicSecret {
-      // The name assigned to the secret.
-      string name = 1;
+  // The statically loaded scoped route configs.
+  repeated InlineScopedRoutes inline_scoped_routes = 1;
 
-      // This is the per-resource version information.
-      string version_info = 2;
+  // The dynamically loaded scoped route configs.
+  repeated DynamicScopedRoute dynamic_scoped_routes = 2;
 
-      // The timestamp when the secret was last updated.
-      google.protobuf.Timestamp last_updated = 3;
+  // Set if the last update failed, cleared after the next successful update.
+  UpdateFailureState error_state = 3;
+}
 
-      // The actual secret information.
-      // Security sensitive information is redacted (replaced with "[redacted]") for
-      // private keys and passwords in TLS certificates.
-      api.v2.auth.Secret secret = 4;
-    }
+// Envoys SDS implementation fills this message with all secrets fetched dynamically via SDS.
+message SecretsConfigDump {
+  // DynamicSecret contains secret information fetched via SDS.
+  message DynamicSecretState {
+    // The name assigned to the secret.
+    string name = 1;
 
-    // StaticSecret specifies statically loaded secret in bootstrap.
-    message StaticSecret {
-      // The name assigned to the secret.
-      string name = 1;
+    // This is the per-resource version information.
+    string version_info = 2;
 
-      // The timestamp when the secret was last updated.
-      google.protobuf.Timestamp last_updated = 2;
+    // The timestamp when the secret was last successfully updated.
+    google.protobuf.Timestamp last_updated = 3;
 
-      // The actual secret information.
-      // Security sensitive information is redacted (replaced with "[redacted]") for
-      // private keys and passwords in TLS certificates.
-      api.v2.auth.Secret secret = 3;
-    }
-
-    // The statically loaded secrets.
-    repeated StaticSecret static_secrets = 1;
-
-    // The dynamically loaded active secrets. These are secrets that are available to service
-    // clusters or listeners.
-    repeated DynamicSecret dynamic_active_secrets = 2;
-
-    // The dynamically loaded warming secrets. These are secrets that are currently undergoing
-    // warming in preparation to service clusters or listeners.
-    repeated DynamicSecret dynamic_warming_secrets = 3;
+    // The actual secret information.
+    // Security sensitive information is redacted (replaced with "[redacted]") for
+    // private keys and passwords in TLS certificates.
+    api.v2.auth.Secret secret = 4;
   }
+
+  message DynamicSecret {
+    // The name or unique id of this secret, pulled from the DynamicSecretState config.
+    string name = 1;
+
+    // The state for any active secrets by this name.
+    DynamicSecretState active_state = 2;
+
+    // The state for any warming secrets by this name.
+    DynamicSecretState warming_state = 3;
+
+    // Set if the last update failed, cleared after the next successful update.
+    UpdateFailureState error_state = 4;
+  }
+
+  // StaticSecret specifies statically loaded secret in bootstrap.
+  message StaticSecret {
+    // The name assigned to the secret.
+    string name = 1;
+
+    // The timestamp when the secret was last successfully updated.
+    google.protobuf.Timestamp last_updated = 2;
+
+    // The actual secret information.
+    // Security sensitive information is redacted (replaced with "[redacted]") for
+    // private keys and passwords in TLS certificates.
+    api.v2.auth.Secret secret = 3;
+  }
+
+  // The statically loaded secrets.
+  repeated StaticSecret static_secrets = 1;
+
+  // State about warming and active secrets.
+  repeated DynamicSecret dynamic_secrets = 2;
+}
