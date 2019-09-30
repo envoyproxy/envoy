@@ -19,6 +19,7 @@ TransportSocketMatcher::TransportSocketMatcher(
       if (kv.second.kind_case() == ProtobufWkt::Value::kStringValue) {
         factory_match.match[kv.first] = kv.second.string_value();
       }
+      factory_match.label_set.emplace_back(kv.first, kv.second);
     }
     const auto& socket_config = socket_match.transport_socket();
     auto& config_factory = Config::Utility::getAndCheckFactory<
@@ -30,37 +31,6 @@ TransportSocketMatcher::TransportSocketMatcher(
   }
 }
 
-bool metadataMatch(const envoy::api::v2::core::Metadata& metadata,
-                   const std::map<std::string, std::string>& match) {
-  if (match.empty()) {
-    return true;
-  }
-  // TODO: which header to put this names to? what the right name?
-  // maybe envoy.transport_socket_match?
-  const auto socket_match_it = metadata.filter_metadata().find("envoy.transport_socket");
-  if (socket_match_it == metadata.filter_metadata().end()) {
-    return false;
-  }
-  const ProtobufWkt::Struct data_struct = socket_match_it->second;
-  for (const auto& kv_itr : match) {
-    const auto& match_key = kv_itr.first;
-    const auto& match_val = kv_itr.second;
-    const auto& entry_it = data_struct.fields().find(match_key);
-    if (entry_it == data_struct.fields().end()) {
-      return false;
-    }
-    const ProtobufWkt::Value* val = &(entry_it->second);
-    // Only support string typed match, TBD for the reviewer's to decide though.
-    if (val->kind_case() != ProtobufWkt::Value::kStringValue) {
-      return false;
-    }
-    if (val->string_value() != match_val) {
-      return false;
-    }
-  }
-  return true;
-}
-
 TransportSocketMatchStats TransportSocketMatcher::generateStats(const std::string& prefix) {
   return {ALL_TRANSPORT_SOCKET_MATCHER_STATS(POOL_COUNTER_PREFIX(stats_scope_, prefix))};
 }
@@ -69,7 +39,8 @@ Network::TransportSocketFactory&
 TransportSocketMatcher::resolve(const std::string& endpoint_addr,
                                 const envoy::api::v2::core::Metadata& metadata) {
   for (const auto& socket_factory_match : matches_) {
-    if (metadataMatch(metadata, socket_factory_match.match)) {
+    if (Config::Metadata::metadataLabelMatch(socket_factory_match.label_set, metadata,
+                                             "envoy.transport_socket", false)) {
       socket_factory_match.stats.total_match_count_.inc();
       ENVOY_LOG(debug, "transport socket match found: name {}, metadata {}, address {}",
                 socket_factory_match.name, metadata.DebugString(), endpoint_addr);

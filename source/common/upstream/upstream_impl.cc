@@ -221,9 +221,6 @@ HostVector filterHosts(const std::unordered_set<HostSharedPtr>& hosts,
 Host::CreateConnectionData HostImpl::createConnection(
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsSharedPtr transport_socket_options) const {
-
-  // ENVOY_LOG(info, "incfly debug address {} metadata {}", address_->asString(),
-  // metadata()->DebugString());
   return {createConnection(dispatcher, *cluster_, address_, *metadata(), options,
                            transport_socket_options),
           shared_from_this()};
@@ -274,10 +271,9 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
     connection_options = options;
   }
   Network::TransportSocketFactory& socket_factory =
-      cluster.resolveTransportSocketFactory(address->asString(), metadata);
+    cluster.resolveTransportSocketFactory(address->asString(), metadata);
   Network::ClientConnectionPtr connection = dispatcher.createClientConnection(
       address, cluster.sourceAddress(),
-      // cluster.transportSocketFactory().createTransportSocket(transport_socket_options),
       socket_factory.createTransportSocket(transport_socket_options), connection_options);
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());
   cluster.createNetworkFilterChain(*connection);
@@ -1078,9 +1074,6 @@ void PriorityStateManager::registerHostForPriority(
     const std::string& hostname, Network::Address::InstanceConstSharedPtr address,
     const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
     const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint) {
-  ENVOY_LOG(info, "incfly debug the endpoint information {}", lb_endpoint.DebugString());
-  ENVOY_LOG(info, "incfly debug the endpoint metadata information {}",
-            lb_endpoint.metadata().DebugString());
   const HostSharedPtr host(
       new HostImpl(parent_.info(), hostname, address, lb_endpoint.metadata(),
                    lb_endpoint.load_balancing_weight().value(), locality_lb_endpoint.locality(),

@@ -365,6 +365,8 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
                             *cluster->mutable_transport_socket(), tls_config);
     }
   }
+  // ENVOY_LOG_MISC(info, "incfly debug the bootstrap is {}\n port_idx {}, ports.size() {}",
+  // bootstrap_.DebugString(), port_idx, ports.size());
   ASSERT(skip_port_usage_validation_ || port_idx == ports.size() || eds_hosts ||
          original_dst_cluster || custom_cluster || bootstrap_.dynamic_resources().has_cds_config());
 
