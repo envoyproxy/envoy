@@ -52,17 +52,17 @@ public:
 protected:
   // Send some number of requests with 'delay_ms' specifying the amount of time the fault filter
   // will delay them.
-  void sendRequests(const uint32_t request_count, const uint32_t num_forwarded);
+  void sendRequests(uint32_t request_count, uint32_t num_forwarded);
 
   // Waits for a specified duration and then responds to all queued up requests in a FIFO manner.
   // Asserts that the expected number of requests are forwarded through the filter. The oldest
   // requests are the forwarded requests.
   //
   // Note: For interleaved forwarded/blocked requests, use respondToRequest() directly.
-  void respondToAllRequests(int forwarded_count, std::chrono::milliseconds latency);
+  void respondToAllRequests(uint32_t forwarded_count, std::chrono::milliseconds latency);
 
   // Responds to a single request in a FIFO manner. Asserts the forwarding expectation.
-  void respondToRequest(const bool expect_forwarded);
+  void respondToRequest(bool expect_forwarded);
 
   void verifyResponseForwarded(IntegrationStreamDecoderPtr response) {
     EXPECT_EQ("200", response->headers().Status()->value().getStringView());

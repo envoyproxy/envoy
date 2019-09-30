@@ -10,8 +10,8 @@
 
 namespace Envoy {
 
-void AdaptiveConcurrencyIntegrationTest::sendRequests(const uint32_t request_count,
-                                                      const uint32_t num_forwarded) {
+void AdaptiveConcurrencyIntegrationTest::sendRequests(uint32_t request_count,
+                                                      uint32_t num_forwarded) {
   ASSERT_LE(num_forwarded, request_count);
 
   // We expect these requests to reach the upstream.
@@ -45,13 +45,13 @@ void AdaptiveConcurrencyIntegrationTest::sendRequests(const uint32_t request_cou
   ASSERT_EQ(responses_.size(), upstream_requests_.size());
 }
 
-void AdaptiveConcurrencyIntegrationTest::respondToAllRequests(int forwarded_count,
+void AdaptiveConcurrencyIntegrationTest::respondToAllRequests(uint32_t forwarded_count,
                                                               std::chrono::milliseconds latency) {
   ASSERT_GE(responses_.size(), static_cast<size_t>(forwarded_count));
 
   timeSystem().sleep(latency);
 
-  for (int idx = 0; idx < forwarded_count; ++idx) {
+  for (uint32_t idx = 0; idx < forwarded_count; ++idx) {
     respondToRequest(true);
   }
   while (!responses_.empty()) {
@@ -59,7 +59,7 @@ void AdaptiveConcurrencyIntegrationTest::respondToAllRequests(int forwarded_coun
   }
 }
 
-void AdaptiveConcurrencyIntegrationTest::respondToRequest(const bool expect_forwarded) {
+void AdaptiveConcurrencyIntegrationTest::respondToRequest(bool expect_forwarded) {
   ASSERT_EQ(upstream_connections_.size(), upstream_requests_.size());
   ASSERT_EQ(responses_.size(), upstream_requests_.size());
 
