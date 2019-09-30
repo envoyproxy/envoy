@@ -1242,7 +1242,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
   // This allows socket options to control connection pooling so that connections with
   // different options are not pooled together.
   bool have_options = false;
-  if (context && context->downstreamConnection()) {
+  if (context != nullptr && context->downstreamConnection()) {
     const Network::ConnectionSocket::OptionsSharedPtr& options =
         context->downstreamConnection()->socketOptions();
     if (options) {
@@ -1254,7 +1254,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
   }
 
   bool have_transport_socket_options = false;
-  if (context && context->upstreamTransportSocketOptions() != nullptr) {
+  if (context != nullptr && context->upstreamTransportSocketOptions() != nullptr) {
     have_transport_socket_options = true;
     context->upstreamTransportSocketOptions()->hashKey(hash_key);
   }
