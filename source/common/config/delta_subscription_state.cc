@@ -6,12 +6,12 @@
 namespace Envoy {
 namespace Config {
 
-DeltaSubscriptionState::DeltaSubscriptionState(const std::string& type_url,
+DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
                                                SubscriptionCallbacks& callbacks,
                                                const LocalInfo::LocalInfo& local_info,
                                                std::chrono::milliseconds init_fetch_timeout,
                                                Event::Dispatcher& dispatcher)
-    : type_url_(type_url), callbacks_(callbacks), local_info_(local_info),
+    : type_url_(std::move(type_url)), callbacks_(callbacks), local_info_(local_info),
       init_fetch_timeout_(init_fetch_timeout) {
   if (init_fetch_timeout_.count() > 0 && !init_fetch_timeout_timer_) {
     init_fetch_timeout_timer_ = dispatcher.createTimer([this]() -> void {

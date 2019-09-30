@@ -19,7 +19,7 @@ namespace Config {
 // being multiplexed together by ADS.
 class DeltaSubscriptionState : public Logger::Loggable<Logger::Id::config> {
 public:
-  DeltaSubscriptionState(const std::string& type_url, SubscriptionCallbacks& callbacks,
+  DeltaSubscriptionState(std::string type_url, SubscriptionCallbacks& callbacks,
                          const LocalInfo::LocalInfo& local_info,
                          std::chrono::milliseconds init_fetch_timeout,
                          Event::Dispatcher& dispatcher);
