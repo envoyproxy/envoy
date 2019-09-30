@@ -150,6 +150,10 @@ message RedisProxy {
       repeated RequestMirrorPolicy request_mirror_policy = 4;
     }
 
+    reserved 3;
+
+    reserved "catch_all_cluster";
+
     // List of prefix routes.
     repeated Route routes = 1;
 
@@ -158,31 +162,15 @@ message RedisProxy {
 
     // Optional catch-all route to forward commands that doesn't match any of the routes. The
     // catch-all route becomes required when no routes are specified.
-    // .. attention::
-    //
-    //   This field is deprecated. Use a :ref:`catch_all
-    //   route<envoy_api_field_config.filter.network.redis_proxy.v3alpha.RedisProxy.PrefixRoutes.catch_all_route>`
-    //   instead.
-    string catch_all_cluster = 3 [deprecated = true];
-
-    // Optional catch-all route to forward commands that doesn't match any of the routes. The
-    // catch-all route becomes required when no routes are specified.
     Route catch_all_route = 4;
   }
 
+  reserved 2;
+
+  reserved "cluster";
+
   // The prefix to use when emitting :ref:`statistics <config_network_filters_redis_proxy_stats>`.
   string stat_prefix = 1 [(validate.rules).string = {min_bytes: 1}];
-
-  // Name of cluster from cluster manager. See the :ref:`configuration section
-  // <arch_overview_redis_configuration>` of the architecture overview for recommendations on
-  // configuring the backing cluster.
-  //
-  // .. attention::
-  //
-  //   This field is deprecated. Use a :ref:`catch_all
-  //   route<envoy_api_field_config.filter.network.redis_proxy.v3alpha.RedisProxy.PrefixRoutes.catch_all_route>`
-  //   instead.
-  string cluster = 2 [deprecated = true];
 
   // Network settings for the connection pool to the upstream clusters.
   ConnPoolSettings settings = 3 [(validate.rules).message = {required: true}];
