@@ -151,7 +151,7 @@ private:
   };
 
   struct NullConfig : public Router::Config {
-    Router::RouteConstSharedPtr route(const Http::HeaderMap&, uint64_t) const override {
+    Router::RouteConstSharedPtr route(const Http::HeaderMap&, const StreamInfo::StreamInfo&, uint64_t) const override {
       return nullptr;
     }
 

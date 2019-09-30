@@ -323,6 +323,10 @@ message WeightedCluster {
 }
 
 message RouteMatch {
+  message CredentialMatchOptions {
+        google.protobuf.BoolValue presented = 1;
+  }
+
   oneof path_specifier {
     option (validate.required) = true;
 
@@ -412,6 +416,8 @@ message RouteMatch {
   // that the content-type header has a application/grpc or one of the various
   // application/grpc+ values.
   GrpcRouteMatchOptions grpc = 8;
+
+  CredentialMatchOptions credentials = 11;
 }
 
 // [#comment:next free field: 11]

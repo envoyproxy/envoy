@@ -853,6 +853,7 @@ public:
    * @return the route or nullptr if there is no matching route for the request.
    */
   virtual RouteConstSharedPtr route(const Http::HeaderMap& headers,
+                                    const StreamInfo::StreamInfo& stream_info,
                                     uint64_t random_value) const PURE;
 
   /**

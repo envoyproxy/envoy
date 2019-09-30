@@ -46,6 +46,7 @@ public:
    * @return true if input headers match this object.
    */
   virtual RouteConstSharedPtr matches(const Http::HeaderMap& headers,
+                                      const StreamInfo::StreamInfo& stream_info,
                                       uint64_t random_value) const PURE;
 };
 
@@ -152,6 +153,7 @@ public:
                   Server::Configuration::FactoryContext& factory_context, bool validate_clusters);
 
   RouteConstSharedPtr getRouteFromEntries(const Http::HeaderMap& headers,
+                                          const StreamInfo::StreamInfo& stream_info,
                                           uint64_t random_value) const;
   const VirtualCluster* virtualClusterFromEntries(const Http::HeaderMap& headers) const;
   const ConfigImpl& globalRouteConfig() const { return global_route_config_; }
@@ -397,7 +399,7 @@ public:
     return !host_redirect_.empty() || !path_redirect_.empty() || !prefix_rewrite_redirect_.empty();
   }
 
-  bool matchRoute(const Http::HeaderMap& headers, uint64_t random_value) const;
+  bool matchRoute(const Http::HeaderMap& headers, const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const;
   void validateClusters(Upstream::ClusterManager& cm) const;
 
   // Router::RouteEntry
@@ -709,7 +711,7 @@ public:
   PathMatchType matchType() const override { return PathMatchType::Prefix; }
 
   // Router::Matchable
-  RouteConstSharedPtr matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
+  RouteConstSharedPtr matches(const Http::HeaderMap& headers, const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const override;
 
   // Router::DirectResponseEntry
   void rewritePathHeader(Http::HeaderMap& headers, bool insert_envoy_original_path) const override;
@@ -731,7 +733,7 @@ public:
   PathMatchType matchType() const override { return PathMatchType::Exact; }
 
   // Router::Matchable
-  RouteConstSharedPtr matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
+  RouteConstSharedPtr matches(const Http::HeaderMap& headers, const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const override;
 
   // Router::DirectResponseEntry
   void rewritePathHeader(Http::HeaderMap& headers, bool insert_envoy_original_path) const override;
@@ -753,7 +755,7 @@ public:
   PathMatchType matchType() const override { return PathMatchType::Regex; }
 
   // Router::Matchable
-  RouteConstSharedPtr matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
+  RouteConstSharedPtr matches(const Http::HeaderMap& headers, const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const override;
 
   // Router::DirectResponseEntry
   void rewritePathHeader(Http::HeaderMap& headers, bool insert_envoy_original_path) const override;
@@ -775,7 +777,7 @@ public:
                const ConfigImpl& global_http_config,
                Server::Configuration::FactoryContext& factory_context, bool validate_clusters);
 
-  RouteConstSharedPtr route(const Http::HeaderMap& headers, uint64_t random_value) const;
+  RouteConstSharedPtr route(const Http::HeaderMap& headers, const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const;
 
 private:
   const VirtualHostImpl* findVirtualHost(const Http::HeaderMap& headers) const;
@@ -816,8 +818,8 @@ public:
   const HeaderParser& responseHeaderParser() const { return *response_headers_parser_; };
 
   // Router::Config
-  RouteConstSharedPtr route(const Http::HeaderMap& headers, uint64_t random_value) const override {
-    return route_matcher_->route(headers, random_value);
+  RouteConstSharedPtr route(const Http::HeaderMap& headers, const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const override {
+    return route_matcher_->route(headers, stream_info, random_value);
   }
 
   const std::list<Http::LowerCaseString>& internalOnlyHeaders() const override {
@@ -844,7 +846,7 @@ private:
 class NullConfigImpl : public Config {
 public:
   // Router::Config
-  RouteConstSharedPtr route(const Http::HeaderMap&, uint64_t) const override { return nullptr; }
+  RouteConstSharedPtr route(const Http::HeaderMap&, const StreamInfo::StreamInfo&, uint64_t) const override { return nullptr; }
 
   const std::list<Http::LowerCaseString>& internalOnlyHeaders() const override {
     return internal_only_headers_;
