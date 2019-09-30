@@ -301,7 +301,7 @@ void InstanceImpl::initialize(const Options& options,
       server_stats_->dynamic_unknown_fields_);
 
   initialization_timer_ =
-      std::make_unique<Stats::Timespan>(server_stats_->initialization_time_ms_, timeSource());
+      std::make_unique<Stats::Timespan>(server_stats_->initialization_time_, timeSource());
   server_stats_->concurrency_.set(options_.concurrency());
   server_stats_->hot_restart_epoch_.set(options_.restartEpoch());
 

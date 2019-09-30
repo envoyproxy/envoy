@@ -83,12 +83,12 @@ void forEachSampleStat(int num_clusters, std::function<void(absl::string_view)> 
 
   // These are the other stats that appear in the admin /stats request when made
   // prior to any requests.
-  static const char* other_stats[] = {"http.admin.downstream_cx_length_ms",
+  static const char* other_stats[] = {"http.admin.downstream_cx_length",
                                       "http.admin.downstream_rq_time",
-                                      "http.ingress_http.downstream_cx_length_ms",
+                                      "http.ingress_http.downstream_cx_length",
                                       "http.ingress_http.downstream_rq_time",
-                                      "listener.0.0.0.0_40000.downstream_cx_length_ms",
-                                      "listener.admin.downstream_cx_length_ms"};
+                                      "listener.0.0.0.0_40000.downstream_cx_length",
+                                      "listener.admin.downstream_cx_length"};
 
   for (int cluster = 0; cluster <= num_clusters; ++cluster) {
     for (const auto& cluster_stat : cluster_stats) {

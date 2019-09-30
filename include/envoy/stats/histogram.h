@@ -46,16 +46,17 @@ public:
   virtual const std::vector<double>& supportedBuckets() const PURE;
 
   /**
-   * Returns computed bucket values during the period. The vector contains an approximation
-   * of samples below each quantile bucket defined in supportedBuckets(). This vector is
-   * guaranteed to be the same length as supportedBuckets().
+   * Returns computed bucket values during the period. The vector contains an
+   * approximation of samples below each quantile bucket defined in
+   * supportedBuckets(). This vector is guaranteed to be the same length as
+   * supportedBuckets().
    */
   virtual const std::vector<uint64_t>& computedBuckets() const PURE;
 
   /**
-   * Returns number of values during the period. This number may be an approximation
-   * of the number of samples in the histogram, it is not guaranteed that this will be
-   * 100% the number of samples observed.
+   * Returns number of values during the period. This number may be an
+   * approximation of the number of samples in the histogram, it is not
+   * guaranteed that this will be 100% the number of samples observed.
    */
   virtual uint64_t sampleCount() const PURE;
 
@@ -67,17 +68,51 @@ public:
 
 /**
  * A histogram that records values one at a time.
- * Note: Histograms now incorporate what used to be timers because the only difference between the
- * two stat types was the units being represented. It is assumed that no downstream user of this
- * class (Sinks, in particular) will need to explicitly differentiate between histograms
- * representing durations and histograms representing other types of data.
+ * Note: Histograms now incorporate what used to be timers because the only
+ * difference between the two stat types was the units being represented.
  */
 class Histogram : public Metric {
 public:
+  /**
+   * Histogram values represent scalar quantity like time, length, mass,
+   * distance, or in general anything which has only magnitude and no other
+   * characteristics. These are often accompanied by a unit of measurement.
+   * This enum defines units for commonly measured quantities. Base units
+   * are preferred unless they are not granular enough to be useful as an
+   * integer.
+   */
+  enum class Unit {
+    Unspecified, // Measured quantity does not require a unit, e.g. "items".
+    Bytes,
+    Microseconds,
+    Milliseconds,
+  };
+
   ~Histogram() override = default;
 
   /**
-   * Records an unsigned value. If a timer, values are in units of milliseconds.
+   * @return the unit of measurement for values recorded by the histogram.
+   */
+  virtual Unit unit() const PURE;
+
+  /**
+   * @return the unit symbol.
+   */
+  virtual std::string unit_symbol() const {
+    switch (unit()) {
+    case Unit::Unspecified:
+      return "";
+    case Unit::Bytes:
+      return "b";
+    case Unit::Microseconds:
+      return "us";
+    case Unit::Milliseconds:
+      return "ms";
+    }
+  }
+
+  /**
+   * Records an unsigned value in the unit specified during the construction.
    */
   virtual void recordValue(uint64_t value) PURE;
 };
@@ -85,15 +120,16 @@ public:
 using HistogramSharedPtr = RefcountPtr<Histogram>;
 
 /**
- * A histogram that is stored in main thread and provides summary view of the histogram.
+ * A histogram that is stored in main thread and provides summary view of the
+ * histogram.
  */
 class ParentHistogram : public Histogram {
 public:
   ~ParentHistogram() override = default;
 
   /**
-   * This method is called during the main stats flush process for each of the histograms and used
-   * to merge the histogram values.
+   * This method is called during the main stats flush process for each of the
+   * histograms and used to merge the histogram values.
    */
   virtual void merge() PURE;
 

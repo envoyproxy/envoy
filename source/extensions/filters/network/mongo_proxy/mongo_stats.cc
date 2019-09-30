@@ -20,9 +20,9 @@ MongoStats::MongoStats(Stats::Scope& scope, absl::string_view prefix)
       multi_get_(stat_name_set_->add("multi_get")),
       reply_num_docs_(stat_name_set_->add("reply_num_docs")),
       reply_size_(stat_name_set_->add("reply_size")),
-      reply_time_ms_(stat_name_set_->add("reply_time_ms")),
-      time_ms_(stat_name_set_->add("time_ms")), query_(stat_name_set_->add("query")),
-      scatter_get_(stat_name_set_->add("scatter_get")), total_(stat_name_set_->add("total")),
+      reply_time_(stat_name_set_->add("reply_time")), time_(stat_name_set_->add("time")),
+      query_(stat_name_set_->add("query")), scatter_get_(stat_name_set_->add("scatter_get")),
+      total_(stat_name_set_->add("total")),
       unknown_command_(stat_name_set_->add("unknown_command")) {
 
   // TODO(jmarantz): is this the right set of mongo commands to use as builtins?
@@ -44,9 +44,10 @@ void MongoStats::incCounter(const std::vector<Stats::StatName>& names) {
   scope_.counterFromStatName(Stats::StatName(stat_name_storage.get())).inc();
 }
 
-void MongoStats::recordHistogram(const std::vector<Stats::StatName>& names, uint64_t sample) {
+void MongoStats::recordHistogram(const std::vector<Stats::StatName>& names,
+                                 Stats::Histogram::Unit unit, uint64_t sample) {
   const Stats::SymbolTable::StoragePtr stat_name_storage = addPrefix(names);
-  scope_.histogramFromStatName(Stats::StatName(stat_name_storage.get())).recordValue(sample);
+  scope_.histogramFromStatName(Stats::StatName(stat_name_storage.get()), unit).recordValue(sample);
 }
 
 } // namespace MongoProxy

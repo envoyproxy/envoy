@@ -305,9 +305,9 @@ TEST_F(TcpConnPoolImplTest, DrainConnections) {
  */
 TEST_F(TcpConnPoolImplTest, VerifyTimingStats) {
   EXPECT_CALL(cluster_->stats_store_,
-              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_connect_ms"), _));
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_connect"), _));
   EXPECT_CALL(cluster_->stats_store_,
-              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_length_ms"), _));
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_length"), _));
 
   ActiveTestConn c1(*this, 0, ActiveTestConn::Type::CreateConnection);
 

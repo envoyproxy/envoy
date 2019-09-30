@@ -205,13 +205,18 @@ public:
   ~MockHistogram() override;
 
   MOCK_METHOD1(recordValue, void(uint64_t value));
+  MOCK_CONST_METHOD0(unit, Histogram::Unit());
   MOCK_CONST_METHOD0(used, bool());
+
+  // Histogram
+  std::string unit_symbol() const override { return Histogram::unit_symbol(); }
 
   // RefcountInterface
   void incRefCount() override { refcount_helper_.incRefCount(); }
   bool decRefCount() override { return refcount_helper_.decRefCount(); }
   uint32_t use_count() const override { return refcount_helper_.use_count(); }
 
+  Unit unit_;
   Store* store_;
 
 private:
@@ -229,14 +234,19 @@ public:
 
   MOCK_CONST_METHOD0(used, bool());
   MOCK_METHOD1(recordValue, void(uint64_t value));
+  MOCK_CONST_METHOD0(unit, Histogram::Unit());
   MOCK_CONST_METHOD0(cumulativeStatistics, const HistogramStatistics&());
   MOCK_CONST_METHOD0(intervalStatistics, const HistogramStatistics&());
+
+  // Histogram
+  std::string unit_symbol() const override { return Histogram::unit_symbol(); }
 
   // RefcountInterface
   void incRefCount() override { refcount_helper_.incRefCount(); }
   bool decRefCount() override { return refcount_helper_.decRefCount(); }
   uint32_t use_count() const override { return refcount_helper_.use_count(); }
 
+  Unit unit_;
   bool used_;
   Store* store_;
   std::shared_ptr<HistogramStatistics> histogram_stats_ =
@@ -288,7 +298,7 @@ public:
   MOCK_METHOD2(gauge, Gauge&(const std::string&, Gauge::ImportMode));
   MOCK_METHOD1(nullGauge, NullGaugeImpl&(const std::string&));
   MOCK_CONST_METHOD0(gauges, std::vector<GaugeSharedPtr>());
-  MOCK_METHOD1(histogram, Histogram&(const std::string& name));
+  MOCK_METHOD2(histogram, Histogram&(const std::string&, Histogram::Unit));
   MOCK_CONST_METHOD0(histograms, std::vector<ParentHistogramSharedPtr>());
 
   MOCK_CONST_METHOD1(findCounter, OptionalCounter(StatName));
@@ -301,8 +311,8 @@ public:
   Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override {
     return gauge(symbol_table_->toString(name), import_mode);
   }
-  Histogram& histogramFromStatName(StatName name) override {
-    return histogram(symbol_table_->toString(name));
+  Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override {
+    return histogram(symbol_table_->toString(name), unit);
   }
 
   TestSymbolTable symbol_table_;
