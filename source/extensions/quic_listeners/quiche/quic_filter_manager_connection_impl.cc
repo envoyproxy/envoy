@@ -43,13 +43,12 @@ void QuicFilterManagerConnectionImpl::setBufferLimits(uint32_t /*limit*/) {
   // TODO(danzh): add interface to quic for connection level buffer throttling.
   // Currently read buffer is capped by connection level flow control. And
   // write buffer is not capped.
-  ENVOY_CONN_LOG(error, "Quic manages its own buffer currently.", *this);
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 void QuicFilterManagerConnectionImpl::close(Network::ConnectionCloseType type) {
   if (type != Network::ConnectionCloseType::NoFlush) {
     // TODO(danzh): Implement FlushWrite and FlushWriteAndDelay mode.
-    ENVOY_CONN_LOG(error, "Flush write is not implemented for QUIC.", *this);
   }
   quic_connection_->CloseConnection(quic::QUIC_NO_ERROR, "Closed by application",
                                     quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);

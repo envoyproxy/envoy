@@ -306,15 +306,13 @@ TEST_P(EnvoyQuicServerSessionTest, FlushCloseNotSupported) {
   EXPECT_CALL(*quic_connection_,
               SendConnectionClosePacket(quic::QUIC_NO_ERROR, "Closed by application"));
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
-  EXPECT_LOG_CONTAINS("error", "Flush write is not implemented for QUIC.",
-                      envoy_quic_session_.close(Network::ConnectionCloseType::FlushWrite));
+  envoy_quic_session_.close(Network::ConnectionCloseType::FlushWrite);
 }
 
 TEST_P(EnvoyQuicServerSessionTest, ShutdownNotice) {
   installReadFilter();
   // Not verifying dummy implementation, just to have coverage.
   EXPECT_DEBUG_DEATH(envoy_quic_session_.enableHalfClose(true), "");
-  envoy_quic_session_.setBufferLimits(1024 * 1024);
   EXPECT_EQ(nullptr, envoy_quic_session_.ssl());
   EXPECT_DEATH(envoy_quic_session_.aboveHighWatermark(), "");
   EXPECT_DEATH(envoy_quic_session_.setDelayedCloseTimeout(std::chrono::milliseconds(1)), "");
@@ -395,8 +393,6 @@ TEST_P(EnvoyQuicServerSessionTest, NetworkConnectionInterface) {
   EXPECT_FALSE(envoy_quic_session_.localAddressRestored());
   EXPECT_DEBUG_DEATH(envoy_quic_session_.unixSocketPeerCredentials(),
                      "Unix domain socket is not supported.");
-  EXPECT_DEBUG_DEATH(envoy_quic_session_.readDisable(true),
-                     "Quic connection should be able to read through out its life time.");
 }
 
 } // namespace Quic
