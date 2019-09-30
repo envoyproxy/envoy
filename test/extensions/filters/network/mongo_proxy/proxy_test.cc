@@ -62,7 +62,7 @@ public:
 
 class MongoProxyFilterTest : public testing::Test {
 public:
-  MongoProxyFilterTest() : mongo_stats_(std::make_shared<MongoStats>(store_, "test")) { setup(); }
+  MongoProxyFilterTest() { setup(); }
 
   void setup() {
     ON_CALL(runtime_.snapshot_, featureEnabled("mongo.proxy_enabled", 100))
@@ -82,9 +82,11 @@ public:
   }
 
   void initializeFilter(bool emit_dynamic_metadata = false) {
+    const std::string stat_prefix {"test"};
+    MongoStatsSharedPtr mongo_stats {std::make_shared<MongoStats>(store_, stat_prefix)};
     filter_ = std::make_unique<TestProxyFilter>(
-        "test.", store_, runtime_, access_log_, fault_config_, drain_decision_,
-        dispatcher_.timeSource(), emit_dynamic_metadata, mongo_stats_);
+        stat_prefix, store_, runtime_, access_log_, fault_config_, drain_decision_,
+        dispatcher_.timeSource(), emit_dynamic_metadata, mongo_stats);
     filter_->initializeReadFilterCallbacks(read_filter_callbacks_);
     filter_->onNewConnection();
 
@@ -114,7 +116,6 @@ public:
 
   Buffer::OwnedImpl fake_data_;
   NiceMock<TestStatStore> store_;
-  MongoStatsSharedPtr mongo_stats_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Envoy::AccessLog::MockAccessLogFile> file_{

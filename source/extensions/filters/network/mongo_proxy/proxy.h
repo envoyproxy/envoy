@@ -160,9 +160,10 @@ private:
   using ActiveQueryPtr = std::unique_ptr<ActiveQuery>;
 
   MongoProxyStats generateStats(const std::string& prefix, Stats::Scope& scope) {
-    return MongoProxyStats{ALL_MONGO_PROXY_STATS(POOL_COUNTER_PREFIX(scope, prefix),
-                                                 POOL_GAUGE_PREFIX(scope, prefix),
-                                                 POOL_HISTOGRAM_PREFIX(scope, prefix))};
+    const std::string dot_prefix = fmt::format("{}.", prefix);
+    return MongoProxyStats{ALL_MONGO_PROXY_STATS(POOL_COUNTER_PREFIX(scope, dot_prefix),
+                                                 POOL_GAUGE_PREFIX(scope, dot_prefix),
+                                                 POOL_HISTOGRAM_PREFIX(scope, dot_prefix))};
   }
 
   // Increment counters related to queries. 'names' is passed by non-const
