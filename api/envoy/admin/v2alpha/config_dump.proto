@@ -36,7 +36,7 @@ message ConfigDump {
 
 message UpdateFailureState {
   // What the component configuration would have been if the update had succeeded.
-  google.protobuf.Any failed_state = 1;
+  google.protobuf.Any failed_configuration = 1;
 
   // Time of the latest failed update attempt.
   google.protobuf.Timestamp last_update_attempt = 2;
