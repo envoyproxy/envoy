@@ -35,6 +35,8 @@ void LdsApiImpl::onConfigUpdate(
   Cleanup rds_resume([this] { cm_.adsMux().resume(Config::TypeUrl::get().RouteConfiguration); });
 
   bool any_applied = false;
+  listener_manager_.beginListenerUpdate();
+
   // We do all listener removals before adding the new listeners. This allows adding a new listener
   // with the same address as a listener that is to be removed. Do not change the order.
   for (const auto& removed_listener : removed_resources) {

@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/api/v2/listener/listener.pb.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/filter_config.h"
@@ -137,6 +138,7 @@ public:
   void startWorkers(GuardDog& guard_dog) override;
   void stopListeners() override;
   void stopWorkers() override;
+  virtual void beginListenerUpdate() override { error_state_tracker_.clear(); }
   Http::Context& httpContext() { return server_.httpContext(); }
 
   Instance& server_;
@@ -145,6 +147,9 @@ public:
 private:
   using ListenerList = std::list<ListenerImplPtr>;
 
+  bool addOrUpdateListenerInternal(const envoy::api::v2::Listener& config,
+                                   const std::string& version_info, bool added_via_api,
+                                   const std::string& name);
   struct DrainingListener {
     DrainingListener(ListenerImplPtr&& listener, uint64_t workers_pending_removal)
         : listener_(std::move(listener)), workers_pending_removal_(workers_pending_removal) {}
@@ -198,6 +203,8 @@ private:
   ConfigTracker::EntryOwnerPtr config_tracker_entry_;
   LdsApiPtr lds_api_;
   const bool enable_dispatcher_stats_{};
+  using UpdateFailureState = envoy::admin::v2alpha::UpdateFailureState;
+  absl::flat_hash_map<std::string, std::unique_ptr<UpdateFailureState>> error_state_tracker_;
 };
 
 // TODO(mattklein123): Consider getting rid of pre-worker start and post-worker start code by
@@ -248,7 +255,7 @@ public:
 
   Network::Address::InstanceConstSharedPtr address() const { return address_; }
   Network::Address::SocketType socketType() const { return socket_type_; }
-  const envoy::api::v2::Listener& config() { return config_; }
+  const envoy::api::v2::Listener& config() const { return config_; }
   const Network::SocketSharedPtr& getSocket() const { return socket_; }
   void debugLog(const std::string& message);
   void initialize();
@@ -256,7 +263,7 @@ public:
   void setSocket(const Network::SocketSharedPtr& socket);
   void setSocketAndOptions(const Network::SocketSharedPtr& socket);
   const Network::Socket::OptionsSharedPtr& listenSocketOptions() { return listen_socket_options_; }
-  const std::string& versionInfo() { return version_info_; }
+  const std::string& versionInfo() const { return version_info_; }
 
   // Network::ListenerConfig
   Network::FilterChainManager& filterChainManager() override { return filter_chain_manager_; }

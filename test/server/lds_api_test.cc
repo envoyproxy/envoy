@@ -70,6 +70,7 @@ public:
       refs.push_back(listeners_.back());
     }
     EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(refs));
+    EXPECT_CALL(listener_manager_, beginListenerUpdate());
   }
 
   void addListener(Protobuf::RepeatedPtrField<ProtobufWkt::Any>& listeners,
@@ -108,6 +109,7 @@ TEST_F(LdsApiTest, ValidateFail) {
   listeners.Add()->PackFrom(listener);
   std::vector<std::reference_wrapper<Network::ListenerConfig>> existing_listeners;
   EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(existing_listeners));
+  EXPECT_CALL(listener_manager_, beginListenerUpdate());
   EXPECT_CALL(init_watcher_, ready());
 
   EXPECT_THROW(lds_callbacks_->onConfigUpdate(listeners, ""), EnvoyException);
@@ -131,6 +133,7 @@ TEST_F(LdsApiTest, MisconfiguredListenerNameIsPresentInException) {
 
   EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(existing_listeners));
 
+  EXPECT_CALL(listener_manager_, beginListenerUpdate());
   EXPECT_CALL(listener_manager_, addOrUpdateListener(_, _, true))
       .WillOnce(Throw(EnvoyException("something is wrong")));
   EXPECT_CALL(init_watcher_, ready());
@@ -150,6 +153,7 @@ TEST_F(LdsApiTest, EmptyListenersUpdate) {
   std::vector<std::reference_wrapper<Network::ListenerConfig>> existing_listeners;
 
   EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(existing_listeners));
+  EXPECT_CALL(listener_manager_, beginListenerUpdate());
   EXPECT_CALL(init_watcher_, ready());
 
   lds_callbacks_->onConfigUpdate(listeners, "");
@@ -171,6 +175,7 @@ TEST_F(LdsApiTest, ListenerCreationContinuesEvenAfterException) {
 
   EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(existing_listeners));
 
+  EXPECT_CALL(listener_manager_, beginListenerUpdate());
   EXPECT_CALL(listener_manager_, addOrUpdateListener(_, _, true))
       .WillOnce(Return(true))
       .WillOnce(Throw(EnvoyException("something is wrong")))
@@ -198,6 +203,7 @@ TEST_F(LdsApiTest, ValidateDuplicateListeners) {
 
   std::vector<std::reference_wrapper<Network::ListenerConfig>> existing_listeners;
   EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(existing_listeners));
+  EXPECT_CALL(listener_manager_, beginListenerUpdate());
   EXPECT_CALL(listener_manager_, addOrUpdateListener(_, _, true)).WillOnce(Return(true));
   EXPECT_CALL(init_watcher_, ready());
 
@@ -398,6 +404,7 @@ TEST_F(LdsApiTest, FailureInvalidConfig) {
 
   std::vector<std::reference_wrapper<Network::ListenerConfig>> existing_listeners;
   EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(existing_listeners));
+  EXPECT_CALL(listener_manager_, beginListenerUpdate());
   EXPECT_CALL(init_watcher_, ready());
   EXPECT_THROW(lds_callbacks_->onConfigUpdate(response1.resources(), response1.version_info()),
                EnvoyException);

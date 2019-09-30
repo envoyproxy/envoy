@@ -168,6 +168,11 @@ public:
    * have exited.
    */
   virtual void stopWorkers() PURE;
+
+  /*
+   * Warn the listener of an impending update. This allows the listener to clear per-update state.
+   */
+  virtual void beginListenerUpdate() PURE;
 };
 
 } // namespace Server
