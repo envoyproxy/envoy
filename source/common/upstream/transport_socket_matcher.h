@@ -28,10 +28,10 @@
 
 // TODO(incfly):
 // http1_conn_pool_test the connect_timer_, create codec_client_ is not invoked...
-//  - http1_test use a mock clusterinfo, to create the conection, passed it, might unable to resolve
+//  - http1_test use a mock clusterinfo, to create the connection, passed it, might unable to resolve
 //    transport socket factory.
 //    Potential Solution, add contion check in createConnection in upstream_impl, only use new logic
-//    for new cluste info.
+//    for new cluster info.
 namespace Envoy {
 namespace Upstream {
 
