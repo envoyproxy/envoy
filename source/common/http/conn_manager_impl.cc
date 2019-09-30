@@ -2251,6 +2251,7 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataTooLarge() {
           parent_.is_head_request_);
       parent_.maybeEndEncode(parent_.state_.local_complete_);
     } else {
+      ENVOY_STREAM_LOG(debug, "Stream closed. Response data too large and headers have already been sent", *this);
       resetStream();
     }
   }
