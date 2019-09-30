@@ -20,7 +20,10 @@ envoy_cc_test(
     name = "backtrace_test",
     srcs = ["backtrace_test.cc"],
     tags = ["backtrace"],
-    deps = ["//source/server:backtrace_lib"],
+    deps = [
+        "//source/server:backtrace_lib",
+        "//test/test_common:logging_lib",
+    ],
 )
 
 envoy_cc_test(
@@ -291,6 +294,7 @@ envoy_cc_test(
         ":node_bootstrap_no_admin_port.yaml",
         ":node_bootstrap_with_admin_socket_options.yaml",
         ":node_bootstrap_without_access_log.yaml",
+        ":proxy_version_bootstrap.yaml",
         ":runtime_bootstrap.yaml",
         ":runtime_test_data",
         ":static_validation_test_data",

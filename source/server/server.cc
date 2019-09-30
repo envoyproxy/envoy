@@ -61,10 +61,12 @@ InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_syste
                           !options.rejectUnknownDynamicFields()),
       time_source_(time_system), restarter_(restarter), start_time_(time(nullptr)),
       original_start_time_(start_time_), stats_store_(store), thread_local_(tls),
-      api_(new Api::Impl(thread_factory, store, time_system, file_system)),
+      api_(new Api::Impl(thread_factory, store, time_system, file_system,
+                         process_context ? OptProcessContextRef(std::ref(*process_context))
+                                         : absl::nullopt)),
       dispatcher_(api_->allocateDispatcher()),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
-      handler_(new ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
+      handler_(new ConnectionHandlerImpl(*dispatcher_, "main_thread")),
       random_generator_(std::move(random_generator)), listener_component_factory_(*this),
       worker_factory_(thread_local_, *api_, hooks),
       dns_resolver_(dispatcher_->createDnsResolver({})),
@@ -307,12 +309,18 @@ void InstanceImpl::initialize(const Options& options,
 
   InstanceImpl::failHealthcheck(false);
 
+  // Check if bootstrap has server version override set, if yes, we should use that as
+  // 'server.version' stat.
   uint64_t version_int;
-  if (!StringUtil::atoull(VersionInfo::revision().substr(0, 6).c_str(), version_int, 16)) {
-    throw EnvoyException("compiled GIT SHA is invalid. Invalid build.");
+  if (bootstrap_.stats_server_version_override().value() > 0) {
+    version_int = bootstrap_.stats_server_version_override().value();
+  } else {
+    if (!StringUtil::atoull(VersionInfo::revision().substr(0, 6).c_str(), version_int, 16)) {
+      throw EnvoyException("compiled GIT SHA is invalid. Invalid build.");
+    }
   }
-
   server_stats_->version_.set(version_int);
+
   bootstrap_.mutable_node()->set_build_version(VersionInfo::version());
 
   local_info_ = std::make_unique<LocalInfo::LocalInfoImpl>(
@@ -530,7 +538,8 @@ void InstanceImpl::run() {
 
   // Run the main dispatch loop waiting to exit.
   ENVOY_LOG(info, "starting main dispatch loop");
-  auto watchdog = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId());
+  auto watchdog =
+      guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "main_thread");
   watchdog->startWatchdog(*dispatcher_);
   dispatcher_->post([this] { notifyCallbacksForStage(Stage::Startup); });
   dispatcher_->run(Event::Dispatcher::RunType::Block);

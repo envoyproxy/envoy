@@ -69,11 +69,11 @@ public:
   /**
    * Determines whether the given name matches 'pattern' which may optionally begin with a wildcard.
    * NOTE:  public for testing
-   * @param san the subjectAltName to match
+   * @param dns_name the DNS name to match
    * @param pattern the pattern to match against (*.example.com)
    * @return true if the san matches pattern
    */
-  static bool dNSNameMatch(const std::string& dnsName, const char* pattern);
+  static bool dnsNameMatch(const std::string& dns_name, const char* pattern);
 
   SslStats& stats() { return stats_; }
 
@@ -128,7 +128,8 @@ protected:
   static SslStats generateStats(Stats::Scope& scope);
 
   std::string getCaFileName() const { return ca_file_path_; };
-  void incCounter(const Stats::StatName name, absl::string_view value) const;
+  void incCounter(const Stats::StatName name, absl::string_view value,
+                  const Stats::StatName fallback) const;
 
   Envoy::Ssl::CertificateDetailsPtr certificateDetails(X509* cert, const std::string& path) const;
 
@@ -170,7 +171,11 @@ protected:
   std::string cert_chain_file_path_;
   TimeSource& time_source_;
   const unsigned tls_max_version_;
-  mutable Stats::StatNameSet stat_name_set_;
+  mutable Stats::StatNameSetPtr stat_name_set_;
+  const Stats::StatName unknown_ssl_cipher_;
+  const Stats::StatName unknown_ssl_curve_;
+  const Stats::StatName unknown_ssl_algorithm_;
+  const Stats::StatName unknown_ssl_version_;
   const Stats::StatName ssl_ciphers_;
   const Stats::StatName ssl_versions_;
   const Stats::StatName ssl_curves_;

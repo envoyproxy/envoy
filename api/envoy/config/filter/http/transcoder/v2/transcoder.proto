@@ -12,27 +12,6 @@ import "validate/validate.proto";
 // gRPC-JSON transcoder :ref:`configuration overview <config_http_filters_grpc_json_transcoder>`.
 
 message GrpcJsonTranscoder {
-  oneof descriptor_set {
-    option (validate.required) = true;
-
-    // Supplies the filename of
-    // :ref:`the proto descriptor set <config_grpc_json_generate_proto_descriptor_set>` for the gRPC
-    // services.
-    string proto_descriptor = 1;
-
-    // Supplies the binary content of
-    // :ref:`the proto descriptor set <config_grpc_json_generate_proto_descriptor_set>` for the gRPC
-    // services.
-    bytes proto_descriptor_bin = 4;
-  }
-
-  // A list of strings that
-  // supplies the fully qualified service names (i.e. "package_name.service_name") that
-  // the transcoder will translate. If the service name doesn't exist in ``proto_descriptor``,
-  // Envoy will fail at startup. The ``proto_descriptor`` may contain more services than
-  // the service names specified here, but they won't be translated.
-  repeated string services = 2 [(validate.rules).repeated .min_items = 1];
-
   message PrintOptions {
     // Whether to add spaces, line breaks and indentation to make the JSON
     // output easy to read. Defaults to false.
@@ -53,7 +32,28 @@ message GrpcJsonTranscoder {
     // generate JSON field names using the ``json_name`` option, or lower camel case,
     // in that order. Setting this flag will preserve the original field names. Defaults to false.
     bool preserve_proto_field_names = 4;
-  };
+  }
+
+  oneof descriptor_set {
+    option (validate.required) = true;
+
+    // Supplies the filename of
+    // :ref:`the proto descriptor set <config_grpc_json_generate_proto_descriptor_set>` for the gRPC
+    // services.
+    string proto_descriptor = 1;
+
+    // Supplies the binary content of
+    // :ref:`the proto descriptor set <config_grpc_json_generate_proto_descriptor_set>` for the gRPC
+    // services.
+    bytes proto_descriptor_bin = 4;
+  }
+
+  // A list of strings that
+  // supplies the fully qualified service names (i.e. "package_name.service_name") that
+  // the transcoder will translate. If the service name doesn't exist in ``proto_descriptor``,
+  // Envoy will fail at startup. The ``proto_descriptor`` may contain more services than
+  // the service names specified here, but they won't be translated.
+  repeated string services = 2 [(validate.rules).repeated = {min_items: 1}];
 
   // Control options for response JSON. These options are passed directly to
   // `JsonPrintOptions <https://developers.google.com/protocol-buffers/docs/reference/cpp/
