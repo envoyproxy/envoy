@@ -60,7 +60,7 @@ private:
 
   struct ItemCount {
     std::string item_;
-    int64_t count_;
+    uint64_t count_;
   };
   using List = std::list<ItemCount>;
   List list_;

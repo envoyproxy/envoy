@@ -48,6 +48,8 @@ void RecentLookups::setCapacity(uint64_t capacity) {
 }
 
 void RecentLookups::evictOne() {
+  ASSERT(!list_.empty());
+  ASSERT(!map_.empty());
   const ItemCount& item_count = list_.back();
   int erased = map_.erase(item_count.item_);
   ASSERT(erased == 1);
