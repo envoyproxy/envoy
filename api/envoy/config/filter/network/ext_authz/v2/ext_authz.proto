@@ -18,6 +18,7 @@ import "validate/validate.proto";
 // gRPC Authorization API defined by
 // :ref:`CheckRequest <envoy_api_msg_service.auth.v2.CheckRequest>`.
 // A failed check will cause this filter to close the TCP connection.
+// [#comment:next free field: 4]
 message ExtAuthz {
   // The prefix to use when emitting statistics.
   string stat_prefix = 1 [(validate.rules).string = {min_bytes: 1}];

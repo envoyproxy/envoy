@@ -15,6 +15,7 @@ import "validate/validate.proto";
 // [#protodoc-title: Upstream filters]
 //
 // Upstream filters apply to the connections to the upstream cluster hosts.
+// [#comment:next free field: 3]
 message Filter {
   // The name of the filter to instantiate. The name must match a
   // :ref:`supported filter <config_network_filters>`.

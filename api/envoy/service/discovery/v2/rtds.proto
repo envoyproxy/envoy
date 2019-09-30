@@ -40,6 +40,7 @@ message RtdsDummy {
 }
 
 // RTDS resource type. This describes a layer in the runtime virtual filesystem.
+// [#comment:next free field: 3]
 message Runtime {
   // Runtime resource name. This makes the Runtime a self-describing xDS
   // resource.

@@ -17,6 +17,7 @@ import "validate/validate.proto";
 // [#protodoc-title: Common tap configuration]
 
 // Tap configuration.
+// [#comment:next free field: 4]
 message TapConfig {
   // [#comment:TODO(mattklein123): Rate limiting]
 
@@ -41,6 +42,7 @@ message TapConfig {
 
 // Tap match configuration. This is a recursive structure which allows complex nested match
 // configurations to be built using various logical operators.
+// [#comment:next free field: 9]
 message MatchPredicate {
   // A set of match configurations used for logical operations.
   message MatchSet {
@@ -86,6 +88,7 @@ message HttpHeadersMatch {
 }
 
 // Tap output configuration.
+// [#comment:next free field: 5]
 message OutputConfig {
   // Output sinks for tap data. Currently a single sink is allowed in the list. Once multiple
   // sink types are supported this constraint will be relaxed.
@@ -113,6 +116,7 @@ message OutputConfig {
 }
 
 // Tap output sink configuration.
+// [#comment:next free field: 5]
 message OutputSink {
   // Output format. All output is in the form of one or more :ref:`TraceWrapper
   // <envoy_api_msg_data.tap.v2alpha.TraceWrapper>` messages. This enumeration indicates
@@ -191,6 +195,7 @@ message FilePerTapSink {
 
 // [#not-implemented-hide:] Streaming gRPC sink configuration sends the taps to an external gRPC
 // server.
+// [#comment:next free field: 3]
 message StreamingGrpcSink {
   // Opaque identifier, that will be sent back to the streaming grpc server.
   string tap_id = 1;

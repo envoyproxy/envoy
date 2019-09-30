@@ -16,6 +16,7 @@ import "google/protobuf/timestamp.proto";
 // sequences on a socket.
 
 // Connection properties.
+// [#comment:next free field: 4]
 message Connection {
   // Local address.
   api.v3alpha.core.Address local_address = 2;
@@ -25,6 +26,7 @@ message Connection {
 }
 
 // Event in a socket trace.
+// [#comment:next free field: 5]
 message SocketEvent {
   // Data read by Envoy from the transport socket.
   message Read {
@@ -35,6 +37,7 @@ message SocketEvent {
   }
 
   // Data written by Envoy to the transport socket.
+  // [#comment:next free field: 3]
   message Write {
     // Binary data written.
     Body data = 1;
@@ -62,6 +65,7 @@ message SocketEvent {
 }
 
 // Sequence of read/write events that constitute a buffered trace on a socket.
+// [#comment:next free field: 6]
 message SocketBufferedTrace {
   // Trace ID unique to the originating Envoy only. Trace IDs can repeat and should not be used
   // for long term stable uniqueness. Matches connection IDs used in Envoy logs.
@@ -83,6 +87,7 @@ message SocketBufferedTrace {
 }
 
 // A streamed socket trace segment. Multiple segments make up a full trace.
+// [#comment:next free field: 4]
 message SocketStreamedTraceSegment {
   // Trace ID unique to the originating Envoy only. Trace IDs can repeat and should not be used
   // for long term stable uniqueness. Matches connection IDs used in Envoy logs.

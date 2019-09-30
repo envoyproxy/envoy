@@ -19,6 +19,7 @@ import "validate/validate.proto";
 
 // gRPC service configuration. This is used by :ref:`ApiConfigSource
 // <envoy_api_msg_core.ApiConfigSource>` and filter configurations.
+// [#comment:next free field: 6]
 message GrpcService {
   message EnvoyGrpc {
     // The name of the upstream gRPC cluster. SSL credentials will be supplied
@@ -28,8 +29,10 @@ message GrpcService {
   }
 
   // [#proto-status: draft]
+  // [#comment:next free field: 7]
   message GoogleGrpc {
     // See https://grpc.io/grpc/cpp/structgrpc_1_1_ssl_credentials_options.html.
+    // [#comment:next free field: 4]
     message SslCredentials {
       // PEM encoded server root certificates.
       DataSource root_certs = 1;
@@ -48,6 +51,7 @@ message GrpcService {
 
     // See https://grpc.io/docs/guides/auth.html#credential-types to understand Channel and Call
     // credential types.
+    // [#comment:next free field: 4]
     message ChannelCredentials {
       oneof credential_specifier {
         option (validate.required) = true;
@@ -61,19 +65,23 @@ message GrpcService {
       }
     }
 
+    // [#comment:next free field: 7]
     message CallCredentials {
+      // [#comment:next free field: 3]
       message ServiceAccountJWTAccessCredentials {
         string json_key = 1;
 
         uint64 token_lifetime_seconds = 2;
       }
 
+      // [#comment:next free field: 3]
       message GoogleIAMCredentials {
         string authorization_token = 1;
 
         string authority_selector = 2;
       }
 
+      // [#comment:next free field: 4]
       message MetadataCredentialsFromPlugin {
         string name = 1;
 

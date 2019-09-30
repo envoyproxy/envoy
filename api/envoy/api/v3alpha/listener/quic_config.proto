@@ -11,6 +11,7 @@ import "google/protobuf/wrappers.proto";
 
 // Configuration specific to the QUIC protocol.
 // Next id: 4
+// [#comment:next free field: 4]
 message QuicProtocolOptions {
   // Maximum number of streams that the client can negotiate per connection. 100
   // if not specified.

@@ -13,6 +13,7 @@ import "validate/validate.proto";
 // [#protodoc-title: IP tagging]
 // IP tagging :ref:`configuration overview <config_http_filters_ip_tagging>`.
 
+// [#comment:next free field: 5]
 message IPTagging {
   // The type of requests the filter should apply to. The supported types
   // are internal, external or both. The
@@ -32,6 +33,7 @@ message IPTagging {
   }
 
   // Supplies the IP tag name and the IP address subnets.
+  // [#comment:next free field: 3]
   message IPTag {
     // Specifies the IP tag name to apply.
     string ip_tag_name = 1;

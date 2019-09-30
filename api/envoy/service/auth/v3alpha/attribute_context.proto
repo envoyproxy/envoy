@@ -33,11 +33,13 @@ import "google/protobuf/timestamp.proto";
 // - field mask to send
 // - which return values from request_context are copied back
 // - which return values are copied into request_headers]
+// [#comment:next free field: 12]
 message AttributeContext {
   // This message defines attributes for a node that handles a network request.
   // The node can be either a service or an application that sends, forwards,
   // or receives the request. Service peers should fill in the `service`,
   // `principal`, and `labels` as appropriate.
+  // [#comment:next free field: 5]
   message Peer {
     // The address of the peer, this is typically the IP address.
     // It can also be UDS path, or others.
@@ -68,6 +70,7 @@ message AttributeContext {
   }
 
   // Represents a network request, such as an HTTP request.
+  // [#comment:next free field: 3]
   message Request {
     // The timestamp when the proxy receives the first byte of the request.
     google.protobuf.Timestamp time = 1;
@@ -78,6 +81,7 @@ message AttributeContext {
 
   // This message defines attributes for an HTTP request.
   // HTTP/1.x, HTTP/2, gRPC are all considered as HTTP requests.
+  // [#comment:next free field: 12]
   message HttpRequest {
     // The unique ID for a request, which can be propagated to downstream
     // systems. The ID should have low probability of collision

@@ -15,6 +15,7 @@ import "validate/validate.proto";
 
 // Configuration for tap transport socket. This wraps another transport socket, providing the
 // ability to interpose and record in plain text any traffic that is surfaced to Envoy.
+// [#comment:next free field: 3]
 message Tap {
   // Common configuration for the tap transport socket.
   common.tap.v3alpha.CommonExtensionConfig common_config = 1

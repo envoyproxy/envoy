@@ -11,6 +11,7 @@ import "validate/validate.proto";
 // [#protodoc-title: Grpc Credentials AWS IAM]
 // Configuration for AWS IAM Grpc Credentials Plugin
 
+// [#comment:next free field: 3]
 message AwsIamConfig {
   // The `service namespace
   // <https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html#genref-aws-service-namespaces>`_

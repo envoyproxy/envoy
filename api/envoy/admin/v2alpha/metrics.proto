@@ -9,6 +9,7 @@ option java_package = "io.envoyproxy.envoy.admin.v2alpha";
 // [#protodoc-title: Metrics]
 
 // Proto representation of an Envoy Counter or Gauge value.
+// [#comment:next free field: 4]
 message SimpleMetric {
   enum Type {
     COUNTER = 0;

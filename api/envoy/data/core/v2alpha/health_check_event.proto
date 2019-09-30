@@ -28,6 +28,7 @@ enum HealthCheckerType {
   REDIS = 3;
 }
 
+// [#comment:next free field: 10]
 message HealthCheckEvent {
   HealthCheckerType health_checker_type = 1 [(validate.rules).enum = {defined_only: true}];
 
@@ -70,6 +71,7 @@ message HealthCheckAddHealthy {
   bool first_check = 1;
 }
 
+// [#comment:next free field: 3]
 message HealthCheckFailure {
   // The type of failure that caused this event.
   HealthCheckFailureType failure_type = 1 [(validate.rules).enum = {defined_only: true}];

@@ -12,8 +12,10 @@ import "envoy/data/tap/v2alpha/common.proto";
 // [#protodoc-title: HTTP tap data]
 
 // A fully buffered HTTP trace message.
+// [#comment:next free field: 3]
 message HttpBufferedTrace {
   // HTTP message wrapper.
+  // [#comment:next free field: 4]
   message Message {
     // Message headers.
     repeated api.v2.core.HeaderValue headers = 1;
@@ -33,6 +35,7 @@ message HttpBufferedTrace {
 }
 
 // A streamed HTTP trace segment. Multiple segments make up a full trace.
+// [#comment:next free field: 8]
 message HttpStreamedTraceSegment {
   // Trace ID unique to the originating Envoy only. Trace IDs can repeat and should not be used
   // for long term stable uniqueness.

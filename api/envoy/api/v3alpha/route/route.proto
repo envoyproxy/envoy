@@ -28,7 +28,7 @@ import "validate/validate.proto";
 // host header. This allows a single listener to service multiple top level domain path trees. Once
 // a virtual host is selected based on the domain, the routes are processed in order to see which
 // upstream cluster to route to or whether to perform a redirect.
-// [#comment:next free field: 17]
+// [#comment:next free field: 18]
 message VirtualHost {
   enum TlsRequirementType {
     // No TLS requirement for the virtual host.
@@ -154,7 +154,7 @@ message VirtualHost {
 //
 //   Envoy supports routing on HTTP method via :ref:`header matching
 //   <envoy_api_msg_route.HeaderMatcher>`.
-// [#comment:next free field: 15]
+// [#comment:next free field: 16]
 message Route {
   reserved 6;
 
@@ -238,8 +238,9 @@ message Route {
 // multiple upstream clusters along with weights that indicate the percentage of
 // traffic to be forwarded to each cluster. The router selects an upstream cluster based on the
 // weights.
-// [#comment:next free field: 11]
+// [#comment:next free field: 4]
 message WeightedCluster {
+  // [#comment:next free field: 11]
   message ClusterWeight {
     reserved 7;
 
@@ -321,6 +322,7 @@ message WeightedCluster {
   string runtime_key_prefix = 2;
 }
 
+// [#comment:next free field: 11]
 message RouteMatch {
   message GrpcRouteMatchOptions {
   }
@@ -397,7 +399,7 @@ message RouteMatch {
   GrpcRouteMatchOptions grpc = 8;
 }
 
-// [#comment:next free field: 11]
+// [#comment:next free field: 12]
 message CorsPolicy {
   reserved 1, 8, 7;
 
@@ -471,6 +473,7 @@ message RouteAction {
   //
   // During shadowing, the host/authority header is altered such that *-shadow* is appended. This is
   // useful for logging. For example, *cluster1* becomes *cluster1-shadow*.
+  // [#comment:next free field: 4]
   message RequestMirrorPolicy {
     reserved 2;
 
@@ -505,6 +508,7 @@ message RouteAction {
 
   // Specifies the route's hashing policy if the upstream cluster uses a hashing :ref:`load balancer
   // <arch_overview_load_balancing_types>`.
+  // [#comment:next free field: 5]
   message HashPolicy {
     message Header {
       // The name of the request header that will be used to obtain the hash
@@ -526,6 +530,7 @@ message RouteAction {
     //    destination ports and addresses so that multiple independent HTTP2
     //    streams on the same connection will independently receive the same
     //    cookie, even if they arrive at the Envoy simultaneously.
+    // [#comment:next free field: 4]
     message Cookie {
       // The name of the cookie that will be used to obtain the hash key. If the
       // cookie is not present and ttl below is not set, no hash will be
@@ -588,6 +593,7 @@ message RouteAction {
   // :ref:upgrade_configs`
   // <envoy_api_field_config.filter.network.http_connection_manager.v3alpha.HttpConnectionManager.upgrade_configs>`
   // but does not affect any custom filter chain specified there.
+  // [#comment:next free field: 3]
   message UpgradeConfig {
     // The case-insensitive name of this upgrade, e.g. "websocket".
     // For each upgrade type present in upgrade_configs, requests with
@@ -797,6 +803,7 @@ message RouteAction {
 // HTTP retry :ref:`architecture overview <arch_overview_http_routing_retry>`.
 // [#comment:next free field: 10]
 message RetryPolicy {
+  // [#comment:next free field: 4]
   message RetryPriority {
     string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
@@ -807,6 +814,7 @@ message RetryPolicy {
     }
   }
 
+  // [#comment:next free field: 4]
   message RetryHostPredicate {
     string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
@@ -817,6 +825,7 @@ message RetryPolicy {
     }
   }
 
+  // [#comment:next free field: 3]
   message RetryBackOff {
     // Specifies the base interval between retries. This parameter is required and must be greater
     // than zero. Values less than 1 ms are rounded up to 1 ms.
@@ -890,6 +899,7 @@ message RetryPolicy {
 }
 
 // HTTP request hedging :ref:`architecture overview <arch_overview_http_routing_hedging>`.
+// [#comment:next free field: 4]
 message HedgePolicy {
   // Specifies the number of initial requests that should be sent upstream.
   // Must be at least 1.
@@ -914,6 +924,7 @@ message HedgePolicy {
   bool hedge_on_per_try_timeout = 3;
 }
 
+// [#comment:next free field: 9]
 message RedirectAction {
   enum RedirectResponseCode {
     // Moved Permanently HTTP Status Code - 301.
@@ -975,6 +986,7 @@ message RedirectAction {
   bool strip_query = 6;
 }
 
+// [#comment:next free field: 3]
 message DirectResponseAction {
   // Specifies the HTTP response status to be returned.
   uint32 status = 1 [(validate.rules).uint32 = {lt: 600 gte: 100}];
@@ -1002,6 +1014,7 @@ message Decorator {
   string operation = 1 [(validate.rules).string = {min_bytes: 1}];
 }
 
+// [#comment:next free field: 4]
 message Tracing {
   // Target percentage of requests managed by this HTTP connection manager that will be force
   // traced if the :ref:`x-client-trace-id <config_http_conn_man_headers_x-client-trace-id>`
@@ -1046,6 +1059,7 @@ message Tracing {
 //    Virtual clusters are a useful tool, but we do not recommend setting up a virtual cluster for
 //    every application endpoint. This is both not easily maintainable and as well the matching and
 //    statistics output are not free.
+// [#comment:next free field: 5]
 message VirtualCluster {
   reserved 1, 3;
 
@@ -1063,7 +1077,9 @@ message VirtualCluster {
 }
 
 // Global rate limiting :ref:`architecture overview <arch_overview_rate_limit>`.
+// [#comment:next free field: 4]
 message RateLimit {
+  // [#comment:next free field: 7]
   message Action {
     // The following descriptor entry is appended to the descriptor:
     //
@@ -1100,6 +1116,7 @@ message RateLimit {
     // .. code-block:: cpp
     //
     //   ("<descriptor_key>", "<header_value_queried_from_header>")
+    // [#comment:next free field: 3]
     message RequestHeaders {
       // The header name to be queried from the request headers. The header’s
       // value is used to populate the value of the descriptor entry for the
@@ -1134,6 +1151,7 @@ message RateLimit {
     // .. code-block:: cpp
     //
     //   ("header_match", "<descriptor_value>")
+    // [#comment:next free field: 4]
     message HeaderValueMatch {
       // The value to use in the descriptor entry.
       string descriptor_value = 1 [(validate.rules).string = {min_bytes: 1}];
@@ -1220,6 +1238,7 @@ message RateLimit {
 //   value.
 //
 //  [#next-major-version: HeaderMatcher should be refactored to use StringMatcher.]
+// [#comment:next free field: 12]
 message HeaderMatcher {
   reserved 2, 3, 5;
 
@@ -1283,6 +1302,7 @@ message HeaderMatcher {
 
 // Query parameter matching treats the query string of a request's :path header
 // as an ampersand-separated list of keys and/or key=value elements.
+// [#comment:next free field: 7]
 message QueryParameterMatcher {
   reserved 3, 4;
 

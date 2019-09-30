@@ -47,8 +47,10 @@ enum HealthStatus {
   DEGRADED = 5;
 }
 
+// [#comment:next free field: 21]
 message HealthCheck {
   // Describes the encoding of the payload bytes in the payload.
+  // [#comment:next free field: 3]
   message Payload {
     oneof payload {
       option (validate.required) = true;
@@ -103,6 +105,7 @@ message HealthCheck {
     repeated type.Int64Range expected_statuses = 9;
   }
 
+  // [#comment:next free field: 3]
   message TcpHealthCheck {
     // Empty payloads imply a connect-only health check.
     Payload send = 1;
@@ -125,6 +128,7 @@ message HealthCheck {
   // <https://github.com/grpc/grpc/blob/master/src/proto/grpc/health/v1/health.proto>`_-based
   // healthcheck. See `gRPC doc <https://github.com/grpc/grpc/blob/master/doc/health-checking.md>`_
   // for details.
+  // [#comment:next free field: 3]
   message GrpcHealthCheck {
     // An optional service name parameter which will be sent to gRPC service in
     // `grpc.health.v1.HealthCheckRequest
@@ -140,6 +144,7 @@ message HealthCheck {
   }
 
   // Custom health check.
+  // [#comment:next free field: 4]
   message CustomHealthCheck {
     // The registered name of the custom health checker.
     string name = 1 [(validate.rules).string = {min_bytes: 1}];

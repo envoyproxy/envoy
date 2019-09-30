@@ -19,6 +19,7 @@ import "validate/validate.proto";
 // Statistics :ref:`architecture overview <arch_overview_statistics>`.
 
 // Configuration for pluggable stats sinks.
+// [#comment:next free field: 4]
 message StatsSink {
   // The name of the stats sink to instantiate. The name must match a supported
   // stats sink. The built-in stats sinks are:
@@ -41,6 +42,7 @@ message StatsSink {
 }
 
 // Statistics configuration such as tagging.
+// [#comment:next free field: 4]
 message StatsConfig {
   // Each stat name is iteratively processed through these tag specifiers.
   // When a tag is matched, the first capture group is removed from the name so
@@ -71,6 +73,7 @@ message StatsConfig {
 }
 
 // Configuration for disabling stat instantiation.
+// [#comment:next free field: 4]
 message StatsMatcher {
   // The instantiation of stats is unrestricted by default. If the goal is to configure Envoy to
   // instantiate all stats, there is no need to construct a StatsMatcher.
@@ -161,6 +164,7 @@ message StatsMatcher {
 // or a regex providing the value via capture groups. The specified tag will be
 // unconditionally set if a fixed value, otherwise it will only be set if one
 // or more capture groups in the regex match.
+// [#comment:next free field: 4]
 message TagSpecifier {
   // Attaches an identifier to the tag values to identify the tag being in the
   // sink. Envoy has a set of default names and regexes to extract dynamic
@@ -241,6 +245,7 @@ message TagSpecifier {
 
 // Stats configuration proto schema for built-in *envoy.statsd* sink. This sink does not support
 // tagged metrics.
+// [#comment:next free field: 4]
 message StatsdSink {
   oneof statsd_specifier {
     option (validate.required) = true;
@@ -289,7 +294,7 @@ message StatsdSink {
 // The sink emits stats with `DogStatsD <https://docs.datadoghq.com/guides/dogstatsd/>`_
 // compatible tags. Tags are configurable via :ref:`StatsConfig
 // <envoy_api_msg_config.metrics.v3alpha.StatsConfig>`.
-// [#comment:next free field: 3]
+// [#comment:next free field: 4]
 message DogStatsdSink {
   reserved 2;
 

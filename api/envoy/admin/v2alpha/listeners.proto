@@ -18,6 +18,7 @@ message Listeners {
 }
 
 // Details an individual listener's current status.
+// [#comment:next free field: 3]
 message ListenerStatus {
   // Name of the listener
   string name = 1;

@@ -21,6 +21,7 @@ message Percent {
 //
 // * **Example**: 1/100 = 1%.
 // * **Example**: 3/10000 = 0.03%.
+// [#comment:next free field: 3]
 message FractionalPercent {
   // Fraction percentages support several fixed denominator values.
   enum DenominatorType {

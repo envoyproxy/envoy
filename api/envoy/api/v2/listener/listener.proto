@@ -21,6 +21,7 @@ import "validate/validate.proto";
 // [#protodoc-title: Listener components]
 // Listener :ref:`configuration overview <config_listeners>`
 
+// [#comment:next free field: 5]
 message Filter {
   reserved 3;
 
@@ -65,6 +66,7 @@ message Filter {
 // listed at the end, because that's how we want to list them in the docs.
 //
 // [#comment:TODO(PiotrSikora): Add support for configurable precedence of the rules]
+// [#comment:next free field: 13]
 message FilterChainMatch {
   enum ConnectionSourceType {
     // Any connection source matches.
@@ -160,6 +162,7 @@ message FilterChainMatch {
 
 // A filter chain wraps a set of match criteria, an option TLS context, a set of filters, and
 // various other parameters.
+// [#comment:next free field: 8]
 message FilterChain {
   // The criteria to use when matching a connection to this filter chain.
   FilterChainMatch filter_chain_match = 1;
@@ -193,6 +196,7 @@ message FilterChain {
   string name = 7;
 }
 
+// [#comment:next free field: 4]
 message ListenerFilter {
   // The name of the filter to instantiate. The name must match a
   // :ref:`supported filter <config_listener_filters>`.

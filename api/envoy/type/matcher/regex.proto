@@ -13,6 +13,7 @@ import "validate/validate.proto";
 // [#protodoc-title: RegexMatcher]
 
 // A regex matcher designed for safety when used with untrusted input.
+// [#comment:next free field: 3]
 message RegexMatcher {
   // Google's `RE2 <https://github.com/google/re2>`_ regex engine. The regex string must adhere to
   // the documented `syntax <https://github.com/google/re2/wiki/Syntax>`_. The engine is designed

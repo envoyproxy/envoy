@@ -38,6 +38,7 @@ message ConfigDump {
 // any CLI overrides that were merged. Bootstrap configuration information can be used to recreate
 // the static portions of an Envoy configuration by reusing the output as the bootstrap
 // configuration for another Envoy.
+// [#comment:next free field: 3]
 message BootstrapConfigDump {
   config.bootstrap.v3alpha.Bootstrap bootstrap = 1;
 
@@ -48,8 +49,10 @@ message BootstrapConfigDump {
 // Envoy's listener manager fills this message with all currently known listeners. Listener
 // configuration information can be used to recreate an Envoy configuration by populating all
 // listeners as static listeners or by returning them in a LDS response.
+// [#comment:next free field: 6]
 message ListenersConfigDump {
   // Describes a statically loaded listener.
+  // [#comment:next free field: 3]
   message StaticListener {
     // The listener config.
     api.v3alpha.Listener listener = 1;
@@ -59,6 +62,7 @@ message ListenersConfigDump {
   }
 
   // Describes a dynamically loaded cluster via the LDS API.
+  // [#comment:next free field: 4]
   message DynamicListener {
     // This is the per-resource version information. This version is currently taken from the
     // :ref:`version_info <envoy_api_field_DiscoveryResponse.version_info>` field at the time
@@ -101,8 +105,10 @@ message ListenersConfigDump {
 // Envoy's cluster manager fills this message with all currently known clusters. Cluster
 // configuration information can be used to recreate an Envoy configuration by populating all
 // clusters as static clusters or by returning them in a CDS response.
+// [#comment:next free field: 5]
 message ClustersConfigDump {
   // Describes a statically loaded cluster.
+  // [#comment:next free field: 3]
   message StaticCluster {
     // The cluster config.
     api.v3alpha.Cluster cluster = 1;
@@ -112,6 +118,7 @@ message ClustersConfigDump {
   }
 
   // Describes a dynamically loaded cluster via the CDS API.
+  // [#comment:next free field: 4]
   message DynamicCluster {
     // This is the per-resource version information. This version is currently taken from the
     // :ref:`version_info <envoy_api_field_DiscoveryResponse.version_info>` field at the time
@@ -150,7 +157,9 @@ message ClustersConfigDump {
 // separated from those configured dynamically via RDS. Route configuration information can be used
 // to recreate an Envoy configuration by populating all routes as static routes or by returning them
 // in RDS responses.
+// [#comment:next free field: 4]
 message RoutesConfigDump {
+  // [#comment:next free field: 3]
   message StaticRouteConfig {
     // The route config.
     api.v3alpha.RouteConfiguration route_config = 1;
@@ -159,6 +168,7 @@ message RoutesConfigDump {
     google.protobuf.Timestamp last_updated = 2;
   }
 
+  // [#comment:next free field: 4]
   message DynamicRouteConfig {
     // This is the per-resource version information. This version is currently taken from the
     // :ref:`version_info <envoy_api_field_DiscoveryResponse.version_info>` field at the time that
@@ -183,7 +193,9 @@ message RoutesConfigDump {
 // configuration scopes (defined via ScopedRouteConfigurationsSet protos). This message lists both
 // the scopes defined inline with the higher order object (i.e., the HttpConnectionManager) and the
 // dynamically obtained scopes via the SRDS API.
+// [#comment:next free field: 3]
 message ScopedRoutesConfigDump {
+  // [#comment:next free field: 4]
   message InlineScopedRouteConfigs {
     // The name assigned to the scoped route configurations.
     string name = 1;
@@ -195,6 +207,7 @@ message ScopedRoutesConfigDump {
     google.protobuf.Timestamp last_updated = 3;
   }
 
+  // [#comment:next free field: 5]
   message DynamicScopedRouteConfigs {
     // The name assigned to the scoped route configurations.
     string name = 1;
@@ -219,8 +232,10 @@ message ScopedRoutesConfigDump {
 }
 
 // Envoys SDS implementation fills this message with all secrets fetched dynamically via SDS.
+// [#comment:next free field: 4]
 message SecretsConfigDump {
   // DynamicSecret contains secret information fetched via SDS.
+  // [#comment:next free field: 5]
   message DynamicSecret {
     // The name assigned to the secret.
     string name = 1;
@@ -238,6 +253,7 @@ message SecretsConfigDump {
   }
 
   // StaticSecret specifies statically loaded secret in bootstrap.
+  // [#comment:next free field: 4]
   message StaticSecret {
     // The name assigned to the secret.
     string name = 1;

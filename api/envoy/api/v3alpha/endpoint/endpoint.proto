@@ -17,6 +17,7 @@ import "validate/validate.proto";
 // [#protodoc-title: Endpoints]
 
 // Upstream host identifier.
+// [#comment:next free field: 3]
 message Endpoint {
   // The optional health check configuration.
   message HealthCheckConfig {
@@ -51,6 +52,7 @@ message Endpoint {
 }
 
 // An Endpoint that Envoy can route traffic to.
+// [#comment:next free field: 6]
 message LbEndpoint {
   // Upstream host identifier or a named reference.
   oneof host_identifier {
@@ -86,6 +88,7 @@ message LbEndpoint {
 // One can have multiple LocalityLbEndpoints for a locality, but this is
 // generally only done if the different groups need to have different load
 // balancing weights or different priorities.
+// [#comment:next free field: 7]
 message LocalityLbEndpoints {
   // Identifies location of where the upstream hosts run.
   core.Locality locality = 1;

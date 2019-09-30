@@ -17,6 +17,7 @@ import "validate/validate.proto";
 
 // [#protodoc-title: Common access log types]
 
+// [#comment:next free field: 5]
 message AccessLog {
   // The name of the access log implementation to instantiate. The name must
   // match a statically registered access log. Current built-in loggers include:
@@ -45,6 +46,7 @@ message AccessLog {
   }
 }
 
+// [#comment:next free field: 12]
 message AccessLogFilter {
   oneof filter_specifier {
     option (validate.required) = true;
@@ -85,6 +87,7 @@ message AccessLogFilter {
 }
 
 // Filter on an integer comparison.
+// [#comment:next free field: 3]
 message ComparisonFilter {
   enum Op {
     // =
@@ -127,6 +130,7 @@ message TraceableFilter {
 }
 
 // Filters for random sampling of requests.
+// [#comment:next free field: 4]
 message RuntimeFilter {
   // Runtime key to get an optional overridden numerator for use in the *percent_sampled* field.
   // If found in runtime, this value will replace the default numerator.
@@ -160,6 +164,7 @@ message AndFilter {
 // Performs a logical “or” operation on the result of each individual filter.
 // Filters are evaluated sequentially and if one of them returns true, the
 // filter returns true immediately.
+// [#comment:next free field: 3]
 message OrFilter {
   repeated AccessLogFilter filters = 2 [(validate.rules).repeated = {min_items: 2}];
 }
@@ -206,6 +211,7 @@ message ResponseFlagFilter {
 
 // Filters gRPC requests based on their response status. If a gRPC status is not provided, the
 // filter will infer the status from the HTTP status code.
+// [#comment:next free field: 3]
 message GrpcStatusFilter {
   enum Status {
     OK = 0;
@@ -236,6 +242,7 @@ message GrpcStatusFilter {
 }
 
 // Extension filter is statically registered at runtime.
+// [#comment:next free field: 4]
 message ExtensionFilter {
   // The name of the filter implementation to instantiate. The name must
   // match a statically registered filter.

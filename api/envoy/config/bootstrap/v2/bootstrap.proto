@@ -28,7 +28,9 @@ import "validate/validate.proto";
 // <config_overview_v2_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_v2_bootstrap>`.
+// [#comment:next free field: 20]
 message Bootstrap {
+  // [#comment:next free field: 4]
   message StaticResources {
     // Static :ref:`Listeners <envoy_api_msg_Listener>`. These listeners are
     // available regardless of LDS configuration.
@@ -47,6 +49,7 @@ message Bootstrap {
     repeated api.v2.auth.Secret secrets = 3;
   }
 
+  // [#comment:next free field: 5]
   message DynamicResources {
     reserved 4;
 
@@ -158,6 +161,7 @@ message Bootstrap {
 
 // Administration interface :ref:`operations documentation
 // <operations_admin_interface>`.
+// [#comment:next free field: 5]
 message Admin {
   // The path to write the access log for the administration server. If no
   // access log is desired specify ‘/dev/null’. This is only required if
@@ -178,6 +182,7 @@ message Admin {
 }
 
 // Cluster manager :ref:`architecture overview <arch_overview_cluster_manager>`.
+// [#comment:next free field: 5]
 message ClusterManager {
   message OutlierDetection {
     // Specifies the path to the outlier event log.
@@ -212,6 +217,7 @@ message ClusterManager {
 // Envoy process watchdog configuration. When configured, this monitors for
 // nonresponsive threads and kills the process after the configured thresholds.
 // See the :ref:`watchdog documentation <operations_performance_watchdog>` for more information.
+// [#comment:next free field: 5]
 message Watchdog {
   // The duration after which Envoy counts a nonresponsive thread in the
   // *watchdog_miss* statistic. If not specified the default is 200ms.
@@ -234,6 +240,7 @@ message Watchdog {
 }
 
 // Runtime :ref:`configuration overview <config_runtime>` (deprecated).
+// [#comment:next free field: 5]
 message Runtime {
   // The implementation assumes that the file system tree is accessed via a
   // symbolic link. An atomic link swap is used when a new tree should be
@@ -263,8 +270,10 @@ message Runtime {
   google.protobuf.Struct base = 4;
 }
 
+// [#comment:next free field: 6]
 message RuntimeLayer {
   // :ref:`Disk runtime <config_runtime_local_disk>` layer.
+  // [#comment:next free field: 4]
   message DiskLayer {
     // The implementation assumes that the file system tree is accessed via a
     // symbolic link. An atomic link swap is used when a new tree should be
@@ -290,6 +299,7 @@ message RuntimeLayer {
   }
 
   // :ref:`Runtime Discovery Service (RTDS) <config_runtime_rtds>` layer.
+  // [#comment:next free field: 3]
   message RtdsLayer {
     // Resource to subscribe to at *rtds_config* for the RTDS layer.
     string name = 1;

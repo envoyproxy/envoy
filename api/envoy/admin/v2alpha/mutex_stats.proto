@@ -15,6 +15,7 @@ option java_package = "io.envoyproxy.envoy.admin.v2alpha";
 // *NB*: The wait cycles below are measured by `absl::base_internal::CycleClock`, and may not
 // correspond to core clock frequency. For more information, see the `CycleClock`
 // [docs](https://github.com/abseil/abseil-cpp/blob/master/absl/base/internal/cycleclock.h).
+// [#comment:next free field: 4]
 message MutexStats {
   // The number of individual mutex contentions which have occurred since startup.
   uint64 num_contentions = 1;
