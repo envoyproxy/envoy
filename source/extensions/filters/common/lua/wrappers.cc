@@ -127,7 +127,7 @@ ProtobufWkt::Value MetadataMapHelper::loadValue(lua_State* state) {
 
 /**
  * Returns the length of a Lua table if it's actually shaped like a List,
- * i.e. if all the keys are consecutive number values. Otherwise, returns -1
+ * i.e. if all the keys are consecutive number values. Otherwise, returns -1.
  */
 int MetadataMapHelper::tableLength(lua_State* state) {
   double max = 0;

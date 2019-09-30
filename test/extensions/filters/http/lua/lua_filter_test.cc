@@ -1546,7 +1546,9 @@ TEST_F(LuaHttpFilterTest, SetGetDynamicMetadata) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
       request_handle:streamInfo():dynamicMetadata():set("envoy.lb", "foo", "bar")
+      request_handle:streamInfo():dynamicMetadata():set("envoy.lb", "complex", {x="abcd", y=1234})
       request_handle:logTrace(request_handle:streamInfo():dynamicMetadata():get("envoy.lb")["foo"])
+      request_handle:logTrace(request_handle:streamInfo():dynamicMetadata():get("envoy.lb")["complex"].x)
     end
   )EOF"};
 
@@ -1559,6 +1561,7 @@ TEST_F(LuaHttpFilterTest, SetGetDynamicMetadata) {
   EXPECT_EQ(0, stream_info.dynamicMetadata().filter_metadata_size());
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("bar")));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("abcd")));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
   EXPECT_EQ(1, stream_info.dynamicMetadata().filter_metadata_size());
   EXPECT_EQ("bar", stream_info.dynamicMetadata()
@@ -1567,6 +1570,15 @@ TEST_F(LuaHttpFilterTest, SetGetDynamicMetadata) {
                        .fields()
                        .at("foo")
                        .string_value());
+
+  const ProtobufWkt::Struct& meta_complex = stream_info.dynamicMetadata()
+                                                .filter_metadata()
+                                                .at("envoy.lb")
+                                                .fields()
+                                                .at("complex")
+                                                .struct_value();
+  EXPECT_EQ("abcd", meta_complex.fields().at("x").string_value());
+  EXPECT_EQ(1234.0, meta_complex.fields().at("y").number_value());
 }
 
 // Check the connection.
