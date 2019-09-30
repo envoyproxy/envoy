@@ -62,6 +62,7 @@ private:
 
   Network::DnsResolverSharedPtr dns_resolver_;
   const std::chrono::milliseconds dns_refresh_rate_ms_;
+  BackOffStrategyPtr failure_backoff_strategy_;
   const bool respect_dns_ttl_;
   Network::DnsLookupFamily dns_lookup_family_;
   Event::TimerPtr resolve_timer_;

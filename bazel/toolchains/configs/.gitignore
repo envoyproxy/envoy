@@ -1,2 +1,0 @@
-# RBE autoconfig generator will generate a .bazelrc but we don't need it.
-.latest.bazelrc
