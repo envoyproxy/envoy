@@ -436,7 +436,8 @@ TEST_F(RedisLoadBalancerContextImplTest, EnforceHashTag) {
   set_request.type(NetworkFilters::Common::Redis::RespType::Array);
   set_request.asArray().swap(set_foo);
 
-  // Enable_hash tagging should be ignored when use_crc16 is true. This is treated like "foo"
+  // Enable_hash tagging should be override when is_redis_cluster is true. This is treated like
+  // "foo"
   RedisLoadBalancerContextImpl context2("{foo}bar", false, true, set_request,
                                         NetworkFilters::Common::Redis::Client::ReadPolicy::Master);
 

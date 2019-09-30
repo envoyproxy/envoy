@@ -68,16 +68,18 @@ class RedisLoadBalancerContextImpl : public RedisLoadBalancerContext,
                                      public Upstream::LoadBalancerContextBase {
 public:
   /**
-   * The load balancer context for Redis requests. Note that use_crc16 implies using Redis cluster
-   * which require us to always enable hashtagging.
+   * The load balancer context for Redis requests. Note that is_redis_cluster implies using Redis
+   * cluster which require us to always enable hashtagging.
    * @param key specify the key for the Redis request.
    * @param enabled_hashtagging specify whether to enable hashtagging, this will always be true if
-   * use_crc16 is true.
-   * @param use_crc16 specify whether to use crc16.
+   * is_redis_cluster is true.
+   * @param is_redis_cluster specify whether this is a request for redis cluster, if true the key
+   * will be hashed using crc16.
    * @param request specify the Redis request.
    * @param read_policy specify the read policy.
    */
-  RedisLoadBalancerContextImpl(const std::string& key, bool enabled_hashtagging, bool use_crc16,
+  RedisLoadBalancerContextImpl(const std::string& key, bool enabled_hashtagging,
+                               bool is_redis_cluster,
                                const NetworkFilters::Common::Redis::RespValue& request,
                                NetworkFilters::Common::Redis::Client::ReadPolicy read_policy =
                                    NetworkFilters::Common::Redis::Client::ReadPolicy::Master);
