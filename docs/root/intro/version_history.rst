@@ -40,6 +40,7 @@ Version history
 * listeners: added :ref:`continue_on_listener_filters_timeout <envoy_api_field_Listener.continue_on_listener_filters_timeout>` to configure whether a listener will still create a connection when listener filters time out.
 * listeners: added :ref:`HTTP inspector listener filter <config_listener_filters_http_inspector>`.
 * lua: extended `httpCall()` and `respond()` APIs to accept headers with entry values that can be a string or table of strings.
+* lua: extended `dynamicMetadata:set()` to allow setting complex values
 * metrics_service: added support for flushing histogram buckets.
 * outlier_detector: added :ref:`support for the grpc-status response header <arch_overview_outlier_detection_grpc>` by mapping it to HTTP status. Guarded by envoy.reloadable_features.outlier_detection_support_for_grpc_status which defaults to true.
 * performance: new buffer implementation enabled by default (to disable add "--use-libevent-buffers 1" to the command-line arguments when starting Envoy).
