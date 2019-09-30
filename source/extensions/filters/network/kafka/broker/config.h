@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/config/filter/network/kafka_broker/v2/kafka_broker.pb.h"
-#include "envoy/config/filter/network/kafka_broker/v2/kafka_broker.pb.validate.h"
+#include "envoy/config/filter/network/kafka_broker/v3alpha/kafka_broker.pb.h"
+#include "envoy/config/filter/network/kafka_broker/v3alpha/kafka_broker.pb.validate.h"
 
 #include "extensions/filters/network/common/factory_base.h"
 #include "extensions/filters/network/well_known_names.h"

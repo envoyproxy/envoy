@@ -19,7 +19,7 @@ envoy_cc_library(
         ":kafka_broker_filter_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
-        "@envoy_api//envoy/config/filter/network/kafka_broker/v2:kafka_broker_cc",
+        "@envoy_api//envoy/config/filter/network/kafka_broker/v3alpha:kafka_broker_cc",
     ],
 )
 
