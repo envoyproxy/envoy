@@ -59,6 +59,13 @@ Java_io_envoyproxy_envoymobile_engine_AndroidJniLibrary_isAresInitialized(JNIEnv
   return ares_library_android_initialized() == ARES_SUCCESS;
 }
 
+extern "C" JNIEXPORT jint JNICALL
+Java_io_envoyproxy_envoymobile_engine_AndroidJniLibrary_setPreferredNetwork(JNIEnv* env,
+                                                                            jclass, // class
+                                                                            jint network) {
+  return set_preferred_network(static_cast<envoy_network_t>(network));
+}
+
 extern "C" JNIEXPORT jstring JNICALL
 Java_io_envoyproxy_envoymobile_engine_JniLibrary_templateString(JNIEnv* env,
                                                                 jclass // class

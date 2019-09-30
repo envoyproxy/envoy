@@ -7,6 +7,7 @@ envoy_mobile_android_library(
     srcs = [
         "AndroidEngineImpl.java",
         "AndroidJniLibrary.java",
+        "AndroidNetworkMonitor.java",
     ],
     custom_package = "io.envoyproxy.envoymobile.engine",
     manifest = "AndroidEngineManifest.xml",
