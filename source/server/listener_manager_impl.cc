@@ -309,7 +309,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
       parent_.server_.clusterManager(), parent_.server_.localInfo(), parent_.server_.dispatcher(),
       parent_.server_.random(), parent_.server_.stats(), parent_.server_.singletonManager(),
       parent_.server_.threadLocal(), validation_visitor, parent_.server_.api());
-  factory_context.setInitManager(initManager());
+  factory_context.setInitManager(ListenerImpl::initManager());
   ListenerFilterChainFactoryBuilder builder(*this, factory_context);
   filter_chain_manager_.addFilterChain(config.filter_chains(), builder);
 
@@ -565,7 +565,7 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
   auto it = error_state_tracker_.find(name);
   try {
     return addOrUpdateListenerInternal(config, version_info, added_via_api, name);
-  } catch (EnvoyException e) {
+  } catch (const EnvoyException& e) {
     if (it == error_state_tracker_.end()) {
       it = error_state_tracker_.emplace(name, std::make_unique<UpdateFailureState>()).first;
     }

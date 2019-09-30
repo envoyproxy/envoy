@@ -67,7 +67,7 @@ public:
     for (const auto& name : listener_names) {
       listeners_.emplace_back();
       listeners_.back().name_ = name;
-      refs.push_back(listeners_.back());
+      refs.emplace_back(listeners_.back());
     }
     EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(refs));
     EXPECT_CALL(listener_manager_, beginListenerUpdate());
