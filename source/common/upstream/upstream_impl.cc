@@ -271,7 +271,7 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
     connection_options = options;
   }
   Network::TransportSocketFactory& socket_factory =
-    cluster.resolveTransportSocketFactory(address->asString(), metadata);
+      cluster.resolveTransportSocketFactory(address->asString(), metadata);
   Network::ClientConnectionPtr connection = dispatcher.createClientConnection(
       address, cluster.sourceAddress(),
       socket_factory.createTransportSocket(transport_socket_options), connection_options);
