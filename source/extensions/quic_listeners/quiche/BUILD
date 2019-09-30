@@ -191,6 +191,37 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "active_quic_listener_lib",
+    srcs = ["active_quic_listener.cc"],
+    hdrs = ["active_quic_listener.h"],
+    tags = ["nofips"],
+    deps = [
+        ":envoy_quic_alarm_factory_lib",
+        ":envoy_quic_connection_helper_lib",
+        ":envoy_quic_dispatcher_lib",
+        ":envoy_quic_packet_writer_lib",
+        ":envoy_quic_proof_source_lib",
+        ":envoy_quic_utils_lib",
+        "//include/envoy/network:listener_interface",
+        "//source/common/network:listener_lib",
+        "//source/common/protobuf:utility_lib",
+        "//source/server:connection_handler_lib",
+        "@envoy_api//envoy/api/v2/listener:quic_config_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "active_quic_listener_config_lib",
+    srcs = ["active_quic_listener_config.cc"],
+    hdrs = ["active_quic_listener_config.h"],
+    tags = ["nofips"],
+    deps = [
+        ":active_quic_listener_lib",
+        "//include/envoy/registry",
+    ],
+)
+
+envoy_cc_library(
     name = "envoy_quic_utils_lib",
     srcs = ["envoy_quic_utils.cc"],
     hdrs = ["envoy_quic_utils.h"],
@@ -201,5 +232,21 @@ envoy_cc_library(
         "//source/common/http:header_map_lib",
         "//source/common/network:address_lib",
         "@com_googlesource_quiche//:quic_core_http_header_list_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "quic_transport_socket_factory_lib",
+    srcs = ["quic_transport_socket_factory.cc"],
+    hdrs = ["quic_transport_socket_factory.h"],
+    tags = ["nofips"],
+    deps = [
+        "//include/envoy/network:transport_socket_interface",
+        "//include/envoy/server:transport_socket_config_interface",
+        "//include/envoy/ssl:context_config_interface",
+        "//source/common/common:assert_lib",
+        "//source/extensions/transport_sockets:well_known_names",
+        "//source/extensions/transport_sockets/tls:context_config_lib",
+        "@envoy_api//envoy/api/v2/auth:cert_cc",
     ],
 )

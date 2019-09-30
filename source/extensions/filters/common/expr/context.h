@@ -40,10 +40,9 @@ constexpr absl::string_view Metadata = "metadata";
 
 // Connection properties
 constexpr absl::string_view Connection = "connection";
-constexpr absl::string_view UpstreamAddress = "upstream_address";
-constexpr absl::string_view UpstreamPort = "upstream_port";
 constexpr absl::string_view MTLS = "mtls";
 constexpr absl::string_view RequestedServerName = "requested_server_name";
+constexpr absl::string_view TLSVersion = "tls_version";
 
 // Source properties
 constexpr absl::string_view Source = "source";
@@ -52,6 +51,9 @@ constexpr absl::string_view Port = "port";
 
 // Destination properties
 constexpr absl::string_view Destination = "destination";
+
+// Upstream properties
+constexpr absl::string_view Upstream = "upstream";
 
 class RequestWrapper;
 
@@ -106,6 +108,15 @@ private:
 class ConnectionWrapper : public BaseWrapper {
 public:
   ConnectionWrapper(const StreamInfo::StreamInfo& info) : info_(info) {}
+  absl::optional<CelValue> operator[](CelValue key) const override;
+
+private:
+  const StreamInfo::StreamInfo& info_;
+};
+
+class UpstreamWrapper : public BaseWrapper {
+public:
+  UpstreamWrapper(const StreamInfo::StreamInfo& info) : info_(info) {}
   absl::optional<CelValue> operator[](CelValue key) const override;
 
 private:

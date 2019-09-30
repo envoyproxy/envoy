@@ -1,0 +1,11 @@
+config {
+  vhds {
+    config_source {
+      api_config_source {
+        request_timeout {
+          nanos: -2147483648
+        }
+      }
+    }
+  }
+}

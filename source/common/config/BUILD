@@ -311,6 +311,7 @@ envoy_cc_library(
     srcs = ["remote_data_fetcher.cc"],
     hdrs = ["remote_data_fetcher.h"],
     deps = [
+        "//bazel:crypto_utility_lib",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:hex_lib",
         "//source/common/crypto:utility_lib",
@@ -376,6 +377,7 @@ envoy_cc_library(
         "//include/envoy/server:filter_config_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:backoff_lib",
         "//source/common/common:hash_lib",
         "//source/common/common:hex_lib",
         "//source/common/grpc:common_lib",

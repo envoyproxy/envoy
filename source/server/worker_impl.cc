@@ -13,19 +13,21 @@
 namespace Envoy {
 namespace Server {
 
-WorkerPtr ProdWorkerFactory::createWorker(OverloadManager& overload_manager) {
+WorkerPtr ProdWorkerFactory::createWorker(OverloadManager& overload_manager,
+                                          const std::string& worker_name) {
   Event::DispatcherPtr dispatcher(api_.allocateDispatcher());
   return WorkerPtr{new WorkerImpl(
       tls_, hooks_, std::move(dispatcher),
-      Network::ConnectionHandlerPtr{new ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher)},
-      overload_manager, api_)};
+      Network::ConnectionHandlerPtr{new ConnectionHandlerImpl(*dispatcher, worker_name)},
+      overload_manager, api_, worker_name)};
 }
 
 WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, ListenerHooks& hooks,
                        Event::DispatcherPtr&& dispatcher, Network::ConnectionHandlerPtr handler,
-                       OverloadManager& overload_manager, Api::Api& api)
+                       OverloadManager& overload_manager, Api::Api& api,
+                       const std::string& worker_name)
     : tls_(tls), hooks_(hooks), dispatcher_(std::move(dispatcher)), handler_(std::move(handler)),
-      api_(api) {
+      api_(api), worker_name_(worker_name) {
   tls_.registerThread(*dispatcher_, false);
   overload_manager.registerForAction(
       OverloadActionNames::get().StopAcceptingConnections, *dispatcher_,
@@ -99,18 +101,22 @@ void WorkerImpl::stopListeners() {
 
 void WorkerImpl::threadRoutine(GuardDog& guard_dog) {
   ENVOY_LOG(debug, "worker entering dispatch loop");
-  auto watchdog = guard_dog.createWatchDog(api_.threadFactory().currentThreadId());
-  watchdog->startWatchdog(*dispatcher_);
+  // The watch dog must be created after the dispatcher starts running and has post events flushed,
+  // as this is when TLS stat scopes start working.
+  dispatcher_->post([this, &guard_dog]() {
+    watch_dog_ = guard_dog.createWatchDog(api_.threadFactory().currentThreadId(), worker_name_);
+    watch_dog_->startWatchdog(*dispatcher_);
+  });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   ENVOY_LOG(debug, "worker exited dispatch loop");
-  guard_dog.stopWatching(watchdog);
+  guard_dog.stopWatching(watch_dog_);
 
   // We must close all active connections before we actually exit the thread. This prevents any
   // destructors from running on the main thread which might reference thread locals. Destroying
   // the handler does this which additionally purges the dispatcher delayed deletion list.
   handler_.reset();
   tls_.shutdownThread();
-  watchdog.reset();
+  watch_dog_.reset();
 }
 
 void WorkerImpl::stopAcceptingConnectionsCb(OverloadActionState state) {

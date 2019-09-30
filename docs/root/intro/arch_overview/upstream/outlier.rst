@@ -145,6 +145,33 @@ Most configuration items, namely
 types of errors, but :ref:`outlier_detection.enforcing_success_rate<envoy_api_field_cluster.OutlierDetection.enforcing_success_rate>` applies
 to externally originated errors only and :ref:`outlier_detection.enforcing_local_origin_success_rate<envoy_api_field_cluster.OutlierDetection.enforcing_local_origin_success_rate>`  applies to locally originated errors only.
 
+.. _arch_overview_outlier_detection_failure_percentage:
+
+Failure Percentage
+^^^^^^^^^^^^^^^^^^
+
+Failure Percentage based outlier ejection functions similarly to the success rate detecion type, in
+that it relies on success rate data from each host in a cluster. However, rather than compare those
+values to the mean success rate of the cluster as a whole, they are compared to a flat
+user-configured threshold. This threshold is configured via the
+:ref:`outlier_detection.failure_percentage_threshold<envoy_api_field_cluster.OutlierDetection.failure_percentage_threshold>`
+field.
+
+The other configuration fields for failure percentage based ejection are similar to the fields for
+success rate ejection. Failure percentage based ejection also obeys
+:ref:`outlier_detection.split_external_local_origin_errors<envoy_api_field_cluster.OutlierDetection.split_external_local_origin_errors>`;
+the enforcement percentages for externally- and locally-originated errors are controlled by
+:ref:`outlier_detection.enforcing_failure_percentage<envoy_api_field_cluster.OutlierDetection.enforcing_failure_percentage>`
+and
+:ref:`outlier_detection.enforcing_failure_percentage_local_origin<envoy_api_field_cluster.OutlierDetection.enforcing_failure_percentage_local_origin>`,
+respectively. As with success rate detection, detection will not be performed for a host if its
+request volume over the aggregation interval is less than the
+:ref:`outlier_detection.failure_percentage_request_volume<envoy_api_field_cluster.OutlierDetection.failure_percentage_request_volume>`
+value. Detection also will not be performed for a cluster if the number of hosts with the minimum
+required request volume in an interval is less than the
+:ref:`outlier_detection.failure_percentage_minimum_hosts<envoy_api_field_cluster.OutlierDetection.failure_percentage_minimum_hosts>`
+value.
+
 .. _arch_overview_outlier_detection_grpc:
 
 gRPC

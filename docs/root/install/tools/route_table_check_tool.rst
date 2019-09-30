@@ -48,7 +48,7 @@ Usage
 
     --covall
       Enables comprehensive code coverage percent calculation taking into account all the possible
-      asserts.
+      asserts. Displays missing tests.
 
     --disable-deprecation-check
       Disables the deprecation check for RouteConfiguration proto.
@@ -65,7 +65,7 @@ Output
   The program exits with status EXIT_FAILURE if any test case does not match the expected route parameter
   value.
 
-  If a test fails, details of the failed test cases are printed if ``-details`` flag is provided. 
+  If a test fails, details of the failed test cases are printed if ``--details`` flag is provided. 
   The first field is the expected route parameter value. The second field is the actual route parameter value. 
   The third field indicates the parameter that is compared.
   In the following example, Test_2 and Test_5 failed while the other tests

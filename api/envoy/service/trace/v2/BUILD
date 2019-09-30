@@ -13,7 +13,7 @@ api_proto_package(
 api_proto_library_internal(
     name = "trace_service",
     srcs = ["trace_service.proto"],
-    has_services = 1,
+    has_services = 0,
     require_py = 0,
     deps = [
         "//envoy/api/v2/core:base",

@@ -152,7 +152,7 @@ private:
   SslSocketFactoryStats stats_;
   Envoy::Ssl::ClientContextConfigPtr config_;
   mutable absl::Mutex ssl_ctx_mu_;
-  Envoy::Ssl::ClientContextSharedPtr ssl_ctx_ GUARDED_BY(ssl_ctx_mu_);
+  Envoy::Ssl::ClientContextSharedPtr ssl_ctx_ ABSL_GUARDED_BY(ssl_ctx_mu_);
 };
 
 class ServerSslSocketFactory : public Network::TransportSocketFactory,
@@ -177,7 +177,7 @@ private:
   Envoy::Ssl::ServerContextConfigPtr config_;
   const std::vector<std::string> server_names_;
   mutable absl::Mutex ssl_ctx_mu_;
-  Envoy::Ssl::ServerContextSharedPtr ssl_ctx_ GUARDED_BY(ssl_ctx_mu_);
+  Envoy::Ssl::ServerContextSharedPtr ssl_ctx_ ABSL_GUARDED_BY(ssl_ctx_mu_);
 };
 
 } // namespace Tls

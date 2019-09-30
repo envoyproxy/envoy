@@ -306,6 +306,55 @@ TEST_F(AccessLogManagerImplTest, reopenFile) {
   }
 }
 
+// Test that the flush timer will trigger file reopen even if no data is waiting.
+TEST_F(AccessLogManagerImplTest, reopenFileOnTimerOnly) {
+  NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
+
+  Sequence sq;
+  EXPECT_CALL(*file_, open_(_))
+      .InSequence(sq)
+      .WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
+  AccessLogFileSharedPtr log_file = access_log_manager_.createAccessLog("foo");
+
+  EXPECT_CALL(*file_, write_(_))
+      .InSequence(sq)
+      .WillOnce(Invoke([](absl::string_view data) -> Api::IoCallSizeResult {
+        EXPECT_EQ(0, data.compare("before"));
+        return Filesystem::resultSuccess<ssize_t>(static_cast<ssize_t>(data.length()));
+      }));
+
+  log_file->write("before");
+  timer->invokeCallback();
+
+  {
+    Thread::LockGuard lock(file_->write_mutex_);
+    while (file_->num_writes_ != 1) {
+      file_->write_event_.wait(file_->write_mutex_);
+    }
+  }
+
+  EXPECT_CALL(*file_, close_())
+      .InSequence(sq)
+      .WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
+  EXPECT_CALL(*file_, open_(_))
+      .InSequence(sq)
+      .WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
+
+  EXPECT_CALL(*file_, close_())
+      .InSequence(sq)
+      .WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
+
+  log_file->reopen();
+  timer->invokeCallback();
+
+  {
+    Thread::LockGuard lock(file_->open_mutex_);
+    while (file_->num_opens_ != 2) {
+      file_->open_event_.wait(file_->open_mutex_);
+    }
+  }
+}
+
 TEST_F(AccessLogManagerImplTest, reopenThrows) {
   NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
 

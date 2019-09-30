@@ -79,6 +79,7 @@ public:
     // Clear fields which are not deterministic.
     auto* log_entry = request_msg.mutable_http_logs()->mutable_log_entry(0);
     log_entry->mutable_common_properties()->clear_downstream_remote_address();
+    log_entry->mutable_common_properties()->clear_downstream_direct_remote_address();
     log_entry->mutable_common_properties()->clear_downstream_local_address();
     log_entry->mutable_common_properties()->clear_start_time();
     log_entry->mutable_common_properties()->clear_time_to_last_rx_byte();

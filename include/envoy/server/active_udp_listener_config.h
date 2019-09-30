@@ -2,6 +2,8 @@
 
 #include "envoy/network/connection_handler.h"
 
+#include "common/protobuf/protobuf.h"
+
 namespace Envoy {
 namespace Server {
 
@@ -12,6 +14,8 @@ namespace Server {
 class ActiveUdpListenerConfigFactory {
 public:
   virtual ~ActiveUdpListenerConfigFactory() = default;
+
+  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
 
   /**
    * Create an ActiveUdpListenerFactory object according to given message.

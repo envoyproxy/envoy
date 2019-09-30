@@ -122,6 +122,11 @@ void Utility::extractCommonAccessLogProperties(
         *stream_info.downstreamRemoteAddress(),
         *common_access_log.mutable_downstream_remote_address());
   }
+  if (stream_info.downstreamDirectRemoteAddress() != nullptr) {
+    Network::Utility::addressToProtobufAddress(
+        *stream_info.downstreamDirectRemoteAddress(),
+        *common_access_log.mutable_downstream_direct_remote_address());
+  }
   if (stream_info.downstreamLocalAddress() != nullptr) {
     Network::Utility::addressToProtobufAddress(
         *stream_info.downstreamLocalAddress(),

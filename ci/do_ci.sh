@@ -159,6 +159,7 @@ elif [[ "$CI_TARGET" == "bazel.asan" ]]; then
   mkdir -p "${TAP_TMP}"
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-asan \
     --strategy=TestRunner=local --test_env=TAP_PATH="${TAP_TMP}/tap" \
+    --test_env=PATH="/usr/sbin:${PATH}" \
     //test/extensions/transport_sockets/tls/integration:ssl_integration_test
   # Verify that some pb_text files have been created. We can't check for pcap,
   # since tcpdump is not available in general due to CircleCI lack of support
@@ -260,17 +261,39 @@ elif [[ "$CI_TARGET" == "bazel.fuzz" ]]; then
   echo "Building envoy fuzzers and executing 100 fuzz iterations..."
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} --config=asan-fuzzer ${FUZZ_TEST_TARGETS} --test_arg="-runs=10"
   exit 0
+elif [[ "$CI_TARGET" == "bazel.fuzzit_regression" ]]; then
+  setup_clang_toolchain
+  FUZZ_TEST_TARGETS="$(bazel query "attr('tags','fuzzer',${TEST_TARGETS})")"
+  echo "bazel ASAN libFuzzer build with fuzz tests ${FUZZ_TEST_TARGETS}"
+  echo "Building fuzzers and run a regression with corpus from Fuzzit"
+  bazel_with_collection build ${BAZEL_BUILD_OPTIONS} --config=asan-fuzzer ${FUZZ_TEST_TARGETS}
+  ./ci/run_fuzzit.sh local-regression
+  exit 0
+elif [[ "$CI_TARGET" == "bazel.fuzzit_fuzzing" ]]; then
+  setup_clang_toolchain
+  FUZZ_TEST_TARGETS="$(bazel query "attr('tags','fuzzer',${TEST_TARGETS})")"
+  echo "bazel ASAN libFuzzer build with fuzz tests ${FUZZ_TEST_TARGETS}"
+  echo "Build fuzzers and push them to Fuzzit servers for continuous fuzzing"
+  bazel_with_collection build ${BAZEL_BUILD_OPTIONS} --config=asan-fuzzer ${FUZZ_TEST_TARGETS}
+  ./ci/run_fuzzit.sh fuzzing
+  exit 0
 elif [[ "$CI_TARGET" == "fix_format" ]]; then
+  # proto_format.sh needs to build protobuf.
+  setup_clang_toolchain
   echo "fix_format..."
   ./tools/check_format.py fix
   ./tools/format_python_tools.sh fix
+  ./tools/proto_format.sh fix
   exit 0
 elif [[ "$CI_TARGET" == "check_format" ]]; then
+  # proto_format.sh needs to build protobuf.
+  setup_clang_toolchain
   echo "check_format_test..."
   ./tools/check_format_test_helper.py --log=WARN
   echo "check_format..."
   ./tools/check_format.py check
   ./tools/format_python_tools.sh check
+  ./tools/proto_format.sh check
   exit 0
 elif [[ "$CI_TARGET" == "check_repositories" ]]; then
   echo "check_repositories..."

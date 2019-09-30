@@ -29,6 +29,7 @@ namespace Logger {
   FUNCTION(client)               \
   FUNCTION(config)               \
   FUNCTION(connection)           \
+  FUNCTION(conn_handler)         \
   FUNCTION(dubbo)                \
   FUNCTION(file)                 \
   FUNCTION(filter)               \
@@ -78,7 +79,7 @@ public:
    * but the method to log at err level is called LOGGER.error not LOGGER.err. All other level are
    * fine spdlog::info corresponds to LOGGER.info method.
    */
-  using levels = enum {
+  using Levels = enum {
     trace = spdlog::level::trace,
     debug = spdlog::level::debug,
     info = spdlog::level::info,
@@ -189,7 +190,7 @@ private:
 
   SinkDelegate* sink_{nullptr};
   std::unique_ptr<StderrSinkDelegate> stderr_sink_; // Builtin sink to use as a last resort.
-  std::unique_ptr<spdlog::formatter> formatter_ GUARDED_BY(format_mutex_);
+  std::unique_ptr<spdlog::formatter> formatter_ ABSL_GUARDED_BY(format_mutex_);
   absl::Mutex format_mutex_; // direct absl reference to break build cycle.
 };
 
