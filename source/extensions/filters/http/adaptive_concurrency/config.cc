@@ -25,7 +25,7 @@ Http::FilterFactoryCb AdaptiveConcurrencyFilterFactory::createFilterFactoryFromP
          proto::ConcurrencyControllerConfigCase::kGradientControllerConfig);
   controller = std::make_shared<ConcurrencyController::GradientController>(
       config.gradient_controller_config(), context.dispatcher(), context.runtime(),
-      acc_stats_prefix + "gradient_controller.", context.scope());
+      acc_stats_prefix + "gradient_controller.", context.scope(), context.random());
 
   AdaptiveConcurrencyFilterConfigSharedPtr filter_config(
       new AdaptiveConcurrencyFilterConfig(config, context.runtime(), std::move(acc_stats_prefix),
