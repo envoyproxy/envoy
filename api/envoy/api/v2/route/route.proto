@@ -324,7 +324,7 @@ message WeightedCluster {
 
 message RouteMatch {
   message CredentialMatchOptions {
-        google.protobuf.BoolValue presented = 1;
+    google.protobuf.BoolValue presented = 1;
   }
 
   oneof path_specifier {

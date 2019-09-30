@@ -487,7 +487,9 @@ bool RouteEntryImplBase::evaluateRuntimeMatch(const uint64_t random_value) const
                                                        random_value);
 }
 
-bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, const StreamInfo::StreamInfo& /*stream_info*/, uint64_t random_value) const {
+bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers,
+                                    const StreamInfo::StreamInfo& /*stream_info*/,
+                                    uint64_t random_value) const {
   bool matches = true;
 
   matches &= evaluateRuntimeMatch(random_value);
