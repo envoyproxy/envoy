@@ -270,12 +270,11 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
   } else {
     connection_options = options;
   }
-  //Network::TransportSocketFactory& socket_factory =
+  Network::TransportSocketFactory& socket_factory =
       cluster.resolveTransportSocketFactory(address->asString(), metadata);
   Network::ClientConnectionPtr connection = dispatcher.createClientConnection(
       address, cluster.sourceAddress(),
-      cluster.transportSocketFactory().createTransportSocket(transport_socket_options), connection_options);
-      //socket_factory.createTransportSocket(transport_socket_options), connection_options);
+      socket_factory.createTransportSocket(transport_socket_options), connection_options);
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());
   cluster.createNetworkFilterChain(*connection);
   return connection;
