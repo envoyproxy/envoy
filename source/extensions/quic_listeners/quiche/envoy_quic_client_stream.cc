@@ -48,10 +48,12 @@ void EnvoyQuicClientStream::encode100ContinueHeaders(const Http::HeaderMap& head
 void EnvoyQuicClientStream::encodeHeaders(const Http::HeaderMap& headers, bool end_stream) {
   ENVOY_LOG(debug, "stream {} encodeHeaders: (end_stream={}) ", id(), headers, end_stream);
   WriteHeaders(envoyHeadersToSpdyHeaderBlock(headers), end_stream, nullptr);
+  local_end_stream_ = end_stream;
 }
 
 void EnvoyQuicClientStream::encodeData(Buffer::Instance& data, bool end_stream) {
   ENVOY_LOG(debug, "stream {} encodeData (end_stream={}).", id(), end_stream);
+  local_end_stream_ = end_stream;
   // This is counting not serialized bytes in the send buffer.
   uint64_t bytes_to_send_old = BufferedDataBytes();
   // QUIC stream must take all.
@@ -70,6 +72,8 @@ void EnvoyQuicClientStream::encodeData(Buffer::Instance& data, bool end_stream) 
 }
 
 void EnvoyQuicClientStream::encodeTrailers(const Http::HeaderMap& trailers) {
+  ASSERT(!local_end_stream_);
+  local_end_stream_ = true;
   ENVOY_LOG(debug, "stream {} encodeTrailers: ", id(), trailers);
   WriteTrailers(envoyHeadersToSpdyHeaderBlock(trailers), nullptr);
 }
