@@ -13,6 +13,16 @@ http_archive(
     urls = ["https://github.com/abseil/abseil-cpp/archive/61c9bf3e3e1c28a4aa6d7f1be4b37fd473bb5529.tar.gz"],
 )
 
+# This should be kept in sync with Envoy itself, we just need to apply this patch
+# Remove this once https://boringssl-review.googlesource.com/c/boringssl/+/37804 is in master-with-bazel
+http_archive(
+    name = "boringssl",
+    patches = ["//bazel:boringssl.patch"],
+    sha256 = "36049e6cd09b353c83878cae0dd84e8b603ba1a40dcd74e44ebad101fc5c672d",
+    strip_prefix = "boringssl-37b57ed537987f1b4c60c60fa1aba20f3a0f6d26",
+    urls = ["https://github.com/google/boringssl/archive/37b57ed537987f1b4c60c60fa1aba20f3a0f6d26.tar.gz"],
+)
+
 local_repository(
     name = "envoy",
     path = "envoy",
