@@ -79,7 +79,7 @@ public:
    * but the method to log at err level is called LOGGER.error not LOGGER.err. All other level are
    * fine spdlog::info corresponds to LOGGER.info method.
    */
-  using levels = enum {
+  using Levels = enum {
     trace = spdlog::level::trace,
     debug = spdlog::level::debug,
     info = spdlog::level::info,

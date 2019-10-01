@@ -31,14 +31,20 @@ protected:
   Api::ApiPtr api_;
 };
 
+TEST_F(ProtobufUtilityTest, convertPercentNaNDouble) {
+  envoy::api::v2::Cluster::CommonLbConfig common_config_;
+  common_config_.mutable_healthy_panic_threshold()->set_value(
+      std::numeric_limits<double>::quiet_NaN());
+  EXPECT_THROW(PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(common_config_, healthy_panic_threshold, 0.5),
+               EnvoyException);
+}
+
 TEST_F(ProtobufUtilityTest, convertPercentNaN) {
   envoy::api::v2::Cluster::CommonLbConfig common_config_;
   common_config_.mutable_healthy_panic_threshold()->set_value(
       std::numeric_limits<double>::quiet_NaN());
   EXPECT_THROW(PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(common_config_,
                                                               healthy_panic_threshold, 100, 50),
-               EnvoyException);
-  EXPECT_THROW(PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(common_config_, healthy_panic_threshold, 0.5),
                EnvoyException);
 }
 

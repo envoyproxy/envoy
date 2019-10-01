@@ -159,6 +159,9 @@ public:
     return bytes;
   }
 
+  StatNameSetPtr makeSet(absl::string_view name) override;
+  void forgetSet(StatNameSet& stat_name_set) override;
+
 private:
   friend class StatName;
   friend class StatNameTest;
@@ -238,6 +241,7 @@ private:
   // TODO(ambuc): There might be an optimization here relating to storing ranges of freed symbols
   // using an Envoy::IntervalSet.
   std::stack<Symbol> pool_ GUARDED_BY(lock_);
+  absl::flat_hash_set<StatNameSet*> stat_name_sets_ GUARDED_BY(lock_);
 };
 
 /**
@@ -565,7 +569,7 @@ struct HeterogeneousStatNameHash {
   // https://en.cppreference.com/w/cpp/utility/functional/less_void for an
   // official reference, and https://abseil.io/tips/144 for a description of
   // using it in the context of absl.
-  using is_transparent = void;
+  using is_transparent = void; // NOLINT(readability-identifier-naming)
 
   size_t operator()(StatName a) const { return a.hash(); }
   size_t operator()(const StatNameStorage& a) const { return a.statName().hash(); }
@@ -573,7 +577,7 @@ struct HeterogeneousStatNameHash {
 
 struct HeterogeneousStatNameEqual {
   // See description for HeterogeneousStatNameHash::is_transparent.
-  using is_transparent = void;
+  using is_transparent = void; // NOLINT(readability-identifier-naming)
 
   size_t operator()(StatName a, StatName b) const { return a == b; }
   size_t operator()(const StatNameStorage& a, const StatNameStorage& b) const {
@@ -594,7 +598,7 @@ class StatNameStorageSet {
 public:
   using HashSet =
       absl::flat_hash_set<StatNameStorage, HeterogeneousStatNameHash, HeterogeneousStatNameEqual>;
-  using iterator = HashSet::iterator;
+  using Iterator = HashSet::iterator;
 
   ~StatNameStorageSet();
 
@@ -616,12 +620,12 @@ public:
    * @param stat_name The stat_name to find.
    * @return the iterator pointing to the stat_name, or end() if not found.
    */
-  iterator find(StatName stat_name) { return hash_set_.find(stat_name); }
+  Iterator find(StatName stat_name) { return hash_set_.find(stat_name); }
 
   /**
    * @return the end-marker.
    */
-  iterator end() { return hash_set_.end(); }
+  Iterator end() { return hash_set_.end(); }
 
   /**
    * @param set the storage set to swap with.
@@ -647,7 +651,9 @@ private:
 // builtins must *not* be added in the request-path.
 class StatNameSet {
 public:
-  explicit StatNameSet(SymbolTable& symbol_table);
+  // This object must be instantiated via SymbolTable::makeSet(), thus constructor is private.
+
+  ~StatNameSet();
 
   /**
    * Adds a string to the builtin map, which is not mutex protected. This map is
@@ -679,11 +685,20 @@ public:
    * subsequent lookups of the same string to take only the set's lock, and not
    * the whole symbol-table lock.
    *
+   * @return a StatName corresponding to the passed-in token, owned by the set.
+   *
    * TODO(jmarantz): Potential perf issue here with contention, both on this
    * set's mutex and also the SymbolTable mutex which must be taken during
    * StatNamePool::add().
    */
   StatName getDynamic(absl::string_view token);
+
+  /**
+   * Finds a builtin StatName by name. If the builtin has not been registered,
+   * then the fallback is returned.
+   *
+   * @return the StatName or fallback.
+   */
   StatName getBuiltin(absl::string_view token, StatName fallback);
 
   /**
@@ -695,6 +710,13 @@ public:
   }
 
 private:
+  friend class FakeSymbolTableImpl;
+  friend class SymbolTableImpl;
+
+  StatNameSet(SymbolTable& symbol_table, absl::string_view name);
+
+  const std::string name_;
+  Stats::SymbolTable& symbol_table_;
   Stats::StatNamePool pool_ GUARDED_BY(mutex_);
   absl::Mutex mutex_;
   using StringStatNameMap = absl::flat_hash_map<std::string, Stats::StatName>;

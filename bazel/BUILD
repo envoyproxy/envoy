@@ -128,6 +128,13 @@ config_setting(
 )
 
 config_setting(
+    name = "dynamic_link_tests",
+    values = {
+        "define": "dynamic_link_tests=true",
+    },
+)
+
+config_setting(
     name = "disable_tcmalloc",
     values = {"define": "tcmalloc=disabled"},
 )

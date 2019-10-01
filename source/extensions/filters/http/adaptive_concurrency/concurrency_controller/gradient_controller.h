@@ -25,20 +25,22 @@ namespace ConcurrencyController {
 /**
  * All stats for the gradient controller.
  */
-#define ALL_GRADIENT_CONTROLLER_STATS(GAUGE)                                                       \
+#define ALL_GRADIENT_CONTROLLER_STATS(COUNTER, GAUGE)                                              \
+  COUNTER(rq_blocked)                                                                              \
   GAUGE(concurrency_limit, NeverImport)                                                            \
   GAUGE(gradient, NeverImport)                                                                     \
   GAUGE(burst_queue_size, NeverImport)                                                             \
-  GAUGE(min_rtt_msecs, NeverImport)
+  GAUGE(min_rtt_msecs, NeverImport)                                                                \
+  GAUGE(sample_rtt_msecs, NeverImport)
 
 /**
  * Wrapper struct for gradient controller stats. @see stats_macros.h
  */
 struct GradientControllerStats {
-  ALL_GRADIENT_CONTROLLER_STATS(GENERATE_GAUGE_STRUCT)
+  ALL_GRADIENT_CONTROLLER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
-class GradientControllerConfig {
+class GradientControllerConfig : public Logger::Loggable<Logger::Id::filter> {
 public:
   GradientControllerConfig(
       const envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig&
@@ -76,6 +78,10 @@ public:
                                          sample_aggregate_percentile_);
   }
 
+  double jitterPercent() const {
+    return runtime_.snapshot().getDouble(RuntimeKeys::get().JitterPercentKey, jitter_pct_);
+  }
+
 private:
   class RuntimeKeyValues {
   public:
@@ -90,6 +96,8 @@ private:
     const std::string MaxGradientKey = "http.adaptive_concurrency.gradient_controller.max_gradient";
     const std::string SampleAggregatePercentileKey =
         "http.adaptive_concurrency.gradient_controller.sample_aggregate_percentile";
+    const std::string JitterPercentKey =
+        "http.adaptive_concurrency.gradient_controller.jitter";
   };
 
   using RuntimeKeys = ConstSingleton<RuntimeKeyValues>;
@@ -101,6 +109,9 @@ private:
 
   // The measured sample round-trip milliseconds from the previous time window.
   const uint32_t sample_rtt_calc_interval_;
+
+  // Randomized time delta added to the start of the minRTT calculation window.
+  const double jitter_pct_;
 
   // The maximum allowed concurrency value.
   const uint32_t max_concurrency_limit_;
@@ -180,9 +191,9 @@ using GradientControllerConfigSharedPtr = std::shared_ptr<GradientControllerConf
  */
 class GradientController : public ConcurrencyController {
 public:
-  GradientController(GradientControllerConfigSharedPtr config, Event::Dispatcher& dispatcher,
-                     Runtime::Loader& runtime, const std::string& stats_prefix,
-                     Stats::Scope& scope);
+  GradientController(GradientControllerConfig config, Event::Dispatcher& dispatcher,
+                     Runtime::Loader& runtime, const std::string& stats_prefix, Stats::Scope& scope,
+                     Runtime::RandomGenerator& random);
 
   // ConcurrencyController.
   RequestForwardingAction forwardingDecision() override;
@@ -204,11 +215,14 @@ private:
     concurrency_limit_.store(new_limit);
     stats_.concurrency_limit_.set(concurrency_limit_.load());
   }
+  std::chrono::milliseconds applyJitter(std::chrono::milliseconds interval,
+                                        double jitter_pct) const;
 
-  const GradientControllerConfigSharedPtr config_;
+  const GradientControllerConfig config_;
   Event::Dispatcher& dispatcher_;
   Stats::Scope& scope_;
   GradientControllerStats stats_;
+  Runtime::RandomGenerator& random_;
 
   // Protects data related to latency sampling and RTT values. In addition to protecting the latency
   // sample histogram, the mutex ensures that the minRTT calculation window and the sample window

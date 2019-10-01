@@ -47,7 +47,7 @@ service ClusterDiscoveryService {
 }
 
 // Configuration for a single upstream cluster.
-// [#comment:next free field: 44]
+// [#comment:next free field: 45]
 message Cluster {
   // Refer to :ref:`service discovery type <arch_overview_service_discovery_types>`
   // for an explanation on each type.
@@ -79,6 +79,10 @@ message Cluster {
   // Refer to :ref:`load balancer type <arch_overview_load_balancing_types>` architecture
   // overview section for information on each type.
   enum LbPolicy {
+    reserved 4;
+
+    reserved "ORIGINAL_DST_LB";
+
     // Refer to the :ref:`round robin load balancing
     // policy<arch_overview_load_balancing_types_round_robin>`
     // for an explanation.
@@ -98,16 +102,6 @@ message Cluster {
     // policy<arch_overview_load_balancing_types_random>`
     // for an explanation.
     RANDOM = 3;
-
-    // Refer to the :ref:`original destination load balancing
-    // policy<arch_overview_load_balancing_types_original_destination>`
-    // for an explanation.
-    //
-    // .. attention::
-    //
-    //   **This load balancing policy is deprecated**. Use CLUSTER_PROVIDED instead.
-    //
-    ORIGINAL_DST_LB = 4 [deprecated = true];
 
     // Refer to the :ref:`Maglev load balancing policy<arch_overview_load_balancing_types_maglev>`
     // for an explanation.
@@ -436,6 +430,22 @@ message Cluster {
     bool close_connections_on_host_set_change = 6;
   }
 
+  message RefreshRate {
+    // Specifies the base interval between refreshes. This parameter is required and must be greater
+    // than zero and less than
+    // :ref:`max_interval <envoy_api_field_Cluster.RefreshRate.max_interval>`.
+    google.protobuf.Duration base_interval = 1 [(validate.rules).duration = {
+      required: true
+      gt {nanos: 1000000}
+    }];
+
+    // Specifies the maximum interval between refreshes. This parameter is optional, but must be
+    // greater than or equal to the
+    // :ref:`base_interval <envoy_api_field_Cluster.RefreshRate.base_interval>`  if set. The default
+    // is 10 times the :ref:`base_interval <envoy_api_field_Cluster.RefreshRate.base_interval>`.
+    google.protobuf.Duration max_interval = 2 [(validate.rules).duration = {gt {nanos: 1000000}}];
+  }
+
   reserved 12, 15;
 
   // Configuration to use different transport sockets for different endpoints.
@@ -613,6 +623,19 @@ message Cluster {
   // and :ref:`LOGICAL_DNS<envoy_api_enum_value_Cluster.DiscoveryType.LOGICAL_DNS>`
   // this setting is ignored.
   google.protobuf.Duration dns_refresh_rate = 16 [(validate.rules).duration = {gt {}}];
+
+  // If the DNS failure refresh rate is specified and the cluster type is either
+  // :ref:`STRICT_DNS<envoy_api_enum_value_Cluster.DiscoveryType.STRICT_DNS>`,
+  // or :ref:`LOGICAL_DNS<envoy_api_enum_value_Cluster.DiscoveryType.LOGICAL_DNS>`,
+  // this is used as the cluster’s DNS refresh rate when requests are failing. If this setting is
+  // not specified, the failure refresh rate defaults to the DNS refresh rate. For cluster types
+  // other than :ref:`STRICT_DNS<envoy_api_enum_value_Cluster.DiscoveryType.STRICT_DNS>` and
+  // :ref:`LOGICAL_DNS<envoy_api_enum_value_Cluster.DiscoveryType.LOGICAL_DNS>` this setting is
+  // ignored.
+  //
+  // Note: Currently, DNS failures and empty DNS responses are not treated differently and this
+  // configuration is applied in both situations.
+  RefreshRate dns_failure_refresh_rate = 44;
 
   // Optional configuration for setting cluster's DNS refresh rate. If the value is set to true,
   // cluster's DNS refresh rate will be set to resource record's TTL which comes from DNS
