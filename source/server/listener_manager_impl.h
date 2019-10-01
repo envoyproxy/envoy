@@ -138,7 +138,7 @@ public:
   void startWorkers(GuardDog& guard_dog) override;
   void stopListeners() override;
   void stopWorkers() override;
-  virtual void beginListenerUpdate() override { error_state_tracker_.clear(); }
+  void beginListenerUpdate() override { error_state_tracker_.clear(); }
   Http::Context& httpContext() { return server_.httpContext(); }
 
   Instance& server_;

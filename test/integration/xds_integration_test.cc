@@ -92,7 +92,8 @@ TEST_P(LdsIntegrationTest, FailConfigLoad) {
     auto* filter_chain = listener->mutable_filter_chains(0);
     filter_chain->mutable_filters(0)->set_name("grewgragra");
   });
-  EXPECT_DEATH(initialize(), "Didn't find a registered implementation for name: 'grewgragra'");
+  EXPECT_DEATH_LOG_TO_STDERR(initialize(),
+                             "Didn't find a registered implementation for name: 'grewgragra'");
 }
 
 } // namespace
