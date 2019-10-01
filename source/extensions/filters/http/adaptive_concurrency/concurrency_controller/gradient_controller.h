@@ -96,8 +96,7 @@ private:
     const std::string MaxGradientKey = "http.adaptive_concurrency.gradient_controller.max_gradient";
     const std::string SampleAggregatePercentileKey =
         "http.adaptive_concurrency.gradient_controller.sample_aggregate_percentile";
-    const std::string JitterPercentKey =
-        "http.adaptive_concurrency.gradient_controller.jitter";
+    const std::string JitterPercentKey = "http.adaptive_concurrency.gradient_controller.jitter";
   };
 
   using RuntimeKeys = ConstSingleton<RuntimeKeyValues>;
