@@ -36,7 +36,7 @@ void QuicFilterManagerConnectionImpl::addConnectionCallbacks(Network::Connection
 }
 
 void QuicFilterManagerConnectionImpl::enableHalfClose(bool enabled) {
-  ASSERT(!enabled, "Quic connection doesn't support half close.");
+  RELEASE_ASSERT(!enabled, "Quic connection doesn't support half close.");
 }
 
 void QuicFilterManagerConnectionImpl::setBufferLimits(uint32_t /*limit*/) {
@@ -88,7 +88,6 @@ QuicFilterManagerConnectionImpl::localAddress() const {
 
 Ssl::ConnectionInfoConstSharedPtr QuicFilterManagerConnectionImpl::ssl() const {
   // TODO(danzh): construct Ssl::ConnectionInfo from crypto stream
-  ENVOY_CONN_LOG(error, "Ssl::ConnectionInfo instance is not populated.", *this);
   return nullptr;
 }
 

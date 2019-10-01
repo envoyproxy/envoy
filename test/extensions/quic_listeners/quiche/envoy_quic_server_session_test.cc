@@ -312,7 +312,7 @@ TEST_P(EnvoyQuicServerSessionTest, FlushCloseNotSupported) {
 TEST_P(EnvoyQuicServerSessionTest, ShutdownNotice) {
   installReadFilter();
   // Not verifying dummy implementation, just to have coverage.
-  EXPECT_DEBUG_DEATH(envoy_quic_session_.enableHalfClose(true), "");
+  EXPECT_DEATH(envoy_quic_session_.enableHalfClose(true), "");
   EXPECT_EQ(nullptr, envoy_quic_session_.ssl());
   EXPECT_DEATH(envoy_quic_session_.aboveHighWatermark(), "");
   EXPECT_DEATH(envoy_quic_session_.setDelayedCloseTimeout(std::chrono::milliseconds(1)), "");
@@ -390,9 +390,6 @@ TEST_P(EnvoyQuicServerSessionTest, NetworkConnectionInterface) {
   installReadFilter();
   EXPECT_EQ(dispatcher_.get(), &envoy_quic_session_.dispatcher());
   EXPECT_TRUE(envoy_quic_session_.readEnabled());
-  EXPECT_FALSE(envoy_quic_session_.localAddressRestored());
-  EXPECT_DEBUG_DEATH(envoy_quic_session_.unixSocketPeerCredentials(),
-                     "Unix domain socket is not supported.");
 }
 
 } // namespace Quic

@@ -51,8 +51,8 @@ public:
   const Network::Address::InstanceConstSharedPtr& localAddress() const override;
   absl::optional<Network::Connection::UnixDomainSocketPeerCredentials>
   unixSocketPeerCredentials() const override {
-    ASSERT(false, "Unix domain socket is not supported.");
-    return absl::nullopt;
+    // Unix domain socket is not supported.
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
   void setConnectionStats(const Network::Connection::ConnectionStats& stats) override {
     stats_ = std::make_unique<Network::Connection::ConnectionStats>(stats);
@@ -74,7 +74,7 @@ public:
   }
   bool localAddressRestored() const override {
     // SO_ORIGINAL_DST not supported by QUIC.
-    return false;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
   bool aboveHighWatermark() const override {
     // TODO(danzh) Aggregate the write buffer usage cross all the streams and
@@ -120,7 +120,7 @@ private:
   // them.
   std::list<Network::ConnectionCallbacks*> network_connection_callbacks_;
   std::string transport_failure_reason_;
-  uint64_t id_;
+  const uint64_t id_;
 };
 
 } // namespace Quic
