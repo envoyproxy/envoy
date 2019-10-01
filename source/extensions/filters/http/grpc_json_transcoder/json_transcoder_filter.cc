@@ -563,12 +563,6 @@ bool JsonTranscoderFilter::maybeConvertGrpcStatus(Grpc::Status::GrpcStatus grpc_
     return false;
   }
 
-  // We do not support responses with a separate trailer frame.
-  // TODO(ascheglov): remove this if after HCM can buffer data added from |encodeTrailers|.
-  if (response_headers_ != &trailers) {
-    return false;
-  }
-
   // Send a serialized status only if there was no body.
   if (has_body_) {
     return false;
