@@ -206,13 +206,11 @@ public:
                                                          ResourcePriority priority,
                                                          Http::Protocol protocol,
                                                          LoadBalancerContext* context) override;
-  Tcp::ConnectionPool::Instance*
-  tcpConnPoolForCluster(const std::string& cluster, ResourcePriority priority,
-                        LoadBalancerContext* context,
-                        Network::TransportSocketOptionsSharedPtr transport_socket_options) override;
-  Host::CreateConnectionData
-  tcpConnForCluster(const std::string& cluster, LoadBalancerContext* context,
-                    Network::TransportSocketOptionsSharedPtr transport_socket_options) override;
+  Tcp::ConnectionPool::Instance* tcpConnPoolForCluster(const std::string& cluster,
+                                                       ResourcePriority priority,
+                                                       LoadBalancerContext* context) override;
+  Host::CreateConnectionData tcpConnForCluster(const std::string& cluster,
+                                               LoadBalancerContext* context) override;
   Http::AsyncClient& httpAsyncClientForCluster(const std::string& cluster) override;
   bool removeCluster(const std::string& cluster) override;
   void shutdown() override {
@@ -308,9 +306,8 @@ private:
       Http::ConnectionPool::Instance* connPool(ResourcePriority priority, Http::Protocol protocol,
                                                LoadBalancerContext* context);
 
-      Tcp::ConnectionPool::Instance*
-      tcpConnPool(ResourcePriority priority, LoadBalancerContext* context,
-                  Network::TransportSocketOptionsSharedPtr transport_socket_options);
+      Tcp::ConnectionPool::Instance* tcpConnPool(ResourcePriority priority,
+                                                 LoadBalancerContext* context);
 
       // Upstream::ThreadLocalCluster
       const PrioritySet& prioritySet() override { return priority_set_; }
