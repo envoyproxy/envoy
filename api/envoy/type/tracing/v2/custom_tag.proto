@@ -1,0 +1,67 @@
+syntax = "proto3";
+
+package envoy.type.tracing.v2;
+
+option java_outer_classname = "CustomTagProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.type.tracing.v2";
+
+import "envoy/type/matcher/metadata.proto";
+
+import "validate/validate.proto";
+
+// [#protodoc-title: Custom Tag]
+
+// Describes custom tags for the active span.
+message CustomTag {
+  // Literal type custom tag with static value for the tag value.
+  message Literal {
+    // Static literal value to populate the tag value.
+    string value = 1 [(validate.rules).string = {min_bytes: 1}];
+  }
+
+  // Environment type custom tag with environment name and default value.
+  message Environment {
+    // Environment variable name to obtain the value to populate the tag value.
+    string name = 1 [(validate.rules).string = {min_bytes: 1}];
+
+    // When the environment variable is not found,
+    // the tag value will be populated with this default value if specified,
+    // otherwise no tag will be populated.
+    string default_value = 2;
+  }
+
+  // Header type custom tag with header name and default value.
+  message Header {
+    // Request header name to obtain the value to populate the tag value.
+    string name = 1 [(validate.rules).string = {min_bytes: 1}];
+
+    // When the request header does not exist,
+    // the tag value will be populated with this default value if specified,
+    // otherwise no tag will be populated.
+    string default_value = 2;
+  }
+
+  // Used to populate the tag name.
+  string tag = 1 [(validate.rules).string = {min_bytes: 1}];
+
+  // Used to specify what kind of custom tag.
+  oneof type {
+    option (validate.required) = true;
+
+    // A literal custom tag.
+    Literal literal = 2;
+
+    // An environment custom tag.
+    Environment environment = 3;
+
+    // A request header custom tag.
+    Header request_header = 4;
+
+    // A metadata custom tag associated with the request.
+    matcher.MetadataMatcher request_metadata = 5;
+
+    // A metadata custom tag associated with the route.
+    matcher.MetadataMatcher route_metadata = 6;
+  }
+}

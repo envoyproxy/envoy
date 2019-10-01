@@ -8,6 +8,7 @@ api_proto_package(
         "//envoy/api/v2/core",
         "//envoy/config/filter/accesslog/v2:pkg",
         "//envoy/type",
+        "//envoy/type/tracing/v2:tracing",
     ],
 )
 
@@ -22,6 +23,6 @@ api_proto_library_internal(
         "//envoy/api/v2/core:protocol",
         "//envoy/config/filter/accesslog/v2:accesslog",
         "//envoy/type:percent",
-        "//envoy/type:tracing",
+        "//envoy/type/tracing/v2:custom_tag",
     ],
 )

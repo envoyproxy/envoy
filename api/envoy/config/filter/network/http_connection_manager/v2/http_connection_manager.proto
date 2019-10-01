@@ -12,7 +12,7 @@ import "envoy/api/v2/rds.proto";
 import "envoy/api/v2/srds.proto";
 import "envoy/config/filter/accesslog/v2/accesslog.proto";
 import "envoy/type/percent.proto";
-import "envoy/type/tracing.proto";
+import "envoy/type/tracing/v2/custom_tag.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
@@ -141,7 +141,7 @@ message HttpConnectionManager {
     google.protobuf.UInt32Value max_path_tag_length = 7;
 
     // A list of custom tags with unique tag name to create tags for the active span.
-    repeated type.TracingCustomTag custom_tags = 8;
+    repeated type.tracing.v2.CustomTag custom_tags = 8;
   }
 
   message InternalAddressConfig {

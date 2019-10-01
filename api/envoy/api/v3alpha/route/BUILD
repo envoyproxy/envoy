@@ -7,6 +7,7 @@ api_proto_package(
         "//envoy/api/v3alpha/core",
         "//envoy/type",
         "//envoy/type/matcher",
+        "//envoy/type/tracing/v3alpha:tracing",
     ],
 )
 
@@ -21,5 +22,6 @@ api_proto_library_internal(
         "//envoy/type:tracing",
         "//envoy/type/matcher:regex",
         "//envoy/type/matcher:string",
+        "//envoy/type/tracing/v3alpha:custom_tag",
     ],
 )

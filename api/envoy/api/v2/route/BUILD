@@ -7,6 +7,7 @@ api_proto_package(
         "//envoy/api/v2/core",
         "//envoy/type",
         "//envoy/type/matcher",
+        "//envoy/type/tracing/v2:tracing",
     ],
 )
 
@@ -18,8 +19,8 @@ api_proto_library_internal(
         "//envoy/api/v2/core:base",
         "//envoy/type:percent",
         "//envoy/type:range",
-        "//envoy/type:tracing",
         "//envoy/type/matcher:regex",
         "//envoy/type/matcher:string",
+        "//envoy/type/tracing/v2:custom_tag",
     ],
 )

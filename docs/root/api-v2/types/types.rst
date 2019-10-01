@@ -8,7 +8,7 @@ Types
   ../type/http_status.proto
   ../type/percent.proto
   ../type/range.proto
-  ../type/tracing.proto
+  ../type/tracing/v2/custom_tag.proto
   ../type/matcher/metadata.proto
   ../type/matcher/number.proto
   ../type/matcher/regex.proto

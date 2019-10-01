@@ -89,5 +89,6 @@ proto_library(
         "//envoy/service/tap/v2alpha:common",
         "//envoy/type",
         "//envoy/type/matcher",
+        "//envoy/type/tracing/v2:tracing",
     ],
 )

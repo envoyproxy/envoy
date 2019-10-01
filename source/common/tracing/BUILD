@@ -39,6 +39,6 @@ envoy_cc_library(
         "//source/common/runtime:uuid_util_lib",
         "//source/common/stream_info:utility_lib",
         "@envoy_api//envoy/api/v2/core:base_cc",
-        "@envoy_api//envoy/type:tracing_cc",
+        "@envoy_api//envoy/type/tracing/v2:custom_tag_cc",
     ],
 )

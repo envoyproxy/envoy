@@ -11,7 +11,7 @@ import "envoy/type/matcher/regex.proto";
 import "envoy/type/matcher/string.proto";
 import "envoy/type/percent.proto";
 import "envoy/type/range.proto";
-import "envoy/type/tracing.proto";
+import "envoy/type/tracing/v2/custom_tag.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
@@ -1077,11 +1077,13 @@ message Tracing {
   // Default: 100%
   type.FractionalPercent overall_sampling = 3;
 
-  // A list of custom tags with unique tag name to create tags for the active span,
-  // applied after merging with the connection manager :ref:`tracing configuration
-  // <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing.custom_tags>`,
-  // here takes priority if configured with the same tag name.
-  repeated type.TracingCustomTag custom_tags = 4;
+  // A list of custom tags with unique tag name to create tags for the active span.
+  // It will take effect after merging with the :ref:`corresponding configuration
+  // <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing.custom_tags>`
+  // configured in the HTTP connection manager. If two tags with the same name are configured
+  // each in the HTTP connection manager and the route level, the one configured here takes
+  // priority.
+  repeated type.tracing.v2.CustomTag custom_tags = 4;
 }
 
 // A virtual cluster is a way of specifying a regex matching rule against
