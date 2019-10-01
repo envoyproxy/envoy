@@ -88,6 +88,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "recent_lookups_lib",
+    srcs = ["recent_lookups.cc"],
+    hdrs = ["recent_lookups.h"],
+    deps = [
+        "//source/common/common:assert_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "store_impl_lib",
     hdrs = ["store_impl.h"],
     deps = [
