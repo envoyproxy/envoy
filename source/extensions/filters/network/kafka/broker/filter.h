@@ -56,7 +56,7 @@ private:
 /**
  * Single access point for all Kafka-related metrics.
  * Implements Kafka message callback, so decoders can refer to it when parse results appear.
- * This interface was extracted to faciliate mock injection in unit tests.
+ * This interface was extracted to facilitate mock injection in unit tests.
  */
 class KafkaMetricsFacade : public KafkaCallback {
 public:
@@ -94,12 +94,12 @@ public:
                          RichResponseMetricsSharedPtr response_metrics);
 
   /**
-   * When request is succesfully parsed, increase type count and store its arrival timestamp.
+   * When request is successfully parsed, increase type count and store its arrival timestamp.
    */
   void onMessage(AbstractRequestSharedPtr request) override;
 
   /**
-   * When response is succesfully parsed, compute processing time using its correlation id and
+   * When response is successfully parsed, compute processing time using its correlation id and
    * stored request arrival timestamp, then update metrics with the result.
    */
   void onMessage(AbstractResponseSharedPtr response) override;
