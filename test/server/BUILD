@@ -294,6 +294,7 @@ envoy_cc_test(
         ":node_bootstrap_no_admin_port.yaml",
         ":node_bootstrap_with_admin_socket_options.yaml",
         ":node_bootstrap_without_access_log.yaml",
+        ":proxy_version_bootstrap.yaml",
         ":runtime_bootstrap.yaml",
         ":runtime_test_data",
         ":static_validation_test_data",
