@@ -6,7 +6,8 @@
   for easier access to metrics using message's api_key.
 
   There is one metric for each of request types (e.g. produce) - number of responses received.
-  There is also a single metric counting requests that could not be parsed.
+  There is also a metric for counting requests that could not be recognised, and one for requests
+  that could caused deserialization errors.
 #}
 
 #pragma once
@@ -29,7 +30,8 @@ namespace Kafka {
 {% for message_type in message_types %}                                                            \
   COUNTER({{ message_type.name_in_c_case() }})                                                     \
 {% endfor %}                                                                                       \
-  COUNTER(unknown)
+  COUNTER(unknown)                                                                                 \
+  COUNTER(failure)
 
 struct KafkaRequestMetrics {
   KAFKA_REQUEST_METRICS(GENERATE_COUNTER_STRUCT)
@@ -52,6 +54,11 @@ public:
    * Invoked when an unknown message is received.
    */
   virtual void onUnknownRequest() PURE;
+
+  /**
+   * Invoked when a deserialization error occurs.
+   */
+  virtual void onBrokenRequest() PURE;
 };
 
 using RichRequestMetricsSharedPtr = std::shared_ptr<RichRequestMetrics>;
@@ -78,6 +85,8 @@ public:
   }
 
   void onUnknownRequest() override { metrics_.unknown_.inc(); }
+
+  void onBrokenRequest() override { metrics_.failure_.inc(); }
 
 private:
   KafkaRequestMetrics metrics_;

@@ -1,5 +1,4 @@
 #include "extensions/filters/network/kafka/broker/filter.h"
-#include "extensions/filters/network/kafka/broker/filter_impl.h"
 #include "extensions/filters/network/kafka/external/requests.h"
 
 #include "test/mocks/server/mocks.h"
@@ -19,6 +18,18 @@ namespace Kafka {
 namespace Broker {
 
 // Mocks.
+
+class MockKafkaMetricsFacade : public KafkaMetricsFacade {
+public:
+  MOCK_METHOD1(onMessage, void(AbstractRequestSharedPtr));
+  MOCK_METHOD1(onMessage, void(AbstractResponseSharedPtr));
+  MOCK_METHOD1(onFailedParse, void(RequestParseFailureSharedPtr));
+  MOCK_METHOD1(onFailedParse, void(ResponseMetadataSharedPtr));
+  MOCK_METHOD0(onRequestException, void());
+  MOCK_METHOD0(onResponseException, void());
+};
+
+using MockKafkaMetricsFacadeSharedPtr = std::shared_ptr<MockKafkaMetricsFacade>;
 
 class MockResponseDecoder : public ResponseDecoder {
 public:
@@ -49,12 +60,14 @@ class MockRichRequestMetrics : public RichRequestMetrics {
 public:
   MOCK_METHOD1(onRequest, void(const int16_t));
   MOCK_METHOD0(onUnknownRequest, void());
+  MOCK_METHOD0(onBrokenRequest, void());
 };
 
 class MockRichResponseMetrics : public RichResponseMetrics {
 public:
   MOCK_METHOD2(onResponse, void(const int16_t, const long long duration));
   MOCK_METHOD0(onUnknownResponse, void());
+  MOCK_METHOD0(onBrokenResponse, void());
 };
 
 class MockRequest : public AbstractRequest {
@@ -77,12 +90,13 @@ public:
 
 class KafkaBrokerFilterUnitTest : public testing::Test {
 protected:
+  MockKafkaMetricsFacadeSharedPtr metrics_{std::make_shared<MockKafkaMetricsFacade>()};
   MockResponseDecoderSharedPtr response_decoder_{std::make_shared<MockResponseDecoder>()};
   MockRequestDecoderSharedPtr request_decoder_{std::make_shared<MockRequestDecoder>()};
 
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
 
-  KafkaBrokerFilter testee_{response_decoder_, request_decoder_};
+  KafkaBrokerFilter testee_{metrics_, response_decoder_, request_decoder_};
 
   void initialize() {
     testee_.initializeReadFilterCallbacks(filter_callbacks_);
@@ -109,6 +123,7 @@ TEST_F(KafkaBrokerFilterUnitTest, shouldStopIterationIfProcessingDataFromKafkaCl
   Buffer::OwnedImpl data;
   EXPECT_CALL(*request_decoder_, onData(_)).WillOnce(Throw(EnvoyException("boom")));
   EXPECT_CALL(*request_decoder_, reset());
+  EXPECT_CALL(*metrics_, onRequestException());
 
   // when
   initialize();
@@ -137,6 +152,7 @@ TEST_F(KafkaBrokerFilterUnitTest, shouldStopIterationIfProcessingDataFromKafkaBr
   Buffer::OwnedImpl data;
   EXPECT_CALL(*response_decoder_, onData(_)).WillOnce(Throw(EnvoyException("boom")));
   EXPECT_CALL(*response_decoder_, reset());
+  EXPECT_CALL(*metrics_, onResponseException());
 
   // when
   initialize();
@@ -181,17 +197,17 @@ TEST_F(ForwarderUnitTest, shouldUpdateResponseDecoderStateOnFailedParse) {
   // then - response_decoder_ had a new expected response registered.
 }
 
-class MetricTrackingCallbackUnitTest : public testing::Test {
+class KafkaMetricsFacadeImplUnitTest : public testing::Test {
 protected:
   MockTimeSource time_source_;
   std::shared_ptr<MockRichRequestMetrics> request_metrics_ =
       std::make_shared<MockRichRequestMetrics>();
   std::shared_ptr<MockRichResponseMetrics> response_metrics_ =
       std::make_shared<MockRichResponseMetrics>();
-  MetricTrackingCallback testee_{time_source_, request_metrics_, response_metrics_};
+  KafkaMetricsFacadeImpl testee_{time_source_, request_metrics_, response_metrics_};
 };
 
-TEST_F(MetricTrackingCallbackUnitTest, shouldRegisterRequest) {
+TEST_F(KafkaMetricsFacadeImplUnitTest, shouldRegisterRequest) {
   // given
   const int16_t api_key = 42;
   const int32_t correlation_id = 1234;
@@ -210,7 +226,7 @@ TEST_F(MetricTrackingCallbackUnitTest, shouldRegisterRequest) {
   ASSERT_EQ(request_arrivals.at(correlation_id), time_point);
 }
 
-TEST_F(MetricTrackingCallbackUnitTest, shouldRegisterUnknownRequest) {
+TEST_F(KafkaMetricsFacadeImplUnitTest, shouldRegisterUnknownRequest) {
   // given
   RequestHeader header = {0, 0, 0, ""};
   RequestParseFailureSharedPtr unknown_request = std::make_shared<RequestParseFailure>(header);
@@ -223,7 +239,7 @@ TEST_F(MetricTrackingCallbackUnitTest, shouldRegisterUnknownRequest) {
   // then - request_metrics_ is updated.
 }
 
-TEST_F(MetricTrackingCallbackUnitTest, shouldRegisterResponse) {
+TEST_F(KafkaMetricsFacadeImplUnitTest, shouldRegisterResponse) {
   // given
   const int16_t api_key = 42;
   const int32_t correlation_id = 1234;
@@ -245,7 +261,7 @@ TEST_F(MetricTrackingCallbackUnitTest, shouldRegisterResponse) {
   ASSERT_EQ(request_arrivals.find(correlation_id), request_arrivals.end());
 }
 
-TEST_F(MetricTrackingCallbackUnitTest, shouldRegisterUnknownResponse) {
+TEST_F(KafkaMetricsFacadeImplUnitTest, shouldRegisterUnknownResponse) {
   // given
   ResponseMetadataSharedPtr unknown_response = std::make_shared<ResponseMetadata>(0, 0, 0);
 

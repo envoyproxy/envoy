@@ -9,7 +9,8 @@
   - number of responses received,
   - response processing time in milliseconds (time between receiving a request and receiving a
     response with the same correlation id).
-  There is also a single metric counting responses that could not be parsed.
+  There is also a metric for counting responses that could not be recognised, and one for responses
+  that could caused deserialization errors.
 #}
 
 #pragma once
@@ -33,7 +34,8 @@ namespace Kafka {
   COUNTER({{ message_type.name_in_c_case() }})                                                     \
   HISTOGRAM({{ message_type.name_in_c_case() }}_duration)                                          \
 {% endfor %}                                                                                       \
-  COUNTER(unknown)
+  COUNTER(unknown)                                                                                 \
+  COUNTER(failure)
 
 struct KafkaResponseMetrics {
   KAFKA_RESPONSE_METRICS(GENERATE_COUNTER_STRUCT, GENERATE_HISTOGRAM_STRUCT)
@@ -56,6 +58,11 @@ public:
    * Invoked when an unknown message is received.
    */
   virtual void onUnknownResponse() PURE;
+
+  /**
+   * Invoked when a deserialization error occurs.
+   */
+  virtual void onBrokenResponse() PURE;
 };
 
 using RichResponseMetricsSharedPtr = std::shared_ptr<RichResponseMetrics>;
@@ -85,6 +92,8 @@ public:
   }
 
   void onUnknownResponse() override { metrics_.unknown_.inc(); }
+
+  void onBrokenResponse() override { metrics_.failure_.inc(); }
 
 private:
   KafkaResponseMetrics metrics_;

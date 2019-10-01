@@ -47,7 +47,9 @@ statistics per message type.
   :widths: 1, 1, 2
 
   request.TYPE, Counter, Number of times a request of particular type was received from Kafka client
-  request.failed_parse, Counter, Number of times a request could not be parsed
+  request.unknown, Counter, Number of times a request with format not recognized by this filter was received
+  request.failure, Counter, Number of times a request with invalid format was received, or other processing exception occurred
   response.TYPE, Counter, Number of times a response of particular type was received from Kafka broker
   response.TYPE_duration, Histogram, Response generation time in milliseconds
-  response.failed_parse, Counter, Number of times a response could not be parsed
+  response.unknown, Counter, Number of times a response with format not recognized by this filter was received
+  response.failure, Counter, Number of times a response with invalid format was received, or other processing exception occurred

@@ -6,6 +6,8 @@
 
 #include "common/common/logger.h"
 
+#include "extensions/filters/network/kafka/external/request_metrics.h"
+#include "extensions/filters/network/kafka/external/response_metrics.h"
 #include "extensions/filters/network/kafka/parser.h"
 #include "extensions/filters/network/kafka/request_codec.h"
 #include "extensions/filters/network/kafka/response_codec.h"
@@ -24,17 +26,149 @@ class KafkaCallback : public RequestCallback, public ResponseCallback {};
 using KafkaCallbackSharedPtr = std::shared_ptr<KafkaCallback>;
 
 /**
+ * Request callback responsible for updating state of related response decoder.
+ * When a request gets successfully parsed, the response decoder registers a new incoming request.
+ */
+class Forwarder : public RequestCallback {
+public:
+  /**
+   * Binds forwarder to given response decoder.
+   */
+  Forwarder(ResponseDecoder& response_decoder) : response_decoder_{response_decoder} {};
+
+  /**
+   * When request is successfully parsed, register expected response in request decoder.
+   */
+  void onMessage(AbstractRequestSharedPtr request) override;
+
+  /**
+   * When request could not be recognized, we can extract the header, so we can register the
+   * expected response.
+   * Decoder will not be able to capable of decoding the response, but at least we will not break
+   * the communication between client and broker.
+   */
+  void onFailedParse(RequestParseFailureSharedPtr) override;
+
+private:
+  ResponseDecoder& response_decoder_;
+};
+
+/**
+ * Single access point for all Kafka-related metrics.
+ * Implements Kafka message callback, so decoders can refer to it when parse results appear.
+ * This interface was extracted to faciliate mock injection in unit tests.
+ */
+class KafkaMetricsFacade : public KafkaCallback {
+public:
+  /**
+   * To be invoked when exceptions occur while processing a request.
+   */
+  virtual void onRequestException() PURE;
+
+  /**
+   * To be invoked when exceptions occur while processing a response.
+   */
+  virtual void onResponseException() PURE;
+};
+
+using KafkaMetricsFacadeSharedPtr = std::shared_ptr<KafkaMetricsFacade>;
+
+/**
+ * Metrics facade implementation that actually uses rich request/response metrics.
+ * Keeps requests' arrival timestamps (by correlation id) and uses them calculate response
+ * processing time.
+ */
+class KafkaMetricsFacadeImpl : public KafkaMetricsFacade {
+public:
+  /**
+   * Creates facade that keeps prefixed metrics in given scope, and uses given time source to
+   * compute processing durations.
+   */
+  KafkaMetricsFacadeImpl(Stats::Scope& scope, TimeSource& time_source,
+                         const std::string& stat_prefix);
+
+  /**
+   * Visible for testing.
+   */
+  KafkaMetricsFacadeImpl(TimeSource& time_source, RichRequestMetricsSharedPtr request_metrics,
+                         RichResponseMetricsSharedPtr response_metrics);
+
+  /**
+   * When request is succesfully parsed, increase type count and store its arrival timestamp.
+   */
+  void onMessage(AbstractRequestSharedPtr request) override;
+
+  /**
+   * When response is succesfully parsed, compute processing time using its correlation id and
+   * stored request arrival timestamp, then update metrics with the result.
+   */
+  void onMessage(AbstractResponseSharedPtr response) override;
+
+  /**
+   * When request could not be recognised, increase unknown request count.
+   */
+  void onFailedParse(RequestParseFailureSharedPtr) override;
+
+  /**
+   * When response could not be recognised, increase unknown response count.
+   */
+  void onFailedParse(ResponseMetadataSharedPtr) override;
+
+  /**
+   * When exceptions occurred while deserializing request, increase request failure count.
+   */
+  void onRequestException() override;
+
+  /**
+   * When exceptions occurred while deserializing response, increase response failure count.
+   */
+  void onResponseException() override;
+
+  std::map<int32_t, MonotonicTime>& getRequestArrivalsForTest();
+
+private:
+  TimeSource& time_source_;
+  std::map<int32_t, MonotonicTime> request_arrivals_;
+  RichRequestMetricsSharedPtr request_metrics_;
+  RichResponseMetricsSharedPtr response_metrics_;
+};
+
+/**
  * Implementation of Kafka broker-level filter.
+ * Uses two decoders - request and response ones, that are connected using Forwarder instance.
+ * There's also a KafkaMetricsFacade, that is listening on codec events.
+ *
+ *        +---------------------------------------------------+
+ *        |                                                   |
+ *        |               +--------------+                    |
+ *        |   +---------->+RequestDecoder+----------------+   |
+ *        |   |           +-------+------+                |   |
+ *        |   |                   |                       |   |
+ *        |   |                   |                       |   |
+ *        |   |                   v                       v   v
+ * +------+---+------+       +----+----+        +---------+---+----+
+ * |KafkaBrokerFilter|       |Forwarder|        |KafkaMetricsFacade|
+ * +----------+------+       +----+----+        +---------+--------+
+ *            |                   |                       ^
+ *            |                   |                       |
+ *            |                   v                       |
+ *            |           +-------+-------+               |
+ *            +---------->+ResponseDecoder+---------------+
+ *                        +---------------+
  */
 class KafkaBrokerFilter : public Network::Filter, private Logger::Loggable<Logger::Id::kafka> {
-
 public:
-  // Main constructor.
+  /**
+   * Main constructor.
+   * Creates decoders that eventually update prefixed metrics stored in scope, using time source for
+   * duration calculation.
+   */
   KafkaBrokerFilter(Stats::Scope& scope, TimeSource& time_source, const std::string& stat_prefix);
 
-  // Visible for testing only.
-  // Allows for injecting request and response decoders.
-  KafkaBrokerFilter(ResponseDecoderSharedPtr response_decoder,
+  /**
+   * Visible for testing.
+   */
+  KafkaBrokerFilter(KafkaMetricsFacadeSharedPtr metrics, ResponseDecoderSharedPtr response_decoder,
                     RequestDecoderSharedPtr request_decoder);
 
   // Network::ReadFilter
@@ -49,10 +183,15 @@ public:
   ResponseDecoderSharedPtr getResponseDecoderForTest();
 
 private:
-  KafkaBrokerFilter(const KafkaCallbackSharedPtr& callback);
+  /**
+   * Helper delegate constructor.
+   * Passes metrics facade as argument to decoders.
+   */
+  KafkaBrokerFilter(const KafkaMetricsFacadeSharedPtr& metrics);
 
-  ResponseDecoderSharedPtr response_decoder_;
-  RequestDecoderSharedPtr request_decoder_;
+  const KafkaMetricsFacadeSharedPtr metrics_;
+  const ResponseDecoderSharedPtr response_decoder_;
+  const RequestDecoderSharedPtr request_decoder_;
 };
 
 } // namespace Broker
