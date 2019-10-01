@@ -170,9 +170,9 @@ private:
    * Mark a listener for draining. The listener will no longer be considered active but will remain
    * present to allow connection draining.
    * @param listener supplies the listener to drain.
-   * @param remove indicates whether the listener should be removed after draining.
+   * @param remove_listener indicates whether the listener should be removed after draining.
    */
-  void drainListener(ListenerImplPtr&& listener, bool remove);
+  void drainListener(ListenerImplPtr&& listener, bool remove_listener);
 
   /**
    * Get a listener by name. This routine is used because listeners have inherent order in static

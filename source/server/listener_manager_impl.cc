@@ -648,7 +648,7 @@ bool ListenerManagerImpl::hasListenerWithAddress(const ListenerList& list,
   return false;
 }
 
-void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener, bool remove) {
+void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener, bool remove_listener) {
   // First add the listener to the draining list.
   std::list<DrainingListener>::iterator draining_it = draining_listeners_.emplace(
       draining_listeners_.begin(), std::move(listener), workers_.size());
@@ -666,8 +666,8 @@ void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener, bool remove)
   // Start the drain sequence which completes when the listener's drain manager has completed
   // draining at whatever the server configured drain times are.
   draining_it->listener_->localDrainManager().startDrainSequence(
-      [this, draining_it, remove]() -> void {
-        if (remove) {
+      [this, draining_it, remove_listener]() -> void {
+        if (remove_listener) {
           draining_it->listener_->debugLog("removing listener");
           for (const auto& worker : workers_) {
             // Once the drain time has completed via the drain manager's timer, we tell the workers
@@ -775,6 +775,12 @@ bool ListenerManagerImpl::stopListener(const std::string& name) {
 
   auto existing_active_listener = getListenerByName(active_listeners_, name);
   auto existing_warming_listener = getListenerByName(warming_listeners_, name);
+
+  if (existing_warming_listener == warming_listeners_.end() &&
+      existing_active_listener == active_listeners_.end()) {
+    ENVOY_LOG(debug, "unknown listener '{}'. no stop", name);
+    return false;
+  }
 
   // Destroy a warming listener directly.
   if (existing_warming_listener != warming_listeners_.end()) {
