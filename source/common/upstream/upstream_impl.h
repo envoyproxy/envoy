@@ -516,7 +516,7 @@ public:
   ClusterInfoImpl(const envoy::api::v2::Cluster& config,
                   const envoy::api::v2::core::BindConfig& bind_config, Runtime::Loader& runtime,
                   Network::TransportSocketFactoryPtr&& socket_factory,
-                  TransportSocketMatcherPtr&& socket_overrides, Stats::ScopePtr&& stats_scope,
+                  TransportSocketMatcherPtr&& socket_matcher, Stats::ScopePtr&& stats_scope,
                   bool added_via_api, ProtobufMessage::ValidationVisitor& validation_visitor,
                   Server::Configuration::TransportSocketFactoryContext&);
 
@@ -564,14 +564,11 @@ public:
   const std::string& name() const override { return name_; }
   ResourceManager& resourceManager(ResourcePriority priority) const override;
 
-  Network::TransportSocketFactory& transportSocketFactory() const override {
-    return *transport_socket_factory_;
-  }
   Network::TransportSocketFactory&
-  resolveTransportSocketFactory(const std::string& hc,
-                                const envoy::api::v2::core::Metadata& metadata) const override {
-    return socket_overrides_->resolve(hc, metadata);
+  transportSocketFactory(const ClusterInfo::TransportSocketFactoryOption& option) const override {
+    return socket_matcher_->resolve(option.address_, option.metadata_);
   }
+
   ClusterStats& stats() const override { return stats_; }
   Stats::Scope& statsScope() const override { return *stats_scope_; }
   ClusterLoadReportStats& loadReportStats() const override { return load_report_stats_; }
@@ -614,7 +611,7 @@ private:
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   const uint32_t per_connection_buffer_limit_bytes_;
   Network::TransportSocketFactoryPtr transport_socket_factory_;
-  TransportSocketMatcherPtr socket_overrides_;
+  TransportSocketMatcherPtr socket_matcher_;
   Stats::ScopePtr stats_scope_;
   mutable ClusterStats stats_;
   Stats::IsolatedStoreImpl load_report_stats_store_;

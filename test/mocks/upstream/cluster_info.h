@@ -93,7 +93,8 @@ public:
   MOCK_CONST_METHOD0(maxRequestsPerConnection, uint64_t());
   MOCK_CONST_METHOD0(name, const std::string&());
   MOCK_CONST_METHOD1(resourceManager, ResourceManager&(ResourcePriority priority));
-  MOCK_CONST_METHOD0(transportSocketFactory, Network::TransportSocketFactory&());
+  MOCK_CONST_METHOD1(transportSocketFactory, Network::TransportSocketFactory&(
+                                                 const ClusterInfo::TransportSocketFactoryOption&));
   MOCK_CONST_METHOD0(stats, ClusterStats&());
   MOCK_CONST_METHOD0(statsScope, Stats::Scope&());
   MOCK_CONST_METHOD0(loadReportStats, ClusterLoadReportStats&());
@@ -106,9 +107,6 @@ public:
   MOCK_CONST_METHOD0(warmHosts, bool());
   MOCK_CONST_METHOD0(eds_service_name, absl::optional<std::string>());
   MOCK_CONST_METHOD1(createNetworkFilterChain, void(Network::Connection&));
-  MOCK_CONST_METHOD2(resolveTransportSocketFactory,
-                     Network::TransportSocketFactory&(const std::string&,
-                                                      const envoy::api::v2::core::Metadata&));
 
   std::string name_{"fake_cluster"};
   absl::optional<std::string> eds_service_name_;

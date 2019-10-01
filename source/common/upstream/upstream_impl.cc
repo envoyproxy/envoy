@@ -270,11 +270,14 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
   } else {
     connection_options = options;
   }
-  Network::TransportSocketFactory& socket_factory =
-      cluster.resolveTransportSocketFactory(address->asString(), metadata);
+  cluster.transportSocketFactory(
+      ClusterInfo::TransportSocketFactoryOption{address->asString(), metadata});
+  auto socket = cluster
+                    .transportSocketFactory(
+                        ClusterInfo::TransportSocketFactoryOption{address->asString(), metadata})
+                    .createTransportSocket(transport_socket_options);
   Network::ClientConnectionPtr connection = dispatcher.createClientConnection(
-      address, cluster.sourceAddress(),
-      socket_factory.createTransportSocket(transport_socket_options), connection_options);
+      address, cluster.sourceAddress(), std::move(socket), connection_options);
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());
   cluster.createNetworkFilterChain(*connection);
   return connection;
@@ -592,7 +595,7 @@ private:
 ClusterInfoImpl::ClusterInfoImpl(
     const envoy::api::v2::Cluster& config, const envoy::api::v2::core::BindConfig& bind_config,
     Runtime::Loader& runtime, Network::TransportSocketFactoryPtr&& socket_factory,
-    TransportSocketMatcherPtr&& socket_overrides, Stats::ScopePtr&& stats_scope, bool added_via_api,
+    TransportSocketMatcherPtr&& socket_matcher, Stats::ScopePtr&& stats_scope, bool added_via_api,
     ProtobufMessage::ValidationVisitor& validation_visitor,
     Server::Configuration::TransportSocketFactoryContext& factory_context)
     : runtime_(runtime), name_(config.name()), type_(config.type()),
@@ -603,7 +606,7 @@ ClusterInfoImpl::ClusterInfoImpl(
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       transport_socket_factory_(std::move(socket_factory)),
-      socket_overrides_(std::move(socket_overrides)), stats_scope_(std::move(stats_scope)),
+      socket_matcher_(std::move(socket_matcher)), stats_scope_(std::move(stats_scope)),
       stats_(generateStats(*stats_scope_)), load_report_stats_store_(stats_scope_->symbolTable()),
       load_report_stats_(generateLoadReportStats(load_report_stats_store_)),
       features_(parseFeatures(config)),
@@ -781,11 +784,11 @@ ClusterImplBase::ClusterImplBase(
       symbol_table_(stats_scope->symbolTable()) {
   factory_context.setInitManager(init_manager_);
   auto socket_factory = createTransportSocketFactory(cluster, factory_context);
-  auto socket_overrides = createTransportSocketMatcher(ENVOY_LOGGER(), cluster, factory_context,
-                                                       *socket_factory, *stats_scope);
+  auto socket_matcher = createTransportSocketMatcher(ENVOY_LOGGER(), cluster, factory_context,
+                                                     *socket_factory, *stats_scope);
   info_ = std::make_unique<ClusterInfoImpl>(
       cluster, factory_context.clusterManager().bindConfig(), runtime, std::move(socket_factory),
-      std::move(socket_overrides), std::move(stats_scope), added_via_api,
+      std::move(socket_matcher), std::move(stats_scope), added_via_api,
       factory_context.messageValidationVisitor(), factory_context);
   // Create the default (empty) priority set before registering callbacks to
   // avoid getting an update the first time it is accessed.
