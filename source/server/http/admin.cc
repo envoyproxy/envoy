@@ -692,7 +692,7 @@ Http::Code AdminImpl::handlerDrainListeners(absl::string_view url, Http::HeaderM
   const bool inbound_only = params.find("inboundonly") != params.end();
   for (const Network::ListenerConfig& listener : server_.listenerManager().listeners()) {
     if (!inbound_only || listener.direction() == envoy::api::v2::core::TrafficDirection::INBOUND) {
-      server_.listenerManager().removeListener(listener.name());
+      server_.listenerManager().stopListener(listener.name());
     }
   }
 

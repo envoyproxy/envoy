@@ -151,6 +151,13 @@ public:
    */
   virtual bool removeListener(const std::string& name) PURE;
 
+  /*
+   * Stop a listener by name.
+   * @param name supplies the listener name to stop.
+   * @return TRUE if the listener was found and stopped.
+   */
+  virtual bool stopListener(const std::string& name) PURE;
+
   /**
    * Start all workers accepting new connections on all added listeners.
    * @param guard_dog supplies the guard dog to use for thread watching.

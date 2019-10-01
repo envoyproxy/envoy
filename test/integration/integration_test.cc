@@ -100,7 +100,7 @@ TEST_P(IntegrationTest, AdminDrainDrainsListeners) {
   ASSERT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
 
-  test_server_->waitForCounterGe("listener_manager.listener_removed", 1);
+  test_server_->waitForGaugeGe("listener_manager.total_listeners_draining", 1);
 
   cleanupUpstreamAndDownstream();
 }
