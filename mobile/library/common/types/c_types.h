@@ -11,13 +11,13 @@
  * Handle to an Envoy engine instance. Valid only for the lifetime of the engine and not intended
  * for any external interpretation or use.
  */
-typedef uint64_t envoy_engine_t;
+typedef intptr_t envoy_engine_t;
 
 /**
  * Handle to an outstanding Envoy HTTP stream. Valid only for the duration of the stream and not
  * intended for any external interpretation or use.
  */
-typedef uint64_t envoy_stream_t;
+typedef intptr_t envoy_stream_t;
 
 /**
  * Result codes returned by all calls made to this interface.
