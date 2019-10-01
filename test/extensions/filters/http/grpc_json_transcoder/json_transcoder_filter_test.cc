@@ -833,6 +833,60 @@ TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest,
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, true));
 }
 
+// Response with a header frame and a trailer frame.
+// (E.g. a gRPC server sends metadata and then it sends an error.)
+TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest, TranscodingStatusFromTrailer) {
+  Http::TestHeaderMapImpl response_headers{{"content-type", "application/grpc"},
+                                           {":status", "200"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_.encodeHeaders(response_headers, false));
+  EXPECT_EQ("application/json", response_headers.get_("content-type"));
+
+  std::string expected_response(R"({"code":5,"message":"Resource not found"})");
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
+      .WillOnce(Invoke([&expected_response](Buffer::Instance& data, bool) {
+        EXPECT_EQ(expected_response, data.toString());
+      }));
+
+  Http::TestHeaderMapImpl response_trailers{
+      {"grpc-status", "5"},
+      {"grpc-message", "unused"},
+      {"grpc-status-details-bin", "CAUSElJlc291cmNlIG5vdCBmb3VuZA"}};
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
+  EXPECT_EQ("404", response_headers.get_(":status"));
+  EXPECT_EQ("application/json", response_headers.get_("content-type"));
+  EXPECT_FALSE(response_headers.has("grpc-status"));
+  EXPECT_FALSE(response_headers.has("grpc-message"));
+  EXPECT_FALSE(response_headers.has("grpc-status-details-bin"));
+}
+
+// Server sends a response body, don't replace it.
+TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest, SkipTranscodingStatusIfBodyIsPresent) {
+  Http::TestHeaderMapImpl response_headers{{"content-type", "application/grpc"},
+                                           {":status", "200"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_.encodeHeaders(response_headers, false));
+  EXPECT_EQ("application/json", response_headers.get_("content-type"));
+
+  bookstore::Shelf response;
+  response.set_id(20);
+  response.set_theme("Children");
+
+  auto response_data = Grpc::Common::serializeToGrpcFrame(response);
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer,
+            filter_.encodeData(*response_data, false));
+
+  std::string response_json = response_data->toString();
+  EXPECT_EQ(R"({"id":"20","theme":"Children"})", response_json);
+
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, _)).Times(0);
+
+  Http::TestHeaderMapImpl response_trailers{{"grpc-status", "2"}, {"grpc-message", "not good"}};
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(response_trailers));
+}
+
 struct GrpcJsonTranscoderFilterPrintTestParam {
   std::string config_json_;
   std::string expected_response_;
