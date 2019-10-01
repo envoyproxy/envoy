@@ -162,7 +162,7 @@ public:
 
   StatNameSetPtr makeSet(absl::string_view name) override;
   void forgetSet(StatNameSet& stat_name_set) override;
-  uint64_t getRecentLookups(const RecentLookupsFn&) override;
+  uint64_t getRecentLookups(const RecentLookupsFn&) const override;
   void clearRecentLookups() override;
   void setRecentLookupCapacity(uint64_t capacity) override;
   uint64_t recentLookupCapacity() const override;
@@ -736,12 +736,12 @@ private:
   friend class SymbolTableImpl;
 
   StatNameSet(SymbolTable& symbol_table, absl::string_view name);
-  uint64_t getRecentLookups(const RecentLookups::IterFn& iter);
+  uint64_t getRecentLookups(const RecentLookups::IterFn& iter) const;
 
   const std::string name_;
   Stats::SymbolTable& symbol_table_;
   Stats::StatNamePool pool_ GUARDED_BY(mutex_);
-  absl::Mutex mutex_;
+  mutable absl::Mutex mutex_;
   using StringStatNameMap = absl::flat_hash_map<std::string, Stats::StatName>;
   StringStatNameMap builtin_stat_names_;
   StringStatNameMap dynamic_stat_names_ GUARDED_BY(mutex_);

@@ -208,7 +208,7 @@ void SymbolTableImpl::free(const StatName& stat_name) {
   }
 }
 
-uint64_t SymbolTableImpl::getRecentLookups(const RecentLookupsFn& iter) {
+uint64_t SymbolTableImpl::getRecentLookups(const RecentLookupsFn& iter) const {
   uint64_t total = 0;
   absl::flat_hash_map<std::string, uint64_t> name_count_map;
 
@@ -563,7 +563,7 @@ StatName StatNameSet::getDynamic(absl::string_view token) {
   return stat_name;
 }
 
-uint64_t StatNameSet::getRecentLookups(const RecentLookups::IterFn& iter) {
+uint64_t StatNameSet::getRecentLookups(const RecentLookups::IterFn& iter) const {
   absl::MutexLock lock(&mutex_);
   recent_lookups_.forEach(iter);
   return recent_lookups_.total();

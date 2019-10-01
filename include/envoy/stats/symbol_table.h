@@ -155,7 +155,7 @@ public:
    *
    * @param iter the function to call for every recent item.
    */
-  virtual uint64_t getRecentLookups(const RecentLookupsFn& iter) PURE;
+  virtual uint64_t getRecentLookups(const RecentLookupsFn& iter) const PURE;
 
   /**
    * Clears the recent-lookups structures.
