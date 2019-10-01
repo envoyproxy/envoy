@@ -246,9 +246,8 @@ void HostImpl::setEdsHealthFlag(envoy::api::v2::core::HealthStatus health_status
 
 Host::CreateConnectionData
 HostImpl::createHealthCheckConnection(Event::Dispatcher& dispatcher) const {
-  return {
-      createConnection(dispatcher, *cluster_, healthCheckAddress(), *metadata(), nullptr, nullptr),
-      shared_from_this()};
+  return {createConnection(dispatcher, *cluster_, healthCheckAddress(), *metadata(), nullptr),
+          shared_from_this()};
 }
 
 Network::ClientConnectionPtr
@@ -760,15 +759,6 @@ Network::TransportSocketFactoryPtr createTransportSocketFactory(
   return config_factory.createTransportSocketFactory(*message, factory_context);
 }
 
-TransportSocketMatcherPtr
-createTransportSocketMatcher(spdlog::logger&, const envoy::api::v2::Cluster& config,
-                             Server::Configuration::TransportSocketFactoryContext& factory_context,
-                             Network::TransportSocketFactory& default_factory,
-                             Stats::Scope& stats_scope) {
-  return std::make_unique<TransportSocketMatcher>(config.transport_socket_matches(),
-                                                  factory_context, default_factory, stats_scope);
-}
-
 void ClusterInfoImpl::createNetworkFilterChain(Network::Connection& connection) const {
   for (const auto& factory : filter_factories_) {
     factory(connection);
@@ -784,8 +774,8 @@ ClusterImplBase::ClusterImplBase(
       symbol_table_(stats_scope->symbolTable()) {
   factory_context.setInitManager(init_manager_);
   auto socket_factory = createTransportSocketFactory(cluster, factory_context);
-  auto socket_matcher = createTransportSocketMatcher(ENVOY_LOGGER(), cluster, factory_context,
-                                                     *socket_factory, *stats_scope);
+  auto socket_matcher = std::make_unique<TransportSocketMatcher>(
+      config.transport_socket_matches(), factory_context, default_factory, stats_scope);
   info_ = std::make_unique<ClusterInfoImpl>(
       cluster, factory_context.clusterManager().bindConfig(), runtime, std::move(socket_factory),
       std::move(socket_matcher), std::move(stats_scope), added_via_api,
