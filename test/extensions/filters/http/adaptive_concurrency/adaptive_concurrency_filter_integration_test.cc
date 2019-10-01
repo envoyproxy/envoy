@@ -14,10 +14,16 @@ void AdaptiveConcurrencyIntegrationTest::sendRequests(uint32_t request_count,
                                                       uint32_t num_forwarded) {
   ASSERT_LE(num_forwarded, request_count);
 
+  // TODO (tonya11en):
+  // We send header-only requests below because the adaptive concurrency filter will reject requests
+  // when decoding their headers. If we try to send data, there's no way to ensure that the filter
+  // doesn't respond between the client sending headers and data, invalidating the client's encoder
+  // stream. We should change this integration test to allow for the ability to test this scenario.
+
   // We expect these requests to reach the upstream.
   for (uint32_t idx = 0; idx < num_forwarded; ++idx) {
-    auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
-    responses_.push_back(std::move(encoder_decoder.second));
+    auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+    responses_.push_back(std::move(response));
     upstream_connections_.emplace_back();
     upstream_requests_.emplace_back();
 
@@ -26,15 +32,16 @@ void AdaptiveConcurrencyIntegrationTest::sendRequests(uint32_t request_count,
     ASSERT_TRUE(
         upstream_connections_.back()->waitForNewStream(*dispatcher_, upstream_requests_.back()));
 
-    codec_client_->sendData(encoder_decoder.first, 0, true);
     ASSERT_TRUE(upstream_requests_.back()->waitForEndStream(*dispatcher_));
   }
 
   // These requests should be blocked by the filter, so they never make it to the upstream.
+  auto blocked_counter = test_server_->counter(REQUEST_BLOCK_COUNTER_NAME)->value();
   for (uint32_t idx = 0; idx < request_count - num_forwarded; ++idx) {
-    auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
-    responses_.push_back(std::move(encoder_decoder.second));
-    codec_client_->sendData(encoder_decoder.first, 0, true);
+    auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+    responses_.push_back(std::move(response));
+
+    test_server_->waitForCounterEq(REQUEST_BLOCK_COUNTER_NAME, ++blocked_counter);
 
     // These will remain nullptr.
     upstream_connections_.emplace_back();
@@ -54,6 +61,7 @@ void AdaptiveConcurrencyIntegrationTest::respondToAllRequests(uint32_t forwarded
   for (uint32_t idx = 0; idx < forwarded_count; ++idx) {
     respondToRequest(true);
   }
+
   while (!responses_.empty()) {
     respondToRequest(false);
   }
@@ -67,7 +75,8 @@ void AdaptiveConcurrencyIntegrationTest::respondToRequest(bool expect_forwarded)
     ASSERT_NE(upstream_connections_.front(), nullptr);
     ASSERT_NE(upstream_requests_.front(), nullptr);
     ASSERT_TRUE(upstream_requests_.front()->waitForEndStream(*dispatcher_));
-    upstream_requests_.front()->encodeHeaders(default_response_headers_, true);
+    upstream_requests_.front()->encodeHeaders(default_response_headers_, false);
+    upstream_requests_.front()->encodeData(1, true);
   }
 
   responses_.front()->waitForEndStream();
@@ -100,8 +109,9 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AdaptiveConcurrencyIntegrationTest,
 TEST_P(AdaptiveConcurrencyIntegrationTest, TestConcurrency1) {
   customInit();
 
+  EXPECT_EQ(0, test_server_->counter(REQUEST_BLOCK_COUNTER_NAME)->value());
   sendRequests(2, 1);
-  respondToAllRequests(1, std::chrono::milliseconds(1));
+  respondToAllRequests(1, std::chrono::milliseconds(5));
   test_server_->waitForCounterEq(REQUEST_BLOCK_COUNTER_NAME, 1);
 }
 
@@ -111,8 +121,9 @@ TEST_P(AdaptiveConcurrencyIntegrationTest, TestConcurrency1) {
 TEST_P(AdaptiveConcurrencyIntegrationTest, TestManyConcurrency1) {
   customInit();
 
+  EXPECT_EQ(0, test_server_->counter(REQUEST_BLOCK_COUNTER_NAME)->value());
   sendRequests(10, 1);
-  respondToAllRequests(1, std::chrono::milliseconds(1));
+  respondToAllRequests(1, std::chrono::milliseconds(5));
   test_server_->waitForCounterEq(REQUEST_BLOCK_COUNTER_NAME, 9);
 }
 
