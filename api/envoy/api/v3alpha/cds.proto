@@ -274,7 +274,7 @@ message Cluster {
 
     // When used with locality_weight_aware, scales the weight of each locality by the ratio
     // of hosts in the subset vs hosts in the original subset. This aims to even out the load
-    // going to an individual locality if said locality is disproportionally affected by the
+    // going to an individual locality if said locality is disproportionately affected by the
     // subset predicate.
     bool scale_locality_weight = 5;
 
