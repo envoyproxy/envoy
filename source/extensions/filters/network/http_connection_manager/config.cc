@@ -183,7 +183,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
       kRouteConfig:
     route_config_provider_ = Router::RouteConfigProviderUtil::create(
-        config, context_, stats_prefix_, route_config_provider_manager_);
+        config, context_, stats_prefix_, route_config_provider_manager_,
+        context_.clusterManager().xdsIsDelta());
     break;
   case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
       kScopedRoutes:
