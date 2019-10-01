@@ -157,6 +157,7 @@ LDS
 LEV
 LHS
 LF
+LRS
 MB
 MD
 MGET
@@ -439,6 +440,7 @@ decls
 dedup
 dedupe
 deduplicate
+deduplicates
 deflateInit
 deletable
 deleter

@@ -10,6 +10,7 @@
 #include "common/memory/stats.h"
 #include "common/network/io_socket_handle_impl.h"
 
+#include "absl/strings/match.h"
 #include "gtest/gtest.h"
 
 // Strong assertion that applies across all compilation modes and doesn't rely
@@ -126,6 +127,8 @@ public:
   ssize_t search(const void* data, uint64_t size, size_t start) const override {
     return data_.find(std::string(static_cast<const char*>(data), size), start);
   }
+
+  bool startsWith(absl::string_view data) const override { return absl::StartsWith(data_, data); }
 
   std::string toString() const override { return data_; }
 

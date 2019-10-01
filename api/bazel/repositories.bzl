@@ -54,7 +54,7 @@ api_proto_library(
 
 go_proto_library(
     name = "client_model_go_proto",
-    importpath = "client_model",
+    importpath = "github.com/prometheus/client_model/go",
     proto = ":client_model",
     visibility = ["//visibility:public"],
 )

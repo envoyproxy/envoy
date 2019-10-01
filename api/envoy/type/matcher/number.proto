@@ -19,7 +19,7 @@ message DoubleMatcher {
 
     // If specified, the input double value must be in the range specified here.
     // Note: The range is using half-open interval semantics [start, end).
-    envoy.type.DoubleRange range = 1;
+    DoubleRange range = 1;
 
     // If specified, the input double value must be equal to the value specified here.
     double exact = 2;
