@@ -42,6 +42,14 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_runEngine(JNIEnv* env,
                     env->GetStringUTFChars(log_level, nullptr));
 }
 
+extern "C" JNIEXPORT jstring JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_templateString(JNIEnv* env,
+                                                                jclass // class
+) {
+  jstring result = env->NewStringUTF(config_template);
+  return result;
+}
+
 // AndroidJniLibrary
 
 extern "C" JNIEXPORT jint JNICALL
@@ -64,14 +72,6 @@ Java_io_envoyproxy_envoymobile_engine_AndroidJniLibrary_setPreferredNetwork(JNIE
                                                                             jclass, // class
                                                                             jint network) {
   return set_preferred_network(static_cast<envoy_network_t>(network));
-}
-
-extern "C" JNIEXPORT jstring JNICALL
-Java_io_envoyproxy_envoymobile_engine_JniLibrary_templateString(JNIEnv* env,
-                                                                jclass // class
-) {
-  jstring result = env->NewStringUTF(config_template);
-  return result;
 }
 
 // JvmCallbackContext
