@@ -6,7 +6,7 @@ final class MockEnvoyHTTPStream {
   static var onData: ((Data, Bool) -> Void)?
   static var onTrailers: (([String: [String]]) -> Void)?
 
-  init(handle: UInt64, callbacks: EnvoyHTTPCallbacks) {}
+  init(handle: Int, callbacks: EnvoyHTTPCallbacks) {}
 }
 
 extension MockEnvoyHTTPStream: EnvoyHTTPStream {
