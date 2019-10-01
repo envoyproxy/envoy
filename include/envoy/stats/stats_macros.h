@@ -5,6 +5,8 @@
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/stats.h"
 
+#include "common/common/assert.h"
+
 namespace Envoy {
 /**
  * These are helper macros for allocating "fixed" stats throughout the code base in a way that
@@ -40,9 +42,14 @@ namespace Envoy {
 #define FINISH_STAT_DECL_(X) + std::string(#X)),
 #define FINISH_STAT_DECL_MODE_(X, MODE) + std::string(#X), Envoy::Stats::Gauge::ImportMode::MODE),
 
-#define POOL_COUNTER_PREFIX(POOL, PREFIX) (POOL).counter(PREFIX FINISH_STAT_DECL_
-#define POOL_GAUGE_PREFIX(POOL, PREFIX) (POOL).gauge(PREFIX FINISH_STAT_DECL_MODE_
-#define POOL_HISTOGRAM_PREFIX(POOL, PREFIX) (POOL).histogram(PREFIX FINISH_STAT_DECL_
+static inline const std::string& verifyEmptyOrEndsInDot(const std::string& prefix) {
+  ASSERT(prefix.empty() || prefix[prefix.size() - 1] == '.');
+  return prefix;
+}
+
+#define POOL_COUNTER_PREFIX(POOL, PREFIX) (POOL).counter(verifyEmptyOrEndsInDot(PREFIX) FINISH_STAT_DECL_
+#define POOL_GAUGE_PREFIX(POOL, PREFIX) (POOL).gauge(verifyEmptyOrEndsInDot(PREFIX) FINISH_STAT_DECL_MODE_
+#define POOL_HISTOGRAM_PREFIX(POOL, PREFIX) (POOL).histogram(verifyEmptyOrEndsInDot(PREFIX) FINISH_STAT_DECL_
 
 #define POOL_COUNTER(POOL) POOL_COUNTER_PREFIX(POOL, "")
 #define POOL_GAUGE(POOL) POOL_GAUGE_PREFIX(POOL, "")
@@ -52,4 +59,9 @@ namespace Envoy {
 #define NULL_STAT_DECL_IGNORE_MODE_(X, MODE) std::string(#X)),
 
 #define NULL_POOL_GAUGE(POOL) (POOL).nullGauge(NULL_STAT_DECL_IGNORE_MODE_
+
+namespace Stats {
+std::string VerifyPrefix(absl::string_view a);
+}
+
 } // namespace Envoy

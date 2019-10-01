@@ -6,6 +6,7 @@
 
 #include "common/common/fmt.h"
 #include "common/config/filter_json.h"
+#include "common/stats/utility.h"
 
 #include "extensions/filters/network/mongo_proxy/proxy.h"
 
@@ -32,7 +33,8 @@ Network::FilterFactoryCb MongoProxyFilterConfigFactory::createFilterFactoryFromP
     fault_config = std::make_shared<Filters::Common::Fault::FaultDelayConfig>(proto_config.delay());
   }
 
-  auto stats = std::make_shared<MongoStats>(context.scope(), stat_prefix);
+  auto stats =
+      std::make_shared<MongoStats>(context.scope(), Stats::Utility::sanitizeStatsName(stat_prefix));
   const bool emit_dynamic_metadata = proto_config.emit_dynamic_metadata();
   return [stat_prefix, &context, access_log, fault_config, emit_dynamic_metadata,
           stats](Network::FilterManager& filter_manager) -> void {
