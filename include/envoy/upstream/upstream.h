@@ -780,10 +780,10 @@ public:
 
   // Configuration to determine the transport socket factory to use.
   struct TransportSocketFactoryOption {
-   // upstream networking address trying to connect to, for debugging purpose only.
-   const std::string address_;
-   // the metadata associated with upstream endpoint.
-   const envoy::api::v2::core::Metadata metadata_;
+    // upstream networking address trying to connect to, for debugging purpose only.
+    const std::string address_;
+    // the metadata associated with upstream endpoint.
+    const envoy::api::v2::core::Metadata metadata_;
   };
 
   /**
