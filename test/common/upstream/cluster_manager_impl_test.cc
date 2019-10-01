@@ -101,7 +101,7 @@ public:
     return std::make_pair(result.first, ThreadAwareLoadBalancerPtr(result.second));
   }
 
-  CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource&, ClusterManager&) override {
+  CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource&, bool, ClusterManager&) override {
     return CdsApiPtr{createCds_()};
   }
 
@@ -2972,12 +2972,7 @@ TEST_F(ClusterManagerInitHelperTest, InitSecondaryWithoutEdsPaused) {
   ON_CALL(cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
   init_helper_.addCluster(cluster1);
 
-  const auto& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
-  EXPECT_CALL(cm_.ads_mux_, paused(Eq(ByRef(type_url)))).WillRepeatedly(Return(false));
-  EXPECT_CALL(cm_.ads_mux_, pause(Eq(ByRef(type_url))));
   EXPECT_CALL(cluster1, initialize(_));
-  EXPECT_CALL(cm_.ads_mux_, resume(Eq(ByRef(type_url))));
-
   init_helper_.onStaticLoadComplete();
 
   EXPECT_CALL(*this, onClusterInit(Ref(cluster1)));
@@ -2999,12 +2994,7 @@ TEST_F(ClusterManagerInitHelperTest, InitSecondaryWithEdsPaused) {
   ON_CALL(cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
   init_helper_.addCluster(cluster1);
 
-  const auto& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
-  EXPECT_CALL(cm_.ads_mux_, paused(Eq(ByRef(type_url)))).WillRepeatedly(Return(true));
-  EXPECT_CALL(cm_.ads_mux_, pause(Eq(ByRef(type_url)))).Times(0);
   EXPECT_CALL(cluster1, initialize(_));
-  EXPECT_CALL(cm_.ads_mux_, resume(Eq(ByRef(type_url)))).Times(0);
-
   init_helper_.onStaticLoadComplete();
 
   EXPECT_CALL(*this, onClusterInit(Ref(cluster1)));

@@ -178,14 +178,14 @@ public:
   virtual const envoy::api::v2::core::BindConfig& bindConfig() const PURE;
 
   /**
-   * Return a reference to the singleton ADS provider for upstream control plane muxing of xDS. This
-   * is treated somewhat as a special case in ClusterManager, since it does not relate logically to
-   * the management of clusters but instead is required early in ClusterManager/server
+   * Returns a shared_ptr to the singleton xDS-over-gRPC provider for upstream control plane muxing
+   * of xDS. This is treated somewhat as a special case in ClusterManager, since it does not relate
+   * logically to the management of clusters but instead is required early in ClusterManager/server
    * initialization and in various sites that need ClusterManager for xDS API interfacing.
    *
    * @return GrpcMux& ADS API provider referencee.
    */
-  virtual Config::GrpcMux& adsMux() PURE;
+  virtual Config::GrpcMuxSharedPtr adsMux() PURE;
 
   /**
    * @return Grpc::AsyncClientManager& the cluster manager's gRPC client manager.
@@ -223,6 +223,8 @@ public:
   virtual Config::SubscriptionFactory& subscriptionFactory() PURE;
 
   virtual std::size_t warmingClusterCount() const PURE;
+
+  virtual bool xdsIsDelta() const PURE;
 };
 
 using ClusterManagerPtr = std::unique_ptr<ClusterManager>;
@@ -295,7 +297,7 @@ public:
   /**
    * Create a CDS API provider from configuration proto.
    */
-  virtual CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource& cds_config,
+  virtual CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource& cds_config, bool is_delta,
                               ClusterManager& cm) PURE;
 
   /**
