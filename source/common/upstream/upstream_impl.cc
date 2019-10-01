@@ -246,8 +246,9 @@ void HostImpl::setEdsHealthFlag(envoy::api::v2::core::HealthStatus health_status
 
 Host::CreateConnectionData
 HostImpl::createHealthCheckConnection(Event::Dispatcher& dispatcher) const {
-  return {createConnection(dispatcher, *cluster_, healthCheckAddress(), *metadata(), nullptr),
-          shared_from_this()};
+  return {
+      createConnection(dispatcher, *cluster_, healthCheckAddress(), *metadata(), nullptr, nullptr),
+      shared_from_this()};
 }
 
 Network::ClientConnectionPtr
@@ -775,7 +776,7 @@ ClusterImplBase::ClusterImplBase(
   factory_context.setInitManager(init_manager_);
   auto socket_factory = createTransportSocketFactory(cluster, factory_context);
   auto socket_matcher = std::make_unique<TransportSocketMatcher>(
-      config.transport_socket_matches(), factory_context, default_factory, stats_scope);
+      cluster.transport_socket_matches(), factory_context, *socket_factory, *stats_scope);
   info_ = std::make_unique<ClusterInfoImpl>(
       cluster, factory_context.clusterManager().bindConfig(), runtime, std::move(socket_factory),
       std::move(socket_matcher), std::move(stats_scope), added_via_api,

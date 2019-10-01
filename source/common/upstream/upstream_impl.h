@@ -649,12 +649,6 @@ Network::TransportSocketFactoryPtr
 createTransportSocketFactory(const envoy::api::v2::Cluster& config,
                              Server::Configuration::TransportSocketFactoryContext& factory_context);
 
-TransportSocketMatcherPtr
-createTransportSocketMatcher(spdlog::logger& logger, const envoy::api::v2::Cluster& config,
-                             Server::Configuration::TransportSocketFactoryContext& factory_context,
-                             Network::TransportSocketFactory& default_factory,
-                             Stats::Scope& stats_scope);
-
 /**
  * Base class all primary clusters.
  */
