@@ -496,7 +496,7 @@ public:
     mock_cluster_info_->transport_socket_factory_ =
         std::make_unique<Extensions::TransportSockets::Tls::ClientSslSocketFactory>(
             std::move(cfg), context_manager_, *stats_store_);
-    ON_CALL(*mock_cluster_info_, transportSocketFactory())
+    ON_CALL(*mock_cluster_info_, transportSocketFactory(_))
         .WillByDefault(ReturnRef(*mock_cluster_info_->transport_socket_factory_));
     async_client_transport_socket_ =
         mock_cluster_info_->transport_socket_factory_->createTransportSocket(nullptr);
