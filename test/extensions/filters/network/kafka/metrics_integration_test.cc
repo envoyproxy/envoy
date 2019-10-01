@@ -20,7 +20,7 @@ protected:
   RichResponseMetricsImpl response_metrics_{scope_, "prefix"};
 };
 
-const int UPDATE_COUNT = 42;
+constexpr static int32_t UPDATE_COUNT = 42;
 
 TEST_F(MetricsIntegrationTest, shouldUpdateRequestMetrics) {
   for (int16_t api_key = 0; api_key < MessageUtilities::apiKeys(); ++api_key) {

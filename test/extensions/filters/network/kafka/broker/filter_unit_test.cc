@@ -10,6 +10,7 @@
 
 using testing::_;
 using testing::Return;
+using testing::Throw;
 
 namespace Envoy {
 namespace Extensions {
@@ -24,6 +25,7 @@ public:
   MockResponseDecoder() : ResponseDecoder{{}} {};
   MOCK_METHOD1(onData, void(Buffer::Instance&));
   MOCK_METHOD2(expectResponse, void(const int16_t, const int16_t));
+  MOCK_METHOD0(reset, void());
 };
 
 using MockResponseDecoderSharedPtr = std::shared_ptr<MockResponseDecoder>;
@@ -32,6 +34,7 @@ class MockRequestDecoder : public RequestDecoder {
 public:
   MockRequestDecoder() : RequestDecoder{{}} {};
   MOCK_METHOD1(onData, void(Buffer::Instance&));
+  MOCK_METHOD0(reset, void());
 };
 
 using MockRequestDecoderSharedPtr = std::shared_ptr<MockRequestDecoder>;
@@ -87,7 +90,7 @@ protected:
   }
 };
 
-TEST_F(KafkaBrokerFilterUnitTest, shouldForwardDataFromClient) {
+TEST_F(KafkaBrokerFilterUnitTest, shouldAcceptDataSentByKafkaClient) {
   // given
   Buffer::OwnedImpl data;
   EXPECT_CALL(*request_decoder_, onData(_));
@@ -101,7 +104,21 @@ TEST_F(KafkaBrokerFilterUnitTest, shouldForwardDataFromClient) {
   // Also, request_decoder got invoked.
 }
 
-TEST_F(KafkaBrokerFilterUnitTest, shouldForwardDataFromBroker) {
+TEST_F(KafkaBrokerFilterUnitTest, shouldStopIterationIfProcessingDataFromKafkaClientFails) {
+  // given
+  Buffer::OwnedImpl data;
+  EXPECT_CALL(*request_decoder_, onData(_)).WillOnce(Throw(EnvoyException("boom")));
+  EXPECT_CALL(*request_decoder_, reset());
+
+  // when
+  initialize();
+  const auto result = testee_.onData(data, false);
+
+  // then
+  ASSERT_EQ(result, Network::FilterStatus::StopIteration);
+}
+
+TEST_F(KafkaBrokerFilterUnitTest, shouldAcceptDataSentByKafkaBroker) {
   // given
   Buffer::OwnedImpl data;
   EXPECT_CALL(*response_decoder_, onData(_));
@@ -113,6 +130,20 @@ TEST_F(KafkaBrokerFilterUnitTest, shouldForwardDataFromBroker) {
   // then
   ASSERT_EQ(result, Network::FilterStatus::Continue);
   // Also, request_decoder got invoked.
+}
+
+TEST_F(KafkaBrokerFilterUnitTest, shouldStopIterationIfProcessingDataFromKafkaBrokerFails) {
+  // given
+  Buffer::OwnedImpl data;
+  EXPECT_CALL(*response_decoder_, onData(_)).WillOnce(Throw(EnvoyException("boom")));
+  EXPECT_CALL(*response_decoder_, reset());
+
+  // when
+  initialize();
+  const auto result = testee_.onWrite(data, false);
+
+  // then
+  ASSERT_EQ(result, Network::FilterStatus::StopIteration);
 }
 
 class ForwarderUnitTest : public testing::Test {

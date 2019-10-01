@@ -73,6 +73,11 @@ public:
     }
   }
 
+  /**
+   * Erases codec state.
+   */
+  virtual void reset() { current_parser_ = nullptr; }
+
   ParserType getCurrentParserForTest() const { return current_parser_; }
 
 protected:

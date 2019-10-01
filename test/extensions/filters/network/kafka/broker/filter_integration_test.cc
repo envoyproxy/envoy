@@ -20,6 +20,9 @@ namespace Broker {
 using RequestB = MessageBasedTest<RequestEncoder>;
 using ResponseB = MessageBasedTest<ResponseEncoder>;
 
+// Message size for all kind of broken messages (we are not going to process all the bytes).
+constexpr static int32_t BROKEN_MESSAGE_SIZE = std::numeric_limits<int32_t>::max();
+
 class KafkaBrokerFilterIntegrationTest : public testing::Test,
                                          protected RequestB,
                                          protected ResponseB {
@@ -64,39 +67,32 @@ TEST_F(KafkaBrokerFilterIntegrationTest, shouldHandleUnknownRequestAndResponseWi
 
 TEST_F(KafkaBrokerFilterIntegrationTest, shouldHandleBrokenRequestPayload) {
   // given
-  const int16_t api_key = 0;
-  const int16_t api_version = 0;
-  const int32_t correlation_id = 0;
-  const int16_t invalid_nullable_string_length =
-      std::numeric_limits<int16_t>::min(); // Breaks parse.
 
-  EncodingContext ec{0};
-  ec.encode(static_cast<uint32_t>(sizeof(api_key) + sizeof(api_version) + sizeof(correlation_id) +
-                                  sizeof(invalid_nullable_string_length)),
-            RequestB::buffer_);
-  ec.encode(api_key, RequestB::buffer_);
-  ec.encode(api_version, RequestB::buffer_);
-  ec.encode(correlation_id, RequestB::buffer_);
-  ec.encode(invalid_nullable_string_length, RequestB::buffer_);
+  // Encode broken request into buffer.
+  // We will put invalid length of nullable string passed as client-id (length < -1).
+  RequestB::putIntoBuffer(BROKEN_MESSAGE_SIZE);
+  RequestB::putIntoBuffer(static_cast<int16_t>(0)); // Api key.
+  RequestB::putIntoBuffer(static_cast<int16_t>(0)); // Api version.
+  RequestB::putIntoBuffer(static_cast<int32_t>(0)); // Correlation-id.
+  RequestB::putIntoBuffer(static_cast<int16_t>(std::numeric_limits<int16_t>::min())); // Client-id.
 
   // when
   const Network::FilterStatus result = consumeRequestFromBuffer();
 
   // then
   ASSERT_EQ(result, Network::FilterStatus::StopIteration);
+  ASSERT_EQ(testee_.getRequestDecoderForTest()->getCurrentParserForTest(), nullptr);
 }
 
 TEST_F(KafkaBrokerFilterIntegrationTest, shouldHandleBrokenResponsePayload) {
   // given
-  const int32_t correlation_id = 0;
-  const int32_t invalid_nullable_array_length =
-      std::numeric_limits<int32_t>::min(); // Breaks parse.
 
-  EncodingContext ec{0};
-  ec.encode(static_cast<uint32_t>(sizeof(correlation_id) + sizeof(invalid_nullable_array_length)),
-            ResponseB::buffer_);
-  ec.encode(correlation_id, ResponseB::buffer_);
-  ec.encode(invalid_nullable_array_length, ResponseB::buffer_);
+  // Encode broken response into buffer.
+  // Produce response v0 is a nullable array of TopicProduceResponses.
+  // Encoding invalid length (< -1) of this nullable array is going to break the parser.
+  ResponseB::putIntoBuffer(BROKEN_MESSAGE_SIZE);
+  ResponseB::putIntoBuffer(static_cast<int32_t>(0)); // Correlation-id.
+  ResponseB::putIntoBuffer(static_cast<int32_t>(std::numeric_limits<int32_t>::min())); // Array.
 
   testee_.getResponseDecoderForTest()->expectResponse(0, 0);
 
@@ -105,6 +101,7 @@ TEST_F(KafkaBrokerFilterIntegrationTest, shouldHandleBrokenResponsePayload) {
 
   // then
   ASSERT_EQ(result, Network::FilterStatus::StopIteration);
+  ASSERT_EQ(testee_.getResponseDecoderForTest()->getCurrentParserForTest(), nullptr);
 }
 
 TEST_F(KafkaBrokerFilterIntegrationTest, shouldAbortOnUnregisteredResponse) {

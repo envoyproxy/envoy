@@ -90,6 +90,7 @@ Network::FilterStatus KafkaBrokerFilter::onData(Buffer::Instance& data, bool) {
     return Network::FilterStatus::Continue;
   } catch (const EnvoyException& e) {
     ENVOY_LOG(info, "could not process data from Kafka client: {}", e.what());
+    request_decoder_->reset();
     return Network::FilterStatus::StopIteration;
   }
 }
@@ -101,9 +102,12 @@ Network::FilterStatus KafkaBrokerFilter::onWrite(Buffer::Instance& data, bool) {
     return Network::FilterStatus::Continue;
   } catch (const EnvoyException& e) {
     ENVOY_LOG(info, "could not process data from Kafka broker: {}", e.what());
+    response_decoder_->reset();
     return Network::FilterStatus::StopIteration;
   }
 }
+
+RequestDecoderSharedPtr KafkaBrokerFilter::getRequestDecoderForTest() { return request_decoder_; }
 
 ResponseDecoderSharedPtr KafkaBrokerFilter::getResponseDecoderForTest() {
   return response_decoder_;

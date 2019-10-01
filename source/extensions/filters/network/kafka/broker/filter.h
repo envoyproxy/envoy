@@ -45,6 +45,7 @@ public:
   // Network::WriteFilter
   Network::FilterStatus onWrite(Buffer::Instance& data, bool end_stream) override;
 
+  RequestDecoderSharedPtr getRequestDecoderForTest();
   ResponseDecoderSharedPtr getResponseDecoderForTest();
 
 private:
