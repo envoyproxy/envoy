@@ -51,8 +51,8 @@ public:
 
 protected:
   struct FactoryMatch {
-    FactoryMatch(const std::string& match_name, TransportSocketMatchStats match_stats)
-        : name(match_name), stats(match_stats) {}
+    FactoryMatch(std::string match_name, TransportSocketMatchStats match_stats)
+        : name(std::move(match_name)), stats(match_stats) {}
     std::string name;
     Network::TransportSocketFactoryPtr factory;
     Config::Metadata::LabelSet label_set;

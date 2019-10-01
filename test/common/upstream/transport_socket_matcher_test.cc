@@ -31,17 +31,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
-using testing::AtLeast;
 using testing::Eq;
-using testing::InSequence;
-using testing::Invoke;
-using testing::InvokeWithoutArgs;
 using testing::NiceMock;
-using testing::Return;
-using testing::ReturnNew;
-using testing::ReturnRef;
-using testing::SaveArg;
 
 namespace Envoy {
 namespace Upstream {
@@ -52,7 +43,7 @@ public:
   MOCK_CONST_METHOD0(implementsSecureTransport, bool());
   MOCK_CONST_METHOD1(createTransportSocket,
                      Network::TransportSocketPtr(Network::TransportSocketOptionsSharedPtr));
-  FakeTransportSocketFactory(const std::string& id) : id_(id) {}
+  FakeTransportSocketFactory(std::string id) : id_(std::move(id)) {}
   std::string id() const { return id_; }
 
 private:
@@ -64,9 +55,6 @@ class FooTransportSocketFactory
       public Server::Configuration::UpstreamTransportSocketConfigFactory,
       Logger::Loggable<Logger::Id::upstream> {
 public:
-  FooTransportSocketFactory() {}
-  ~FooTransportSocketFactory() override {}
-
   MOCK_CONST_METHOD0(implementsSecureTransport, bool());
   MOCK_CONST_METHOD1(createTransportSocket,
                      Network::TransportSocketPtr(Network::TransportSocketOptionsSharedPtr));
@@ -76,7 +64,7 @@ public:
                                Server::Configuration::TransportSocketFactoryContext&) override {
     const auto* node = dynamic_cast<const envoy::api::v2::core::Node*>(&proto);
     std::string id = "default-foo";
-    if (node->id() != "") {
+    if (!node->id().empty()) {
       id = node->id();
     }
     return std::make_unique<FakeTransportSocketFactory>(id);

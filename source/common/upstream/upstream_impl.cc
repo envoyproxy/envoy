@@ -253,7 +253,7 @@ HostImpl::createHealthCheckConnection(Event::Dispatcher& dispatcher) const {
 
 Network::ClientConnectionPtr
 HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
-                           Network::Address::InstanceConstSharedPtr address,
+                           const Network::Address::InstanceConstSharedPtr& address,
                            const envoy::api::v2::core::Metadata& metadata,
                            const Network::ConnectionSocket::OptionsSharedPtr& options,
                            Network::TransportSocketOptionsSharedPtr transport_socket_options) {
@@ -275,7 +275,7 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
   auto socket = cluster
                     .transportSocketFactory(
                         ClusterInfo::TransportSocketFactoryOption{address->asString(), metadata})
-                    .createTransportSocket(transport_socket_options);
+                    .createTransportSocket(std::move(transport_socket_options));
   Network::ClientConnectionPtr connection = dispatcher.createClientConnection(
       address, cluster.sourceAddress(), std::move(socket), connection_options);
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());

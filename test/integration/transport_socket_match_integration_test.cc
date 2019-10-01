@@ -16,7 +16,7 @@ public:
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1,
                             TestEnvironment::getIpVersionsForTest().front(),
                             ConfigHelper::HTTP_PROXY_CONFIG),
-        num_hosts_{2}, enable_transport_socket_match_(true) {
+        num_hosts_{2} {
     autonomous_upstream_ = true;
     setUpstreamCount(num_hosts_);
   }
@@ -166,7 +166,7 @@ require_client_certificate: true
   const std::string host_header_{"x-host"};
   const std::string type_header_{"x-type"};
   const std::string type_key_{"type"};
-  bool enable_transport_socket_match_;
+  bool enable_transport_socket_match_{true};
 };
 
 TEST_F(TransportSockeMatchIntegrationTest, TlsAndPlaintextSucceed) {
