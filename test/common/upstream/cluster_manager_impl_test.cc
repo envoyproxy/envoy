@@ -963,7 +963,6 @@ TEST_F(ClusterManagerImplTest, UnknownCluster) {
   EXPECT_EQ(nullptr, cluster_manager_->get("hello"));
   EXPECT_EQ(nullptr, cluster_manager_->httpConnPoolForCluster("hello", ResourcePriority::Default,
                                                               Http::Protocol::Http2, nullptr));
-  Network::TransportSocketOptionsSharedPtr transport_socket_options;
   EXPECT_EQ(nullptr,
             cluster_manager_->tcpConnPoolForCluster("hello", ResourcePriority::Default, nullptr));
   EXPECT_THROW(cluster_manager_->tcpConnForCluster("hello", nullptr), EnvoyException);
