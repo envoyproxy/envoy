@@ -94,12 +94,8 @@ HotRestartingParent::Internal::getListenSocketsForChild(const HotRestartMessage:
   wrapped_reply.mutable_reply()->mutable_pass_listen_socket()->set_fd(-1);
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::resolveUrl(request.pass_listen_socket().address());
-  for (const auto& listener : server_->listenerManager().listeners()) {
-    if (listener.get().socket().socketType() == Network::Address::SocketType::Stream &&
-        !listener.get().bindToPort()) {
-      continue;
-    }
-
+  for (const auto& listener :
+       server_->listenerManager().listeners() && listener.get().bindToPort()) {
     if (*listener.get().socket().localAddress() == *addr) {
       wrapped_reply.mutable_reply()->mutable_pass_listen_socket()->set_fd(
           listener.get().socket().ioHandle().fd());
