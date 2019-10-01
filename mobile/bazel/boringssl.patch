@@ -1,0 +1,11 @@
+--- src/include/openssl/base.h
++++ src/include/openssl/base.h
+@@ -258,7 +258,7 @@ extern "C" {
+ // with the old gnu89 model:
+ // https://stackoverflow.com/questions/216510/extern-inline
+ #if defined(__cplusplus)
+-#define OPENSSL_INLINE inline
++#define OPENSSL_INLINE static inline
+ #else
+ // Add OPENSSL_UNUSED so that, should an inline function be emitted via macro
+ // (e.g. a |STACK_OF(T)| implementation) in a source file without tripping
