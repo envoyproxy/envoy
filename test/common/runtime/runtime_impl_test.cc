@@ -176,7 +176,7 @@ TEST_F(DiskLoaderImplTest, All) {
   // Valid float string followed by newlines.
   EXPECT_EQ(3.141, loader_->snapshot().getDouble("file_with_double_newlines", 1.1));
 
-  const SnapshotImpl* snapshot = reinterpret_cast<const SnapshotImpl*>(&loader_->snapshot());
+  const auto snapshot = reinterpret_cast<const SnapshotImpl*>(&loader_->snapshot());
 
   // Validate that the layer name is set properly for static layers.
   EXPECT_EQ("base", snapshot->getLayers()[0]->name());
@@ -606,7 +606,7 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
   EXPECT_EQ(23.2, loader_->snapshot().getDouble("file_with_double", 1.1));
 
   // Boolean getting.
-  const SnapshotImpl* snapshot = reinterpret_cast<const SnapshotImpl*>(&loader_->snapshot());
+  const auto snapshot = reinterpret_cast<const SnapshotImpl*>(&loader_->snapshot());
 
   EXPECT_EQ(true, snapshot->getBoolean("file11", true));
   EXPECT_EQ(true, snapshot->getBoolean("file11", false));
