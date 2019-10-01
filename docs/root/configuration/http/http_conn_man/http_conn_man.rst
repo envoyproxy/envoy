@@ -14,4 +14,3 @@ HTTP connection manager
   stats
   runtime
   rds
-  local_reply

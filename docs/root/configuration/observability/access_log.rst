@@ -91,8 +91,6 @@ Format dictionaries have the following restrictions:
 
 * The dictionary must map strings to strings (specifically, strings to command operators). Nesting is not currently supported.
 
-.. _config_access_log_command_operators:
-
 Command Operators
 -----------------
 
