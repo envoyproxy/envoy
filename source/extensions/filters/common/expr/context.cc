@@ -145,8 +145,8 @@ absl::optional<CelValue> UpstreamWrapper::operator[](CelValue key) const {
     }
   } else if (value == MTLS) {
     return CelValue::CreateBool(info_.upstreamSslConnection() != nullptr &&
-                                info_.upstreamSslConnection()->localCertificatePresented()) &&
-           info_.upstreamSslConnection()->peerCertificatePresented();
+                                info_.upstreamSslConnection()->localCertificatePresented() &&
+                                info_.upstreamSslConnection()->peerCertificatePresented());
   }
 
   return {};
