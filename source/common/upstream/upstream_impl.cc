@@ -39,8 +39,6 @@
 
 #include "extensions/transport_sockets/well_known_names.h"
 
-#include "spdlog/spdlog.h"
-
 namespace Envoy {
 namespace Upstream {
 namespace {
@@ -270,12 +268,9 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
   } else {
     connection_options = options;
   }
-  cluster.transportSocketFactory(
-      ClusterInfo::TransportSocketFactoryOption{address->asString(), metadata});
-  auto socket = cluster
-                    .transportSocketFactory(
-                        ClusterInfo::TransportSocketFactoryOption{address->asString(), metadata})
-                    .createTransportSocket(std::move(transport_socket_options));
+  Network::TransportSocketFactory& factory = cluster.transportSocketFactory(
+      absl::optional<ClusterInfo::TransportSocketFactoryOption>({address->asString(), metadata}));
+  auto socket = factory.createTransportSocket(std::move(transport_socket_options));
   Network::ClientConnectionPtr connection = dispatcher.createClientConnection(
       address, cluster.sourceAddress(), std::move(socket), connection_options);
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());

@@ -92,7 +92,7 @@ bool convertRequestHeadersForInternalRedirect(Http::HeaderMap& downstream_header
 
 void FilterUtility::setUpstreamScheme(Http::HeaderMap& headers,
                                       const Upstream::ClusterInfo& cluster) {
-  if (cluster.transportSocketFactory().implementsSecureTransport()) {
+  if (cluster.transportSocketFactory(absl::nullopt).implementsSecureTransport()) {
     headers.insertScheme().value().setReference(Http::Headers::get().SchemeValues.Https);
   } else {
     headers.insertScheme().value().setReference(Http::Headers::get().SchemeValues.Http);
@@ -832,15 +832,15 @@ void Filter::onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_
 
     callbacks_->streamInfo().setResponseFlag(response_flags);
 
-    callbacks_->sendLocalReply(
-        code, body,
-        [dropped, this](Http::HeaderMap& headers) {
-          if (dropped && !config_.suppress_envoy_headers_) {
-            headers.insertEnvoyOverloaded().value(Http::Headers::get().EnvoyOverloadedValues.True);
-          }
-          modify_headers_(headers);
-        },
-        absl::nullopt, details);
+    callbacks_->sendLocalReply(code, body,
+                               [dropped, this](Http::HeaderMap& headers) {
+                                 if (dropped && !config_.suppress_envoy_headers_) {
+                                   headers.insertEnvoyOverloaded().value(
+                                       Http::Headers::get().EnvoyOverloadedValues.True);
+                                 }
+                                 modify_headers_(headers);
+                               },
+                               absl::nullopt, details);
   }
 }
 

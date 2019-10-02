@@ -93,8 +93,9 @@ public:
   MOCK_CONST_METHOD0(maxRequestsPerConnection, uint64_t());
   MOCK_CONST_METHOD0(name, const std::string&());
   MOCK_CONST_METHOD1(resourceManager, ResourceManager&(ResourcePriority priority));
-  MOCK_CONST_METHOD1(transportSocketFactory, Network::TransportSocketFactory&(
-                                                 const ClusterInfo::TransportSocketFactoryOption&));
+  MOCK_CONST_METHOD1(
+      transportSocketFactory,
+      Network::TransportSocketFactory&(absl::optional<ClusterInfo::TransportSocketFactoryOption>));
   MOCK_CONST_METHOD0(stats, ClusterStats&());
   MOCK_CONST_METHOD0(statsScope, Stats::Scope&());
   MOCK_CONST_METHOD0(loadReportStats, ClusterLoadReportStats&());

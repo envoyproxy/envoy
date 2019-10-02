@@ -565,8 +565,11 @@ public:
   ResourceManager& resourceManager(ResourcePriority priority) const override;
 
   Network::TransportSocketFactory&
-  transportSocketFactory(const ClusterInfo::TransportSocketFactoryOption& option) const override {
-    return socket_matcher_->resolve(option.address_, option.metadata_);
+  transportSocketFactory(absl::optional<TransportSocketFactoryOption> option) const override {
+    if (option.has_value()) {
+      return socket_matcher_->resolve(option.value().address_, option.value().metadata_);
+    }
+    return *transport_socket_factory_;
   }
 
   ClusterStats& stats() const override { return stats_; }

@@ -787,20 +787,12 @@ public:
   };
 
   /**
-   * @return Network::ClusterInfo::TransportSocketFactoryOption the default option
-   *         to select a transport socket for a given cluster.
-   */
-  static TransportSocketFactoryOption DefaultTransportSocketFactoryOption() {
-    return TransportSocketFactoryOption{"", envoy::api::v2::core::Metadata()};
-  }
-
-  /**
+   * @param option supplies the options used to select a transport socket factory.
    * @return Network::TransportSocketFactory& the factory of transport socket to use when
    *         communicating with the cluster.
    */
   virtual Network::TransportSocketFactory&
-  transportSocketFactory(const TransportSocketFactoryOption& option =
-                             DefaultTransportSocketFactoryOption()) const PURE;
+  transportSocketFactory(absl::optional<TransportSocketFactoryOption> option) const PURE;
 
   /**
    * @return ClusterStats& strongly named stats for this cluster.
