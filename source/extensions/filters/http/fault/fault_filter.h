@@ -133,7 +133,7 @@ private:
   FaultFilterStats stats_;
   Stats::Scope& scope_;
   TimeSource& time_source_;
-  Stats::StatNameSet stat_name_set_;
+  Stats::StatNameSetPtr stat_name_set_;
   const Stats::StatName aborts_injected_;
   const Stats::StatName delays_injected_;
   const Stats::StatName stats_prefix_; // Includes ".fault".

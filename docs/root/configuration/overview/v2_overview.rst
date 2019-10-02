@@ -570,6 +570,32 @@ to
 with the effect that the LDS stream will be directed to *some_ads_cluster* over
 the shared ADS channel.
 
+.. _config_overview_v2_delta:
+
+Delta endpoints
+---------------
+
+The REST, filesystem, and original gRPC xDS implementations all deliver "state of the world" updates:
+every CDS update must contain every cluster, with the absence of a cluster from an update implying
+that the cluster is gone. For Envoy deployments with huge amounts of resources and even a trickle of
+churn, these state-of-the-world updates can be cumbersome.
+
+As of 1.12.0, Envoy supports a "delta" variant of xDS (including ADS), where updates only contain
+resources added/changed/removed. Delta xDS is a gRPC (only) protocol. Delta uses different
+request/response protos than SotW (DeltaDiscovery{Request,Response}); see
+:repo:`discovery.proto <api/envoy/api/v2/discovery.proto>`. Conceptually, delta should be viewed as
+a new xDS transport type: there is static, filesystem, REST, gRPC-SotW, and now gRPC-delta.
+(Envoy's implementation of the gRPC-SotW/delta client happens to share most of its code between the
+two, and something similar is likely possible on the server side. However, they are in fact
+incompatible protocols.
+:ref:`The specification of the delta xDS protocol's behavior is here <xds_protocol_delta>`.)
+
+To use delta, simply set the api_type field of your
+:ref:`ApiConfigSource <envoy_api_msg_core.ApiConfigSource>` proto(s) to DELTA_GRPC.
+That works for both xDS and ADS; for ADS, it's the api_type field of
+:ref:`DynamicResources.ads_config <envoy_api_field_config.bootstrap.v2.Bootstrap.dynamic_resources>`,
+as described in the previous section.
+
 .. _config_overview_v2_mgmt_con_issues:
 
 Management Server Unreachability

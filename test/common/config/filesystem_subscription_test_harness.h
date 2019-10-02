@@ -43,11 +43,11 @@ public:
     subscription_.start(cluster_names);
   }
 
-  void updateResources(const std::set<std::string>& cluster_names) override {
-    subscription_.updateResources(cluster_names);
+  void updateResourceInterest(const std::set<std::string>& cluster_names) override {
+    subscription_.updateResourceInterest(cluster_names);
   }
 
-  void updateFile(const std::string json, bool run_dispatcher = true) {
+  void updateFile(const std::string& json, bool run_dispatcher = true) {
     // Write JSON contents to file, rename to path_ and run dispatcher to catch
     // inotify.
     const std::string temp_path = TestEnvironment::writeStringToFileForTest("eds.json.tmp", json);
@@ -94,13 +94,10 @@ public:
                                              version);
   }
 
-  void expectConfigUpdateFailed() override {
-    // initial_fetch_timeout not implemented
-  }
+  void expectConfigUpdateFailed() override { stats_.update_failure_.inc(); }
 
-  void expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds timeout) override {
-    UNREFERENCED_PARAMETER(timeout);
-    // initial_fetch_timeout not implemented
+  void expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds) override {
+    // initial_fetch_timeout not implemented.
   }
 
   void expectDisableInitFetchTimeoutTimer() override {

@@ -34,9 +34,19 @@ public:
   void start() override;
   GrpcMuxWatchPtr subscribe(const std::string& type_url, const std::set<std::string>& resources,
                             GrpcMuxCallbacks& callbacks) override;
+
+  // GrpcMux
   void pause(const std::string& type_url) override;
   void resume(const std::string& type_url) override;
   bool paused(const std::string& type_url) const override;
+
+  Watch* addOrUpdateWatch(const std::string&, Watch*, const std::set<std::string>&,
+                          SubscriptionCallbacks&, std::chrono::milliseconds) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+  void removeWatch(const std::string&, Watch*) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+
+  void handleDiscoveryResponse(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message);
 
   void sendDiscoveryRequest(const std::string& type_url);
 
@@ -52,6 +62,7 @@ public:
   }
 
 private:
+  void drainRequests();
   void setRetryTimer();
 
   struct GrpcMuxWatchImpl : public GrpcMuxWatch, RaiiListElement<GrpcMuxWatchImpl*> {
@@ -100,7 +111,6 @@ private:
   // Request queue management logic.
   void queueDiscoveryRequest(const std::string& queue_item);
   void clearRequestQueue();
-  void drainRequests();
 
   GrpcStream<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse> grpc_stream_;
   const LocalInfo::LocalInfo& local_info_;
@@ -116,7 +126,7 @@ private:
   std::queue<std::string> request_queue_;
 };
 
-class NullGrpcMuxImpl : public GrpcMux {
+class NullGrpcMuxImpl : public GrpcMux, GrpcStreamCallbacks<envoy::api::v2::DiscoveryResponse> {
 public:
   void start() override {}
   GrpcMuxWatchPtr subscribe(const std::string&, const std::set<std::string>&,
@@ -126,6 +136,19 @@ public:
   void pause(const std::string&) override {}
   void resume(const std::string&) override {}
   bool paused(const std::string&) const override { return false; }
+
+  Watch* addOrUpdateWatch(const std::string&, Watch*, const std::set<std::string>&,
+                          SubscriptionCallbacks&, std::chrono::milliseconds) override {
+    throw EnvoyException("ADS must be configured to support an ADS config source");
+  }
+  void removeWatch(const std::string&, Watch*) override {
+    throw EnvoyException("ADS must be configured to support an ADS config source");
+  }
+
+  void onWriteable() override {}
+  void onStreamEstablished() override {}
+  void onEstablishmentFailure() override {}
+  void onDiscoveryResponse(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&&) override {}
 };
 
 } // namespace Config

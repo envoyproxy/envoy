@@ -181,6 +181,7 @@ TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponCHLO) {
   EXPECT_CALL(*read_filter, onNewConnection())
       // Stop iteration to avoid calling getRead/WriteBuffer().
       .WillOnce(Invoke([]() { return Network::FilterStatus::StopIteration; }));
+  EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
 
   quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);
   // Upon receiving a full CHLO. A new quic connection should be created and have its filter

@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 
 # Diff or copy protoxform artifacts from Bazel cache back to the source tree.
 
