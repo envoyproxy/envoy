@@ -21,7 +21,7 @@ ZooKeeperFilterConfig::ZooKeeperFilterConfig(const std::string& stat_prefix,
                                              const uint32_t max_packet_bytes, Stats::Scope& scope)
     : scope_(scope), max_packet_bytes_(max_packet_bytes), stats_(generateStats(stat_prefix, scope)),
       stat_name_set_(scope.symbolTable().makeSet("Zookeeper")),
-      stat_prefix_(stat_name_set_->add(Stats::Utility::sanitizeStatsName(stat_prefix))),
+      stat_prefix_(stat_name_set_->add(stat_prefix)),
       auth_(stat_name_set_->add("auth")),
       connect_latency_(stat_name_set_->add("connect_response_latency")),
       unknown_scheme_rq_(stat_name_set_->add("unknown_scheme_rq")),

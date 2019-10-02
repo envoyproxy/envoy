@@ -110,7 +110,6 @@ envoy_cc_library(
         ":proxy_lib",
         "//include/envoy/registry",
         "//source/common/config:filter_json_lib",
-        "//source/common/stats:utility_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
     ],

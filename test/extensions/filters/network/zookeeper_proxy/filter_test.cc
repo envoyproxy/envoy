@@ -503,7 +503,7 @@ public:
   Stats::IsolatedStoreImpl scope_;
   ZooKeeperFilterConfigSharedPtr config_;
   std::unique_ptr<ZooKeeperFilter> filter_;
-  std::string stat_prefix_{"test.zookeeper."};
+  std::string stat_prefix_{"test.zookeeper"};
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
   Event::SimulatedTimeSystem time_system_;
