@@ -29,7 +29,10 @@ build:sim --ios_multi_cpus=i386,x86_64 --fat_apk_cpu=x86,x86_64
 
 build:fat --ios_multi_cpus=i386,x86_64,armv7,arm64 --fat_apk_cpu=x86,x86_64,armeabi-v7a,arm64-v8a
 
+# TODO: Enable `--copt -ggdb3`. Issues were encountered previously with this:
+# https://github.com/lyft/envoy-mobile/pull/155#issuecomment-507461500
 build:release \
+  --linkopt=-s \
+  --copt=-O2 \
   --apple_bitcode=embedded \
-  --compilation_mode=opt \
   --copt=-fembed-bitcode
