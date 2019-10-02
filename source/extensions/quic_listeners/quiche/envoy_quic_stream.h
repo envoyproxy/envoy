@@ -1,7 +1,8 @@
 #pragma once
 
-#include "envoy/http/codec.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/http/codec.h"
+
 #include "common/http/codec_helper.h"
 
 #include "extensions/quic_listeners/quiche/envoy_quic_simulated_watermark_buffer.h"
@@ -17,7 +18,7 @@ class EnvoyQuicStream : public Http::StreamEncoder,
 public:
   EnvoyQuicStream(uint32_t buffer_limit, std::function<void()> below_low_watermark,
                   std::function<void()> above_high_watermark)
-      :          send_buffer_simulation_(buffer_limit / 2, buffer_limit, std::move(below_low_watermark),
+      : send_buffer_simulation_(buffer_limit / 2, buffer_limit, std::move(below_low_watermark),
                                 std::move(above_high_watermark)) {}
 
   // Http::StreamEncoder

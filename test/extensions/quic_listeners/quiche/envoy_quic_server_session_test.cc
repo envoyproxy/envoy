@@ -84,10 +84,11 @@ public:
         crypto_config_(quic::QuicCryptoServerConfig::TESTING, quic::QuicRandom::GetInstance(),
                        std::make_unique<EnvoyQuicFakeProofSource>(),
                        quic::KeyExchangeSource::Default()),
-        envoy_quic_session_(
-            quic_config_, quic_version_, std::unique_ptr<TestEnvoyQuicServerConnection>(quic_connection_),
-            /*visitor=*/nullptr, &crypto_stream_helper_, &crypto_config_, &compressed_certs_cache_,
-            *dispatcher_, /*send_buffer_limit*/ 1024 * 1024),
+        envoy_quic_session_(quic_config_, quic_version_,
+                            std::unique_ptr<TestEnvoyQuicServerConnection>(quic_connection_),
+                            /*visitor=*/nullptr, &crypto_stream_helper_, &crypto_config_,
+                            &compressed_certs_cache_, *dispatcher_,
+                            /*send_buffer_limit*/ 1024 * 1024),
         read_filter_(new Network::MockReadFilter()) {
     EXPECT_EQ(time_system_.systemTime(), envoy_quic_session_.streamInfo().startTime());
     EXPECT_EQ(EMPTY_STRING, envoy_quic_session_.nextProtocol());

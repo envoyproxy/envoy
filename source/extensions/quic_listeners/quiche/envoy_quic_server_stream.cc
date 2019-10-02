@@ -74,7 +74,7 @@ void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) 
 }
 
 void EnvoyQuicServerStream::encodeTrailers(const Http::HeaderMap& trailers) {
-    ASSERT(!local_end_stream_);
+  ASSERT(!local_end_stream_);
   local_end_stream_ = true;
   ENVOY_LOG(debug, "stream {} encodeTrailers: ", id(), trailers);
   WriteTrailers(envoyHeadersToSpdyHeaderBlock(trailers), nullptr);
@@ -90,16 +90,17 @@ void EnvoyQuicServerStream::resetStream(Http::StreamResetReason reason) {
     // of propagating original reset reason.
     StopReading();
   } else {
-  Reset(envoyResetReasonToQuicRstError(reason));
+    Reset(envoyResetReasonToQuicRstError(reason));
   }
 }
 
 void EnvoyQuicServerStream::switchStreamBlockState(bool should_block) {
-  ASSERT(FinishedReadingHeaders(), "Upperstream buffer limit is reached before request body is delivered.");
+  ASSERT(FinishedReadingHeaders(),
+         "Upperstream buffer limit is reached before request body is delivered.");
   if (should_block) {
     sequencer()->SetBlockedUntilFlush();
   } else {
-      ASSERT(read_disable_counter_ == 0, "readDisable called in btw.");
+    ASSERT(read_disable_counter_ == 0, "readDisable called in btw.");
     sequencer()->SetUnblocked();
   }
 }
@@ -144,21 +145,23 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
   bool empty_payload_with_fin = buffer->length() == 0 && finished_reading;
   if (!empty_payload_with_fin || !end_stream_decoded_) {
     ASSERT(decoder() != nullptr);
-    std::cerr << "============ decodeData with finished_reading " << finished_reading << " empty_payload_with_fin " << empty_payload_with_fin << " end_stream_decoded_ " << end_stream_decoded_ << ".\n";
+    std::cerr << "============ decodeData with finished_reading " << finished_reading
+              << " empty_payload_with_fin " << empty_payload_with_fin << " end_stream_decoded_ "
+              << end_stream_decoded_ << ".\n";
     decoder()->decodeData(*buffer, finished_reading);
     std::cerr << "=========== finished decodeData\n";
     if (finished_reading) {
-       end_stream_decoded_ = true;
+      end_stream_decoded_ = true;
     }
   }
 
   if (!sequencer()->IsClosed()) {
-      in_encode_data_callstack_ = false;
-  if (read_disable_counter_ > 0) {
-    // If readDisable() was ever called during decodeData() and it meant to disable
-    // reading from downstream, the call must have been deferred. Call it now.
-    switchStreamBlockState(true);
-  }
+    in_encode_data_callstack_ = false;
+    if (read_disable_counter_ > 0) {
+      // If readDisable() was ever called during decodeData() and it meant to disable
+      // reading from downstream, the call must have been deferred. Call it now.
+      switchStreamBlockState(true);
+    }
     return;
   }
 

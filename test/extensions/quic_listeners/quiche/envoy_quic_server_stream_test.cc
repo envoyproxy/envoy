@@ -40,13 +40,15 @@ class MockQuicServerSession : public EnvoyQuicServerSession {
 public:
   MockQuicServerSession(const quic::QuicConfig& config,
                         const quic::ParsedQuicVersionVector& supported_versions,
-                        std::unique_ptr<EnvoyQuicServerConnection> connection, quic::QuicSession::Visitor* visitor,
+                        std::unique_ptr<EnvoyQuicServerConnection> connection,
+                        quic::QuicSession::Visitor* visitor,
                         quic::QuicCryptoServerStream::Helper* helper,
                         const quic::QuicCryptoServerConfig* crypto_config,
                         quic::QuicCompressedCertsCache* compressed_certs_cache,
                         Event::Dispatcher& dispatcher, uint32_t send_buffer_limit)
       : EnvoyQuicServerSession(config, supported_versions, std::move(connection), visitor, helper,
-                                    crypto_config, compressed_certs_cache, dispatcher, send_buffer_limit) {}
+                               crypto_config, compressed_certs_cache, dispatcher,
+                               send_buffer_limit) {}
 
   MOCK_METHOD1(CreateIncomingStream, quic::QuicSpdyStream*(quic::QuicStreamId id));
   MOCK_METHOD1(CreateIncomingStream, quic::QuicSpdyStream*(quic::PendingStream* pending));
@@ -55,17 +57,17 @@ public:
   MOCK_METHOD1(ShouldCreateIncomingStream, bool(quic::QuicStreamId id));
   MOCK_METHOD0(ShouldCreateOutgoingBidirectionalStream, bool());
   MOCK_METHOD0(ShouldCreateOutgoingUnidirectionalStream, bool());
-  MOCK_METHOD1(ShouldYield, bool (quic::QuicStreamId stream_id));
-  MOCK_METHOD5(WritevData, quic::QuicConsumedData(quic::QuicStream* stream,
-                                         quic::QuicStreamId id,
-                                         size_t write_length,
-                                         quic::QuicStreamOffset offset,
-                                         quic::StreamSendingState state));
-  
-  quic::QuicCryptoServerStream* CreateQuicCryptoServerStream(const quic::QuicCryptoServerConfig* crypto_config,
-                                             quic::QuicCompressedCertsCache* compressed_certs_cache) override {
-  return new quic::QuicCryptoServerStream(crypto_config, compressed_certs_cache, this,
-                                          stream_helper());
+  MOCK_METHOD1(ShouldYield, bool(quic::QuicStreamId stream_id));
+  MOCK_METHOD5(WritevData,
+               quic::QuicConsumedData(quic::QuicStream* stream, quic::QuicStreamId id,
+                                      size_t write_length, quic::QuicStreamOffset offset,
+                                      quic::StreamSendingState state));
+
+  quic::QuicCryptoServerStream*
+  CreateQuicCryptoServerStream(const quic::QuicCryptoServerConfig* crypto_config,
+                               quic::QuicCompressedCertsCache* compressed_certs_cache) override {
+    return new quic::QuicCryptoServerStream(crypto_config, compressed_certs_cache, this,
+                                            stream_helper());
   }
 
   using quic::QuicServerSessionBase::ActivateStream;
@@ -83,33 +85,35 @@ public:
         listener_stats_({ALL_LISTENER_STATS(POOL_COUNTER(listener_config_.listenerScope()),
                                             POOL_GAUGE(listener_config_.listenerScope()),
                                             POOL_HISTOGRAM(listener_config_.listenerScope()))}),
-        quic_connection_(new EnvoyQuicServerConnection(quic::test::TestConnectionId(),
-                         quic::QuicSocketAddress(quic::QuicIpAddress::Any6(), 12345),
-                         connection_helper_, alarm_factory_, &writer_,
-                         /*owns_writer=*/false, {quic_version_}, listener_config_, listener_stats_)),
-        quic_session_(quic_config_, {quic_version_}, std::unique_ptr<EnvoyQuicServerConnection>(quic_connection_), /*visitor=*/nullptr,
+        quic_connection_(new EnvoyQuicServerConnection(
+            quic::test::TestConnectionId(),
+            quic::QuicSocketAddress(quic::QuicIpAddress::Any6(), 12345), connection_helper_,
+            alarm_factory_, &writer_,
+            /*owns_writer=*/false, {quic_version_}, listener_config_, listener_stats_)),
+        quic_session_(quic_config_, {quic_version_},
+                      std::unique_ptr<EnvoyQuicServerConnection>(quic_connection_),
+                      /*visitor=*/nullptr,
                       /*helper=*/nullptr, /*crypto_config=*/nullptr,
                       /*compressed_certs_cache=*/nullptr, *dispatcher_,
                       quic_config_.GetInitialStreamFlowControlWindowToSend()),
         stream_id_(quic_version_.transport_version == quic::QUIC_VERSION_99 ? 4u : 5u),
         quic_stream_(new EnvoyQuicServerStream(stream_id_, &quic_session_, quic::BIDIRECTIONAL)),
-  response_headers_{{":status", "200"}} {
+        response_headers_{{":status", "200"}} {
     quic::SetVerbosityLogThreshold(3);
     quic_stream_->setDecoder(stream_decoder_);
     quic_stream_->addCallbacks(stream_callbacks_);
     quic_session_.ActivateStream(std::unique_ptr<EnvoyQuicServerStream>(quic_stream_));
- EXPECT_CALL(quic_session_, ShouldYield(_)).WillRepeatedly(Return(false));
-  EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _)).WillRepeatedly(Invoke([](quic::QuicStream*,
-                                         quic::QuicStreamId,
-                                         size_t write_length,
-                                         quic::QuicStreamOffset,
-                                         quic::StreamSendingState){return quic::QuicConsumedData{write_length, true};}));
-  EXPECT_CALL(writer_, WritePacket(_, _, _, _, _)).WillRepeatedly(Invoke([](const char*,
-                           size_t buf_len,
-                           const quic::QuicIpAddress&,
-                           const quic::QuicSocketAddress&,
-                           quic::PerPacketOptions*){ return quic::WriteResult{quic::WRITE_STATUS_OK, static_cast<int>(buf_len)}; }));
-
+    EXPECT_CALL(quic_session_, ShouldYield(_)).WillRepeatedly(Return(false));
+    EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _))
+        .WillRepeatedly(Invoke([](quic::QuicStream*, quic::QuicStreamId, size_t write_length,
+                                  quic::QuicStreamOffset, quic::StreamSendingState) {
+          return quic::QuicConsumedData{write_length, true};
+        }));
+    EXPECT_CALL(writer_, WritePacket(_, _, _, _, _))
+        .WillRepeatedly(Invoke([](const char*, size_t buf_len, const quic::QuicIpAddress&,
+                                  const quic::QuicSocketAddress&, quic::PerPacketOptions*) {
+          return quic::WriteResult{quic::WRITE_STATUS_OK, static_cast<int>(buf_len)};
+        }));
   }
 
   void SetUp() override {
@@ -118,7 +122,8 @@ public:
     request_headers_.OnHeader(":authority", host_);
     request_headers_.OnHeader(":method", "GET");
     request_headers_.OnHeader(":path", "/");
-    request_headers_.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0, /*compressed_header_bytes=*/0);
+    request_headers_.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0,
+                                      /*compressed_header_bytes=*/0);
 
     trailers_.OnHeaderBlockStart();
     trailers_.OnHeader("key1", "value1");
@@ -130,7 +135,7 @@ public:
   }
 
   void TearDown() override {
-     if (quic_connection_->connected()) {
+    if (quic_connection_->connected()) {
       quic_session_.close(Network::ConnectionCloseType::NoFlush);
     }
   }
@@ -172,7 +177,8 @@ TEST_P(EnvoyQuicServerStreamTest, PostRequestAndResponse) {
   if (quic_version_.transport_version == quic::QUIC_VERSION_99) {
     quic_stream_->OnHeadersDecoded(request_headers_);
   } else {
-    quic_stream_->OnStreamHeaderList(/*fin=*/false, request_headers_.uncompressed_header_bytes(), request_headers_);
+    quic_stream_->OnStreamHeaderList(/*fin=*/false, request_headers_.uncompressed_header_bytes(),
+                                     request_headers_);
   }
   EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
 
@@ -204,7 +210,8 @@ TEST_P(EnvoyQuicServerStreamTest, DecodeHeadersBodyAndTrailers) {
         EXPECT_EQ(Http::Headers::get().MethodValues.Get,
                   headers->Method()->value().getStringView());
       }));
-  quic_stream_->OnStreamHeaderList(/*fin=*/false, request_headers_.uncompressed_header_bytes(), request_headers_);
+  quic_stream_->OnStreamHeaderList(/*fin=*/false, request_headers_.uncompressed_header_bytes(),
+                                   request_headers_);
   EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
 
   std::string data = request_body_;
@@ -239,7 +246,7 @@ TEST_P(EnvoyQuicServerStreamTest, DecodeHeadersBodyAndTrailers) {
         EXPECT_EQ(nullptr, headers->get(key2));
       }));
   quic_stream_->OnStreamHeaderList(/*fin=*/true, trailers_.uncompressed_header_bytes(), trailers_);
-        EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
+  EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }
 
 TEST_P(EnvoyQuicServerStreamTest, OutOfOrderTrailers) {
@@ -254,7 +261,8 @@ TEST_P(EnvoyQuicServerStreamTest, OutOfOrderTrailers) {
         EXPECT_EQ(Http::Headers::get().MethodValues.Get,
                   headers->Method()->value().getStringView());
       }));
-  quic_stream_->OnStreamHeaderList(/*fin=*/false, request_headers_.uncompressed_header_bytes(), request_headers_);
+  quic_stream_->OnStreamHeaderList(/*fin=*/false, request_headers_.uncompressed_header_bytes(),
+                                   request_headers_);
   EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
 
   // Trailer should be delivered to HCM later after body arrives.
@@ -304,7 +312,8 @@ TEST_P(EnvoyQuicServerStreamTest, WatermarkSendBuffer) {
   if (quic_version_.transport_version == quic::QUIC_VERSION_99) {
     quic_stream_->OnHeadersDecoded(request_headers_);
   } else {
-    quic_stream_->OnStreamHeaderList(/*fin=*/false, request_headers_.uncompressed_header_bytes(), request_headers_);
+    quic_stream_->OnStreamHeaderList(/*fin=*/false, request_headers_.uncompressed_header_bytes(),
+                                     request_headers_);
   }
   EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
 
@@ -325,7 +334,7 @@ TEST_P(EnvoyQuicServerStreamTest, WatermarkSendBuffer) {
   quic::QuicStreamFrame frame(stream_id_, true, 0, data);
   quic_stream_->OnStreamFrame(frame);
 
-  response_headers_.addCopy(":content-length", "32770");  // 32KB + 2 byte
+  response_headers_.addCopy(":content-length", "32770"); // 32KB + 2 byte
   quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/false);
   // encode 32kB response body. first 16KB shoudl be written out right away. The
   // rest should be buffered. The high watermark is 16KB, so this call should
@@ -339,37 +348,38 @@ TEST_P(EnvoyQuicServerStreamTest, WatermarkSendBuffer) {
   EXPECT_TRUE(quic_stream_->flow_controller()->IsBlocked());
   // Bump connection flow control window large enough not to cause connection
   // level flow control blocked.
-  quic::QuicWindowUpdateFrame window_update(quic::kInvalidControlFrameId,  quic::QuicUtils::GetInvalidStreamId(quic_version_.transport_version),
-                                       1024 * 1024);
+  quic::QuicWindowUpdateFrame window_update(
+      quic::kInvalidControlFrameId,
+      quic::QuicUtils::GetInvalidStreamId(quic_version_.transport_version), 1024 * 1024);
   quic_session_.OnWindowUpdateFrame(window_update);
 
   // Receive a WINDOW_UPDATE frame not large enough to drain half of the send
   // buffer.
   quic::QuicWindowUpdateFrame window_update1(quic::kInvalidControlFrameId, quic_stream_->id(),
-                                       16 * 1024 + 8 * 1024);
+                                             16 * 1024 + 8 * 1024);
   quic_stream_->OnWindowUpdateFrame(window_update1);
-   EXPECT_FALSE(quic_stream_->flow_controller()->IsBlocked());
-   quic_session_.OnCanWrite();
-     EXPECT_TRUE(quic_stream_->flow_controller()->IsBlocked());
+  EXPECT_FALSE(quic_stream_->flow_controller()->IsBlocked());
+  quic_session_.OnCanWrite();
+  EXPECT_TRUE(quic_stream_->flow_controller()->IsBlocked());
 
   // Receive another WINDOW_UPDATE frame to drain the send buffer till below low
   // watermark.
   quic::QuicWindowUpdateFrame window_update2(quic::kInvalidControlFrameId, quic_stream_->id(),
-                                      16 * 1024 + 8 *1024 + 1024);
+                                             16 * 1024 + 8 * 1024 + 1024);
   quic_stream_->OnWindowUpdateFrame(window_update2);
-   EXPECT_FALSE(quic_stream_->flow_controller()->IsBlocked());
- EXPECT_CALL(stream_callbacks_, onBelowWriteBufferLowWatermark()).WillOnce(Invoke([this](){
-   std::string rest_response(1, 'a');
-   Buffer::OwnedImpl buffer(rest_response);
-   quic_stream_->encodeData(buffer, true);
- }));
-   quic_session_.OnCanWrite();
-     EXPECT_TRUE(quic_stream_->flow_controller()->IsBlocked());
+  EXPECT_FALSE(quic_stream_->flow_controller()->IsBlocked());
+  EXPECT_CALL(stream_callbacks_, onBelowWriteBufferLowWatermark()).WillOnce(Invoke([this]() {
+    std::string rest_response(1, 'a');
+    Buffer::OwnedImpl buffer(rest_response);
+    quic_stream_->encodeData(buffer, true);
+  }));
+  quic_session_.OnCanWrite();
+  EXPECT_TRUE(quic_stream_->flow_controller()->IsBlocked());
 
-      quic::QuicWindowUpdateFrame window_update3(quic::kInvalidControlFrameId, quic_stream_->id(),
-                                       32 * 1024 + 1024);
+  quic::QuicWindowUpdateFrame window_update3(quic::kInvalidControlFrameId, quic_stream_->id(),
+                                             32 * 1024 + 1024);
   quic_stream_->OnWindowUpdateFrame(window_update3);
-   quic_session_.OnCanWrite();
+  quic_session_.OnCanWrite();
 
   EXPECT_TRUE(quic_stream_->local_end_stream_);
   EXPECT_TRUE(quic_stream_->write_side_closed());

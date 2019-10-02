@@ -31,7 +31,7 @@ public:
 
   // Http::Stream
   void resetStream(Http::StreamResetReason reason) override;
-   // EnvoyQuicStream
+  // EnvoyQuicStream
   void switchStreamBlockState(bool should_block) override;
   // quic::QuicSpdyStream
   void OnBodyAvailable() override;

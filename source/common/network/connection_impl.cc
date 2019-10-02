@@ -20,6 +20,7 @@
 #include "common/network/listen_socket_impl.h"
 #include "common/network/raw_buffer_socket.h"
 #include "common/network/utility.h"
+
 #include "server/backtrace.h"
 
 namespace Envoy {
@@ -451,7 +452,7 @@ void ConnectionImpl::onLowWatermark() {
 }
 
 void ConnectionImpl::onHighWatermark() {
-   Envoy::BackwardsTrace t;
+  Envoy::BackwardsTrace t;
   t.capture();
   std::ostringstream os;
   t.printTrace(os);

@@ -25,13 +25,13 @@ namespace Quic {
 
 class CodecClientCallbacksForTest : public Http::CodecClientCallbacks {
 public:
-   void onStreamDestroy() override {}
-  
-   void onStreamReset(Http::StreamResetReason reason) override {
-     last_stream_reset_reason_ = reason;
-   }
+  void onStreamDestroy() override {}
 
-   Http::StreamResetReason last_stream_reset_reason_{Http::StreamResetReason::LocalReset};
+  void onStreamReset(Http::StreamResetReason reason) override {
+    last_stream_reset_reason_ = reason;
+  }
+
+  Http::StreamResetReason last_stream_reset_reason_{Http::StreamResetReason::LocalReset};
 };
 
 class QuicHttpIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
@@ -43,7 +43,7 @@ public:
         supported_versions_(quic::CurrentSupportedVersions()),
         crypto_config_(std::make_unique<EnvoyQuicFakeProofVerifier>()), conn_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *conn_helper_.GetClock()) {
-     // quic::SetVerbosityLogThreshold(1);
+    // quic::SetVerbosityLogThreshold(1);
   }
 
   Network::ClientConnectionPtr makeClientConnection(uint32_t port) override {
@@ -59,7 +59,6 @@ public:
         &push_promise_index_, *dispatcher_, 0);
     return session;
   }
-
 
   IntegrationCodecClientPtr makeRawHttpConnection(Network::ClientConnectionPtr&& conn) override {
     IntegrationCodecClientPtr codec = HttpIntegrationTest::makeRawHttpConnection(std::move(conn));
@@ -90,8 +89,8 @@ public:
         [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
                hcm) {
           hcm.mutable_delayed_close_timeout()->set_nanos(0);
-        EXPECT_EQ(hcm.codec_type(),
-                  envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::HTTP3);
+          EXPECT_EQ(hcm.codec_type(), envoy::config::filter::network::http_connection_manager::v2::
+                                          HttpConnectionManager::HTTP3);
         });
 
     HttpIntegrationTest::initialize();
@@ -118,8 +117,10 @@ TEST_P(QuicHttpIntegrationTest, GetRequestAndEmptyResponse) {
 }
 
 TEST_P(QuicHttpIntegrationTest, GetRequestAndResponseWithBody) {
-    initialize();
-         sendRequestAndVerifyResponse(default_request_headers_, /*request_size=*/0, default_response_headers_, /*response_size=*/1024, /*backend_index*/0);
+  initialize();
+  sendRequestAndVerifyResponse(default_request_headers_, /*request_size=*/0,
+                               default_response_headers_, /*response_size=*/1024,
+                               /*backend_index*/ 0);
 }
 
 TEST_P(QuicHttpIntegrationTest, PostRequestAndResponseWithBody) {
@@ -157,7 +158,6 @@ TEST_P(QuicHttpIntegrationTest, UpstreamFlowControlOnGiantResponseBody) {
   config_helper_.setBufferLimits(/*upstream_buffer_limit=*/1024, /*downstream_buffer_limit=*/1024);
   testRouterRequestAndResponseWithBody(/*request_size=*/512, /*response_size=*/1024 * 1024, false);
 }
-
 
 TEST_P(QuicHttpIntegrationTest, DownstreamFlowControlOnGiantPost) {
   config_helper_.setBufferLimits(/*upstream_buffer_limit=*/1024, /*downstream_buffer_limit=*/1024);
