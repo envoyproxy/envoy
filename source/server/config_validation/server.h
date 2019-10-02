@@ -96,7 +96,7 @@ public:
   Http::Context& httpContext() override { return http_context_; }
   ProcessContext& processContext() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
-  const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
+  const LocalInfo::LocalInfo& localInfo() const override { return *local_info_; }
   TimeSource& timeSource() override { return api_->timeSource(); }
   Envoy::MutexTracer* mutexTracer() override { return mutex_tracer_; }
 

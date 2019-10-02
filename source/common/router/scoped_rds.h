@@ -168,6 +168,11 @@ private:
   absl::flat_hash_map<uint64_t, std::string> scope_name_by_hash_;
   // For creating RDS subscriptions.
   Server::Configuration::FactoryContext& factory_context_;
+  // Init::ManagerImpl init_manager;
+
+  // For notifying parent init manager
+  // Init::TargetImpl init_target;
+
   const std::string name_;
   std::unique_ptr<Envoy::Config::Subscription> subscription_;
   const envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::ScopeKeyBuilder

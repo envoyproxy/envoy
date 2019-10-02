@@ -207,7 +207,7 @@ public:
   /**
    * @return information about the local environment the server is running in.
    */
-  virtual const LocalInfo::LocalInfo& localInfo() PURE;
+  virtual const LocalInfo::LocalInfo& localInfo() const PURE;
 
   /**
    * @return the time source used for the server.

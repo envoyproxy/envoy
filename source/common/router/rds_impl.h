@@ -140,7 +140,8 @@ private:
   std::unique_ptr<Envoy::Config::Subscription> subscription_;
   const std::string route_config_name_;
   Server::Configuration::FactoryContext& factory_context_;
-  Init::TargetImpl init_target_;
+  // Server::Configuration::ServerFactoryContext& get_factory_context_;
+  Init::SharedTargetImpl init_target_;
   Stats::ScopePtr scope_;
   std::string stat_prefix_;
   RdsStats stats_;
@@ -178,6 +179,10 @@ public:
   SystemTime lastUpdated() const override { return config_update_info_->lastUpdated(); }
   void onConfigUpdate() override;
   void validateConfig(const envoy::api::v2::RouteConfiguration& config) const override;
+
+  Server::Configuration::ServerFactoryContext& getServerFactoryContext() {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
 
 private:
   struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {

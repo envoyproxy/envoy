@@ -146,7 +146,8 @@ private:
  */
 class InstanceImpl : Logger::Loggable<Logger::Id::main>,
                      public Instance,
-                     public ServerLifecycleNotifier {
+                     public ServerLifecycleNotifier,
+                     public Configuration::ServerFactoryContext {
 public:
   /**
    * @throw EnvoyException if initialization fails.
@@ -196,9 +197,14 @@ public:
   Http::Context& httpContext() override { return http_context_; }
   ProcessContext& processContext() override { return *process_context_; }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
-  const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
+  const LocalInfo::LocalInfo& localInfo() const override { return *local_info_; }
   TimeSource& timeSource() override { return time_source_; }
 
+  // TODO(lambdai): implement it
+  Stats::Scope& scope() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
   std::chrono::milliseconds statsFlushInterval() const override {
     return config_.statsFlushInterval();
   }
