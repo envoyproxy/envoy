@@ -87,7 +87,8 @@ void EnvoyQuicClientStream::resetStream(Http::StreamResetReason reason) {
 }
 
 void EnvoyQuicClientStream::switchStreamBlockState(bool should_block) {
-  ASSERT(FinishedReadingHeaders(), "codec buffer limit is reached before response body is delivered.");
+  ASSERT(FinishedReadingHeaders(),
+         "codec buffer limit is reached before response body is delivered.");
   if (should_block) {
     sequencer()->SetBlockedUntilFlush();
   } else {

@@ -193,7 +193,7 @@ AssertionResult FakeStream::waitForEndStream(Event::Dispatcher& client_dispatche
 }
 
 AssertionResult FakeStream::waitForReset(milliseconds timeout) {
-    ENVOY_LOG(trace, "============== FakeStream waiting for reset");
+  ENVOY_LOG(trace, "============== FakeStream waiting for reset");
   Thread::LockGuard lock(lock_);
   auto start_time = time_system_.monotonicTime();
   while (!saw_reset_) {

@@ -577,10 +577,10 @@ void HttpIntegrationTest::testRouterUpstreamResponseBeforeRequestComplete() {
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-   std::cerr << "=============== encodeHeaders\n";
+  std::cerr << "=============== encodeHeaders\n";
 
   upstream_request_->encodeHeaders(default_response_headers_, false);
-   std::cerr << "=============== encodeData\n";
+  std::cerr << "=============== encodeData\n";
 
   upstream_request_->encodeData(512, true);
   std::cerr << "=============== waitForEndStream\n";

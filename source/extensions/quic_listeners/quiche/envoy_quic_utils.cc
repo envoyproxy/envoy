@@ -86,16 +86,16 @@ quic::QuicRstStreamErrorCode envoyResetReasonToQuicRstError(Http::StreamResetRea
   case Http::StreamResetReason::ConnectionTermination:
     return quic::QUIC_STREAM_NO_ERROR;
   default:
-    return quic:: QUIC_BAD_APPLICATION_PAYLOAD;
+    return quic::QUIC_BAD_APPLICATION_PAYLOAD;
   }
 }
 
 Http::StreamResetReason quicRstErrorToEnvoyResetReason(quic::QuicRstStreamErrorCode rst_err) {
   switch (rst_err) {
-    case quic::QUIC_REFUSED_STREAM:
-      return Http::StreamResetReason::RemoteRefusedStreamReset;
-    default:
-      return Http::StreamResetReason::RemoteReset;
+  case quic::QUIC_REFUSED_STREAM:
+    return Http::StreamResetReason::RemoteRefusedStreamReset;
+  default:
+    return Http::StreamResetReason::RemoteReset;
   }
 }
 

@@ -8,7 +8,7 @@ namespace Quic {
 QuicFilterManagerConnectionImpl::QuicFilterManagerConnectionImpl(EnvoyQuicConnection& connection,
                                                                  Event::Dispatcher& dispatcher,
                                                                  uint32_t send_buffer_limit)
-    : quic_connection_(&connection),  dispatcher_(dispatcher), filter_manager_(*this),
+    : quic_connection_(&connection), dispatcher_(dispatcher), filter_manager_(*this),
       stream_info_(dispatcher.timeSource()),
       write_buffer_watermark_simulation_(
           send_buffer_limit / 2, send_buffer_limit, [this]() { onSendBufferLowWatermark(); },
@@ -38,7 +38,6 @@ bool QuicFilterManagerConnectionImpl::initializeReadFilters() {
 void QuicFilterManagerConnectionImpl::addConnectionCallbacks(Network::ConnectionCallbacks& cb) {
   network_connection_callbacks_.push_back(&cb);
 }
-
 
 void QuicFilterManagerConnectionImpl::enableHalfClose(bool enabled) {
   RELEASE_ASSERT(!enabled, "Quic connection doesn't support half close.");

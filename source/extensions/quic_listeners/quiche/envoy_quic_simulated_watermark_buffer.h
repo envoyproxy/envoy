@@ -22,7 +22,8 @@ public:
   void checkHighWatermark(uint32_t bytes_buffered) {
     if (high_watermark_ > 0 && !is_above_high_watermark_ && bytes_buffered > high_watermark_) {
       // Just exceeds high watermark.
-      std::cerr << "cross high watermark "  << high_watermark_ << " bytes_buffered " << bytes_buffered << "\n";
+      std::cerr << "cross high watermark " << high_watermark_ << " bytes_buffered "
+                << bytes_buffered << "\n";
       is_above_high_watermark_ = true;
       is_below_low_watermark_ = false;
       above_high_watermark_();
@@ -31,7 +32,8 @@ public:
 
   void checkLowWatermark(uint32_t bytes_buffered) {
     if (low_watermark_ > 0 && !is_below_low_watermark_ && bytes_buffered < low_watermark_) {
-        std::cerr << "cross low watermark "  << low_watermark_ << " bytes_buffered " << bytes_buffered << "\n";
+      std::cerr << "cross low watermark " << low_watermark_ << " bytes_buffered " << bytes_buffered
+                << "\n";
       // Just cross low watermark.
       is_below_low_watermark_ = true;
       is_above_high_watermark_ = false;
