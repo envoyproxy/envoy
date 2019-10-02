@@ -35,7 +35,7 @@ message PreviousVersion {
   }
   PreviousVersionNested nested_field = 11;
 
-  // Repeated entitites.
+  // Repeated entities.
   repeated string repeated_scalar_field = 12;
   repeated PreviousVersionNested repeated_nested_field = 13;
 
@@ -63,7 +63,7 @@ message NextVersion {
   }
   NextVersionNested nested_field = 11;
 
-  // Repeated entitites.
+  // Repeated entities.
   repeated string repeated_scalar_field = 12;
   repeated NextVersionNested repeated_nested_field = 13;
 

@@ -62,7 +62,7 @@ TEST(VersionConverterTest, All) {
   EXPECT_THAT(previous_version.nested_field().any_field(),
               ProtoEq(next_version.nested_field().any_field()));
 
-  // Repeated entitites.
+  // Repeated entities.
   EXPECT_EQ(previous_version.repeated_scalar_field().size(),
             next_version.repeated_scalar_field().size());
   for (int n = 0; n < previous_version.repeated_scalar_field().size(); ++n) {
