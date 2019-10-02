@@ -1355,6 +1355,49 @@ TEST_F(RouteMatcherTest, TestAddRemoveResponseHeadersAppendFalseReverse) {
               ContainerEq(config.internalOnlyHeaders()));
 }
 
+TEST_F(RouteMatcherTest, TestAddGlobalResponseHeaderRemoveFromRoute) {
+  const std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: www2
+    domains: ["www.lyft.com"]
+    reverse_header_evaluation_order: true
+    routes:
+      - match:
+          prefix: "/cacheable"
+        route:
+          cluster: www2
+        response_headers_to_remove: ["cache-control"]
+      - match:
+          prefix: "/"
+        route:
+          cluster: "www2"
+response_headers_to_add:
+  - header:
+      key: cache-control
+      value: private
+)EOF";
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
+
+  {
+    Http::TestHeaderMapImpl req_headers = genHeaders("www.lyft.com", "/cacheable", "GET");
+    const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
+    Http::TestHeaderMapImpl headers;
+    route->finalizeResponseHeaders(headers, stream_info);
+    EXPECT_FALSE(headers.has("cache-control"));
+  }
+
+  {
+    Http::TestHeaderMapImpl req_headers = genHeaders("www.lyft.com", "/foo", "GET");
+    const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
+    Http::TestHeaderMapImpl headers;
+    route->finalizeResponseHeaders(headers, stream_info);
+    EXPECT_EQ("private", headers.get_("cache-control"));
+  }
+}
+
 // Validate that we can't add :-prefixed request headers.
 TEST_F(RouteMatcherTest, TestRequestHeadersToAddNoPseudoHeader) {
   for (const std::string& header : {":path", ":authority", ":method", ":scheme", ":status",
