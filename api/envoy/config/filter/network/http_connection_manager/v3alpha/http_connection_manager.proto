@@ -129,8 +129,6 @@ message HttpConnectionManager {
     // truncate lengthy request paths to meet the needs of a tracing backend.
     // Default: 256
     google.protobuf.UInt32Value max_path_tag_length = 7;
-
-    google.protobuf.Any _api_internal_do_not_use = 8;
   }
 
   message InternalAddressConfig {

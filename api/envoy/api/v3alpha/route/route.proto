@@ -395,8 +395,6 @@ message RouteMatch {
   // that the content-type header has a application/grpc or one of the various
   // application/grpc+ values.
   GrpcRouteMatchOptions grpc = 8;
-
-  google.protobuf.Any _api_internal_do_not_use = 11;
 }
 
 // [#comment:next free field: 11]
@@ -448,8 +446,6 @@ message CorsPolicy {
   //   This field defaults to 100/:ref:`HUNDRED
   //   <envoy_api_enum_type.FractionalPercent.DenominatorType>`.
   core.RuntimeFractionalPercent shadow_enabled = 10;
-
-  google.protobuf.Any _api_internal_do_not_use = 12;
 }
 
 // [#comment:next free field: 30]
@@ -505,8 +501,6 @@ message RouteAction {
     //   HUNDRED. This is behaviour is different to that of the deprecated `runtime_key` field,
     //   where the implicit denominator is 10000.
     core.RuntimeFractionalPercent runtime_fraction = 3;
-
-    google.protobuf.Any _api_internal_do_not_use = 4;
   }
 
   // Specifies the route's hashing policy if the upstream cluster uses a hashing :ref:`load balancer
@@ -1066,8 +1060,6 @@ message VirtualCluster {
   // as the virtual host name are used when emitting statistics. The statistics are emitted by the
   // router filter and are documented :ref:`here <config_http_filters_router_stats>`.
   string name = 2 [(validate.rules).string = {min_bytes: 1}];
-
-  google.protobuf.Any _api_internal_do_not_use = 5;
 }
 
 // Global rate limiting :ref:`architecture overview <arch_overview_rate_limit>`.
@@ -1287,8 +1279,6 @@ message HeaderMatcher {
   // * The regex ``\d{3}`` does not match the value *1234*, so it will match when inverted.
   // * The range [-10,0) will match the value -1, so it will not match when inverted.
   bool invert_match = 8;
-
-  google.protobuf.Any _api_internal_do_not_use = 12;
 }
 
 // Query parameter matching treats the query string of a request's :path header
@@ -1309,6 +1299,4 @@ message QueryParameterMatcher {
     // Specifies whether a query parameter should be present.
     bool present_match = 6;
   }
-
-  google.protobuf.Any _api_internal_do_not_use = 7;
 }

@@ -12,8 +12,6 @@ import "envoy/api/v3alpha/core/http_uri.proto";
 import "envoy/type/http_status.proto";
 import "envoy/type/matcher/string.proto";
 
-import "google/protobuf/any.proto";
-
 import "validate/validate.proto";
 
 // [#protodoc-title: External Authorization]
@@ -81,8 +79,6 @@ message ExtAuthz {
   //    - envoy.filters.http.jwt_authn
   //
   repeated string metadata_context_namespaces = 8;
-
-  google.protobuf.Any _api_internal_do_not_use = 9;
 }
 
 // Configuration for buffering the request data.
